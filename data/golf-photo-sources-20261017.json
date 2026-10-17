@@ -1,0 +1,522 @@
+[
+  {
+    "id": 1119,
+    "name": "The Overlander Golf & Event Centre",
+    "file": "/images/venues/overlander-golf-event-centre-2610.jpg",
+    "dimensions": "1440x720",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x537e7d8d8ba1bd93:0x15100cf4b0b30524",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdv0SMge4aH-QbOU_PLtA5H4-4OObfEsryoJhdEBoOqmkBrDJuO7iCufZgB_WWSNaXMEUPWl-ttD2kSfWvsCzNy6opQqFav7-UdHEMr1y1o9HE7t0syPw-3Cltnz-BjmB9MwKOo=w2400",
+    "source_kind": "google_maps",
+    "note": "Sunset over a fairway and reflecting pond, mountain and treeline behind"
+  },
+  {
+    "id": 1097,
+    "name": "Mabel Lake Golf & Country Club",
+    "file": "/images/venues/mabel-lake-golf-country-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://mabellakegolf.com/",
+    "image_url": "https://mabellakegolf.com/wp-content/uploads/2026/09/MLR-GK-17-O.jpeg",
+    "source_kind": "official_website",
+    "note": "Aerial of a fairway with fountain pond and clubhouse, Mabel Lake and mountains behind"
+  },
+  {
+    "id": 1113,
+    "name": "St. Andrews by the Lake Golf Resort",
+    "file": "/images/venues/st-andrews-by-the-lake-golf-resort-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482f2da0d91a6f5:0xe984d111efcbe7ea",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeYI0pMnPPeh1wLbv6Mlv1htuf2NTUfJ6yJSORkYkaTy4gB0bZ3xnPtaIahTo8NQKUP12v3oXB2G_TG-aBl3d83wPNiC4Nvof47hc9Xc5DE2TwlvEh4ZIJb7PJjNAWBeQq4tsnAZ6RT2QE=w2400",
+    "source_kind": "google_maps",
+    "note": "Pond on the course ringed by willows and fairway turf, forested hills behind; fountain and dock in view"
+  },
+  {
+    "id": 1102,
+    "name": "Twin Lakes Golf Course and RV Park",
+    "file": "/images/venues/twin-lakes-golf-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://twinlakesgolfresort.com/",
+    "image_url": "https://twinlakesgolfresort.com/wp-content/uploads/sites/248/2026/03/Twin-Lakes-GolfRV-Hero-01.webp",
+    "source_kind": "official_website",
+    "note": "Elevated view down a striped fairway lined with pines toward the green, canyon hillsides behind"
+  },
+  {
+    "id": 1125,
+    "name": "Anytime Sim Golf",
+    "file": "/images/venues/anytime-sim-golf-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.facebook.com/photo/?fbid=820366904098572&set=a.121469080655028",
+    "image_url": "https://scontent-sea5-1.xx.fbcdn.net/v/t39.30808-6/580138196_820366910765238_4863477803530980864_n.jpg?stp=dst-jpg_tt6&cstp=mx2048x1366&ctp=s2048x1366&_nc_cat=107&ccb=1-7&_nc_sid=cc71e4&_nc_ohc=ayy_dpk-bSUQ7kNvwHMBvYH&_nc_oc=AdqXor0O3PcBq4Bi5HB1g3uUnsciAbnTBQM1CFiOSnlyeyygTpg1BFCkksomqP1Z6WQ&_nc_zt=23&_nc_ht=scontent-sea5-1.xx&_nc_gid=5r8s8E4lAl3A2FTWRdlBeQ&_nc_ss=792a8&oh=00_AQNqhjyWNm5tKkSGaR1iHoGhdfN2S9ZH6V4KsXXCaAbP3w&oe=6AD98922",
+    "source_kind": "facebook",
+    "note": "Row of simulator bays: big screen with a fairway over turf hitting mats, bay corridor and a putting area (same scene as the owner photo on Google Maps)"
+  },
+  {
+    "id": 1089,
+    "name": "Black Mountain Golf Club",
+    "file": "/images/venues/black-mountain-golf-club-2610.jpg",
+    "dimensions": "1200x600",
+    "source_page": "https://blackmountaingolf.ca/about-us/gallery/",
+    "image_url": "https://blackmountaingolf.ca/wp-content/uploads/2021/04/Black-Mountain-Golf-Course-Signature-Island-Green-2.jpg",
+    "source_kind": "official_website",
+    "note": "Signature island green with stone bridge and pond, fairways, pines and the valley and hills behind"
+  },
+  {
+    "id": 1084,
+    "name": "Gallagher's Canyon Golf & Country Club — Canyon Course",
+    "file": "/images/venues/gallaghers-canyon-canyon-course-2610.jpg",
+    "dimensions": "1200x600",
+    "source_page": "https://gallagherscanyon.com/about/gallery/category/golf",
+    "image_url": "https://gallagherscanyon.com/images/courses/gallaghers_canyon/photos/golf/gc_5a.jpg",
+    "source_kind": "official_website",
+    "note": "Canyon Course fairway with bunkers framed by ponderosa pines, valley and hillside neighbourhoods behind"
+  },
+  {
+    "id": 1085,
+    "name": "Gallagher's Canyon Golf & Country Club — Pinnacle Course",
+    "file": "/images/venues/gallaghers-canyon-pinnacle-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/The+Pinnacle+Course+at+Gallagher's+Canyon/data=!4m2!3m1!1s0x537d8c360aec5789:0xd58e885ea9b6cda6",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfvy-7PoqNUhaTWijGv38SIFmqYoIyQ5Ru7IPEWHH9e_JLIAOR83Ne9llFll6eMRKyY3Jg1oPEaBrohsKNREF6DDEyh8mskxDZIWuMTa-Q2GxuMB7FDsyN6JxhfVW4TTpGrP2Gd=w2400",
+    "source_kind": "google_maps",
+    "note": "Green and pond with autumn-coloured homes and the Gallagher's Canyon rock cliff behind (photo from the Pinnacle Course Maps listing)"
+  },
+  {
+    "id": 1123,
+    "name": "Golf Evolution",
+    "file": "/images/venues/golf-evolution-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://golfevolutionkelowna.ca/",
+    "image_url": "https://golfevolutionkelowna.ca/wp-content/uploads/2025/10/41788568-4D96-4CCA-929C-B7C8E71E1501-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Lounge interior with two golf simulator bays showing courses at the back, bar along the left"
+  },
+  {
+    "id": 1127,
+    "name": "JSquared Golf",
+    "file": "/images/venues/jsquared-golf-2610.jpg",
+    "dimensions": "1440x720",
+    "source_page": "https://www.facebook.com/photo.php?fbid=890579322629211",
+    "image_url": "https://scontent-sea5-1.xx.fbcdn.net/v/t39.30808-6/487503369_1260445392309267_4798487040059656513_n.jpg?stp=dst-jpg_tt6&cstp=mx1440x1259&ctp=s1440x1259&_nc_cat=110&ccb=1-7&_nc_sid=127cfc&_nc_ohc=qdGAz-guNyUQ7kNvwHxp2kx&_nc_oc=AdpyHDXiX49ZtVmV9qTpCLybX4Jp56D6VoGY9MkSqygaqb-IFi41PdSntifm2hYGvl8&_nc_zt=23&_nc_ht=scontent-sea5-1.xx&_nc_gid=xPryI3M1hiFRGwSlXy2goA&_nc_ss=792a8&oh=00_AQOdt6LKnCcQWlD7aPQMnfUVd_zIuP0UerdOM_6Mh2_2LQ&oe=6AD99DDB",
+    "source_kind": "facebook",
+    "note": "JSquared's Foresight simulator bay inside the Gallagher's Canyon clubhouse: screen, turf mat and nets"
+  },
+  {
+    "id": 1440,
+    "name": "Kelowna Driving Range & Mini Golf",
+    "file": "/images/venues/kelowna-driving-range-mini-golf-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.kelownadrivingrange.com/",
+    "image_url": "https://static.wixstatic.com/media/534670_437fd8fa6dcc4e53b6ea56d4ff89f67b~mv2.jpeg",
+    "source_kind": "official_website",
+    "note": "Tee mats with ball pyramids looking out over the grass driving range, treeline and hills behind"
+  },
+  {
+    "id": 1086,
+    "name": "Kelowna Golf & Country Club",
+    "file": "/images/venues/kelowna-golf-country-club-2610.jpg",
+    "dimensions": "1232x616",
+    "source_page": "https://kelownagolfandcountryclub.com/",
+    "image_url": "https://kelownagolfandcountryclub.com/getmedia/d95380ef-838b-462b-9a52-72f7c235cc37/wv-PiJHg.aspx?width=1980&height=616&ext=.jpeg",
+    "source_kind": "official_website",
+    "note": "Green with bunker beside a stone-edged pond and bridge, pine-lined fairways and mountains behind"
+  },
+  {
+    "id": 1095,
+    "name": "Kelowna Springs Golf Club",
+    "file": "/images/venues/kelowna-springs-golf-club-2610.jpg",
+    "dimensions": "1743x871",
+    "source_page": "https://kelownasprings.com/",
+    "image_url": "https://kelownasprings.com/assets/uielementalpageheader/BCGMA_KelownaSprings_GolfKelowna_0757.jpg",
+    "source_kind": "official_website",
+    "note": "Aerial of a stone-walled island green with bunkers, willow-lined fairways and valley hills behind"
+  },
+  {
+    "id": 1088,
+    "name": "Michaelbrook Golf Course",
+    "file": "/images/venues/michaelbrook-golf-course-2610.jpg",
+    "dimensions": "1200x600",
+    "source_page": "https://michaelbrook.ca/",
+    "image_url": "https://www.michaelbrook.ca/wp-content/uploads/2025/10/mb-social-default.webp",
+    "source_kind": "official_website",
+    "note": "Aerial of tree-lined fairways and a pond, Okanagan Lake and hills on the horizon"
+  },
+  {
+    "id": 1093,
+    "name": "Mission Creek Golf Club",
+    "file": "/images/venues/mission-creek-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://missioncreekgolfclub.com/gallery.html",
+    "image_url": "https://www.missioncreekgolfclub.com/assets/image-cache/uploads/assets/galleries/4/3_IMG_3690.f40ccd46.jpg",
+    "source_kind": "official_website",
+    "note": "Fairway lined with big weeping willows, reedy pond in the foreground"
+  },
+  {
+    "id": 1126,
+    "name": "Okanagan Virtual Golf",
+    "file": "/images/venues/okanagan-virtual-golf-2610.jpg",
+    "dimensions": "1536x768",
+    "source_page": "https://ovgkelowna.com/",
+    "image_url": "https://ovgkelowna.com/uploads/b/a6e8150716b9c148ed8610e6e4479fd0cf90e7ff824f69aacc4b57a119238c08/d91c58b1-c53d-4f81-a25b-6580985fea51_1776259041.jpg",
+    "source_kind": "official_website",
+    "note": "Interior: simulator bays with golf course on screen beside the curved bar and stools"
+  },
+  {
+    "id": 1104,
+    "name": "Orchard Greens Golf Club",
+    "file": "/images/venues/orchard-greens-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/Kelowna+Golf+Course+-+Orchard+Greens+Golf+Club/data=!4m2!3m1!1s0x537d8c8cc21c8791:0x64502917c80e3295",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLekQeCNH8H8RbBqfSPgTzQY2Drs_SRgMsliGjTx7ur_lLf35NzcUHkqAmANl5iB_SjGN0ZZrOaAj2yj_NgmC_Wx12jXgcE92o4-3yvmMwayO48DiQT9191fGp9RX9YXcPh8BtE-6w=w2400",
+    "source_kind": "google_maps",
+    "note": "Rolling fairway and green with fruit trees and golfers behind, Okanagan hills on the horizon"
+  },
+  {
+    "id": 1094,
+    "name": "Shadow Ridge Golf Club",
+    "file": "/images/venues/shadow-ridge-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://shadowridgekelowna.com/",
+    "image_url": "https://www.shadowridgekelowna.com/wp-content/uploads/2026/02/shadowridge-front-01-scaled.webp",
+    "source_kind": "official_website",
+    "note": "Aerial of a pond with footbridge between fairways, weeping willows and evening shadows"
+  },
+  {
+    "id": 1124,
+    "name": "Simplex Sportszone",
+    "file": "/images/venues/simplex-sportszone-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x537df32b329b1929:0xb4e8b1a29e9f8373",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfYWNzRK9JKa4lo_ewsxRuhJMBBWnfpnufqbLzk4bdIk9S6mPGIXRq__vrTMZFzFEXP_NRAVZs_sD-d9SDD3zSX3Mq4OV-Li0SMnicy8Y4GLxlByVt3At4ZxtxorL3B3TEQIfedw5fgLgkh=w2400",
+    "source_kind": "google_maps",
+    "note": "Interior of a Trackman simulator bay: big screen, turf hitting area, club rack and high-top tables"
+  },
+  {
+    "id": 1090,
+    "name": "Sunset Ranch Golf & Country Club",
+    "file": "/images/venues/sunset-ranch-golf-country-club-2610.jpg",
+    "dimensions": "1600x800",
+    "source_page": "https://sunsetranchbc.com/",
+    "image_url": "https://sunsetranchbc.com/wp-content/uploads/sites/280/2023/08/58138cb6-0e6c-4cfc-9ad1-4a04d8b0b5a5-1-1-jpg.webp",
+    "source_kind": "official_website",
+    "note": "Aerial of a fountain pond between pine-lined fairways, hills behind"
+  },
+  {
+    "id": 1128,
+    "name": "The Fringe Indoor Golf",
+    "file": "/images/venues/fringe-indoor-golf-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8bb44bbea805:0xfed5c10f3fad5258",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfqPyai3QGGvnWETLrQFHhefEChAz0pU7xg9pNlqWD5WQL8oWB8joW-infmj5ZeaUGGvp_Pkotc_ktzG_pxZ8bpCc590PqsWjRxclAbmDlUfBYAeyiZSUM4tpd00esTKNw5XzfRsPANzR5d=w2400",
+    "source_kind": "google_maps",
+    "note": "A simulator bay: big screen showing a fairway, turf hitting mat in a dark bay (alt: exterior with The Fringe Indoor Golf sign, raw c6)"
+  },
+  {
+    "id": 1103,
+    "name": "The Harvest Golf Club",
+    "file": "/images/venues/harvest-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://harvestgolf.com/",
+    "image_url": "https://www.harvestgolf.com/files/Harvest-0394-4.jpg",
+    "source_kind": "official_website",
+    "note": "Aerial of greens, ponds and bunkers among orchard trees, valley hills behind"
+  },
+  {
+    "id": 1091,
+    "name": "The Okanagan Golf Club — Bear Course",
+    "file": "/images/venues/okanagan-golf-club-bear-course-2610.jpg",
+    "dimensions": "1400x700",
+    "source_page": "https://www.google.com/maps/place/The+Okanagan+Golf+Club+-+Bear+and+Quail/data=!4m2!3m1!1s0x537ded9000daaf0d:0x65adf48f74ae89a3",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc5Ct9YhGc7lYUfeo3VOHOiRAspcAym5OyO5AAZrbtSmqupHY5ERh3V4E-8XS5WWSHbsIjUWl7TrQTvPLNnv-iprIFGdziotErvxlgTrJbF9f-CVQKaBTZ1nxO0GNo3RoZzAMe2=w2400",
+    "source_kind": "google_maps",
+    "note": "Golden-hour Bear Course fairway and bunkered green with valley and hills behind (same scene as the club's Bear Course header photos)"
+  },
+  {
+    "id": 1092,
+    "name": "The Okanagan Golf Club — Quail Course",
+    "file": "/images/venues/okanagan-golf-club-quail-course-2610.jpg",
+    "dimensions": "1406x703",
+    "source_page": "https://okanagangolfclub.com/golf_course/quail/6",
+    "image_url": "https://okanagangolfclub.com/images/courses/quail/photos/golf/ql_6c.jpg",
+    "source_kind": "official_website",
+    "note": "Quail hole 6: fairway winding through ponderosa pines with bunkers, hills and mountains behind"
+  },
+  {
+    "id": 1087,
+    "name": "Tower Ranch Golf & Country Club",
+    "file": "/images/venues/tower-ranch-golf-country-club-2610.jpg",
+    "dimensions": "1760x880",
+    "source_page": "https://golftowerranch.com/",
+    "image_url": "https://www.golftowerranch.com/wp-content/uploads/2019/03/TowerRanchGolfCountryClub.jpg",
+    "source_kind": "official_website",
+    "note": "Golden-hour fairway with bunkers below grassy hills and a forested knoll"
+  },
+  {
+    "id": 1096,
+    "name": "Coldstream Golf Course",
+    "file": "/images/venues/coldstream-golf-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/Coldstream+Golf+Course/data=!4m2!3m1!1s0x537dd10a3f7498cd:0xc71a9f6a9f9b80c6",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLecvYnMUq6A8Zbf_UyPMPObvdxAtkYQj-UoYw8e-COGMixGXMSZPVlUKa4gxn_Lvc1E9iD2taLU5pkQt75pwIBw7Cel-aDsnRlV4-rj3B1mJ7WPcWHdCS4N6uc-NfG61ppOxbDF=w2400",
+    "source_kind": "google_maps",
+    "note": "Heritage log barn clubhouse (OPEN sign) and small shed on the course lawn, hills behind"
+  },
+  {
+    "id": 1797,
+    "name": "Lumby Golf Club",
+    "file": "/images/venues/lumby-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd3caf3f7eb0f:0x34a21b7874a1bbbd",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeLPUFEEdK3-tplpWHTmT_2mD2H-lkXXSqSJ1F-wmFCQ-iQQr9JUHANfWte5tgOaTxy9O8EviyjXEraaJWd0GyqknWcLCsD4ZfVMXv6iwA7x94eSdmVIjZiOTPw1W2fP1KAXe1SxA=w2400",
+    "source_kind": "google_maps",
+    "note": "Open rolling fairway with a tee marker, scattered pines, forested hill and Lumby valley mountains behind (photo from the Maps listing of the disc golf course that shares the Lumby Golf Club grounds)"
+  },
+  {
+    "id": 1114,
+    "name": "Fairview Mountain Golf Club",
+    "file": "/images/venues/fairview-mountain-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x5482e9905f3b0f5d:0xda4f058261f428bf",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeX0f225SPYWsCfkLpLrqXFCwOPWFuUFnRMKvlCCklVjVw-eNpKexU_kh26XI7lvUk4HSARLp-BB8Vq9xqWfhzOIt9-IbtqUpDKAZWd9rTfJiDAhj8sU3bHpvQv2ldscX0TD6FEcA=w2400",
+    "source_kind": "google_maps",
+    "note": "Elevated view over greens and pine-lined fairways toward the Oliver valley mountains"
+  },
+  {
+    "id": 1115,
+    "name": "Nk'Mip Canyon Desert Golf Course",
+    "file": "/images/venues/nkmip-canyon-desert-golf-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/Nk'Mip+Canyon+Desert+Golf+Course/data=!4m2!3m1!1s0x5482ea54ccbc2fab:0xa54f0acd44c1c1af",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLenYbMNh1S6hta3jCfGcMmnPV7CdyN0FZXssD61dY566LIYvKXMePmQUqhRs6iSBdfst3iQcm5zSLCFst60JqmdDBEjO4yi6y2Pgqh2Ab9rs59sZLcQJT1xitU0A79ixwrywfba=w2400",
+    "source_kind": "google_maps",
+    "note": "Fairway and bunker with desert sage, vineyards and the rocky bluffs of the south Okanagan behind"
+  },
+  {
+    "id": 1101,
+    "name": "Osoyoos Golf Club — Desert Gold",
+    "file": "/images/venues/osoyoos-golf-club-desert-gold-2610.jpg",
+    "dimensions": "1620x810",
+    "source_page": "https://golfosoyoos.com/golf/",
+    "image_url": "https://golfosoyoos.com/wp-content/uploads/2025/05/E85A8559.jpg",
+    "source_kind": "official_website",
+    "note": "Desert-style fairways with bunkers framed by sagebrush and poplars, mountain behind"
+  },
+  {
+    "id": 1100,
+    "name": "Osoyoos Golf Club — Park Meadows",
+    "file": "/images/venues/osoyoos-golf-club-park-meadows-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x5482c50ffe9522fb:0xed80c4cd18ac37d8",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcgYTKwUCUJkm8N4KZrtMZTUMkeeRhvx_xKfyt2Y8KOS1wzF4VyFf8vLG3vECE_e5HTCteU4cOtRGbI2XNHRqAl821s2tl4UOAvLEJqPR_Ce0mohV-ekDQtegkExRndn3rhsZbK=w2400",
+    "source_kind": "google_maps",
+    "note": "Parkland tee box and tree-lined fairways near the clubhouse, Osoyoos Lake and mountains behind"
+  },
+  {
+    "id": 1672,
+    "name": "Rattlesnake Canyon",
+    "file": "/images/venues/rattlesnake-canyon-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/Rattlesnake+Canyon/data=!4m2!3m1!1s0x5482c5c6cd770f23:0x287c8d57e160c81",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeLQ-ZOJ8aYOgp4Obp5QhJQtk9_aHcficaTPSWD3_ZdnU3AVxvn5BTme7PVYr-UH3vZf3LuzjhscljIrJPDYa7KmhvwhpVuiRzEnWbGjMztAC2SjvqeSwMXnq8KkcRrsuJz4_xNss5cNFef=w2400",
+    "source_kind": "google_maps",
+    "note": "Adventure mini-golf holes with rock borders, a wooden mine-shaft tower and pergola, flower planters"
+  },
+  {
+    "id": 1116,
+    "name": "Sonora Dunes Golf Course",
+    "file": "/images/venues/sonora-dunes-golf-course-2610.jpg",
+    "dimensions": "1600x800",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482c5d728093805:0xa447c18205e79e92",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcN8hIWnfpFk9PRe6rPFDVYvcWUhJPppzQh6SoSrZyEVIZrBX5zXd6dJrP1tqQ35SJT0noAGCwKogJ49dHLW0aN7UVFESmDoLGHXfiyUvTA3jFUk9HBSvPZ5Ea4Qz8ujwQQEvTPbdfh9Q4=w2400",
+    "source_kind": "google_maps",
+    "note": "Aerial of fairways and greens through desert sage, pond with fountain, Osoyoos Lake and rocky mountain behind"
+  },
+  {
+    "id": 1132,
+    "name": "Okanagan Virtual Golf",
+    "file": "/images/venues/okanagan-virtual-golf-penticton-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x54828999714dbd3d:0x7c64e93cb121e673",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfWfuTGyqc1eYpL8ue8-5uGWWnM0_HKRSddiUVtUBJZixDNvpp9QzF7oj-QuR471_GbGP4lv0jHQ00l5CT66R83qpJIYRG2-nZMjoHlqYUhg1wDxtg_gSqGp-ox8BsCfw80T5iG=w4000",
+    "source_kind": "google_maps",
+    "note": "Interior panorama of three simulator bays with turf, wooden bars and stools"
+  },
+  {
+    "id": 1107,
+    "name": "Penticton Golf & Country Club",
+    "file": "/images/venues/penticton-golf-country-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://pentictongolf.ca/",
+    "image_url": "https://www.pentictongolf.ca/files/18%20green%20from%20clubhouse-1.jpg",
+    "source_kind": "official_website",
+    "note": "18th green from the clubhouse: island tee, ponds and willows with the hills behind"
+  },
+  {
+    "id": 1109,
+    "name": "Pine Hills Golf Club",
+    "file": "/images/venues/pine-hills-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482624637185d11:0xd67ec233a06d382c",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfynUbZ8YQN_Mf9rGCOZIM3CCDRZPrVlH1ssLUmxKV3WbNTGn8tSWK5PdONKFdmvHi9Ib7jcX3hIfbB-Q4nJmBtYcL0sknS44H2B9q_r-u29R7zWr7Tu4tcUmH7zW5ajV5YMlQ=w2400",
+    "source_kind": "google_maps",
+    "note": "Hillside green with bunker framed by ponderosa pines, Okanagan Lake and Penticton with mountains below"
+  },
+  {
+    "id": 1108,
+    "name": "Skaha Meadows Golf Course",
+    "file": "/images/venues/skaha-meadows-golf-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x54828a271490aae1:0xbe8698abefabcb5a",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf6lkPrummY9RZk5Nlcq8bg3MHq9rz2JQ4sSugs_TlHb2_IGV0sdIQrObiSHJ70kcwr-d1olPQS0RaOOYjglrrKZ0A9N4QoReiIBKZEWVRSHoFgBP7BK5oywd9mBHJ7eu9saIoBGg=w2400",
+    "source_kind": "google_maps",
+    "note": "Rolling fairway in evening light with the clubhouse and mountainside behind (power lines cross the sky)"
+  },
+  {
+    "id": 1110,
+    "name": "Wow Golf Club",
+    "file": "/images/venues/wow-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/Wow+Golf+Club/data=!4m2!3m1!1s0x54826247549f6997:0x1401646acedf7f",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdpTb5888HSXyDSJZycYWzjPGgXcnXifnO98n5cVjQhFQKEBzsvvhOZHmJtD4LMh4gf-wcV7pjpu1fFWBZb6y7eNzZGJJ8kTb21IzLN9rAEtEgQ7LiWTxDELwkA8eqdgHK4Bs5PBIDrbwj4=w2400",
+    "source_kind": "google_maps",
+    "note": "Striped green and fairway among sage and clay bluffs above Okanagan Lake, hills across the water"
+  },
+  {
+    "id": 1112,
+    "name": "Sumac Ridge Golf & Country Club",
+    "file": "/images/venues/sumac-ridge-golf-country-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482653e2d43561f:0xf32057234fced6e0",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd4vlRheeCYSO5u97La5VKH3-2gLLnhcE3UgrgnNwlwWemUCVMdImYGra0tmWBoH6q04S7DfexbYUThtk8gBSH4iF00_Q90Ubb5ErndIsxMrpVut1ZsEmls4RXKpJIu57OBkaTHbA=w2400",
+    "source_kind": "google_maps",
+    "note": "Green on the hillside with pines, Okanagan Lake and rocky mountains behind (hazy day; some brown turf on the approach)"
+  },
+  {
+    "id": 1111,
+    "name": "Summerland Golf & Country Club",
+    "file": "/images/venues/summerland-golf-country-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x5482640e99601b03:0x2d561bdf421f3bfe",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdCVgcwZgefxSa2koxnOBJ9mPtBnVEMCRDWMj6H-Zdmmc_7gGh9lmQmMBbhEe1Dk9_s6wg2x_nVdl_14e6KVggVdVfshdgVALyGHs2fGsmzUKzyfnT4v0IBStkYIPUMNtYh8KdvAEW38OSe=w2400",
+    "source_kind": "google_maps",
+    "note": "Tee box and pine-framed fairway with a canyon edge and Okanagan valley hills behind"
+  },
+  {
+    "id": 1131,
+    "name": "Back Nine Indoor Golf",
+    "file": "/images/venues/back-nine-indoor-golf-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/Back+Nine+Indoor+Golf+Vernon/data=!4m2!3m1!1s0x537dd915ad013a95:0x20abc591d07fc147",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf0C2wMOU8vnuknhGrxxTaxiwhuaiCGQN0x0uAXS0s_z6JWwVxdzhS87ZCsUqLeiMIXhf5xOlZ5kPj58dqQeJyH56ztaAlg16LePXnQtD3eC8kjlvF7A-eUFCPJCpWnMYisc2FluPAbAe8=w2400",
+    "source_kind": "google_maps",
+    "note": "A Full Swing simulator bay at the Vernon location: big screen showing a fairway over the turf hitting area"
+  },
+  {
+    "id": 1707,
+    "name": "Dante's Golf Lounge",
+    "file": "/images/venues/dante-s-golf-lounge-2610.jpg",
+    "dimensions": "1440x720",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537ddf11a34eb463:0x99856150cc7cca29",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcGxsH1lUqDD5nAEYfdtf5wsGOvTviVOqNpWq5JOTfdaGFQkce24mDAavtbtCDUYBJGDGrV74Klfqlr88uSmqwo8rTHvLNxbtoLyOtbouvXVo3kotAJmLxZaOXT2SuMwbq5CeQn1g=w2400",
+    "source_kind": "google_maps",
+    "note": "Simulator lounge: hitting bay with big course screen on the right, sofas and a forest mural, second bay visible behind"
+  },
+  {
+    "id": 1122,
+    "name": "Hillview Golf Course",
+    "file": "/images/venues/hillview-golf-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://hillviewgolf.ca/",
+    "image_url": "https://www.hillviewgolf.ca/wp-content/uploads/2025/02/golf-1-scaled.jpg",
+    "source_kind": "official_website",
+    "note": "Aerial over greens, ponds and cart paths with Vernon neighbourhoods and hills behind"
+  },
+  {
+    "id": 1098,
+    "name": "Predator Ridge — Predator Course",
+    "file": "/images/venues/predator-ridge-predator-course-2610.jpg",
+    "dimensions": "1180x590",
+    "source_page": "https://www.predatorridge.com/golf/predator-course/",
+    "image_url": "https://www.predatorridge.com/wp-content/uploads/Header-Image-PredatorCourse-2021-1920x590-1.jpg",
+    "source_kind": "official_website",
+    "note": "Predator Course at golden hour: rolling fairways, bunkers and fescue mounds, homes and forest on the ridge behind"
+  },
+  {
+    "id": 1099,
+    "name": "Predator Ridge — Ridge Course",
+    "file": "/images/venues/predator-ridge-ridge-course-2610.jpg",
+    "dimensions": "1200x600",
+    "source_page": "https://www.predatorridge.com/golf/ridge-course/",
+    "image_url": "https://www.predatorridge.com/wp-content/uploads/Featured-Image-Ridge-Signature-Hole-1200x628-1.jpg",
+    "source_kind": "official_website",
+    "note": "Ridge Course signature hole: fairway down a pine-lined valley past a rock bluff, Okanagan Lake and mountains beyond"
+  },
+  {
+    "id": 1120,
+    "name": "Spallumcheen Golf & Country Club — Championship Course",
+    "file": "/images/venues/spallumcheen-golf-country-club-championship-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/Spallumcheen+Golf+%26+Country+Club/data=!4m2!3m1!1s0x537dd8dcdc187d8b:0x7437fe053f42b59d",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc420Bj4-TIKUHm8zWEOpULhB7_wHWve4XF8sM4oC9WvMVsQCNIeu1X1upFF0NuNpjmHGa5TzDDL1GZfAwwdN3WGhenn6Osqsvh_pDBUT9JCsAtyHfaDgHFDZoFxGROMDqRfEW65Qbjnsxi=w2400",
+    "source_kind": "google_maps",
+    "note": "Aerial of a fountain pond and green by the clubhouse, poplar-lined fairways, Swan Lake and hills behind"
+  },
+  {
+    "id": 1121,
+    "name": "Spallumcheen Golf & Country Club — Executive Course",
+    "file": "/images/venues/spallumcheen-golf-country-club-executive-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8dcdc187d8b:0x7437fe053f42b59d",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc420Bj4-TIKUHm8zWEOpULhB7_wHWve4XF8sM4oC9WvMVsQCNIeu1X1upFF0NuNpjmHGa5TzDDL1GZfAwwdN3WGhenn6Osqsvh_pDBUT9JCsAtyHfaDgHFDZoFxGROMDqRfEW65Qbjnsxi=w2400",
+    "source_kind": "google_maps",
+    "note": "Aerial of the Spallumcheen club: pond with fountain by a green, clubhouse, poplar-lined fairways, Swan Lake and hills behind"
+  },
+  {
+    "id": 1117,
+    "name": "The Rise Golf Course",
+    "file": "/images/venues/rise-golf-course-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/?q=place_id:0x537ddf6bbf69b595:0x194b6e4bdb6f563b",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeC1LVSCzhxJ9ZtRTDwbnvKvWHeiHbGN-oCPQB5i7pSbzyXORY8I72e7QR7CeTJkX1BaaEeTuaK7f1QMfgE78VwhzXrma3-PHQ8hgtcfZc7wLj9sxEOmINkOQTzOxdFthjFYwLVCA=w2400",
+    "source_kind": "google_maps",
+    "note": "Hilltop green and bunkered fairway high above Okanagan Lake with Vernon and mountains behind"
+  },
+  {
+    "id": 1118,
+    "name": "Vernon Golf & Country Club",
+    "file": "/images/venues/vernon-golf-country-club-vernon-2610.jpg",
+    "dimensions": "1440x720",
+    "source_page": "https://vernongolf.com/",
+    "image_url": "https://vernongolf.com/getmedia/712012b7-9c53-4524-9009-895d3fea509d/vgcc-banner-golf1.aspx",
+    "source_kind": "official_website",
+    "note": "Golden-hour aerial of tree-lined fairways and a bunkered green, grassland hills behind"
+  },
+  {
+    "id": 1129,
+    "name": "GOLFBOX",
+    "file": "/images/venues/golfbox-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482755976ebbe65:0x78166560847763dd",
+    "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfRcv_Ql9dg5RHY5WAVFu4DaBQLGi7CF3BtbGMfHW4IvLkbsZhuXuSpDwy2lHaHb8snodSnDMiwuHwAVdtlIsyq8PpGRLGqZSbic1pBqCxvzjssMSMCULE4iIYC9jCa5epXZGXFjlyWhIGR=w2400",
+    "source_kind": "google_maps",
+    "note": "Simulator bay with turf mat and screen, live-edge bar table and stools, row of further bays behind"
+  },
+  {
+    "id": 1105,
+    "name": "Shannon Lake Golf Club",
+    "file": "/images/venues/shannon-lake-golf-club-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://shannonlakegolf.com/",
+    "image_url": "https://shannonlakegolf.com/wp-content/uploads/2025/01/GK-ShannonLake-0554.jpg",
+    "source_kind": "official_website",
+    "note": "Aerial of a pine-lined fairway curving along Shannon Lake, hills and mountains behind"
+  },
+  {
+    "id": 1106,
+    "name": "Two Eagles Golf Course & Academy",
+    "file": "/images/venues/two-eagles-golf-course-academy-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://twoeaglesgolf.com/",
+    "image_url": "https://twoeaglesgolf.com/wp-content/uploads/2026/01/GK-TwoEagles-0247-1.jpg",
+    "source_kind": "official_website",
+    "note": "Green and bunkers above ponds and a pine-framed fairway, clubhouse/villas with Okanagan Lake and hills behind"
+  }
+]
