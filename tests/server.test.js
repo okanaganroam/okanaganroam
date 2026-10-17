@@ -22766,3 +22766,51 @@ test('Menus: "My menu is on my website" finds the menu (page or PDF) and never f
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('New business (2026-10-17): approval emails the owner their private edit link, and their own single event shows on their page', async () => {
+  const http = require('node:http');
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const mail = [];
+  app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+  app.setVenueSubmissionTransport(async () => {});
+  let ip = 1;
+  const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.25.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  try {
+    const sub = await post('/api/venue-submissions', { name: 'Ridge Test Tours', type: 'tour', region: 'kelowna',
+      description: 'Guided e-bike tours through vineyards and canyon trestles, with local guides and snacks.', contact_name: 'Sam Test',
+      contact_email: 'ridge@example.com', consent: true, company_website: '', started_at: Date.now() - 10000 });
+    assert.equal(sub.status, 201, JSON.stringify(sub.body));
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    const id = sub.body.id || db.prepare("SELECT id FROM venue_submissions WHERE name = 'Ridge Test Tours'").get().id;
+    assert.equal((await post(`/admin/review/venue/${id}/approve`, {}, cookie)).status, 200);
+    const approved = mail.find((m) => m.to === 'ridge@example.com' && /Approved: your new listing/.test(m.subject));
+    assert.ok(approved, 'the owner is told');
+    const link = /https:\/\/okanaganroam\.com(\/owner\/[A-Za-z0-9_-]+)/.exec(approved.text);
+    assert.ok(link, 'with their private edit link');
+    assert.match(approved.text, /tours & prices/);
+    const page = await fetch(`${base}${link[1]}`).then((r) => r.text());
+    assert.match(page, /Add your tours &amp; prices/);
+    assert.match(page, /<details class="op-fold" id="opLinksBox" open>/, 'booking link up front for a tour');
+    const v = app.findVenueBySlug('kelowna', 'tour', 'ridge-test-tours');
+    assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'ridge@example.com');
+
+    // Their one event, once approved, shows on their page.
+    const day = app.todayLocal ? app.todayLocal() : new Date().toISOString().slice(0, 10);
+    const later = new Date(Date.parse(`${day}T12:00:00Z`) + 8 * 86400000).toISOString().slice(0, 10);
+    const ev = await post(`${link[1]}/events`, { name: 'Ridge Sunset Ride', categories: ['sports-recreation'], description: 'An evening e-bike ride above the lake with a picnic at the lookout.',
+      start_date: later, end_date: '', start_time: '18:00', end_time: '20:00', all_day: false, event_url: '', price_text: '$99', schedule_notes: '',
+      contact_name: 'Sam Test', contact_email: 'ridge@example.com', company_website: '', started_at: Date.now() - 10000 });
+    assert.equal(ev.status, 201, JSON.stringify(ev.body));
+    assert.equal((await post(`/admin/review/event/${ev.body.id}/approve`, {}, cookie)).status, 200);
+    assert.match(await fetch(`${base}/kelowna/tours/ridge-test-tours`).then((r) => r.text()), /Events at Ridge Test Tours[\s\S]*Ridge Sunset Ride/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
