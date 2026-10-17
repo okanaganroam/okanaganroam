@@ -830,6 +830,60 @@ CREATE TABLE IF NOT EXISTS owner_photos (
 CREATE INDEX IF NOT EXISTS idx_owner_photos_venue ON owner_photos (venue_id, status);
 `);
 
+// Menus (2026-10-17): an owner photographs their printed menu (or sends a PDF), the server has it read into text,
+// the owner checks it and publishes. One row per attempt; the published one is shown on the venue's /menu page.
+// status: draft (pages being added) -> reading -> ready (owner checking) -> published, or pending (link-only owner,
+// waiting for Dayton) -> published / rejected; help = "Can you do it for me?" (sent to info@). superseded = replaced
+// by a newer published menu; removed = taken down by the owner. data is the menu as JSON (sections and items).
+// The page files live on the persistent volume (server.js MENU_DIR); preview_key is an unguessable id for viewing one.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_menus (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'reading', 'ready', 'pending', 'published', 'rejected', 'help', 'superseded', 'removed')),
+  data TEXT,
+  read_error TEXT,
+  read_started_at TEXT,
+  submitted_by TEXT,
+  contact_name TEXT,
+  contact_email TEXT,
+  help_note TEXT,
+  ip_hash TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  submitted_at TEXT,
+  published_at TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_venue_menus_venue ON venue_menus (venue_id, status);
+CREATE TABLE IF NOT EXISTS venue_menu_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  menu_id INTEGER NOT NULL REFERENCES venue_menus(id),
+  position INTEGER NOT NULL,
+  file TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL CHECK (kind IN ('jpeg', 'pdf')),
+  preview_key TEXT NOT NULL UNIQUE,
+  bytes INTEGER,
+  width INTEGER,
+  height INTEGER,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_venue_menu_files_menu ON venue_menu_files (menu_id, position);
+CREATE TABLE IF NOT EXISTS menu_reads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL,
+  menu_id INTEGER NOT NULL,
+  ok INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  model TEXT,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 // Owner logins (2026-10-15): an owner creates a password from their private
 // edit link; one account can manage several venues. Sessions are stored as a
 // hash of the cookie value and expire after 30 days.
