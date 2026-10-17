@@ -22315,4 +22315,22 @@ test('Menus: the free scanner splits columns, keeps prices with their dish, and 
   assert.deepEqual(read, [...left, ...right].map(([n, pr]) => (pr ? `${n} ${pr}` : n)));
   assert.deepEqual(items(parse(win.__menuOcrLines({ blocks }))).map((i) => `${i.section}: ${i.name} ${i.price}`).slice(5, 8),
     ['Starters: Wings 16', 'Pasta: Carbonara 21', 'Pasta: Pesto Penne 19']);
+  // Each dish remembers where its name and price are in the photo (for the strip shown while checking).
+  const withPage = win.__menuOcrLines({ blocks }).map((l) => ({ ...l, page: 7 }));
+  const poutine = items(parse(withPage)).find((i) => i.name === 'Poutine');
+  assert.equal(poutine.src.f, 7);
+  assert.deepEqual(poutine.src.n.slice(0, 1), [100]);
+  assert.deepEqual(poutine.src.p.slice(0, 1), [820]);
+
+  // Look-alike letters in common menu words are fixed; a business's own names are left alone.
+  const fixed = items(parse(lines('BAKING\nButter Crolssant 4.50\nCeasar Salad 12\nToncini Special 18\nCarbcnara 21')));
+  assert.deepEqual(fixed.map((i) => i.name), ['Butter Croissant', 'Caesar Salad', 'Toncini Special', 'Carbonara']);
+});
+
+test('Menus: where each dish is in the photo is kept for checking but never published', () => {
+  const kept = app.normalizeMenuData({ sections: [{ name: 'Mains', items: [
+    { name: 'Burger', price: '19', src: { f: 3, b: [10, 20, 600, 60], n: [10, 20, 200, 60], p: [560, 20, 600, 60] } },
+    { name: 'Fries', price: '6', src: { f: 'x', b: [1, 2, 3] } }] }] });
+  assert.deepEqual(kept.sections[0].items[0].src, { f: 3, b: [10, 20, 600, 60], n: [10, 20, 200, 60], p: [560, 20, 600, 60] });
+  assert.equal(kept.sections[0].items[1].src, undefined);
 });
