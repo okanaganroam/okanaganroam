@@ -18703,7 +18703,8 @@ test('Titles (health crawl, 2026-10-13): place and event titles fit ~65 characte
   assert.ok(title.startsWith(long.name), 'the name always leads');
   const frTitle = app.renderVenuePage({ ...long, description_fr: 'Un vignoble.' }, [], [], [], { lang: 'fr' }).match(/<title>([^<]*)<\/title>/)[1];
   assert.notEqual(frTitle, title, 'English and French titles always differ');
-  assert.match(frTitle, /, C\.-B\./);
+  assert.ok(frTitle.length <= 65 && frTitle.startsWith(long.name), frTitle);
+  assert.match(frTitle, /C\.-B\.|\(Lake Country\)/);
   const veryLong = { ...long, name: 'Vaseux Lake Wildlife Centre & Migratory Bird Sanctuary And More', description_fr: 'Un site.' };
   assert.notEqual(app.renderVenuePage(veryLong, [], [], [], { lang: 'fr' }).match(/<title>([^<]*)<\/title>/)[1], app.renderVenuePage(veryLong, [], [], []).match(/<title>([^<]*)<\/title>/)[1], 'even when the name alone is too long');
   const ev = s5create({ name: 'An Extremely Long Event Name That Goes On And On Past The Limit' });

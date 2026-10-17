@@ -22142,7 +22142,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const title = editorial ? editorial.title : fr
     // The French title always keeps its French ending ("..., C.-B."), so a long name never gives the English and French
     // pages the same title (health re-crawl, 2026-10-13).
-    ? fitTitle([`${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam`, `${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B.`, `${venue.name} \u2014 ${regionLabel}, C.-B.`])
+    ? fitTitle([`${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam`, `${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B.`, `${venue.name} \u2014 ${regionLabel}, C.-B.`, `${venue.name} (${regionLabel})`, `${venue.name} (C.-B.)`])
     : fitTitle([`${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`, `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC`, `${venue.name} \u2014 ${regionLabel}, BC`, `${venue.name} \u2014 ${regionLabel}`, venue.name]);
   const rawDesc = fr && venue.description_fr ? venue.description_fr : (venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`);
   const description = editorial ? editorial.metaDescription
