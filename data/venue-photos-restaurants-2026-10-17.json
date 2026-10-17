@@ -1,0 +1,6090 @@
+{
+  "reason": "Restaurant listing photos from Google Maps (that exact location), the restaurant's website, tourism boards, Tripadvisor or news; Dayton reviewed the contact sheets and said deploy all on 2026-10-17.",
+  "batch_id": "venue-photos-restaurants-2026-10-17",
+  "venues": [
+    {
+      "id": 152,
+      "name": "Country Manor Kitchen",
+      "region": "armstrong",
+      "slug": "country-manor-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/country-manor-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 267,
+      "name": "Haru Sushi & Grill",
+      "region": "armstrong",
+      "slug": "haru-sushi-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/haru-sushi-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 297,
+      "name": "JJ's Pizza Plus",
+      "region": "armstrong",
+      "slug": "jj-s-pizza-plus",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jj-s-pizza-plus-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 673,
+      "name": "The Clove Restaurant",
+      "region": "armstrong",
+      "slug": "the-clove-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-clove-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 726,
+      "name": "Tiffany's Asian Treats",
+      "region": "armstrong",
+      "slug": "tiffany-s-asian-treats",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tiffany-s-asian-treats-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 151,
+      "name": "Corduroy Cafe",
+      "region": "baldy",
+      "slug": "corduroy-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/corduroy-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1055,
+      "name": "6° Bistro",
+      "region": "big-white",
+      "slug": "6-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/6-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1665,
+      "name": "Alpine Burger Co.",
+      "region": "big-white",
+      "slug": "alpine-burger-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/alpine-burger-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 71,
+      "name": "Black Diamond Bar & Grill",
+      "region": "big-white",
+      "slug": "black-diamond-bar-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-diamond-bar-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 103,
+      "name": "Bullwheel",
+      "region": "big-white",
+      "slug": "bullwheel",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bullwheel-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 112,
+      "name": "Cabin Kitchen + Bar at Whitefoot Lodge",
+      "region": "big-white",
+      "slug": "cabin-kitchen-bar-at-whitefoot-lodge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cabin-kitchen-bar-at-whitefoot-lodge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1050,
+      "name": "Fat Marmot",
+      "region": "big-white",
+      "slug": "fat-marmot",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fat-marmot-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1056,
+      "name": "Fourth Ace Bar & Smokehouse",
+      "region": "big-white",
+      "slug": "fourth-ace-bar-smokehouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fourth-ace-bar-smokehouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1049,
+      "name": "Kettle Valley Steakhouse",
+      "region": "big-white",
+      "slug": "kettle-valley-steakhouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kettle-valley-steakhouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1052,
+      "name": "SPUDS at The Ridge Day Lodge",
+      "region": "big-white",
+      "slug": "spuds-at-the-ridge-day-lodge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spuds-at-the-ridge-day-lodge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1058,
+      "name": "Sasquatch Sushi",
+      "region": "big-white",
+      "slug": "sasquatch-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sasquatch-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1054,
+      "name": "Sopra: Sam's Italian Kitchen",
+      "region": "big-white",
+      "slug": "sopra-sam-s-italian-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sopra-sam-s-italian-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 718,
+      "name": "The Woods Restaurant",
+      "region": "big-white",
+      "slug": "the-woods-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-woods-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1053,
+      "name": "Underground Pizza",
+      "region": "big-white",
+      "slug": "underground-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/underground-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1046,
+      "name": "VISTA at Black Forest Day Lodge",
+      "region": "big-white",
+      "slug": "vista-at-black-forest-day-lodge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vista-at-black-forest-day-lodge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 85,
+      "name": "Bluenose Mountain Bistro",
+      "region": "coldstream",
+      "slug": "bluenose-mountain-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bluenose-mountain-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 949,
+      "name": "Friesen's Countrytyme",
+      "region": "coldstream",
+      "slug": "friesen-s-countrytyme",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/friesen-s-countrytyme-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 168,
+      "name": "Dan Chinese Restaurant & Bar",
+      "region": "enderby",
+      "slug": "dan-chinese-restaurant-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dan-chinese-restaurant-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 325,
+      "name": "Kaze Japanese Restaurant",
+      "region": "enderby",
+      "slug": "kaze-japanese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kaze-japanese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 302,
+      "name": "Jane's Farmhouse",
+      "region": "kaleden",
+      "slug": "jane-s-farmhouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jane-s-farmhouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 26,
+      "name": "Antico Pizza Napoletana",
+      "region": "kelowna",
+      "slug": "antico-pizza-napoletana",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/antico-pizza-napoletana-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 28,
+      "name": "Aomi Sushi Japanese Restaurant",
+      "region": "kelowna",
+      "slug": "aomi-sushi-japanese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/aomi-sushi-japanese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1739,
+      "name": "Asian Pear Buffet",
+      "region": "kelowna",
+      "slug": "asian-pear-buffet",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/asian-pear-buffet-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 37,
+      "name": "BBQ Boss",
+      "region": "kelowna",
+      "slug": "bbq-boss",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bbq-boss-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 41,
+      "name": "BNA Burger",
+      "region": "kelowna",
+      "slug": "bna-burger",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bna-burger-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 50,
+      "name": "Bai Tong Thai Restaurant",
+      "region": "kelowna",
+      "slug": "bai-tong-thai-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bai-tong-thai-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 887,
+      "name": "Bamboo Chopsticks Downtown",
+      "region": "kelowna",
+      "slug": "bamboo-chopsticks-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bamboo-chopsticks-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 57,
+      "name": "Basha Donair & Shawarma Kelowna",
+      "region": "kelowna",
+      "slug": "basha-donair-shawarma-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/basha-donair-shawarma-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 58,
+      "name": "Basil & Mint",
+      "region": "kelowna",
+      "slug": "basil-mint",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/basil-mint-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 59,
+      "name": "Basil Leaf Asian Fusion Restaurant - Glenmore",
+      "region": "kelowna",
+      "slug": "basil-leaf-asian-fusion-restaurant-glenmore",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/basil-leaf-asian-fusion-restaurant-glenmore-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1753,
+      "name": "Basil Leaf Asian Fusion – Powick Road",
+      "region": "kelowna",
+      "slug": "basil-leaf-asian-fusion-powick-road",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/basil-leaf-asian-fusion-powick-road-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 60,
+      "name": "Basil Leaf Noodle + Rice",
+      "region": "kelowna",
+      "slug": "basil-leaf-asian-fusion-restaurant-gyro-beach",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/basil-leaf-asian-fusion-restaurant-gyro-beach-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1617,
+      "name": "Bin 4 Burger Lounge",
+      "region": "kelowna",
+      "slug": "bin-4-burger-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bin-4-burger-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 86,
+      "name": "Bluetail Sushi - Commerce",
+      "region": "kelowna",
+      "slug": "bluetail-sushi-commerce",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bluetail-sushi-commerce-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 89,
+      "name": "Bon Ga Korean Cuisine",
+      "region": "kelowna",
+      "slug": "bon-ga-korean-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bon-ga-korean-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1744,
+      "name": "Boston Pizza Dilworth Centre",
+      "region": "kelowna",
+      "slug": "boston-pizza-dilworth-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boston-pizza-dilworth-centre-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1816,
+      "name": "Boston Pizza Kelowna Downtown",
+      "region": "kelowna",
+      "slug": "boston-pizza-kelowna-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boston-pizza-kelowna-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 91,
+      "name": "Bouchons Bistro",
+      "region": "kelowna",
+      "slug": "bouchons-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bouchons-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 99,
+      "name": "Broken Anchor Cafe and Catering",
+      "region": "kelowna",
+      "slug": "broken-anchor-cafe-and-catering",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/broken-anchor-cafe-and-catering-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1652,
+      "name": "Browns Socialhouse Harvey",
+      "region": "kelowna",
+      "slug": "browns-socialhouse-harvey",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/browns-socialhouse-harvey-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 107,
+      "name": "C-Lovers Fish & Chips",
+      "region": "kelowna",
+      "slug": "c-lovers-fish-chips",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/c-lovers-fish-chips-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1743,
+      "name": "Cactus Club Cafe Banks Road",
+      "region": "kelowna",
+      "slug": "cactus-club-cafe-banks-road",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cactus-club-cafe-banks-road-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 891,
+      "name": "Cactus Club Café",
+      "region": "kelowna",
+      "slug": "cactus-club-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cactus-club-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 123,
+      "name": "Casa de Frida",
+      "region": "kelowna",
+      "slug": "casa-de-frida",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/casa-de-frida-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 124,
+      "name": "Cecil's Perogy Palace",
+      "region": "kelowna",
+      "slug": "cecil-s-perogy-palace",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cecil-s-perogy-palace-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 126,
+      "name": "Central Kitchen + Bar",
+      "region": "kelowna",
+      "slug": "central-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/central-kitchen-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 131,
+      "name": "Charros Takos",
+      "region": "kelowna",
+      "slug": "charros-takos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/charros-takos-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 132,
+      "name": "Chef De Cuisine",
+      "region": "kelowna",
+      "slug": "chef-de-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chef-de-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 137,
+      "name": "Chilango Modern Mexican",
+      "region": "kelowna",
+      "slug": "chilango-modern-mexican",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chilango-modern-mexican-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 143,
+      "name": "Chutney Cuisine of India",
+      "region": "kelowna",
+      "slug": "chutney-cuisine-of-india",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chutney-cuisine-of-india-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 893,
+      "name": "City Pizza",
+      "region": "kelowna",
+      "slug": "city-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/city-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 150,
+      "name": "Coop Wicked Chicken & Bar Kelowna",
+      "region": "kelowna",
+      "slug": "coop-wicked-chicken-bar-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/coop-wicked-chicken-bar-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1653,
+      "name": "Cora Kelowna",
+      "region": "kelowna",
+      "slug": "cora-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cora-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 163,
+      "name": "Curious Cafe",
+      "region": "kelowna",
+      "slug": "curious-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/curious-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 170,
+      "name": "Dawett Fine Indian Cuisine",
+      "region": "kelowna",
+      "slug": "dawett-fine-indian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dawett-fine-indian-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1730,
+      "name": "De Dutch (Capri Centre)",
+      "region": "kelowna",
+      "slug": "de-dutch-capri-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/de-dutch-capri-centre-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1729,
+      "name": "De Dutch (Springfield)",
+      "region": "kelowna",
+      "slug": "de-dutch-springfield",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/de-dutch-springfield-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1727,
+      "name": "Denny's Kelowna",
+      "region": "kelowna",
+      "slug": "denny-s-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/denny-s-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 173,
+      "name": "Derrick's Steakhouse",
+      "region": "kelowna",
+      "slug": "derrick-s-steakhouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/derrick-s-steakhouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1732,
+      "name": "Diner Deluxe – The Shore",
+      "region": "kelowna",
+      "slug": "diner-deluxe-the-shore",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/diner-deluxe-the-shore-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 183,
+      "name": "Donair Dude / Scoopville Ice Cream",
+      "region": "kelowna",
+      "slug": "donair-dude-scoopville-ice-cream",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/donair-dude-scoopville-ice-cream-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 894,
+      "name": "Dosa Crepe Café",
+      "region": "kelowna",
+      "slug": "dosa-crepe-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dosa-crepe-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 187,
+      "name": "Double J Hong Kong Fusion",
+      "region": "kelowna",
+      "slug": "double-j-hong-kong-fusion",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/double-j-hong-kong-fusion-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1733,
+      "name": "Dozo House",
+      "region": "kelowna",
+      "slug": "dozo-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dozo-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 188,
+      "name": "Dragon King Restaurant",
+      "region": "kelowna",
+      "slug": "dragon-king-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dragon-king-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 190,
+      "name": "DunnEnzies Pizza Downtown",
+      "region": "kelowna",
+      "slug": "dunnenzies-pizza-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dunnenzies-pizza-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 191,
+      "name": "DunnEnzies Pizza Mission",
+      "region": "kelowna",
+      "slug": "dunnenzies-pizza-mission",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dunnenzies-pizza-mission-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 192,
+      "name": "Earls Kitchen + Bar",
+      "region": "kelowna",
+      "slug": "earls-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/earls-kitchen-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 197,
+      "name": "El Taquero - Tacos, Tequila & Catering",
+      "region": "kelowna",
+      "slug": "el-taquero-tacos-tequila-catering",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/el-taquero-tacos-tequila-catering-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 204,
+      "name": "Erica Jane Restaurant",
+      "region": "kelowna",
+      "slug": "erica-jane-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/erica-jane-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 208,
+      "name": "Eye Tasty Food",
+      "region": "kelowna",
+      "slug": "eye-tasty-food",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/eye-tasty-food-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 209,
+      "name": "Fancy's Cold Cuts & Cocktails",
+      "region": "kelowna",
+      "slug": "fancy-s-cold-cuts-cocktails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fancy-s-cold-cuts-cocktails-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1749,
+      "name": "Flip Flops & Hops Eatery",
+      "region": "kelowna",
+      "slug": "flip-flops-hops-eatery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/flip-flops-hops-eatery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 222,
+      "name": "Frankie We Salute You!",
+      "region": "kelowna",
+      "slug": "frankie-we-salute-you",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/frankie-we-salute-you-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1734,
+      "name": "Ga-on Sushi",
+      "region": "kelowna",
+      "slug": "ga-on-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ga-on-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 236,
+      "name": "Gather Restaurant",
+      "region": "kelowna",
+      "slug": "gather-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gather-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 244,
+      "name": "Golden Masala",
+      "region": "kelowna",
+      "slug": "golden-masala",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/golden-masala-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 255,
+      "name": "Gulfstream",
+      "region": "kelowna",
+      "slug": "gulfstream",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gulfstream-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 256,
+      "name": "HUMO Kelowna",
+      "region": "kelowna",
+      "slug": "humo-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/humo-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 257,
+      "name": "Habibi Tapas Grill",
+      "region": "kelowna",
+      "slug": "habibi-tapas-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/habibi-tapas-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 262,
+      "name": "Happy Slice Pizza (Airport)",
+      "region": "kelowna",
+      "slug": "happy-slice-pizza-airport",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/happy-slice-pizza-airport-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 263,
+      "name": "Happy Slice Pizza (Downtown)",
+      "region": "kelowna",
+      "slug": "happy-slice-pizza-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/happy-slice-pizza-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 265,
+      "name": "Happy Slice Pizza (OrchardPark Mall)",
+      "region": "kelowna",
+      "slug": "happy-slice-pizza-orchardpark-mall",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/happy-slice-pizza-orchardpark-mall-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 270,
+      "name": "Hector's Casa",
+      "region": "kelowna",
+      "slug": "hector-s-casa",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hector-s-casa-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 274,
+      "name": "Hoang Gia Vietnamese Cuisine",
+      "region": "kelowna",
+      "slug": "hoang-gia-vietnamese-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hoang-gia-vietnamese-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 275,
+      "name": "Home Block at CedarCreek Estate Winery",
+      "region": "kelowna",
+      "slug": "home-block-at-cedarcreek-estate-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/home-block-at-cedarcreek-estate-winery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 277,
+      "name": "Hong Kong Garden Restaurant",
+      "region": "kelowna",
+      "slug": "hong-kong-garden-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hong-kong-garden-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1748,
+      "name": "Hugo's Mexican Kitchen",
+      "region": "kelowna",
+      "slug": "hugo-s-mexican-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hugo-s-mexican-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1728,
+      "name": "IHOP Kelowna",
+      "region": "kelowna",
+      "slug": "ihop-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ihop-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 287,
+      "name": "Imperial Banquet Restaurant",
+      "region": "kelowna",
+      "slug": "imperial-banquet-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/imperial-banquet-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 298,
+      "name": "JOEY Kelowna",
+      "region": "kelowna",
+      "slug": "joey-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/joey-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 303,
+      "name": "Jeepney Republiq",
+      "region": "kelowna",
+      "slug": "jeepney-republiq",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jeepney-republiq-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1074,
+      "name": "Journey Restaurant",
+      "region": "kelowna",
+      "slug": "journey-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/journey-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 316,
+      "name": "KINTON RAMEN KELOWNA DOWNTOWN",
+      "region": "kelowna",
+      "slug": "kinton-ramen-kelowna-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kinton-ramen-kelowna-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1757,
+      "name": "KO-DAK Chicken",
+      "region": "kelowna",
+      "slug": "ko-dak-chicken",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ko-dak-chicken-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 321,
+      "name": "Kasai Teppanyaki Steak & Sushi House",
+      "region": "kelowna",
+      "slug": "kasai-teppanyaki-steak-sushi-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kasai-teppanyaki-steak-sushi-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1650,
+      "name": "Kaya Sushi + Grill",
+      "region": "kelowna",
+      "slug": "kaya-sushi-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kaya-sushi-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 324,
+      "name": "Kayan Shawarma and Grill House",
+      "region": "kelowna",
+      "slug": "kayan-shawarma-and-grill-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kayan-shawarma-and-grill-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 896,
+      "name": "Kelly & Carlos O'Bryans Restaurant",
+      "region": "kelowna",
+      "slug": "kelly-carlos-o-bryans-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelly-carlos-o-bryans-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 332,
+      "name": "Kimbap & Sushi",
+      "region": "kelowna",
+      "slug": "kimbap-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kimbap-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 334,
+      "name": "Kin & Folk Kelowna",
+      "region": "kelowna",
+      "slug": "kin-folk-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kin-folk-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 336,
+      "name": "King Taps",
+      "region": "kelowna",
+      "slug": "king-taps",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/king-taps-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 340,
+      "name": "Komo Sushi",
+      "region": "kelowna",
+      "slug": "komo-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/komo-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 346,
+      "name": "La Bussola Restaurant",
+      "region": "kelowna",
+      "slug": "la-bussola-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-bussola-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 353,
+      "name": "La Vela Pizzeria",
+      "region": "kelowna",
+      "slug": "la-vela-pizzeria",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-vela-pizzeria-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 358,
+      "name": "Lakeside Dining Room",
+      "region": "kelowna",
+      "slug": "lakeside-dining-room",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakeside-dining-room-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 361,
+      "name": "Laneway Canteen",
+      "region": "kelowna",
+      "slug": "laneway-canteen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/laneway-canteen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 362,
+      "name": "Latin Fiesta",
+      "region": "kelowna",
+      "slug": "latin-fiesta",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/latin-fiesta-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 897,
+      "name": "Little Hobo Soup & Sandwich Shop",
+      "region": "kelowna",
+      "slug": "little-hobo-soup-sandwich-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/little-hobo-soup-sandwich-shop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 382,
+      "name": "MR MIKES SteakhouseCasual",
+      "region": "kelowna",
+      "slug": "mr-mikes-steakhousecasual",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mr-mikes-steakhousecasual-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 384,
+      "name": "Mabui Kitchen",
+      "region": "kelowna",
+      "slug": "mabui-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mabui-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1754,
+      "name": "Made in India Restaurant (Commerce Ave)",
+      "region": "kelowna",
+      "slug": "made-in-india-restaurant-commerce-ave",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/made-in-india-restaurant-commerce-ave-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1740,
+      "name": "Made in India Restaurant (KLO)",
+      "region": "kelowna",
+      "slug": "made-in-india-restaurant-klo",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/made-in-india-restaurant-klo-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 386,
+      "name": "Maestro's Mediterranean Restaurant and Terrace",
+      "region": "kelowna",
+      "slug": "maestro-s-mediterranean-restaurant-and-terrace",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/maestro-s-mediterranean-restaurant-and-terrace-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 899,
+      "name": "Maki Sushi Restaurant",
+      "region": "kelowna",
+      "slug": "maki-sushi-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/maki-sushi-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 389,
+      "name": "Mamma Rosa Restaurant",
+      "region": "kelowna",
+      "slug": "mamma-rosa-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mamma-rosa-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 900,
+      "name": "Manhattan Point Restaurant",
+      "region": "kelowna",
+      "slug": "manhattan-point-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/manhattan-point-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 397,
+      "name": "Masa's Grill at The Harvest Golf Club",
+      "region": "kelowna",
+      "slug": "masa-s-grill-at-the-harvest-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/masa-s-grill-at-the-harvest-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 400,
+      "name": "Mavara Indian Bistro",
+      "region": "kelowna",
+      "slug": "mavara-indian-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mavara-indian-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1654,
+      "name": "Milestones Kelowna",
+      "region": "kelowna",
+      "slug": "milestones-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/milestones-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 901,
+      "name": "Misato's Kitchen",
+      "region": "kelowna",
+      "slug": "misato-s-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/misato-s-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 411,
+      "name": "Miss. Pats Jamaican Fusion Kitchen",
+      "region": "kelowna",
+      "slug": "miss-pats-jamaican-fusion-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/miss-pats-jamaican-fusion-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1747,
+      "name": "Mizu Japanese Restaurant",
+      "region": "kelowna",
+      "slug": "mizu-japanese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mizu-japanese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 414,
+      "name": "Momo Sushi Mission",
+      "region": "kelowna",
+      "slug": "momo-sushi-mission",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/momo-sushi-mission-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 416,
+      "name": "Montana's BBQ & Bar",
+      "region": "kelowna",
+      "slug": "montana-s-bbq-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/montana-s-bbq-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 420,
+      "name": "Moxies Kelowna Restaurant",
+      "region": "kelowna",
+      "slug": "moxies-kelowna-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/moxies-kelowna-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 421,
+      "name": "Mr. Lu's Kitchen",
+      "region": "kelowna",
+      "slug": "mr-lu-s-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mr-lu-s-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 426,
+      "name": "Murray's Pizza Kelowna",
+      "region": "kelowna",
+      "slug": "murray-s-pizza-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/murray-s-pizza-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 430,
+      "name": "Naked Cafe",
+      "region": "kelowna",
+      "slug": "naked-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/naked-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1428,
+      "name": "Natsukashi Neighbourhood Store & Eatery",
+      "region": "kelowna",
+      "slug": "natsukashi-neighbourhood-store-eatery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/natsukashi-neighbourhood-store-eatery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 432,
+      "name": "Nature's Table at Summerhill",
+      "region": "kelowna",
+      "slug": "nature-s-table-at-summerhill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nature-s-table-at-summerhill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 436,
+      "name": "New PunjabSweets",
+      "region": "kelowna",
+      "slug": "new-punjabsweets",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/new-punjabsweets-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 443,
+      "name": "Norman's Diner - Kelowna",
+      "region": "kelowna",
+      "slug": "norman-s-diner-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/norman-s-diner-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1745,
+      "name": "O-Machi Taiwanese Appetizer Bento House",
+      "region": "kelowna",
+      "slug": "o-machi-taiwanese-appetizer-bento-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/o-machi-taiwanese-appetizer-bento-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 446,
+      "name": "O-Zeki Japanese Restaurant",
+      "region": "kelowna",
+      "slug": "o-zeki-japanese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/o-zeki-japanese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 447,
+      "name": "OEB Breakfast Co.",
+      "region": "kelowna",
+      "slug": "oeb-breakfast-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oeb-breakfast-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1741,
+      "name": "OKA Japanese Restaurant",
+      "region": "kelowna",
+      "slug": "oka-japanese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oka-japanese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 904,
+      "name": "Oak + Cru",
+      "region": "kelowna",
+      "slug": "oak-cru",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oak-cru-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 456,
+      "name": "Okanagan Pizza",
+      "region": "kelowna",
+      "slug": "okanagan-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 905,
+      "name": "Okanagan Table",
+      "region": "kelowna",
+      "slug": "okanagan-table",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-table-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 462,
+      "name": "Olympia Greek Taverna",
+      "region": "kelowna",
+      "slug": "olympia-greek-taverna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/olympia-greek-taverna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 471,
+      "name": "Pacific Poke",
+      "region": "kelowna",
+      "slug": "pacific-poke",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pacific-poke-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 475,
+      "name": "Pakwaan Restaurant",
+      "region": "kelowna",
+      "slug": "pakwaan-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pakwaan-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 478,
+      "name": "Pandan Thai Eatery",
+      "region": "kelowna",
+      "slug": "pandan-thai-eatery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pandan-thai-eatery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 480,
+      "name": "Pandosy pizza",
+      "region": "kelowna",
+      "slug": "pandosy-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pandosy-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 482,
+      "name": "Panjabi Pizzeria",
+      "region": "kelowna",
+      "slug": "panjabi-pizzeria",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/panjabi-pizzeria-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 497,
+      "name": "Perogies Bar by Ready To Cook",
+      "region": "kelowna",
+      "slug": "perogies-bar-by-ready-to-cook",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/perogies-bar-by-ready-to-cook-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 498,
+      "name": "Perogy Hut",
+      "region": "kelowna",
+      "slug": "perogy-hut",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/perogy-hut-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 503,
+      "name": "Pho Soc Trang Vietnamese Cuisine",
+      "region": "kelowna",
+      "slug": "pho-soc-trang-vietnamese-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pho-soc-trang-vietnamese-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 506,
+      "name": "Pick Thai restaurant",
+      "region": "kelowna",
+      "slug": "pick-thai-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pick-thai-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 508,
+      "name": "Pita Land Shawarma - Kelowna",
+      "region": "kelowna",
+      "slug": "pita-land-shawarma-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pita-land-shawarma-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 513,
+      "name": "Pizza Garden",
+      "region": "kelowna",
+      "slug": "pizza-garden",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pizza-garden-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 522,
+      "name": "Porter's",
+      "region": "kelowna",
+      "slug": "porter-s",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/porter-s-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 528,
+      "name": "Pur & Simple",
+      "region": "kelowna",
+      "slug": "pur-simple",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pur-simple-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 908,
+      "name": "Quench on the Boardwalk",
+      "region": "kelowna",
+      "slug": "quench-on-the-boardwalk",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/quench-on-the-boardwalk-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 543,
+      "name": "Raw Action Oyster Co.",
+      "region": "kelowna",
+      "slug": "raw-action-oyster-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/raw-action-oyster-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1817,
+      "name": "Red Robin Kelowna",
+      "region": "kelowna",
+      "slug": "red-robin-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-robin-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1430,
+      "name": "Ricardo's at Soma",
+      "region": "kelowna",
+      "slug": "ricardos-at-soma",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ricardos-at-soma-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1731,
+      "name": "Ricky's All Day Grill Kelowna",
+      "region": "kelowna",
+      "slug": "ricky-s-all-day-grill-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ricky-s-all-day-grill-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 556,
+      "name": "Roma Nord Bistro",
+      "region": "kelowna",
+      "slug": "roma-nord-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/roma-nord-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 563,
+      "name": "SUSHI HAYASHI",
+      "region": "kelowna",
+      "slug": "sushi-hayashi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sushi-hayashi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 567,
+      "name": "Salsa & Sabor",
+      "region": "kelowna",
+      "slug": "salsa-sabor",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/salsa-sabor-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 573,
+      "name": "Satang Thai Cuisine",
+      "region": "kelowna",
+      "slug": "satang-thai-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/satang-thai-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 580,
+      "name": "Shady Rest Fish & Chips",
+      "region": "kelowna",
+      "slug": "shady-rest-fish-chips",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shady-rest-fish-chips-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 582,
+      "name": "Shambhu's Spice House Cuisine of India",
+      "region": "kelowna",
+      "slug": "shambhu-s-spice-house-cuisine-of-india",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shambhu-s-spice-house-cuisine-of-india-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 595,
+      "name": "Smoke's Poutinerie Kelowna",
+      "region": "kelowna",
+      "slug": "smoke-s-poutinerie-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/smoke-s-poutinerie-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 598,
+      "name": "Soban Korean restaurant",
+      "region": "kelowna",
+      "slug": "soban-korean-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/soban-korean-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 602,
+      "name": "Sol Korea Restaurant",
+      "region": "kelowna",
+      "slug": "sol-korea-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sol-korea-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 909,
+      "name": "Soul De Cuba Cafe",
+      "region": "kelowna",
+      "slug": "soul-de-cuba-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/soul-de-cuba-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 605,
+      "name": "Soy Asian Fusion Restaurant",
+      "region": "kelowna",
+      "slug": "soy-asian-fusion-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/soy-asian-fusion-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1079,
+      "name": "Spice Garden Asian Fusion",
+      "region": "kelowna",
+      "slug": "spice-garden-asian-fusion",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spice-garden-asian-fusion-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 615,
+      "name": "Steve's Poke Bar",
+      "region": "kelowna",
+      "slug": "steve-s-poke-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/steve-s-poke-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 629,
+      "name": "Sunny's a modern diner",
+      "region": "kelowna",
+      "slug": "sunny-s-a-modern-diner",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sunny-s-a-modern-diner-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1750,
+      "name": "TAAZ Restaurant",
+      "region": "kelowna",
+      "slug": "taaz-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/taaz-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 643,
+      "name": "THYME at Ellison Lake",
+      "region": "kelowna",
+      "slug": "thyme-at-ellison-lake",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/thyme-at-ellison-lake-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 644,
+      "name": "TORI DORI Japanese Chicken & Grill",
+      "region": "kelowna",
+      "slug": "tori-dori-japanese-chicken-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tori-dori-japanese-chicken-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 645,
+      "name": "Table Nineteen Kelowna",
+      "region": "kelowna",
+      "slug": "table-nineteen-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/table-nineteen-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 651,
+      "name": "Tahini's Shawarma",
+      "region": "kelowna",
+      "slug": "tahini-s-shawarma",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tahini-s-shawarma-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 653,
+      "name": "Taki Japanese Grill",
+      "region": "kelowna",
+      "slug": "taki-japanese-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/taki-japanese-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 691,
+      "name": "The Hot Box",
+      "region": "kelowna",
+      "slug": "the-hot-box",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-hot-box-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 692,
+      "name": "The House of the Caribbean",
+      "region": "kelowna",
+      "slug": "the-house-of-the-caribbean",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-house-of-the-caribbean-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 695,
+      "name": "The Indian Eatery",
+      "region": "kelowna",
+      "slug": "the-indian-eatery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-indian-eatery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 696,
+      "name": "The Jammery City",
+      "region": "kelowna",
+      "slug": "the-jammery-city",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-jammery-city-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 698,
+      "name": "The Keg Steakhouse + Bar - Kelowna",
+      "region": "kelowna",
+      "slug": "the-keg-steakhouse-bar-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-keg-steakhouse-bar-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1726,
+      "name": "The Old Spaghetti Factory",
+      "region": "kelowna",
+      "slug": "the-old-spaghetti-factory",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-old-spaghetti-factory-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 729,
+      "name": "Tokyo 1",
+      "region": "kelowna",
+      "slug": "tokyo-1",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tokyo-1-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1071,
+      "name": "Toncini Modern Italian",
+      "region": "kelowna",
+      "slug": "toncini-modern-italian",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/toncini-modern-italian-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 749,
+      "name": "USTAAD G76 KELOWNA",
+      "region": "kelowna",
+      "slug": "ustaad-g76-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ustaad-g76-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 756,
+      "name": "Vancouver Pizza Kitchen",
+      "region": "kelowna",
+      "slug": "vancouver-pizza-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vancouver-pizza-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 760,
+      "name": "Vietnam Village Restaurant",
+      "region": "kelowna",
+      "slug": "vietnam-village-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vietnam-village-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 764,
+      "name": "Vintners",
+      "region": "kelowna",
+      "slug": "vintners",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vintners-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 770,
+      "name": "WOK STAR RESTAURANT",
+      "region": "kelowna",
+      "slug": "wok-star-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wok-star-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 771,
+      "name": "Wa Skew'r Sushi & Bar",
+      "region": "kelowna",
+      "slug": "wa-skew-r-sushi-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wa-skew-r-sushi-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 773,
+      "name": "Wasabi Ramen and Izakaya",
+      "region": "kelowna",
+      "slug": "wasabi-ramen-and-izakaya",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wasabi-ramen-and-izakaya-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 775,
+      "name": "Waterfront Wines Restaurant",
+      "region": "kelowna",
+      "slug": "waterfront-wines-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/waterfront-wines-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 779,
+      "name": "West Coast Seafood & Raw Bar Kelowna",
+      "region": "kelowna",
+      "slug": "west-coast-seafood-raw-bar-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/west-coast-seafood-raw-bar-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 785,
+      "name": "Wildling",
+      "region": "kelowna",
+      "slug": "wildling",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wildling-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 787,
+      "name": "Wok Inn Restaurant",
+      "region": "kelowna",
+      "slug": "wok-inn-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wok-inn-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 792,
+      "name": "Xing Yun",
+      "region": "kelowna",
+      "slug": "xing-yun",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/xing-yun-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 793,
+      "name": "YLW Tacos",
+      "region": "kelowna",
+      "slug": "ylw-tacos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ylw-tacos-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 795,
+      "name": "Yama Kitchen",
+      "region": "kelowna",
+      "slug": "yama-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yama-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 796,
+      "name": "Yamas Taverna",
+      "region": "kelowna",
+      "slug": "yamas-taverna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yamas-taverna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1742,
+      "name": "Yellow Star Snack House",
+      "region": "kelowna",
+      "slug": "yellow-star-snack-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yellow-star-snack-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 801,
+      "name": "Yum Yum Tree",
+      "region": "kelowna",
+      "slug": "yum-yum-tree",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yum-yum-tree-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 802,
+      "name": "Yuzu Bowl and Bistro",
+      "region": "kelowna",
+      "slug": "yuzu-bowl-and-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yuzu-bowl-and-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 803,
+      "name": "Zabb Thai Restaurant",
+      "region": "kelowna",
+      "slug": "zabb-thai-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/zabb-thai-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 804,
+      "name": "Zen's Plant-Based Cuisine",
+      "region": "kelowna",
+      "slug": "zen-s-plant-based-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/zen-s-plant-based-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 809,
+      "name": "reggaefusionfood",
+      "region": "kelowna",
+      "slug": "reggaefusionfood",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/reggaefusionfood-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 129,
+      "name": "Chantana's Thai Restaurant",
+      "region": "lake-country",
+      "slug": "chantana-s-thai-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chantana-s-thai-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1039,
+      "name": "Chaos Bistro",
+      "region": "lake-country",
+      "slug": "chaos-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chaos-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 251,
+      "name": "Greek House Restaurant",
+      "region": "lake-country",
+      "slug": "greek-house-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/greek-house-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 264,
+      "name": "Happy Slice Pizza (Lake Country)",
+      "region": "lake-country",
+      "slug": "happy-slice-pizza-lake-country",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/happy-slice-pizza-lake-country-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 300,
+      "name": "Jade Buffet Lake Country",
+      "region": "lake-country",
+      "slug": "jade-buffet-lake-country",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jade-buffet-lake-country-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 317,
+      "name": "KOHA VIETNAMESE KITCHEN",
+      "region": "lake-country",
+      "slug": "koha-vietnamese-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/koha-vietnamese-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 344,
+      "name": "L'Isola Bella Bistro",
+      "region": "lake-country",
+      "slug": "l-isola-bella-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/l-isola-bella-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1044,
+      "name": "Lookout Restaurant",
+      "region": "lake-country",
+      "slug": "lookout-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lookout-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 373,
+      "name": "Lu Lou's Lakeside Grill & Chill",
+      "region": "lake-country",
+      "slug": "lu-lou-s-lakeside-grill-chill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lu-lou-s-lakeside-grill-chill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1040,
+      "name": "Made In India",
+      "region": "lake-country",
+      "slug": "made-in-india",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/made-in-india-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 395,
+      "name": "Marno's Woodfire Pizza",
+      "region": "lake-country",
+      "slug": "marno-s-woodfire-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/marno-s-woodfire-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 444,
+      "name": "Norman's Diner - Lake Country",
+      "region": "lake-country",
+      "slug": "norman-s-diner-lake-country",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/norman-s-diner-lake-country-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 450,
+      "name": "OKF Grill",
+      "region": "lake-country",
+      "slug": "okf-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okf-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 481,
+      "name": "Pane Vino Pizzeria",
+      "region": "lake-country",
+      "slug": "pane-vino-pizzeria",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pane-vino-pizzeria-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 559,
+      "name": "Row 188 @ O'Rourke Family Estate",
+      "region": "lake-country",
+      "slug": "row-188-o-rourke-family-estate",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/row-188-o-rourke-family-estate-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1041,
+      "name": "The Jammery",
+      "region": "lake-country",
+      "slug": "the-jammery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-jammery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 739,
+      "name": "Turtle Bay GOGO Sushi",
+      "region": "lake-country",
+      "slug": "turtle-bay-gogo-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/turtle-bay-gogo-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 765,
+      "name": "Viva Mexicana",
+      "region": "lake-country",
+      "slug": "viva-mexicana",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/viva-mexicana-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 472,
+      "name": "Pagoda Inn Restaurant",
+      "region": "lumby",
+      "slug": "pagoda-inn-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pagoda-inn-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 589,
+      "name": "Sisters Family Restaurant",
+      "region": "lumby",
+      "slug": "sisters-family-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sisters-family-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 799,
+      "name": "Yuki Sushi",
+      "region": "lumby",
+      "slug": "yuki-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yuki-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1014,
+      "name": "Bench Patio Bistro",
+      "region": "naramata",
+      "slug": "bench-patio-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bench-patio-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 70,
+      "name": "Bistro Lapin Perdu",
+      "region": "naramata",
+      "slug": "bistro-lapin-perdu",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bistro-lapin-perdu-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 553,
+      "name": "Rocky's Real Things Pizza Naramata",
+      "region": "naramata",
+      "slug": "rocky-s-real-things-pizza-naramata",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rocky-s-real-things-pizza-naramata-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 660,
+      "name": "Terroir Kitchen",
+      "region": "naramata",
+      "slug": "terroir-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/terroir-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 666,
+      "name": "The Bistro at Hillside Winery",
+      "region": "naramata",
+      "slug": "the-bistro-at-hillside-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-bistro-at-hillside-winery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 704,
+      "name": "The Patio At Lake Breeze",
+      "region": "naramata",
+      "slug": "the-patio-at-lake-breeze",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-patio-at-lake-breeze-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 22,
+      "name": "Angel Place",
+      "region": "okanagan-falls",
+      "slug": "angel-place",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/angel-place-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1827,
+      "name": "The Barn Bistro at See Ya Later Ranch",
+      "region": "okanagan-falls",
+      "slug": "the-barn-bistro-at-see-ya-later-ranch",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-barn-bistro-at-see-ya-later-ranch-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 707,
+      "name": "The Restaurant at Liquidity Wines",
+      "region": "okanagan-falls",
+      "slug": "the-restaurant-at-liquidity-wines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-restaurant-at-liquidity-wines-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 807,
+      "name": "kettle valley pizza (Okanagan Falls)",
+      "region": "okanagan-falls",
+      "slug": "kettle-valley-pizza-okanagan-falls",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kettle-valley-pizza-okanagan-falls-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 36,
+      "name": "Auntie Ag's Seafood Cafe",
+      "region": "oliver",
+      "slug": "auntie-ag-s-seafood-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/auntie-ag-s-seafood-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 49,
+      "name": "Backyard Farm Chef's Table",
+      "region": "oliver",
+      "slug": "backyard-farm-chef-s-table",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/backyard-farm-chef-s-table-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 68,
+      "name": "Bharawan Da Dhaba Indian Cuisine",
+      "region": "oliver",
+      "slug": "bharawan-da-dhaba-indian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bharawan-da-dhaba-indian-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 196,
+      "name": "El Sabor De Marina",
+      "region": "oliver",
+      "slug": "el-sabor-de-marina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/el-sabor-de-marina-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 213,
+      "name": "Firehall Bistro",
+      "region": "oliver",
+      "slug": "firehall-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/firehall-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 260,
+      "name": "Hammer's House of Hog",
+      "region": "oliver",
+      "slug": "hammer-s-house-of-hog",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hammer-s-house-of-hog-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1029,
+      "name": "Miradoro Restaurant",
+      "region": "oliver",
+      "slug": "miradoro-restaurant-1029",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/miradoro-restaurant-1029-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 461,
+      "name": "Oliver Garden Restaurant",
+      "region": "oliver",
+      "slug": "oliver-garden-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oliver-garden-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 509,
+      "name": "Pizza 64 (Oliver)",
+      "region": "oliver",
+      "slug": "pizza-64-oliver",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pizza-64-oliver-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 514,
+      "name": "Pizza Rolla",
+      "region": "oliver",
+      "slug": "pizza-rolla",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pizza-rolla-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1027,
+      "name": "Restaurant @ Fairview Mountain Golf Club",
+      "region": "oliver",
+      "slug": "restaurant-fairview-mountain-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/restaurant-fairview-mountain-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 574,
+      "name": "Savvios Family Restaurant",
+      "region": "oliver",
+      "slug": "savvios-family-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/savvios-family-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 604,
+      "name": "Sonora Room Restaurant",
+      "region": "oliver",
+      "slug": "sonora-room-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sonora-room-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 647,
+      "name": "TacoRiendo Mexican Cantina Inc (Oliver)",
+      "region": "oliver",
+      "slug": "tacoriendo-mexican-cantina-inc-oliver",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tacoriendo-mexican-cantina-inc-oliver-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 658,
+      "name": "Terrafina at Hester Creek",
+      "region": "oliver",
+      "slug": "terrafina-at-hester-creek",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/terrafina-at-hester-creek-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1028,
+      "name": "The Lynx Lounge",
+      "region": "oliver",
+      "slug": "the-lynx-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-lynx-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1,
+      "name": "15 Park Bistro",
+      "region": "osoyoos",
+      "slug": "15-park-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/15-park-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 18,
+      "name": "Ambrosia Family Restaurant",
+      "region": "osoyoos",
+      "slug": "ambrosia-family-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ambrosia-family-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1800,
+      "name": "Boston Pizza at the Watermark",
+      "region": "osoyoos",
+      "slug": "boston-pizza-at-the-watermark",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boston-pizza-at-the-watermark-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 120,
+      "name": "Canco Gas Station - Curries & More",
+      "region": "osoyoos",
+      "slug": "canco-gas-station-curries-more",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/canco-gas-station-curries-more-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 149,
+      "name": "Convivia Bistro Cuisine",
+      "region": "osoyoos",
+      "slug": "convivia-bistro-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/convivia-bistro-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 176,
+      "name": "Diamond Steak & Seafood House",
+      "region": "osoyoos",
+      "slug": "diamond-steak-seafood-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/diamond-steak-seafood-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 180,
+      "name": "Dolci Thai Bistro",
+      "region": "osoyoos",
+      "slug": "dolci-thai-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dolci-thai-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 185,
+      "name": "Dosa Crepe Cafe",
+      "region": "osoyoos",
+      "slug": "dosa-crepe-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dosa-crepe-cafe-osoyoos-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 230,
+      "name": "Fugassa Italian Eatery",
+      "region": "osoyoos",
+      "slug": "fugassa-italian-eatery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fugassa-italian-eatery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1019,
+      "name": "Greenside Bar & Grill",
+      "region": "osoyoos",
+      "slug": "greenside-bar-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/greenside-bar-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1020,
+      "name": "Indian Flame",
+      "region": "osoyoos",
+      "slug": "indian-flame",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/indian-flame-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 351,
+      "name": "La Marqueza Mexican Tacos & Market",
+      "region": "osoyoos",
+      "slug": "la-marqueza-mexican-tacos-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-marqueza-mexican-tacos-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 388,
+      "name": "Mami's Pizza",
+      "region": "osoyoos",
+      "slug": "mami-s-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mami-s-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1021,
+      "name": "Miks Food Studio",
+      "region": "osoyoos",
+      "slug": "miks-food-studio",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/miks-food-studio-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 440,
+      "name": "Nisu Ramen and Asian Fusion",
+      "region": "osoyoos",
+      "slug": "nisu-ramen-and-asian-fusion",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nisu-ramen-and-asian-fusion-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 448,
+      "name": "OGOPOGO Burgers & Shakes",
+      "region": "osoyoos",
+      "slug": "ogopogo-burgers-shakes",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ogopogo-burgers-shakes-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 507,
+      "name": "Pit Stop Smokery",
+      "region": "osoyoos",
+      "slug": "pit-stop-smokery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pit-stop-smokery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 511,
+      "name": "Pizza Factory",
+      "region": "osoyoos",
+      "slug": "pizza-factory",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pizza-factory-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1023,
+      "name": "Pointe 49 Kitchen & Bar",
+      "region": "osoyoos",
+      "slug": "pointe-49-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pointe-49-kitchen-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1456,
+      "name": "Pomace Kitchen & Bar",
+      "region": "osoyoos",
+      "slug": "pomace-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pomace-kitchen-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 593,
+      "name": "Smitty's Family Restaurant - Osoyoos",
+      "region": "osoyoos",
+      "slug": "smitty-s-family-restaurant-osoyoos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/smitty-s-family-restaurant-osoyoos-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 601,
+      "name": "Sofia Mexican Food",
+      "region": "osoyoos",
+      "slug": "sofia-mexican-food",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sofia-mexican-food-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 609,
+      "name": "Spirit Beach Cantina",
+      "region": "osoyoos",
+      "slug": "spirit-beach-cantina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spirit-beach-cantina-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 639,
+      "name": "Sweetgrass @ Nk'Mip Cellars",
+      "region": "osoyoos",
+      "slug": "sweetgrass-nk-mip-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sweetgrass-nk-mip-cellars-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 663,
+      "name": "The Bear, The Fish, The Root & The Berry",
+      "region": "osoyoos",
+      "slug": "the-bear-the-fish-the-root-the-berry",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-bear-the-fish-the-root-the-berry-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 630,
+      "name": "The Ridge Pub & Restaurant",
+      "region": "osoyoos",
+      "slug": "sunridge-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sunridge-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 4,
+      "name": "19 Bistro @ Fitz",
+      "region": "peachland",
+      "slug": "19-bistro-fitz",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/19-bistro-fitz-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 61,
+      "name": "Basil Leaf Asian Fusion Restaurant - Peachland",
+      "region": "peachland",
+      "slug": "basil-leaf-asian-fusion-restaurant-peachland",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/basil-leaf-asian-fusion-restaurant-peachland-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 145,
+      "name": "Cibo & Vines",
+      "region": "peachland",
+      "slug": "cibo-vines",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cibo-vines-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 235,
+      "name": "Gasthaus on the Lake",
+      "region": "peachland",
+      "slug": "gasthaus-on-the-lake",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gasthaus-on-the-lake-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 295,
+      "name": "JAC's On The Beach",
+      "region": "peachland",
+      "slug": "jac-s-on-the-beach",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jac-s-on-the-beach-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 424,
+      "name": "Murray's Pizza & Pasta (Peachland)",
+      "region": "peachland",
+      "slug": "murray-s-pizza-pasta-peachland",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/murray-s-pizza-pasta-peachland-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 487,
+      "name": "Peachland Sushi",
+      "region": "peachland",
+      "slug": "peachland-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 523,
+      "name": "Porto Peach Restaurant",
+      "region": "peachland",
+      "slug": "porto-peach-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/porto-peach-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 668,
+      "name": "The Blind Angler Grill",
+      "region": "peachland",
+      "slug": "the-blind-angler-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-blind-angler-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 681,
+      "name": "The Edgewater Bar and Grill",
+      "region": "peachland",
+      "slug": "the-edgewater-bar-and-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-edgewater-bar-and-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 23,
+      "name": "Angry Vegan",
+      "region": "penticton",
+      "slug": "angry-vegan",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/angry-vegan-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1017,
+      "name": "Ashoka Indian Cuisine",
+      "region": "penticton",
+      "slug": "ashoka-indian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ashoka-indian-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 991,
+      "name": "Asian Garden Restaurant",
+      "region": "penticton",
+      "slug": "asian-garden-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/asian-garden-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 43,
+      "name": "BRODO Kitchen",
+      "region": "penticton",
+      "slug": "brodo-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/brodo-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 46,
+      "name": "BaBa Express",
+      "region": "penticton",
+      "slug": "baba-express",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/baba-express-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1002,
+      "name": "Bar One",
+      "region": "penticton",
+      "slug": "bar-one",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bar-one-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1006,
+      "name": "Barking Parrot Bar",
+      "region": "penticton",
+      "slug": "barking-parrot-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/barking-parrot-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 998,
+      "name": "Bear's Den Restaurant",
+      "region": "penticton",
+      "slug": "bear-s-den-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bear-s-den-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1016,
+      "name": "Blue Heron Restaurant",
+      "region": "penticton",
+      "slug": "blue-heron-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blue-heron-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1688,
+      "name": "Boston Pizza Penticton",
+      "region": "penticton",
+      "slug": "boston-pizza-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boston-pizza-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 982,
+      "name": "Bufflehead Café",
+      "region": "penticton",
+      "slug": "bufflehead-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bufflehead-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 106,
+      "name": "Buy The Sea Seafood",
+      "region": "penticton",
+      "slug": "buy-the-sea-seafood",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/buy-the-sea-seafood-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 983,
+      "name": "Cambo Beach Restaurant",
+      "region": "penticton",
+      "slug": "cambo-beach-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cambo-beach-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 130,
+      "name": "CharCo Wood Fired Sandwiches",
+      "region": "penticton",
+      "slug": "charco-wood-fired-sandwiches",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/charco-wood-fired-sandwiches-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 987,
+      "name": "China Palace",
+      "region": "penticton",
+      "slug": "china-palace",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/china-palace-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 146,
+      "name": "Cinco de Mayo Mexican Bistro 1862",
+      "region": "penticton",
+      "slug": "cinco-de-mayo-mexican-bistro-1862",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cinco-de-mayo-mexican-bistro-1862-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 158,
+      "name": "Creperie Ooolala - Food truck",
+      "region": "penticton",
+      "slug": "creperie-ooolala-food-truck",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/creperie-ooolala-food-truck-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 981,
+      "name": "Cue's Game Room",
+      "region": "penticton",
+      "slug": "cue-s-game-room",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cue-s-game-room-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 169,
+      "name": "Danelo's Authentic Italian Sandwiches",
+      "region": "penticton",
+      "slug": "danelo-s-authentic-italian-sandwiches",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/danelo-s-authentic-italian-sandwiches-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1826,
+      "name": "Denny's Penticton",
+      "region": "penticton",
+      "slug": "denny-s-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/denny-s-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 186,
+      "name": "Dosa Vilas",
+      "region": "penticton",
+      "slug": "dosa-vilas",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dosa-vilas-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 990,
+      "name": "Earls Kitchen & Bar",
+      "region": "penticton",
+      "slug": "earls-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/earls-kitchen-bar-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 199,
+      "name": "Elma",
+      "region": "penticton",
+      "slug": "elma",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/elma-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 225,
+      "name": "Freshslice Pizza",
+      "region": "penticton",
+      "slug": "freshslice-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/freshslice-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 232,
+      "name": "GINZA SUSHI & POKE",
+      "region": "penticton",
+      "slug": "ginza-sushi-poke",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ginza-sushi-poke-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 234,
+      "name": "Garden House Restaurant",
+      "region": "penticton",
+      "slug": "garden-house-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/garden-house-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 992,
+      "name": "Gusto Ferrari",
+      "region": "penticton",
+      "slug": "gusto-ferrari",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gusto-ferrari-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 261,
+      "name": "Happiness Thai Restaurant",
+      "region": "penticton",
+      "slug": "happiness-thai-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/happiness-thai-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 278,
+      "name": "Hooded Merganser Restaurant",
+      "region": "penticton",
+      "slug": "hooded-merganser-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hooded-merganser-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 292,
+      "name": "Isshin Sushi Bar & Asian Dining",
+      "region": "penticton",
+      "slug": "isshin-sushi-bar-asian-dining",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/isshin-sushi-bar-asian-dining-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 296,
+      "name": "JJ Joy",
+      "region": "penticton",
+      "slug": "jj-joy",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jj-joy-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1007,
+      "name": "Japanese Kitchen Kura",
+      "region": "penticton",
+      "slug": "japanese-kitchen-kura",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/japanese-kitchen-kura-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 304,
+      "name": "Jeffer's Fryzz",
+      "region": "penticton",
+      "slug": "jeffer-s-fryzz",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jeffer-s-fryzz-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 322,
+      "name": "Katsu Heaven",
+      "region": "penticton",
+      "slug": "katsu-heaven",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/katsu-heaven-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 333,
+      "name": "Kin & Folk",
+      "region": "penticton",
+      "slug": "kin-folk",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kin-folk-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1013,
+      "name": "Kitchen @ Da Silva Winery",
+      "region": "penticton",
+      "slug": "kitchen-da-silva-winery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kitchen-da-silva-winery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 345,
+      "name": "LOCAL Public Eatery Penticton",
+      "region": "penticton",
+      "slug": "local-public-eatery-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/local-public-eatery-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 348,
+      "name": "La Casa Ouzeria Restaurant",
+      "region": "penticton",
+      "slug": "la-casa-ouzeria-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-casa-ouzeria-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 354,
+      "name": "Lachi Fine Indian Cuisine",
+      "region": "penticton",
+      "slug": "lachi-fine-indian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lachi-fine-indian-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 360,
+      "name": "Lala Ji's pizzeria",
+      "region": "penticton",
+      "slug": "lala-ji-s-pizzeria",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lala-ji-s-pizzeria-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 988,
+      "name": "Lee's Overseas Delights",
+      "region": "penticton",
+      "slug": "lee-s-overseas-delights",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lee-s-overseas-delights-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 377,
+      "name": "MAKU",
+      "region": "penticton",
+      "slug": "maku",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/maku-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 986,
+      "name": "Mack's Social House",
+      "region": "penticton",
+      "slug": "mack-s-social-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mack-s-social-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 427,
+      "name": "Mykonos Pizza & Spaghetti House",
+      "region": "penticton",
+      "slug": "mykonos-pizza-spaghetti-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mykonos-pizza-spaghetti-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 454,
+      "name": "Oh My Cod Fish N Chips",
+      "region": "penticton",
+      "slug": "oh-my-cod-fish-n-chips",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oh-my-cod-fish-n-chips-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 467,
+      "name": "Osmow's Shawarma",
+      "region": "penticton",
+      "slug": "osmow-s-shawarma",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osmow-s-shawarma-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 474,
+      "name": "Painted Turtle Bistro",
+      "region": "penticton",
+      "slug": "painted-turtle-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/painted-turtle-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 477,
+      "name": "Palmer Kitchen + Spirits",
+      "region": "penticton",
+      "slug": "palmer-kitchen-spirits",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/palmer-kitchen-spirits-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 485,
+      "name": "Pasta Factory",
+      "region": "penticton",
+      "slug": "pasta-factory",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pasta-factory-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 486,
+      "name": "Patio Burger & Ice Cream Co.",
+      "region": "penticton",
+      "slug": "patio-burger-ice-cream-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/patio-burger-ice-cream-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 493,
+      "name": "Penticton Indian Cuisine",
+      "region": "penticton",
+      "slug": "penticton-indian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-indian-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 504,
+      "name": "Pho&More Vietnamese Restaurant",
+      "region": "penticton",
+      "slug": "pho-more-vietnamese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pho-more-vietnamese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 515,
+      "name": "Pizzeria Tratto Napoletana",
+      "region": "penticton",
+      "slug": "pizzeria-tratto-napoletana",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pizzeria-tratto-napoletana-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 519,
+      "name": "Polish Bistro",
+      "region": "penticton",
+      "slug": "polish-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/polish-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 531,
+      "name": "Queen City Eats",
+      "region": "penticton",
+      "slug": "queen-city-eats",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/queen-city-eats-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1004,
+      "name": "Salty's Beach House",
+      "region": "penticton",
+      "slug": "salty-s-beach-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/salty-s-beach-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 579,
+      "name": "Shades on Main Restaurant",
+      "region": "penticton",
+      "slug": "shades-on-main-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shades-on-main-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 600,
+      "name": "Sociale",
+      "region": "penticton",
+      "slug": "sociale",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sociale-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 631,
+      "name": "Sushi Genki+ Ramen",
+      "region": "penticton",
+      "slug": "sushi-genki-ramen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sushi-genki-ramen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 632,
+      "name": "Sushi Heaven Penticton",
+      "region": "penticton",
+      "slug": "sushi-heaven-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sushi-heaven-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1015,
+      "name": "Sushi Kojo",
+      "region": "penticton",
+      "slug": "kizuna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kizuna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 642,
+      "name": "THE MAGIC FOOD TRUCK LTD",
+      "region": "penticton",
+      "slug": "the-magic-food-truck-ltd",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-magic-food-truck-ltd-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 648,
+      "name": "TacoRiendo Mexican Cantina Penticton",
+      "region": "penticton",
+      "slug": "tacoriendo-mexican-cantina-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tacoriendo-mexican-cantina-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 649,
+      "name": "Tacos del Norte",
+      "region": "penticton",
+      "slug": "tacos-del-norte",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tacos-del-norte-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 656,
+      "name": "Taste of Mediterranean",
+      "region": "penticton",
+      "slug": "taste-of-mediterranean",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/taste-of-mediterranean-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 657,
+      "name": "Tequila Vallarta Restaurante Mexicano",
+      "region": "penticton",
+      "slug": "tequila-vallarta-restaurante-mexicano",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tequila-vallarta-restaurante-mexicano-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 667,
+      "name": "The Black Antler",
+      "region": "penticton",
+      "slug": "the-black-antler",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-black-antler-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1010,
+      "name": "The Oven Wine Bar",
+      "region": "penticton",
+      "slug": "the-oven-wine-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-oven-wine-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1012,
+      "name": "The Restaurant at Poplar Grove",
+      "region": "penticton",
+      "slug": "the-restaurant-at-poplar-grove-1012",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-restaurant-at-poplar-grove-1012-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 997,
+      "name": "The Vista at Play",
+      "region": "penticton",
+      "slug": "sonetto",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sonetto-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 719,
+      "name": "Theo's Restaurant",
+      "region": "penticton",
+      "slug": "theo-s-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/theo-s-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1001,
+      "name": "Tootsies Diner",
+      "region": "penticton",
+      "slug": "tootsies-diner",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tootsies-diner-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 731,
+      "name": "Tres taco loco",
+      "region": "penticton",
+      "slug": "tres-taco-loco",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tres-taco-loco-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 736,
+      "name": "Tube Steak Boogie",
+      "region": "penticton",
+      "slug": "tube-steak-boogie",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tube-steak-boogie-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 996,
+      "name": "Twisted Chopsticks Eatery",
+      "region": "penticton",
+      "slug": "twisted-chopsticks-eatery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/twisted-chopsticks-eatery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1687,
+      "name": "White Spot Penticton",
+      "region": "penticton",
+      "slug": "white-spot-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/white-spot-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 783,
+      "name": "Wild Ginger",
+      "region": "penticton",
+      "slug": "wild-ginger",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wild-ginger-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 995,
+      "name": "Wings Tap & Grill",
+      "region": "penticton",
+      "slug": "wings-tap-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wings-tap-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1064,
+      "name": "Black Pine",
+      "region": "silverstar",
+      "slug": "black-pine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-pine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1060,
+      "name": "The Den",
+      "region": "silverstar",
+      "slug": "the-den",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-den-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 706,
+      "name": "The Red Antler",
+      "region": "silverstar",
+      "slug": "the-red-antler",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-red-antler-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1062,
+      "name": "Town Hall",
+      "region": "silverstar",
+      "slug": "town-hall",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/town-hall-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1061,
+      "name": "d'argento",
+      "region": "silverstar",
+      "slug": "d-argento",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/d-argento-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 94,
+      "name": "Bread & Cheese Co",
+      "region": "summerland",
+      "slug": "bread-cheese-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bread-cheese-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1075,
+      "name": "Canyonview Bar & Grill",
+      "region": "summerland",
+      "slug": "canyonview-bar-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/canyonview-bar-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 314,
+      "name": "Just Delicious Japanese Bistro",
+      "region": "summerland",
+      "slug": "just-delicious-japanese-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/just-delicious-japanese-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1037,
+      "name": "Kitchen @ Ve Oh Lay Acres Honey Wine & Farm",
+      "region": "summerland",
+      "slug": "kitchen-ve-oh-lay-acres-honey-wine-farm",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kitchen-ve-oh-lay-acres-honey-wine-farm-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 425,
+      "name": "Murray's Pizza & Pasta (Summerland)",
+      "region": "summerland",
+      "slug": "murray-s-pizza-pasta-summerland",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/murray-s-pizza-pasta-summerland-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 527,
+      "name": "Prima Pizza & Chicken",
+      "region": "summerland",
+      "slug": "prima-pizza-chicken",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/prima-pizza-chicken-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 576,
+      "name": "Second Home Cafe & Grill",
+      "region": "summerland",
+      "slug": "second-home-cafe-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/second-home-cafe-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 584,
+      "name": "Shaughnessy's Cove",
+      "region": "summerland",
+      "slug": "shaughnessy-s-cove",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shaughnessy-s-cove-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 626,
+      "name": "Summerland Smoke Shack",
+      "region": "summerland",
+      "slug": "summerland-smoke-shack",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-smoke-shack-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 794,
+      "name": "Yaki's Pizza & Subs",
+      "region": "summerland",
+      "slug": "yaki-s-pizza-subs",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yaki-s-pizza-subs-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 805,
+      "name": "Zias Stonehouse Restaurant",
+      "region": "summerland",
+      "slug": "zias-stonehouse-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/zias-stonehouse-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 935,
+      "name": "A Fine Kettle O Fish",
+      "region": "vernon",
+      "slug": "a-fine-kettle-o-fish",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/a-fine-kettle-o-fish-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 17,
+      "name": "Amarin Thai Restaurant",
+      "region": "vernon",
+      "slug": "amarin-thai-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/amarin-thai-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 19,
+      "name": "Amigo chicken and mexican kitchen",
+      "region": "vernon",
+      "slug": "amigo-chicken-and-mexican-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/amigo-chicken-and-mexican-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 24,
+      "name": "Anna's Ukrainian Kitchen",
+      "region": "vernon",
+      "slug": "anna-s-ukrainian-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/anna-s-ukrainian-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 27,
+      "name": "Antojitos Guadalajara",
+      "region": "vernon",
+      "slug": "antojitos-guadalajara",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/antojitos-guadalajara-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 936,
+      "name": "Asian Avenue",
+      "region": "vernon",
+      "slug": "asian-avenue",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/asian-avenue-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 66,
+      "name": "Bento & Sushi",
+      "region": "vernon",
+      "slug": "bento-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bento-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 87,
+      "name": "Boa-Thong Thai Food Restaurant",
+      "region": "vernon",
+      "slug": "boa-thong-thai-food-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boa-thong-thai-food-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1789,
+      "name": "Boston Pizza Vernon",
+      "region": "vernon",
+      "slug": "boston-pizza-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boston-pizza-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 92,
+      "name": "Bourbon Street Bar and Grill",
+      "region": "vernon",
+      "slug": "bourbon-street-bar-and-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bourbon-street-bar-and-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 938,
+      "name": "Brixx Brewhouse",
+      "region": "vernon",
+      "slug": "brixx-brewhouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/brixx-brewhouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 939,
+      "name": "Browns Socialhouse",
+      "region": "vernon",
+      "slug": "browns-socialhouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/browns-socialhouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 940,
+      "name": "C-Lovers Fish & Chips",
+      "region": "vernon",
+      "slug": "c-lovers-fish-chips",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/c-lovers-fish-chips-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 110,
+      "name": "Cabana Bar + Kitchen",
+      "region": "vernon",
+      "slug": "cabana-bar-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cabana-bar-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 111,
+      "name": "Cabbana Indian Bistro",
+      "region": "vernon",
+      "slug": "cabbana-indian-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cabbana-indian-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 941,
+      "name": "Cactus Club Café",
+      "region": "vernon",
+      "slug": "cactus-club-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cactus-club-cafe-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 138,
+      "name": "Chill&Go Tacos",
+      "region": "vernon",
+      "slug": "chill-go-tacos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chill-go-tacos-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 942,
+      "name": "Cora",
+      "region": "vernon",
+      "slug": "cora",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cora-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 156,
+      "name": "Crepe Bistro",
+      "region": "vernon",
+      "slug": "crepe-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/crepe-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1787,
+      "name": "Denny's Vernon",
+      "region": "vernon",
+      "slug": "denny-s-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/denny-s-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 184,
+      "name": "Dorians Greek Taverna Vernon",
+      "region": "vernon",
+      "slug": "dorians-greek-taverna-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dorians-greek-taverna-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 946,
+      "name": "Earls Kitchen & Bar",
+      "region": "vernon",
+      "slug": "earls-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/earls-kitchen-bar-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 193,
+      "name": "Eatology",
+      "region": "vernon",
+      "slug": "eatology",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/eatology-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 201,
+      "name": "Elora Restaurant & Bar",
+      "region": "vernon",
+      "slug": "elora-restaurant-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/elora-restaurant-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 217,
+      "name": "Flamez Chicken",
+      "region": "vernon",
+      "slug": "flamez-chicken",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/flamez-chicken-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 224,
+      "name": "Fresh Lemongrass Vietnamese Restaurant",
+      "region": "vernon",
+      "slug": "fresh-lemongrass-vietnamese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fresh-lemongrass-vietnamese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 238,
+      "name": "Gerni's Farmhouse",
+      "region": "vernon",
+      "slug": "gerni-s-farmhouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gerni-s-farmhouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 266,
+      "name": "Happy Slice Pizza (Vernon)",
+      "region": "vernon",
+      "slug": "happy-slice-pizza-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/happy-slice-pizza-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 951,
+      "name": "Hot Spot on 6th Restaurant",
+      "region": "vernon",
+      "slug": "hot-spot-on-6th-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hot-spot-on-6th-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 289,
+      "name": "Intermezzo Restaurant and Wine Cellar",
+      "region": "vernon",
+      "slug": "intermezzo-restaurant-and-wine-cellar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/intermezzo-restaurant-and-wine-cellar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 953,
+      "name": "J Don",
+      "region": "vernon",
+      "slug": "j-don",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/j-don-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 299,
+      "name": "Jade Asian kitchen",
+      "region": "vernon",
+      "slug": "jade-asian-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jade-asian-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 305,
+      "name": "JenAlio's",
+      "region": "vernon",
+      "slug": "jenalio-s",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jenalio-s-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 306,
+      "name": "Jim's Place Pizza",
+      "region": "vernon",
+      "slug": "jim-s-place-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jim-s-place-pizza-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 323,
+      "name": "Kawakubo Vernon",
+      "region": "vernon",
+      "slug": "kawakubo-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kawakubo-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 954,
+      "name": "Kelly O Bryan's Restaurant",
+      "region": "vernon",
+      "slug": "kelly-o-bryan-s-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelly-o-bryan-s-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 955,
+      "name": "Kiki Gardens Restaurant",
+      "region": "vernon",
+      "slug": "kiki-gardens-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kiki-gardens-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 372,
+      "name": "Los Huesos Restaurant",
+      "region": "vernon",
+      "slug": "los-huesos-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/los-huesos-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 957,
+      "name": "Lynn's Vietnamese Restaurant",
+      "region": "vernon",
+      "slug": "lynn-s-vietnamese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lynn-s-vietnamese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 383,
+      "name": "MR MIKES SteakhouseCasual (Vernon)",
+      "region": "vernon",
+      "slug": "mr-mikes-steakhousecasual-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mr-mikes-steakhousecasual-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 387,
+      "name": "Mahoroba Japanese Restaurant",
+      "region": "vernon",
+      "slug": "mahoroba-japanese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mahoroba-japanese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 398,
+      "name": "Masiero Pizzeria Napoletana",
+      "region": "vernon",
+      "slug": "masiero-pizzeria-napoletana",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/masiero-pizzeria-napoletana-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 405,
+      "name": "Mi Taqueria- Mexican Cantina",
+      "region": "vernon",
+      "slug": "mi-taqueria-mexican-cantina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mi-taqueria-mexican-cantina-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 407,
+      "name": "Midtown Bistro",
+      "region": "vernon",
+      "slug": "midtown-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/midtown-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 960,
+      "name": "New Golden Crown",
+      "region": "vernon",
+      "slug": "new-golden-crown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/new-golden-crown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 435,
+      "name": "New Punjab Restaurant, Bar & Sweets Vernon",
+      "region": "vernon",
+      "slug": "new-punjab-restaurant-bar-sweets-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/new-punjab-restaurant-bar-sweets-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 449,
+      "name": "OHKIM Sushi",
+      "region": "vernon",
+      "slug": "ohkim-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ohkim-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 463,
+      "name": "On The Way",
+      "region": "vernon",
+      "slug": "on-the-way",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/on-the-way-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 961,
+      "name": "Original Joe's Restaurant",
+      "region": "vernon",
+      "slug": "original-joe-s-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/original-joe-s-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 476,
+      "name": "Pallino's",
+      "region": "vernon",
+      "slug": "pallino-s",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pallino-s-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 963,
+      "name": "PeakFine at Sparkling Hill Resort",
+      "region": "vernon",
+      "slug": "peakfine-at-sparkling-hill-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peakfine-at-sparkling-hill-resort-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 502,
+      "name": "Pho Sate Restaurant",
+      "region": "vernon",
+      "slug": "pho-sate-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pho-sate-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 505,
+      "name": "Phoenix Steakhouse",
+      "region": "vernon",
+      "slug": "phoenix-steakhouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/phoenix-steakhouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 535,
+      "name": "RANGE restaurant, bar + patio",
+      "region": "vernon",
+      "slug": "range-restaurant-bar-patio",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/range-restaurant-bar-patio-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 966,
+      "name": "RB Bar & Grill",
+      "region": "vernon",
+      "slug": "rb-bar-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rb-bar-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 540,
+      "name": "Raku Rice & Noodle Bar",
+      "region": "vernon",
+      "slug": "raku-rice-noodle-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/raku-rice-noodle-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 547,
+      "name": "Red Tomato Pies",
+      "region": "vernon",
+      "slug": "red-tomato-pies",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-tomato-pies-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 558,
+      "name": "Rosalinda's",
+      "region": "vernon",
+      "slug": "rosalinda-s",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rosalinda-s-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 969,
+      "name": "Roster Sports Club",
+      "region": "vernon",
+      "slug": "roster-sports-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/roster-sports-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 970,
+      "name": "Royal Garden",
+      "region": "vernon",
+      "slug": "royal-garden",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/royal-garden-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 562,
+      "name": "Rustlers Table",
+      "region": "vernon",
+      "slug": "rustlers-table",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rustlers-table-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 564,
+      "name": "Saffron Touch Indian Cuisine",
+      "region": "vernon",
+      "slug": "saffron-touch-indian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/saffron-touch-indian-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 566,
+      "name": "Sakura Sushi & Japanese Grocery",
+      "region": "vernon",
+      "slug": "sakura-sushi-japanese-grocery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sakura-sushi-japanese-grocery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 581,
+      "name": "Shahi Pakwan",
+      "region": "vernon",
+      "slug": "shahi-pakwan",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shahi-pakwan-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 592,
+      "name": "Sky High Diner",
+      "region": "vernon",
+      "slug": "sky-high-diner",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sky-high-diner-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 974,
+      "name": "Spallumcheen Golf & Country Club",
+      "region": "vernon",
+      "slug": "spallumcheen-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spallumcheen-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 613,
+      "name": "Station BBQ Smokehouse",
+      "region": "vernon",
+      "slug": "station-bbq-smokehouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/station-bbq-smokehouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 618,
+      "name": "Suda Restaurant",
+      "region": "vernon",
+      "slug": "suda-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/suda-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 620,
+      "name": "Sugoi Ramen Express",
+      "region": "vernon",
+      "slug": "sugoi-ramen-express",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sugoi-ramen-express-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 633,
+      "name": "Sushi Kawa",
+      "region": "vernon",
+      "slug": "sushi-kawa",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sushi-kawa-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 758,
+      "name": "The 1913 Restaurant",
+      "region": "vernon",
+      "slug": "vernon-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 665,
+      "name": "The Bistro - by Intermezzo",
+      "region": "vernon",
+      "slug": "the-bistro-by-intermezzo",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-bistro-by-intermezzo-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 676,
+      "name": "The Curry Pot Indian & Nepalese Cuisine Restaurant",
+      "region": "vernon",
+      "slug": "the-curry-pot-indian-nepalese-cuisine-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-curry-pot-indian-nepalese-cuisine-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 680,
+      "name": "The Edge Restaurant & Bar",
+      "region": "vernon",
+      "slug": "the-edge-restaurant-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-edge-restaurant-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 687,
+      "name": "The Go Grill / The Fancy Induced Burger",
+      "region": "vernon",
+      "slug": "the-go-grill-the-fancy-induced-burger",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-go-grill-the-fancy-induced-burger-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 701,
+      "name": "The Med Restaurant - Vernon",
+      "region": "vernon",
+      "slug": "the-med-restaurant-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-med-restaurant-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 774,
+      "name": "Wasabi Sushi & Grill",
+      "region": "vernon",
+      "slug": "wasabi-sushi-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wasabi-sushi-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1788,
+      "name": "White Spot Vernon",
+      "region": "vernon",
+      "slug": "white-spot-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/white-spot-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 977,
+      "name": "Wings Tap & Grill",
+      "region": "vernon",
+      "slug": "wings-tap-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wings-tap-grill-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 800,
+      "name": "YukiOn Sushi",
+      "region": "vernon",
+      "slug": "yukion-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yukion-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 808,
+      "name": "maaza indian kitchen + Bar",
+      "region": "vernon",
+      "slug": "maaza-indian-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/maaza-indian-kitchen-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 5,
+      "name": "19 Okanagan Grill + Bar",
+      "region": "west-kelowna",
+      "slug": "19-okanagan-grill-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/19-okanagan-grill-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 914,
+      "name": "31 Charkay",
+      "region": "west-kelowna",
+      "slug": "31-charkay",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/31-charkay-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 25,
+      "name": "Annie's Beach Cafe & Lounge",
+      "region": "west-kelowna",
+      "slug": "annie-s-beach-cafe-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/annie-s-beach-cafe-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 34,
+      "name": "Asuki sushi",
+      "region": "west-kelowna",
+      "slug": "asuki-sushi",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/asuki-sushi-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 45,
+      "name": "BUY THE SEA SEAFOOD (West Kelowna)",
+      "region": "west-kelowna",
+      "slug": "buy-the-sea-seafood-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/buy-the-sea-seafood-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 51,
+      "name": "Bamboo Chopsticks Vietnamese Restaurant",
+      "region": "west-kelowna",
+      "slug": "bamboo-chopsticks-vietnamese-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bamboo-chopsticks-vietnamese-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1713,
+      "name": "Boston Pizza West Kelowna",
+      "region": "west-kelowna",
+      "slug": "boston-pizza-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boston-pizza-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 917,
+      "name": "BurgerBloc",
+      "region": "west-kelowna",
+      "slug": "burgerbloc",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/burgerbloc-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 108,
+      "name": "C-Lovers Fish & Chips (West Kelowna)",
+      "region": "west-kelowna",
+      "slug": "c-lovers-fish-chips-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/c-lovers-fish-chips-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 135,
+      "name": "Cherry Pit Restaurant",
+      "region": "west-kelowna",
+      "slug": "cherry-pit-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cherry-pit-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 205,
+      "name": "Everest Indian Restaurant",
+      "region": "west-kelowna",
+      "slug": "everest-indian-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/everest-indian-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 920,
+      "name": "Gians Tandoori Corner",
+      "region": "west-kelowna",
+      "slug": "gians-tandoori-corner",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gians-tandoori-corner-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 921,
+      "name": "Golden Chopsticks Restaurant",
+      "region": "west-kelowna",
+      "slug": "golden-chopsticks-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/golden-chopsticks-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 285,
+      "name": "Il Mercato Social Kitchen",
+      "region": "west-kelowna",
+      "slug": "il-mercato-social-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/il-mercato-social-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 301,
+      "name": "Jade Buffet West Kelowna",
+      "region": "west-kelowna",
+      "slug": "jade-buffet-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jade-buffet-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 379,
+      "name": "MEX-KELOWNA TACOS",
+      "region": "west-kelowna",
+      "slug": "mex-kelowna-tacos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mex-kelowna-tacos-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 380,
+      "name": "MJ Asian Cuisine",
+      "region": "west-kelowna",
+      "slug": "mj-asian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mj-asian-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 923,
+      "name": "MeiWei Chinese Cuisine",
+      "region": "west-kelowna",
+      "slug": "meiwei-chinese-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/meiwei-chinese-cuisine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 413,
+      "name": "Momo Sushi (West Kelowna)",
+      "region": "west-kelowna",
+      "slug": "momo-sushi-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/momo-sushi-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 930,
+      "name": "Old Vines Restaurant",
+      "region": "west-kelowna",
+      "slug": "old-vines-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/old-vines-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 465,
+      "name": "Opa! Of Greece",
+      "region": "west-kelowna",
+      "slug": "opa-of-greece",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/opa-of-greece-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 924,
+      "name": "Original Joe's Restaurant",
+      "region": "west-kelowna",
+      "slug": "original-joe-s-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/original-joe-s-restaurant-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 479,
+      "name": "Pandanus Thai Restaurant",
+      "region": "west-kelowna",
+      "slug": "pandanus-thai-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pandanus-thai-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 925,
+      "name": "Pepper Pot Grill",
+      "region": "west-kelowna",
+      "slug": "pepper-pot-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pepper-pot-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 583,
+      "name": "Shannon Lake Restaurant",
+      "region": "west-kelowna",
+      "slug": "shannon-lake-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shannon-lake-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 926,
+      "name": "Smitty's",
+      "region": "west-kelowna",
+      "slug": "smitty-s",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/smitty-s-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 931,
+      "name": "Terrace Restaurant",
+      "region": "west-kelowna",
+      "slug": "terrace-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/terrace-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 699,
+      "name": "The Landing Kitchen + Bar",
+      "region": "west-kelowna",
+      "slug": "the-landing-kitchen-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-landing-kitchen-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 703,
+      "name": "The Modest Butcher Kitchen + Market",
+      "region": "west-kelowna",
+      "slug": "the-modest-butcher-kitchen-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-modest-butcher-kitchen-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 737,
+      "name": "Tula Restaurant @ Little Straw Vineyards",
+      "region": "west-kelowna",
+      "slug": "tula-restaurant-little-straw-vineyards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tula-restaurant-little-straw-vineyards-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 744,
+      "name": "Two Brothers Mexican Restaurant",
+      "region": "west-kelowna",
+      "slug": "two-brothers-mexican-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/two-brothers-mexican-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 780,
+      "name": "West Sakura Teriyaki Restaurant",
+      "region": "west-kelowna",
+      "slug": "west-sakura-teriyaki-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/west-sakura-teriyaki-restaurant-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 927,
+      "name": "Whiski-Jacks Pins & Pints",
+      "region": "west-kelowna",
+      "slug": "whiski-jacks-pins-pints",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/whiski-jacks-pins-pints-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1714,
+      "name": "White Spot West Kelowna",
+      "region": "west-kelowna",
+      "slug": "white-spot-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/white-spot-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 929,
+      "name": "Wings Tap & Grill",
+      "region": "west-kelowna",
+      "slug": "wings-tap-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wings-tap-grill-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 797,
+      "name": "Yamato - West Kelowna",
+      "region": "west-kelowna",
+      "slug": "yamato-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yamato-west-kelowna-2610.jpg?v=20261017"
+      }
+    }
+  ]
+}
