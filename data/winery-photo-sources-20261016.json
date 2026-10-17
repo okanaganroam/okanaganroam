@@ -1918,5 +1918,23 @@
     "image_url": "https://volcanichillswinery.com/cdn/shop/files/hero_image_boucherie.jpg?v=1613758751",
     "source_kind": "official_website",
     "note": "Volcanic Hills vineyard rows leading to the winery building with Okanagan Lake and mountains behind"
+  },
+  {
+    "id": 864,
+    "name": "Rigour and Whimsy",
+    "file": "/images/venues/rigour-and-whimsy-2610.jpg",
+    "dimensions": "1320x650",
+    "source_page": "https://www.rigourandwhimsy.ca/",
+    "source_kind": "official_website",
+    "note": "Young netted vines on the estate vineyard with hills behind, from the winery website."
+  },
+  {
+    "id": 1421,
+    "name": "Cassini Cellars",
+    "file": "/images/venues/cassini-cellars-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.destinationosoyoos.com",
+    "source_kind": "tourism_board",
+    "note": "The yellow Tuscan-style Cassini winery building on Highway 97 with vineyard at each side, from its Destination Osoyoos listing."
   }
 ]
