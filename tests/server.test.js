@@ -16551,7 +16551,8 @@ test('SEO audit: region pages get their own share image; ski resorts get après-
   assert.match(kelowna, /<title>Things to Do in Kelowna: Beaches, Wineries &amp; Food \| Okanagan Roam<\/title>/);
 
   const bigWhite = app.renderRegionPage('big-white', app.getRegionCategoryCounts('big-white') || {}, []);
-  assert.match(bigWhite, /<title>Big White Restaurants, Bars &amp; Après-Ski, BC \| Okanagan Roam<\/title>/);
+  // Winter copy (2026-10-17) replaced the shared ski-hill title.
+  assert.match(bigWhite, /<title>Big White Restaurants, Après-Ski &amp; Winter Guide \| Okanagan Roam<\/title>/);
   assert.doesNotMatch(bigWhite.match(/<meta name="description" content="([^"]*)">/)[1], /golf|winer/i);
   assert.equal(ogImage(bigWhite), 'https://okanaganroam.com/images/regions/photos/big-white-2610.jpg');
 });
@@ -16581,7 +16582,7 @@ test('Region intros: every destination carries local copy; towns get a "Things t
     const title = html.match(/<title>([^<]*)<\/title>/)[1];
     const desc = html.match(/<meta name="description" content="([^"]*)">/)[1];
     if (app.SKI_RESORT_REGIONS.has(region)) {
-      assert.ok(title.includes('Restaurants, Bars &amp; Après-Ski'), `${region} keeps its ski title`);
+      assert.ok(/Winter|Apr\u00e8s/.test(title) && !title.startsWith('Things to Do'), `${region} keeps its ski title (winter copy, 2026-10-17)`);
       assert.ok(!intro.titleTail);
     } else {
       assert.ok(title.startsWith(`Things to Do in ${label}: `), title);
@@ -21887,4 +21888,28 @@ test('French leaks (2026-10-17): notes, blurbs, directions and linked guide line
   assert.ok(fr.includes(encodeURIComponent(address)), 'the map link searches the stored address');
   assert.match(app.advisoryNoticeHtml('The trail down to the waterfalls is closed for slope stability issues.', app.frTextOr), /Le sentier qui descend aux chutes est fermé en raison de problèmes de stabilité de la pente\./);
   assert.match(app.advisoryNoticeHtml('The trail down to the waterfalls is closed for slope stability issues.'), /The trail down to the waterfalls is closed/, 'English pages unchanged');
+});
+
+test('Ski-hill town pages (2026-10-17): approved winter titles and descriptions in English and French', () => {
+  const want = {
+    'big-white': ['Big White Restaurants, Après-Ski &amp; Winter Guide | Okanagan Roam', 'Restaurants, après-ski et guide d’hiver à Big White'],
+    silverstar: ['SilverStar Dining, Winter Activities &amp; Après Guide', 'Guide d’hiver, restaurants et après-ski à SilverStar'],
+    apex: ['Apex Mountain Restaurants, Pubs &amp; Winter Guide | Okanagan Roam', 'Guide de la station Apex : restaurants et après-ski'],
+    baldy: ['Mount Baldy Winter Guide &amp; Local Dining | Okanagan Roam', 'Guide d’hiver et restauration au mont Baldy | Okanagan Roam'],
+  };
+  const fr = require('../data/french/ski-resorts-2026-10-17.json');
+  for (const [region, [enTitle, frTitle]] of Object.entries(want)) {
+    const en = app.renderRegionPage(region, { restaurant: 3, pub: 2, cafe: 1 }, []);
+    const twin = app.frenchTwinHtml(en, `/${region}`);
+    const title = (h) => h.match(/<title>([^<]*)<\/title>/)[1];
+    const desc = (h) => h.match(/<meta name="description" content="([^"]*)"/)[1];
+    assert.equal(title(en), enTitle, region);
+    assert.equal(title(twin), frTitle, `${region} fr`);
+    assert.ok(title(en).replace(/&amp;/g, '&').length <= 65 && title(twin).length <= 65, `${region}: titles fit`);
+    const enDesc = desc(en).replace(/&amp;/g, '&');
+    assert.equal(desc(twin), fr[enDesc], `${region} fr description`);
+    assert.ok(enDesc.length <= 160 && fr[enDesc].length <= 160, `${region}: descriptions fit`);
+  }
+  // Other towns keep their own titles.
+  assert.match(app.renderRegionPage('kelowna', { restaurant: 3 }, []), /<title>(?!Big White|SilverStar|Apex|Mount Baldy)/);
 });

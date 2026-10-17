@@ -12156,6 +12156,27 @@ const REGION_PAGE_STYLE = `<style id="region-page">
     body.region-page .region-lead-split .region-intro { max-width: none; }
   }
 </style>`;
+// Winter search copy for the four ski-hill town pages (approved by Dayton, 2026-10-17). Each line names only what the
+// hill's listings have; a title over 65 characters drops "| Okanagan Roam" (Google shows the site name anyway). The
+// French is in data/french/ski-resorts-2026-10-17.json, keyed by these strings.
+const SKI_RESORT_META = {
+  'big-white': {
+    title: 'Big White Restaurants, Après-Ski & Winter Guide | Okanagan Roam',
+    description: 'Plan your trip to Big White Ski Resort. Discover the best slope-side restaurants, cozy après-ski pubs, cafés and kid-friendly village activities.',
+  },
+  silverstar: {
+    title: 'SilverStar Dining, Winter Activities & Après Guide',
+    description: 'Your guide to winter at SilverStar Mountain Resort. Find cozy village cafés, restaurants, bars, and kid-friendly snowy adventures near Vernon, BC.',
+  },
+  apex: {
+    title: 'Apex Mountain Restaurants, Pubs & Winter Guide | Okanagan Roam',
+    description: 'Explore dining and après-ski options at Apex Mountain Resort near Penticton. Discover restaurants, pubs, cafés and winter things to do.',
+  },
+  baldy: {
+    title: 'Mount Baldy Winter Guide & Local Dining | Okanagan Roam',
+    description: 'Discover places to eat and things to do around Baldy Mountain Resort near Oliver and Osoyoos, BC.',
+  },
+};
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
   const totalVenues = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
@@ -12163,12 +12184,13 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
   // courses" wording doesn't match what people search for on a ski hill.
   const isSkiResort = SKI_RESORT_REGIONS.has(region);
   const intro = REGION_INTROS[region];
-  const title = intro && intro.titleTail
+  const skiMeta = SKI_RESORT_META[region] || null;
+  const title = skiMeta ? skiMeta.title : intro && intro.titleTail
     ? `Things to Do in ${regionLabel}: ${intro.titleTail} | Okanagan Roam`
     : isSkiResort
       ? `${regionLabel} Restaurants, Bars & Après-Ski, BC | Okanagan Roam`
       : `${regionLabel} Restaurants, Wineries & More, BC | Okanagan Roam`;
-  const description = intro && intro.describe
+  const description = skiMeta ? skiMeta.description : intro && intro.describe
     ? intro.describe(totalVenues)
     : isSkiResort
       ? `${totalVenues} verified spots at ${regionLabel}, BC: restaurants, bars, cafés and après-ski, all reviewed and badge-checked by Okanagan Roam.`
