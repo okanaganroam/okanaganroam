@@ -5443,9 +5443,10 @@ function parseAdvisoryNote(note) {
 // kicker in the site's eyebrow style, the advisory sentence in body type, and
 // an "Official source" link when the note carries a URL. It sits between the
 // permanent description and the CTA row and never styles itself as an alert.
-function advisoryNoticeHtml(note) {
+// tr: the French place page passes frTextOr, so a note listed in data/french reads in French (2026-10-17).
+function advisoryNoticeHtml(note, tr = (s) => s) {
   const { text, url } = parseAdvisoryNote(note);
-  const message = text || 'A temporary condition currently affects this venue. Check the official source for the latest update.';
+  const message = tr(text || 'A temporary condition currently affects this venue. Check the official source for the latest update.');
   let host = '';
   if (url) { try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; } }
   const source = url
@@ -22362,7 +22363,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const venueLinkRow = venueLinks(venue.id);
   const detailRows = [
     venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
-    venue.address ? [L('Address', 'Adresse'), `${escapeHtml(venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
+    // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
+    // link and the schema keep the stored English.
+    venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
     venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved.
@@ -22447,7 +22450,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // description and the CTA row; '' for the overwhelming majority of
   // venues, which keeps their page markup byte-identical.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes().get(venue.id);
-  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
+  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frTextOr).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
   const golfGlanceHtml = fr ? '' : golfAtAGlanceHtml(venue);
@@ -36163,6 +36166,7 @@ module.exports = {
   frenchTwinRequest,
   frText,
   frenchTwinHtml,
+  frTextOr,
   englishTwinHtml,
   withFrenchTwinEntries,
   venuePagePath,

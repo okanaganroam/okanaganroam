@@ -21865,3 +21865,26 @@ test('SEO audit 2 (2026-10-17): FR breadcrumbs, event end dates, summary ItemLis
     }
   }
 });
+
+test('French leaks (2026-10-17): notes, blurbs, directions and linked guide lines are French on /fr; place pages translate address and advisory', () => {
+  const notes = require('../data/french/notes-2026-10-17.json');
+  for (const [en, fr] of Object.entries(notes)) if (!en.includes('{a0}')) assert.equal(app.frText(en), fr, en);
+  const page = (body, enPath) => app.frenchTwinHtml(`<!DOCTYPE html><html lang="en"><head>\n<title>T</title>\n<link rel="canonical" href="https://okanaganroam.com${enPath}">\n</head><body><main>${body}</main></body></html>`, enPath);
+  // A guide line with links is translated whole, links kept in place.
+  const kokanee = page('<ul><li><strong>The salmon run:</strong> <a href="/guides/kokanee-salmon-okanagan">Where to see the kokanee salmon run</a> covers the creeks where the listings mention spawning kokanee, plus other salmon runs and fishing.</li></ul>', '/guides/fall-okanagan');
+  assert.match(kokanee, /couvre les ruisseaux où les fiches mentionnent la fraie des kokanis/);
+  assert.match(kokanee, /href="\/fr\/guides\/kokanee-salmon-okanagan"/);
+  const empty = page('<p>Okanagan Roam is building its What’s On listings community by community. Your region and category choices are saved in the address bar, so this page is ready the moment the first events arrive — in the meantime, <a href="/outdoors">explore the outdoors</a> or <a href="/trip">start planning a trip</a>.</p>', '/whats-on');
+  assert.match(empty, /Okanagan Roam construit ses listes d’événements une communauté à la fois/);
+  assert.doesNotMatch(empty, /is building its What/);
+  // A card note on a list page.
+  assert.match(page('<p class="card-note"><span class="card-note-label">Dogs:</span> Designated area on the east side of the beach for dogs</p>', '/beaches'), /Zone désignée pour les chiens du côté est de la plage/);
+  // The French place page: address (directions) and advisory text in French; the map link keeps the stored English.
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const address = 'Knox Mountain Drive, just north of downtown Kelowna, BC (additional parking at the western base off Poplar Point Drive)';
+  const fr = app.renderVenuePage({ ...venue, address, latitude: null, longitude: null, description_fr: 'Une trattoria (fixture).' }, [], [], [], { lang: 'fr' });
+  assert.match(fr, /Knox Mountain Drive, juste au nord du centre-ville de Kelowna \(C\.-B\.\)/);
+  assert.ok(fr.includes(encodeURIComponent(address)), 'the map link searches the stored address');
+  assert.match(app.advisoryNoticeHtml('The trail down to the waterfalls is closed for slope stability issues.', app.frTextOr), /Le sentier qui descend aux chutes est fermé en raison de problèmes de stabilité de la pente\./);
+  assert.match(app.advisoryNoticeHtml('The trail down to the waterfalls is closed for slope stability issues.'), /The trail down to the waterfalls is closed/, 'English pages unchanged');
+});
