@@ -22334,3 +22334,45 @@ test('Menus: where each dish is in the photo is kept for checking but never publ
   assert.deepEqual(kept.sections[0].items[0].src, { f: 3, b: [10, 20, 600, 60], n: [10, 20, 200, 60], p: [560, 20, 600, 60] });
   assert.equal(kept.sections[0].items[1].src, undefined);
 });
+
+test('Menus: real menu layouts (capitals dish names, prices after long descriptions, add-ons, choices, no prices)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  const start = src.indexOf('const MENU_APP_SCRIPT = String.raw`') + 'const MENU_APP_SCRIPT = String.raw`'.length;
+  const win = { MENU_CFG: { t: { diet: {} }, state: { menu: null, published: null, scan: 'device' }, base: '', mode: 'token' }, scrollTo() {} };
+  new Function('window', 'document', src.slice(start, src.indexOf('})();`;', start) + 5))(win, { getElementById: () => ({ addEventListener() {}, innerHTML: '' }), head: { appendChild() {} } });
+  const parse = (txt) => win.__menuParse(txt.trim().split('\n').map((text) => ({ text, conf: 100 })));
+  const flat = (r) => r.sections.flatMap((s) => s.items.map((i) => `${s.name} | ${i.name} | ${i.price}${i.check ? ' ?' : ''}`));
+
+  // A pub: dish names in capitals, the description, the price at the end of the description; "PACHOS" heads its sizes.
+  assert.deepEqual(flat(parse(`APPETIZERS
+STUFFED MUSHROOMS
+Crab & Shrimp, Cream Cheese, Baked Mozzarella 17.95
+IRISH YORKIES
+Two Fresh Yorkies, Sirloin Roast, Maple Bacon Bourbon Gravy
+Horseradish Aioli 18.95
+PACHOS
+Lattice-Style Fries Seasoned with our Signature Spice, Topped with Cheddar
+Pachos For One 14.95 Pachos For Two 29.95`)), [
+    'Appetizers | Stuffed Mushrooms | 17.95', 'Appetizers | Irish Yorkies | 18.95',
+    'Pachos | Pachos For One | 14.95', 'Pachos | Pachos For Two | 29.95']);
+
+  // A restaurant: the price after a two-line description, an add-on price that isn't the dish's, a list of flavours.
+  assert.deepEqual(flat(parse(`STARTERS
+Pub Nachos
+Fresh house made tortilla chips layered with melted cheese, jalapenos,
+$16 single, $22 double. Add: Beef or Pulled Pork 6
+Chicken Wings
+Breaded wings, fried crisp and served with ranch dressing 19
+Salt & Pepper
+Korean BBQ
+Honey Lime
+Bruschetta
+Toasted artisan bread topped with tomatoes,
+basil, parmesan cheese 14`)), [
+    'Starters | Pub Nachos | 16 ?', 'Starters | Chicken Wings | 19', 'Starters | Bruschetta | 14']);
+  assert.match(parse('MAINS\nChicken Wings\nBreaded wings, fried crisp 19\nSalt & Pepper\nKorean BBQ').sections[0].items[0].description, /Choice of: Salt & Pepper, Korean BBQ/);
+
+  // A dining room that prints no prices: nothing is flagged.
+  assert.deepEqual(flat(parse('SHAREABLES\nSourdough\ncompound butter\nBurrata\nwinter squash, pear vinegar, candied pepitas')),
+    ['Shareables | Sourdough | ', 'Shareables | Burrata | ']);
+});

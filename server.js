@@ -31474,19 +31474,54 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     function readPdfPage(pdf, n){
       return pdf.getPage(n).then(function(page){
         return page.getTextContent().then(function(tc){
-          var rows = {}, chars = 0;
-          tc.items.forEach(function(it){ var y = Math.round(it.transform[5] / 3); (rows[y] = rows[y] || []).push(it); chars += String(it.str).trim().length; });
-          if (chars > 40) {
-            Object.keys(rows).map(Number).sort(function(a, b){ return b - a; }).forEach(function(y){
-              lines.push({ text: rows[y].sort(function(a, b){ return a.transform[4] - b.transform[4]; }).map(function(it){ return it.str; }).join(' '), conf: 100 });
-            });
+          // Some PDFs (often made in design apps) store letters in a private font code, so their "text" is junk:
+          // those pages are read as a picture instead.
+          var chars = 0, good = 0;
+          tc.items.forEach(function(it){ var t = String(it.str).replace(/\s+/g, ''); chars += t.length; good += t.replace(/[^A-Za-z0-9$.,&'\u00c0-\u00ff()\-\/%]/g, '').length; });
+          if (chars > 40 && good >= chars * 0.85) {
+            // A PDF with real text: its words and positions go through the same column reading as a photo.
+            ocrLines(pdfTextData(tc.items, page.getViewport({ scale: 1 }).height)).forEach(function(l){ delete l.box; lines.push(l); });
             return;
           }
-          var vp = page.getViewport({ scale: 2 }), c = document.createElement('canvas');
-          c.width = vp.width; c.height = vp.height;
-          return page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function(){ return recognise(c, null); });
+          // A scanned PDF page is one photo: read that photo straight out of the file, at its own resolution.
+          // Anything else (designed pages with junk text codes) is drawn and read like a photo.
+          return scannedImage(page).then(function(img){
+            if (img) return recognise(img, null);
+            var vp = page.getViewport({ scale: 2 }), c = document.createElement('canvas');
+            c.width = vp.width; c.height = vp.height;
+            return page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function(){ return recognise(c, null); });
+          });
         });
       });
+    }
+    function scannedImage(page){
+      return page.getOperatorList().then(function(ops){
+        var OPS = window.pdfjsLib.OPS, names = [];
+        if (ops.fnArray.length > 40) return null;
+        ops.fnArray.forEach(function(fn, k){ if (fn === OPS.paintImageXObject || fn === OPS.paintJpegXObject) names.push(ops.argsArray[k][0]); });
+        if (names.length !== 1) return null;
+        return new Promise(function(resolve){
+          var settled = false, finish = function(v){ if (!settled) { settled = true; resolve(v); } };
+          setTimeout(function(){ finish(null); }, 15000);
+          try {
+            page.objs.get(names[0], function(img){
+              if (!img || Math.max(img.width, img.height) < 1000) return finish(null);
+              var k = Math.min(1, 3000 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+              c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+              var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+              if (img.bitmap) { ctx.drawImage(img.bitmap, 0, 0, c.width, c.height); return finish(c); }
+              if (!img.data || (img.kind !== 2 && img.kind !== 3)) return finish(null);
+              var t = document.createElement('canvas'); t.width = img.width; t.height = img.height;
+              var tctx = t.getContext('2d'), id = tctx.createImageData(img.width, img.height), src = img.data, dst = id.data;
+              for (var a = 0, b = 0; b < dst.length; b += 4) {
+                dst[b] = src[a]; dst[b + 1] = src[a + 1]; dst[b + 2] = src[a + 2]; dst[b + 3] = 255;
+                a += img.kind === 3 ? 4 : 3;
+              }
+              tctx.putImageData(id, 0, 0); ctx.drawImage(t, 0, 0, c.width, c.height); finish(c);
+            });
+          } catch (e) { finish(null); }
+        });
+      }, function(){ return null; });
     }
     function readPdf(url){
       return loadScript(PDFJS_SRC).then(function(){
@@ -31515,6 +31550,41 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       S.menu.read_error = 'failed'; render(navigator.onLine === false ? T.networkText : null);
     });
   }
+  // A PDF's text pieces as the reader's lines and words (top-down positions), so columns are found the same way as
+  // in a photo. Pieces printed tight together are one word ("B" + "readed"); a piece is split into words with
+  // positions shared out by length.
+  function pdfTextData(items, height){
+    var rows = {}, seen = {};
+    items.forEach(function(it){
+      var str = String(it.str || ''); if (!str.trim()) return;
+      var t = it.transform, hgt = Math.abs(t[3]) || it.height || 10, x0 = t[4], y1 = height - t[5];
+      // The same words printed twice in one spot (a shadow effect) are read once.
+      var dup = str + '@' + Math.round(x0 / 2) + ',' + Math.round(t[5] / 2);
+      if (seen[dup]) return; seen[dup] = 1;
+      var key = Math.round(t[5] / 3);
+      (rows[key] = rows[key] || []).push({ str: str, x0: x0, x1: x0 + (it.width || str.length * hgt * 0.5), y0: y1 - hgt, y1: y1, h: hgt });
+    });
+    var lns = Object.keys(rows).map(Number).sort(function(a, b){ return b - a; }).map(function(key){
+      var pieces = rows[key].sort(function(a, b){ return a.x0 - b.x0; }), merged = [];
+      pieces.forEach(function(pc){
+        var prev = merged[merged.length - 1];
+        if (prev && pc.x0 - prev.x1 < prev.h * 0.15 && !/\s$/.test(prev.str) && !/^\s/.test(pc.str)) { prev.str += pc.str; prev.x1 = pc.x1; }
+        else merged.push({ str: pc.str, x0: pc.x0, x1: pc.x1, y0: pc.y0, y1: pc.y1, h: pc.h });
+      });
+      var words = [];
+      merged.forEach(function(pc){
+        var len = pc.str.length || 1, per = (pc.x1 - pc.x0) / len, at = 0;
+        pc.str.split(/(\s+)/).forEach(function(part){
+          if (part && !/^\s+$/.test(part)) words.push({ text: part, confidence: 100, bbox: { x0: pc.x0 + at * per, x1: pc.x0 + (at + part.length) * per, y0: pc.y0, y1: pc.y1 } });
+          at += part.length;
+        });
+      });
+      if (!words.length) return null;
+      var y = words[0].bbox.y1, x0 = words[0].bbox.x0, x1 = words[words.length - 1].bbox.x1;
+      return { text: words.map(function(w){ return w.text; }).join(' '), confidence: 100, words: words, baseline: { x0: x0, y0: y, x1: x1, y1: y } };
+    }).filter(Boolean);
+    return { blocks: [{ paragraphs: [{ lines: lns }] }] };
+  }
   // Menus are often printed in columns, and the reader can run straight across them ("Poutine 14 Carbonara 21").
   // So each recognised line is cut at the empty gutters between columns, and every column is read top to bottom.
   // Word positions are first turned to undo the photo's tilt (from the slope of the text baselines).
@@ -31540,38 +31610,65 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       if (g.width > best.width) best = { splits: g.splits, width: g.width, lean: lean };
     }
     words.forEach(function(w){ w.x -= best.lean * w.y; });
-    var splits = best.splits, parts = {};
-    words.forEach(function(w){
-      var col = 0; while (col < splits.length && w.x > splits[col]) col++;
-      var key = w.line + '|' + col; (parts[key] = parts[key] || { col: col, ws: [] }).ws.push(w);
-    });
-    // A price printed at the right edge of a column sits beside the gutter and can land in the next column
-    // ("14 Carbonara 21"): prices belong to the words on their left, so they move back.
+    // Pages often mix layouts (a one-column section, then a three-column grid), so columns are found region by
+    // region down the page: each line looks at the lines around it, neighbouring lines that agree form a region,
+    // and every region is read column by column before the next one.
     var isPriceWord = function(t){ return /^[$S]?\d{1,4}([.,]\d{1,2})?$/.test(t); };
-    Object.keys(parts).forEach(function(k){ parts[k].ws.sort(function(a, b){ return a.x - b.x; }); });
-    Object.keys(parts).forEach(function(k){
-      var p = parts[k], prev = parts[k.split('|')[0] + '|' + (p.col - 1)];
-      if (!prev) return;
-      while (p.ws.length && isPriceWord(p.ws[0].t)) prev.ws.push(p.ws.shift());
-      if (!p.ws.length) delete parts[k];
+    var lineY = {};
+    words.forEach(function(w){ var e = lineY[w.line] = lineY[w.line] || { y: 0, n: 0 }; e.y += w.y; e.n++; });
+    var order = Object.keys(lineY).map(Number).sort(function(a, b){ return lineY[a].y / lineY[a].n - lineY[b].y / lineY[b].n; });
+    var pageW = 0;
+    (function(){ var lo = Infinity, hi = -Infinity; words.forEach(function(w){ lo = Math.min(lo, w.x - w.hw); hi = Math.max(hi, w.x + w.hw); }); pageW = hi - lo; })();
+    var near = function(k, reach){
+      var set = {}; for (var j = Math.max(0, k - reach); j < Math.min(order.length, k + reach + 1); j++) set[order[j]] = 1;
+      return words.filter(function(w){ return set[w.line]; });
+    };
+    var regions = [];
+    // A gutter that runs the whole page wins (a plain two-column menu); regions only when there isn't one.
+    if (best.splits.length) regions.push({ sp: best.splits, lines: order.slice() });
+    else order.forEach(function(li, k){
+      var sp = findGutters(near(k, 8)).splits, r = regions[regions.length - 1];
+      var same = r && r.sp.length === sp.length && sp.every(function(x, i){ return Math.abs(x - r.sp[i]) < pageW * 0.05; });
+      if (same) r.lines.push(li); else regions.push({ sp: sp, lines: [li] });
     });
-    Object.keys(parts).map(function(k){
-      var p = parts[k], y = 0, c = 0;
-      // A wrong price matters most, so a line is only as sure as its least certain price.
-      // Where the line sits in the photo, so the owner can see it next to what was read.
-      var pc = 100, grow = function(bx, w){ return bx ? [Math.min(bx[0], w.b.x0), Math.min(bx[1], w.b.y0), Math.max(bx[2], w.b.x1), Math.max(bx[3], w.b.y1)] : [w.b.x0, w.b.y0, w.b.x1, w.b.y1]; };
-      var box = null, nbox = null, pbox = null;
-      // The price is the number(s) at the end of the line; a number inside the name ("18 holes") is part of the name.
-      var tail = p.ws.length;
-      while (tail > 0 && isPriceWord(p.ws[tail - 1].t)) tail--;
-      if (tail === 0) tail = p.ws.length;
-      p.ws.forEach(function(w, wi){
-        y += w.y; c += w.c;
-        box = grow(box, w);
-        if (wi >= tail) { pc = Math.min(pc, w.c); pbox = grow(pbox, w); } else nbox = grow(nbox, w);
+    // A region of one or two lines is a wobble, not a new layout: it joins the region above.
+    var merged = [];
+    regions.forEach(function(r){ if (merged.length && r.lines.length < 3) merged[merged.length - 1].lines = merged[merged.length - 1].lines.concat(r.lines); else merged.push(r); });
+    merged.forEach(function(r){
+      var inRegion = {}; r.lines.forEach(function(li){ inRegion[li] = 1; });
+      var rw = words.filter(function(w){ return inRegion[w.line]; });
+      var splits = merged.length > 1 && rw.length >= 20 ? findGutters(rw).splits : r.sp, parts = {};
+      rw.forEach(function(w){
+        var col = 0; while (col < splits.length && w.x > splits[col]) col++;
+        var key = w.line + '|' + col; (parts[key] = parts[key] || { col: col, ws: [] }).ws.push(w);
       });
-      return { col: p.col, y: y / p.ws.length, text: p.ws.map(function(w){ return w.t; }).join(' '), conf: Math.min(c / p.ws.length, pc), box: box, nbox: nbox, pbox: pbox };
-    }).sort(function(a, b){ return a.col - b.col || a.y - b.y; }).forEach(function(o){ lines.push({ text: o.text, conf: o.conf, box: o.box, nbox: o.nbox, pbox: o.pbox }); });
+      // A price printed at the right edge of a column sits beside the gutter and can land in the next column
+      // ("14 Carbonara 21"): prices belong to the words on their left, so they move back.
+      Object.keys(parts).forEach(function(k){ parts[k].ws.sort(function(a, b){ return a.x - b.x; }); });
+      Object.keys(parts).forEach(function(k){
+        var p = parts[k], prev = parts[k.split('|')[0] + '|' + (p.col - 1)];
+        if (!prev) return;
+        while (p.ws.length && isPriceWord(p.ws[0].t)) prev.ws.push(p.ws.shift());
+        if (!p.ws.length) delete parts[k];
+      });
+        Object.keys(parts).map(function(k){
+        var p = parts[k], y = 0, c = 0;
+        // A wrong price matters most, so a line is only as sure as its least certain price.
+        // Where the line sits in the photo, so the owner can see it next to what was read.
+        var pc = 100, grow = function(bx, w){ return bx ? [Math.min(bx[0], w.b.x0), Math.min(bx[1], w.b.y0), Math.max(bx[2], w.b.x1), Math.max(bx[3], w.b.y1)] : [w.b.x0, w.b.y0, w.b.x1, w.b.y1]; };
+        var box = null, nbox = null, pbox = null;
+        // The price is the number(s) at the end of the line; a number inside the name ("18 holes") is part of the name.
+        var tail = p.ws.length;
+        while (tail > 0 && isPriceWord(p.ws[tail - 1].t)) tail--;
+        if (tail === 0) tail = p.ws.length;
+        p.ws.forEach(function(w, wi){
+          y += w.y; c += w.c;
+          box = grow(box, w);
+          if (wi >= tail) { pc = Math.min(pc, w.c); pbox = grow(pbox, w); } else nbox = grow(nbox, w);
+        });
+        return { col: p.col, y: y / p.ws.length, text: p.ws.map(function(w){ return w.t; }).join(' '), conf: Math.min(c / p.ws.length, pc), wconf: c / p.ws.length, box: box, nbox: nbox, pbox: pbox };
+      }).sort(function(a, b){ return a.col - b.col || a.y - b.y; }).forEach(function(o){ lines.push({ text: o.text, conf: o.conf, wconf: o.wconf, box: o.box, nbox: o.nbox, pbox: o.pbox }); });
+    });
     return lines;
   }
   // Vertical bands (in the middle 70% of the page) that almost no word crosses. A band only counts as a gutter when
@@ -31618,6 +31715,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   var PRICE_RE = /(?:^|\s)(from\s+)?((?:\$\s?(?:\d{1,3}(?:,\d{3})+|\d{1,4})|S?\d{1,3})(?:[.,]\d{1,2})?)((?:\s*[\/|]\s*(?:\$\s?\d{1,4}|S?\d{1,3})(?:[.,]\d{1,2})?)*)(\s*(?:per\s+(?:person|adult|guest|couple|group|hour|child)|pp|p\.p\.|\/\s*(?:person|adult|guest|pp|child|hour)|each|\+\s*(?:gst|tax(?:es)?)))?\s*$/i;
   var DURATION_RE = /^\(?\s*(?:approx\.?\s*|about\s+)?\d+(?:\.\d)?(?:\s*[-–]\s*\d+(?:\.\d)?)?\s*(?:hours?|hrs?|minutes?|mins?|days?|nights?)\b/i;
   var DESC_START_RE = /^(?:includes?|including|departs?|departing|available|minimum|ages?\s+\d|pick-?up|meets?|duration)\b/i;
+  // Notes printed under a dish, sometimes with their own price ("Suggested wine pairing: Merlot 14"): never a dish.
+  var NOTE_START_RE = /^(?:suggested|recommended|pairs? (?:well )?with|wine pairing|pairing|served with|comes with|make it a|upgrade)\b/i;
   var JUNK_RE = /(www\.|https?:|@|\.com\b|\.ca\b|\bphone\b|\btel\b|\(\d{3}\)|\d{3}[-. ]\d{3}[-. ]\d{4}|instagram|facebook|gratuity|\bgst\b|\bpst\b|plus tax|prices? (?:are )?subject|allerg|consuming raw)/i;
   var DIET = { V: 'vegetarian', VG: 'vegan', VE: 'vegan', GF: 'gluten_free', DF: 'dairy_free' };
   function words(t){ return t.split(/\s+/).filter(Boolean).length; }
@@ -31651,7 +31750,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     + 'holes weekday weekend twilight cart carts rental rentals range bucket balls lesson lessons junior senior adult adults child '
     + 'children member members green fees membership round rounds tour tours cruise cruises winery wineries class classes lunch dinner '
     + 'breakfast brunch pickup private group guided admission entry pass passes day hour hours').split(' ').forEach(function(w){ if (w) MENU_WORDS[w] = 1; });
-  var LOOKALIKE = [['l', 'i'], ['i', 'l'], ['1', 'l'], ['1', 'i'], ['0', 'o'], ['5', 's'], ['c', 'e'], ['e', 'c'], ['c', 'o'], ['o', 'c'], ['rn', 'm'], ['cl', 'd'], ['vv', 'w'], ['ea', 'ae'], ['ae', 'ea']];
+  var LOOKALIKE = [['l', 'i'], ['i', 'l'], ['1', 'l'], ['1', 'i'], ['0', 'o'], ['5', 's'], ['c', 'e'], ['e', 'c'], ['c', 'o'], ['o', 'c'], ['t', 'i'], ['i', 't'], ['rn', 'm'], ['cl', 'd'], ['vv', 'w'], ['ea', 'ae'], ['ae', 'ea']];
   function fixWord(w){
     var low = w.toLowerCase();
     if (low.length < 4 || MENU_WORDS[low] || !/^[a-z0-9]+$/.test(low)) return w;
@@ -31704,50 +31803,131 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     }
     function grow(it, ln){ if (!it) return; it._from.push(ln); var src = srcOf(it._from); if (src) it.src = src; }
     // A held line that isn't a dish: a sentence under a fresh heading is that section's note, otherwise a heading.
-    function flush(){
+    function flush(nextIsName){
       if (!pending) return;
+      if (pending.caps) { section(pending.text); pending = null; return; }
+      // A short line followed by another name line: a choice ("Korean BBQ") or a heading ("Flatbreads"); kept as a
+      // maybe for now, decided once the whole menu is read.
+      if (nextIsName && cur && cur.items.length && words(pending.text) <= 3 && !/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]/.test(pending.text)) {
+        item(pending.text, '', '', pending.conf, [pending.ln]); last._maybe = true; pending = null; return;
+      }
       // Stray marks ("Americano \u201c+") mean a price the reader could not make out, not a heading.
       if (/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]/.test(pending.text) && cur) item(pending.text.replace(/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]+/g, ' ').trim(), '', '', 0, [pending.ln]);
       else if (cur && !cur.items.length && words(pending.text) > 2) cur.note = (cur.note ? cur.note + ' ' : '') + pending.text;
       else section(pending.text);
       pending = null;
     }
+    // Two priced items on one line ("Pachos For One 14.95 Pachos For Two 29.95") become two lines.
+    var split = [];
     lines.forEach(function(ln){
+      var parts = String(ln.text || '').replace(/(\s\$?\d{1,3}[.,]\d{2})\s+(?=[A-Z][A-Za-z])/g, '$1\n').split('\n');
+      if (parts.length < 2) { split.push(ln); return; }
+      parts.forEach(function(text){ var c = {}; for (var k in ln) c[k] = ln[k]; c.text = text; split.push(c); });
+    });
+    split.forEach(function(ln){
       var t = String(ln.text || '').replace(/[|_]/g, ' ').replace(/(\s?[.·•…]){2,}\s?/g, ' ').replace(/\s+/g, ' ').replace(/[\s.]+$/, '').trim();
       var conf = typeof ln.conf === 'number' ? ln.conf : 100;
       if (t.length < 2 || JUNK_RE.test(t)) return;
+      // What the reader "saw" in a menu's pictures and decorations: unsure, and mostly not words. Dropped.
+      var sure = typeof ln.wconf === 'number' ? ln.wconf : conf;
+      if (sure < 75) {
+        var textToks = t.split(' ').filter(function(x){ return !/^[$S]?\d[\d.,\/]*$/.test(x); });
+        var wordish = textToks.filter(function(x){ return /^[A-Za-z\u00c0-\u00ff'\u2019&-]{3,}[.,]?$/.test(x) && /[aeiouy]/i.test(x); }).length;
+        if (sure < 35 || (textToks.length && wordish < textToks.length * 0.4)) return;
+      }
+      // Spaced-out decorative lettering ("B U F F A L O") is design, not a dish.
+      var toks = t.split(' ');
+      if (toks.length >= 4 && toks.filter(function(x){ return x.length === 1; }).length >= toks.length * 0.7) return;
       var m = PRICE_RE.exec(t);
       if (m) {
         var unit = m[4] ? ' ' + m[4].trim().replace(/\s+/g, ' ').replace(/^\/\s*/, 'per ') : '';
         var price = (m[2] + (m[3] || '')).replace(/[S$\s]/gi, '').replace(/[\/|]/g, ' / ');
         if (m[1] || unit) price = (m[1] ? 'From ' : '') + '$' + price + unit;
         var rest = t.slice(0, m.index).trim();
+        if (NOTE_START_RE.test(rest) && last && !pending) { last.description = (last.description ? last.description + ' ' : '') + fixWords(t); grow(last, ln); return; }
+        // "$16 single, $22 double. Add: beef 6" / "add bacon 2": the price at the end is an add-on's. The line is
+        // more description, and the dish's own price is the first dollar amount before the "add" (if any).
+        var addAt = rest.search(/\badd\b/i);
+        if (addAt >= 0 && (pending || last)) {
+          if (pending) { item(pending.text, '', '', Math.min(conf, pending.conf), [pending.ln]); if (pending.caps) last._caps = true; pending = null; }
+          var own = /\$\s?(\d{1,4}(?:[.,]\d{2})?)/.exec(t);
+          last.description = (last.description ? last.description + ' ' : '') + fixWords(t);
+          if (!last.price && own && own.index < t.search(/\badd\b/i)) { last.price = own[1]; last.check = true; }
+          grow(last, ln); return;
+        }
         if (rest.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) {
-          if (pending) { item(pending.text, '', price, Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; }
+          if (pending) { item(pending.text, '', price, Math.min(conf, pending.conf), [pending.ln, ln]); if (pending.caps) last._caps = true; pending = null; }
           else if (last && !last.price) { last.price = price; if (conf < 75) last.check = true; grow(last, ln); }
           return;
         }
-        if (pending && looksDesc(rest)) { item(pending.text, rest, price, Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; return; }
+        // "Name - description 15" under a capitals line is its own dish, so the capitals line was a heading.
+        var ownDish = /^(.{3,60}?)\s+[\-–—:]\s+(.+)$/.test(rest) && words(rest) > 6;
+        // Under a capitals line, a short "18 holes, weekday 72" is its own item; a description is longer.
+        var shortItem = pending && pending.caps && words(rest) < 5 && !/^[a-z(]/.test(rest);
+        if (pending && looksDesc(rest) && !(pending.caps && ownDish) && !shortItem) { item(pending.text, rest, price, Math.min(conf, pending.conf), [pending.ln, ln]); if (pending.caps) last._caps = true; pending = null; return; }
+        // The price at the end of a dish's description that ran over several lines ("... house made tortilla chips 12").
+        // (Unless it repeats the dish's own name, "PACHOS" ... "Pachos For One 14.95": that's a size of it.)
+        var repeatsName = rest.toLowerCase().indexOf(last ? last.name.toLowerCase().split(' ')[0] : '\u0000') === 0;
+        if (!pending && last && !last.price && !repeatsName && (looksDesc(rest) || /^[a-z]/.test(rest) || (last._caps && last.description))) {
+          last.description = (last.description ? last.description + ' ' : '') + fixWords(rest); last.price = price;
+          if (conf < 75) last.check = true; grow(last, ln); return;
+        }
         flush();
         var parts = /^(.{3,60}?)\s+[\-–—:]\s+(.+)$/.exec(rest);
         if (parts && words(rest) > 6) item(parts[1], parts[2], price, conf, [ln]); else item(rest, '', price, conf, [ln]);
         return;
       }
       if (t.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) return;
-      if (isCapsHeading(t)) { flush(); section(t); return; }
+      // A line in capitals is a heading ("MAINS") or a dish name ("STUFFED MUSHROOMS"): what follows decides.
+      if (isCapsHeading(t)) { flush(); pending = { text: t, conf: conf, ln: ln, caps: true }; return; }
+      // A dish named in capitals runs on with description lines until its price (or the next capitals name).
+      if (!pending && last && last._caps && last.description && !last.price) { last.description += ' ' + fixWords(t); grow(last, ln); return; }
+      if (NOTE_START_RE.test(t) && last && !pending) { last.description = (last.description ? last.description + ' ' : '') + fixWords(t); grow(last, ln); return; }
       if (looksDesc(t)) {
-        if (pending) { item(pending.text, t, '', Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; return; }
+        if (pending) { item(pending.text, t, '', Math.min(conf, pending.conf), [pending.ln, ln]); if (pending.caps) last._caps = true; pending = null; return; }
         if (last) { last.description = (last.description ? last.description + ' ' : '') + fixWords(t); grow(last, ln); return; }
         if (cur && !cur.items.length) { cur.note = (cur.note ? cur.note + ' ' : '') + t; }
         return;
       }
-      flush();
+      flush(true);
       pending = { text: t, conf: conf, ln: ln };
     });
     if (pending) item(pending.text, '', '', pending.conf, [pending.ln]);
-    sections.forEach(function(s){ s.items.forEach(function(it){ delete it._from; }); });
+    // Short lines with no price right after a dish ("Salt & Pepper", "Korean BBQ", "Buffalo", "Honey Lime") are its
+    // choices, not dishes: two or more in a row become part of the dish's description.
+    sections.forEach(function(s){
+      var keep = [];
+      for (var k = 0; k < s.items.length; k++) {
+        var it = s.items[k], run = [];
+        while (k + 1 + run.length < s.items.length) {
+          var nx = s.items[k + 1 + run.length];
+          if (nx.price || nx.description || words(nx.name) > 3 || nx._caps) break;
+          run.push(nx);
+        }
+        keep.push(it);
+        if (it.price && run.length >= 2) { it.description = (it.description ? it.description + ' ' : '') + 'Choice of: ' + run.map(function(r){ return r.name; }).join(', ') + '.'; k += run.length; }
+      }
+      s.items = keep;
+    });
+    // A capitals line read as a dish but with no price, followed by more dishes, was a heading after all
+    // ("PACHOS" + its description, then "Pachos For One 14.95"): it heads those dishes, its text becomes the note.
+    var regrouped = [];
+    sections.forEach(function(s){
+      var curS = { name: s.name, note: s.note, items: [] };
+      regrouped.push(curS);
+      s.items.forEach(function(it, k){
+        if (((it._caps && !it.price) || (it._maybe && !it.price && !it.description)) && k < s.items.length - 1) { curS = { name: it.name, note: it.description, items: [] }; regrouped.push(curS); return; }
+        curS.items.push(it);
+      });
+    });
+    sections = regrouped;
+    sections.forEach(function(s){ s.items.forEach(function(it){ delete it._from; delete it._caps; delete it._maybe; it.description = it.description.replace(/[\s\-–—]+$/, ''); }); });
     sections = sections.filter(function(s){ return s.items.length; });
-    sections.forEach(function(s){ s.items.forEach(function(it){ if (!it.price && !it.check) it.check = true; }); });
+    // A menu that prints no prices at all (some dining rooms) isn't flagged dish by dish.
+    var total = 0, priced = 0;
+    sections.forEach(function(s){ s.items.forEach(function(it){ total++; if (it.price) priced++; }); });
+    var expectPrices = priced >= total * 0.25;
+    sections.forEach(function(s){ s.items.forEach(function(it){ if (!it.price && !it.check && expectPrices) it.check = true; }); });
     // A lost decimal point: on a menu priced in dollars and cents, "575" is $5.75 (shown yellow to check).
     var all = [], cents = 0;
     sections.forEach(function(s){ s.items.forEach(function(it){ if (it.price) { all.push(it); if (/\d[.,]\d{2}\b/.test(it.price)) cents++; } }); });
@@ -31757,6 +31937,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   window.__menuParse = parseMenuLines;
   window.__menuOcrLines = ocrLines;
+  window.__menuPdfText = pdfTextData;
   // ----- Help -----
   function helpScreen(){
     var has = pages().length > 0;
