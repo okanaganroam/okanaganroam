@@ -4160,7 +4160,8 @@ test('S5 #19-#23: sitemap includes exactly the publishable, occurrence-backed, u
   for (const hub of ['whats-on', 'outdoors', 'golf', 'beaches']) {
     assert.equal(after.filter((u) => u === `https://okanaganroam.com/${hub}`).length, 1, `valley-wide hub /${hub} listed exactly once`);
   }
-  assert.ok(!after.includes('https://okanaganroam.com/trip'), '/trip is deliberately not listed');
+  // /trip was left out on 2026-09-22; it is indexable with a French twin and listed since the 2026-10-17 SEO audit.
+  assert.equal(after.filter((u) => u === 'https://okanaganroam.com/trip').length, 1, '/trip listed exactly once');
   assert.ok(!after.includes('https://okanaganroam.com/events'), 'the retired /events index is no longer listed (it redirects to /whats-on)');
   assert.deepEqual(app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`), app.listEventsForSitemap().map((e) => `${e.region}/${e.slug}`).slice().sort(), 'deterministic region/slug order');
 });
@@ -12110,7 +12111,8 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
-  assert.doesNotMatch(sitemap, /list-your-venue/, 'sitemap unchanged: the page is not listed');
+  // Listed since the 2026-10-17 SEO audit (with its French twin).
+  assert.equal((sitemap.match(/<loc>https:\/\/okanaganroam\.com\/list-your-venue<\/loc>/g) || []).length, 1, 'the page is listed once');
 }));
 
 // ---------- List an Event, Phase 1 (2026-09-25) ----------
@@ -15987,7 +15989,9 @@ test('Browse hub: /browse/classic is the unchanged wizard page, noindex, and /br
   const routed = await fetch(`${base}/browse?q=restaurants%20in%20Kelowna`, { redirect: 'manual' });
   assert.equal(routed.status, 302, 'discovery routing still runs first'); await routed.text();
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
-  assert.doesNotMatch(sitemap, /okanaganroam\.com\/browse[\/<?]/, 'the sitemap is unchanged');
+  // /browse is listed since the 2026-10-17 SEO audit; the noindex /browse/classic never is.
+  assert.equal((sitemap.match(/<loc>https:\/\/okanaganroam\.com\/browse<\/loc>/g) || []).length, 1, '/browse listed once');
+  assert.doesNotMatch(sitemap, /okanaganroam\.com\/browse\//, 'no /browse/classic or other /browse sub-page');
 })));
 
 // ---- Browse cards are DISCOVERY cards (2026-10-05 correction) ----------------------------
@@ -21721,4 +21725,72 @@ test('SEO round 3: photos declare their size, long names shorten in titles, Fren
   const en = title(app.renderVenuePage(longVenue, [], [], [])), fr = title(app.renderVenuePage(longVenue, [], [], [], { lang: 'fr' }));
   assert.ok(en.length <= 65 && fr.length <= 65 && en !== fr, `${en} / ${fr}`);
   assert.match(en, /^Vernon Recreation Complex — /);
+});
+
+test('SEO audit fixes (2026-10-17): sitemap pages, .ics noindex, no hreflang on noindex pages, shared descriptions, Field of Screams in French', async () => {
+  const get = (urlPath) => new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => {
+      try { const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`); resolve({ status: res.status, headers: res.headers, text: await res.text() }); }
+      catch (err) { reject(err); } finally { tmp.close(); }
+    });
+  });
+  const ids = [];
+  try {
+    // Build My Trip, the directory and the two listing forms are in the sitemap, each with its French twin.
+    const sitemap = (await get('/sitemap.xml')).text;
+    for (const p of ['/trip', '/browse', '/list-your-venue', '/list-an-event']) {
+      assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com${p}</loc>`), p);
+      assert.match(sitemap, new RegExp(`<loc>https://okanaganroam\\.com/fr${p}</loc>`), `/fr${p}`);
+      assert.match(sitemap, new RegExp(`hreflang="fr-CA" href="https://okanaganroam\\.com/fr${p}"`), `${p} alternates`);
+    }
+
+    // A calendar download is kept out of search.
+    const shared = 'S5 audit shared moose hunt description.';
+    const feb = s5create({ name: 'S5 Audit Moose February', description: shared, occurrences: [{ start_date: '2032-02-14' }] });
+    const mar = s5create({ name: 'S5 Audit Moose March', description: shared, occurrences: [{ start_date: '2032-03-14' }] });
+    const solo = s5create({ name: 'S5 Audit Solo Show', description: 'S5 audit one-of-a-kind description.' });
+    ids.push(feb.id, mar.id, solo.id);
+    const ics = await get(`/kelowna/events/${feb.slug}/calendar.ics`);
+    assert.equal(ics.status, 200);
+    assert.equal(ics.headers.get('x-robots-tag'), 'noindex');
+
+    // Two events sharing a description get different snippets: next date and town first.
+    const meta = (html) => (html.match(/<meta name="description" content="([^"]*)"/) || [])[1];
+    const febMeta = meta((await get(`/kelowna/events/${feb.slug}`)).text), marMeta = meta((await get(`/kelowna/events/${mar.slug}`)).text);
+    assert.match(febMeta, /^[A-Z][a-z]{2} Feb 14 · Kelowna: S5 audit shared moose hunt/);
+    assert.match(marMeta, /^[A-Z][a-z]{2} Mar 14 · Kelowna: S5 audit shared moose hunt/);
+    assert.equal(app.eventSharedDescriptionLead(app.getEventById(solo.id)), null, 'a unique description is left alone');
+    assert.equal(meta((await get(`/kelowna/events/${solo.slug}`)).text), 'S5 audit one-of-a-kind description.');
+
+    // A noindex page carries no hreflang; an indexable one does.
+    const head = (robots) => `<!DOCTYPE html><html lang="en"><head>\n<link rel="canonical" href="https://okanaganroam.com/naramata/events">\n${robots}</head><body></body></html>`;
+    assert.doesNotMatch(app.addTwinHead(head('<meta name="robots" content="noindex">\n'), '/naramata/events'), /hreflang/);
+    assert.match(app.addTwinHead(head(''), '/naramata/events'), /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/naramata\/events"/);
+
+    // Field of Screams: its stored description has French, so it gets a French twin whose written title, description
+    // and sections are French too.
+    const fosDesc = "Thirteen seasons in, the Okanagan's biggest haunted corn maze has gone all-in on the number. Field of Screams takes over the fields at Historic O'Keefe Ranch north of Vernon with four separate walk-through mazes — The Village, Distortion, Chocolate Factory and the Vintage Hotel — each with its own build, its own set and its own live scare actors waiting in the corn. Parking opens at 6 pm and the mazes start taking people at 6:30, which means the whole thing happens in the dark. You can buy into one maze, two, all four, or a VIP pass that moves you up the queue. Opening week, September 25 to October 4, is the cheapest time to go, and Wednesdays are discounted all season. This is built to frighten adults: the organizers do not recommend it for children under 12, and say it is best suited to teens and adults.";
+    const fos = s5create({ name: 'Field of Screams XIII: The Unlucky', region: 'vernon', venue_id: null, venue_name_text: "Historic O'Keefe Ranch", description: fosDesc, occurrences: [{ start_date: '2026-09-25', end_date: '2026-11-01' }] });
+    ids.push(fos.id);
+    assert.equal(fos.slug, 'field-of-screams-xiii-the-unlucky');
+    const path = '/vernon/events/field-of-screams-xiii-the-unlucky';
+    assert.equal(app.hasFrenchTwin(path), true);
+    const en = app.renderEventPage(app.getEventById(fos.id), null, { now: new Date('2026-10-17T19:00:00Z') });
+    assert.match(en, /<title>Field of Screams Vernon 2026: Dates &amp; Tickets \| Okanagan Roam<\/title>/);
+    const fr = app.frenchTwinHtml(en, path);
+    assert.match(fr, /<title>Field of Screams Vernon 2026 : dates et billets \| Okanagan Roam<\/title>/);
+    assert.match(meta(fr), /^Field of Screams à Vernon, du 25 septembre au 1er novembre 2026 : labyrinthes hantés/);
+    assert.match(fr, /Billets et soirs disponibles/);
+    assert.match(fr, /Arrivée et stationnement/);
+    assert.match(fr, /Field of Screams revient au Historic O’Keefe Ranch/);
+    for (const english of ['Tickets and available nights', 'Arrival and parking', 'Check available nights', 'Explore Field of Screams in Vernon']) {
+      assert.ok(!fr.includes(english), `no English left: ${english}`);
+    }
+  } finally {
+    for (const id of ids) {
+      for (const t of ['event_enrichment_log', 'event_submissions', 'owner_event_changes', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
 });
