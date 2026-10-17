@@ -1,0 +1,582 @@
+{
+  "reason": "Tour and experience listing photos from each operator's website, Google Maps or tourism pages; Dayton reviewed the contact sheet and said deploy all on 2026-10-17.",
+  "batch_id": "venue-photos-tours-2026-10-17",
+  "venues": [
+    {
+      "id": 1609,
+      "name": "Caravan Farm Theatre – Winter Sleigh Ride Show",
+      "region": "armstrong",
+      "slug": "caravan-farm-theatre-winter-sleigh-ride-show",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/caravan-farm-theatre-winter-sleigh-ride-show-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1796,
+      "name": "Sparrowgrass Field & Flower",
+      "region": "armstrong",
+      "slug": "sparrowgrass-field-flower",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sparrowgrass-field-flower-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1589,
+      "name": "Big White Guided Snowshoe Tours",
+      "region": "big-white",
+      "slug": "big-white-guided-snowshoe-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/big-white-guided-snowshoe-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1590,
+      "name": "Big White Winter eBike Tours",
+      "region": "big-white",
+      "slug": "big-white-winter-ebike-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/big-white-winter-ebike-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1794,
+      "name": "Ed's Mobile Kayak Rental",
+      "region": "coldstream",
+      "slug": "ed-s-mobile-kayak-rental",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ed-s-mobile-kayak-rental-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1582,
+      "name": "A Taste of Kelowna Food Tours",
+      "region": "kelowna",
+      "slug": "a-taste-of-kelowna-food-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/a-taste-of-kelowna-food-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1766,
+      "name": "Carefree Wine Tours",
+      "region": "kelowna",
+      "slug": "carefree-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/carefree-wine-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1585,
+      "name": "Desert Salmon Charters",
+      "region": "kelowna",
+      "slug": "desert-salmon-charters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/desert-salmon-charters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1765,
+      "name": "Discover Okanagan Tours",
+      "region": "kelowna",
+      "slug": "discover-okanagan-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/discover-okanagan-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1769,
+      "name": "Don-O-Ray Farm Adventure",
+      "region": "kelowna",
+      "slug": "don-o-ray-farm-adventure",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/don-o-ray-farm-adventure-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1642,
+      "name": "Farming Karma Fruit Co.",
+      "region": "kelowna",
+      "slug": "farming-karma-fruit-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/farming-karma-fruit-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1764,
+      "name": "Just Grapes Wine Tours",
+      "region": "kelowna",
+      "slug": "just-grapes-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/just-grapes-wine-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1768,
+      "name": "Kelowna Bike Rentals",
+      "region": "kelowna",
+      "slug": "kelowna-bike-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-bike-rentals-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1639,
+      "name": "Kelowna Cruises",
+      "region": "kelowna",
+      "slug": "kelowna-cruises",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-cruises-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1759,
+      "name": "Lake Life Pontoon Cruises",
+      "region": "kelowna",
+      "slug": "lake-life-pontoon-cruises",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lake-life-pontoon-cruises-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1588,
+      "name": "Lakeside Eco-Sports",
+      "region": "kelowna",
+      "slug": "lakeside-eco-sports",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakeside-eco-sports-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1638,
+      "name": "Okanagan Beach Rentals",
+      "region": "kelowna",
+      "slug": "okanagan-beach-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-beach-rentals-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1761,
+      "name": "Okanagan Experience",
+      "region": "kelowna",
+      "slug": "okanagan-experience",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-experience-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1584,
+      "name": "Okanagan Mountain Helicopters (OK Heli)",
+      "region": "kelowna",
+      "slug": "okanagan-mountain-helicopters-ok-heli",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-mountain-helicopters-ok-heli-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1641,
+      "name": "SunWave Boat Rentals",
+      "region": "kelowna",
+      "slug": "sunwave-boat-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sunwave-boat-rentals-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1640,
+      "name": "Tiki Time Tours",
+      "region": "kelowna",
+      "slug": "tiki-time-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tiki-time-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1767,
+      "name": "Western Canyoning Adventure – Okanagan",
+      "region": "kelowna",
+      "slug": "western-canyoning-adventure-okanagan",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/western-canyoning-adventure-okanagan-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1586,
+      "name": "Beach Bum Tours",
+      "region": "lake-country",
+      "slug": "beach-bum-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/beach-bum-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1616,
+      "name": "Elements Adventure Company",
+      "region": "lumby",
+      "slug": "elements-adventure-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/elements-adventure-company-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1613,
+      "name": "Monashee Powder Snowcats",
+      "region": "lumby",
+      "slug": "monashee-powder-snowcats",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/monashee-powder-snowcats-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1807,
+      "name": "Unique Blend South Okanagan Tours",
+      "region": "oliver",
+      "slug": "unique-blend-south-okanagan-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/unique-blend-south-okanagan-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1603,
+      "name": "ATB Watersports",
+      "region": "osoyoos",
+      "slug": "atb-watersports",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/atb-watersports-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1806,
+      "name": "Desert Country Wine Tours",
+      "region": "osoyoos",
+      "slug": "desert-country-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/desert-country-wine-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1808,
+      "name": "Indian Grove Riding Stables",
+      "region": "osoyoos",
+      "slug": "indian-grove-riding-stables",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/indian-grove-riding-stables-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1803,
+      "name": "Rover Bike and Sport",
+      "region": "osoyoos",
+      "slug": "rover-bike-and-sport",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rover-bike-and-sport-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1674,
+      "name": "Sessions Outdoor Sports",
+      "region": "osoyoos",
+      "slug": "sessions-outdoor-sports",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sessions-outdoor-sports-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1801,
+      "name": "Spirit Beach Watersports",
+      "region": "osoyoos",
+      "slug": "spirit-beach-watersports",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spirit-beach-watersports-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1805,
+      "name": "Wine Tours Gone South",
+      "region": "osoyoos",
+      "slug": "wine-tours-gone-south",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wine-tours-gone-south-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1628,
+      "name": "GottaGoat Farm",
+      "region": "penticton",
+      "slug": "gottagoat-farm",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gottagoat-farm-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1691,
+      "name": "Rover Bike Shop",
+      "region": "penticton",
+      "slug": "rover-bike-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rover-bike-shop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1594,
+      "name": "Skaha Rock Adventures",
+      "region": "penticton",
+      "slug": "skaha-rock-adventures",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/skaha-rock-adventures-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1690,
+      "name": "Tiki Water Bikes",
+      "region": "penticton",
+      "slug": "tiki-water-bikes",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tiki-water-bikes-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1612,
+      "name": "Paradise Camp Snowcat Dinner Tours – SilverStar",
+      "region": "silverstar",
+      "slug": "paradise-camp-snowcat-dinner-tours-silverstar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/paradise-camp-snowcat-dinner-tours-silverstar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1814,
+      "name": "Dickinson Family Farm",
+      "region": "summerland",
+      "slug": "dickinson-family-farm",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dickinson-family-farm-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1700,
+      "name": "Okanagan Beach Rentals (Sun-Oka Beach)",
+      "region": "summerland",
+      "slug": "okanagan-beach-rentals-sun-oka-beach",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-beach-rentals-sun-oka-beach-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1611,
+      "name": "Okanagan Life Private Boat Charters",
+      "region": "vernon",
+      "slug": "okanagan-life-private-boat-charters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-life-private-boat-charters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1792,
+      "name": "Peter's U-Pick Orchard",
+      "region": "vernon",
+      "slug": "peter-s-u-pick-orchard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peter-s-u-pick-orchard-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1795,
+      "name": "Triple Splash Sea-Doo Rentals",
+      "region": "vernon",
+      "slug": "triple-splash-sea-doo-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/triple-splash-sea-doo-rentals-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1760,
+      "name": "LakeSurf Premium Rentals",
+      "region": "west-kelowna",
+      "slug": "lakesurf-premium-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakesurf-premium-rentals-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1763,
+      "name": "Lust 4 Luxury Tours",
+      "region": "west-kelowna",
+      "slug": "lust-4-luxury-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lust-4-luxury-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1819,
+      "name": "Paynter's Fruit Market",
+      "region": "west-kelowna",
+      "slug": "paynter-s-fruit-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/paynter-s-fruit-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1592,
+      "name": "Uncorked Okanagan Wine Tours",
+      "region": "west-kelowna",
+      "slug": "uncorked-okanagan-wine-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/uncorked-okanagan-wine-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1583,
+      "name": "Valhalla Helicopters",
+      "region": "west-kelowna",
+      "slug": "valhalla-helicopters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/valhalla-helicopters-2610.jpg?v=20261017"
+      }
+    }
+  ]
+}
