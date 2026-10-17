@@ -21643,11 +21643,11 @@ function frEventTitle(enTitle, ev) {
     .replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})/g, (m, mo, d, y) => `${d === '1' ? '1er' : d} ${FR_MONTH_LONG[mo]} ${y}`)
     .replace(/ \u2014 Event in (.+?), BC( \| Okanagan Roam)?$/, (m, tw, brand) => ` \u2014 \u00c9v\u00e9nement \u00e0 ${tw} (C.-B.)${brand || ''}`);
   if (t !== enTitle && t.replace(/ \| Okanagan Roam$/, '').length <= TITLE_MAX) return t;
-  // Too long: keep what tells this event apart (its full name and any date) and drop the town first, so two
-  // showings of a film series or two dates of one concert never share a title.
+  // Too long: keep what tells this event apart (its full name, any date, then the town) and drop "C.-B." first,
+  // so two showings of a film series, two dates of one concert or one tour in two towns never share a title.
   const core = t.replace(/ \u2014 \u00c9v\u00e9nement \u00e0 .+? \(C\.-B\.\)( \| Okanagan Roam)?$/, '')
     .replace(new RegExp(` \u2014 ${town.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '');
-  return fitTitle([`${core} (${town}, C.-B.)`, `${core} (C.-B.)`, `${shortTitleName(core, TITLE_MAX - 8)} (C.-B.)`]);
+  return fitTitle([`${core} (${town}, C.-B.)`, `${core} (${town})`, `${core} (C.-B.)`, `${shortTitleName(core, TITLE_MAX - 8)} (C.-B.)`]);
 }
 function frEventHead(html, ev) {
   const enTitle = frDecode((/<title>([^<]*)<\/title>/.exec(html) || [])[1] || '');

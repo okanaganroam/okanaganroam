@@ -21673,6 +21673,8 @@ test('SEO round 3: photos declare their size, long names shorten in titles, Fren
   assert.equal(app.frEventTitle("Handel's Messiah Live — November 29, 2026 — Event in Kelowna, BC", ev), "Handel's Messiah Live — 29 novembre 2026 (Kelowna, C.-B.)");
   assert.notEqual(app.frEventTitle('PAG Film Series: H is for Hawk at Landmark Cinema — Penticton', { region: 'penticton' }),
     app.frEventTitle('PAG Film Series: The Christophs at Landmark Cinema — Penticton', { region: 'penticton' }));
+  assert.notEqual(app.frEventTitle('Freya & Friends: Okanagan Symphony Holiday Concert — Penticton', { region: 'penticton' }),
+    app.frEventTitle('Freya & Friends: Okanagan Symphony Holiday Concert — Vernon', { region: 'vernon' }));
   // A fixture event has no French description, so it stays English-only.
   assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), false);
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
