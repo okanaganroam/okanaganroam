@@ -2854,7 +2854,8 @@ function listUpcomingEventsAtVenue(venueId, { limit = 3, now = new Date() } = {}
         AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
       ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
     .all(today, today, venueId, today);
-  if (rows.length < MIN_VENUE_EVENTS) return [];
+  // One event the business posted itself still shows on its page (it expects to see it there).
+  if (rows.length < MIN_VENUE_EVENTS && !rows.some((r) => r.source_type === 'official_venue')) return [];
   return rows.slice(0, limit).map((r) => ({
     ...rowToEvent(r),
     primaryCategory: r.primary_category || null,
@@ -26507,7 +26508,7 @@ async function handleVenueSubmission(req, res) {
   return sendSubmissionResponse(res, 201, {
     ok: true,
     id,
-    message: 'Thanks! Your venue has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it, and we may email you with questions.',
+    message: 'Thanks! Your venue has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it, and we may email you with questions. Once it\u2019s approved, we\u2019ll email you a private link to add photos, your menu or prices, and events.',
   });
 }
 
@@ -28729,7 +28730,7 @@ ${renderGolfHeaderHtml()}
       <div class="form-row full" id="lyvHappyHourRow" hidden>
         ${field('lyvHappyHour', 'Happy hour days and times', '<input type="text" id="lyvHappyHour" name="happy_hour_text" maxlength="150" placeholder="e.g. Mon&ndash;Fri 3&ndash;6pm">')}
       </div>
-      <p class="lyv-hint lyv-photos-note">Have photos? Email 1&ndash;5 of your own (wide shots work best) to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> with your venue name, and tell us who to credit.</p>
+      <p class="lyv-hint lyv-photos-note">Photos, your menu or prices, and events: once your listing is approved, we&rsquo;ll email you a private link to add them yourself in a few minutes.</p>
       <p class="lyv-section-label">Your contact details</p>
       <div class="form-row">
         ${field('lyvContactName', 'Your name *', '<input type="text" id="lyvContactName" name="contact_name" required minlength="2" maxlength="100" autocomplete="name">')}
@@ -33630,6 +33631,13 @@ function ownerDecisionRecipients(venueId, senderEmail) {
   return [...new Set([sender, ...ownerEmailsForVenue(venueId)].filter(Boolean))];
 }
 
+// What else a business can add from its owner page, in its own words.
+function ownerExtrasFor(venue) {
+  const kind = menuKind(venue);
+  if (!MENU_VENUE_TYPES.has(venue.type)) return 'booking and social links';
+  return kind === 'menu' ? 'your menu' : PRICE_LIST_WORDS[kind].en.list;
+}
+
 function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edited }) {
   const sign = '\n\nThanks,\nOkanagan Roam\ninfo@okanaganroam.com';
   const manage = owner ? `\n\nYou can update your listing, add events or send photos any time: ${OWNER_LOGIN_URL} (no login yet? Get your private edit link at https://okanaganroam.com${OWNER_NEW_LINK_PATH}).` : '';
@@ -33710,8 +33718,14 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const s = getVenueSubmission(id);
     if (!s) return 'no_address';
     const v = s.venue_id ? db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(s.venue_id) : null;
-    return sendOwnerDecision(s.contact_email ? [String(s.contact_email).trim().toLowerCase()] : [],
-      ownerDecisionEmail({ venueName: s.name, what: 'your new listing', outcome, reason, edited: !!extra.edited, link: v ? venueListingUrl(v) : null, owner: false }));
+    const message = ownerDecisionEmail({ venueName: s.name, what: 'your new listing', outcome, reason, edited: !!extra.edited, link: v ? venueListingUrl(v) : null, owner: false });
+    // A new business gets its private edit link with the good news (2026-10-17): photos, hours, tours & prices or
+    // menu, events and a login, all from day one. Their email goes on the link, so "Email me my link" works too.
+    if (outcome === 'approved' && v) {
+      const made = createOwnerLink(v.id, { contact_email: s.contact_email || undefined });
+      if (made.ok) message.text = message.text.replace(/\n\nThanks,\nOkanagan Roam/, `\n\nMake your page stand out: add your photos, opening hours, ${ownerExtrasFor(v)} and events here (your private link, no password needed):\n${made.url}\n\nOn that page you can also create a login, so next time you just sign in at ${OWNER_LOGIN_URL}.\n\nThanks,\nOkanagan Roam`);
+    }
+    return sendOwnerDecision(s.contact_email ? [String(s.contact_email).trim().toLowerCase()] : [], message);
   }
   if (kind === 'menu') {
     const m = db.prepare('SELECT venue_id, contact_email FROM venue_menus WHERE id = ?').get(id);
@@ -34328,6 +34342,9 @@ function ownerMenuCardHtml(venue, href) {
   return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
 }
 
+// Businesses people book (tours, golf, activities): the booking link comes first on the owner page.
+const OWNER_BOOKING_FIRST_TYPES = new Set(['tour', 'golf', 'indoor', 'sport', 'outdoor']);
+
 function renderOwnerPage(found, token, pending) {
   return ownerA11y(renderOwnerPageHtml(found, token, pending));
 }
@@ -34360,8 +34377,10 @@ function renderOwnerPageHtml(found, token, pending) {
           <span class="op-copy">Copy Monday to: <button type="button" data-copy="weekdays">Tue&ndash;Fri</button> <button type="button" data-copy="all">every day</button></span>` : ''}
         </div>`;
   }).join('');
+  // Food-only badges mean nothing to a tour or an activity: kept (so nothing changes) but not shown.
+  const foodOnly = OWNER_BOOKING_FIRST_TYPES.has(venue.type) && venue.type !== 'golf' ? new Set(['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv']) : new Set();
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
-          <label class="amenity-check"><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(BADGE_LABELS[f].title)}</label>`).join('');
+          <label class="amenity-check"${foodOnly.has(f) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(BADGE_LABELS[f].title)}</label>`).join('');
   const pendingNote = pending
     ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review. Anything else you send now is added to them.</p>`
     : '';
@@ -34470,8 +34489,8 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="opWebsite">Website</label><input type="url" id="opWebsite" maxlength="300" placeholder="yourbusiness.com" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
-      <details class="op-fold" id="opLinksBox">
-      <summary><span class="lyv-section-label">Name, address &amp; links</span> <span class="op-fold-hint">Change your business name, address, menu, booking or social links</span></summary>
+      <details class="op-fold" id="opLinksBox"${OWNER_BOOKING_FIRST_TYPES.has(venue.type) && !snap.booking_url ? ' open' : ''}>
+      <summary><span class="lyv-section-label">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Booking link, name, address &amp; links' : 'Name, address &amp; links'}</span> <span class="op-fold-hint">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Add your booking link so visitors get a &ldquo;Book&rdquo; button' : 'Change your business name, address, menu, booking or social links'}</span></summary>
       <div class="form-row">
         <div class="form-field"><label for="opBizName">Business name</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
         <div class="form-field"><label for="opAddress">Street address</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
