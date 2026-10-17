@@ -22336,7 +22336,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   };
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
   const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
-  if (venueMenu) localBusiness.hasMenu = menuMenuUrl(venue, fr ? 'fr' : 'en');
+  if (venueMenu && menuKind(venue) === 'menu') localBusiness.hasMenu = menuMenuUrl(venue, fr ? 'fr' : 'en');
 
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
@@ -30490,7 +30490,9 @@ async function handleOwnerPhotoUpload(req, res, token) {
 // Page files stay private on the persistent volume (only the text is ever published).
 const MENU_DIR = process.env.MENU_DIR
   || (fs.existsSync('/data') ? '/data/owner-menus' : path.join(__dirname, '.owner-menus-local'));
-const MENU_VENUE_TYPES = new Set([...FOOD_DRINK_TYPES, 'winery']);
+// Tour operators (2026-10-17) use the same uploader for their price list: "Tours & prices" on a /prices page.
+const MENU_VENUE_TYPES = new Set([...FOOD_DRINK_TYPES, 'winery', 'tour']);
+function menuKind(venue) { return venue && venue.type === 'tour' ? 'tours' : 'menu'; }
 const MENU_MAX_PAGES = 10;
 const MENU_JPEG_MAX_BYTES = 4 * 1024 * 1024;
 const MENU_PDF_MAX_BYTES = 10 * 1024 * 1024;
@@ -30501,6 +30503,7 @@ const MENU_UPLOAD_RATE_LIMIT = 60; // page uploads per IP per hour
 const MENU_READS_PER_VENUE_PER_DAY = 8;
 const MENU_READS_PER_DAY = Number(process.env.MENU_DAILY_READ_LIMIT) || 200;
 const MENU_INDEX_MIN_ITEMS = 5; // fewer dishes: the /menu page is noindex and left out of the sitemap
+const TOURS_INDEX_MIN_ITEMS = 3; // operators run a handful of tours, each with a real description
 const MENU_LIMITS = { sections: 40, items: 500, name: 140, description: 500, price: 40, note: 300 };
 const MENU_DIETARY = ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'spicy'];
 const MENU_DIETARY_LABELS = {
@@ -30514,7 +30517,7 @@ function menuFilePath(file) {
   if (!/^[a-f0-9]{24}\.(?:jpg|pdf)$/.test(file)) throw new Error('bad menu file name');
   return path.join(MENU_DIR, file);
 }
-function menuPagePath(venue, lang = 'en') { return `${venuePagePath(venue, lang)}/menu`; }
+function menuPagePath(venue, lang = 'en') { return `${venuePagePath(venue, lang)}/${menuKind(venue) === 'tours' ? 'prices' : 'menu'}`; }
 function menuPreviewUrl(f) { return `/owner-menus/preview/${f.preview_key}.${f.kind === 'pdf' ? 'pdf' : 'jpg'}`; }
 
 // A menu as stored and published: { sections: [{ name, note, items: [{ name, description, price, dietary, check }] }] }.
@@ -30545,12 +30548,16 @@ function parseMenuData(json) { try { return normalizeMenuData(JSON.parse(json ||
 
 // "18" -> 18, "$18.50" -> 18.5, "12 / 16" -> 12 (the first price), "MP" -> null.
 function menuPriceNumber(price) {
-  const m = /(\d{1,5}(?:[.,]\d{1,2})?)/.exec(String(price || ''));
+  const m = /(\d{1,5}(?:[.,]\d{1,2})?)/.exec(String(price || '').replace(/(\d),(\d{3})(?!\d)/g, '$1$2'));
   return m ? Number(m[1].replace(',', '.')) : null;
 }
 // How a price shows: a bare number gets a dollar sign ("18.50" -> "$18.50", French "18,50 $"); anything else as printed.
 function menuPriceLabel(price, lang = 'en') {
   const p = String(price || '').trim();
+  if (/^\$?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(p)) { // thousands: "$1,299", French "1 299 $"
+    const t = p.replace('$', '');
+    return lang === 'fr' ? `${t.replace(/,/g, ' ').replace('.', ',')} $` : `$${t}`;
+  }
   if (!/^\$?\d{1,5}(?:[.,]\d{1,2})?$/.test(p)) return p;
   const n = p.replace('$', '');
   return lang === 'fr' ? `${n.replace('.', ',')} $` : `$${n.replace(',', '.')}`;
@@ -30611,17 +30618,26 @@ readable and problem:
 - Mostly readable but parts are cut off or unreadable: readable true, problem "partly_unreadable", and mark the doubtful items with check.
 - Otherwise: readable true, problem "none".`;
 
+const TOURS_READ_SYSTEM = MENU_READ_SYSTEM
+  .replace('a restaurant, cafe, bar, brewery or winery menu', 'a tour operator\'s price list or brochure (tours, cruises, classes, rentals, experiences)')
+  .replace(/dish and drink names/g, 'tour and experience names').replace(/a dish or drink/g, 'a tour or experience')
+  .replace('- dietary: only what the menu itself marks, such as V, VG, GF or DF letters, a leaf or chili icon, or the words written out. Never guess from the ingredients.',
+    '- dietary: always empty.\n- description: also the duration, what is included and departure times when printed, in a few words.')
+  .replace('price: as printed, without adding a currency sign ("18", "18.50", "12 / 16", "MP", "Market price")', 'price: as printed, keeping per-person wording ("129 per person", "From 89", "75 / 45 child")')
+  .replace(/menu/g, 'price list');
+
 function anthropicApiKey() {
   return String(process.env.ANTHROPIC_API_KEY || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
 }
 // pages: [{ kind: 'jpeg' | 'pdf', buf }]. Resolves { ok: true, result, usage, model } or { ok: false, error }.
-async function readMenuWithClaude(pages) {
+async function readMenuWithClaude(pages, kind = 'menu') {
   const key = anthropicApiKey();
   if (!key) return { ok: false, error: 'unavailable' };
   const content = pages.map((p) => (p.kind === 'pdf'
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: p.buf.toString('base64') } }
     : { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.buf.toString('base64') } }));
-  content.push({ type: 'text', text: pages.length > 1 ? `These ${pages.length} pages are one menu, in order. Transcribe it.` : 'Transcribe this menu.' });
+  const what = kind === 'tours' ? 'price list' : 'menu';
+  content.push({ type: 'text', text: pages.length > 1 ? `These ${pages.length} pages are one ${what}, in order. Transcribe it.` : `Transcribe this ${what}.` });
   let res;
   try {
     res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -30636,7 +30652,7 @@ async function readMenuWithClaude(pages) {
       body: JSON.stringify({
         model: MENU_MODEL,
         max_tokens: 32000,
-        system: MENU_READ_SYSTEM,
+        system: kind === 'tours' ? TOURS_READ_SYSTEM : MENU_READ_SYSTEM,
         output_config: { effort: 'medium', format: { type: 'json_schema', schema: MENU_READ_SCHEMA } },
         fallbacks: 'default',
         messages: [{ role: 'user', content }],
@@ -30700,7 +30716,8 @@ function startMenuRead(menu) {
     }
     if (!pages.length) { done({ error: 'failed' }); return; }
     let r;
-    try { r = await menuReader(pages); } catch (err) { r = { ok: false, error: 'failed', detail: String((err && err.message) || err).slice(0, 200) }; }
+    const v = db.prepare('SELECT type FROM venues WHERE id = ?').get(menu.venue_id);
+    try { r = await menuReader(pages, menuKind(v)); } catch (err) { r = { ok: false, error: 'failed', detail: String((err && err.message) || err).slice(0, 200) }; }
     db.prepare('INSERT INTO menu_reads (venue_id, menu_id, ok, error, model, input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(menu.venue_id, menu.id, r.ok ? 1 : 0, r.ok ? null : `${r.error}${r.detail ? `: ${r.detail}` : ''}`.slice(0, 300), r.model || null,
         r.usage && Number.isFinite(r.usage.input) ? r.usage.input : null, r.usage && Number.isFinite(r.usage.output) ? r.usage.output : null);
@@ -30789,8 +30806,8 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   const pages = menuFiles(menu.id).map((f, i) => `Page ${i + 1}: https://okanaganroam.com${f.preview}`).join('\n') || 'No pages were added.';
   const items = menuItemCount(parseMenuData(menu.data));
   const fields = {
-    _subject: kind === 'help' ? `[MENU HELP] ${venue.name} asked us to type up their menu`
-      : kind === 'pending' ? `[PENDING REVIEW] Menu from ${venue.name} (${items} dishes)` : `[LIVE] Menu from ${venue.name} (${items} dishes)`,
+    _subject: kind === 'help' ? `[MENU HELP] ${venue.name} asked us to type up their ${menuKind(venue) === 'tours' ? 'tours & prices' : 'menu'}`
+      : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
     'Status': kind === 'help' ? 'They pressed "Can you do it for me?". Nothing is on the site yet: open the menu editor, read the pages, then publish.'
@@ -31082,6 +31099,54 @@ const MENU_APP_STRINGS = {
   },
 };
 
+// Tour operators: the same screens, worded for a price list of tours (2026-10-17). No diet tags.
+const MENU_APP_STRINGS_TOURS = {
+  en: {
+    title: 'Add your tours &amp; prices', adminTitle: 'Tours editor',
+    intro: 'Take a photo of your price list or brochure and we&rsquo;ll turn it into a list of your tours on your page, so people looking for things to do can find you. It takes about 2 minutes.',
+    take: '&#128247;&nbsp;Take a photo of your price list',
+    reading: 'Reading your price list&hellip; about {s} seconds &#9749;', readingSub: 'You can stay on this page. Your tours will show up here when they&rsquo;re ready.',
+    blurry: 'This photo is a little hard to read. Could you try again in good light, holding the phone straight above the page?',
+    notMenu: 'Hmm, that doesn&rsquo;t look like a price list. Could you try another photo?',
+    unavailable: 'Our reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
+    reviewTitle: 'Here are your tours', reviewIntro: 'This is how customers will see them. Tap any tour or price to fix it.',
+    dishName: 'Tour name', description: 'Description: how long, what&rsquo;s included (optional)', deleteDish: 'Delete this tour',
+    addDish: '+ Add a tour', newDish: 'New tour', emptySection: 'No tours yet.',
+    live: '&#127881; Your tours &amp; prices are live!', liveSub: 'Customers can now see your tours and prices on Okanagan Roam.',
+    sent: '&#127881; Thanks! Your tours &amp; prices are on their way.',
+    helpIntro: 'We&rsquo;ll type up your tours and prices and put them on your page, usually within a couple of days.',
+    helpNoPages: 'No photo yet? Tell us where to find your prices, like a link to them on your website.', helpNoteNeeded: 'Where can we find your prices?',
+    helpDone: 'Thanks! We&rsquo;ve got it. We&rsquo;ll put your tours up and let you know.',
+    haveMenu: 'Your tours &amp; prices are live', haveMenuSub: '{n} tours &middot; updated {date}',
+    replace: '&#128247;&nbsp;Replace with a new price list', takeDownConfirm: 'Take your tours and prices off Okanagan Roam? You can add them again any time.',
+    waiting: 'Thanks! Your tours &amp; prices are waiting for a quick check. They will be live soon.',
+    helpWaiting: 'Thanks! We&rsquo;re typing up your tours and will let you know when they&rsquo;re up.',
+    pdfBig: 'That PDF is too big. Try a photo of the price list instead.', diet: {},
+  },
+  fr: {
+    title: 'Ajoutez vos activit&eacute;s et tarifs', adminTitle: '&Eacute;diteur d&rsquo;activit&eacute;s',
+    intro: 'Prenez votre liste de prix ou votre brochure en photo et nous en faisons la liste de vos activit&eacute;s sur votre page, pour que les gens qui cherchent quoi faire vous trouvent. Environ 2&nbsp;minutes.',
+    take: '&#128247;&nbsp;Prendre votre liste de prix en photo',
+    reading: 'Lecture de votre liste de prix&hellip; environ {s}&nbsp;secondes &#9749;', readingSub: 'Restez sur cette page. Vos activit&eacute;s s&rsquo;afficheront ici d&egrave;s qu&rsquo;elles seront pr&ecirc;tes.',
+    blurry: 'Cette photo est un peu difficile &agrave; lire. Pourriez-vous r&eacute;essayer avec une bonne lumi&egrave;re, le t&eacute;l&eacute;phone bien au-dessus de la page&nbsp;?',
+    notMenu: 'Hmm, cela ne ressemble pas &agrave; une liste de prix. Pourriez-vous essayer une autre photo&nbsp;?',
+    unavailable: 'Notre lecteur fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous la taperons pour vous.',
+    reviewTitle: 'Voici vos activit&eacute;s', reviewIntro: 'Voici ce que verront vos clients. Touchez une activit&eacute; ou un prix pour le corriger.',
+    dishName: 'Nom de l&rsquo;activit&eacute;', description: 'Description&nbsp;: dur&eacute;e, ce qui est inclus (facultatif)', deleteDish: 'Supprimer cette activit&eacute;',
+    addDish: '+ Ajouter une activit&eacute;', newDish: 'Nouvelle activit&eacute;', emptySection: 'Aucune activit&eacute; pour l&rsquo;instant.',
+    live: '&#127881; Vos activit&eacute;s et tarifs sont en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir vos activit&eacute;s et vos prix sur Okanagan Roam.',
+    sent: '&#127881; Merci&nbsp;! Vos activit&eacute;s et tarifs sont en route.',
+    helpIntro: 'Nous taperons vos activit&eacute;s et vos prix et les mettrons sur votre page, g&eacute;n&eacute;ralement en quelques jours.',
+    helpNoPages: 'Pas encore de photo&nbsp;? Dites-nous o&ugrave; trouver vos prix, par exemple un lien vers votre site.', helpNoteNeeded: 'O&ugrave; trouver vos prix&nbsp;?',
+    helpDone: 'Merci&nbsp;! C&rsquo;est re&ccedil;u. Nous mettrons vos activit&eacute;s en ligne et vous pr&eacute;viendrons.',
+    haveMenu: 'Vos activit&eacute;s et tarifs sont en ligne', haveMenuSub: '{n}&nbsp;activit&eacute;s &middot; mis &agrave; jour {date}',
+    replace: '&#128247;&nbsp;Remplacer par une nouvelle liste de prix', takeDownConfirm: 'Retirer vos activit&eacute;s et tarifs d&rsquo;Okanagan Roam&nbsp;? Vous pourrez les rajouter quand vous voulez.',
+    waiting: 'Merci&nbsp;! Vos activit&eacute;s attendent une v&eacute;rification rapide. Elles seront bient&ocirc;t en ligne.',
+    helpWaiting: 'Merci&nbsp;! Nous tapons vos activit&eacute;s et vous pr&eacute;viendrons quand elles seront en ligne.',
+    pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo de la liste de prix.', diet: {},
+  },
+};
+
 // The page's client code (ES5 so older phones run it). Config comes from window.MENU_CFG.
 const MENU_APP_SCRIPT = String.raw`(function(){
   var C = window.MENU_CFG, T = C.t, S = C.state, base = C.base, app = document.getElementById('mnApp');
@@ -31167,7 +31232,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   // ----- Review -----
   function countChecks(){ var n = 0; data.sections.forEach(function(s){ s.items.forEach(function(it){ if (it.check) n++; }); }); return n; }
-  function priceText(p){ p = String(p || '').trim(); return /^\$?\d{1,5}([.,]\d{1,2})?$/.test(p) ? (C.lang === 'fr' ? p.replace('$', '').replace('.', ',') + ' $' : '$' + p.replace('$', '')) : p; }
+  function priceText(p){ p = String(p || '').trim(); if (/^\$?\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(p)) return C.lang === 'fr' ? p.replace('$', '').replace(/,/g, ' ').replace('.', ',') + ' $' : '$' + p.replace('$', ''); return /^\$?\d{1,5}([.,]\d{1,2})?$/.test(p) ? (C.lang === 'fr' ? p.replace('$', '').replace('.', ',') + ' $' : '$' + p.replace('$', '')) : p; }
   function itemHtml(it, si, ii){
     var key = si + ':' + ii;
     if (openItem === key) {
@@ -31190,7 +31255,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   function reviewScreen(message){
     var n = countChecks(), m = S.menu;
-    var head = C.mode === 'admin' ? '<h1>' + T.adminTitle + ': ' + h(C.venueName) + '</h1><p class="mn-sub">Menu #' + m.id + ' &middot; ' + h(m.status) + '</p>'
+    var head = C.mode === 'admin' ? '<h1>' + T.adminTitle + ': ' + h(C.venueName) + '</h1><p class="mn-sub">#' + m.id + ' &middot; ' + h(m.status) + '</p>'
       + (C.adminNote ? '<div class="mn-card mn-warn"><p>' + h(C.adminNote) + '</p></div>' : '')
       : '<h1>' + T.reviewTitle + '</h1><p class="mn-lead">' + T.reviewIntro + '</p>';
     var notes = (data.partial ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + '</p></div>' : '');
@@ -31346,11 +31411,15 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   // Menus are laid out many ways ("Poutine .... 14", a name over a description with the price at its end, a price on
   // its own line), so a short line without a price is held until the next line shows whether it was a dish name or
   // a section heading. Unsure readings (low recognition confidence) are marked check.
-  var PRICE_RE = /(?:^|\s)[$S]?\s?(\d{1,3}(?:[.,]\d{1,2})?)((?:\s*[\/|]\s*[$S]?\s?\d{1,3}(?:[.,]\d{1,2})?)*)\s*$/;
+  // A price at the end of a line: "14", "$12.50", "12 / 16", and tour-style "From $89", "$129 per person", "$1,299".
+  // Four figures only with a dollar sign, so a year ("Est. 1998") is never a price.
+  var PRICE_RE = /(?:^|\s)(from\s+)?((?:\$\s?(?:\d{1,3}(?:,\d{3})+|\d{1,4})|S?\d{1,3})(?:[.,]\d{1,2})?)((?:\s*[\/|]\s*(?:\$\s?\d{1,4}|S?\d{1,3})(?:[.,]\d{1,2})?)*)(\s*(?:per\s+(?:person|adult|guest|couple|group|hour|child)|pp|p\.p\.|\/\s*(?:person|adult|guest|pp|child|hour)|each|\+\s*(?:gst|tax(?:es)?)))?\s*$/i;
+  var DURATION_RE = /^\(?\s*(?:approx\.?\s*|about\s+)?\d+(?:\.\d)?(?:\s*[-–]\s*\d+(?:\.\d)?)?\s*(?:hours?|hrs?|minutes?|mins?|days?|nights?)\b/i;
+  var DESC_START_RE = /^(?:includes?|including|departs?|departing|available|minimum|ages?\s+\d|pick-?up|meets?|duration)\b/i;
   var JUNK_RE = /(www\.|https?:|@|\.com\b|\.ca\b|\bphone\b|\btel\b|\(\d{3}\)|\d{3}[-. ]\d{3}[-. ]\d{4}|instagram|facebook|gratuity|\bgst\b|\bpst\b|plus tax|prices? (?:are )?subject|allerg|consuming raw)/i;
   var DIET = { V: 'vegetarian', VG: 'vegan', VE: 'vegan', GF: 'gluten_free', DF: 'dairy_free' };
   function words(t){ return t.split(/\s+/).filter(Boolean).length; }
-  function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6; }
+  function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6 || DURATION_RE.test(t) || DESC_START_RE.test(t); }
   function isCapsHeading(t){ var l = t.replace(/[^A-Za-z]/g, ''); return l.length >= 3 && l === l.toUpperCase() && words(t) <= 5 && t.length <= 40; }
   function niceCase(t){ return isCapsHeading(t) ? t.toLowerCase().replace(/(^|[\s\-&\/])([a-z])/g, function(m, a, b){ return a + b.toUpperCase(); }) : t; }
   function takeDiet(t, out){
@@ -31381,7 +31450,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       if (t.length < 2 || JUNK_RE.test(t)) return;
       var m = PRICE_RE.exec(t);
       if (m) {
-        var price = (m[1] + (m[2] || '')).replace(/[S$]/g, '').replace(/\s*([\/|])\s*/g, ' / ').replace(/\|/g, '/');
+        var unit = m[4] ? ' ' + m[4].trim().replace(/\s+/g, ' ').replace(/^\/\s*/, 'per ') : '';
+        var price = (m[2] + (m[3] || '')).replace(/[S$\s]/gi, '').replace(/[\/|]/g, ' / ');
+        if (m[1] || unit) price = (m[1] ? 'From ' : '') + '$' + price + unit;
         var rest = t.slice(0, m.index).trim();
         if (rest.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) {
           if (pending) { item(pending.text, '', price, Math.min(conf, pending.conf)); pending = null; }
@@ -31491,8 +31562,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const t = MENU_APP_STRINGS[lang];
-  const plain = (s) => String(s).replace(/&rsquo;/g, '\u2019').replace(/&nbsp;/g, '\u00a0').replace(/&Eacute;/g, '\u00c9').replace(/&eacute;/g, '\u00e9').replace(/&egrave;/g, '\u00e8').replace(/&agrave;/g, '\u00e0');
+  const t = { ...MENU_APP_STRINGS[lang], ...(menuKind(venue) === 'tours' ? MENU_APP_STRINGS_TOURS[lang] : {}) };
+  const plain = (s) => String(s).replace(/&amp;/g, '&').replace(/&rsquo;/g, '\u2019').replace(/&nbsp;/g, '\u00a0').replace(/&Eacute;/g, '\u00c9').replace(/&eacute;/g, '\u00e9').replace(/&egrave;/g, '\u00e8').replace(/&agrave;/g, '\u00e0');
   const pub = publishedMenu(venue.id);
   const state = menuStateJson(venue, opts.mode === 'admin' ? db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(opts.menuId) : activeMenuDraft(venue.id));
   if (state.published && pub) state.published.date = ownerUpdatedDate(pub.publishedAt, lang === 'fr');
@@ -31570,7 +31641,7 @@ ${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}: ${venue.na
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main"><div class="mn-wrap">
     ${switcher}
-    <div id="mnApp"><p class="mn-lead">${t.adding.replace('votre page', 'votre menu').replace('your page', 'your menu')}</p></div>
+    <div id="mnApp"><p class="mn-lead">${t.adding}</p></div>
     <noscript><p class="mn-card mn-warn">Please turn on JavaScript, or email your menu to <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</p></noscript>
   </div></main>
 <script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
@@ -31608,9 +31679,16 @@ function menuUpdatedLabel(utc, lang = 'en') {
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'short', year: 'numeric' });
 }
-function menuDishCountText(n, lang) { return lang === 'fr' ? `${n} plat${n === 1 ? '' : 's'}` : `${n} dish${n === 1 ? '' : 'es'}`; }
+function menuDishCountText(n, lang, kind = 'menu') {
+  if (kind === 'tours') return lang === 'fr' ? `${n} activité${n === 1 ? '' : 's'}` : `${n} tour${n === 1 ? '' : 's'}`;
+  return lang === 'fr' ? `${n} plat${n === 1 ? '' : 's'}` : `${n} dish${n === 1 ? '' : 'es'}`;
+}
+// What the uploaded list is called, by kind and language.
+function menuNoun(venue, lang = 'en') {
+  return menuKind(venue) === 'tours' ? (lang === 'fr' ? 'Activités et tarifs' : 'Tours & prices') : 'Menu';
+}
 function menuMenuUrl(venue, lang = 'en') { return `https://okanaganroam.com${menuPagePath(venue, lang)}`; }
-function menuIndexable(menu) { return !!menu && menu.items >= MENU_INDEX_MIN_ITEMS; }
+function menuIndexable(menu, venue) { return !!menu && menu.items >= (menuKind(venue) === 'tours' ? TOURS_INDEX_MIN_ITEMS : MENU_INDEX_MIN_ITEMS); }
 
 // schema.org Menu for a published menu: sections, dishes, prices in CAD, and the diets the menu itself marks.
 function menuSchema(venue, menu, lang) {
@@ -31665,17 +31743,42 @@ const VENUE_MENU_CSS = `<style>
   a.vm-btn:hover, a.vm-btn:focus { background: #2C4257; }
 </style>`;
 
+// schema.org for a tour operator's list: an OfferCatalog per section, each tour a TouristTrip offered at a CAD price.
+function toursOfferCatalog(venue, menu, lang) {
+  return {
+    '@type': 'OfferCatalog',
+    name: lang === 'fr' ? `Activités et tarifs ${frDe(venue.name)}` : `${venue.name} tours & prices`,
+    url: menuMenuUrl(venue, lang),
+    itemListElement: menu.data.sections.map((s) => ({
+      '@type': 'OfferCatalog',
+      name: s.name || menuNoun(venue, lang),
+      itemListElement: s.items.map((it) => {
+        const price = menuPriceNumber(it.price);
+        return {
+          '@type': 'Offer',
+          itemOffered: { '@type': 'TouristTrip', name: it.name, description: it.description || undefined },
+          price: price != null ? price.toFixed(2) : undefined,
+          priceCurrency: price != null ? 'CAD' : undefined,
+        };
+      }),
+    })),
+  };
+}
+
 // The short menu on the place page: the first few dishes and a link to the full menu page.
 function venueMenuPreviewHtml(venue, menu, lang) {
   if (!menu) return '';
   const fr = lang === 'fr';
   const picks = [];
   for (const s of menu.data.sections) for (const it of s.items) if (picks.length < 5) picks.push(it);
-  return `<section class="venue-section vm-preview" id="menu">
-    <h2>${fr ? 'Menu' : 'Menu'}</h2>
+  const tours = menuKind(venue) === 'tours';
+  const count = menuDishCountText(menu.items, lang, menuKind(venue));
+  const see = tours ? (fr ? `Voir toutes les activités et tarifs (${count})` : `See all tours & prices (${count})`) : (fr ? `Voir tout le menu (${count})` : `See the full menu (${count})`);
+  return `<section class="venue-section vm-preview" id="${tours ? 'prices' : 'menu'}">
+    <h2>${escapeHtml(menuNoun(venue, lang))}</h2>
     <ul class="vm-list">${picks.map((it) => menuItemHtml(it, lang)).join('')}</ul>
-    <a class="vm-btn" href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${fr ? `Voir tout le menu (${menuDishCountText(menu.items, 'fr')})` : `See the full menu (${menuDishCountText(menu.items, 'en')})`} &rarr;</a>
-    <p class="vm-meta">${fr ? 'Menu mis à jour' : 'Menu updated'} ${escapeHtml(menuUpdatedLabel(menu.publishedAt, lang))}</p>
+    <a class="vm-btn" href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${escapeHtml(see)} &rarr;</a>
+    <p class="vm-meta">${tours ? (fr ? 'Tarifs mis à jour' : 'Prices updated') : (fr ? 'Menu mis à jour' : 'Menu updated')} ${escapeHtml(menuUpdatedLabel(menu.publishedAt, lang))}</p>
   </section>`;
 }
 
@@ -31690,12 +31793,22 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   const canonical = menuMenuUrl(venue, lang);
   const venueUrl = `https://okanaganroam.com${venuePagePath(venue, lang)}`;
   const updated = menuUpdatedLabel(menu.publishedAt, lang);
-  const title = fr
+  const tours = menuKind(venue) === 'tours';
+  const noun = menuNoun(venue, lang);
+  const count = menuDishCountText(menu.items, lang, menuKind(venue));
+  const updatedText = tours ? L('Prices updated', 'Tarifs mis à jour') : L('Menu updated', 'Menu mis à jour');
+  const title = tours ? (fr
+    ? fitTitle([venue.name, shortTitleName(venue.name, 36)].flatMap((n) => [`Activités et tarifs ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `Activités et tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)}`]))
+    : fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`${n} Tours & Prices — ${regionLabel}, BC | Okanagan Roam`, `${n} Tours & Prices — ${regionLabel}, BC`, `${n} Prices — ${regionLabel}`, `${n} Prices`])))
+    : fr
     ? fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`Menu et prix ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `Menu et prix ${frDe(n)} — ${regionLabel}`, `Menu ${frDe(n)} — ${regionLabel}`, `Menu ${frDe(n)}`]))
     : fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`${n} Menu & Prices — ${regionLabel}, BC | Okanagan Roam`, `${n} Menu & Prices — ${regionLabel}, BC`, `${n} Menu — ${regionLabel}`, `${n} Menu`]));
   const names = [];
   for (const s of menu.data.sections) for (const it of s.items) if (names.length < 3) names.push(it.name);
-  const rawDesc = fr
+  const rawDesc = tours ? (fr
+    ? `Les activités ${frDe(venue.name)} à ${regionLabel}, C.-B., avec les prix : ${names.join(', ')} et plus. Mis à jour ${updated}.`
+    : `${venue.name} tours and prices in ${regionLabel}, BC: ${names.join(', ')} and more. Updated ${updated}.`)
+    : fr
     ? `Le menu ${frDe(venue.name)} à ${regionLabel}, C.-B., avec les prix : ${names.join(', ')} et plus. Mis à jour ${updated}.`
     : `See the ${venue.name} menu in ${regionLabel}, BC, with prices: ${names.join(', ')} and more. Updated ${updated}.`;
   const description = rawDesc.length > 155 ? `${rawDesc.slice(0, 152).replace(/[\s,]+\S*$/, '')}...` : rawDesc;
@@ -31705,7 +31818,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     { name: regionLabel, url: `${crumbBase}/${venue.region}` },
     { name: label.plural, url: `${crumbBase}/${venue.region}/${catSlug}` },
     { name: venue.name, url: venueUrl },
-    { name: 'Menu', url: canonical },
+    { name: noun, url: canonical },
   ]);
   const business = {
     '@context': 'https://schema.org',
@@ -31716,7 +31829,8 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     telephone: venue.phone || undefined,
     address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressLocality: regionLabel, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
-    hasMenu: menuSchema(venue, menu, lang),
+    hasMenu: tours ? undefined : menuSchema(venue, menu, lang),
+    hasOfferCatalog: tours ? toursOfferCatalog(venue, menu, lang) : undefined,
   };
   const themedShell = usesThemedVenueShell(venue.type);
   const sections = menu.data.sections.map((s) => `<section class="vm-section">
@@ -31724,10 +31838,11 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     <ul class="vm-list">${s.items.map((it) => menuItemHtml(it, lang)).join('')}</ul>
   </section>`).join('\n  ');
   const website = normalizeWebsiteUrl(venue.website);
+  const booking = tours ? venueLinks(venue.id).booking_url || null : null;
   const page = `<!DOCTYPE html>
 <html lang="${lang}"${hasFrench ? ` data-page-lang="${lang}"` : ''}>
 <head>
-${pageHead(title, description, canonical, [breadcrumb, business], { noindex: !menuIndexable(menu), alternates: hasFrench ? [{ hreflang: 'en-CA', href: menuMenuUrl(venue) }, { hreflang: 'fr-CA', href: menuMenuUrl(venue, 'fr') }, { hreflang: 'x-default', href: menuMenuUrl(venue) }] : null, locale: hasFrench && fr ? 'fr_CA' : null, shareImage: venueShareCardUrl(venue, lang), golfTheme: themedShell })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, business], { noindex: !menuIndexable(menu, venue), alternates: hasFrench ? [{ hreflang: 'en-CA', href: menuMenuUrl(venue) }, { hreflang: 'fr-CA', href: menuMenuUrl(venue, 'fr') }, { hreflang: 'x-default', href: menuMenuUrl(venue) }] : null, locale: hasFrench && fr ? 'fr_CA' : null, shareImage: venueShareCardUrl(venue, lang), golfTheme: themedShell })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}
 ${VENUE_MENU_CSS}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
@@ -31737,22 +31852,25 @@ ${VENUE_MENU_CSS}
     { name: regionLabel, href: `/${venue.region}` },
     { name: label.plural, href: `/${venue.region}/${catSlug}` },
     { name: venue.name, href: venuePagePath(venue) },
-    { name: 'Menu' },
+    { name: noun },
   ])}
   <div class="vm-page">
   <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><p style="margin:0 0 14px"><a href="${venuePagePath(venue, lang)}">&larr; ${escapeHtml(venue.name)}</a></p>${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${menuPagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${menuPagePath(venue, 'fr')}" hreflang="fr" lang="fr">Français</a>`}</p>` : ''}</div>
-  <h1>${fr ? `Menu ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Menu`}</h1>
-  <p class="vm-meta">${escapeHtml(label.singular)} ${fr ? 'à' : 'in'} ${escapeHtml(regionLabel)}, ${fr ? 'C.-B.' : 'BC'} &middot; ${menuDishCountText(menu.items, lang)} &middot; ${fr ? 'Menu mis à jour' : 'Menu updated'} ${escapeHtml(updated)}</p>
+  <h1>${tours ? (fr ? `Activités et tarifs ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Tours &amp; Prices`) : fr ? `Menu ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Menu`}</h1>
+  <p class="vm-meta">${escapeHtml(label.singular)} ${fr ? 'à' : 'in'} ${escapeHtml(regionLabel)}, ${fr ? 'C.-B.' : 'BC'} &middot; ${count} &middot; ${updatedText} ${escapeHtml(updated)}</p>
   ${sections}
-  <div class="vm-note-box">${fr
+  <div class="vm-note-box">${tours ? (fr
+    ? `Les prix, horaires et disponibilités peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant de réserver.`
+    : `Prices, times and availability can change. Check with ${escapeHtml(venue.name)} before you book.`) : fr
     ? `Les plats et les prix peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant d’y aller, et confirmez toute allergie ou restriction alimentaire directement avec l’établissement.`
     : `Dishes and prices can change. Check with ${escapeHtml(venue.name)} before you go, and confirm any allergies or dietary needs with them directly.`}</div>
   <p>
     <a class="vm-btn" href="${venuePagePath(venue, lang)}">${fr ? `Infos, heures et carte ${escapeHtml(frDe(venue.name))}` : `Hours, map and more for ${escapeHtml(venue.name)}`}</a>
+    ${booking ? `<a class="cta secondary" href="${escapeHtml(booking)}" rel="nofollow noopener" target="_blank" data-track="booking">${L('Book online', 'Réserver en ligne')} ↗</a>` : ''}
     ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
-  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise ?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
+  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise ?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
   <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} à ${escapeHtml(regionLabel)}` : `More ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
   </div>
   ${themedShell ? '</main>' : ''}
@@ -31770,7 +31888,7 @@ function listIndexableMenusForSitemap() {
   for (const r of rows) {
     const menu = publishedMenu(r.venue_id);
     const v = menu && getVenue(r.venue_id);
-    if (v && !v.redirect_to && CATEGORY_SLUGS[v.type] && v.slug && MENU_VENUE_TYPES.has(v.type) && menuIndexable(menu)) out.push({ venue: v, publishedAt: menu.publishedAt });
+    if (v && !v.redirect_to && CATEGORY_SLUGS[v.type] && v.slug && MENU_VENUE_TYPES.has(v.type) && menuIndexable(menu, v)) out.push({ venue: v, publishedAt: menu.publishedAt });
   }
   return out;
 }
@@ -31778,9 +31896,9 @@ function listIndexableMenusForSitemap() {
 // GET /<region>/<category>/<slug>/menu and its /fr twin. A place with no live menu has no menu page (404); the French
 // one goes to the English one when the place has no French page.
 function handleVenueMenuPage(req, res, pathname, parsed) {
-  const m = /^(\/fr)?\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/menu\/?$/.exec(pathname);
+  const m = /^(\/fr)?\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/(menu|prices)\/?$/.exec(pathname);
   if (!m) return false;
-  const [, frPrefix, region, categorySlug, slug] = m;
+  const [, frPrefix, region, categorySlug, slug, suffix] = m;
   const type = SLUG_TO_TYPE[categorySlug];
   const venue = REGION_LABELS[region] && type ? findVenueBySlug(region, type, slug) : null;
   if (venue && venue.redirect_to) {
@@ -31790,7 +31908,8 @@ function handleVenueMenuPage(req, res, pathname, parsed) {
       return res.end() || true;
     }
   }
-  const menu = venue && !venue.redirect_to ? publishedMenu(venue.id) : null;
+  // A tour operator's list lives at /prices, everyone else's at /menu.
+  const menu = venue && !venue.redirect_to && (suffix === 'prices') === (menuKind(venue) === 'tours') ? publishedMenu(venue.id) : null;
   if (!menu) {
     if (venue && !venue.redirect_to) { res.writeHead(302, { Location: venuePagePath(venue, frPrefix && venueHasFrench(venue) ? 'fr' : 'en') }); return res.end() || true; }
     res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -32840,7 +32959,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const v = m && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(m.venue_id);
     if (!v) return 'no_address';
     const link = outcome === 'approved' ? `https://okanaganroam.com${menuPagePath(v)}` : venueListingUrl(v);
-    return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: 'your menu', outcome, reason, link, owner: true }));
+    return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: menuKind(v) === 'tours' ? 'your tours & prices' : 'your menu', outcome, reason, link, owner: true }));
   }
   return 'no_address';
 }
@@ -33072,7 +33191,7 @@ function renderAdminMenuCard(m) {
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">Menu #${m.id} · ${what} · ${items} dishes · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${m.status === 'published' ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
@@ -33439,11 +33558,15 @@ function ownerMenuCardHtml(venue, href) {
   if (!MENU_VENUE_TYPES.has(venue.type)) return '';
   const pub = publishedMenu(venue.id);
   const draft = activeMenuDraft(venue.id);
-  const sub = pub ? `Your menu is live (${pub.items} dishes). Tap to change or replace it.`
-    : draft && ['pending', 'help'].includes(draft.status) ? 'Thanks! We have your menu and will put it up soon.'
-      : draft ? 'You started adding your menu. Tap to pick up where you left off.'
-        : 'Take a photo of your menu. We turn it into text on your page in about 2 minutes.';
-  return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${pub ? '&#128203; Your menu' : '&#128247; Add your menu'}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
+  const tours = menuKind(venue) === 'tours';
+  const what = tours ? 'tours & prices' : 'menu';
+  const sub = pub ? `Your ${what} ${tours ? 'are' : 'is'} live (${menuDishCountText(pub.items, 'en', menuKind(venue))}). Tap to change or replace ${tours ? 'them' : 'it'}.`
+    : draft && ['pending', 'help'].includes(draft.status) ? `Thanks! We have your ${what} and will put ${tours ? 'them' : 'it'} up soon.`
+      : draft ? `You started adding your ${what}. Tap to pick up where you left off.`
+        : tours ? 'Take a photo of your price list or brochure. We turn it into a list of your tours on your page in about 2 minutes.'
+          : 'Take a photo of your menu. We turn it into text on your page in about 2 minutes.';
+  const big = tours ? (pub ? '&#128203; Your tours &amp; prices' : '&#128247; Add your tours &amp; prices') : (pub ? '&#128203; Your menu' : '&#128247; Add your menu');
+  return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
 }
 
 function renderOwnerPage(found, token, pending) {
@@ -37080,7 +37203,7 @@ const server = http.createServer(async (req, res) => {
 
     // GET /fr/:region/:category/:slug -- a place's French page (2026-10-13). A place without a French description, or a
     // retired one, goes to its English page / its successor's French page; anything else under /fr/ is not served.
-    if ((method === 'GET' || method === 'HEAD') && /\/menu\/?$/.test(pathname) && handleVenueMenuPage(req, res, pathname, parsed)) return;
+    if ((method === 'GET' || method === 'HEAD') && /\/(?:menu|prices)\/?$/.test(pathname) && handleVenueMenuPage(req, res, pathname, parsed)) return;
     const frVenueMatch = method === 'GET' ? pathname.match(/^\/fr\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/) : null;
     if (frVenueMatch) {
       const [, region, categorySlug, slug] = frVenueMatch;
