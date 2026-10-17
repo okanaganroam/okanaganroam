@@ -22220,3 +22220,61 @@ test('Tours & prices (2026-10-17): tour operators use the uploader for their pri
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Price lists (2026-10-17): golf courses post green fees & rates, indoor and sports spots post prices; beaches do not', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Rates Fixture Golf', type: 'golf', hours: SEASON_WEEK, slug: 'rates-fixture-golf' });
+  seasonInsert.run({ name: 'Rates Fixture Escape', type: 'indoor', hours: SEASON_WEEK, slug: 'rates-fixture-escape' });
+  seasonInsert.run({ name: 'Rates Fixture Beach', type: 'beach', hours: SEASON_WEEK, slug: 'rates-fixture-beach' });
+  const g = app.findVenueBySlug('kelowna', 'golf', 'rates-fixture-golf');
+  const i = app.findVenueBySlug('kelowna', 'indoor', 'rates-fixture-escape');
+  const b = app.findVenueBySlug('kelowna', 'beach', 'rates-fixture-beach');
+  const tg = app.createOwnerLink(g.id, {}).url.split('/owner/')[1];
+  const ti = app.createOwnerLink(i.id, {}).url.split('/owner/')[1];
+  const tb = app.createOwnerLink(b.id, {}).url.split('/owner/')[1];
+  const jpeg = (w, h) => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.23.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const get = (p) => fetch(`${base}${p}`, { redirect: 'manual' });
+  app.setVenueSubmissionTransport(async () => {});
+  app.setOwnerEmailTransport(async () => {});
+  const rates = { sections: [{ name: 'Green Fees', note: '', items: [
+    { name: '18 holes, weekday', description: 'Before 2 pm', price: '89', dietary: [], check: false },
+    { name: '18 holes, weekend', description: '', price: '99', dietary: [], check: false },
+    { name: 'Power cart', description: 'Per rider', price: '25', dietary: [], check: false }] }] };
+  try {
+    assert.match(await get(`/owner/${tg}`).then((r) => r.text()), /Add your green fees &amp; rates/);
+    assert.match(await get(`/owner/${tg}/menu`).then((r) => r.text()), /What it is \(like 18 holes, weekday\)/);
+    assert.match(await get(`/owner/${ti}`).then((r) => r.text()), /Add your prices &amp; rates/);
+    assert.doesNotMatch(await get(`/owner/${tb}`).then((r) => r.text()), /class="op-menu-card"/, 'beaches have no price list');
+
+    assert.equal((await post(`/owner/${tg}/menu/pages`, { image: `data:image/jpeg;base64,${jpeg(1600, 1200).toString('base64')}` })).status, 201);
+    assert.equal((await post(`/owner/${tg}/menu/publish`, { data: rates })).status, 200);
+    const id = db.prepare("SELECT id FROM venue_menus WHERE venue_id = ? AND status = 'pending'").get(g.id).id;
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    assert.equal((await post(`/admin/review/menu/${id}/publish`, { data: rates }, cookie)).body.live, true);
+
+    const html = await get('/kelowna/golf/rates-fixture-golf/prices').then((r) => r.text());
+    assert.match(html, /<h1>Rates Fixture Golf Green Fees &amp; Rates<\/h1>/);
+    assert.match(html, /<title>Rates Fixture Golf Green Fees &amp; Rates — Kelowna, BC/);
+    assert.match(html, /<span class="vm-price">\$89<\/span>/);
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+    const offer = ld.find((x) => x.hasOfferCatalog).hasOfferCatalog.itemListElement[0].itemListElement[0];
+    assert.deepEqual(offer.itemOffered, { '@type': 'Service', name: '18 holes, weekday', description: 'Before 2 pm' });
+    const venuePage = await get('/kelowna/golf/rates-fixture-golf').then((r) => r.text());
+    assert.match(venuePage, /Green fees &amp; rates from the course/);
+    assert.match(venuePage, /See all green fees &amp; rates \(3 rates\)/);
+    assert.match(await get('/sitemap.xml').then((r) => r.text()), /rates-fixture-golf\/prices<\/loc>/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    for (const f of db.prepare('SELECT file FROM venue_menu_files').all()) { try { fs.unlinkSync(path.join(app.MENU_DIR, f.file)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

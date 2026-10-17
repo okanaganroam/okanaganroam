@@ -30490,9 +30490,35 @@ async function handleOwnerPhotoUpload(req, res, token) {
 // Page files stay private on the persistent volume (only the text is ever published).
 const MENU_DIR = process.env.MENU_DIR
   || (fs.existsSync('/data') ? '/data/owner-menus' : path.join(__dirname, '.owner-menus-local'));
-// Tour operators (2026-10-17) use the same uploader for their price list: "Tours & prices" on a /prices page.
-const MENU_VENUE_TYPES = new Set([...FOOD_DRINK_TYPES, 'winery', 'tour']);
-function menuKind(venue) { return venue && venue.type === 'tour' ? 'tours' : 'menu'; }
+// Price lists (2026-10-17) use the same uploader: tour operators ("Tours & prices"), golf courses ("Green fees &
+// rates") and indoor attractions, simulators and sports & recreation ("Prices & rates"), each on a /prices page.
+// Beaches and outdoor spots are public places with no owner posting prices, so they have none.
+const MENU_VENUE_TYPES = new Set([...FOOD_DRINK_TYPES, 'winery', 'tour', 'golf', 'indoor', 'sport']);
+function menuKind(venue) {
+  if (!venue) return 'menu';
+  if (venue.type === 'tour') return 'tours';
+  if (venue.type === 'golf') return isIndoorGolfVenue(venue) ? 'prices' : 'golf';
+  return venue.type === 'indoor' || venue.type === 'sport' ? 'prices' : 'menu';
+}
+function isPriceList(venue) { return menuKind(venue) !== 'menu'; }
+// What each kind of price list is called. item/items name one line of it ("3 tours", "5 rates").
+const PRICE_LIST_WORDS = {
+  tours: {
+    en: { noun: 'Tours & prices', title: 'Tours & Prices', list: 'tours & prices', item: 'tour', items: 'tours', blurb: 'a list of your tours', seekers: 'people looking for things to do', name: 'Tour name', desc: 'how long, what&rsquo;s included', what: 'your tours' },
+    fr: { noun: 'Activit\u00e9s et tarifs', item: 'activit\u00e9', items: 'activit\u00e9s', name: 'Nom de l&rsquo;activit&eacute;', desc: 'dur&eacute;e, ce qui est inclus', listHtml: 'vos activit&eacute;s et tarifs', blurb: 'la liste de vos activit&eacute;s' },
+    schema: 'TouristTrip',
+  },
+  golf: {
+    en: { noun: 'Green fees & rates', title: 'Green Fees & Rates', list: 'green fees & rates', item: 'rate', items: 'rates', blurb: 'a list of your green fees and rates', seekers: 'golfers looking for a round', name: 'What it is (like 18 holes, weekday)', desc: 'times, what&rsquo;s included', what: 'your rates' },
+    fr: { noun: 'Tarifs de golf', item: 'tarif', items: 'tarifs', name: 'Ce que c&rsquo;est (ex. 18 trous, semaine)', desc: 'horaires, ce qui est inclus', listHtml: 'vos tarifs de golf', blurb: 'la liste de vos tarifs' },
+    schema: 'Service',
+  },
+  prices: {
+    en: { noun: 'Prices & rates', title: 'Prices & Rates', list: 'prices & rates', item: 'price', items: 'prices', blurb: 'a list of your prices', seekers: 'people looking for things to do', name: 'What it is (like Adult admission)', desc: 'details, what&rsquo;s included', what: 'your prices' },
+    fr: { noun: 'Tarifs', item: 'tarif', items: 'tarifs', name: 'Ce que c&rsquo;est (ex. entr&eacute;e adulte)', desc: 'd&eacute;tails, ce qui est inclus', listHtml: 'vos tarifs', blurb: 'la liste de vos tarifs' },
+    schema: 'Service',
+  },
+};
 const MENU_MAX_PAGES = 10;
 const MENU_JPEG_MAX_BYTES = 4 * 1024 * 1024;
 const MENU_PDF_MAX_BYTES = 10 * 1024 * 1024;
@@ -30503,7 +30529,7 @@ const MENU_UPLOAD_RATE_LIMIT = 60; // page uploads per IP per hour
 const MENU_READS_PER_VENUE_PER_DAY = 8;
 const MENU_READS_PER_DAY = Number(process.env.MENU_DAILY_READ_LIMIT) || 200;
 const MENU_INDEX_MIN_ITEMS = 5; // fewer dishes: the /menu page is noindex and left out of the sitemap
-const TOURS_INDEX_MIN_ITEMS = 3; // operators run a handful of tours, each with a real description
+const TOURS_INDEX_MIN_ITEMS = 3; // price lists are short: a handful of tours or rates, each with a real description
 const MENU_LIMITS = { sections: 40, items: 500, name: 140, description: 500, price: 40, note: 300 };
 const MENU_DIETARY = ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'spicy'];
 const MENU_DIETARY_LABELS = {
@@ -30517,7 +30543,7 @@ function menuFilePath(file) {
   if (!/^[a-f0-9]{24}\.(?:jpg|pdf)$/.test(file)) throw new Error('bad menu file name');
   return path.join(MENU_DIR, file);
 }
-function menuPagePath(venue, lang = 'en') { return `${venuePagePath(venue, lang)}/${menuKind(venue) === 'tours' ? 'prices' : 'menu'}`; }
+function menuPagePath(venue, lang = 'en') { return `${venuePagePath(venue, lang)}/${isPriceList(venue) ? 'prices' : 'menu'}`; }
 function menuPreviewUrl(f) { return `/owner-menus/preview/${f.preview_key}.${f.kind === 'pdf' ? 'pdf' : 'jpg'}`; }
 
 // A menu as stored and published: { sections: [{ name, note, items: [{ name, description, price, dietary, check }] }] }.
@@ -30619,7 +30645,7 @@ readable and problem:
 - Otherwise: readable true, problem "none".`;
 
 const TOURS_READ_SYSTEM = MENU_READ_SYSTEM
-  .replace('a restaurant, cafe, bar, brewery or winery menu', 'a tour operator\'s price list or brochure (tours, cruises, classes, rentals, experiences)')
+  .replace('a restaurant, cafe, bar, brewery or winery menu', 'a business\'s price list or brochure (tours, green fees, admission, rentals, lessons, passes)')
   .replace(/dish and drink names/g, 'tour and experience names').replace(/a dish or drink/g, 'a tour or experience')
   .replace('- dietary: only what the menu itself marks, such as V, VG, GF or DF letters, a leaf or chili icon, or the words written out. Never guess from the ingredients.',
     '- dietary: always empty.\n- description: also the duration, what is included and departure times when printed, in a few words.')
@@ -30636,7 +30662,7 @@ async function readMenuWithClaude(pages, kind = 'menu') {
   const content = pages.map((p) => (p.kind === 'pdf'
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: p.buf.toString('base64') } }
     : { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.buf.toString('base64') } }));
-  const what = kind === 'tours' ? 'price list' : 'menu';
+  const what = kind === 'menu' ? 'menu' : 'price list';
   content.push({ type: 'text', text: pages.length > 1 ? `These ${pages.length} pages are one ${what}, in order. Transcribe it.` : `Transcribe this ${what}.` });
   let res;
   try {
@@ -30652,7 +30678,7 @@ async function readMenuWithClaude(pages, kind = 'menu') {
       body: JSON.stringify({
         model: MENU_MODEL,
         max_tokens: 32000,
-        system: kind === 'tours' ? TOURS_READ_SYSTEM : MENU_READ_SYSTEM,
+        system: kind === 'menu' ? MENU_READ_SYSTEM : TOURS_READ_SYSTEM,
         output_config: { effort: 'medium', format: { type: 'json_schema', schema: MENU_READ_SCHEMA } },
         fallbacks: 'default',
         messages: [{ role: 'user', content }],
@@ -30806,7 +30832,7 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   const pages = menuFiles(menu.id).map((f, i) => `Page ${i + 1}: https://okanaganroam.com${f.preview}`).join('\n') || 'No pages were added.';
   const items = menuItemCount(parseMenuData(menu.data));
   const fields = {
-    _subject: kind === 'help' ? `[MENU HELP] ${venue.name} asked us to type up their ${menuKind(venue) === 'tours' ? 'tours & prices' : 'menu'}`
+    _subject: kind === 'help' ? `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`
       : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
@@ -31099,53 +31125,58 @@ const MENU_APP_STRINGS = {
   },
 };
 
-// Tour operators: the same screens, worded for a price list of tours (2026-10-17). No diet tags.
-const MENU_APP_STRINGS_TOURS = {
-  en: {
-    title: 'Add your tours &amp; prices', adminTitle: 'Tours editor',
-    intro: 'Take a photo of your price list or brochure and we&rsquo;ll turn it into a list of your tours on your page, so people looking for things to do can find you. It takes about 2 minutes.',
+// Price lists (tours, golf, other prices, 2026-10-17): the same screens, worded for a price list. No diet tags.
+function priceListAppStrings(kind, lang) {
+  const w = PRICE_LIST_WORDS[kind];
+  const e = w.en, f = w.fr;
+  const L = escapeHtml(e.list);
+  if (lang === 'fr') {
+    return {
+      title: `Ajoutez ${f.listHtml}`, adminTitle: '&Eacute;diteur de tarifs',
+      intro: `Prenez votre liste de prix ou votre brochure en photo et nous en faisons ${f.blurb} sur votre page, pour que les gens qui vous cherchent vous trouvent. Environ 2&nbsp;minutes.`,
+      take: '&#128247;&nbsp;Prendre votre liste de prix en photo',
+      reading: 'Lecture de votre liste de prix&hellip; environ {s}&nbsp;secondes &#9749;', readingSub: 'Restez sur cette page. Vos tarifs s&rsquo;afficheront ici d&egrave;s que ce sera pr&ecirc;t.',
+      blurry: 'Cette photo est un peu difficile &agrave; lire. Pourriez-vous r&eacute;essayer avec une bonne lumi&egrave;re, le t&eacute;l&eacute;phone bien au-dessus de la page&nbsp;?',
+      notMenu: 'Hmm, cela ne ressemble pas &agrave; une liste de prix. Pourriez-vous essayer une autre photo&nbsp;?',
+      unavailable: 'Notre lecteur fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous la taperons pour vous.',
+      reviewTitle: 'Voici vos tarifs', reviewIntro: 'Voici ce que verront vos clients. Touchez une ligne ou un prix pour le corriger.',
+      dishName: f.name, description: `Description&nbsp;: ${f.desc} (facultatif)`, deleteDish: 'Supprimer cette ligne',
+      addDish: '+ Ajouter une ligne', newDish: 'Nouvelle ligne', emptySection: 'Rien pour l&rsquo;instant.',
+      live: '&#127881; Vos tarifs sont en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir vos prix sur Okanagan Roam.',
+      sent: '&#127881; Merci&nbsp;! Vos tarifs sont en route.',
+      helpIntro: 'Nous taperons vos prix et les mettrons sur votre page, g&eacute;n&eacute;ralement en quelques jours.',
+      helpNoPages: 'Pas encore de photo&nbsp;? Dites-nous o&ugrave; trouver vos prix, par exemple un lien vers votre site.', helpNoteNeeded: 'O&ugrave; trouver vos prix&nbsp;?',
+      helpDone: 'Merci&nbsp;! C&rsquo;est re&ccedil;u. Nous mettrons vos tarifs en ligne et vous pr&eacute;viendrons.',
+      haveMenu: 'Vos tarifs sont en ligne', haveMenuSub: `{n}&nbsp;${f.items} &middot; mis &agrave; jour {date}`,
+      replace: '&#128247;&nbsp;Remplacer par une nouvelle liste de prix', takeDownConfirm: 'Retirer vos tarifs d&rsquo;Okanagan Roam&nbsp;? Vous pourrez les rajouter quand vous voulez.',
+      waiting: 'Merci&nbsp;! Vos tarifs attendent une v&eacute;rification rapide. Ce sera bient&ocirc;t en ligne.',
+      helpWaiting: 'Merci&nbsp;! Nous tapons vos tarifs et vous pr&eacute;viendrons quand ce sera en ligne.',
+      pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo de la liste de prix.', diet: {},
+    };
+  }
+  return {
+    title: `Add your ${L}`, adminTitle: kind === 'tours' ? 'Tours editor' : 'Prices editor',
+    intro: `Take a photo of your price list or brochure and we&rsquo;ll turn it into ${e.blurb} on your page, so ${e.seekers} can find you. It takes about 2 minutes.`,
     take: '&#128247;&nbsp;Take a photo of your price list',
-    reading: 'Reading your price list&hellip; about {s} seconds &#9749;', readingSub: 'You can stay on this page. Your tours will show up here when they&rsquo;re ready.',
+    reading: 'Reading your price list&hellip; about {s} seconds &#9749;', readingSub: `You can stay on this page. ${e.what.charAt(0).toUpperCase() + e.what.slice(1)} will show up here when they&rsquo;re ready.`,
     blurry: 'This photo is a little hard to read. Could you try again in good light, holding the phone straight above the page?',
     notMenu: 'Hmm, that doesn&rsquo;t look like a price list. Could you try another photo?',
     unavailable: 'Our reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
-    reviewTitle: 'Here are your tours', reviewIntro: 'This is how customers will see them. Tap any tour or price to fix it.',
-    dishName: 'Tour name', description: 'Description: how long, what&rsquo;s included (optional)', deleteDish: 'Delete this tour',
-    addDish: '+ Add a tour', newDish: 'New tour', emptySection: 'No tours yet.',
-    live: '&#127881; Your tours &amp; prices are live!', liveSub: 'Customers can now see your tours and prices on Okanagan Roam.',
-    sent: '&#127881; Thanks! Your tours &amp; prices are on their way.',
-    helpIntro: 'We&rsquo;ll type up your tours and prices and put them on your page, usually within a couple of days.',
+    reviewTitle: `Here are ${e.what}`, reviewIntro: `This is how customers will see them. Tap any ${e.item} or price to fix it.`,
+    dishName: e.name, description: `Description: ${e.desc} (optional)`, deleteDish: `Delete this ${e.item}`,
+    addDish: `+ Add a ${e.item}`, newDish: `New ${e.item}`, emptySection: `No ${e.items} yet.`,
+    live: `&#127881; Your ${L} are live!`, liveSub: `Customers can now see ${e.what} on Okanagan Roam.`,
+    sent: `&#127881; Thanks! Your ${L} are on their way.`,
+    helpIntro: `We&rsquo;ll type up ${e.what} and put them on your page, usually within a couple of days.`,
     helpNoPages: 'No photo yet? Tell us where to find your prices, like a link to them on your website.', helpNoteNeeded: 'Where can we find your prices?',
-    helpDone: 'Thanks! We&rsquo;ve got it. We&rsquo;ll put your tours up and let you know.',
-    haveMenu: 'Your tours &amp; prices are live', haveMenuSub: '{n} tours &middot; updated {date}',
-    replace: '&#128247;&nbsp;Replace with a new price list', takeDownConfirm: 'Take your tours and prices off Okanagan Roam? You can add them again any time.',
-    waiting: 'Thanks! Your tours &amp; prices are waiting for a quick check. They will be live soon.',
-    helpWaiting: 'Thanks! We&rsquo;re typing up your tours and will let you know when they&rsquo;re up.',
+    helpDone: `Thanks! We&rsquo;ve got it. We&rsquo;ll put ${e.what} up and let you know.`,
+    haveMenu: `Your ${L} are live`, haveMenuSub: `{n} ${e.items} &middot; updated {date}`,
+    replace: '&#128247;&nbsp;Replace with a new price list', takeDownConfirm: `Take ${e.what} off Okanagan Roam? You can add them again any time.`,
+    waiting: `Thanks! Your ${L} are waiting for a quick check. They will be live soon.`,
+    helpWaiting: `Thanks! We&rsquo;re typing up ${e.what} and will let you know when they&rsquo;re up.`,
     pdfBig: 'That PDF is too big. Try a photo of the price list instead.', diet: {},
-  },
-  fr: {
-    title: 'Ajoutez vos activit&eacute;s et tarifs', adminTitle: '&Eacute;diteur d&rsquo;activit&eacute;s',
-    intro: 'Prenez votre liste de prix ou votre brochure en photo et nous en faisons la liste de vos activit&eacute;s sur votre page, pour que les gens qui cherchent quoi faire vous trouvent. Environ 2&nbsp;minutes.',
-    take: '&#128247;&nbsp;Prendre votre liste de prix en photo',
-    reading: 'Lecture de votre liste de prix&hellip; environ {s}&nbsp;secondes &#9749;', readingSub: 'Restez sur cette page. Vos activit&eacute;s s&rsquo;afficheront ici d&egrave;s qu&rsquo;elles seront pr&ecirc;tes.',
-    blurry: 'Cette photo est un peu difficile &agrave; lire. Pourriez-vous r&eacute;essayer avec une bonne lumi&egrave;re, le t&eacute;l&eacute;phone bien au-dessus de la page&nbsp;?',
-    notMenu: 'Hmm, cela ne ressemble pas &agrave; une liste de prix. Pourriez-vous essayer une autre photo&nbsp;?',
-    unavailable: 'Notre lecteur fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous la taperons pour vous.',
-    reviewTitle: 'Voici vos activit&eacute;s', reviewIntro: 'Voici ce que verront vos clients. Touchez une activit&eacute; ou un prix pour le corriger.',
-    dishName: 'Nom de l&rsquo;activit&eacute;', description: 'Description&nbsp;: dur&eacute;e, ce qui est inclus (facultatif)', deleteDish: 'Supprimer cette activit&eacute;',
-    addDish: '+ Ajouter une activit&eacute;', newDish: 'Nouvelle activit&eacute;', emptySection: 'Aucune activit&eacute; pour l&rsquo;instant.',
-    live: '&#127881; Vos activit&eacute;s et tarifs sont en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir vos activit&eacute;s et vos prix sur Okanagan Roam.',
-    sent: '&#127881; Merci&nbsp;! Vos activit&eacute;s et tarifs sont en route.',
-    helpIntro: 'Nous taperons vos activit&eacute;s et vos prix et les mettrons sur votre page, g&eacute;n&eacute;ralement en quelques jours.',
-    helpNoPages: 'Pas encore de photo&nbsp;? Dites-nous o&ugrave; trouver vos prix, par exemple un lien vers votre site.', helpNoteNeeded: 'O&ugrave; trouver vos prix&nbsp;?',
-    helpDone: 'Merci&nbsp;! C&rsquo;est re&ccedil;u. Nous mettrons vos activit&eacute;s en ligne et vous pr&eacute;viendrons.',
-    haveMenu: 'Vos activit&eacute;s et tarifs sont en ligne', haveMenuSub: '{n}&nbsp;activit&eacute;s &middot; mis &agrave; jour {date}',
-    replace: '&#128247;&nbsp;Remplacer par une nouvelle liste de prix', takeDownConfirm: 'Retirer vos activit&eacute;s et tarifs d&rsquo;Okanagan Roam&nbsp;? Vous pourrez les rajouter quand vous voulez.',
-    waiting: 'Merci&nbsp;! Vos activit&eacute;s attendent une v&eacute;rification rapide. Elles seront bient&ocirc;t en ligne.',
-    helpWaiting: 'Merci&nbsp;! Nous tapons vos activit&eacute;s et vous pr&eacute;viendrons quand elles seront en ligne.',
-    pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo de la liste de prix.', diet: {},
-  },
-};
+  };
+}
 
 // The page's client code (ES5 so older phones run it). Config comes from window.MENU_CFG.
 const MENU_APP_SCRIPT = String.raw`(function(){
@@ -31562,7 +31593,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const t = { ...MENU_APP_STRINGS[lang], ...(menuKind(venue) === 'tours' ? MENU_APP_STRINGS_TOURS[lang] : {}) };
+  const t = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}) };
   const plain = (s) => String(s).replace(/&amp;/g, '&').replace(/&rsquo;/g, '\u2019').replace(/&nbsp;/g, '\u00a0').replace(/&Eacute;/g, '\u00c9').replace(/&eacute;/g, '\u00e9').replace(/&egrave;/g, '\u00e8').replace(/&agrave;/g, '\u00e0');
   const pub = publishedMenu(venue.id);
   const state = menuStateJson(venue, opts.mode === 'admin' ? db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(opts.menuId) : activeMenuDraft(venue.id));
@@ -31680,15 +31711,17 @@ function menuUpdatedLabel(utc, lang = 'en') {
   return d.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'short', year: 'numeric' });
 }
 function menuDishCountText(n, lang, kind = 'menu') {
-  if (kind === 'tours') return lang === 'fr' ? `${n} activité${n === 1 ? '' : 's'}` : `${n} tour${n === 1 ? '' : 's'}`;
+  const w = PRICE_LIST_WORDS[kind];
+  if (w) return lang === 'fr' ? `${n} ${n === 1 ? w.fr.item : w.fr.items}` : `${n} ${n === 1 ? w.en.item : w.en.items}`;
   return lang === 'fr' ? `${n} plat${n === 1 ? '' : 's'}` : `${n} dish${n === 1 ? '' : 'es'}`;
 }
 // What the uploaded list is called, by kind and language.
 function menuNoun(venue, lang = 'en') {
-  return menuKind(venue) === 'tours' ? (lang === 'fr' ? 'Activités et tarifs' : 'Tours & prices') : 'Menu';
+  const w = PRICE_LIST_WORDS[menuKind(venue)];
+  return w ? (lang === 'fr' ? w.fr.noun : w.en.noun) : 'Menu';
 }
 function menuMenuUrl(venue, lang = 'en') { return `https://okanaganroam.com${menuPagePath(venue, lang)}`; }
-function menuIndexable(menu, venue) { return !!menu && menu.items >= (menuKind(venue) === 'tours' ? TOURS_INDEX_MIN_ITEMS : MENU_INDEX_MIN_ITEMS); }
+function menuIndexable(menu, venue) { return !!menu && menu.items >= (isPriceList(venue) ? TOURS_INDEX_MIN_ITEMS : MENU_INDEX_MIN_ITEMS); }
 
 // schema.org Menu for a published menu: sections, dishes, prices in CAD, and the diets the menu itself marks.
 function menuSchema(venue, menu, lang) {
@@ -31743,11 +31776,13 @@ const VENUE_MENU_CSS = `<style>
   a.vm-btn:hover, a.vm-btn:focus { background: #2C4257; }
 </style>`;
 
-// schema.org for a tour operator's list: an OfferCatalog per section, each tour a TouristTrip offered at a CAD price.
-function toursOfferCatalog(venue, menu, lang) {
+// schema.org for a price list: an OfferCatalog per section, each line offered at a CAD price (a tour is a
+// TouristTrip, a green fee, admission or rental a Service).
+function priceListOfferCatalog(venue, menu, lang) {
+  const w = PRICE_LIST_WORDS[menuKind(venue)];
   return {
     '@type': 'OfferCatalog',
-    name: lang === 'fr' ? `Activités et tarifs ${frDe(venue.name)}` : `${venue.name} tours & prices`,
+    name: lang === 'fr' ? `${w.fr.noun} ${frDe(venue.name)}` : `${venue.name} ${w.en.list}`,
     url: menuMenuUrl(venue, lang),
     itemListElement: menu.data.sections.map((s) => ({
       '@type': 'OfferCatalog',
@@ -31756,7 +31791,7 @@ function toursOfferCatalog(venue, menu, lang) {
         const price = menuPriceNumber(it.price);
         return {
           '@type': 'Offer',
-          itemOffered: { '@type': 'TouristTrip', name: it.name, description: it.description || undefined },
+          itemOffered: { '@type': w.schema, name: it.name, description: it.description || undefined },
           price: price != null ? price.toFixed(2) : undefined,
           priceCurrency: price != null ? 'CAD' : undefined,
         };
@@ -31771,11 +31806,14 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   const fr = lang === 'fr';
   const picks = [];
   for (const s of menu.data.sections) for (const it of s.items) if (picks.length < 5) picks.push(it);
-  const tours = menuKind(venue) === 'tours';
+  const tours = isPriceList(venue);
+  const w = PRICE_LIST_WORDS[menuKind(venue)];
   const count = menuDishCountText(menu.items, lang, menuKind(venue));
-  const see = tours ? (fr ? `Voir toutes les activités et tarifs (${count})` : `See all tours & prices (${count})`) : (fr ? `Voir tout le menu (${count})` : `See the full menu (${count})`);
+  const see = tours ? (fr ? `Voir tous les tarifs (${count})` : `See all ${w.en.list} (${count})`) : (fr ? `Voir tout le menu (${count})` : `See the full menu (${count})`);
+  // Golf pages also carry the researched green-fee table, so the course's own list says where it came from.
+  const heading = menuKind(venue) === 'golf' ? (fr ? 'Tarifs de golf, selon le terrain' : 'Green fees & rates from the course') : menuNoun(venue, lang);
   return `<section class="venue-section vm-preview" id="${tours ? 'prices' : 'menu'}">
-    <h2>${escapeHtml(menuNoun(venue, lang))}</h2>
+    <h2>${escapeHtml(heading)}</h2>
     <ul class="vm-list">${picks.map((it) => menuItemHtml(it, lang)).join('')}</ul>
     <a class="vm-btn" href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${escapeHtml(see)} &rarr;</a>
     <p class="vm-meta">${tours ? (fr ? 'Tarifs mis à jour' : 'Prices updated') : (fr ? 'Menu mis à jour' : 'Menu updated')} ${escapeHtml(menuUpdatedLabel(menu.publishedAt, lang))}</p>
@@ -31793,21 +31831,22 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   const canonical = menuMenuUrl(venue, lang);
   const venueUrl = `https://okanaganroam.com${venuePagePath(venue, lang)}`;
   const updated = menuUpdatedLabel(menu.publishedAt, lang);
-  const tours = menuKind(venue) === 'tours';
+  const tours = isPriceList(venue);
+  const kindWords = PRICE_LIST_WORDS[menuKind(venue)];
   const noun = menuNoun(venue, lang);
   const count = menuDishCountText(menu.items, lang, menuKind(venue));
   const updatedText = tours ? L('Prices updated', 'Tarifs mis à jour') : L('Menu updated', 'Menu mis à jour');
   const title = tours ? (fr
-    ? fitTitle([venue.name, shortTitleName(venue.name, 36)].flatMap((n) => [`Activités et tarifs ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `Activités et tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)}`]))
-    : fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`${n} Tours & Prices — ${regionLabel}, BC | Okanagan Roam`, `${n} Tours & Prices — ${regionLabel}, BC`, `${n} Prices — ${regionLabel}`, `${n} Prices`])))
+    ? fitTitle([venue.name, shortTitleName(venue.name, 36)].flatMap((n) => [`${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)}`]))
+    : fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`${n} ${kindWords.en.title} — ${regionLabel}, BC | Okanagan Roam`, `${n} ${kindWords.en.title} — ${regionLabel}, BC`, `${n} Prices — ${regionLabel}`, `${n} Prices`])))
     : fr
     ? fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`Menu et prix ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `Menu et prix ${frDe(n)} — ${regionLabel}`, `Menu ${frDe(n)} — ${regionLabel}`, `Menu ${frDe(n)}`]))
     : fitTitle([venue.name, shortTitleName(venue.name, 40)].flatMap((n) => [`${n} Menu & Prices — ${regionLabel}, BC | Okanagan Roam`, `${n} Menu & Prices — ${regionLabel}, BC`, `${n} Menu — ${regionLabel}`, `${n} Menu`]));
   const names = [];
   for (const s of menu.data.sections) for (const it of s.items) if (names.length < 3) names.push(it.name);
   const rawDesc = tours ? (fr
-    ? `Les activités ${frDe(venue.name)} à ${regionLabel}, C.-B., avec les prix : ${names.join(', ')} et plus. Mis à jour ${updated}.`
-    : `${venue.name} tours and prices in ${regionLabel}, BC: ${names.join(', ')} and more. Updated ${updated}.`)
+    ? `${kindWords.fr.noun} ${frDe(venue.name)} à ${regionLabel}, C.-B. : ${names.join(', ')} et plus. Mis à jour ${updated}.`
+    : `${venue.name} ${kindWords.en.list.replace('&', 'and')} in ${regionLabel}, BC: ${names.join(', ')} and more. Updated ${updated}.`)
     : fr
     ? `Le menu ${frDe(venue.name)} à ${regionLabel}, C.-B., avec les prix : ${names.join(', ')} et plus. Mis à jour ${updated}.`
     : `See the ${venue.name} menu in ${regionLabel}, BC, with prices: ${names.join(', ')} and more. Updated ${updated}.`;
@@ -31830,7 +31869,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressLocality: regionLabel, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
     hasMenu: tours ? undefined : menuSchema(venue, menu, lang),
-    hasOfferCatalog: tours ? toursOfferCatalog(venue, menu, lang) : undefined,
+    hasOfferCatalog: tours ? priceListOfferCatalog(venue, menu, lang) : undefined,
   };
   const themedShell = usesThemedVenueShell(venue.type);
   const sections = menu.data.sections.map((s) => `<section class="vm-section">
@@ -31838,7 +31877,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     <ul class="vm-list">${s.items.map((it) => menuItemHtml(it, lang)).join('')}</ul>
   </section>`).join('\n  ');
   const website = normalizeWebsiteUrl(venue.website);
-  const booking = tours ? venueLinks(venue.id).booking_url || null : null;
+  const booking = tours ? venueLinks(venue.id).booking_url || null : null; // "Book online" (tee times, tours, sessions)
   const page = `<!DOCTYPE html>
 <html lang="${lang}"${hasFrench ? ` data-page-lang="${lang}"` : ''}>
 <head>
@@ -31856,12 +31895,12 @@ ${VENUE_MENU_CSS}
   ])}
   <div class="vm-page">
   <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap"><p style="margin:0 0 14px"><a href="${venuePagePath(venue, lang)}">&larr; ${escapeHtml(venue.name)}</a></p>${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${menuPagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${menuPagePath(venue, 'fr')}" hreflang="fr" lang="fr">Français</a>`}</p>` : ''}</div>
-  <h1>${tours ? (fr ? `Activités et tarifs ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Tours &amp; Prices`) : fr ? `Menu ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Menu`}</h1>
+  <h1>${tours ? (fr ? `${escapeHtml(kindWords.fr.noun)} ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} ${escapeHtml(kindWords.en.title)}`) : fr ? `Menu ${escapeHtml(frDe(venue.name))}` : `${escapeHtml(venue.name)} Menu`}</h1>
   <p class="vm-meta">${escapeHtml(label.singular)} ${fr ? 'à' : 'in'} ${escapeHtml(regionLabel)}, ${fr ? 'C.-B.' : 'BC'} &middot; ${count} &middot; ${updatedText} ${escapeHtml(updated)}</p>
   ${sections}
   <div class="vm-note-box">${tours ? (fr
     ? `Les prix, horaires et disponibilités peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant de réserver.`
-    : `Prices, times and availability can change. Check with ${escapeHtml(venue.name)} before you book.`) : fr
+    : `Prices, times and availability can change. Check with ${escapeHtml(venue.name)} before you ${menuKind(venue) === 'tours' || menuKind(venue) === 'golf' ? 'book' : 'go'}.`) : fr
     ? `Les plats et les prix peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant d’y aller, et confirmez toute allergie ou restriction alimentaire directement avec l’établissement.`
     : `Dishes and prices can change. Check with ${escapeHtml(venue.name)} before you go, and confirm any allergies or dietary needs with them directly.`}</div>
   <p>
@@ -31909,7 +31948,7 @@ function handleVenueMenuPage(req, res, pathname, parsed) {
     }
   }
   // A tour operator's list lives at /prices, everyone else's at /menu.
-  const menu = venue && !venue.redirect_to && (suffix === 'prices') === (menuKind(venue) === 'tours') ? publishedMenu(venue.id) : null;
+  const menu = venue && !venue.redirect_to && (suffix === 'prices') === isPriceList(venue) ? publishedMenu(venue.id) : null;
   if (!menu) {
     if (venue && !venue.redirect_to) { res.writeHead(302, { Location: venuePagePath(venue, frPrefix && venueHasFrench(venue) ? 'fr' : 'en') }); return res.end() || true; }
     res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -32959,7 +32998,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const v = m && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(m.venue_id);
     if (!v) return 'no_address';
     const link = outcome === 'approved' ? `https://okanaganroam.com${menuPagePath(v)}` : venueListingUrl(v);
-    return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: menuKind(v) === 'tours' ? 'your tours & prices' : 'your menu', outcome, reason, link, owner: true }));
+    return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: isPriceList(v) ? `your ${PRICE_LIST_WORDS[menuKind(v)].en.list}` : 'your menu', outcome, reason, link, owner: true }));
   }
   return 'no_address';
 }
@@ -33558,14 +33597,14 @@ function ownerMenuCardHtml(venue, href) {
   if (!MENU_VENUE_TYPES.has(venue.type)) return '';
   const pub = publishedMenu(venue.id);
   const draft = activeMenuDraft(venue.id);
-  const tours = menuKind(venue) === 'tours';
-  const what = tours ? 'tours & prices' : 'menu';
-  const sub = pub ? `Your ${what} ${tours ? 'are' : 'is'} live (${menuDishCountText(pub.items, 'en', menuKind(venue))}). Tap to change or replace ${tours ? 'them' : 'it'}.`
-    : draft && ['pending', 'help'].includes(draft.status) ? `Thanks! We have your ${what} and will put ${tours ? 'them' : 'it'} up soon.`
+  const w = PRICE_LIST_WORDS[menuKind(venue)];
+  const what = w ? w.en.list : 'menu';
+  const sub = pub ? `Your ${what} ${w ? 'are' : 'is'} live (${menuDishCountText(pub.items, 'en', menuKind(venue))}). Tap to change or replace ${w ? 'them' : 'it'}.`
+    : draft && ['pending', 'help'].includes(draft.status) ? `Thanks! We have your ${what} and will put ${w ? 'them' : 'it'} up soon.`
       : draft ? `You started adding your ${what}. Tap to pick up where you left off.`
-        : tours ? 'Take a photo of your price list or brochure. We turn it into a list of your tours on your page in about 2 minutes.'
+        : w ? `Take a photo of your price list or brochure. We turn it into ${w.en.blurb} on your page in about 2 minutes.`
           : 'Take a photo of your menu. We turn it into text on your page in about 2 minutes.';
-  const big = tours ? (pub ? '&#128203; Your tours &amp; prices' : '&#128247; Add your tours &amp; prices') : (pub ? '&#128203; Your menu' : '&#128247; Add your menu');
+  const big = w ? `${pub ? '&#128203; Your' : '&#128247; Add your'} ${escapeHtml(w.en.list)}` : (pub ? '&#128203; Your menu' : '&#128247; Add your menu');
   return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
 }
 
