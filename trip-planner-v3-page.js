@@ -1409,7 +1409,7 @@ function renderScript(d) {
       var sr=p.sparseRecovery, srFr=lang()==='fr';
       html+='<section class="t3-warnings" aria-label="'+(srFr?'Options pour les journées libres':'Options for activity gaps')+'"><h3>'+(srFr?'Adapter ce voyage':'Make this trip fit')+'</h3><p>'+(srFr?'Certaines journées n’ont aucune autre activité correspondante. Choisissez une option; votre plan ne change pas automatiquement.':'Some days have no additional matching activity. Choose an option; your plan stays unchanged until you do.')+'</p>';
       if(sr.shorterDays)html+='<button type="button" class="t3-btn" data-t3-shorten="'+sr.shorterDays+'">'+(srFr?'Essayer '+sr.shorterDays+' jour(s)':'Try '+sr.shorterDays+' day(s)')+'</button> ';
-      if(sr.region&&REGIONS.some(function(r){return r.slug===sr.region;}))html+='<a class="t3-btn t3-btn-ghost" href="/'+esc(sr.region)+'">'+(srFr?'Voir les lieux de cette région':'Review local places')+'</a>';
+      if(sr.region&&REGIONS.some(function(r){return r.slug===sr.region;})){var regionHref='/'+esc(sr.region);html+='<a class="t3-btn t3-btn-ghost" href="'+regionHref+'">'+(srFr?'Voir les lieux de cette région':'Review local places')+'</a>';}
       html+='</section>';
     }
     html += t3ListingGapSummaryHtml(p,lang()==='fr',esc);

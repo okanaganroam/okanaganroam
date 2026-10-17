@@ -881,6 +881,8 @@ const FR_TEXT = {
   'Local guides: patios, brunch, wineries for first-timers, rainy days and more.': 'Guides locaux : terrasses, brunch, vignobles pour débutants, jours de pluie et plus encore.',
   'Guides': 'Guides',
   'Browse by town': 'Parcourir par ville',
+  'Browse by activity': 'Parcourir par activité',
+  'Further ahead': 'Plus tard dans le calendrier',
   'real places': 'vrais lieux',
   'places to eat & drink': 'lieux où manger et boire',
   'trails, parks & lookouts': 'sentiers, parcs et belvédères',

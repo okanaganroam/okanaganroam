@@ -2908,7 +2908,8 @@ test('Home footer: About and Social Media (renamed from Follow) column links/ico
   assert.ok(html.includes('<button type="button" class="home-footer-link-btn" data-app-teaser-open aria-haspopup="dialog" aria-controls="appTeaserDialog" data-i18n="nav.appComingSoon">App coming soon</button>'));
   assert.ok(!html.includes('href="/browse#app"'));
   assert.match(html, /<a href="\/list-your-venue" data-i18n="footer\.listVenue">List your venue<\/a>/);
-  assert.match(html, /<button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/button>/);
+  // SEO audit 2 (2026-10-17): Contact is a real link to /contact that still opens the dialog (crawlers follow the link).
+  assert.match(html, /<a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/a>/);
   assert.match(html, /icon-instagram" href="https:\/\/www\.instagram\.com\/okanaganroam"/);
   assert.match(html, /icon-tiktok" href="https:\/\/www\.tiktok\.com\/@okanaganroam"/);
   assert.ok(html.includes('<a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">'));
@@ -7883,7 +7884,8 @@ test('/outdoors (Okanagan-wide) renders the discovery landing: one H1, canonical
   assert.match(html, /<script type="application\/json" id="outdoorActivityMap">\{[\s\S]*?\}<\/script>/);
   assert.doesNotMatch(outdoorMarkupOnly(html), /data-venue-category="beach"|data-venue-category="golf"|beach-page|golf-glance|Indoor Golf/);
   assert.doesNotMatch(html, /Beach page theme/);
-  assert.match(html, /"@type":"TouristAttraction"/);
+  // Summary-format ItemList (SEO audit 2, 2026-10-17): position, url and name per destination, no partial item.
+  assert.match(html, /"@type":"ListItem","position":1,"url":"https:\/\/okanaganroam\.com\/[a-z-]+\/outdoors\/[a-z0-9-]+","name":"/);
   assert.match(html, /<footer class="home-footer"/, 'shared footer markup present');
 });
 
@@ -8139,7 +8141,7 @@ test('Activity page + landing sections render once an activity reaches the thres
     assert.equal((html.match(/rel="canonical"/g) || []).length, 1, 'exactly one canonical');
     assert.match(html, /<meta property="og:title" content="Hiking &amp; Trails in the Okanagan \| Okanagan Roam">/);
     assert.match(html, /<meta name="description" content="Creek-side greenways[^"]* 4 spots across the Okanagan Valley\.">/);
-    assert.match(html, /"@type":"ItemList"/); assert.match(html, /"@type":"BreadcrumbList"/); assert.match(html, /"@type":"TouristAttraction"/);
+    assert.match(html, /"@type":"ItemList"/); assert.match(html, /"@type":"BreadcrumbList"/); assert.match(html, /"@type":"ListItem","position":1,"url":"https:\/\/okanaganroam\.com\/[^"]+","name":"/);
     assert.match(html, /<body class="golf-page outdoor-page">/);
     assert.match(html, /<a class="category-back-link" href="\/outdoors">← All Outdoors<\/a>/);
     assert.match(html, /<nav class="category-region-selector outdoor-activity-selector" aria-label="Choose an activity">\s*<a href="\/outdoors">All Outdoors<\/a>\s*<span class="category-region-selector-active">Hiking &amp; Trails<\/span>\s*<\/nav>/, 'active chip is static; sub-threshold activities are not offered');
@@ -9265,7 +9267,7 @@ test('Food & Drink incremental rendering: one batch in the render tree, every ve
     .filter((b) => b.startsWith('{') && b.includes('"@type":"ItemList"')).map((b) => JSON.parse(b))[0];
   assert.ok(itemList, 'the ItemList block is present');
   assert.equal(itemList.itemListElement.length, venues.length, 'every venue is still in the ItemList schema');
-  assert.ok(itemList.itemListElement.every((x) => x.url && x.item && x.item.name), 'each entry keeps its URL and name');
+  assert.ok(itemList.itemListElement.every((x) => x.url && x.name && !x.item), 'each entry keeps its URL and name (summary format)');
   assert.match(html, /rel="canonical" href="https:\/\/okanaganroam\.com\/food-drink"/);
   assert.match(html, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/);
 });
@@ -12065,7 +12067,7 @@ const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
           <li><a href="/owner/login">Business login</a></li>
-          <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
+          <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
         </ul>`;
 
 test('Footer: "List your venue" points to /list-your-venue on every footer page; the rest of the footer is unchanged', () => withDiscoveryServer(async (base) => {
@@ -16171,7 +16173,7 @@ test('Contact: the footer Contact is a button that opens one native dialog on ev
     if (res.status !== 200) { await res.text(); continue; }
     const html = await res.text();
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/)[0];
-    assert.match(footer, /<li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/button><\/li>/, page);
+    assert.match(footer, /<li><a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer\.contact">Contact<\/a><\/li>/, page);
     assert.doesNotMatch(footer.replace(/<dialog[\s\S]*?<\/dialog>/g, ''), /mailto:/, `${page}: no mailto link in the footer itself (the dialog shows the address as an alternative)`);
     assert.equal((html.match(/id="contactDialog"/g) || []).length, 1, `${page}: exactly one Contact dialog`);
     const dialog = html.match(/<dialog class="app-teaser-dialog contact-dialog"[\s\S]*?<\/dialog>/)[0];
@@ -16537,7 +16539,7 @@ test('Page weight: Food & Drink and guide ItemLists keep url + name per venue bu
   for (const html of [app.renderFoodDrinkHubPage(venues.filter((v) => ['restaurant', 'cafe', 'brewery', 'pub', 'cocktail'].includes(v.type))), app.renderGuidePage('kelowna', 'patio', venues.filter((v) => v.region === 'kelowna'))]) {
     const list = parseItemList(html);
     assert.ok(list && list.itemListElement.length > 0, 'ItemList present');
-    assert.ok(list.itemListElement.every((x) => x.item && x.item.name && !('description' in x.item)), 'name kept, description dropped');
+    assert.ok(list.itemListElement.every((x) => (x.name || (x.item && x.item.name)) && !('description' in (x.item || {})) && !('description' in x)), 'name kept, description dropped');
   }
 });
 
@@ -17834,7 +17836,9 @@ test('Venue descriptions ship in English and French: the EN / FR toggle (<html l
     await withWinterServer(async (base) => {
       const page = await WINTER_GET(base, '/kelowna/restaurants/bilingual-test-bistro');
       assert.equal(page.status, 200);
-      assert.match(page.text, /<p class="venue-description"><span class="desc-en" lang="en">A cosy test bistro \(fixture\)\.<\/span><span class="desc-fr" lang="fr">Un bistro d&#39;essai chaleureux \(fixture\)\.<\/span><\/p>/);
+      // SEO audit 2 (2026-10-17): a place with a French page carries only its English description; the French is on /fr.
+      assert.match(page.text, /<p class="venue-description">A cosy test bistro \(fixture\)\.<\/p>/);
+      assert.doesNotMatch(page.text, /Un bistro d&#39;essai chaleureux/);
       assert.match(page.text, /\.desc-fr \{ display: none; \}\nhtml\[lang="fr"\] \.desc-fr \{ display: inline; \}\nhtml\[lang="fr"\] \.desc-en \{ display: none; \}/);
       // A list page with a French twin (2026-10-14) carries the English blurb only; its /fr twin carries the French.
       const list = await WINTER_GET(base, '/kelowna/restaurants');
@@ -21787,6 +21791,73 @@ test('SEO audit fixes (2026-10-17): sitemap pages, .ics noindex, no hreflang on 
     for (const english of ['Tickets and available nights', 'Arrival and parking', 'Check available nights', 'Explore Field of Screams in Vernon']) {
       assert.ok(!fr.includes(english), `no English left: ${english}`);
     }
+  } finally {
+    for (const id of ids) {
+      for (const t of ['event_enrichment_log', 'event_submissions', 'owner_event_changes', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
+});
+
+test('SEO audit 2 (2026-10-17): FR breadcrumbs, event end dates, summary ItemLists, activity links, /contact link, EN-only place text, further-ahead events, FR guides, /trip script', async () => {
+  const ldBlocks = (html) => [...html.matchAll(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/g)].map((m) => JSON.parse(m[1]));
+  const ids = [];
+  try {
+    // 1. A French place page's breadcrumb trail stays on /fr.
+    const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+    const frPage = app.renderVenuePage({ ...venue, description_fr: 'Une trattoria (fixture).' }, [], [], [], { lang: 'fr' });
+    const crumbs = ldBlocks(frPage).find((b) => b['@type'] === 'BreadcrumbList').itemListElement.map((li) => li.item);
+    assert.deepEqual(crumbs, ['https://okanaganroam.com/fr', 'https://okanaganroam.com/fr/kelowna', 'https://okanaganroam.com/fr/kelowna/restaurants', 'https://okanaganroam.com/fr/kelowna/restaurants/test-trattoria']);
+    const enCrumbs = ldBlocks(app.renderVenuePage(venue, [], [], [])).find((b) => b['@type'] === 'BreadcrumbList').itemListElement.map((li) => li.item);
+    assert.equal(enCrumbs[0], 'https://okanaganroam.com/');
+    assert.equal(enCrumbs[2], 'https://okanaganroam.com/kelowna/restaurants');
+
+    // 2. A timed start with no end time on the same day: no endDate (never midnight before the start); series dates carry status.
+    const timed = s5create({ name: 'S5 Audit2 Timed Show', occurrences: [{ start_date: '2032-05-15', start_time: '19:30', end_time: null }, { start_date: '2032-05-16', start_time: '19:30', end_time: null }] });
+    const spanning = s5create({ name: 'S5 Audit2 Two Day Fair', occurrences: [{ start_date: '2032-06-01', end_date: '2032-06-02', start_time: '10:00', end_time: null }] });
+    ids.push(timed.id, spanning.id);
+    const ev = ldBlocks((await s5get(`/kelowna/events/${timed.slug}`)).text).find((b) => /Event/.test(b['@type']) && b.startDate);
+    assert.equal(ev.startDate, '2032-05-15T19:30:00-07:00');
+    assert.ok(!('endDate' in ev), 'no endDate before the start');
+    assert.equal(ev.subEvent.length, 1);
+    assert.equal(ev.subEvent[0].eventStatus, 'https://schema.org/EventScheduled');
+    assert.equal(ev.subEvent[0].eventAttendanceMode, 'https://schema.org/OfflineEventAttendanceMode');
+    assert.ok(!('endDate' in ev.subEvent[0]));
+    const fair = ldBlocks((await s5get(`/kelowna/events/${spanning.slug}`)).text).find((b) => /Event/.test(b['@type']) && b.startDate);
+    assert.equal(fair.endDate, '2032-06-02', 'a multi-day event keeps its later end date');
+
+    // 3. Summary-format ItemLists: position, url and name, no partial item.
+    const list = ldBlocks((await s5get('/kelowna/restaurants')).text).find((b) => b['@type'] === 'ItemList');
+    assert.ok(list.itemListElement.length && list.itemListElement.every((x) => x.position && x.url && x.name && !x.item));
+
+    // 4. /categories links every live activity page.
+    const categories = (await s5get('/categories')).text;
+    assert.match(categories, /<h2 class="category-subsection-heading" id="categoriesActivities">Browse by activity<\/h2>/);
+    for (const p of app.liveActivityPagePaths()) assert.ok(categories.includes(`href="${p}"`), p);
+
+    // 5. The footer's Contact is a real link that still opens the dialog.
+    assert.match(app.renderHomeFooterHTML(), /<a href="\/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog"/);
+
+    // 6. Further ahead: an event past the town page's 90-day window is linked from the town and valley pages.
+    const far = s5create({ name: 'S5 Audit2 Far Future Gala', occurrences: [{ start_date: '2033-02-10' }] });
+    ids.push(far.id);
+    for (const page of ['/kelowna/events', '/whats-on']) {
+      const html = (await s5get(page)).text;
+      assert.match(html, /<h2 class="category-subsection-heading" id="whatsOnFurtherHeading">Further ahead<\/h2>/, page);
+      assert.ok(html.includes(`href="/kelowna/events/${far.slug}"`), `${page} links the far event`);
+      assert.match(html, /Feb 10, 2033/);
+    }
+    assert.doesNotMatch((await s5get('/kelowna/events?when=this-week')).text, /whatsOnFurtherHeading/, 'filtered views stay as they were');
+
+    // 7. The French guide pieces that were left in English now translate.
+    const guideFr = require('../data/french/guides-4.json');
+    for (const [en, fr] of Object.entries(guideFr)) assert.equal(app.frText(en), fr, en);
+    assert.equal(app.frText('Browse by activity'), 'Parcourir par activité');
+    assert.equal(app.frText('Further ahead'), 'Plus tard dans le calendrier');
+
+    // 8. /trip's script no longer holds a link-shaped string a crawler reads as a broken URL.
+    const trip = (await s5get('/trip')).text;
+    assert.doesNotMatch(trip, /href="\/'\s*\+/);
   } finally {
     for (const id of ids) {
       for (const t of ['event_enrichment_log', 'event_submissions', 'owner_event_changes', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(id);
