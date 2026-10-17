@@ -22459,10 +22459,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const themedShell = usesThemedVenueShell(venue.type);
   const themedHeroTitle = themedShell && !venue.image_url;
   const heroPhoto = themedHeroTitle ? venueHeroPhoto(venue) : null;
-  const photoCredit = venue.image_url ? (ownerPhotoCreditFor(venue.image_url) || require('./data/venue-photo-credits.json')[venue.image_url.split('?')[0]]) : null;
+  const photoCredit = venue.image_url ? (ownerPhotoCreditFor(venue.image_url) || visitorPhotoCreditFor(venue.image_url, L) || require('./data/venue-photo-credits.json')[venue.image_url.split('?')[0]]) : null;
   // Gallery (2026-10-16): with two or more photos the hero gets a "See all"
   // button and a thumbnail row that open a full-screen viewer.
-  const galleryPhotos = venue.image_url ? venueGalleryPhotos(venue) : [];
+  const galleryPhotos = venue.image_url ? venueGalleryPhotos(venue, L) : [];
   const galleryHtml = venueGalleryHtml(venue, galleryPhotos, L);
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
@@ -22649,6 +22649,7 @@ ${VENUE_MENU_CSS}` : ''}
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
+  ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
   </div>
   <aside class="venue-aside">
@@ -30353,7 +30354,7 @@ function ownerPhotoPreviewUrl(key) {
 // owner upload, then any extra photos listed for the venue in
 // data/venue-gallery.json ({"<venue id>": [{"src": "/images/venues/x.jpg", "credit": "..."}]}),
 // with each photo shown once.
-function venueGalleryPhotos(venue) {
+function venueGalleryPhotos(venue, L = (en) => en) {
   const credits = require('./data/venue-photo-credits.json');
   let extra = {};
   try { extra = require('./data/venue-gallery.json'); } catch (e) { extra = {}; }
@@ -30365,10 +30366,12 @@ function venueGalleryPhotos(venue) {
     seen.add(key);
     out.push({ src: String(src), credit: credit || credits[key] || null });
   };
-  if (venue.image_url) add(venue.image_url, ownerPhotoCreditFor(venue.image_url));
+  if (venue.image_url) add(venue.image_url, ownerPhotoCreditFor(venue.image_url) || visitorPhotoCreditFor(venue.image_url, L));
   for (const p of db.prepare("SELECT file, credit FROM owner_photos WHERE venue_id = ? AND status = 'approved' ORDER BY id").all(venue.id)) {
     add(`/images/owner/${p.file}`, p.credit);
   }
+  // Approved visitor photos (2026-10-17) come after the owner's, credited "Sarah M. (visitor)".
+  for (const p of approvedVisitorPhotos(venue.id)) add(`/images/visitor/${p.file}`, visitorCredit(p.display_name, L));
   for (const p of (Array.isArray(extra[String(venue.id)]) ? extra[String(venue.id)] : [])) add(p && p.src, p && p.credit);
   return out;
 }
@@ -30550,6 +30553,804 @@ async function handleOwnerPhotoUpload(req, res, token) {
     }
   }
   return sendSubmissionResponse(res, 201, { ok: true, id, live, main, preview: `/owner-photos/preview/${previewKey}.jpg` });
+}
+
+// ---------- Visitor photos & tips (2026-10-17) ----------
+//
+// drafts/visitor-photos-tips-plan.md. A visitor shares a short tip and/or up
+// to 3 photos from a venue page. Nothing is public until Dayton approves it:
+//   submit  -> 'unconfirmed', and a confirm link (48 hours, only its hash
+//              kept) is emailed to them (Brevo, or Dayton forwards it);
+//   confirm -> 'pending' (/contribute/confirm/<token>), Dayton is notified;
+//   review  -> 'approved' or 'rejected' on /admin/review (the visitor is
+//              emailed either way); 'removed' takes an item down later.
+// Photos are resized and re-encoded as JPEG in the browser exactly like owner
+// photos, checked with the same size rules, stripped of any metadata segments
+// that are left (EXIF/GPS, XMP, comments) and stored with the owner photos on
+// the persistent volume. Approved photos join the venue gallery after the
+// owner's, credited "Sarah M. (visitor)"; approved tips are shown as escaped
+// text. The visitor's email is never rendered on a page or returned by an API.
+// Unconfirmed items are deleted after 7 days, checked whenever a new one is
+// sent and whenever /admin/review loads (no cron).
+const VISITOR_TIP_MAX = 500;
+const VISITOR_PHOTO_LIMIT = 3;
+const VISITOR_DAILY_PER_EMAIL = 5;
+const VISITOR_CONFIRM_HOURS = 48;
+const VISITOR_UNCONFIRMED_DAYS = 7;
+const VISITOR_TIPS_SHOWN = 5;
+const VISITOR_MAX_BODY = VISITOR_PHOTO_LIMIT * OWNER_PHOTO_MAX_BODY + 16 * 1024;
+const VISITOR_KEYS = new Set(['name', 'email', 'tip', 'photos', 'rights', 'honesty', 'lang', 'company_website', 'started_at']);
+const VISITOR_CONFIRM_PATH = '/contribute/confirm/';
+const VISITOR_REPORT_RATE_LIMIT = 20;
+
+// Every visitor-facing string, [English, French].
+const VC_TEXT = {
+  heading: ['Visitor photos & tips', 'Photos et conseils des visiteurs'],
+  empty: ['Been here? Share a photo or a tip for other visitors.', 'Vous y êtes allé? Partagez une photo ou un conseil avec les autres visiteurs.'],
+  share: ['Share a photo or tip', 'Partager une photo ou un conseil'],
+  name: ['Your name', 'Votre nom'],
+  nameHint: ['Shown as your first name and last initial, e.g. Sarah M.', 'Affiché avec votre prénom et l’initiale de votre nom, p. ex. Sarah M.'],
+  email: ['Your email', 'Votre courriel'],
+  emailHint: ['Never shown. We use it to confirm and to tell you when it’s live.', 'Jamais affiché. Il sert à confirmer l’envoi et à vous prévenir quand c’est en ligne.'],
+  tip: ['Tip (optional)', 'Conseil (facultatif)'],
+  tipHint: ['What should other visitors know? Best dish, best time to go, parking…', 'Que devraient savoir les autres visiteurs? Meilleur plat, meilleur moment pour y aller, stationnement…'],
+  photos: ['Photos (optional, up to 3)', 'Photos (facultatif, jusqu’à 3)'],
+  photosHint: ['JPEG, PNG, WebP or HEIC, at least 800 pixels wide.', 'JPEG, PNG, WebP ou HEIC, d’au moins 800 pixels de large.'],
+  rights: ['If adding photos: I took these photos (or have the rights to them) and Okanagan Roam may show them on this listing and its social posts.', 'Si vous ajoutez des photos : j’ai pris ces photos (ou j’en ai les droits) et Okanagan Roam peut les montrer sur cette fiche et dans ses publications sur les réseaux sociaux.'],
+  honesty: ['My tip is my own honest experience. I don’t work for or own this business.', 'Mon conseil reflète honnêtement ma propre expérience. Je ne travaille pas pour cette entreprise et je n’en suis pas propriétaire.'],
+  hp: ['Leave this empty', 'Laissez ce champ vide'],
+  send: ['Send', 'Envoyer'],
+  sending: ['Sending…', 'Envoi…'],
+  preparing: ['Preparing photo {n} of {total}…', 'Préparation de la photo {n} sur {total}…'],
+  done: ['Check your email. Click the link to send your photo/tip for review.', 'Vérifiez vos courriels. Cliquez sur le lien pour envoyer votre photo ou votre conseil à notre équipe, qui le vérifiera.'],
+  chars: ['{n} characters left', 'Encore {n} caractères'],
+  showMore: ['Show more', 'Afficher plus'],
+  report: ['Report', 'Signaler'],
+  reportAria: ['Report this tip', 'Signaler ce conseil'],
+  reportSure: ['Report this tip to Okanagan Roam?', 'Signaler ce conseil à Okanagan Roam?'],
+  reported: ['Reported. Thanks, we’ll take a look.', 'Signalé. Merci, nous allons vérifier.'],
+  visitor: ['visitor', 'visiteur'],
+  errName: ['Please enter your name.', 'Veuillez entrer votre nom.'],
+  errEmail: ['Please enter a valid email address.', 'Veuillez entrer une adresse courriel valide.'],
+  errTipLong: [`Please keep your tip to ${VISITOR_TIP_MAX} characters.`, `Votre conseil doit faire au plus ${VISITOR_TIP_MAX} caractères.`],
+  errNeedOne: ['Please add a tip or at least one photo.', 'Ajoutez un conseil ou au moins une photo.'],
+  errTooMany: [`Please choose up to ${VISITOR_PHOTO_LIMIT} photos.`, `Choisissez jusqu’à ${VISITOR_PHOTO_LIMIT} photos.`],
+  errPhoto: ['That file could not be read as a photo. Please try a JPG or PNG.', 'Ce fichier n’a pas pu être lu comme une photo. Essayez un JPG ou un PNG.'],
+  errPhotoSmall: [`That photo is too small. Please use one at least ${OWNER_PHOTO_MIN_EDGE} pixels wide.`, `Cette photo est trop petite. Utilisez-en une d’au moins ${OWNER_PHOTO_MIN_EDGE} pixels de large.`],
+  errPhotoLarge: ['That photo is too large. Please try again.', 'Cette photo est trop grande. Veuillez réessayer.'],
+  errRights: ['Please confirm you took these photos or have the rights to them.', 'Veuillez confirmer que vous avez pris ces photos ou que vous en avez les droits.'],
+  errHonesty: ['Please confirm this is your own honest experience.', 'Veuillez confirmer qu’il s’agit de votre propre expérience.'],
+  errFix: ['Please fix the highlighted fields.', 'Veuillez corriger les champs indiqués.'],
+  errDaily: [`You’ve already sent ${VISITOR_DAILY_PER_EMAIL} today. Please try again tomorrow.`, `Vous en avez déjà envoyé ${VISITOR_DAILY_PER_EMAIL} aujourd’hui. Veuillez réessayer demain.`],
+  errRate: ['Too many submissions. Please try again in an hour.', 'Trop d’envois. Veuillez réessayer dans une heure.'],
+  errQuick: ['That was very quick. Please check and send it again.', 'C’était très rapide. Vérifiez puis envoyez de nouveau.'],
+  errGeneric: ['Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.', 'Désolé, une erreur s’est produite. Veuillez réessayer ou nous écrire à info@okanaganroam.com.'],
+  errOrigin: ['Photos and tips are only accepted from the Okanagan Roam website.', 'Les photos et conseils ne sont acceptés que depuis le site d’Okanagan Roam.'],
+  errTooBig: ['Your photos are too large. Please send fewer or smaller photos.', 'Vos photos sont trop lourdes. Envoyez-en moins ou de plus petites.'],
+  errNetwork: ['Could not send. Please check your connection and try again.', 'Envoi impossible. Vérifiez votre connexion et réessayez.'],
+  errNotFound: ['This listing is not available.', 'Cette fiche n’est pas disponible.'],
+  confirmedTitle: ['Thanks!', 'Merci!'],
+  confirmed: ['Thanks — we’ll email you when it’s live.', 'Merci! Nous vous écrirons quand ce sera en ligne.'],
+  alreadyConfirmed: ['You’ve already confirmed this one. We’ll email you when it’s live.', 'Vous avez déjà confirmé cet envoi. Nous vous écrirons quand ce sera en ligne.'],
+  expiredTitle: ['This link has expired', 'Ce lien a expiré'],
+  expired: [`Confirm links work for ${VISITOR_CONFIRM_HOURS} hours. Please send your photo or tip again from the listing.`, `Les liens de confirmation fonctionnent pendant ${VISITOR_CONFIRM_HOURS} heures. Veuillez renvoyer votre photo ou votre conseil depuis la fiche.`],
+  invalidTitle: ['This link isn’t valid', 'Ce lien n’est pas valide'],
+  invalid: ['It may have been mistyped, or the item was already reviewed. Questions? Email info@okanaganroam.com.', 'Il a peut-être été mal copié, ou l’envoi a déjà été traité. Des questions? Écrivez à info@okanaganroam.com.'],
+  back: ['Back to {name}', 'Retour à {name}'],
+};
+function vcText(lang, key, vars) {
+  let s = VC_TEXT[key][lang === 'fr' ? 1 : 0];
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+  return s;
+}
+
+function visitorConfirmHash(value) {
+  return crypto.createHash('sha256').update(`okanagan-roam-visitor-confirm:${value}`).digest('hex');
+}
+
+// What they typed -> "Sarah M." (first name, last initial), or null when
+// there is no name in it. Made on the server so the full surname is never kept.
+function visitorDisplayName(raw) {
+  const words = String(raw || '').normalize('NFC').replace(/[^\p{L}\p{M}'’ .-]/gu, ' ').split(/\s+/)
+    .map((w) => w.replace(/^[-'’.]+|[-'’.]+$/g, '')).filter((w) => /\p{L}/u.test(w));
+  if (!words.length) return null;
+  const fix = (w) => {
+    const chars = Array.from(w === w.toLocaleUpperCase() && w.length > 1 ? w.toLocaleLowerCase() : w);
+    return chars[0].toLocaleUpperCase() + chars.slice(1).join('');
+  };
+  const first = Array.from(fix(words[0])).slice(0, 30).join('');
+  if (words.length < 2) return first;
+  const initial = Array.from(words[words.length - 1].replace(/[^\p{L}]/gu, ''))[0];
+  return initial ? `${first} ${initial.toLocaleUpperCase()}.` : first;
+}
+
+function visitorCredit(displayName, L = (en) => en) {
+  return `${displayName} (${L('visitor', 'visiteur')})`;
+}
+
+// A tip as it is kept: no control characters, at most one blank line in a row.
+function cleanVisitorTip(value) {
+  return String(value == null ? '' : value).normalize('NFC').replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F​-‏‪-‮⁦-⁩]/g, '')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// A JPEG without its metadata segments (APP1 EXIF/GPS/XMP, APP3-APP13 incl.
+// Photoshop IPTC, APP15, comments). JFIF, ICC colour and Adobe colour segments
+// stay so the photo still looks the same. null if the bytes aren't a JPEG.
+function stripJpegMetadata(buf) {
+  if (!buf || buf.length < 4 || buf[0] !== 0xFF || buf[1] !== 0xD8) return null;
+  const parts = [buf.subarray(0, 2)];
+  let i = 2;
+  while (i + 1 < buf.length) {
+    if (buf[i] !== 0xFF) return null;
+    const marker = buf[i + 1];
+    if (marker === 0xFF) { i++; continue; }
+    if (marker === 0xDA) { parts.push(buf.subarray(i)); return Buffer.concat(parts); }
+    if (marker === 0xD9) return null;
+    if ((marker >= 0xD0 && marker <= 0xD7) || marker === 0x01) { parts.push(buf.subarray(i, i + 2)); i += 2; continue; }
+    if (i + 4 > buf.length) return null;
+    const len = buf.readUInt16BE(i + 2);
+    if (len < 2 || i + 2 + len > buf.length) return null;
+    const metadata = marker === 0xE1 || (marker >= 0xE3 && marker <= 0xED) || marker === 0xEF || marker === 0xFE;
+    if (!metadata) parts.push(buf.subarray(i, i + 2 + len));
+    i += 2 + len;
+  }
+  return null;
+}
+
+const visitorContributionAttempts = new Map(); // ip -> [timestamps]; same limit as the public event form
+const visitorReportAttempts = new Map();
+function visitorRateLimited(map, ip, limit, now = Date.now()) {
+  const recent = (map.get(ip) || []).filter((t) => now - t < EVENT_SUBMISSION_RATE_WINDOW_MS);
+  recent.push(now);
+  map.set(ip, recent);
+  if (map.size > 5000) {
+    for (const [key, times] of map) {
+      if (!times.some((t) => now - t < EVENT_SUBMISSION_RATE_WINDOW_MS)) map.delete(key);
+    }
+  }
+  return recent.length > limit;
+}
+
+function visitorPhotoPreviewPath(key) {
+  return `/visitor-photos/preview/${key}.jpg`;
+}
+
+function visitorPhotosFor(contributionId) {
+  return db.prepare('SELECT id, file, preview_key, width, height, bytes, made_main_at FROM visitor_contribution_photos WHERE contribution_id = ? ORDER BY id').all(contributionId);
+}
+
+function deleteVisitorPhotoFiles(contributionId) {
+  for (const p of visitorPhotosFor(contributionId)) {
+    const fp = ownerPhotoPath(p.file);
+    if (fp) { try { fs.unlinkSync(fp); } catch (err) { /* already gone */ } }
+  }
+}
+
+// Unconfirmed items older than 7 days go, with their photo files.
+function purgeStaleVisitorContributions() {
+  const stale = db.prepare(`SELECT id FROM visitor_contributions WHERE status = 'unconfirmed' AND submitted_at < datetime('now', ?)`).all(`-${VISITOR_UNCONFIRMED_DAYS} days`);
+  for (const { id } of stale) {
+    deleteVisitorPhotoFiles(id);
+    db.prepare('DELETE FROM visitor_contribution_photos WHERE contribution_id = ?').run(id);
+    db.prepare("DELETE FROM visitor_contributions WHERE id = ? AND status = 'unconfirmed'").run(id);
+  }
+  return stale.length;
+}
+
+// Public reads: approved items only, and never the email.
+function approvedVisitorPhotos(venueId) {
+  return db.prepare(`SELECT p.id, p.file, c.display_name FROM visitor_contribution_photos p JOIN visitor_contributions c ON c.id = p.contribution_id
+    WHERE c.venue_id = ? AND c.status = 'approved' ORDER BY c.reviewed_at, p.id`).all(venueId);
+}
+
+function visitorTipsForVenue(venueId) {
+  return db.prepare(`SELECT id, display_name, tip, submitted_at FROM visitor_contributions
+    WHERE venue_id = ? AND status = 'approved' AND tip IS NOT NULL AND tip != '' ORDER BY submitted_at DESC, id DESC LIMIT 60`).all(venueId);
+}
+
+// The credit for a venue's main photo when it is an approved visitor photo.
+function visitorPhotoCreditFor(imageUrl, L) {
+  const m = /^\/images\/visitor\/([a-z0-9]{24}\.jpg)$/.exec(String(imageUrl || ''));
+  if (!m) return null;
+  const row = db.prepare(`SELECT c.display_name FROM visitor_contribution_photos p JOIN visitor_contributions c ON c.id = p.contribution_id
+    WHERE p.file = ? AND c.status = 'approved'`).get(m[1]);
+  return row ? visitorCredit(row.display_name, L) : null;
+}
+
+// "October 2026" / "octobre 2026" in Okanagan time.
+function visitorMonthYear(utc, lang) {
+  const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'long', year: 'numeric' });
+}
+
+const VISITOR_SECTION_CSS = `
+  .vc-section .vc-tips { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 10px; }
+  .vc-section .vc-tip { background: var(--sand, #F5F0E6); border-radius: 12px; padding: 12px 14px; }
+  .vc-section .vc-tip[hidden] { display: none; }
+  .vc-section .vc-tip-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.55; font-size: 0.96rem; }
+  .vc-section .vc-tip-meta { margin: 6px 0 0; font-size: 0.82rem; color: var(--ink, #2A2019); opacity: 0.75; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; }
+  .vc-section .vc-linkbtn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+  .vc-section .vc-empty { margin: 0 0 12px; }
+  .vc-section .vc-open { display: inline-block; background: var(--paper, #fff); color: var(--plum, #1B2B3A); border: 1.5px solid currentColor; border-radius: 9px; padding: 10px 18px; font: inherit; font-weight: 700; font-size: 0.92rem; cursor: pointer; max-width: 100%; }
+  .vc-section .vc-open:hover { background: var(--sand-deep, #EAE6D9); }
+  .vc-section .vc-form { margin-top: 14px; background: var(--paper, #fff); border: 1px solid rgba(74,52,40,0.14); border-radius: 14px; padding: 18px; box-sizing: border-box; max-width: 640px; }
+  .vc-section .vc-form[hidden], .vc-section .vc-done[hidden], .vc-section .vc-error[hidden] { display: none; }
+  .vc-section .vc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .vc-section .vc-row > * { min-width: 0; }
+  .vc-section .vc-field { margin: 0 0 14px; min-width: 0; }
+  .vc-section .vc-field > label { display: block; font-weight: 700; font-size: 0.86rem; margin-bottom: 5px; }
+  .vc-section .vc-field input[type=text], .vc-section .vc-field input[type=email], .vc-section .vc-field textarea { display: block; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1.5px solid rgba(42,32,25,0.18); border-radius: 10px; font: inherit; font-size: 16px; background: #fff; color: inherit; }
+  .vc-section .vc-field textarea { resize: vertical; min-height: 96px; }
+  .vc-section .vc-field input[type=file] { display: block; width: 100%; max-width: 100%; box-sizing: border-box; font: inherit; font-size: 0.9rem; }
+  .vc-section .vc-field [aria-invalid="true"] { border-color: #C0392B; }
+  .vc-section .vc-hint { font-size: 0.8rem; opacity: 0.72; margin: 4px 0 0; }
+  .vc-section .vc-field > .vc-check { display: flex; gap: 10px; align-items: flex-start; font-size: 0.88rem; line-height: 1.45; font-weight: 600; cursor: pointer; }
+  .vc-section .vc-check input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; }
+  .vc-section .vc-error { color: #C0392B; font-size: 0.82rem; font-weight: 700; margin: 5px 0 0; }
+  .vc-section .vc-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  .vc-section .vc-submit { display: block; width: 100%; border: 0; border-radius: 10px; padding: 13px; background: var(--plum, #1B2B3A); color: var(--paper, #fff); font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; }
+  .vc-section .vc-submit:disabled { opacity: 0.6; cursor: wait; }
+  .vc-section .vc-progress { font-size: 0.85rem; margin: 8px 0 0; }
+  .vc-section .vc-done { background: #E9F6EE; border-radius: 12px; padding: 14px 16px; font-weight: 600; margin-top: 14px; }
+  .vc-section .vc-reported { font-weight: 700; }
+  @media (max-width: 480px) {
+    .vc-section .vc-row { grid-template-columns: 1fr; }
+    .vc-section .vc-form { padding: 14px; }
+  }`;
+
+// The "Visitor photos & tips" section of a venue page: approved tips (newest
+// first, the first 5 then "Show more") or a one-line invitation, and the form.
+function visitorSectionHtml(venue, lang) {
+  const t = (key, vars) => escapeHtml(vcText(lang, key, vars));
+  const tips = visitorTipsForVenue(venue.id);
+  const tipsHtml = tips.length ? `<ul class="vc-tips">${tips.map((tip, i) => `
+      <li class="vc-tip"${i >= VISITOR_TIPS_SHOWN ? ' hidden data-vc-more' : ''}><p class="vc-tip-text">${escapeHtml(tip.tip)}</p>
+        <p class="vc-tip-meta"><span>${escapeHtml(tip.display_name)}</span><span aria-hidden="true">&middot;</span><span>${escapeHtml(visitorMonthYear(tip.submitted_at, lang))}</span><span aria-hidden="true">&middot;</span><button type="button" class="vc-linkbtn" data-vc-report="${tip.id}" aria-label="${t('reportAria')}">${t('report')}</button></p></li>`).join('')}
+    </ul>${tips.length > VISITOR_TIPS_SHOWN ? `<p><button type="button" class="vc-linkbtn" id="vcMore">${t('showMore')}</button></p>` : ''}`
+    : `<p class="vc-empty">${t('empty')}</p>`;
+  const msgs = {};
+  for (const k of ['send', 'sending', 'preparing', 'chars', 'reportSure', 'reported', 'errName', 'errEmail', 'errTipLong', 'errNeedOne', 'errTooMany', 'errPhoto', 'errPhotoSmall', 'errRights', 'errHonesty', 'errFix', 'errGeneric', 'errNetwork', 'errTooBig']) msgs[k] = vcText(lang, k);
+  return `<section class="venue-section vc-section" id="visitor-tips" aria-labelledby="vcHead">
+    <h2 id="vcHead">${t('heading')}</h2>
+    ${tipsHtml}
+    <button type="button" class="vc-open" id="vcOpen" aria-expanded="false" aria-controls="vcForm">${t('share')}</button>
+    <form class="vc-form" id="vcForm" novalidate hidden>
+      <div class="vc-row">
+        <div class="vc-field"><label for="vcName">${t('name')}</label><input type="text" id="vcName" maxlength="80" autocomplete="name" aria-describedby="vcNameHint"><p class="vc-hint" id="vcNameHint">${t('nameHint')}</p><p class="vc-error" id="vcNameError" hidden></p></div>
+        <div class="vc-field"><label for="vcEmail">${t('email')}</label><input type="email" id="vcEmail" maxlength="254" autocomplete="email" inputmode="email" aria-describedby="vcEmailHint"><p class="vc-hint" id="vcEmailHint">${t('emailHint')}</p><p class="vc-error" id="vcEmailError" hidden></p></div>
+      </div>
+      <div class="vc-field"><label for="vcTip">${t('tip')}</label><textarea id="vcTip" rows="4" maxlength="${VISITOR_TIP_MAX}" placeholder="${t('tipHint')}" aria-describedby="vcTipCount"></textarea><p class="vc-hint" id="vcTipCount" aria-live="polite">${t('chars', { n: VISITOR_TIP_MAX })}</p><p class="vc-error" id="vcTipError" hidden></p></div>
+      <div class="vc-field"><label for="vcPhotos">${t('photos')}</label><input type="file" id="vcPhotos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple aria-describedby="vcPhotosHint"><p class="vc-hint" id="vcPhotosHint">${t('photosHint')}</p><p class="vc-error" id="vcPhotosError" hidden></p></div>
+      <div class="vc-field"><label class="vc-check"><input type="checkbox" id="vcRights"> <span>${t('rights')}</span></label><p class="vc-error" id="vcRightsError" hidden></p></div>
+      <div class="vc-field"><label class="vc-check"><input type="checkbox" id="vcHonesty"> <span>${t('honesty')}</span></label><p class="vc-error" id="vcHonestyError" hidden></p></div>
+      <div class="vc-hp" aria-hidden="true"><label>${t('hp')} <input type="text" id="vcHp" tabindex="-1" autocomplete="off"></label></div>
+      <p class="vc-error" id="vcFormError" role="alert" hidden></p>
+      <button type="submit" class="vc-submit" id="vcSubmit">${t('send')}</button>
+      <p class="vc-progress" id="vcProgress" aria-live="polite"></p>
+    </form>
+    <p class="vc-done" id="vcDone" role="status" hidden>${t('done')}</p>
+    <style>${VISITOR_SECTION_CSS}</style>
+    <script>
+    (function(){
+      var VC = ${JSON.stringify(msgs).replace(/</g, '\\u003c')}, VENUE = ${Number(venue.id)}, LANG = '${lang === 'fr' ? 'fr' : 'en'}', MAX_TIP = ${VISITOR_TIP_MAX}, MAX_PHOTOS = ${VISITOR_PHOTO_LIMIT};
+      var form = document.getElementById('vcForm'), open = document.getElementById('vcOpen'); if (!form || !open) return;
+      var started = Date.now();
+      function $(id){ return document.getElementById(id); }
+      function show(id, msg){ var el = $(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg; var f = el.parentNode && el.parentNode.querySelector('input,textarea'); if (f && f.type !== 'checkbox' && id !== 'vcFormError') { if (msg) f.setAttribute('aria-invalid', 'true'); else f.removeAttribute('aria-invalid'); } }
+      open.addEventListener('click', function(){
+        var showing = form.hidden; form.hidden = !showing; open.setAttribute('aria-expanded', showing ? 'true' : 'false');
+        if (showing) $('vcName').focus();
+      });
+      var more = $('vcMore');
+      if (more) more.addEventListener('click', function(){
+        Array.prototype.forEach.call(document.querySelectorAll('[data-vc-more]'), function(li){ li.hidden = false; });
+        more.parentNode.removeChild(more);
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-vc-report]'), function(b){
+        b.addEventListener('click', function(){
+          if (!window.confirm(VC.reportSure)) return;
+          b.disabled = true;
+          fetch('/api/contributions/' + b.getAttribute('data-vc-report') + '/report', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' })
+            .then(function(){ var s = document.createElement('span'); s.className = 'vc-reported'; s.textContent = VC.reported; b.parentNode.replaceChild(s, b); })
+            .catch(function(){ b.disabled = false; });
+        });
+      });
+      var tip = $('vcTip'), count = $('vcTipCount');
+      tip.addEventListener('input', function(){ count.textContent = VC.chars.replace('{n}', Math.max(0, MAX_TIP - tip.value.length)); });
+      form.addEventListener('input', function(e){ var f = e.target.closest('.vc-field'); if (f) Array.prototype.forEach.call(f.querySelectorAll('.vc-error'), function(x){ x.hidden = true; }); if (e.target.removeAttribute) e.target.removeAttribute('aria-invalid'); });
+      form.addEventListener('change', function(e){ var f = e.target.closest('.vc-field'); if (f) Array.prototype.forEach.call(f.querySelectorAll('.vc-error'), function(x){ x.hidden = true; }); });
+      // Same as owner photos: at most 1600px on the long edge, re-encoded as
+      // JPEG (which drops the phone's EXIF data, GPS included).
+      function resize(file){
+        return new Promise(function(resolve, reject){
+          var url = URL.createObjectURL(file), img = new Image();
+          img.onload = function(){
+            var w = img.naturalWidth, h = img.naturalHeight, long = Math.max(w, h);
+            URL.revokeObjectURL(url);
+            if (long < 800) return reject(new Error('small'));
+            var scale = Math.min(1, 1600 / long), c = document.createElement('canvas');
+            c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/jpeg', 0.85));
+          };
+          img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('read')); };
+          img.src = url;
+        });
+      }
+      var ERR_IDS = { name: 'vcNameError', email: 'vcEmailError', tip: 'vcTipError', photos: 'vcPhotosError', rights: 'vcRightsError', honesty: 'vcHonestyError' };
+      form.addEventListener('submit', function(e){
+        e.preventDefault();
+        Object.keys(ERR_IDS).forEach(function(k){ show(ERR_IDS[k], ''); }); show('vcFormError', '');
+        var files = Array.prototype.slice.call($('vcPhotos').files || []);
+        var name = $('vcName').value.trim(), email = $('vcEmail').value.trim(), text = tip.value.trim();
+        var errs = {};
+        if (!name) errs.name = VC.errName;
+        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errs.email = VC.errEmail;
+        if (text.length > MAX_TIP) errs.tip = VC.errTipLong;
+        if (files.length > MAX_PHOTOS) errs.photos = VC.errTooMany;
+        if (!text && !files.length) errs.tip = VC.errNeedOne;
+        if (files.length && !$('vcRights').checked) errs.rights = VC.errRights;
+        if (!$('vcHonesty').checked) errs.honesty = VC.errHonesty;
+        if (Object.keys(errs).length) { Object.keys(errs).forEach(function(k){ show(ERR_IDS[k], errs[k]); }); show('vcFormError', VC.errFix); return; }
+        var btn = $('vcSubmit'), progress = $('vcProgress'); btn.disabled = true; btn.textContent = VC.sending;
+        function fail(msg){ btn.disabled = false; btn.textContent = VC.send; progress.textContent = ''; show('vcFormError', msg); }
+        var photos = [], chain = Promise.resolve();
+        files.forEach(function(file, i){
+          chain = chain.then(function(){
+            progress.textContent = VC.preparing.replace('{n}', i + 1).replace('{total}', files.length);
+            return resize(file).then(function(d){ photos.push(d); }, function(err){ throw new Error(err.message === 'small' ? VC.errPhotoSmall : VC.errPhoto); });
+          });
+        });
+        chain.then(function(){
+          progress.textContent = '';
+          return fetch('/api/venues/' + VENUE + '/contributions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ name: name, email: email, tip: text, photos: photos, rights: $('vcRights').checked, honesty: true, lang: LANG, company_website: $('vcHp').value, started_at: started }) })
+            .then(function(r){ return r.json().catch(function(){ return { ok: false, error: r.status === 413 ? VC.errTooBig : VC.errGeneric }; }); }, function(){ return { ok: false, error: VC.errNetwork }; })
+            .then(function(j){
+              if (j && j.ok) { form.hidden = true; open.hidden = true; var done = $('vcDone'); done.hidden = false; done.setAttribute('tabindex', '-1'); done.focus(); return; }
+              var es = (j && j.errors) || {};
+              Object.keys(es).forEach(function(k){ if (ERR_IDS[k]) show(ERR_IDS[k], es[k]); });
+              fail((j && j.error) || (Object.keys(es).length ? VC.errFix : VC.errGeneric));
+            });
+        }, function(err){ show('vcPhotosError', err.message); fail(VC.errFix); });
+      });
+    })();
+    </script>
+  </section>`;
+}
+
+// "photo", "photos and tip"... for emails, in their language.
+function visitorWhat(hasTip, photoCount, lang) {
+  const fr = lang === 'fr';
+  if (photoCount && hasTip) return fr ? (photoCount > 1 ? 'vos photos et votre conseil' : 'votre photo et votre conseil') : (photoCount > 1 ? 'photos and tip' : 'photo and tip');
+  if (photoCount) return fr ? (photoCount > 1 ? 'vos photos' : 'votre photo') : (photoCount > 1 ? 'photos' : 'photo');
+  return fr ? 'votre conseil' : 'tip';
+}
+
+function visitorConfirmEmail(c, venue, url, photoCount, hours) {
+  const first = String(c.display_name).split(' ')[0];
+  const what = visitorWhat(!!c.tip, photoCount, c.lang);
+  if (c.lang === 'fr') {
+    return { subject: `Confirmez votre envoi pour ${venue.name}`, text: [`Bonjour ${first},`, '',
+      `Merci d’avoir partagé ${what} pour ${venue.name} sur Okanagan Roam.`, '',
+      `Pour l’envoyer à notre équipe, ouvrez ce lien (il fonctionne pendant ${hours} heures) :`, url, '',
+      'Nous vérifions chaque envoi et vous écrirons quand il sera en ligne.', '',
+      'Si vous n’avez rien envoyé, ignorez ce courriel : rien ne sera publié.', '', 'Okanagan Roam', 'okanaganroam.com'].join('\n') };
+  }
+  return { subject: `Confirm your ${what} for ${venue.name}`, text: [`Hi ${first},`, '',
+    `Thanks for sharing your ${what} for ${venue.name} on Okanagan Roam.`, '',
+    `To send it for review, open this link (it works for ${hours} hours):`, url, '',
+    'We review everything before it goes on the site, and we’ll email you when it’s live.', '',
+    'If you didn’t send this, you can ignore this email and nothing will be posted.', '', 'Okanagan Roam', 'okanaganroam.com'].join('\n') };
+}
+
+function visitorDecisionEmail(c, venue, outcome, reason, photoCount, edited) {
+  const first = String(c.display_name).split(' ')[0];
+  const what = visitorWhat(!!c.tip, photoCount, c.lang);
+  const link = c.lang === 'fr' && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue);
+  if (c.lang === 'fr') {
+    if (outcome === 'approved') {
+      return { subject: `Votre envoi est en ligne sur Okanagan Roam`, text: [`Bonjour ${first},`, '',
+        `Bonne nouvelle : ${what} pour ${venue.name} est maintenant en ligne sur Okanagan Roam.${edited ? ' Nous avons fait une petite retouche avant de le publier.' : ''}`, '',
+        `Voyez-le ici : ${link}`, '', 'Merci de nous aider, vous et les autres visiteurs!', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n') };
+    }
+    return { subject: `À propos de votre envoi pour ${venue.name}`, text: [`Bonjour ${first},`, '',
+      `Merci d’avoir partagé ${what} pour ${venue.name}. Nous ne pouvons pas le publier cette fois-ci.${reason ? `\n\nRaison : ${reason}` : ''}`, '',
+      'Des questions? Écrivez-nous à info@okanaganroam.com.', '', 'Okanagan Roam'].join('\n') };
+  }
+  if (outcome === 'approved') {
+    return { subject: `Your ${what} is live on Okanagan Roam`, text: [`Hi ${first},`, '',
+      `Good news: your ${what} for ${venue.name} is now live on Okanagan Roam.${edited ? ' We made a small edit before publishing it.' : ''}`, '',
+      `See it here: ${link}`, '', 'Thanks for helping other visitors!', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n') };
+  }
+  return { subject: `About your ${what} for ${venue.name}`, text: [`Hi ${first},`, '',
+    `Thanks for sharing your ${what} for ${venue.name}. We weren’t able to publish it this time.${reason ? `\n\nReason: ${reason}` : ''}`, '',
+    'Questions? Email us at info@okanaganroam.com.', '', 'Okanagan Roam'].join('\n') };
+}
+
+// POST /api/venues/:id/contributions (JSON; photos as browser-made JPEG data URLs, like owner photos).
+async function handleVisitorContribution(req, res, venueId) {
+  // The page's language until the body says otherwise.
+  let lang = /^\/fr\//.test(String(req.headers.referer || '').replace(/^https?:\/\/[^/]+/, '')) ? 'fr' : 'en';
+  const say = (key) => vcText(lang, key);
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: say('errOrigin') });
+  const ip = requestClientIp(req);
+  if (visitorRateLimited(visitorContributionAttempts, ip, EVENT_SUBMISSION_RATE_LIMIT)) return sendSubmissionResponse(res, 429, { ok: false, error: say('errRate') });
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+  if (!row || row.redirect_to) return sendSubmissionResponse(res, 404, { ok: false, error: say('errNotFound') });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: say('errGeneric') });
+  let body;
+  try {
+    body = await readLimitedJsonBody(req, VISITOR_MAX_BODY);
+  } catch (err) {
+    return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: say(err.status === 413 ? 'errTooBig' : 'errGeneric') }, err.status === 413);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !VISITOR_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: say('errGeneric') });
+  }
+  if (body.lang === 'fr' || body.lang === 'en') lang = body.lang;
+  // The honeypot: a bot gets the same answer as a person, and nothing is kept.
+  if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
+  const startedAt = Number(body.started_at);
+  if (!Number.isFinite(startedAt) || Date.now() - startedAt < VENUE_SUBMISSION_MIN_FILL_MS) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: say('errQuick') });
+  }
+  const errors = {};
+  const displayName = typeof body.name === 'string' && body.name.length <= 200 ? visitorDisplayName(body.name) : null;
+  if (!displayName) errors.name = say('errName');
+  const email = validOwnerEmail(body.email);
+  if (!email) errors.email = say('errEmail');
+  const tip = typeof body.tip === 'string' ? cleanVisitorTip(body.tip) : '';
+  if (body.tip != null && typeof body.tip !== 'string') errors.tip = say('errGeneric');
+  else if (Array.from(tip).length > VISITOR_TIP_MAX) errors.tip = say('errTipLong');
+  const rawPhotos = body.photos == null ? [] : body.photos;
+  const photos = [];
+  if (!Array.isArray(rawPhotos)) errors.photos = say('errPhoto');
+  else if (rawPhotos.length > VISITOR_PHOTO_LIMIT) errors.photos = say('errTooMany');
+  else {
+    for (const p of rawPhotos) {
+      const m = typeof p === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(p) : null;
+      const raw = m ? Buffer.from(m[1], 'base64') : null;
+      const buf = raw && raw.length <= OWNER_PHOTO_MAX_BYTES ? stripJpegMetadata(raw) : null;
+      const dims = buf ? jpegDimensions(buf) : null;
+      if (!buf || !dims) { errors.photos = say(raw && raw.length > OWNER_PHOTO_MAX_BYTES ? 'errPhotoLarge' : 'errPhoto'); break; }
+      const longEdge = Math.max(dims.width, dims.height);
+      if (longEdge < OWNER_PHOTO_MIN_EDGE) { errors.photos = say('errPhotoSmall'); break; }
+      if (longEdge > OWNER_PHOTO_MAX_EDGE) { errors.photos = say('errPhotoLarge'); break; }
+      photos.push({ buf, dims });
+    }
+  }
+  if (!errors.tip && !errors.photos && !tip && !photos.length) errors.tip = say('errNeedOne');
+  if (photos.length && body.rights !== true) errors.rights = say('errRights');
+  if (body.honesty !== true) errors.honesty = say('errHonesty');
+  if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: say('errFix'), errors });
+  purgeStaleVisitorContributions();
+  const today = db.prepare("SELECT COUNT(*) AS n FROM visitor_contributions WHERE email = ? AND submitted_at > datetime('now', '-1 day')").get(email).n;
+  if (today >= VISITOR_DAILY_PER_EMAIL) return sendSubmissionResponse(res, 429, { ok: false, error: say('errDaily') });
+
+  const files = photos.map((p) => ({ ...p, file: `${crypto.randomBytes(12).toString('hex')}.jpg`, previewKey: crypto.randomBytes(18).toString('base64url') }));
+  try {
+    if (files.length) fs.mkdirSync(OWNER_PHOTO_DIR, { recursive: true });
+    for (const f of files) fs.writeFileSync(ownerPhotoPath(f.file), f.buf, { flag: 'wx' });
+  } catch (err) {
+    for (const f of files) { try { fs.unlinkSync(ownerPhotoPath(f.file)); } catch (e) { /* not written */ } }
+    console.error(`[visitor] writing photos for venue #${row.id} failed: ${err.message}`);
+    return sendSubmissionResponse(res, 500, { ok: false, error: say('errGeneric') });
+  }
+  const direct = ownerDirectEmail();
+  const hours = VISITOR_CONFIRM_HOURS;
+  const token = crypto.randomBytes(32).toString('base64url');
+  const ipHash = crypto.createHash('sha256').update(`okanagan-roam-visitor-contribution:${ip}`).digest('hex');
+  let id;
+  db.exec('BEGIN');
+  try {
+    id = Number(db.prepare(`INSERT INTO visitor_contributions (venue_id, display_name, email, tip, status, confirm_token_hash, confirm_expires_at,
+      rights_confirmed_at, honesty_confirmed_at, ip_hash, lang) VALUES (?, ?, ?, ?, 'unconfirmed', ?, datetime('now', ?), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)`)
+      .run(row.id, displayName, email, tip || null, visitorConfirmHash(token), `+${hours} hours`, ipHash, lang).lastInsertRowid);
+    for (const f of files) {
+      db.prepare('INSERT INTO visitor_contribution_photos (contribution_id, file, preview_key, width, height, bytes) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id, f.file, f.previewKey, f.dims.width, f.dims.height, f.buf.length);
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    for (const f of files) { try { fs.unlinkSync(ownerPhotoPath(f.file)); } catch (e) { /* gone */ } }
+    console.error(`[visitor] saving a contribution for venue #${row.id} failed: ${err.message}`);
+    return sendSubmissionResponse(res, 500, { ok: false, error: say('errGeneric') });
+  }
+  const venue = rowToVenue(row);
+  const url = `https://okanaganroam.com${VISITOR_CONFIRM_PATH}${token}`;
+  const message = visitorConfirmEmail({ display_name: displayName, tip, lang }, venue, url, files.length, hours);
+  try {
+    if (direct) {
+      await direct({ to: email, subject: message.subject, text: message.text });
+    } else {
+      // No Brevo: the request goes to Dayton's inbox with the email to forward,
+      // the same way owner password resets work without it.
+      await venueSubmissionTransport({
+        _subject: `[ACTION] Visitor confirm link: ${venue.name}`,
+        _template: 'table',
+        _captcha: 'false',
+        'What to do': `Forward the email below to ${email} from info@okanaganroam.com. The link works for ${hours} hours. Nothing is public until they confirm and you approve it.`,
+        'Venue': `${venue.name} (venue #${venue.id})`,
+        'Subject': message.subject,
+        'Email to forward': message.text,
+      });
+    }
+  } catch (err) {
+    console.error(`[visitor] confirm email for contribution #${id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+  }
+  return sendSubmissionResponse(res, 201, { ok: true, message: vcText(lang, 'done') });
+}
+
+function renderVisitorConfirmPage(lang, title, text, venue) {
+  const back = venue ? `<p style="margin-top:20px"><a href="${escapeHtml(lang === 'fr' && venueHasFrench(venue) ? venuePagePath(venue, 'fr') : venuePagePath(venue))}#visitor-tips">${escapeHtml(vcText(lang, 'back', { name: venue.name }))}</a></p>` : '';
+  const page = ownerSimplePage(title, `<h1>${escapeHtml(title)}</h1><p class="op-done">${escapeHtml(text)}</p>${back}`);
+  return lang === 'fr' ? page.replace('<html lang="en">', '<html lang="fr-CA">') : page;
+}
+
+// GET /contribute/confirm/<token>: unconfirmed -> pending, and Dayton is told.
+async function handleVisitorConfirm(req, res, token) {
+  const send = (status, html) => {
+    res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
+    return res.end(req.method === 'HEAD' ? undefined : html);
+  };
+  const c = /^[A-Za-z0-9_-]{43}$/.test(token) ? db.prepare('SELECT * FROM visitor_contributions WHERE confirm_token_hash = ?').get(visitorConfirmHash(token)) : null;
+  if (!c) return send(404, renderVisitorConfirmPage('en', vcText('en', 'invalidTitle'), vcText('en', 'invalid'), null));
+  const lang = c.lang === 'fr' ? 'fr' : 'en';
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(c.venue_id);
+  const venue = row && !row.redirect_to ? rowToVenue(row) : null;
+  if (c.status !== 'unconfirmed') {
+    if (c.status === 'pending' || c.status === 'approved') return send(200, renderVisitorConfirmPage(lang, vcText(lang, 'confirmedTitle'), vcText(lang, 'alreadyConfirmed'), venue));
+    return send(404, renderVisitorConfirmPage(lang, vcText(lang, 'invalidTitle'), vcText(lang, 'invalid'), venue));
+  }
+  // HEAD (link scanners) never confirms.
+  if (req.method === 'HEAD') return send(200, '');
+  const changed = db.prepare(`UPDATE visitor_contributions SET status = 'pending', confirmed_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND status = 'unconfirmed' AND confirm_expires_at > datetime('now')`).run(c.id).changes;
+  if (!changed) return send(410, renderVisitorConfirmPage(lang, vcText(lang, 'expiredTitle'), vcText(lang, 'expired'), venue));
+  const photos = visitorPhotosFor(c.id);
+  try {
+    await venueSubmissionTransport({
+      _subject: `[PENDING REVIEW] Visitor ${visitorWhat(!!c.tip, photos.length, 'en')} for ${row ? row.name : `venue #${c.venue_id}`}`,
+      _template: 'table',
+      _captcha: 'false',
+      'Status': 'PENDING REVIEW. Not on the site until approved.',
+      'Venue': row ? `${row.name} (venue #${row.id})` : `venue #${c.venue_id}`,
+      'Listing': row ? venueListingUrl(row) : '',
+      'From': `${c.display_name} (visitor)`,
+      'Tip': c.tip || '(no tip)',
+      'Photos': photos.length ? photos.map((p) => `https://okanaganroam.com${visitorPhotoPreviewPath(p.preview_key)}`).join('\n') : '(no photos)',
+      'How to review': `Open ${ADMIN_REVIEW_URL}#visitor`,
+    });
+  } catch (err) {
+    console.error(`[visitor] admin notification for contribution #${c.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+  }
+  return send(200, renderVisitorConfirmPage(lang, vcText(lang, 'confirmedTitle'), vcText(lang, 'confirmed'), venue));
+}
+
+// POST /api/contributions/:id/report: a visitor flags a live tip for Dayton.
+const visitorReportsSeen = new Set(); // `${id}:${ip hash}`, so one person counts once
+async function handleVisitorReport(req, res, id) {
+  req.resume();
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Forbidden.' });
+  const ip = requestClientIp(req);
+  if (visitorRateLimited(visitorReportAttempts, ip, VISITOR_REPORT_RATE_LIMIT)) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many reports. Please try again later.' });
+  const c = db.prepare("SELECT id, venue_id, display_name, tip, reported_count FROM visitor_contributions WHERE id = ? AND status = 'approved'").get(id);
+  if (!c) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
+  const key = `${id}:${crypto.createHash('sha256').update(`okanagan-roam-visitor-report:${ip}`).digest('hex')}`;
+  if (!visitorReportsSeen.has(key)) {
+    if (visitorReportsSeen.size > 20000) visitorReportsSeen.clear();
+    visitorReportsSeen.add(key);
+    db.prepare('UPDATE visitor_contributions SET reported_count = reported_count + 1 WHERE id = ?').run(id);
+    if (c.reported_count === 0) {
+      const v = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(c.venue_id);
+      try {
+        await venueSubmissionTransport({
+          _subject: `[REPORTED] Visitor tip on ${v ? v.name : `venue #${c.venue_id}`}`,
+          _template: 'table',
+          _captcha: 'false',
+          'Status': 'A visitor reported this live tip. It stays up until you remove it.',
+          'Venue': v ? `${v.name} (venue #${v.id})` : `venue #${c.venue_id}`,
+          'Listing': v ? venueListingUrl(v) : '',
+          'From': `${c.display_name} (visitor)`,
+          'Tip': c.tip || '(photos only)',
+          'How to review': `Open ${ADMIN_REVIEW_URL}#visitorreported`,
+        });
+      } catch (err) {
+        console.error(`[visitor] report notification for contribution #${id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+      }
+    }
+  }
+  return sendSubmissionResponse(res, 200, { ok: true });
+}
+
+// --- review -----------------------------------------------------------------
+
+// For /admin/review and the token API: everything but the email.
+function listVisitorContributions(status = 'pending') {
+  const where = status === 'reported' ? "c.status = 'approved' AND c.reported_count > 0"
+    : status === 'live' ? "c.status = 'approved' AND c.reviewed_at > datetime('now', '-30 days')"
+      : status === 'all' ? '1 = 1' : 'c.status = ?';
+  const args = ['reported', 'live', 'all'].includes(status) ? [] : [status];
+  const rows = db.prepare(`SELECT c.id, c.venue_id, c.display_name, c.tip, c.status, c.submitted_at, c.confirmed_at, c.reviewed_at, c.reviewed_by,
+      c.rejection_reason, c.reported_count, c.lang, v.name AS venue_name, v.region, v.type, v.slug, v.image_url
+    FROM visitor_contributions c LEFT JOIN venues v ON v.id = c.venue_id WHERE ${where} ORDER BY c.id ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 300`).all(...args);
+  return rows.map((r) => ({
+    id: r.id, venue_id: r.venue_id, venue_name: r.venue_name, listing_url: venueListingUrl(r), status: r.status, display_name: r.display_name,
+    credit: visitorCredit(r.display_name), tip: r.tip, submitted_at: r.submitted_at, confirmed_at: r.confirmed_at, reviewed_at: r.reviewed_at,
+    reviewed_by: r.reviewed_by, rejection_reason: r.rejection_reason, reported_count: r.reported_count, lang: r.lang,
+    photos: visitorPhotosFor(r.id).map((p) => ({ id: p.id, width: p.width, height: p.height, preview_url: visitorPhotoPreviewPath(p.preview_key),
+      public_url: r.status === 'approved' ? `/images/visitor/${p.file}` : null, is_main: r.image_url === `/images/visitor/${p.file}` })),
+  }));
+}
+
+function visitorVenueFor(c) {
+  return db.prepare('SELECT id, name, region, type, slug, image_url, redirect_to FROM venues WHERE id = ?').get(c.venue_id);
+}
+
+// Makes an approved visitor photo the listing's main photo (venue image_url).
+function makeVisitorPhotoMain(contributionId, photoId, reviewer) {
+  const c = db.prepare('SELECT * FROM visitor_contributions WHERE id = ?').get(contributionId);
+  if (!c) return { ok: false, reason: 'not_found' };
+  if (c.status !== 'approved') return { ok: false, reason: 'not_live' };
+  const p = db.prepare('SELECT * FROM visitor_contribution_photos WHERE id = ? AND contribution_id = ?').get(photoId, contributionId);
+  if (!p) return { ok: false, reason: 'photo_not_found' };
+  const venue = visitorVenueFor(c);
+  if (!venue || venue.redirect_to) return { ok: false, reason: 'venue_unavailable' };
+  if (!fs.existsSync(ownerPhotoPath(p.file))) return { ok: false, reason: 'file_missing' };
+  const url = `/images/visitor/${p.file}`;
+  if (venue.image_url !== url) {
+    updateVenue(venue.id, { image_url: url });
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'image_url', ?, ?, 'admin', ?, 'high', ?, 0, ?)`).run(venue.id, venue.image_url || null, url, `visitor photo #${p.id}`, `visitor-photo-${p.id}`, reviewer);
+  }
+  db.prepare('UPDATE visitor_contribution_photos SET made_main_at = CURRENT_TIMESTAMP WHERE id = ?').run(p.id);
+  return { ok: true, main: true, public_url: `https://okanaganroam.com${url}`, listing: venueListingUrl(venue) };
+}
+
+// Approve a confirmed item, optionally with the tip edited and one photo made
+// the main photo. -> { ok, edited, main } | { ok: false, reason }
+function approveVisitorContribution(id, reviewer, opts = {}) {
+  const c = db.prepare('SELECT * FROM visitor_contributions WHERE id = ?').get(id);
+  if (!c) return { ok: false, reason: 'not_found' };
+  if (c.status !== 'pending') return { ok: false, reason: 'not_pending', status: c.status };
+  const venue = visitorVenueFor(c);
+  if (!venue || venue.redirect_to) return { ok: false, reason: 'venue_unavailable' };
+  const photos = visitorPhotosFor(id);
+  if (photos.some((p) => !fs.existsSync(ownerPhotoPath(p.file)))) return { ok: false, reason: 'file_missing' };
+  if (opts.mainPhotoId !== undefined && !photos.some((p) => p.id === opts.mainPhotoId)) return { ok: false, reason: 'photo_not_found' };
+  let tip = c.tip;
+  let edited = false;
+  if (typeof opts.tip === 'string') {
+    const clean = cleanVisitorTip(opts.tip);
+    if (Array.from(clean).length > VISITOR_TIP_MAX || (!clean && !photos.length)) return { ok: false, reason: 'bad_tip' };
+    if (clean !== (c.tip || '')) { tip = clean || null; edited = true; }
+  }
+  const changed = db.prepare("UPDATE visitor_contributions SET status = 'approved', tip = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ? AND status = 'pending'")
+    .run(tip, reviewer, id).changes;
+  if (!changed) return { ok: false, reason: 'not_pending' };
+  let main = false;
+  if (opts.mainPhotoId !== undefined) main = !!makeVisitorPhotoMain(id, opts.mainPhotoId, reviewer).ok;
+  db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(venue.id);
+  return { ok: true, edited, main, listing: venueListingUrl(venue) };
+}
+
+function rejectVisitorContribution(id, reviewer, reason) {
+  const c = db.prepare('SELECT * FROM visitor_contributions WHERE id = ?').get(id);
+  if (!c) return { ok: false, reason: 'not_found' };
+  if (c.status !== 'pending') return { ok: false, reason: 'not_pending', status: c.status };
+  db.prepare("UPDATE visitor_contributions SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
+    .run(reviewer, String(reason || '').slice(0, 300) || null, id);
+  deleteVisitorPhotoFiles(id);
+  return { ok: true };
+}
+
+// Takes an item down (pending or live). A photo that is the main photo stops
+// being it, so the listing falls back to its example photo. Files are deleted.
+function removeVisitorContribution(id, reviewer, reason) {
+  const c = db.prepare('SELECT * FROM visitor_contributions WHERE id = ?').get(id);
+  if (!c) return { ok: false, reason: 'not_found' };
+  if (!['pending', 'approved', 'unconfirmed'].includes(c.status)) return { ok: false, reason: 'not_pending', status: c.status };
+  const venue = visitorVenueFor(c);
+  let wasMain = false;
+  for (const p of visitorPhotosFor(id)) {
+    const url = `/images/visitor/${p.file}`;
+    if (venue && venue.image_url === url) {
+      updateVenue(venue.id, { image_url: null });
+      db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, 'image_url', ?, NULL, 'admin', ?, 'high', ?, 0, ?)`).run(venue.id, url, `removed visitor photo #${p.id}`, `visitor-photo-${p.id}`, reviewer);
+      wasMain = true;
+    }
+  }
+  db.prepare("UPDATE visitor_contributions SET status = 'removed', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
+    .run(reviewer, String(reason || 'removed').slice(0, 300), id);
+  deleteVisitorPhotoFiles(id);
+  if (venue) db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(venue.id);
+  return { ok: true, was_main: wasMain };
+}
+
+// A reported tip Dayton has looked at and is keeping.
+function keepReportedVisitorContribution(id) {
+  const c = db.prepare('SELECT status FROM visitor_contributions WHERE id = ?').get(id);
+  if (!c) return { ok: false, reason: 'not_found' };
+  if (c.status !== 'approved') return { ok: false, reason: 'not_live' };
+  db.prepare('UPDATE visitor_contributions SET reported_count = 0 WHERE id = ?').run(id);
+  return { ok: true };
+}
+
+// Emails the visitor after approve / reject (Brevo, like owner decision
+// emails). -> 'sent' | 'failed' | 'no_address' | 'email_off'
+async function notifyVisitorDecision(id, action, reason, edited) {
+  const c = db.prepare('SELECT * FROM visitor_contributions WHERE id = ?').get(id);
+  const row = c && db.prepare('SELECT * FROM venues WHERE id = ?').get(c.venue_id);
+  if (!row) return 'no_address';
+  const message = visitorDecisionEmail(c, rowToVenue(row), action === 'approve' ? 'approved' : 'rejected', reason, visitorPhotosFor(id).length, edited);
+  return sendOwnerDecision(validOwnerEmail(c.email) ? [validOwnerEmail(c.email)] : [], message);
+}
+
+const VISITOR_ADMIN_ERRORS = {
+  not_live: 'This item is not live.', photo_not_found: 'That photo is not part of this item.',
+  bad_tip: `The tip should be at most ${VISITOR_TIP_MAX} characters, and can only be empty when there are photos.`,
+};
+
+// One decision on a visitor item, from /admin/review or the token API -> { status, body }.
+async function visitorAdminAction(id, action, body, reviewer) {
+  const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+  const photoId = Number.isInteger(body.photo_id) ? body.photo_id : Number.isInteger(body.main_photo_id) ? body.main_photo_id : undefined;
+  let r;
+  if (action === 'approve') {
+    const tip = body.edits && typeof body.edits === 'object' && typeof body.edits.tip === 'string' ? body.edits.tip : typeof body.tip === 'string' ? body.tip : undefined;
+    r = approveVisitorContribution(id, reviewer, { tip, mainPhotoId: photoId });
+  } else if (action === 'reject') r = rejectVisitorContribution(id, reviewer, reason);
+  else if (action === 'remove') r = removeVisitorContribution(id, reviewer, reason);
+  else if (action === 'make-main') r = photoId === undefined ? { ok: false, reason: 'photo_not_found' } : makeVisitorPhotoMain(id, photoId, reviewer);
+  else if (action === 'keep') r = keepReportedVisitorContribution(id);
+  else return { status: 400, body: { error: 'Unknown action.' } };
+  if (!r.ok) {
+    const status = { not_found: 404, photo_not_found: 404, not_pending: 409, not_live: 409, venue_unavailable: 409, file_missing: 410 }[r.reason] || 400;
+    return { status, body: { error: VISITOR_ADMIN_ERRORS[r.reason] || ADMIN_REVIEW_ERRORS[r.reason] || r.reason, reason: r.reason, status: r.status } };
+  }
+  const emailed = action === 'approve' || action === 'reject' ? await notifyVisitorDecision(id, action, reason, !!r.edited) : 'no_address';
+  return { status: 200, body: { id, ...r, emailed } };
+}
+
+function renderAdminVisitorCard(c, mode) {
+  const live = mode !== 'pending';
+  const photos = c.photos.map((p) => `<figure style="margin:0 0 10px"><img class="rv-photo" src="${adminReviewEsc(p.preview_url)}" alt="" loading="lazy">
+        <figcaption class="rv-meta">${p.width}×${p.height}${p.is_main ? ' · <strong>main photo</strong>' : ''}${p.is_main ? '' : ` <button type="button" class="rv-btn rv-approve" data-act="${live ? 'make-main' : 'approve'}" data-photo="${p.id}">${live ? 'Make main photo' : 'Approve and make main photo'}</button>`}</figcaption></figure>`).join('');
+  const tip = live
+    ? (c.tip ? `<p class="rv-text">${adminReviewEsc(c.tip)}</p>` : '')
+    : `<label class="rv-field">Tip ${adminEditBox('tip', c.tip || '', { multiline: true, rows: 4, max: VISITOR_TIP_MAX })}</label>`;
+  const actions = live
+    ? `<div class="rv-actions">${mode === 'reported' ? '<button type="button" class="rv-btn rv-approve" data-act="keep">Keep it up</button>' : ''}<input type="text" name="reason" maxlength="300" placeholder="Reason (kept for our records)"><button type="button" class="rv-btn rv-reject" data-act="remove">Remove from site</button></div>
+      <p class="rv-result" hidden></p>`
+    : adminReviewActions('visitor', c.id, {});
+  return `<article class="rv-card" data-kind="visitor" data-id="${c.id}">
+      <h3>${adminReviewEsc(c.venue_name)}</h3>
+      <p class="rv-meta">Visitor #${c.id} · from ${adminReviewEsc(c.display_name)} · sent ${adminReviewEsc(adminReviewTime(c.submitted_at))}${c.confirmed_at ? ` · confirmed ${adminReviewEsc(adminReviewTime(c.confirmed_at))}` : ''}${c.lang === 'fr' ? ' · French' : ''}${c.reported_count ? ` · <strong>reported ${c.reported_count} time${c.reported_count === 1 ? '' : 's'}</strong>` : ''} · <a href="${adminReviewEsc(c.listing_url)}" target="_blank" rel="noopener">listing</a></p>
+      ${photos}
+      ${tip}
+      ${live ? '' : '<p class="rv-meta">You can fix the tip before approving. Approve publishes the tip and every photo.</p>'}
+      ${actions}
+    </article>`;
+}
+
+// What a signed-in owner sees on "My listings": visitor items that went live in the last 30 days.
+function ownerVisitorItemsHtml(venueId) {
+  const rows = db.prepare(`SELECT id, display_name, tip, reviewed_at FROM visitor_contributions
+    WHERE venue_id = ? AND status = 'approved' AND reviewed_at > datetime('now', '-30 days') ORDER BY reviewed_at DESC, id DESC LIMIT 5`).all(venueId);
+  if (!rows.length) return '';
+  const items = rows.map((r) => {
+    const photos = visitorPhotosFor(r.id);
+    const thumbs = photos.map((p) => `<img src="/images/visitor/${escapeHtml(p.file)}" alt="" loading="lazy" style="width:56px;height:42px;object-fit:cover;border-radius:6px;margin:4px 4px 0 0;vertical-align:top">`).join('');
+    const tip = r.tip ? (Array.from(r.tip).length > 160 ? `${Array.from(r.tip).slice(0, 157).join('')}…` : r.tip) : '';
+    return `<span style="display:block;margin:6px 0"><strong>${escapeHtml(visitorCredit(r.display_name))}</strong>, ${escapeHtml(ownerUpdatedDate(r.reviewed_at))}${tip ? `: “${escapeHtml(tip)}”` : ''}${thumbs ? `<br>${thumbs}` : ''}</span>`;
+  }).join('');
+  return `<span class="op-visitor" style="display:block;margin-top:10px;font-size:0.86rem"><strong>New from visitors</strong>${items}</span>`;
 }
 
 // ---------- Menus (2026-10-17) ----------
@@ -33079,7 +33880,7 @@ function renderOwnerLoginPage() {
 
 function renderOwnerAccountPage(account) {
   const venues = ownerAccountVenues(account.id);
-  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><span class="op-summary">${ownerVenueSummary(v.id)}</span><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a></span>
+  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><span class="op-summary">${ownerVenueSummary(v.id)}</span><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a>${ownerVisitorItemsHtml(v.id)}</span>
       <a class="op-edit" href="/owner/account/venue/${v.id}">Edit listing, events &amp; photos &rarr;</a></li>`).join('');
   return ownerSimplePage('My listings', `
     <div class="op-bar"><span>Signed in as <strong>${escapeHtml(account.email)}</strong></span>
@@ -34122,7 +34923,11 @@ function renderAdminReviewPage() {
   const venues = listVenueSubmissions('pending');
   const menus = listMenusForReview();
   const liveMenus = recentLiveMenus();
-  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length;
+  purgeStaleVisitorContributions();
+  const visitor = listVisitorContributions('pending');
+  const visitorReported = listVisitorContributions('reported');
+  const visitorLive = listVisitorContributions('live').filter((c) => !c.reported_count);
+  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
   const mail = ownerDirectEmail()
@@ -34132,7 +34937,7 @@ function renderAdminReviewPage() {
     <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#live">Live photos (${live.length})</a></nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a></nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
@@ -34140,6 +34945,9 @@ function renderAdminReviewPage() {
     ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
     ${section('menus', 'Menus', menus, renderAdminMenuCard, 'No menus waiting.')}
     ${liveMenus.length ? section('livemenus', 'Menus owners published (last 14 days)', liveMenus, renderAdminMenuCard, '') : ''}
+    ${section('visitor', 'Visitor photos &amp; tips', visitor, (c) => renderAdminVisitorCard(c, 'pending'), 'No visitor photos or tips waiting.')}
+    ${visitorReported.length ? section('visitorreported', 'Reported visitor tips', visitorReported, (c) => renderAdminVisitorCard(c, 'reported'), '') : ''}
+    ${visitorLive.length ? section('visitorlive', 'Visitor photos &amp; tips live (last 30 days)', visitorLive, (c) => renderAdminVisitorCard(c, 'live'), '') : ''}
     ${section('live', 'Photos owners published (last 14 days)', live, (p) => renderAdminPhotoCard(p, true), 'None in the last 14 days.')}
 <script>
 (function(){
@@ -34157,6 +34965,7 @@ function renderAdminReviewPage() {
     var kind = card.getAttribute('data-kind');
     if (kind === 'change') body.fields = Array.prototype.map.call(card.querySelectorAll('input[name=field]:checked'), function(i){ return i.value; });
     var main = card.querySelector('input[name=main]'); if (main) body.main = main.checked;
+    if (btn.hasAttribute('data-photo')) body.photo_id = Number(btn.getAttribute('data-photo'));
     var nd = card.querySelector('input[name=notdup]'); if (nd && nd.checked) body.reviewed_duplicates = nd.getAttribute('data-ids').split(',').map(Number);
     var ad = card.querySelector('input[name=allowdup]'); if (ad) body.allow_duplicate = ad.checked;
     var am = card.querySelector('input[name=amenities]'); if (am) body.include_amenities = am.checked;
@@ -34171,7 +34980,7 @@ function renderAdminReviewPage() {
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(x){
         out.hidden = false;
-        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') : act === 'remove' ? 'Removed from the site.' : 'Rejected.') + (EMAIL[x.j.emailed] || ''); card.classList.add('rv-done'); return; }
+        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
       })
@@ -36006,6 +36815,41 @@ const server = http.createServer(async (req, res) => {
         const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(im[1]);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
         return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'public, max-age=86400' });
+      }
+      // Visitor photos (2026-10-17): private previews while waiting for review, public once approved.
+      const vp = /^\/visitor-photos\/preview\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
+      if (vp && method === 'GET') {
+        const row = db.prepare(`SELECT p.file FROM visitor_contribution_photos p JOIN visitor_contributions c ON c.id = p.contribution_id
+          WHERE p.preview_key = ? AND c.status IN ('pending', 'approved')`).get(vp[1]);
+        if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
+      }
+      const vi = /^\/images\/visitor\/([a-z0-9]{24}\.jpg)$/.exec(pathname);
+      if (vi && method === 'GET') {
+        const row = db.prepare(`SELECT p.file FROM visitor_contribution_photos p JOIN visitor_contributions c ON c.id = p.contribution_id
+          WHERE p.file = ? AND c.status = 'approved'`).get(vi[1]);
+        if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'public, max-age=86400' });
+      }
+    }
+    // Visitor photos & tips, token API (2026-10-17): the same bearer check and
+    // reviewer field as /admin/owner-photos. /admin/review uses its cookie.
+    if (pathname === '/admin/visitor-contributions' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      const status = ['unconfirmed', 'pending', 'approved', 'rejected', 'removed', 'reported', 'all'].includes(query.status) ? query.status : 'pending';
+      return sendJSON(res, 200, { status, contributions: listVisitorContributions(status) });
+    }
+    {
+      const m = /^\/admin\/visitor-contributions\/(\d+)\/(approve|reject|remove|make-main|keep)$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!requireAdminToken(req, res)) return;
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const reviewer = validateReviewer(body.reviewer);
+        if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
+        const out = await visitorAdminAction(Number(m[1]), m[2], body, reviewer);
+        return sendJSON(res, out.status, out.body);
       }
     }
     if (pathname === '/admin/owner-photos' && method === 'GET') {
@@ -37903,6 +38747,18 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true });
     }
     {
+      const m = /^\/admin\/review\/visitor\/(\d+)\/(approve|reject|remove|make-main|keep)$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+        if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const out = await visitorAdminAction(Number(m[1]), m[2], body, ADMIN_REVIEWER);
+        return sendJSON(res, out.status, out.body);
+      }
+    }
+    {
       const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
@@ -37949,6 +38805,15 @@ const server = http.createServer(async (req, res) => {
         const emailed = await notifyReviewDecision('change', id, m[2], { reason: body.reason, applied: r.applied });
         return sendJSON(res, 200, { id, ...r, emailed });
       }
+    }
+    // Visitor photos & tips (2026-10-17).
+    {
+      const m = /^\/api\/venues\/(\d+)\/contributions$/.exec(pathname);
+      if (m && method === 'POST') return await handleVisitorContribution(req, res, Number(m[1]));
+      const cm = /^\/contribute\/confirm\/([^/]+)$/.exec(pathname);
+      if (cm && (method === 'GET' || method === 'HEAD')) return await handleVisitorConfirm(req, res, cm[1]);
+      const rm = /^\/api\/contributions\/(\d+)\/report$/.exec(pathname);
+      if (rm && method === 'POST') return await handleVisitorReport(req, res, Number(rm[1]));
     }
     if ((pathname === '/list-an-event' || pathname === '/list-an-event/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -38505,6 +39370,16 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   recurringSeasonRow,
+  // Visitor photos & tips (2026-10-17)
+  visitorDisplayName,
+  stripJpegMetadata,
+  cleanVisitorTip,
+  purgeStaleVisitorContributions,
+  listVisitorContributions,
+  approveVisitorContribution,
+  rejectVisitorContribution,
+  removeVisitorContribution,
+  makeVisitorPhotoMain,
   // Menus (2026-10-17)
   setMenuReader,
   readMenuWithClaude,
