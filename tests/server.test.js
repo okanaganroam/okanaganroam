@@ -18997,6 +18997,14 @@ test('Food & Drink cards: an example photo of the place type on every hub card, 
   assert.ok(cards.every((c) => /data-ph="[a-z]+(?:-(?:\d|dog))?"/.test(c)), 'every card names its photo');
   for (const key of new Set(cards.map((c) => c.match(/data-ph="([^"]+)"/)[1]))) assert.ok(html.includes(`li.venue-card[data-ph="${key}"]{--fd-ph:url(`), key);
   assert.equal(app.foodDrinkCardPhotoKey({ id: 7, type: 'restaurant', cuisine: 'Ramen' }), 'noodle');
+  // No twin example photos in a row: a key is never the same as one of the
+  // three cards before it when its kind has another photo to swap in.
+  const keys = cards.map((c) => c.match(/data-ph="([^"]+)"/)[1]).filter((k) => /^[a-z]+-\d+$/.test(k));
+  keys.forEach((k, i) => {
+    if ((app.FD_CARD_PHOTOS[k.split('-')[0]] || []).length > 3) assert.ok(!keys.slice(Math.max(0, i - 3), i).includes(k), `${k} repeats at card ${i}`);
+  });
+  const spread = app.photoKeySpreader();
+  assert.deepEqual(['winery-1', 'winery-1', 'winery-1', 'own', 'beach-0'].map(spread), ['winery-1', 'winery-2', 'winery-3', 'own', 'beach-0']);
   assert.equal(app.foodDrinkCardPhotoKey({ id: 9, type: 'pub', dog_friendly: 1 }), 'pub-dog');
   assert.equal(app.foodDrinkCardPhotoKey({ id: 10, type: 'pub', dog_friendly: 1 }), 'pub-0');
   const own = app.renderFoodDrinkHubPage([{ ...venues[0], image_url: '/images/food-drink/cafes-800.jpg' }, ...venues.slice(1)], { types: [], features: [], regions: [] });

@@ -16450,6 +16450,30 @@ function foodDrinkCardPhotoKey(v) {
   if (Number(v.dog_friendly) === 1 && FD_CARD_DOG_PHOTOS[t] && id % 3 === 0) return `${t}-dog`;
   return `${t}-${id % list.length}`;
 }
+// No twin example photos side by side (2026-10-16): the "<type>-<n>" key
+// comes from the venue id, so neighbouring cards could land on the same
+// picture (two wineries showing the same toast). Given the keys in card
+// order, swap a key for another photo of the same kind when it matches one
+// of the previous three example-photo cards (covering the card to its left
+// and the one above it in a three-column grid). Own photos and single-photo
+// kinds are left alone.
+const PHOTO_KEY_SPREAD = 3;
+function photoKeySpreader() {
+  const recent = [];
+  return (key) => {
+    const m = /^([a-z]+)-(\d+)$/.exec(key);
+    const list = m && FD_CARD_PHOTOS[m[1]];
+    if (list && list.length > 1 && recent.includes(key)) {
+      for (let step = 1; step < list.length; step++) {
+        const alt = `${m[1]}-${(Number(m[2]) + step) % list.length}`;
+        if (!recent.includes(alt)) { key = alt; break; }
+      }
+    }
+    recent.push(key);
+    if (recent.length > PHOTO_KEY_SPREAD) recent.shift();
+    return key;
+  };
+}
 function foodDrinkCardPhotoCss() {
   const rules = [];
   // Activity example photos keep their focal height on the short card strip
@@ -17248,12 +17272,13 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
   const venueById = new Map(venues.map((v) => [v.id, v]));
   // Card photo (2026-10-14): the venue's own photo when it has one, otherwise
   // the example photo key the stylesheet maps (foodDrinkCardPhotoCss).
+  const spread = photoKeySpreader();
   const photoAttr = (id) => {
     const v = venueById.get(Number(id));
     if (!v) return '';
     const own = String(v.image_url || '').trim();
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
-    return ` data-ph="${extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v)}"`;
+    return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}"`;
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
@@ -25289,12 +25314,13 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   // the cards waiting in the template (the page script builds it when a card
   // is shown). The page was 5.5 MB with every card in full.
   const venueById = new Map(venues.map((v) => [v.id, v]));
+  const spread = photoKeySpreader();
   const photoAttr = (id) => {
     const v = venueById.get(Number(id));
     if (!v) return '';
     const own = String(v.image_url || '').trim();
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
-    return ` data-ph="${curatedPhotoKey(v)}"`;
+    return ` data-ph="${spread(curatedPhotoKey(v))}"`;
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true, hideSocial: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
@@ -36426,6 +36452,7 @@ module.exports = {
   compactFoodDrinkHours,
   expandFoodDrinkHours,
   foodDrinkCardPhotoKey,
+  photoKeySpreader,
   FD_CARD_PHOTOS,
   FD_CARD_DOG_PHOTOS,
   FD_HEART_USE,

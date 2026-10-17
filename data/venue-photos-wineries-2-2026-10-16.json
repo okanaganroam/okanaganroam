@@ -1,0 +1,30 @@
+{
+  "reason": "Last two winery photos (Rigour and Whimsy, Cassini Cellars), approved by Dayton on 2026-10-16 after the first winery batch.",
+  "batch_id": "venue-photos-wineries-2-2026-10-16",
+  "venues": [
+    {
+      "id": 864,
+      "name": "Rigour and Whimsy",
+      "region": "okanagan-falls",
+      "slug": "rigour-and-whimsy",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rigour-and-whimsy-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1421,
+      "name": "Cassini Cellars",
+      "region": "oliver",
+      "slug": "cassini-cellars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cassini-cellars-2610.jpg?v=20261016"
+      }
+    }
+  ]
+}
