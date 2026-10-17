@@ -4320,6 +4320,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       hours: v.hours || null, // the stored JSON; parsed (never modified) by the planner
+      imageUrl: v.image_url || null, // the venue's own photo, shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
       // course's published rate windows.
