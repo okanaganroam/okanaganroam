@@ -22093,6 +22093,18 @@ test('Menus (2026-10-17): reading, checking and publishing a menu; private links
     const blurry = await waitRead(t2);
     assert.equal(blurry.menu.status, 'draft');
     assert.equal(blurry.menu.read_error, 'blurry');
+    assert.equal(blurry.scan, 'ai');
+
+    // No API key (the free setup): the page scans the pages on the owner's phone instead, and nothing calls the API.
+    const savedKey = process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    app.setMenuReader(null);
+    try {
+      const free = await state(t2);
+      assert.equal(free.scan, 'device');
+      assert.equal(free.reading_available, false);
+      assert.match(await get(t2).then((r) => r.text()), /tesseract\.js@5\.1\.1/);
+    } finally { if (savedKey !== undefined) process.env.ANTHROPIC_API_KEY = savedKey; }
   } finally {
     app.setMenuReader(null);
     app.setOwnerEmailTransport(null);

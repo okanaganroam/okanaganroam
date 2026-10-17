@@ -30761,7 +30761,10 @@ function menuStateJson(venue, menu) {
   return {
     menu: m,
     published: pub ? { items: pub.items, published_at: pub.publishedAt, url: menuPagePath(venue) } : null,
-    reading_available: !menuReadBlocked(venue.id) || (m && m.status === 'reading'),
+    reading_available: !menuReadBlocked(venue.id) || !!(m && m.status === 'reading'),
+    // 'ai': the server reads the pages with Claude (only when ANTHROPIC_API_KEY is set); 'device': free, the page
+    // scans them in the browser (Dayton wants no running cost, 2026-10-17).
+    scan: !menuReadBlocked(venue.id) || (m && m.status === 'reading') ? 'ai' : 'device',
   };
 }
 
@@ -31201,7 +31204,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var photos = pages().length ? '<details class="mn-photos"' + (C.mode === 'admin' ? ' open' : '') + '><summary>' + T.yourPhotos + '</summary>' + thumbs(C.mode === 'admin') + '</details>' : '';
     var admin = C.mode === 'admin' ? '<div class="mn-admin">'
       + '<label class="mn-btn mn-plain">+ Add page<input type="file" accept="image/*,application/pdf" multiple data-pick class="mn-file"></label>'
-      + (pages().length ? '<button type="button" class="mn-btn mn-plain" data-act="read">Read the pages with AI (replaces the text below)</button>' : '')
+      + (pages().length ? '<button type="button" class="mn-btn mn-plain" data-act="read">' + (S.scan === 'device' ? 'Scan the pages' : 'Read the pages with AI') + ' (replaces the text below)</button>' : '')
       + '<button type="button" class="mn-btn mn-plain" data-act="add-sec">' + T.addSection + '</button></div>' : '';
     var email = C.mode === 'token' ? '<label class="mn-email">' + T.email + '<input type="email" id="mnEmail" maxlength="254" autocomplete="email" value="' + h(C.email || '') + '"></label>' : '';
     setScreen(head + photos + admin + notes + err(message) + '<div class="mn-menu">' + secs + '</div>'
@@ -31259,6 +31262,156 @@ const MENU_APP_SCRIPT = String.raw`(function(){
           function(e){ problem = e && e.message === 'pdfbig' ? T.pdfBig : T.photoBad; next(); });
     })();
   }
+  // ----- Scanning on this device (free: no API key needed) -----
+  // Tesseract (open-source text recognition) runs in the browser on the owner's phone; PDFs with real text are read
+  // directly with pdf.js, scanned PDFs are drawn and recognised like photos. The text is then split into sections,
+  // dishes and prices (parseMenuLines) and shown for checking; anything unsure is yellow.
+  var TESSERACT_SRC = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+  var PDFJS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  var loaded = {};
+  function loadScript(src){
+    if (!loaded[src]) loaded[src] = new Promise(function(resolve, reject){
+      var s = document.createElement('script'); s.src = src; s.async = true;
+      s.onload = resolve; s.onerror = function(){ delete loaded[src]; reject(new Error('load')); };
+      document.head.appendChild(s);
+    });
+    return loaded[src];
+  }
+  function scanProgress(frac){ var bar = el('mnBar'); if (bar) bar.style.width = Math.max(4, Math.min(97, Math.round(frac * 100))) + '%'; }
+  function deviceRead(){
+    var list = pages(); if (!list.length) return;
+    var secs = 15 + list.length * 15;
+    setScreen('<h1 class="mn-center">' + f(T.reading, { s: secs }) + '</h1><div class="mn-bar"><span id="mnBar" style="transition:width .4s linear"></span></div><p class="mn-center mn-sub">' + T.readingSub + '</p>' + thumbs(false) + helpBtn());
+    var lines = [], worker = null, i = 0;
+    function ocr(){
+      if (worker) return Promise.resolve(worker);
+      return loadScript(TESSERACT_SRC).then(function(){
+        return window.Tesseract.createWorker('eng', 1, { logger: function(m){
+          if (m && m.status === 'recognizing text') scanProgress((i + (m.progress || 0)) / list.length);
+        } });
+      }).then(function(w){ worker = w; return w; });
+    }
+    function addResult(data){
+      var got = 0;
+      (data.blocks || []).forEach(function(b){ (b.paragraphs || []).forEach(function(p){ (p.lines || []).forEach(function(l){ lines.push({ text: l.text, conf: l.confidence }); got++; }); }); });
+      if (!got) String(data.text || '').split('\n').forEach(function(t){ lines.push({ text: t, conf: data.confidence }); });
+    }
+    function recognise(src){ return ocr().then(function(w){ return w.recognize(src, {}, { text: true, blocks: true }); }).then(function(r){ addResult(r.data); }); }
+    function readPdfPage(pdf, n){
+      return pdf.getPage(n).then(function(page){
+        return page.getTextContent().then(function(tc){
+          var rows = {}, chars = 0;
+          tc.items.forEach(function(it){ var y = Math.round(it.transform[5] / 3); (rows[y] = rows[y] || []).push(it); chars += String(it.str).trim().length; });
+          if (chars > 40) {
+            Object.keys(rows).map(Number).sort(function(a, b){ return b - a; }).forEach(function(y){
+              lines.push({ text: rows[y].sort(function(a, b){ return a.transform[4] - b.transform[4]; }).map(function(it){ return it.str; }).join(' '), conf: 100 });
+            });
+            return;
+          }
+          var vp = page.getViewport({ scale: 2 }), c = document.createElement('canvas');
+          c.width = vp.width; c.height = vp.height;
+          return page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function(){ return recognise(c); });
+        });
+      });
+    }
+    function readPdf(url){
+      return loadScript(PDFJS_SRC).then(function(){
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+        return window.pdfjsLib.getDocument(url).promise;
+      }).then(function(pdf){
+        var n = 0, total = Math.min(pdf.numPages, 10);
+        return (function next(){ n++; if (n > total) return; return readPdfPage(pdf, n).then(next); })();
+      });
+    }
+    (function next(){
+      if (i >= list.length) return Promise.resolve();
+      var pg = list[i];
+      return (pg.kind === 'pdf' ? readPdf(pg.preview) : recognise(pg.preview)).then(function(){ i++; scanProgress(i / list.length); return next(); });
+    })().then(function(){
+      if (worker) worker.terminate();
+      var parsed = parseMenuLines(lines);
+      if (!parsed.sections.length) { S.menu.read_error = 'blurry'; return render(); }
+      scanProgress(1);
+      return api('/save', { data: parsed }).then(function(r){
+        if (!r || !r.ok) { S.menu.read_error = 'failed'; return render(); }
+        return api('/state').then(function(st){ if (st && st.ok) S = st; render(); });
+      });
+    }, function(){
+      if (worker) worker.terminate();
+      S.menu.read_error = 'failed'; render(navigator.onLine === false ? T.networkText : null);
+    });
+  }
+  // Scanned lines -> { sections: [{ name, note, items: [{ name, description, price, dietary, check }] }] }.
+  // Menus are laid out many ways ("Poutine .... 14", a name over a description with the price at its end, a price on
+  // its own line), so a short line without a price is held until the next line shows whether it was a dish name or
+  // a section heading. Unsure readings (low recognition confidence) are marked check.
+  var PRICE_RE = /(?:^|\s)[$S]?\s?(\d{1,3}(?:[.,]\d{1,2})?)((?:\s*[\/|]\s*[$S]?\s?\d{1,3}(?:[.,]\d{1,2})?)*)\s*$/;
+  var JUNK_RE = /(www\.|https?:|@|\.com\b|\.ca\b|\bphone\b|\btel\b|\(\d{3}\)|\d{3}[-. ]\d{3}[-. ]\d{4}|instagram|facebook|gratuity|\bgst\b|\bpst\b|plus tax|prices? (?:are )?subject|allerg|consuming raw)/i;
+  var DIET = { V: 'vegetarian', VG: 'vegan', VE: 'vegan', GF: 'gluten_free', DF: 'dairy_free' };
+  function words(t){ return t.split(/\s+/).filter(Boolean).length; }
+  function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6; }
+  function isCapsHeading(t){ var l = t.replace(/[^A-Za-z]/g, ''); return l.length >= 3 && l === l.toUpperCase() && words(t) <= 5 && t.length <= 40; }
+  function niceCase(t){ return isCapsHeading(t) ? t.toLowerCase().replace(/(^|[\s\-&\/])([a-z])/g, function(m, a, b){ return a + b.toUpperCase(); }) : t; }
+  function takeDiet(t, out){
+    return t.replace(/\(\s*(VG|VE|V|GF|DF)\s*\)|(?:^|\s)(VG|GF|DF)(?=\s|$|,)/g, function(m, a, b){ var d = DIET[a || b]; if (d && out.indexOf(d) < 0) out.push(d); return ' '; }).replace(/\s+/g, ' ').trim();
+  }
+  function parseMenuLines(lines){
+    var sections = [], cur = null, last = null, pending = null;
+    function section(name){ cur = { name: niceCase(name), note: '', items: [] }; sections.push(cur); last = null; }
+    function item(name, desc, price, conf){
+      if (!cur) section('Menu');
+      var diet = [];
+      name = takeDiet(name, diet).replace(/^[\s\-–—:*•]+|[\s\-–—:.$]+$/g, '');
+      desc = takeDiet(desc || '', diet);
+      if (!name) return;
+      last = { name: niceCase(name), description: desc, price: price || '', dietary: diet, check: conf < 75 };
+      cur.items.push(last);
+    }
+    // A held line that isn't a dish: a sentence under a fresh heading is that section's note, otherwise a heading.
+    function flush(){
+      if (!pending) return;
+      if (cur && !cur.items.length && words(pending.text) > 2) cur.note = (cur.note ? cur.note + ' ' : '') + pending.text;
+      else section(pending.text);
+      pending = null;
+    }
+    lines.forEach(function(ln){
+      var t = String(ln.text || '').replace(/[|_]/g, ' ').replace(/(\s?[.·•…]){2,}\s?/g, ' ').replace(/\s+/g, ' ').replace(/[\s.]+$/, '').trim();
+      var conf = typeof ln.conf === 'number' ? ln.conf : 100;
+      if (t.length < 2 || JUNK_RE.test(t)) return;
+      var m = PRICE_RE.exec(t);
+      if (m) {
+        var price = (m[1] + (m[2] || '')).replace(/[S$]/g, '').replace(/\s*([\/|])\s*/g, ' / ').replace(/\|/g, '/');
+        var rest = t.slice(0, m.index).trim();
+        if (rest.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) {
+          if (pending) { item(pending.text, '', price, Math.min(conf, pending.conf)); pending = null; }
+          else if (last && !last.price) { last.price = price; if (conf < 75) last.check = true; }
+          return;
+        }
+        if (pending && looksDesc(rest)) { item(pending.text, rest, price, Math.min(conf, pending.conf)); pending = null; return; }
+        flush();
+        var parts = /^(.{3,60}?)\s+[\-–—:]\s+(.+)$/.exec(rest);
+        if (parts && words(rest) > 6) item(parts[1], parts[2], price, conf); else item(rest, '', price, conf);
+        return;
+      }
+      if (t.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) return;
+      if (isCapsHeading(t)) { flush(); section(t); return; }
+      if (looksDesc(t)) {
+        if (pending) { item(pending.text, t, '', Math.min(conf, pending.conf)); pending = null; return; }
+        if (last) { last.description = (last.description ? last.description + ' ' : '') + t; return; }
+        if (cur && !cur.items.length) { cur.note = (cur.note ? cur.note + ' ' : '') + t; }
+        return;
+      }
+      flush();
+      pending = { text: t, conf: conf };
+    });
+    if (pending) item(pending.text, '', '', pending.conf);
+    sections = sections.filter(function(s){ return s.items.length; });
+    sections.forEach(function(s){ s.items.forEach(function(it){ if (!it.price && !it.check) it.check = true; }); });
+    var any = sections.some(function(s){ return s.items.some(function(it){ return it.check; }); });
+    return { sections: sections, partial: any };
+  }
+  window.__menuParse = parseMenuLines;
   // ----- Help -----
   function helpScreen(){
     var has = pages().length > 0;
@@ -31302,6 +31455,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     if (act === 'add-item') { var si = +t.getAttribute('data-s'); data.sections[si].items.push({ name: T.newDishText, description: '', price: '', dietary: [], check: false }); openItem = si + ':' + (data.sections[si].items.length - 1); save(); rerender(); var i2 = app.querySelector('.mn-open input'); if (i2) i2.select(); return; }
     if (act === 'add-sec') { data.sections.push({ name: T.newSectionText, note: '', items: [{ name: T.newDishText, description: '', price: '', dietary: [], check: false }] }); openItem = (data.sections.length - 1) + ':0'; save(); return rerender(); }
     if (act === 'del-sec') { data.sections.splice(+t.getAttribute('data-s'), 1); save(); return rerender(); }
+    if (act === 'read' && S.scan === 'device') { if (S.menu) S.menu.read_error = null; return deviceRead(); }
     if (act === 'read') { t.disabled = true; return api('/read', {}).then(function(r){ if (r && r.ok) { S = r; readStart = Date.now(); render(); } else { t.disabled = false; render(r && r.error ? h(r.error) : T.failed); } }); }
     if (act === 'restart' || act === 'restart-take' || act === 'replace') {
       return api('/restart', {}).then(function(r){ if (r && r.ok) { S = r; S.published = act === 'replace' ? null : S.published; } startScreen(); });
