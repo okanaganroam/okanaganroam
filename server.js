@@ -30891,12 +30891,230 @@ function menuUploadRateLimited(ip, now = Date.now()) {
 }
 function menuIpHash(ip) { return crypto.createHash('sha256').update(`okanagan-roam-menu:${ip}`).digest('hex'); }
 
+// ----- "My menu is on my website" (2026-10-17) -----
+// Free and usually the most accurate way in: many places already publish their menu as a web page or a PDF. The
+// server fetches the link the owner gives (or the website on file), finds the menu (text on that page, a "Menu" page
+// it links to, or a menu PDF) and hands it to the same review screen. Only public web addresses are fetched: no
+// private or internal network addresses, http(s) on the usual ports, a few redirects, size and time limits.
+const MENU_IMPORT_MAX_BYTES = MENU_PDF_MAX_BYTES;
+const MENU_IMPORT_TIMEOUT_MS = 15000;
+const MENU_IMPORT_UA = 'Mozilla/5.0 (compatible; OkanaganRoam/1.0; +https://okanaganroam.com)';
+// Swapped out by the test suite so tests never reach the internet.
+let menuImportFetch = (url, init) => fetch(url, init);
+let menuImportLookup = (host) => require('dns').promises.lookup(host, { all: true });
+function setMenuImportNetwork(fetchFn, lookupFn) {
+  menuImportFetch = fetchFn || ((url, init) => fetch(url, init));
+  menuImportLookup = lookupFn || ((host) => require('dns').promises.lookup(host, { all: true }));
+}
+function isPrivateAddress(ip) {
+  const net = require('net');
+  let a = String(ip || '').toLowerCase();
+  if (a.startsWith('::ffff:')) a = a.slice(7);
+  if (net.isIPv4(a)) {
+    const [x, y] = a.split('.').map(Number);
+    return x === 0 || x === 10 || x === 127 || (x === 169 && y === 254) || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168)
+      || (x === 100 && y >= 64 && y <= 127) || x >= 224;
+  }
+  if (net.isIPv6(a)) return a === '::' || a === '::1' || /^f[cd]/.test(a) || /^fe[89ab]/.test(a);
+  return true;
+}
+function menuImportUrl(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  let u;
+  try { u = new URL(s); } catch (e) { return null; }
+  if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password) return null;
+  if (u.port && !['80', '443'].includes(u.port)) return null;
+  if (/^(localhost|.*\.local|.*\.internal|.*\.localhost)$/i.test(u.hostname)) return null;
+  return u;
+}
+// GET with every hop checked; resolves { url, type, buf } or throws (err.code: 'blocked' | 'too_big' | 'http' | 'network').
+async function menuImportGet(rawUrl) {
+  let u = menuImportUrl(rawUrl);
+  for (let hop = 0; hop < 4; hop++) {
+    if (!u) throw Object.assign(new Error('bad url'), { code: 'blocked' });
+    const host = u.hostname.replace(/^\[|\]$/g, '');
+    const addrs = require('net').isIP(host) ? [{ address: host }] : await menuImportLookup(host).catch(() => []);
+    if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) throw Object.assign(new Error('blocked'), { code: 'blocked' });
+    let res;
+    try {
+      res = await menuImportFetch(u.href, { redirect: 'manual', headers: { 'User-Agent': MENU_IMPORT_UA, Accept: 'text/html,application/pdf;q=0.9,*/*;q=0.5' }, signal: AbortSignal.timeout(MENU_IMPORT_TIMEOUT_MS) });
+    } catch (err) { throw Object.assign(new Error('network'), { code: 'network' }); }
+    if ([301, 302, 303, 307, 308].includes(res.status)) {
+      const loc = res.headers.get('location');
+      u = loc ? menuImportUrl(new URL(loc, u).href) : null;
+      continue;
+    }
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { code: 'http' });
+    if (Number(res.headers.get('content-length') || 0) > MENU_IMPORT_MAX_BYTES) throw Object.assign(new Error('too big'), { code: 'too_big' });
+    const chunks = [];
+    let size = 0;
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > MENU_IMPORT_MAX_BYTES) { try { reader.cancel(); } catch (e) { /* closed */ } throw Object.assign(new Error('too big'), { code: 'too_big' }); }
+        chunks.push(Buffer.from(value));
+      }
+    } else {
+      const b = Buffer.from(await res.arrayBuffer());
+      if (b.length > MENU_IMPORT_MAX_BYTES) throw Object.assign(new Error('too big'), { code: 'too_big' });
+      chunks.push(b);
+    }
+    const buf = Buffer.concat(chunks);
+    const type = buf.slice(0, 5).toString('latin1') === '%PDF-' ? 'pdf' : /html|text\/plain/i.test(res.headers.get('content-type') || 'text/html') ? 'html' : 'other';
+    return { url: u.href, type, buf };
+  }
+  throw Object.assign(new Error('too many redirects'), { code: 'blocked' });
+}
+
+const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“',
+  ndash: '–', mdash: '—', hellip: '…', eacute: 'é', egrave: 'è', agrave: 'à', ccedil: 'ç', ntilde: 'ñ', middot: '·', bull: '•', trade: '™', reg: '®', copy: '©', deg: '°' };
+function decodeHtmlText(s) {
+  return String(s).replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+    if (e[0] === '#') { const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10); return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ''; }
+    return HTML_ENTITIES[e.toLowerCase()] !== undefined ? HTML_ENTITIES[e.toLowerCase()] : m;
+  });
+}
+// A web page as lines of visible text, roughly as a person reads it: blocks (paragraphs, list items, headings, table
+// rows) on their own lines, table cells side by side. Scripts, styles and the site's header, navigation and footer
+// are left out.
+function htmlToMenuLines(html) {
+  let h = String(html || '');
+  h = h.replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<(script|style|noscript|svg|template|head|iframe|form|select|button)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<(nav|header|footer)\b[\s\S]*?<\/\1>/gi, ' ');
+  h = h.replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(p|div|li|ul|ol|h[1-6]|tr|table|section|article|aside|main|dd|dt|dl|blockquote|figure|figcaption|hr)\b[^>]*>/gi, '\n')
+    .replace(/<\/?(td|th)\b[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, '');
+  return decodeHtmlText(h).split('\n').map((l) => l.replace(/[\s\u00a0]+/g, ' ').trim())
+    .filter((l) => l && l.length <= 400 && !WEB_BUTTON_RE.test(l)).slice(0, 3000);
+}
+// Website buttons and links that aren't part of a menu.
+const WEB_BUTTON_RE = /^(?:view (?:more|menu|details)|learn more|read more|see more|more info|book(?: now| online| a table)?|reserve(?: now)?|order(?: now| online| takeout| delivery)?|skip to (?:main )?content|your cart|cart|add to cart|shop(?: now)?|subscribe|sign up|log ?in|close|home|contact(?: us)?|gift cards?|apply now|careers|follow us|back to top|download(?: the)? (?:app|pdf)|apple ios app.*|android app.*|view full menu.*|menu|\W*)$/i;
+function htmlLinks(baseUrl, html) {
+  const out = [];
+  for (const m of String(html || '').matchAll(/<a\b[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>([\s\S]{0,300}?)<\/a>/gi)) {
+    let u;
+    try { u = new URL(decodeHtmlText(m[1]), baseUrl); } catch (e) { continue; }
+    if (!['http:', 'https:'].includes(u.protocol)) continue;
+    out.push({ url: u.href, text: decodeHtmlText(m[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim().toLowerCase() });
+  }
+  return out;
+}
+// How many lines end in a price: a page with a menu on it has several.
+// (Street addresses, phone numbers and years don't count.)
+function pricedLineCount(lines) {
+  return lines.filter((l) => !/\b\d{1,2}(?:[:.]\d{2})?\s?(?:am|pm|a\.m\.|p\.m\.)|\b(?:st|street|ave|avenue|rd|road|hwy|highway|dr|drive|blvd|way|suite|unit|bc|v\d[a-z]\s?\d)\b\.?|\d{3}[-. ]\d{3}[-. ]\d{4}|\b(?:19|20)\d{2}\b/i.test(l)
+    && (/\$\s?\d{1,4}(?:[.,]\d{2})?\b/.test(l) || /[A-Za-z].*\s\d{1,3}(?:[.,]\d{2})?\s*$/.test(l))).length;
+}
+
+// Finds the menu at (or linked from) a web address. kind: 'menu' or a price-list kind.
+// Resolves { type: 'text', lines, source } | { type: 'pdf', files: [{ buf, url }] } | { error }.
+async function findMenuOnWebsite(rawUrl, kind = 'menu') {
+  const words = kind === 'menu' ? /menu|food|eat|drink|brunch|lunch|dinner|breakfast|bar|wine|beer|cocktail|dessert|dining|restaurant|kitchen|bistro/
+    : /price|rate|fee|tour|book|admission|ticket|pass|rental|lesson|green|golf|experience|package/;
+  // A PDF has to say what it is: "Lunch-Menu.pdf" yes, contest rules or a vineyard map no.
+  const pdfWords = kind === 'menu' ? /menu|food|lunch|dinner|brunch|breakfast|dessert|drinks?[-_ ]?(list|menu)|wine[-_ ]?list|cocktails?|happy[-_ ]?hour|tasting/
+    : /price|rate|fee|menu|tour|admission/;
+  const pdfNot = /contest|rules|privacy|policy|terms|map|application|job|career|employment|waiver|form|newsletter|report|brochure/;
+  const menuPdf = (l) => /\.pdf(\?|$)/i.test(l.url) && pdfWords.test(l.url.toLowerCase() + ' ' + l.text) && !pdfNot.test(l.url.toLowerCase() + ' ' + l.text);
+  let first;
+  try { first = await menuImportGet(rawUrl); } catch (err) { return { error: err.code === 'blocked' ? 'blocked' : err.code === 'too_big' ? 'too_big' : 'unreachable' }; }
+  if (first.type === 'pdf') return { type: 'pdf', files: [{ buf: first.buf, url: first.url }] };
+  if (first.type !== 'html') return { error: 'not_found' };
+  const html = first.buf.toString('utf8');
+  // The page itself and the menu pages it links to (on the same site) are all looked at; the ones with a menu on
+  // them are kept, food before drinks, up to three (a food menu and a drinks list come in together). Menu PDFs
+  // (often on a file host) are the fallback.
+  const host = new URL(first.url).hostname.replace(/^www\./, '');
+  const links = htmlLinks(first.url, html).filter((l) => words.test(l.url.toLowerCase() + ' ' + l.text));
+  const seen = new Set([first.url]);
+  const pdfs = htmlLinks(first.url, html).filter(menuPdf).filter((l) => !seen.has(l.url) && seen.add(l.url)).slice(0, 3);
+  // Links called "menu" first, then the restaurant or dining pages (where a winery keeps its menus), then the rest.
+  const pagePriority = (l) => { const t = l.url.toLowerCase() + ' ' + l.text; return /menu/.test(t) ? 0 : /dining|restaurant|eat|food|kitchen|bistro|cafe|patio|rates|prices/.test(t) ? 1 : 2; };
+  const pages = links.filter((l) => !/\.(pdf|jpe?g|png|gif|webp)(\?|$)/i.test(l.url) && new URL(l.url).hostname.replace(/^www\./, '').endsWith(host))
+    .filter((l) => !seen.has(l.url) && seen.add(l.url)).sort((a, b) => pagePriority(a) - pagePriority(b)).slice(0, 6);
+  const found = [];
+  const firstLines = htmlToMenuLines(html);
+  if (pricedLineCount(firstLines) >= 5) found.push({ url: first.url, label: '', lines: firstLines, priced: pricedLineCount(firstLines) });
+  for (const p of pages) {
+    let got;
+    try { got = await menuImportGet(p.url); } catch (e) { continue; }
+    if (got.type === 'pdf') { if (menuPdf({ url: got.url, text: p.text })) pdfs.unshift({ url: got.url, got }); continue; }
+    if (got.type !== 'html') continue;
+    const pageHtml = got.buf.toString('utf8');
+    const pl = htmlToMenuLines(pageHtml);
+    const priced = pricedLineCount(pl);
+    if (priced >= 5) found.push({ url: got.url, label: (p.url + ' ' + p.text).toLowerCase(), lines: pl, priced });
+    for (const l of htmlLinks(got.url, pageHtml)) {
+      if (menuPdf(l) && !seen.has(l.url)) { seen.add(l.url); pdfs.push(l); }
+    }
+  }
+  // A page that has prices but isn't a menu page (hours, events) loses to real menu PDFs.
+  const menuPage = kind === 'menu' ? /menu|dining|food|eat|lunch|dinner|brunch|breakfast/ : /rate|price|fee/;
+  if (found.length && pdfs.length && !found.some((f) => menuPage.test(f.label + ' ' + f.url))) found.length = 0;
+  if (found.length) {
+    // A page called "menu" (or "rates", "prices" for a price list) beats one that just has numbers on it (a golf
+    // scorecard); a dedicated page beats the homepage; food beats drinks; then the fuller page.
+    const strong = menuPage;
+    const drinks = (f) => /wine|bar|drink|beer|cocktail|happy/.test(f.label);
+    const rank = (f) => (f.url === first.url && found.length > 1 ? 4 : 0) + (strong.test(f.label) ? 0 : 2) + (drinks(f) ? 1 : 0);
+    found.sort((a, b) => rank(a) - rank(b) || b.priced - a.priced);
+    // One menu, plus its drinks list when there is one (never several near-identical menus, e.g. other locations').
+    const main = found[0];
+    const extra = !drinks(main) ? found.find((f) => f !== main && drinks(f) && f.url !== first.url) : null;
+    const keep = extra ? [main, extra] : [main];
+    return { type: 'text', lines: keep.flatMap((f) => f.lines), source: main.url };
+  }
+  const files = [];
+  for (const p of pdfs.slice(0, 3)) {
+    let got = p.got;
+    if (!got) { try { got = await menuImportGet(p.url); } catch (e) { continue; } }
+    if (got.type === 'pdf') files.push({ buf: got.buf, url: got.url });
+  }
+  return files.length ? { type: 'pdf', files } : { error: 'not_found' };
+}
+
 async function handleMenuApi(req, res, ctx, action, arg) {
   const generic = 'Sorry, something went wrong. Please try again, or tap "Can you do it for me?".';
   const { venue } = ctx.found;
   const send = (status, data) => sendSubmissionResponse(res, status, data);
   // The menu this request works on: admins work on one fixed menu; owners on their current draft.
   const current = () => (ctx.menuId ? db.prepare('SELECT * FROM venue_menus WHERE id = ? AND venue_id = ?').get(ctx.menuId, venue.id) || null : activeMenuDraft(venue.id));
+  // Adds one page (a photo or PDF) to the menu being worked on, starting one if needed.
+  const storePage = (kind, buf, dims) => {
+    let menu = current();
+    if (menu && !['draft', 'ready'].includes(menu.status) && !ctx.menuId) menu = null;
+    if (menu && menu.status === 'ready') {
+      // New pages after a read: the menu is read again from all its pages.
+      db.prepare("UPDATE venue_menus SET status = 'draft', read_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
+    }
+    if (!menu) {
+      const id = Number(db.prepare('INSERT INTO venue_menus (venue_id, status, submitted_by, ip_hash) VALUES (?, ?, ?, ?)')
+        .run(venue.id, 'draft', ctx.actor, menuIpHash(requestClientIp(req))).lastInsertRowid);
+      menu = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
+    }
+    const count = db.prepare('SELECT COUNT(*) AS n, MAX(position) AS p FROM venue_menu_files WHERE menu_id = ?').get(menu.id);
+    if (count.n >= MENU_MAX_PAGES) return { status: 409, error: `That’s ${MENU_MAX_PAGES} pages, the most for one menu. Press "That’s everything" to carry on.` };
+    const file = `${crypto.randomBytes(12).toString('hex')}.${kind === 'pdf' ? 'pdf' : 'jpg'}`;
+    const previewKey = crypto.randomBytes(18).toString('base64url');
+    try {
+      fs.mkdirSync(MENU_DIR, { recursive: true });
+      fs.writeFileSync(menuFilePath(file), buf, { flag: 'wx' });
+    } catch (err) {
+      console.error(`[menus] writing ${file} for venue #${venue.id} failed: ${err.message}`);
+      return { status: 500, error: generic };
+    }
+    const fid = Number(db.prepare('INSERT INTO venue_menu_files (menu_id, position, file, kind, preview_key, bytes, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(menu.id, (count.p || 0) + 1, file, kind, previewKey, buf.length, dims ? dims.width : null, dims ? dims.height : null).lastInsertRowid);
+    db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
+    return { menu, page: { id: fid, kind, preview: menuPreviewUrl({ kind, preview_key: previewKey }) } };
+  };
   if (action === 'state') return send(200, { ok: true, ...menuStateJson(venue, current()) });
   if (!isSameOriginSubmission(req)) return send(403, { ok: false, error: generic });
   const ip = requestClientIp(req);
@@ -30923,32 +31141,35 @@ async function handleMenuApi(req, res, ctx, action, arg) {
     } else {
       return send(400, { ok: false, error: 'Please choose a photo or a PDF of your menu.' });
     }
-    let menu = current();
-    if (menu && !['draft', 'ready'].includes(menu.status) && !ctx.menuId) menu = null;
-    if (menu && menu.status === 'ready') {
-      // New pages after a read: the menu is read again from all its pages.
-      db.prepare("UPDATE venue_menus SET status = 'draft', read_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
+    const stored = storePage(kind, buf, dims);
+    if (stored.error) return send(stored.status, { ok: false, error: stored.error });
+    return send(201, { ok: true, menu_id: stored.menu.id, page: stored.page });
+  }
+  if (action === 'import') {
+    if (menuUploadRateLimited(ip)) return send(429, { ok: false, error: 'Lots of tries at once! Please wait a few minutes and try again.' });
+    let ib;
+    try { ib = await readLimitedJsonBody(req, 8 * 1024); } catch (err) { return send(400, { ok: false, error: generic }); }
+    const raw = ib && typeof ib.url === 'string' && ib.url.trim() ? ib.url : venue.website;
+    if (!menuImportUrl(raw)) return send(400, { ok: false, error: 'Please paste the address of your website or menu, like www.yourplace.com/menu.' });
+    const found = await findMenuOnWebsite(raw, menuKind(venue));
+    if (found.error) {
+      const why = { blocked: 'We can’t open that address. Please check it and try again.', too_big: 'That file is too big for us. Try a photo of the menu instead.',
+        unreachable: 'We couldn’t reach that website. Please check the address, or take a photo of your menu instead.' }[found.error]
+        || 'We couldn’t find a menu on that page. Try the link to the menu itself, take a photo, or tap “Can you do it for me?”';
+      return send(200, { ok: false, error: why, code: found.error });
     }
-    if (!menu) {
-      const id = Number(db.prepare('INSERT INTO venue_menus (venue_id, status, submitted_by, ip_hash) VALUES (?, ?, ?, ?)')
-        .run(venue.id, 'draft', ctx.actor, menuIpHash(ip)).lastInsertRowid);
-      menu = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
+    if (found.type === 'text') {
+      let draft = current();
+      if (!draft || !['draft', 'ready'].includes(draft.status)) {
+        db.prepare('INSERT INTO venue_menus (venue_id, status, submitted_by, ip_hash) VALUES (?, ?, ?, ?)').run(venue.id, 'draft', ctx.actor, menuIpHash(ip));
+      }
+      return send(200, { ok: true, from: 'text', source: found.source, lines: found.lines });
     }
-    const count = db.prepare('SELECT COUNT(*) AS n, MAX(position) AS p FROM venue_menu_files WHERE menu_id = ?').get(menu.id);
-    if (count.n >= MENU_MAX_PAGES) return send(409, { ok: false, error: `That’s ${MENU_MAX_PAGES} pages, the most for one menu. Press "That’s everything" to carry on.` });
-    const file = `${crypto.randomBytes(12).toString('hex')}.${kind === 'pdf' ? 'pdf' : 'jpg'}`;
-    const previewKey = crypto.randomBytes(18).toString('base64url');
-    try {
-      fs.mkdirSync(MENU_DIR, { recursive: true });
-      fs.writeFileSync(menuFilePath(file), buf, { flag: 'wx' });
-    } catch (err) {
-      console.error(`[menus] writing ${file} for venue #${venue.id} failed: ${err.message}`);
-      return send(500, { ok: false, error: generic });
+    for (const f of found.files) {
+      const stored = storePage('pdf', f.buf, null);
+      if (stored.error) return send(stored.status, { ok: false, error: stored.error });
     }
-    const fid = Number(db.prepare('INSERT INTO venue_menu_files (menu_id, position, file, kind, preview_key, bytes, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(menu.id, (count.p || 0) + 1, file, kind, previewKey, buf.length, dims ? dims.width : null, dims ? dims.height : null).lastInsertRowid);
-    db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
-    return send(201, { ok: true, menu_id: menu.id, page: { id: fid, kind, preview: menuPreviewUrl({ kind, preview_key: previewKey }) } });
+    return send(200, { ok: true, from: 'pdf', count: found.files.length, sources: found.files.map((f) => f.url), ...menuStateJson(venue, current()) });
   }
   let body = {};
   try { body = await readLimitedJsonBody(req, 512 * 1024); } catch (err) { return send(400, { ok: false, error: generic }); }
@@ -31061,6 +31282,11 @@ const MENU_APP_STRINGS = {
     failed: 'Sorry, that didn&rsquo;t work this time. Please try again.',
     unavailable: 'Our menu reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
     busy: 'That&rsquo;s a lot of menus today! Press the button below and we&rsquo;ll finish it for you, or try again tomorrow.',
+    webButton: '&#128279;&nbsp;My menu is on my website', webTitle: 'Get your menu from your website',
+    webIntro: 'Paste the link to your website or your menu page. We&rsquo;ll find the menu and bring it in for you to check.',
+    webGo: 'Get my menu', webLooking: 'Looking at your website&hellip;', webFound: 'We brought your menu in from your website. Please check it, then publish.',
+    webNothing: 'We found the page, but couldn&rsquo;t pick out a menu on it. Try a photo instead, or tap &ldquo;Can you do it for me?&rdquo;',
+    webCancel: 'Back',
     gettingReady: 'Getting the reader ready (first time only, about 10 seconds)&hellip;', checkingPrices: 'Double-checking the prices&hellip;',
     stripHint: 'Under each line you&rsquo;ll see that bit of your photo, so you can check the name and price at a glance.',
     moveUp: 'Move up', moveDown: 'Move down', moveTo: 'Section:',
@@ -31106,6 +31332,11 @@ const MENU_APP_STRINGS = {
     failed: 'D&eacute;sol&eacute;, &ccedil;a n&rsquo;a pas fonctionn&eacute; cette fois. Veuillez r&eacute;essayer.',
     unavailable: 'Notre lecteur de menus fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous le taperons pour vous.',
     busy: 'Beaucoup de menus aujourd&rsquo;hui&nbsp;! Appuyez ci-dessous et nous le terminerons pour vous, ou r&eacute;essayez demain.',
+    webButton: '&#128279;&nbsp;Mon menu est sur mon site', webTitle: 'R&eacute;cup&eacute;rer votre menu depuis votre site',
+    webIntro: 'Collez le lien de votre site ou de votre page menu. Nous trouverons le menu et l&rsquo;importerons pour que vous le v&eacute;rifiiez.',
+    webGo: 'R&eacute;cup&eacute;rer mon menu', webLooking: 'Nous regardons votre site&hellip;', webFound: 'Votre menu a &eacute;t&eacute; import&eacute; depuis votre site. V&eacute;rifiez-le, puis publiez.',
+    webNothing: 'Nous avons trouv&eacute; la page, mais pas de menu dessus. Essayez plut&ocirc;t une photo, ou touchez &laquo;&nbsp;Pouvez-vous le faire pour moi&nbsp;?&nbsp;&raquo;',
+    webCancel: 'Retour',
     gettingReady: 'Pr&eacute;paration du lecteur (premi&egrave;re fois seulement, environ 10&nbsp;secondes)&hellip;', checkingPrices: 'V&eacute;rification des prix&hellip;',
     stripHint: 'Sous chaque ligne, vous verrez ce morceau de votre photo pour v&eacute;rifier le nom et le prix d&rsquo;un coup d&rsquo;&oelig;il.',
     moveUp: 'Monter', moveDown: 'Descendre', moveTo: 'Section&nbsp;:',
@@ -31167,6 +31398,10 @@ function priceListAppStrings(kind, lang) {
       waiting: 'Merci&nbsp;! Vos tarifs attendent une v&eacute;rification rapide. Ce sera bient&ocirc;t en ligne.',
       helpWaiting: 'Merci&nbsp;! Nous tapons vos tarifs et vous pr&eacute;viendrons quand ce sera en ligne.',
       pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo de la liste de prix.', diet: {},
+      webButton: '&#128279;&nbsp;Mes tarifs sont sur mon site', webTitle: 'R&eacute;cup&eacute;rer vos tarifs depuis votre site',
+      webIntro: 'Collez le lien de votre site ou de votre page de tarifs. Nous trouverons vos prix et les importerons pour que vous les v&eacute;rifiiez.',
+      webGo: 'R&eacute;cup&eacute;rer mes tarifs', webFound: 'Vos tarifs ont &eacute;t&eacute; import&eacute;s depuis votre site. V&eacute;rifiez-les, puis publiez.',
+      webNothing: 'Nous avons trouv&eacute; la page, mais pas de prix dessus. Essayez plut&ocirc;t une photo, ou touchez &laquo;&nbsp;Pouvez-vous le faire pour moi&nbsp;?&nbsp;&raquo;',
     };
   }
   return {
@@ -31190,6 +31425,10 @@ function priceListAppStrings(kind, lang) {
     waiting: `Thanks! Your ${L} are waiting for a quick check. They will be live soon.`,
     helpWaiting: `Thanks! We&rsquo;re typing up ${e.what} and will let you know when they&rsquo;re up.`,
     pdfBig: 'That PDF is too big. Try a photo of the price list instead.', diet: {},
+    webButton: '&#128279;&nbsp;My prices are on my website', webTitle: `Get your ${L} from your website`,
+    webIntro: 'Paste the link to your website or the page with your prices. We&rsquo;ll find them and bring them in for you to check.',
+    webGo: 'Get my prices', webFound: `We brought ${e.what} in from your website. Please check them, then publish.`,
+    webNothing: 'We found the page, but couldn&rsquo;t pick out prices on it. Try a photo instead, or tap &ldquo;Can you do it for me?&rdquo;',
   };
 }
 
@@ -31234,7 +31473,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   function backLink(){ return C.back ? '<p class="mn-back"><a href="' + h(C.back) + '">' + T.back + '</a></p>' : ''; }
   function startScreen(message){
-    setScreen('<h1>' + T.title + '</h1><p class="mn-lead">' + T.intro + '</p>' + err(message) + pickers(true) + '<p class="mn-tip">' + T.tip + '</p>' + helpBtn() + backLink());
+    setScreen('<h1>' + T.title + '</h1><p class="mn-lead">' + T.intro + '</p>' + err(message) + pickers(true)
+      + '<button type="button" class="mn-btn mn-plain" data-act="web">' + T.webButton + '</button>'
+      + '<p class="mn-tip">' + T.tip + '</p>' + helpBtn() + backLink());
   }
   function publishedScreen(){
     var p = S.published;
@@ -31323,8 +31564,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var head = C.mode === 'admin' ? '<h1>' + T.adminTitle + ': ' + h(C.venueName) + '</h1><p class="mn-sub">#' + m.id + ' &middot; ' + h(m.status) + '</p>'
       + (C.adminNote ? '<div class="mn-card mn-warn"><p>' + h(C.adminNote) + '</p></div>' : '')
       : '<h1>' + T.reviewTitle + '</h1><p class="mn-lead">' + T.reviewIntro + '</p>';
-    var notes = (data.partial ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + '</p></div>' : '')
+    var notes = (notice ? '<div class="mn-card mn-ok"><p>' + notice + '</p></div>' : '') + (data.partial && !notice ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + '</p></div>' : '')
       + (hasStrips() ? '<p class="mn-sub">' + T.stripHint + '</p>' : '');
+    notice = null;
     var secs = data.sections.map(function(s, si){
       return '<section class="mn-sec" data-sec="' + si + '"><input class="mn-sec-name" type="text" data-sec-name="' + si + '" maxlength="140" value="' + h(s.name) + '" aria-label="' + T.sectionName + '">'
         + (s.note ? '<p class="mn-note">' + h(s.note) + '</p>' : '')
@@ -31717,7 +31959,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   var DESC_START_RE = /^(?:includes?|including|departs?|departing|available|minimum|ages?\s+\d|pick-?up|meets?|duration)\b/i;
   // Notes printed under a dish, sometimes with their own price ("Suggested wine pairing: Merlot 14"): never a dish.
   var NOTE_START_RE = /^(?:suggested|recommended|pairs? (?:well )?with|wine pairing|pairing|served with|comes with|make it a|upgrade)\b/i;
-  var JUNK_RE = /(www\.|https?:|@|\.com\b|\.ca\b|\bphone\b|\btel\b|\(\d{3}\)|\d{3}[-. ]\d{3}[-. ]\d{4}|instagram|facebook|gratuity|\bgst\b|\bpst\b|plus tax|prices? (?:are )?subject|allerg|consuming raw)/i;
+  var JUNK_RE = /(\b\d{1,2}(?:[:. ]\d{2})?\s?(?:am|pm)\b|www\.|https?:|@|\.com\b|\.ca\b|\bphone\b|\btel\b|\(\d{3}\)|\d{3}[-. ]\d{3}[-. ]\d{4}|instagram|facebook|gratuity|\bgst\b|\bpst\b|plus tax|prices? (?:are )?subject|allerg|consuming raw)/i;
   var DIET = { V: 'vegetarian', VG: 'vegan', VE: 'vegan', GF: 'gluten_free', DF: 'dairy_free' };
   function words(t){ return t.split(/\s+/).filter(Boolean).length; }
   var SIZE_RE = /^\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb|lbs|pc|pcs|pieces?|inch|in|cm)\b/i; // "8 oz striploin", "6 pc"
@@ -31835,6 +32077,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         var wordish = textToks.filter(function(x){ return /^[A-Za-z\u00c0-\u00ff'\u2019&-]{3,}[.,]?$/.test(x) && /[aeiouy]/i.test(x); }).length;
         if (sure < 35 || (textToks.length && wordish < textToks.length * 0.4)) return;
       }
+      // A dish's name printed again right after it (a website's photo caption or hidden label) is a repeat.
+      var normName = function(x){ return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+      if (last && normName(t) && normName(t) === normName(last.name)) return;
       // Spaced-out decorative lettering ("B U F F A L O") is design, not a dish.
       var toks = t.split(' ');
       if (toks.length >= 4 && toks.filter(function(x){ return x.length === 1; }).length >= toks.length * 0.7) return;
@@ -31938,6 +32183,27 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   window.__menuParse = parseMenuLines;
   window.__menuOcrLines = ocrLines;
   window.__menuPdfText = pdfTextData;
+  // ----- From the owner's website -----
+  var notice = null;
+  function webScreen(message){
+    setScreen('<h1>' + T.webTitle + '</h1><p class="mn-lead">' + T.webIntro + '</p>' + err(message)
+      + '<label class="mn-email">Link<input type="url" id="mnWebUrl" inputmode="url" autocomplete="url" maxlength="500" placeholder="www.yourplace.com/menu" value="' + h(C.website || '') + '"></label>'
+      + '<button type="button" class="mn-btn mn-big mn-go" data-act="web-go">' + T.webGo + '</button>'
+      + '<button type="button" class="mn-btn mn-plain" data-act="web-cancel">' + T.webCancel + '</button>' + helpBtn());
+  }
+  function webImport(url){
+    setScreen('<h1 class="mn-center">' + T.webLooking + '</h1><div class="mn-bar"><span style="width:45%" class="mn-pulse"></span></div>');
+    api('/import', { url: url }).then(function(r){
+      if (!r || !r.ok) return webScreen(r && r.error ? h(r.error) : T.failed);
+      if (r.from === 'pdf') { S = r; return deviceRead(); }
+      var parsed = parseMenuLines((r.lines || []).map(function(t){ return { text: t, conf: 100 }; }));
+      if (!parsed.sections.length) return webScreen(T.webNothing);
+      return api('/save', { data: parsed }).then(function(sv){
+        if (!sv || !sv.ok) return webScreen(T.failed);
+        return api('/state').then(function(st){ if (st && st.ok) S = st; notice = T.webFound; render(); });
+      });
+    });
+  }
   // ----- Help -----
   function helpScreen(){
     var has = pages().length > 0;
@@ -32008,6 +32274,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     }
     if (act === 'edit') { return api('/edit', {}).then(function(r){ if (r && r.ok) { S = r; render(); } else render(r && r.error ? h(r.error) : T.failed); }); }
     if (act === 'unpublish') { if (!window.confirm(T.takeDownConfirmText)) return; return api('/unpublish', {}).then(function(r){ if (r && r.ok) { S = r; render(); } }); }
+    if (act === 'web') return webScreen();
+    if (act === 'web-cancel') return render();
+    if (act === 'web-go') { var wu = el('mnWebUrl'); return webImport(wu ? wu.value : ''); }
     if (act === 'help') return helpScreen();
     if (act === 'help-cancel') return render();
     if (act === 'help-send') {
@@ -32043,7 +32312,7 @@ function renderMenuAppPage(found, opts) {
   const state = menuStateJson(venue, opts.mode === 'admin' ? db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(opts.menuId) : activeMenuDraft(venue.id));
   if (state.published && pub) state.published.date = ownerUpdatedDate(pub.publishedAt, lang === 'fr');
   const cfg = {
-    base: opts.base, mode: opts.mode, lang, back: opts.back || null, email: found.contactEmail || '', venueName: venue.name, adminNote: opts.adminNote || null,
+    base: opts.base, mode: opts.mode, lang, back: opts.back || null, website: normalizeWebsiteUrl(venue.website) || '', email: found.contactEmail || '', venueName: venue.name, adminNote: opts.adminNote || null,
     t: { ...t, networkText: t.network, newDishText: plain(t.newDish), newSectionText: plain(t.newSection), takeDownConfirmText: plain(t.takeDownConfirm) },
     state,
   };
@@ -32149,7 +32418,7 @@ async function handleMenuRoute(req, res, method, sub, ctx) {
   if (method !== 'POST') return sendSubmissionResponse(res, 405, { ok: false, error: 'Not allowed.' });
   const rp = /^\/pages\/(\d+)\/remove$/.exec(sub);
   if (rp) return handleMenuApi(req, res, ctx, 'remove-page', Number(rp[1]));
-  const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit' }[sub];
+  const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit', '/import': 'import' }[sub];
   if (!action || (ctx.mode === 'admin' && ['help', 'restart', 'unpublish', 'edit'].includes(action))) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
   return handleMenuApi(req, res, ctx, action);
 }
@@ -38130,6 +38399,9 @@ module.exports = {
   // Menus (2026-10-17)
   setMenuReader,
   readMenuWithClaude,
+  setMenuImportNetwork,
+  htmlToMenuLines,
+  isPrivateAddress,
   normalizeMenuData,
   menuPriceLabel,
   menuPriceNumber,
