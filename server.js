@@ -2725,6 +2725,20 @@ function listEventOccurrences(eventId, { includeCancelled = true } = {}) {
 function countScheduledOccurrences(eventId) {
   return db.prepare("SELECT COUNT(*) AS n FROM event_occurrences WHERE event_id = ? AND status = 'scheduled'").get(eventId).n;
 }
+// Two events that share one description (the same tour in two towns, a monthly series entered month by month) would
+// share a search snippet. Their meta descriptions then open with the event's next date and its town, which always tell
+// them apart: { date: 'Sat Feb 14', town: 'Big White' }, or null for an event whose description is its own
+// (SEO audit, 2026-10-17).
+function eventSharedDescriptionLead(ev, now = new Date()) {
+  if (!ev || !ev.description) return null;
+  const twin = db.prepare("SELECT 1 FROM events WHERE description = ? AND id != ? AND status = 'scheduled' LIMIT 1").get(ev.description, ev.id);
+  if (!twin) return null;
+  const today = todayLocal(now);
+  const occ = listEventOccurrences(ev.id, { includeCancelled: false });
+  const next = occ.find((o) => o.end_date >= today) || occ[0];
+  const date = next && next.start_date ? formatLocalDateShort(next.start_date) : null;
+  return date ? { date, town: REGION_LABELS[ev.region] || ev.region } : null;
+}
 
 // H1 internal linking (2026-09-22): the handful of other events a visitor on
 // one event page is most likely to want next. Same publication rules as the
@@ -21677,9 +21691,15 @@ function frEventTitle(enTitle, ev) {
 function frEventHead(html, ev) {
   const enTitle = frDecode((/<title>([^<]*)<\/title>/.exec(html) || [])[1] || '');
   if (!enTitle) return html;
-  const title = escapeHtml(frEventTitle(enTitle, ev));
+  // An event page with its own written title and description (Field of Screams) uses their French when listed.
+  const enMeta = frDecode((/<meta name="description" content="([^"]*)"/.exec(html) || [])[1] || '');
+  const ownTitle = frLookup(enTitle), ownDesc = enMeta ? frLookup(enMeta) : null;
+  const title = escapeHtml(ownTitle != null ? ownTitle : frEventTitle(enTitle, ev));
   const fr = frLookup(String(ev.description).replace(/\s+/g, ' ').trim());
-  const desc = fr ? escapeHtml(clampMetaText(fr, 160)) : null;
+  // An event sharing its description with another opens with its date and town, as the English does.
+  const lead = fr && ownDesc == null ? eventSharedDescriptionLead(ev) : null;
+  const desc = ownDesc != null ? escapeHtml(ownDesc)
+    : fr ? escapeHtml(clampMetaText(`${lead ? `${frTextOr(lead.date)} · ${lead.town} : ` : ''}${fr}`, 160)) : null;
   return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
     .replace(/(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*"/g, (m, a) => `${a}${title}"`)
     .replace(/(<meta (?:name="description"|property="og:description"|name="twitter:description") content=")[^"]*"/g, (m, a) => (desc ? `${a}${desc}"` : m));
@@ -21901,6 +21921,9 @@ function withTwinLangSwitch(html, href, lang) {
 }
 function addTwinHead(html, enPath, search = '') {
   if (/hreflang="fr-CA"/.test(html)) return html;
+  // A noindex page (a thin town events page ...) carries no hreflang: Google ignores the pair on a page it won't index,
+  // and the noindex'd twin is not in the sitemap either (SEO audit, 2026-10-17). The EN / FR switch still links them.
+  if (/<meta name="robots" content="[^"]*noindex/.test(html.split('</head>')[0])) return html;
   return html.replace(/(<link rel="canonical" href="[^"]*">\n)/, `$1${twinHeadLinks(enPath, search)}`);
 }
 // The English page of a pair: hreflang, data-page-lang="en" (app.js keeps it English) and the switch. A visitor who
@@ -22798,7 +22821,8 @@ function renderEventPage(event, hostVenue, opts = {}) {
     && full.slug === 'field-of-screams-xiii-the-unlucky' && occurrences.length === 1
     && occurrences[0].start_date === '2026-09-25' && occurrences[0].end_date === '2026-11-01'
     ? require('./data/field-of-screams-2026.json') : null;
-  const rawDesc = full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`;
+  const lead = eventSharedDescriptionLead(full, now);
+  const rawDesc = (lead ? `${lead.date} · ${lead.town}: ` : '') + (full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`);
   const description = editorial ? editorial.metaDescription
     : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
   const editorialHtml = editorial ? editorial.sections.map((section) => `
@@ -33309,6 +33333,11 @@ const server = http.createServer(async (req, res) => {
         `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         // About, Privacy and Terms (2026-10-14).
         `  <url>\n    <loc>https://okanaganroam.com/map</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`,
+        // Build My Trip, the all-places directory and the two listing forms (SEO audit, 2026-10-17): all live,
+        // self-canonical and indexable, with French twins, but missing from the sitemap.
+        `  <url>\n    <loc>https://okanaganroam.com/trip</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+        `  <url>\n    <loc>https://okanaganroam.com/browse</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`,
+        ...['/list-your-venue', '/list-an-event'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.4</priority>\n  </url>`),
         ...['/about', '/contact', '/privacy', '/terms'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>${p === '/about' || p === '/contact' ? '0.6' : '0.3'}</priority>\n  </url>`),
         // Editorial guides (2026-10-10).
         `  <url>\n    <loc>https://okanaganroam.com/guides</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -35062,7 +35091,8 @@ const server = http.createServer(async (req, res) => {
         const hostVenue = full.venue_id ? getVenue(full.venue_id) : null;
         const location = hostVenue ? [hostVenue.name, hostVenue.address].filter(Boolean).join(', ') : (full.venue_name_text ? `${full.venue_name_text}, ${REGION_LABELS[region]}, BC` : `${REGION_LABELS[region]}, BC`);
         const ics = eventIcs(full, listEventOccurrences(full.id, { includeCancelled: false }), location, `https://okanaganroam.com/${region}/events/${slug}`);
-        res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="${slug}.ics"`, 'Cache-Control': 'no-cache' });
+        // A download, not a page: keep it out of search results (SEO audit, 2026-10-17).
+        res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="${slug}.ics"`, 'Cache-Control': 'no-cache', 'X-Robots-Tag': 'noindex' });
         return res.end(ics);
       }
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -36221,6 +36251,8 @@ module.exports = {
   parseWhatsOnReadQuery,
   listWhatsOnEventsPublic,
   renderEventPage,
+  eventSharedDescriptionLead,
+  addTwinHead,
   pageHead,
   // Events index (2026-09-17)
   eventCardHtml,
