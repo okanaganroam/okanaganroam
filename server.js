@@ -36104,6 +36104,7 @@ module.exports = {
   regionPageSchemas,
   whatsOnScopeFromPath,
   whatsOnWeekendWindow,
+  whatsOnScopeText,
   whatsOnRelatedGuides,
   liveWhatsOnScopes,
   WHATSON_SCOPE_MIN_EVENTS,
