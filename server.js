@@ -7811,7 +7811,7 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
           <li><a href="/list-an-event">List an Event</a></li>
           <li><a href="/owner/login">Business login</a></li>
-          <li><button type="button" class="home-footer-link-btn" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</button></li>
+          <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
         </ul>
       </div>
       <details class="home-footer-col home-footer-col-regions home-footer-fold" open>
@@ -12553,11 +12553,13 @@ function renderDestinationsPage(entries = destinationRegionEntries()) {
   const geo = (r) => { const i = DESTINATION_GEO_ORDER.indexOf(r.region); return i < 0 ? 999 : i; };
   const ordered = entries.map((g) => ({ ...g, regions: g.regions.slice().sort((a, b) => geo(a) - geo(b)) }));
   const listed = new Set(ordered.flatMap((g) => g.regions.map((r) => r.region)));
+  // Summary-page lists (SEO audit 2, 2026-10-17): each entry is position, url and name. A partial item object
+  // (a business with only a name) mixed both of Google's list formats and failed its required fields.
   const itemList = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
     name: 'Okanagan destinations',
-    itemListElement: ordered.flatMap((g) => g.regions).map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: `https://okanaganroam.com/${r.region}`, item: { '@type': 'TouristDestination', name: `${r.label}, BC`, ...(DESTINATION_TAGLINES[r.region] ? { description: DESTINATION_TAGLINES[r.region] } : {}) } })),
+    itemListElement: ordered.flatMap((g) => g.regions).map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: `https://okanaganroam.com/${r.region}`, name: `${r.label}, BC` })),
   };
   const starts = DESTINATION_STARTS.filter((x) => listed.has(x.region));
   const startsHtml = starts.length ? `<section class="destination-starts" aria-labelledby="destinationStartsHeading">
@@ -14560,6 +14562,24 @@ function regionVenueCounts() {
     .filter((r) => REGION_LABELS[r.region])
     .sort((a, b) => b.n - a.n || REGION_LABELS[a.region].localeCompare(REGION_LABELS[b.region]));
 }
+// Every live activity page (/outdoors/<a>, /tours/<a>, /sports/<a>, /indoor/<a>) as one link row. The hubs show
+// activities as filter buttons, so without this row several of these indexable pages had no link pointing to them
+// (SEO audit 2, 2026-10-17). /outdoors itself still carries no activity links (owner decision, 2026-09-24).
+function categoriesActivityLinksHtml() {
+  const links = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities()).map((a) => ({ href: `/${CATEGORY_SLUGS.outdoor}/${a.slug}`, label: a.label }));
+  const labelOf = (path) => {
+    const [section, slug] = path.split('/').filter(Boolean);
+    const list = section === CATEGORY_SLUGS.tour ? TOUR_ACTIVITIES : section === CATEGORY_SLUGS.sport ? SPORT_ACTIVITIES : INDOOR_EXPERIENCES;
+    const a = list.find((x) => x.slug === slug);
+    return a ? a.label : null;
+  };
+  for (const path of liveActivityPagePaths()) { const label = labelOf(path); if (label) links.push({ href: path, label }); }
+  if (!links.length) return '';
+  return `<h2 class="category-subsection-heading" id="categoriesActivities">Browse by activity</h2>
+  <nav class="categories-towns categories-activities" aria-labelledby="categoriesActivities">
+    ${links.map((l) => `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`).join('\n    ')}
+  </nav>`;
+}
 function renderCategoriesPage(entries = categoryDirectoryEntries()) {
   const title = 'All Categories: Food, Wine, Outdoors & Events in the Okanagan | Okanagan Roam';
   const description = 'Browse every Okanagan Roam category, from restaurants, cafés and wineries to golf, beaches, the outdoors, events and hidden gems, or search the whole site.';
@@ -14608,6 +14628,7 @@ ${renderGolfHeaderHtml()}
     <button type="submit">Search</button>
   </form>
   ${sections}
+  ${categoriesActivityLinksHtml()}
   <h2 class="category-subsection-heading" id="categoriesTowns">Browse by town</h2>
   <nav class="categories-towns" aria-labelledby="categoriesTowns">
     ${regionVenueCounts().map((r) => `<a href="/${r.region}">${escapeHtml(REGION_LABELS[r.region])} <span>${r.n.toLocaleString('en-CA')}</span></a>`).join('\n    ')}
@@ -14799,10 +14820,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: {
-        '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
-        name: v.name,
-      },
+      name: v.name,
     })),
   };
 
@@ -15597,7 +15615,7 @@ function renderOutdoorActivityPage(activity, venues) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   const hiddenGemIds = getHiddenGemVenueIds();
@@ -16056,10 +16074,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: {
-        '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
-        name: v.name,
-      },
+      name: v.name,
     })),
   };
 
@@ -17498,10 +17513,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${catSlug}/${v.slug}`,
-      item: {
-        '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness',
-        name: v.name,
-      },
+      name: v.name,
     })),
   };
   const payload = {};
@@ -17659,7 +17671,7 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   // id -> { c: categories, f: features, r: region } for the client script,
@@ -17785,7 +17797,7 @@ function renderWineriesHubPage(venues, filter = null, now = new Date()) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   const payload = {};
@@ -18003,7 +18015,7 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   const payload = {};
@@ -18201,7 +18213,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   const payload = {};
@@ -18916,7 +18928,7 @@ function renderDogHubPage(venues, filter = null, now = new Date()) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   const payload = {};
@@ -19481,7 +19493,7 @@ function renderCuratedCollectionPage(cfg, venues, filter = null) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   const payload = {};
@@ -19718,7 +19730,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-      item: { '@type': SCHEMA_TYPE_MAP[v.type] || 'LocalBusiness', name: v.name },
+      name: v.name,
     })),
   };
   const notes = cfg.cardNotes || new Map();
@@ -21341,6 +21353,16 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const comingUp = scope && scope.weekend && scopeList.length < WHATSON_SCOPE_MIN_EVENTS
     ? filterWhatsOnEvents(getWhatsOnEvents({ from: addLocalDays(window.to, 1), to: addLocalDays(window.to, 30) }), townScope ? [townScope] : selectedRegions, []).slice(0, 6)
     : [];
+  // Further ahead (SEO audit 2, 2026-10-17): events whose next date is past this page's window (30 days here, 90 on a
+  // town or type page) had a page and a sitemap entry but no link from anywhere. The unfiltered page lists them as plain
+  // links, the town's or type's own first, the valley page capped.
+  const furtherAhead = hasInventory && !queryDates && !filtered && !(scope && scope.weekend) ? (() => {
+    const shown = new Set(events.map((e) => e.id));
+    const later = getWhatsOnEvents({ from: addLocalDays(window.to, 1), to: addLocalDays(window.to, 3650) })
+      .filter((e) => !shown.has(e.id))
+      .filter((e) => (townScope ? !e.valleyWide && e.region === townScope : scope && scope.category ? (e.categories || []).includes(scope.category) : true));
+    return later.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate))).slice(0, scope ? 80 : 40);
+  })() : [];
   const itemList = scope && scopeList.length ? {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -21440,6 +21462,12 @@ ${renderGolfHeaderHtml()}
   ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
     <h2 class="category-subsection-heading" id="whatsOnComingUpHeading">Coming up after the weekend</h2>
     <ul class="card-grid">${comingUp.map((e) => whatsOnEventCardHtml(e)).join('')}</ul>
+  </section>` : ''}
+  ${furtherAhead.length ? `<section class="whatson-further" aria-labelledby="whatsOnFurtherHeading">
+    <h2 class="category-subsection-heading" id="whatsOnFurtherHeading">Further ahead</h2>
+    <ul class="whatson-further-list" style="list-style:none;padding:0;margin:0 0 24px;columns:18rem auto;column-gap:2rem">${furtherAhead.map((e) => `
+      <li style="margin:0 0 8px;break-inside:avoid"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a> <span class="event-related-meta" style="color:#5f6b73;font-size:0.9rem">${escapeHtml(`${formatLocalDateShort(e.startDate, { weekday: false })}, ${e.startDate.slice(0, 4)}`)}</span></li>`).join('')}
+    </ul>
   </section>` : ''}
   ${scope ? whatsOnRelatedGuidesHtml(whatsOnRelatedGuides(scopeList.length ? scopeList : comingUp)) : ''}
   ${whatsOnBrowseLinksHtml(live, scope ? basePath : null)}
@@ -22218,6 +22246,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const fr = opts.lang === 'fr';
   const L = (en, frText) => (fr ? frText : en);
   const num = (n) => (fr ? String(n).replace('.', ',') : String(n)); // French decimal comma: 4,6\u2605
+  // A place with a French page: its English page carries only the English description (the French one, hidden, made
+  // the English page repeat its twin's main text; SEO audit 2, 2026-10-17).
   const hasFrench = venueHasFrench(venue);
   // Page-only editorial copy: no database changes or effects on other venues. It is English, so the French page skips it.
   const editorial = !fr && !venue.redirect_to && venue.type === 'restaurant'
@@ -22248,10 +22278,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     ${section.links.length ? `<ul>${section.links.map((link) => `<li><a href="${escapeHtml(link.href)}"${link.href.startsWith('https://') ? ' rel="nofollow noopener" target="_blank" data-track="website"' : ''}>${escapeHtml(link.label)}</a></li>`).join('')}</ul>` : ''}
   </section>`).join('') : '';
 
+  // The French page's trail points at the French twins (SEO audit 2, 2026-10-17: it linked the English town and category).
+  const crumbBase = `https://okanaganroam.com${fr ? '/fr' : ''}`;
   const breadcrumb = breadcrumbListSchema([
-    { name: L('Home', 'Accueil'), url: 'https://okanaganroam.com/' },
-    { name: regionLabel, url: `https://okanaganroam.com/${venue.region}` },
-    { name: label.plural, url: `https://okanaganroam.com/${venue.region}/${catSlug}` },
+    { name: L('Home', 'Accueil'), url: fr ? 'https://okanaganroam.com/fr' : 'https://okanaganroam.com/' },
+    { name: regionLabel, url: `${crumbBase}/${venue.region}` },
+    { name: label.plural, url: `${crumbBase}/${venue.region}/${catSlug}` },
     { name: venue.name, url: canonical },
   ]);
 
@@ -22539,7 +22571,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}
       return last ? `\n    <p class="venue-owner-updated" style="font-size:.84rem;margin:6px 0 0;color:#1E6B3A;font-weight:700"><span aria-hidden="true">&#10003;</span> ${L('Updated by the business', 'Mis \u00e0 jour par l\u2019entreprise')} &middot; ${escapeHtml(ownerUpdatedDate(last, fr))}</p>` : '';
     })()}
   </div>
-  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
+  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
   ${guideLinks}
   </div>
@@ -22631,7 +22663,11 @@ function eventSchemaType(event, categories) {
 function occurrenceIsoStart(o) { return o.all_day === 1 || !o.start_time ? o.start_date : toVancouverIso(o.start_date, o.start_time); }
 function occurrenceIsoEnd(o) {
   const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date, 1) : o.end_date;
-  return o.all_day === 1 || !o.end_time ? endDate : toVancouverIso(endDate, o.end_time);
+  if (o.all_day !== 1 && o.end_time) return toVancouverIso(endDate, o.end_time);
+  // A timed start with no stored end time, ending the same day: a bare date reads as that day's midnight, before the
+  // start, which Google rejects. No end time is invented; endDate is left out (SEO audit 2, 2026-10-17).
+  if (o.all_day !== 1 && o.start_time && endDate <= o.start_date) return undefined;
+  return endDate;
 }
 // JSON-LD for a scheduled event with real occurrences: the next upcoming
 // occurrence (or the first, when all are past) is the Event; further
@@ -22676,6 +22712,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     name: o.label ? `${event.name} – ${o.label}` : event.name,
     startDate: occurrenceIsoStart(o),
     endDate: occurrenceIsoEnd(o),
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    eventStatus: 'https://schema.org/EventScheduled',
     location,
   });
   return {
@@ -23097,7 +23135,7 @@ function renderEventsIndexPage(events) {
       '@type': 'ListItem',
       position: i + 1,
       url: `https://okanaganroam.com/${e.region}/events/${e.slug}`,
-      item: { '@type': 'Event', name: e.name, description: e.description || undefined },
+      name: e.name,
     })),
   };
 
