@@ -1,0 +1,630 @@
+{
+  "reason": "Golf course listing photos from each club's website, Google Maps or Facebook; Dayton reviewed the contact sheet and said deploy all on 2026-10-17.",
+  "batch_id": "venue-photos-golf-2026-10-17",
+  "venues": [
+    {
+      "id": 1119,
+      "name": "The Overlander Golf & Event Centre",
+      "region": "armstrong",
+      "slug": "overlander-golf-event-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/overlander-golf-event-centre-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1097,
+      "name": "Mabel Lake Golf & Country Club",
+      "region": "enderby",
+      "slug": "mabel-lake-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mabel-lake-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1113,
+      "name": "St. Andrews by the Lake Golf Resort",
+      "region": "kaleden",
+      "slug": "st-andrews-by-the-lake-golf-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/st-andrews-by-the-lake-golf-resort-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1102,
+      "name": "Twin Lakes Golf Course and RV Park",
+      "region": "kaleden",
+      "slug": "twin-lakes-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/twin-lakes-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1125,
+      "name": "Anytime Sim Golf",
+      "region": "kelowna",
+      "slug": "anytime-sim-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/anytime-sim-golf-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1089,
+      "name": "Black Mountain Golf Club",
+      "region": "kelowna",
+      "slug": "black-mountain-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-mountain-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1084,
+      "name": "Gallagher's Canyon Golf & Country Club — Canyon Course",
+      "region": "kelowna",
+      "slug": "gallaghers-canyon-canyon-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallaghers-canyon-canyon-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1085,
+      "name": "Gallagher's Canyon Golf & Country Club — Pinnacle Course",
+      "region": "kelowna",
+      "slug": "gallaghers-canyon-pinnacle-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallaghers-canyon-pinnacle-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1123,
+      "name": "Golf Evolution",
+      "region": "kelowna",
+      "slug": "golf-evolution",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/golf-evolution-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1127,
+      "name": "JSquared Golf",
+      "region": "kelowna",
+      "slug": "jsquared-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jsquared-golf-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1440,
+      "name": "Kelowna Driving Range & Mini Golf",
+      "region": "kelowna",
+      "slug": "kelowna-driving-range-mini-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-driving-range-mini-golf-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1086,
+      "name": "Kelowna Golf & Country Club",
+      "region": "kelowna",
+      "slug": "kelowna-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1095,
+      "name": "Kelowna Springs Golf Club",
+      "region": "kelowna",
+      "slug": "kelowna-springs-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-springs-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1088,
+      "name": "Michaelbrook Golf Course",
+      "region": "kelowna",
+      "slug": "michaelbrook-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/michaelbrook-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1093,
+      "name": "Mission Creek Golf Club",
+      "region": "kelowna",
+      "slug": "mission-creek-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mission-creek-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1126,
+      "name": "Okanagan Virtual Golf",
+      "region": "kelowna",
+      "slug": "okanagan-virtual-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-virtual-golf-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1104,
+      "name": "Orchard Greens Golf Club",
+      "region": "kelowna",
+      "slug": "orchard-greens-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/orchard-greens-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1094,
+      "name": "Shadow Ridge Golf Club",
+      "region": "kelowna",
+      "slug": "shadow-ridge-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shadow-ridge-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1124,
+      "name": "Simplex Sportszone",
+      "region": "kelowna",
+      "slug": "simplex-sportszone",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/simplex-sportszone-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1090,
+      "name": "Sunset Ranch Golf & Country Club",
+      "region": "kelowna",
+      "slug": "sunset-ranch-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sunset-ranch-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1128,
+      "name": "The Fringe Indoor Golf",
+      "region": "kelowna",
+      "slug": "fringe-indoor-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fringe-indoor-golf-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1103,
+      "name": "The Harvest Golf Club",
+      "region": "kelowna",
+      "slug": "harvest-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/harvest-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1091,
+      "name": "The Okanagan Golf Club — Bear Course",
+      "region": "kelowna",
+      "slug": "okanagan-golf-club-bear-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-golf-club-bear-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1092,
+      "name": "The Okanagan Golf Club — Quail Course",
+      "region": "kelowna",
+      "slug": "okanagan-golf-club-quail-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-golf-club-quail-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1087,
+      "name": "Tower Ranch Golf & Country Club",
+      "region": "kelowna",
+      "slug": "tower-ranch-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tower-ranch-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1096,
+      "name": "Coldstream Golf Course",
+      "region": "lumby",
+      "slug": "coldstream-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/coldstream-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1797,
+      "name": "Lumby Golf Club",
+      "region": "lumby",
+      "slug": "lumby-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lumby-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1114,
+      "name": "Fairview Mountain Golf Club",
+      "region": "oliver",
+      "slug": "fairview-mountain-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fairview-mountain-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1115,
+      "name": "Nk'Mip Canyon Desert Golf Course",
+      "region": "oliver",
+      "slug": "nkmip-canyon-desert-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nkmip-canyon-desert-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1101,
+      "name": "Osoyoos Golf Club — Desert Gold",
+      "region": "osoyoos",
+      "slug": "osoyoos-golf-club-desert-gold",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-golf-club-desert-gold-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1100,
+      "name": "Osoyoos Golf Club — Park Meadows",
+      "region": "osoyoos",
+      "slug": "osoyoos-golf-club-park-meadows",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-golf-club-park-meadows-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1672,
+      "name": "Rattlesnake Canyon",
+      "region": "osoyoos",
+      "slug": "rattlesnake-canyon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rattlesnake-canyon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1116,
+      "name": "Sonora Dunes Golf Course",
+      "region": "osoyoos",
+      "slug": "sonora-dunes-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sonora-dunes-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1132,
+      "name": "Okanagan Virtual Golf",
+      "region": "penticton",
+      "slug": "okanagan-virtual-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-virtual-golf-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1107,
+      "name": "Penticton Golf & Country Club",
+      "region": "penticton",
+      "slug": "penticton-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1109,
+      "name": "Pine Hills Golf Club",
+      "region": "penticton",
+      "slug": "pine-hills-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pine-hills-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1108,
+      "name": "Skaha Meadows Golf Course",
+      "region": "penticton",
+      "slug": "skaha-meadows-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/skaha-meadows-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1110,
+      "name": "Wow Golf Club",
+      "region": "penticton",
+      "slug": "wow-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wow-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1112,
+      "name": "Sumac Ridge Golf & Country Club",
+      "region": "summerland",
+      "slug": "sumac-ridge-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sumac-ridge-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1111,
+      "name": "Summerland Golf & Country Club",
+      "region": "summerland",
+      "slug": "summerland-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-golf-country-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1131,
+      "name": "Back Nine Indoor Golf",
+      "region": "vernon",
+      "slug": "back-nine-indoor-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/back-nine-indoor-golf-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1707,
+      "name": "Dante's Golf Lounge",
+      "region": "vernon",
+      "slug": "dante-s-golf-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dante-s-golf-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1122,
+      "name": "Hillview Golf Course",
+      "region": "vernon",
+      "slug": "hillview-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hillview-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1098,
+      "name": "Predator Ridge — Predator Course",
+      "region": "vernon",
+      "slug": "predator-ridge-predator-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/predator-ridge-predator-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1099,
+      "name": "Predator Ridge — Ridge Course",
+      "region": "vernon",
+      "slug": "predator-ridge-ridge-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/predator-ridge-ridge-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1120,
+      "name": "Spallumcheen Golf & Country Club — Championship Course",
+      "region": "vernon",
+      "slug": "spallumcheen-golf-country-club-championship-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spallumcheen-golf-country-club-championship-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1121,
+      "name": "Spallumcheen Golf & Country Club — Executive Course",
+      "region": "vernon",
+      "slug": "spallumcheen-golf-country-club-executive-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/spallumcheen-golf-country-club-executive-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1117,
+      "name": "The Rise Golf Course",
+      "region": "vernon",
+      "slug": "rise-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rise-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1118,
+      "name": "Vernon Golf & Country Club",
+      "region": "vernon",
+      "slug": "vernon-golf-country-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-golf-country-club-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1129,
+      "name": "GOLFBOX",
+      "region": "west-kelowna",
+      "slug": "golfbox",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/golfbox-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1105,
+      "name": "Shannon Lake Golf Club",
+      "region": "west-kelowna",
+      "slug": "shannon-lake-golf-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shannon-lake-golf-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1106,
+      "name": "Two Eagles Golf Course & Academy",
+      "region": "west-kelowna",
+      "slug": "two-eagles-golf-course-academy",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/two-eagles-golf-course-academy-2610.jpg?v=20261017"
+      }
+    }
+  ]
+}
