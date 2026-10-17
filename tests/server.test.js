@@ -22334,3 +22334,323 @@ test('Menus: where each dish is in the photo is kept for checking but never publ
   assert.deepEqual(kept.sections[0].items[0].src, { f: 3, b: [10, 20, 600, 60], n: [10, 20, 200, 60], p: [560, 20, 600, 60] });
   assert.equal(kept.sections[0].items[1].src, undefined);
 });
+
+// ---- Visitor photos & tips (2026-10-17, drafts/visitor-photos-tips-plan.md) ----
+// A tiny but well-formed JPEG: JFIF, an EXIF segment with fake GPS text, a
+// comment, a SOF0 frame of w x h, then a scan. The server must strip the EXIF
+// and comment segments before storing it.
+function visitorTestJpeg(w = 1200, h = 900) {
+  const seg = (marker, payload) => Buffer.concat([Buffer.from([0xFF, marker, (payload.length + 2) >> 8, (payload.length + 2) & 255]), payload]);
+  return Buffer.concat([
+    Buffer.from([0xFF, 0xD8]),
+    seg(0xE0, Buffer.from([0x4A, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0])),
+    seg(0xE1, Buffer.concat([Buffer.from('Exif\0\0'), Buffer.from('GPSLatitude-secret-49.88')])),
+    seg(0xFE, Buffer.from('comment-secret')),
+    seg(0xC0, Buffer.from([0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1])),
+    seg(0xDA, Buffer.from([0x03, 1, 0, 2, 0x11, 3, 0x11, 0, 0x3F, 0])),
+    Buffer.alloc(32, 0x55),
+    Buffer.from([0xFF, 0xD9]),
+  ]);
+}
+
+async function visitorTestServer() {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (p, body, extra = {}) => fetch(`${base}${p}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.77.${Math.floor(ip / 250)}.${(ip++ % 250) + 1}`, ...extra }, body: JSON.stringify(body) })
+    .then(async (r) => { const text = await r.text(); let json = {}; try { json = JSON.parse(text); } catch (e) { /* not JSON */ } return { status: r.status, body: json, text, setCookie: r.headers.get('set-cookie') || '' }; });
+  const get = (p, headers = {}) => fetch(`${base}${p}`, { headers }).then(async (r) => ({ status: r.status, text: await r.text() }));
+  const admin = (p, body) => post(p, body, { Authorization: `Bearer ${LYV_TOKEN}` });
+  return { srv, base, post, get, admin, close: () => new Promise((resolve) => srv.close(resolve)) };
+}
+
+test('Visitor contributions: display name is first name + last initial, made on the server', () => {
+  assert.equal(app.visitorDisplayName('sarah mitchell'), 'Sarah M.');
+  assert.equal(app.visitorDisplayName('  Élodie   de la Tour '), 'Élodie T.');
+  assert.equal(app.visitorDisplayName('JOHN'), 'John');
+  assert.equal(app.visitorDisplayName("Mary-Jane O'Neil"), 'Mary-Jane O.');
+  assert.equal(app.visitorDisplayName('<b>'), 'B');
+  assert.equal(app.visitorDisplayName('12345 !!'), null);
+  assert.equal(app.visitorDisplayName(''), null);
+  const stripped = app.stripJpegMetadata(visitorTestJpeg(1000, 800));
+  assert.ok(stripped);
+  assert.equal(stripped.includes('GPSLatitude'), false);
+  assert.equal(stripped.includes('comment-secret'), false);
+  assert.equal(stripped.includes('JFIF'), true);
+  assert.deepEqual(app.jpegDimensions(stripped), { width: 1000, height: 800 });
+  assert.equal(app.stripJpegMetadata(Buffer.from('not a jpeg')), null);
+});
+
+test('Visitor contributions: submit, confirm, approve; tips are escaped; unconfirmed/pending and emails never public; report; remove', async () => {
+  seasonInsert.run({ name: 'Visitor Tips Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'visitor-tips-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'visitor-tips-fixture');
+  const pagePath = '/kelowna/cafes/visitor-tips-fixture';
+  const t = await visitorTestServer();
+  const mail = [];
+  const adminMail = [];
+  app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+  app.setVenueSubmissionTransport(async (m) => { adminMail.push(m); });
+  const EMAIL = 'sarah.visitor@example.com';
+  const tipText = '<script>alert(1)</script> Try the <b>pie</b> & park out back';
+  const good = { name: 'sarah mitchell', email: 'Sarah.Visitor@Example.com', tip: tipText, rights: true, honesty: true, company_website: '', started_at: Date.now() - 10000 };
+  const url = `/api/venues/${v.id}/contributions`;
+  const count = () => db.prepare('SELECT COUNT(*) AS n FROM visitor_contributions WHERE venue_id = ?').get(v.id).n;
+  try {
+    // Nothing yet: the one-line invitation and the form.
+    const empty = (await t.get(pagePath)).text;
+    assert.match(empty, /<h2 id="vcHead">Visitor photos &amp; tips<\/h2>/);
+    assert.match(empty, /Been here\? Share a photo or a tip for other visitors\./);
+    assert.match(empty, /Share a photo or tip/);
+    assert.match(empty, /id="vcRights"/);
+    assert.match(empty, /id="vcHonesty"/);
+    assert.match(empty, /class="vc-hp"/);
+    assert.match(empty, /@media \(max-width: 480px\) \{\s*\.vc-section \.vc-row \{ grid-template-columns: 1fr; \}/);
+
+    // Checks: both boxes required, a tip or a photo required, tip length, name, email, origin, speed, honeypot.
+    let r = await t.post(url, { ...good, rights: false });
+    assert.equal(r.status, 400);
+    assert.ok(r.body.errors.rights);
+    r = await t.post(url, { ...good, honesty: undefined });
+    assert.equal(r.status, 400);
+    assert.ok(r.body.errors.honesty);
+    r = await t.post(url, { ...good, tip: '   ', photos: [] });
+    assert.equal(r.status, 400);
+    assert.equal(r.body.errors.tip, 'Please add a tip or at least one photo.');
+    r = await t.post(url, { ...good, tip: 'x'.repeat(501) });
+    assert.equal(r.status, 400);
+    assert.match(r.body.errors.tip, /500 characters/);
+    assert.equal((await t.post(url, { ...good, tip: 'y'.repeat(500) })).status, 201, 'exactly 500 is fine');
+    r = await t.post(url, { ...good, name: '!!!' });
+    assert.ok(r.body.errors.name);
+    r = await t.post(url, { ...good, email: 'nope' });
+    assert.ok(r.body.errors.email);
+    r = await t.post(url, { ...good, rights: false, lang: 'fr' });
+    assert.match(r.body.errors.rights, /^Veuillez confirmer/);
+    assert.equal((await t.post(url, good, { Origin: 'https://evil.example' })).status, 403);
+    assert.equal((await t.post(url, { ...good, started_at: Date.now() })).status, 400);
+    assert.equal((await t.post(url, { ...good, extra: 1 })).status, 400);
+    assert.equal((await t.post('/api/venues/99999999/contributions', good)).status, 404);
+    const before = count();
+    assert.equal((await t.post(url, { ...good, company_website: 'http://spam.example' })).status, 201);
+    assert.equal(count(), before, 'the honeypot keeps nothing');
+    mail.length = 0;
+
+    // Submit: unconfirmed, the confirm link is emailed, and the email is not in the response.
+    r = await t.post(url, good);
+    assert.equal(r.status, 201, r.text);
+    assert.equal(r.text.toLowerCase().includes(EMAIL), false);
+    assert.equal(r.body.message, 'Check your email. Click the link to send your photo/tip for review.');
+    const row = db.prepare('SELECT * FROM visitor_contributions WHERE venue_id = ? ORDER BY id DESC LIMIT 1').get(v.id);
+    assert.equal(row.status, 'unconfirmed');
+    assert.equal(row.display_name, 'Sarah M.');
+    assert.equal(row.email, EMAIL);
+    assert.equal(row.tip, tipText);
+    assert.ok(row.rights_confirmed_at && row.honesty_confirmed_at && row.ip_hash && row.confirm_token_hash);
+    assert.equal(mail.length, 1);
+    assert.equal(mail[0].to, EMAIL);
+    const token = /\/contribute\/confirm\/([A-Za-z0-9_-]{43})/.exec(mail[0].text)[1];
+    assert.notEqual(row.confirm_token_hash, token, 'only the hash is stored');
+
+    // Unconfirmed: not on the page.
+    let page = (await t.get(pagePath)).text;
+    assert.equal(page.includes('alert(1)'), false);
+    assert.equal(page.includes('<span>Sarah M.</span>'), false);
+
+    // Confirm: pending, Dayton is told (without the visitor's email), still not public.
+    const adminBefore = adminMail.length;
+    const conf = await t.get(`/contribute/confirm/${token}`);
+    assert.equal(conf.status, 200);
+    assert.match(conf.text, /we’ll email you when it’s live/);
+    assert.equal(db.prepare('SELECT status FROM visitor_contributions WHERE id = ?').get(row.id).status, 'pending');
+    assert.equal(adminMail.length, adminBefore + 1);
+    assert.match(adminMail[adminMail.length - 1]._subject, /^\[PENDING REVIEW\] Visitor tip for Visitor Tips Fixture/);
+    assert.equal(JSON.stringify(adminMail[adminMail.length - 1]).toLowerCase().includes(EMAIL), false);
+    page = (await t.get(pagePath)).text;
+    assert.equal(page.includes('alert(1)'), false, 'pending is not public');
+    assert.match((await t.get(`/contribute/confirm/${token}`)).text, /already confirmed/);
+    assert.equal((await t.get('/contribute/confirm/not-a-real-token')).status, 404);
+
+    // The review page lists it (with no email), and approving emails the visitor.
+    const login = await t.post('/admin/review/login', { token: LYV_TOKEN });
+    const cookie = login.setCookie.split(';')[0];
+    const review = (await t.get('/admin/review', { Cookie: cookie })).text;
+    assert.match(review, new RegExp(`data-kind="visitor" data-id="${row.id}"`));
+    assert.match(review, /from Sarah M\./);
+    assert.equal(review.toLowerCase().includes(EMAIL), false);
+    assert.equal((await t.post(`/admin/review/visitor/${row.id}/approve`, {})).status, 401, 'needs the cookie');
+    const ok = await t.post(`/admin/review/visitor/${row.id}/approve`, {}, { Cookie: cookie });
+    assert.equal(ok.status, 200, ok.text);
+    assert.equal(ok.body.emailed, 'sent');
+    assert.equal(ok.text.toLowerCase().includes(EMAIL), false);
+    const live = mail[mail.length - 1];
+    assert.equal(live.to, EMAIL);
+    assert.match(live.subject, /^Your tip is live on Okanagan Roam/);
+    assert.match(live.text, /kelowna\/cafes\/visitor-tips-fixture/);
+    assert.equal((await t.post(`/admin/review/visitor/${row.id}/reject`, { reason: 'x' }, { Cookie: cookie })).status, 409);
+
+    // Live: escaped text only, first name + initial and month/year; no email anywhere public.
+    page = (await t.get(pagePath)).text;
+    assert.match(page, /&lt;script&gt;alert\(1\)&lt;\/script&gt; Try the &lt;b&gt;pie&lt;\/b&gt; &amp; park out back/);
+    assert.equal(page.includes('<script>alert(1)'), false);
+    assert.equal(page.includes('<b>pie</b>'), false);
+    assert.match(page, /<span>Sarah M\.<\/span>/);
+    assert.match(page, /data-vc-report="\d+"/);
+    assert.doesNotMatch(page, /Been here\? Share a photo/);
+    assert.equal(page.toLowerCase().includes(EMAIL), false);
+    const api = await t.get(`/api/venues/${v.id}`);
+    assert.equal(api.status, 200);
+    assert.equal(api.text.toLowerCase().includes(EMAIL), false);
+    assert.equal(api.text.includes('visitor.example'), false);
+    const list = await fetch(`${t.base}/admin/visitor-contributions?status=approved`, { headers: { Authorization: `Bearer ${LYV_TOKEN}` } }).then((x) => x.text());
+    assert.match(list, /Sarah M\./);
+    assert.equal(list.toLowerCase().includes(EMAIL), false, 'not even the admin API returns it');
+
+    // Report: counted once per person, then it shows under "Reported" on /admin/review.
+    assert.equal((await t.post(`/api/contributions/${row.id}/report`, {}, { 'X-Real-IP': '10.78.0.1' })).status, 200);
+    assert.equal((await t.post(`/api/contributions/${row.id}/report`, {}, { 'X-Real-IP': '10.78.0.1' })).status, 200);
+    assert.equal(db.prepare('SELECT reported_count FROM visitor_contributions WHERE id = ?').get(row.id).reported_count, 1);
+    assert.match(adminMail[adminMail.length - 1]._subject, /^\[REPORTED\]/);
+    assert.match((await t.get('/admin/review', { Cookie: cookie })).text, /Reported visitor tips/);
+    assert.equal((await t.post('/api/contributions/99999999/report', {})).status, 404);
+
+    // Remove (token API): gone from the page.
+    assert.equal((await t.admin(`/admin/visitor-contributions/${row.id}/remove`, { reason: 'spam' })).status, 400, 'reviewer required');
+    const removed = await t.admin(`/admin/visitor-contributions/${row.id}/remove`, { reviewer: 'test', reason: 'spam' });
+    assert.equal(removed.status, 200, removed.text);
+    assert.equal(db.prepare('SELECT status FROM visitor_contributions WHERE id = ?').get(row.id).status, 'removed');
+    page = (await t.get(pagePath)).text;
+    assert.equal(page.includes('alert(1)'), false);
+    assert.equal((await t.post(`/api/contributions/${row.id}/report`, {})).status, 404, 'only live tips can be reported');
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await t.close();
+  }
+});
+
+test('Visitor contributions: photo upload (metadata stripped), make main with credit, gallery, reject, expired link, 7-day clean-up, 5 a day per email', async () => {
+  const nodeFs = require('node:fs');
+  const nodePath = require('node:path');
+  seasonInsert.run({ name: 'Visitor Photo Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'visitor-photo-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'visitor-photo-fixture');
+  const pagePath = '/kelowna/cafes/visitor-photo-fixture';
+  const t = await visitorTestServer();
+  const mail = [];
+  app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+  app.setVenueSubmissionTransport(async () => {});
+  const dataUrl = (buf) => `data:image/jpeg;base64,${buf.toString('base64')}`;
+  const url = `/api/venues/${v.id}/contributions`;
+  const base = { name: 'Jo Nguyen', email: 'jo@example.com', rights: true, honesty: true, company_website: '', started_at: Date.now() - 10000 };
+  const filePath = (f) => nodePath.join(app.OWNER_PHOTO_DIR, f);
+  const created = [];
+  const submitAndConfirm = async (body) => {
+    const r = await t.post(url, body);
+    assert.equal(r.status, 201, r.text);
+    const id = db.prepare('SELECT MAX(id) AS id FROM visitor_contributions WHERE venue_id = ?').get(v.id).id;
+    const token = /\/contribute\/confirm\/([A-Za-z0-9_-]{43})/.exec(mail[mail.length - 1].text)[1];
+    const photos = db.prepare('SELECT * FROM visitor_contribution_photos WHERE contribution_id = ? ORDER BY id').all(id);
+    created.push(...photos.map((p) => p.file));
+    return { id, token, photos };
+  };
+  try {
+    // Photo checks match owner photos.
+    let r = await t.post(url, { ...base, photos: [dataUrl(visitorTestJpeg(400, 300))] });
+    assert.match(r.body.errors.photos, /too small/);
+    r = await t.post(url, { ...base, photos: ['data:image/png;base64,AAAA'] });
+    assert.ok(r.body.errors.photos);
+    r = await t.post(url, { ...base, photos: [1, 2, 3, 4].map(() => dataUrl(visitorTestJpeg())) });
+    assert.match(r.body.errors.photos, /up to 3/);
+
+    // A photo with no tip is enough. Stored without its EXIF/GPS and comment.
+    const a = await submitAndConfirm({ ...base, photos: [dataUrl(visitorTestJpeg())] });
+    assert.equal(a.photos.length, 1);
+    const stored = nodeFs.readFileSync(filePath(a.photos[0].file));
+    assert.equal(stored.includes('GPSLatitude'), false);
+    assert.equal(stored.includes('comment-secret'), false);
+    assert.equal(a.photos[0].width, 1200);
+    const preview = `/visitor-photos/preview/${a.photos[0].preview_key}.jpg`;
+    const publicUrl = `/images/visitor/${a.photos[0].file}`;
+    assert.equal((await t.get(preview)).status, 404, 'no preview while unconfirmed');
+    assert.equal((await t.get(`/contribute/confirm/${a.token}`)).status, 200);
+    assert.equal((await t.get(preview)).status, 200, 'preview once pending');
+    assert.equal((await t.get(publicUrl)).status, 404, 'not public while pending');
+    assert.equal((await t.get(pagePath)).text.includes(a.photos[0].file), false);
+
+    // Approve and make it the main photo: public, credited "Jo N. (visitor)".
+    const ok = await t.admin(`/admin/visitor-contributions/${a.id}/approve`, { reviewer: 'test', photo_id: a.photos[0].id });
+    assert.equal(ok.status, 200, ok.text);
+    assert.equal(ok.body.main, true);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, publicUrl);
+    assert.equal((await t.get(publicUrl)).status, 200);
+    let page = (await t.get(pagePath)).text;
+    assert.match(page, new RegExp(`src="${publicUrl}"`));
+    assert.match(page, /Photo: Jo N\. \(visitor\)/);
+    assert.match(mail[mail.length - 1].subject, /^Your photo is live/);
+
+    // A second approved photo joins the gallery after it, with its credit.
+    const b = await submitAndConfirm({ ...base, name: 'Ana Silva', email: 'ana@example.com', tip: 'Go early on weekends.', photos: [dataUrl(visitorTestJpeg(1600, 1000))] });
+    assert.equal((await t.get(`/contribute/confirm/${b.token}`)).status, 200);
+    const okB = await t.admin(`/admin/visitor-contributions/${b.id}/approve`, { reviewer: 'test', edits: { tip: 'Go early on weekends!' } });
+    assert.equal(okB.status, 200, okB.text);
+    assert.equal(okB.body.edited, true);
+    assert.equal(okB.body.main, false);
+    page = (await t.get(pagePath)).text;
+    assert.match(page, /See all 2 photos/);
+    assert.match(page, /<figcaption>Photo: Ana S\. \(visitor\)<\/figcaption>/);
+    assert.match(page, /Go early on weekends!/);
+    // Make main later (cookie route) swaps the listing's photo.
+    const cookie = (await t.post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    const mm = await t.post(`/admin/review/visitor/${b.id}/make-main`, { photo_id: b.photos[0].id }, { Cookie: cookie });
+    assert.equal(mm.status, 200, mm.text);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/visitor/${b.photos[0].file}`);
+    assert.ok(db.prepare('SELECT made_main_at FROM visitor_contribution_photos WHERE id = ?').get(b.photos[0].id).made_main_at);
+
+    // Remove the main one: the listing loses that photo and the file is deleted.
+    const rm = await t.post(`/admin/review/visitor/${b.id}/remove`, { reason: 'not this venue' }, { Cookie: cookie });
+    assert.equal(rm.status, 200, rm.text);
+    assert.equal(rm.body.was_main, true);
+    assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, null);
+    assert.equal(nodeFs.existsSync(filePath(b.photos[0].file)), false);
+    assert.equal((await t.get(`/images/visitor/${b.photos[0].file}`)).status, 404);
+
+    // Reject: file deleted, a short polite email with the reason.
+    const c = await submitAndConfirm({ ...base, name: 'Lee Park', email: 'lee@example.com', photos: [dataUrl(visitorTestJpeg())] });
+    assert.equal((await t.get(`/contribute/confirm/${c.token}`)).status, 200);
+    const rej = await t.post(`/admin/review/visitor/${c.id}/reject`, { reason: 'Too blurry' }, { Cookie: cookie });
+    assert.equal(rej.status, 200, rej.text);
+    assert.equal(rej.body.emailed, 'sent');
+    assert.equal(mail[mail.length - 1].to, 'lee@example.com');
+    assert.match(mail[mail.length - 1].subject, /^About your photo for Visitor Photo Fixture/);
+    assert.match(mail[mail.length - 1].text, /Reason: Too blurry/);
+    assert.equal(nodeFs.existsSync(filePath(c.photos[0].file)), false);
+    assert.equal((await t.get(`/visitor-photos/preview/${c.photos[0].preview_key}.jpg`)).status, 404);
+    assert.equal(db.prepare('SELECT status FROM visitor_contributions WHERE id = ?').get(c.id).status, 'rejected');
+
+    // An expired confirm link does nothing; after 7 days the item and its photo are deleted.
+    const d = await submitAndConfirm({ ...base, name: 'Max Roy', email: 'max@example.com', photos: [dataUrl(visitorTestJpeg())] });
+    db.prepare("UPDATE visitor_contributions SET confirm_expires_at = datetime('now', '-1 hour') WHERE id = ?").run(d.id);
+    const exp = await t.get(`/contribute/confirm/${d.token}`);
+    assert.equal(exp.status, 410);
+    assert.match(exp.text, /This link has expired/);
+    assert.equal(db.prepare('SELECT status FROM visitor_contributions WHERE id = ?').get(d.id).status, 'unconfirmed');
+    db.prepare("UPDATE visitor_contributions SET submitted_at = datetime('now', '-8 days') WHERE id = ?").run(d.id);
+    assert.ok(app.purgeStaleVisitorContributions() >= 1);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM visitor_contributions WHERE id = ?').get(d.id).n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM visitor_contribution_photos WHERE contribution_id = ?').get(d.id).n, 0);
+    assert.equal(nodeFs.existsSync(filePath(d.photos[0].file)), false);
+
+    // At most 5 a day from one email (any listing, any status).
+    for (let i = 0; i < 5; i++) assert.equal((await t.post(url, { ...base, email: 'Limit@Example.com', tip: `Tip number ${i}` })).status, 201);
+    const sixth = await t.post(url, { ...base, email: 'limit@example.com', tip: 'One more' });
+    assert.equal(sixth.status, 429);
+    assert.match(sixth.body.error, /already sent 5 today/);
+  } finally {
+    for (const f of created) { try { nodeFs.unlinkSync(filePath(f)); } catch (e) { /* gone */ } }
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await t.close();
+  }
+});
