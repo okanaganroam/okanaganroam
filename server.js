@@ -21604,7 +21604,8 @@ function frIsVenuePath(p) {
   return seg.length === 3 && !!REGION_LABELS[seg[0]] && !!SLUG_TO_TYPE[seg[1]] && /^[a-z0-9-]+$/.test(seg[2]);
 }
 // An English address with a French twin: a main page, a section's activity page, a town page or a town's category
-// or events page, a badge guide, a guide, or a place page. Event pages stay English (their text is English only).
+// or events page, a badge guide, a guide, or a place page. An event page has a twin once its description has a French
+// translation (data/french/events-*.json, 2026-10-17); a new or edited event stays English until it is translated.
 function hasFrenchTwin(p) {
   const path = String(p || '').replace(/(.)\/$/, '$1');
   if (FR_TWIN_STATIC.has(path)) return true;
@@ -21612,8 +21613,48 @@ function hasFrenchTwin(p) {
   if (!seg.every((x) => /^[a-z0-9-]+$/.test(x)) && !(seg[0] === 'guide' && seg.length === 3 && /^[a-z_]+$/.test(seg[2]))) return false;
   if (seg.length === 1) return !!REGION_LABELS[seg[0]];
   if (seg.length === 2) return FR_TWIN_SECTIONS.has(seg[0]) || (!!REGION_LABELS[seg[0]] && (!!SLUG_TO_TYPE[seg[1]] || seg[1] === 'events'));
-  if (seg.length === 3) return (seg[0] === 'guide' && !!REGION_LABELS[seg[1]]) || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && seg[2] === 'this-weekend') || frIsVenuePath(path);
+  if (seg.length === 3) return (seg[0] === 'guide' && !!REGION_LABELS[seg[1]]) || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && seg[2] === 'this-weekend') || frIsVenuePath(path)
+    || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && !!frEventForPath(path));
   return false;
+}
+// The event behind /<town>/events/<slug> when its description has a French translation, else null. Cached for five
+// minutes: links on every French page ask this.
+const frEventCache = new Map();
+function frEventForPath(p) {
+  const seg = String(p || '').split('/').filter(Boolean);
+  if (seg.length !== 3 || seg[1] !== 'events' || !REGION_LABELS[seg[0]]) return null;
+  const key = `${seg[0]}/${seg[2]}`, now = Date.now(), hit = frEventCache.get(key);
+  if (hit && now - hit.at < 5 * 60 * 1000) return hit.ev;
+  let ev = null;
+  try {
+    const e = findEventBySlug(seg[0], seg[2]);
+    if (e && e.description && frLookup(String(e.description).replace(/\s+/g, ' ').trim()) != null) ev = e;
+  } catch (err) { ev = null; }
+  if (frEventCache.size > 5000) frEventCache.clear();
+  frEventCache.set(key, { ev, at: now });
+  return ev;
+}
+// A French event page's title and search description, from the English ones: "Name — Event in Kelowna, BC" reads
+// "Name — Événement à Kelowna (C.-B.)", dates go French, and the description is the French one cut to fit.
+const FR_MONTH_LONG = { January: 'janvier', February: 'février', March: 'mars', April: 'avril', May: 'mai', June: 'juin', July: 'juillet', August: 'août', September: 'septembre', October: 'octobre', November: 'novembre', December: 'décembre' };
+function frEventTitle(enTitle, ev) {
+  const town = REGION_LABELS[ev.region] || ev.region;
+  let t = enTitle
+    .replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})/g, (m, mo, d, y) => `${d === '1' ? '1er' : d} ${FR_MONTH_LONG[mo]} ${y}`)
+    .replace(/ \u2014 Event in (.+?), BC( \| Okanagan Roam)?$/, (m, tw, brand) => ` \u2014 \u00c9v\u00e9nement \u00e0 ${tw} (C.-B.)${brand || ''}`);
+  if (t === enTitle) t = `${enTitle.endsWith(` \u2014 ${town}`) ? enTitle.slice(0, -(town.length + 3)) : enTitle} (${town}, C.-B.)`;
+  const plain = t.replace(/ \| Okanagan Roam$/, '');
+  return plain.length <= TITLE_MAX ? t : fitTitle([`${ev.name} (${town}, C.-B.)`, `${shortTitleName(ev.name, TITLE_MAX - town.length - 10)} (${town}, C.-B.)`]);
+}
+function frEventHead(html, ev) {
+  const enTitle = frDecode((/<title>([^<]*)<\/title>/.exec(html) || [])[1] || '');
+  if (!enTitle) return html;
+  const title = escapeHtml(frEventTitle(enTitle, ev));
+  const fr = frLookup(String(ev.description).replace(/\s+/g, ' ').trim());
+  const desc = fr ? escapeHtml(clampMetaText(fr, 160)) : null;
+  return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+    .replace(/(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*"/g, (m, a) => `${a}${title}"`)
+    .replace(/(<meta (?:name="description"|property="og:description"|name="twitter:description") content=")[^"]*"/g, (m, a) => (desc ? `${a}${desc}"` : m));
 }
 function frTwinPath(enPath) { return enPath === '/' ? '/fr' : `/fr${enPath}`; }
 // A /fr request for a main or town page -> the English address it is rendered from (place pages have their own route).
@@ -21850,6 +21891,8 @@ function englishTwinHtml(html, enPath, search = '') {
 function frenchTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frPath = frTwinPath(enPath);
+  const frEvent = frEventForPath(enPath);
+  if (frEvent) html = frEventHead(html, frEvent);
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -22142,8 +22185,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const title = editorial ? editorial.title : fr
     // The French title always keeps its French ending ("..., C.-B."), so a long name never gives the English and French
     // pages the same title (health re-crawl, 2026-10-13).
-    ? fitTitle([`${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam`, `${venue.name} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B.`, `${venue.name} \u2014 ${regionLabel}, C.-B.`, `${venue.name} (${regionLabel})`, `${venue.name} (C.-B.)`])
-    : fitTitle([`${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`, `${venue.name} \u2014 ${label.singular} in ${regionLabel}, BC`, `${venue.name} \u2014 ${regionLabel}, BC`, `${venue.name} \u2014 ${regionLabel}`, venue.name]);
+    ? fitTitle([venue.name, shortTitleName(venue.name, 50)].flatMap((n) => [`${n} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B. | Okanagan Roam`, `${n} \u2014 ${label.singular} \u00e0 ${regionLabel}, C.-B.`, `${n} \u2014 ${regionLabel}, C.-B.`, `${n} (${regionLabel})`, `${n} (C.-B.)`]).concat(`${shortTitleName(venue.name, TITLE_MAX - 9)} (C.-B.)`))
+    : fitTitle([venue.name, shortTitleName(venue.name, 50)].flatMap((n) => [`${n} \u2014 ${label.singular} in ${regionLabel}, BC | Okanagan Roam`, `${n} \u2014 ${label.singular} in ${regionLabel}, BC`, `${n} \u2014 ${regionLabel}, BC`, `${n} \u2014 ${regionLabel}`, n]).concat(shortTitleName(venue.name)));
   const rawDesc = fr && venue.description_fr ? venue.description_fr : (venue.description || `${venue.name} is a ${label.singular.toLowerCase()} in ${regionLabel}, BC, listed on Okanagan Roam.`);
   const description = editorial ? editorial.metaDescription
     : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
@@ -22264,13 +22307,13 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // button and a thumbnail row that open a full-screen viewer.
   const galleryPhotos = venue.image_url ? venueGalleryPhotos(venue) : [];
   const galleryHtml = venueGalleryHtml(venue, galleryPhotos, L);
-  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}" alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
+  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
-        <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
+        <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''}${imgDimsAttr(heroPhoto.src)} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
         <span class="venue-hero-type">${escapeHtml(golfKindLabel)}</span>
         <h1>${escapeHtml(venue.name)}</h1>${heroPhoto && heroPhoto.example ? `
         <span class="venue-hero-example">${L('Example photo', 'Photo d\u2019exemple')}</span>` : ''}
@@ -22628,17 +22671,31 @@ function eventOffersSchema(event) {
 // event titles ran longer. The first candidate that fits wins; the brand suffix goes first (Google shows the site name
 // anyway), then the descriptive tail; a very long name stands alone.
 const TITLE_MAX = 65;
+// A name too long for a title is cut at a natural break (' – ', ' (', ': ')
+// when that leaves a real name, otherwise at a word with '…'. Only the <title>
+// uses this; headings always show the full name.
+function shortTitleName(name, max = TITLE_MAX) {
+  const n = String(name || '').trim();
+  if (n.length <= max) return n;
+  for (const sep of [' \u2014 ', ' \u2013 ', ' - ', ' (', ': ', ' | ']) {
+    const i = n.indexOf(sep);
+    if (i >= 15 && i <= max) return n.slice(0, i).trim();
+  }
+  const cut = n.slice(0, max - 1);
+  const sp = cut.lastIndexOf(' ');
+  return `${(sp >= 15 ? cut.slice(0, sp) : cut).replace(/[\s,&\-\u2013\u2014:(]+$/, '')}\u2026`;
+}
 function fitTitle(candidates) {
   return candidates.find((t) => t.length <= TITLE_MAX) || candidates[candidates.length - 1];
 }
 function eventPageTitle(full, regionLabel, mainOccurrence) {
-  const plain = fitTitle([`${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — Event in ${regionLabel}, BC`, `${full.name} — ${regionLabel}`, full.name]);
+  const plain = fitTitle([`${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — Event in ${regionLabel}, BC`, `${full.name} — ${regionLabel}`, full.name, shortTitleName(full.name)]);
   const twin = db.prepare('SELECT 1 FROM events WHERE region = ? AND name = ? AND id <> ? LIMIT 1').get(full.region, full.name, full.id);
   if (!twin) return plain;
   const dateStr = mainOccurrence ? mainOccurrence.start_date : String(full.start_datetime || '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return plain;
   const date = formatLocalDateLong(dateStr, { weekday: false });
-  return fitTitle([`${full.name} — ${date} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — ${date} — Event in ${regionLabel}, BC`, `${full.name} — ${date}`]);
+  return fitTitle([`${full.name} — ${date} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — ${date} — Event in ${regionLabel}, BC`, `${full.name} — ${date}`, `${shortTitleName(full.name, TITLE_MAX - date.length - 3)} — ${date}`]);
 }
 // ---------- Event pages 9/10 pass (2026-10-14) ----------
 // The next occurrence a visitor can still go to (in progress or upcoming).
@@ -22787,7 +22844,7 @@ ${pastOccs.map(dateItem).join('\n')}
   // A photo for every event page (2026-10-14): its own, else one for its kind.
   const hero = eventHeroImage(full, categories);
   const ownImage = !!(full.image_url && /^\/(?!\/)|^https:\/\//.test(full.image_url));
-  const imageHtml = `<div class="event-hero"><img src="${escapeHtml(hero.big)}"${hero.big !== hero.small ? ` srcset="${escapeHtml(hero.small)} 800w, ${escapeHtml(hero.big)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${ownImage ? escapeHtml(full.name) : ''}" fetchpriority="high">${ownImage ? '' : '<span class="event-hero-example">Example photo</span>'}</div>`;
+  const imageHtml = `<div class="event-hero"><img src="${escapeHtml(hero.big)}"${imgDimsAttr(hero.big)}${hero.big !== hero.small ? ` srcset="${escapeHtml(hero.small)} 800w, ${escapeHtml(hero.big)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${ownImage ? escapeHtml(full.name) : ''}" fetchpriority="high">${ownImage ? '' : '<span class="event-hero-example">Example photo</span>'}</div>`;
   const next = eventNextOccurrence(occurrences, todayStr);
   const statusText = expired ? null : eventStatusText(next, todayStr, isSeries);
   // The calendar-import sentence becomes its short summary (the What's On card's).
@@ -30059,6 +30116,24 @@ function jpegDimensions(buf) {
   return null;
 }
 
+// ' width="W" height="H"' for a JPEG under public/images, read once from the
+// file so the browser can reserve the space before the photo arrives (no
+// layout shift). Unknown or remote images get '' and render as before.
+const imageDimsCache = new Map();
+function imgDimsAttr(src) {
+  const p = String(src || '').split('?')[0];
+  if (!/^\/images\/[^]+\.jpe?g$/i.test(p) || p.includes('..')) return '';
+  if (!imageDimsCache.has(p)) {
+    let d = null;
+    try {
+      const fd = fs.openSync(path.join(__dirname, 'public', p), 'r');
+      try { const buf = Buffer.alloc(65536); const n = fs.readSync(fd, buf, 0, buf.length, 0); d = jpegDimensions(buf.subarray(0, n)); } finally { fs.closeSync(fd); }
+    } catch (e) { d = null; }
+    imageDimsCache.set(p, d && d.width && d.height ? ` width="${d.width}" height="${d.height}"` : '');
+  }
+  return imageDimsCache.get(p);
+}
+
 const ownerPhotoAttempts = new Map(); // ip -> [timestamps]
 function ownerPhotoRateLimited(ip, now = Date.now()) {
   const recent = (ownerPhotoAttempts.get(ip) || []).filter((t) => now - t < OWNER_CHANGE_RATE_WINDOW_MS);
@@ -30118,9 +30193,9 @@ function venueGalleryHtml(venue, photos, L) {
   const thumbs = shown.map((p, i) => {
     const hidden = rest.length - shown.length;
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
-    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(p.src)}" alt="" loading="lazy">${more}</button>`;
+    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
   }).join('');
-  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}" alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo', 'Photo')}: ${escapeHtml(p.credit)}</figcaption>` : ''}</figure>`).join('');
+  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo', 'Photo')}: ${escapeHtml(p.credit)}</figcaption>` : ''}</figure>`).join('');
   return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
       <dialog class="vg-dialog" id="venueGallery" aria-label="${L(`Photos of ${name}`, `Photos de ${name}`)}">
         <div class="vg-bar"><span class="vg-count" aria-live="polite">1 / ${n}</span><button type="button" class="vg-close" aria-label="${L('Close photos', 'Fermer les photos')}">&times;</button></div>
@@ -30158,7 +30233,7 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
         .vg-track::-webkit-scrollbar { display: none; }
         .vg-slide { flex: 0 0 100%; height: 100%; margin: 0; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 52px 12px 16px; box-sizing: border-box; }
-        .vg-slide img { max-width: 100%; max-height: calc(100% - 28px); object-fit: contain; }
+        .vg-slide img { width: auto; height: auto; max-width: 100%; max-height: calc(100% - 28px); object-fit: contain; }
         .vg-slide figcaption { margin-top: 8px; font-size: 0.8rem; opacity: 0.75; }
         .vg-nav { position: absolute; top: 50%; transform: translateY(-50%); border: 0; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.15); color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; z-index: 2; }
         .vg-prev { left: 12px; } .vg-next { right: 12px; }
@@ -36356,6 +36431,9 @@ module.exports = {
   foodDrinkCardPhotoCss,
   eventKindPhoto,
   tidySeoHead,
+  frEventTitle,
+  shortTitleName,
+  imgDimsAttr,
   frSeasonText,
   EXAMPLE_ACTIVITY_FILES,
   listComboGuides,

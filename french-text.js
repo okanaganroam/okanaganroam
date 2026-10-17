@@ -1095,4 +1095,52 @@ const FR_SCRIPT = [
   }
 })();
 
+// Event pages (2026-10-17): the labels around an event, and the long dates its schedule uses
+// ("Friday, October 16, 2026 · 19 h", "Saturday, June 13 – Sunday, October 25, 2026 · All day").
+Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
+  'Example photo': 'Photo d’exemple',
+  'Get directions': 'Itinéraire',
+  'Add to calendar': 'Ajouter au calendrier',
+  'Tickets & info ↗': 'Billets et infos ↗',
+  'Tickets & info': 'Billets et infos',
+  'Website': 'Site web',
+  'Featured in our guides:': 'Dans nos guides :',
+  'Upcoming dates': 'Dates à venir',
+  '(past)': '(passée)',
+  'Recurs': 'Récurrence',
+  'All day': 'Toute la journée',
+  'Matinee': 'Matinée',
+  'Mondays & Thursdays until the end of October': 'Les lundis et jeudis jusqu’à la fin d’octobre',
+  'Nightly Oct 24 to Oct 30, 7 pm': 'Tous les soirs du 24 au 30 oct., 19 h',
+  'Daily Oct 20–23, 26–30 (9–4) and Sat Oct 24 & 31 (12–7)': 'Tous les jours du 20 au 23 et du 26 au 30 oct. (9 h à 16 h), et les sam. 24 et 31 oct. (12 h à 19 h)',
+  'Departures at 4:30 and 6:30 pm': 'Départs à 16 h 30 et 18 h 30',
+  'Rides at 3:30, 4:00, 4:30 and 5:00 pm': 'Départs à 15 h 30, 16 h, 16 h 30 et 17 h',
+  'Rides at 4:00, 4:30, 5:00 and 5:30 pm': 'Départs à 16 h, 16 h 30, 17 h et 17 h 30',
+  'Oct 17 per Tourism Kelowna\'s October list': '17 oct. selon la liste d’octobre de Tourism Kelowna',
+  'Holiday Markets, Lights & Christmas Events in the Okanagan, {0}': 'Marchés des fêtes, lumières et événements de Noël dans l’Okanagan, {0}',
+  'Winter Festivals & Events in the Okanagan, January–March {0}': 'Festivals et événements d’hiver dans l’Okanagan, janv. à mars {0}',
+}).filter(([en]) => !Object.prototype.hasOwnProperty.call(FR_TEXT, en))));
+const LONG_DATE_RE = /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2})(?:, (\d{4}))?/g;
+function frLongDates(t) {
+  return t.replace(LONG_DATE_RE, (m, d, mo, n, y) => `${DAYS_LONG[d]} ${n === '1' ? '1er' : n} ${MONTHS_LONG[mo]}${y ? ` ${y}` : ''}`)
+    .replace(/ · All day$/, ' · Toute la journée')
+    .replace(new RegExp(TIME, 'g'), (m, h, mm, ap) => frTime(h, mm, ap));
+}
+FR_PATTERNS.unshift(
+  [/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (January|February|March|April|May|June|July|August|September|October|November|December) \d/, (m) => frLongDates(m.input)],
+  [/^(\d+) dates · next: (.+)$/, (m) => `${m[1]} dates · prochaine : ${frLongDates(m[2])}`],
+  [/^Next: (Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(.*)$/, (m) => `Prochaine : ${DAYS[m[1]]} ${m[3]} ${MONTHS[m[2]]}${frLongDates(m[4])}`],
+  [/^Show (\d+) past dates?$/, (m) => (m[1] === '1' ? 'Afficher 1 date passée' : `Afficher ${m[1]} dates passées`)],
+  [/^Event series in (.+), BC$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `Série d’événements à ${m[1]} (C.-B.)` : null)],
+  [/^More events in (.+)$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `Plus d’événements à ${m[1]}` : null)],
+  [/^See what['’]s on in (.+)$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `Voir ce qui se passe à ${m[1]}` : null)],
+  [/^Explore all of (.+)$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `Tout explorer à ${m[1]}` : null)],
+  [/^Listed by (.+)$/, (m) => `Publié par ${m[1]}`],
+  [/^vs (.+)$/, (m) => `contre ${m[1]}`],
+  [/^Home (games|fixtures) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}) to (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `Matchs à domicile du ${m[3]} ${MONTHS[m[2]]} au ${m[5]} ${MONTHS[m[4]]}${m[6] ? ` ${m[6]}` : ''}`],
+  [/^(\d+) dates until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `${m[1]} dates jusqu’au ${m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
+  [/^Recurring weekly on ([A-Za-z, ]+) until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `Chaque semaine (${m[1].split(', ').map((d) => DAYS_LONG[d] || d).join(', ')}) jusqu’au ${m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
+  [/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `Les ${DAYS_LONG[m[1]]}s jusqu’au ${m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
+);
+
 module.exports = { FR_TEXT, FR_PATTERNS, FR_SCRIPT, FR_CUISINE, frTime };

@@ -21655,3 +21655,26 @@ test('SEO fixes: season notice with a comma, trailing-slash 301, clamped head ta
     });
   });
 });
+
+// ---- SEO round 3 (2026-10-17): image sizes, short titles, French event pages ----
+test('SEO round 3: photos declare their size, long names shorten in titles, French event pages need a translation', () => {
+  assert.match(app.imgDimsAttr('/images/whats-on/arts-culture.jpg?v=1'), /^ width="\d+" height="\d+"$/);
+  assert.equal(app.imgDimsAttr('https://example.com/a.jpg'), '');
+  assert.equal(app.imgDimsAttr('/images/../server.js'), '');
+  assert.equal(app.shortTitleName('Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink'), 'Vernon Recreation Complex');
+  assert.equal(app.shortTitleName('Short name'), 'Short name');
+  const cut = app.shortTitleName('Spring Awakening Easter Yin Yoga Sound Healing Renewal in the Salt Cave Today', 50);
+  assert.ok(cut.length <= 50 && cut.endsWith('…'), cut);
+  const ev = { name: 'Skillful', region: 'kelowna' };
+  assert.equal(app.frEventTitle('Skillful — Event in Kelowna, BC | Okanagan Roam', ev), 'Skillful — Événement à Kelowna (C.-B.) | Okanagan Roam');
+  assert.equal(app.frEventTitle('Skillful — October 16, 2026 — Event in Kelowna, BC', ev), 'Skillful — 16 octobre 2026 — Événement à Kelowna (C.-B.)');
+  assert.equal(app.frEventTitle('Skillful — Kelowna', ev), 'Skillful (Kelowna, C.-B.)');
+  // A fixture event has no French description, so it stays English-only.
+  assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), false);
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const title = (html) => html.match(/<title>([^<]*)<\/title>/)[1];
+  const longVenue = { ...venue, name: 'Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink', description_fr: 'Un aréna.' };
+  const en = title(app.renderVenuePage(longVenue, [], [], [])), fr = title(app.renderVenuePage(longVenue, [], [], [], { lang: 'fr' }));
+  assert.ok(en.length <= 65 && fr.length <= 65 && en !== fr, `${en} / ${fr}`);
+  assert.match(en, /^Vernon Recreation Complex — /);
+});
