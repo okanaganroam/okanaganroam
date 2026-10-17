@@ -22660,3 +22660,109 @@ test('Visitor contributions: photo upload (metadata stripped), make main with cr
     await t.close();
   }
 });
+
+test('Menus: real menu layouts (capitals dish names, prices after long descriptions, add-ons, choices, no prices)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  const start = src.indexOf('const MENU_APP_SCRIPT = String.raw`') + 'const MENU_APP_SCRIPT = String.raw`'.length;
+  const win = { MENU_CFG: { t: { diet: {} }, state: { menu: null, published: null, scan: 'device' }, base: '', mode: 'token' }, scrollTo() {} };
+  new Function('window', 'document', src.slice(start, src.indexOf('})();`;', start) + 5))(win, { getElementById: () => ({ addEventListener() {}, innerHTML: '' }), head: { appendChild() {} } });
+  const parse = (txt) => win.__menuParse(txt.trim().split('\n').map((text) => ({ text, conf: 100 })));
+  const flat = (r) => r.sections.flatMap((s) => s.items.map((i) => `${s.name} | ${i.name} | ${i.price}${i.check ? ' ?' : ''}`));
+
+  // A pub: dish names in capitals, the description, the price at the end of the description; "PACHOS" heads its sizes.
+  assert.deepEqual(flat(parse(`APPETIZERS
+STUFFED MUSHROOMS
+Crab & Shrimp, Cream Cheese, Baked Mozzarella 17.95
+IRISH YORKIES
+Two Fresh Yorkies, Sirloin Roast, Maple Bacon Bourbon Gravy
+Horseradish Aioli 18.95
+PACHOS
+Lattice-Style Fries Seasoned with our Signature Spice, Topped with Cheddar
+Pachos For One 14.95 Pachos For Two 29.95`)), [
+    'Appetizers | Stuffed Mushrooms | 17.95', 'Appetizers | Irish Yorkies | 18.95',
+    'Pachos | Pachos For One | 14.95', 'Pachos | Pachos For Two | 29.95']);
+
+  // A restaurant: the price after a two-line description, an add-on price that isn't the dish's, a list of flavours.
+  assert.deepEqual(flat(parse(`STARTERS
+Pub Nachos
+Fresh house made tortilla chips layered with melted cheese, jalapenos,
+$16 single, $22 double. Add: Beef or Pulled Pork 6
+Chicken Wings
+Breaded wings, fried crisp and served with ranch dressing 19
+Salt & Pepper
+Korean BBQ
+Honey Lime
+Bruschetta
+Toasted artisan bread topped with tomatoes,
+basil, parmesan cheese 14`)), [
+    'Starters | Pub Nachos | 16 ?', 'Starters | Chicken Wings | 19', 'Starters | Bruschetta | 14']);
+  assert.match(parse('MAINS\nChicken Wings\nBreaded wings, fried crisp 19\nSalt & Pepper\nKorean BBQ').sections[0].items[0].description, /Choice of: Salt & Pepper, Korean BBQ/);
+
+  // A dining room that prints no prices: nothing is flagged.
+  assert.deepEqual(flat(parse('SHAREABLES\nSourdough\ncompound butter\nBurrata\nwinter squash, pear vinegar, candied pepitas')),
+    ['Shareables | Sourdough | ', 'Shareables | Burrata | ']);
+});
+
+test('Menus: "My menu is on my website" finds the menu (page or PDF) and never fetches private addresses', async () => {
+  const http = require('node:http');
+  assert.equal(app.isPrivateAddress('10.1.2.3'), true);
+  assert.equal(app.isPrivateAddress('192.168.0.9'), true);
+  assert.equal(app.isPrivateAddress('169.254.169.254'), true);
+  assert.equal(app.isPrivateAddress('::1'), true);
+  assert.equal(app.isPrivateAddress('fd12::1'), true);
+  assert.equal(app.isPrivateAddress('::ffff:127.0.0.1'), true);
+  assert.equal(app.isPrivateAddress('142.250.1.1'), false);
+  assert.deepEqual(app.htmlToMenuLines('<nav>Home Menu</nav><h2>Starters</h2><ul><li>Poutine <span>14</span></li><li>Caesar &amp; Fries<br>romaine</li></ul><script>x()</script><table><tr><td>Latte</td><td>5.25</td></tr></table>'),
+    ['Starters', 'Poutine 14', 'Caesar & Fries', 'romaine', 'Latte 5.25']);
+
+  seasonInsert.run({ name: 'Web Menu Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'web-menu-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'web-menu-fixture');
+  db.prepare('UPDATE venues SET website = ? WHERE id = ?').run('https://webmenu.example', v.id);
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const pdf = Buffer.from('%PDF-1.4 menu');
+  const sites = {
+    'https://webmenu.example/': { type: 'text/html', body: '<nav><a href="/menu">Our Menu</a></nav><p>Welcome to the lake!</p><a href="/about">About</a>' },
+    'https://webmenu.example/menu': { type: 'text/html', body: '<h2>Starters</h2><p>Poutine 14</p><p>Wings 16</p><p>Nachos 18</p><h2>Mains</h2><p>Burger 19</p><p>Fish & Chips 22</p>' },
+    'https://pdfonly.example/': { type: 'text/html', body: '<a href="https://files.example/our-menu.pdf">Download our menu</a>' },
+    'https://files.example/our-menu.pdf': { type: 'application/pdf', body: pdf },
+    'https://sneaky.example/': { status: 302, location: 'http://127.0.0.1:3000/admin' },
+  };
+  const fetched = [];
+  app.setMenuImportNetwork(async (url) => {
+    fetched.push(url);
+    const s = sites[url];
+    if (!s) return new Response('nope', { status: 404 });
+    if (s.status) return new Response(null, { status: s.status, headers: { location: s.location } });
+    return new Response(s.body, { status: 200, headers: { 'content-type': s.type } });
+  }, async (host) => [{ address: host === 'internal.example' ? '10.0.0.5' : '93.184.216.34' }]);
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const imp = (url) => fetch(`${base}/owner/${token}/menu/import`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.24.0.${ip++}` }, body: JSON.stringify(url === undefined ? {} : { url }) }).then((r) => r.json());
+  try {
+    // The website on file, followed to its Menu page; the menu comes back as text lines.
+    const fromSite = await imp();
+    assert.equal(fromSite.ok, true, JSON.stringify(fromSite));
+    assert.equal(fromSite.from, 'text');
+    assert.equal(fromSite.source, 'https://webmenu.example/menu');
+    assert.ok(fromSite.lines.includes('Poutine 14') && fromSite.lines.includes('Fish & Chips 22'));
+    // A menu PDF linked from the page becomes a page of the menu, to be scanned like an upload.
+    const fromPdf = await imp('pdfonly.example');
+    assert.equal(fromPdf.from, 'pdf', JSON.stringify(fromPdf));
+    assert.equal(fromPdf.menu.pages.length, 1);
+    assert.equal(fromPdf.menu.pages[0].kind, 'pdf');
+    // Never a private or internal address, directly or through a redirect.
+    assert.equal((await imp('http://internal.example/menu')).code, 'blocked');
+    assert.equal((await imp('https://sneaky.example/')).code, 'blocked');
+    assert.ok(!fetched.some((u) => u.includes('127.0.0.1')), 'the redirect target was never fetched');
+    assert.equal((await imp('http://localhost/menu')).ok, false);
+    assert.equal((await imp('https://webmenu.example:8080/')).ok, false);
+    assert.match((await imp('https://nothing.example/')).error, /couldn.t (reach|find)/);
+  } finally {
+    app.setMenuImportNetwork(null, null);
+    for (const f of db.prepare('SELECT file FROM venue_menu_files').all()) { try { fs.unlinkSync(path.join(app.MENU_DIR, f.file)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
