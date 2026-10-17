@@ -1,0 +1,2262 @@
+{
+  "reason": "Café listing photos from Google Maps (that exact location), the café's website, tourism boards or Yelp; Dayton reviewed the contact sheets and said deploy all on 2026-10-17.",
+  "batch_id": "venue-photos-cafes-2026-10-17",
+  "venues": [
+    {
+      "id": 1067,
+      "name": "The Edge Bistro",
+      "region": "apex",
+      "slug": "the-edge-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-edge-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 371,
+      "name": "Log Barn 1912",
+      "region": "armstrong",
+      "slug": "log-barn-1912",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/log-barn-1912-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 529,
+      "name": "Pv Blvd Coffee",
+      "region": "armstrong",
+      "slug": "pv-blvd-coffee",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pv-blvd-coffee-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1433,
+      "name": "Village Dairy + Table",
+      "region": "armstrong",
+      "slug": "village-dairy-table",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/village-dairy-table-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1668,
+      "name": "Wild Oak Cafe",
+      "region": "armstrong",
+      "slug": "wild-oak-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wild-oak-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1047,
+      "name": "Clocktower Coffee Co.",
+      "region": "big-white",
+      "slug": "clocktower-coffee-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/clocktower-coffee-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1048,
+      "name": "Moonlight Bistro",
+      "region": "big-white",
+      "slug": "moonlight-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/moonlight-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1057,
+      "name": "The Market",
+      "region": "big-white",
+      "slug": "the-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 728,
+      "name": "Toasty",
+      "region": "big-white",
+      "slug": "toasty",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/toasty-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 536,
+      "name": "Rail Trail Café & Market",
+      "region": "coldstream",
+      "slug": "rail-trail-cafe-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rail-trail-cafe-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 203,
+      "name": "Enderbeans Cafe",
+      "region": "enderby",
+      "slug": "enderbeans-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/enderbeans-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 281,
+      "name": "Hungry Jacks Cafe",
+      "region": "enderby",
+      "slug": "hungry-jacks-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hungry-jacks-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 635,
+      "name": "Sutherland's Bakery & Deli",
+      "region": "enderby",
+      "slug": "sutherland-s-bakery-deli",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sutherland-s-bakery-deli-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 638,
+      "name": "Sweet Iron Cafe",
+      "region": "enderby",
+      "slug": "sweet-iron-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sweet-iron-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 368,
+      "name": "Linden Gardens",
+      "region": "kaleden",
+      "slug": "linden-gardens",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/linden-gardens-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1618,
+      "name": "350° Bakehouse and Cafe",
+      "region": "kelowna",
+      "slug": "350-bakehouse-and-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/350-bakehouse-and-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 11,
+      "name": "AMORE MIO Italian artisanal gelato",
+      "region": "kelowna",
+      "slug": "amore-mio-italian-artisanal-gelato",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/amore-mio-italian-artisanal-gelato-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1738,
+      "name": "Analog Coffee – One Water",
+      "region": "kelowna",
+      "slug": "analog-coffee-one-water",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/analog-coffee-one-water-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 20,
+      "name": "Anarchy Coffee Roasters",
+      "region": "kelowna",
+      "slug": "anarchy-coffee-roasters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/anarchy-coffee-roasters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 42,
+      "name": "BOBA Bubble Tea & Desserts",
+      "region": "kelowna",
+      "slug": "boba-bubble-tea-desserts",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boba-bubble-tea-desserts-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 886,
+      "name": "Bagel Boys Bagel Shop",
+      "region": "kelowna",
+      "slug": "bagel-boys-bagel-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bagel-boys-bagel-shop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 52,
+      "name": "Banh Mi Bo Bakery",
+      "region": "kelowna",
+      "slug": "banh-mi-bo-bakery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/banh-mi-bo-bakery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1736,
+      "name": "Bean Scene Coffee Works (Landmark)",
+      "region": "kelowna",
+      "slug": "bean-scene-coffee-works-landmark",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bean-scene-coffee-works-landmark-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1737,
+      "name": "Bean Scene Coffee Works (North)",
+      "region": "kelowna",
+      "slug": "bean-scene-coffee-works-north",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bean-scene-coffee-works-north-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 74,
+      "name": "Black Rabbit Coffee House",
+      "region": "kelowna",
+      "slug": "black-rabbit-coffee-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/black-rabbit-coffee-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 889,
+      "name": "Blenz Innovation Centre",
+      "region": "kelowna",
+      "slug": "blenz-innovation-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blenz-innovation-centre-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 888,
+      "name": "Blenz – Bernard",
+      "region": "kelowna",
+      "slug": "blenz-bernard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blenz-bernard-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 88,
+      "name": "Bohemian Cafe",
+      "region": "kelowna",
+      "slug": "bohemian-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bohemian-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 890,
+      "name": "Bread Company",
+      "region": "kelowna",
+      "slug": "bread-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bread-company-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 95,
+      "name": "Bright Jenny Coffee",
+      "region": "kelowna",
+      "slug": "bright-jenny-coffee",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bright-jenny-coffee-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 96,
+      "name": "Bright Jenny Coffee (Glenmore)",
+      "region": "kelowna",
+      "slug": "bright-jenny-coffee-glenmore",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bright-jenny-coffee-glenmore-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1758,
+      "name": "Cafe Quattro",
+      "region": "kelowna",
+      "slug": "cafe-quattro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cafe-quattro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 114,
+      "name": "Cafe milk",
+      "region": "kelowna",
+      "slug": "cafe-milk",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cafe-milk-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 115,
+      "name": "Cake Otaku",
+      "region": "kelowna",
+      "slug": "cake-otaku",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cake-otaku-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1646,
+      "name": "CeCe's Coffee",
+      "region": "kelowna",
+      "slug": "cece-s-coffee",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cece-s-coffee-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 127,
+      "name": "Cha House",
+      "region": "kelowna",
+      "slug": "cha-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cha-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 892,
+      "name": "Chaibaba",
+      "region": "kelowna",
+      "slug": "chaibaba",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chaibaba-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 134,
+      "name": "Cherry Hill Coffee Inc",
+      "region": "kelowna",
+      "slug": "cherry-hill-coffee-inc",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cherry-hill-coffee-inc-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 139,
+      "name": "Chocolats Favoris Kelowna",
+      "region": "kelowna",
+      "slug": "chocolats-favoris-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chocolats-favoris-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 147,
+      "name": "Codfather's Seafood Market",
+      "region": "kelowna",
+      "slug": "codfather-s-seafood-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/codfather-s-seafood-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 148,
+      "name": "Convair Cafe",
+      "region": "kelowna",
+      "slug": "convair-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/convair-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 154,
+      "name": "Craft 42 Roasters",
+      "region": "kelowna",
+      "slug": "craft-42-roasters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/craft-42-roasters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 157,
+      "name": "Crepe Delicious Urban Cafe",
+      "region": "kelowna",
+      "slug": "crepe-delicious-urban-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/crepe-delicious-urban-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1755,
+      "name": "D Spot Dessert Cafe Kelowna",
+      "region": "kelowna",
+      "slug": "d-spot-dessert-cafe-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/d-spot-dessert-cafe-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 175,
+      "name": "Deville Coffee Bernard",
+      "region": "kelowna",
+      "slug": "deville-coffee-bernard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/deville-coffee-bernard-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 202,
+      "name": "Empire Crepe",
+      "region": "kelowna",
+      "slug": "empire-crepe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/empire-crepe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1647,
+      "name": "Fezziwig's Bakery-Cafe",
+      "region": "kelowna",
+      "slug": "fezziwig-s-bakery-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fezziwig-s-bakery-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 220,
+      "name": "Formosa Tea Cafe - Harvey",
+      "region": "kelowna",
+      "slug": "formosa-tea-cafe-harvey",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/formosa-tea-cafe-harvey-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 902,
+      "name": "Fortune Creek",
+      "region": "kelowna",
+      "slug": "fortune-creek",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fortune-creek-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1725,
+      "name": "Frequency Cafe",
+      "region": "kelowna",
+      "slug": "frequency-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/frequency-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 245,
+      "name": "Goods Health and Wellness",
+      "region": "kelowna",
+      "slug": "goods-health-and-wellness",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/goods-health-and-wellness-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 248,
+      "name": "Grate Cheesery",
+      "region": "kelowna",
+      "slug": "grate-cheesery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/grate-cheesery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 283,
+      "name": "Ice Cream Lab Kelowna",
+      "region": "kelowna",
+      "slug": "ice-cream-lab-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ice-cream-lab-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 293,
+      "name": "Istanbul Cafe & Brunch",
+      "region": "kelowna",
+      "slug": "istanbul-cafe-brunch",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/istanbul-cafe-brunch-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 294,
+      "name": "Italian Sandwich Co.",
+      "region": "kelowna",
+      "slug": "italian-sandwich-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/italian-sandwich-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 315,
+      "name": "Just Peachy",
+      "region": "kelowna",
+      "slug": "just-peachy",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/just-peachy-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 895,
+      "name": "Karat Chocolate",
+      "region": "kelowna",
+      "slug": "karat-chocolate",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/karat-chocolate-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1756,
+      "name": "Kettle Valley Coffee & Scoops",
+      "region": "kelowna",
+      "slug": "kettle-valley-coffee-scoops",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kettle-valley-coffee-scoops-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 341,
+      "name": "Komorebi Cafe and Healing Art Studio",
+      "region": "kelowna",
+      "slug": "komorebi-cafe-and-healing-art-studio",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/komorebi-cafe-and-healing-art-studio-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 381,
+      "name": "MOO-LIX Ice Cream Shop",
+      "region": "kelowna",
+      "slug": "moo-lix-ice-cream-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/moo-lix-ice-cream-shop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1751,
+      "name": "Marmalade Cat Cafe (Pandosy)",
+      "region": "kelowna",
+      "slug": "marmalade-cat-cafe-pandosy",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/marmalade-cat-cafe-pandosy-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1752,
+      "name": "Marmalade Cat Cafe Downtown",
+      "region": "kelowna",
+      "slug": "marmalade-cat-cafe-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/marmalade-cat-cafe-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 408,
+      "name": "Milk Shed Coffeehouse",
+      "region": "kelowna",
+      "slug": "milk-shed-coffeehouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/milk-shed-coffeehouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1746,
+      "name": "O-Lake Cafe & Bistro",
+      "region": "kelowna",
+      "slug": "o-lake-cafe-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/o-lake-cafe-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 459,
+      "name": "Okanagan premium fruit juice",
+      "region": "kelowna",
+      "slug": "okanagan-premium-fruit-juice",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-premium-fruit-juice-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 484,
+      "name": "Parlour Ice Cream",
+      "region": "kelowna",
+      "slug": "parlour-ice-cream",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/parlour-ice-cream-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 495,
+      "name": "Perc's Place",
+      "region": "kelowna",
+      "slug": "perc-s-place",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/perc-s-place-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 499,
+      "name": "Perseval & Young Cheesemongers",
+      "region": "kelowna",
+      "slug": "perseval-young-cheesemongers",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/perseval-young-cheesemongers-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 518,
+      "name": "Polene Bakery & Bistro",
+      "region": "kelowna",
+      "slug": "polene-bakery-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/polene-bakery-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 907,
+      "name": "Pulp Fiction – Pandosy",
+      "region": "kelowna",
+      "slug": "pulp-fiction-pandosy",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pulp-fiction-pandosy-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 545,
+      "name": "Red Bird Roasting",
+      "region": "kelowna",
+      "slug": "red-bird-roasting",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-bird-roasting-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 548,
+      "name": "Rich Tea",
+      "region": "kelowna",
+      "slug": "rich-tea",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rich-tea-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 552,
+      "name": "Rocket Subs",
+      "region": "kelowna",
+      "slug": "rocket-subs",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rocket-subs-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 555,
+      "name": "Rollz Ice Cream & Desserts - Kelowna",
+      "region": "kelowna",
+      "slug": "rollz-ice-cream-desserts-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rollz-ice-cream-desserts-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 572,
+      "name": "Sandrine French Pastry and Chocolate",
+      "region": "kelowna",
+      "slug": "sandrine-french-pastry-and-chocolate",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sandrine-french-pastry-and-chocolate-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 587,
+      "name": "Simplee Boba",
+      "region": "kelowna",
+      "slug": "simplee-boba",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/simplee-boba-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1818,
+      "name": "Specialty Bakery & Bistro (Finns Road)",
+      "region": "kelowna",
+      "slug": "specialty-bakery-bistro-finns-road",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/specialty-bakery-bistro-finns-road-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 610,
+      "name": "Sprout Bread",
+      "region": "kelowna",
+      "slug": "sprout-bread",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sprout-bread-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 674,
+      "name": "The Cozy Cafe + Bar",
+      "region": "kelowna",
+      "slug": "the-cozy-cafe-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-cozy-cafe-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 682,
+      "name": "The Energy Den",
+      "region": "kelowna",
+      "slug": "the-energy-den",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-energy-den-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 910,
+      "name": "The Galley Lakeside Cafe",
+      "region": "kelowna",
+      "slug": "the-galley-lakeside-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-galley-lakeside-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1735,
+      "name": "Tripke Bakery Too",
+      "region": "kelowna",
+      "slug": "tripke-bakery-too",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tripke-bakery-too-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 742,
+      "name": "Twice The Dice Board Game Cafe and bar",
+      "region": "kelowna",
+      "slug": "twice-the-dice-board-game-cafe-and-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/twice-the-dice-board-game-cafe-and-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 743,
+      "name": "Twin Sparks Coffee Roasters",
+      "region": "kelowna",
+      "slug": "twin-sparks-coffee-roasters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/twin-sparks-coffee-roasters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 746,
+      "name": "Two Donkeys Bakery (Kelowna Airport)",
+      "region": "kelowna",
+      "slug": "two-donkeys-bakery-kelowna-airport",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/two-donkeys-bakery-kelowna-airport-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 913,
+      "name": "Von Schweets Treat Shop",
+      "region": "kelowna",
+      "slug": "von-schweets-treat-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/von-schweets-treat-shop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 789,
+      "name": "Wood Fire Bakery",
+      "region": "kelowna",
+      "slug": "wood-fire-bakery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wood-fire-bakery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1038,
+      "name": "Beat Patisserie",
+      "region": "lake-country",
+      "slug": "beat-patisserie",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/beat-patisserie-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 356,
+      "name": "Lake Country Radio Cafe",
+      "region": "lake-country",
+      "slug": "lake-country-radio-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lake-country-radio-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 367,
+      "name": "Lil Reds Cafe",
+      "region": "lake-country",
+      "slug": "lil-reds-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lil-reds-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 490,
+      "name": "Peaks to Shore",
+      "region": "lake-country",
+      "slug": "peaks-to-shore",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peaks-to-shore-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 677,
+      "name": "The Daily Grind Lake Country",
+      "region": "lake-country",
+      "slug": "the-daily-grind-lake-country",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-daily-grind-lake-country-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 712,
+      "name": "The Salty Caramel Kitchen",
+      "region": "lake-country",
+      "slug": "the-salty-caramel-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-salty-caramel-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 790,
+      "name": "Wooden Nickel Cafe",
+      "region": "lake-country",
+      "slug": "wooden-nickel-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wooden-nickel-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 284,
+      "name": "Ida's Bakery & Deli",
+      "region": "lumby",
+      "slug": "ida-s-bakery-deli",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ida-s-bakery-deli-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 307,
+      "name": "Jitter Beans Coffee House",
+      "region": "lumby",
+      "slug": "jitter-beans-coffee-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jitter-beans-coffee-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 596,
+      "name": "Snac Shac Lumby - Coffee & Takeout",
+      "region": "lumby",
+      "slug": "snac-shac-lumby-coffee-takeout",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/snac-shac-lumby-coffee-takeout-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 128,
+      "name": "Chabendo Gelato",
+      "region": "naramata",
+      "slug": "chabendo-gelato",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chabendo-gelato-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 247,
+      "name": "Grape Leaf Cafe",
+      "region": "naramata",
+      "slug": "grape-leaf-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/grape-leaf-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 313,
+      "name": "Just Baked : food + drink",
+      "region": "naramata",
+      "slug": "just-baked-food-drink",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/just-baked-food-drink-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 683,
+      "name": "The Farmstead",
+      "region": "naramata",
+      "slug": "the-farmstead",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-farmstead-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1032,
+      "name": "KJ Coffee Bar",
+      "region": "okanagan-falls",
+      "slug": "kj-coffee-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kj-coffee-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 549,
+      "name": "Rise and Shine Coffee House",
+      "region": "okanagan-falls",
+      "slug": "rise-and-shine-coffee-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rise-and-shine-coffee-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1429,
+      "name": "Tickleberry's",
+      "region": "okanagan-falls",
+      "slug": "tickleberrys",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tickleberrys-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 69,
+      "name": "Big Al's Bakery & Deli",
+      "region": "oliver",
+      "slug": "big-al-s-bakery-deli",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/big-al-s-bakery-deli-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 77,
+      "name": "Blenz Coffee",
+      "region": "oliver",
+      "slug": "blenz-coffee",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blenz-coffee-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1799,
+      "name": "La Levainière by Audrey Sourdough Artisan Bakehouse & Workshop",
+      "region": "oliver",
+      "slug": "la-levainiere-by-audrey-sourdough-artisan-bakehouse-workshop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-levainiere-by-audrey-sourdough-artisan-bakehouse-workshop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1798,
+      "name": "OKGN To Go",
+      "region": "oliver",
+      "slug": "okgn-to-go",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okgn-to-go-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 460,
+      "name": "Oliver Eats Ltd",
+      "region": "oliver",
+      "slug": "oliver-eats-ltd",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oliver-eats-ltd-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 678,
+      "name": "The Ditch Cafe",
+      "region": "oliver",
+      "slug": "the-ditch-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-ditch-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 788,
+      "name": "Wolf Tree Coffee",
+      "region": "oliver",
+      "slug": "wolf-tree-coffee",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wolf-tree-coffee-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 55,
+      "name": "Barn Owl Eatery & Cafe",
+      "region": "osoyoos",
+      "slug": "barn-owl-eatery-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/barn-owl-eatery-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 241,
+      "name": "Gino's Coffee House",
+      "region": "osoyoos",
+      "slug": "gino-s-coffee-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gino-s-coffee-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 310,
+      "name": "Joycraft Roasters",
+      "region": "osoyoos",
+      "slug": "joycraft-roasters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/joycraft-roasters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 417,
+      "name": "Moolix",
+      "region": "osoyoos",
+      "slug": "moolix",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/moolix-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 532,
+      "name": "Queen of the South",
+      "region": "osoyoos",
+      "slug": "queen-of-the-south",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/queen-of-the-south-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 551,
+      "name": "Roberto's Gelato",
+      "region": "osoyoos",
+      "slug": "roberto-s-gelato",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/roberto-s-gelato-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 619,
+      "name": "Sugar Quail Bakeshop",
+      "region": "osoyoos",
+      "slug": "sugar-quail-bakeshop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sugar-quail-bakeshop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 82,
+      "name": "Bliss Bakery and Bistro",
+      "region": "peachland",
+      "slug": "bliss-bakery-and-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bliss-bakery-and-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1815,
+      "name": "Accent Chocolate Factory",
+      "region": "penticton",
+      "slug": "accent-chocolate-factory",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/accent-chocolate-factory-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 16,
+      "name": "All Roads Cafe",
+      "region": "penticton",
+      "slug": "all-roads-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/all-roads-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 993,
+      "name": "Atomic Coffee House",
+      "region": "penticton",
+      "slug": "atomic-coffee-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/atomic-coffee-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 984,
+      "name": "Bench Market",
+      "region": "penticton",
+      "slug": "bench-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bench-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 136,
+      "name": "Cherry on Top Shake Shop",
+      "region": "penticton",
+      "slug": "cherry-on-top-shake-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cherry-on-top-shake-shop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 159,
+      "name": "Creperie Ooolala Bistro",
+      "region": "penticton",
+      "slug": "creperie-ooolala-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/creperie-ooolala-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 177,
+      "name": "Different Desserts",
+      "region": "penticton",
+      "slug": "different-desserts",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/different-desserts-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 249,
+      "name": "Gratify",
+      "region": "penticton",
+      "slug": "gratify",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gratify-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 286,
+      "name": "Il Vecchio Delicatessen",
+      "region": "penticton",
+      "slug": "il-vecchio-delicatessen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/il-vecchio-delicatessen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 349,
+      "name": "La Cucina European Market",
+      "region": "penticton",
+      "slug": "la-cucina-european-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-cucina-european-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 365,
+      "name": "Lickity Splitz",
+      "region": "penticton",
+      "slug": "lickity-splitz",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lickity-splitz-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 399,
+      "name": "Maui's Teahouse Bubble Tea Cafe",
+      "region": "penticton",
+      "slug": "maui-s-teahouse-bubble-tea-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/maui-s-teahouse-bubble-tea-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 464,
+      "name": "One14 Coffee Co.",
+      "region": "penticton",
+      "slug": "one14-coffee-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/one14-coffee-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1005,
+      "name": "Peach City Sips",
+      "region": "penticton",
+      "slug": "peach-city-sips",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peach-city-sips-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 994,
+      "name": "Petrasek Bakery",
+      "region": "penticton",
+      "slug": "petrasek-bakery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/petrasek-bakery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1626,
+      "name": "South Main Market",
+      "region": "penticton",
+      "slug": "south-main-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/south-main-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 616,
+      "name": "Stillfood Bistro & Cappuccino Bar",
+      "region": "penticton",
+      "slug": "stillfood-bistro-cappuccino-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/stillfood-bistro-cappuccino-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 628,
+      "name": "Sunflower Ukrainian Cafe Penticton",
+      "region": "penticton",
+      "slug": "sunflower-ukrainian-cafe-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sunflower-ukrainian-cafe-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 723,
+      "name": "Tickleberry's Downtown",
+      "region": "penticton",
+      "slug": "tickleberry-s-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tickleberry-s-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 724,
+      "name": "Tickleberry's at the Peach",
+      "region": "penticton",
+      "slug": "tickleberry-s-at-the-peach",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tickleberry-s-at-the-peach-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 725,
+      "name": "Tickleberry's on the Beach",
+      "region": "penticton",
+      "slug": "tickleberry-s-on-the-beach",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tickleberry-s-on-the-beach-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 776,
+      "name": "Wayne & Freda",
+      "region": "penticton",
+      "slug": "wayne-freda",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wayne-freda-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1003,
+      "name": "Wouda's Bakery",
+      "region": "penticton",
+      "slug": "wouda-s-bakery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wouda-s-bakery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 810,
+      "name": "soe cafe",
+      "region": "penticton",
+      "slug": "soe-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/soe-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 101,
+      "name": "Bugaboos Bakery Cafe",
+      "region": "silverstar",
+      "slug": "bugaboos-bakery-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bugaboos-bakery-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 483,
+      "name": "Paradise Camp",
+      "region": "silverstar",
+      "slug": "paradise-camp",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/paradise-camp-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1063,
+      "name": "Tube Town Café & Bar",
+      "region": "silverstar",
+      "slug": "tube-town-cafe-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tube-town-cafe-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1033,
+      "name": "Country Café",
+      "region": "summerland",
+      "slug": "country-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/country-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 161,
+      "name": "Crick Coffee and Farm Store",
+      "region": "summerland",
+      "slug": "crick-coffee-and-farm-store",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/crick-coffee-and-farm-store-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 246,
+      "name": "Granny's Fruit Stand, Bakery, Cafe",
+      "region": "summerland",
+      "slug": "granny-s-fruit-stand-bakery-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/granny-s-fruit-stand-bakery-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 627,
+      "name": "Sunflower Ukrainian Cafe",
+      "region": "summerland",
+      "slug": "sunflower-ukrainian-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sunflower-ukrainian-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 662,
+      "name": "The Beanery Cafe",
+      "region": "summerland",
+      "slug": "the-beanery-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-beanery-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 664,
+      "name": "The Bistro (Summerland Resort)",
+      "region": "summerland",
+      "slug": "the-bistro-summerland-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-bistro-summerland-resort-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 735,
+      "name": "True Grain Bakehouse",
+      "region": "summerland",
+      "slug": "true-grain-bakehouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/true-grain-bakehouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 937,
+      "name": "Barrique & Java",
+      "region": "vernon",
+      "slug": "barrique-java",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/barrique-java-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 62,
+      "name": "Bean Scene Coffee House",
+      "region": "vernon",
+      "slug": "bean-scene-coffee-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bean-scene-coffee-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 78,
+      "name": "Blenz Coffee (Vernon Downtown)",
+      "region": "vernon",
+      "slug": "blenz-coffee-vernon-downtown",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blenz-coffee-vernon-downtown-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 947,
+      "name": "East Hill Crossing Cafe",
+      "region": "vernon",
+      "slug": "east-hill-crossing-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/east-hill-crossing-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 200,
+      "name": "Elodie's Playhouse Cafe",
+      "region": "vernon",
+      "slug": "elodie-s-playhouse-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/elodie-s-playhouse-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 210,
+      "name": "Farmhouse Cafe",
+      "region": "vernon",
+      "slug": "farmhouse-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/farmhouse-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 948,
+      "name": "Fig Bistro",
+      "region": "vernon",
+      "slug": "fig-bistro",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fig-bistro-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 950,
+      "name": "Helmut's Sausage Kitchen",
+      "region": "vernon",
+      "slug": "helmut-s-sausage-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/helmut-s-sausage-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 276,
+      "name": "Homegirl Cafe",
+      "region": "vernon",
+      "slug": "homegirl-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/homegirl-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1621,
+      "name": "Hot Bread Shoppe",
+      "region": "vernon",
+      "slug": "hot-bread-shoppe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hot-bread-shoppe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 335,
+      "name": "Kin+Pod Chocolate, Ice Cream, and Coffee",
+      "region": "vernon",
+      "slug": "kin-pod-chocolate-ice-cream-and-coffee",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kin-pod-chocolate-ice-cream-and-coffee-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 347,
+      "name": "La Carraia Gelateria Cafe",
+      "region": "vernon",
+      "slug": "la-carraia-gelateria-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-carraia-gelateria-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 375,
+      "name": "Lunch Matters... Breakfast Too",
+      "region": "vernon",
+      "slug": "lunch-matters-breakfast-too",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lunch-matters-breakfast-too-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 392,
+      "name": "Marble Slab Creamery",
+      "region": "vernon",
+      "slug": "marble-slab-creamery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/marble-slab-creamery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 958,
+      "name": "Mezzo Market",
+      "region": "vernon",
+      "slug": "mezzo-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mezzo-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 959,
+      "name": "Mug N Muffin",
+      "region": "vernon",
+      "slug": "mug-n-muffin",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mug-n-muffin-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1791,
+      "name": "Pup-n-Cup Family Café & Shop",
+      "region": "vernon",
+      "slug": "pup-n-cup-family-cafe-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pup-n-cup-family-cafe-shop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 542,
+      "name": "Ratio Coffee & Pastry",
+      "region": "vernon",
+      "slug": "ratio-coffee-pastry",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ratio-coffee-pastry-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 968,
+      "name": "Rich Tea Vernon",
+      "region": "vernon",
+      "slug": "rich-tea-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rich-tea-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1620,
+      "name": "Sweet Caroline's Bakery",
+      "region": "vernon",
+      "slug": "sweet-caroline-s-bakery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sweet-caroline-s-bakery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 976,
+      "name": "Teassential",
+      "region": "vernon",
+      "slug": "teassential",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/teassential-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 669,
+      "name": "The Boarding House Cafe",
+      "region": "vernon",
+      "slug": "the-boarding-house-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-boarding-house-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 709,
+      "name": "The Roxy Cafe - Vegan and Vegetarian Restaurant Cafe",
+      "region": "vernon",
+      "slug": "the-roxy-cafe-vegan-and-vegetarian-restaurant-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-roxy-cafe-vegan-and-vegetarian-restaurant-cafe-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 732,
+      "name": "Triumph Coffee",
+      "region": "vernon",
+      "slug": "triumph-coffee",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/triumph-coffee-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 745,
+      "name": "Two Donkeys Bakery",
+      "region": "vernon",
+      "slug": "two-donkeys-bakery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/two-donkeys-bakery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 777,
+      "name": "Wedge Cheesery",
+      "region": "vernon",
+      "slug": "wedge-cheesery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wedge-cheesery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1778,
+      "name": "A Touch of Austria",
+      "region": "west-kelowna",
+      "slug": "a-touch-of-austria",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/a-touch-of-austria-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 916,
+      "name": "Blend Bites",
+      "region": "west-kelowna",
+      "slug": "blend-bites",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blend-bites-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 81,
+      "name": "Bliss Bakery - Kitchen",
+      "region": "west-kelowna",
+      "slug": "bliss-bakery-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bliss-bakery-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 113,
+      "name": "Cafe Bella Bean",
+      "region": "west-kelowna",
+      "slug": "cafe-bella-bean",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cafe-bella-bean-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 918,
+      "name": "Cozy Nook Cafe & Bar",
+      "region": "west-kelowna",
+      "slug": "cozy-nook-cafe-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cozy-nook-cafe-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 320,
+      "name": "Kapi Chido Coffee Roasters",
+      "region": "west-kelowna",
+      "slug": "kapi-chido-coffee-roasters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kapi-chido-coffee-roasters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 326,
+      "name": "Kekuli Cafe - West Kelowna",
+      "region": "west-kelowna",
+      "slug": "kekuli-cafe-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kekuli-cafe-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 607,
+      "name": "Specialty Bakery",
+      "region": "west-kelowna",
+      "slug": "specialty-bakery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/specialty-bakery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 747,
+      "name": "Two Donkeys Bakery (West Kelowna)",
+      "region": "west-kelowna",
+      "slug": "two-donkeys-bakery-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/two-donkeys-bakery-west-kelowna-2610.jpg?v=20261017"
+      }
+    }
+  ]
+}
