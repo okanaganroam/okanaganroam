@@ -1,0 +1,1434 @@
+{
+  "reason": "Indoor & Rainy Day listing photos from each venue's website, tourism-board listing, or (second round) Google Maps/Facebook photos; approved by Dayton on 2026-10-16 (round 1 all except The Dream, round 2 all except Xperience Games).",
+  "batch_id": "venue-photos-indoor-2026-10-16",
+  "venues": [
+    {
+      "id": 1711,
+      "name": "Mackie Lake House",
+      "region": "coldstream",
+      "slug": "mackie-lake-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mackie-lake-house-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1540,
+      "name": "Cardiff Miller Art Warehouse",
+      "region": "enderby",
+      "slug": "cardiff-miller-art-warehouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cardiff-miller-art-warehouse-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1547,
+      "name": "Courtyard Gallery",
+      "region": "enderby",
+      "slug": "courtyard-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/courtyard-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1541,
+      "name": "Enderby & District Museum & Archives",
+      "region": "enderby",
+      "slug": "enderby-district-museum-archives",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/enderby-district-museum-archives-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1566,
+      "name": "Dominion Radio Astrophysical Observatory (DRAO)",
+      "region": "kaleden",
+      "slug": "dominion-radio-astrophysical-observatory-drao",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dominion-radio-astrophysical-observatory-drao-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1459,
+      "name": "Airhouse Kelowna",
+      "region": "kelowna",
+      "slug": "airhouse-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/airhouse-kelowna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1467,
+      "name": "Alternator Centre for Contemporary Art",
+      "region": "kelowna",
+      "slug": "alternator-centre-for-contemporary-art",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/alternator-centre-for-contemporary-art-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1461,
+      "name": "Beyond the Crux Climbing Gym",
+      "region": "kelowna",
+      "slug": "beyond-the-crux-climbing-gym",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/beyond-the-crux-climbing-gym-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1499,
+      "name": "Catelowna Cat Cafe",
+      "region": "kelowna",
+      "slug": "catelowna-cat-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/catelowna-cat-cafe-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1548,
+      "name": "Chances Casino Kelowna",
+      "region": "kelowna",
+      "slug": "chances-casino-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chances-casino-kelowna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1497,
+      "name": "Cleopatra's Rituals Thermal Spa and Steam",
+      "region": "kelowna",
+      "slug": "cleopatra-s-rituals-thermal-spa-and-steam",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cleopatra-s-rituals-thermal-spa-and-steam-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1458,
+      "name": "Energyplex",
+      "region": "kelowna",
+      "slug": "energyplex",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/energyplex-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1492,
+      "name": "Gallery 421",
+      "region": "kelowna",
+      "slug": "gallery-421",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallery-421-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1501,
+      "name": "Geert Maas Sculpture Gardens & Gallery",
+      "region": "kelowna",
+      "slug": "geert-maas-sculpture-gardens-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/geert-maas-sculpture-gardens-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1490,
+      "name": "Gneiss Climbing - OG Banks",
+      "region": "kelowna",
+      "slug": "gneiss-climbing-og-banks",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gneiss-climbing-og-banks-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1457,
+      "name": "H2O Adventure + Fitness Centre",
+      "region": "kelowna",
+      "slug": "h2o-adventure-fitness-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/h2o-adventure-fitness-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1494,
+      "name": "Hambleton Galleries",
+      "region": "kelowna",
+      "slug": "hambleton-galleries",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hambleton-galleries-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1496,
+      "name": "KF Aerospace Centre for Excellence",
+      "region": "kelowna",
+      "slug": "kf-aerospace-centre-for-excellence",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kf-aerospace-centre-for-excellence-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1473,
+      "name": "Kelowna Actors Studio",
+      "region": "kelowna",
+      "slug": "kelowna-actors-studio",
+      "expect": {
+        "image_url": "https://lh3.googleusercontent.com/d/1EnpCTd3yS4zTLoylg1HvpzIMvUHlNNTF"
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-actors-studio-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1466,
+      "name": "Kelowna Art Gallery",
+      "region": "kelowna",
+      "slug": "kelowna-art-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-art-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1550,
+      "name": "Kelowna Comedy Club at Dakoda's Comedy Lounge",
+      "region": "kelowna",
+      "slug": "kelowna-comedy-club-at-dakoda-s-comedy-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-comedy-club-at-dakoda-s-comedy-lounge-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1471,
+      "name": "Kelowna Community Theatre",
+      "region": "kelowna",
+      "slug": "kelowna-community-theatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-community-theatre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1549,
+      "name": "Kelowna Curling Club",
+      "region": "kelowna",
+      "slug": "kelowna-curling-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-curling-club-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1635,
+      "name": "Kelowna Downtown YMCA",
+      "region": "kelowna",
+      "slug": "kelowna-downtown-ymca",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-downtown-ymca-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1634,
+      "name": "Kelowna Family YMCA",
+      "region": "kelowna",
+      "slug": "kelowna-family-ymca",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-family-ymca-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1495,
+      "name": "Kelowna Karting Entertainment Centre",
+      "region": "kelowna",
+      "slug": "kelowna-karting-entertainment-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-karting-entertainment-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1554,
+      "name": "Löyly Floating Sauna",
+      "region": "kelowna",
+      "slug": "loyly-floating-sauna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/loyly-floating-sauna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1462,
+      "name": "McCurdy Bowling Centre",
+      "region": "kelowna",
+      "slug": "mccurdy-bowling-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mccurdy-bowling-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1468,
+      "name": "Okanagan Heritage Museum",
+      "region": "kelowna",
+      "slug": "okanagan-heritage-museum",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-heritage-museum-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1470,
+      "name": "Okanagan Military Museum",
+      "region": "kelowna",
+      "slug": "okanagan-military-museum",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-military-museum-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1633,
+      "name": "Okanagan Regional Library – Kelowna Downtown Branch",
+      "region": "kelowna",
+      "slug": "okanagan-regional-library-kelowna-downtown-branch",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-regional-library-kelowna-downtown-branch-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1469,
+      "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+      "region": "kelowna",
+      "slug": "okanagan-wine-orchard-museum-laurel-packinghouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-wine-orchard-museum-laurel-packinghouse-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1553,
+      "name": "Parkinson Recreation Centre",
+      "region": "kelowna",
+      "slug": "parkinson-recreation-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/parkinson-recreation-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1463,
+      "name": "Planet Lazer Kelowna",
+      "region": "kelowna",
+      "slug": "planet-lazer-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/planet-lazer-kelowna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1552,
+      "name": "Revelry Food + Music Hub",
+      "region": "kelowna",
+      "slug": "revelry-food-music-hub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/revelry-food-music-hub-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1472,
+      "name": "Rotary Centre for the Arts",
+      "region": "kelowna",
+      "slug": "rotary-centre-for-the-arts",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rotary-centre-for-the-arts-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1493,
+      "name": "SOPA Fine Arts",
+      "region": "kelowna",
+      "slug": "sopa-fine-arts",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sopa-fine-arts-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1465,
+      "name": "Scandia Golf & Games",
+      "region": "kelowna",
+      "slug": "scandia-golf-games",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/scandia-golf-games-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1489,
+      "name": "Virtual Rcades",
+      "region": "kelowna",
+      "slug": "virtual-rcades",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/virtual-rcades-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1485,
+      "name": "Creekside Theatre",
+      "region": "lake-country",
+      "slug": "creekside-theatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/creekside-theatre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1484,
+      "name": "Lake Country Art Gallery",
+      "region": "lake-country",
+      "slug": "lake-country-art-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lake-country-art-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1483,
+      "name": "Lake Country Museum & Archives",
+      "region": "lake-country",
+      "slug": "lake-country-museum-archives",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lake-country-museum-archives-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1519,
+      "name": "Venables Theatre",
+      "region": "oliver",
+      "slug": "venables-theatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/venables-theatre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1517,
+      "name": "Okanagan Art Gallery",
+      "region": "osoyoos",
+      "slug": "okanagan-art-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-art-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1565,
+      "name": "Sonora Community Centre",
+      "region": "osoyoos",
+      "slug": "sonora-community-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sonora-community-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1518,
+      "name": "The Art Gallery Osoyoos",
+      "region": "osoyoos",
+      "slug": "the-art-gallery-osoyoos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-art-gallery-osoyoos-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1487,
+      "name": "Peachland Art Gallery",
+      "region": "peachland",
+      "slug": "peachland-art-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-art-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1557,
+      "name": "Peachland Community Centre – Drop-in Pickleball",
+      "region": "peachland",
+      "slug": "peachland-community-centre-drop-in-pickleball",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-community-centre-drop-in-pickleball-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1558,
+      "name": "Cascades Casino Penticton",
+      "region": "penticton",
+      "slug": "cascades-casino-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cascades-casino-penticton-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1507,
+      "name": "Cleland Community Theatre",
+      "region": "penticton",
+      "slug": "cleland-community-theatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cleland-community-theatre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1521,
+      "name": "Donut House Studios",
+      "region": "penticton",
+      "slug": "donut-house-studios",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/donut-house-studios-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1510,
+      "name": "Leir House Cultural Centre (Penticton Arts Council Gallery)",
+      "region": "penticton",
+      "slug": "leir-house-cultural-centre-penticton-arts-council-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/leir-house-cultural-centre-penticton-arts-council-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1512,
+      "name": "Many Hats Theatre Company (Cannery Stage)",
+      "region": "penticton",
+      "slug": "many-hats-theatre-company-cannery-stage",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/many-hats-theatre-company-cannery-stage-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1502,
+      "name": "Penticton Art Gallery",
+      "region": "penticton",
+      "slug": "penticton-art-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-art-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1505,
+      "name": "Penticton Community Centre (Pool & Lazy River)",
+      "region": "penticton",
+      "slug": "penticton-community-centre-pool-lazy-river",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-community-centre-pool-lazy-river-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1559,
+      "name": "Penticton Curling Club",
+      "region": "penticton",
+      "slug": "penticton-curling-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-curling-club-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1504,
+      "name": "Penticton Museum & Archives",
+      "region": "penticton",
+      "slug": "penticton-museum-archives",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-museum-archives-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1561,
+      "name": "Penticton Virtual Reality Studio",
+      "region": "penticton",
+      "slug": "penticton-virtual-reality-studio",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-virtual-reality-studio-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1503,
+      "name": "SS Sicamous Museum & Heritage Park",
+      "region": "penticton",
+      "slug": "ss-sicamous-museum-heritage-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ss-sicamous-museum-heritage-park-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1563,
+      "name": "Shelter Floating Sauna",
+      "region": "penticton",
+      "slug": "shelter-floating-sauna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shelter-floating-sauna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1567,
+      "name": "South Okanagan Events Centre (SOEC)",
+      "region": "penticton",
+      "slug": "south-okanagan-events-centre-soec",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/south-okanagan-events-centre-soec-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1568,
+      "name": "Springers Gymnastics (Drop-in Gym)",
+      "region": "penticton",
+      "slug": "springers-gymnastics-drop-in-gym",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/springers-gymnastics-drop-in-gym-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1511,
+      "name": "Tempest Theatre & Film",
+      "region": "penticton",
+      "slug": "tempest-theatre-film",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tempest-theatre-film-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1509,
+      "name": "The Lloyd Gallery",
+      "region": "penticton",
+      "slug": "the-lloyd-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-lloyd-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1514,
+      "name": "Nixdorf Classic Cars",
+      "region": "summerland",
+      "slug": "nixdorf-classic-cars",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nixdorf-classic-cars-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1515,
+      "name": "Summerland Arts Council Gallery (George Ryga Arts & Culture Centre)",
+      "region": "summerland",
+      "slug": "summerland-arts-council-gallery-george-ryga-arts-culture-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-arts-council-gallery-george-ryga-arts-culture-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1513,
+      "name": "Summerland Museum & Archives",
+      "region": "summerland",
+      "slug": "summerland-museum-archives",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-museum-archives-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1528,
+      "name": "Beyond Belief Escape Rooms",
+      "region": "vernon",
+      "slug": "beyond-belief-escape-rooms",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/beyond-belief-escape-rooms-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1531,
+      "name": "Caetani Cultural Centre",
+      "region": "vernon",
+      "slug": "caetani-cultural-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/caetani-cultural-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1530,
+      "name": "Gallery Vertigo",
+      "region": "vernon",
+      "slug": "gallery-vertigo",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallery-vertigo-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1545,
+      "name": "Historic O'Keefe Ranch",
+      "region": "vernon",
+      "slug": "historic-o-keefe-ranch",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/historic-o-keefe-ranch-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1575,
+      "name": "Lake City Casino Vernon",
+      "region": "vernon",
+      "slug": "lake-city-casino-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lake-city-casino-vernon-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1537,
+      "name": "Lincoln Lanes",
+      "region": "vernon",
+      "slug": "lincoln-lanes",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lincoln-lanes-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1524,
+      "name": "Museum & Archives of Vernon",
+      "region": "vernon",
+      "slug": "museum-archives-of-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/museum-archives-of-vernon-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1526,
+      "name": "Okanagan Science Centre",
+      "region": "vernon",
+      "slug": "okanagan-science-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-science-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1572,
+      "name": "Planet Bee Honey Farm & Honeymoon Meadery",
+      "region": "vernon",
+      "slug": "planet-bee-honey-farm-honeymoon-meadery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/planet-bee-honey-farm-honeymoon-meadery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1533,
+      "name": "Powerhouse Theatre",
+      "region": "vernon",
+      "slug": "powerhouse-theatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/powerhouse-theatre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1574,
+      "name": "Vernon Curling Club",
+      "region": "vernon",
+      "slug": "vernon-curling-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-curling-club-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1538,
+      "name": "Vernon Jazz Club",
+      "region": "vernon",
+      "slug": "vernon-jazz-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-jazz-club-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1525,
+      "name": "Vernon Public Art Gallery",
+      "region": "vernon",
+      "slug": "vernon-public-art-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-public-art-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1551,
+      "name": "FunSpace Kids",
+      "region": "west-kelowna",
+      "slug": "funspace-kids",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/funspace-kids-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1481,
+      "name": "Johnson Bentley Memorial Aquatic Centre",
+      "region": "west-kelowna",
+      "slug": "johnson-bentley-memorial-aquatic-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/johnson-bentley-memorial-aquatic-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1482,
+      "name": "Pearl & Fern Pottery Studio",
+      "region": "west-kelowna",
+      "slug": "pearl-fern-pottery-studio",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pearl-fern-pottery-studio-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1479,
+      "name": "Sncewips Heritage Museum",
+      "region": "west-kelowna",
+      "slug": "sncewips-heritage-museum",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sncewips-heritage-museum-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1475,
+      "name": "Cineplex Cinemas Orchard Plaza",
+      "region": "kelowna",
+      "slug": "cineplex-cinemas-orchard-plaza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cineplex-cinemas-orchard-plaza-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1460,
+      "name": "Exit Kelowna Escape Games",
+      "region": "kelowna",
+      "slug": "exit-kelowna-escape-games",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/exit-kelowna-escape-games-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1491,
+      "name": "Gneiss Climbing - Hill Security",
+      "region": "kelowna",
+      "slug": "gneiss-climbing-hill-security",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gneiss-climbing-hill-security-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1556,
+      "name": "Kelowna Escape Room by Omni",
+      "region": "kelowna",
+      "slug": "kelowna-escape-room-by-omni",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-escape-room-by-omni-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1474,
+      "name": "Landmark Cinemas Grand 10 Kelowna",
+      "region": "kelowna",
+      "slug": "landmark-cinemas-grand-10-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/landmark-cinemas-grand-10-kelowna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1555,
+      "name": "Playtime Casino Kelowna",
+      "region": "kelowna",
+      "slug": "playtime-casino-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/playtime-casino-kelowna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1488,
+      "name": "Tality Wellness Kelowna",
+      "region": "kelowna",
+      "slug": "tality-wellness-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tality-wellness-kelowna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1500,
+      "name": "Work of Art Pottery Studio",
+      "region": "kelowna",
+      "slug": "work-of-art-pottery-studio",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/work-of-art-pottery-studio-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1542,
+      "name": "Lumby & District Museum",
+      "region": "lumby",
+      "slug": "lumby-district-museum",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lumby-district-museum-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1810,
+      "name": "Okanagan Falls Museum (Bassett House)",
+      "region": "okanagan-falls",
+      "slug": "okanagan-falls-museum-bassett-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-falls-museum-bassett-house-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1520,
+      "name": "Oliver & District Museum",
+      "region": "oliver",
+      "slug": "oliver-district-museum",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oliver-district-museum-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1571,
+      "name": "Oliver Curling Club (Eastlink Curling Centre)",
+      "region": "oliver",
+      "slug": "oliver-curling-club-eastlink-curling-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oliver-curling-club-eastlink-curling-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1523,
+      "name": "Oliver Theatre",
+      "region": "oliver",
+      "slug": "oliver-theatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oliver-theatre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1522,
+      "name": "Kobau Lanes",
+      "region": "osoyoos",
+      "slug": "kobau-lanes",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kobau-lanes-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1516,
+      "name": "Osoyoos & District Museum and Archives",
+      "region": "osoyoos",
+      "slug": "osoyoos-district-museum-and-archives",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-district-museum-and-archives-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1560,
+      "name": "Osoyoos Curling Club",
+      "region": "osoyoos",
+      "slug": "osoyoos-curling-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-curling-club-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1569,
+      "name": "Ethos Parkour & Movement",
+      "region": "penticton",
+      "slug": "ethos-parkour-movement",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ethos-parkour-movement-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1697,
+      "name": "Gallery One Twenty-Seven",
+      "region": "penticton",
+      "slug": "gallery-one-twenty-seven",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallery-one-twenty-seven-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1570,
+      "name": "Lakeline Gallery",
+      "region": "penticton",
+      "slug": "lakeline-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakeline-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1506,
+      "name": "Landmark Cinemas 7 Penticton",
+      "region": "penticton",
+      "slug": "landmark-cinemas-7-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/landmark-cinemas-7-penticton-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1508,
+      "name": "Roll N Stones Fun Centre",
+      "region": "penticton",
+      "slug": "roll-n-stones-fun-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/roll-n-stones-fun-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1562,
+      "name": "The Dream (live music venue)",
+      "region": "penticton",
+      "slug": "the-dream-live-music-venue",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-dream-live-music-venue-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1543,
+      "name": "Gallery Artiva",
+      "region": "silverstar",
+      "slug": "gallery-artiva",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallery-artiva-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1564,
+      "name": "Summerland Aquatic & Fitness Centre",
+      "region": "summerland",
+      "slug": "summerland-aquatic-fitness-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-aquatic-fitness-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1529,
+      "name": "Another World VR Vernon",
+      "region": "vernon",
+      "slug": "another-world-vr-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/another-world-vr-vernon-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1573,
+      "name": "Canadian Wildlife Museum",
+      "region": "vernon",
+      "slug": "canadian-wildlife-museum",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/canadian-wildlife-museum-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1535,
+      "name": "Galaxy Cinemas Vernon",
+      "region": "vernon",
+      "slug": "galaxy-cinemas-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/galaxy-cinemas-vernon-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1546,
+      "name": "Headbones Gallery",
+      "region": "vernon",
+      "slug": "headbones-gallery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/headbones-gallery-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1527,
+      "name": "The Rock Garden Climbing Centre",
+      "region": "vernon",
+      "slug": "the-rock-garden-climbing-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-rock-garden-climbing-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1536,
+      "name": "Vernon Aquatic Centre",
+      "region": "vernon",
+      "slug": "vernon-aquatic-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-aquatic-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1544,
+      "name": "Vernon Community Arts Centre",
+      "region": "vernon",
+      "slug": "vernon-community-arts-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-community-arts-centre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1534,
+      "name": "Vernon Towne Theatre",
+      "region": "vernon",
+      "slug": "vernon-towne-theatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-towne-theatre-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1476,
+      "name": "Landmark Cinemas 8 Xtreme West Kelowna",
+      "region": "west-kelowna",
+      "slug": "landmark-cinemas-8-xtreme-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/landmark-cinemas-8-xtreme-west-kelowna-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1480,
+      "name": "Westbank Museum",
+      "region": "west-kelowna",
+      "slug": "westbank-museum",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/westbank-museum-2610.jpg?v=20261016"
+      }
+    },
+    {
+      "id": 1478,
+      "name": "Wild Kidz Indoor Play & Party Centre",
+      "region": "west-kelowna",
+      "slug": "wild-kidz-indoor-play-party-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wild-kidz-indoor-play-party-centre-2610.jpg?v=20261016"
+      }
+    }
+  ]
+}
