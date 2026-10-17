@@ -21348,7 +21348,7 @@ test('Shareable trips: a shared link describes its own trip in the page head, in
   const en = (await s4request('GET', `/my-trip?${q}`)).text;
   const head = en.split('</head>')[0];
   assert.match(head, /<title>1-day Okanagan trip: Kelowna \| Okanagan Roam<\/title>/);
-  assert.match(head, new RegExp(`<meta property="og:image" content="https://okanaganroam\\.com/share/trip\\.png\\?stops=venue:${venue.id}&amp;days=1&amp;v=[0-9a-f]{8}">`));
+  assert.match(head, new RegExp(`<meta property="og:image" content="https://okanaganroam\\.com/share/trip\\.jpg\\?stops=venue:${venue.id}&amp;days=1&amp;v=[0-9a-f]{8}">`));
   assert.match(head, new RegExp(`<link rel="canonical" href="https://okanaganroam\\.com/my-trip\\?stops=venue:${venue.id}&amp;days=1">`));
   assert.match(head, /<meta name="robots" content="noindex">/);
   assert.match(head, /Test Trattoria/);
@@ -21361,7 +21361,7 @@ test('Shareable trips: a shared link describes its own trip in the page head, in
   const frHead = fr.split('</head>')[0];
   assert.match(fr, /<html lang="fr"/);
   assert.match(frHead, /<title>Voyage de 1 jour dans l\u2019Okanagan : Kelowna \| Okanagan Roam<\/title>/);
-  assert.match(frHead, new RegExp(`<meta property="og:image" content="https://okanaganroam\\.com/share/fr/trip\\.png\\?stops=venue:${venue.id}&amp;days=1&amp;v=[0-9a-f]{8}">`));
+  assert.match(frHead, new RegExp(`<meta property="og:image" content="https://okanaganroam\\.com/share/fr/trip\\.jpg\\?stops=venue:${venue.id}&amp;days=1&amp;v=[0-9a-f]{8}">`));
   assert.match(frHead, new RegExp(`<meta property="og:url" content="https://okanaganroam\\.com/fr/my-trip\\?stops=venue:${venue.id}&amp;days=1">`));
   assert.match(frHead, /1 arr\u00eat : Test Trattoria\./);
   assert.match(fr, /id="langToggle" href="\/my-trip\?stops=venue:\d+&amp;days=1"/);
@@ -21547,4 +21547,86 @@ test('Tours & Experiences photos (2026-10-16): example photos exist in both size
     assert.ok(credits[rel], `${rel} is credited`);
   }
   assert.equal(app.venueHeroPhoto({ id: 1628, name: 'GottaGoat Farm', type: 'tour' }).src, '/images/outdoors/examples/tour-goat-2610.jpg');
+});
+
+// ---- Trip share cards over a photo (2026-10-17) ----
+const sofSize = (buf) => { for (let p = 2; p < buf.length;) { if (buf[p] !== 0xff) return null; const m = buf[p + 1]; if (m === 0xc0 || m === 0xc2) return [buf.readUInt16BE(p + 7), buf.readUInt16BE(p + 5)]; p += 2 + buf.readUInt16BE(p + 2); } return null; };
+test('JPEG module: reads the card photos like a reference decoder, and its own files decode back', () => {
+  const { decodeJpeg, encodeJpeg } = require('../jpeg-lite.js');
+  const photo = decodeJpeg(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'data', 'trip-card-photos', 'valley.jpg')));
+  assert.equal(photo.width, 1200); assert.equal(photo.height, 630); assert.equal(photo.data.length, 1200 * 630 * 3);
+  // Pixel values from a reference decoder (sharp): chroma is smoothed there and repeated here, so allow a few levels.
+  for (const [x, y, rgb] of [[20, 20, [136, 141, 161]], [600, 300, [113, 93, 104]], [1100, 600, [205, 156, 53]], [300, 500, [70, 43, 0]], [900, 100, [218, 163, 132]]]) {
+    for (let c = 0; c < 3; c++) assert.ok(Math.abs(photo.data[(y * 1200 + x) * 3 + c] - rgb[c]) <= 12, `pixel ${x},${y} channel ${c}: ${photo.data[(y * 1200 + x) * 3 + c]} vs ${rgb[c]}`);
+  }
+  // Writer: a gradient (odd size, so it is padded) goes out as a JPEG and comes back close to what went in.
+  const w = 37, h = 21, rgb = new Uint8Array(w * h * 3);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = (y * w + x) * 3; rgb[o] = x * 6; rgb[o + 1] = y * 11; rgb[o + 2] = 128; }
+  const out = encodeJpeg(rgb, w, h, 90);
+  assert.deepEqual([...out.subarray(0, 2)], [0xff, 0xd8]); assert.deepEqual([...out.subarray(-2)], [0xff, 0xd9]);
+  assert.deepEqual(sofSize(out), [w, h]);
+  const back = decodeJpeg(out);
+  assert.equal(back.width, w); assert.equal(back.height, h);
+  let err = 0; for (let i = 0; i < rgb.length; i++) err += Math.abs(rgb[i] - back.data[i]);
+  assert.ok(err / rgb.length < 6, `mean error ${err / rgb.length}`);
+  // Anything else is refused rather than guessed at.
+  assert.throws(() => decodeJpeg(Buffer.from('not a jpeg')), /not a JPEG/);
+  const progressive = Buffer.from(out); for (let p = 2; p < progressive.length;) { if (progressive[p + 1] === 0xc0) { progressive[p + 1] = 0xc2; break; } p += 2 + progressive.readUInt16BE(p + 2); }
+  assert.throws(() => decodeJpeg(progressive), /baseline/);
+});
+
+test('Trip cards: the photo card is a 1200x630 JPEG under WhatsApp\'s 300 KB, and the place card is unchanged', () => {
+  const card = require('../share-card.js'), { decodeJpeg } = require('../jpeg-lite.js');
+  const photo = decodeJpeg(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'data', 'trip-card-photos', 'kelowna.jpg')));
+  const jpeg = card.renderPhotoShareCard({ name: 'Sperling Vineyards, Tantalus Vineyards + 1 more', label: '3-DAY TRIP \u00b7 KELOWNA', photo });
+  assert.deepEqual(sofSize(jpeg), [1200, 630]);
+  assert.ok(jpeg.length > 20000 && jpeg.length < 300000, `photo card is ${jpeg.length} bytes`);
+  assert.throws(() => card.renderPhotoShareCard({ name: 'x', label: 'y', photo: { width: 10, height: 10, data: new Uint8Array(300) } }), /1200x630/);
+  const png = card.renderShareCard({ name: 'Quails\u2019 Gate', label: 'WINERY \u00b7 WEST KELOWNA, BC' });
+  assert.deepEqual([...png.subarray(1, 4)], [0x50, 0x4e, 0x47]);
+});
+
+test('Trip cards: which photo a trip gets, and no credited photo is used', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const dir = path.join(__dirname, '..', 'data', 'trip-card-photos');
+  const index = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')).photos;
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const block = src.slice(src.indexOf('const REGION_PHOTOS = Object.freeze({'), src.indexOf('});', src.indexOf('const REGION_PHOTOS = Object.freeze({')));
+  const credited = [...block.matchAll(/^\s+(?:'([a-z-]+)'|([a-z]+)): \{[^\n]*(?:credit:|small: true)/gm)].map((m) => m[1] || m[2]);
+  assert.ok(credited.length >= 7, `found the credited or small photos: ${credited}`);
+  for (const r of credited) assert.ok(!index[r], `${r} has a credit line or is low resolution, so it is not used on cards`);
+  assert.ok(index.valley, 'the valley photo is the fallback');
+  for (const [key, entry] of Object.entries(index)) {
+    const buf = fs.readFileSync(path.join(dir, entry.file));
+    assert.deepEqual(sofSize(buf), [1200, 630], `${key} is 1200x630`);
+    assert.ok(buf.length < 300000, `${key} is ${buf.length} bytes`);
+  }
+  const stops = (...regions) => regions.map((region) => ({ region }));
+  assert.equal(app.tripCardPhotoKey(stops('osoyoos', 'osoyoos', 'kelowna')), 'osoyoos', 'the town with most stops');
+  assert.equal(app.tripCardPhotoKey(stops('kelowna', 'penticton')), 'kelowna', 'a tie goes to the first stop');
+  assert.equal(app.tripCardPhotoKey(stops('vernon', 'vernon', 'kelowna')), 'valley', 'a credited main town gets the valley photo, not another town\'s');
+  assert.equal(app.tripCardPhotoKey(stops('armstrong')), 'valley');
+  assert.equal(app.tripCardPhotoKey(stops('nowhere')), 'valley');
+});
+
+test('Trip cards: /share/trip.jpg serves the photo card, /share/trip.png is still there, and bad links are 404', async () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const saved = { ...app.TRIP_CARD_RATE };
+  try {
+    app.tripCardRateReset();
+    Object.assign(app.TRIP_CARD_RATE, { perIp: 50, global: 500, windowMs: 60000 });
+    for (const path of [`/share/trip.jpg?stops=venue:${venue.id}&days=1`, `/share/fr/trip.jpg?stops=venue:${venue.id}&days=1`]) {
+      const r = await tripShareFetch(path);
+      assert.equal(r.status, 200, path);
+      assert.match(r.type, /image\/jpeg/);
+      assert.deepEqual(sofSize(r.bytes), [1200, 630]);
+      assert.ok(r.bytes.length < 300000, `${r.bytes.length} bytes`);
+      assert.match(r.cache, /max-age=86400/);
+    }
+    const png = await tripShareFetch(`/share/trip.png?stops=venue:${venue.id}&days=1`);
+    assert.equal(png.status, 200); assert.match(png.type, /image\/png/);
+    for (const path of ['/share/trip.jpg', '/share/trip.jpg?stops=venue:999999999', '/share/fr/trip.jpg?stops=nope']) assert.equal((await tripShareFetch(path)).status, 404, path);
+    const head = (await s4request('GET', `/my-trip?stops=venue:${venue.id}&days=1`)).text.split('</head>')[0];
+    assert.match(head, /og:image" content="https:\/\/okanaganroam\.com\/share\/trip\.jpg\?/);
+  } finally { Object.assign(app.TRIP_CARD_RATE, saved); app.tripCardRateReset(); }
 });

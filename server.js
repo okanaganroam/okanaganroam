@@ -27984,22 +27984,53 @@ function tripShareSummary(query, lang = 'en') {
     ? `${live.length} ${stopWord} : ${nameText}. Voyez le plan sur la carte et enregistrez-le dans Mon voyage.`
     : `${live.length} ${stopWord}: ${nameText}. See the plan on a map and save it to your own trip.`, 160);
   const query_ = `stops=${refs.join(',')}` + (refs.every((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i]).join(',')}` : '');
+  const more2 = names.length - 2;
   const card = {
     label: (dayCount ? `${dayLabel} · ${townText}` : `${live.length} ${stopWord} · ${townText}`).toUpperCase(),
     name: nameText,
+    // The photo card has a narrower text column: two stops, then the count of the rest.
+    photoKey: tripCardPhotoKey(live),
+    photoName: names.slice(0, 2).join(', ') + (more2 > 0 ? (fr ? ` + ${more2} ${more2 === 1 ? 'autre' : 'autres'}` : ` + ${more2} more`) : ''),
   };
-  const v = require('crypto').createHash('sha1').update(`${card.label}|${card.name}`).digest('hex').slice(0, 8);
+  const v = require('crypto').createHash('sha1').update(`${card.label}|${card.name}|${card.photoKey}|${card.photoName}`).digest('hex').slice(0, 8);
   return {
     title, description, card, lang,
     canonicalAttr: `https://okanaganroam.com/my-trip?${query_.replace(/&/g, '&amp;')}`,
-    imageAttr: `https://okanaganroam.com/share/${fr ? 'fr/' : ''}trip.png?${query_.replace(/&/g, '&amp;')}&amp;v=${v}`,
+    imageAttr: `https://okanaganroam.com/share/${fr ? 'fr/' : ''}trip.${card.photoKey ? 'jpg' : 'png'}?${query_.replace(/&/g, '&amp;')}&amp;v=${v}`,
   };
 }
-const tripShareCardCache = new Map(); // "label|name" -> PNG buffer; oldest dropped past 100 entries
-// Drawing a card takes ~65 ms of the server's one thread, and the space of possible trips is huge, so only DRAWING a
+// Trip card photos (2026-10-17): data/trip-card-photos/ holds a 1200x630 JPEG for each town whose photo can carry
+// text without a credit line, plus "valley" (see scripts/make-trip-card-photos.js). A trip gets the photo of the town
+// with most of its stops, otherwise the valley photo; with no photos (or no card module) it keeps the plain card.
+let tripCardPhotoIndexCache;
+function tripCardPhotoIndex() {
+  if (tripCardPhotoIndexCache === undefined) {
+    try { tripCardPhotoIndexCache = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'trip-card-photos', 'index.json'), 'utf8')).photos; } catch (e) { tripCardPhotoIndexCache = null; }
+  }
+  return tripCardPhotoIndexCache;
+}
+function tripCardPhotoKey(live) {
+  const index = tripCardPhotoIndex();
+  if (!index || !shareCardModule || typeof shareCardModule.renderPhotoShareCard !== 'function') return null;
+  const counts = new Map();
+  for (const s of live) counts.set(s.region, (counts.get(s.region) || 0) + 1);
+  let top = null, most = 0;
+  for (const [region, n] of counts) if (n > most) { top = region; most = n; }
+  return index[top] ? top : (index.valley ? 'valley' : null);
+}
+const tripCardPhotoCache = new Map(); // key -> decoded photo; the last 3 stay (about 2.3 MB each)
+function tripCardPhoto(key) {
+  if (tripCardPhotoCache.has(key)) return tripCardPhotoCache.get(key);
+  const photo = require('./jpeg-lite').decodeJpeg(fs.readFileSync(path.join(__dirname, 'data', 'trip-card-photos', tripCardPhotoIndex()[key].file)));
+  tripCardPhotoCache.set(key, photo);
+  if (tripCardPhotoCache.size > 3) tripCardPhotoCache.delete(tripCardPhotoCache.keys().next().value);
+  return photo;
+}
+const tripShareCardCache = new Map(); // "label|name" -> PNG buffer, "photo|key|label|name" -> JPEG buffer; oldest dropped past 100 entries
+// Drawing a card takes 65 ms (plain) to 250 ms (photo) of the server's one thread, and the space of possible trips is huge, so only DRAWING a
 // new card is rationed (a cached one costs nothing): per visitor and across the site, per minute. Over the limit the
 // answer is 429 with Retry-After; link-preview bots retry later and the page itself is unaffected.
-const TRIP_CARD_RATE = { perIp: 30, global: 120, windowMs: 60000 };
+const TRIP_CARD_RATE = { perIp: 15, global: 50, windowMs: 60000 };
 const tripCardDraws = new Map(); // ip -> draw timestamps inside the window
 let tripCardGlobalDraws = [];
 function tripCardRateAllow(ip, now = Date.now()) {
@@ -28019,7 +28050,15 @@ function tripCardRateAllow(ip, now = Date.now()) {
   return true;
 }
 function tripCardRateReset() { tripCardDraws.clear(); tripCardGlobalDraws = []; }
-function tripShareCardCached(card) { return tripShareCardCache.has(`${card.label}|${card.name}`); }
+function tripShareCardCached(card, photo = false) { return tripShareCardCache.has(photo ? `photo|${card.photoKey}|${card.label}|${card.photoName}` : `${card.label}|${card.name}`); }
+function tripShareCardJpeg(card) {
+  const key = `photo|${card.photoKey}|${card.label}|${card.photoName}`;
+  if (tripShareCardCache.has(key)) return tripShareCardCache.get(key);
+  const jpeg = shareCardModule.renderPhotoShareCard({ name: card.photoName, label: card.label, photo: tripCardPhoto(card.photoKey) });
+  tripShareCardCache.set(key, jpeg);
+  if (tripShareCardCache.size > 100) tripShareCardCache.delete(tripShareCardCache.keys().next().value);
+  return jpeg;
+}
 function tripShareCardPng(card) {
   const key = `${card.label}|${card.name}`;
   if (tripShareCardCache.has(key)) return tripShareCardCache.get(key);
@@ -33219,21 +33258,30 @@ const server = http.createServer(async (req, res) => {
       '/badges/featured-on-okanagan-roam.svg': { file: 'public/badges/featured-on-okanagan-roam.svg', type: 'image/svg+xml' },
       '/badges/featured-on-okanagan-roam.png': { file: 'public/badges/featured-on-okanagan-roam.png', type: 'image/png' },
     };
-    // GET /share/trip.png and /share/fr/trip.png?stops=...&days=... -- the preview card of a shared trip (2026-10-16).
-    const tripCardMatch = method === 'GET' ? pathname.match(/^\/share\/(fr\/)?trip\.png$/) : null;
+    // GET /share/trip.jpg and /share/fr/trip.jpg?stops=...&days=... -- the preview card of a shared trip, over a photo
+    // (2026-10-17); /share/trip.png is the same card without one (2026-10-16), kept for links already shared.
+    const tripCardMatch = method === 'GET' ? pathname.match(/^\/share\/(fr\/)?trip\.(png|jpg)$/) : null;
     if (tripCardMatch) {
       const tripSummary = shareCardModule ? tripShareSummary(query, tripCardMatch[1] ? 'fr' : 'en') : null;
-      if (!tripSummary) {
+      const wantsPhoto = tripCardMatch[2] === 'jpg';
+      if (!tripSummary || (wantsPhoto && !tripSummary.card.photoKey)) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         return res.end('Not found');
       }
-      if (!tripShareCardCached(tripSummary.card) && !tripCardRateAllow(requestClientIp(req))) {
+      if (!tripShareCardCached(tripSummary.card, wantsPhoto) && !tripCardRateAllow(requestClientIp(req))) {
         res.writeHead(429, { 'Content-Type': 'text/plain', 'Retry-After': '30', 'Cache-Control': 'no-store' });
         return res.end('Too many requests. Please try again shortly.');
       }
-      const png = tripShareCardPng(tripSummary.card);
-      res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': png.length, 'Cache-Control': 'public, max-age=86400' });
-      return res.end(png);
+      let image, type = wantsPhoto ? 'image/jpeg' : 'image/png';
+      try {
+        image = wantsPhoto ? tripShareCardJpeg(tripSummary.card) : tripShareCardPng(tripSummary.card);
+      } catch (err) {
+        // A photo that cannot be read: the plain card is better than no preview.
+        image = tripShareCardPng(tripSummary.card);
+        type = 'image/png';
+      }
+      res.writeHead(200, { 'Content-Type': type, 'Content-Length': image.length, 'Cache-Control': 'public, max-age=86400' });
+      return res.end(image);
     }
     // GET /share/<region>/<category>/<slug>.png -- a place's share card (2026-10-13). Only live places with a public page get one.
     const shareCardMatch = method === 'GET' ? pathname.match(/^\/share\/(fr\/)?([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\.png$/) : null;
@@ -36111,6 +36159,7 @@ module.exports = {
   tripStopsFor,
   tripShareSummary,
   tripShareSearch,
+  tripCardPhotoKey,
   TRIP_CARD_RATE,
   tripCardRateAllow,
   tripCardRateReset,
