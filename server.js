@@ -30561,7 +30561,16 @@ function normalizeMenuData(raw) {
       const name = text(it.name, MENU_LIMITS.name);
       if (!name) continue;
       const dietary = Array.isArray(it.dietary) ? [...new Set(it.dietary.filter((d) => MENU_DIETARY.includes(d)))] : [];
-      sec.items.push({ name, description: text(it.description, MENU_LIMITS.description), price: text(it.price, MENU_LIMITS.price), dietary, check: it.check === true });
+      const item = { name, description: text(it.description, MENU_LIMITS.description), price: text(it.price, MENU_LIMITS.price), dietary, check: it.check === true };
+      // Where the dish is in the owner's photo (page file id + box), shown under it while checking; never published.
+      const src = it.src;
+      if (src && Number.isInteger(src.f) && src.f > 0 && Array.isArray(src.b) && src.b.length === 4 && src.b.every((n) => Number.isFinite(n) && n >= 0 && n <= 20000)) {
+        const box = (v) => (Array.isArray(v) && v.length === 4 && v.every((n) => Number.isFinite(n) && n >= 0 && n <= 20000) ? v.map((n) => Math.round(n)) : null);
+        item.src = { f: src.f, b: box(src.b) };
+        if (box(src.n)) item.src.n = box(src.n);
+        if (box(src.p)) item.src.p = box(src.p);
+      }
+      sec.items.push(item);
       items++;
     }
     if (sec.items.length) out.sections.push(sec);
@@ -31052,6 +31061,9 @@ const MENU_APP_STRINGS = {
     failed: 'Sorry, that didn&rsquo;t work this time. Please try again.',
     unavailable: 'Our menu reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
     busy: 'That&rsquo;s a lot of menus today! Press the button below and we&rsquo;ll finish it for you, or try again tomorrow.',
+    gettingReady: 'Getting the reader ready (first time only, about 10 seconds)&hellip;', checkingPrices: 'Double-checking the prices&hellip;',
+    stripHint: 'Under each line you&rsquo;ll see that bit of your photo, so you can check the name and price at a glance.',
+    moveUp: 'Move up', moveDown: 'Move down', moveTo: 'Section:',
     tryAgain: 'Try again', newPhoto: '&#128247;&nbsp;Take a new photo', startOver: 'Start over with new photos',
     reviewTitle: 'Here&rsquo;s your menu', reviewIntro: 'This is how customers will see it. Tap any dish or price to fix it.',
     checkCount: 'Please check the {n} in yellow.', checkOne: 'Please check the one in yellow.', checkThis: 'Please check this',
@@ -31094,6 +31106,9 @@ const MENU_APP_STRINGS = {
     failed: 'D&eacute;sol&eacute;, &ccedil;a n&rsquo;a pas fonctionn&eacute; cette fois. Veuillez r&eacute;essayer.',
     unavailable: 'Notre lecteur de menus fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous le taperons pour vous.',
     busy: 'Beaucoup de menus aujourd&rsquo;hui&nbsp;! Appuyez ci-dessous et nous le terminerons pour vous, ou r&eacute;essayez demain.',
+    gettingReady: 'Pr&eacute;paration du lecteur (premi&egrave;re fois seulement, environ 10&nbsp;secondes)&hellip;', checkingPrices: 'V&eacute;rification des prix&hellip;',
+    stripHint: 'Sous chaque ligne, vous verrez ce morceau de votre photo pour v&eacute;rifier le nom et le prix d&rsquo;un coup d&rsquo;&oelig;il.',
+    moveUp: 'Monter', moveDown: 'Descendre', moveTo: 'Section&nbsp;:',
     tryAgain: 'R&eacute;essayer', newPhoto: '&#128247;&nbsp;Prendre une nouvelle photo', startOver: 'Recommencer avec de nouvelles photos',
     reviewTitle: 'Voici votre menu', reviewIntro: 'Voici ce que verront vos clients. Touchez un plat ou un prix pour le corriger.',
     checkCount: 'V&eacute;rifiez les {n} en jaune.', checkOne: 'V&eacute;rifiez celui en jaune.', checkThis: '&Agrave; v&eacute;rifier',
@@ -31275,6 +31290,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         + '<label>' + T.price + '<input type="text" data-f="price" maxlength="40" inputmode="decimal" value="' + h(it.price) + '"></label>'
         + '<label>' + T.description + '<textarea data-f="description" maxlength="500" rows="2">' + h(it.description) + '</textarea></label>'
         + '<div class="mn-chips">' + diets + '</div>'
+        + '<div class="mn-move"><button type="button" class="mn-link" data-act="up"' + (si === 0 && ii === 0 ? ' disabled' : '') + '>&uarr; ' + T.moveUp + '</button>'
+        + '<button type="button" class="mn-link" data-act="down">&darr; ' + T.moveDown + '</button>'
+        + (data.sections.length > 1 ? '<label class="mn-moveto">' + T.moveTo + ' <select data-moveto>' + data.sections.map(function(sec, k){ return '<option value="' + k + '"' + (k === si ? ' selected' : '') + '>' + h(sec.name || '-') + '</option>'; }).join('') + '</select></label>' : '') + '</div>'
         + '<div class="mn-row"><button type="button" class="mn-btn mn-small" data-act="close">' + T.done + '</button>'
         + '<button type="button" class="mn-link mn-danger" data-act="del-item">' + T.deleteDish + '</button></div></div>';
     }
@@ -31282,14 +31300,31 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     return '<button type="button" class="mn-item' + (it.check ? ' mn-check' : '') + '" data-item="' + key + '">'
       + '<span class="mn-line"><span class="mn-name">' + h(it.name) + '</span><span class="mn-price">' + (it.price ? h(priceText(it.price)) : '<em>' + T.noPrice + '</em>') + '</span></span>'
       + (it.description ? '<span class="mn-desc">' + h(it.description) + '</span>' : '') + (tags ? '<span class="mn-tags">' + tags + '</span>' : '')
+      + stripHtml(it)
       + (it.check ? '<span class="mn-flag">&#9888;&#65039; ' + T.checkThis + '</span>' : '') + '</button>';
   }
+  // The dish's name and price as they look in the owner's photo, under what was read, so checking is "does it match?".
+  function stripHtml(it){
+    var src = it.src, pg = null;
+    if (!src || !src.n) return '';
+    pages().forEach(function(x){ if (x.id === src.f && x.kind === 'jpeg' && x.width) pg = x; });
+    if (!pg) return '';
+    var s = Math.min(1.6, 20 / Math.max(10, src.n[3] - src.n[1]));
+    var crop = function(b, maxW){
+      var pad = 4, w = Math.min(maxW, (b[2] - b[0] + pad * 2) * s), hgt = (b[3] - b[1] + pad * 2) * s;
+      return '<span class="mn-crop" style="width:' + Math.round(w) + 'px;height:' + Math.round(hgt) + 'px;background-image:url(' + h(pg.preview) + ');background-size:'
+        + Math.round(pg.width * s) + 'px ' + Math.round(pg.height * s) + 'px;background-position:' + Math.round(-(b[0] - pad) * s) + 'px ' + Math.round(-(b[1] - pad) * s) + 'px"></span>';
+    };
+    return '<span class="mn-strip" aria-hidden="true">' + crop(src.n, 190) + (src.p ? crop(src.p, 80) : '') + '</span>';
+  }
+  function hasStrips(){ return data.sections.some(function(sec){ return sec.items.some(function(it){ return it.src && it.src.n; }); }); }
   function reviewScreen(message){
     var n = countChecks(), m = S.menu;
     var head = C.mode === 'admin' ? '<h1>' + T.adminTitle + ': ' + h(C.venueName) + '</h1><p class="mn-sub">#' + m.id + ' &middot; ' + h(m.status) + '</p>'
       + (C.adminNote ? '<div class="mn-card mn-warn"><p>' + h(C.adminNote) + '</p></div>' : '')
       : '<h1>' + T.reviewTitle + '</h1><p class="mn-lead">' + T.reviewIntro + '</p>';
-    var notes = (data.partial ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + '</p></div>' : '');
+    var notes = (data.partial ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + '</p></div>' : '')
+      + (hasStrips() ? '<p class="mn-sub">' + T.stripHint + '</p>' : '');
     var secs = data.sections.map(function(s, si){
       return '<section class="mn-sec" data-sec="' + si + '"><input class="mn-sec-name" type="text" data-sec-name="' + si + '" maxlength="140" value="' + h(s.name) + '" aria-label="' + T.sectionName + '">'
         + (s.note ? '<p class="mn-note">' + h(s.note) + '</p>' : '')
@@ -31378,17 +31413,64 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   function deviceRead(){
     var list = pages(); if (!list.length) return;
     var secs = 15 + list.length * 15;
-    setScreen('<h1 class="mn-center">' + f(T.reading, { s: secs }) + '</h1><div class="mn-bar"><span id="mnBar" style="transition:width .4s linear"></span></div><p class="mn-center mn-sub">' + T.readingSub + '</p>' + thumbs(false) + helpBtn());
+    setScreen('<h1 class="mn-center">' + f(T.reading, { s: secs }) + '</h1><div class="mn-bar"><span id="mnBar" style="transition:width .4s linear"></span></div><p class="mn-center mn-sub" id="mnStage">' + T.readingSub + '</p>' + thumbs(false) + helpBtn());
     var lines = [], worker = null, i = 0;
+    function stage(text){ var e = el('mnStage'); if (e) e.innerHTML = text; }
     function ocr(){
       if (worker) return Promise.resolve(worker);
+      stage(T.gettingReady);
       return loadScript(TESSERACT_SRC).then(function(){
         return window.Tesseract.createWorker('eng', 1, { logger: function(m){
-          if (m && m.status === 'recognizing text') scanProgress((i + (m.progress || 0)) / list.length);
+          if (m && m.status === 'recognizing text') { stage(T.readingSub); scanProgress((i + (m.progress || 0)) / list.length); }
         } });
       }).then(function(w){ worker = w; return w; });
     }
-    function recognise(src){ return ocr().then(function(w){ return w.recognize(src, {}, { text: true, blocks: true }); }).then(function(r){ lines.push.apply(lines, ocrLines(r.data)); }); }
+    function loadImage(url){
+      return new Promise(function(resolve, reject){
+        var img = new Image();
+        img.onload = function(){ var c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0); resolve(c); };
+        img.onerror = function(){ reject(new Error('image')); };
+        img.src = url;
+      });
+    }
+    // Every price is read a second time, zoomed in and looking only for digits. When the two readings disagree
+    // (an 11 read as 1, a 7 as 2), that price is marked unsure, so it shows yellow for the owner to check.
+    function checkPrices(w, canvas, data){
+      var todo = [];
+      (data.blocks || []).forEach(function(b){ (b.paragraphs || []).forEach(function(p){ (p.lines || []).forEach(function(l){ (l.words || []).forEach(function(wd){
+        if (wd.bbox && /^[$S]?\d{1,4}([.,]\d{1,2})?$/.test(String(wd.text || '').trim())) todo.push(wd);
+      }); }); }); });
+      if (!todo.length) return Promise.resolve();
+      stage(T.checkingPrices);
+      var digits = function(t){ return String(t || '').replace(/[^0-9]/g, ''); };
+      return w.setParameters({ tessedit_char_whitelist: '0123456789.$', tessedit_pageseg_mode: '7' }).then(function(){
+        var k = 0;
+        return (function next(){
+          if (k >= todo.length) return;
+          var wd = todo[k++], b = wd.bbox, pad = Math.max(6, (b.y1 - b.y0) * 0.35);
+          var x0 = Math.max(0, b.x0 - pad), y0 = Math.max(0, b.y0 - pad), x1 = Math.min(canvas.width, b.x1 + pad), y1 = Math.min(canvas.height, b.y1 + pad);
+          var c = document.createElement('canvas'); c.width = Math.round((x1 - x0) * 3); c.height = Math.round((y1 - y0) * 3);
+          var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(canvas, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+          return w.recognize(c).then(function(r){
+            var raw = String(r.data.text || '').replace(/[^0-9.$]/g, ''), again = digits(raw);
+            if (!again || again === digits(wd.text)) return;
+            wd.confidence = Math.min(wd.confidence, 40);
+            // The zoomed, digits-only reading is usually the right one: use it (still yellow, to check).
+            if (/^\$?\d{1,4}(\.\d{1,2})?$/.test(raw)) wd.text = raw;
+          }, function(){}).then(next);
+        })();
+      }).then(function(){ return w.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '3' }); });
+    }
+    function recognise(canvas, pageId){
+      return ocr().then(function(w){
+        return w.recognize(canvas, {}, { text: true, blocks: true }).then(function(r){
+          return checkPrices(w, canvas, r.data).then(function(){
+            ocrLines(r.data).forEach(function(l){ if (pageId) l.page = pageId; else delete l.box; lines.push(l); });
+          });
+        });
+      });
+    }
     function readPdfPage(pdf, n){
       return pdf.getPage(n).then(function(page){
         return page.getTextContent().then(function(tc){
@@ -31402,7 +31484,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
           }
           var vp = page.getViewport({ scale: 2 }), c = document.createElement('canvas');
           c.width = vp.width; c.height = vp.height;
-          return page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function(){ return recognise(c); });
+          return page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function(){ return recognise(c, null); });
         });
       });
     }
@@ -31418,7 +31500,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     (function next(){
       if (i >= list.length) return Promise.resolve();
       var pg = list[i];
-      return (pg.kind === 'pdf' ? readPdf(pg.preview) : recognise(pg.preview)).then(function(){ i++; scanProgress(i / list.length); return next(); });
+      return (pg.kind === 'pdf' ? readPdf(pg.preview) : loadImage(pg.preview).then(function(c){ return recognise(c, pg.id); })).then(function(){ i++; scanProgress(i / list.length); return next(); });
     })().then(function(){
       if (worker) worker.terminate();
       var parsed = parseMenuLines(lines);
@@ -31447,7 +31529,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     lns.forEach(function(l, li){ (l.words || []).forEach(function(w){
       var t = String(w.text || '').trim(); if (!t || !w.bbox) return;
       var cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
-      words.push({ t: t, c: w.confidence, line: li, x: cx * cos + cy * sin, y: -cx * sin + cy * cos, hw: (w.bbox.x1 - w.bbox.x0) / 2 });
+      words.push({ t: t, c: w.confidence, line: li, x: cx * cos + cy * sin, y: -cx * sin + cy * cos, hw: (w.bbox.x1 - w.bbox.x0) / 2, b: w.bbox });
     }); });
     if (!words.length) { lns.forEach(function(l){ lines.push({ text: l.text, conf: l.confidence }); }); return lines; }
     // A photo taken at an angle also leans the columns, so the gutter is looked for at a few slants and the
@@ -31476,10 +31558,20 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     Object.keys(parts).map(function(k){
       var p = parts[k], y = 0, c = 0;
       // A wrong price matters most, so a line is only as sure as its least certain price.
-      var pc = 100;
-      p.ws.forEach(function(w){ y += w.y; c += w.c; if (isPriceWord(w.t)) pc = Math.min(pc, w.c); });
-      return { col: p.col, y: y / p.ws.length, text: p.ws.map(function(w){ return w.t; }).join(' '), conf: Math.min(c / p.ws.length, pc) };
-    }).sort(function(a, b){ return a.col - b.col || a.y - b.y; }).forEach(function(o){ lines.push({ text: o.text, conf: o.conf }); });
+      // Where the line sits in the photo, so the owner can see it next to what was read.
+      var pc = 100, grow = function(bx, w){ return bx ? [Math.min(bx[0], w.b.x0), Math.min(bx[1], w.b.y0), Math.max(bx[2], w.b.x1), Math.max(bx[3], w.b.y1)] : [w.b.x0, w.b.y0, w.b.x1, w.b.y1]; };
+      var box = null, nbox = null, pbox = null;
+      // The price is the number(s) at the end of the line; a number inside the name ("18 holes") is part of the name.
+      var tail = p.ws.length;
+      while (tail > 0 && isPriceWord(p.ws[tail - 1].t)) tail--;
+      if (tail === 0) tail = p.ws.length;
+      p.ws.forEach(function(w, wi){
+        y += w.y; c += w.c;
+        box = grow(box, w);
+        if (wi >= tail) { pc = Math.min(pc, w.c); pbox = grow(pbox, w); } else nbox = grow(nbox, w);
+      });
+      return { col: p.col, y: y / p.ws.length, text: p.ws.map(function(w){ return w.t; }).join(' '), conf: Math.min(c / p.ws.length, pc), box: box, nbox: nbox, pbox: pbox };
+    }).sort(function(a, b){ return a.col - b.col || a.y - b.y; }).forEach(function(o){ lines.push({ text: o.text, conf: o.conf, box: o.box, nbox: o.nbox, pbox: o.pbox }); });
     return lines;
   }
   // Vertical bands (in the middle 70% of the page) that almost no word crosses. A band only counts as a gutter when
@@ -31536,24 +31628,86 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   function takeDiet(t, out){
     return t.replace(/\(\s*(VG|VE|V|GF|DF)\s*\)|(?:^|\s)(VG|GF|DF)(?=\s|$|,)/g, function(m, a, b){ var d = DIET[a || b]; if (d && out.indexOf(d) < 0) out.push(d); return ' '; }).replace(/\s+/g, ' ').trim();
   }
+  // Classic reader mix-ups in common menu words ("Crolssant", "Carbcnara", "Ceasar"), fixed only when exactly one
+  // well-known word is a single look-alike letter away, so a business's own names ("Toncini") are never touched.
+  var MENU_WORDS = {};
+  ('croissant croissants latte lattes americano espresso cappuccino macchiato mocha chai matcha cortado flat white drip coffee tea teas '
+    + 'london fog hot chocolate muffin muffins scone scones bagel bagels cookie cookies brownie brownies banana bread loaf granola yogurt parfait '
+    + 'oatmeal pancakes waffles french toast benedict eggs omelette omelet frittata hash browns bacon sausage ham toast sourdough brioche '
+    + 'avocado smoothie smoothies juice lemonade kombucha soda butter blueberry raspberry strawberry chocolate vanilla caramel cinnamon '
+    + 'poutine caesar salad salads calamari bruschetta wings nachos fries chips tacos taco quesadilla burrito soup chowder chili starters '
+    + 'appetizers shareables mains entrees desserts sides kids drinks beverages burgers burger cheeseburger sandwich sandwiches club wrap '
+    + 'chicken beef pork lamb salmon halibut cod tuna shrimp prawns scallops mussels lobster crab steak striploin ribeye tenderloin frites '
+    + 'carbonara linguine penne spaghetti fettuccine rigatoni gnocchi lasagna ravioli risotto pasta pizza margherita pepperoni prosciutto '
+    + 'pesto marinara alfredo bolognese arrabbiata parmesan mozzarella cheddar feta gouda brie swiss burrata ricotta goat cheese '
+    + 'tomato tomatoes basil garlic onion onions mushroom mushrooms spinach arugula romaine kale greens peppers jalapeno olives capers '
+    + 'lemon lime aioli mayo gravy sauce dressing vinaigrette balsamic honey maple chipotle sriracha teriyaki curry coconut ginger sesame '
+    + 'rice noodles ramen pho sushi bowl bowls tofu tempeh vegan vegetarian gluten dairy free creme brulee cheesecake torte tart pie gelato '
+    + 'sorbet ice cream sundae coulis whipped seasonal house daily special specials served with choice of side salad fries add extra '
+    + 'beer beers lager pilsner ale ipa stout porter sour cider wine wines red white rose sparkling prosecco champagne cocktail cocktails '
+    + 'mocktail mocktails martini margarita mojito negroni spritz sangria whisky whiskey bourbon vodka gin rum tequila mezcal liqueur '
+    + 'merlot pinot gris noir grigio chardonnay riesling gewurztraminer cabernet sauvignon franc syrah shiraz malbec viognier blanc '
+    + 'tasting flight flights glass bottle pour pours reserve vintage estate '
+    + 'holes weekday weekend twilight cart carts rental rentals range bucket balls lesson lessons junior senior adult adults child '
+    + 'children member members green fees membership round rounds tour tours cruise cruises winery wineries class classes lunch dinner '
+    + 'breakfast brunch pickup private group guided admission entry pass passes day hour hours').split(' ').forEach(function(w){ if (w) MENU_WORDS[w] = 1; });
+  var LOOKALIKE = [['l', 'i'], ['i', 'l'], ['1', 'l'], ['1', 'i'], ['0', 'o'], ['5', 's'], ['c', 'e'], ['e', 'c'], ['c', 'o'], ['o', 'c'], ['rn', 'm'], ['cl', 'd'], ['vv', 'w'], ['ea', 'ae'], ['ae', 'ea']];
+  function fixWord(w){
+    var low = w.toLowerCase();
+    if (low.length < 4 || MENU_WORDS[low] || !/^[a-z0-9]+$/.test(low)) return w;
+    var found = {};
+    LOOKALIKE.forEach(function(pair){
+      for (var at = low.indexOf(pair[0]); at >= 0; at = low.indexOf(pair[0], at + 1)) {
+        var cand = low.slice(0, at) + pair[1] + low.slice(at + pair[0].length);
+        if (MENU_WORDS[cand]) found[cand] = 1;
+      }
+    });
+    var keys = Object.keys(found);
+    if (keys.length !== 1) return w;
+    var fixed = keys[0];
+    if (w === w.toUpperCase()) return fixed.toUpperCase();
+    return /^[A-Z]/.test(w) ? fixed.charAt(0).toUpperCase() + fixed.slice(1) : fixed;
+  }
+  function fixWords(t){ return String(t || '').replace(/[A-Za-z0-9]+/g, fixWord); }
+  // The part of the photo a dish came from (its lines, on one page), shown under it while checking.
+  // n is where the dish's name is printed and p its price; the owner sees those two bits of the photo side by side.
+  function srcOf(lns){
+    var page = null, b = null, n = null, pr = null;
+    lns.forEach(function(l){
+      if (!l || !l.box || !l.page || (page && l.page !== page)) return;
+      page = l.page;
+      b = b ? [Math.min(b[0], l.box[0]), Math.min(b[1], l.box[1]), Math.max(b[2], l.box[2]), Math.max(b[3], l.box[3])] : l.box.slice();
+      if (!n && l.nbox) n = l.nbox;
+      if (l.pbox) pr = l.pbox;
+    });
+    if (!page || !b) return null;
+    var out = { f: page, b: b.map(Math.round) };
+    if (n) out.n = n.map(Math.round);
+    if (pr) out.p = pr.map(Math.round);
+    return out;
+  }
   function parseMenuLines(lines){
     var sections = [], cur = null, last = null, pending = null;
-    function section(name){ cur = { name: niceCase(name), note: '', items: [] }; sections.push(cur); last = null; }
-    function item(name, desc, price, conf){
+    function section(name){ cur = { name: fixWords(niceCase(name)), note: '', items: [] }; sections.push(cur); last = null; }
+    function item(name, desc, price, conf, from){
       if (!cur) section('Menu');
       var diet = [];
       name = takeDiet(name, diet).replace(/^[\s\-–—:*•]+|[\s\-–—:.$]+$/g, '');
       desc = takeDiet(desc || '', diet);
       if (!name) return;
-      name = niceCase(name).replace(/^[a-z]/, function(c){ return c.toUpperCase(); });
-      last = { name: name, description: desc, price: price || '', dietary: diet, check: conf < 75 };
+      name = fixWords(niceCase(name)).replace(/^[a-z]/, function(c){ return c.toUpperCase(); });
+      last = { name: name, description: fixWords(desc), price: price || '', dietary: diet, check: conf < 75 };
+      var src = srcOf(from || []);
+      if (src) last.src = src;
+      last._from = (from || []).slice();
       cur.items.push(last);
     }
+    function grow(it, ln){ if (!it) return; it._from.push(ln); var src = srcOf(it._from); if (src) it.src = src; }
     // A held line that isn't a dish: a sentence under a fresh heading is that section's note, otherwise a heading.
     function flush(){
       if (!pending) return;
       // Stray marks ("Americano \u201c+") mean a price the reader could not make out, not a heading.
-      if (/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]/.test(pending.text) && cur) item(pending.text.replace(/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]+/g, ' ').trim(), '', '', 0);
+      if (/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]/.test(pending.text) && cur) item(pending.text.replace(/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]+/g, ' ').trim(), '', '', 0, [pending.ln]);
       else if (cur && !cur.items.length && words(pending.text) > 2) cur.note = (cur.note ? cur.note + ' ' : '') + pending.text;
       else section(pending.text);
       pending = null;
@@ -31569,28 +31723,29 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         if (m[1] || unit) price = (m[1] ? 'From ' : '') + '$' + price + unit;
         var rest = t.slice(0, m.index).trim();
         if (rest.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) {
-          if (pending) { item(pending.text, '', price, Math.min(conf, pending.conf)); pending = null; }
-          else if (last && !last.price) { last.price = price; if (conf < 75) last.check = true; }
+          if (pending) { item(pending.text, '', price, Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; }
+          else if (last && !last.price) { last.price = price; if (conf < 75) last.check = true; grow(last, ln); }
           return;
         }
-        if (pending && looksDesc(rest)) { item(pending.text, rest, price, Math.min(conf, pending.conf)); pending = null; return; }
+        if (pending && looksDesc(rest)) { item(pending.text, rest, price, Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; return; }
         flush();
         var parts = /^(.{3,60}?)\s+[\-–—:]\s+(.+)$/.exec(rest);
-        if (parts && words(rest) > 6) item(parts[1], parts[2], price, conf); else item(rest, '', price, conf);
+        if (parts && words(rest) > 6) item(parts[1], parts[2], price, conf, [ln]); else item(rest, '', price, conf, [ln]);
         return;
       }
       if (t.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) return;
       if (isCapsHeading(t)) { flush(); section(t); return; }
       if (looksDesc(t)) {
-        if (pending) { item(pending.text, t, '', Math.min(conf, pending.conf)); pending = null; return; }
-        if (last) { last.description = (last.description ? last.description + ' ' : '') + t; return; }
+        if (pending) { item(pending.text, t, '', Math.min(conf, pending.conf), [pending.ln, ln]); pending = null; return; }
+        if (last) { last.description = (last.description ? last.description + ' ' : '') + fixWords(t); grow(last, ln); return; }
         if (cur && !cur.items.length) { cur.note = (cur.note ? cur.note + ' ' : '') + t; }
         return;
       }
       flush();
-      pending = { text: t, conf: conf };
+      pending = { text: t, conf: conf, ln: ln };
     });
-    if (pending) item(pending.text, '', '', pending.conf);
+    if (pending) item(pending.text, '', '', pending.conf, [pending.ln]);
+    sections.forEach(function(s){ s.items.forEach(function(it){ delete it._from; }); });
     sections = sections.filter(function(s){ return s.items.length; });
     sections.forEach(function(s){ s.items.forEach(function(it){ if (!it.price && !it.check) it.check = true; }); });
     // A lost decimal point: on a menu priced in dollars and cents, "575" is $5.75 (shown yellow to check).
@@ -31622,6 +31777,13 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       if (t.hasAttribute('data-replace')) return api('/restart', {}).then(function(){ addFiles(picked); });
       return addFiles(picked);
     }
+    if (t.hasAttribute('data-moveto')) {
+      var mv = openItem.split(':'), from = data.sections[+mv[0]].items, to = data.sections[+t.value];
+      if (!to || +t.value === +mv[0]) return;
+      to.items.push(from.splice(+mv[1], 1)[0]);
+      openItem = t.value + ':' + (to.items.length - 1);
+      save(); return rerender();
+    }
     if (t.hasAttribute('data-diet')) {
       var it = currentItem(); if (!it) return;
       var d = t.getAttribute('data-diet'), at = it.dietary.indexOf(d);
@@ -31646,6 +31808,14 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var act = t.getAttribute('data-act');
     if (!act && t.hasAttribute('data-item')) { openItem = t.getAttribute('data-item'); rerender(); var inp = app.querySelector('.mn-open input'); if (inp) inp.focus(); return; }
     if (act === 'close') { openItem = null; save(); return rerender(); }
+    if (act === 'up' || act === 'down') {
+      var q = openItem.split(':'), qs = +q[0], qi = +q[1], list = data.sections[qs].items, moving = list[qi];
+      if (act === 'up' && qi > 0) { list.splice(qi, 1); list.splice(qi - 1, 0, moving); openItem = qs + ':' + (qi - 1); }
+      else if (act === 'up' && qs > 0) { list.splice(qi, 1); data.sections[qs - 1].items.push(moving); openItem = (qs - 1) + ':' + (data.sections[qs - 1].items.length - 1); }
+      else if (act === 'down' && qi < list.length - 1) { list.splice(qi, 1); list.splice(qi + 1, 0, moving); openItem = qs + ':' + (qi + 1); }
+      else if (act === 'down' && qs < data.sections.length - 1) { list.splice(qi, 1); data.sections[qs + 1].items.unshift(moving); openItem = (qs + 1) + ':0'; }
+      save(); return rerender();
+    }
     if (act === 'del-item') { var p = openItem.split(':'); data.sections[+p[0]].items.splice(+p[1], 1); openItem = null; save(); return rerender(); }
     if (act === 'add-item') { var si = +t.getAttribute('data-s'); data.sections[si].items.push({ name: T.newDishText, description: '', price: '', dietary: [], check: false }); openItem = si + ':' + (data.sections[si].items.length - 1); save(); rerender(); var i2 = app.querySelector('.mn-open input'); if (i2) i2.select(); return; }
     if (act === 'add-sec') { data.sections.push({ name: T.newSectionText, note: '', items: [{ name: T.newDishText, description: '', price: '', dietary: [], check: false }] }); openItem = (data.sections.length - 1) + ':0'; save(); return rerender(); }
@@ -31752,6 +31922,12 @@ ${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}: ${venue.na
   body.owner-page .mn-open label, body.owner-page .mn-email { display: block; font-weight: 700; font-size: 0.92rem; margin: 0 0 10px; }
   body.owner-page .mn-open input[type=text], body.owner-page .mn-open textarea, body.owner-page .mn-email input, body.owner-page .mn-email textarea { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 1.05rem; padding: 10px 12px; margin-top: 4px; border: 1px solid rgba(42,32,25,0.3); border-radius: 10px; background: #fff; }
   body.owner-page .mn-chip { display: inline-flex !important; align-items: center; gap: 6px; font-weight: 700; font-size: 0.88rem !important; background: var(--paper, #F7F1E6); border-radius: 999px; padding: 6px 12px; margin: 0 !important; }
+  body.owner-page .mn-strip { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+  body.owner-page .mn-crop { display: block; flex: none; max-width: 100%; background-repeat: no-repeat; border-radius: 4px; box-shadow: 0 0 0 1px rgba(42,32,25,0.15); }
+  body.owner-page .mn-move { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 4px 0 6px; font-size: 0.92rem; }
+  body.owner-page .mn-move button:disabled { opacity: 0.35; }
+  body.owner-page .mn-moveto { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; font-weight: 700; }
+  body.owner-page .mn-moveto select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(42,32,25,0.3); background: #fff; max-width: 160px; }
   body.owner-page .mn-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0 4px; }
   body.owner-page .mn-saved { text-align: center; min-height: 1.2em; font-size: 0.88rem; color: #2E7D4F; font-weight: 700; margin: 6px 0 0; }
   body.owner-page .mn-photos { margin: 12px 0; }
