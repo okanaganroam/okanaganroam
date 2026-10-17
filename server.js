@@ -5190,6 +5190,36 @@ function seasonStateOn(s, today) {
   return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text };
 }
 
+// "5-10" -> "May \u2013 October" (fr: "mai \u2013 octobre").
+const MONTH_NAMES = { en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  fr: ['janvier', 'f\u00e9vrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'ao\u00fbt', 'septembre', 'octobre', 'novembre', 'd\u00e9cembre'] };
+function openMonthsText(value, lang = 'en') {
+  const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(value || ''));
+  if (!m) return '';
+  const names = MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'];
+  return lang === 'fr' ? `${names[Number(m[1]) - 1]} \u00e0 ${names[Number(m[2]) - 1]}` : `${names[Number(m[1]) - 1]} \u2013 ${names[Number(m[2]) - 1]}`;
+}
+// An owner's yearly season ("open May to October") as a season row for `today`, in the same shape as venue_seasons:
+// out of season -> closed until the first day of the opening month; the last 30 days of the season -> open until the
+// last day; otherwise null (open as usual). Months can wrap the new year ("11-4", a winter business).
+function recurringSeasonRow(venueId, openMonths, today) {
+  const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(openMonths || ''));
+  if (!m || !parseLocalDate(today)) return null;
+  const from = Number(m[1]), to = Number(m[2]);
+  const y = Number(today.slice(0, 4)), mon = Number(today.slice(5, 7));
+  const iso = (yy, mm, dd) => { const d = new Date(Date.UTC(yy, mm - 1, dd)); return d.toISOString().slice(0, 10); };
+  const inSeason = from <= to ? mon >= from && mon <= to : mon >= from || mon <= to;
+  if (inSeason) {
+    const endYear = from <= to || mon <= to ? y : y + 1;
+    const until = iso(endYear, to + 1, 0); // last day of the closing month
+    return addLocalDays(today, 30) >= until ? { venue_id: venueId, status: 'open_until', until_date: until, reopens_date: null, source_url: null, checked_at: today } : null;
+  }
+  const openYear = mon < from ? y : y + 1;
+  const reopens = iso(openYear, from, 1);
+  const closedFrom = mon > to ? iso(y, to + 1, 1) : iso(y - 1, to + 1, 1);
+  return { venue_id: venueId, status: 'closed', until_date: null, reopens_date: reopens, source_url: null, checked_at: closedFrom };
+}
+
 function getSeasonRows() {
   const map = new Map();
   for (const r of db.prepare(`
@@ -5197,6 +5227,14 @@ function getSeasonRows() {
     FROM venue_seasons s JOIN venues v ON v.id = s.venue_id
     WHERE v.redirect_to IS NULL
   `).all()) map.set(r.venue_id, r);
+  // Owners' yearly seasons, where no dated closure has been set by hand.
+  const today = todayLocal();
+  for (const r of db.prepare(`SELECT l.venue_id, l.open_months FROM venue_links l JOIN venues v ON v.id = l.venue_id
+    WHERE l.open_months IS NOT NULL AND v.redirect_to IS NULL`).all()) {
+    if (map.has(r.venue_id)) continue;
+    const row = recurringSeasonRow(r.venue_id, r.open_months, today);
+    if (row) map.set(r.venue_id, row);
+  }
   return map;
 }
 
@@ -22366,6 +22404,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     }).join('');
     hoursHtml = `<h2>${L('Hours', 'Heures')}</h2><ul class="hours-list" data-today="${today}">${rows}</ul>`;
   }
+  // An owner's yearly season ("Open May \u2013 October") goes with the hours.
+  const openMonths = venue.redirect_to ? null : venueLinks(venue.id).open_months;
+  if (openMonths) {
+    const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${L('Open', 'Ouvert de')} ${escapeHtml(openMonthsText(openMonths, fr ? 'fr' : 'en'))}${fr ? '' : ' each year'}</p>`;
+    hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
+  }
 
   // Outbound links carry a data-track kind so the venue-page engagement
   // script can report them (golf 2026-09-19; every venue type since
@@ -28603,7 +28647,7 @@ function venueLookup(q, region) {
 }
 function renderListYourVenuePage() {
   const title = 'List Your Venue | Okanagan Roam';
-  const description = 'Own a restaurant, winery, cafe, brewery or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
+  const description = 'Own a restaurant, winery, cafe, brewery, tour company, golf course or other Okanagan venue? Send us your details and we will review them for a listing on Okanagan Roam.';
   const canonical = 'https://okanaganroam.com/list-your-venue';
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -28674,7 +28718,7 @@ ${renderGolfHeaderHtml()}
     <div class="list-venue-head">
       <span class="eyebrow">Free for every Okanagan business</span>
       <h1>List Your Venue on Okanagan Roam</h1>
-      <p>Own a restaurant, winery, caf&eacute;, brewery or other place visitors should know about? Listing it is free. Tell us about it below &mdash; every submission is reviewed by a person before anything appears on Okanagan Roam.</p>
+      <p>Own a restaurant, winery, caf&eacute;, brewery, tour company, golf course or other place visitors should know about? Listing it is free. Tell us about it below &mdash; every submission is reviewed by a person before anything appears on Okanagan Roam.</p>
     </div>
     <div class="lyv-panel lyv-lookup">
       <h2>Already listed? Find your venue</h2>
@@ -28766,6 +28810,25 @@ ${renderGolfHeaderHtml()}
   if (!form || !window.fetch) return;
   var startedAt = Date.now();
   var fields = { name: 'lyvName', type: 'lyvType', region: 'lyvRegion', description: 'lyvDescription', address: 'lyvAddress', website: 'lyvWebsite', phone: 'lyvPhone', cuisine: 'lyvCuisine', hours_text: 'lyvHours', social_url: 'lyvSocial', happy_hour_text: 'lyvHappyHour', contact_name: 'lyvContactName', contact_email: 'lyvContactEmail', submitter_role: 'lyvRole', consent: 'lyvConsent' };
+  // Food and drink questions (cuisine, vegan, happy hour...) only for food and drink places: a tour company or a golf
+  // course doesn't see them.
+  var typeSel = document.getElementById('lyvType');
+  var FOOD_TYPES = { restaurant: 1, cafe: 1, pub: 1, cocktail: 1, brewery: 1, distillery: 1, winery: 1 };
+  var FOOD_ONLY = ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv', 'happy_hour'];
+  function syncType(){
+    var t = typeSel ? typeSel.value : '';
+    var food = !t || FOOD_TYPES[t];
+    var cuisine = document.getElementById('lyvCuisine');
+    if (cuisine && cuisine.closest('.form-field')) cuisine.closest('.form-field').hidden = !food;
+    FOOD_ONLY.forEach(function(v){
+      var box = form.querySelector('input[name="amenities"][value="' + v + '"]');
+      if (!box) return;
+      var lab = box.closest('label') || box.parentNode;
+      lab.hidden = !food;
+      if (!food && box.checked) { box.checked = false; box.dispatchEvent(new Event('change')); }
+    });
+  }
+  if (typeSel) { typeSel.addEventListener('change', syncType); syncType(); }
   // Happy hour times appear once Happy Hour is ticked.
   var hhBox = form.querySelector('input[name="amenities"][value="happy_hour"]'), hhRow = document.getElementById('lyvHappyHourRow');
   if (hhBox && hhRow) { var syncHH = function(){ hhRow.hidden = !hhBox.checked; }; hhBox.addEventListener('change', syncHH); syncHH(); }
@@ -29573,12 +29636,12 @@ function ownerOptionalEmail(value) {
 function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
-const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
+const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months'];
 // Name, address and links (2026-10-15). Links live in venue_links.
 const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
 function venueLinks(venueId) {
-  return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url FROM venue_links WHERE venue_id = ?').get(venueId)
-    || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null };
+  return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
+    || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null, open_months: null };
 }
 // Instagram/Facebook links for listing cards (2026-10-16): one read of the
 // small venue_links table, kept for a minute and dropped whenever a link is
@@ -29809,6 +29872,12 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     }
     if (url !== current[f]) changes[f] = url || null;
   }
+  if ('open_months' in input) {
+    const raw = typeof input.open_months === 'string' ? input.open_months.trim() : '';
+    const m = /^(1[0-2]|[1-9])-(1[0-2]|[1-9])$/.exec(raw);
+    if (raw && (!m || m[1] === m[2])) errors.open_months = 'Please pick the first and last month you\u2019re open.';
+    else if (raw !== (current.open_months || '')) changes.open_months = raw || null;
+  }
   if ('badges' in input) {
     const b = input.badges;
     if (!b || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).some((k) => !RESEARCHED_BOOL_FIELDS.includes(k) || typeof b[k] !== 'boolean')) {
@@ -29873,7 +29942,7 @@ function listOwnerChanges(status = 'pending') {
 }
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
-  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook' };
+  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season' };
 function ownerWeekText(json) {
   if (!json) return '(none)';
   try {
@@ -29883,6 +29952,7 @@ function ownerWeekText(json) {
 }
 function ownerValueText(field, value) {
   if (field === 'hours' || field === 'happy_hour') return ownerWeekText(value);
+  if (field === 'open_months') return value ? openMonthsText(value) : 'Open all year';
   if (field === 'badges') return Object.entries(value).map(([k, on]) => `${on ? 'add' : 'remove'} ${BADGE_LABELS[k] ? BADGE_LABELS[k].title : k}`).join(', ');
   return value == null || value === '' ? '(none)' : String(value);
 }
@@ -34299,7 +34369,7 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
         continue;
       }
       if (field === 'happy_hour') continue; // same reason; written below
-      if (OWNER_LINK_FIELDS.includes(field)) {
+      if (OWNER_LINK_FIELDS.includes(field) || field === 'open_months') {
         const before = venueLinks(venue.id)[field];
         db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, value);
         clearVenueSocialCache();
@@ -35145,8 +35215,8 @@ function ownerMenuCardHtml(venue, href) {
   const sub = pub ? `Your ${what} ${w ? 'are' : 'is'} live (${menuDishCountText(pub.items, 'en', menuKind(venue))}). Tap to change or replace ${w ? 'them' : 'it'}.`
     : draft && ['pending', 'help'].includes(draft.status) ? `Thanks! We have your ${what} and will put ${w ? 'them' : 'it'} up soon.`
       : draft ? `You started adding your ${what}. Tap to pick up where you left off.`
-        : w ? `Take a photo of your price list or brochure. We turn it into ${w.en.blurb} on your page in about 2 minutes.`
-          : 'Take a photo of your menu. We turn it into text on your page in about 2 minutes.';
+        : w ? `Snap a photo of your price list, or share the link from your website. We turn it into ${w.en.blurb} on your page in about 2 minutes.`
+          : 'Snap a photo of your menu, or share the link from your website. We turn it into text on your page in about 2 minutes.';
   const big = w ? `${pub ? '&#128203; Your' : '&#128247; Add your'} ${escapeHtml(w.en.list)}` : (pub ? '&#128203; Your menu' : '&#128247; Add your menu');
   return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
 }
@@ -35210,6 +35280,9 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-wrap { max-width: 760px; margin: 0 auto; padding: 16px 0 48px; }
   body.owner-page .op-head p { color: rgba(42,32,25,0.75); }
   body.owner-page .op-pending { background: #FFF6E5; border-radius: 12px; padding: 12px 16px; font-weight: 600; }
+  body.owner-page .op-season { margin: 14px 0 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  body.owner-page .op-season select { width: auto; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; }
+  body.owner-page .op-season .op-hint { flex-basis: 100%; margin: 2px 0 0; }
   body.owner-page .op-menu-card { display: block; background: var(--ref-navy, #1F3A5F); color: #fff; border-radius: 18px; padding: 18px 20px; margin: 16px 0; text-decoration: none; }
   body.owner-page .op-menu-card:hover, body.owner-page .op-menu-card:focus { color: #fff; filter: brightness(1.1); }
   body.owner-page .op-menu-big { display: block; font-size: 1.35rem; font-weight: 800; }
@@ -35273,7 +35346,7 @@ ${renderGolfHeaderHtml()}
       ${ownerActivityHtml(ownerVenueActivity(venue.id))}
       ${found.account ? `<p class="op-bar-in">Signed in as <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="/owner/account">My listings</a> &middot; <a href="/owner/account/settings">Account settings</a></p>` : `
       <details class="op-login" id="opLogin">
-        <summary><strong>Create a login</strong> so you don&rsquo;t need this link next time</summary>
+        <summary><strong>Create a login</strong> (30 seconds): your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} then go live straight away, and you won&rsquo;t need this link next time</summary>
         <form id="olsForm" novalidate>
           <p class="op-hint">Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login? Use the same email and password to add this business to it. <a href="/owner/forgot">Forgot your password?</a></p>
           <div class="form-row">
@@ -35291,6 +35364,19 @@ ${renderGolfHeaderHtml()}
       <p class="op-hint">${hoursKnown ? '' : '<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. '}${hoursKnown ? 'Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ' : ''}Closing after midnight? Just enter the closing time, like 01:00.</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>
+      ${(() => {
+        // Seasonal businesses (tours, golf, patios): the months they open every year.
+        const om = /^(\d{1,2})-(\d{1,2})$/.exec(snap.open_months || '');
+        const opts = (sel) => MONTH_NAMES.en.map((n, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${n}</option>`).join('');
+        return `<div class="op-season">
+        <label for="opSeasonMode"><strong>Season</strong></label>
+        <select id="opSeasonMode" onchange="document.getElementById('opSeasonMonths').hidden = !this.value"><option value="">Open all year</option><option value="season"${om ? ' selected' : ''}>Open some months only</option></select>
+        <span id="opSeasonMonths"${om ? '' : ' hidden'}>from <select id="opSeasonFrom" aria-label="First month open">${opts(om ? Number(om[1]) : 5)}</select>
+        to <select id="opSeasonTo" aria-label="Last month open">${opts(om ? Number(om[2]) : 10)}</select></span>
+        <p class="lyv-error" id="opSeasonError" hidden></p>
+        <p class="op-hint">Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.</p>
+      </div>`;
+      })()}
 
       <p class="lyv-section-label">Contact</p>
       <div class="form-row">
@@ -35525,8 +35611,10 @@ ${renderGolfHeaderHtml()}
       menu_url: document.getElementById('opMenu').value, booking_url: document.getElementById('opBooking').value,
       instagram_url: document.getElementById('opInstagram').value, facebook_url: document.getElementById('opFacebook').value,
       description: document.getElementById('opDescription').value,
+      open_months: document.getElementById('opSeasonMode').value ? document.getElementById('opSeasonFrom').value + '-' + document.getElementById('opSeasonTo').value : '',
       badges: {}
     };
+    if (changes.open_months && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', 'Please pick two different months, or choose Open all year.'); jumpToError(form); return; }
     Array.prototype.forEach.call(document.querySelectorAll('#opBadges input'), function(b){ changes.badges[b.value] = b.checked; });
     if (document.getElementById('opHappy')) {
       var hh = week('opHappy');
@@ -35537,7 +35625,7 @@ ${renderGolfHeaderHtml()}
     if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
     if (changes.phone === initial.phone) delete changes.phone;
     if (changes.website === initial.website) delete changes.website;
-    ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url'].forEach(function(k){ if (changes[k] === initial[k]) delete changes[k]; });
+    ['name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months'].forEach(function(k){ if (changes[k] === (initial[k] || '')) delete changes[k]; });
     if (changes.description === initial.description) delete changes.description;
     var btn = document.getElementById('opSubmit');
     btn.disabled = true;
@@ -39281,6 +39369,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  recurringSeasonRow,
   // Visitor photos & tips (2026-10-17)
   visitorDisplayName,
   stripJpegMetadata,

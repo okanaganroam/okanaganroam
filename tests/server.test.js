@@ -22814,3 +22814,46 @@ test('New business (2026-10-17): approval emails the owner their private edit li
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner season (2026-10-17): an owner sets "open May to October"; out of season the page says closed for the season, not open now', async () => {
+  // The yearly season as a dated row for a given day.
+  assert.equal(app.recurringSeasonRow(1, '5-10', '2026-07-15'), null, 'mid-season: nothing to say');
+  assert.deepEqual(app.recurringSeasonRow(1, '5-10', '2026-10-10'), { venue_id: 1, status: 'open_until', until_date: '2026-10-31', reopens_date: null, source_url: null, checked_at: '2026-10-10' });
+  assert.equal(app.recurringSeasonRow(1, '5-10', '2026-12-01').reopens_date, '2027-05-01');
+  assert.equal(app.recurringSeasonRow(1, '5-10', '2026-02-01').reopens_date, '2026-05-01');
+  assert.equal(app.recurringSeasonRow(1, '11-4', '2026-07-15').reopens_date, '2026-11-01', 'a winter season wraps the new year');
+  assert.equal(app.recurringSeasonRow(1, '11-4', '2027-01-15'), null);
+
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Season Fixture Sleigh', type: 'tour', hours: SEASON_WEEK, slug: 'season-fixture-sleigh' });
+  const v = app.findVenueBySlug('kelowna', 'tour', 'season-fixture-sleigh');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.26.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  app.setVenueSubmissionTransport(async () => {});
+  try {
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /id="opSeasonMode"/);
+    assert.match(page, /Create a login<\/strong> \(30 seconds\): your photos and prices then go live straight away/);
+    assert.equal((await post(`/owner/${token}/changes`, { changes: { open_months: '6-6' }, started_at: Date.now() - 10000 })).status, 400);
+    const ch = await post(`/owner/${token}/changes`, { changes: { open_months: '11-4' }, started_at: Date.now() - 10000 });
+    assert.equal(ch.status, 201, JSON.stringify(ch.body));
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    assert.match(await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text()), /November – April/);
+    assert.equal((await post(`/admin/review/change/${ch.body.id}/approve`, {}, cookie)).status, 200);
+    // The test day is in July: a November-to-April business is out of season.
+    const html = await fetch(`${base}/kelowna/tours/season-fixture-sleigh`).then((r) => r.text());
+    assert.match(html, /Open November – April each year/);
+    assert.match(html, /Closed for the season\. Reopens November 1/);
+    assert.doesNotMatch(html, /id="venueOpenStatus"/, "no Open now for her out of season");
+  } finally {
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});

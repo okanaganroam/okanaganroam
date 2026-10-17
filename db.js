@@ -964,6 +964,11 @@ CREATE TABLE IF NOT EXISTS venue_links (
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `);
+// The months a seasonal business opens every year, "5-10" (May to October) or "11-4" (winter); NULL = all year.
+// Set by the owner (2026-10-17); server.js turns it into the same season notes as venue_seasons.
+if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'open_months')) {
+  db.exec('ALTER TABLE venue_links ADD COLUMN open_months TEXT');
+}
 
 // Visitor photos & tips (2026-10-17, drafts/visitor-photos-tips-plan.md): a
 // visitor sends a short tip and/or up to 3 photos for a listing. It stays
