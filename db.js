@@ -965,4 +965,51 @@ CREATE TABLE IF NOT EXISTS venue_links (
 );
 `);
 
+// Visitor photos & tips (2026-10-17, drafts/visitor-photos-tips-plan.md): a
+// visitor sends a short tip and/or up to 3 photos for a listing. It stays
+// 'unconfirmed' until they click the emailed link (only its hash is kept),
+// then 'pending' until Dayton approves it on /admin/review. email is private:
+// it is never shown on a page or returned by an API. display_name is the
+// first name and last initial the server made from what they typed. Photo
+// files live with the owner photos on the persistent volume (server.js
+// OWNER_PHOTO_DIR); preview_key is an unguessable id for viewing one before
+// it is approved. lang is the page they sent it from ('en' or 'fr'), so the
+// emails and the confirm page use their language.
+db.exec(`
+CREATE TABLE IF NOT EXISTS visitor_contributions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  display_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  tip TEXT,
+  status TEXT NOT NULL DEFAULT 'unconfirmed' CHECK (status IN ('unconfirmed', 'pending', 'approved', 'rejected', 'removed')),
+  confirm_token_hash TEXT UNIQUE,
+  confirm_expires_at TEXT,
+  confirmed_at TEXT,
+  rights_confirmed_at TEXT NOT NULL,
+  honesty_confirmed_at TEXT NOT NULL,
+  ip_hash TEXT,
+  lang TEXT NOT NULL DEFAULT 'en',
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT,
+  reported_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_visitor_contributions_venue ON visitor_contributions (venue_id, status);
+CREATE INDEX IF NOT EXISTS idx_visitor_contributions_status ON visitor_contributions (status, submitted_at);
+CREATE INDEX IF NOT EXISTS idx_visitor_contributions_email ON visitor_contributions (email, submitted_at);
+CREATE TABLE IF NOT EXISTS visitor_contribution_photos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contribution_id INTEGER NOT NULL REFERENCES visitor_contributions(id),
+  file TEXT NOT NULL UNIQUE,
+  preview_key TEXT NOT NULL UNIQUE,
+  width INTEGER,
+  height INTEGER,
+  bytes INTEGER,
+  made_main_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_visitor_contribution_photos_contribution ON visitor_contribution_photos (contribution_id);
+`);
+
 module.exports = db;
