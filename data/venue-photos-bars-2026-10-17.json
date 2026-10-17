@@ -1,0 +1,1650 @@
+{
+  "reason": "Pub, brewery, cocktail bar and distillery listing photos from Google Maps (that exact location), the venue's website or other pages about it; Dayton reviewed the contact sheet and said deploy all on 2026-10-17.",
+  "batch_id": "venue-photos-bars-2026-10-17",
+  "venues": [
+    {
+      "id": 688,
+      "name": "The Gunbarrel Saloon",
+      "region": "apex",
+      "slug": "the-gunbarrel-saloon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-gunbarrel-saloon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 93,
+      "name": "Branding Iron Pub",
+      "region": "armstrong",
+      "slug": "branding-iron-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/branding-iron-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 211,
+      "name": "Farmstrong Cider Company",
+      "region": "armstrong",
+      "slug": "farmstrong-cider-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/farmstrong-cider-company-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 597,
+      "name": "Snowshoe Sam's",
+      "region": "big-white",
+      "slug": "snowshoe-sam-s",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/snowshoe-sam-s-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 15,
+      "name": "Alexander's Beach Pub & Liquor Store",
+      "region": "coldstream",
+      "slug": "alexander-s-beach-pub-liquor-store",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/alexander-s-beach-pub-liquor-store-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1426,
+      "name": "Tony's Craft Cidery",
+      "region": "coldstream",
+      "slug": "tonys-craft-cidery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tonys-craft-cidery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 221,
+      "name": "Fortune's Landing Motel | Enderby Restaurant & Pub",
+      "region": "enderby",
+      "slug": "fortune-s-landing-motel-enderby-restaurant-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fortune-s-landing-motel-enderby-restaurant-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1431,
+      "name": "Riverfront Pub & Grill",
+      "region": "enderby",
+      "slug": "riverfront-pub-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/riverfront-pub-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1667,
+      "name": "Shuswap Cider Company",
+      "region": "enderby",
+      "slug": "shuswap-cider-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shuswap-cider-company-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 714,
+      "name": "The Small Axe Road House",
+      "region": "enderby",
+      "slug": "the-small-axe-road-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-small-axe-road-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 6,
+      "name": "27",
+      "region": "kelowna",
+      "slug": "27",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/27-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1645,
+      "name": "97 Street Pub",
+      "region": "kelowna",
+      "slug": "97-street-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/97-street-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 33,
+      "name": "Ask Pablo Cocktail Bar + Kitchen",
+      "region": "kelowna",
+      "slug": "ask-pablo-cocktail-bar-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ask-pablo-cocktail-bar-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 39,
+      "name": "BNA Brewing Kelowna",
+      "region": "kelowna",
+      "slug": "bna-brewing-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bna-brewing-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 44,
+      "name": "BTS Cocktail Bar & Kitchen",
+      "region": "kelowna",
+      "slug": "bts-cocktail-bar-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bts-cocktail-bar-kitchen-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1783,
+      "name": "Bar One",
+      "region": "kelowna",
+      "slug": "bar-one",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bar-one-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 54,
+      "name": "Barn Owl Brewing",
+      "region": "kelowna",
+      "slug": "barn-owl-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/barn-owl-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1784,
+      "name": "Baxter's Bar & Grill",
+      "region": "kelowna",
+      "slug": "baxter-s-bar-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/baxter-s-bar-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 67,
+      "name": "Bernie's Supper Club & Cinema",
+      "region": "kelowna",
+      "slug": "bernie-s-supper-club-cinema",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bernie-s-supper-club-cinema-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 83,
+      "name": "Blue Gator Bar",
+      "region": "kelowna",
+      "slug": "blue-gator-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blue-gator-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1785,
+      "name": "Boomers Bar & Grill",
+      "region": "kelowna",
+      "slug": "boomers-bar-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boomers-bar-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1781,
+      "name": "Brandt's Creek Pub",
+      "region": "kelowna",
+      "slug": "brandt-s-creek-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/brandt-s-creek-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 100,
+      "name": "Buffalo Rouge Brewing Co.",
+      "region": "kelowna",
+      "slug": "buffalo-rouge-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/buffalo-rouge-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 109,
+      "name": "CRAFT Beer Market Kelowna",
+      "region": "kelowna",
+      "slug": "craft-beer-market-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/craft-beer-market-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 122,
+      "name": "Cantina del Centro - Kelowna",
+      "region": "kelowna",
+      "slug": "cantina-del-centro-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cantina-del-centro-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1413,
+      "name": "Copper Brewing Co.",
+      "region": "kelowna",
+      "slug": "copper-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/copper-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1077,
+      "name": "Ellison Field Taphouse",
+      "region": "kelowna",
+      "slug": "ellison-field-taphouse",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ellison-field-taphouse-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1417,
+      "name": "Freddy's Brewpub",
+      "region": "kelowna",
+      "slug": "freddys-brewpub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/freddys-brewpub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1414,
+      "name": "Grey Fox Brewing",
+      "region": "kelowna",
+      "slug": "grey-fox-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/grey-fox-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1415,
+      "name": "Jackknife Brewing",
+      "region": "kelowna",
+      "slug": "jackknife-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jackknife-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 329,
+      "name": "Kelowna Beer Institute",
+      "region": "kelowna",
+      "slug": "kelowna-beer-institute",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-beer-institute-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 330,
+      "name": "Kettle River Brewing Co.",
+      "region": "kelowna",
+      "slug": "kettle-river-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kettle-river-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 364,
+      "name": "Leopold's Tavern Kelowna - Bernard",
+      "region": "kelowna",
+      "slug": "leopold-s-tavern-kelowna-bernard",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/leopold-s-tavern-kelowna-bernard-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 374,
+      "name": "Luckhurst Farm & Distillery",
+      "region": "kelowna",
+      "slug": "luckhurst-farm-distillery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/luckhurst-farm-distillery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1782,
+      "name": "Match Eatery & Public House",
+      "region": "kelowna",
+      "slug": "match-eatery-public-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/match-eatery-public-house-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1644,
+      "name": "McCulloch Station Pub",
+      "region": "kelowna",
+      "slug": "mcculloch-station-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mcculloch-station-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 406,
+      "name": "Micro Bar + Bites",
+      "region": "kelowna",
+      "slug": "micro-bar-bites",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/micro-bar-bites-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 903,
+      "name": "O'Flannigan's Pub",
+      "region": "kelowna",
+      "slug": "o-flannigan-s-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/o-flannigan-s-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 458,
+      "name": "Okanagan Spirits Craft Distillery Kelowna",
+      "region": "kelowna",
+      "slug": "okanagan-spirits-craft-distillery-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-spirits-craft-distillery-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 466,
+      "name": "Original Joe's",
+      "region": "kelowna",
+      "slug": "original-joe-s",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/original-joe-s-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 470,
+      "name": "PNB - Pretty Not Bad",
+      "region": "kelowna",
+      "slug": "pnb-pretty-not-bad",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pnb-pretty-not-bad-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1780,
+      "name": "Packing House Pub",
+      "region": "kelowna",
+      "slug": "packing-house-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/packing-house-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 496,
+      "name": "Perch Sky Lounge",
+      "region": "kelowna",
+      "slug": "perch-sky-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/perch-sky-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 524,
+      "name": "Post Haus Pub",
+      "region": "kelowna",
+      "slug": "post-haus-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/post-haus-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 538,
+      "name": "Railside Brewing Ltd",
+      "region": "kelowna",
+      "slug": "railside-brewing-ltd",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/railside-brewing-ltd-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1412,
+      "name": "Red Bird Brewing",
+      "region": "kelowna",
+      "slug": "red-bird-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-bird-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 557,
+      "name": "Room 272 Bar + Bites",
+      "region": "kelowna",
+      "slug": "room-272-bar-bites",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/room-272-bar-bites-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1411,
+      "name": "Rustic Reel Brewing Co",
+      "region": "kelowna",
+      "slug": "rustic-reel-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rustic-reel-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1786,
+      "name": "Rusty's Sports Lounge",
+      "region": "kelowna",
+      "slug": "rusty-s-sports-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rusty-s-sports-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 575,
+      "name": "Scenic Road Cider Co.",
+      "region": "kelowna",
+      "slug": "scenic-road-cider-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/scenic-road-cider-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1643,
+      "name": "Shore Line Brewing Co.",
+      "region": "kelowna",
+      "slug": "shore-line-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shore-line-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 591,
+      "name": "Skinny Duke's Glorious Emporium",
+      "region": "kelowna",
+      "slug": "skinny-duke-s-glorious-emporium",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/skinny-duke-s-glorious-emporium-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1777,
+      "name": "So Fetch Canine Social Club",
+      "region": "kelowna",
+      "slug": "so-fetch-canine-social-club",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/so-fetch-canine-social-club-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 603,
+      "name": "Soma Craft Cidery",
+      "region": "kelowna",
+      "slug": "soma-craft-cidery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/soma-craft-cidery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 672,
+      "name": "The Canadian Brewhouse & Grill (Kelowna)",
+      "region": "kelowna",
+      "slug": "the-canadian-brewhouse-grill-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-canadian-brewhouse-grill-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 721,
+      "name": "Three Lakes Brewing Ltd",
+      "region": "kelowna",
+      "slug": "three-lakes-brewing-ltd",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/three-lakes-brewing-ltd-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 911,
+      "name": "Tonics Pub & Grill",
+      "region": "kelowna",
+      "slug": "tonics-pub-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tonics-pub-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 912,
+      "name": "Train Station Pub",
+      "region": "kelowna",
+      "slug": "train-station-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/train-station-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 741,
+      "name": "Tutt Street Tapas + Wine",
+      "region": "kelowna",
+      "slug": "tutt-street-tapas-wine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tutt-street-tapas-wine-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1455,
+      "name": "Unicorn Lounge",
+      "region": "kelowna",
+      "slug": "unicorn-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/unicorn-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 750,
+      "name": "Unleashed Brewing Company",
+      "region": "kelowna",
+      "slug": "unleashed-brewing-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/unleashed-brewing-company-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 752,
+      "name": "Upside Cidery",
+      "region": "kelowna",
+      "slug": "upside-cidery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/upside-cidery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 753,
+      "name": "Urban Distilleries",
+      "region": "kelowna",
+      "slug": "urban-distilleries",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/urban-distilleries-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 759,
+      "name": "Vice & Virtue Brewing Co.",
+      "region": "kelowna",
+      "slug": "vice-virtue-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vice-virtue-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 768,
+      "name": "WINGS Restaurants & Pubs - Kelowna",
+      "region": "kelowna",
+      "slug": "wings-restaurants-pubs-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wings-restaurants-pubs-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1453,
+      "name": "Wiseacre Distillery",
+      "region": "kelowna",
+      "slug": "wiseacre-distillery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wiseacre-distillery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 97,
+      "name": "Britannia Brewing Co",
+      "region": "lake-country",
+      "slug": "britannia-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/britannia-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 164,
+      "name": "Cutwater Brewing and Lounge",
+      "region": "lake-country",
+      "slug": "cutwater-brewing-and-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cutwater-brewing-and-lounge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 218,
+      "name": "Folktale Cider",
+      "region": "lake-country",
+      "slug": "folktale-cider",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/folktale-cider-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1424,
+      "name": "Rose Hill Orchard & Cidery",
+      "region": "lake-country",
+      "slug": "rose-hill-orchard-cidery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rose-hill-orchard-cidery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1045,
+      "name": "Turtle Bay Pub",
+      "region": "lake-country",
+      "slug": "turtle-bay-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/turtle-bay-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 791,
+      "name": "Woody's Pub",
+      "region": "lake-country",
+      "slug": "woody-s-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/woody-s-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 84,
+      "name": "Blue Ox Pub",
+      "region": "lumby",
+      "slug": "blue-ox-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/blue-ox-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 391,
+      "name": "Maple Leaf Spirits Inc.",
+      "region": "naramata",
+      "slug": "maple-leaf-spirits-inc",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/maple-leaf-spirits-inc-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 431,
+      "name": "Naramata Pub & Grill",
+      "region": "naramata",
+      "slug": "naramata-pub-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/naramata-pub-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 455,
+      "name": "Ok Falls Hotel Bar & Grill",
+      "region": "okanagan-falls",
+      "slug": "ok-falls-hotel-bar-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ok-falls-hotel-bar-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 214,
+      "name": "Firehall Brewery",
+      "region": "oliver",
+      "slug": "firehall-brewery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/firehall-brewery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1409,
+      "name": "Neighbourhood Outpost",
+      "region": "oliver",
+      "slug": "neighbourhood-outpost",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/neighbourhood-outpost-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 679,
+      "name": "The Dubh Glas Distillery Ltd.",
+      "region": "oliver",
+      "slug": "the-dubh-glas-distillery-ltd",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-dubh-glas-distillery-ltd-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 685,
+      "name": "The Flealess Hound Pub",
+      "region": "oliver",
+      "slug": "the-flealess-hound-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-flealess-hound-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 693,
+      "name": "The Howling Coyote Pub",
+      "region": "oliver",
+      "slug": "the-howling-coyote-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-howling-coyote-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1454,
+      "name": "Yellow Dog Spirits",
+      "region": "oliver",
+      "slug": "yellow-dog-spirits",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yellow-dog-spirits-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 48,
+      "name": "Backroads Brewing Co",
+      "region": "osoyoos",
+      "slug": "backroads-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/backroads-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1018,
+      "name": "Coyote Ridge Pub",
+      "region": "osoyoos",
+      "slug": "coyote-ridge-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/coyote-ridge-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 219,
+      "name": "Footprints",
+      "region": "osoyoos",
+      "slug": "footprints",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/footprints-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1425,
+      "name": "Orchard Hill Estate Cidery",
+      "region": "osoyoos",
+      "slug": "orchard-hill-estate-cidery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/orchard-hill-estate-cidery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 469,
+      "name": "Owl Pub",
+      "region": "osoyoos",
+      "slug": "owl-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/owl-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 711,
+      "name": "The Sage Pub & Liquor Store",
+      "region": "osoyoos",
+      "slug": "the-sage-pub-liquor-store",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-sage-pub-liquor-store-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 738,
+      "name": "Tumbleweed Distilling",
+      "region": "osoyoos",
+      "slug": "tumbleweed-distilling",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tumbleweed-distilling-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 12,
+      "name": "Abandoned Rail Brewing Co.",
+      "region": "penticton",
+      "slug": "abandoned-rail-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/abandoned-rail-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 989,
+      "name": "BNA Brewing",
+      "region": "penticton",
+      "slug": "bna-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bna-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 53,
+      "name": "Barley Mill Brew Pub",
+      "region": "penticton",
+      "slug": "barley-mill-brew-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/barley-mill-brew-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 98,
+      "name": "Britbar",
+      "region": "penticton",
+      "slug": "britbar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/britbar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 121,
+      "name": "Cannery Brewing Co.",
+      "region": "penticton",
+      "slug": "cannery-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cannery-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 980,
+      "name": "Copper Mug Pub",
+      "region": "penticton",
+      "slug": "copper-mug-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/copper-mug-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1423,
+      "name": "Creek & Gully Cider",
+      "region": "penticton",
+      "slug": "creek-gully-cider",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/creek-gully-cider-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 189,
+      "name": "Dragonboat Pub",
+      "region": "penticton",
+      "slug": "dragonboat-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dragonboat-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1008,
+      "name": "Highway 97 Brewing",
+      "region": "penticton",
+      "slug": "highway-97-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/highway-97-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1419,
+      "name": "La Petite Abeille Cider",
+      "region": "penticton",
+      "slug": "la-petite-abeille-cider",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-petite-abeille-cider-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1686,
+      "name": "MATCH Eatery & Public House",
+      "region": "penticton",
+      "slug": "match-eatery-public-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/match-eatery-public-house-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1000,
+      "name": "Neighbourhood Brewing",
+      "region": "penticton",
+      "slug": "neighbourhood-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/neighbourhood-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 451,
+      "name": "OROLO Restaurant + Cocktail Bar",
+      "region": "penticton",
+      "slug": "orolo-restaurant-cocktail-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/orolo-restaurant-cocktail-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 686,
+      "name": "The Forest",
+      "region": "penticton",
+      "slug": "the-forest",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-forest-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 694,
+      "name": "The Hub on Martin",
+      "region": "penticton",
+      "slug": "the-hub-on-martin",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-hub-on-martin-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 715,
+      "name": "The Underdog",
+      "region": "penticton",
+      "slug": "the-underdog",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-underdog-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1418,
+      "name": "Tin Whistle Brewing",
+      "region": "penticton",
+      "slug": "tin-whistle-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tin-whistle-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1452,
+      "name": "Wildflower Distilling Co.",
+      "region": "penticton",
+      "slug": "wildflower-distilling-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wildflower-distilling-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 798,
+      "name": "Yellow Dog Brewing Co",
+      "region": "penticton",
+      "slug": "yellow-dog-brewing-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/yellow-dog-brewing-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 352,
+      "name": "La Plata",
+      "region": "silverstar",
+      "slug": "la-plata",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/la-plata-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1065,
+      "name": "Long John's Pub",
+      "region": "silverstar",
+      "slug": "long-john-s-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/long-john-s-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 671,
+      "name": "The Bulldog Grand Cafe Silver Star",
+      "region": "silverstar",
+      "slug": "the-bulldog-grand-cafe-silver-star",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-bulldog-grand-cafe-silver-star-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 14,
+      "name": "Alchemist Distiller",
+      "region": "summerland",
+      "slug": "alchemist-distiller",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/alchemist-distiller-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1699,
+      "name": "Controlled Entropy Distilling",
+      "region": "summerland",
+      "slug": "controlled-entropy-distilling",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/controlled-entropy-distilling-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 174,
+      "name": "Detonate Brewing Company",
+      "region": "summerland",
+      "slug": "detonate-brewing-company",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/detonate-brewing-company-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 182,
+      "name": "Dominion Cider Co.",
+      "region": "summerland",
+      "slug": "dominion-cider-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dominion-cider-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 239,
+      "name": "Giant's Head Brewing",
+      "region": "summerland",
+      "slug": "giant-s-head-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/giant-s-head-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 409,
+      "name": "Millionaires' Row Cider Co.",
+      "region": "summerland",
+      "slug": "millionaires-row-cider-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/millionaires-row-cider-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1698,
+      "name": "NOMAD Cider",
+      "region": "summerland",
+      "slug": "nomad-cider",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nomad-cider-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 488,
+      "name": "Peacock's Perch Pub",
+      "region": "summerland",
+      "slug": "peacock-s-perch-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peacock-s-perch-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 2,
+      "name": "1516 Pub & Grill",
+      "region": "vernon",
+      "slug": "1516-pub-grill",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/1516-pub-grill-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 40,
+      "name": "BNA Brewing Vernon",
+      "region": "vernon",
+      "slug": "bna-brewing-vernon-40",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bna-brewing-vernon-40-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 116,
+      "name": "Cambium Cider Co",
+      "region": "vernon",
+      "slug": "cambium-cider-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cambium-cider-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 956,
+      "name": "Longhorn Pub",
+      "region": "vernon",
+      "slug": "longhorn-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/longhorn-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1712,
+      "name": "MATCH Eatery & Public House (Vernon)",
+      "region": "vernon",
+      "slug": "match-eatery-public-house-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/match-eatery-public-house-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 457,
+      "name": "Okanagan Spirits Craft Distillery (Vernon)",
+      "region": "vernon",
+      "slug": "okanagan-spirits-craft-distillery-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-spirits-craft-distillery-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 973,
+      "name": "Silverstar Brewing",
+      "region": "vernon",
+      "slug": "silverstar-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/silverstar-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 614,
+      "name": "Status Nightclub Vernon",
+      "region": "vernon",
+      "slug": "status-nightclub-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/status-nightclub-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 697,
+      "name": "The Kal",
+      "region": "vernon",
+      "slug": "the-kal",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-kal-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 978,
+      "name": "Winston Pub",
+      "region": "vernon",
+      "slug": "winston-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/winston-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 919,
+      "name": "Friends Pub",
+      "region": "west-kelowna",
+      "slug": "friends-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/friends-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 328,
+      "name": "Kelly O'Bryan's Restaurant and Carlos O'Bryan's Pub",
+      "region": "west-kelowna",
+      "slug": "kelly-o-bryan-s-restaurant-and-carlos-o-bryan-s-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelly-o-bryan-s-restaurant-and-carlos-o-bryan-s-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 359,
+      "name": "Lakesider Brewing",
+      "region": "west-kelowna",
+      "slug": "lakesider-brewing",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakesider-brewing-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 434,
+      "name": "Neighbours Pub",
+      "region": "west-kelowna",
+      "slug": "neighbours-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/neighbours-pub-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 570,
+      "name": "Sammy J's Grill and Bar",
+      "region": "west-kelowna",
+      "slug": "sammy-j-s-grill-and-bar",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sammy-j-s-grill-and-bar-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 690,
+      "name": "The Hatching Post Brewery & Smokery",
+      "region": "west-kelowna",
+      "slug": "the-hatching-post-brewery-smokery",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-hatching-post-brewery-smokery-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 740,
+      "name": "Turtle Jack's West Kelowna",
+      "region": "west-kelowna",
+      "slug": "turtle-jack-s-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/turtle-jack-s-west-kelowna-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 928,
+      "name": "Whiski-Jacks Pub",
+      "region": "west-kelowna",
+      "slug": "whiski-jacks-pub",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/whiski-jacks-pub-2610.jpg?v=20261017"
+      }
+    }
+  ]
+}
