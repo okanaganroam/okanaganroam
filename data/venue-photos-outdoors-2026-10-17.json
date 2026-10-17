@@ -1,0 +1,1182 @@
+{
+  "reason": "Outdoor place listing photos from Google Maps visitor photos of that place, operator or park websites, tourism boards or local guides; Dayton reviewed the contact sheet and said deploy all on 2026-10-17.",
+  "batch_id": "venue-photos-outdoors-2026-10-17",
+  "venues": [
+    {
+      "id": 1663,
+      "name": "Nickel Plate Provincial Park",
+      "region": "apex",
+      "slug": "nickel-plate-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/nickel-plate-provincial-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1710,
+      "name": "Bluenose Mountain Trail",
+      "region": "coldstream",
+      "slug": "bluenose-mountain-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bluenose-mountain-trail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1405,
+      "name": "Dutch's Campground",
+      "region": "coldstream",
+      "slug": "dutchs-campground",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dutchs-campground-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1359,
+      "name": "Hidden Lake Recreation Site",
+      "region": "enderby",
+      "slug": "hidden-lake-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hidden-lake-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1382,
+      "name": "Mabel Lake Resort & Marina",
+      "region": "enderby",
+      "slug": "mabel-lake-resort-marina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mabel-lake-resort-marina-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1374,
+      "name": "Riverside RV Park & Campground",
+      "region": "enderby",
+      "slug": "riverside-rv-park-campground",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/riverside-rv-park-campground-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1437,
+      "name": "Shuswap River Float",
+      "region": "enderby",
+      "slug": "shuswap-river-float",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shuswap-river-float-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1696,
+      "name": "Kaleden Hotel Park",
+      "region": "kaleden",
+      "slug": "kaleden-hotel-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kaleden-hotel-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1630,
+      "name": "Ben Lee Park",
+      "region": "kelowna",
+      "slug": "ben-lee-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ben-lee-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1776,
+      "name": "Brandt's Creek Linear Park",
+      "region": "kelowna",
+      "slug": "brandt-s-creek-linear-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/brandt-s-creek-linear-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1821,
+      "name": "Canyon Falls Park (Crawford Falls)",
+      "region": "kelowna",
+      "slug": "canyon-falls-park-crawford-falls",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/canyon-falls-park-crawford-falls-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1632,
+      "name": "Father Pandosy Mission Heritage Site",
+      "region": "kelowna",
+      "slug": "father-pandosy-mission-heritage-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/father-pandosy-mission-heritage-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1304,
+      "name": "Full Cyrcle Adventures",
+      "region": "kelowna",
+      "slug": "full-cyrcle-adventures",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/full-cyrcle-adventures-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1631,
+      "name": "Guisachan Heritage Park",
+      "region": "kelowna",
+      "slug": "guisachan-heritage-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/guisachan-heritage-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1446,
+      "name": "Holy Doodle Sailing Charters",
+      "region": "kelowna",
+      "slug": "holy-doodle-sailing-charters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/holy-doodle-sailing-charters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1361,
+      "name": "Hydraulic Lake Recreation Site",
+      "region": "kelowna",
+      "slug": "hydraulic-lake-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hydraulic-lake-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1306,
+      "name": "Inspire Trails – Myra Canyon Ranch",
+      "region": "kelowna",
+      "slug": "inspire-trails-myra-canyon-ranch",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/inspire-trails-myra-canyon-ranch-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1775,
+      "name": "Lebanon Creek Greenway Regional Park",
+      "region": "kelowna",
+      "slug": "lebanon-creek-greenway-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lebanon-creek-greenway-regional-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1320,
+      "name": "MNP Place",
+      "region": "kelowna",
+      "slug": "mnp-place",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mnp-place-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1360,
+      "name": "McCulloch Reservoir Recreation Site",
+      "region": "kelowna",
+      "slug": "mcculloch-reservoir-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mcculloch-reservoir-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1244,
+      "name": "Okanagan Adventure Park",
+      "region": "kelowna",
+      "slug": "okanagan-adventure-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-adventure-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1451,
+      "name": "Okanagan Ballooning",
+      "region": "kelowna",
+      "slug": "okanagan-ballooning",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-ballooning-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1410,
+      "name": "Okanagan Parasail",
+      "region": "kelowna",
+      "slug": "okanagan-parasail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-parasail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1820,
+      "name": "Stephens Coyote Ridge Regional Park",
+      "region": "kelowna",
+      "slug": "stephens-coyote-ridge-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/stephens-coyote-ridge-regional-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1317,
+      "name": "Al-ways Fishing Charters",
+      "region": "lake-country",
+      "slug": "al-ways-fishing-charters",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/al-ways-fishing-charters-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1310,
+      "name": "Beaver Lake Mountain Resort",
+      "region": "lake-country",
+      "slug": "beaver-lake-mountain-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/beaver-lake-mountain-resort-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1449,
+      "name": "Bridlewood Riding Centre",
+      "region": "lake-country",
+      "slug": "bridlewood-riding-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bridlewood-riding-centre-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1311,
+      "name": "Dee Lake Wilderness Resort",
+      "region": "lake-country",
+      "slug": "dee-lake-wilderness-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/dee-lake-wilderness-resort-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1362,
+      "name": "Island Lake Recreation Site (Dee Lake chain)",
+      "region": "lake-country",
+      "slug": "island-lake-recreation-site-dee-lake-chain",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/island-lake-recreation-site-dee-lake-chain-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1307,
+      "name": "Okanagan Stables",
+      "region": "lake-country",
+      "slug": "okanagan-stables",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-stables-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1313,
+      "name": "Oyama Lake Lodge",
+      "region": "lake-country",
+      "slug": "oyama-lake-lodge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oyama-lake-lodge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1243,
+      "name": "Oyama Zipline Adventure Park",
+      "region": "lake-country",
+      "slug": "oyama-zipline-adventure-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oyama-zipline-adventure-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1363,
+      "name": "Swalwell (Beaver) Lake Recreation Site",
+      "region": "lake-country",
+      "slug": "swalwell-beaver-lake-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/swalwell-beaver-lake-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1662,
+      "name": "Swalwell Park & Trethewey Splash Park",
+      "region": "lake-country",
+      "slug": "swalwell-park-trethewey-splash-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/swalwell-park-trethewey-splash-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1376,
+      "name": "Wood Lake RV Park & Marina",
+      "region": "lake-country",
+      "slug": "wood-lake-rv-park-marina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wood-lake-rv-park-marina-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1358,
+      "name": "Cottonwood Beach Recreation Site (Mabel Lake)",
+      "region": "lumby",
+      "slug": "cottonwood-beach-recreation-site-mabel-lake",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cottonwood-beach-recreation-site-mabel-lake-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1671,
+      "name": "Echo Lake Provincial Park",
+      "region": "lumby",
+      "slug": "echo-lake-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/echo-lake-provincial-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1404,
+      "name": "Echo Lake Resort",
+      "region": "lumby",
+      "slug": "echo-lake-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/echo-lake-resort-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1301,
+      "name": "Freedom Flight Park & School",
+      "region": "lumby",
+      "slug": "freedom-flight-park-and-school",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/freedom-flight-park-and-school-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1381,
+      "name": "Gold Panner Campground",
+      "region": "lumby",
+      "slug": "gold-panner-campground",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gold-panner-campground-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1670,
+      "name": "Shuswap Falls Recreation Area",
+      "region": "lumby",
+      "slug": "shuswap-falls-recreation-area",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/shuswap-falls-recreation-area-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1364,
+      "name": "Sugar Lake 2 Mile Recreation Site",
+      "region": "lumby",
+      "slug": "sugar-lake-2-mile-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sugar-lake-2-mile-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1375,
+      "name": "Naramata Centre Campground",
+      "region": "naramata",
+      "slug": "naramata-centre-campground",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/naramata-centre-campground-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1812,
+      "name": "Rock Ovens Park",
+      "region": "naramata",
+      "slug": "rock-ovens-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rock-ovens-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1679,
+      "name": "Gala Street Walkway and Ditch Trail",
+      "region": "oliver",
+      "slug": "gala-street-walkway-and-ditch-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gala-street-walkway-and-ditch-trail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1450,
+      "name": "Gallagher Lake Camping & RV Resort",
+      "region": "oliver",
+      "slug": "gallagher-lake-camping-rv-resort",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallagher-lake-camping-rv-resort-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1677,
+      "name": "Kinsmen Spray Park",
+      "region": "oliver",
+      "slug": "kinsmen-spray-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kinsmen-spray-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1678,
+      "name": "Lions Park (Oliver)",
+      "region": "oliver",
+      "slug": "lions-park-oliver",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lions-park-oliver-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1680,
+      "name": "nʕaylintn (McIntyre Bluff) Hike",
+      "region": "oliver",
+      "slug": "n-aylintn-mcintyre-bluff-hike",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/n-aylintn-mcintyre-bluff-hike-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1682,
+      "name": "Jack Shaw Splash Park",
+      "region": "osoyoos",
+      "slug": "jack-shaw-splash-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jack-shaw-splash-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1442,
+      "name": "Lakefront Marina",
+      "region": "osoyoos",
+      "slug": "lakefront-marina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakefront-marina-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1809,
+      "name": "Osoyoos Oxbows Trail",
+      "region": "osoyoos",
+      "slug": "osoyoos-oxbows-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-oxbows-trail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1681,
+      "name": "Pioneer Walkway Park",
+      "region": "osoyoos",
+      "slug": "pioneer-walkway-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pioneer-walkway-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1804,
+      "name": "Splash BC Floating Water Park – Osoyoos",
+      "region": "osoyoos",
+      "slug": "splash-bc-floating-water-park-osoyoos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/splash-bc-floating-water-park-osoyoos-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1305,
+      "name": "Sun Hills Riding Centre",
+      "region": "osoyoos",
+      "slug": "sun-hills-riding-centre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sun-hills-riding-centre-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1299,
+      "name": "Wakepilot",
+      "region": "osoyoos",
+      "slug": "wakepilot",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/wakepilot-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1314,
+      "name": "Headwaters Family Camp",
+      "region": "peachland",
+      "slug": "headwaters-family-camp",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/headwaters-family-camp-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1303,
+      "name": "Okanagan ATV Tours",
+      "region": "peachland",
+      "slug": "okanagan-atv-tours",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-atv-tours-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1719,
+      "name": "Peachland Heritage Park",
+      "region": "peachland",
+      "slug": "peachland-heritage-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-heritage-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1779,
+      "name": "Peachland to West Kelowna Multi-Use Trail (Westside Trail)",
+      "region": "peachland",
+      "slug": "peachland-to-west-kelowna-multi-use-trail-westside-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-to-west-kelowna-multi-use-trail-westside-trail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1292,
+      "name": "Splash BC Floating Water Park – Peachland",
+      "region": "peachland",
+      "slug": "splash-bc-floating-water-park-peachland",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/splash-bc-floating-water-park-peachland-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1722,
+      "name": "Stairway to Heaven Trail",
+      "region": "peachland",
+      "slug": "stairway-to-heaven-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/stairway-to-heaven-trail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1242,
+      "name": "ZipZone Peachland",
+      "region": "peachland",
+      "slug": "zipzone-peachland",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/zipzone-peachland-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1365,
+      "name": "Idleback Lake Recreation Site",
+      "region": "penticton",
+      "slug": "idleback-lake-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/idleback-lake-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1693,
+      "name": "Lakawanna Park",
+      "region": "penticton",
+      "slug": "lakawanna-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lakawanna-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1308,
+      "name": "LocoLanding Adventure Park",
+      "region": "penticton",
+      "slug": "locolanding-adventure-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/locolanding-adventure-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1689,
+      "name": "Okanagan Warriors Adventure",
+      "region": "penticton",
+      "slug": "okanagan-warriors-adventure",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-warriors-adventure-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1445,
+      "name": "Penticton Boat Rentals",
+      "region": "penticton",
+      "slug": "penticton-boat-rentals",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-boat-rentals-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1625,
+      "name": "Penticton Farmers' Market",
+      "region": "penticton",
+      "slug": "penticton-farmers-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-farmers-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1694,
+      "name": "Penticton Rose Garden",
+      "region": "penticton",
+      "slug": "penticton-rose-garden",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-rose-garden-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1692,
+      "name": "Penticton Speedway",
+      "region": "penticton",
+      "slug": "penticton-speedway",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-speedway-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1370,
+      "name": "South Beach Gardens RV Park",
+      "region": "penticton",
+      "slug": "south-beach-gardens-rv-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/south-beach-gardens-rv-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1291,
+      "name": "Splash BC Floating Water Park – Penticton",
+      "region": "penticton",
+      "slug": "splash-bc-floating-water-park-penticton",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/splash-bc-floating-water-park-penticton-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1334,
+      "name": "Vernon Snowmobile Association – Silver Star Trails",
+      "region": "silverstar",
+      "slug": "vernon-snowmobile-association-silver-star-trails",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-snowmobile-association-silver-star-trails-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1704,
+      "name": "Brigade Trail & Priest Camp Historic Park",
+      "region": "summerland",
+      "slug": "brigade-trail-priest-camp-historic-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/brigade-trail-priest-camp-historic-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1701,
+      "name": "Memorial Park",
+      "region": "summerland",
+      "slug": "memorial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/memorial-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1705,
+      "name": "Summerland Centennial Trail",
+      "region": "summerland",
+      "slug": "summerland-centennial-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-centennial-trail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1706,
+      "name": "Summerland Rotary Trail Lakeshore Loop",
+      "region": "summerland",
+      "slug": "summerland-rotary-trail-lakeshore-loop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-rotary-trail-lakeshore-loop-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1703,
+      "name": "Trout Creek Trestle (Trout Creek Bridge)",
+      "region": "summerland",
+      "slug": "trout-creek-trestle-trout-creek-bridge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/trout-creek-trestle-trout-creek-bridge-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1378,
+      "name": "Cedar Falls Campground",
+      "region": "vernon",
+      "slug": "cedar-falls-campground",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cedar-falls-campground-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1619,
+      "name": "Davison Orchards",
+      "region": "vernon",
+      "slug": "davison-orchards",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/davison-orchards-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1356,
+      "name": "Evely Recreation Site",
+      "region": "vernon",
+      "slug": "evely-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/evely-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1379,
+      "name": "Lake Front RV Park (Swan Lake)",
+      "region": "vernon",
+      "slug": "lake-front-rv-park-swan-lake",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lake-front-rv-park-swan-lake-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1380,
+      "name": "Okanagan Glamping Co.",
+      "region": "vernon",
+      "slug": "okanagan-glamping-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-glamping-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1300,
+      "name": "Okanagan Skydive",
+      "region": "vernon",
+      "slug": "okanagan-skydive",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-skydive-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1302,
+      "name": "Paraglide Canada",
+      "region": "vernon",
+      "slug": "paraglide-canada",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/paraglide-canada-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1709,
+      "name": "Polson Park",
+      "region": "vernon",
+      "slug": "polson-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/polson-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1448,
+      "name": "Splashdown Vernon",
+      "region": "vernon",
+      "slug": "splashdown-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/splashdown-vernon-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1622,
+      "name": "Vernon Farmers' Market",
+      "region": "vernon",
+      "slug": "vernon-farmers-market",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-farmers-market-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1718,
+      "name": "Boucherie Multi-Use Path",
+      "region": "west-kelowna",
+      "slug": "boucherie-multi-use-path",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/boucherie-multi-use-path-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1773,
+      "name": "Carrot Mountain Bluffs",
+      "region": "west-kelowna",
+      "slug": "carrot-mountain-bluffs",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/carrot-mountain-bluffs-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1717,
+      "name": "Gellatly Heritage Regional Park",
+      "region": "west-kelowna",
+      "slug": "gellatly-heritage-regional-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gellatly-heritage-regional-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1366,
+      "name": "Lambly (Bear) Lake Recreation Site",
+      "region": "west-kelowna",
+      "slug": "lambly-bear-lake-recreation-site",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/lambly-bear-lake-recreation-site-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1772,
+      "name": "McDougall Rim Trail",
+      "region": "west-kelowna",
+      "slug": "mcdougall-rim-trail",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mcdougall-rim-trail-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1715,
+      "name": "Memorial Park & Annette Beaudreau Amphitheatre",
+      "region": "west-kelowna",
+      "slug": "memorial-park-annette-beaudreau-amphitheatre",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/memorial-park-annette-beaudreau-amphitheatre-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1316,
+      "name": "Okanagan Bucktail Co.",
+      "region": "west-kelowna",
+      "slug": "okanagan-bucktail-co",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-bucktail-co-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1774,
+      "name": "Rotary Trails (Powers Creek)",
+      "region": "west-kelowna",
+      "slug": "rotary-trails-powers-creek",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rotary-trails-powers-creek-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1716,
+      "name": "Westbank Centre Park (Julia's Junction & Kids Care Spray Park)",
+      "region": "west-kelowna",
+      "slug": "westbank-centre-park-julia-s-junction-kids-care-spray-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/westbank-centre-park-julia-s-junction-kids-care-spray-park-2610.jpg?v=20261017"
+      }
+    }
+  ]
+}
