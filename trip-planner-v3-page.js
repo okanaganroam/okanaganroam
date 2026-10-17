@@ -1075,9 +1075,11 @@ function renderScript(d) {
     // A dated plan's timing ("Provisional visit 09:00–10:00 ...") is already in the timeline and the Before you go list.
     var cav = (stop.caveats || []).filter(function(c){ return !/No usable hours listed|Aucun horaire utilisable|No map location on file|emplacement.*carte|^Provisional visit|^Visite provisoire/i.test(c); }).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
     var same = counts[v.name] > 1;
-    // A photo of the kind of place (beach, winery, café...), shown as an example, never as the venue's own photo.
+    // The venue's own photo when it has one; otherwise a photo of the kind of place (beach, winery, café...),
+    // tagged as an example so nobody takes it for this business.
     var photoUrl = stopPhotoUrl(v);
-    var photoHtml = photoUrl ? '<div class="t3-card-photo"><img src="' + esc(photoUrl) + '" alt="" width="480" height="320" loading="lazy" decoding="async"><span class="t3-photo-tag">' + esc(lang() === 'fr' ? 'Photo d’exemple' : 'Example photo') + '</span></div>' : '';
+    var photoTag = v.ownPhoto ? '' : '<span class="t3-photo-tag">' + esc(lang() === 'fr' ? 'Photo d’exemple' : 'Example photo') + '</span>';
+    var photoHtml = photoUrl ? '<div class="t3-card-photo"><img src="' + esc(photoUrl) + '" alt="' + (v.ownPhoto ? esc(v.name) : '') + '" width="480" height="320" loading="lazy" decoding="async">' + photoTag + '</div>' : '';
     var html = '<article class="t3-card' + (kept ? ' is-kept' : '') + (photoUrl ? ' has-photo' : '') + '"' + cardAnchor + ' data-venue-id="' + esc(v.id) + '">'
       // Four groups (head / tags / body / actions) so that cards in the same
       // grid row can share row tracks (see .t3-grid) and line up. Each group

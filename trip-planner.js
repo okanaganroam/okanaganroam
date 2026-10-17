@@ -676,6 +676,10 @@ function stopPhoto(v) {
   if (v.type === 'restaurant' && /\b(?:ramen|pho|noodles?|udon)\b/.test(`${name} ${v.textCuisine || ''}`)) key = 'restaurant-noodle';
   return STOP_PHOTO_KEYS.has(key) ? `/images/trip-v3/stops/stop-${key}-480.jpg` : null;
 }
+function ownStopPhoto(v) {
+  const own = String(v.imageUrl || '').trim();
+  return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : null;
+}
 const STOP_PHOTO_KEYS = new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery', 'beach', 'golf', 'outdoor', 'hiking', 'viewpoints', 'water', 'cycling', 'adventure', 'winter', 'indoor', 'arts', 'family', 'games', 'spa', 'theatre', 'tour', 'tour-wine', 'tour-lake', 'tour-farm', 'tour-bike', 'sport', 'ski', 'restaurant-noodle']);
 function isDogTrip(ctx) { return !!(ctx.dog || ctx.features.includes('dog_friendly') || (ctx.requirements?.items || []).some((i) => i.kind === 'feature' && i.value === 'dog_friendly')); }
 function indoorAppeal(v, ctx, add) {
@@ -739,8 +743,10 @@ function publicVenue(v, ctx) {
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
     rating: v.rating, reviews: v.reviews, price: v.price, address: v.address || null,
-    // A photo of the kind of place (Okanagan Roam's category photos), never presented as the venue itself.
-    photo: stopPhoto(v),
+    // The venue's own photo when it has one (2026-10-17); otherwise a photo of
+    // the kind of place (Okanagan Roam's category photos), labelled as an example.
+    photo: ownStopPhoto(v) || stopPhoto(v),
+    ownPhoto: !!ownStopPhoto(v),
     latitude: hasCoords(v) ? v.lat : null, longitude: hasCoords(v) ? v.lng : null,
     // Build My Trip V3 (Step 2, 2026-09-29), additive: stored facts a stop
     // card can show as they are -- the verified badge columns that are set
@@ -3202,6 +3208,7 @@ function scheduleNotes(result, ctx) {
 }
 
 module.exports = {
+  publicVenue,
   parseVenueHours,
   hoursFit,
   listedHoursText,
