@@ -127,8 +127,34 @@ function encodePng(px) {
   ]);
 }
 
+// The card's content on top of whatever is already in `px`: the brand row, the gold label, the name and the footer.
+// `maxWidth` is the width the label and name may use.
+function paintCard(px, { name, label, maxWidth }) {
+  // Brand row: the gold mark, then OKANAGAN in cream and ROAM in gold.
+  const mark = drawSprite(px, 'mark', MARGIN - 4, 62, GOLD);
+  const wordBaseline = 62 + Math.round(mark.h * 0.78);
+  const after = drawText(px, 'OKANAGAN', 'wordmark', MARGIN + mark.w + 10, wordBaseline, CREAM, 2);
+  drawText(px, 'ROAM', 'wordmark', after + 12, wordBaseline, GOLD, 2);
+  // Label and name, as one block centred in the space between the brand row and the footer.
+  const { style, lines } = fitName(name, maxWidth);
+  const s = atlas().header.styles[style];
+  const lineHeight = Math.round(s.size * 1.12);
+  const labelGap = 30;
+  const blockHeight = 26 + labelGap + s.ascent + lineHeight * (lines.length - 1);
+  const top = Math.round(150 + (H - 120 - 150 - blockHeight) / 2);
+  const shortLabel = label && measure(label, 'label', 3) > maxWidth ? label.split(' \u00b7 ')[0] : label;
+  if (shortLabel) {
+    for (let y = top + 9; y < top + 12; y++) for (let x = MARGIN; x < MARGIN + 44; x++) blend(px, x, y, 255, GOLD);
+    drawText(px, shortLabel, 'label', MARGIN + 58, top + 22, GOLD, 3);
+  }
+  lines.forEach((line, i) => drawText(px, line, style, MARGIN, top + 26 + labelGap + s.ascent + lineHeight * i, CREAM));
+  // Footer.
+  for (let x = MARGIN; x < W - MARGIN; x++) blend(px, x, H - 104, 60, CREAM);
+  drawText(px, 'okanaganroam.com', 'small', MARGIN, H - 58, [0xd8, 0xd2, 0xc4]);
+}
+
 // { name, label } -> PNG buffer. `label` is the gold line above the name,
-// e.g. "WINERY · KELOWNA, BC".
+// e.g. "WINERY \u00b7 KELOWNA, BC".
 function renderShareCard({ name, label }) {
   const px = new Float32Array(W * H * 3);
   // Navy, deepening toward the bottom right.
@@ -139,29 +165,32 @@ function renderShareCard({ name, label }) {
       for (let c = 0; c < 3; c++) px[i + c] = NAVY[c] + (NAVY_DEEP[c] - NAVY[c]) * t;
     }
   }
-  // Brand row: the gold mark, then OKANAGAN in cream and ROAM in gold.
-  const mark = drawSprite(px, 'mark', MARGIN - 4, 62, GOLD);
-  const wordBaseline = 62 + Math.round(mark.h * 0.78);
-  const after = drawText(px, 'OKANAGAN', 'wordmark', MARGIN + mark.w + 10, wordBaseline, CREAM, 2);
-  drawText(px, 'ROAM', 'wordmark', after + 12, wordBaseline, GOLD, 2);
-  // Label and name, as one block centred in the space between the brand row and the footer.
-  const maxWidth = W - MARGIN * 2;
-  const { style, lines } = fitName(name, maxWidth);
-  const s = atlas().header.styles[style];
-  const lineHeight = Math.round(s.size * 1.12);
-  const labelGap = 30;
-  const blockHeight = 26 + labelGap + s.ascent + lineHeight * (lines.length - 1);
-  const top = Math.round(150 + (H - 120 - 150 - blockHeight) / 2);
-  const shortLabel = label && measure(label, 'label', 3) > maxWidth ? label.split(' · ')[0] : label;
-  if (shortLabel) {
-    for (let y = top + 9; y < top + 12; y++) for (let x = MARGIN; x < MARGIN + 44; x++) blend(px, x, y, 255, GOLD);
-    drawText(px, shortLabel, 'label', MARGIN + 58, top + 22, GOLD, 3);
-  }
-  lines.forEach((line, i) => drawText(px, line, style, MARGIN, top + 26 + labelGap + s.ascent + lineHeight * i, CREAM));
-  // Footer.
-  for (let x = MARGIN; x < W - MARGIN; x++) blend(px, x, H - 104, 60, CREAM);
-  drawText(px, 'okanaganroam.com', 'small', MARGIN, H - 58, [0xd8, 0xd2, 0xc4]);
+  paintCard(px, { name, label, maxWidth: W - MARGIN * 2 });
   return encodePng(px);
 }
 
-module.exports = { renderShareCard, SHARE_CARD_WIDTH: W, SHARE_CARD_HEIGHT: H };
+// Trip cards (2026-10-17): the same card over a photo. `photo` is { width: 1200, height: 630, data: RGB bytes } (see
+// jpeg-lite.js decodeJpeg and data/trip-card-photos/). A navy veil, strongest on the text side and under the footer,
+// keeps the text readable while the right of the photo shows through. Leaves as a JPEG (a photo card is far too big
+// for a PNG, and WhatsApp wants previews under 300 KB).
+const PHOTO_TEXT_WIDTH = 700;
+function renderPhotoShareCard({ name, label, photo }) {
+  if (!photo || photo.width !== W || photo.height !== H) throw new Error('the card photo must be 1200x630');
+  const px = new Float32Array(W * H * 3);
+  const textEdge = MARGIN + PHOTO_TEXT_WIDTH;
+  for (let y = 0; y < H; y++) {
+    const footer = Math.min(1, Math.max(0, (y - (H - 170)) / 90));
+    const header = Math.min(1, Math.max(0, (150 - y) / 90));
+    for (let x = 0; x < W; x++) {
+      const across = x <= textEdge ? 0.85 : 0.85 - 0.73 * Math.min(1, (x - textEdge) / (W - textEdge));
+      const veil = Math.min(0.92, Math.max(across, footer * 0.8, header * 0.5));
+      const i = (y * W + x) * 3;
+      const t = Math.min(1, (x / W) * 0.45 + (y / H) * 0.75);
+      for (let c = 0; c < 3; c++) px[i + c] = photo.data[i + c] * (1 - veil) + (NAVY[c] + (NAVY_DEEP[c] - NAVY[c]) * t) * veil;
+    }
+  }
+  paintCard(px, { name, label, maxWidth: PHOTO_TEXT_WIDTH });
+  return require('./jpeg-lite').encodeJpeg(px, W, H, 78);
+}
+
+module.exports = { renderShareCard, renderPhotoShareCard, SHARE_CARD_WIDTH: W, SHARE_CARD_HEIGHT: H };

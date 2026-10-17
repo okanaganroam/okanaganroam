@@ -1,0 +1,57 @@
+{
+  "generated": "scripts/make-trip-card-photos.js",
+  "photos": {
+    "kelowna": {
+      "file": "kelowna.jpg",
+      "source": "Unsplash Vc6DcC6CUJc (Jeffrey Eisen)"
+    },
+    "west-kelowna": {
+      "file": "west-kelowna.jpg",
+      "source": "Unsplash 0UCSYkG_RMk (Mike Benna)"
+    },
+    "penticton": {
+      "file": "penticton.jpg",
+      "source": "Adobe Stock 218718206"
+    },
+    "naramata": {
+      "file": "naramata.jpg",
+      "source": "supplied by Dayton"
+    },
+    "peachland": {
+      "file": "peachland.jpg",
+      "source": "supplied by Dayton"
+    },
+    "coldstream": {
+      "file": "coldstream.jpg",
+      "source": "Adobe Stock 212523544"
+    },
+    "oliver": {
+      "file": "oliver.jpg",
+      "source": "Adobe Stock 535400006"
+    },
+    "osoyoos": {
+      "file": "osoyoos.jpg",
+      "source": "Adobe Stock 1157692482"
+    },
+    "okanagan-falls": {
+      "file": "okanagan-falls.jpg",
+      "source": "supplied by Dayton"
+    },
+    "kaleden": {
+      "file": "kaleden.jpg",
+      "source": "supplied by Dayton"
+    },
+    "lumby": {
+      "file": "lumby.jpg",
+      "source": "supplied by Dayton"
+    },
+    "big-white": {
+      "file": "big-white.jpg",
+      "source": "Adobe Stock 567585920"
+    },
+    "valley": {
+      "file": "valley.jpg",
+      "source": "the site hero photo"
+    }
+  }
+}
