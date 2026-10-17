@@ -31076,7 +31076,7 @@ const MENU_APP_STRINGS = {
     takeDownConfirm: 'Take your menu off Okanagan Roam? You can add it again any time.',
     waiting: 'Thanks! Your menu is waiting for a quick check. It will be live soon.',
     helpWaiting: 'Thanks! We&rsquo;re typing up your menu and will let you know when it&rsquo;s up.',
-    photoBad: 'We couldn&rsquo;t open that photo. Try taking it with your phone&rsquo;s camera instead.',
+    photoBad: 'We couldn&rsquo;t open that file. Please take a photo with your phone&rsquo;s camera instead.',
     pdfBig: 'That PDF is too big. Try a photo of the menu instead.',
     network: 'No connection right now. Please check your internet and try again.',
     other: 'Fran&ccedil;ais', diet: { vegan: 'Vegan', vegetarian: 'Vegetarian', gluten_free: 'Gluten-free', dairy_free: 'Dairy-free', spicy: 'Spicy' },
@@ -31118,7 +31118,7 @@ const MENU_APP_STRINGS = {
     takeDownConfirm: 'Retirer votre menu d&rsquo;Okanagan Roam&nbsp;? Vous pourrez le rajouter quand vous voulez.',
     waiting: 'Merci&nbsp;! Votre menu attend une v&eacute;rification rapide. Il sera bient&ocirc;t en ligne.',
     helpWaiting: 'Merci&nbsp;! Nous tapons votre menu et vous pr&eacute;viendrons quand il sera en ligne.',
-    photoBad: 'Impossible d&rsquo;ouvrir cette photo. Essayez de la prendre avec l&rsquo;appareil photo de votre t&eacute;l&eacute;phone.',
+    photoBad: 'Impossible d&rsquo;ouvrir ce fichier. Prenez plut&ocirc;t une photo avec l&rsquo;appareil photo de votre t&eacute;l&eacute;phone.',
     pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo du menu.',
     network: 'Pas de connexion pour l&rsquo;instant. V&eacute;rifiez votre internet et r&eacute;essayez.',
     other: 'English', diet: MENU_DIETARY_LABELS.fr,
@@ -31237,7 +31237,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     if (note) {
       out = '<div class="mn-card mn-warn"><p>' + note + '</p></div>' + out;
       if (re === 'unavailable' || re === 'busy') out += '<button type="button" class="mn-btn mn-big" data-act="help">' + T.help + '</button>';
-      else out += '<button type="button" class="mn-btn mn-big" data-act="restart-take">' + T.newPhoto + '</button>'
+      else out += '<label class="mn-btn mn-big">' + T.newPhoto + '<input type="file" accept="image/*" capture="environment" data-pick data-replace class="mn-file"></label>'
         + '<button type="button" class="mn-btn mn-plain" data-act="read">' + T.tryAgain + '</button>' + helpBtn();
     } else {
       out = '<h1>' + T.gotIt + '</h1>' + err(message) + out + '<button type="button" class="mn-btn mn-big mn-go" data-act="read">' + T.thatsAll + ' &rarr;</button>'
@@ -31388,12 +31388,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         } });
       }).then(function(w){ worker = w; return w; });
     }
-    function addResult(data){
-      var got = 0;
-      (data.blocks || []).forEach(function(b){ (b.paragraphs || []).forEach(function(p){ (p.lines || []).forEach(function(l){ lines.push({ text: l.text, conf: l.confidence }); got++; }); }); });
-      if (!got) String(data.text || '').split('\n').forEach(function(t){ lines.push({ text: t, conf: data.confidence }); });
-    }
-    function recognise(src){ return ocr().then(function(w){ return w.recognize(src, {}, { text: true, blocks: true }); }).then(function(r){ addResult(r.data); }); }
+    function recognise(src){ return ocr().then(function(w){ return w.recognize(src, {}, { text: true, blocks: true }); }).then(function(r){ lines.push.apply(lines, ocrLines(r.data)); }); }
     function readPdfPage(pdf, n){
       return pdf.getPage(n).then(function(page){
         return page.getTextContent().then(function(tc){
@@ -31438,6 +31433,90 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       S.menu.read_error = 'failed'; render(navigator.onLine === false ? T.networkText : null);
     });
   }
+  // Menus are often printed in columns, and the reader can run straight across them ("Poutine 14 Carbonara 21").
+  // So each recognised line is cut at the empty gutters between columns, and every column is read top to bottom.
+  // Word positions are first turned to undo the photo's tilt (from the slope of the text baselines).
+  function ocrLines(data){
+    var lines = [], lns = [];
+    (data.blocks || []).forEach(function(b){ (b.paragraphs || []).forEach(function(p){ (p.lines || []).forEach(function(l){ lns.push(l); }); }); });
+    if (!lns.length) { String(data.text || '').split('\n').forEach(function(t){ lines.push({ text: t, conf: data.confidence }); }); return lines; }
+    var slopes = lns.filter(function(l){ return l.baseline && l.baseline.x1 - l.baseline.x0 > 150; })
+      .map(function(l){ return (l.baseline.y1 - l.baseline.y0) / (l.baseline.x1 - l.baseline.x0); }).sort(function(a, b){ return a - b; });
+    var ang = slopes.length ? Math.atan(slopes[Math.floor(slopes.length / 2)]) : 0, cos = Math.cos(ang), sin = Math.sin(ang);
+    var words = [];
+    lns.forEach(function(l, li){ (l.words || []).forEach(function(w){
+      var t = String(w.text || '').trim(); if (!t || !w.bbox) return;
+      var cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
+      words.push({ t: t, c: w.confidence, line: li, x: cx * cos + cy * sin, y: -cx * sin + cy * cos, hw: (w.bbox.x1 - w.bbox.x0) / 2 });
+    }); });
+    if (!words.length) { lns.forEach(function(l){ lines.push({ text: l.text, conf: l.confidence }); }); return lines; }
+    // A photo taken at an angle also leans the columns, so the gutter is looked for at a few slants and the
+    // clearest one wins.
+    var best = { splits: [], width: 0, lean: 0 };
+    for (var lean = -0.08; lean <= 0.0801; lean += 0.01) {
+      var g = findGutters(words.map(function(w){ return { t: w.t, line: w.line, x: w.x - lean * w.y, y: w.y, hw: w.hw }; }));
+      if (g.width > best.width) best = { splits: g.splits, width: g.width, lean: lean };
+    }
+    words.forEach(function(w){ w.x -= best.lean * w.y; });
+    var splits = best.splits, parts = {};
+    words.forEach(function(w){
+      var col = 0; while (col < splits.length && w.x > splits[col]) col++;
+      var key = w.line + '|' + col; (parts[key] = parts[key] || { col: col, ws: [] }).ws.push(w);
+    });
+    // A price printed at the right edge of a column sits beside the gutter and can land in the next column
+    // ("14 Carbonara 21"): prices belong to the words on their left, so they move back.
+    var isPriceWord = function(t){ return /^[$S]?\d{1,4}([.,]\d{1,2})?$/.test(t); };
+    Object.keys(parts).forEach(function(k){ parts[k].ws.sort(function(a, b){ return a.x - b.x; }); });
+    Object.keys(parts).forEach(function(k){
+      var p = parts[k], prev = parts[k.split('|')[0] + '|' + (p.col - 1)];
+      if (!prev) return;
+      while (p.ws.length && isPriceWord(p.ws[0].t)) prev.ws.push(p.ws.shift());
+      if (!p.ws.length) delete parts[k];
+    });
+    Object.keys(parts).map(function(k){
+      var p = parts[k], y = 0, c = 0;
+      // A wrong price matters most, so a line is only as sure as its least certain price.
+      var pc = 100;
+      p.ws.forEach(function(w){ y += w.y; c += w.c; if (isPriceWord(w.t)) pc = Math.min(pc, w.c); });
+      return { col: p.col, y: y / p.ws.length, text: p.ws.map(function(w){ return w.t; }).join(' '), conf: Math.min(c / p.ws.length, pc) };
+    }).sort(function(a, b){ return a.col - b.col || a.y - b.y; }).forEach(function(o){ lines.push({ text: o.text, conf: o.conf }); });
+    return lines;
+  }
+  // Vertical bands (in the middle 70% of the page) that almost no word crosses. A band only counts as a gutter when
+  // there is a real column on each side: enough words, and not just the prices of a one-column menu.
+  function findGutters(words){
+    if (words.length < 20) return { splits: [], width: 0 };
+    var minX = Infinity, maxX = -Infinity, i;
+    words.forEach(function(w){ minX = Math.min(minX, w.x - w.hw); maxX = Math.max(maxX, w.x + w.hw); });
+    var bins = 200, span = (maxX - minX) / bins, cover = [];
+    if (!(span > 0)) return { splits: [], width: 0 };
+    for (i = 0; i < bins; i++) cover[i] = 0;
+    words.forEach(function(w){
+      var a = Math.max(0, Math.floor((w.x - w.hw - minX) / span)), b = Math.min(bins - 1, Math.floor((w.x + w.hw - minX) / span));
+      for (i = a; i <= b; i++) cover[i]++;
+    });
+    var limit = Math.max(1, Math.round(words.length * 0.01)), runs = [], start = -1;
+    for (i = 30; i <= 170; i++) {
+      if (i < 170 && cover[i] <= limit) { if (start < 0) start = i; }
+      else { if (start >= 0 && i - start >= 3) runs.push({ x: minX + ((start + i) / 2) * span, w: i - start }); start = -1; }
+    }
+    var isPrice = function(t){ return /^[$S]?\d{1,4}([.,]\d{1,2})?$/.test(t); };
+    // The gap between a dish name and its right-aligned price can look like a gutter too; a real gutter has words,
+    // not prices, just to its right on most lines.
+    var startsWithWords = function(x){
+      var first = {};
+      words.forEach(function(w){ if (w.x > x && (!first[w.line] || w.x < first[w.line].x)) first[w.line] = w; });
+      var f = Object.keys(first).map(function(k){ return first[k]; });
+      return f.length && f.filter(function(w){ return isPrice(w.t); }).length < f.length * 0.5;
+    };
+    var ok = function(ws){ return ws.length >= words.length * 0.15 && ws.filter(function(w){ return isPrice(w.t); }).length < ws.length * 0.5; };
+    var kept = [], width = 0;
+    runs.forEach(function(r){
+      var x = r.x, lo = kept.length ? kept[kept.length - 1] : -Infinity;
+      if (kept.length < 2 && startsWithWords(x) && ok(words.filter(function(w){ return w.x > lo && w.x <= x; })) && ok(words.filter(function(w){ return w.x > x; }))) { kept.push(x); width += r.w; }
+    });
+    return { splits: kept, width: width };
+  }
   // Scanned lines -> { sections: [{ name, note, items: [{ name, description, price, dietary, check }] }] }.
   // Menus are laid out many ways ("Poutine .... 14", a name over a description with the price at its end, a price on
   // its own line), so a short line without a price is held until the next line shows whether it was a dish name or
@@ -31450,7 +31529,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   var JUNK_RE = /(www\.|https?:|@|\.com\b|\.ca\b|\bphone\b|\btel\b|\(\d{3}\)|\d{3}[-. ]\d{3}[-. ]\d{4}|instagram|facebook|gratuity|\bgst\b|\bpst\b|plus tax|prices? (?:are )?subject|allerg|consuming raw)/i;
   var DIET = { V: 'vegetarian', VG: 'vegan', VE: 'vegan', GF: 'gluten_free', DF: 'dairy_free' };
   function words(t){ return t.split(/\s+/).filter(Boolean).length; }
-  function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6 || DURATION_RE.test(t) || DESC_START_RE.test(t); }
+  var SIZE_RE = /^\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb|lbs|pc|pcs|pieces?|inch|in|cm)\b/i; // "8 oz striploin", "6 pc"
+  function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6 || DURATION_RE.test(t) || DESC_START_RE.test(t) || SIZE_RE.test(t); }
   function isCapsHeading(t){ var l = t.replace(/[^A-Za-z]/g, ''); return l.length >= 3 && l === l.toUpperCase() && words(t) <= 5 && t.length <= 40; }
   function niceCase(t){ return isCapsHeading(t) ? t.toLowerCase().replace(/(^|[\s\-&\/])([a-z])/g, function(m, a, b){ return a + b.toUpperCase(); }) : t; }
   function takeDiet(t, out){
@@ -31465,13 +31545,16 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       name = takeDiet(name, diet).replace(/^[\s\-–—:*•]+|[\s\-–—:.$]+$/g, '');
       desc = takeDiet(desc || '', diet);
       if (!name) return;
-      last = { name: niceCase(name), description: desc, price: price || '', dietary: diet, check: conf < 75 };
+      name = niceCase(name).replace(/^[a-z]/, function(c){ return c.toUpperCase(); });
+      last = { name: name, description: desc, price: price || '', dietary: diet, check: conf < 75 };
       cur.items.push(last);
     }
     // A held line that isn't a dish: a sentence under a fresh heading is that section's note, otherwise a heading.
     function flush(){
       if (!pending) return;
-      if (cur && !cur.items.length && words(pending.text) > 2) cur.note = (cur.note ? cur.note + ' ' : '') + pending.text;
+      // Stray marks ("Americano \u201c+") mean a price the reader could not make out, not a heading.
+      if (/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]/.test(pending.text) && cur) item(pending.text.replace(/[^A-Za-z0-9\u00c0-\u00ff\s&'\u2019\-\/.,()]+/g, ' ').trim(), '', '', 0);
+      else if (cur && !cur.items.length && words(pending.text) > 2) cur.note = (cur.note ? cur.note + ' ' : '') + pending.text;
       else section(pending.text);
       pending = null;
     }
@@ -31510,10 +31593,15 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     if (pending) item(pending.text, '', '', pending.conf);
     sections = sections.filter(function(s){ return s.items.length; });
     sections.forEach(function(s){ s.items.forEach(function(it){ if (!it.price && !it.check) it.check = true; }); });
+    // A lost decimal point: on a menu priced in dollars and cents, "575" is $5.75 (shown yellow to check).
+    var all = [], cents = 0;
+    sections.forEach(function(s){ s.items.forEach(function(it){ if (it.price) { all.push(it); if (/\d[.,]\d{2}\b/.test(it.price)) cents++; } }); });
+    if (all.length >= 3 && cents >= all.length / 2) all.forEach(function(it){ if (/^\d{3}$/.test(it.price)) { it.price = it.price.charAt(0) + '.' + it.price.slice(1); it.check = true; } });
     var any = sections.some(function(s){ return s.items.some(function(it){ return it.check; }); });
     return { sections: sections, partial: any };
   }
   window.__menuParse = parseMenuLines;
+  window.__menuOcrLines = ocrLines;
   // ----- Help -----
   function helpScreen(){
     var has = pages().length > 0;
@@ -31528,7 +31616,12 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   // ----- Events -----
   app.addEventListener('change', function(e){
     var t = e.target;
-    if (t.hasAttribute('data-pick')) return addFiles(t.files || []);
+    if (t.hasAttribute('data-pick')) {
+      var picked = t.files || [];
+      // "Take a new photo" after a hard-to-read one: the new photo replaces the old pages.
+      if (t.hasAttribute('data-replace')) return api('/restart', {}).then(function(){ addFiles(picked); });
+      return addFiles(picked);
+    }
     if (t.hasAttribute('data-diet')) {
       var it = currentItem(); if (!it) return;
       var d = t.getAttribute('data-diet'), at = it.dietary.indexOf(d);

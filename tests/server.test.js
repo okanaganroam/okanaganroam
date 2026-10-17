@@ -22278,3 +22278,41 @@ test('Price lists (2026-10-17): golf courses post green fees & rates, indoor and
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Menus: the free scanner splits columns, keeps prices with their dish, and flags what it is unsure of', () => {
+  // The scanner runs in the owner's browser; this runs the page's own code with a stand-in page.
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  const start = src.indexOf('const MENU_APP_SCRIPT = String.raw`') + 'const MENU_APP_SCRIPT = String.raw`'.length;
+  const code = src.slice(start, src.indexOf('})();`;', start) + 5);
+  const win = { MENU_CFG: { t: { diet: {} }, state: { menu: null, published: null, scan: 'device' }, base: '', mode: 'token' }, scrollTo() {} };
+  const doc = { getElementById: () => ({ addEventListener() {}, innerHTML: '' }), head: { appendChild() {} } };
+  new Function('window', 'document', code)(win, doc);
+  const parse = win.__menuParse;
+  const items = (r) => r.sections.flatMap((s) => s.items.map((i) => ({ section: s.name, ...i })));
+  const lines = (txt, conf = 92) => txt.trim().split('\n').map((text) => ({ text, conf }));
+
+  // A lost decimal on a dollars-and-cents menu, and a line whose price was unreadable (stray marks), from a chalkboard.
+  const cafe = items(parse(lines('COFFEE\nDrip Coffee 3.25\nAmericano “+\nLatte 5.25\noat Milk Latte 575\nMocha 5.50')));
+  assert.deepEqual(cafe.map((i) => [i.section, i.name, i.price, i.check]), [
+    ['Coffee', 'Drip Coffee', '3.25', false], ['Coffee', 'Americano', '', true], ['Coffee', 'Latte', '5.25', false],
+    ['Coffee', 'Oat Milk Latte', '5.75', true], ['Coffee', 'Mocha', '5.50', false]]);
+  // "8 oz striploin" is the steak's description, not a new section.
+  const steak = items(parse(lines('MAINS\nSteak Frites 34\n8 oz striploin\nChicken Club 18')));
+  assert.deepEqual(steak.map((i) => [i.section, i.name, i.description]), [['Mains', 'Steak Frites', '8 oz striploin'], ['Mains', 'Chicken Club', '']]);
+
+  // A two-column menu the reader ran straight across, photographed slightly tilted: each column is read top to bottom,
+  // and each column's right-aligned prices stay with its own dishes.
+  const left = [['STARTERS', ''], ['Poutine', '14'], ['Caesar Salad', '13'], ['Calamari', '17'], ['Bruschetta', '12'], ['Soup', '9'], ['Wings', '16']];
+  const right = [['PASTA', ''], ['Carbonara', '21'], ['Pesto Penne', '19'], ['Lobster Linguine', '32'], ['Gnocchi', '20'], ['Lasagna', '22'], ['Ravioli', '23']];
+  const tilt = 0.03; // about 2 degrees
+  const word = (t, x0, x1, y) => ({ text: t, confidence: 90, bbox: { x0, x1, y0: y + x0 * tilt, y1: y + 30 + x0 * tilt } });
+  const blocks = [{ paragraphs: [{ lines: left.map(([ln, lp], i) => {
+    const [rn, rp] = right[i], y = 100 + i * 70;
+    const ws = [word(ln, 100, 100 + ln.length * 22, y), ...(lp ? [word(lp, 820, 860, y)] : []), word(rn, 960, 960 + rn.length * 22, y), ...(rp ? [word(rp, 1700, 1740, y)] : [])];
+    return { text: ws.map((w) => w.text).join(' '), confidence: 90, words: ws, baseline: { x0: 100, y0: y + 30 + 100 * tilt, x1: 1740, y1: y + 30 + 1740 * tilt } };
+  }) }] }];
+  const read = win.__menuOcrLines({ blocks }).map((l) => l.text);
+  assert.deepEqual(read, [...left, ...right].map(([n, pr]) => (pr ? `${n} ${pr}` : n)));
+  assert.deepEqual(items(parse(win.__menuOcrLines({ blocks }))).map((i) => `${i.section}: ${i.name} ${i.price}`).slice(5, 8),
+    ['Starters: Wings 16', 'Pasta: Carbonara 21', 'Pasta: Pesto Penne 19']);
+});
