@@ -1,0 +1,246 @@
+{
+  "reason": "Sports and recreation listing photos from Google Maps visitor photos, municipal pages, UDisc or Trailforks; Dayton reviewed the contact sheet and said deploy all on 2026-10-17.",
+  "batch_id": "venue-photos-sports-2026-10-17",
+  "venues": [
+    {
+      "id": 1841,
+      "name": "Armstrong Skate Park",
+      "region": "armstrong",
+      "slug": "armstrong-skate-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/armstrong-skate-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1823,
+      "name": "Armstrong Spallumcheen Outdoor Pool",
+      "region": "armstrong",
+      "slug": "armstrong-spallumcheen-outdoor-pool",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/armstrong-spallumcheen-outdoor-pool-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1844,
+      "name": "Chip Trail Disc Golf",
+      "region": "armstrong",
+      "slug": "chip-trail-disc-golf",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/chip-trail-disc-golf-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1664,
+      "name": "Big White Disc Golf Course",
+      "region": "big-white",
+      "slug": "big-white-disc-golf-course",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/big-white-disc-golf-course-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1839,
+      "name": "Creekside Park Skate Park",
+      "region": "coldstream",
+      "slug": "creekside-park-skate-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/creekside-park-skate-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1669,
+      "name": "Enderby Outdoor Pool",
+      "region": "enderby",
+      "slug": "enderby-outdoor-pool",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/enderby-outdoor-pool-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1842,
+      "name": "Enderby Skate Park",
+      "region": "enderby",
+      "slug": "enderby-skate-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/enderby-skate-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1832,
+      "name": "Kelowna BMX Track",
+      "region": "kelowna",
+      "slug": "kelowna-bmx-track",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-bmx-track-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1319,
+      "name": "Kelowna Memorial Arena",
+      "region": "kelowna",
+      "slug": "kelowna-memorial-arena",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kelowna-memorial-arena-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1318,
+      "name": "Rutland Arena",
+      "region": "kelowna",
+      "slug": "rutland-arena",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rutland-arena-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1837,
+      "name": "Okanagan Falls Skate Park (Keogan Sports Park)",
+      "region": "okanagan-falls",
+      "slug": "okanagan-falls-skate-park-keogan-sports-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/okanagan-falls-skate-park-keogan-sports-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1675,
+      "name": "Oliver Community Pool",
+      "region": "oliver",
+      "slug": "oliver-community-pool",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/oliver-community-pool-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1683,
+      "name": "Osoyoos Skate Park",
+      "region": "osoyoos",
+      "slug": "osoyoos-skate-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/osoyoos-skate-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1838,
+      "name": "West Bench Complex Tennis & Pickleball Courts",
+      "region": "osoyoos",
+      "slug": "west-bench-complex-tennis-pickleball-courts",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/west-bench-complex-tennis-pickleball-courts-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1834,
+      "name": "Penticton BMX Track",
+      "region": "penticton",
+      "slug": "penticton-bmx-track",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-bmx-track-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1828,
+      "name": "Sovereign Lake Mountain Bike Trails (Silver Star Provincial Park)",
+      "region": "silverstar",
+      "slug": "sovereign-lake-mountain-bike-trails-silver-star-provincial-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sovereign-lake-mountain-bike-trails-silver-star-provincial-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1836,
+      "name": "Summerland Skatepark",
+      "region": "summerland",
+      "slug": "summerland-skatepark",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-skatepark-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1843,
+      "name": "Vernon BMX Track (Ranger Park)",
+      "region": "vernon",
+      "slug": "vernon-bmx-track-ranger-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-bmx-track-ranger-park-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1324,
+      "name": "Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink",
+      "region": "vernon",
+      "slug": "vernon-recreation-complex-priest-valley-arena-centennial-outdoor-rink",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/vernon-recreation-complex-priest-valley-arena-centennial-outdoor-rink-2610.jpg?v=20261017"
+      }
+    },
+    {
+      "id": 1322,
+      "name": "Mount Boucherie Arenas – Jim Lind Arena & Royal LePage Place",
+      "region": "west-kelowna",
+      "slug": "mount-boucherie-arenas-jim-lind-arena-royal-lepage-place",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mount-boucherie-arenas-jim-lind-arena-royal-lepage-place-2610.jpg?v=20261017"
+      }
+    }
+  ]
+}
