@@ -22410,10 +22410,8 @@ test('Visitor contributions: submit, confirm, approve; tips are escaped; unconfi
     assert.match(empty, /@media \(max-width: 480px\) \{\s*\.vc-section \.vc-row \{ grid-template-columns: 1fr; \}/);
 
     // Checks: both boxes required, a tip or a photo required, tip length, name, email, origin, speed, honeypot.
-    let r = await t.post(url, { ...good, rights: false });
-    assert.equal(r.status, 400);
-    assert.ok(r.body.errors.rights);
-    r = await t.post(url, { ...good, honesty: undefined });
+    // The photo-rights box only matters when photos are attached (checked in the photo test below).
+    let r = await t.post(url, { ...good, honesty: undefined });
     assert.equal(r.status, 400);
     assert.ok(r.body.errors.honesty);
     r = await t.post(url, { ...good, tip: '   ', photos: [] });
@@ -22427,8 +22425,8 @@ test('Visitor contributions: submit, confirm, approve; tips are escaped; unconfi
     assert.ok(r.body.errors.name);
     r = await t.post(url, { ...good, email: 'nope' });
     assert.ok(r.body.errors.email);
-    r = await t.post(url, { ...good, rights: false, lang: 'fr' });
-    assert.match(r.body.errors.rights, /^Veuillez confirmer/);
+    r = await t.post(url, { ...good, honesty: false, lang: 'fr' });
+    assert.ok(r.body.errors.honesty);
     assert.equal((await t.post(url, good, { Origin: 'https://evil.example' })).status, 403);
     assert.equal((await t.post(url, { ...good, started_at: Date.now() })).status, 400);
     assert.equal((await t.post(url, { ...good, extra: 1 })).status, 400);
@@ -22563,6 +22561,14 @@ test('Visitor contributions: photo upload (metadata stripped), make main with cr
     assert.ok(r.body.errors.photos);
     r = await t.post(url, { ...base, photos: [1, 2, 3, 4].map(() => dataUrl(visitorTestJpeg())) });
     assert.match(r.body.errors.photos, /up to 3/);
+    // Photos need the rights box; a tip on its own does not.
+    r = await t.post(url, { ...base, rights: false, photos: [dataUrl(visitorTestJpeg())] });
+    assert.equal(r.status, 400);
+    assert.ok(r.body.errors.rights);
+    r = await t.post(url, { ...base, rights: false, lang: 'fr', photos: [dataUrl(visitorTestJpeg())] });
+    assert.match(r.body.errors.rights, /^Veuillez confirmer/);
+    r = await t.post(url, { ...base, email: 'tiponly@example.com', rights: false, tip: 'Park behind the building.' });
+    assert.equal(r.status, 201, r.text);
 
     // A photo with no tip is enough. Stored without its EXIF/GPS and comment.
     const a = await submitAndConfirm({ ...base, photos: [dataUrl(visitorTestJpeg())] });

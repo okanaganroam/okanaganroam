@@ -30525,7 +30525,7 @@ const VC_TEXT = {
   tipHint: ['What should other visitors know? Best dish, best time to go, parking…', 'Que devraient savoir les autres visiteurs? Meilleur plat, meilleur moment pour y aller, stationnement…'],
   photos: ['Photos (optional, up to 3)', 'Photos (facultatif, jusqu’à 3)'],
   photosHint: ['JPEG, PNG, WebP or HEIC, at least 800 pixels wide.', 'JPEG, PNG, WebP ou HEIC, d’au moins 800 pixels de large.'],
-  rights: ['I took these photos (or have the rights to them) and Okanagan Roam may show them on this listing and its social posts.', 'J’ai pris ces photos (ou j’en ai les droits) et Okanagan Roam peut les montrer sur cette fiche et dans ses publications sur les réseaux sociaux.'],
+  rights: ['If adding photos: I took these photos (or have the rights to them) and Okanagan Roam may show them on this listing and its social posts.', 'Si vous ajoutez des photos : j’ai pris ces photos (ou j’en ai les droits) et Okanagan Roam peut les montrer sur cette fiche et dans ses publications sur les réseaux sociaux.'],
   honesty: ['My tip is my own honest experience. I don’t work for or own this business.', 'Mon conseil reflète honnêtement ma propre expérience. Je ne travaille pas pour cette entreprise et je n’en suis pas propriétaire.'],
   hp: ['Leave this empty', 'Laissez ce champ vide'],
   send: ['Send', 'Envoyer'],
@@ -30821,7 +30821,7 @@ function visitorSectionHtml(venue, lang) {
         if (text.length > MAX_TIP) errs.tip = VC.errTipLong;
         if (files.length > MAX_PHOTOS) errs.photos = VC.errTooMany;
         if (!text && !files.length) errs.tip = VC.errNeedOne;
-        if (!$('vcRights').checked) errs.rights = VC.errRights;
+        if (files.length && !$('vcRights').checked) errs.rights = VC.errRights;
         if (!$('vcHonesty').checked) errs.honesty = VC.errHonesty;
         if (Object.keys(errs).length) { Object.keys(errs).forEach(function(k){ show(ERR_IDS[k], errs[k]); }); show('vcFormError', VC.errFix); return; }
         var btn = $('vcSubmit'), progress = $('vcProgress'); btn.disabled = true; btn.textContent = VC.sending;
@@ -30836,7 +30836,7 @@ function visitorSectionHtml(venue, lang) {
         chain.then(function(){
           progress.textContent = '';
           return fetch('/api/venues/' + VENUE + '/contributions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ name: name, email: email, tip: text, photos: photos, rights: true, honesty: true, lang: LANG, company_website: $('vcHp').value, started_at: started }) })
+            body: JSON.stringify({ name: name, email: email, tip: text, photos: photos, rights: $('vcRights').checked, honesty: true, lang: LANG, company_website: $('vcHp').value, started_at: started }) })
             .then(function(r){ return r.json().catch(function(){ return { ok: false, error: r.status === 413 ? VC.errTooBig : VC.errGeneric }; }); }, function(){ return { ok: false, error: VC.errNetwork }; })
             .then(function(j){
               if (j && j.ok) { form.hidden = true; open.hidden = true; var done = $('vcDone'); done.hidden = false; done.setAttribute('tabindex', '-1'); done.focus(); return; }
@@ -30953,7 +30953,7 @@ async function handleVisitorContribution(req, res, venueId) {
     }
   }
   if (!errors.tip && !errors.photos && !tip && !photos.length) errors.tip = say('errNeedOne');
-  if (body.rights !== true) errors.rights = say('errRights');
+  if (photos.length && body.rights !== true) errors.rights = say('errRights');
   if (body.honesty !== true) errors.honesty = say('errHonesty');
   if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: say('errFix'), errors });
   purgeStaleVisitorContributions();
