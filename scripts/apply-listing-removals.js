@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Applies data/listing-removals-2026-10.json to a running site.
+// Applies a listing-removals file (default data/listing-removals-2026-10.json)
+// to a running site.
 //
-//   node scripts/apply-listing-removals.js            # dry run: checks each listing
-//   ENRICHMENT_ADMIN_TOKEN=... node scripts/apply-listing-removals.js --apply
+//   node scripts/apply-listing-removals.js [file.json]            # dry run: checks each listing
+//   ENRICHMENT_ADMIN_TOKEN=... node scripts/apply-listing-removals.js [file.json] --apply
 //
 // Redirects go through POST /admin/retire-duplicate (old links keep working);
 // deletions go through DELETE /api/venues/:id. Each venue is re-read first
@@ -14,7 +15,8 @@ const path = require('node:path');
 const BASE = (process.env.OKR_BASE_URL || 'https://okanaganroam.com').replace(/\/$/, '');
 const APPLY = process.argv.includes('--apply');
 const TOKEN = process.env.ENRICHMENT_ADMIN_TOKEN;
-const data = require(path.join(__dirname, '..', 'data', 'listing-removals-2026-10.json'));
+const fileArg = process.argv.slice(2).find((a) => a.endsWith('.json'));
+const data = require(fileArg ? path.resolve(fileArg) : path.join(__dirname, '..', 'data', 'listing-removals-2026-10.json'));
 
 async function live(expected) {
   const res = await fetch(`${BASE}/api/venues/${expected.id}`);

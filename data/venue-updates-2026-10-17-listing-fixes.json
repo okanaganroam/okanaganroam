@@ -1,0 +1,242 @@
+{
+  "reason": "Listings found out of date during the Oct 2026 photo work (moved, renamed, reopened or replaced), checked against each venue's site, Google Maps and local news on 2026-10-17; Dayton approved.",
+  "batch_id": "listing-fixes-2026-10-17",
+  "venues": [
+    {
+      "id": 596,
+      "name": "Snac Shac Lumby - Coffee & Takeout",
+      "region": "lumby",
+      "slug": "snac-shac-lumby-coffee-takeout",
+      "expect": {
+        "name": "Snac Shac Lumby - Coffee & Takeout",
+        "website": null,
+        "description": "Snac Shac in Lumby is a small coffee, ice cream and takeout counter that covers breakfast through lunch. Order a poutine or a chili dog for a proper lunch, then finish with something from the ice cream side.",
+        "description_fr": "Snac Shac, à Lumby, est un petit comptoir de café, de crème glacée et de mets à emporter qui couvre le déjeuner comme le dîner. Commandez une poutine ou un chili dog pour un vrai dîner, puis terminez avec quelque chose du côté crème glacée.",
+        "hours": "{\"mon\":[[\"07:30\",\"19:00\"]],\"tue\":[[\"07:30\",\"19:00\"]],\"wed\":[[\"07:30\",\"19:00\"]],\"thu\":[[\"07:30\",\"19:00\"]],\"fri\":[[\"07:30\",\"19:00\"]],\"sat\":[[\"09:00\",\"18:00\"]],\"sun\":[[\"09:00\",\"18:00\"]]}"
+      },
+      "set": {
+        "name": "Snac Shac Cafe & Bistro",
+        "website": "https://www.facebook.com/Lumbysnacshac",
+        "description": "Snac Shac Cafe & Bistro is a small café in Lumby that reopened under new owners in May 2026, serving coffee and casual food from breakfast through lunch.",
+        "description_fr": "Snac Shac Cafe & Bistro est un petit café de Lumby qui a rouvert sous de nouveaux propriétaires en mai 2026, avec du café et des plats simples du déjeuner au dîner.",
+        "hours": null
+      }
+    },
+    {
+      "id": 506,
+      "name": "Pick Thai restaurant",
+      "region": "kelowna",
+      "slug": "pick-thai-restaurant",
+      "expect": {
+        "address": "1889 Springfield Rd, Kelowna, BC V1Y 5V5",
+        "latitude": 49.8759724,
+        "longitude": -119.4437142,
+        "website": null
+      },
+      "set": {
+        "address": "467 Bernard Ave, Kelowna, BC V1Y 6N8",
+        "latitude": 49.886091,
+        "longitude": -119.4940592,
+        "website": "https://www.clover.com/online-ordering/pick-thai-restaurant-kelowna"
+      }
+    },
+    {
+      "id": 274,
+      "name": "Hoang Gia Vietnamese Cuisine",
+      "region": "kelowna",
+      "slug": "hoang-gia-vietnamese-cuisine",
+      "expect": {
+        "address": "1875 Baron Rd #200, Kelowna, BC V1X 6A5",
+        "latitude": 49.8802107,
+        "longitude": -119.4108803
+      },
+      "set": {
+        "address": "2469 Hwy 97 N, Kelowna, BC V1X 7G9",
+        "latitude": 49.887625,
+        "longitude": -119.4210867
+      }
+    },
+    {
+      "id": 407,
+      "name": "Midtown Bistro",
+      "region": "vernon",
+      "slug": "midtown-bistro",
+      "expect": {
+        "address": "3103 32nd Ave, Vernon, BC V1T 2C4",
+        "latitude": 50.2637929,
+        "longitude": -119.2751655
+      },
+      "set": {
+        "address": "3024 30th Ave, Vernon, BC V1T 2B9",
+        "latitude": 50.2636601,
+        "longitude": -119.2719652
+      }
+    },
+    {
+      "id": 266,
+      "name": "Happy Slice Pizza (Vernon)",
+      "region": "vernon",
+      "slug": "happy-slice-pizza-vernon",
+      "expect": {
+        "address": "3200 32nd Ave, Vernon, BC V1T 2L8",
+        "latitude": 50.2637905,
+        "longitude": -119.2761745,
+        "website": null
+      },
+      "set": {
+        "address": "4300 27 St #3, Vernon, BC V1T 4Y4",
+        "latitude": 50.2751356,
+        "longitude": -119.2674586,
+        "website": "https://happyslice.ca/"
+      }
+    },
+    {
+      "id": 332,
+      "name": "Kimbap & Sushi",
+      "region": "kelowna",
+      "slug": "kimbap-sushi",
+      "expect": {
+        "address": "1553 Harvey Ave #103, Kelowna, BC V1Y 6G3",
+        "latitude": 49.883425,
+        "longitude": -119.4573459,
+        "website": null
+      },
+      "set": {
+        "address": "2189 Springfield Rd #118, Kelowna, BC V1Y 7X1",
+        "latitude": 49.8768043,
+        "longitude": -119.4404754,
+        "website": "https://www.kimbapandsushi.com/"
+      }
+    },
+    {
+      "id": 783,
+      "name": "Wild Ginger",
+      "region": "penticton",
+      "slug": "wild-ginger",
+      "expect": {
+        "address": "1616 Government St, Penticton, BC V2A 7A1",
+        "latitude": 49.4820528,
+        "longitude": -119.5951761
+      },
+      "set": {
+        "address": "340 Main St, Penticton, BC V2A 5C3",
+        "latitude": 49.498207,
+        "longitude": -119.5917956
+      }
+    },
+    {
+      "id": 475,
+      "name": "Pakwaan Restaurant",
+      "region": "kelowna",
+      "slug": "pakwaan-restaurant",
+      "expect": {
+        "address": "1876 Cooper Rd #148, Kelowna, BC V1Y 8B7",
+        "latitude": 49.8789394,
+        "longitude": -119.4453892
+      },
+      "set": {
+        "address": "538 Yates Rd #4, Kelowna, BC V1V 2V1",
+        "latitude": 49.909442,
+        "longitude": -119.4491636
+      }
+    },
+    {
+      "id": 1785,
+      "name": "Boomers Bar & Grill",
+      "region": "kelowna",
+      "slug": "boomers-bar-grill",
+      "expect": {
+        "name": "Boomers Bar & Grill",
+        "address": "4105 Gordon Dr, Kelowna, BC",
+        "phone": "250-764-1688",
+        "website": null,
+        "latitude": 49.83575,
+        "longitude": -119.48251,
+        "description": "Boomers Bar & Grill is a Lower Mission neighbourhood bar on Gordon Drive serving bar-and-grill staples. Regulars rate the poutine with its dark gravy and generous cheese curds, plus well-seasoned wings and cauliflower bites, and the staff keep the room friendly.",
+        "description_fr": "Boomers Bar & Grill est un bar de quartier du Lower Mission, sur Gordon Drive, qui sert les classiques de bar-grill. Les habitués apprécient la poutine à la sauce foncée et généreuse en fromage en grains, les ailes bien assaisonnées et les bouchées de chou-fleur, et le personnel garde l'ambiance conviviale."
+      },
+      "set": {
+        "name": "heyhey Bar & Grill",
+        "address": "4105 Gordon Dr, Kelowna, BC V1W 4Z1",
+        "phone": "+1 250-764-1688",
+        "website": "https://heyheybarandgrill.ca/",
+        "latitude": 49.8354187,
+        "longitude": -119.4805095,
+        "description": "heyhey Bar & Grill is a Lower Mission neighbourhood bar on Gordon Drive serving bar-and-grill staples. Regulars rate the poutine with its dark gravy and generous cheese curds, plus well-seasoned wings and cauliflower bites, and the staff keep the room friendly.",
+        "description_fr": "heyhey Bar & Grill est un bar de quartier du Lower Mission, sur Gordon Drive, qui sert les classiques de bar-grill. Les habitués apprécient la poutine à la sauce foncée et généreuse en fromage en grains, les ailes bien assaisonnées et les bouchées de chou-fleur, et le personnel garde l'ambiance conviviale."
+      }
+    },
+    {
+      "id": 376,
+      "name": "M&J's Country Kitchen",
+      "region": "oliver",
+      "slug": "m-j-s-country-kitchen",
+      "expect": {
+        "name": "M&J's Country Kitchen",
+        "description": "M&J's Country Kitchen is a homestyle diner in an Oliver strip mall that regulars rely on for gluten-free-friendly cooking. Dietary care doesn't feel like an afterthought here, so order with confidence if you need gluten-free.",
+        "description_fr": "M&J's Country Kitchen est un diner aux saveurs maison situé dans un centre commercial linéaire d'Oliver, sur lequel les habitués comptent pour une cuisine adaptée au sans gluten. L'attention aux besoins alimentaires n'y est pas une réflexion après coup : commandez en toute confiance.",
+        "hours": "{\"mon\":null,\"tue\":[[\"07:00\",\"16:00\"]],\"wed\":[[\"07:00\",\"16:00\"]],\"thu\":[[\"07:00\",\"16:00\"]],\"fri\":[[\"07:00\",\"16:00\"]],\"sat\":[[\"07:00\",\"16:00\"]],\"sun\":[[\"07:00\",\"16:00\"]]}"
+      },
+      "set": {
+        "name": "Gino's Family Kitchen",
+        "description": "Gino's Family Kitchen is a family restaurant in an Oliver strip mall on Main Street, in the spot long known as M&J's Country Kitchen, which the new owners took over in August 2026.",
+        "description_fr": "Gino's Family Kitchen est un restaurant familial situé dans un centre commercial de la rue Main à Oliver, à l'emplacement longtemps occupé par M&J's Country Kitchen, que les nouveaux propriétaires ont repris en août 2026.",
+        "hours": null
+      }
+    },
+    {
+      "id": 1020,
+      "name": "Indian Flame",
+      "region": "osoyoos",
+      "slug": "indian-flame",
+      "expect": {
+        "name": "Indian Flame",
+        "website": null,
+        "description": "Indian Flame is a well-established Indian restaurant and banquet hall in Osoyoos, known for food that has stayed consistently good over years of visits. The popcorn potato balls and coconut lamb stand out on the menu.",
+        "description_fr": "Indian Flame est un restaurant indien et salle de banquet bien établi à Osoyoos, reconnu pour une cuisine qui reste bonne d'année en année. Les bouchées de pommes de terre popcorn et l'agneau à la noix de coco se démarquent au menu."
+      },
+      "set": {
+        "name": "The Flame",
+        "website": "https://theflamebc.com/",
+        "description": "The Flame is a well-established Indian restaurant and banquet hall in Osoyoos, known for food that has stayed consistently good over years of visits. The popcorn potato balls and coconut lamb stand out on the menu.",
+        "description_fr": "The Flame est un restaurant indien et salle de banquet bien établi à Osoyoos, reconnu pour une cuisine qui reste bonne d'année en année. Les bouchées de pommes de terre popcorn et l'agneau à la noix de coco se démarquent au menu."
+      }
+    },
+    {
+      "id": 1018,
+      "name": "Coyote Ridge Pub",
+      "region": "osoyoos",
+      "slug": "coyote-ridge-pub",
+      "expect": {
+        "name": "Coyote Ridge Pub",
+        "address": "5000 Anarchist Mountain Rd, Osoyoos, BC V0H 1V0",
+        "website": null,
+        "latitude": 49.0359228,
+        "longitude": -119.3860964,
+        "description": "Coyote Ridge Pub in Osoyoos was recently revamped under new ownership, with a pool table, foosball and a small stage for live music. Portions are huge, and the Ukrainian dinner special is worth trying.",
+        "description_fr": "Coyote Ridge Pub, à Osoyoos, a récemment été rénové par ses nouveaux propriétaires, avec une table de billard, un baby-foot et une petite scène pour la musique live. Les portions sont énormes, et le spécial souper ukrainien vaut la peine d'être essayé."
+      },
+      "set": {
+        "name": "The Ridge Pub & Restaurant",
+        "address": "9913 BC-3, Osoyoos, BC V0H 1V2",
+        "website": "http://www.ridgepub.com/",
+        "latitude": 49.0353038,
+        "longitude": -119.4778321,
+        "description": "The Ridge Pub & Restaurant in Osoyoos was recently revamped under new ownership, with a pool table, foosball and a small stage for live music. Portions are huge, and the Ukrainian dinner special is worth trying.",
+        "description_fr": "The Ridge Pub & Restaurant, à Osoyoos, a récemment été rénové par ses nouveaux propriétaires, avec une table de billard, un baby-foot et une petite scène pour la musique live. Les portions sont énormes, et le spécial souper ukrainien vaut la peine d'être essayé."
+      }
+    },
+    {
+      "id": 1015,
+      "name": "Sushi Kojo",
+      "region": "penticton",
+      "slug": "kizuna",
+      "expect": {
+        "website": null
+      },
+      "set": {
+        "website": "http://www.sushikojo.com/"
+      }
+    }
+  ]
+}

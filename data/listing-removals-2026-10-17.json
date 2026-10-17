@@ -1,0 +1,21 @@
+{
+  "verifiedOn": "2026-10-17",
+  "about": "Listings that are not public venues, found during the Oct 2026 photo work. Applied with scripts/apply-listing-removals.js data/listing-removals-2026-10-17.json.",
+  "redirect": [],
+  "delete": [
+    {
+      "id": 155,
+      "region": "west-kelowna",
+      "slug": "crazechill-eatery",
+      "name": "CrazeChill Eatery",
+      "reason": "Delivery-app listing only: no West Kelowna storefront on Google Maps, and its phone is the Trail, BC location."
+    },
+    {
+      "id": 254,
+      "region": "west-kelowna",
+      "slug": "gronco",
+      "name": "Gronco",
+      "reason": "Home-based gelato maker and supplier with no shop visitors can go to; website dead."
+    }
+  ]
+}
