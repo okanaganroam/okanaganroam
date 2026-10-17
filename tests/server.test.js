@@ -22151,3 +22151,72 @@ test('Menus: the Claude request (model, refusal fallback, structured output) and
   assert.deepEqual(app.normalizeMenuData({ sections: [{ name: 'Empty', items: [] }, { name: 'X', items: [{ name: '  ' }, { name: 'Tea', price: 3 }] }] }),
     { sections: [{ name: 'X', note: '', items: [{ name: 'Tea', description: '', price: '', dietary: [], check: false }] }] });
 });
+
+test('Tours & prices (2026-10-17): tour operators use the uploader for their price list, published at /prices', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Prices Fixture Tours', type: 'tour', hours: SEASON_WEEK, slug: 'prices-fixture-tours' });
+  const v = app.findVenueBySlug('kelowna', 'tour', 'prices-fixture-tours');
+  const token = app.createOwnerLink(v.id, { contact_email: 'guide@example.com' }).url.split('/owner/')[1];
+  const jpeg = (w, h) => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.22.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const get = (p, cookie) => fetch(`${base}${p}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
+  const kinds = [];
+  app.setMenuReader(async (pages, kind) => { kinds.push(kind); return { ok: true, result: { readable: true, problem: 'none', sections: [{ name: 'Wine Tours', note: '', items: [
+    { name: 'Naramata Bench Tour', description: '4 hours, includes lunch', price: '$129 per person', dietary: [], check: false },
+    { name: 'Sunset Cruise', description: '2 hours', price: 'From 89', dietary: [], check: false },
+    { name: 'Private Charter', description: 'Up to 12 guests', price: '1,299', dietary: [], check: false }] }] } }; });
+  const sent = [], ownerMail = [];
+  app.setVenueSubmissionTransport(async (payload) => { sent.push(payload); });
+  app.setOwnerEmailTransport(async (m) => { ownerMail.push(m); });
+  const mb = `/owner/${token}/menu`;
+  try {
+    assert.match(await get(`/owner/${token}`).then((r) => r.text()), /Add your tours &amp; prices/);
+    const page = await get(mb).then((r) => r.text());
+    assert.match(page, /Take a photo of your price list/);
+    assert.match(page, /"diet":\{\}/, 'no diet tags for tours');
+    assert.equal((await post(`${mb}/pages`, { image: `data:image/jpeg;base64,${jpeg(1600, 1200).toString('base64')}` })).status, 201);
+    await post(`${mb}/read`, {});
+    let s;
+    for (let i = 0; i < 50; i++) { s = await get(`${mb}/state`).then((r) => r.json()); if (s.menu.status !== 'reading') break; await new Promise((r) => setTimeout(r, 20)); }
+    assert.deepEqual(kinds, ['tours'], 'the reader is told it is a price list');
+    const pub = await post(`${mb}/publish`, { data: s.menu.data });
+    assert.equal(pub.body.live, false);
+    assert.match(sent.at(-1)._subject, /\[PENDING REVIEW\] Tours & prices from Prices Fixture Tours \(3 tours\)/);
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    assert.match(await get('/admin/review', cookie).then((r) => r.text()), /Tours &amp; prices #\d+|Tours & prices #\d+/);
+    assert.equal((await post(`/admin/review/menu/${s.menu.id}/publish`, { data: s.menu.data }, cookie)).body.live, true);
+    assert.ok(ownerMail.some((m) => /Approved: your tours & prices/.test(m.subject)));
+
+    const html = await get('/kelowna/tours/prices-fixture-tours/prices').then((r) => r.text());
+    assert.match(html, /<h1>Prices Fixture Tours Tours &amp; Prices<\/h1>/);
+    assert.match(html, /<span class="vm-price">\$129 per person<\/span>/);
+    assert.match(html, /<span class="vm-price">\$1,299<\/span>/);
+    assert.match(html, /Prices, times and availability can change/);
+    assert.doesNotMatch(html, /name="robots" content="noindex"/, '3 tours is enough to index');
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+    const biz = ld.find((x) => x.hasOfferCatalog);
+    assert.equal(biz.hasMenu, undefined);
+    const offer = biz.hasOfferCatalog.itemListElement[0].itemListElement[0];
+    assert.deepEqual(offer, { '@type': 'Offer', itemOffered: { '@type': 'TouristTrip', name: 'Naramata Bench Tour', description: '4 hours, includes lunch' }, price: '129.00', priceCurrency: 'CAD' });
+    assert.equal(biz.hasOfferCatalog.itemListElement[0].itemListElement[2].price, '1299.00');
+    // A tour operator has no /menu page, and the place page links to /prices.
+    assert.equal((await get('/kelowna/tours/prices-fixture-tours/menu')).status, 302);
+    const venuePage = await get('/kelowna/tours/prices-fixture-tours').then((r) => r.text());
+    assert.match(venuePage, /See all tours &amp; prices \(3 tours\)/);
+    assert.doesNotMatch(venuePage, /"hasMenu"/);
+    assert.match(await get('/sitemap.xml').then((r) => r.text()), /prices-fixture-tours\/prices<\/loc>/);
+  } finally {
+    app.setMenuReader(null);
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    for (const f of db.prepare('SELECT file FROM venue_menu_files').all()) { try { fs.unlinkSync(path.join(app.MENU_DIR, f.file)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
