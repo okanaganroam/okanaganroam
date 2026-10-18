@@ -111,6 +111,8 @@ const PHRASES = [
   ['incontournables', 'must see'], ['incontournable', 'must see'], ['a ne pas manquer', 'do not miss'],
   ['meilleurs', 'best'], ['meilleures', 'best'], ['meilleur', 'best'], ['meilleure', 'best'],
   // food and drink
+  // 2026-10-18: "un bon souper chaque soir" is a dinner every night ("chaque" was left as a search word).
+  ['chaque soir', 'each night'], ['chaque soiree', 'each evening'], ['tous les soirs', 'every night'], ['chaque jour', 'each day'], ['tous les jours', 'every day'], ['chaque', 'each'],
   ['un seul souper', 'one dinner'], ['un seul repas du soir', 'one dinner'],
   ['petit dejeuner', 'breakfast'], ['petits dejeuners', 'breakfasts'], ['dejeuner', 'breakfast'], ['dejeuners', 'breakfasts'],
   ['diner', 'lunch'], ['diners', 'lunches'], ['souper', 'dinner'], ['soupers', 'dinners'],

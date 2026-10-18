@@ -183,7 +183,7 @@ const CUISINE_SYNONYMS = {
 };
 
 const BUDGET_ALIASES = {
-  budget: ['cheap', 'inexpensive', 'affordable', 'on a budget', 'low cost', 'budget friendly', 'cheap eats'],
+  budget: ['cheap', 'inexpensive', 'affordable', 'on a budget', 'low cost', 'budget friendly', 'cheap eats', 'budget', 'low budget', 'tight budget', 'budget conscious', 'cheaper', 'frugal', 'cheap eat'],
   moderate: ['mid range', 'reasonable', 'reasonably priced', 'moderately priced'],
   upscale: ['upscale', 'high end', 'higher end', 'luxury', 'luxurious', 'splurge', 'premium', 'fancy', 'fine dining', 'expensive'],
 };
@@ -359,7 +359,10 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'two three four five six seven eight nine ten eleven twelve dozen '
   // Teens are read by the planner from the request itself (activities first, no bars).
   + 'teen teens teenager teenagers tween tweens adolescents '
-  + 'first ever highlights must musts favourite favorite favourites favorites along beside alongside').split(/\s+/));
+  + 'first ever highlights must musts favourite favorite favourites favorites along beside alongside '
+  // 2026-10-18: "a nice dinner each night" put "each" on the plan as a request and matched a garden whose
+  // description happened to contain it. Quantity and filler words never become search words.
+  + 'each every per both either another other others everyone everybody someone anyone nightly daily maybe perhaps lovely nicer better').split(/\s+/));
 
 // ---------- polarity (Stage 3.1, 2026-09-29) ----------
 // A negation word that no phrase claims ("not", "no", "nothing", "without",
@@ -1017,7 +1020,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const t = normalizeTaxonomy(taxonomy);
   const table = opts.phraseTable || buildPhraseTable(taxonomy);
   const intent = emptyIntent();
-  const normalized = normalizeDiscoveryText(text);
+  // A lone "$" ("$ restaurants") is the budget price level; "$$$"/"$$$$" are upscale (2026-10-18).
+  const priced = typeof text === 'string' ? text.replace(/(^|[\s(])\${3,4}(?=[\s),.!?]|$)/g, '$1 upscale ').replace(/(^|[\s(])\$(?=[\s),.!?]|$)/g, '$1 cheap ') : text;
+  const normalized = normalizeDiscoveryText(priced);
   if (!normalized) return finalizeIntent(intent, t);
 
   // 1. An exact venue name wins outright (the full name, then a unique
@@ -1178,7 +1183,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const occasion = lastOf('occasion', occasionPool);
   intent.occasion = occasion;
   const anchorStarts = new Set(themeAnchors.map((a) => a.start));
-  const lengthDays = lastOf('days', lengthMentions.filter((l) => !anchorStarts.has(l.start)).map((l) => ({ value: l.days, start: l.start })));
+  // "A 3-day wine weekend" is 3 days: a counted length wins over the bare word "weekend" (2026-10-18).
+  const countedLength = lengthMentions.some((l) => /\bdays?\b/.test(l.phrase) && l.days > 1);
+  const lengthDays = lastOf('days', lengthMentions.filter((l) => !anchorStarts.has(l.start) && !(countedLength && /^weekend$/.test(l.phrase))).map((l) => ({ value: l.days, start: l.start })));
   const month = lastOf('month', monthMentions);
   const season = lastOf('season', seasonMentions);
   if (month) intent.month = month;
