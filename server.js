@@ -23640,6 +23640,8 @@ function renderVenuePageLayoutStyles() {
     body.golf-page .venue-hero-photo img { max-height: clamp(220px, 42vh, 420px); }
     body.golf-page .vg-mosaic .venue-hero-photo, body.golf-page .vg-mosaic .venue-hero-photo img { height: clamp(220px, 42vh, 380px); }
   }
+  /* Gallery pages: the 2x2 thumbnails beside the photo keep the photo's height. */
+  @media (min-width: 900px) { body.golf-page .vg-mosaic .vg-strip { height: clamp(220px, 42vh, 380px); } }
   body.golf-page .venue-hours-daily { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 4px; font-weight: 800; color: var(--ink); }
   body.golf-page .venue-hours-days summary { cursor: pointer; font-size: 0.84rem; font-weight: 700; opacity: 0.8; }
   @media (min-width: 960px) {
@@ -31907,7 +31909,7 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-thumb { position: relative; flex: 1 1 0; min-width: 0; max-width: 96px; height: 64px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: #EAE6D9; }
         .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
-        .vg-mosaic + .venue-photo-credit { margin-bottom: 14px !important; }
+        .vg-mosaic + .venue-photo-credit { margin-top: 6px !important; margin-bottom: 14px !important; }
         .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1rem 'Nunito', sans-serif; }
         /* Wide screens: main photo on the left, the other photos as a 2x2
            grid on the right at the same height, so the venue name below is
