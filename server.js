@@ -4101,11 +4101,24 @@ function discoveryPresentation(run) {
 //     rather than /browse's raw substring filter, which found "low" in
 //     "follow" and nothing for "Earl's")
 // Returns { url, reason }; url null = serve /browse as typed.
-function heroSearchTarget(text) {
+// French (2026-10-18): from a French page (lang 'fr') the words are read through the planner's French vocabulary
+// ("terrasse" -> "patio"), and the /search link keeps the visitor's own words.
+function discoverySearchText(text, lang) {
+  if (lang !== 'fr') return text;
+  try { return tripPlannerFrModule().tripPlannerText(text, buildDiscoveryTaxonomy()); } catch (e) { return text; }
+}
+function heroSearchTarget(text, { lang = 'en' } = {}) {
+  const typed = text;
+  text = discoverySearchText(text, lang);
   const intent = interpretDiscoveryText(text);
   const destination = resolveDiscoveryDestination(intent);
-  const search = `/search${discoveryQueryString({ q: text.trim() })}`;
+  const search = `/search${discoveryQueryString({ q: typed.trim() })}`;
   if (intent.mode === 'navigate' && destination.url) return { url: destination.url, reason: 'exact_venue' };
+  // Smarter search (2026-10-18): breakfast, kids and rainy days, date night,
+  // dated events, guide topics and "a winery with a restaurant" (smartSearchPlan).
+  const plan = smartSearchPlan(text, intent);
+  if (plan && plan.url) return { url: plan.url, reason: `intent_${plan.key}` };
+  if (plan && plan.list) return { url: search, reason: `intent_${plan.key}` };
   if (intent.cuisines.length) return { url: search, reason: 'cuisine' };
   // A plain one-word text search (/browse?q=<word>, nothing else) is not a
   // page of its own: the one-word rule below decides, so "Poutine" is never
@@ -4121,8 +4134,15 @@ function heroSearchTarget(text) {
   // search; neither is anything that normalizes to several words
   // ("dog-friendly-patios", "joe's patio").
   if (hasDiscoveryExclusion(intent.excluded)) return { url: search, reason: 'exclusion' };
-  if (discoveryIntentModule().normalizeDiscoveryText(text).split(' ').filter(Boolean).length > 1) return { url: search, reason: 'multi_word' };
   const found = selectDiscoveryVenues(intent, 1).total;
+  // A typo in a place's name ("mision hill"), when nothing else matches:
+  // straight to the place when one name is clearly closest (2026-10-18).
+  if (!found && intent.mode !== 'events') {
+    const venue = smartFuzzyWinner(smartFuzzyVenues(text, intent));
+    const url = venue && discoveryVenueUrl(venue);
+    if (url) return { url, reason: 'fuzzy_venue' };
+  }
+  if (discoveryIntentModule().normalizeDiscoveryText(text).split(' ').filter(Boolean).length > 1) return { url: search, reason: 'multi_word' };
   return { url: search, reason: found > 0 ? 'single_word' : 'single_word_no_results' };
 }
 
@@ -4164,59 +4184,552 @@ const SEARCH_EMPTY_TEXT = {
   ambiguous: 'More than one place has that name. Pick the one you mean:',
 };
 
-function renderSearchPage(run) {
-  const p = run.presentation, labels = tripPlannerLabels();
-  const q = run.query.trim();
-  const esc = escapeHtml;
-  const total = run.results.total || 0;
-  const items = run.results.items || [];
-  const title = `Search: ${q.length > 60 ? q.slice(0, 60) + '…' : q} | Okanagan Roam`;
-  const correctionText = p.corrections.length
-    ? `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>` : '';
-  // Stage 3.5: a sentence is shown once ("Trip length and pace are used by
-  // Build My Trip, not search." covers both the length and the pace note).
-  const notes = p.notes.map((n) => discoveryNoteText(n, labels)).filter((t, i, all) => t && all.indexOf(t) === i);
-  const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
-  let resultsHtml = '';
-  if (run.results.kind === 'events' && items.length) {
-    resultsHtml = `<p class="search-count">${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}</p>
-  <ul class="card-grid">${items.map((e) => `
-    <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
-      <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
-  </ul>`;
-  } else if (items.length) {
-    resultsHtml = `<p class="search-count">${total} place${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}</p>
-  <ul class="card-grid">${items.map((v) => {
-      const why = (v.matchedOn || []).map(discoveryMatchedOnText).filter(Boolean);
-      return `
-    <li class="category-card"><h2><a href="${esc(v.url)}">${esc(v.name)}</a></h2>
-      <p class="venue-meta">${esc(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)} · ${esc(REGION_LABELS[v.region] || v.region)}</p>${why.length ? `
-      <p class="venue-meta search-why">${esc(why.join(' · '))}</p>` : ''}</li>`;
-    }).join('')}
-  </ul>`;
-  } else {
-    resultsHtml = `<p class="search-empty">${esc(SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results)}</p>`;
+// ---------- Smarter search (2026-10-18) ----------
+//
+// An intent layer over the interpreter for the requests the structured
+// routing above cannot place on one page (site review, 2026-10-18):
+//   breakfast / brunch          -> cafés and restaurants that open early or
+//                                  mention breakfast or brunch (Kelowna brunch
+//                                  -> the brunch guide)
+//   kids / family / rainy day   -> /indoor?types=family&regions=<town>
+//   date night / romantic       -> restaurants and cocktail lounges in the town
+//   live music / things to do + a date ("this weekend", "tonight")
+//                               -> What's On for that window and category
+//   a winery (brewery, distillery) with a restaurant
+//                               -> only those that have one
+//   a guide topic ("halloween") -> that guide
+//   a typo in a place's name ("mision hill") -> the place, when nothing else matches
+// Rules over the site's own data only: no external search service.
+
+// Lower case, accent-free, apostrophe-free, single-spaced words.
+function smartFold(text) {
+  return String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['‘’`]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+const smartHas = (folded, phrases) => phrases.some((p) => ` ${folded} `.includes(` ${p} `));
+// The folded text with each phrase removed (longest first), as single-spaced words.
+function smartStrip(folded, phrases) {
+  let s = ` ${folded} `;
+  for (const p of phrases.slice().sort((a, b) => b.length - a.length)) {
+    while (s.includes(` ${p} `)) s = s.replace(` ${p} `, ' ');
   }
-  const suggestionHtml = p.suggestions.length ? `<h2 class="category-subsection-heading">${p.status === 'ambiguous' ? 'Places with that name' : 'You could also try'}</h2>
-  <ul class="search-suggestions">${p.suggestions.map((sg) => `<li><a href="${esc(sg.url)}">${esc(sg.label)}</a></li>`).join('')}</ul>` : '';
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-${pageHead(title, 'Search results on Okanagan Roam.', null, [], { golfTheme: true, noindex: true })}
-${renderOutdoorThemeStyles()}
-${renderAnalyticsHeadHtml('search')}
-<style>
+  return s.trim().split(' ').filter(Boolean);
+}
+const SMART_BREAKFAST_WORDS = ['breakfast', 'breakfasts', 'brunch', 'brunches', 'eggs benny', 'pancakes', 'petit dejeuner', 'petits dejeuners', 'dejeuner', 'dejeuners'];
+const SMART_FAMILY_WORDS = ['kids', 'kid', 'children', 'child', 'family', 'families', 'toddler', 'toddlers', 'little ones', 'enfants', 'enfant', 'famille', 'familles', 'en famille'];
+const SMART_RAINY_WORDS = ['rainy day', 'rainy days', 'rainy', 'rain', 'raining', 'wet day', 'indoor', 'indoors', 'inside', 'jour de pluie', 'pluie', 'pluvieux', 'pluvieuse', 'interieur', 'interieures', 'interieurs', 'a l interieur'];
+const SMART_DATE_WORDS = ['date night', 'date nights', 'date idea', 'date ideas', 'romantic', 'romance', 'anniversary', 'anniversary dinner', 'romantique', 'en amoureux', 'soiree romantique', 'tete a tete'];
+// French date words the interpreter does not read; the English ones it does.
+const SMART_WHEN_FR = [['ce soir', 'today'], ['aujourd hui', 'today'], ['ce week end', 'this-weekend'], ['ce weekend', 'this-weekend'],
+  ['cette fin de semaine', 'this-weekend'], ['fin de semaine', 'this-weekend'], ['cette semaine', 'this-week'], ['ce mois ci', 'this-month'], ['ce mois', 'this-month']];
+const SMART_WHEN_WORDS = ['tonight', 'today', 'tomorrow', 'this weekend', 'weekend', 'this week', 'this month', 'next week', 'this evening', 'tonite',
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'on', 'this', 'night', 'evening', ...SMART_WHEN_FR.map((x) => x[0])];
+// Words that ask for What's On categories.
+const SMART_EVENT_CATEGORY_WORDS = [
+  ['live-music', ['live music', 'music', 'concert', 'concerts', 'gig', 'gigs', 'band', 'bands', 'musique', 'musique live', 'spectacle', 'spectacles']],
+  ['family-kids', SMART_FAMILY_WORDS],
+  ['markets-fairs', ['market', 'markets', 'farmers market', 'farmers markets', 'marche', 'marches', 'fair', 'fairs']],
+  ['holiday-seasonal', ['halloween', 'christmas', 'xmas', 'noel', 'holiday', 'holidays']],
+  ['arts-culture', ['art', 'arts', 'theatre', 'theater', 'comedy', 'show', 'shows', 'gallery', 'galleries']],
+  ['nightlife', ['nightlife', 'party', 'parties', 'dance', 'dancing', 'dj']],
+  ['events-festivals', ['festival', 'festivals']],
+  ['workshops-classes', ['workshop', 'workshops', 'class', 'classes']],
+];
+// Words that add nothing to a "what's on" request.
+const SMART_EVENT_GENERIC = ['things to do', 'thing to do', 'what to do', 'stuff to do', 'something to do', 'what s on', 'whats on', 'whats happening', 'what s happening',
+  'things', 'thing', 'to', 'do', 'fun', 'something', 'what', 'whats', 'happening', 'going', 'events', 'event', 'activities', 'activity', 'stuff',
+  'in', 'the', 'a', 'an', 'near', 'me', 'okanagan', 'see', 'any', 'for', 'and', 'with', 'live', 'local', 'free', 'at', 'around',
+  'quoi', 'faire', 'que', 'sortir', 'evenements', 'evenement', 'activites', 'a', 'au', 'dans', 'la', 'le', 'les', 'de', 'du', 'des', 'et', 'pour', 'avec'];
+// Words that add nothing to a kids / rainy-day request.
+const SMART_FAMILY_GENERIC = [...SMART_EVENT_GENERIC, 'day', 'days', 'go', 'places', 'place', 'spots', 'spot', 'ideas', 'idea', 'where', 'take', 'my', 'our', 'kids activities',
+  'jour', 'journee', 'endroits', 'idees', 'mes', 'nos'];
+function smartRegionWords() {
+  const words = [];
+  for (const [slug, label] of Object.entries(REGION_LABELS)) { words.push(smartFold(label), smartFold(slug.replace(/-/g, ' '))); }
+  return uniqueList(words.filter(Boolean));
+}
+// The words a request is about once its town, dates and any typo the
+// interpreter already corrected are taken out.
+function smartTopicWords(folded, intent, extra = []) {
+  const corrected = (intent.corrections || []).map((c) => smartFold(c.from));
+  return smartStrip(folded, [...smartRegionWords(), ...corrected, ...SMART_WHEN_WORDS, ...extra]);
+}
+// A What's On window for the request: the interpreter's, or a French date phrase.
+function smartWhenParams(folded, intent, now = new Date()) {
+  if (intent.when) return discoveryWhatsOnWindowParams(intent.when, now);
+  const fr = SMART_WHEN_FR.find(([p]) => smartHas(folded, [p]));
+  return fr ? { when: fr[1] } : null;
+}
+
+// Guides (2026-10-18): a request whose topic words all appear in a guide's
+// title goes to that guide; the /search page lists the guides that fit.
+const SMART_GUIDE_STOP = new Set(['the', 'a', 'an', 'in', 'of', 'for', 'and', 'to', 'best', 'top', 'okanagan', 'bc', 'guide', 'guides', 'things', 'thing', 'do',
+  'with', 'near', 'me', 'where', 'what', 'how', 'our', 'your', 'my', 'on', 'at', 'is', 'are', 'spots', 'spot', 'places', 'place', 'visit', 'go', 'see', 'this',
+  'day', 'days', 'cool', 'time', 'new', 'year', 'season', 'seasons', 'without', 'beyond', 'catch', 'smaller', 'events', 'event', 'more', 'fun', 'ideas',
+  'le', 'la', 'les', 'de', 'du', 'des', 'au', 'aux', 'en', 'et', 'pour', 'meilleur', 'meilleurs', 'meilleure', 'meilleures', 'ou', 'quoi', 'faire']);
+const SMART_GUIDE_ALIASES = [['hot springs', 'spas soaks'], ['hot spring', 'spas soaks'], ['hot tub', 'soaks'], ['hot tubs', 'soaks'], ['xmas', 'christmas'], ['noel', 'christmas'],
+  ['skiing', 'ski'], ['snowboarding', 'ski'], ['snowshoeing', 'snowshoe'], ['salmon run', 'kokanee'], ['salmon', 'kokanee'], ['cider', 'cideries'], ['ciders', 'cideries'],
+  ['u pick', 'pick'], ['upick', 'pick'], ['apple picking', 'pick'], ['pumpkin patch', 'farms pick'], ['sauna', 'saunas'], ['spa', 'spas'], ['skate', 'skating'],
+  ['waterfall', 'waterfall'], ['waterfalls', 'waterfall'], ['sleigh ride', 'sleigh'], ['dog sledding', 'sledding'], ['valentines', 'valentine']];
+const smartStem = (w) => (w.length > 4 && w.endsWith('ies') ? `${w.slice(0, -3)}y` : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+function smartGuideQueryWords(folded) {
+  let s = ` ${folded} `;
+  for (const [from, to] of SMART_GUIDE_ALIASES) s = s.split(` ${from} `).join(` ${to} `);
+  const regionSet = new Set(smartRegionWords().flatMap((r) => r.split(' ')));
+  return uniqueList(s.trim().split(' ').filter((w) => w && !SMART_GUIDE_STOP.has(w) && !regionSet.has(w) && !/^\d+$/.test(w)).map(smartStem));
+}
+// The live guides that fit, best first: { path, heading, full } (full = every topic word is in the title).
+function smartGuideMatches(text, intent) {
+  const words = smartGuideQueryWords(smartFold(text));
+  if (!words.length) return [];
+  const regionFolds = Object.entries(REGION_LABELS).map(([slug, label]) => [slug, smartFold(label)]);
+  const out = [];
+  for (const g of liveGuides()) {
+    const title = smartFold(g.heading);
+    // A town's own guide ("Best Brunch in Kelowna") only for that town or no town.
+    const towns = regionFolds.filter(([, f]) => ` ${title} `.includes(` ${f} `)).map(([slug]) => slug);
+    if (towns.length && intent.regions.length && !intent.regions.some((r) => towns.includes(r))) continue;
+    const tokens = new Set(`${title} ${smartFold(g.path.split('/').pop().replace(/-/g, ' '))}`.split(' ').map(smartStem));
+    const hits = words.filter((w) => tokens.has(w)).length;
+    if (!hits) continue;
+    const full = hits === words.length;
+    if (!full && hits * 2 < words.length) continue;
+    out.push({ path: g.path, heading: g.heading, full, score: hits / words.length - tokens.size / 1000 });
+  }
+  return out.sort((a, b) => b.score - a.score);
+}
+
+// Fuzzy place names (2026-10-18): "mision hill" -> Mission Hill. Only when
+// nothing else matches; within two edits of the name, its first words, or the
+// name without generic words like "winery" or "estate".
+function smartEditDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < best) best = cur[j];
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+const SMART_NAME_GENERIC = new Set(['the', 'a', 'winery', 'wineries', 'estate', 'estates', 'family', 'vineyard', 'vineyards', 'cellars', 'cellar', 'wines', 'wine',
+  'restaurant', 'cafe', 'coffee', 'brewing', 'brewery', 'company', 'co', 'inc', 'ltd', 'bistro', 'bar', 'grill', 'kitchen', 'house', 'and', 'at', 'of', 'distillery', 'distilling']);
+const smartCore = (folded) => { const w = folded.split(' ').filter((x) => !SMART_NAME_GENERIC.has(x)); return w.length ? w.join(' ') : folded; };
+function smartFuzzyVenues(text, intent) {
+  const raw = smartFold(text);
+  const variants = uniqueList([smartCore(raw), smartCore(smartTopicWords(raw, intent).join(' '))]).filter((q) => q.replace(/ /g, '').length >= 4 && q.split(' ').length <= 5);
+  if (!variants.length) return [];
+  const found = [];
+  for (const v of discoverySearchVenues()) {
+    const name = smartFold(v.row.name), core = smartCore(name);
+    let best = 99;
+    for (const q of variants) {
+      const k = q.split(' ').length;
+      const max = q.length >= 8 ? 2 : 1;
+      const cands = [name, core];
+      // A name's first words only for a request of two or more words ("mision hill").
+      if (k >= 2) cands.push(name.split(' ').slice(0, k).join(' '), core.split(' ').slice(0, k).join(' '));
+      for (const c of cands) { const d = smartEditDistance(q, c, max); if (d <= max && d < best) best = d; }
+    }
+    if (best < 99) found.push({ venue: v.row, distance: best });
+  }
+  return found.sort((a, b) => a.distance - b.distance || (Number(b.venue.reviews) || 0) - (Number(a.venue.reviews) || 0) || String(a.venue.name).localeCompare(String(b.venue.name)));
+}
+// One clear winner: a single place (or one name) at the smallest distance.
+function smartFuzzyWinner(matches) {
+  if (!matches.length) return null;
+  const top = matches.filter((m) => m.distance === matches[0].distance);
+  return top.length === 1 ? top[0].venue : null;
+}
+
+// Venues for a plan's own list (breakfast, a winery with a restaurant), best first.
+function smartPickVenues(test, rank) {
+  const out = [];
+  for (const v of discoverySearchVenues()) {
+    const why = test(v);
+    if (why) out.push({ row: v.row, why: why === true ? '' : why, rank: rank(v) });
+  }
+  return out.sort((a, b) => b.rank - a.rank || String(a.row.name).localeCompare(String(b.row.name)));
+}
+const smartTextHas = (v, re) => re.test(String(v.row.name || '')) || re.test(String(v.row.description || ''));
+
+// The plan for a request, or null to keep the routing above:
+//   { key, url } -> send the visitor straight to that page
+//   { key, list() } -> /search shows exactly that list (heading, headingFr)
+function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new Date()) {
+  if (!intent || (intent.mode === 'navigate' && intent.exactVenue) || hasDiscoveryExclusion(intent.excluded)) return null;
+  const folded = smartFold(text);
+  if (!folded) return null;
+  const R = intent.regions, T = intent.types, F = intent.features;
+  if (R.length > 1) return null;
+  const region = R[0] || null;
+  const town = region ? REGION_LABELS[region] : null;
+  const others = intent.cuisines.length || intent.collections.length || intent.activities.length;
+
+  // Breakfast and brunch.
+  if (smartHas(folded, SMART_BREAKFAST_WORDS) && T.every((t) => t === 'cafe' || t === 'restaurant') && !others) {
+    if (smartHas(folded, ['brunch', 'brunches']) && region === 'kelowna' && !T.length && !F.length) return { key: 'brunch_guide', url: BRUNCH_GUIDE_PATH };
+    const types = T.length ? T : ['cafe', 'restaurant'];
+    const re = /\b(breakfasts?|brunch(es)?)\b/i;
+    const hasT = (v) => types.includes(v.type) || v.fdTypes.some((t) => types.includes(t));
+    const guides = [];
+    if (region && listGuideCombos(MIN_GUIDE_VENUES).some((c) => c.region === region && c.badge === 'open_early')) guides.push({ path: `/guide/${region}/open_early`, heading: guideBadgeHeading(region, 'open_early').heading });
+    if (!region || region === 'kelowna') guides.push({ path: BRUNCH_GUIDE_PATH, heading: 'Best Brunch in Kelowna' });
+    return {
+      key: 'breakfast',
+      heading: `Breakfast & brunch${town ? ` in ${town}` : ''}`,
+      headingFr: `Déjeuner et brunch${town ? ` à ${town}` : ''}`,
+      guides,
+      list: () => smartPickVenues((v) => {
+        if ((region && v.region !== region) || !hasT(v) || !F.every((f) => v.features[f])) return false;
+        const early = Number(v.row.open_early) === 1, said = smartTextHas(v, re);
+        if (!early && !said) return false;
+        return [early ? 'Opens early' : '', said ? 'Mentions breakfast or brunch' : ''].filter(Boolean).join(' · ');
+      }, (v) => (Number(v.row.open_early) === 1 ? 1 : 0) + (smartTextHas(v, re) ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+    };
+  }
+
+  // Date night: restaurants and cocktail lounges, best rated first.
+  if ((smartHas(folded, SMART_DATE_WORDS) || intent.occasion === 'date_night') && T.every((t) => t === 'restaurant' || t === 'cocktail') && !others
+    && getFoodDrinkHubVenues().length >= MIN_CATEGORY_VENUES) {
+    const types = T.length ? T : ['restaurant', 'cocktail'];
+    return { key: 'date_night', url: `/food-drink${discoveryQueryString({ types, features: F.filter((f) => FD_HUB_FEATURE_KEYS.has(f)), regions: R })}` };
+  }
+
+  // Dated events: "live music this weekend", "things to do tonight".
+  const whenParams = smartWhenParams(folded, intent, now);
+  const rainy = smartHas(folded, SMART_RAINY_WORDS) || intent.occasion === 'rainy_day';
+  if (whenParams && !rainy && !T.length && !others && F.every((f) => f === 'live_music' || f === 'kid_friendly')) {
+    const catWords = SMART_EVENT_CATEGORY_WORDS.flatMap(([, w]) => w);
+    const left = smartTopicWords(folded, intent, [...SMART_EVENT_GENERIC, ...catWords]);
+    if (!left.length) {
+      const categories = uniqueList([...intent.eventCategories, ...SMART_EVENT_CATEGORY_WORDS.filter(([, w]) => smartHas(folded, w)).map(([k]) => k),
+        ...(F.includes('live_music') ? ['live-music'] : []), ...(F.includes('kid_friendly') ? ['family-kids'] : [])]).filter((k) => WHATSON_CATEGORY_BY_KEY[k]);
+      return { key: 'events', url: `/whats-on${discoveryQueryString({ ...whenParams, regions: R, categories })}` };
+    }
+  }
+
+  // Kids, family and rainy days -> the Indoor hub's Family Fun (or all of Indoor for a rainy day alone).
+  const family = smartHas(folded, SMART_FAMILY_WORDS) && !smartHas(folded, ['family friendly', 'kid friendly', 'kids friendly', 'child friendly']);
+  if ((family || rainy) && T.every((t) => t === 'indoor') && !others && F.every((f) => f === 'kid_friendly') && countIndoorHubVenues() >= MIN_CATEGORY_VENUES
+    && !smartTopicWords(folded, intent, [...SMART_FAMILY_WORDS, ...SMART_RAINY_WORDS, ...SMART_FAMILY_GENERIC, 'indoor activities', 'kid friendly', 'family friendly']).length) {
+    if (!family) {
+      // A rainy day alone keeps the routing above (/indoor or the town's Indoor page) when it has one.
+      const d = resolveDiscoveryDestination(intent);
+      if (d.url) return null;
+      return { key: 'rainy', url: `/indoor${discoveryQueryString({ regions: region && smartIndoorCount(region, false) ? [region] : [] })}` };
+    }
+    return { key: 'family', url: `/indoor${discoveryQueryString({ types: ['family'], regions: region && smartIndoorCount(region, true) ? [region] : [] })}` };
+  }
+
+  // A winery, brewery or distillery with a restaurant: only the ones that have one.
+  const frBase = smartHas(folded, ['vignoble', 'vignobles', 'domaine viticole', 'domaines viticoles']) ? ['winery'] : smartHas(folded, ['brasserie', 'brasseries', 'microbrasserie', 'microbrasseries']) ? ['brewery'] : smartHas(folded, ['distillerie', 'distilleries']) ? ['distillery'] : [];
+  const typedBase = T.filter((t) => t === 'winery' || t === 'brewery' || t === 'distillery');
+  const base = typedBase.length ? typedBase : frBase;
+  const wantsFood = T.includes('restaurant') || smartHas(folded, ['restaurant', 'restaurants', 'dining', 'dinner', 'lunch', 'bistro', 'kitchen', 'food', 'eat', 'meal']);
+  if (base.length === 1 && wantsFood && T.every((t) => t === base[0] || t === 'restaurant') && !others) {
+    const re = /\b(restaurants?|bistro|kitchen|dining|lunch|dinner|chef|eatery|tasting menu|farm-to-table|small plates)\b/i;
+    const label = CATEGORY_LABELS[base[0]].plural, labelFr = CATEGORY_LABELS_FR[base[0]].plural;
+    return {
+      key: 'with_restaurant',
+      heading: `${label} with a restaurant${town ? ` in ${town}` : ''}`,
+      headingFr: `${labelFr} avec restaurant${town ? ` à ${town}` : ''}`,
+      list: () => smartPickVenues((v) => {
+        if (v.type !== base[0] || (region && v.region !== region) || !F.every((f) => v.features[f])) return false;
+        if (v.fdTypes.includes('restaurant')) return 'Also listed as a restaurant';
+        return smartTextHas(v, re) ? 'Mentions its restaurant or dining' : false;
+      }, (v) => (v.fdTypes.includes('restaurant') ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+    };
+  }
+
+  // A guide topic ("halloween", "cideries", "kokanee salmon"), when no
+  // structured page shows the request.
+  const guides = smartGuideMatches(text, intent).filter((g) => g.full);
+  if (guides.length && !T.length && !F.length && !others) {
+    const d = resolveDiscoveryDestination(intent);
+    if (!d.url || d.kind === 'browse' || (d.kind === 'events' && !intent.when)) return { key: 'guide', url: guides[0].path };
+  }
+  return null;
+}
+function smartIndoorCount(region, familyOnly) {
+  const notes = getIndoorAlsoNotes();
+  const seen = new Set();
+  let n = 0;
+  for (const v of [...getVenuesByCategory('indoor'), ...getIndoorGolfVenues(), ...getIndoorAlsoVenues()]) {
+    if (seen.has(v.id)) continue;
+    seen.add(v.id);
+    if (v.region === region && (!familyOnly || indoorExperiencesOf(v, notes.get(v.id)).includes('family'))) n += 1;
+  }
+  return n;
+}
+
+function renderSearchPage(run, opts = {}) {
+  const lang = opts.lang === 'fr' ? 'fr' : 'en';
+  const model = searchPageModel(run, opts.now || new Date(), lang);
+  return model.venues.length ? renderSearchResultsHubPage(model, lang) : renderSearchSimplePage(model, lang);
+}
+// French search results (2026-10-18): /fr/search writes its own sentences in French (what it understood, why each
+// place matched, counts and notes); labels go through the French word list (frTextOr), place and town names stay.
+const SEARCH_EMPTY_TEXT_FR = {
+  exclusion_only: 'Nous avons compris ce que vous ne voulez pas, mais cela seul ne précise rien. Dites-nous plutôt ce que vous aimeriez, par exemple « restaurants à Kelowna ».',
+  needs_more: 'Ajoutez un type de lieu ou une ville, par exemple « vignobles à Naramata » ou « plages à Penticton », et nous vous montrerons de vrais lieux.',
+  no_match_for_words: 'Aucun lieu dont le nom, la cuisine indiquée ou la description mentionne ces mots.',
+  no_results: 'Aucun lieu ne correspond à tout cela. Essayez avec moins de mots ou une autre ville.',
+  ambiguous: 'Plusieurs lieux portent ce nom. Choisissez celui que vous cherchez :',
+};
+function frSearchLabel(t) { return frTextOr(String(t)); }
+function frSearchTypePlural(t, labels) {
+  return (CATEGORY_LABELS_FR[t] ? CATEGORY_LABELS_FR[t].plural : frSearchLabel(labels.types[t] ? labels.types[t].plural : t)).toLowerCase();
+}
+const FR_SEARCH_COLLECTIONS = { hidden_gem: 'trésors cachés', local_favorite: 'coups de cœur locaux', dog_friendly: 'plages pour chiens' };
+function discoveryInterpretedTextFr(intent, labels) {
+  const foodWords = uniqueList((intent.foodTerms || []).filter((f) => f.cuisine && intent.cuisines.includes(f.cuisine)).map((f) => `« ${f.term} »`));
+  const parts = [
+    ...intent.collections.map((c) => FR_SEARCH_COLLECTIONS[c] || c),
+    ...foodWords,
+    ...intent.types.map((t) => frSearchTypePlural(t, labels)),
+    ...intent.activities.map((a) => frSearchLabel(labels.activities[a] || a).toLowerCase()),
+    ...intent.textTerms.map((w) => `« ${w} »`),
+  ];
+  if (!(parts.length + intent.features.length + intent.regions.length)) return null;
+  let text = parts.length ? parts.join(', ') : 'lieux';
+  if (intent.features.length) text += intent.features.length > 1
+    ? ` avec les badges ${intent.features.map((f) => frSearchLabel(labels.features[f] || f)).join(', ')}`
+    : ` avec le badge ${frSearchLabel(labels.features[intent.features[0]] || intent.features[0])}`;
+  if (intent.regions.length) text += ` à ${intent.regions.map((r) => labels.regions[r] || r).join(' ou ')}`;
+  const ex = intent.excluded;
+  const not = [
+    ...ex.types.map((t) => `sans ${frSearchTypePlural(t, labels)}`),
+    ...ex.regions.map((r) => `pas à ${labels.regions[r] || r}`),
+    ...ex.cuisines.map((c) => `sans ${frCuisine(c).toLowerCase()}`),
+    ...ex.collections.map((c) => `sauf ${FR_SEARCH_COLLECTIONS[c] || c}`),
+    ...ex.activities.map((a) => `sans ${frSearchLabel(labels.activities[a] || a).toLowerCase()}`),
+    ...(ex.budget === 'upscale' ? ['rien de haut de gamme'] : []),
+  ];
+  if (not.length) text += `, ${not.join(', ')}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+function discoveryMatchedOnTextFr(m) {
+  const i = m.indexOf(':');
+  const key = m.slice(0, i), value = m.slice(i + 1);
+  if (key === 'cuisine') return `Cuisine indiquée : ${frCuisine(value.charAt(0).toUpperCase() + value.slice(1))}`;
+  if (key === 'feature') return BADGE_LABELS[value] ? `A le badge ${frSearchLabel(BADGE_LABELS[value].title)}` : null;
+  if (key === 'collection') return value === 'hidden_gem' ? 'Un des trésors cachés d’Okanagan Roam' : value === 'local_favorite' ? 'Un coup de cœur local d’Okanagan Roam' : value === 'dog_friendly' ? 'Sur la liste officielle des lieux qui acceptent les chiens' : null;
+  const where = value.split('+').map((w) => (w === 'name' ? 'son nom' : w === 'cuisine' ? 'sa cuisine indiquée' : 'sa description'));
+  return `Mentionne « ${key} » dans ${where.join(' et ')}`;
+}
+function discoveryNoteTextFr(n, labels) {
+  const what = (f, v) => (f === 'region' ? `pas à ${labels.regions[v] || v}` : f === 'type' ? `sans ${frSearchTypePlural(v, labels)}` : f === 'cuisine' ? `sans ${v}`
+    : f === 'collection' ? `sauf ${FR_SEARCH_COLLECTIONS[v] || v}` : f === 'activity' ? `sans ${frSearchLabel(labels.activities[v] || v).toLowerCase()}`
+      : f === 'budget' ? 'rien de haut de gamme' : f === 'feature' ? `sans « ${frSearchLabel(labels.features[v] || v)} »` : `pas « ${v} »`);
+  if (n.code === 'exclusion_applied') return n.field === 'budget'
+    ? 'Rien de haut de gamme : les lieux au niveau de prix le plus élevé ($$) sont exclus. Les lieux sans prix indiqué sont conservés.'
+    : `Compris : « ${what(n.field, n.value)} ». Ces lieux ont été exclus.`;
+  if (n.code === 'exclusion_understood') return `Compris : « ${what(n.field, n.value)} ».`;
+  if (n.code === 'exclusion_not_applied') return n.field === 'feature'
+    ? `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas exclure de lieux selon un badge; aucun n’a été retiré.`
+    : `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas l’appliquer; aucun lieu n’a été retiré pour cette raison.`;
+  if (n.field === 'occasion') return `Les occasions comme « ${String(n.value).replace(/_/g, ' ')} » ne s’appliquent pas à la recherche. Planifier mon voyage peut en tenir compte.`;
+  if (n.field === 'budget') return 'Le budget ne s’applique pas à la recherche : tous les lieux n’indiquent pas leurs prix.';
+  if (n.field === 'when') return 'Les dates et les heures ne sont pas vérifiées ici. La page À l’affiche présente les événements datés.';
+  if (n.field === 'days' || n.field === 'pace') return 'La durée et le rythme du voyage servent à Planifier mon voyage, pas à la recherche.';
+  if (n.field === 'phrase') return `La recherche ne peut pas encore appliquer « ${n.value} ».`;
+  return null;
+}
+
+// Smarter search (2026-10-18): everything the /search page shows, worked out once.
+const SEARCH_PAGE_MAX_RESULTS = 480;
+function searchPageModel(run, now = new Date(), lang = 'en') {
+  // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
+  // from (a French search goes through the planner's French words first, see discoverySearchText).
+  const q = run.query.trim(), sq = String(run.searchText || run.query).trim();
+  const plan = smartSearchPlan(sq, run.intent, now);
+  let venues = [], why = new Map();
+  if (plan && plan.list) {
+    const picked = plan.list().slice(0, SEARCH_PAGE_MAX_RESULTS);
+    venues = picked.map((x) => x.row);
+    why = new Map(picked.filter((x) => x.why).map((x) => [x.row.id, x.why]));
+  } else if (run.results.kind === 'venues' && run.results.items.length) {
+    // Name matches first (2026-10-18): the whole request in the name, then
+    // every word in the name, then the rest in the retrieval's own order.
+    const byId = new Map(discoverySearchVenues().map((v) => [v.id, v]));
+    const phrase = smartTopicWords(smartFold(sq), run.intent).join(' ');
+    const tier = (item) => {
+      const v = byId.get(item.id);
+      const name = v ? smartFold(v.row.name) : '';
+      if (phrase && ` ${name} `.includes(` ${phrase} `)) return 0;
+      const terms = (item.matchedOn || []).filter((m) => !/^(feature|collection|cuisine):/.test(m));
+      return terms.length && terms.every((m) => /:name/.test(m)) ? 1 : 2;
+    };
+    const ranked = run.results.items.map((item, i) => ({ item, i, t: tier(item) })).sort((a, b) => a.t - b.t || a.i - b.i);
+    for (const { item } of ranked) {
+      const v = byId.get(item.id);
+      if (!v) continue;
+      venues.push(v.row);
+      const text = (item.matchedOn || []).map(lang === 'fr' ? discoveryMatchedOnTextFr : discoveryMatchedOnText).filter(Boolean).join(' · ');
+      if (text) why.set(v.id, text);
+    }
+  }
+  const guides = plan && plan.guides ? plan.guides : smartGuideMatches(sq, run.intent).slice(0, 3);
+  const fuzzy = !venues.length && run.results.kind !== 'events' ? smartFuzzyVenues(sq, run.intent).slice(0, 5).map((m) => m.venue) : [];
+  return { run, q, plan, venues, why, guides, fuzzy, now };
+}
+// French words for the page's own text (the cards and filters are translated with every French page).
+const SEARCH_PAGE_TEXT = {
+  en: { title: 'Search', h1: 'Search results', searched: 'You searched', showing: 'showing', button: 'Search', label: 'Search Okanagan Roam', places: (n) => `${n} place${n === 1 ? '' : 's'}`,
+    guides: 'Our guides', didYouMean: 'Did you mean', tryThese: 'You could also try', popular: (t) => `Popular in ${t}`, browse: (q) => `Search the directory for “${q}”`,
+    filter: 'Filter these results', filterPh: 'Filter by name, place or dish...', matched: 'Matched:', allGuides: 'All our guides', none: 'Nothing matched those words. Here are some places to start.' },
+  fr: { title: 'Recherche', h1: 'Résultats de recherche', searched: 'Vous avez cherché', showing: 'résultats', button: 'Chercher', label: 'Chercher sur Okanagan Roam', places: (n) => `${n} endroit${n > 1 ? 's' : ''}`,
+    guides: 'Nos guides', didYouMean: 'Vouliez-vous dire', tryThese: 'Essayez aussi', popular: (t) => `Populaire à ${t}`, browse: (q) => `Chercher « ${q} » dans le répertoire`,
+    filter: 'Filtrer ces résultats', filterPh: 'Filtrer par nom, endroit ou plat...', matched: 'Correspond :', allGuides: 'Tous nos guides', none: 'Rien ne correspond à ces mots. Voici quelques idées pour commencer.' },
+};
+// The directory link keeps the visitor's words (?q=); the extra parameter
+// stops /browse from sending a lone ?q= straight back here.
+const searchDirectoryHref = (q) => `/browse?q=${encodeURIComponent(q)}&from=search`;
+function searchFormHtml(q, L) {
+  return `<form class="search-form" action="/browse" method="get" role="search">
+    <input type="search" name="q" value="${escapeHtml(q)}" aria-label="${escapeHtml(L.label)}" maxlength="${discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH}">
+    <button type="submit">${escapeHtml(L.button)}</button>
+  </form>`;
+}
+const SEARCH_PAGE_STYLES = `<style id="search-page">
   body.search-page .search-form { display: flex; gap: 10px; max-width: 640px; margin: 8px 0 18px; }
-  body.search-page .search-form input { flex: 1; min-width: 0; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); font: inherit; background: var(--ref-white, #fff); }
+  body.search-page .search-form input { flex: 1; min-width: 0; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); font: inherit; font-size: 16px; background: var(--ref-white, #fff); }
   body.search-page .search-form button { padding: 12px 22px; border-radius: 999px; border: 0; cursor: pointer; font-weight: 800; background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); font-family: 'Nunito', sans-serif; }
   body.search-page .search-interpreted { font-size: 1.05rem; margin: 0 0 6px; }
   body.search-page .search-corrected, body.search-page .search-count { color: rgba(42,32,25,0.72); margin: 0 0 8px; }
   body.search-page .search-notes { margin: 6px 0 16px; padding-left: 18px; color: rgba(42,32,25,0.72); font-size: 0.92rem; }
   body.search-page .search-empty { font-size: 1.02rem; margin: 18px 0; }
   body.search-page .search-why { font-size: 0.85rem; }
-  body.search-page .search-suggestions { list-style: none; padding: 0; margin: 8px 0 30px; display: flex; flex-wrap: wrap; gap: 10px; }
-  body.search-page .search-suggestions a { display: inline-block; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); text-decoration: none; font-weight: 700; background: var(--ref-white, #fff); }
-</style>
+  body.search-page .search-suggestions { list-style: none; padding: 0; margin: 8px 0 22px; display: flex; flex-wrap: wrap; gap: 10px; }
+  body.search-page .search-suggestions a { display: inline-block; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); text-decoration: none; font-weight: 700; background: var(--ref-white, #fff); color: var(--ink, #2a2019); }
+  body.search-page .search-guides { margin: 4px 0 14px; font-weight: 800; }
+  body.search-page .search-guides a { color: var(--teal-deep, #1F5450); }
+</style>`;
+// The visitor's words, the interpretation, corrections and notes.
+function searchSummaryHtml(model, lang) {
+  const { run, q, plan } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], labels = tripPlannerLabels(), esc = escapeHtml;
+  // French gaps (2026-10-18): the French page says what it understood, its corrections and notes in French too.
+  const interpreted = plan && plan.heading ? (lang === 'fr' ? plan.headingFr : plan.heading)
+    : (lang === 'fr' ? (p.status === 'ambiguous' ? null : discoveryInterpretedTextFr(run.intent, labels)) : p.interpreted);
+  const correctionText = !p.corrections.length ? ''
+    : lang === 'fr' ? `<p class="search-corrected">Nous avons lu ${p.corrections.map((c) => `« ${esc(c.from)} » comme « ${esc(c.to)} »`).join(', ')}.</p>`
+      : `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>`;
+  // Stage 3.5: a sentence is shown once. A plan's own list (2026-10-18)
+  // applies its occasion and dates itself, so their notes are left off.
+  const notes = p.notes.filter((n) => !(plan && plan.list && ['occasion', 'when'].includes(n.field)))
+    .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
+  const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
+  const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
+  return `<p class="search-interpreted">${esc(L.searched)} ${quote}${interpreted ? `${lang === 'fr' ? ' : ' : ': showing '}<strong>${esc(interpreted)}</strong>` : ''}</p>
+  ${correctionText}
+  ${noteHtml}`;
+}
+function searchGuidesHtml(model, lang) {
+  if (!model.guides.length) return '';
+  const L = SEARCH_PAGE_TEXT[lang];
+  return `<p class="search-guides">${escapeHtml(L.guides)}${lang === 'fr' ? ' :' : ':'} ${model.guides.map((g) => `<a href="${g.path}">${escapeHtml(lang === 'fr' ? frTextOr(g.heading) : g.heading)} &rarr;</a>`).join(' · ')}</p>`;
+}
+// Results: the site's standard listing cards on the shared directory engine
+// (photo, open status, Favorite and Add to trip, Show more past 48, type
+// chips, Regions, filters and a sort), in best-match order.
+function renderSearchResultsHubPage(model, lang) {
+  const { q, venues, why } = model, L = SEARCH_PAGE_TEXT[lang];
+  const tally = {};
+  for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
+  const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
+    .map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural }));
+  const total = model.plan && model.plan.list ? venues.length : (model.run.results.total || venues.length);
+  return renderCuratedHubPage({
+    path: `/search?q=${encodeURIComponent(q)}`,
+    name: L.title,
+    title: `${L.title}${lang === 'fr' ? ' : ' : ': '}${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`,
+    description: lang === 'fr' ? 'Résultats de recherche sur Okanagan Roam.' : 'Search results on Okanagan Roam.',
+    bodyClass: 'region-page search-page',
+    surface: 'search',
+    pageType: 'search',
+    noindex: true,
+    noBanner: true,
+    keepOrder: true,
+    sorts: [{ key: 'recommended', label: 'Best match' }, { key: 'rating', label: 'Top rated' }, { key: 'town', label: 'By town' }, { key: 'az', label: 'A–Z' }],
+    types,
+    catsFor: (v) => [v.type],
+    photoKeyFor: (v) => curatedPhotoKey(v),
+    features: ['patio', 'dog_friendly', 'kid_friendly', 'lake_view', 'great_groups', 'live_music', 'happy_hour', 'vegetarian', 'open_early', 'open_late'],
+    openNow: true,
+    // French: each note piece the word list knows, in French; the rest left off.
+    cardNotes: lang === 'fr' ? new Map([...why].map(([id, t]) => [id, t.split(' · ').map((x) => frText(x)).filter(Boolean).join(' · ')]).filter(([, t]) => t)) : why,
+    cardNoteLabel: L.matched,
+    search: { label: L.filter, placeholder: L.filterPh },
+    categoryContent: { all: { banner: FOOD_DRINK_HUB_BANNER, heading: L.h1, intro: '' } },
+    extraHead: SEARCH_PAGE_STYLES,
+    leadHtml: `${searchFormHtml(q, L)}
+  ${searchSummaryHtml(model, lang)}
+  <p class="search-count">${escapeHtml(L.places(total))}${total > venues.length ? ` (${venues.length})` : ''}</p>
+  ${searchGuidesHtml(model, lang)}`,
+  }, venues, null, model.now);
+}
+// No places (an event search, or nothing matched): the visitor's words,
+// any events, then real ways forward -- a place the words nearly spell, our
+// guides, the town's busiest kinds of place and the directory with ?q= kept.
+function renderSearchSimplePage(model, lang) {
+  const { run, q } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], esc = escapeHtml, fr = lang === 'fr';
+  const total = run.results.total || 0;
+  const items = run.results.items || [];
+  let resultsHtml = '';
+  if (run.results.kind === 'events' && items.length) {
+    resultsHtml = `<p class="search-count">${fr ? `${total} événement${total === 1 ? '' : 's'}${total > items.length ? `, voici les ${items.length} premiers` : ''}` : `${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}`}</p>
+  <ul class="card-grid">${items.map((e) => `
+    <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
+      <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
+  </ul>`;
+  } else {
+    const text = lang === 'fr' ? (SEARCH_EMPTY_TEXT_FR[p.status] || SEARCH_EMPTY_TEXT_FR.no_results) : (SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results);
+    resultsHtml = `<p class="search-empty">${esc(text)}</p>`;
+  }
+  const blocks = [];
+  if (model.fuzzy.length) {
+    blocks.push([L.didYouMean, model.fuzzy.map((v) => ({ label: `${v.name} (${REGION_LABELS[v.region]})`, url: discoveryVenueUrl(v) })).filter((x) => x.url)]);
+  }
+  const suggestions = p.status === 'ambiguous' ? p.suggestions : [];
+  if (suggestions.length) blocks.push([lang === 'fr' ? 'Endroits portant ce nom' : 'Places with that name', suggestions]);
+  if (model.guides.length) blocks.push([L.guides, model.guides.map((g) => ({ label: lang === 'fr' ? frTextOr(g.heading) : g.heading, url: g.path }))]);
+  const others = p.status === 'ambiguous' ? [] : p.suggestions.filter((s) => s.kind !== 'directory');
+  const more = [...others];
+  if (run.results.kind !== 'events' && p.status !== 'exclusion_only') {
+    const region = run.intent.regions.length === 1 ? run.intent.regions[0] : null;
+    if (region) {
+      const counts = getRegionCategoryCounts(region);
+      const labels = lang === 'fr' ? CATEGORY_LABELS_FR : CATEGORY_LABELS;
+      for (const t of Object.keys(counts).filter((t) => counts[t] >= MIN_CATEGORY_VENUES).sort((a, b) => counts[b] - counts[a]).slice(0, 4)) {
+        more.push({ label: `${labels[t].plural} · ${REGION_LABELS[region]}`, url: `/${region}/${CATEGORY_SLUGS[t]}` });
+      }
+      more.push({ label: lang === 'fr' ? `${REGION_LABELS[region]} : tout voir` : `Everything in ${REGION_LABELS[region]}`, url: `/${region}` });
+    } else if (p.status !== 'needs_more') {
+      for (const h of SEARCH_HUB_SUGGESTIONS) more.push({ kind: 'page', ...h });
+    }
+    if (!model.guides.length) more.push({ label: L.allGuides, url: '/guides' });
+    // The directory, with the visitor's words kept (2026-10-18).
+    if (run.intent.textTerms.length || !total) more.push({ label: L.browse(q), url: searchDirectoryHref(q) });
+  }
+  const seen = new Set();
+  const moreUnique = more.filter((s) => s.url && !seen.has(s.url) && seen.add(s.url));
+  if (moreUnique.length) blocks.push([L.tryThese, moreUnique]);
+  const blockHtml = blocks.map(([heading, list]) => `<h2 class="category-subsection-heading">${esc(heading)}</h2>
+  <ul class="search-suggestions">${list.map((sg) => `<li><a href="${esc(sg.url)}">${esc(sg.label)}</a></li>`).join('')}</ul>`).join('\n  ');
+  const title = `${L.title}${fr ? ' : ' : ': '}${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, fr ? 'Résultats de recherche sur Okanagan Roam.' : 'Search results on Okanagan Roam.', null, [], { golfTheme: true, noindex: true })}
+${renderOutdoorThemeStyles()}
+${renderAnalyticsHeadHtml('search')}
+${SEARCH_PAGE_STYLES}
 </head>
 <body class="golf-page outdoor-page region-page search-page">
   ${renderGolfTripTrayHtml()}
@@ -4225,18 +4738,13 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
-    { name: 'Search' },
+    { name: L.title },
   ])}
-  <h1>Search results</h1>
-  <form class="search-form" action="/browse" method="get" role="search">
-    <input type="search" name="q" value="${esc(q)}" aria-label="Search Okanagan Roam" maxlength="${discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH}">
-    <button type="submit">Search</button>
-  </form>
-  <p class="search-interpreted">You searched “${esc(q)}”${p.interpreted ? `: showing <strong>${esc(p.interpreted)}</strong>` : ''}</p>
-  ${correctionText}
-  ${noteHtml}
+  <h1>${esc(L.h1)}</h1>
+  ${searchFormHtml(q, L)}
+  ${searchSummaryHtml(model, lang)}
   ${resultsHtml}
-  ${suggestionHtml}
+  ${blockHtml}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
@@ -7483,6 +7991,8 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (total < 100) return '';
   const fmt = (x) => Number(x).toLocaleString('en-CA');
+  // French (2026-10-18): "1 766 vrais lieux", with a no-break space, not "1,766".
+  const fmtFr = (x) => fmt(x).replace(/,/g, '\u00a0');
   const items = [
     [total, '/destinations', 'real places', 'vrais lieux'],
     [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 30 days
@@ -7492,7 +8002,7 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
     [n(['golf']), '/golf', 'golf courses', 'terrains de golf'],
     [n(['outdoor']), '/outdoors', 'trails, parks & lookouts', 'sentiers, parcs et points de vue'],
   ].filter(([v]) => v > 0);
-  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v)}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
+  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v) === fmtFr(v) ? fmt(v) : `<span class="home-en">${fmt(v)}</span><span class="home-fr" lang="fr">${fmtFr(v)}</span>`}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
 }
 function renderBuildTripCTAHTML({ now = homepageNow() } = {}) {
   const fall = isFallHeroSeason(now);
@@ -11710,7 +12220,7 @@ function themedCardHolderSelector(type) {
   // 'guide' (Stage 5B) is a guide page, whose one list can hold any venue
   // type -- the same set as 'lf', but its events report each card's own
   // venue_category (see golfCardEngagementScriptHtml).
-  if (type === 'guide') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
+  if (type === 'guide' || type === 'search') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   // 'indoor': the /indoor hub also lists the indoor golf simulators (type golf)
   // and, in "Also good on a rainy day", tagged venues of any other type (an
   // arena, a brewery with bowling, a board-game cafe), so it wires every type
@@ -20021,7 +20531,9 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const typeKeys = new Set(allTypes.map((t) => t.type));
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   f.types = f.types.filter((t) => typeKeys.has(t));
-  const sort = CURATED_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
+  // cfg.sorts (2026-10-18): the page's own sort choices (search adds Top rated).
+  const sorts = cfg.sorts || CURATED_SORTS;
+  const sort = sorts.some((x) => x.key === f.sort) ? f.sort : 'recommended';
   const openNowOn = !!cfg.openNow && !!f.openNow;
   const catsById = new Map(venues.map((v) => [v.id, cfg.catsFor(v)]));
   const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
@@ -20029,7 +20541,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   // (the four ski resorts on Ski & Snow), in their own given order.
   const pinned = cfg.pinFirst ? venues.filter(cfg.pinFirst).sort((a, b) => cfg.pinFirst(a) - cfg.pinFirst(b)) : [];
   const pinnedIds = new Set(pinned.map((v) => v.id));
-  const mixed = [...pinned, ...curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now)];
+  // cfg.keepOrder (2026-10-18): the list is already ranked (search results), so its first order is the given one.
+  const mixed = cfg.keepOrder ? venues.slice() : [...pinned, ...curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now)];
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -20076,6 +20589,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: mixedRank.get(v.id) };
     const st = openInfo.byId.get(v.id);
     if (cfg.openNow && st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+    if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, cfg.openNow ? openInfo.byId : null, {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {},
@@ -20104,7 +20618,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(cfg.title, cfg.description, canonical, [breadcrumb, itemList], { shareImage: content.banner.src, golfTheme: true, beachTheme: list.some((v) => v.type === 'beach'), advisoryStyles: list.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(cfg.title, cfg.description, cfg.noindex ? null : canonical, cfg.noindex ? [] : [breadcrumb, itemList], { shareImage: content.banner.src, golfTheme: true, beachTheme: list.some((v) => v.type === 'beach'), advisoryStyles: list.some((v) => advisoryNotes.has(v.id)), savedSidecar: true, noindex: !!cfg.noindex })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
@@ -20122,7 +20636,7 @@ ${CATEGORY_BANNER_STYLE}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, ...crumbs, { name: cfg.name }])}
-  ${categoryHeroHtml(`<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(content.banner.credit)}</div>
+  ${categoryHeroHtml(cfg.noBanner ? '' : `<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(content.banner.credit)}</div>
   <script>
   (function(){
     var c = ${JSON.stringify(cfg.categoryContent).replace(/</g, '\\u003c')};
@@ -20139,7 +20653,7 @@ ${renderGolfHeaderHtml()}
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
   </script>`, `<h1>${escapeHtml(content.heading)}</h1>
-  <p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>${cfg.heroExtraHtml || ''}`)}
+  ${content.intro ? `<p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>` : ''}${cfg.heroExtraHtml || ''}`)}
   ${cfg.leadHtml || ''}
   ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
   ${chips}
@@ -20147,7 +20661,7 @@ ${renderGolfHeaderHtml()}
   ${cfg.openNow ? `<p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>` : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
-  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, CURATED_SORTS)}
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, sorts)}
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">Nothing matches that combination yet.</span> <a href="${cfg.path}" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   ${tryHtml ? `<p class="fd-no-results-try">Try one word, like ${tryHtml}.</p>` : ''}</div>
@@ -21935,7 +22449,11 @@ function frBadgeLabel(field) {
 // A stored cuisine ("Italian") -> its French name through app.js's cuisine.* keys; unknown values stay as stored.
 function frCuisine(cuisine) {
   const key = Object.keys(APP_TRANSLATIONS.en).find((k) => k.startsWith('cuisine.') && APP_TRANSLATIONS.en[k] === cuisine);
-  return (key && APP_TRANSLATIONS.fr[key]) || cuisine;
+  if (key && APP_TRANSLATIONS.fr[key]) return APP_TRANSLATIONS.fr[key];
+  // French gaps (2026-10-18): cuisines app.js has no key for ("Soup", "Coffee", "West Coast" ...) use french-text.js's list.
+  let list = {};
+  try { list = frenchText.FR_CUISINE || {}; } catch (e) { list = {}; }
+  return list[cuisine] || list[String(cuisine).replace(/^./, (c) => c.toUpperCase())] || cuisine;
 }
 // Server-side twin of app.js applyTranslations(): the shared header/footer carry data-i18n keys, so a French page swaps
 // their text (and data-i18n-aria/-title/-placeholder attributes) before it leaves the server.
@@ -22067,7 +22585,11 @@ const FR_TWIN_STATIC = new Set(['/', '/food-drink', '/restaurants', '/cafes', '/
   '/wineries', '/golf', '/beaches', '/outdoors', '/tours', '/ski-snow', '/indoor', '/sports', '/dog-friendly', '/local-favorites',
   '/secret-spots', '/hidden-gems', '/destinations', '/browse', '/categories',
   // Phase 2 and 3 (2026-10-14): What's On, the guides, the map, the trip pages, the forms and the info pages.
-  '/whats-on', '/guides', '/map', '/trip', '/my-trip', '/favorites', '/list-your-venue', '/list-an-event', '/about', '/contact', '/privacy', '/terms']);
+  '/whats-on', '/guides', '/map', '/trip', '/my-trip', '/favorites', '/list-your-venue', '/list-an-event', '/about', '/contact', '/privacy', '/terms',
+  // Smarter search (2026-10-18): a French search lands on French results (/fr/search), not the English page.
+  // French gaps (2026-10-18): the business login, new-link and forgot-password pages (the signed-in portal stays
+  // English for now).
+  '/search', '/owner/login', '/owner/link', '/owner/forgot']);
 const FR_TWIN_SECTIONS = new Set(['outdoors', 'tours', 'indoor', 'sports', 'whats-on', 'guides']);
 // A place page (/kelowna/restaurants/slug): it has its own French route.
 function frIsVenuePath(p) {
@@ -22135,6 +22657,12 @@ function frEventHead(html, ev) {
   return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
     .replace(/(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*"/g, (m, a) => `${a}${title}"`)
     .replace(/(<meta (?:name="description"|property="og:description"|name="twitter:description") content=")[^"]*"/g, (m, a) => (desc ? `${a}${desc}"` : m));
+}
+// The query string an EN / FR switch keeps: a shared trip's stops, or the words searched (2026-10-18).
+function twinSearchFor(enPath, rawUrl) {
+  if (enPath === '/my-trip') return tripShareSearch(url.parse(rawUrl, true).query);
+  if (enPath === '/search') { const q = url.parse(rawUrl, true).query.q; return typeof q === 'string' && q.trim() ? `?q=${encodeURIComponent(q)}` : ''; }
+  return '';
 }
 function frTwinPath(enPath) { return enPath === '/' ? '/fr' : `/fr${enPath}`; }
 // A /fr request for a main or town page -> the English address it is rendered from (place pages have their own route).
@@ -23004,7 +23532,11 @@ ${VENUE_MENU_CSS}` : ''}
   </div>` : ''}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
-  <p class="venue-owner-cta" style="font-size:.88rem;margin:16px 0 0;opacity:.85">${L('Own this business?', 'C\u2019est votre entreprise\u00a0?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
+  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
+    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
+    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Revendiquer cette fiche')}</a>
+    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
+  </div>`}
   </aside>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
@@ -28901,7 +29433,7 @@ ${renderGolfHeaderHtml()}
     shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) days[r] = sharedDays[i]; });
     save(); store(DAYS, days);
     viewing = 'mine';
-    history.replaceState(null, '', '/my-trip');
+    history.replaceState(null, '', /^\/fr(\/|$)/.test(location.pathname) ? '/fr/my-trip' : '/my-trip');
     status(T.saved);
     track('shared_trip_save', { stop_count: trip.length });
     render();
@@ -28932,9 +29464,9 @@ function renderPrivacyPage() {
     </ul>
     <h2>Analytics</h2>
     <p>We use Google Analytics to understand how the site is used in general &mdash; which pages are popular, roughly where visitors come from and what devices they use. Google Analytics uses cookies to do this. We use the reports to improve the site, not to identify you. You can learn more in <a href="https://policies.google.com/technologies/partner-sites" rel="noopener" target="_blank">how Google uses information from sites that use its services</a>, or install the <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener" target="_blank">Google Analytics opt-out add-on</a>.</p>
-    ${process.env.CLARITY_PROJECT_ID ? `<h2>Optional session recordings</h2>
-    <p>If you choose Allow recordings, Microsoft Clarity records interactions such as clicks, scrolling and navigation on selected public pages to help us improve the site. Text and form fields are masked. Recording does not load before you agree. We exclude private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments. Use Recording preferences on public pages to change your choice; declining reloads the page to stop recording. This choice applies to session recordings and does not change Google Analytics settings.</p>
-    <p>Clarity processes usage, device and network data and may use cookies after you consent. See the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. Your recording preference is stored in your browser.</p>` : ''}
+    ${process.env.CLARITY_PROJECT_ID ? `<h2>Masked session recordings</h2>
+    <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
+    <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
     <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email.</p>
     <h2>Services that help run the site</h2>
@@ -30066,21 +30598,28 @@ function venueListingUrl(v) {
 
 // Creates (or, with reset, replaces) a venue's edit link. Returns
 // { ok: true, token, url } -- the only time the token is ever visible.
+// keepOld (2026-10-18): the link being replaced keeps working until the new
+// one is first opened (venueForOwnerToken), so someone who knows a business's
+// email can't kill the owner's working link just by asking for a new one. If
+// the replaced link was itself never opened, the one before it stays the
+// fallback, so repeated requests can't push the working link out either.
+// Without keepOld (admin reset of a leaked link) the old link stops at once.
 function createOwnerLink(venueId, opts = {}) {
   const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(venueId);
   if (!venue) return { ok: false, reason: 'venue_not_found' };
   if (venue.redirect_to) return { ok: false, reason: 'venue_redirected' };
   const email = opts.contact_email == null ? null : String(opts.contact_email).trim().slice(0, 254) || null;
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'invalid_email' };
-  const existing = db.prepare('SELECT venue_id FROM venue_owner_links WHERE venue_id = ?').get(venueId);
+  const existing = db.prepare('SELECT venue_id, token_hash, prev_token_hash FROM venue_owner_links WHERE venue_id = ?').get(venueId);
   if (existing && !opts.reset) return { ok: false, reason: 'link_exists' };
+  const prev = existing && opts.keepOld ? (existing.prev_token_hash || existing.token_hash) : null;
   const token = crypto.randomBytes(24).toString('base64url');
-  db.prepare(`INSERT INTO venue_owner_links (venue_id, token_hash, contact_email, created_at, last_used_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP, NULL)
+  db.prepare(`INSERT INTO venue_owner_links (venue_id, token_hash, contact_email, created_at, last_used_at, prev_token_hash)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, NULL, ?)
     ON CONFLICT(venue_id) DO UPDATE SET token_hash = excluded.token_hash,
       contact_email = COALESCE(excluded.contact_email, venue_owner_links.contact_email),
-      created_at = CURRENT_TIMESTAMP, last_used_at = NULL`).run(venueId, ownerTokenHash(token), email);
-  return { ok: true, token, url: ownerLinkUrl(token), replaced: !!existing };
+      created_at = CURRENT_TIMESTAMP, last_used_at = NULL, prev_token_hash = excluded.prev_token_hash`).run(venueId, ownerTokenHash(token), email, prev);
+  return { ok: true, token, url: ownerLinkUrl(token), replaced: !!existing, oldStillWorks: !!prev };
 }
 
 function revokeOwnerLink(venueId) {
@@ -30091,7 +30630,12 @@ function revokeOwnerLink(venueId) {
 // revoked token (and for a venue that has since been retired).
 function venueForOwnerToken(token) {
   if (typeof token !== 'string' || !OWNER_TOKEN_RE.test(token)) return null;
-  const link = db.prepare('SELECT venue_id, contact_email FROM venue_owner_links WHERE token_hash = ?').get(ownerTokenHash(token));
+  const hash = ownerTokenHash(token);
+  let link = db.prepare('SELECT venue_id, contact_email, prev_token_hash FROM venue_owner_links WHERE token_hash = ?').get(hash);
+  // The newest link was opened: the one it replaced stops working now (2026-10-18).
+  if (link && link.prev_token_hash) db.prepare('UPDATE venue_owner_links SET prev_token_hash = NULL WHERE venue_id = ?').run(link.venue_id);
+  // The link before a re-send still works until the new one is opened.
+  if (!link) link = db.prepare('SELECT venue_id, contact_email FROM venue_owner_links WHERE prev_token_hash = ?').get(hash);
   if (!link) return null;
   const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(link.venue_id);
   if (!row || row.redirect_to) return null;
@@ -33850,7 +34394,7 @@ ${VENUE_MENU_CSS}
     ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
-  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise ?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
+  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
   <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} à ${escapeHtml(regionLabel)}` : `More ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
   </div>
   ${themedShell ? '</main>' : ''}
@@ -34173,7 +34717,7 @@ async function handleOwnerLogin(req, res) {
 // answers below, matched in the owner's browser to what they type or tap, with the most likely topics for the page
 // they are on first. If a portal error is showing it explains that error. Anything it can't answer goes to
 // info@okanaganroam.com through POST /owner/help, with the business and page attached so Dayton can reply.
-// Pages: login, link, forgot, reset, account, settings, edit, menu, invalid.
+// Pages: login, link, forgot, reset, account, settings, edit, menu, invalid, claim.
 const OWNER_HELP_TOPICS = [
   { id: 'signin', q: 'I can\u2019t sign in', pages: ['login', 'account'],
     keys: ['sign in', 'signin', 'log in', 'login', 'cant get in', 'password wrong', 'dont match', 'locked', 'locked out', 'cannot log'],
@@ -34183,7 +34727,17 @@ const OWNER_HELP_TOPICS = [
     a: '<ol><li>Go to <a href="/owner/forgot">Reset your password</a> and enter your login email.</li><li>Open the email from Okanagan Roam (check spam or promotions if it isn\u2019t there in a few minutes).</li><li>Choose a new password: at least 10 characters, typed twice.</li></ol><p>The reset link works once and expires after an hour. Resetting signs you out on your other devices.</p>' },
   { id: 'newlink', q: 'I lost my edit link, or it doesn\u2019t work', pages: ['invalid', 'login', 'link'],
     keys: ['link', 'edit link', 'lost link', 'link not valid', 'isnt valid', 'expired', 'old link', 'new link', 'email link'],
-    a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>A new link replaces the old one, so always use the newest email. If no email comes, your business may be listed with a different email. Use <strong>Message us</strong> below and we\u2019ll sort it out.</p>' },
+    a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>Your old link keeps working until you open the new one; after that, use the newest email. If no email comes, we may not have your email, or have a different one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, or use <strong>Message us</strong> below.</p>' },
+  // Claim this listing (2026-10-18): owners with no edit link, no email on file, or a changed email.
+  { id: 'claim', q: 'How do I claim my listing?', pages: ['login', 'link', 'invalid', 'account', 'claim'],
+    keys: ['claim', 'claim my listing', 'claim this listing', 'claim my business', 'take over', 'takeover', 'my business is listed', 'business is on your site', 'ownership', 'prove', 'verify', 'own this business', 'get access', 'access my listing', 'no edit link', 'never had a link', 'manage my listing', 'control my listing'],
+    a: '<ol><li>Open your business\u2019s page on Okanagan Roam and tap <strong>Claim this listing</strong> (beside the opening hours).</li><li>Tell us your name, your role and your business email, and how we can check it\u2019s you, for example by calling the number on your listing.</li><li>Once we\u2019ve checked, usually within a day or two, we email you a private edit link. On that page you can also create a login.</li></ol><p>It\u2019s free. Already got an email from us before? <a href="/owner/link">Email me a new link</a> is faster. Not listed at all? <a href="/list-your-venue">List your business</a>.</p>' },
+  { id: 'noemail', q: 'I never got the email', pages: ['login', 'link', 'forgot', 'invalid'],
+    keys: ['never got', 'didnt get', 'did not get', 'didnt receive', 'not received', 'never received', 'havent received', 'havent got', 'no email', 'didnt arrive', 'hasnt arrived', 'not arrived', 'where is the email', 'spam', 'junk', 'promotions', 'never came', 'didnt come'],
+    a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>' },
+  { id: 'staff', q: 'Can my staff or a partner log in too?', pages: ['account', 'edit', 'login', 'settings'],
+    keys: ['staff', 'employee', 'employees', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'same login'],
+    a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password.</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don\u2019t share one password between people. Each person can take a business off their own login in <a href="/owner/account/settings">Account settings</a>; to remove someone else, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>' },
   { id: 'login-create', q: 'How do I make a login?', pages: ['edit', 'login'],
     keys: ['create login', 'make login', 'account', 'make an account', 'sign up', 'register', 'why login'],
     a: '<ol><li>Open your listing with the edit link we emailed you.</li><li>Find <strong>Create a login</strong> near the top, then enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, photos and menus you add from <strong>My listings</strong> go live straight away.</p>' },
@@ -34269,15 +34823,16 @@ const OWNER_HELP_ERROR_RULES = [
   [/event date has already passed|1 to 3 categories|start time, or tick all day/i, 'event-add'],
 ];
 const OWNER_HELP_START = {
-  login: ['signin', 'forgot', 'newlink', 'login-create'],
-  link: ['newlink', 'signin'],
+  login: ['signin', 'forgot', 'newlink', 'claim', 'login-create'],
+  link: ['newlink', 'noemail', 'claim', 'signin'],
   forgot: ['forgot', 'signin'],
   reset: ['forgot', 'signin'],
-  account: ['photo-pending', 'more-businesses', 'settings', 'changes-review'],
+  account: ['photo-pending', 'more-businesses', 'staff', 'settings', 'changes-review'],
   settings: ['settings', 'more-businesses', 'forgot'],
   edit: ['photo-add', 'hours', 'event-add', 'menu-add', 'changes-review', 'photo-pending'],
   menu: ['menu-add', 'menu-blurry', 'menu-website', 'photo-pending'],
-  invalid: ['newlink', 'signin'],
+  invalid: ['newlink', 'claim', 'signin'],
+  claim: ['claim', 'noemail', 'staff', 'cost'],
 };
 const OWNER_HELP_CSS = `
   .ohb-btn { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; background: #1F3A5F; background: var(--ref-navy, #1F3A5F); color: #fff; border: 0; border-radius: 999px; padding: 12px 18px 12px 14px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 28px -10px rgba(0,0,0,0.5); }
@@ -34484,6 +35039,12 @@ async function handleOwnerHelpMessage(req, res) {
     const found = venueForOwnerAccount(account, Number(accountVenue[1]));
     if (found) venues = [found.venue];
   }
+  // From a claim form (2026-10-18): the listing they are claiming.
+  const claimMatch = /^(?:\/fr)?\/claim\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)/.exec(path);
+  if (!venues.length && claimMatch && SLUG_TO_TYPE[claimMatch[2]]) {
+    const found = findVenueBySlug(claimMatch[1], SLUG_TO_TYPE[claimMatch[2]], claimMatch[3]);
+    if (found && !found.redirect_to) venues = [found];
+  }
   if (!venues.length && account) venues = ownerAccountVenues(account.id);
   const replyTo = account ? account.email : clean(body.email, 200);
   if (!account && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please add your email so we can reply.' });
@@ -34520,13 +35081,17 @@ async function handleOwnerHelpMessage(req, res) {
 // The help bot on the simple portal pages, picked by page title (admin and visitor pages get none).
 const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
   'Business login': ['login', false], 'My listings': ['account', true], 'Account settings': ['settings', true],
-  'Get your edit link': ['link', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
+  'Get your edit link': ['link', false], 'Claim this listing': ['claim', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
 });
-function ownerSimplePage(title, inner, extraHead = '') {
+// French entry pages (2026-10-18): lang 'fr' gives the page a French title and description; the help bot is English
+// only, so those pages point to info@ in French instead (see ownerEntryHelpFr).
+function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
+  const fr = lang === 'fr';
+  const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
   return ownerA11y(`<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(`${title} | Okanagan Roam`, 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
+${pageHead(`${title} | Okanagan Roam`, fr ? 'Espace entreprises des fiches Okanagan Roam.' : 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
 ${extraHead}
 <style>
   body.owner-page .op-wrap { max-width: 560px; margin: 0 auto; padding: 24px 0 56px; }
@@ -34548,26 +35113,55 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main"><div class="op-wrap">
 ${inner}
   </div></main>
-${OWNER_SIMPLE_PAGE_HELP[title] ? ownerHelpWidgetHtml(OWNER_SIMPLE_PAGE_HELP[title][0], { signedIn: OWNER_SIMPLE_PAGE_HELP[title][1] }) : ''}
+${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
 </body>
 </html>`);
 }
 
-function renderOwnerLoginPage() {
-  return ownerSimplePage('Business login', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Business login</h1>
-    <p>Sign in to update your listing on Okanagan Roam, add events and send photos.</p>
+// The server's messages on the French entry pages, in French (the JSON replies stay English for the English pages).
+const OWNER_ENTRY_MESSAGES_FR = {
+  'That email and password don\u2019t match. Forgot your password? Reset it at okanaganroam.com/owner/forgot.': 'Ce courriel et ce mot de passe ne correspondent pas. Mot de passe oublié? Réinitialisez-le à okanaganroam.com/fr/owner/forgot.',
+  [OWNER_LOCKED_MESSAGE]: `Trop de mots de passe erronés. Réessayez dans ${OWNER_LOGIN_LOCK_MINUTES} minutes ou réinitialisez votre mot de passe à okanaganroam.com/fr/owner/forgot.`,
+  'Please enter the email you sign in with.': 'Entrez le courriel que vous utilisez pour vous connecter.',
+  'Please enter the email we have for your business.': 'Entrez le courriel que nous avons pour votre entreprise.',
+  'Please enter your email address.': 'Entrez votre adresse courriel.',
+  'Please use the Okanagan Roam website.': 'Veuillez utiliser le site Okanagan Roam.',
+  'Too many attempts. Please wait a while and try again.': 'Trop de tentatives. Patientez un moment, puis réessayez.',
+  'Please try again.': 'Veuillez réessayer.',
+};
+// A JSON block, not a script literal: the French twin translates English strings inside page scripts, which would
+// turn this list's English keys French.
+function ownerEntryMessagesJson(fr) {
+  return fr ? `<script type="application/json" id="oeFr">${JSON.stringify(OWNER_ENTRY_MESSAGES_FR).replace(/</g, '\\u003c')}</script>\n` : '';
+}
+function ownerEntryMessagesScript(fr) {
+  return fr ? "var OE_FR = {}; try { OE_FR = JSON.parse(document.getElementById('oeFr').textContent); } catch (e) {} function oeMsg(t){ return (t && OE_FR[t]) || t; }"
+    : 'function oeMsg(t){ return t; }';
+}
+function ownerEntryHelpFr() {
+  return '<p class="op-hint" style="margin-top:14px">Besoin d’aide? Écrivez-nous à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>; nous répondons en français ou en anglais.</p>';
+}
+function renderOwnerLoginPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Business login', 'Espace entreprises'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Business login', 'Espace entreprises')}</h1>
+    <p>${L('Sign in to update your listing on Okanagan Roam, add events and send photos.', 'Connectez-vous pour mettre à jour votre fiche sur Okanagan Roam, ajouter des événements et envoyer des photos.')}</p>
     <form class="venue-form" id="olForm" novalidate>
-      <div class="form-field"><label for="olEmail">Email</label><input type="email" id="olEmail" autocomplete="username" maxlength="254"></div>
-      <div class="form-field"><label for="olPassword">Password</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
+      <div class="form-field"><label for="olEmail">${L('Email', 'Courriel')}</label><input type="email" id="olEmail" autocomplete="username" maxlength="254"></div>
+      <div class="form-field"><label for="olPassword">${L('Password', 'Mot de passe')}</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
       <p class="lyv-error" id="olError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="olSubmit">Sign in</button>
-      <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">Forgot your password?</a></p>
+      <button type="submit" class="venue-form-submit" id="olSubmit">${L('Sign in', 'Se connecter')}</button>
+      <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">${L('Forgot your password?', 'Mot de passe oublié?')}</a></p>
     </form>
-    <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
-    <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>
-<script>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé par courriel et choisissez-y un mot de passe. Vous ne le trouvez pas? <a href="${OWNER_NEW_LINK_PATH}">Recevoir un nouveau lien par courriel</a>.
+    <br><strong>Pas encore inscrit?</strong> <a href="/list-your-venue">Inscrivez votre entreprise gratuitement</a>.</p>
+    <p class="op-hint">Après la connexion, la gestion de vos fiches s’affiche en anglais pour l’instant.</p>
+    ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
+    <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('olForm'), err = document.getElementById('olError'), btn = document.getElementById('olSubmit');
   f.addEventListener('submit', function(e){
@@ -34575,11 +35169,11 @@ function renderOwnerLoginPage() {
     fetch('/owner/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ email: document.getElementById('olEmail').value, password: document.getElementById('olPassword').value }) })
       .then(function(r){ return r.json(); })
-      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = (j && j.error) || 'Please try again.'; err.hidden = false; })
-      .catch(function(){ btn.disabled = false; err.textContent = 'Could not sign in. Please check your connection.'; err.hidden = false; });
+      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = oeMsg((j && j.error) || 'Please try again.'); err.hidden = false; })
+      .catch(function(){ btn.disabled = false; err.textContent = ${fr ? "'Connexion impossible. Vérifiez votre connexion Internet.'" : "'Could not sign in. Please check your connection.'"}; err.hidden = false; });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Business login' });
 }
 
 function renderOwnerAccountPage(account) {
@@ -34862,8 +35456,9 @@ async function handleOwnerForgot(req, res) {
 //
 // /owner/link: an owner who can't find the private link we emailed enters the
 // email we have on file for their business (venue_owner_links.contact_email).
-// For each business with that email we make a fresh link (the old one stops
-// working) and email it straight to that address. The page says the same thing
+// For each business with that email we make a fresh link and email it straight
+// to that address. The old link keeps working until the new one is first
+// opened (2026-10-18), so a request from someone else can't lock the owner out. The page says the same thing
 // whether or not the email is on file. At most 3 requests per email per hour.
 const OWNER_NEW_LINK_PATH = '/owner/link';
 const ownerNewLinkRecent = new Map();
@@ -34873,7 +35468,7 @@ function ownerNewLinkEmailText(items) {
     ? `Here's a new private link to update ${items[0].name} on Okanagan Roam:`
     : 'Here are new private links to update your businesses on Okanagan Roam:',
   '', ...items.map((it) => (items.length === 1 ? it.url : `${it.name}: ${it.url}`)), '',
-  'No password needed. Keep the link private; anyone with it can suggest changes. Any older link we sent you no longer works.',
+  'No password needed. Keep the link private; anyone with it can suggest changes. Once you open this link, any older link we sent you stops working.',
   '', 'Tip: on that page you can create a login, so next time you can sign in at https://okanaganroam.com/owner/login instead.',
   '', 'If you didn’t ask for this, you can ignore this email.', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n');
 }
@@ -34891,7 +35486,7 @@ async function handleOwnerNewLink(req, res) {
     recent.push(now); ownerNewLinkRecent.set(email, recent);
     const items = [];
     for (const v of venues) {
-      const r = createOwnerLink(v.id, { reset: true });
+      const r = createOwnerLink(v.id, { reset: true, keepOld: true });
       if (r.ok) items.push({ name: v.name, url: r.url });
     }
     const direct = ownerDirectEmail();
@@ -34909,20 +35504,27 @@ async function handleOwnerNewLink(req, res) {
   return sendSubmissionResponse(res, 200, { ok: true });
 }
 
-function renderOwnerNewLinkPage() {
-  return ownerSimplePage('Get your edit link', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Get your edit link</h1>
-    <p>Can&rsquo;t find the private link we emailed you? Enter the email address we have for your business and we&rsquo;ll send you a new one straight away.</p>
+function renderOwnerNewLinkPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Get your edit link', 'Recevoir votre lien de modification'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Get your edit link', 'Recevoir votre lien de modification')}</h1>
+    <p>${L('Can&rsquo;t find the private link we emailed you? Enter the email address we have for your business and we&rsquo;ll send you a new one straight away.', 'Vous ne trouvez plus le lien privé que nous vous avons envoyé? Entrez l’adresse courriel que nous avons pour votre entreprise et nous vous en enverrons un nouveau tout de suite.')}</p>
     <form class="venue-form" id="onlForm" novalidate>
-      <div class="form-field"><label for="onlEmail">Your business email</label><input type="email" id="onlEmail" autocomplete="email" maxlength="254"><p class="lyv-error" id="onlEmailError" hidden></p></div>
+      <div class="form-field"><label for="onlEmail">${L('Your business email', 'Courriel de votre entreprise')}</label><input type="email" id="onlEmail" autocomplete="email" maxlength="254"><p class="lyv-error" id="onlEmailError" hidden></p></div>
       <p class="lyv-error" id="onlError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="onlSubmit">Email me my link</button>
+      <button type="submit" class="venue-form-submit" id="onlSubmit">${L('Email me my link', 'M’envoyer mon lien')}</button>
     </form>
-    <p class="op-done" id="onlDone" hidden>If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Any older link stops working.</p>
-    <p class="op-hint" style="margin-top:20px"><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
-    <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>
-<script>
+    <p class="op-done" id="onlDone" hidden>${L('If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.', 'Si nous avons ce courriel pour une entreprise, un nouveau lien est en route. Vérifiez votre boîte de réception (et vos courriels indésirables). Votre ancien lien fonctionne jusqu’à ce que vous ouvriez le nouveau.')}</p>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Nous n’avons pas votre courriel, ou il a changé?</strong> Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong>. Nous vérifierons qu’il s’agit bien de vous et vous enverrons un lien.
+    <br><strong>Vous ne savez pas quel courriel nous avons?</strong> Écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous réglerons la question.
+    <br><strong>Vous avez déjà un compte?</strong> <a href="/owner/login">Connectez-vous ici</a>.</p>
+    <p class="op-hint">La page de modification de votre fiche s’affiche en anglais pour l’instant.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
+    <br><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
+    <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('onlForm'), btn = document.getElementById('onlSubmit');
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
@@ -34935,13 +35537,392 @@ function renderOwnerNewLinkPage() {
         btn.disabled = false;
         if (j && j.ok) { f.hidden = true; document.getElementById('onlDone').hidden = false; return; }
         var errs = (j && j.errors) || {};
-        show('onlEmailError', errs.email);
-        if (!errs.email) show('onlError', (j && j.error) || 'Please try again.');
+        show('onlEmailError', oeMsg(errs.email));
+        if (!errs.email) show('onlError', oeMsg((j && j.error) || 'Please try again.'));
       })
-      .catch(function(){ btn.disabled = false; show('onlError', 'Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; show('onlError', ${fr ? "'Connexion impossible. Veuillez réessayer.'" : "'Could not connect. Please try again.'"}); });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Get your edit link' });
+}
+
+// ---------- Claim this listing (2026-10-18) ----------
+//
+// Owners who never got an edit link (about 331 phone-only listings have no
+// email on file) or whose email changed had no way in: /owner/link only mails
+// an email we already have. Every venue page now has a "Claim this listing"
+// button -> /claim/<region>/<category>/<slug> (French: /fr/claim/...). The
+// claim is stored in venue_claims and emailed to info@okanaganroam.com;
+// Dayton checks it against the phone, website and email on file and approves
+// it on /admin/review, which makes an edit link for the claimant's email and
+// emails it to them. Nothing on the listing changes until then.
+const CLAIM_PATH = '/claim/';
+const CLAIM_ROLES = { owner: ['Owner', 'Propriétaire'], manager: ['Manager', 'Gérant ou gérante'], staff: ['Staff', 'Employé ou employée'], other: ['Other', 'Autre'] };
+const CLAIM_VERIFY = {
+  call: ['Call the business number on this listing', 'Appelez le numéro de l’entreprise indiqué sur cette fiche'],
+  website: ['Our website shows the email I gave above', 'Notre site Web affiche l’adresse courriel indiquée ci-dessus'],
+  social: ['I’ll message you from the business’s Instagram or Facebook', 'Je vous écrirai depuis l’Instagram ou le Facebook de l’entreprise'],
+  other: ['Something else', 'Autre chose'],
+};
+const CLAIM_KEYS = new Set(['venue_id', 'name', 'role', 'email', 'phone', 'verify_method', 'verify_detail', 'message', 'lang', 'company_website', 'started_at']);
+const CLAIM_RATE_LIMIT = 10; // claim attempts per IP per hour
+const claimAttempts = new Map();
+
+const CLAIM_TEXT = {
+  en: {
+    title: 'Claim this listing', eyebrow: 'For businesses',
+    intro: 'Own or manage {name}? Tell us who you are and how we can check it’s you. Once we have, we’ll email you a private link to update the listing: photos, hours, menu or prices, and events. It’s free.',
+    name: 'Your name', role: 'Your role', choose: 'Choose one', email: 'Business email', emailHint: 'We’ll send the edit link here.',
+    phone: 'Phone number', verify: 'How can we check it’s you?', detailSocial: 'Which account? (for example @yourbusiness)', detailOther: 'Tell us how',
+    message: 'Anything else? (optional)', submit: 'Send my claim', sending: 'Sending…',
+    callNumber: ' ({phone})', already: 'Already have a login?', signIn: 'Sign in', haveEmail: 'Got an email from us before?', newLink: 'Email me a new link',
+    doneTitle: 'Thanks, we’ve got it',
+    done: 'We’ll check it’s you{how} and email {email} a private link to update {name}, usually within a day or two. Nothing on the listing changes until then.',
+    doneCall: ' (we may call the business)', back: 'Back to {name}', noJs: 'This form needs JavaScript. You can also email info@okanaganroam.com.',
+    errName: 'Please enter your name.', errRole: 'Please choose your role.', errEmail: 'Please enter a valid email address.',
+    errPhone: 'Please enter a valid phone number, like 250-555-0123.', errVerify: 'Please choose how we can check it’s you.',
+    errDetail: 'Please tell us a little more (up to 300 characters).', errMessage: 'Please keep your message under 1,000 characters.',
+    errFix: 'Please fix the highlighted fields.', errFast: 'That was very quick. Please check your details and press Send again.',
+    errExpired: 'This form has expired. Please reload the page and try again.', errRate: 'Too many requests from your connection. Please try again in an hour, or email info@okanaganroam.com.',
+    errOrigin: 'Please use the form on okanaganroam.com.', errGeneric: 'Sorry, something went wrong. Please try again, or email info@okanaganroam.com.',
+    errVenue: 'We couldn’t find that listing.', errConnect: 'Could not connect. Please try again.',
+  },
+  fr: {
+    title: 'Revendiquer cette fiche', eyebrow: 'Pour les entreprises',
+    intro: 'Vous êtes propriétaire ou gérant de {name} ? Dites-nous qui vous êtes et comment vérifier que c’est bien vous. Ensuite, nous vous enverrons par courriel un lien privé pour modifier la fiche : photos, heures, menu ou tarifs, et événements. C’est gratuit.',
+    name: 'Votre nom', role: 'Votre rôle', choose: 'Choisissez', email: 'Courriel de l’entreprise', emailHint: 'Nous enverrons le lien de modification à cette adresse.',
+    phone: 'Numéro de téléphone', verify: 'Comment vérifier que c’est bien vous ?', detailSocial: 'Quel compte ? (par exemple @votreentreprise)', detailOther: 'Expliquez-nous',
+    message: 'Autre chose ? (facultatif)', submit: 'Envoyer ma demande', sending: 'Envoi…',
+    callNumber: ' ({phone})', already: 'Vous avez déjà un compte ?', signIn: 'Connectez-vous', haveEmail: 'Vous avez déjà reçu un courriel de nous ?', newLink: 'Recevoir un nouveau lien',
+    doneTitle: 'Merci, c’est reçu',
+    done: 'Nous vérifierons que c’est bien vous{how} et enverrons à {email} un lien privé pour modifier {name}, en général d’ici un jour ou deux. Rien ne change sur la fiche d’ici là.',
+    doneCall: ' (nous appellerons peut-être l’entreprise)', back: 'Retour à {name}', noJs: 'Ce formulaire a besoin de JavaScript. Vous pouvez aussi écrire à info@okanaganroam.com.',
+    errName: 'Veuillez indiquer votre nom.', errRole: 'Veuillez choisir votre rôle.', errEmail: 'Veuillez indiquer une adresse courriel valide.',
+    errPhone: 'Veuillez indiquer un numéro valide, comme 250-555-0123.', errVerify: 'Veuillez choisir comment vérifier que c’est bien vous.',
+    errDetail: 'Veuillez nous en dire un peu plus (300 caractères au plus).', errMessage: 'Veuillez écrire moins de 1 000 caractères.',
+    errFix: 'Veuillez corriger les champs indiqués.', errFast: 'C’était très rapide. Vérifiez vos renseignements et appuyez de nouveau sur Envoyer.',
+    errExpired: 'Ce formulaire a expiré. Rechargez la page et réessayez.', errRate: 'Trop de demandes depuis votre connexion. Réessayez dans une heure, ou écrivez à info@okanaganroam.com.',
+    errOrigin: 'Veuillez utiliser le formulaire sur okanaganroam.com.', errGeneric: 'Désolé, un problème est survenu. Réessayez, ou écrivez à info@okanaganroam.com.',
+    errVenue: 'Nous n’avons pas trouvé cette fiche.', errConnect: 'Connexion impossible. Veuillez réessayer.',
+  },
+};
+function claimText(lang, key, vars = {}) {
+  const t = (CLAIM_TEXT[lang] || CLAIM_TEXT.en)[key] || CLAIM_TEXT.en[key] || '';
+  return t.replace(/\{(\w+)\}/g, (m, k) => (vars[k] == null ? '' : String(vars[k])));
+}
+
+function claimPagePath(venue, lang = 'en') {
+  return `${lang === 'fr' ? '/fr' : ''}${CLAIM_PATH}${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}`;
+}
+
+function claimRateLimited(ip, now = Date.now()) {
+  const recent = (claimAttempts.get(ip) || []).filter((t) => now - t < 3600000);
+  recent.push(now);
+  claimAttempts.set(ip, recent);
+  if (claimAttempts.size > 5000) for (const [k, times] of claimAttempts) if (!times.some((t) => now - t < 3600000)) claimAttempts.delete(k);
+  return recent.length > CLAIM_RATE_LIMIT;
+}
+
+// -> { data, errors } with messages in the claimant's language.
+function validateClaim(body, venue, lang) {
+  const errors = {}, data = {};
+  const str = (k) => (typeof body[k] === 'string' ? cleanSubmissionText(body[k], { multiline: k === 'message' }) : '');
+  const name = str('name');
+  if (name.length < 2 || name.length > 100 || /[<>]/.test(name)) errors.name = claimText(lang, 'errName'); else data.name = name;
+  if (!Object.prototype.hasOwnProperty.call(CLAIM_ROLES, body.role)) errors.role = claimText(lang, 'errRole'); else data.role = body.role;
+  const email = validOwnerEmail(body.email);
+  if (!email) errors.email = claimText(lang, 'errEmail'); else data.email = email;
+  const phone = str('phone');
+  const digits = phone.replace(/\D/g, '').length;
+  if (!/^[0-9+().\-\s]{7,40}$/.test(phone) || digits < 7 || digits > 15) errors.phone = claimText(lang, 'errPhone'); else data.phone = phone;
+  const method = body.verify_method;
+  const offered = claimVerifyOptions(venue);
+  if (!offered.includes(method)) errors.verify_method = claimText(lang, 'errVerify'); else data.verify_method = method;
+  const detail = str('verify_detail');
+  if (detail.length > 300 || /[<>]/.test(detail) || ((method === 'social' || method === 'other') && detail.length < 2)) errors.verify_detail = claimText(lang, 'errDetail');
+  else data.verify_detail = detail || null;
+  const message = str('message');
+  if (message.length > 1000 || /[<>]/.test(message)) errors.message = claimText(lang, 'errMessage'); else data.message = message || null;
+  return { data, errors };
+}
+
+// "Call us" only when we have a number to call; "our website" only when we have a website.
+function claimVerifyOptions(venue) {
+  return Object.keys(CLAIM_VERIFY).filter((k) => (k === 'call' ? !!(venue && venue.phone) : k === 'website' ? !!(venue && venue.website) : true));
+}
+
+// What we already know about the listing, so Dayton can check a claim against it.
+function claimOnFile(venueId) {
+  const v = db.prepare('SELECT id, name, phone, website, region, type, slug, redirect_to FROM venues WHERE id = ?').get(venueId) || {};
+  const link = db.prepare('SELECT contact_email, created_at, last_used_at FROM venue_owner_links WHERE venue_id = ?').get(venueId) || null;
+  const logins = db.prepare('SELECT a.email FROM owner_account_venues av JOIN owner_accounts a ON a.id = av.account_id WHERE av.venue_id = ? ORDER BY a.email').all(venueId).map((r) => r.email);
+  return { venue: v, link, logins };
+}
+
+// The claimant's email domain is the website's domain: a strong sign it's them.
+function claimEmailMatchesWebsite(email, website) {
+  try {
+    const host = new URL(website).hostname.toLowerCase().replace(/^www\./, '');
+    const domain = String(email || '').split('@')[1] || '';
+    return !!host && !!domain && (domain === host || domain.endsWith(`.${host}`));
+  } catch (e) { return false; }
+}
+
+function buildClaimEmail(claim) {
+  const f = claimOnFile(claim.venue_id);
+  const v = f.venue;
+  const payload = {
+    _subject: `[PENDING REVIEW] Listing claim #${claim.id}: ${v.name || `venue #${claim.venue_id}`}`,
+    _template: 'table',
+    _captcha: 'false',
+    _replyto: claim.email,
+    'Status': 'PENDING REVIEW. Nobody gets an edit link until you approve this claim.',
+    'Claim ID': String(claim.id),
+    'Submitted': formatSubmissionTimestamp(claim.submitted_at),
+    'Listing': `${v.name || ''} (venue #${claim.venue_id}) ${v.slug ? venueListingUrl(v) : ''}`.trim(),
+    'Their name': claim.name,
+    'Their role': CLAIM_ROLES[claim.role] ? CLAIM_ROLES[claim.role][0] : claim.role,
+    'Their email': claim.email,
+    'Their phone': claim.phone,
+    'How to check': CLAIM_VERIFY[claim.verify_method] ? CLAIM_VERIFY[claim.verify_method][0] : claim.verify_method,
+  };
+  if (claim.verify_detail) payload['Their details'] = claim.verify_detail;
+  if (claim.message) payload['Message'] = claim.message;
+  payload['Phone on file'] = v.phone || '(none)';
+  payload['Website on file'] = v.website || '(none)';
+  if (v.website && claimEmailMatchesWebsite(claim.email, v.website)) payload['Email check'] = 'Their email uses the website’s domain.';
+  payload['Edit link'] = f.link ? `Exists${f.link.contact_email ? ` (sent to ${f.link.contact_email})` : ' (no email on it)'}${f.link.last_used_at ? `, last used ${f.link.last_used_at} UTC` : ', never used'}` : 'None yet';
+  payload['Logins on this listing'] = f.logins.length ? f.logins.join(', ') : 'None';
+  if (claim.lang === 'fr') payload['Language'] = 'Sent from the French page';
+  payload['How to review'] = `Open ${ADMIN_REVIEW_URL}#claims and approve or reject claim #${claim.id}.`;
+  return payload;
+}
+
+async function notifyClaim(id) {
+  const claim = db.prepare('SELECT * FROM venue_claims WHERE id = ?').get(id);
+  try {
+    await venueSubmissionTransport(buildClaimEmail(claim));
+    db.prepare("UPDATE venue_claims SET notify_status = 'sent', notify_error = NULL WHERE id = ?").run(id);
+    return true;
+  } catch (err) {
+    const message = String((err && err.message) || err).slice(0, 300);
+    db.prepare("UPDATE venue_claims SET notify_status = 'failed', notify_error = ? WHERE id = ?").run(message, id);
+    console.error(`[claims] notification for claim #${id} failed (claim kept as pending): ${message}`);
+    return false;
+  }
+}
+
+// POST /api/claims
+async function handleClaimSubmission(req, res) {
+  let lang = /^\/fr\//.test(String(req.headers.referer || '').replace(/^https?:\/\/[^/]+/, '')) ? 'fr' : 'en';
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: claimText(lang, 'errOrigin') });
+  const ip = requestClientIp(req);
+  if (claimRateLimited(ip)) return sendSubmissionResponse(res, 429, { ok: false, error: claimText(lang, 'errRate') });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: claimText(lang, 'errGeneric') });
+  let body;
+  try { body = await readLimitedJsonBody(req, 8192); } catch (err) { return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: claimText(lang, 'errGeneric') }, err.status === 413); }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !CLAIM_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errGeneric') });
+  }
+  if (body.lang === 'fr' || body.lang === 'en') lang = body.lang;
+  // Honeypot: answer like a success, store nothing.
+  if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
+  const startedAt = Number(body.started_at);
+  const elapsed = Date.now() - startedAt;
+  if (!Number.isFinite(startedAt) || elapsed > VENUE_SUBMISSION_MAX_FORM_AGE_MS || elapsed < -60000) return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errExpired') });
+  if (elapsed < VENUE_SUBMISSION_MIN_FILL_MS) return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errFast') });
+  const row = Number.isInteger(body.venue_id) ? db.prepare('SELECT * FROM venues WHERE id = ?').get(body.venue_id) : null;
+  if (!row || row.redirect_to || !CATEGORY_SLUGS[row.type] || !row.slug) return sendSubmissionResponse(res, 404, { ok: false, error: claimText(lang, 'errVenue') });
+  const { data, errors } = validateClaim(body, row, lang);
+  if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errFix'), errors });
+  const message = claimText(lang, 'done', { how: data.verify_method === 'call' ? claimText(lang, 'doneCall') : '', email: data.email, name: row.name });
+  // The same person sending twice: one claim, one email to Dayton.
+  const dup = db.prepare("SELECT id FROM venue_claims WHERE venue_id = ? AND email = ? AND status = 'pending'").get(row.id, data.email);
+  if (dup) return sendSubmissionResponse(res, 201, { ok: true, id: dup.id, message });
+  const info = db.prepare(`INSERT INTO venue_claims (venue_id, name, role, email, phone, verify_method, verify_detail, message, lang, ip_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.id, data.name, data.role, data.email, data.phone, data.verify_method, data.verify_detail, data.message, lang,
+    crypto.createHash('sha256').update(`okanagan-roam-claim:${ip}`).digest('hex'));
+  const id = Number(info.lastInsertRowid);
+  await notifyClaim(id);
+  return sendSubmissionResponse(res, 201, { ok: true, id, message });
+}
+
+// GET /claim/<region>/<category>/<slug> and /fr/claim/...
+function renderClaimPage(venue, lang) {
+  const T = (k, vars) => escapeHtml(claimText(lang, k, vars));
+  const fr = lang === 'fr';
+  const listing = fr && venueHasFrench(venue) ? venuePagePath(venue, 'fr') : venuePagePath(venue);
+  const roles = Object.entries(CLAIM_ROLES).map(([k, l]) => `<option value="${k}">${escapeHtml(l[fr ? 1 : 0])}</option>`).join('');
+  const verify = claimVerifyOptions(venue).map((k, i) => `<label class="cl-radio"><input type="radio" name="verify_method" value="${k}"${i === 0 ? ' checked' : ''}> <span>${escapeHtml(CLAIM_VERIFY[k][fr ? 1 : 0])}${k === 'call' ? escapeHtml(claimText(lang, 'callNumber', { phone: venue.phone })) : ''}</span></label>`).join('');
+  const field = (id, key, label, input, hint) => `<div class="form-field" id="${id}Field"><label for="${id}">${label}</label>${input}${hint ? `<p class="op-hint" style="margin:4px 0 0">${hint}</p>` : ''}<p class="lyv-error" role="alert" id="${id}Error" hidden></p></div>`;
+  const page = ownerSimplePage(claimText(lang, 'title'), `
+    <span class="eyebrow">${T('eyebrow')}</span>
+    <h1>${T('title')}</h1>
+    <p><strong>${escapeHtml(venue.name)}</strong> &middot; ${escapeHtml(REGION_LABELS[venue.region] || venue.region)}</p>
+    <p>${T('intro', { name: venue.name })}</p>
+    <form class="venue-form" id="clForm" novalidate>
+      <div class="lyv-hp" aria-hidden="true"><label>Leave this empty <input type="text" id="clCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off"></label></div>
+      ${field('clName', 'name', T('name'), '<input type="text" id="clName" autocomplete="name" maxlength="100" required>')}
+      ${field('clRole', 'role', T('role'), `<select id="clRole" required><option value="">${T('choose')}</option>${roles}</select>`)}
+      ${field('clEmail', 'email', T('email'), '<input type="email" id="clEmail" autocomplete="email" maxlength="254" required>', T('emailHint'))}
+      ${field('clPhone', 'phone', T('phone'), '<input type="tel" id="clPhone" autocomplete="tel" maxlength="40" required>')}
+      <fieldset class="form-field cl-verify" id="clVerifyField"><legend>${T('verify')}</legend>${verify}<p class="lyv-error" role="alert" id="clVerifyError" hidden></p></fieldset>
+      <div class="form-field" id="clDetailField" hidden><label for="clDetail" id="clDetailLabel">${T('detailSocial')}</label><input type="text" id="clDetail" maxlength="300"><p class="lyv-error" role="alert" id="clDetailError" hidden></p></div>
+      ${field('clMessage', 'message', T('message'), '<textarea id="clMessage" rows="3" maxlength="1000"></textarea>')}
+      <p class="lyv-error" role="alert" id="clError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="clSubmit">${T('submit')}</button>
+    </form>
+    <div class="op-done" id="clDone" role="status" tabindex="-1" hidden><strong>${T('doneTitle')}</strong><p id="clDoneText" style="margin:6px 0 0"></p></div>
+    <noscript><p class="op-hint">${T('noJs')}</p></noscript>
+    <p class="op-hint" style="margin-top:20px"><a href="${escapeHtml(listing)}">${T('back', { name: venue.name })}</a>
+    <br><strong>${T('haveEmail')}</strong> <a href="${OWNER_NEW_LINK_PATH}">${T('newLink')}</a>
+    <br><strong>${T('already')}</strong> <a href="/owner/login">${T('signIn')}</a></p>
+<script>
+(function(){
+  var f = document.getElementById('clForm'), btn = document.getElementById('clSubmit');
+  if (!f || !window.fetch) return;
+  var startedAt = Date.now();
+  var LABELS = { social: ${JSON.stringify(claimText(lang, 'detailSocial'))}, other: ${JSON.stringify(claimText(lang, 'detailOther'))} };
+  var IDS = { name: 'clName', role: 'clRole', email: 'clEmail', phone: 'clPhone', verify_method: 'clVerify', verify_detail: 'clDetail', message: 'clMessage' };
+  function method(){ var r = f.querySelector('input[name=verify_method]:checked'); return r ? r.value : ''; }
+  function syncDetail(){ var m = method(), box = document.getElementById('clDetailField'); box.hidden = !LABELS[m]; if (LABELS[m]) document.getElementById('clDetailLabel').textContent = LABELS[m]; }
+  f.addEventListener('change', function(e){ if (e.target.name === 'verify_method') syncDetail(); });
+  syncDetail();
+  function show(id, text){ var e = document.getElementById(id + 'Error'); if (!e) return; e.textContent = text || ''; e.hidden = !text; var input = document.getElementById(id); if (input && input.setAttribute) { if (text) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid'); } }
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    Object.keys(IDS).forEach(function(k){ show(IDS[k], ''); }); show('cl', '');
+    var m = method();
+    var body = { venue_id: ${Number(venue.id)}, lang: ${JSON.stringify(fr ? 'fr' : 'en')}, started_at: startedAt, company_website: document.getElementById('clCompanyWebsite').value,
+      name: document.getElementById('clName').value, role: document.getElementById('clRole').value, email: document.getElementById('clEmail').value,
+      phone: document.getElementById('clPhone').value, verify_method: m, verify_detail: LABELS[m] ? document.getElementById('clDetail').value : '', message: document.getElementById('clMessage').value };
+    btn.disabled = true; btn.textContent = ${JSON.stringify(claimText(lang, 'sending'))};
+    fetch('/api/claims', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        btn.disabled = false; btn.textContent = ${JSON.stringify(claimText(lang, 'submit'))};
+        if (j && j.ok) { f.hidden = true; var d = document.getElementById('clDone'); document.getElementById('clDoneText').textContent = j.message || ''; d.hidden = false; d.focus(); return; }
+        var errs = (j && j.errors) || {}, first = null;
+        Object.keys(errs).forEach(function(k){ if (IDS[k]) { show(IDS[k], errs[k]); if (!first) first = document.getElementById(IDS[k]); } });
+        show('cl', (j && j.error) || ${JSON.stringify(claimText(lang, 'errGeneric'))});
+        if (first && first.focus) first.focus();
+      })
+      .catch(function(){ btn.disabled = false; btn.textContent = ${JSON.stringify(claimText(lang, 'submit'))}; show('cl', ${JSON.stringify(claimText(lang, 'errConnect'))}); });
+  });
+})();
+</script>`, `<style>
+  body.owner-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  body.owner-page .cl-verify { border: 0; padding: 0; margin: 0 0 14px; }
+  body.owner-page .cl-verify legend { font-size: 0.82rem; font-weight: 700; color: rgb(74, 52, 40); margin-bottom: 6px; padding: 0; }
+  body.owner-page .cl-radio { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; font-weight: 500; margin: 8px 0; cursor: pointer; }
+  body.owner-page .cl-radio input[type=radio] { flex: 0 0 auto; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; padding: 0; }
+  body.owner-page .cl-radio span { flex: 1 1 auto; min-width: 0; }
+  body.owner-page [hidden] { display: none !important; }
+</style>`, { lang, helpKey: 'Claim this listing' });
+  return fr ? page.replace('<html lang="en">', '<html lang="fr-CA">') : page;
+}
+
+// --- admin side ---
+
+function listPendingClaims() {
+  return db.prepare(`SELECT c.*, v.name AS venue_name FROM venue_claims c JOIN venues v ON v.id = c.venue_id
+    WHERE c.status = 'pending' ORDER BY c.submitted_at, c.id`).all();
+}
+
+function renderAdminClaimCard(c) {
+  const f = claimOnFile(c.venue_id);
+  const v = f.venue;
+  const esc = adminReviewEsc;
+  const tel = (p) => (p ? `<a href="tel:${esc(String(p).replace(/[^0-9+]/g, ''))}">${esc(p)}</a>` : '<em>none</em>');
+  const site = v.website ? `<a href="${esc(v.website)}" target="_blank" rel="noopener nofollow">${esc(v.website)}</a>` : '<em>none</em>';
+  const match = v.website && claimEmailMatchesWebsite(c.email, v.website);
+  const check = {
+    call: `Call the number on file, ${tel(v.phone)}, and ask for ${esc(c.name)}.`,
+    website: `Look on ${site} for <strong>${esc(c.email)}</strong>.`,
+    social: `Wait for a message from <strong>${esc(c.verify_detail || '')}</strong>, and check it is the account linked from the listing or website.`,
+    other: `They said: <strong>${esc(c.verify_detail || '')}</strong>`,
+  }[c.verify_method] || '';
+  const linkLine = f.link ? `An edit link exists${f.link.contact_email ? ` (sent to ${esc(f.link.contact_email)})` : ''}${f.link.last_used_at ? `, last used ${esc(adminReviewTime(f.link.last_used_at))}` : ', never used'}. Approving sends a new one to ${esc(c.email)}; the old one stops working once they open it. Logins already made keep working.` : '';
+  return `<article class="rv-card" data-kind="claim" data-id="${c.id}">
+      <h3>${esc(c.venue_name)}</h3>
+      <p class="rv-meta">Claim #${c.id} · sent ${esc(adminReviewTime(c.submitted_at))}${c.lang === 'fr' ? ' · from the French page' : ''}${v.slug ? ` · <a href="${esc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}${c.notify_status === 'failed' ? ' · <strong>email to info@ failed</strong>' : ''}</p>
+      <table class="rv-diff"><tr><th></th><th>They told us</th><th>We have on file</th></tr>
+        <tr><th>Who</th><td>${esc(c.name)} (${esc(CLAIM_ROLES[c.role] ? CLAIM_ROLES[c.role][0] : c.role)})</td><td>${f.logins.length ? `Logins: ${esc(f.logins.join(', '))}` : 'No logins yet'}</td></tr>
+        <tr><th>Email</th><td>${esc(c.email)}${match ? ' <strong>(matches the website)</strong>' : ''}</td><td>${f.link && f.link.contact_email ? esc(f.link.contact_email) : '<em>none</em>'}</td></tr>
+        <tr><th>Phone</th><td>${tel(c.phone)}</td><td>${tel(v.phone)}</td></tr>
+        <tr><th>Website</th><td></td><td>${site}</td></tr>
+      </table>
+      <div class="rv-warn"><strong>How to check:</strong> ${check}</div>
+      ${c.message ? `<p class="rv-text"><strong>Message:</strong> ${esc(c.message)}</p>` : ''}
+      ${linkLine ? `<p class="rv-meta">${linkLine}</p>` : ''}
+      ${adminReviewActions('claim', c.id, { approveLabel: 'Approve and email them a link', reasonPlaceholder: 'Reason if rejecting (only emailed to them if you write one)' })}
+    </article>`;
+}
+
+function claimApprovalEmail(claim, venue, url) {
+  const first = String(claim.name || '').split(/\s+/)[0];
+  if (claim.lang === 'fr') {
+    return {
+      subject: `Votre lien pour modifier ${venue.name} sur Okanagan Roam`,
+      text: [`Bonjour ${first},`, '', `Merci d’avoir revendiqué ${venue.name} sur Okanagan Roam. Nous avons vérifié que c’est bien vous. Voici votre lien privé pour modifier la fiche (aucun mot de passe requis) :`, url, '',
+        `Sur cette page (en anglais), vous pouvez ajouter vos photos, vos heures d’ouverture, ${ownerExtrasFor(venue)} et vos événements, et créer un compte pour vous connecter ensuite à ${OWNER_LOGIN_URL}.`, '',
+        `Gardez ce lien privé : toute personne qui l’a peut proposer des modifications. Vous l’avez perdu ? Demandez-en un nouveau à https://okanaganroam.com${OWNER_NEW_LINK_PATH} avec cette adresse courriel.`, '',
+        'Merci,', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n'),
+    };
+  }
+  return {
+    subject: `Your link to update ${venue.name} on Okanagan Roam`,
+    text: [`Hi ${first},`, '', `Thanks for claiming ${venue.name} on Okanagan Roam. We’ve checked it’s you, so here’s your private link to update the listing (no password needed):`, url, '',
+      `On that page you can add your photos, opening hours, ${ownerExtrasFor(venue)} and events, and create a login so next time you just sign in at ${OWNER_LOGIN_URL}.`, '',
+      `Keep the link private: anyone with it can suggest changes. Lost it? Get a new one at https://okanaganroam.com${OWNER_NEW_LINK_PATH} with this email address.`, '',
+      'Thanks,', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n'),
+  };
+}
+
+function claimRejectionEmail(claim, venue, reason) {
+  const first = String(claim.name || '').split(/\s+/)[0];
+  if (claim.lang === 'fr') {
+    return { subject: `Votre demande pour ${venue.name}`, text: [`Bonjour ${first},`, '', `Merci pour votre demande concernant ${venue.name}. Nous n’avons pas pu confirmer que la fiche vous revient, alors nous ne pouvons pas envoyer de lien de modification pour l’instant.`, '', `Raison : ${reason}`, '',
+      'Si c’est une erreur, répondez à info@okanaganroam.com et nous verrons ensemble.', '', 'Merci,', 'Okanagan Roam'].join('\n') };
+  }
+  return { subject: `Your request for ${venue.name}`, text: [`Hi ${first},`, '', `Thanks for your request about ${venue.name}. We weren’t able to confirm the listing is yours, so we can’t send an edit link just now.`, '', `Reason: ${reason}`, '',
+    'If we’ve got this wrong, email info@okanaganroam.com and we’ll sort it out together.', '', 'Thanks,', 'Okanagan Roam'].join('\n') };
+}
+
+// Approve: a new edit link for the claimant's email, emailed to them (or to
+// info@ to forward when direct email is off). Reject: a polite note only when
+// a reason is given. -> { status, body }
+async function adminClaimAction(id, action, body, reviewer) {
+  if (action !== 'approve' && action !== 'reject') return { status: 400, body: { error: 'Unknown action.' } };
+  const claim = db.prepare('SELECT * FROM venue_claims WHERE id = ?').get(id);
+  if (!claim) return { status: 404, body: { error: ADMIN_REVIEW_ERRORS.not_found } };
+  if (claim.status !== 'pending') return { status: 409, body: { error: ADMIN_REVIEW_ERRORS.not_pending } };
+  const venue = db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(claim.venue_id);
+  const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+  if (action === 'reject') {
+    db.prepare("UPDATE venue_claims SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ? AND status = 'pending'").run(reviewer, reason || null, id);
+    if (!reason || !venue) return { status: 200, body: { ok: true, emailed: 'not_told' } };
+    return { status: 200, body: { ok: true, emailed: await sendOwnerDecision([claim.email], claimRejectionEmail(claim, venue, reason)) } };
+  }
+  if (!venue || venue.redirect_to) return { status: 409, body: { error: ADMIN_REVIEW_ERRORS.venue_unavailable } };
+  const made = createOwnerLink(venue.id, { contact_email: claim.email, reset: true, keepOld: true });
+  if (!made.ok) return { status: 409, body: { error: made.reason } };
+  db.prepare("UPDATE venue_claims SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ? AND status = 'pending'").run(reviewer, id);
+  const message = claimApprovalEmail(claim, venue, made.url);
+  let emailed;
+  if (ownerDirectEmail()) {
+    emailed = await sendOwnerDecision([claim.email], message);
+  } else {
+    try {
+      await venueSubmissionTransport({ _subject: `[ACTION] Approved claim #${id}: forward the edit link to ${claim.email}`, _template: 'table', _captcha: 'false',
+        'What to do': `Forward the email below to ${claim.email} from info@okanaganroam.com.`, 'Subject': message.subject, 'Email to forward': message.text });
+      emailed = 'forwarded';
+    } catch (err) {
+      console.error(`[claims] forwarding the link for claim #${id} failed: ${String((err && err.message) || err).slice(0, 200)}`);
+      emailed = 'failed';
+    }
+  }
+  return { status: 200, body: { ok: true, emailed, link: made.url } };
 }
 
 // POST /owner/reset/<token>
@@ -34969,20 +35950,25 @@ async function handleOwnerReset(req, res, value) {
   return res.end(JSON.stringify({ ok: true }));
 }
 
-function renderOwnerForgotPage() {
-  return ownerSimplePage('Reset your password', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Reset your password</h1>
-    <p>Enter the email you sign in with. We&rsquo;ll send you a link to choose a new password.</p>
+function renderOwnerForgotPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Reset your password', 'Réinitialiser votre mot de passe'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Reset your password', 'Réinitialiser votre mot de passe')}</h1>
+    <p>${L('Enter the email you sign in with. We&rsquo;ll send you a link to choose a new password.', 'Entrez le courriel que vous utilisez pour vous connecter. Nous vous enverrons un lien pour choisir un nouveau mot de passe.')}</p>
     <form class="venue-form" id="ofgForm" novalidate>
-      <div class="form-field"><label for="ofgEmail">Email</label><input type="email" id="ofgEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="ofgEmailError" hidden></p></div>
+      <div class="form-field"><label for="ofgEmail">${L('Email', 'Courriel')}</label><input type="email" id="ofgEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="ofgEmailError" hidden></p></div>
       <p class="lyv-error" id="ofgError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="ofgSubmit">Send reset link</button>
+      <button type="submit" class="venue-form-submit" id="ofgSubmit">${L('Send reset link', 'Envoyer le lien de réinitialisation')}</button>
     </form>
-    <p class="op-done" id="ofgDone" hidden>If that email has a login, a reset link is on its way. Check your inbox (and spam folder). <span id="ofgSlow" hidden>It can take a few hours to arrive.</span></p>
-    <p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
-    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there, or <a href="${OWNER_NEW_LINK_PATH}">get a new link</a>.</p>
-<script>
+    <p class="op-done" id="ofgDone" hidden>${L('If that email has a login, a reset link is on its way. Check your inbox (and spam folder).', 'Si ce courriel est associé à un compte, un lien de réinitialisation est en route. Vérifiez votre boîte de réception (et vos courriels indésirables).')} <span id="ofgSlow" hidden>${L('It can take a few hours to arrive.', 'Il peut prendre quelques heures à arriver.')}</span></p>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Retour à la connexion</a>
+    <br><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé et choisissez-y un mot de passe, ou <a href="${OWNER_NEW_LINK_PATH}">recevez un nouveau lien</a>.</p>
+    ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
+    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there, or <a href="${OWNER_NEW_LINK_PATH}">get a new link</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('ofgForm'), btn = document.getElementById('ofgSubmit');
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
@@ -34995,13 +35981,13 @@ function renderOwnerForgotPage() {
         btn.disabled = false;
         if (j && j.ok) { f.hidden = true; document.getElementById('ofgDone').hidden = false; document.getElementById('ofgSlow').hidden = !!j.direct; return; }
         var errs = (j && j.errors) || {};
-        show('ofgEmailError', errs.email);
-        if (!errs.email) show('ofgError', (j && j.error) || 'Please try again.');
+        show('ofgEmailError', oeMsg(errs.email));
+        if (!errs.email) show('ofgError', oeMsg((j && j.error) || 'Please try again.'));
       })
-      .catch(function(){ btn.disabled = false; show('ofgError', 'Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; show('ofgError', ${fr ? "'Connexion impossible. Veuillez réessayer.'" : "'Could not connect. Please try again.'"}); });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Reset your password' });
 }
 
 function renderOwnerResetPage(valid) {
@@ -35356,6 +36342,7 @@ const ADMIN_REVIEW_ERRORS = {
 
 // One decision from the review page -> { status, body }.
 async function adminReviewAction(kind, id, action, body) {
+  if (kind === 'claim') return adminClaimAction(id, action, body, ADMIN_REVIEWER);
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
   let r;
   if (kind === 'change') {
@@ -35488,7 +36475,7 @@ function adminReviewActions(kind, id, opts = {}) {
   const approve = opts.remove ? '' : `<button type="button" class="rv-btn rv-approve" data-act="approve">${opts.approveLabel || 'Approve'}</button>`;
   const reject = `<button type="button" class="rv-btn rv-reject" data-act="${opts.remove ? 'remove' : 'reject'}">${opts.remove ? 'Remove from site' : 'Reject'}</button>`;
   return `<div class="rv-actions">${opts.options || ''}</div>
-      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)'}">${reject}</div>
+      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.reasonPlaceholder || (opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)')}">${reject}</div>
       <p class="rv-result" hidden></p>`;
 }
 
@@ -35631,7 +36618,8 @@ function renderAdminReviewPage() {
   const visitor = listVisitorContributions('pending');
   const visitorReported = listVisitorContributions('reported');
   const visitorLive = listVisitorContributions('live').filter((c) => !c.reported_count);
-  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length;
+  const claims = listPendingClaims();
+  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
   const mail = ownerDirectEmail()
@@ -35641,12 +36629,13 @@ function renderAdminReviewPage() {
     <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a></nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a></nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
     ${eventChanges.length ? section('eventchanges', 'Changes to live events', eventChanges, renderAdminEventChangeCard, '') : ''}
     ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
+    ${section('claims', 'Listing claims', claims, renderAdminClaimCard, 'No claims waiting.')}
     ${section('menus', 'Menus', menus, renderAdminMenuCard, 'No menus waiting.')}
     ${liveMenus.length ? section('livemenus', 'Menus owners published (last 14 days)', liveMenus, renderAdminMenuCard, '') : ''}
     ${section('visitor', 'Visitor photos &amp; tips', visitor, (c) => renderAdminVisitorCard(c, 'pending'), 'No visitor photos or tips waiting.')}
@@ -35661,7 +36650,7 @@ function renderAdminReviewPage() {
   document.addEventListener('input', function(e){
     if (e.target.classList && e.target.classList.contains('rv-edit')) e.target.classList.toggle('rv-changed', e.target.value !== e.target.getAttribute('data-orig'));
   });
-  var EMAIL = { sent: ' They were emailed.', failed: ' The email to them failed.', email_off: '', no_address: ' (No email address to tell them.)' };
+  var EMAIL = { sent: ' They were emailed.', failed: ' The email to them failed.', email_off: '', no_address: ' (No email address to tell them.)', forwarded: ' Their link went to info@okanaganroam.com to forward.', not_told: ' Nothing was sent to them.' };
   document.addEventListener('click', function(e){
     var btn = e.target.closest('button[data-act]'); if (!btn) return;
     var card = btn.closest('.rv-card'), act = btn.getAttribute('data-act'), out = card.querySelector('.rv-result');
@@ -35684,7 +36673,7 @@ function renderAdminReviewPage() {
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(x){
         out.hidden = false;
-        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || ''); card.classList.add('rv-done'); return; }
+        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
       })
@@ -36827,10 +37816,10 @@ const server = http.createServer(async (req, res) => {
     const frTwinReq = frenchTwinRequest(req.url);
     if (frTwinReq) {
       req.url = frTwinReq.enUrl;
-      installTwinResponse(res, 'fr', frTwinReq.enPath, frTwinReq.enPath === '/my-trip' ? tripShareSearch(url.parse(req.url, true).query) : '');
+      installTwinResponse(res, 'fr', frTwinReq.enPath, twinSearchFor(frTwinReq.enPath, req.url));
     } else {
       const p = String(req.url).split('?')[0].replace(/(.)\/$/, '$1');
-      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p, p === '/my-trip' ? tripShareSearch(url.parse(req.url, true).query) : '');
+      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p, twinSearchFor(p, req.url));
     }
   }
   const parsed = url.parse(req.url, true);
@@ -37026,7 +38015,12 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: '/browse', 'Cache-Control': 'no-store' });
         return res.end();
       }
-      const html = renderSearchPage(runDiscovery(q, { limit: DISCOVERY_MAX_LIMIT }));
+      // Smarter search (2026-10-18): every match (Show more), in the visitor's language. French gaps (2026-10-18): a
+      // French search is read through the planner's French words ("terrasse" -> "patio"); the page shows what was typed.
+      const searchText = discoverySearchText(q, res.twinLang);
+      const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS });
+      run.query = q; run.searchText = searchText;
+      const html = renderSearchPage(run, { lang: res.twinLang });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
       return res.end(html);
     }
@@ -37084,7 +38078,7 @@ const server = http.createServer(async (req, res) => {
           && query.q.length <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
           // Stage 3.4: heroSearchTarget() decides (see its comment); a null
           // url keeps today's /browse, as typed.
-          const target = heroSearchTarget(query.q);
+          const target = heroSearchTarget(query.q, { lang: res.twinLang });
           if (target.url) {
             res.writeHead(302, { Location: target.url, 'Cache-Control': 'no-store' });
             return res.end();
@@ -39271,6 +40265,21 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(infoPage());
     }
+    // Claim this listing (2026-10-18): see renderClaimPage.
+    {
+      const cm = method === 'GET' ? /^(\/fr)?\/claim\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/.exec(pathname) : null;
+      if (cm) {
+        const type = SLUG_TO_TYPE[cm[3]];
+        const venue = REGION_LABELS[cm[2]] && type ? findVenueBySlug(cm[2], type, cm[4]) : null;
+        if (!venue || venue.redirect_to) {
+          res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(render404Page(pathname));
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', ...(cm[1] ? { 'Content-Language': 'fr-CA' } : {}) });
+        return res.end(renderClaimPage(venue, cm[1] ? 'fr' : 'en'));
+      }
+      if (pathname === '/api/claims' && method === 'POST') return await handleClaimSubmission(req, res);
+    }
     if ((pathname === '/list-your-venue' || pathname === '/list-your-venue/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderListYourVenuePage());
@@ -39311,21 +40320,21 @@ const server = http.createServer(async (req, res) => {
       if (method === 'GET' || method === 'HEAD') {
         if (ownerAccountForRequest(req)) { res.writeHead(302, { Location: '/owner/account', 'Cache-Control': 'no-store' }); return res.end(); }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname === OWNER_NEW_LINK_PATH || pathname === `${OWNER_NEW_LINK_PATH}/`) {
       if (method === 'POST') return await handleOwnerNewLink(req, res);
       if (method === 'GET' || method === 'HEAD') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerNewLinkPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerNewLinkPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname === '/owner/forgot' || pathname === '/owner/forgot/') {
       if (method === 'POST') return await handleOwnerForgot(req, res);
       if (method === 'GET' || method === 'HEAD') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerForgotPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerForgotPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname.startsWith(OWNER_RESET_PATH)) {
@@ -39486,7 +40495,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     {
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
@@ -40260,6 +41269,7 @@ module.exports = {
   frText,
   frenchTwinHtml,
   frTextOr,
+  frCuisine,
   englishTwinHtml,
   withFrenchTwinEntries,
   venuePagePath,
@@ -40745,6 +41755,10 @@ module.exports = {
   resolveDiscoveryDestination,
   selectDiscoveryVenues,
   heroSearchTarget,
+  smartSearchPlan,
+  smartFuzzyVenues,
+  smartGuideMatches,
+  searchPageModel,
   discoveryPresentation,
   renderSearchPage,
   renderMapPage,
