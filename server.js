@@ -24124,11 +24124,21 @@ ${VENUE_MENU_CSS}` : ''}
   </div>` : ''}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
-  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
+  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
     <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
     <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Revendiquer cette fiche')}</a>
     <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
-  </div>`}
+  </div>
+  <script>
+  // Owners (2026-10-18): on a device where this listing's owner is signed in (My listings remembers its
+  // listings), "Claim this listing" becomes "You manage this listing" with a link to edit it.
+  (function(){
+    var box = document.getElementById('venueOwnerCta'), mine = [];
+    try { mine = JSON.parse(localStorage.getItem('okrOwnerVenues') || '[]') || []; } catch (e) { return; }
+    if (!box || mine.indexOf(Number(box.getAttribute('data-venue-id'))) < 0) return;
+    box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" href="/owner/account/venue/' + box.getAttribute('data-venue-id') + '" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
+  })();
+  </script>`}
   </aside>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
@@ -31383,6 +31393,106 @@ function removeOwnerLoginFromVenue(venueId, email) {
   return db.prepare('DELETE FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').run(account.id, venueId).changes > 0;
 }
 
+// People with access (2026-10-18): owners see who else can update their listing and can take people off it.
+// The rule: a login can only remove logins that were added to the listing AFTER it (seq is the row's insert
+// order). So someone who has just got in, with a leaked edit link or as new staff, can't push out the original
+// owner; the original owner can remove them. Every new login is emailed to the people already on the listing,
+// and every removal is emailed to the person removed and to Dayton, so nothing happens silently. Anyone
+// removing themselves is always allowed (Account settings or "Remove me").
+function ownerVenueLogins(venueId) {
+  return db.prepare(`SELECT a.id AS account_id, a.email, av.added_at, av.rowid AS seq FROM owner_account_venues av
+    JOIN owner_accounts a ON a.id = av.account_id WHERE av.venue_id = ? ORDER BY av.rowid`).all(venueId);
+}
+// "jo•••@joiefarm.com": enough for an owner to recognise their staff, not enough to read off a full address.
+function maskOwnerEmail(email) {
+  const [local, domain] = String(email || '').split('@');
+  return `${local.slice(0, local.length <= 3 ? 1 : 2)}•••@${domain || ''}`;
+}
+function ownerCanRemoveLogin(actor, target) {
+  return !!actor && !!target && (actor.account_id === target.account_id || actor.seq < target.seq);
+}
+// Tells everyone already on a listing that a new login was added to it.
+function notifyOwnersOfNewLogin(venue, newAccount) {
+  const direct = ownerDirectEmail();
+  if (!direct) return;
+  for (const l of ownerVenueLogins(venue.id)) {
+    if (l.account_id === newAccount.id) continue;
+    direct({ to: l.email, subject: `New login added to ${venue.name} on Okanagan Roam`, text: ['Hi,', '',
+      `${newAccount.email} now has a login that can update ${venue.name} on Okanagan Roam.`, '',
+      'If you know them, there’s nothing to do. If you don’t, sign in and remove them under People with access:',
+      `https://okanaganroam.com/owner/account/venue/${venue.id}#access`, '',
+      'Then email info@okanaganroam.com and we’ll send you a fresh private edit link, so the old one stops working.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
+  }
+}
+async function notifyOwnerLoginRemoved(venue, removed, by) {
+  const direct = ownerDirectEmail();
+  if (direct) {
+    direct({ to: removed.email, subject: `Your access to ${venue.name} on Okanagan Roam was removed`, text: ['Hi,', '',
+      `Another person who manages ${venue.name} took your login (${removed.email}) off the listing, so you can’t update it any more. Your login itself still works for any other businesses on it.`, '',
+      'If that’s a mistake, email info@okanaganroam.com and we’ll sort it out.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
+  }
+  try {
+    await venueSubmissionTransport({
+      _subject: `[FYI] Login removed from ${venue.name}`, _template: 'table', _captcha: 'false',
+      'Status': 'FYI. An owner removed another login from their listing. Nothing to do unless it looks like a takeover.',
+      'Venue': `${venue.name} (venue #${venue.id})`, 'Listing': venueListingUrl(venue),
+      'Removed': removed.email, 'Removed by': by.email,
+      'Logins left': ownerVenueLogins(venue.id).map((l) => l.email).join(', ') || 'None',
+      'To undo': 'The removed person opens the listing’s private edit link and signs in with their login there.',
+    });
+  } catch (err) {
+    console.error(`[owner-access] notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+  }
+}
+// The name an owner last gave on an event or a listing update (2026-10-18), to fill "Your name" for them.
+function ownerAccountName(email) {
+  if (!email) return '';
+  const row = db.prepare(`SELECT name FROM (
+    SELECT contact_name AS name, submitted_at AS t FROM event_submissions WHERE contact_email = ? COLLATE NOCASE AND contact_name != ''
+    UNION ALL SELECT contact_name, submitted_at FROM owner_change_requests WHERE contact_email = ? COLLATE NOCASE AND contact_name IS NOT NULL AND contact_name != ''
+  ) ORDER BY t DESC LIMIT 1`).get(email, email);
+  return row ? row.name : '';
+}
+// The panel's rows for one viewer.
+function ownerAccessRows(venueId, viewerId) {
+  const logins = ownerVenueLogins(venueId);
+  const me = logins.find((l) => l.account_id === viewerId);
+  return logins.map((l) => ({ id: l.account_id, you: l.account_id === viewerId, email: l.account_id === viewerId ? l.email : maskOwnerEmail(l.email),
+    added: l.added_at ? ownerLocalDate(l.added_at) : '', canRemove: l.account_id !== viewerId && ownerCanRemoveLogin(me, l) }));
+}
+function ownerAccessPanelHtml(venue, account) {
+  const rows = ownerAccessRows(venue.id, account.id);
+  const items = rows.map((r) => `<li><span class="op-act-main"><span><strong>${escapeHtml(r.email)}</strong>${r.you ? ' (you)' : ''}</span><span class="op-act-date">${r.added ? `Added ${escapeHtml(r.added)}` : ''}${!r.you && !r.canRemove ? ' &middot; added before you' : ''}</span></span>${
+    r.you ? '<button type="button" class="op-btn" id="opRemoveMe">Remove me</button>'
+      : r.canRemove ? `<button type="button" class="op-btn op-btn-danger" data-login-remove="${r.id}" data-label="${escapeHtml(r.email)}">Remove</button>` : ''}</li>`).join('');
+  return `<details class="op-fold" id="access">
+      <summary><span class="lyv-section-label">People with access</span> <span class="op-fold-hint">${rows.length === 1 ? 'Only you can update this listing' : `${rows.length} logins can update this listing`}</span></summary>
+      <ul class="op-access" id="opAccessList">${items}</ul>
+      <p class="op-hint">Each person signs in with their own login. Anyone with this listing&rsquo;s private edit link can add one, and everyone already here gets an email when that happens. You can remove people added after you; to remove someone added before you, email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
+      <p class="lyv-error" id="opAccessError" hidden></p>
+      <p class="op-hint" id="opAccessStatus" role="status"></p>
+    </details>`;
+}
+// POST /owner/account/venue/<id>/logins/<accountId>/remove
+async function handleOwnerLoginRemoval(req, res, account, venueId, targetId) {
+  if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
+  const body = await readOwnerJson(req, res, []);
+  if (!body) return;
+  const found = venueForOwnerAccount(account, venueId);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'That business isn’t on your login.' });
+  const logins = ownerVenueLogins(venueId);
+  const me = logins.find((l) => l.account_id === account.id);
+  const target = logins.find((l) => l.account_id === targetId);
+  if (!target) return sendSubmissionResponse(res, 404, { ok: false, error: 'That person isn’t on this listing any more.' });
+  if (!ownerCanRemoveLogin(me, target)) {
+    return sendSubmissionResponse(res, 403, { ok: false, error: 'They were added before you, so only Okanagan Roam can remove them. Email info@okanaganroam.com and we’ll check.' });
+  }
+  removeOwnerLoginFromVenue(venueId, target.email);
+  if (target.account_id === account.id) return sendSubmissionResponse(res, 200, { ok: true, self: true });
+  await notifyOwnerLoginRemoved(found.venue, target, account);
+  return sendSubmissionResponse(res, 200, { ok: true, logins: ownerAccessRows(venueId, account.id).length });
+}
+
 // The venue behind an edit-link token, or null for a malformed, unknown or
 // revoked token (and for a venue that has since been retired).
 function venueForOwnerToken(token) {
@@ -32100,8 +32210,26 @@ function ownerPhotoRateLimited(ip, now = Date.now()) {
   return recent.length > OWNER_PHOTO_RATE_LIMIT;
 }
 
+// Photo order (2026-10-18): the order the venue gallery shows them in (after the main
+// photo): photos the owner moved first, by sort_order, then the rest oldest first.
+const OWNER_PHOTO_ORDER_SQL = 'sort_order IS NULL, sort_order, id';
 function ownerPhotosForVenue(venueId) {
-  return db.prepare("SELECT id, file, preview_key, status, credit, submitted_at FROM owner_photos WHERE venue_id = ? AND status != 'rejected' ORDER BY id DESC LIMIT 40").all(venueId);
+  return db.prepare(`SELECT id, file, preview_key, status, credit, submitted_at FROM owner_photos WHERE venue_id = ? AND status != 'rejected' ORDER BY ${OWNER_PHOTO_ORDER_SQL} LIMIT 60`).all(venueId);
+}
+// Moves one photo a place earlier (-1) or later (+1) among the venue's photos other
+// than the main one, then numbers them all 1..n so the order is fixed from now on.
+// -> { ok, order: [ids] } or { ok: false, reason }.
+function moveOwnerPhoto(venueId, photoId, delta) {
+  const main = ownerVenueMainImage(venueId);
+  const list = ownerPhotosForVenue(venueId).filter((p) => main !== `/images/owner/${p.file}`);
+  const i = list.findIndex((p) => p.id === photoId);
+  if (i < 0) return { ok: false, reason: 'not_found' };
+  const j = i + delta;
+  if (j < 0 || j >= list.length) return { ok: true, order: list.map((p) => p.id), moved: false };
+  [list[i], list[j]] = [list[j], list[i]];
+  const set = db.prepare('UPDATE owner_photos SET sort_order = ? WHERE id = ?');
+  list.forEach((p, n) => set.run(n + 1, p.id));
+  return { ok: true, order: list.map((p) => p.id), moved: true, position: j + 1, total: list.length };
 }
 
 function ownerPhotoPreviewUrl(key) {
@@ -32126,7 +32254,7 @@ function venueGalleryPhotos(venue, L = (en) => en) {
     out.push({ src: String(src), credit: credit || credits[key] || null });
   };
   if (venue.image_url) add(venue.image_url, ownerPhotoCreditFor(venue.image_url) || visitorPhotoCreditFor(venue.image_url, L));
-  for (const p of db.prepare("SELECT file, credit FROM owner_photos WHERE venue_id = ? AND status = 'approved' ORDER BY id").all(venue.id)) {
+  for (const p of db.prepare(`SELECT file, credit FROM owner_photos WHERE venue_id = ? AND status = 'approved' ORDER BY ${OWNER_PHOTO_ORDER_SQL}`).all(venue.id)) {
     add(`/images/owner/${p.file}`, p.credit);
   }
   // Approved visitor photos (2026-10-17) come after the owner's, credited "Sarah M. (visitor)".
@@ -35800,11 +35928,21 @@ async function readOwnerJson(req, res, keys) {
 // venue to an existing login. An existing login always needs its password:
 // the link proves access to this one venue, not to everything else on the
 // login, so it never changes a password (that's /owner/forgot).
+// Add to my login (2026-10-18): { add: true } from someone already signed in adds this venue to
+// their login with one tap. The edit link proves access to the venue and the session proves the login,
+// which is everything the email-and-password route checks.
 async function handleOwnerAccountSetup(req, res, token) {
-  const body = await readOwnerJson(req, res, ['email', 'password']);
+  const body = await readOwnerJson(req, res, ['email', 'password', 'add']);
   if (!body) return;
   const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
   if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  if (body.add === true) {
+    const signedIn = ownerAccountForRequest(req);
+    if (!signedIn) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again, or create a login below.' });
+    const added = db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(signedIn.id, found.venue.id).changes > 0;
+    if (added) notifyOwnersOfNewLogin(found.venue, signedIn);
+    return sendSubmissionResponse(res, 201, { ok: true, action: added ? 'venue_added' : 'signed_in', href: `/owner/account/venue/${found.venue.id}` });
+  }
   const email = validOwnerEmail(body.email);
   const password = typeof body.password === 'string' ? body.password : '';
   if (!email) return sendSubmissionResponse(res, 400, { ok: false, errors: { email: 'Please enter your email address.' } });
@@ -35827,7 +35965,8 @@ async function handleOwnerAccountSetup(req, res, token) {
     }
     action = manages ? 'signed_in' : 'venue_added';
   }
-  db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(account.id, venueId);
+  const added = db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(account.id, venueId).changes > 0;
+  if (added) notifyOwnersOfNewLogin(found.venue, account);
   const session = startOwnerSession(account.id);
   res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
   return res.end(JSON.stringify({ ok: true, action }));
@@ -36235,6 +36374,10 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
 });
 // French entry pages (2026-10-18): lang 'fr' gives the page a French title and description; the help bot is English
 // only, so those pages point to info@ in French instead (see ownerEntryHelpFr).
+// A small footer on every portal page (2026-10-18): privacy, terms and how to reach us.
+function ownerFooterHtml(fr = false) {
+  return `<footer class="op-footer"><a href="${fr ? '/fr/privacy' : '/privacy'}">${fr ? 'Confidentialité' : 'Privacy'}</a> &middot; <a href="${fr ? '/fr/terms' : '/terms'}">${fr ? 'Conditions' : 'Terms'}</a> &middot; <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a></footer>`;
+}
 function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
   const fr = lang === 'fr';
   const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
@@ -36263,6 +36406,7 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main"><div class="op-wrap">
 ${inner}
   </div></main>
+${ownerFooterHtml(fr)}
 ${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
 </body>
 </html>`));
@@ -36328,16 +36472,19 @@ ${ownerEntryMessagesScript(fr)}
 
 function renderOwnerAccountPage(account) {
   const venues = ownerAccountVenues(account.id);
-  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><span class="op-summary">${ownerVenueSummary(v.id)}</span><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a>${ownerVisitorItemsHtml(v.id)}</span>
+  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><span class="op-summary">${ownerVenueSummary(v.id)}</span><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a> &middot; ${(() => { const n = ownerVenueLogins(v.id).length; return `<a href="/owner/account/venue/${v.id}#access" class="op-hint">${n === 1 ? 'Only you have access' : `${n} people have access`}</a>`; })()}${ownerVisitorItemsHtml(v.id)}</span>
       <a class="op-edit" href="/owner/account/venue/${v.id}">Edit listing, events &amp; photos &rarr;</a></li>`).join('');
   return ownerSimplePage('My listings', `
     <div class="op-bar"><span>Signed in as <strong>${escapeHtml(account.email)}</strong></span>
       <span><a href="/owner/account/settings">Account settings</a> &nbsp;&middot;&nbsp; <button type="button" class="op-linkbtn" id="opLogout">Log out</button></span></div>
     <h1>My listings</h1>
     ${venues.length ? `<ul class="op-venues">${items}</ul>` : '<p>No businesses are linked to this login yet.</p>'}
-    <p class="op-hint">Manage another business? Open its private edit link and sign in with this email and password there to add it here.</p>
+    <p class="op-hint">Manage another business? Open its private edit link on this device while you&rsquo;re signed in and tap <strong>Add to my login</strong>.</p>
 <script>
+// This device remembers which listings are yours, so their public pages say "You manage this listing" (2026-10-18).
+try { localStorage.setItem('okrOwnerVenues', JSON.stringify(${JSON.stringify(venues.map((v) => v.id))})); } catch (e) {}
 document.getElementById('opLogout').addEventListener('click', function(){
+  try { localStorage.removeItem('okrOwnerVenues'); } catch (e) {}
   fetch('/owner/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.href = '/owner/login'; });
 });
 </script>`);
@@ -36380,7 +36527,8 @@ function renderOwnerSettingsPage(account) {
     <p class="op-done" id="osSignoutDone" hidden>Signed out everywhere else.</p>
 
     <h2 class="os-h">Your businesses</h2>
-    ${venues.length ? `<ul class="op-venues">${rows}</ul><p class="op-hint">Removing a business only takes it off this login. Its listing stays on Okanagan Roam, and you can add it back with its private edit link.</p>` : '<p>No businesses are linked to this login.</p>'}
+    ${venues.length ? `<ul class="op-venues" id="osVenues">${rows}</ul><p class="op-hint" id="osVenuesHint">Removing a business only takes it off this login. Its listing stays on Okanagan Roam, and you can add it back with its private edit link.</p>` : ''}
+    <p class="op-done" id="osNoVenues"${venues.length ? ' hidden' : ''}>No businesses are on this login now. To add one, open its private edit link while signed in and tap <strong>Add to my login</strong>. No link? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.</p>
     <p class="lyv-error" id="osError" hidden></p>
 <style>
   body.owner-page .os-h { font-size: 1.15rem; margin: 34px 0 6px; }
@@ -36417,9 +36565,18 @@ function renderOwnerSettingsPage(account) {
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-unlink]'), function(b){
     b.addEventListener('click', function(){
-      if (b.getAttribute('data-sure') !== '1') { b.setAttribute('data-sure', '1'); b.textContent = 'Click again to remove ' + b.getAttribute('data-name'); return; }
+      // "Tap" on phones and tablets, "Click" with a mouse (2026-10-18).
+      var tap = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (b.getAttribute('data-sure') !== '1') { b.setAttribute('data-sure', '1'); b.textContent = (tap ? 'Tap' : 'Click') + ' again to remove ' + b.getAttribute('data-name'); return; }
       post('/owner/account/venue/' + b.getAttribute('data-unlink') + '/unlink', {}).then(function(j){
-        if (j.ok) { b.closest('li').remove(); return; }
+        if (j.ok) {
+          var id = Number(b.getAttribute('data-unlink'));
+          try { localStorage.setItem('okrOwnerVenues', JSON.stringify((JSON.parse(localStorage.getItem('okrOwnerVenues') || '[]') || []).filter(function(x){ return x !== id; }))); } catch (e) {}
+          b.closest('li').remove();
+          // The last business gone: say so, instead of leaving an empty list.
+          if (!document.querySelector('#osVenues li')) { ['osVenues', 'osVenuesHint'].forEach(function(x){ var el = document.getElementById(x); if (el) el.hidden = true; }); document.getElementById('osNoVenues').hidden = false; }
+          return;
+        }
         show('osError', j.error || 'Please try again.');
       });
     });
@@ -36732,7 +36889,7 @@ const CLAIM_TEXT = {
     errName: 'Please enter your name.', errRole: 'Please choose your role.', errEmail: 'Please enter a valid email address.',
     errPhone: 'Please enter a valid phone number, like 250-555-0123.', errVerify: 'Please choose how we can check it’s you.',
     errDetail: 'Please tell us a little more (up to 300 characters).', errMessage: 'Please keep your message under 1,000 characters.',
-    errFix: 'Please fix the highlighted fields.', errFast: 'That was very quick. Please check your details and press Send again.',
+    errFix: 'Please fix the highlighted fields.', errFast: 'Sorry, that was quicker than we expected. Please press Send again.',
     errExpired: 'This form has expired. Please reload the page and try again.', errRate: 'Too many requests from your connection. Please try again in an hour, or email info@okanaganroam.com.',
     errOrigin: 'Please use the form on okanaganroam.com.', errGeneric: 'Sorry, something went wrong. Please try again, or email info@okanaganroam.com.',
     errVenue: 'We couldn’t find that listing.', errConnect: 'Could not connect. Please try again.',
@@ -36750,7 +36907,7 @@ const CLAIM_TEXT = {
     errName: 'Veuillez indiquer votre nom.', errRole: 'Veuillez choisir votre rôle.', errEmail: 'Veuillez indiquer une adresse courriel valide.',
     errPhone: 'Veuillez indiquer un numéro valide, comme 250-555-0123.', errVerify: 'Veuillez choisir comment vérifier que c’est bien vous.',
     errDetail: 'Veuillez nous en dire un peu plus (300 caractères au plus).', errMessage: 'Veuillez écrire moins de 1 000 caractères.',
-    errFix: 'Veuillez corriger les champs indiqués.', errFast: 'C’était très rapide. Vérifiez vos renseignements et appuyez de nouveau sur Envoyer.',
+    errFix: 'Veuillez corriger les champs indiqués.', errFast: 'Désolé, c’était plus rapide que prévu. Appuyez de nouveau sur Envoyer.',
     errExpired: 'Ce formulaire a expiré. Rechargez la page et réessayez.', errRate: 'Trop de demandes depuis votre connexion. Réessayez dans une heure, ou écrivez à info@okanaganroam.com.',
     errOrigin: 'Veuillez utiliser le formulaire sur okanaganroam.com.', errGeneric: 'Désolé, un problème est survenu. Réessayez, ou écrivez à info@okanaganroam.com.',
     errVenue: 'Nous n’avons pas trouvé cette fiche.', errConnect: 'Connexion impossible. Veuillez réessayer.',
@@ -36940,6 +37097,21 @@ function renderClaimPage(venue, lang) {
   f.addEventListener('change', function(e){ if (e.target.name === 'verify_method') syncDetail(); });
   syncDetail();
   function show(id, text){ var e = document.getElementById(id + 'Error'); if (!e) return; e.textContent = text || ''; e.hidden = !text; var input = document.getElementById(id); if (input && input.setAttribute) { if (text) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid'); } }
+  // Check the fields here first (2026-10-18), with the server's own rules and words, so a mistake shows
+  // straight away; and an autofilled form sent within 3 seconds waits the rest quietly instead of
+  // getting "too quick" from the anti-bot check.
+  var ERR = ${JSON.stringify({ name: claimText(lang, 'errName'), role: claimText(lang, 'errRole'), email: claimText(lang, 'errEmail'), phone: claimText(lang, 'errPhone'), verify_method: claimText(lang, 'errVerify'), verify_detail: claimText(lang, 'errDetail'), message: claimText(lang, 'errMessage'), fix: claimText(lang, 'errFix') }).replace(/</g, '\\u003c')};
+  function check(b){
+    var errs = {}, t = function(v){ return String(v || '').trim(); };
+    var n = t(b.name); if (n.length < 2 || n.length > 100 || /[<>]/.test(n)) errs.name = ERR.name;
+    if (!b.role) errs.role = ERR.role;
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(t(b.email))) errs.email = ERR.email;
+    var ph = t(b.phone), digits = ph.replace(/\\D/g, '').length; if (!/^[0-9+().\\-\\s]{7,40}$/.test(ph) || digits < 7 || digits > 15) errs.phone = ERR.phone;
+    if (!b.verify_method) errs.verify_method = ERR.verify_method;
+    var d = t(b.verify_detail); if (d.length > 300 || /[<>]/.test(d) || (LABELS[b.verify_method] && d.length < 2)) errs.verify_detail = ERR.verify_detail;
+    var msg = t(b.message); if (msg.length > 1000 || /[<>]/.test(msg)) errs.message = ERR.message;
+    return errs;
+  }
   f.addEventListener('submit', function(e){
     e.preventDefault();
     Object.keys(IDS).forEach(function(k){ show(IDS[k], ''); }); show('cl', '');
@@ -36947,8 +37119,12 @@ function renderClaimPage(venue, lang) {
     var body = { venue_id: ${Number(venue.id)}, lang: ${JSON.stringify(fr ? 'fr' : 'en')}, started_at: startedAt, company_website: document.getElementById('clCompanyWebsite').value,
       name: document.getElementById('clName').value, role: document.getElementById('clRole').value, email: document.getElementById('clEmail').value,
       phone: document.getElementById('clPhone').value, verify_method: m, verify_detail: LABELS[m] ? document.getElementById('clDetail').value : '', message: document.getElementById('clMessage').value };
+    var bad = check(body), firstBad = null;
+    Object.keys(bad).forEach(function(k){ show(IDS[k], bad[k]); if (!firstBad) firstBad = document.getElementById(IDS[k]) || f.querySelector('input[name=verify_method]'); });
+    if (firstBad) { show('cl', ERR.fix); if (firstBad.focus) firstBad.focus(); return; }
     btn.disabled = true; btn.textContent = ${JSON.stringify(claimText(lang, 'sending'))};
-    fetch('/api/claims', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
+    var wait = Math.max(0, startedAt + 3200 - Date.now());
+    new Promise(function(done){ setTimeout(done, wait); }).then(function(){ return fetch('/api/claims', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) }); })
       .then(function(r){ return r.json(); })
       .then(function(j){
         btn.disabled = false; btn.textContent = ${JSON.stringify(claimText(lang, 'submit'))};
@@ -38122,13 +38298,18 @@ function ownerVenueSummary(venueId) {
   return (parts.length ? parts.join(' ') : '<span class="op-status op-status-live">Up to date</span>') + lastHtml;
 }
 
-// POST /owner/account/venue/<id>/photos/<photoId>/(remove|main), signed-in owners only.
+// POST /owner/account/venue/<id>/photos/<photoId>/(remove|main|up|down), signed-in owners only.
 async function handleOwnerPhotoAction(req, res, account, venueId, photoId, action) {
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
   if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
   const found = venueForOwnerAccount(account, venueId);
   const photo = found && db.prepare('SELECT * FROM owner_photos WHERE id = ? AND venue_id = ?').get(photoId, venueId);
   if (!photo || photo.status === 'rejected') return sendSubmissionResponse(res, 404, { ok: false, error: 'That photo isn’t available any more.' });
+  if (action === 'up' || action === 'down') {
+    const r = moveOwnerPhoto(venueId, photo.id, action === 'up' ? -1 : 1);
+    if (!r.ok) return sendSubmissionResponse(res, 409, { ok: false, error: 'The main photo always comes first. Make another photo main to change it.' });
+    return sendSubmissionResponse(res, 200, { ok: true, order: r.order, moved: r.moved, position: r.position || null, total: r.total || r.order.length });
+  }
   if (action === 'main') {
     if (photo.status !== 'approved') return sendSubmissionResponse(res, 409, { ok: false, error: 'This photo is still waiting for review.' });
     const r = approveOwnerPhoto(photo.id, 'owner', { main: true });
@@ -38157,6 +38338,7 @@ ${renderGolfHeaderHtml()}
     <h1>This edit link isn&rsquo;t valid</h1>
     <p>It may have been replaced with a newer link. <a href="${OWNER_NEW_LINK_PATH}"><strong>Email me a new link</strong></a> (it arrives in a minute), or email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
   </main>
+${ownerFooterHtml()}
 ${ownerHelpWidgetHtml('invalid')}
 </body>
 </html>`;
@@ -38195,7 +38377,20 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-fold-hint { display: block; font-size: 0.84rem; color: rgba(42,32,25,0.66); margin-top: 2px; }
   body.owner-page .op-count-low { color: #9C2F22; font-weight: 700; }
   body.owner-page .op-changing { background: #FFF4D6; border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; margin: 0 0 12px; }
-  body.owner-page .op-changing[hidden] { display: none; }`;
+  body.owner-page .op-changing[hidden] { display: none; }
+  /* Phones (2026-10-18). Checkboxes and radios never shrink (a flex row squashed the photo rights box
+     to 4px wide), and every box is 16px text (no iOS zoom) and at least 44px tall. */
+  body.owner-page input[type=checkbox], body.owner-page input[type=radio] { flex: 0 0 auto; width: 22px; height: 22px; min-width: 22px; min-height: 0; margin: 0; padding: 0; accent-color: var(--ref-navy, #1F3A5F); }
+  body.owner-page .form-field input:not([type=checkbox]):not([type=radio]):not([type=file]), body.owner-page .form-field select, body.owner-page .form-field textarea, body.owner-page .op-times input, body.owner-page .op-season select { font-size: 16px; }
+  body.owner-page .form-field input:not([type=checkbox]):not([type=radio]):not([type=file]), body.owner-page .form-field select, body.owner-page .op-times input, body.owner-page .op-season select { min-height: 44px; }
+  body.owner-page .op-times input { padding: 6px 10px; border: 1px solid rgba(42,32,25,0.3); border-radius: 10px; background: #fff; color: var(--ink, #2A2019); font-family: inherit; }
+  body.owner-page .op-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; min-width: 40px; padding: 6px 14px; border: 1.5px solid rgba(31,58,95,0.35); border-radius: 10px; background: #fff; color: var(--ref-navy, #1F3A5F); font: inherit; font-size: 0.9rem; font-weight: 800; text-decoration: none; cursor: pointer; }
+  body.owner-page .op-btn:disabled { opacity: 0.45; cursor: default; }
+  body.owner-page .op-btn-danger { color: #9C2F22; border-color: rgba(156,47,34,0.4); }
+  body.owner-page .op-linkbtn { min-height: 40px; }
+  body.owner-page .op-act-btns button, body.owner-page .op-changing button { padding: 10px 0; }
+  body.owner-page .op-footer { max-width: 760px; margin: 0 auto; padding: 18px 16px 90px; font-size: 0.86rem; color: rgba(42,32,25,0.8); text-align: center; border-top: 1px solid rgba(42,32,25,0.12); }
+  body.owner-page .op-footer a { color: var(--ref-navy, #1F3A5F); font-weight: 700; display: inline-block; padding: 10px 4px; }`;
 // Accessibility (2026-10-15): error messages announce themselves to screen readers.
 function ownerA11y(html) {
   return html.replace(/<p class="lyv-error" id="/g, '<p class="lyv-error" role="alert" id="');
@@ -38261,6 +38456,27 @@ function ownerClosuresHtml(closures, chip) {
     </details>`;
 }
 
+// The owner's photo grid, in the order the venue page shows them: the main photo, then the rest
+// (2026-10-18). Signed-in owners get Make main, Remove and the earlier/later arrows. The page
+// fetches itself again and swaps this in after an upload or a change, instead of reloading.
+function ownerPhotoGridHtml(venueId, signedIn) {
+  const ph = ownerPhotosForVenue(venueId);
+  if (!ph.length) return '';
+  const main = ownerVenueMainImage(venueId);
+  const isMain = (p) => main === `/images/owner/${p.file}`;
+  const ordered = ph.filter(isMain).concat(ph.filter((p) => !isMain(p)));
+  const movable = ordered.filter((p) => !isMain(p));
+  return `<div class="op-photos" id="opPhotoGrid">${ordered.map((p) => {
+    const m = isMain(p);
+    const st = p.status === 'approved' ? (m ? '<span class="op-status op-status-live">Main photo</span>' : '<span class="op-status op-status-live">Live</span>') : '<span class="op-status op-status-wait">Waiting for review</span>';
+    const k = movable.indexOf(p);
+    const pos = k >= 0 ? `photo ${k + 1} of ${movable.length}` : 'main photo';
+    const arrows = k >= 0 && movable.length > 1 ? `<span class="op-photo-move"><button type="button" class="op-btn op-up" data-photo="${p.id}" data-move="up" aria-label="Move ${pos} earlier"${k === 0 ? ' disabled' : ''}>&uarr;</button><button type="button" class="op-btn op-down" data-photo="${p.id}" data-move="down" aria-label="Move ${pos} later"${k === movable.length - 1 ? ' disabled' : ''}>&darr;</button></span>` : '';
+    const btns = signedIn ? `<span class="op-photo-btns">${p.status === 'approved' && !m ? `<button type="button" class="op-btn op-make-main" data-photo="${p.id}">Make main photo</button>` : ''}<button type="button" class="op-btn op-btn-danger op-remove" data-photo="${p.id}" aria-label="Remove ${pos}">Remove</button>${arrows}</span>` : '';
+    return `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${st}${btns}</figcaption></figure>`;
+  }).join('')}</div>`;
+}
+
 function renderOwnerPage(found, token, pending) {
   return ownerA11y(renderOwnerPageHtml(found, token, pending));
 }
@@ -38324,6 +38540,9 @@ function renderOwnerPageHtml(found, token, pending) {
     if (it.kind === 'event' && it.canEdit) editableEvents[it.id] = ownerEventFormData(getEventSubmission(it.id));
   }
   const editableEventsJson = JSON.stringify(editableEvents).replace(/</g, '\\u003c');
+  // Signed in (2026-10-18): "Your name" starts from the name this login gave last time.
+  const accountName = found.account ? ownerAccountName(found.account.email) : found.viewer ? ownerAccountName(found.viewer.email) : '';
+  const viewer = found.viewer || null;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38354,18 +38573,19 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 28px 0 10px; }
   body.owner-page .op-day { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 0; border-bottom: 1px solid rgba(42,32,25,0.08); }
   body.owner-page .op-day-name { width: 96px; font-weight: 700; }
-  body.owner-page .op-closed { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.9rem; width: 90px; }
-  body.owner-page .op-closed input { width: auto; }
+  body.owner-page .op-closed { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.95rem; width: 100px; min-height: 44px; cursor: pointer; }
   body.owner-page .op-times { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-  body.owner-page .op-times input { width: auto; min-width: 110px; }
-  body.owner-page .op-day.is-off .op-times { opacity: 0.35; pointer-events: none; }
+  body.owner-page .op-times input { width: auto; min-width: 116px; }
+  /* A closed day hides its times (2026-10-18): shorter, and no faded unreadable boxes. */
+  body.owner-page .op-day.is-off .op-times { display: none; }
+  body.owner-page .op-day.is-off .op-copy { display: none; }
   body.owner-page .op-done-login { display: block; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(42,32,25,0.12); }
   body.owner-page .op-done-login[hidden] { display: none; }
-  body.owner-page .op-add { background: none; border: 0; color: var(--ref-navy); font-weight: 700; cursor: pointer; padding: 4px; }
-  body.owner-page .op-copy { display: block; flex-basis: 100%; font-size: 0.84rem; color: rgba(42,32,25,0.7); margin-top: 6px; }
-  body.owner-page .op-copy button { background: var(--sand-deep, #EFE6D6); border: 0; border-radius: 999px; padding: 5px 12px; margin: 2px 4px 2px 0; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
+  body.owner-page .op-add { background: none; border: 1.5px dashed rgba(31,58,95,0.4); border-radius: 10px; color: var(--ref-navy); font: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer; padding: 6px 12px; min-height: 40px; }
+  body.owner-page .op-copy { display: block; flex-basis: 100%; font-size: 0.84rem; color: rgba(42,32,25,0.8); margin-top: 6px; }
+  body.owner-page .op-copy button { background: var(--sand-deep, #EFE6D6); border: 0; border-radius: 999px; padding: 5px 14px; min-height: 40px; margin: 2px 4px 2px 0; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
   body.owner-page .op-copy-done { font-weight: 700; color: #2E7D4F; }
-  body.owner-page .op-hint { font-size: 0.82rem; color: rgba(42,32,25,0.62); margin: 4px 0 8px; }
+  body.owner-page .op-hint { font-size: 0.84rem; color: rgba(42,32,25,0.8); margin: 4px 0 8px; }
   body.owner-page .lyv-error { font-size: 0.85rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
   body.owner-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
   body.owner-page .op-done { display: none; background: #E9F6EE; border-radius: 14px; padding: 18px; font-weight: 600; }
@@ -38381,17 +38601,48 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-photos figure { margin: 0; }
   body.owner-page .op-photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; display: block; }
   body.owner-page .op-photos figcaption { font-size: 0.78rem; font-weight: 700; color: rgba(42,32,25,0.7); margin-top: 6px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-  body.owner-page .op-photo-btns { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-  body.owner-page .op-photo-btns button { background: none; border: 0; padding: 0; font: inherit; font-size: 0.8rem; font-weight: 700; color: var(--ref-navy); text-decoration: underline; cursor: pointer; }
-  body.owner-page .op-photo-btns button.op-remove { color: #9C2F22; }
+  body.owner-page .op-photos figcaption { align-items: stretch; }
+  body.owner-page .op-photos figcaption .op-status { align-self: flex-start; }
+  body.owner-page .op-photo-btns { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
+  body.owner-page .op-photo-btns .op-btn { padding: 6px 8px; font-size: 0.85rem; }
+  body.owner-page .op-photo-btns .op-make-main { grid-column: 1 / -1; }
+  body.owner-page .op-photo-move { display: contents; }
+  body.owner-page .op-photo-move .op-btn { padding: 0; width: 40px; font-size: 1.1rem; }
   body.owner-page .op-activity ul { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper); border-radius: 14px; }
   body.owner-page .op-activity li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(42,32,25,0.08); }
   body.owner-page .op-activity li:last-child { border-bottom: 0; }
   body.owner-page .op-act-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  body.owner-page .op-act-date { font-size: 0.78rem; color: rgba(42,32,25,0.6); }
+  body.owner-page .op-act-date { font-size: 0.8rem; color: rgba(42,32,25,0.8); }
+  body.owner-page .op-access { list-style: none; padding: 0; margin: 8px 0; background: var(--paper); border-radius: 14px; }
+  body.owner-page .op-access li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid rgba(42,32,25,0.08); }
+  body.owner-page .op-access li:last-child { border-bottom: 0; }
+  body.owner-page .op-access strong { overflow-wrap: anywhere; }
+  /* Folding sections and the section bar (2026-10-18). */
+  body.owner-page .op-sec { margin: 10px 0; }
+  body.owner-page .op-sec > summary { min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+  body.owner-page .op-sec > summary .op-fold-hint { flex-basis: 100%; margin: 0; }
+  body.owner-page .op-sec > summary h2.lyv-section-label { font-size: 0.78rem; }
+  body.owner-page details.op-fold { scroll-margin-top: 120px; }
+  body.owner-page .op-secnav { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
+  body.owner-page .op-secnav a { display: inline-flex; align-items: center; min-height: 40px; padding: 4px 14px; border-radius: 999px; background: var(--sand-deep, #EFE6D6); color: var(--ref-navy, #1F3A5F); font-weight: 800; font-size: 0.9rem; text-decoration: none; }
   body.owner-page .op-why { font-size: 0.82rem; color: #9C2F22; }
   ${OWNER_STATUS_CSS}
-  @media (max-width: 640px) { body.owner-page .venue-form { padding: 22px 16px; } body.owner-page .op-day-name { width: 100%; } }
+  @media (max-width: 640px) {
+    body.owner-page .venue-form { padding: 18px 14px; }
+    body.owner-page .op-day { padding: 6px 0; gap: 4px 10px; }
+    body.owner-page .op-day-name { width: 92px; }
+    body.owner-page .op-day.is-off .op-day-name { width: 92px; }
+    body.owner-page .op-times { flex-basis: 100%; }
+    body.owner-page .op-times input { min-width: 0; flex: 1 1 96px; }
+    body.owner-page .op-times .op-second { display: contents; }
+    body.owner-page .op-times .op-second[hidden] { display: none; }
+    /* "+ second time" shrinks to a "+" beside the times (its words stay for screen readers). */
+    body.owner-page .op-add { font-size: 0; width: 44px; min-width: 44px; height: 44px; padding: 0; flex: 0 0 44px; }
+    body.owner-page .op-add::before { content: '+'; font-size: 1.4rem; line-height: 1; }
+    body.owner-page .op-secnav { position: sticky; top: 0; z-index: 30; flex-wrap: nowrap; overflow-x: auto; margin: 8px -16px; padding: 8px 16px; background: var(--paper, #FBF7F0); box-shadow: 0 6px 12px -10px rgba(0,0,0,0.35); }
+    body.owner-page .op-secnav a { flex: 1 0 auto; justify-content: center; }
+    body.owner-page .op-photos { grid-template-columns: 1fr 1fr; }
+  }
 </style>
 </head>
 <body class="golf-page owner-page">
@@ -38406,12 +38657,20 @@ ${renderGolfHeaderHtml()}
       <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`
     : `<p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
       <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it. Signed-in owners&rsquo; hours and details go live straight away.</p>`}
-      ${ownerMenuCardHtml(venue, token ? `${OWNER_LINK_PATH}${token}/menu` : `/owner/account/venue/${venue.id}/menu`)}
-      <p><a href="#photos"><strong>Send photos &darr;</strong></a> &nbsp;&middot;&nbsp; <a href="#events"><strong>Add an event &darr;</strong></a></p>
+      ${ownerMenuCardHtml(venue, token ? `${OWNER_LINK_PATH}${token}/menu` : `/owner/account/venue/${venue.id}/menu`).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}
+    </div>
+    <nav class="op-secnav" id="opSecNav" aria-label="Parts of this page"><a href="#hours">Hours</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? 'Prices' : 'Menu'}</a>` : ''}<a href="#events">Events</a></nav>
+    <div class="op-head">
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">Last updated ${ownerUpdatedDate(last)}</p>` : ''; })()}
       ${pendingNote}
       ${ownerActivityHtml(ownerVenueActivity(venue.id))}
-      ${found.account ? `<p class="op-bar-in">Signed in as <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="/owner/account">My listings</a> &middot; <a href="/owner/account/settings">Account settings</a></p>` : `
+      ${found.account ? `<p class="op-bar-in">Signed in as <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="/owner/account">My listings</a> &middot; <a href="/owner/account/settings">Account settings</a></p>` : viewer && found.viewerManages ? `
+      <p class="op-login">You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.</p>` : viewer ? `
+      <div class="op-login" id="opAddLogin">
+        <p style="margin:0 0 10px">You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>. Add ${escapeHtml(venue.name)} to your login to manage it from <a href="/owner/account">My listings</a>, with photos going live straight away.</p>
+        <button type="button" class="venue-form-submit" id="olsAdd">Add to my login (${escapeHtml(viewer.email)})</button>
+        <p class="lyv-error" id="olsAddError" hidden></p>
+      </div>` : `
       <details class="op-login" id="opLogin">
         <summary><strong>Create a login</strong> (30 seconds): your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} then go live straight away, and you won&rsquo;t need this link next time</summary>
         <form id="olsForm" novalidate>
@@ -38427,7 +38686,8 @@ ${renderGolfHeaderHtml()}
       </details>`}
     </div>
     <form class="venue-form" id="opForm" novalidate>
-      <p class="lyv-section-label">Opening hours${waitChip('hours')}</p>
+      <details class="op-fold op-sec" id="hours" open>
+      <summary><span class="lyv-section-label">Opening hours${waitChip('hours')}</span></summary>
       <p class="op-hint">${hoursKnown ? '' : '<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. '}${hoursKnown ? 'Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ' : ''}Closing after midnight? Just enter the closing time, like 01:00.</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>
@@ -38446,6 +38706,7 @@ ${renderGolfHeaderHtml()}
       })()}
       ${ownerSeasonalHoursHtml(season0, dayRows, waitChip('hours_seasons'))}
       ${ownerClosuresHtml(snap.closures || [], waitChip('closures'))}
+      </details>
 
       <p class="lyv-section-label">Contact</p>
       <div class="form-row">
@@ -38478,29 +38739,35 @@ ${renderGolfHeaderHtml()}
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
-      <p class="lyv-section-label">Badges${waitChip('badges')}</p>
+      <details class="op-fold op-sec" id="badges">
+      <summary><span class="lyv-section-label">Badges${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? `${n} ticked, like dog friendly or patio` : 'Dog friendly, patio, vegan options and more'; })()}</span></summary>
       <p class="op-hint">Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
+      </details>
       ${venue.type === 'golf' ? '' : `
-      <p class="lyv-section-label" id="opPriceLabel">Price range${waitChip('price_range')}</p>
+      <details class="op-fold op-sec" id="price"${waitingFields.has('price_range') ? ' open' : ''}>
+      <summary><span class="lyv-section-label" id="opPriceLabel">Price range${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}: ${escapeHtml(OWNER_PRICE_SCALE[Number(snap.price_range)])} per person` : 'Not set: what one person usually spends'}</span></summary>
       <div class="form-row full"><div class="form-field">
         <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
           <option value="">Not set</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml(OWNER_PRICE_SCALE[n])} per person</option>`).join('')}
         </select>
         <p class="op-hint" id="opPriceScale">What one person usually spends: $ under $15, $$ $15&ndash;30, $$$ $30&ndash;60, $$$$ over $60 per person.</p>
         <p class="lyv-error" id="opPriceError" hidden></p>
-      </div></div>`}
+      </div></div>
+      </details>`}
       ${showHappyHour ? `
-      <p class="lyv-section-label">Happy hour${waitChip('happy_hour')}</p>
+      <details class="op-fold op-sec" id="happy">
+      <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? `Set for ${n} day${n === 1 ? '' : 's'}` : 'Not set'; })()}</span></summary>
       <p class="op-hint">Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.</p>
       <div id="opHappy">${dayRows('happy', hh, false)}</div>
-      <p class="lyv-error" id="opHappyError" hidden></p>` : ''}
+      <p class="lyv-error" id="opHappyError" hidden></p>
+      </details>` : ''}
 
       <p class="lyv-section-label">Anything else?</p>
       <div class="form-row">
-        <div class="form-field"><label for="opName">Your name</label><input type="text" id="opName" maxlength="100" autocomplete="name"></div>
+        <div class="form-field"><label for="opName">Your name</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
         ${found.account ? '' : `<div class="form-field"><label for="opEmail">Your email (optional)</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">We&rsquo;ll email you when it&rsquo;s live.</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
       <div class="form-row full"><div class="form-field">
@@ -38512,23 +38779,15 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="opSubmit">${instantOn ? 'Save changes' : 'Send changes'}</button>
     </form>
     <div class="op-done" id="opDone" role="status"><span id="opDoneText">Thanks! We&rsquo;ve got your changes and will review them, usually within a day.</span><span id="opDoneMail"${found.account ? '' : ' hidden'}> We&rsquo;ll email you when they&rsquo;re live.</span>
-      <button type="button" class="op-more" id="opMore">Make more changes</button>${found.account ? '' : `
+      <button type="button" class="op-more" id="opMore">Make more changes</button>${found.account || viewer ? '' : `
       <span class="op-done-login" id="opDoneLogin"><strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.</span>`}</div>
     <div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t ${instantOn ? 'saved' : 'sent'} yet.</span> <button type="button" id="opUnsentSend">${instantOn ? 'Save changes' : 'Send changes'}</button></div>
-    <h2 id="photos" style="margin-top:44px">Photos</h2>
+    <details class="op-fold op-sec" id="photos" open>
+    <summary><h2 class="lyv-section-label">Photos</h2></summary>
     <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. ${found.account ? 'Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.' : 'We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.'}</p>
-    ${(() => {
-      const ph = ownerPhotosForVenue(venue.id);
-      if (!ph.length) return '';
-      const main = ownerVenueMainImage(venue.id);
-      return `<div class="op-photos" id="opPhotoGrid">${ph.map((p) => {
-        const isMain = main === `/images/owner/${p.file}`;
-        const st = p.status === 'approved' ? (isMain ? '<span class="op-status op-status-live">Main photo</span>' : '<span class="op-status op-status-live">Live</span>') : '<span class="op-status op-status-wait">Waiting for review</span>';
-        const btns = found.account ? `<span class="op-photo-btns">${p.status === 'approved' && !isMain ? `<button type="button" class="op-make-main" data-photo="${p.id}">Make main photo</button>` : ''}<button type="button" class="op-remove" data-photo="${p.id}">Remove</button></span>` : '';
-        return `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${st}${btns}</figcaption></figure>`;
-      }).join('')}</div>
-    <p class="lyv-error" id="opPhotoActionError" hidden></p>`;
-    })()}
+    <div id="opPhotoBox">${ownerPhotoGridHtml(venue.id, !!found.account)}</div>
+    <p class="lyv-error" id="opPhotoActionError" hidden></p>
+    <p class="op-hint" id="opPhotoStatus" role="status"></p>
     <form class="venue-form" id="ofForm" novalidate>
       <div class="form-row full"><div class="form-field">
         <label for="ofFiles">Choose photos</label>
@@ -38547,7 +38806,9 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="ofFormError" hidden></p>
       <button type="submit" class="venue-form-submit" id="ofSubmit">Upload photos</button>
     </form>
-    <h2 id="events" style="margin-top:44px">Add an event</h2>
+    </details>
+    <details class="op-fold op-sec" id="events">
+    <summary><h2 class="lyv-section-label" id="oeHead">Add an event</h2> <span class="op-fold-hint">Live music, tastings, markets, classes or specials on What&rsquo;s On</span></summary>
     <p class="op-hint">Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.</p>
     <form class="venue-form" id="oeForm" novalidate>
       <p class="op-changing" id="oeChanging" hidden>Changing <strong id="oeChangingName"></strong>. Edit anything below and press <strong>Send change</strong>. <button type="button" class="op-linkbtn" id="oeChangeStop">Add a new event instead</button></p>
@@ -38575,7 +38836,7 @@ ${renderGolfHeaderHtml()}
       </div>
       <div class="form-row full"><div class="form-field"><label for="oeNotes">Repeats or other dates?</label><textarea id="oeNotes" rows="2" maxlength="500" placeholder="e.g. every Friday until December. We'll add the dates."></textarea></div></div>
       <div class="form-row">
-        <div class="form-field"><label for="oeContactName">Your name *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
+        <div class="form-field"><label for="oeContactName">Your name *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
         <div class="form-field"><label for="oeContactEmail">Your email *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
       </div>
       <div class="lyv-hp" aria-hidden="true"><label>Company website <input type="text" id="oeHp" tabindex="-1" autocomplete="off"></label></div>
@@ -38583,9 +38844,12 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="oeSubmit">Send event</button>
     </form>
     <div class="op-done" id="oeDone"><span id="oeDoneText">Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.</span> <a href="#events" id="oeAnother">Add another event</a></div>
+    </details>
+    ${found.account ? ownerAccessPanelHtml(venue, found.account) : ''}
 
   </div>
   </main>
+${ownerFooterHtml()}
 <script>
 (function(){
   var startedAt = Date.now();
@@ -38803,7 +39067,7 @@ ${renderGolfHeaderHtml()}
   var changeOf = null;
   function stopChange(){
     changeOf = null; document.getElementById('oeChanging').hidden = true;
-    document.getElementById('oeSubmit').textContent = 'Send event'; document.getElementById('events').textContent = 'Add an event';
+    document.getElementById('oeSubmit').textContent = 'Send event'; document.getElementById('oeHead').textContent = 'Add an event';
   }
   document.getElementById('oeChangeStop').addEventListener('click', function(){
     var keepName = document.getElementById('oeContactName').value, keepEmail = document.getElementById('oeContactEmail').value;
@@ -38825,7 +39089,8 @@ ${renderGolfHeaderHtml()}
       changeOf = c.getAttribute('data-ev-change');
       document.getElementById('oeChangingName').textContent = d.name || 'your event';
       document.getElementById('oeChanging').hidden = false;
-      document.getElementById('oeSubmit').textContent = 'Send change'; document.getElementById('events').textContent = 'Change your event';
+      document.getElementById('oeSubmit').textContent = 'Send change'; document.getElementById('oeHead').textContent = 'Change your event';
+      document.getElementById('events').open = true;
       document.getElementById('events').scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
@@ -38840,18 +39105,90 @@ ${renderGolfHeaderHtml()}
       .catch(function(){ x.disabled = false; x.textContent = 'Could not connect. Please try again.'; });
   });
   document.getElementById('oeAnother').addEventListener('click', function(){ stopChange(); ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); if (lastEmail) document.getElementById('oeContactEmail').value = lastEmail; });
-  // Signed-in owners: remove a photo, or make one the main photo.
-  var grid = document.getElementById('opPhotoGrid');
-  if (grid) grid.addEventListener('click', function(e){
+  // Photos (2026-10-18): after an upload or a change, fetch this page again and swap in the new
+  // grid (no reload, so nothing typed elsewhere on the page is lost).
+  var photoBox = document.getElementById('opPhotoBox'), photoStatus = document.getElementById('opPhotoStatus');
+  function refreshPhotos(focusSel){
+    return fetch(location.pathname, { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+      .then(function(r){ return r.text(); })
+      .then(function(html){
+        var doc = new DOMParser().parseFromString(html, 'text/html'), fresh = doc.getElementById('opPhotoBox');
+        if (!fresh || !photoBox) return;
+        photoBox.innerHTML = fresh.innerHTML;
+        var f = focusSel && photoBox.querySelector(focusSel);
+        if (f && !f.disabled) f.focus();
+        else if (focusSel) { var other = photoBox.querySelector(focusSel.replace('op-up', 'op-x').replace('op-down', 'op-up').replace('op-x', 'op-down')); if (other) other.focus(); }
+      });
+  }
+  // Signed-in owners: remove a photo, make one the main photo, or move it earlier or later.
+  if (photoBox) photoBox.addEventListener('click', function(e){
     var btn = e.target.closest ? e.target.closest('button[data-photo]') : null;
     if (!btn) return;
-    var remove = btn.classList.contains('op-remove');
+    var remove = btn.classList.contains('op-remove'), move = btn.getAttribute('data-move');
     if (remove && !window.confirm('Remove this photo from your page? This can\u2019t be undone.')) return;
     btn.disabled = true; show('opPhotoActionError', '');
-    fetch(location.pathname + '/photos/' + btn.getAttribute('data-photo') + (remove ? '/remove' : '/main'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
+    var id = btn.getAttribute('data-photo');
+    fetch(location.pathname + '/photos/' + id + (remove ? '/remove' : move ? '/' + move : '/main'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
       .then(function(r){ return r.json(); })
-      .then(function(j){ if (j && j.ok) { location.reload(); return; } btn.disabled = false; show('opPhotoActionError', (j && j.error) || 'Please try again.'); })
+      .then(function(j){
+        if (!j || !j.ok) { btn.disabled = false; show('opPhotoActionError', (j && j.error) || 'Please try again.'); return; }
+        if (photoStatus) photoStatus.textContent = remove ? 'Photo removed.' : move ? (j.position ? 'Moved. It\u2019s now photo ' + j.position + ' of ' + j.total + ' after the main photo.' : 'It can\u2019t move further.') : 'Main photo changed.';
+        return refreshPhotos(move ? 'button.op-' + move + '[data-photo="' + id + '"]' : null);
+      })
       .catch(function(){ btn.disabled = false; show('opPhotoActionError', 'Could not connect. Please try again.'); });
+  });
+  // Links to a folded part of the page (the menu at the top, "Add another event", help answers) open it first.
+  function openFor(hash){
+    var t = hash && hash.length > 1 ? document.getElementById(hash.slice(1)) : null;
+    var d = t && (t.tagName === 'DETAILS' ? t : t.closest && t.closest('details'));
+    if (d) d.open = true;
+    return t;
+  }
+  document.addEventListener('click', function(e){
+    var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (a && a.getAttribute('href').length > 1) openFor(a.getAttribute('href'));
+  });
+  if (location.hash) openFor(location.hash);
+  window.addEventListener('hashchange', function(){ openFor(location.hash); });
+  // The section bar sits just under the site header on phones.
+  var secNav = document.getElementById('opSecNav'), siteHead = document.querySelector('body > header, .golf-header');
+  function placeNav(){ if (secNav) secNav.style.top = (siteHead && getComputedStyle(siteHead).position === 'sticky' ? siteHead.offsetHeight : 0) + 'px'; }
+  placeNav(); window.addEventListener('resize', placeNav);
+  // People with access (2026-10-18).
+  var accessList = document.getElementById('opAccessList');
+  if (accessList) accessList.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (!b) return;
+    show('opAccessError', '');
+    var me = b.id === 'opRemoveMe';
+    var sure = me ? 'Take this business off your login? You\u2019ll need its edit link to add it back.'
+      : 'Remove ' + b.getAttribute('data-label') + '? They won\u2019t be able to update this listing any more, and we\u2019ll email them to say so.';
+    if (!window.confirm(sure)) return;
+    b.disabled = true;
+    var url = me ? location.pathname + '/unlink' : location.pathname + '/logins/' + b.getAttribute('data-login-remove') + '/remove';
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) { b.disabled = false; show('opAccessError', (j && j.error) || 'Please try again.'); return; }
+        if (me) { forgetVenue(); location.href = '/owner/account'; return; }
+        var li = b.closest('li'); if (li) li.parentNode.removeChild(li);
+        document.getElementById('opAccessStatus').textContent = 'Removed. We\u2019ve emailed them to say so.';
+      })
+      .catch(function(){ b.disabled = false; show('opAccessError', 'Could not connect. Please try again.'); });
+  });
+  // The venue page swaps "Claim this listing" for "You manage this listing" on this device.
+  var VENUES_KEY = 'okrOwnerVenues', thisVenue = ${Number(venue.id)};
+  function ownVenues(){ try { return JSON.parse(localStorage.getItem(VENUES_KEY) || '[]') || []; } catch (e) { return []; } }
+  function forgetVenue(){ try { localStorage.setItem(VENUES_KEY, JSON.stringify(ownVenues().filter(function(x){ return x !== thisVenue; }))); } catch (e) {} }
+  if (${found.account ? 'true' : 'false'}) { try { var ov = ownVenues(); if (ov.indexOf(thisVenue) < 0) { ov.push(thisVenue); localStorage.setItem(VENUES_KEY, JSON.stringify(ov.slice(-50))); } } catch (e) {} }
+  // Already signed in on a different business's edit link: one tap adds it to the login.
+  var addBtn = document.getElementById('olsAdd');
+  if (addBtn) addBtn.addEventListener('click', function(){
+    addBtn.disabled = true; show('olsAddError', '');
+    fetch(location.pathname + '/account', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ add: true }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if (j && j.ok && j.href) { location.href = j.href; return; } addBtn.disabled = false; show('olsAddError', (j && j.error) || 'Please try again.'); })
+      .catch(function(){ addBtn.disabled = false; show('olsAddError', 'Could not connect. Please try again.'); });
   });
   ev.addEventListener('submit', function(e){
     e.preventDefault();
@@ -38959,7 +39296,7 @@ ${renderGolfHeaderHtml()}
       btn.disabled = false;
       progress.textContent = !sent ? '' : liveCount ? sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded and live on your page. Thanks!' : sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded. Thanks! We\u2019ll review ' + (sent === 1 ? 'it' : 'them') + ', usually within a day' + (emailVal('ofEmail').trim() ? ', and email you when ' + (sent === 1 ? 'it\u2019s' : 'they\u2019re') + ' live.' : '.');
       if (problems.length) show('ofFormError', problems.join(' '));
-      if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); }
+      if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); refreshPhotos(); }
     }).catch(function(){ btn.disabled = false; show('ofFormError', 'Could not upload. Please check your connection and try again.'); });
   });
   // "create a login" in the thank-you note opens the login box.
@@ -41834,7 +42171,9 @@ const server = http.createServer(async (req, res) => {
         if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
         return await handleOwnerEventCancel(req, res, () => venueForOwnerAccount(account, Number(ec[1])), Number(ec[2]));
       }
-      const pa = /^\/owner\/account\/venue\/(\d+)\/photos\/(\d+)\/(remove|main)$/.exec(pathname);
+      const lr = /^\/owner\/account\/venue\/(\d+)\/logins\/(\d+)\/remove$/.exec(pathname);
+      if (lr && method === 'POST') return await handleOwnerLoginRemoval(req, res, account, Number(lr[1]), Number(lr[2]));
+      const pa = /^\/owner\/account\/venue\/(\d+)\/photos\/(\d+)\/(remove|main|up|down)$/.exec(pathname);
       if (pa && method === 'POST') return await handleOwnerPhotoAction(req, res, account, Number(pa[1]), Number(pa[2]), pa[3]);
       const mr = /^\/owner\/account\/venue\/(\d+)\/menu(\/[a-z0-9/]*)?$/.exec(pathname);
       if (mr) {
@@ -41891,6 +42230,9 @@ const server = http.createServer(async (req, res) => {
         const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
         if (!found) { res.writeHead(404, headers); return res.end(method === 'HEAD' ? undefined : renderOwnerInvalidLinkPage()); }
         res.writeHead(200, headers);
+        // Already signed in (2026-10-18): offer "Add to my login" instead of "Create a login".
+        found.viewer = ownerAccountForRequest(req);
+        if (found.viewer) found.viewerManages = !!db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(found.viewer.id, found.venue.id);
         return res.end(method === 'HEAD' ? undefined : renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id)));
       }
     }
@@ -42713,6 +43055,7 @@ module.exports = {
   createOwnerLink,
   revokeOwnerLink,
   ownerLoginsForVenue,
+  venueGalleryPhotos,
   renderAdminClaimCard,
   removeOwnerLoginFromVenue,
   venueForOwnerToken,

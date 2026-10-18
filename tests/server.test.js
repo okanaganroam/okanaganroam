@@ -25268,6 +25268,287 @@ test('Seasonal hours and closures (2026-10-18): owners set them; the venue page 
   const fact = app.buildTripPlannerFacts(false).find((f) => f.id === v.id);
   assert.deepEqual(fact.ownerClosures, [{ from: app.addLocalDays(today, 2), to: app.addLocalDays(today, 2) }]);
 }));
+// ---------- Owner portal phone pass and access (2026-10-18) ----------
+function ownerUiServer() {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  return new Promise((resolve) => srv.listen(0, () => {
+    const base = `http://localhost:${srv.address().port}`;
+    let ip = 1;
+    const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.66.${Math.floor(ip / 250)}.${(ip++ % 250) + 1}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+      .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+    const get = (p, cookie) => fetch(`${base}${p}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
+    resolve({ srv, base, post, get, close: () => new Promise((r) => srv.close(r)) });
+  }));
+}
+function ownerUiInlineScripts(html) {
+  return [...html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)].filter((m) => !/type="application\/(ld\+)?json"/.test(m[1] || '')).map((m) => m[2]);
+}
+
+test('Owner portal phone pass (2026-10-18): checkboxes never shrink, 16px/44px fields, folding sections, section bar, footer, contrast', async () => {
+  const vm = require('node:vm');
+  seasonInsert.run({ name: 'Phone Pass Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'phone-pass-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'phone-pass-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const s = await ownerUiServer();
+  try {
+    const html = await (await s.get(`/owner/${token}`)).text();
+    // The rights box sits in a flex label; the shared rule stops it shrinking to a sliver.
+    assert.match(html, /<label class="op-closed"[^>]*><input type="checkbox" id="ofRights"/);
+    assert.match(html, /body\.owner-page input\[type=checkbox\], body\.owner-page input\[type=radio\] \{ flex: 0 0 auto; width: 22px; height: 22px; min-width: 22px;/);
+    assert.match(html, /body\.owner-page \.op-times input, body\.owner-page \.op-season select \{ font-size: 16px; \}/);
+    assert.match(html, /\.op-times input, body\.owner-page \.op-season select \{ min-height: 44px; \}/);
+    assert.match(html, /\.op-btn \{ display: inline-flex; align-items: center; justify-content: center; min-height: 40px;/);
+    // Closed days hide their times instead of fading them (no 1.94 contrast), and hints are darker.
+    assert.match(html, /\.op-day\.is-off \.op-times \{ display: none; \}/);
+    assert.doesNotMatch(html, /\.op-day\.is-off \.op-times \{ opacity/);
+    assert.doesNotMatch(html, /\.op-hint \{[^}]*rgba\(42,32,25,0\.62\)/);
+    assert.match(html, /\.op-act-date \{ font-size: 0\.8rem; color: rgba\(42,32,25,0\.8\); \}/);
+    // Hours and Photos open; Badges, Events folded; one section bar.
+    assert.match(html, /<details class="op-fold op-sec" id="hours" open>/);
+    assert.match(html, /<details class="op-fold op-sec" id="photos" open>/);
+    assert.match(html, /<details class="op-fold op-sec" id="badges">/);
+    assert.match(html, /<details class="op-fold op-sec" id="events">[\s\S]*id="oeHead">Add an event</);
+    assert.match(html, /<nav class="op-secnav" id="opSecNav" aria-label="Parts of this page"><a href="#hours">Hours<\/a><a href="#photos">Photos<\/a><a href="#opMenuCard">Menu<\/a><a href="#events">Events<\/a><\/nav>/);
+    assert.match(html, /id="opMenuCard"/);
+    assert.match(html, /position: sticky; top: 0; z-index: 30;/);
+    // Footer with privacy, terms and info@ on the edit page and the simple pages.
+    for (const page of [html, await (await s.get('/owner/login')).text(), await (await s.get('/owner/forgot')).text()]) {
+      assert.match(page, /<footer class="op-footer"><a href="\/privacy">Privacy<\/a> &middot; <a href="\/terms">Terms<\/a> &middot; <a href="mailto:info@okanaganroam.com">/);
+    }
+    assert.match(await (await s.get('/fr/owner/login')).text(), /<footer class="op-footer"><a href="\/fr\/privacy">Confidentialité<\/a>/);
+    for (const code of ownerUiInlineScripts(html)) assert.doesNotThrow(() => new vm.Script(code), code.slice(0, 80));
+  } finally { await s.close(); }
+});
+
+test('Owner portal photos (2026-10-18): the grid refreshes in place and owners move photos earlier or later; the order sticks', async () => {
+  const nodeFs = require('node:fs');
+  const nodePath = require('node:path');
+  seasonInsert.run({ name: 'Photo Order Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'photo-order-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'photo-order-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
+  const photo = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, credit: 'Order Cafe', rights: true, notify: false, company_website: '', started_at: Date.now() - 10000 };
+  const s = await ownerUiServer();
+  const files = [];
+  try {
+    const me = await s.post(`/owner/${token}/account`, { email: 'order@example.com', password: 'a long enough password' });
+    const ids = [];
+    for (let i = 0; i < 4; i++) {
+      const r = await s.post(`/owner/account/venue/${v.id}/photos`, photo, me.cookie);
+      assert.equal(r.status, 201, JSON.stringify(r.body));
+      ids.push(r.body.id);
+      files.push(db.prepare('SELECT file FROM owner_photos WHERE id = ?').get(r.body.id).file);
+    }
+    const [main, a, b, c] = ids; // the first became the main photo
+    const gridOrder = async () => [...(await (await s.get(`/owner/account/venue/${v.id}`, me.cookie)).text()).matchAll(/<button type="button" class="op-btn op-btn-danger op-remove" data-photo="(\d+)"/g)].map((m) => Number(m[1]));
+    assert.deepEqual(await gridOrder(), [main, a, b, c], 'main first, then oldest first');
+    const page = await (await s.get(`/owner/account/venue/${v.id}`, me.cookie)).text();
+    assert.match(page, /<div id="opPhotoBox"><div class="op-photos" id="opPhotoGrid">/, 'one box the page swaps after an upload');
+    assert.match(page, new RegExp(`data-photo="${a}" data-move="up" aria-label="Move photo 1 of 3 earlier" disabled>`));
+    assert.match(page, new RegExp(`data-photo="${c}" data-move="down" aria-label="Move photo 3 of 3 later" disabled>`));
+    assert.match(page, /refreshPhotos\(\); \}/, 'the upload refreshes the grid');
+    assert.doesNotMatch(page, /if \(j && j\.ok\) \{ location\.reload\(\); return; \}/, 'photo buttons no longer reload the page');
+
+    const down = await s.post(`/owner/account/venue/${v.id}/photos/${a}/down`, {}, me.cookie);
+    assert.equal(down.status, 200, JSON.stringify(down.body));
+    assert.deepEqual(down.body.order, [b, a, c]);
+    assert.equal(down.body.position, 2);
+    assert.deepEqual((await s.post(`/owner/account/venue/${v.id}/photos/${c}/up`, {}, me.cookie)).body.order, [b, c, a]);
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/photos/${b}/up`, {}, me.cookie)).body.moved, false, 'already first');
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/photos/${main}/up`, {}, me.cookie)).status, 409, 'the main photo stays first');
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/photos/${a}/up`, {})).status, 401, 'signed out');
+    assert.deepEqual(db.prepare('SELECT id, sort_order FROM owner_photos WHERE venue_id = ? ORDER BY sort_order').all(v.id).filter((r) => r.sort_order != null).map((r) => r.id), [b, c, a], 'stored');
+    assert.deepEqual(await gridOrder(), [main, b, c, a]);
+    // The public gallery uses the same order after the main photo.
+    const gallery = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'cafe', 'photo-order-fixture'));
+    const byFile = Object.fromEntries(db.prepare('SELECT id, file FROM owner_photos WHERE venue_id = ?').all(v.id).map((r) => [`/images/owner/${r.file}`, r.id]));
+    assert.deepEqual(gallery.map((g) => byFile[g.src.split('?')[0]]).filter(Boolean), [main, b, c, a]);
+    // A new upload goes after the ordered ones.
+    const e = await s.post(`/owner/account/venue/${v.id}/photos`, photo, me.cookie);
+    files.push(db.prepare('SELECT file FROM owner_photos WHERE id = ?').get(e.body.id).file);
+    assert.deepEqual(await gridOrder(), [main, b, c, a, e.body.id]);
+  } finally {
+    for (const f of files) { try { nodeFs.unlinkSync(nodePath.join(app.OWNER_PHOTO_DIR, f)); } catch (err) { /* gone */ } }
+    await s.close();
+  }
+});
+
+test('Owner portal access (2026-10-18): People with access lists logins, emails them about a new login, and only older logins can remove newer ones', async () => {
+  seasonInsert.run({ name: 'Access Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'access-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'access-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const s = await ownerUiServer();
+  const mail = [];
+  const dayton = [];
+  app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+  app.setVenueSubmissionTransport(async (p) => { dayton.push(p); });
+  try {
+    const owner = await s.post(`/owner/${token}/account`, { email: 'first.owner@example.com', password: 'first owner password' });
+    assert.equal(owner.status, 201);
+    assert.equal(mail.length, 0, 'nobody else to tell');
+    const staff = await s.post(`/owner/${token}/account`, { email: 'newstaff@example.com', password: 'staff member password' });
+    assert.equal(staff.status, 201);
+    assert.deepEqual(mail.map((m) => m.to), ['first.owner@example.com'], 'the existing login is told about the new one');
+    assert.equal(mail[0].subject, 'New login added to Access Fixture on Okanagan Roam');
+    assert.match(mail[0].text, /newstaff@example\.com now has a login/);
+    assert.match(mail[0].text, new RegExp(`/owner/account/venue/${v.id}#access`));
+    // Signing in again on the same listing is not a new login.
+    await s.post(`/owner/${token}/account`, { email: 'newstaff@example.com', password: 'staff member password' });
+    assert.equal(mail.length, 1);
+
+    const ownerPage = await (await s.get(`/owner/account/venue/${v.id}`, owner.cookie)).text();
+    assert.match(ownerPage, /<details class="op-fold" id="access">[\s\S]*2 logins can update this listing/);
+    assert.match(ownerPage, /<strong>first\.owner@example\.com<\/strong> \(you\)/);
+    assert.match(ownerPage, /<strong>ne•••@example\.com<\/strong>/, 'others are partly masked');
+    assert.doesNotMatch(ownerPage, /newstaff@example\.com/);
+    const staffId = db.prepare('SELECT id FROM owner_accounts WHERE email = ?').get('newstaff@example.com').id;
+    const ownerId = db.prepare('SELECT id FROM owner_accounts WHERE email = ?').get('first.owner@example.com').id;
+    assert.match(ownerPage, new RegExp(`data-login-remove="${staffId}"`), 'the owner can remove the newer login');
+    const staffPage = await (await s.get(`/owner/account/venue/${v.id}`, staff.cookie)).text();
+    assert.match(staffPage, /fi•••@example\.com<\/strong><\/span><span class="op-act-date">Added [^<]*&middot; added before you/);
+    assert.doesNotMatch(staffPage, new RegExp(`data-login-remove="${ownerId}"`), 'no Remove button for an older login');
+    assert.match(await (await s.get('/owner/account', owner.cookie)).text(), new RegExp(`href="/owner/account/venue/${v.id}#access" class="op-hint">2 people have access`));
+
+    // The rule: the newer login can't remove the original owner.
+    const blocked = await s.post(`/owner/account/venue/${v.id}/logins/${ownerId}/remove`, {}, staff.cookie);
+    assert.equal(blocked.status, 403);
+    assert.match(blocked.body.error, /added before you/);
+    assert.equal(app.ownerLoginsForVenue(v.id).length, 2);
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/logins/${staffId}/remove`, {})).status, 401, 'signed out');
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/logins/999999/remove`, {}, owner.cookie)).status, 404);
+
+    // The owner removes the newer login: they lose access at once, and they and Dayton are told.
+    mail.length = 0;
+    const removed = await s.post(`/owner/account/venue/${v.id}/logins/${staffId}/remove`, {}, owner.cookie);
+    assert.equal(removed.status, 200, JSON.stringify(removed.body));
+    assert.deepEqual(app.ownerLoginsForVenue(v.id).map((l) => l.email), ['first.owner@example.com']);
+    assert.equal((await s.get(`/owner/account/venue/${v.id}`, staff.cookie)).status, 404);
+    assert.deepEqual(mail.map((m) => m.to), ['newstaff@example.com']);
+    assert.match(mail[0].subject, /Your access to Access Fixture on Okanagan Roam was removed/);
+    const fyi = dayton[dayton.length - 1];
+    assert.match(fyi._subject, /Login removed from Access Fixture/);
+    assert.equal(fyi['Removed'], 'newstaff@example.com');
+    assert.equal(fyi['Removed by'], 'first.owner@example.com');
+
+    // Removing yourself keeps working (settings unlink and the panel's Remove me use the same route).
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/unlink`, {}, owner.cookie)).status, 200);
+    assert.equal(app.ownerLoginsForVenue(v.id).length, 0);
+    const settings = await (await s.get('/owner/account/settings', owner.cookie)).text();
+    assert.match(settings, /<p class="op-done" id="osNoVenues">No businesses are on this login now\./, 'the empty settings page says so');
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await s.close();
+  }
+});
+
+test('Owner portal conveniences (2026-10-18): one-tap Add to my login, event name filled in, settings last-business message', async () => {
+  const vm = require('node:vm');
+  seasonInsert.run({ name: 'Convenience Fixture A', type: 'cafe', hours: SEASON_WEEK, slug: 'convenience-fixture-a' });
+  seasonInsert.run({ name: 'Convenience Fixture B', type: 'cafe', hours: SEASON_WEEK, slug: 'convenience-fixture-b' });
+  const a = app.findVenueBySlug('kelowna', 'cafe', 'convenience-fixture-a');
+  const b = app.findVenueBySlug('kelowna', 'cafe', 'convenience-fixture-b');
+  const tokenA = app.createOwnerLink(a.id, {}).url.split('/owner/')[1];
+  const tokenB = app.createOwnerLink(b.id, {}).url.split('/owner/')[1];
+  const s = await ownerUiServer();
+  const mail = [];
+  app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+  try {
+    const me = await s.post(`/owner/${tokenA}/account`, { email: 'convenient@example.com', password: 'convenient password' });
+    // Signed out, B's link offers Create a login; signed in, it offers Add to my login.
+    assert.match(await (await s.get(`/owner/${tokenB}`)).text(), /<summary><strong>Create a login<\/strong>/);
+    const bPage = await (await s.get(`/owner/${tokenB}`, me.cookie)).text();
+    assert.match(bPage, /<button type="button" class="venue-form-submit" id="olsAdd">Add to my login \(convenient@example\.com\)<\/button>/);
+    assert.doesNotMatch(bPage, /id="olsForm"/);
+    for (const code of ownerUiInlineScripts(bPage)) assert.doesNotThrow(() => new vm.Script(code), code.slice(0, 80));
+    assert.equal((await s.post(`/owner/${tokenB}/account`, { add: true })).status, 401, 'needs a session');
+    const added = await s.post(`/owner/${tokenB}/account`, { add: true }, me.cookie);
+    assert.equal(added.status, 201, JSON.stringify(added.body));
+    assert.deepEqual(added.body, { ok: true, action: 'venue_added', href: `/owner/account/venue/${b.id}` });
+    assert.equal((await s.get(`/owner/account/venue/${b.id}`, me.cookie)).status, 200);
+    assert.equal((await s.post(`/owner/${tokenB}/account`, { add: true }, me.cookie)).body.action, 'signed_in', 'already there');
+    // Now it's on the login, the link page points to My listings instead.
+    assert.match(await (await s.get(`/owner/${tokenB}`, me.cookie)).text(), /this business is on your login\. <a href="\/owner\/account\/venue\/\d+"><strong>Open it from My listings/);
+
+    // Event "Your name" (and the listing's) start from the name this login last gave.
+    const before = await (await s.get(`/owner/account/venue/${a.id}`, me.cookie)).text();
+    assert.match(before, /id="oeContactName" maxlength="100" autocomplete="name" value=""/);
+    db.prepare(`INSERT INTO event_submissions (name, region, categories, description, venue_name, start_date, end_date, event_url, organizer_name,
+      contact_name, contact_email, consent, consent_version, status, owner_venue_id)
+      VALUES ('Name Fixture Event', 'kelowna', '["music"]', 'A test event description long enough.', 'Convenience Fixture A', '2026-08-01', '2026-08-01', '',
+      'Convenience Fixture A', 'Jamie Rivera', 'Convenient@example.com', 1, 'test', 'pending', ?)`).run(a.id);
+    const after = await (await s.get(`/owner/account/venue/${a.id}`, me.cookie)).text();
+    assert.match(after, /id="oeContactName" maxlength="100" autocomplete="name" value="Jamie Rivera"/);
+    assert.match(after, /id="opName" maxlength="100" autocomplete="name" value="Jamie Rivera"/);
+
+    // My listings remembers this login's listings on the device, for the venue page's owner box.
+    const listings = await (await s.get('/owner/account', me.cookie)).text();
+    assert.match(listings, new RegExp(`localStorage\\.setItem\\('okrOwnerVenues', JSON\\.stringify\\(\\[${[a.id, b.id].sort((x, y) => x - y).join(',')}\\]\\)\\)|localStorage\\.setItem\\('okrOwnerVenues', JSON\\.stringify\\(\\[${b.id},${a.id}\\]\\)\\)`));
+    assert.match(listings, /tap <strong>Add to my login<\/strong>/);
+    // Settings: "Tap" on touch screens, and a message once the last business is gone.
+    const settings = await (await s.get('/owner/account/settings', me.cookie)).text();
+    assert.match(settings, /\(tap \? 'Tap' : 'Click'\) \+ ' again to remove '/);
+    assert.match(settings, /<p class="op-done" id="osNoVenues" hidden>/);
+    assert.match(settings, /if \(!document\.querySelector\('#osVenues li'\)\)/);
+    for (const code of ownerUiInlineScripts(settings).concat(ownerUiInlineScripts(listings))) assert.doesNotThrow(() => new vm.Script(code), code.slice(0, 80));
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await s.close();
+  }
+});
+
+test('Owner portal venue box (2026-10-18): the owner sees "You manage this listing" instead of Claim, on their own device', async () => {
+  const vm = require('node:vm');
+  seasonInsert.run({ name: 'Manage Box Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'manage-box-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'manage-box-fixture');
+  const s = await ownerUiServer();
+  try {
+    const html = await (await s.get(`/kelowna/${app.CATEGORY_SLUGS ? app.CATEGORY_SLUGS.cafe : 'cafes'}/manage-box-fixture`)).text();
+    assert.match(html, new RegExp(`<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${v.id}"`));
+    const code = ownerUiInlineScripts(html).find((c) => c.includes('okrOwnerVenues'));
+    assert.ok(code, 'the swap script is on the page');
+    // Run it against a tiny fake page: mine -> swapped, not mine -> unchanged.
+    const run = (stored) => {
+      const box = { innerHTML: 'Claim this listing', getAttribute: () => String(v.id) };
+      vm.runInNewContext(code, { document: { getElementById: () => box }, localStorage: { getItem: () => stored }, JSON, Number });
+      return box.innerHTML;
+    };
+    assert.match(run(JSON.stringify([v.id])), /You manage this listing[\s\S]*href="\/owner\/account\/venue\/' \+ box|You manage this listing/);
+    assert.match(run(JSON.stringify([v.id])), /\/owner\/account\/venue\//);
+    assert.equal(run('[1]'), 'Claim this listing');
+    assert.equal(run(null), 'Claim this listing');
+  } finally { await s.close(); }
+});
+
+test('Claim form timer (2026-10-18): fields are checked in the page first, a quick send waits quietly, and the server message is softer', async () => {
+  const vm = require('node:vm');
+  seasonInsert.run({ name: 'Claim Timer Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'claim-timer-fixture' });
+  db.prepare("UPDATE venues SET phone = '250-555-0101' WHERE slug = 'claim-timer-fixture'").run();
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'claim-timer-fixture');
+  const s = await ownerUiServer();
+  try {
+    const html = await (await s.get(`/claim/kelowna/${app.CATEGORY_SLUGS ? app.CATEGORY_SLUGS.cafe : 'cafes'}/claim-timer-fixture`)).text();
+    const code = ownerUiInlineScripts(html).find((c) => c.includes('clForm'));
+    assert.doesNotThrow(() => new vm.Script(code));
+    assert.match(code, /var bad = check\(body\)/);
+    assert.match(code, /var wait = Math\.max\(0, startedAt \+ 3200 - Date\.now\(\)\);/);
+    // The page's check() uses the server's rules: pull it out and try it.
+    const check = vm.runInNewContext(`var LABELS = { social: 1, other: 1 }; ${code.match(/var ERR = [^\n]+\n/)[0]} ${code.match(/function check\(b\)\{[\s\S]*?return errs;\n  \}/)[0]}; check`);
+    const ok = { name: 'Pat Owner', role: 'owner', email: 'pat@example.com', phone: '250-555-0123', verify_method: 'call', verify_detail: '', message: '' };
+    assert.deepEqual(Object.keys(check(ok)), []);
+    assert.deepEqual(Object.keys(check({ ...ok, name: 'P', email: 'nope', phone: '12', role: '' })).sort(), ['email', 'name', 'phone', 'role']);
+    assert.deepEqual(Object.keys(check({ ...ok, verify_method: 'social', verify_detail: '' })), ['verify_detail']);
+    assert.equal(check({ ...ok, name: '' }).name, 'Please enter your name.');
+    // The server still turns away a form sent within 3 seconds, now more gently.
+    const fast = await s.post('/api/claims', { venue_id: v.id, lang: 'en', ...ok, company_website: '', started_at: Date.now() - 500 });
+    assert.equal(fast.status, 400);
+    assert.equal(fast.body.error, 'Sorry, that was quicker than we expected. Please press Send again.');
+    const frFast = await s.post('/api/claims', { venue_id: v.id, lang: 'fr', ...ok, company_website: '', started_at: Date.now() - 500 });
+    assert.equal(frFast.body.error, 'Désolé, c’était plus rapide que prévu. Appuyez de nouveau sur Envoyer.');
+  } finally { await s.close(); }
+});
 
 test('Venue page layout (2026-10-18): same hours every day read as one line, the website shows as its address, and the extras follow the facts on phones', () => {
   seasonInsert.run({ name: 'Layout Fixture Cafe', type: 'cafe', hours: JSON.stringify({ mon: [['09:30', '17:30']], tue: [['09:30', '17:30']], wed: [['09:30', '17:30']], thu: [['09:30', '17:30']], fri: [['09:30', '17:30']], sat: [['09:30', '17:30']], sun: [['09:30', '17:30']] }), slug: 'layout-fixture-cafe' });

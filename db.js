@@ -931,6 +931,12 @@ for (const table of ['owner_change_requests', 'owner_photos']) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
   if (!cols.includes('contact_email')) db.exec(`ALTER TABLE ${table} ADD COLUMN contact_email TEXT`);
 }
+// Photo order (2026-10-18): signed-in owners move their photos earlier or later
+// with the arrow buttons. NULL = never moved; those follow the ordered ones, oldest first.
+{
+  const cols = db.prepare('PRAGMA table_info(owner_photos)').all().map((c) => c.name);
+  if (!cols.includes('sort_order')) db.exec('ALTER TABLE owner_photos ADD COLUMN sort_order INTEGER');
+}
 
 // Owner event changes (2026-10-15): an owner's change to an event that is
 // already live waits here for review; approving it updates the event.
