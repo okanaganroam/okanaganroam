@@ -17,6 +17,7 @@
    "id": "breakfast-brunch",
    "jump": "Breakfast & brunch",
    "heading": "Breakfast & brunch",
+   "lead": "Three favourites below. For every brunch spot in town, see our {page:/guides/best-brunch-vernon|Vernon brunch guide}.",
    "items": [
     {
      "ref": "vernon/diner-on-six",
@@ -28,12 +29,6 @@
      "ref": "vernon/rosalinda-s",
      "name": "Rosalinda's",
      "text": "a family-run diner serving Filipino breakfast dishes next to the Western classics. Reviewers say the Filipino plates are worth the drive from Kelowna.",
-     "where": "Vernon"
-    },
-    {
-     "ref": "vernon/mug-n-muffin",
-     "name": "Mug N Muffin",
-     "text": "a mom-and-pop diner Barb and Al have run for years, with history on the walls. Expect homemade food, generous portions and fair prices.",
      "where": "Vernon"
     },
     {

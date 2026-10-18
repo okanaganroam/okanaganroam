@@ -1,0 +1,318 @@
+{
+ "heading": "Things to Do in Kelowna in Winter (2026–27)",
+ "title": "Things to Do in Kelowna in Winter 2026–27 | Okanagan Roam",
+ "description": "Kelowna in winter, 2026–27: Nordic and snowshoe trails, outdoor skating, indoor fun for grey days, saunas, cozy cafés and the season's best events.",
+ "banner": "winter",
+ "parent": {
+  "name": "Kelowna",
+  "href": "/kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "Kelowna doesn't shut down when the lake turns grey. This guide covers a winter in and around the city, from late November to March: snowshoe and cross-country trails a short drive from downtown, a free outdoor rink on the waterfront, indoor places for wet or cold days, saunas and warm cafés, and the events worth putting on the calendar, from the holiday light-ups to a February music festival.",
+  "Places are grouped by what you feel like doing. Events are in date order, with town and date. Several places ask you to book ahead, so check each listing before you head out."
+ ],
+ "sections": [
+  {
+   "id": "snow-days-close-to-town",
+   "jump": "Snow days close to town",
+   "heading": "Snow days close to town",
+   "lead": "The big ski hills have their own guide: see {page:/guides/ski-season-big-white-silverstar|Ski season at Big White and SilverStar}. These are the snow spots in Kelowna's own listings, for a day on trails or sleds without a resort lift ticket.",
+   "items": [
+    {
+     "ref": "kelowna/kelowna-nordic-ski-snowshoe-club",
+     "name": "Kelowna Nordic Ski and Snowshoe Club",
+     "text": "Kelowna's own cross-country and snowshoe area, in the McCulloch highlands roughly 20 to 45 minutes from town on paved highway. The club grooms 75 km of double-tracked trails, normally finished by 10 a.m., with marked snowshoe trails, warming cabins and K-9 trails where dogs are welcome. Day passes are sold by the club; check the grooming report before you go.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/graystokes-snowmobile-area-kelowna-snowmobile-club",
+     "name": "Graystokes Snowmobile Area – Kelowna Snowmobile Club",
+     "text": "the Central Okanagan's big sledding country, a high plateau east of Kelowna where the Kelowna Snowmobile Club grooms more than 300 km of trail and keeps eight warm-up cabins stocked. A day pass is $30 including tax, bought online before you go. Only snowmobiles are allowed on the groomed trails in winter, and this is avalanche and backcountry terrain, so ride prepared.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kuipers-peak-mountain-park",
+     "name": "Kuipers' Peak Mountain Park",
+     "text": "a short climb in the Upper Mission, five to ten minutes to the top, with a big view of Okanagan Lake from the peak. The City also features it for winter snowshoeing. Dogs on leash only.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/myra-canyon-myra-bellevue-provincial-park",
+     "name": "Myra Canyon – Myra-Bellevue Provincial Park",
+     "text": "the historic Kettle Valley Railway grade curls around the canyon southeast of Kelowna on its trestles. The park stays open through winter, when Little White Mountain offers backcountry skiing and snowshoeing. The Little White Trail itself is closed.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "skating-and-winter-outdoors",
+   "jump": "Skating and winter",
+   "heading": "Skating and winter outdoors",
+   "lead": "Bring your own skates or rent at the rink, and dress for the cold. Outdoor ice depends on the weather.",
+   "items": [
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "a free outdoor rink on the downtown waterfront, with Okanagan Lake and the Bennett Bridge as the backdrop. It opens in early December, weather permitting. The rental hut runs 11 a.m. to 8 p.m. daily (kids' skates $4, adult skates $5, helmets $2), but it closes when the temperature drops below −10°C, so on the coldest days bring your own.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mnp-place",
+     "name": "MNP Place",
+     "text": "from Thanksgiving to Spring Break the leisure rink opens for weekday public skating, with skate rentals on hand (no helmet rentals, and helmets are required for anyone under 18). Hockey players can sign up for Stick & Puck sessions at $10 to $11 a person, or Adult Drop-In Hockey (19+). Everything is booked through the DaySmart Recreation calendar on the venue's site.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-curling-club",
+     "name": "Kelowna Curling Club",
+     "text": "a 12-sheet club near downtown with one-hour Try Curling sessions, an instructor and all equipment supplied, for about $25 a person. Slots are booked online for up to eight people, and bigger groups can book ice for a curling party.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/knox-mountain-park",
+     "name": "Knox Mountain Park",
+     "text": "Kelowna's largest natural area park, and its lookouts are the classic view of the city. Winter recreation is part of life here, but the road up closes in winter, so go on foot: the Apex Trail to the upper lookout is about 5 km round trip.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/chichester-wetland-park",
+     "name": "Chichester Wetland Park",
+     "text": "Rutland's neighbourhood wetland, free and open year-round, where a resident flock of mallards winters on the open water. The easy loop is short enough for a lunch-hour visit, and it is the one Kelowna wetland park on the BC Bird Trail that allows dogs on leash.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "indoor-fun-for-grey-days",
+   "jump": "Indoor fun for grey days",
+   "heading": "Indoor fun for grey days",
+   "items": [
+    {
+     "ref": "kelowna/h2o-adventure-fitness-centre",
+     "name": "H2O Adventure + Fitness Centre",
+     "text": "a YMCA-run indoor waterpark with waterslides, a FlowRider, wave pool, lazy river and splash park, plus a hot tub and steam room for grown-ups. A go-to for families on a cold day. Drop-in is about $13 for adults, $7 for kids or $34 for a family.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kf-aerospace-centre-for-excellence",
+     "name": "KF Aerospace Centre for Excellence",
+     "text": "nine vintage aircraft, including a DC-3, Mosquito and CF-104 Starfighter, in a working hangar near the airport, with a flight simulator and an airfield viewing gallery. Admission is about $5 a person or $10 for a family.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-art-gallery",
+     "name": "Kelowna Art Gallery",
+     "text": "the city's public art gallery in the downtown Cultural District, with rotating exhibitions across several galleries. Admission is about $10 for adults or $20 for a family, kids under 12 get in free, and it's half price on Thursdays.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/okanagan-wine-orchard-museum-laurel-packinghouse",
+     "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+     "text": "the valley's fruit-growing and wine-making story, told in the historic 1918 Laurel Packinghouse. Admission is by donation (about $5 a person or $15 a family suggested), and it makes a good primer before, or instead of, a rainy winery day.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-karting-entertainment-centre",
+     "name": "Kelowna Karting Entertainment Centre",
+     "text": "an electric go-kart track, free-roam VR, laser tag, axe throwing and an arcade under one roof. Races are eight minutes on track from about $26, and junior karts take ages 7+. Walk-ins are welcome, but book ahead on weekends and holidays.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/catelowna-cat-cafe",
+     "name": "Catelowna Cat Cafe",
+     "text": "book an hour downtown with resident and adoptable cats over coffee or tea, about $16 a person. Reserve ahead, since walk-ins get in only when the 16-person lounge has room. Kids under 5 aren't allowed in the lounge.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/okanagan-bowling-club-obc",
+     "name": "Okanagan Bowling Club (OBC)",
+     "text": "a five-pin centre in Capri Centre, billed as the largest 5-pin alley in the Okanagan. A game is about $8.50 for teens and adults and $8 for kids, plus shoe rental, and weekends add glow-in-the-dark laser bowling.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/play-area-kelowna",
+     "name": "Play Area Kelowna",
+     "text": "an indoor playground for young kids with a ball pit, sand pit, play structures and toys, open for drop-in play. Fall and winter hours (October–March) are 8:30 a.m.–5:30 p.m. on weekdays and 9:30 a.m.–6 p.m. on weekends.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "warm-up-spas-saunas-and-cozy-s",
+   "jump": "Warm up",
+   "heading": "Warm up: spas, saunas and cozy spots",
+   "items": [
+    {
+     "ref": "kelowna/loyly-floating-sauna",
+     "name": "Löyly Floating Sauna",
+     "text": "a Finnish-style cedar sauna floating at the Downtown Marina, with a lake cold plunge and a warm solarium lounge overlooking Okanagan Lake. Book a shared 80-minute community session online, since walk-ins aren't guaranteed space.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cleopatra-s-rituals-thermal-spa-and-steam",
+     "name": "Cleopatra's Rituals Thermal Spa and Steam",
+     "text": "a hot-cold circuit of sauna, steam, thermal showers and a falling-snow room. Sessions are shared and co-ed, and there are no walk-ins, so pre-book online or call ahead. Wear a swimsuit and bring flip-flops if you can.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/anarchy-coffee-roasters",
+     "name": "Anarchy Coffee Roasters",
+     "text": "art-covered walls, a worn-in couch and a little free library, and locals defend it as the home of Kelowna's best cappuccino. There's no rush, so grab a book and stay a while.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/pulp-fiction-pandosy",
+     "name": "Pulp Fiction – Pandosy",
+     "text": "a coffee house that doubles as a rare and used bookstore, with a cozy, vintage atmosphere. Regulars rave about the coffee milkshake, so order one and browse the shelves.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/chaibaba",
+     "name": "Chaibaba",
+     "text": "a cozy downtown tea shop where plants, books and gemstones set a calm mood. Owner Crystal recommends teas based on your mood, and dogs find a treat waiting at the door.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mad-mango-cafe",
+     "name": "Mad Mango Cafe",
+     "text": "a cozy, colourful pan-Asian soup spot on Bernard Ave, blending Malaysian, Vietnamese and other Southeast Asian flavours. Order the laksa.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "winter-events-worth-planning-a",
+   "jump": "Winter events",
+   "heading": "Winter events worth planning around",
+   "lead": "A short list of the season's standouts across Kelowna, West Kelowna and Lake Country. For every Christmas market and craft fair, see our {page:/guides/okanagan-christmas-markets|Okanagan Christmas markets guide}.",
+   "items": [
+    {
+     "ref": "event:west-kelowna/festival-of-trees-at-mission-hill",
+     "name": "Festival of Trees at Mission Hill",
+     "text": "the 10th annual display of community-decorated holiday trees at Mission Hill, with a guided experience and seasonal wine tasting supporting BC Children's Hospital.",
+     "where": "West Kelowna, Nov 20 – Jan 3"
+    },
+    {
+     "ref": "event:kelowna/downtown-kelowna-winter-street-market-light-up",
+     "name": "Downtown Kelowna Winter Street Market & Light Up",
+     "text": "Downtown Kelowna's free kick-off to the holidays fills Stuart Park with a vendor market, family activities and stage performances, then the park's lights are switched on at 5 pm. Hot chocolate sales go to the Central Okanagan Food Bank.",
+     "where": "Kelowna, Sat Nov 28"
+    },
+    {
+     "ref": "event:kelowna/parade-with-a-purpose-2026",
+     "name": "Parade with a Purpose 2026",
+     "text": "35+ lit-up holiday floats roll through downtown Kelowna on a December evening. It's a free family parade that raises money for youth mental-health care through the KGH Foundation.",
+     "where": "Kelowna, Sat Dec 5"
+    },
+    {
+     "ref": "event:west-kelowna/west-kelowna-winterfest",
+     "name": "West Kelowna Winterfest",
+     "text": "a free family winter weekend at the Mount Boucherie Community Centre arena and courtyard, including storytime with Santa and skating with Santa. The city posts the full schedule on November 20.",
+     "where": "West Kelowna, Dec 5 – Dec 6"
+    },
+    {
+     "ref": "event:kelowna/the-nutcracker-canadian-school-of-ballet",
+     "name": "The Nutcracker – Canadian School of Ballet",
+     "text": "the Canadian School of Ballet stages the holiday classic at Kelowna Community Theatre with guest dancers from Miami City Ballet, in matinee and evening performances.",
+     "where": "Kelowna, Fri Dec 11 + 3 more dates"
+    },
+    {
+     "ref": "event:kelowna/valley-first-new-york-new-year-s-2026",
+     "name": "Valley First New York New Year's 2026",
+     "text": "a free, all-ages New Year's Eve party in Stuart Park with live party bands, the Kiwanis Snow Zone games and activities, skating, food trucks and an early fireworks countdown at 9 pm. Made for families who want to ring in the year before bedtime.",
+     "where": "Kelowna, Thu Dec 31"
+    },
+    {
+     "ref": "event:kelowna/polar-bear-dip",
+     "name": "Polar Bear Dip",
+     "text": "hundreds of brave participants plunge into Okanagan Lake at Tugboat Beach. Entry is $15, and all proceeds fund inclusive, accessible outdoor recreation.",
+     "where": "Kelowna, Fri Jan 1"
+    },
+    {
+     "ref": "event:kelowna/imago-and-obsidian-living-things-festival",
+     "name": "IMAGO and Obsidian – Living Things Festival",
+     "text": "a double bill of contemporary circus and dance at the Rotary Centre for the Arts, led by Corpo Imago's award-winning aerial duet. Part of Kelowna's Living Things arts festival.",
+     "where": "Kelowna, Thu Jan 21"
+    },
+    {
+     "ref": "event:kelowna/motorsports-spectacular-monster-truck-show",
+     "name": "Motorsports Spectacular Monster Truck Show",
+     "text": "monster trucks take over Prospera Place for racing, car crushing, wheelie contests, freestyle runs and freestyle motocross. Arrive early for the pre-show pit party, where kids can see the trucks up close.",
+     "where": "Kelowna, Sat Jan 23 + 2 more dates"
+    },
+    {
+     "ref": "event:kelowna/come-from-away",
+     "name": "Come From Away",
+     "text": "the Tony Award-winning musical tells the true story of Gander, Newfoundland, which took in nearly 7,000 stranded passengers on September 11, 2001. Evening shows Wednesday to Saturday plus weekend matinees at the Actors Studio & Dinner Theatre; tickets $93–$100.",
+     "where": "Kelowna, Feb 3 – Feb 21"
+    },
+    {
+     "ref": "event:kelowna/fireside-festival-2027",
+     "name": "Fireside Festival 2027",
+     "text": "Kelowna's homegrown winter arts and music festival, running since 2014: two nights of house, UK garage and bass on the main stage, a second stage called The Wardrobe, and live art painted during the sets. 19+. The downtown venue had not been announced at listing time.",
+     "where": "Kelowna, Feb 26 – Feb 27"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A free winter night out",
+    [
+     "kelowna/stuart-park-outdoor-rink|Stuart Park Outdoor Rink",
+     "event:kelowna/valley-first-new-york-new-year-s-2026|Valley First New York New Year's 2026"
+    ]
+   ],
+   [
+    "Snow without the ski hill",
+    [
+     "kelowna/kelowna-nordic-ski-snowshoe-club|Kelowna Nordic Ski and Snowshoe Club"
+    ]
+   ],
+   [
+    "A grey day with kids",
+    [
+     "kelowna/h2o-adventure-fitness-centre|H2O Adventure + Fitness Centre",
+     "kelowna/kf-aerospace-centre-for-excellence|KF Aerospace Centre for Excellence"
+    ]
+   ],
+   [
+    "A hot-cold reset",
+    [
+     "kelowna/loyly-floating-sauna|Löyly Floating Sauna",
+     "kelowna/cleopatra-s-rituals-thermal-spa-and-steam|Cleopatra's Rituals Thermal Spa and Steam"
+    ]
+   ],
+   [
+    "Something new to try",
+    [
+     "kelowna/kelowna-curling-club|Kelowna Curling Club"
+    ]
+   ],
+   [
+    "A big winter show",
+    [
+     "event:kelowna/come-from-away|Come From Away",
+     "event:kelowna/the-nutcracker-canadian-school-of-ballet|The Nutcracker – Canadian School of Ballet"
+    ]
+   ],
+   [
+    "A slow coffee and a book",
+    [
+     "kelowna/anarchy-coffee-roasters|Anarchy Coffee Roasters",
+     "kelowna/pulp-fiction-pandosy|Pulp Fiction – Pandosy"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guides/ski-season-big-white-silverstar\">Ski season at Big White and SilverStar</a>, <a href=\"/guides/okanagan-winter-beyond-skiing\">Okanagan winter beyond skiing</a>, <a href=\"/guides/okanagan-skating\">Skating in the Okanagan</a>, <a href=\"/guides/cozy-spots-okanagan\">Cozy spots</a>, <a href=\"/guides/okanagan-holiday-events\">Holiday events guide</a>"
+}

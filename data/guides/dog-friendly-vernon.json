@@ -1,0 +1,208 @@
+{
+ "heading": "Dog-Friendly Vernon",
+ "title": "Dog-Friendly Vernon: Beaches, Trails & Patios | Okanagan Roam",
+ "description": "Off-leash swimming at Hurlburt Park, on-leash trails like the Grey Canal, and Vernon patios and cafés that welcome dogs, with the dog rules for each.",
+ "banner": "dog-friendly",
+ "parent": {
+  "name": "Vernon",
+  "href": "/vernon"
+ },
+ "noPlace": true,
+ "intro": [
+  "Greater Vernon calls itself the Trails Capital of BC, and most of those trails welcome a dog on a leash. Add a lake beach with its own off-leash area and a handful of patios where dogs are part of the plan, and it's an easy town to spend a day in with your dog.",
+  "This guide covers the best of them, with the dog rules for each place. Some of Vernon's busiest swimming beaches don't allow dogs, so check the posted signs whenever you arrive somewhere new."
+ ],
+ "sections": [
+  {
+   "id": "dog-beaches-and-off-leash-area",
+   "jump": "Dog beaches",
+   "heading": "Dog beaches and off-leash areas",
+   "items": [
+    {
+     "ref": "vernon/hurlburt-park",
+     "name": "Hurlburt Park",
+     "text": "where Vernon swims with its dog. This pet-friendly Eastside Road beach pairs swimming with a designated off-leash area and a separate on-leash area. A dock and a swimming platform give you somewhere to swim out to, it's a good place to launch a canoe, SUP or kayak, and there are picnic tables for afterwards. There is parking for twenty cars.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/ellison-provincial-park",
+     "name": "Ellison Provincial Park",
+     "text": "an Okanagan Lake park south of Vernon with several beaches. Sandy Beach is the park's pet beach; dogs are not allowed on the other beaches. The season runs roughly April 1 to October 12, and the beaches are about a half-kilometre walk from the parking lot.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/marshall-fields",
+     "name": "Marshall Fields",
+     "text": "a large City park on Okanagan Landing Road with a designated dog area between the playing fields and Vernon Creek. Check the current leash rules before you go, and keep dogs off the sports fields. Local readers named it runner-up for Place to Walk Your Dog in 2026.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "walks-and-trails-on-leash",
+   "jump": "Walks & trails",
+   "heading": "Walks and trails (on leash)",
+   "items": [
+    {
+     "ref": "vernon/grey-canal-trail",
+     "name": "Grey Canal Trail",
+     "text": "follows the line of BC's longest irrigation channel in a series of sections that ring the valley, each with one or two parking areas, so you can walk it in pieces and choose your view. It adds up to roughly 32 km, and most sections are rated easy. Dogs are permitted on every section but must be on leash.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/bx-creek-trail-bx-falls",
+     "name": "BX Creek Trail & BX Falls",
+     "text": "the falls section has several bridge crossings and steep stairs but is suitable for families, either a short walk from the Tillicum Road parking lot or a 6 km round trip. Spring runoff can make it unsafe, so pick a dry spell. Dogs are permitted on leash.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/middleton-mountain-farnsworth-nature-reserve",
+     "name": "Middleton Mountain (Farnsworth Nature Reserve)",
+     "text": "the grassy summit between Vernon and Coldstream, where four loop trails give 360-degree views of Kalamalka Lake. Steep stairs climb to the top, so it's rated Difficult. Dogs must be on leash, as much to avoid the cactus as to protect the grassland wildlife.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/goose-lake-range-park",
+     "name": "Goose Lake Range Park",
+     "text": "a new 46-hectare natural space north of Vernon with over 3 km of gravel trails designed for accessibility, on gentle slopes through native grassland and wetland. Dogs are welcome on the trail but must stay on a leash.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/kal-crystal-waters-trail",
+     "name": "Kal Crystal Waters Trail",
+     "text": "a 12.57 km route from Okanagan College in Vernon south to Lake Country, rated Moderate, with a steep climb to the Kal Lake Lookout. Dogs allowed on leash.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/lakers-park-disc-golf-course",
+     "name": "Lakers Park Disc Golf Course",
+     "text": "a free nine-hole disc golf course in Okanagan Landing, with on-leash walking paths that link to Marshall Fields past ponds and wetlands. There are no washrooms or drinking water on site, so come prepared.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/becker-bike-park",
+     "name": "Becker Bike Park",
+     "text": "the City's in-town bike skills park at 3404 39th Avenue, with three pump tracks for the riders and an on-leash dog area and walking paths for everyone else.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "patios-that-welcome-dogs",
+   "jump": "Patios that welcome dogs",
+   "heading": "Patios that welcome dogs",
+   "items": [
+    {
+     "ref": "vernon/1516-pub-grill",
+     "name": "1516 Pub & Grill",
+     "text": "one of Vernon's most dog-friendly spots, with a lakefront courtyard patio. Live music turns up regularly. Grab a table by the water and order a pint.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/the-med-restaurant-vernon",
+     "name": "The Med Restaurant - Vernon",
+     "text": "a Mediterranean spot with funky decor and a welcoming patio, where dogs are properly accommodated, not just tolerated on the fringes.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/rustlers-table",
+     "name": "Rustlers Table",
+     "text": "a working-farm restaurant that pairs farm-to-table dining with a farm walk past the chickens, cows and sheep before dinner. Dogs are welcome on the patio.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/mr-mikes-steakhousecasual-vernon",
+     "name": "MR MIKES SteakhouseCasual (Vernon)",
+     "text": "a dog-friendly patio, and a kitchen that once made a custom allergen-free butter for one guest's steak.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/kelly-o-bryan-s-restaurant",
+     "name": "Kelly O Bryan's Restaurant",
+     "text": "a dog-friendly location of the chain with a year-round patio feel and a peaceful water feature. Catch the happy hour deals and order the club sandwich regulars call the best around.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "caf-s-and-a-cider-stop",
+   "jump": "Cafés and a cider stop",
+   "heading": "Cafés and a cider stop",
+   "items": [
+    {
+     "ref": "vernon/bean-to-cup",
+     "name": "Bean to Cup",
+     "text": "the café locals default to, with strong coffee and homemade food. Dogs are always welcome on the front terrace, so bring yours and grab a seat outside for the morning.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/pup-n-cup-family-cafe-shop",
+     "name": "Pup-n-Cup Family Café & Shop",
+     "text": "a community café in the Browns Transport building serving coffee, drinks and snacks alongside a dog-training shop. It's run by the Diversity Den Society, and every purchase supports employment and arts programs for people with diverse abilities.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/cambium-cider-co",
+     "name": "Cambium Cider Co",
+     "text": "an orchard cidery with a real restaurant. Dogs aren't allowed inside or on the patio, but leashed dogs are welcome at a few picnic tables in the orchard.",
+     "where": "Vernon"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A swim with your dog",
+    [
+     "vernon/hurlburt-park|Hurlburt Park"
+    ]
+   ],
+   [
+    "A dog beach on a park day",
+    [
+     "vernon/ellison-provincial-park|Ellison Provincial Park"
+    ]
+   ],
+   [
+    "An easy walk you can do in pieces",
+    [
+     "vernon/grey-canal-trail|Grey Canal Trail"
+    ]
+   ],
+   [
+    "A big view",
+    [
+     "vernon/middleton-mountain-farnsworth-nature-reserve|Middleton Mountain (Farnsworth Nature Reserve)"
+    ]
+   ],
+   [
+    "A pint by the lake",
+    [
+     "vernon/1516-pub-grill|1516 Pub & Grill"
+    ]
+   ],
+   [
+    "Dinner on a patio with the dog",
+    [
+     "vernon/the-med-restaurant-vernon|The Med Restaurant - Vernon",
+     "vernon/rustlers-table|Rustlers Table"
+    ]
+   ],
+   [
+    "Morning coffee with the dog",
+    [
+     "vernon/bean-to-cup|Bean to Cup"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guide/vernon/dog_friendly\">Dog-friendly venues in Vernon</a>, or <a href=\"/dog-friendly\">Dog Friendly Finds</a> across the whole valley."
+}

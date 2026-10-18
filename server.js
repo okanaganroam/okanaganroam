@@ -29167,6 +29167,7 @@ const GUIDE_BANNERS = {
   'indoor': () => CATEGORY_BANNER_IMAGES.indoor,
   'food-drink': () => FOOD_DRINK_HUB_BANNER,
   'whats-on': () => WHATS_ON_BANNER,
+  'dog-friendly': () => DOG_FRIENDLY_BANNER,
   'hiking': () => OUTDOOR_ACTIVITY_BANNERS.hiking,
   'nature': () => OUTDOOR_ACTIVITY_BANNERS.nature,
   'fishing': () => OUTDOOR_ACTIVITY_BANNERS.fishing,
@@ -29219,8 +29220,8 @@ function renderFileGuidePage(pathname) {
 const GUIDE_GROUPS = [
   { key: 'fall', heading: 'Fall in the Okanagan', paths: ['/guides/fall-okanagan', '/guides/okanagan-in-november', '/guides/fall-farms-u-pick-okanagan', '/guides/okanagan-cideries', '/guides/okanagan-winery-restaurants', '/guides/kokanee-salmon-okanagan', '/guides/okanagan-waterfall-walks', '/guides/halloween-okanagan', '/guides/fall-events-okanagan', '/guides/okanagan-hockey-season'] },
   { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan', '/guides/okanagan-comedy-shows'] },
-  { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/ski-season-big-white-silverstar', '/guides/apex-baldy-ski-guide', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-christmas-markets', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-in-january', '/guides/valentines-day-okanagan', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
-  { key: 'towns', heading: 'Weekends and town food guides', paths: ['/guides/weekend-in-kelowna', '/guides/kelowna-without-a-car', '/guides/penticton-naramata-wine-weekend', '/guides/oliver-osoyoos-wine-weekend', '/guides/best-restaurants-penticton', '/guides/best-restaurants-vernon', '/guides/best-restaurants-west-kelowna'] },
+  { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/ski-season-big-white-silverstar', '/guides/okanagan-ski-season-2026-27', '/guides/big-white-restaurants-apres', '/guides/silverstar-restaurants-apres', '/guides/apex-baldy-ski-guide', '/guides/winter-in-kelowna', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-christmas-markets', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-in-january', '/guides/valentines-day-okanagan', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
+  { key: 'towns', heading: 'Weekends and town food guides', paths: ['/guides/weekend-in-kelowna', '/guides/kelowna-without-a-car', '/guides/penticton-naramata-wine-weekend', '/guides/oliver-osoyoos-wine-weekend', '/guides/best-restaurants-penticton', '/guides/best-restaurants-vernon', '/guides/best-restaurants-west-kelowna', '/guides/best-brunch-penticton', '/guides/best-brunch-vernon', '/guides/dog-friendly-penticton', '/guides/dog-friendly-vernon'] },
   { key: 'year', heading: 'Food, drink, family and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna', '/guides/happy-hour-kelowna', '/guides/date-night-kelowna', '/guides/cheap-eats-kelowna', '/guides/family-friendly-okanagan'] },
 ];
 // Season order for /guides (Okanagan local month): the current season leads.

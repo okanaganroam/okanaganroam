@@ -1,0 +1,236 @@
+{
+ "heading": "Where to Eat & Après at Big White",
+ "title": "Big White Restaurants & Après-Ski Guide | Okanagan Roam",
+ "description": "Where to eat and après at Big White: pubs, steak and Italian dinners, ramen, sushi, pizza, poutine, coffee and donuts, from the Village to Happy Valley.",
+ "banner": "big-white",
+ "parent": {
+  "name": "Big White",
+  "href": "/big-white"
+ },
+ "noPlace": true,
+ "intro": [
+  "Big White has more places to eat and drink than most people expect from a ski village: lodge pubs for the end of the ski day, a set-menu bistro and a steakhouse for a night out, ramen, sushi, pizza delivery and a poutine counter, plus coffee shops that open early enough for first chair.",
+  "Places are grouped by the kind of meal you're after. Price levels run from $ (cheap and quick) to $$$$ (a splurge), where the listing has one."
+ ],
+ "sections": [
+  {
+   "id": "apr-s-ski-pubs",
+   "jump": "Après-ski & pubs",
+   "heading": "Après-ski & pubs",
+   "items": [
+    {
+     "ref": "big-white/moose-lounge",
+     "name": "Moose Lounge",
+     "text": "a revitalized lounge in the Happy Valley Day Lodge that has brought back longtime favourite après-ski traditions regulars had missed. Come at the end of your ski day; kids are welcome, and there are sports TVs and live music.",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/snowshoe-sam-s",
+     "name": "Snowshoe Sam's",
+     "text": "the village's lively, high-energy pub, with pool tables and sports TVs. Monday pool nights pack the place and have become a village tradition; any other night, catch a game. $$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/black-diamond-bar-grill",
+     "name": "Black Diamond Bar & Grill",
+     "text": "a warm, alpine-lodge room in Big White Village with a beer selection deep enough for a serious craft beer crowd. Treat it as an après-ski beer stop first and a dinner spot second, since food reviews are more mixed. $$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/fourth-ace-bar-smokehouse",
+     "name": "Fourth Ace Bar & Smokehouse",
+     "text": "off the main strip, and you can ski in from the Perfection run. There's a great view, an arcade in the basement and shareable platters like The Meat Sweats built for groups; happy hour too. $$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/fat-marmot",
+     "name": "Fat Marmot",
+     "text": "a ramen bar and Asian fusion restaurant at the Inn at Big White, with a fire-table patio made for sunset après-ski. Order the Korean chicken outside, but head indoors for ramen, which isn't served on the patio. $$",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "sit-down-dinners",
+   "jump": "Sit-down dinners",
+   "heading": "Sit-down dinners",
+   "items": [
+    {
+     "ref": "big-white/6-bistro",
+     "name": "6° Bistro",
+     "text": "an intimate, upscale set-menu bistro with a warm outdoor fireplace and fur seating. The tasting menu has vegetarian options, and it suits a celebratory splurge, even with kids along. $$$$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/kettle-valley-steakhouse",
+     "name": "Kettle Valley Steakhouse",
+     "text": "an award-winning upscale steakhouse on the top floor of the Happy Valley Day Lodge, recently reopened after a five-year hiatus. Order the tenderloin or bison steak and pair it from the Okanagan-rooted wine list. $$$$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/sopra-sam-s-italian-kitchen",
+     "name": "Sopra: Sam's Italian Kitchen",
+     "text": "a cozy, upscale Italian restaurant above Snowshoe Sam's, well suited to family gatherings. The eggplant parmigiana and chicken scallopini stand out. $$$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/the-woods-restaurant",
+     "name": "The Woods Restaurant",
+     "text": "a cozy spot for a warm meal after a day on the slopes, with welcoming staff. Order the seasonal beef dip or the fire-roasted calamari. Dogs are welcome, and there's a patio and live music. $$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/sasquatch-sushi",
+     "name": "Sasquatch Sushi",
+     "text": "in building 2 of Stonebridge Lodge, serving both traditional and North American style sushi, from nigiri and rolls to sashimi and miso soup. $$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/big-white-horse-drawn-sleigh-rides",
+     "name": "Big White Horse-Drawn Sleigh Rides & Dining Tours",
+     "text": "the dinner version takes you by sleigh through snow-covered trails to a cabin in the woods, where the resort's culinary team serves a family-style gourmet meal at two tables of six. Coffee, tea and water are provided and your own wine is welcome. Book at least a day ahead, and tell the Activities Desk about dietary needs 72 hours out.",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "pizza-burgers-quick-bites",
+   "jump": "Pizza & burgers",
+   "heading": "Pizza, burgers & quick bites",
+   "items": [
+    {
+     "ref": "big-white/underground-pizza",
+     "name": "Underground Pizza",
+     "text": "a dog-friendly pizza spot with generous toppings and delivery that stays fast even in winter conditions. Regulars recommend the BBQ chicken pizza, made with real chunks of chicken. $$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/alpine-burger-co",
+     "name": "Alpine Burger Co.",
+     "text": "the burger counter inside the Happy Valley Day Lodge, beside the skating rink, tube park and sleigh-ride meeting spot. A handy refuel for families spending the day in Happy Valley, and it stays open into the evening. Lara's Gondola connects it to the Village Centre for free.",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/spuds-at-the-ridge-day-lodge",
+     "name": "SPUDS at The Ridge Day Lodge",
+     "text": "a playful, potato-focused quick-serve spot with six poutines, friendly, talkative staff and an open, relaxed eating area. $",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/vista-at-black-forest-day-lodge",
+     "name": "VISTA at Black Forest Day Lodge",
+     "text": "a ski-in ski-out restaurant with a beautiful mountain view and outdoor seating, good for a pit stop mid-ski or mid-snowshoe. Season pass holders get a 10% discount. $",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/moonlight-bistro",
+     "name": "Moonlight Bistro",
+     "text": "a cabin-in-the-woods style bistro at the base of the Gem Lake chair, where skiers stop for warming drinks and quick-serve meals and treats between runs. $",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/the-market",
+     "name": "The Market",
+     "text": "Big White's full-service grocery store, with a bistro serving ready-made dishes and weekly specials. Its cold beer, wine and liquor counter carries over 300 local and imported wines, handy for stocking a condo.",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "caf-s-breakfast",
+   "jump": "Cafés & breakfast",
+   "heading": "Cafés & breakfast",
+   "items": [
+    {
+     "ref": "big-white/clocktower-coffee-co",
+     "name": "Clocktower Coffee Co.",
+     "text": "the ski-in, ski-out coffee shop in the Village Centre Mall, open from 7am. Order the strong Canadiano and one of the excellent pastries, and come early at busy times, when seating runs short. $",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/toasty",
+     "name": "Toasty",
+     "text": "a cozy coffee and pastry shop in Big White Village known for excellent oversized donuts. Reviewers say they stay soft for days, so pick up an extra for later. $",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "family-friendly",
+   "jump": "Family-friendly",
+   "heading": "Family-friendly",
+   "items": [
+    {
+     "ref": "big-white/cabin-kitchen-bar-at-whitefoot-lodge",
+     "name": "Cabin Kitchen + Bar at Whitefoot Lodge",
+     "text": "works for every age at a family dinner, with a proper kids' menu and trivia nights for the grown-ups. Regulars order the mac and cheese with braised beef; check whether trivia lines up with your stay. $$",
+     "where": "Big White"
+    },
+    {
+     "ref": "big-white/bullwheel",
+     "name": "Bullwheel",
+     "text": "a cozy, family-friendly lodge restaurant in Big White Village where sweeping mountain views back up the comfort food. Kids get a real steak and fries rather than a watered-down kids' menu, and the espresso martini is the regulars' reward after the last run. $$",
+     "where": "Big White"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Classic après-ski",
+    [
+     "big-white/moose-lounge|Moose Lounge",
+     "big-white/snowshoe-sam-s|Snowshoe Sam's"
+    ]
+   ],
+   [
+    "Craft beer after the lifts",
+    [
+     "big-white/black-diamond-bar-grill|Black Diamond Bar & Grill"
+    ]
+   ],
+   [
+    "A group feast with a view",
+    [
+     "big-white/fourth-ace-bar-smokehouse|Fourth Ace Bar & Smokehouse"
+    ]
+   ],
+   [
+    "A special-occasion dinner",
+    [
+     "big-white/6-bistro|6° Bistro",
+     "big-white/kettle-valley-steakhouse|Kettle Valley Steakhouse"
+    ]
+   ],
+   [
+    "Pizza to the condo",
+    [
+     "big-white/underground-pizza|Underground Pizza"
+    ]
+   ],
+   [
+    "Coffee before first chair",
+    [
+     "big-white/clocktower-coffee-co|Clocktower Coffee Co.",
+     "big-white/toasty|Toasty"
+    ]
+   ],
+   [
+    "Dinner with the kids",
+    [
+     "big-white/cabin-kitchen-bar-at-whitefoot-lodge|Cabin Kitchen + Bar at Whitefoot Lodge",
+     "big-white/bullwheel|Bullwheel"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guides/ski-season-big-white-silverstar\">Ski season at Big White &amp; SilverStar</a>, <a href=\"/big-white/restaurants\">Big White restaurants</a>, <a href=\"/big-white/pubs\">Big White pubs</a>"
+}
