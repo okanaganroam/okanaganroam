@@ -31,5 +31,10 @@
     --ref-navy: #1B2B3A;
     --ref-navy-deep: #101B24;
     --ref-gold: #C9A227;
+    /* Accessibility (2026-10-18): --ref-gold is 2.18:1 on the cream
+       background, so gold TEXT on light backgrounds (the logo's "Roam",
+       link hovers) uses this deeper gold (4.56:1 on --ref-cream). The
+       bright gold stays for icons, rules and text on the navy footer. */
+    --ref-gold-ink: #8A6A0F;
     --ref-white: #FFFFFF;
 }

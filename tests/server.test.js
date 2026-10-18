@@ -2041,7 +2041,7 @@ test('render404Page: mobile viewport, themed site shell, landmarks, search box, 
   assert.doesNotMatch(html, /og:url/);
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/, 'the approved homepage stylesheet');
   assert.match(html, /<body class="golf-page not-found-page">/);
-  assert.match(html, /<main class="wrap-wide golf-main not-found-main">/);
+  assert.match(html, /<main class="wrap-wide golf-main not-found-main" id="main">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one H1');
   assert.match(html, /<h1>We couldn\u2019t find that page<\/h1>/);
   // 2026-10-14: a search box to /browse, prefilled from the address.
@@ -2829,7 +2829,7 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
 
 test('Home footer: Explore column lists the site\'s sections, in order, each with a real href (no invented routes)', () => {
   const html = app.renderHomeFooterHTML();
-  const exploreMatch = html.match(/<summary><h4 data-i18n="homeFooter\.explore">Explore<\/h4><\/summary>\s*<ul>([\s\S]*?)<\/ul>/);
+  const exploreMatch = html.match(/<summary><h2 data-i18n="homeFooter\.explore">Explore<\/h2><\/summary>\s*<ul>([\s\S]*?)<\/ul>/);
   assert.ok(exploreMatch, 'expected to find the Explore column');
   const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
     .map((m) => ({ href: m[1], text: m[2] }));
@@ -2855,7 +2855,7 @@ test('Home footer: Regions column lists ALL 20 real regions (none omitted), each
 
 test('Home footer: Regions renders as two explicit subcolumns -- Central+South, then North+Ski resorts -- matching the approved FOOTER.png reference', () => {
   const html = app.renderHomeFooterHTML();
-  const groupLabels = Array.from(html.matchAll(/<h5 data-i18n="(wizard\.[a-zA-Z]+)">([^<]*)<\/h5>/g)).map((m) => m[2]);
+  const groupLabels = Array.from(html.matchAll(/<h3 data-i18n="(wizard\.[a-zA-Z]+)">([^<]*)<\/h3>/g)).map((m) => m[2]);
   assert.deepEqual(groupLabels, ['Central', 'South', 'North', 'Ski resorts']);
   const subcolMatch = html.match(/<div class="home-footer-region-groups">([\s\S]*?)<\/div>\s*<p class="home-footer-all-regions">/);
   assert.ok(subcolMatch, 'expected the region-groups wrapper, then the See all destinations link');
@@ -2873,7 +2873,7 @@ test('Home footer: exactly FOUR columns (Explore, About, Regions, Social Media) 
   const colsMatch = html.match(/<div class="home-footer-cols">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="wrap-wide home-footer-bottom">/);
   assert.ok(colsMatch, 'expected to find the single .home-footer-cols row, immediately followed by the bottom/copyright row (nothing else in between)');
   const colsHtml = colsMatch[1];
-  const headings = Array.from(colsHtml.matchAll(/<h4[^>]*>([^<]*)<\/h4>/g)).map((m) => m[1]);
+  const headings = Array.from(colsHtml.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)).map((m) => m[1]);
   assert.deepEqual(headings, ['Explore', 'About', 'Regions', 'Social Media'], 'expected exactly these 4 column headings, in this order, all inside one row');
   assert.doesNotMatch(html, /class="home-footer-regions"/, 'the old separate full-width Regions band must be gone');
   // Regions' own region-groups grid must be nested inside the 4th column, not a sibling of .home-footer-cols.
@@ -2884,9 +2884,9 @@ test('Home footer: exactly FOUR columns (Explore, About, Regions, Social Media) 
 
 test('Home footer: Social Media heading (renamed from "Follow") uses its own i18n key, distinct from the old footer.followAlong key /browse still uses', () => {
   const html = app.renderHomeFooterHTML();
-  assert.match(html, /<h4 data-i18n="homeFooter\.socialMedia">Social Media<\/h4>/);
+  assert.match(html, /<h2 data-i18n="homeFooter\.socialMedia">Social Media<\/h2>/);
   assert.doesNotMatch(html, /data-i18n="homeFooter\.follow"/, 'the old "Follow" key must no longer be used');
-  assert.doesNotMatch(html, />Follow<\/h4>/, 'the visible heading text must no longer read just "Follow"');
+  assert.doesNotMatch(html, />Follow<\/h2>/, 'the visible heading text must no longer read just "Follow"');
 });
 
 test('Home footer: logo tagline reads exactly "Okanagan Valley, British Columbia" and keeps the gold Roam accent', () => {
@@ -4867,9 +4867,9 @@ test('Batch 4B Events: every event page renders the themed shell around unchange
     assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/, kind);
     assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${kind}: tray precedes the header`);
     assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, `${kind}: old shell header gone`);
-    assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1, `${kind}: one <main>`);
+    assert.equal((html.match(/<main class="wrap-wide golf-main" id="main">/g) || []).length, 1, `${kind}: one <main>`);
     const main = html.slice(html.indexOf('<main '), html.indexOf('</main>'));
-    assert.ok(main.includes('<nav class="breadcrumb">') && main.includes('<h1>') && main.includes('class="venue-cta-row event-actions"') && main.includes('<a class="cta" href="/kelowna">Explore all of Kelowna</a>'), `${kind}: page content inside <main>`);
+    assert.ok(main.includes('<nav class="breadcrumb" aria-label="Breadcrumb">') && main.includes('<h1>') && main.includes('class="venue-cta-row event-actions"') && main.includes('<a class="cta" href="/kelowna">Explore all of Kelowna</a>'), `${kind}: page content inside <main>`);
     assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${kind}: footer after <main>`);
     assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${kind}: exactly one <h1>`);
     assert.match(html, /<p class="subtitle">Event(?: series)? in Kelowna, BC/, kind);
@@ -6836,7 +6836,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.match(html, /<a class="app-btn" id="navTripBtn" href="\/trip">/);
     assert.doesNotMatch(html, /<button class="nav-search-btn"|<button class="lang-toggle"|<header class="top">/);
     assert.match(html, /<li><a href="\/hidden-gems" data-i18n="gems\.heading">Hidden Gems<\/a><\/li>/, 'footer Hidden Gems link');
-    assert.match(html, /<main class="wrap-wide golf-main">[\s\S]*<\/main>/);
+    assert.match(html, /<main class="wrap-wide golf-main" id="main">[\s\S]*<\/main>/);
     // Site-wide floating Trip control: the homepage's own #tripTray fragment,
     // driven by the homepage's app.js (same as /trip) -- not a Golf copy.
     assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">[\s\S]*<span id="tripTrayCount">0<\/span>/);
@@ -7067,7 +7067,7 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
     assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${type}: tray precedes the header`);
     assert.match(html, /<header id="top">/, type);
     assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, `${type}: old shell header gone`);
-    assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1, `${type}: one <main>`);
+    assert.equal((html.match(/<main class="wrap-wide golf-main" id="main">/g) || []).length, 1, `${type}: one <main>`);
     assert.ok(html.indexOf('<main ') < html.indexOf('<nav class="breadcrumb"') && html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${type}: content inside <main>, footer after`);
     assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1, type);
     assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${type}: exactly one <h1>`);
@@ -7129,7 +7129,7 @@ test('Stage 4.1: winery venue pages render the themed shell with one hero <h1> a
   assert.match(html, /id="tripTray"/, 'the site-wide Trip tray is on the page');
   assert.match(html, /<header id="top">/, 'the shared site header and navigation');
   assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, 'the old minimal header is gone');
-  assert.match(html, /<main class="wrap-wide golf-main">/);
+  assert.match(html, /<main class="wrap-wide golf-main" id="main">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1>');
   assert.match(html, /<div class="venue-hero venue-hero-fallback[^"]*">\s*(?:<img class="venue-hero-img"[^>]*>\s*)?<span class="venue-hero-type">Winery<\/span>\s*<h1>Test Winery<\/h1>/, 'the hero carries the <h1>');
   // Favorite / Add to Trip: app.js's labels, and no standalone-page stylesheet.
@@ -7214,7 +7214,7 @@ test('REGRESSION: non-Golf venue cards have no Favorite / Add to Trip row', () =
 test('Golf category page script reuses the homepage storage keys and reports the four engagement events', () => {
   const rows = app.getVenuesByRegionCategory('kelowna', 'golf');
   const html = app.renderCategoryPage('kelowna', 'golf', rows, []);
-  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'venue_unfavorite'", "'add_to_trip'", "'remove_from_trip'", 'MAX_STOPS = 10', "window.__syncTripButtons", "'[data-venue-category=\"golf\"]'"]) {
+  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'venue_unfavorite'", "'add_to_trip'", "'remove_from_trip'", 'MAX_STOPS = 30', "window.__syncTripButtons", "'[data-venue-category=\"golf\"]'"]) {
     assert.ok(html.includes(needle), `expected ${needle} in golf category page script`);
   }
   const restaurantHtml = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
@@ -10031,7 +10031,7 @@ test('Secret Spots: /secret-spots renders only the Hidden Gem places, with filte
     assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/secret-spots">/);
     assert.match(markup, /<title>Secret Spots in the Okanagan \| Okanagan Roam<\/title>/);
     assert.match(markup, /<h1>Secret Spots in the Okanagan<\/h1>/);
-    assert.match(markup, /<nav class="breadcrumb"><a href="\/">Home<\/a> &rsaquo; Secret Spots<\/nav>/);
+    assert.match(markup, /<nav class="breadcrumb" aria-label="Breadcrumb"><a href="\/">Home<\/a> &rsaquo; Secret Spots<\/nav>/);
     assert.doesNotMatch(markup, /name="robots" content="noindex"/, 'the page is indexable');
     assert.match(html, /"@type":"BreadcrumbList"/);
     assert.match(html, /"@type":"ItemList"/);
@@ -10202,7 +10202,9 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // change must update these deliberately; nothing else may.
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
-  assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
+  // Approved accessibility change (2026-10-18): one added token, --ref-gold-ink, a deeper gold for gold text on the
+  // cream background (the logo's "Roam"); every existing token keeps its value.
+  assert.equal(md5('public/styles/tokens.css'), 'c155b965403a835bfdeba76f9fb58e8f', 'public/styles/tokens.css (+ --ref-gold-ink 2026-10-18)');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
   // fetches the full venue list (/api/venues?limit=5000, ~2 MB) on pages
   // without the /browse #venueGrid -- including the homepage, which never used
@@ -10222,7 +10224,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
-  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd', 'public/scripts/app.js (French hero search, 2026-10-18)');
+  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'public/scripts/app.js (French hero search; My Trip holds 30 stops, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12068,7 +12070,7 @@ test('List Your Venue: the staging table is additive and the old /browse form is
 
 // ---------- List Your Venue footer link (2026-09-25) ----------
 
-const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
+const LYV_FOOTER_ABOUT = `<h2 data-i18n="footer.about">About</h2>
         <ul>
           <li><a href="/about">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
@@ -12091,7 +12093,7 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     assert.equal((footer[0].match(/>List an Event</g) || []).length, 1, page);
     assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
     // Explore and Regions are <details> that fold on phones (2026-10-14).
-    const cols = footer[0].match(/<(?:div|details) class="home-footer-col(?: home-footer-col-regions)?(?: home-footer-fold)?"(?: open)?>\s*(?:<summary>)?<h4 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
+    const cols = footer[0].match(/<(?:div|details) class="home-footer-col(?: home-footer-col-regions)?(?: home-footer-fold)?"(?: open)?>\s*(?:<summary>)?<h2 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
     assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions', 'homeFooter.socialMedia'], `${page}: same four columns in the same order`);
     // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
     const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
@@ -12116,7 +12118,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd');
+  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -12917,7 +12919,7 @@ test('Phase 2 /trip: recommendations keep "Show others"; empty results have no R
 // ==== Build My Trip Phase 3 (2026-09-27): "Add whole trip to My Trip" =========
 // Runs the real whole-trip functions from the /trip script against a small
 // fake page whose Add to trip buttons behave like app.js's own handler:
-// toggle by name, de-duplicated, and no add past MAX_STOPS (10).
+// toggle by name, de-duplicated, and no add past MAX_STOPS (30 since 2026-10-18; it was 10).
 function wholeTripHarness(stopNames, initialTrip = []) {
   const page = app.renderTripPlannerPage(true);
   const script = page.match(/<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/)[0];
@@ -12932,7 +12934,7 @@ function wholeTripHarness(stopNames, initialTrip = []) {
       app_.clicks.push(name);
       app_.sourceAtClick.push(win.__roamTripSource);
       if (app_.trip.includes(name)) app_.trip = app_.trip.filter((n) => n !== name);
-      else if (app_.trip.length >= 10) app_.capMessages += 1;
+      else if (app_.trip.length >= 30) app_.capMessages += 1;
       else app_.trip.push(name);
       sync();
     };
@@ -12990,30 +12992,30 @@ test('Phase 3 whole trip: when every stop is already in My Trip, nothing is clic
   assert.equal(h.status.textContent, 'All 3 stops are already in My Trip — nothing new was added.');
 });
 
-test('Phase 3 whole trip: more stops than room -- adds what fits, reports added and not added, never trips the 10-stop limit', () => {
-  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(8));
+test('Phase 3 whole trip: more stops than room -- adds what fits, reports added and not added, never trips the 30-stop limit', () => {
+  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(28));
   h.addWholeTrip();
-  assert.equal(h.app.trip.length, 10);
-  assert.deepEqual(h.app.trip.slice(8), ['A', 'B']);
+  assert.equal(h.app.trip.length, 30);
+  assert.deepEqual(h.app.trip.slice(28), ['A', 'B']);
   assert.equal(h.app.capMessages, 0, 'no click is made once My Trip is full');
-  assert.equal(h.status.textContent, 'Added 2 stops to My Trip. 2 stops couldn’t be added because My Trip holds up to 10 stops — remove some to make room.');
+  assert.equal(h.status.textContent, 'Added 2 stops to My Trip. 2 stops couldn’t be added because My Trip holds up to 30 stops — remove some to make room.');
   assert.equal(h.attrs['data-state'], 'full');
   assert.equal(h.addAllBtn.textContent, 'My Trip is full');
 });
 
-test('Phase 3 whole trip: exactly reaching 10 stops, and trying again when already at 10', () => {
-  const exact = wholeTripHarness(['A', 'B', 'C', 'D'], others(6));
+test('Phase 3 whole trip: exactly reaching 30 stops, and trying again when already at 30', () => {
+  const exact = wholeTripHarness(['A', 'B', 'C', 'D'], others(26));
   exact.addWholeTrip();
-  assert.equal(exact.app.trip.length, 10);
+  assert.equal(exact.app.trip.length, 30);
   assert.equal(exact.status.textContent, 'Added 4 stops to My Trip.');
   assert.equal(exact.attrs['data-state'], 'added');
-  const full = wholeTripHarness(['A', 'B'], others(10));
+  const full = wholeTripHarness(['A', 'B'], others(30));
   assert.equal(full.attrs['data-state'], 'full');
   assert.equal(full.attrs['aria-disabled'], 'true');
   full.addWholeTrip();
   assert.deepEqual(full.app.clicks, []);
-  assert.equal(full.app.trip.length, 10);
-  assert.equal(full.status.textContent, 'My Trip is full (10 stops), so nothing new was added. Remove a stop from My Trip to make room.');
+  assert.equal(full.app.trip.length, 30);
+  assert.equal(full.status.textContent, 'My Trip is full (30 stops), so nothing new was added. Remove a stop from My Trip to make room.');
 });
 
 test('Phase 3 whole trip: duplicate stop names are added once', () => {
@@ -13024,9 +13026,9 @@ test('Phase 3 whole trip: duplicate stop names are added once', () => {
 });
 
 test('Phase 3 whole trip: removing a tray stop or adding one individually recalculates the room; Regenerate keeps My Trip intact', () => {
-  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(7));
+  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(27));
   h.addWholeTrip();
-  assert.deepEqual(h.app.trip.slice(7), ['A', 'B', 'C']);
+  assert.deepEqual(h.app.trip.slice(27), ['A', 'B', 'C']);
   assert.equal(h.attrs['data-state'], 'full');
   h.remove('Other 1');                                   // tray remove
   assert.equal(h.addAllBtn.textContent, 'Add the remaining 1 stop to My Trip');
@@ -13044,7 +13046,7 @@ test('Phase 3 whole trip: removing a tray stop or adding one individually recalc
   h.addWholeTrip();
   assert.deepEqual(h.app.trip.slice(0, before.length), before, 'nothing already in My Trip is removed or reordered');
   assert.equal(h.app.trip.filter((n) => n === 'D').length, 1, 'no duplicate');
-  assert.equal(h.app.trip.length, Math.min(10, before.length + 2));
+  assert.equal(h.app.trip.length, Math.min(30, before.length + 2));
 });
 
 test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip and the plan-stop markers render where they should', () => {
@@ -13066,10 +13068,10 @@ test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip
   assert.ok(itin.indexOf('data-plan-add-all') < itin.indexOf('data-plan-regenerate'), 'primary action first');
   const recs = render({ kind: 'discover', summary: 'x', overview: {}, notes: [], warnings: [], unsupported: [], recommendations: [{ venue: tripVenue(4, 'Solo', 'cafe'), why: [], caveats: [] }] });
   assert.doesNotMatch(recs, /data-plan-add-all|data-plan-stop/, 'a list of ideas is not a trip');
-  // The page's limit matches the tray's own limit in app.js (unchanged).
+  // The page's limit matches the tray's own limit in app.js (30 since 2026-10-18).
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
-  assert.match(appJs, /var MAX_STOPS = 10;/);
-  assert.equal(wholeTripHarness([]).TRIP_MAX_STOPS, 10);
+  assert.match(appJs, /var MAX_STOPS = 30;/);
+  assert.equal(wholeTripHarness([]).TRIP_MAX_STOPS, 30);
 });
 
 // ==== Measurement Phase A (2026-09-27): GA4 on every public server template ====
@@ -14071,8 +14073,12 @@ test('map day headers: the page uses static <picture> maps with both credits as 
   // Both required credits are real links beside the map.
   assert.ok(page.includes('href="https://www.openstreetmap.org/copyright"') && page.includes('href="https://www.geoapify.com/"'));
   assert.ok(page.includes("Powered by Geoapify") && page.includes('\u00a9 OpenStreetMap contributors'));
-  // No live map or API traffic for day headers: no Leaflet bootstrap for headers, no tile or Geoapify request, no key.
-  for (const gone of ['initDayMaps', 'destroyDayMaps', 'data-t3-dhmap', 't3-dh-canvas', 't3-dh-pin', 'dayMapData']) assert.ok(!page.includes(gone), `${gone} is gone`);
+  // No Geoapify API traffic for day headers (the old live header maps stay gone).
+  for (const gone of ['initDayMaps', 'destroyDayMaps', 'data-t3-dhmap', 't3-dh-canvas', 'dayMapData']) assert.ok(!page.includes(gone), `${gone} is gone`);
+  // 2026-10-18: each day's stops are placed on its header map (numbered pins on the picture, from its zoom and centre);
+  // a day spread wider than the picture gets a small OpenStreetMap map fitted to its stops, only once it scrolls near.
+  assert.ok(page.includes('t3-dh-pin') && page.includes('function fitDayMaps') && page.includes('IntersectionObserver') && page.includes('data-t3-fit-day'));
+  assert.ok(Number.isFinite(mh.penticton.assets.desktop.z) && mh.penticton.assets.desktop.view.length === 2, 'zoom and centre reach the page');
   assert.ok(!/maps\.geoapify\.com|apiKey/i.test(page), 'the browser never talks to the Geoapify API');
   // The whole-trip interactive map and "Map this day" are unchanged.
   assert.ok(page.includes('function loadLeaflet') && page.includes('L.tileLayer(MAP_TILES') && page.includes('tripMap'));
@@ -15549,7 +15555,7 @@ test('Stage 4.4: GET /favorites is a noindex, uncached shell page measured as pa
   assert.doesNotMatch(html, /rel="canonical"/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.match(html, /<h1>My Favorites<\/h1>/);
-  assert.match(html, /<main class="wrap-wide golf-main">/);
+  assert.match(html, /<main class="wrap-wide golf-main" id="main">/);
   assert.match(html, /id="tripTray"/);
   assert.match(html, /page_type: 'favorites'/);
   // The browser runs exactly the tested rules.
@@ -16361,7 +16367,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd');
+  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16454,7 +16460,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -16821,6 +16827,66 @@ test('Season writes: set, no-op, change and clear are audited; cards, pages, Ope
   assert.equal(app.getAdvisoryNotes(SEASON_NOW).has(openUntil.id), false);
   assert.equal(logRows(openUntil.id).length, 2);
   assert.equal(logRows(openUntil.id)[1].new_value, null);
+});
+
+// Build My Trip ski trips (2026-10-18): "ski Big White 3 days in January" never included the resort, because a
+// resort closed for the season today was left out of every plan. It is now planned on every ski day, with lunch and
+// dinner at the hill, and the season row's reopening date is named when the trip is before it.
+test('Build My Trip ski trip (server): a resort closed for the season today is still the ski day, with its opening date', () => {
+  const resortInsert = db.prepare(`INSERT INTO venues (name, region, type, description, slug) VALUES (@name, 'big-white', 'outdoor', @description, @slug)`);
+  resortInsert.run({ name: 'Snowfixture Ski Resort', description: 'A fixture ski resort with skiing on every run.', slug: 'snowfixture-ski-resort' });
+  const resort = app.findVenueBySlug('big-white', 'outdoor', 'snowfixture-ski-resort');
+  const meta = { reason: 'test', batch_id: 'ski-trip-test' };
+  try {
+    assert.equal(app.guardedSeasonUpdate(resort.id, { status: 'closed', reopens_date: '2027-11-26', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
+    const facts = app.buildTripPlannerFacts();
+    assert.equal(facts.find((f) => f.id === resort.id).seasonReopens, '2027-11-26');
+    const p = app.runTripPlan({ text: 'ski Big White 2 days in January' }, SEASON_NOW);
+    assert.equal(p.days.length, 2);
+    for (const day of p.days) {
+      assert.equal(day.stops.find((s) => s.daypart === 'morning').venue.id, resort.id, `day ${day.day} skis at the resort`);
+      assert.ok(day.stops.filter((s) => s.venue).every((s) => s.venue.region === 'big-white'), 'everything at the hill');
+    }
+    assert.ok(p.warnings.some((w) => w.startsWith('Snowfixture Ski Resort opens for the season on November 26')), p.warnings.join(' | '));
+    // The French page asks the same planner.
+    const frPlan = app.runTripPlan({ text: 'Planifie 2 jours de ski à Big White en janvier' }, SEASON_NOW);
+    assert.ok(frPlan.days.length >= 1 && frPlan.days.every((day) => day.stops.find((s) => s.daypart === 'morning')?.venue?.id === resort.id));
+  } finally {
+    app.guardedSeasonUpdate(resort.id, null, meta, SEASON_NOW);
+    db.prepare("DELETE FROM venue_enrichment_log WHERE venue_id = ?").run(resort.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(resort.id);
+  }
+});
+
+test('Build My Trip wine tour (server): "wine tour Oliver Osoyoos 2 days" plans wineries with lunch and dinner, never tour companies', () => {
+  const ins = db.prepare(`INSERT INTO venues (name, region, type, description, slug, rating, price, latitude, longitude) VALUES (@name, @region, @type, 'A wine tour fixture.', @slug, @rating, @price, @lat, @lng)`);
+  const made = [];
+  const mk = (name, region, type, rating, price, lat, lng) => { const slug = app.slugify(name); ins.run({ name, region, type, slug, rating, price, lat, lng }); made.push(app.findVenueBySlug(region, type, slug).id); };
+  for (const [region, lat, lng] of [['oliver', 49.18, -119.55], ['osoyoos', 49.03, -119.47]]) {
+    for (let i = 0; i < 3; i++) mk(`WT ${region} Winery ${i}`, region, 'winery', 5, null, lat + i * 0.01, lng);
+    for (let i = 0; i < 3; i++) mk(`WT ${region} Bistro ${i}`, region, 'restaurant', 4.8, 3, lat + i * 0.01, lng + 0.01);
+    mk(`WT ${region} Wine Tours`, region, 'tour', 5, null, lat, lng);
+  }
+  try {
+    const p = app.runTripPlan({ text: 'wine tour Oliver Osoyoos 2 days' });
+    assert.equal(p.kind, 'multi_day');
+    assert.ok(p.understood.interests.some((x) => /wineries/i.test(x)) && !p.understood.interests.some((x) => /tours/i.test(x)), p.understood.interests.join(', '));
+    for (const day of p.days) {
+      const types = day.stops.filter((s) => s.venue).map((s) => db.prepare('SELECT type FROM venues WHERE id = ?').get(s.venue.id).type);
+      assert.ok(types.filter((t) => t === 'winery').length >= 2, `day ${day.day}: ${types.join(', ')}`);
+      assert.ok(!types.includes('tour') && !types.includes('pub'), types.join(', '));
+      assert.equal(types[types.length - 1], 'restaurant', 'the day ends at dinner');
+    }
+  } finally {
+    for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('My Trip page: stops saved with a planner day are grouped by day even when older stops have none', () => {
+  const html = app.renderMyTripPage({ lang: 'en' });
+  assert.match(html, /var byDay = stops\.length && stops\.some\(function\(s\)\{ return s\.day > 0; \}\);/);
+  assert.match(html, /refs\.some\(function\(x\)\{ return days\[x\.ref\]; \}\)/);
+  assert.match(app.renderMyTripPage({ lang: 'fr' }), /Itinéraire du jour \{d\} dans Google Maps/);
 });
 
 test('POST /admin/set-season: auth, validation and a write, on a private server instance', async () => {
@@ -23472,6 +23538,126 @@ test("Lighter pages: What's On ships its first page of events and every other it
   }
 });
 
+
+// ---- Accessibility: skip link, main landmark, menu keyboard (2026-10-18) ----
+test('Accessibility: shared header has a skip link, a labelled main menu and real <button> dropdown triggers', () => {
+  const header = app.renderGolfHeaderHtml();
+  assert.match(header, /^<header id="top">\s*(?:<!--[\s\S]*?-->\s*)?<a class="skip-link" href="#main"[^>]*>Skip to content<\/a>/, 'skip link is the first thing in the header');
+  assert.match(header, /<nav class="nav wrap" aria-label="Main menu"/);
+  assert.doesNotMatch(header, /<span class="nav-link-label"[^>]*role="button"/, 'no span role=button triggers left');
+  assert.equal((header.match(/<button type="button" class="nav-link-label" aria-haspopup="true" aria-expanded="false">/g) || []).length, 3);
+  assert.match(header, /<button type="button" class="nav-hamburger" id="navHamburger"[^>]*aria-controls="navLinks"/);
+  assert.ok(header.includes(app.NAV_A11Y_SNIPPET), 'the keyboard script and styles ride along with the header');
+  assert.match(app.NAV_A11Y_SNIPPET, /min-width: 44px; min-height: 44px/, 'phone menu button is a 44px target');
+  assert.match(app.NAV_A11Y_SNIPPET, /#navHamburger::before \{ content: none/, 'no red notification-like dot on the menu button');
+});
+
+test('Accessibility: wrapHomeMain puts hero-to-footer in one <main id="main">, once', () => {
+  const html = '<header id="top"></header>\n<section class="hero-scenic hero-scenic-home">h</section>\n<section>x</section>\n<footer class="home-footer">f</footer>';
+  const out = app.wrapHomeMain(html);
+  assert.equal(out, '<header id="top"></header>\n<main id="main">\n<section class="hero-scenic hero-scenic-home">h</section>\n<section>x</section>\n</main>\n<footer class="home-footer">f</footer>');
+  assert.equal(app.wrapHomeMain(out), out, 'no second main');
+  assert.equal(app.wrapHomeMain('<p>no hero</p>'), '<p>no hero</p>');
+});
+
+test('Accessibility: home and /fr home have one main#main, skip link and labelled landmarks; pages label the breadcrumb', async () => {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const [p, skip, menu] of [['/', 'Skip to content', 'Main menu'], ['/fr', 'Aller au contenu', 'Menu principal']]) {
+      const html = await (await fetch(base + p)).text();
+      assert.equal((html.match(/<main id="main">/g) || []).length, 1, `${p}: one main#main`);
+      assert.equal((html.match(/<\/main>/g) || []).length, 1, `${p}: one </main>`);
+      const main = html.slice(html.indexOf('<main id="main">'), html.indexOf('</main>'));
+      assert.ok(main.includes('id="heroScenic"'), `${p}: hero inside main`);
+      assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${p}: footer after main`);
+      assert.match(html, new RegExp(`<a class="skip-link" href="#main"[^>]*>${skip}</a>`), `${p}: skip link`);
+      assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${menu}"`), `${p}: menu label`);
+      assert.doesNotMatch(html, /<h4 data-i18n="(?:homeFooter|footer)\./, `${p}: footer headings are not h4`);
+      assert.match(html, /<h2 data-i18n="trip\.yourTrip">/, `${p}: the My Trip tray title is an h2`);
+      assert.doesNotMatch(html, /<h4 data-i18n="trip\.yourTrip">/);
+    }
+    const trip = await (await fetch(base + '/trip')).text();
+    assert.match(trip, /<nav class="trip-planner-breadcrumb" aria-label="Breadcrumb">/);
+    const frTrip = await (await fetch(base + '/fr/trip')).text();
+    assert.match(frTrip, /<nav class="trip-planner-breadcrumb" aria-label="Fil d’Ariane">/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Accessibility: search, claim and owner pages (EN and FR) have the skip link, main#main and 16px form fields', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const pages = [['/search?q=pizza', 'en'], ['/fr/search?q=pizza', 'fr'], ['/claim/kelowna/restaurants/test-trattoria', 'en'], ['/fr/claim/kelowna/restaurants/test-trattoria', 'fr'],
+    ['/owner/login', 'en'], ['/fr/owner/login', 'fr'], ['/owner/link', 'en'], ['/fr/owner/link', 'fr'], ['/owner/forgot', 'en'], ['/fr/owner/forgot', 'fr']];
+  for (const [p, lang] of pages) {
+    const r = await fetch(base + p);
+    assert.equal(r.status, 200, p);
+    const html = await r.text();
+    assert.match(html, new RegExp(`<a class="skip-link" href="#main">${lang === 'fr' ? 'Aller au contenu' : 'Skip to content'}</a>`), `${p}: skip link`);
+    assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${lang === 'fr' ? 'Menu principal' : 'Main menu'}"`), `${p}: menu label`);
+    assert.equal((html.match(/<main[^>]* id="main"/g) || []).length, 1, `${p}: one main#main`);
+    assert.ok(html.includes('<style id="nav-a11y">'), `${p}: keyboard script and 16px field styles`);
+  }
+  assert.match(app.NAV_A11Y_SNIPPET, /\.form-field input, \.form-field select, \.form-field textarea \{ font-size: 1rem; \}/);
+})));
+
+test('Accessibility: Escape closes the open dropdown, then the My Trip tray, then the phone menu, and returns focus', () => {
+  const vm = require('node:vm');
+  const code = app.NAV_A11Y_SNIPPET.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const observers = [];
+  const doc = { activeElement: null, readyState: 'complete', listeners: {} };
+  function el(id) {
+    const classes = new Set(), attrs = {}, kids = [];
+    const node = {
+      id, attrs, kids, offsetWidth: 10, offsetHeight: 10,
+      classList: {
+        contains: (c) => classes.has(c),
+        add: (c) => { classes.add(c); observers.forEach((o) => o.target === node && o.cb()); },
+        remove: (c) => { classes.delete(c); observers.forEach((o) => o.target === node && o.cb()); },
+      },
+      getClientRects: () => [1],
+      setAttribute: (k, v) => { attrs[k] = String(v); },
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      hasAttribute: (k) => k in attrs,
+      focus() { doc.activeElement = node; },
+      addEventListener() {},
+      contains: (x) => x === node || kids.includes(x),
+      querySelector: () => kids[0] || null,
+      querySelectorAll: () => kids,
+    };
+    return node;
+  }
+  const burger = el('navHamburger'), links = el('navLinks'), panel = el('tripTrayPanel');
+  const dd = el('dd'), trigger = el('trigger'), mytrip = el('mytrip'), close = el('close');
+  dd.kids.push(trigger); panel.kids.push(close); links.kids.push(el('firstLink'));
+  doc.body = el('body');
+  doc.getElementById = (id) => ({ navHamburger: burger, navLinks: links, tripTrayPanel: panel }[id] || null);
+  doc.querySelector = (sel) => (sel === '.nav-dropdown.open' ? (dd.classList.contains('open') ? dd : null) : sel === '.nav-mytrip-btn' ? mytrip : null);
+  doc.addEventListener = (type, fn) => { (doc.listeners[type] = doc.listeners[type] || []).push(fn); };
+  const ctx = { document: doc, setTimeout: (fn) => fn(), MutationObserver: function (cb) { this.observe = (target) => observers.push({ target, cb }); } };
+  ctx.window = ctx;
+  vm.runInNewContext(code, ctx);
+  const esc = () => { let prevented = false; doc.listeners.keydown.forEach((fn) => fn({ key: 'Escape', preventDefault() { prevented = true; } })); return prevented; };
+
+  // All three open: Escape peels them off one at a time.
+  links.classList.add('open'); panel.classList.add('open'); dd.classList.add('open'); trigger.setAttribute('aria-expanded', 'true');
+  assert.equal(esc(), true);
+  assert.equal(dd.classList.contains('open'), false, 'dropdown closes first');
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  assert.equal(doc.activeElement, trigger, 'focus back on the dropdown button');
+  close.focus();
+  esc();
+  assert.equal(panel.classList.contains('open'), false, 'then the My Trip tray');
+  assert.equal(doc.activeElement, mytrip, 'focus back on My Trip');
+  assert.equal(links.classList.contains('open'), true, 'menu still open');
+  esc();
+  assert.equal(links.classList.contains('open'), false, 'then the phone menu');
+  assert.equal(burger.getAttribute('aria-expanded'), 'false');
+  assert.equal(doc.activeElement, burger, 'focus back on the menu button');
+  assert.equal(esc(), false, 'nothing open: Escape is left alone');
+});
 // ---------- French gaps (2026-10-18) ----------
 // The review's French leftovers: What's On descriptions and chips, the date form, the business login link, Roam Now,
 // the contact hints, /fr/list-your-venue, /fr/search, the trip address, number formats and the owner entry pages.

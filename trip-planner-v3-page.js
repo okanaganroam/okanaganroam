@@ -295,7 +295,26 @@ function t3MapPoints(days, removed) {
   });
   return out;
 }
-const CLIENT_HELPERS_SRC = [t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+// Day header map pins (2026-10-18): Day 1 said "3 stops · About 20 km" but its map showed one pin (the town).
+// Each stop is placed on the pre-rendered map from the image's own centre and zoom (Web Mercator; the images use
+// 512px world tiles at their CSS size). fits=false when a stop would fall outside the visible frame, and the page
+// then draws a small live map fitted to the day's stops instead.
+function t3DayPinLayout(points, assets) {
+  const merc = (lat) => { const s = Math.sin(lat * Math.PI / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); };
+  const place = (p, a) => {
+    const world = 512 * Math.pow(2, a.z);
+    return { dx: Math.round(((p.lng - a.view[1]) / 360) * world * 10) / 10, dy: Math.round((merc(p.lat) - merc(a.view[0])) * world * 10) / 10 };
+  };
+  const ok = (a) => a && Number.isFinite(a.z) && Array.isArray(a.view) && Number.isFinite(a.view[0]) && Number.isFinite(a.view[1]);
+  const pts = Array.isArray(points) ? points : [];
+  if (!pts.length || !assets || !ok(assets.desktop) || !ok(assets.narrow)) return { fits: false, pins: [] };
+  // The visible part of the frame, less a pin's radius: about 300 x 200 on a computer, 300 x 100 on a phone.
+  const LIMIT = { desktop: { x: 138, y: 86 }, narrow: { x: 138, y: 40 } };
+  const pins = pts.map((p) => ({ n: p.n, d: place(p, assets.desktop), w: place(p, assets.narrow) }));
+  const fits = pins.every((q) => Math.abs(q.d.dx) <= LIMIT.desktop.x && Math.abs(q.d.dy) <= LIMIT.desktop.y && Math.abs(q.w.dx) <= LIMIT.narrow.x && Math.abs(q.w.dy) <= LIMIT.narrow.y);
+  return { fits, pins };
+}
+const CLIENT_HELPERS_SRC = [t3DayPinLayout, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
@@ -345,6 +364,17 @@ function renderStyles() {
   .t3-example:hover { background: rgba(255,255,255,0.22); }
   .t3-status { min-height: 1.4em; margin: 14px 0 0; font-weight: 700; font-size: 0.92rem; color: #fff; }
   .t3-status.is-error { color: #FFD7A8; }
+  /* Phones opening a plan link (2026-10-18): the request shrinks to one "Edit request" bar so the plan is on screen
+     first, instead of starting about 1,240px down below the form. */
+  .t3-editbar { display: flex; align-items: center; gap: 12px; justify-content: space-between; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.28); border-radius: 14px; padding: 10px 12px; }
+  .t3-editbar[hidden] { display: none; }
+  .t3-editbar-text { margin: 0; min-width: 0; font-size: 0.9rem; line-height: 1.35; color: #fff; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .t3-editbar-label { display: block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #E0A94E; }
+  .t3-editbar-btn { flex: none; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 0; background: #fff; color: var(--ref-navy-deep, #101B24); font-weight: 800; font-size: 0.86rem; cursor: pointer; }
+  .t3.is-compact .t3-hero-inner { padding-top: 12px; padding-bottom: 12px; }
+  .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples { display: none; }
+  .t3.is-compact .t3-crumb { margin-bottom: 10px; }
+  .t3.is-compact .t3-status:empty { display: none; }
 
   /* How it works (before the first plan). */
   .t3-how { padding: 34px 0 56px; }
@@ -413,6 +443,10 @@ function renderStyles() {
   /* The destination is a hollow ring so the map's own town label stays readable underneath it. */
   /* A small gold pin just above the town's name, so the name stays readable (2026-10-14: the ring sat over the label). */
   .t3-dh-ring { position: absolute; left: calc(50% + var(--ddx)); top: calc(50% + var(--ddy)); width: 12px; height: 12px; margin: -24px 0 0 -6px; box-sizing: border-box; border-radius: 50%; background: var(--ref-gold, #C9A227); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(16,27,36,0.45); }
+  /* The day's stops on the header map (2026-10-18), numbered like the whole-trip map; a wide day gets a live map. */
+  .t3-dh-pin { position: absolute; left: calc(50% + var(--pdx)); top: calc(50% + var(--pdy)); width: 22px; height: 22px; margin: -11px 0 0 -11px; box-sizing: border-box; border-radius: 50%; border: 2px solid #fff; color: #fff; font-size: 0.72rem; font-weight: 800; line-height: 18px; text-align: center; box-shadow: 0 1px 4px rgba(16,27,36,0.45); }
+  .t3-dh-live { position: absolute; inset: 0; z-index: 2; background: #E8E3D3; }
+  .t3-dh-live .t3-pin span { width: 24px; height: 24px; font-size: 0.72rem; }
   .t3-dh-attr { position: absolute; right: 0; bottom: 0; z-index: 800; padding: 1px 6px; font-size: 0.66rem; line-height: 1.5; color: rgba(27,43,58,0.78); background: rgba(245,243,237,0.88); text-decoration: none; border-top-left-radius: 6px; }
   .t3-dh-attr a { color: inherit; text-decoration: none; }
   .t3-dh-attr a:hover, .t3-dh-attr a:focus-visible { text-decoration: underline; }
@@ -429,6 +463,7 @@ function renderStyles() {
     .t3-dh-frame { position: relative; inset: auto; height: 120px; border-radius: 12px; }
     .t3-dh-frame img { width: var(--nw); height: var(--nh); }
     .t3-dh-ring { left: calc(50% + var(--ndx)); top: calc(50% + var(--ndy)); }
+    .t3-dh-pin { left: calc(50% + var(--pndx)); top: calc(50% + var(--pndy)); }
     /* Attribution sits in its own quiet strip beneath the map, never over it. */
     .t3-dh-attr { position: static; display: flex; align-items: center; justify-content: flex-end; min-height: 22px; padding: 0 2px; background: none; border-radius: 0; font-size: 0.68rem; color: rgba(245,243,237,0.74); }
     .t3-day-head--map .t3-day-actions { padding: 0 12px 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -438,6 +473,7 @@ function renderStyles() {
   @media (max-width: 1099px) {
     .t3-dh-map--wnarrow .t3-dh-frame img { width: var(--nw); height: var(--nh); }
     .t3-dh-map--wnarrow .t3-dh-ring { left: calc(50% + var(--ndx)); top: calc(50% + var(--ndy)); }
+    .t3-dh-map--wnarrow .t3-dh-pin { left: calc(50% + var(--pndx)); top: calc(50% + var(--pndy)); }
   }
   /* If a map image cannot load, the card simply drops the map column. */
   .t3-day .t3-day-head--map.t3-dh-nomap { grid-template-columns: minmax(0, 1fr); grid-template-areas: "info" "actions"; }
@@ -637,6 +673,10 @@ function renderBody(d) {
         <span class="t3-examples-label" id="t3ExamplesLabel" data-i18n="tripv3.examplesLabel">Or start from one of these:</span>
           ${chips}
       </div>
+      <div class="t3-editbar" id="t3EditBar" hidden>
+        <p class="t3-editbar-text"><span class="t3-editbar-label" id="t3EditLabel">Your request</span> <span id="t3EditText"></span></p>
+        <button type="button" class="t3-editbar-btn" id="t3EditBtn" aria-controls="t3Form">Edit request</button>
+      </div>
       <p class="t3-status" id="t3Status" role="status" aria-live="polite"></p>
     </div>
   </section>
@@ -668,7 +708,7 @@ function renderScript(d) {
   var REGION_IMAGES = ${JSON.stringify(d.regionImages)};
   // Day headers that show a pre-rendered map instead of a photograph: { slug: { group: { key, label }, assets: { desktop, narrow } } } (see tripV3MapHeaders in server.js).
   var MAP_HEADERS = ${JSON.stringify(d.mapHeaders || {})};
-  var TRIP_MAX_STOPS = 10; // My Trip's own limit (MAX_STOPS in /scripts/app.js)
+  var TRIP_MAX_STOPS = 30; // My Trip's own limit (MAX_STOPS in /scripts/app.js; 30 since 2026-10-18)
   ${CLIENT_HELPERS_SRC}
   ${t3EditLosesMatch.toString()}
   ${t3PlanNextSteps.toString()}
@@ -1170,7 +1210,7 @@ function renderScript(d) {
           html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
         }
         if ((s.freeEvening || []).length) {
@@ -1198,14 +1238,18 @@ function renderScript(d) {
   // the matching file. It is decorative (the day's name is text; "Map this day" is the way into a
   // real map), so it is hidden from assistive technology, while its two required credits are real,
   // keyboard-reachable links right next to it. The ring is placed from the true marker offset.
-  function staticMapHtml(a, first){
+  function staticMapHtml(a, first, d){
     var dk = a.desktop, nw = a.narrow;
     var style = '--dw:' + dk.w + 'px;--dh:' + dk.h + 'px;--ddx:' + dk.dx + 'px;--ddy:' + dk.dy + 'px;--nw:' + nw.w + 'px;--nh:' + nw.h + 'px;--ndx:' + nw.dx + 'px;--ndy:' + nw.dy + 'px';
-    var cls = 't3-dh-map t3-dh-map--static' + (nw.below > 721 ? ' t3-dh-map--wnarrow' : '');
-    return '<div class="' + cls + '" style="' + style + '"><div class="t3-dh-frame" aria-hidden="true"><picture>'
+    // The day's own stops as numbered pins; a day spread wider than the picture gets a live map fitted to its stops.
+    var pts = d ? (((t3MapPoints([d], state.removed).days[0] || {}).points) || []) : [];
+    var layout = t3DayPinLayout(pts, a);
+    var pinsHtml = layout.fits ? layout.pins.map(function(q){ return '<span class="t3-dh-pin" style="--pdx:' + q.d.dx + 'px;--pdy:' + q.d.dy + 'px;--pndx:' + q.w.dx + 'px;--pndy:' + q.w.dy + 'px;background:' + dayColor(d.day) + '">' + q.n + '</span>'; }).join('') : '';
+    var cls = 't3-dh-map t3-dh-map--static' + (nw.below > 721 ? ' t3-dh-map--wnarrow' : '') + (layout.fits ? ' t3-dh-map--pins' : '');
+    return '<div class="' + cls + '" style="' + style + '"' + (!layout.fits && pts.length > 1 ? ' data-t3-fit-day="' + esc(d.day) + '"' : '') + '><div class="t3-dh-frame" aria-hidden="true"><picture>'
       + '<source media="(max-width: ' + (nw.below - 1) + 'px)" srcset="' + esc(nw.src) + '">'
       + '<img src="' + esc(dk.src) + '" alt="" width="' + dk.w + '" height="' + dk.h + '" decoding="async" loading="' + (first ? 'eager' : 'lazy') + '"></picture>'
-      + '<span class="t3-dh-ring"></span></div>'
+      + (layout.fits ? pinsHtml : '<span class="t3-dh-ring"></span>') + '</div>'
       + '<span class="t3-dh-attr"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' + esc(dh('osm')) + '</a><span class="t3-dh-sep" aria-hidden="true">\u00b7</span><a href="https://www.geoapify.com/" target="_blank" rel="noopener">' + esc(dh('geo')) + '</a></span></div>';
   }
   function mapHeadHtml(d, mh, maps){
@@ -1225,8 +1269,47 @@ function renderScript(d) {
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
       + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div>'
-      + staticMapHtml(mh.assets, d.day === 1)
+      + staticMapHtml(mh.assets, d.day === 1, d)
       + '</div>';
+  }
+  // A day whose stops spread wider than its header picture: a small live map fitted to all of them, drawn once the
+  // header scrolls near the screen (Leaflet and OpenStreetMap tiles, the same free map as the whole-trip map). If it
+  // cannot load, the picture stays.
+  var fitObserver = null;
+  function fitDayMaps(){
+    var boxes = resultEl.querySelectorAll('[data-t3-fit-day]');
+    if (!boxes.length) return;
+    function draw(box){
+      if (box.getAttribute('data-t3-fit-drawn')) return;
+      box.setAttribute('data-t3-fit-drawn', '1');
+      loadLeaflet(function(ok){
+        if (!ok || !box.isConnected) return;
+        var day = Number(box.getAttribute('data-t3-fit-day'));
+        var d = days().filter(function(x){ return x.day === day; })[0];
+        var pts = d ? (((t3MapPoints([d], state.removed).days[0] || {}).points) || []) : [];
+        if (pts.length < 2) return;
+        var frame = box.querySelector('.t3-dh-frame');
+        var holder = document.createElement('div');
+        holder.className = 't3-dh-live';
+        frame.appendChild(holder);
+        try {
+          var m = L.map(holder, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, tap: false });
+          L.tileLayer(MAP_TILES, { maxZoom: 15 }).addTo(m);
+          var color = dayColor(day), line = [];
+          pts.forEach(function(p){
+            line.push([p.lat, p.lng]);
+            L.marker([p.lat, p.lng], { interactive: false, keyboard: false, icon: L.divIcon({ className: 't3-pin', html: '<span style="background:' + color + '">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(m);
+          });
+          L.polyline(line, { color: color, weight: 3, opacity: 0.8, interactive: false }).addTo(m);
+          m.fitBounds(line, { padding: [22, 22], maxZoom: 14 });
+          box.classList.add('t3-dh-map--live');
+        } catch (e) { if (holder.parentNode) holder.parentNode.removeChild(holder); }
+      });
+    }
+    if (fitObserver) fitObserver.disconnect();
+    if (!('IntersectionObserver' in window)) { Array.prototype.forEach.call(boxes, draw); return; }
+    fitObserver = new IntersectionObserver(function(entries){ entries.forEach(function(en){ if (en.isIntersecting) { fitObserver.unobserve(en.target); draw(en.target); } }); }, { rootMargin: '200px 0px' });
+    Array.prototype.forEach.call(boxes, function(b){ fitObserver.observe(b); });
   }
   // If a map image fails to load, the card drops its map column instead of showing a broken image.
   function watchStaticMaps(){
@@ -1451,6 +1534,7 @@ function renderScript(d) {
     resultEl.hidden = false;
     placeMap();
     watchStaticMaps();
+    fitDayMaps();
     if (howEl) howEl.hidden = true;
     if (window.__syncFavButtons) window.__syncFavButtons();
     if (window.__syncTripButtons) window.__syncTripButtons();
@@ -1458,7 +1542,8 @@ function renderScript(d) {
     if (focus) {
       // On a phone the plan itself comes into view (what we understood stays just above it).
       var scrollTarget = (window.matchMedia && window.matchMedia('(max-width: 640px)').matches && resultEl.querySelector('.t3-plan')) || resultEl;
-      scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // A compact (plan link) page jumps straight there; a smooth scroll can be cut short while photos load.
+      scrollTarget.scrollIntoView({ behavior: mainEl && mainEl.classList.contains('is-compact') ? 'auto' : 'smooth', block: 'start' });
       var t = document.getElementById('t3Headline');
       if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
     }
@@ -1508,6 +1593,20 @@ function renderScript(d) {
     s.textContent = '';
     setTimeout(function(){ s.textContent = text; }, 40);
   }
+  // My Trip keeps the plan's days (2026-10-18): each stop's day goes in okanaganTripDays (ref -> day), the same store
+  // the older planner used, so /my-trip groups the stops by day with a directions link per day. Saved trips without
+  // days still show as one list.
+  function rememberDays(buttons){
+    try {
+      var dayMap = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {};
+      if (typeof dayMap !== 'object' || Array.isArray(dayMap)) dayMap = {};
+      buttons.forEach(function(b){
+        var ref = b.getAttribute('data-trip-ref'), d = parseInt(b.getAttribute('data-plan-day'), 10);
+        if (ref && d > 0 && b.classList.contains('in-trip')) dayMap[ref] = d;
+      });
+      localStorage.setItem('okanaganTripDays', JSON.stringify(dayMap));
+    } catch (e) {}
+  }
   function addStops(day){
     var st = addState(day);
     if (st.state !== 'ready') {
@@ -1527,6 +1626,7 @@ function renderScript(d) {
         if (b.classList.contains('in-trip') || tripSize() > before) added += 1; else failed += 1;
       });
     } finally { window.__roamTripSource = null; }
+    rememberDays(planStopButtons(day));
     if (added && !day) track('add_whole_trip', { added_count: added, already_in_trip_count: already, no_room_count: noRoom, failed_count: failed, trip_size: tripSize(), plan_kind: planFacts(state.last).plan_kind });
     refreshAddAll();
     var msg = tx('tripv3.added', { stops: stopsText(added) });
@@ -1539,6 +1639,9 @@ function renderScript(d) {
   }
   document.addEventListener('click', function(e){
     if (e.target.closest && e.target.closest('.trip-btn, .trip-remove, #tripClearBtn, [data-trip-undo]')) setTimeout(refreshAddAll, 0);
+    // One stop added from its own card keeps its day too.
+    var one = e.target.closest && e.target.closest('.trip-btn[data-plan-day]');
+    if (one && resultEl.contains(one)) setTimeout(function(){ rememberDays([one]); }, 0);
   });
   window.addEventListener('storage', function(ev){ if (ev.key === 'okanaganTrip') refreshAddAll(); });
 
@@ -1763,6 +1866,27 @@ function renderScript(d) {
   // Back / Forward loading it again) is reported as 'restore'; any other
   // arrival with a plan link stays 'link' / 'shared_link'.
   var restored = t3QueryToState(location.search, REGION_SLUGS);
+  // Phones (2026-10-18): a plan link shows the plan first; the request becomes an "Edit request" bar.
+  var EDIT_TEXT = { en: { label: 'Your request', edit: 'Edit request' }, fr: { label: 'Votre demande', edit: 'Modifier la demande' } };
+  var mainEl = document.getElementById('tripV3'), editBar = document.getElementById('t3EditBar');
+  function editText(k){ return (EDIT_TEXT[lang()] || EDIT_TEXT.en)[k]; }
+  function setCompact(on){
+    if (!mainEl || !editBar) return;
+    mainEl.classList.toggle('is-compact', !!on);
+    editBar.hidden = !on;
+    if (on) {
+      document.getElementById('t3EditText').textContent = state.text || input.value;
+      document.getElementById('t3EditLabel').textContent = editText('label');
+      document.getElementById('t3EditBtn').textContent = editText('edit');
+    }
+  }
+  var editBtn = document.getElementById('t3EditBtn');
+  if (editBtn) editBtn.addEventListener('click', function(){
+    setCompact(false);
+    try { form.scrollIntoView({ block: 'center' }); } catch (e) {}
+    try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+  });
+  var phone = !!(window.matchMedia && window.matchMedia('(max-width: 720px)').matches);
   if (restored) {
     var arrival = 'link';
     try { var nav = performance.getEntriesByType('navigation')[0]; if (nav && (nav.type === 'reload' || nav.type === 'back_forward')) arrival = 'restore'; } catch (e) {}
@@ -1770,6 +1894,7 @@ function renderScript(d) {
     // A shared link to a French request opens in French too (a reload keeps whatever language was chosen).
     if (arrival !== 'restore' && lang() !== 'fr' && !document.documentElement.getAttribute('data-page-lang') && t3LooksFrench(restored.text) && typeof setLanguage === 'function') setLanguage('fr');
     state = { text: restored.text, seed: restored.seed, overrides: restored.overrides, locks: restored.locks, exclude: restored.exclude, removed: {}, last: null, lastReq: null };
+    if (phone) { setCompact(true); if (howEl) howEl.hidden = true; }
     track('trip_plan_start', { input_method: arrival });
     if (restored.invalid) track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
     var replay = {};
@@ -1784,7 +1909,7 @@ function renderScript(d) {
   // static text by the time this runs, so the plan on screen is redrawn in
   // the new language (same plan, same kept and removed stops).
   var langToggle = document.getElementById('langToggle');
-  if (langToggle) langToggle.addEventListener('click', function(){ setTimeout(function(){ if (state.last) render(false); }, 0); });
+  if (langToggle) langToggle.addEventListener('click', function(){ setTimeout(function(){ if (state.last) render(false); if (editBar && !editBar.hidden) setCompact(true); }, 0); });
 })();
 </script>`;
 }
@@ -1836,4 +1961,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3DayPinLayout, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
