@@ -1,0 +1,349 @@
+{
+ "heading": "Where to Eat in Vernon",
+ "title": "Where to Eat in Vernon: Restaurants & Cafés | Okanagan Roam",
+ "description": "Where to eat in Vernon and Coldstream: diner breakfasts, scratch bakeries, farm dinners, lakeside pubs, cideries, cheap eats and vegan-friendly picks.",
+ "banner": "restaurant",
+ "parent": {
+  "name": "Vernon",
+  "href": "/vernon"
+ },
+ "noPlace": true,
+ "intro": [
+  "Vernon eats well for a town its size. Breakfast runs from cheerful diners to Filipino plates, the bakeries win local awards, and dinner ranges from an elegant Italian room to a working farm where you can meet the cows first. Out in Coldstream, there are pubs and cafés right beside Kalamalka Lake and its rail trail.",
+  "These are the places worth knowing, grouped by the kind of meal you're after. For the full list, browse all {page:/vernon/restaurants|Vernon restaurants}. Patios and some lakeside spots cut back their hours from November to April, so check each listing's hours before you head out in the cooler months."
+ ],
+ "sections": [
+  {
+   "id": "breakfast-brunch",
+   "jump": "Breakfast & brunch",
+   "heading": "Breakfast & brunch",
+   "items": [
+    {
+     "ref": "vernon/diner-on-six",
+     "name": "Diner On Six",
+     "text": "a cheerful, upbeat diner. Two dishes carry the reputation: the breakfast poutine and the fluffy pancake combo.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/rosalinda-s",
+     "name": "Rosalinda's",
+     "text": "a family-run diner serving Filipino breakfast dishes next to the Western classics. Reviewers say the Filipino plates are worth the drive from Kelowna.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/mug-n-muffin",
+     "name": "Mug N Muffin",
+     "text": "a mom-and-pop diner Barb and Al have run for years, with history on the walls. Expect homemade food, generous portions and fair prices.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "coldstream/friesen-s-countrytyme",
+     "name": "Friesen's Countrytyme",
+     "text": "a neighbourly brunch spot with a garden-market feel. The pancakes are the thing to order.",
+     "where": "Coldstream"
+    }
+   ]
+  },
+  {
+   "id": "coffee-bakeries",
+   "jump": "Coffee & bakeries",
+   "heading": "Coffee & bakeries",
+   "items": [
+    {
+     "ref": "vernon/ratio-coffee-pastry",
+     "name": "Ratio Coffee & Pastry",
+     "text": "coffee roasted in house, served in a converted rail station. Eclairs are baked fresh on Tuesdays only, so that's the day to go.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/bean-to-cup",
+     "name": "Bean to Cup",
+     "text": "the café locals default to, with strong coffee and homemade food. Dogs are welcome on the front terrace, and butter chicken shows up every Wednesday.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/hot-bread-shoppe",
+     "name": "Hot Bread Shoppe",
+     "text": "a downtown artisan bakery using organic flour and sugar. Regulars rave about the chocolate croissants and cheddar bread. Stock up for a picnic in nearby Civic Park.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/sweet-caroline-s-bakery",
+     "name": "Sweet Caroline's",
+     "text": "a family bakery on 48 Avenue since 1996, run by a sixth-generation Dutch baker. Pastries, cakes, breads and pies are baked from scratch daily, and readers named it the top bakery in Best of North Okanagan 2026.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "casual-lunch",
+   "jump": "Casual lunch",
+   "heading": "Casual lunch",
+   "items": [
+    {
+     "ref": "vernon/fig-bistro",
+     "name": "Fig Bistro",
+     "text": "a well-loved sandwich shop with generous, veggie-packed sandwiches and a daily special. It can slow down at peak times.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/anna-s-ukrainian-kitchen",
+     "name": "Anna's Ukrainian Kitchen",
+     "text": "a tiny market and kitchen where the owner greets you like a regular. The borscht is the reason people come back.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/antojitos-guadalajara",
+     "name": "Antojitos Guadalajara",
+     "text": "a family-run kitchen with Guadalajara roots, where locals send newcomers for Mexican food rather than Tex-Mex. The corn tortillas are made fresh to order.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "coldstream/bluenose-mountain-bistro",
+     "name": "Bluenose Mountain Bistro",
+     "text": "out in Lavington, worth the drive for the homemade bread alone. The truffle mushroom melt is the signature, and the chef-owner is patient with kids.",
+     "where": "Coldstream"
+    }
+   ]
+  },
+  {
+   "id": "dinner-worth-booking",
+   "jump": "Dinner worth booking",
+   "heading": "Dinner worth booking",
+   "items": [
+    {
+     "ref": "vernon/intermezzo-restaurant-and-wine-cellar",
+     "name": "Intermezzo Restaurant and Wine Cellar",
+     "text": "an elegant Italian room that takes dietary needs as seriously as its wine cellar. Live Spanish guitar plays on select nights.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/rustlers-table",
+     "name": "Rustlers Table",
+     "text": "farm-to-table dining on a working farm. Before dinner, wander past the chickens, cows and sheep. Dogs are welcome on the patio.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/elora-restaurant-bar",
+     "name": "Elora Restaurant & Bar",
+     "text": "a newer Mediterranean spot with a rotating seasonal menu. The chef stops by every table.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/suda-restaurant",
+     "name": "Suda Restaurant",
+     "text": "widely called the best Korean restaurant in the Okanagan Valley. Order the traditional spicy pork dish and the seafood pancake.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/dorians-greek-taverna-vernon",
+     "name": "Dorians Greek Taverna",
+     "text": "striking Mediterranean styling, and a full rack of lamb that reviewers call excellent value.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "patios-lake-views",
+   "jump": "Patios & lake views",
+   "heading": "Patios & lake views",
+   "items": [
+    {
+     "ref": "vernon/1516-pub-grill",
+     "name": "1516 Pub & Grill",
+     "text": "one of Vernon's most dog-friendly spots, with a lakefront courtyard patio and regular live music. Grab a table by the water.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "coldstream/alexander-s-beach-pub-liquor-store",
+     "name": "Alexander's Beach Pub",
+     "text": "right on Kalamalka Lake, with a patio behind hanging flower baskets and Soma Cider on tap. Built for long lunches.",
+     "where": "Coldstream"
+    },
+    {
+     "ref": "coldstream/rail-trail-cafe-market",
+     "name": "Rail Trail Café & Market",
+     "text": "beside the Kalamalka Rail Trail, a favourite reward stop for cyclists and hikers. Finish your ride or walk on the patio.",
+     "where": "Coldstream"
+    },
+    {
+     "ref": "vernon/the-med-restaurant-vernon",
+     "name": "The Med Restaurant",
+     "text": "Mediterranean food with funky decor and a welcoming patio where dogs are properly accommodated.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "drinks-breweries-cider-cocktai",
+   "jump": "Drinks",
+   "heading": "Drinks: breweries, cider & cocktails",
+   "items": [
+    {
+     "ref": "vernon/bna-brewing-vernon-40",
+     "name": "BNA Brewing Vernon",
+     "text": "a brewpub with 10-pin and duckpin lanes and arcade games next to the beer list. Book lanes and tables separately.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/cambium-cider-co",
+     "name": "Cambium Cider Co.",
+     "text": "an orchard cidery with a real restaurant, so order beyond a flight. Dogs aren't allowed inside or on the patio, but leashed dogs can use a few picnic tables in the orchard.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/silverstar-brewing",
+     "name": "Silverstar Brewing",
+     "text": "a roomy downtown brewery with a wide beer selection and a well-regarded happy hour. The food comes in large portions, and the desserts are part of the draw.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/okanagan-spirits-craft-distillery-vernon",
+     "name": "Okanagan Spirits Craft Distillery",
+     "text": "book a guided tour that mixes history with whisky tastings. There are toys on site for kids.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/masiero-pizzeria-napoletana",
+     "name": "Masiero Pizzeria Napoletana",
+     "text": "thin-crust Neapolitan pizza and a strong wine list. The owner tends bar and is known for his cocktails, so let him pick one.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "easy-on-the-wallet",
+   "jump": "Easy on the wallet",
+   "heading": "Easy on the wallet",
+   "items": [
+    {
+     "ref": "vernon/amigo-chicken-and-mexican-kitchen",
+     "name": "Amigo Chicken and Mexican Kitchen",
+     "text": "quick-service, no-frills Mexican food served sizzling hot. Regulars say it beats the chains.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/fresh-lemongrass-vietnamese-restaurant",
+     "name": "Fresh Lemongrass Vietnamese Restaurant",
+     "text": "a modern, stylish room known for massive portions and a warm welcome.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/saffron-touch-indian-cuisine",
+     "name": "Saffron Touch Indian Cuisine",
+     "text": "one of Vernon's original Indian restaurants, with generous portions and fair prices. Order the garlic naan and butter chicken.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/winston-pub",
+     "name": "Winston Pub",
+     "text": "an old-style pub with a rooftop patio. Locals call the Sunday night pot roast special the best meal deal in town.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "dietary-friendly",
+   "jump": "Dietary-friendly",
+   "heading": "Dietary-friendly",
+   "items": [
+    {
+     "ref": "vernon/the-roxy-cafe-vegan-and-vegetarian-restaurant-cafe",
+     "name": "The Roxy Cafe",
+     "text": "a vegan café with a bright, cheerful dining room. Order at the counter, then try the butter chick'n or a vegan cinnamon roll.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/red-tomato-pies",
+     "name": "Red Tomato Pies",
+     "text": "a takeout-focused pizzeria where regulars call the gluten-free crust good, not an afterthought.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/phoenix-steakhouse",
+     "name": "Phoenix Steakhouse",
+     "text": "a celiac diner praised it for an unusually large number of safe menu options.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/cabbana-indian-bistro",
+     "name": "Cabbana Indian Bistro",
+     "text": "a stylish, contemporary take on Indian food. The owner has confirmed which dishes can be made vegan on request.",
+     "where": "Vernon"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A diner breakfast",
+    [
+     "vernon/diner-on-six|Diner On Six",
+     "vernon/rosalinda-s|Rosalinda's"
+    ]
+   ],
+   [
+    "Coffee and a pastry",
+    [
+     "vernon/ratio-coffee-pastry|Ratio Coffee & Pastry",
+     "vernon/hot-bread-shoppe|Hot Bread Shoppe"
+    ]
+   ],
+   [
+    "A special dinner",
+    [
+     "vernon/intermezzo-restaurant-and-wine-cellar|Intermezzo Restaurant and Wine Cellar",
+     "vernon/rustlers-table|Rustlers Table"
+    ]
+   ],
+   [
+    "Lunch on the lake",
+    [
+     "coldstream/alexander-s-beach-pub-liquor-store|Alexander's Beach Pub"
+    ]
+   ],
+   [
+    "A dog-friendly patio",
+    [
+     "vernon/1516-pub-grill|1516 Pub & Grill",
+     "vernon/the-med-restaurant-vernon|The Med Restaurant"
+    ]
+   ],
+   [
+    "A night out with games",
+    [
+     "vernon/bna-brewing-vernon-40|BNA Brewing Vernon"
+    ]
+   ],
+   [
+    "A cider stop",
+    [
+     "vernon/cambium-cider-co|Cambium Cider Co."
+    ]
+   ],
+   [
+    "A cheap, filling meal",
+    [
+     "vernon/amigo-chicken-and-mexican-kitchen|Amigo Chicken and Mexican Kitchen",
+     "vernon/fresh-lemongrass-vietnamese-restaurant|Fresh Lemongrass Vietnamese Restaurant"
+    ]
+   ],
+   [
+    "Vegan or gluten-free",
+    [
+     "vernon/the-roxy-cafe-vegan-and-vegetarian-restaurant-cafe|The Roxy Cafe",
+     "vernon/red-tomato-pies|Red Tomato Pies"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/vernon/restaurants\">Vernon restaurants</a>, <a href=\"/vernon/cafes\">Vernon cafés</a>, <a href=\"/vernon/breweries\">Vernon breweries</a>, <a href=\"/guides/soup-ramen-pho-okanagan\">Soup, ramen &amp; pho</a>"
+}
