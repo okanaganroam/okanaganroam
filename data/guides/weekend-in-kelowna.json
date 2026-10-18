@@ -1,0 +1,339 @@
+{
+ "heading": "A Weekend in Kelowna",
+ "title": "A Weekend in Kelowna: 2-Day Itinerary | Okanagan Roam",
+ "description": "Two days in Kelowna: the downtown waterfront, a Knox Mountain hike, a winery afternoon, good coffee and dinners, and cozy evenings in any season.",
+ "banner": "region-kelowna",
+ "parent": {
+  "name": "Kelowna",
+  "href": "/kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "Kelowna is an easy city for a short trip. Downtown sits right on Okanagan Lake, the wineries are a short drive south or across the bridge, and good coffee is never far away. This plan keeps the driving light: Day 1 stays downtown and on the waterfront, and Day 2 moves south to Pandosy, the Mission and the wineries.",
+  "It works in any season. Where a stop is a summer thing, there's a fall or winter swap. Many wineries and patios cut their hours from November to April, so check each listing's hours before you set out. If you'd like a plan built around your own dates and interests, try the {page:/trip|trip planner}."
+ ],
+ "sections": [
+  {
+   "id": "day-1-morning",
+   "jump": "Day 1 morning",
+   "heading": "Day 1: Morning",
+   "lead": "Start downtown, near Bernard Avenue and the lake. Everything here is walkable.",
+   "items": [
+    {
+     "ref": "kelowna/bread-company",
+     "name": "Bread Company",
+     "text": "a long-running Bernard Ave bakery and breakfast spot with a loyal following. Order the chocolate croissant or the pizza croissant, and come at a quieter time of day.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/karat-chocolate",
+     "name": "Karat Chocolate",
+     "text": "a pastry boutique that sources its chocolate directly from a partner farm in Brazil and pours espresso from local roaster Bright Jenny. Try the fruit pastry.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/rotary-marsh-park",
+     "name": "Rotary Marsh Park",
+     "text": "a restored wetland at the north end of Waterfront Park, with gravel paths and boardwalks between the cattails. Look for painted turtles and herons; in winter, loons, grebes and diving ducks gather off the point. It's free and open year-round, and no dogs are allowed.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/waterfront-park-tugboat-bay-beach",
+     "name": "Waterfront Park – Tugboat Bay Beach",
+     "text": "a sandy, shallow swimming area in Waterfront Park, with the boardwalk running along the water all the way to City Park. In summer it's a spontaneous swim; the rest of the year, walk the boardwalk.",
+     "where": "Kelowna, downtown"
+    }
+   ]
+  },
+  {
+   "id": "day-1-afternoon",
+   "jump": "Day 1 afternoon",
+   "heading": "Day 1: Afternoon",
+   "lead": "Lunch downtown, then head just north of downtown for the city's classic view.",
+   "items": [
+    {
+     "ref": "kelowna/mad-mango-cafe",
+     "name": "Mad Mango Cafe",
+     "text": "a cozy, colourful pan-Asian soup spot blending Malaysian, Vietnamese and other Southeast Asian flavours. Order the laksa with the mango-strawberry smoothie.",
+     "where": "Kelowna, Bernard Ave"
+    },
+    {
+     "ref": "kelowna/knox-mountain-park",
+     "name": "Knox Mountain Park",
+     "text": "its lookouts are the classic view of the city. The Apex Trail to the upper lookout is about 5 km round trip with stairs; for something gentler, take the 3 km lakeshore walk to Paul's Tomb. The road to the first lookout closes in winter, so walk up from the base then.",
+     "where": "Kelowna, just north of downtown"
+    },
+    {
+     "ref": "kelowna/unleashed-brewing-company",
+     "name": "Unleashed Brewing Company",
+     "text": "a dog-themed brewery where pups are welcome inside and on the patio. A good place to rest your legs after the hike.",
+     "where": "Kelowna, Brewery District"
+    },
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "a free outdoor rink with the lake and the Bennett Bridge behind it. It opens in early December, weather permitting, and there's a skate rental hut. Swap it in for the hike on a cold, clear day.",
+     "where": "Kelowna, downtown waterfront, winter only"
+    }
+   ]
+  },
+  {
+   "id": "day-1-evening",
+   "jump": "Day 1 evening",
+   "heading": "Day 1: Evening",
+   "lead": "Stay downtown for dinner and a drink.",
+   "items": [
+    {
+     "ref": "kelowna/waterfront-wines-restaurant",
+     "name": "Waterfront Wines Restaurant",
+     "text": "an award-winning wine bar and fine-dining spot. Trust the staff for pairings, and expect a small, lively room that can get loud when busy.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bernie-s-supper-club-cinema",
+     "name": "Bernie's Supper Club & Cinema",
+     "text": "a speakeasy-style supper club with an oyster bar and an upstairs theatre for a film after dinner. Book your cinema tickets and your table separately.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bar-travelling-man",
+     "name": "Bar Travelling Man",
+     "text": "a 28-seat room where every cocktail tells a story from somewhere in the world, with street-food tapas to match. An easy nightcap.",
+     "where": "Kelowna, Bernard Ave"
+    }
+   ]
+  },
+  {
+   "id": "day-2-morning",
+   "jump": "Day 2 morning",
+   "heading": "Day 2: Morning",
+   "lead": "Drive south to Pandosy Village for breakfast and a walk by the lake. For more morning options, see our {page:/guides/best-brunch-kelowna|best brunch in Kelowna guide}.",
+   "items": [
+    {
+     "ref": "kelowna/pulp-fiction-pandosy",
+     "name": "Pulp Fiction – Pandosy",
+     "text": "a coffee house that doubles as a rare and used bookstore. The breakfast menu is strong, and regulars rave about the coffee milkshake.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/black-rabbit-coffee-house",
+     "name": "Black Rabbit Coffee House",
+     "text": "a cozy shop known for buttery, flaky croissants. The beach is close enough that a coffee here easily turns into a beach walk.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/pandosy-waterfront-park",
+     "name": "Pandosy Waterfront Park",
+     "text": "Pandosy Village's own spot on the lake, with a public pier, a floating dock, a beachfront and picnic areas.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/mission-creek-regional-park",
+     "name": "Mission Creek Regional Park",
+     "text": "92 hectares of gentle trails, creek and cottonwoods that work in every season, with the kokanee spawning channel and about 7 km of easy walking. Some trails are closed for bridge work, so follow the detour signs.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "day-2-afternoon",
+   "jump": "Day 2 afternoon",
+   "heading": "Day 2: Afternoon",
+   "lead": "Spend the afternoon at the wineries south of Pandosy. Pick two or three and take your time. New to wine touring? Read our {page:/guides/okanagan-wineries-first-timers|first-timer's guide to Okanagan wineries}.",
+   "items": [
+    {
+     "ref": "kelowna/summerhill-pyramid-winery",
+     "name": "Summerhill Pyramid Winery",
+     "text": "a certified-organic estate built around an actual pyramid. Stay for a meal at the on-site restaurant, on the heated lake-view terrace.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cedarcreek-estate-winery",
+     "name": "CedarCreek Estate Winery",
+     "text": "an onsite restaurant with a lake view and cozy outdoor booths. Regulars recommend the schnitzel with a glass of the Pinot Gris grown on the property.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/st-hubertus-oak-bay-estate-winery",
+     "name": "St Hubertus & Oak Bay Estate Winery",
+     "text": "a small, unpretentious winery with a sloped vineyard right on the lake. The wines are reasonably priced, and the tasting fee is waived when you buy a bottle.",
+     "where": "Kelowna"
+    },
+    {
+     "lead": "Winter wine:",
+     "tip": "from November to April, many tasting rooms keep shorter hours or close on some days. Check each listing first, and plan the meal stop around whichever one is open."
+    }
+   ]
+  },
+  {
+   "id": "day-2-afternoon-across-the-bri",
+   "jump": "West Kelowna option",
+   "heading": "Day 2: Afternoon, across the bridge instead",
+   "lead": "If you'd rather see West Kelowna, cross the bridge and visit these instead.",
+   "items": [
+    {
+     "ref": "west-kelowna/quails-gate-winery",
+     "name": "Quails' Gate Winery",
+     "text": "family-farmed since 1956, with a dog-friendly patio that overlooks Okanagan Lake.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/mission-hill-family-estate-winery",
+     "name": "Mission Hill Family Estate Winery",
+     "text": "one of the Okanagan's most iconic estates. Book the architectural tour, then dine on the terrace with its sweeping valley views.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/frind-estate-winery",
+     "name": "Frind Estate Winery",
+     "text": "the only lakefront winery in the area, with a beach picnic spot and a pizza shop on site. The $10 five-wine tasting is good value.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "day-2-evening",
+   "jump": "Day 2 evening",
+   "heading": "Day 2: Evening",
+   "lead": "End with something slow and warm. For more ideas, see our {page:/guides/cozy-spots-okanagan|cozy spots guide}.",
+   "items": [
+    {
+     "ref": "kelowna/chutney-cuisine-of-india",
+     "name": "Chutney Cuisine of India",
+     "text": "warm ambiance and classical Indian music. On a first visit, order the dinner sampler regulars recommend.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/twice-the-dice-board-game-cafe-and-bar",
+     "name": "Twice The Dice Board Game Cafe and Bar",
+     "text": "a cozy board game cafe and bar with more than 1,000 games on the walls. Walk in or reserve a table online, and order the Hyderabadi biryani between games.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/skinny-duke-s-glorious-emporium",
+     "name": "Skinny Duke's Glorious Emporium",
+     "text": "a retro '70s-themed lounge packed with vintage decor. Order a spread of Asian-fusion small plates and an inventive cocktail.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "if-the-weather-turns",
+   "jump": "Rainy day",
+   "heading": "If the weather turns",
+   "lead": "Downtown's Cultural District has most of the indoor stops close together. Our {page:/guides/rainy-day-okanagan|rainy day guide} has more.",
+   "items": [
+    {
+     "ref": "kelowna/kelowna-art-gallery",
+     "name": "Kelowna Art Gallery",
+     "text": "rotating contemporary and historical exhibitions across several galleries. Kids under 12 get in free, and it's half price on Thursdays.",
+     "where": "Kelowna, Cultural District"
+    },
+    {
+     "ref": "kelowna/okanagan-wine-orchard-museum-laurel-packinghouse",
+     "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+     "text": "the valley's fruit-growing and wine-making story, told in the historic 1918 Laurel Packinghouse. Admission is by donation, and it's a good primer before, or instead of, a rainy winery day.",
+     "where": "Kelowna, Cultural District"
+    },
+    {
+     "ref": "kelowna/tality-wellness-kelowna",
+     "name": "Tality Wellness Kelowna",
+     "text": "a social bathhouse with a 20-person cedar sauna, four cold plunges and a lounge around a vapour firepit. Robes, towels and hot tea are included; bring a bathing suit.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/catelowna-cat-cafe",
+     "name": "Catelowna Cat Cafe",
+     "text": "book an hour with resident and adoptable cats over coffee or tea. Reserve ahead, since walk-ins get in only when there's room.",
+     "where": "Kelowna, downtown"
+    }
+   ]
+  },
+  {
+   "id": "where-to-stay",
+   "jump": "Where to stay",
+   "heading": "Where to stay",
+   "items": [
+    {
+     "lead": "Pick a base:",
+     "tip": "pick a base in downtown Kelowna if you want to walk to dinner and the waterfront, or near Pandosy if you'd rather be close to the beaches and the wineries. Either way, nothing on this plan is more than a short drive away."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A downtown breakfast",
+    [
+     "kelowna/bread-company|Bread Company"
+    ]
+   ],
+   [
+    "A walk by the lake",
+    [
+     "kelowna/rotary-marsh-park|Rotary Marsh Park",
+     "kelowna/pandosy-waterfront-park|Pandosy Waterfront Park"
+    ]
+   ],
+   [
+    "A hike with a view",
+    [
+     "kelowna/knox-mountain-park|Knox Mountain Park"
+    ]
+   ],
+   [
+    "A warming bowl of soup",
+    [
+     "kelowna/mad-mango-cafe|Mad Mango Cafe"
+    ]
+   ],
+   [
+    "Dinner and a film",
+    [
+     "kelowna/bernie-s-supper-club-cinema|Bernie's Supper Club & Cinema"
+    ]
+   ],
+   [
+    "A winery with a meal",
+    [
+     "kelowna/summerhill-pyramid-winery|Summerhill Pyramid Winery",
+     "kelowna/cedarcreek-estate-winery|CedarCreek Estate Winery"
+    ]
+   ],
+   [
+    "A lakefront winery",
+    [
+     "west-kelowna/frind-estate-winery|Frind Estate Winery"
+    ]
+   ],
+   [
+    "Coffee and books",
+    [
+     "kelowna/pulp-fiction-pandosy|Pulp Fiction – Pandosy"
+    ]
+   ],
+   [
+    "A cozy night in",
+    [
+     "kelowna/twice-the-dice-board-game-cafe-and-bar|Twice The Dice Board Game Cafe and Bar",
+     "kelowna/tality-wellness-kelowna|Tality Wellness Kelowna"
+    ]
+   ],
+   [
+    "A rainy afternoon",
+    [
+     "kelowna/kelowna-art-gallery|Kelowna Art Gallery"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna\">Kelowna</a>, <a href=\"/wineries\">Wineries</a>, <a href=\"/trip\">Trip planner</a>, <a href=\"/whats-on\">What's On</a>"
+}

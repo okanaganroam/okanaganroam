@@ -1,0 +1,315 @@
+{
+ "heading": "An Oliver & Osoyoos Wine Weekend",
+ "title": "Oliver & Osoyoos Wine Weekend Itinerary | Okanagan Roam",
+ "description": "A two-day Oliver and Osoyoos wine weekend: Golden Mile and Black Sage Road tastings, a winery lunch, desert trails, a lake walk and dinner in Osoyoos.",
+ "banner": "region-osoyoos",
+ "parent": {
+  "name": "Oliver",
+  "href": "/oliver"
+ },
+ "noPlace": true,
+ "intro": [
+  "This is a two-day plan for the south end of the valley. Day one stays in Oliver, with tastings on the Golden Mile in the morning, lunch at a winery and an afternoon on Black Sage Road. Day two moves 20 minutes south to Osoyoos for the desert, wineries by the lake, a walk along the water and dinner downtown. Each day stays in one town, so the driving is short. Pick a designated driver, or book a local wine tour.",
+  "Many tasting rooms cut their hours from November to April, and a few close for part of winter. Every stop below was open at the time of writing, but check each listing's hours before you go, and book ahead where a winery asks you to. New to tasting? Start with our {page:/guides/okanagan-wineries-first-timers|first-timer's guide to Okanagan wineries}. If you want to change the stops, the {page:/trip|trip planner} can build a custom plan."
+ ],
+ "sections": [
+  {
+   "id": "day-1-morning-oliver-and-the-g",
+   "jump": "Day 1 morning",
+   "heading": "Day 1 morning: Oliver and the Golden Mile",
+   "lead": "Start in town, then head southwest to the Golden Mile, on the west side of the valley.",
+   "items": [
+    {
+     "ref": "oliver/the-ditch-cafe",
+     "name": "The Ditch Cafe",
+     "text": "a well-loved breakfast spot on Oliver's main street. Order one of the breakfast bowls, and don't leave without trying the Nutella brownie.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/golden-mile-trail",
+     "name": "Golden Mile Trail",
+     "text": "a 4 km loop that starts at Tinhorn Creek Vineyards, which invites visitors to hike it. It climbs through the vineyard to a viewpoint over the valley, and a fork leads to the ruins of the historic Fairview stamp mill. In spring, runoff raises the creek, so cross with care.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/tinhorn-creek-vineyards",
+     "name": "Tinhorn Creek Vineyards",
+     "text": "end the walk with a tasting. The patio overlooks the Golden Mile, and you can book a Riedel-glass tasting.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/rust-wine-co-oliver-osoyoos",
+     "name": "Rust Wine Co - Oliver/Osoyoos",
+     "text": "a cozy, unpretentious tasting room with outdoor tables out front that look straight down the Golden Mile valley.",
+     "where": "Oliver"
+    }
+   ]
+  },
+  {
+   "id": "day-1-afternoon-a-winery-lunch",
+   "jump": "Day 1 afternoon",
+   "heading": "Day 1 afternoon: a winery lunch, then Black Sage Road",
+   "lead": "Lunch stays on the Golden Mile. Then cross the valley to Black Sage Road on the east side. For more places to eat among the vines, see our {page:/guides/okanagan-winery-restaurants|winery restaurants guide}.",
+   "items": [
+    {
+     "ref": "oliver/terrafina-at-hester-creek",
+     "name": "Terrafina at Hester Creek",
+     "text": "the patio restaurant at the Hester Creek winery estate. Start with the focaccia spreads, then see which seasonal pasta is on the menu that day.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/church-state-wines",
+     "name": "Church & State Wines",
+     "text": "some of the boldest reds on Black Sage Road, poured on a peaceful patio with misters for hot afternoons.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/silver-sage-winery",
+     "name": "Silver Sage Winery",
+     "text": "known on Black Sage Road for a funny, non-stop free tasting. Try the sage Gewurztraminer.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/platinum-bench-estate-winery-artisan-bread-co",
+     "name": "Platinum Bench Estate Winery & Artisan Bread Co.",
+     "text": "wine tastings paired with artisan bread on Black Sage Road, and the views are stunning.",
+     "where": "Oliver"
+    }
+   ]
+  },
+  {
+   "id": "day-1-evening-dinner-in-oliver",
+   "jump": "Day 1 evening",
+   "heading": "Day 1 evening: dinner in Oliver",
+   "items": [
+    {
+     "ref": "oliver/sonora-room-restaurant",
+     "name": "Sonora Room Restaurant",
+     "text": "the restaurant at Burrowing Owl Estate Winery. Its balcony looks out over some of the best vineyard views in the South Okanagan, so book a balcony table.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/savvios-family-restaurant",
+     "name": "Savvios Family Restaurant",
+     "text": "a Greek-Italian family restaurant with generous portions. Locals come back for the souvlaki and spanakopita.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/firehall-brewery",
+     "name": "Firehall Brewery",
+     "text": "a break from wine. Order the well-loved smoked stout and some pub food, which holds its own.",
+     "where": "Oliver"
+    }
+   ]
+  },
+  {
+   "id": "day-2-morning-osoyoos-and-the-",
+   "jump": "Day 2 morning",
+   "heading": "Day 2 morning: Osoyoos and the desert",
+   "lead": "Drive south to Osoyoos. The desert stops sit on the east side of the lake.",
+   "items": [
+    {
+     "ref": "osoyoos/queen-of-the-south",
+     "name": "Queen of the South",
+     "text": "a coffee shop, gift shop and cocktail bar in one space. Order the house roast and one of the breakfast sandwiches.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/nkmip-desert-cultural-centre",
+     "name": "Nk'Mip Desert Cultural Centre",
+     "text": "owned and run by the Osoyoos Indian Band, with more than 1.5 km of walking trails through wild sage and antelope brush above Osoyoos Lake. Inside, exhibits tell the story of the Syilx people and their land. It's open year-round. Allow an hour and a half to two hours, and bring water and a hat.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/anarchist-mountain-lookout",
+     "name": "Anarchist Mountain Lookout",
+     "text": "a free pullout on the Highway 3 switchbacks east of town, with the whole picture at once: the town, the lake and the vineyards below. You can only turn in when driving uphill, away from Osoyoos.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "day-2-afternoon-wineries-by-th",
+   "jump": "Day 2 afternoon",
+   "heading": "Day 2 afternoon: wineries by the lake",
+   "lead": "Lunch at a winery, then two tasting rooms with lake views.",
+   "items": [
+    {
+     "ref": "osoyoos/sweetgrass-nk-mip-cellars",
+     "name": "Sweetgrass @ Nk'Mip Cellars",
+     "text": "the restaurant at Nk'Mip Cellars. Share plates like the duck wings or bison meatballs, with desert and lake views.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/nk-mip-cellars",
+     "name": "Nk'Mip Cellars",
+     "text": "North America's first Indigenous-owned winery, and a visit is a chance to support Indigenous-owned winemaking.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/moon-curser-vineyards",
+     "name": "Moon Curser Vineyards",
+     "text": "a boutique winery known for rare varietals. The tasting bar is small and personal, with lake views.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/lakeside-cellars",
+     "name": "Lakeside Cellars",
+     "text": "a dog-friendly, family-run winery right in Osoyoos with lake views. The cab franc is worth lingering over on the lower deck, and there's live music on Sundays.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "day-2-evening-a-lake-walk-and-",
+   "jump": "Day 2 evening",
+   "heading": "Day 2 evening: a lake walk and dinner downtown",
+   "lead": "Park once downtown, walk by the water, then eat.",
+   "items": [
+    {
+     "ref": "osoyoos/gyro-beach",
+     "name": "Gyro Beach",
+     "text": "the sandy beach in the middle of town, behind the Osoyoos Museum. The washrooms stay open year-round, so it works for a walk in any season.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/pioneer-walkway-park",
+     "name": "Pioneer Walkway Park",
+     "text": "a short lakeside stroll near the east side of the Osoyoos Lake bridge, with wooden arches, gardens and a gazebo by the water.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/15-park-bistro",
+     "name": "15 Park Bistro",
+     "text": "French bistro comfort downtown, with a heated patio for cooler nights. If the short rib special is on, order it. On Sundays, it's prime rib.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/campo-marina",
+     "name": "Campo Marina",
+     "text": "a cozy downtown Italian spot that stays busy. The house focaccia alone is worth the visit.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "if-the-weather-turns",
+   "jump": "Rainy day",
+   "heading": "If the weather turns",
+   "lead": "Rain or snow? Swap a walk for one of these.",
+   "items": [
+    {
+     "ref": "oliver/oliver-district-museum",
+     "name": "Oliver & District Museum",
+     "text": "a heritage museum in Oliver's 1924 provincial police building, with exhibits on mining, ranching, orchards and the Syilx Okanagan people. Step inside the historic Fairview Jail on the grounds.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/oliver-theatre",
+     "name": "Oliver Theatre",
+     "text": "a single-screen downtown movie house showing films since 1947. It's a budget-friendly way to spend a rainy evening.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "osoyoos/osoyoos-district-museum-and-archives",
+     "name": "Osoyoos & District Museum and Archives",
+     "text": "a downtown museum with more than 4,000 artifacts and photo exhibits on the town's early days, ranching, orchards and Syilx history.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "osoyoos/okanagan-art-gallery",
+     "name": "Okanagan Art Gallery",
+     "text": "an artist-run co-op on Main Street showing South Okanagan, Boundary and Similkameen artists. A member artist staffs it each day, so you can chat with the makers.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "where-to-stay",
+   "jump": "Where to stay",
+   "heading": "Where to stay",
+   "items": [
+    {
+     "lead": "Pick a base:",
+     "tip": "pick a base in Oliver for day one and Osoyoos for day two, or stay in one and drive the 20 minutes between them. Osoyoos has more places right on the lake."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A winery lunch",
+    [
+     "oliver/terrafina-at-hester-creek|Terrafina at Hester Creek",
+     "osoyoos/sweetgrass-nk-mip-cellars|Sweetgrass @ Nk'Mip Cellars"
+    ]
+   ],
+   [
+    "A walk through the vines",
+    [
+     "oliver/golden-mile-trail|Golden Mile Trail"
+    ]
+   ],
+   [
+    "Bold reds",
+    [
+     "oliver/church-state-wines|Church & State Wines"
+    ]
+   ],
+   [
+    "A tasting with a laugh",
+    [
+     "oliver/silver-sage-winery|Silver Sage Winery"
+    ]
+   ],
+   [
+    "A view down the Golden Mile",
+    [
+     "oliver/rust-wine-co-oliver-osoyoos|Rust Wine Co - Oliver/Osoyoos"
+    ]
+   ],
+   [
+    "Lake views with your glass",
+    [
+     "osoyoos/moon-curser-vineyards|Moon Curser Vineyards",
+     "osoyoos/lakeside-cellars|Lakeside Cellars"
+    ]
+   ],
+   [
+    "The desert up close",
+    [
+     "osoyoos/nkmip-desert-cultural-centre|Nk'Mip Desert Cultural Centre"
+    ]
+   ],
+   [
+    "Dinner with a vineyard view",
+    [
+     "oliver/sonora-room-restaurant|Sonora Room Restaurant"
+    ]
+   ],
+   [
+    "A cozy dinner in Osoyoos",
+    [
+     "osoyoos/15-park-bistro|15 Park Bistro",
+     "osoyoos/campo-marina|Campo Marina"
+    ]
+   ],
+   [
+    "A rainy-day stop",
+    [
+     "oliver/oliver-theatre|Oliver Theatre",
+     "osoyoos/okanagan-art-gallery|Okanagan Art Gallery"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/wineries\">Wineries</a>, <a href=\"/oliver\">Oliver</a>, <a href=\"/osoyoos\">Osoyoos</a>, <a href=\"/trip\">Trip planner</a>"
+}

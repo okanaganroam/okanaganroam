@@ -18708,9 +18708,9 @@ test('Guides hub (2026-10-13): /guides lists live guides by season, header/foote
   const idx = app.renderGuidesIndexPage(oct);
   assert.match(idx, /<title>Okanagan Guides: Things to Do by Season \| Okanagan Roam<\/title>/);
   assert.match(idx, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides">/);
-  assert.deepEqual(app.guideGroupOrder(oct), ['fall', 'cozy', 'winter', 'year'], 'fall leads in October');
-  assert.deepEqual(app.guideGroupOrder(new Date('2027-01-15T12:00:00-08:00')), ['winter', 'cozy', 'year', 'fall'], 'winter leads in January');
-  assert.deepEqual(app.guideGroupOrder(new Date('2027-06-15T12:00:00-07:00')), ['year', 'fall', 'cozy', 'winter'], 'year-round leads in summer');
+  assert.deepEqual(app.guideGroupOrder(oct), ['fall', 'cozy', 'winter', 'towns', 'year'], 'fall leads in October');
+  assert.deepEqual(app.guideGroupOrder(new Date('2027-01-15T12:00:00-08:00')), ['winter', 'cozy', 'towns', 'year', 'fall'], 'winter leads in January');
+  assert.deepEqual(app.guideGroupOrder(new Date('2027-06-15T12:00:00-07:00')), ['towns', 'year', 'fall', 'cozy', 'winter'], 'year-round leads in summer');
   assert.match(idx, /<h2>Winter in the Okanagan<\/h2>/, 'the ski guide is always listed');
   assert.match(idx, /href="\/guides\/ski-season-big-white-silverstar"/);
   assert.equal(app.seasonalGuideLink(new Date('2026-07-15T12:00:00-07:00')), null, 'no seasonal link in summer');
@@ -24273,3 +24273,25 @@ test('Inline scripts parse on the main pages (EN and FR), incl. My Trip', () => 
     await new Promise((resolve) => srv.close(resolve));
   }
 }));
+
+test('Weekend and town food guides (2026-10-18): six file guides, each in the towns group with a town-photo banner where one needs no credit', () => {
+  const towns = app.GUIDE_GROUPS.find((g) => g.key === 'towns');
+  assert.ok(towns, 'the towns group exists');
+  const banners = {
+    'weekend-in-kelowna': 'region-kelowna', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
+    'best-restaurants-penticton': 'region-penticton', 'best-restaurants-vernon': 'restaurant', 'best-restaurants-west-kelowna': 'region-west-kelowna',
+  };
+  for (const [slug, key] of Object.entries(banners)) {
+    const p = `/guides/${slug}`;
+    const g = app.FILE_GUIDES[p];
+    assert.ok(g, `${p} is a file guide`);
+    assert.ok(towns.paths.includes(p), `${p} is listed on /guides`);
+    const json = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'data', 'guides', `${slug}.json`), 'utf8'));
+    assert.equal(json.banner, key);
+    assert.ok(app.GUIDE_BANNERS[key], `${key} is a known banner`);
+    assert.ok(g.title.length <= 65, `${p} title fits`);
+    assert.ok(g.sections.reduce((n, s) => n + s.items.length, 0) >= 20, `${p} has a full list`);
+  }
+  assert.match(app.GUIDE_BANNERS['region-kelowna']().src, /^\/images\/regions\/photos\/kelowna-/);
+  assert.equal(app.GUIDE_BANNERS['region-vernon'], undefined, 'a town photo that needs a credit is not a guide banner');
+});

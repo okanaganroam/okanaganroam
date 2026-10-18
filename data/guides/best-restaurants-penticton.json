@@ -1,0 +1,366 @@
+{
+ "heading": "Where to Eat in Penticton",
+ "title": "Where to Eat in Penticton | Okanagan Roam",
+ "description": "Where to eat in Penticton: brunch, bakeries, lunch counters, lakeside patios, winery dinners, breweries, cocktail bars, cheap eats and vegan spots.",
+ "banner": "region-penticton",
+ "parent": {
+  "name": "Penticton",
+  "href": "/penticton"
+ },
+ "noPlace": true,
+ "intro": [
+  "Penticton sits between two lakes, and a lot of its food does too. This guide covers the whole day: diner breakfasts and crêpes, small-batch coffee and bakery bread, lunch counters, dinners worth booking, lakeside patios, and a strong run of breweries and cocktail bars. Most picks are in Penticton itself, with a couple of dinners up the road in Naramata.",
+  "Patios, winery restaurants and beachside spots often cut back their hours from November to April, so check each listing's hours before you head out. For the full list, see all {page:/penticton/restaurants|Penticton restaurants}."
+ ],
+ "sections": [
+  {
+   "id": "breakfast-brunch",
+   "jump": "Breakfast & brunch",
+   "heading": "Breakfast & brunch",
+   "lead": "From big diner plates to a French crêpe room.",
+   "items": [
+    {
+     "ref": "penticton/bench-market",
+     "name": "Bench Market",
+     "text": "a busy cafeteria-style breakfast and brunch spot with a market, and a handy stop before a day on the Naramata Bench. The gluten-free options are excellent, and dogs are welcome on the outdoor terrace.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/terry-s-comfort-food",
+     "name": "Terry's Comfort Food",
+     "text": "a classic, no-frills diner on Main St with enormous breakfasts like the King Omelette. Kids love the free jellybean machine.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/tootsies-diner",
+     "name": "Tootsies Diner",
+     "text": "a vintage locals' favourite in the industrial park, with oldies playing, a retro record table and fluffy pancakes.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/creperie-ooolala-bistro",
+     "name": "Creperie Ooolala Bistro",
+     "text": "a tiny room where the staff speak French. Regulars say it feels like a trip to Paris, so let the staff guide your order.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/elma",
+     "name": "Elma",
+     "text": "a beachfront Turkish restaurant with a weekend brunch worth booking. It's just as good at dinner, when the charcoal octopus is the order.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "coffee-bakeries",
+   "jump": "Coffee & bakeries",
+   "heading": "Coffee & bakeries",
+   "items": [
+    {
+     "ref": "penticton/petrasek-bakery",
+     "name": "Petrasek Bakery",
+     "text": "an artisan bakery and café on Main St for fresh bread and pastries. The owners will likely know you by name after a visit or two.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/one14-coffee-co",
+     "name": "One14 Coffee Co.",
+     "text": "small-batch roasting inside a converted industrial complex. Reviewers rate the gluten-free oat cookie on its own merits.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/south-main-market",
+     "name": "South Main Market",
+     "text": "a family-run grocery with a from-scratch bakery, voted Best Bakery in the 2026 Best of Penticton. Locals line up for the cinnamon buns and homemade pies.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/soe-cafe",
+     "name": "soe cafe",
+     "text": "an eclectic spot filled with pottery, with vinyl for sale. Order the matcha by day, or a natural wine if you stay into the evening.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "casual-lunch",
+   "jump": "Casual lunch",
+   "heading": "Casual lunch",
+   "items": [
+    {
+     "ref": "penticton/brodo-kitchen",
+     "name": "BRODO Kitchen",
+     "text": "a lunch-only soup and sandwich spot with a small menu. Order the soup and sandwich combo.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/il-vecchio-delicatessen",
+     "name": "Il Vecchio Delicatessen",
+     "text": "a much-loved Italian deli with huge, generously stuffed sandwiches. Staff are happy to help first-timers.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/baba-express",
+     "name": "BaBa Express",
+     "text": "Vietnamese, with banh mi that comes out crisp outside and soft inside. The salad rolls stand out too.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/buy-the-sea-seafood",
+     "name": "Buy The Sea Seafood",
+     "text": "a simple takeout counter and seafood market, known for its white and red chowder. Eat a bowl, then pick up fish for dinner.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "dinner-worth-booking",
+   "jump": "Dinner worth booking",
+   "heading": "Dinner worth booking",
+   "lead": "For a longer meal, including two in Naramata. Our {page:/guides/okanagan-winery-restaurants|winery restaurants guide} has more dining rooms among the vines.",
+   "items": [
+    {
+     "ref": "penticton/the-restaurant-at-poplar-grove-1012",
+     "name": "The Restaurant at Poplar Grove",
+     "text": "the fine-dining room at Poplar Grove Winery, with a lake view. Gluten-free bread is available, and the team is good at anniversaries and milestone birthdays.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/gusto-ferrari",
+     "name": "Gusto Ferrari",
+     "text": "a small, cozy Italian deli and restaurant that makes everything from scratch. Order the homemade pasta or the wood-fired margherita pizza.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/chulo-tapas-bar",
+     "name": "Chulo Tapas & Bar",
+     "text": "Spanish and Mediterranean small plates in a small tapas bar. Reviewers single out the roasted duck; share a few plates with a craft cocktail.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "naramata/bistro-lapin-perdu",
+     "name": "Bistro Lapin Perdu",
+     "text": "a quiet, romantic French bistro inside the historic Naramata Inn, with a garden view. Book it for an anniversary or a first date.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "naramata/terroir-kitchen",
+     "name": "Terroir Kitchen",
+     "text": "a quiet farm-to-table restaurant where nearly everything is locally sourced. The pace is unhurried, so settle in.",
+     "where": "Naramata"
+    }
+   ]
+  },
+  {
+   "id": "patios-lake-views",
+   "jump": "Patios & lake views",
+   "heading": "Patios & lake views",
+   "items": [
+    {
+     "ref": "penticton/salty-s-beach-house",
+     "name": "Salty's Beach House",
+     "text": "right on Okanagan Lake. Order the ahi tuna salad or fresh oysters, and come for the late happy hour.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/hooded-merganser-restaurant",
+     "name": "Hooded Merganser Restaurant",
+     "text": "lakefront views and a salmon bowl reviewers love. Service can slow on busy nights, so pick a quieter evening if you can.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/sociale",
+     "name": "Sociale",
+     "text": "a lake-view patio and a roadside bar that's good for people-watching. The happy hour is well loved.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/kitchen-da-silva-winery",
+     "name": "Kitchen @ Da Silva Winery",
+     "text": "the tapas restaurant at Da Silva Vineyards and Winery, with lovely views. It's known for the Chef's Choice tasting, fresh bread and paella.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "drinks",
+   "jump": "Drinks",
+   "heading": "Drinks",
+   "lead": "Penticton pours a lot of beer. See all {page:/penticton/breweries|Penticton breweries} for the rest.",
+   "items": [
+    {
+     "ref": "penticton/tin-whistle-brewing",
+     "name": "Tin Whistle Brewing",
+     "text": "the self-described original Okanagan microbrewery, in a former fruit cannery on Fairview Road. The Peach Cream Ale is always on tap, and records spin in the background.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/abandoned-rail-brewing-co",
+     "name": "Abandoned Rail Brewing Co.",
+     "text": "solid beer and real food, with a gluten-free cauliflower-crust pizza and GF beer. The patio looks out toward the mountains, and dogs are welcome.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/the-forest",
+     "name": "The Forest",
+     "text": "a moody, design-forward cocktail bar. Its nightly Enchanted Hour comes with complimentary flatbread.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/wildflower-distilling-co",
+     "name": "Wildflower Distilling Co.",
+     "text": "a downtown distillery that doubles as an intimate cocktail lounge, using its own gins and vodkas. Start with a tasting flight.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/orolo-restaurant-cocktail-bar",
+     "name": "OROLO Restaurant + Cocktail Bar",
+     "text": "a steakhouse and cocktail bar at Chronos Winery. Regulars plan around the well-priced oyster happy hour.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "easy-on-the-wallet",
+   "jump": "Easy on the wallet",
+   "heading": "Easy on the wallet",
+   "items": [
+    {
+     "ref": "penticton/mykonos-pizza-spaghetti-house",
+     "name": "Mykonos Pizza & Spaghetti House",
+     "text": "a cheerful, self-serve Greek-Italian family restaurant. Regulars call it the best-value sit-down meal in town.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/the-underdog",
+     "name": "The Underdog",
+     "text": "a no-frills bar where everything on the food menu stays under $10, with pool and darts.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/happiness-thai-restaurant",
+     "name": "Happiness Thai Restaurant",
+     "text": "a small, takeout-only spot with a warm owner. Order the Tom Yum and watch for the generous lunch specials.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/tacoriendo-mexican-cantina-penticton",
+     "name": "TacoRiendo Mexican Cantina",
+     "text": "near Skaha Lake. Order the fish tacos or the enchiladas verdes, and browse the small attached grocery.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "vegan-gluten-free",
+   "jump": "Vegan & gluten-free",
+   "heading": "Vegan & gluten-free",
+   "items": [
+    {
+     "ref": "penticton/angry-vegan",
+     "name": "Angry Vegan",
+     "text": "Penticton's oldest dedicated vegan restaurant, open since 2017, with a menu mostly made in-house from scratch.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/gratify",
+     "name": "Gratify",
+     "text": "a vegan café and dessert shop whose gluten-free and vegan baking reviewers call excellent. Check the freezer for treats.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/stillfood-bistro-cappuccino-bar",
+     "name": "Stillfood Bistro & Cappuccino Bar",
+     "text": "a fully vegan brunch bistro, and celiac guests can trust the gluten-free options too.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/theo-s-restaurant",
+     "name": "Theo's Restaurant",
+     "text": "a cozy, traditional Greek room with timber beams and a wood-smoke feel. Order the vegan moussaka.",
+     "where": "Penticton"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A big diner breakfast",
+    [
+     "penticton/terry-s-comfort-food|Terry's Comfort Food",
+     "penticton/tootsies-diner|Tootsies Diner"
+    ]
+   ],
+   [
+    "Weekend brunch by the beach",
+    [
+     "penticton/elma|Elma"
+    ]
+   ],
+   [
+    "Fresh bread and pastries",
+    [
+     "penticton/petrasek-bakery|Petrasek Bakery",
+     "penticton/south-main-market|South Main Market"
+    ]
+   ],
+   [
+    "A quick lunch",
+    [
+     "penticton/il-vecchio-delicatessen|Il Vecchio Delicatessen",
+     "penticton/baba-express|BaBa Express"
+    ]
+   ],
+   [
+    "A special-occasion dinner",
+    [
+     "penticton/the-restaurant-at-poplar-grove-1012|The Restaurant at Poplar Grove",
+     "naramata/bistro-lapin-perdu|Bistro Lapin Perdu"
+    ]
+   ],
+   [
+    "Dinner on the lake",
+    [
+     "penticton/salty-s-beach-house|Salty's Beach House",
+     "penticton/hooded-merganser-restaurant|Hooded Merganser Restaurant"
+    ]
+   ],
+   [
+    "A brewery with a patio",
+    [
+     "penticton/abandoned-rail-brewing-co|Abandoned Rail Brewing Co."
+    ]
+   ],
+   [
+    "Cocktails downtown",
+    [
+     "penticton/the-forest|The Forest",
+     "penticton/wildflower-distilling-co|Wildflower Distilling Co."
+    ]
+   ],
+   [
+    "A cheap night out",
+    [
+     "penticton/the-underdog|The Underdog",
+     "penticton/mykonos-pizza-spaghetti-house|Mykonos Pizza & Spaghetti House"
+    ]
+   ],
+   [
+    "Fully vegan",
+    [
+     "penticton/angry-vegan|Angry Vegan",
+     "penticton/stillfood-bistro-cappuccino-bar|Stillfood Bistro & Cappuccino Bar"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/penticton/restaurants\">Penticton restaurants</a>, <a href=\"/penticton/cafes\">Penticton cafés</a>, <a href=\"/guides/okanagan-winery-restaurants\">Winery restaurants</a>, <a href=\"/penticton\">Penticton</a>"
+}

@@ -29036,6 +29036,10 @@ const GUIDE_PHOTOS = {
   'icewine-grapes': { alt: 'Frozen icewine grapes hanging on the vine in a snowy vineyard', pos: 50 }, // Adobe Stock 243238436
 };
 for (const [name, b] of Object.entries(GUIDE_PHOTOS)) GUIDE_BANNERS[`guide-${name}`] = () => ({ src: `/images/guides/${name}.jpg`, alt: b.alt, pos: b.pos });
+// Town guides (2026-10-18): `region-<town>` uses that town's own photo. Only photos that need no on-page credit.
+for (const r of Object.keys(REGION_PHOTOS)) {
+  if (!REGION_PHOTOS[r].credit) GUIDE_BANNERS[`region-${r}`] = () => { const p = regionPhoto(r); return { src: p.src, alt: p.alt, pos: p.pos }; };
+}
 const FILE_GUIDES_DIR = path.join(__dirname, 'data', 'guides');
 const FILE_GUIDES = (() => {
   const out = {};
@@ -29060,14 +29064,15 @@ const GUIDE_GROUPS = [
   { key: 'fall', heading: 'Fall in the Okanagan', paths: ['/guides/fall-okanagan', '/guides/fall-farms-u-pick-okanagan', '/guides/okanagan-cideries', '/guides/okanagan-winery-restaurants', '/guides/kokanee-salmon-okanagan', '/guides/okanagan-waterfall-walks', '/guides/halloween-okanagan', '/guides/fall-events-okanagan', '/guides/okanagan-hockey-season'] },
   { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan'] },
   { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/ski-season-big-white-silverstar', '/guides/apex-baldy-ski-guide', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-in-january', '/guides/valentines-day-okanagan', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
+  { key: 'towns', heading: 'Weekends and town food guides', paths: ['/guides/weekend-in-kelowna', '/guides/penticton-naramata-wine-weekend', '/guides/oliver-osoyoos-wine-weekend', '/guides/best-restaurants-penticton', '/guides/best-restaurants-vernon', '/guides/best-restaurants-west-kelowna'] },
   { key: 'year', heading: 'Food, drink and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna'] },
 ];
 // Season order for /guides (Okanagan local month): the current season leads.
 function guideGroupOrder(now = new Date()) {
   const m = Number(todayLocal(now).slice(5, 7));
-  if (m >= 9 && m <= 11) return ['fall', 'cozy', 'winter', 'year'];
-  if (m === 12 || m <= 3) return ['winter', 'cozy', 'year', 'fall'];
-  return ['year', 'fall', 'cozy', 'winter'];
+  if (m >= 9 && m <= 11) return ['fall', 'cozy', 'winter', 'towns', 'year'];
+  if (m === 12 || m <= 3) return ['winter', 'cozy', 'towns', 'year', 'fall'];
+  return ['towns', 'year', 'fall', 'cozy', 'winter'];
 }
 // Each guide's refs ('region/slug' or 'event:region/slug'), from list items,
 // inline {ref|Label} links and quick-pick rows.

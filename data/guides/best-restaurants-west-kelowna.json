@@ -1,0 +1,308 @@
+{
+ "heading": "Where to Eat in West Kelowna",
+ "title": "Where to Eat in West Kelowna | Okanagan Roam",
+ "description": "Where to eat in West Kelowna: diner breakfasts, bakeries, taco stands, winery dining rooms, lake-view patios, BBQ and beer, and vegan-friendly kitchens.",
+ "banner": "region-west-kelowna",
+ "parent": {
+  "name": "West Kelowna",
+  "href": "/west-kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "West Kelowna sits across the bridge from Kelowna, and it eats better than its size suggests. There are old-school breakfast diners on the Westside, family-run kitchens in Westbank, and winery dining rooms up on the slopes above the lake. This guide picks a few of each, from cheap and quick to a long dinner with a view.",
+  "Many patios and winery kitchens cut back their hours from November to April, so check each listing's hours before you head out. For the full list, see all {page:/west-kelowna/restaurants|West Kelowna restaurants}."
+ ],
+ "sections": [
+  {
+   "id": "breakfast-brunch",
+   "jump": "Breakfast & brunch",
+   "heading": "Breakfast & brunch",
+   "lead": "West Kelowna does the classic breakfast well. Come hungry.",
+   "items": [
+    {
+     "ref": "west-kelowna/cherry-pit-restaurant",
+     "name": "Cherry Pit Restaurant",
+     "text": "a no-frills greasy spoon that regulars call the best breakfast stop in the Okanagan. Order the classic breakfast and expect a generous plate.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/pepper-pot-grill",
+     "name": "Pepper Pot Grill",
+     "text": "a cozy diner serving comfort food. The gravy is a standout and the bacon comes from Bonanza Meats. The lot is small, so expect a short wait.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/cozy-nook-cafe-bar",
+     "name": "Cozy Nook Cafe & Bar",
+     "text": "a bright all-day breakfast and lunch spot on Main St with fast, friendly service. Try the avocado toast or the coffee glory pancakes.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/smitty-s",
+     "name": "Smitty's",
+     "text": "a family restaurant with a Ukrainian menu next to the diner classics. Regulars recommend the borscht, and there's a play area for kids.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "coffee-bakeries",
+   "jump": "Coffee & bakeries",
+   "heading": "Coffee & bakeries",
+   "items": [
+    {
+     "ref": "west-kelowna/cafe-bella-bean",
+     "name": "Cafe Bella Bean",
+     "text": "the owner remembers your order, and board games are out for anyone who wants to stay a while.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/the-ryse-breadworks-coffeehouse",
+     "name": "The Ryse Breadworks & Coffeehouse",
+     "text": "a quiet bakery-cafe with a wind-screened patio. Dogs are welcome, and a water dish is already out for them.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/two-donkeys-bakery-west-kelowna",
+     "name": "Two Donkeys Bakery (West Kelowna)",
+     "text": "known for its pesto breakfast wraps. Add a flaky chocolate croissant.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/a-touch-of-austria",
+     "name": "A Touch of Austria",
+     "text": "a musical garden café at the home of a pastry chef and performer. Expect Viennese coffee, Austrian chocolates and Sachertorte, often with live piano. It runs Friday to Sunday afternoons and you must reserve at least 48 hours ahead. Outdoor seating runs April through October.",
+     "where": "Smith Creek, West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "casual-lunch",
+   "jump": "Casual lunch",
+   "heading": "Casual lunch",
+   "items": [
+    {
+     "ref": "west-kelowna/kekuli-cafe-west-kelowna",
+     "name": "Kekuli Cafe - West Kelowna",
+     "text": "an Indigenous-owned café with a welcoming feel. The bannock tacos are the dish to order.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/smoke-shack-deli",
+     "name": "Smoke Shack Deli",
+     "text": "a smokehouse deli that makes everything in-house. The meat is smoked on site for 20 hours.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/mex-kelowna-tacos",
+     "name": "MEX-KELOWNA TACOS",
+     "text": "a taco stand that many reviewers call the best Mexican food in the Okanagan. The owner walks each guest through the menu, so let them guide you.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/gians-tandoori-corner",
+     "name": "Gians Tandoori Corner",
+     "text": "a down-to-earth Punjabi restaurant where the owner helps first-timers choose. Try the Amritsari kulcha and the gulab jamun.",
+     "where": "Westbank"
+    }
+   ]
+  },
+  {
+   "id": "dinner-worth-booking",
+   "jump": "Dinner worth booking",
+   "heading": "Dinner worth booking",
+   "lead": "The winery dining rooms are the big draw here. For more across the valley, see our {page:/guides/okanagan-winery-restaurants|winery restaurants guide}.",
+   "items": [
+    {
+     "ref": "west-kelowna/old-vines-restaurant",
+     "name": "Old Vines Restaurant",
+     "text": "the fine-dining room at Quails' Gate Winery, with lake and mountain views. Order the haskap-cured salmon or the 63 Acres beef tenderloin. Staff are patient with young families.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/tula-restaurant-little-straw-vineyards",
+     "name": "Tula Restaurant @ Little Straw Vineyards",
+     "text": "Indian-fusion cooking at a winery, with patio seats looking out over the working vineyard. Vegan diners can order with confidence.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/the-modest-butcher-kitchen-market",
+     "name": "The Modest Butcher Kitchen + Market",
+     "text": "a steakhouse at Mt. Boucherie Estate Winery. The signature cut is the Tomahawk steak, and staff are patient with toddlers.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/31-charkay",
+     "name": "31 Charkay",
+     "text": "a modern, warm restaurant attached to Grizzli Winery. Steaks come cooked right, the arancini are crispy, and there are gluten-free options. Ask for the patio.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/two-brothers-mexican-restaurant",
+     "name": "Two Brothers Mexican Restaurant",
+     "text": "a small, cozy spot that regulars love for consistent, authentic cooking. The pozole keeps them coming back.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "patios-lake-views",
+   "jump": "Patios & lake views",
+   "heading": "Patios & lake views",
+   "items": [
+    {
+     "ref": "west-kelowna/19-okanagan-grill-bar",
+     "name": "19 Okanagan Grill + Bar",
+     "text": "above the golf course, with a view over the fairways and Okanagan Lake. Twinkle lights come on across the patio at sunset.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/annie-s-beach-cafe-lounge",
+     "name": "Annie's Beach Cafe & Lounge",
+     "text": "heated dining domes keep the beach view going when it cools off. There's room for kids to play nearby.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/the-landing-kitchen-bar",
+     "name": "The Landing Kitchen + Bar",
+     "text": "a resort restaurant known for its Saturday prime rib special. Tell staff how you want it cooked.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/shannon-lake-restaurant",
+     "name": "Shannon Lake Restaurant",
+     "text": "a golf-course restaurant overlooking the lake. Regulars come for Wednesday wing night and prime rib Sunday.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "drinks-beer-cider-pubs",
+   "jump": "Drinks",
+   "heading": "Drinks: beer, cider & pubs",
+   "items": [
+    {
+     "ref": "west-kelowna/lakesider-brewing",
+     "name": "Lakesider Brewing",
+     "text": "right on the lake, with a dog-friendly patio, wood-fired pizza and a strong beer list.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/the-hatching-post-brewery-smokery",
+     "name": "The Hatching Post Brewery & Smokery",
+     "text": "a lively BBQ smokehouse with live western music. Order the brisket with something from the big craft beer list. Happy hour runs weekdays.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/truck-59-ciderhouse",
+     "name": "Truck 59 Ciderhouse",
+     "text": "crisp cider, open lawns and lakeside lounging. The Truck Yard also pours Hatching Post beer, cocktails and JPC wine.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/whiski-jacks-pub",
+     "name": "Whiski-Jacks Pub",
+     "text": "a longstanding pub near the Smith Creek mountain biking trails, so it suits a post-ride stop. There's a patio, free pool and a happy hour.",
+     "where": "Westbank"
+    }
+   ]
+  },
+  {
+   "id": "vegan-dietary-friendly",
+   "jump": "Dietary-friendly",
+   "heading": "Vegan & dietary-friendly",
+   "items": [
+    {
+     "ref": "west-kelowna/pandanus-thai-restaurant",
+     "name": "Pandanus Thai Restaurant",
+     "text": "authentic Thai, all made to order, so changes are easy. The kitchen has removed egg to make a dish fully vegan. Ask freely.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/everest-indian-restaurant",
+     "name": "Everest Indian Restaurant",
+     "text": "an Indian-Nepalese kitchen that has veganized a coconut curry on request. Ask about changes without worry.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/bamboo-chopsticks-vietnamese-restaurant",
+     "name": "Bamboo Chopsticks Vietnamese Restaurant",
+     "text": "a grandpa-run kitchen cooking comfort food. The curry tofu is the order, and it wins over every age group.",
+     "where": "West Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A big diner breakfast",
+    [
+     "west-kelowna/cherry-pit-restaurant|Cherry Pit Restaurant",
+     "west-kelowna/pepper-pot-grill|Pepper Pot Grill"
+    ]
+   ],
+   [
+    "Coffee and a pastry",
+    [
+     "west-kelowna/two-donkeys-bakery-west-kelowna|Two Donkeys Bakery (West Kelowna)",
+     "west-kelowna/the-ryse-breadworks-coffeehouse|The Ryse Breadworks & Coffeehouse"
+    ]
+   ],
+   [
+    "A cheap, quick lunch",
+    [
+     "west-kelowna/mex-kelowna-tacos|MEX-KELOWNA TACOS",
+     "west-kelowna/kekuli-cafe-west-kelowna|Kekuli Cafe - West Kelowna"
+    ]
+   ],
+   [
+    "A winery dinner",
+    [
+     "west-kelowna/old-vines-restaurant|Old Vines Restaurant",
+     "west-kelowna/tula-restaurant-little-straw-vineyards|Tula Restaurant @ Little Straw Vineyards"
+    ]
+   ],
+   [
+    "A steak",
+    [
+     "west-kelowna/the-modest-butcher-kitchen-market|The Modest Butcher Kitchen + Market",
+     "west-kelowna/31-charkay|31 Charkay"
+    ]
+   ],
+   [
+    "A sunset patio",
+    [
+     "west-kelowna/19-okanagan-grill-bar|19 Okanagan Grill + Bar"
+    ]
+   ],
+   [
+    "A lake view when it's cold",
+    [
+     "west-kelowna/annie-s-beach-cafe-lounge|Annie's Beach Cafe & Lounge"
+    ]
+   ],
+   [
+    "Beer and BBQ",
+    [
+     "west-kelowna/the-hatching-post-brewery-smokery|The Hatching Post Brewery & Smokery"
+    ]
+   ],
+   [
+    "A vegan-friendly dinner",
+    [
+     "west-kelowna/pandanus-thai-restaurant|Pandanus Thai Restaurant",
+     "west-kelowna/everest-indian-restaurant|Everest Indian Restaurant"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/west-kelowna/restaurants\">West Kelowna restaurants</a>, <a href=\"/west-kelowna/cafes\">West Kelowna cafés</a>, <a href=\"/guides/okanagan-winery-restaurants\">Winery restaurants</a>, <a href=\"/trip\">Plan a trip</a>"
+}

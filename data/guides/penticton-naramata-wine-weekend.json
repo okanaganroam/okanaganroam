@@ -1,0 +1,302 @@
+{
+ "heading": "A Penticton & Naramata Wine Weekend",
+ "title": "Penticton & Naramata Wine Weekend | Okanagan Roam",
+ "description": "A two-day Penticton and Naramata wine weekend: Bench tastings and a winery lunch, then the lakefront, the KVR trail, breweries and dinner downtown.",
+ "banner": "region-naramata",
+ "parent": {
+  "name": "Penticton",
+  "href": "/penticton"
+ },
+ "noPlace": true,
+ "intro": [
+  "This weekend splits in two. Day 1 is a slow drive along Naramata Road, tasting your way across the Naramata Bench with a long winery lunch in the middle. Day 2 stays in Penticton: a lakefront brunch and walk, a stretch of the Kettle Valley Rail Trail, a brewery hop and dinner downtown. Everything is a short drive apart, so pick a designated driver or book a tour for the wine day.",
+  "Many tasting rooms cut their hours from November to April, and some close on weekdays or shut for the season, so check each listing's hours before you set out. If this is your first time touring wineries, start with our {page:/guides/okanagan-wineries-first-timers|first-timer's guide}. For a custom plan built around your own dates, try the {page:/trip|trip planner}."
+ ],
+ "sections": [
+  {
+   "id": "day-1-morning-up-onto-the-nara",
+   "jump": "Day 1 morning",
+   "heading": "Day 1 morning: up onto the Naramata Bench",
+   "lead": "Fuel up at the foot of the Bench, then start tasting when the wineries open.",
+   "items": [
+    {
+     "ref": "penticton/bench-market",
+     "name": "Bench Market",
+     "text": "a popular cafeteria-style breakfast and market spot, and a handy pitstop before a Naramata Bench wine day. The gluten-free options are excellent, and dogs are welcome on the terrace.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "naramata/laughing-stock-vineyards",
+     "name": "Laughing Stock Vineyards",
+     "text": "an award-winning winery high on a hill, with a terrace overlooking the lake. Try the playful blind-tasting format, and don't miss the chardonnay and syrah.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "naramata/lang-vineyards",
+     "name": "Lang Vineyards",
+     "text": "a patio overlooking the lake, and tastings are free. Among the reds, look for the marechal foch.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "naramata/red-rooster-winery",
+     "name": "Red Rooster Winery",
+     "text": "a well-known Bench winery with a wide-ranging list and knowledgeable, unpushy staff. Reservations are recommended but not required. From fall to spring the wine shop opens Friday to Sunday only, which suits a weekend.",
+     "where": "Naramata"
+    }
+   ]
+  },
+  {
+   "id": "day-1-afternoon-a-winery-lunch",
+   "jump": "Day 1 afternoon",
+   "heading": "Day 1 afternoon: a winery lunch and more tastings",
+   "lead": "Book lunch ahead. For more winery kitchens across the valley, see our {page:/guides/okanagan-winery-restaurants|winery restaurants guide}.",
+   "items": [
+    {
+     "ref": "penticton/poplar-grove-winery",
+     "name": "Poplar Grove Winery",
+     "text": "a patio with a standout view and a kitchen that holds its own against the wine list. The food isn't an afterthought, so plan on a proper meal.",
+     "where": "Naramata Bench"
+    },
+    {
+     "ref": "naramata/serendipity-winery",
+     "name": "Serendipity Winery",
+     "text": "a tiny, one-chef bistro and winery with a covered, heated patio, so the weather rarely gets in the way. Booking ahead is essential.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "naramata/township-7-vineyards-winery",
+     "name": "Township 7 Vineyards & Winery",
+     "text": "known for detailed, unhurried tastings. The fee is waived when you buy a bottle.",
+     "where": "Naramata Bench"
+    },
+    {
+     "ref": "naramata/elephant-island-winery",
+     "name": "Elephant Island Winery",
+     "text": "berry and apricot fruit wines made in an orchard setting on the Aikins Loop. A change of pace from grape wines, poured with family warmth.",
+     "where": "Naramata"
+    }
+   ]
+  },
+  {
+   "id": "day-1-evening-a-late-pour-and-",
+   "jump": "Day 1 evening",
+   "heading": "Day 1 evening: a late pour and dinner in the village",
+   "lead": "Most tasting rooms close by late afternoon. These two keep the day going.",
+   "items": [
+    {
+     "ref": "naramata/little-engine-wines",
+     "name": "Little Engine Wines",
+     "text": "one of the few Naramata Road wineries that keeps its spacious patio open past 5pm, with great views. An easy way to stretch the wine day after other rooms have closed.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "naramata/bistro-lapin-perdu",
+     "name": "Bistro Lapin Perdu",
+     "text": "a quiet, romantic French bistro inside the historic Naramata Inn, with a garden view. It's built for slow conversation, course by course, so book ahead.",
+     "where": "Naramata"
+    }
+   ]
+  },
+  {
+   "id": "day-2-morning-the-penticton-la",
+   "jump": "Day 2 morning",
+   "heading": "Day 2 morning: the Penticton lakefront",
+   "lead": "Day 2 stays in town. Start with brunch by the water, then walk or ride it off.",
+   "items": [
+    {
+     "ref": "penticton/elma",
+     "name": "Elma",
+     "text": "a beachfront Turkish restaurant with an exceptional weekend brunch. Book it.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/okanagan-beach",
+     "name": "Okanagan Beach",
+     "text": "nearly a kilometre of sand along Lakeshore Drive, beside the SS Sicamous. Free parking and nearby washrooms (the universal washroom is open year-round) make it an easy walk in any season. Dogs aren't permitted.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/penticton-ikeda-japanese-garden",
+     "name": "Penticton Ikeda Japanese Garden",
+     "text": "a quiet garden on the Okanagan Lake waterfront, with koi ponds and graceful bridges. It's a lovely pause on a lakeside stroll near the S.S. Sicamous, and the plantings bloom in April and May.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/kvr-trail-skaha-lake-penticton-to-okanagan-falls",
+     "name": "KVR Trail: Skaha Lake, Penticton to Okanagan Falls",
+     "text": "the south spur of the Kettle Valley Rail Trail, flat and easy packed gravel with the lake beside you the whole way. Pick it up at the far end of Wright's Beach Camp off Skaha Lake Road and do a shorter out-and-back. Pioneer Park along the way has a beach, washrooms and parking for a break.",
+     "where": "Penticton, Skaha Lake end"
+    }
+   ]
+  },
+  {
+   "id": "day-2-afternoon-a-brewery-hop",
+   "jump": "Day 2 afternoon",
+   "heading": "Day 2 afternoon: a brewery hop",
+   "lead": "Three taprooms close together, so you can walk between the last two.",
+   "items": [
+    {
+     "ref": "penticton/tin-whistle-brewing",
+     "name": "Tin Whistle Brewing",
+     "text": "calls itself the Okanagan's original microbrewery, in the historic Cannery Trade Centre, a former fruit cannery. The Peach Cream Ale is always on tap, and records spin in the background.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/highway-97-brewing",
+     "name": "Highway 97 Brewing",
+     "text": "consistently well-crafted beer, and travellers with dogs are welcome. Order the pulled pork nachos, then walk across the street to Cannery.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/cannery-brewing-co",
+     "name": "Cannery Brewing",
+     "text": "a family-friendly main taproom with shareable snacks and a wide range of craft beer. Its Backyard patio closes for the off-season, and dogs aren't allowed in the taproom.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "day-2-evening-cocktails-and-a-",
+   "jump": "Day 2 evening",
+   "heading": "Day 2 evening: cocktails and a winery dinner downtown",
+   "lead": "End the weekend back on the wine theme, without leaving town.",
+   "items": [
+    {
+     "ref": "penticton/wildflower-distilling-co",
+     "name": "Wildflower Distilling Co.",
+     "text": "a downtown craft distillery that doubles as an intimate cocktail lounge, with house-made gins and vodkas. Start with a tasting flight, then let the bartender take it from there.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/chronos-winery",
+     "name": "Chronos Winery",
+     "text": "a downtown winery that does dinner theatre right, with Caesar salad made tableside and a cellar tour that includes bottle-sabring. The full dinner menu stays open late, so stay for the meal after the tour.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "if-the-weather-turns",
+   "jump": "Rainy day",
+   "heading": "If the weather turns",
+   "lead": "Indoor options in Penticton for a wet or cold afternoon. Check hours, since some close on Sundays or for private events.",
+   "items": [
+    {
+     "ref": "penticton/ss-sicamous-museum-heritage-park",
+     "name": "SS Sicamous Museum & Heritage Park",
+     "text": "a restored 1914 sternwheeler beached at the west end of Okanagan Beach. Wander the cabins, dining saloon and wheelhouse. It closes for private events on some days, especially Saturdays, so check before you go.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/penticton-art-gallery",
+     "name": "Penticton Art Gallery",
+     "text": "a public gallery on the waterfront by Okanagan Beach, with rotating exhibitions across several rooms. Admission is about $10 for adults.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/shelter-floating-sauna",
+     "name": "Shelter Floating Sauna",
+     "text": "a cedar sauna floating on Okanagan Lake at the Lakeside Resort marina. Cycle between heat, a cold lake plunge and rest in a 70-minute session booked online ahead.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/upper-bench-estate-winery-and-creamery",
+     "name": "Upper Bench Estate Winery and Creamery",
+     "text": "a winery and working creamery in one. Order the cheese pairing with your tasting, and say hello to the resident dogs in the tasting room.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "where-to-stay",
+   "jump": "Where to stay",
+   "heading": "Where to stay",
+   "items": [
+    {
+     "lead": "Pick a base:",
+     "tip": "stay in Penticton for the easiest drives to both days, or in Naramata for a quieter night close to the wineries."
+    },
+    {
+     "ref": "naramata/therapy-vineyards",
+     "name": "Therapy Vineyards",
+     "text": "a winery with a boutique inn, where you get a welcome glass of wine at check-in and heated bathroom floors.",
+     "where": "Naramata Bench"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Breakfast before the wineries",
+    [
+     "penticton/bench-market|Bench Market"
+    ]
+   ],
+   [
+    "A view with your tasting",
+    [
+     "naramata/laughing-stock-vineyards|Laughing Stock Vineyards",
+     "naramata/lang-vineyards|Lang Vineyards"
+    ]
+   ],
+   [
+    "A winery lunch",
+    [
+     "penticton/poplar-grove-winery|Poplar Grove Winery",
+     "naramata/serendipity-winery|Serendipity Winery"
+    ]
+   ],
+   [
+    "Something other than grape wine",
+    [
+     "naramata/elephant-island-winery|Elephant Island Winery"
+    ]
+   ],
+   [
+    "A tasting after 5pm",
+    [
+     "naramata/little-engine-wines|Little Engine Wines"
+    ]
+   ],
+   [
+    "A romantic dinner",
+    [
+     "naramata/bistro-lapin-perdu|Bistro Lapin Perdu"
+    ]
+   ],
+   [
+    "Weekend brunch by the lake",
+    [
+     "penticton/elma|Elma"
+    ]
+   ],
+   [
+    "An easy lakeside walk or ride",
+    [
+     "penticton/kvr-trail-skaha-lake-penticton-to-okanagan-falls|KVR Trail: Skaha Lake, Penticton to Okanagan Falls"
+    ]
+   ],
+   [
+    "A brewery hop",
+    [
+     "penticton/highway-97-brewing|Highway 97 Brewing and Cannery Brewing"
+    ]
+   ],
+   [
+    "Dinner and a cellar tour",
+    [
+     "penticton/chronos-winery|Chronos Winery"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/wineries\">Wineries</a>, <a href=\"/naramata/wineries\">Naramata wineries</a>, <a href=\"/penticton\">Penticton</a>, <a href=\"/trip\">Trip planner</a>"
+}
