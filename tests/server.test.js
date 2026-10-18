@@ -24563,7 +24563,9 @@ test('Inline scripts parse on the main pages (EN and FR), incl. My Trip', () => 
   const base = `http://localhost:${srv.address().port}`;
   const venue = db.prepare("SELECT region, type, slug FROM venues WHERE type = 'restaurant' AND slug IS NOT NULL LIMIT 1").get();
   const pages = ['/', '/fr', '/my-trip', '/fr/my-trip', '/trip', '/fr/trip', '/restaurants', '/food-drink', '/fr/food-drink',
-    '/whats-on', '/fr/whats-on', '/search?q=pizza', '/fr/search?q=pizza', '/search?q=restaurants', '/fr/search?q=restaurants', '/browse', '/map', '/guides', '/owner/login', '/fr/owner/login', '/list-your-venue', '/fr/list-your-venue'];
+    '/whats-on', '/fr/whats-on', '/search?q=pizza', '/fr/search?q=pizza', '/search?q=restaurants', '/fr/search?q=restaurants', '/browse', '/map', '/guides', '/owner/login', '/fr/owner/login', '/list-your-venue', '/fr/list-your-venue',
+    // French status fix (2026-10-18): the French list pages, the map and Favorites too.
+    '/fr/browse', '/fr/map', '/fr/restaurants', '/fr/wineries', '/fr/cafes', '/fr/kelowna/restaurants', '/fr/favorites', `/fr/search?q=${encodeURIComponent('végétalien')}`];
   if (venue) pages.push(`/${venue.region}/restaurants/${venue.slug}`, `/claim/${venue.region}/restaurants/${venue.slug}`);
   try {
     // /search keeps the visitor's q in the URL when filters change.
@@ -24585,6 +24587,195 @@ test('Inline scripts parse on the main pages (EN and FR), incl. My Trip', () => 
     await new Promise((resolve) => srv.close(resolve));
   }
 }));
+
+// ---------- French status, tray days and French search words (2026-10-18) ----------
+// The French twin rewrote words inside page scripts: 'tomorrow ' became 'demain', so after load the open status read
+// "Fermé aujourd’hui · ouvre demain8:6 h". Page scripts now change only by the listed French (FR_SCRIPT fragments,
+// FR_SCRIPT_STRINGS and JSON data values).
+const FR_STATUS_PAGES = ['/restaurants', '/wineries', '/cafes', '/browse', '/map', '/kelowna/restaurants', '/kelowna/wineries'];
+function inlineScripts(html) {
+  const out = [];
+  for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+    const attrs = m[1] || '';
+    if (/\bsrc=/i.test(attrs) || /type=["']?(application\/(ld\+)?json|text\/template|importmap|module)/i.test(attrs) || !m[2].trim()) continue;
+    out.push(m[2]);
+  }
+  return out;
+}
+test('French status (2026-10-18): the French pages\' live status reads like the server\'s, never "demain8:30" or AM/PM', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const hours = require('../hours.js');
+  const frSrc = app.frScript(hours.HOURS_CLIENT_SRC);
+  assert.ok(frSrc.includes("'tomorrow ' + formatClockMinutes"), 'the English wording logic is left alone');
+  assert.ok(!/'demain'/.test(frSrc), 'no guessed French inside the code');
+  assert.equal((frSrc.match(/function hoursStatusLabelEn\(/g) || []).length, 1, 'the French wrapper is added once');
+  const ctx = {};
+  vm.runInNewContext(`${frSrc}\nthis.label = hoursStatusLabel;`, ctx);
+  const cases = [
+    [{ state: 'closed', closedToday: true, opensAt: { weekday: 'thu', minutes: 510 } }, { weekday: 'wed', minutes: 1200 }, 'Fermé aujourd’hui · ouvre demain à 8 h 30'],
+    [{ state: 'closed', closedToday: false, opensAt: { weekday: 'mon', minutes: 660 } }, { weekday: 'fri', minutes: 1300 }, 'Fermé · ouvre lun. à 11 h'],
+    [{ state: 'closed', closedToday: true, opensAt: { weekday: 'wed', minutes: 1020 } }, { weekday: 'wed', minutes: 600 }, 'Fermé aujourd’hui · ouvre à 17 h'],
+    [{ state: 'open', closesAt: { weekday: 'thu', minutes: 120 } }, { weekday: 'wed', minutes: 1300 }, 'Ouvert · ferme à 2 h'],
+    [{ state: 'open', closesAt: { weekday: 'thu', minutes: 450 } }, { weekday: 'wed', minutes: 1300 }, 'Ouvert · ferme demain à 7 h 30'],
+    [{ state: 'open', closesAt: null }, { weekday: 'wed', minutes: 600 }, 'Ouvert 24 h sur 24'],
+    [{ state: 'unknown' }, { weekday: 'wed', minutes: 600 }, 'Heures non indiquées pour aujourd’hui'],
+  ];
+  for (const [status, clock, want] of cases) {
+    const live = ctx.label(status, clock).text;
+    assert.equal(live, want);
+    assert.equal(live, app.frStatusText(hours.hoursStatusLabel(status, clock).text), 'the same words the server sends');
+    assert.doesNotMatch(live, /demain\d|\d (?:AM|PM)\b/);
+  }
+  // Every French list page and the map carry exactly that script, with no "demain" glued to a time anywhere.
+  for (const p of [...FR_STATUS_PAGES.map((x) => `/fr${x}`), `/fr/search?q=${encodeURIComponent('végétalien')}`]) {
+    const res = await fetch(base + p);
+    if (res.status !== 200) continue;
+    const html = await res.text();
+    assert.doesNotMatch(html, /demain\d|demain'\s*\+/, p);
+    const scripts = inlineScripts(html).join('\n');
+    if (scripts.includes('function hoursStatusLabel(')) {
+      assert.ok(scripts.includes("'tomorrow ' + formatClockMinutes"), `${p}: the hours script is the English one`);
+      assert.equal((scripts.match(/function __frStatusText\(/g) || []).length, (scripts.match(/function hoursStatusLabel\(/g) || []).length, `${p}: one French wrapper per hours script`);
+    }
+    assert.doesNotMatch(html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' '), /(?:ouvre|ferme)[^<]{0,20}\d (?:AM|PM)\b/, `${p}: no AM/PM in a French status`);
+  }
+})));
+
+test('French status (2026-10-18): inline scripts on a French twin are the English ones apart from the listed French', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const frenchText = require('../french-text.js');
+  const LIT = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g;
+  const skeleton = (src) => src.replace(LIT, '""');
+  const decode = (lit) => { try { return lit[0] === '"' ? JSON.parse(lit) : JSON.parse(`"${lit.slice(1, -1).replace(/\\'/g, "'").replace(/"/g, '\\"')}"`); } catch (e) { return lit; } };
+  let compared = 0;
+  for (const p of [...FR_STATUS_PAGES, '/', '/food-drink', '/favorites', '/my-trip', '/whats-on', '/list-your-venue', '/contact']) {
+    const [enRes, frRes] = await Promise.all([fetch(base + p), fetch(`${base}/fr${p === '/' ? '' : p}`)]);
+    if (enRes.status !== 200 || frRes.status !== 200) continue;
+    // The English page's first script sends a visitor who chose French to the twin; the French page has none.
+    const en = inlineScripts(await enRes.text()).filter((x) => !/location\.replace\("\/fr/.test(x));
+    const fr = inlineScripts(await frRes.text());
+    assert.equal(fr.length, en.length, `${p}: same scripts`);
+    en.forEach((src, i) => {
+      const want = app.frScriptFragments(src);
+      // The code is identical; only string contents may differ.
+      assert.equal(skeleton(fr[i]), skeleton(want), `${p} script ${i}: the code is unchanged`);
+      // A single-quoted string changes only when FR_SCRIPT_STRINGS lists it.
+      const a = want.match(LIT) || [], b = fr[i].match(LIT) || [];
+      a.forEach((lit, k) => {
+        if (lit === b[k] || lit[0] !== "'") return;
+        assert.ok(Object.prototype.hasOwnProperty.call(frenchText.FR_SCRIPT_STRINGS, decode(lit)), `${p} script ${i}: ${lit.slice(0, 80)} -> ${String(b[k]).slice(0, 80)} is not listed French`);
+      });
+      compared += 1;
+    });
+  }
+  assert.ok(compared > 20, `${compared} scripts compared`);
+  // The listed strings keep their spaces (' selected' read "3choisi(s)", 'Price ' read "Prix$$").
+  for (const [en, fr] of Object.entries(frenchText.FR_SCRIPT_STRINGS)) {
+    assert.equal(/^\s/.test(fr), /^\s/.test(en), en);
+    assert.equal(/\s$/.test(fr), /\s$/.test(en), en);
+  }
+})));
+
+test('French gaps (2026-10-18): sort menu, bare ratings, the town Wineries empty result, the planner notes and the place page header', () => withDiscoveryServer(async (base) => {
+  const list = await (await fetch(`${base}/fr/restaurants`)).text();
+  const body = (h) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '');
+  if (list.includes('fd-sort-label')) {
+    assert.match(list, /<span class="fd-sort-label">Trier<\/span>/);
+    assert.match(list, /<option value="recommended"[^>]*>Recommandés<\/option>/);
+  }
+  // A winery card with no cuisine shows its rating alone: French decimals.
+  const twin = app.frenchTwinHtml('<!DOCTYPE html><html lang="en"><head></head><body><p class="venue-meta">4.9★</p><p class="fd-no-results">No wineries here match that combination yet. <a href="/kelowna/wineries">Clear the filters</a> to see all of them.</p></body></html>', '/kelowna/wineries');
+  assert.match(twin, /<p class="venue-meta">4,9★<\/p>/);
+  assert.match(twin, /Aucun vignoble ne correspond encore à cette combinaison\./);
+  assert.doesNotMatch(body(list), /\d\.\d★/, 'no English decimals in the French ratings');
+  // Planner notes.
+  const { t3FrenchText } = require('../trip-french-copy');
+  assert.equal(t3FrenchText('Picked with romance in mind, based on each place’s type, badges and description.'), 'Choisis pour une sortie romantique, selon le type, les badges et la description de chaque lieu.');
+  assert.equal(t3FrenchText('Its listed hours only fit the midday on Mon–Fri, Sun — check the day you go'), 'Selon ses horaires indiqués, il ne convient le midi que les lun.–ven., dim. — vérifiez le jour de votre visite');
+  assert.equal(t3FrenchText('Its listed hours only fit the late afternoon on Sat — check the day you go'), 'Selon ses horaires indiqués, il ne convient en fin d’après-midi que le sam. — vérifiez le jour de votre visite');
+  // The planner's slot names stay English in its script, so "Late afternoon" is matched and shown in French.
+  const v3 = require('../trip-planner-v3-page.js');
+  let page = '';
+  try { page = v3.renderTripPlannerV3Page({}); } catch (e) { page = ''; }
+  if (page && page.includes("late: 'Late afternoon'")) {
+    const frPage = app.frenchTwinHtml(page, '/trip');
+    assert.ok(frPage.includes("late: 'Late afternoon'"), 'the slot-name table is not translated');
+  }
+  // A French place page: the header's business link and search button.
+  seasonInsert.run({ name: 'FR Header Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'fr-header-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'fr-header-fixture-cafe');
+  db.prepare("UPDATE venues SET description_fr = 'Un café de test pour l’en-tête.' WHERE id = ?").run(v.id);
+  const venuePage = await (await fetch(`${base}/fr/kelowna/cafes/fr-header-fixture-cafe`)).text();
+  assert.doesNotMatch(body(venuePage), />Business login</);
+  assert.match(venuePage, />Espace entreprises</);
+  assert.doesNotMatch(venuePage, /aria-label="Search all places"/);
+}));
+
+test('Trip tray and My Trip by day (2026-10-18): rows keep their own stop, days in order, stops without a day last', async () => {
+  // The tray's decoration finds each row's stop by its remove button's stored index, not by row position.
+  assert.match(app.TRIP_NAV_SNIPPET, /var rm = item\.querySelector\('\[data-remove-index\]'\);/);
+  assert.match(app.TRIP_NAV_SNIPPET, /var num = \/\^\\s\*\(\\d\+\)\\\.\/\.exec\(span\.textContent\);/, 'the regex keeps its backslashes in the served page');
+  assert.doesNotMatch(app.TRIP_NAV_SNIPPET, /var t = trip\[i\], d = t && t\.ref && info\[t\.ref\];/);
+  // French type labels and pages for the French tray and /fr/my-trip.
+  const w = db.prepare("SELECT id FROM venues WHERE type = 'winery' AND slug IS NOT NULL AND redirect_to IS NULL LIMIT 1").get();
+  if (w) {
+    const [s] = app.tripStopsFor([`venue:${w.id}`]);
+    assert.equal(s.type, 'Winery');
+    assert.equal(s.typeFr, 'Vignoble');
+    assert.match(s.urlFr, /^\/(fr\/)?[a-z-]+\/wineries\//);
+  }
+  // /my-trip: an older stop without a day comes after the planned days, under "Other stops", and its link says so.
+  const run = (lang, trip, days) => {
+    const html = app.renderMyTripPage({ lang });
+    const src = inlineScripts(html).find((x) => x.includes("var KEY = 'okanaganTrip'"));
+    const els = {};
+    const el = (id) => els[id] || (els[id] = { id, hidden: false, textContent: '', innerHTML: '', addEventListener() {}, setAttribute() {} });
+    const store = { okanaganTrip: JSON.stringify(trip), okanaganTripDays: JSON.stringify(days) };
+    const ctx = {
+      document: { getElementById: el, documentElement: { lang }, addEventListener() {} },
+      localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } },
+      location: { search: '', origin: 'https://okanaganroam.com', pathname: '/my-trip' }, history: { replaceState() {} },
+      URLSearchParams, navigator: {}, setTimeout, Promise,
+      fetch: () => Promise.resolve({ json: () => Promise.resolve({ stops: [] }) }),
+    };
+    ctx.window = ctx;
+    vm.runInNewContext(src, ctx);
+    return new Promise((resolve) => setTimeout(() => resolve(els.mtDays.innerHTML), 20));
+  };
+  const trip = [{ ref: 'venue:9001', name: 'Old Vernon Stop', query: 'a' }, { ref: 'venue:9002', name: 'Winery A', query: 'b' }, { ref: 'venue:9003', name: 'Dinner One', query: 'c' },
+    { ref: 'venue:9004', name: 'Winery B', query: 'd' }, { ref: 'venue:9005', name: 'Dinner Two', query: 'e' }];
+  const days = { 'venue:9002': 1, 'venue:9003': 1, 'venue:9004': 2, 'venue:9005': 2 };
+  const out = await run('en', trip, days);
+  const heads = [...out.matchAll(/<h2>([^<]*)<\/h2>/g)].map((m) => m[1]);
+  assert.deepEqual(heads, ['Day 1', 'Day 2', 'Other stops']);
+  const sections = out.split('<section class="mt-day">').slice(1);
+  assert.ok(sections[0].includes('Winery A') && sections[0].includes('Dinner One') && !sections[0].includes('Old Vernon Stop'));
+  assert.ok(sections[1].includes('Winery B') && sections[1].includes('Dinner Two') && !sections[1].includes('Dinner One'));
+  assert.ok(sections[2].includes('Old Vernon Stop') && sections[2].includes('>Directions for other stops<'));
+  assert.deepEqual([...out.matchAll(/<span class="mt-num">(\d+)<\/span>/g)].map((m) => Number(m[1])), [1, 2, 3, 4, 5], 'numbers follow the list as shown');
+  const fr = await run('fr', trip, days);
+  assert.deepEqual([...fr.matchAll(/<h2>([^<]*)<\/h2>/g)].map((m) => m[1]), ['Jour 1', 'Jour 2', 'Autres arrêts']);
+  assert.ok(fr.includes('>Itinéraire des autres arrêts<'));
+  // A trip with no days keeps "Your stops" and its whole-trip link.
+  const flat = await run('en', trip, {});
+  assert.deepEqual([...flat.matchAll(/<h2>([^<]*)<\/h2>/g)].map((m) => m[1]), ['Your stops']);
+  assert.ok(flat.includes('>Directions in Google Maps<'));
+});
+
+test('French search words (2026-10-18): brasseries, cidreries and distillerie search the right places from a French page', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const frMod = require('../trip-planner-fr.js');
+  const tax = app.buildDiscoveryTaxonomy ? app.buildDiscoveryTaxonomy() : { regions: [], venues: [], types: [], features: [] };
+  for (const [fr, en] of [['brasseries', 'breweries'], ['brasserie', 'brewery'], ['cidreries', 'cideries'], ['cidrerie', 'cidery'], ['distillerie', 'distillery']]) {
+    assert.equal(frMod.tripPlannerText(fr, tax, { frenchPage: true }), en, fr);
+    assert.equal(app.discoverySearchText(fr, 'fr'), en, `${fr} from a French page`);
+  }
+  // The planner and English pages keep "brasserie" (an English word too) as typed.
+  assert.equal(frMod.tripPlannerText('brasserie', tax), 'brasserie');
+  assert.equal(app.discoverySearchText('brasserie', 'en'), 'brasserie');
+  const en = await (await fetch(`${base}/search?q=breweries`)).text();
+  const frHtml = await (await fetch(`${base}/fr/search?q=brasseries`)).text();
+  const breweries = (h) => (h.match(/data-venue-category="brewery"/g) || []).length;
+  assert.ok(breweries(en) > 0, 'fixture breweries exist');
+  assert.equal(breweries(frHtml), breweries(en), '"brasseries" finds the breweries');
+})));
 
 test('Weekend and town food guides (2026-10-18): six file guides, each in the towns group with a town-photo banner where one needs no credit', () => {
   const towns = app.GUIDE_GROUPS.find((g) => g.key === 'towns');

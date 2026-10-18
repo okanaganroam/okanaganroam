@@ -136,6 +136,10 @@ const FR_TEXT = {
   'Choose an activity': 'Choisir une activité',
   'Choose an indoor experience': 'Choisir une activité intérieure',
   'Search all places': 'Rechercher tous les lieux',
+  // French gaps (2026-10-18): the header's business link, and the list pages' sort menu.
+  'Business login': 'Espace entreprises',
+  'Sort': 'Trier',
+  'Recommended': 'Recommandés',
   'Search places and events': 'Rechercher des lieux et des événements',
   'Search Okanagan Roam': 'Rechercher dans Okanagan Roam',
   '{0} places': '{0} lieux',
@@ -157,6 +161,8 @@ const FR_TEXT = {
   'No pubs here match that combination yet. {a0} to see all of them.': 'Aucun pub ne correspond encore à cette combinaison. {a0} pour tous les voir.',
   'No cocktail lounges here match that combination yet. {a0} to see all of them.': 'Aucun bar à cocktails ne correspond encore à cette combinaison. {a0} pour tous les voir.',
   'No distilleries here match that combination yet. {a0} to see all of them.': 'Aucune distillerie ne correspond encore à cette combinaison. {a0} pour toutes les voir.',
+  // French gaps (2026-10-18): the town Wineries page's empty filter result.
+  'No wineries here match that combination yet. {a0} to see all of them.': 'Aucun vignoble ne correspond encore à cette combinaison. {a0} pour tous les voir.',
   'to see everything.': 'pour tout voir.',
   'to see all of them.': 'pour tous les voir.',
   'Try one word, like {a0}, {a1}, {a2}.': 'Essayez un seul mot, comme {a0}, {a1}, {a2}.',
@@ -1079,6 +1085,8 @@ const FR_SCRIPT = [
   // The trip tray.
   ["close.setAttribute('aria-label', 'Close My Trip');", "close.setAttribute('aria-label', 'Fermer Mon voyage');"],
   ["full.textContent = 'Open full trip: days, map and share link \\u2192';", "full.textContent = 'Ouvrir le voyage complet : jours, carte et lien à partager \\u2192';"],
+  // Favorites: the share box's link field (2026-10-18).
+  ['aria-label="Link to your list"', 'aria-label="Lien vers votre liste"'],
   // Read more on cards.
   ["'Read more \\u2192'", "'Lire la suite \\u2192'"],
   ["'Read less \\u2191'", "'Réduire \\u2191'"],
@@ -1091,10 +1099,64 @@ const FR_SCRIPT = [
   // same French wording as the place pages ("Ouvert · ferme à 17 h").
   ["function hoursStatusLabel(status, clock) {", "function hoursStatusLabel(status, clock) { var __l = hoursStatusLabelEn(status, clock); __l.text = __frStatusText(__l.text); return __l; }\n" +
     "function __frStatusText(text) { var D = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };\n" +
-    "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1');\n" +
+    "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
     "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
     "function hoursStatusLabelEn(status, clock) {"],
 ];
+
+// Page-script strings (2026-10-18): the French twin no longer guesses at the strings inside a page's inline scripts
+// (it turned 'tomorrow ' into 'demain', so the live status read "ouvre demain8:6 h", and dropped the spaces around
+// ' selected', 'Price ' and 'Correction for '). Only these whole single-quoted strings are turned French, exactly
+// as written here, with their spaces kept. Code is never rewritten except by the FR_SCRIPT fragments above.
+const FR_SCRIPT_STRINGS = {
+  " selected": " choisi(s)",
+  "&copy; OpenStreetMap contributors": "&copy; Contributeurs d’OpenStreetMap",
+  "A list shared with you": "Une liste partagée avec vous",
+  "Added to My Trip.": "Ajouté à Mon voyage.",
+  "Copy this link to share your list:": "Copiez ce lien pour partager votre liste :",
+  "Correction for ": "Correction pour ",
+  "Couldn’t determine your location right now.": "Impossible de déterminer votre position pour l’instant.",
+  "Cuisine &amp; price": "Cuisine et prix",
+  "Finding you…": "Recherche de votre position…",
+  "Link copied. Anyone with it can see this list.": "Lien copié. Toute personne qui l’a peut voir cette liste.",
+  "Location access was denied — you can still pick a region manually.": "L’accès à la localisation a été refusé; vous pouvez quand même choisir une région.",
+  "Location isn’t supported in this browser.": "La localisation n’est pas offerte dans ce navigateur.",
+  "Looking for": "Recherche",
+  "Please enter a valid email address, like name@example.com.": "Entrez une adresse courriel valide, comme nom@exemple.com.",
+  "Please enter your email address.": "Entrez votre adresse courriel.",
+  "Please enter your name.": "Entrez votre nom.",
+  "Please tell us what you would like to say.": "Dites-nous ce que vous voulez nous écrire.",
+  "Price ": "Prix ",
+  "Quickest: use the <a href=\"/list-an-event\">List an event</a> form. It sends us everything we need.": "Le plus rapide : utilisez le formulaire <a href=\"/fr/list-an-event\">Inscrire un événement</a>. Il nous transmet tout ce dont nous avons besoin.",
+  "Quickest: use the <a href=\"/list-your-venue\">List your venue</a> form. It sends us everything we need.": "Le plus rapide : utilisez le formulaire <a href=\"/fr/list-your-venue\">Inscrire votre établissement</a>. Il nous transmet tout ce dont nous avons besoin.",
+  "Read less": "Réduire",
+  "Read less ↑": "Réduire ↑",
+  "Read more": "Lire la suite",
+  "Read more →": "Lire la suite →",
+  "Removed from your favorites.": "Retiré de vos favoris.",
+  "Saved to your favorites.": "Enregistré dans vos favoris.",
+  "Saved your choice.": "Votre choix a été enregistré.",
+  "Send message": "Envoyer le message",
+  "Sending...": "Envoi en cours…",
+  "Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.": "Désolés, une erreur est survenue. Réessayez ou écrivez-nous à info@okanaganroam.com.",
+  "Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at info@okanaganroam.com.": "Désolés, impossible de joindre Okanagan Roam. Vérifiez votre connexion et réessayez, ou écrivez-nous à info@okanaganroam.com.",
+  "Sports on TV": "Sports à la télé",
+  "Submit for review": "Soumettre pour examen",
+  "Tell us the place and what needs fixing. A link to its page helps.": "Dites-nous de quel lieu il s’agit et ce qu’il faut corriger. Un lien vers sa page nous aide.",
+  "Thanks! Your event has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it.": "Merci! Votre événement a été soumis pour examen. Il n’apparaîtra pas sur Okanagan Roam avant que nous l’ayons examiné.",
+  "Thanks! Your venue has been submitted for review. It will not appear on Okanagan Roam until we have reviewed it.": "Merci! Votre établissement a été soumis pour examen. Il n’apparaîtra pas sur Okanagan Roam avant que nous l’ayons examiné.",
+  "This date is no longer listed": "Cette date n’est plus affichée",
+  "Your message needs at least 10 characters.": "Votre message doit compter au moins 10 caractères.",
+  "Your name needs at least 2 characters.": "Votre nom doit compter au moins 2 caractères.",
+  "♡ Favorite": "♡ Favori",
+  "✓ In trip": "✓ Dans le voyage",
+  "📍 Use my location": "📍 Utiliser ma position",
+  "🧳 Add to trip": "🧳 Ajouter au voyage",
+  "＋ Add to Trip": "＋ Ajouter au voyage",
+  // Data in double quotes that sits inside other script text.
+  'place to play': 'lieu pour bouger',
+  'places to play': 'lieux pour bouger',
+};
 
 // The rest of the site's text (town category pages, What's On, the guides, the info pages and forms, the map and trip
 // pages), one JSON file per part in data/french/, each { "English": "French" }. Entries above win over these.
@@ -1200,4 +1262,4 @@ FR_PATTERNS.unshift(
   }],
 );
 
-module.exports = { FR_TEXT, FR_PATTERNS, FR_SCRIPT, FR_CUISINE, frTime };
+module.exports = { FR_TEXT, FR_PATTERNS, FR_SCRIPT, FR_SCRIPT_STRINGS, FR_CUISINE, frTime };
