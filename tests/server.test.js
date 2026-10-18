@@ -10224,7 +10224,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
-  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'public/scripts/app.js (French hero search; My Trip holds 30 stops, 2026-10-18)');
+  // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
+  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85', 'public/scripts/app.js (My Trip tray by day, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12118,7 +12119,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
+  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -14083,7 +14084,7 @@ test('map day headers: the page uses static <picture> maps with both credits as 
   // The whole-trip interactive map and "Map this day" are unchanged.
   assert.ok(page.includes('function loadLeaflet') && page.includes('L.tileLayer(MAP_TILES') && page.includes('tripMap'));
   assert.ok(page.includes('data-t3-map-day') && page.includes("esc(tx('tripv3.mapDay'))") && page.includes('data-t3-regen-day') && page.includes('data-t3-add-day'));
-  assert.ok(page.includes("var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets && firstInRegion ? mapHeadHtml("), 'a region without a map, or a later day in the same town, keeps the photo header');
+  assert.ok(page.includes("var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml("), 'every day with a map gets the map header (2026-10-18); a region without a map keeps the photo header');
   // The served images are real WebP, and nothing else carries any of it.
   const res = await fetch(`${base}${mh.penticton.assets.desktop.src}`);
   assert.equal(res.status, 200); assert.equal(res.headers.get('content-type'), 'image/webp');
@@ -15988,9 +15989,10 @@ test('Browse hub: the page script keeps /browse\'s GA4 events (names and paramet
   assert.ok(html.includes("track('description_expand'") || html.includes("'description_expand'"), 'Read more events are the hub\'s own');
   // Favorite / Add to Trip still come from app.js (add_to_favorites / add_to_trip) and the card script (venue_favorite).
   assert.match(html, /<button type="button" class="card-action fav-btn"/); assert.match(html, /<button type="button" class="card-action trip-btn"/);
-  // Its only request is the rest of its own cards, from this site (2026-10-14).
+  // Its only requests are the rest of its own cards and (Venue JSON,
+  // 2026-10-18) its filter data, both from this site (2026-10-14).
   assert.doesNotMatch(script, /XMLHttpRequest|sendBeacon/, 'no network of its own');
-  assert.deepEqual(script.match(/fetch\([^)]*\)/g), ['fetch(src)'], 'the one fetch is the cards file named in the page');
+  assert.deepEqual(script.match(/fetch\([^)]*\)/g), ['fetch(src)', "fetch('/cards/rest/' + dataHash + '.json?u=' + encodeURIComponent(window.location.pathname + window.location.search)"], 'the cards file named in the page and the filter data');
   assert.doesNotMatch(script, /MutationObserver/, 'no body-wide observer');
   assert.equal((script.match(/setInterval\(/g) || []).length, 1, 'one 60-second clock tick, like the other hubs');
 })));
@@ -16367,7 +16369,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
+  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16460,7 +16462,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -23649,6 +23651,13 @@ test('session replay stays disabled by default and reaches both page renderers w
 
 // ---- Lighter pages (2026-10-18) ----
 const lpHttp = require('node:http');
+// Venue JSON (2026-10-18): a served list page's filter data, inline or from /cards/rest/<hash>.json.
+async function lpVenueData(base, html, id, pagePath) {
+  const m = new RegExp(`<script type="application/json" id="${id}"( data-rest="([0-9a-f]{12})")?>([\\s\\S]*?)</script>`).exec(html);
+  if (!m) return null;
+  if (!m[2]) return JSON.parse(m[3]);
+  return (await fetch(`${base}/cards/rest/${m[2]}.json?u=${encodeURIComponent(pagePath)}`)).json();
+}
 // Shared CSS as versioned cached files, a capped ItemList, and the cards and
 // events after the first page loaded after the page appears.
 test('Lighter pages: shared page CSS is a versioned, year-cached file in the same place as the inline block was', async () => {
@@ -23730,7 +23739,7 @@ test('Lighter pages: /food-drink loads its waiting cards from /cards/rest/, the 
       assert.equal(miss.status, 200);
       assert.equal(miss.headers.get('cache-control'), 'no-store');
       assert.equal(await miss.text(), rest, `${p}: a re-render gives the same cards`);
-      const dataIds = Object.keys(JSON.parse(html.match(/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/)[1]));
+      const dataIds = Object.keys(await lpVenueData(base, html, 'fdVenueData', p));
       assert.deepEqual([...first, ...ids(rest)].sort(), dataIds.sort(), `${p}: the page plus the waiting cards are every place`);
       if (p.startsWith('/fr/')) assert.ok(rest.includes('Voir les détails') && !rest.includes('View details'), 'French cards for the French page');
       assert.match(html, /fetch\('\/cards\/rest\/' \+ restHash/, 'the page script loads them');
@@ -23860,6 +23869,130 @@ test("Lighter pages: What's On ships its first page of events and every other it
       db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
       db.prepare('DELETE FROM events WHERE id = ?').run(id);
     }
+  }
+});
+
+
+// ---- Crawlable links and Venue JSON (2026-10-18) ----
+// The raw HTML a crawler (or a visitor without JavaScript) sees: no scripts, no templates.
+const crawlLinks = (html) => new Set([...html.replace(/<script[\s\S]*?<\/script>|<template[\s\S]*?<\/template>/g, '').matchAll(/<a\b[^>]*\shref="([^"#?]+)/g)].map((m) => m[1]));
+
+test('Lighter pages: crawlable links: every place and event waiting for "Show more" is linked from its hub without JavaScript, in English and French', async () => {
+  const made = [], events = [];
+  for (let i = 0; i < 120; i++) made.push(app.createVenue({ name: `CR Kitchen ${String(i).padStart(3, '0')}`, region: 'kelowna', type: 'restaurant', description: `A crawlable-links fixture kitchen number ${i}.`, slug: `cr-kitchen-${i}` }));
+  const pad = (x) => String(x).padStart(2, '0'), today = new Date();
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (let i = 0; i < 110; i++) {
+      const d = new Date(today.getTime() + (i % 20) * 86400000);
+      const data = { name: `CR Fixture Show ${i}`, region: 'kelowna', description: 'A crawlable-links fixture event.', venue_name_text: `CR Hall ${i}`,
+        source_type: 'official_venue', source_name: 'CR', source_url: `https://example.com/cr-${i}`, categories: ['live-music'],
+        occurrences: [{ start_date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, start_time: '19:00', end_time: '21:00' }] };
+      let r = app.createEvent(data, { reason: 'crawlable links fixture', batch_id: 'test-cr' });
+      if (r && r.reason === 'possible_duplicate') r = app.createEvent(data, { reason: 'crawlable links fixture', batch_id: 'test-cr', reviewed_duplicates: r.detail.map((x) => x.event_id) });
+      assert.ok(r && r.ok !== false, JSON.stringify(r));
+    }
+    events.push(...db.prepare("SELECT id, slug, region FROM events WHERE name LIKE 'CR Fixture Show %'").all());
+    // Every active place in the fixture set, from its town hub and the valley-wide ones.
+    for (const [p, fr] of [['/kelowna/restaurants', false], ['/fr/kelowna/restaurants', true], ['/restaurants', false], ['/food-drink', false], ['/fr/food-drink', true]]) {
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /<template id="fdRest" data-rest="[0-9a-f]{12}"><\/template>/, `${p}: cards are deferred`);
+      const links = crawlLinks(html);
+      const missing = made.filter((v) => !links.has(`${fr ? '/fr' : ''}/kelowna/restaurants/${v.slug}`)).map((v) => v.slug);
+      assert.deepEqual(missing, [], `${p}: every fixture place is linked in the raw HTML`);
+      // A visible, closed <details> list right after the empty template: no hiding tricks.
+      const list = html.match(/<template id="fdRest" data-rest="[0-9a-f]{12}"><\/template>\n  <style id="rest-links-css">[^<]*<\/style><details class="rest-links" id="fdRestLinks"><summary>([^<]*)<\/summary><ul>([\s\S]*?)<\/ul><\/details>/);
+      assert.ok(list, `${p}: the A-Z list follows the template`);
+      assert.match(list[1], fr ? /^Toutes les autres adresses, de A à Z \(\d+\)$/ : /^All the other places here, A–Z \(\d+\)$/);
+      const names = [...list[2].matchAll(/<li><a href="[^"]+">([^<]*)<\/a>/g)].map((m) => m[1]);
+      assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b, fr ? 'fr' : 'en', { sensitivity: 'base' })), `${p}: A to Z`);
+      assert.doesNotMatch(list[0], /display:\s*none|hidden/, `${p}: nothing is hidden`);
+      assert.ok(list[2].length / names.length < 100, `${p}: light (${Math.round(list[2].length / names.length)} bytes a link)`);
+      if (fr) assert.ok(names.length && !/href="\/kelowna\//.test(list[2]), `${p}: French addresses`);
+    }
+    // Events: /whats-on keeps the soonest-first order.
+    for (const p of ['/whats-on', '/fr/whats-on']) {
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /<template id="whatsOnRest" data-rest="[0-9a-f]{12}"><\/template>/, `${p}: events are deferred`);
+      const links = crawlLinks(html);
+      const missing = events.filter((e) => !links.has(`/${e.region}/events/${e.slug}`) && !links.has(`/fr/${e.region}/events/${e.slug}`)).map((e) => e.slug);
+      assert.deepEqual(missing, [], `${p}: every upcoming fixture event is linked`);
+      assert.match(html, p === '/whats-on' ? /<details class="rest-links" id="whatsOnRestLinks"><summary>More upcoming events \(\d+\)<\/summary>/ : /<details class="rest-links" id="whatsOnRestLinks"><summary>Autres événements à venir \(\d+\)<\/summary>/);
+    }
+    // A page whose cards all ship gets no list.
+    assert.doesNotMatch(await (await fetch(base + '/kelowna')).text(), /class="rest-links"/);
+  } finally {
+    srv.close();
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+    for (const e of events) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(e.id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(e.id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(e.id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+    }
+  }
+});
+
+test('Lighter pages: venue JSON: /food-drink, /browse and their French twins load the filter data from a year-cached /cards/rest/<hash>.json that never 404s', async () => {
+  const made = [];
+  for (let i = 0; i < 90; i++) made.push(app.createVenue({ name: `VJ Kitchen ${i}`, region: ['kelowna', 'penticton'][i % 2], type: 'restaurant', description: `A venue-json fixture kitchen with a sunny lakeside patio number ${i}.`, slug: `vj-kitchen-${i}` }).id);
+  db.prepare('UPDATE venues SET description_fr = ? WHERE id = ?').run('Une cuisine d’essai avec une terrasse ensoleillée au bord du lac.', made[0]);
+  app.resetFrSearchWords();
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const [p, id] of [['/food-drink', 'fdVenueData'], ['/fr/food-drink', 'fdVenueData'], ['/restaurants', 'fdVenueData'], ['/browse', 'bhVenueData'], ['/fr/browse', 'bhVenueData']]) {
+      const html = await (await fetch(base + p)).text();
+      const m = html.match(new RegExp(`<script type="application/json" id="${id}" data-rest="([0-9a-f]{12})"></script>`));
+      assert.ok(m, `${p}: the data tag ships empty with its hash ${(html.match(new RegExp(`<script type="application/json" id="${id}"[^>]*>[^<]{0,40}`)) || [])[0]}`);
+      assert.match(html, /fetch\('\/cards\/rest\/' \+ dataHash \+ '\.json\?u=' \+ /, `${p}: the page script loads it`);
+      assert.match(html, /Promise\.all\(waits\)\.then\((?:fd|bh)Start\)/, `${p}: the filters start once it is in`);
+      const hit = await fetch(`${base}/cards/rest/${m[1]}.json?u=${encodeURIComponent(p)}`);
+      assert.equal(hit.status, 200);
+      assert.match(hit.headers.get('content-type'), /application\/json/);
+      assert.equal(hit.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      const text = await hit.text();
+      const data = JSON.parse(text);
+      for (const v of made) assert.ok(data[String(v)], `${p}: ${v} has its filter data`);
+      // After a restart the hash is unknown: the page is rendered again from ?u=, the same data.
+      const miss = await fetch(`${base}/cards/rest/ffffffffffff.json?u=${encodeURIComponent(p)}`);
+      assert.equal(miss.status, 200);
+      assert.equal(miss.headers.get('cache-control'), 'no-store');
+      assert.equal(await miss.text(), text, `${p}: a re-render gives the same data`);
+      if (id === 'fdVenueData') {
+        const fr = p.startsWith('/fr/');
+        assert.match(data[String(made[0])].k, fr ? /terrasse/ : /lakeside/, `${p}: search words in the page's language`);
+        if (fr) assert.doesNotMatch(data[String(made[0])].k, /lakeside|sunny/, 'French pages carry the French words only');
+        if (fr) assert.match(data[String(made[1])].k, /lakeside/, 'a place without French keeps its English words');
+        assert.ok(['c', 'f', 'r', 'o'].every((k) => k in data[String(made[1])]), `${p}: everything the filters need`);
+      }
+    }
+    // Small data stays in the page (under 8 KB it is not worth a request).
+    const small = app.withRestCardsDeferred(`<!DOCTYPE html><html lang="en"><body><script type="application/json" id="fdVenueData">{"1":{}}</script><script>'.json?u='</script></body></html>`);
+    assert.match(small, /id="fdVenueData">\{"1":\{\}\}<\/script>/);
+    // A page whose script cannot load it keeps it inline.
+    const big = `{"1":{"k":"${'x'.repeat(9000)}"}}`;
+    assert.ok(app.withRestCardsDeferred(`<!DOCTYPE html><html lang="en"><body><script type="application/json" id="fdVenueData">${big}</script></body></html>`).includes(big));
+    assert.match(app.withRestCardsDeferred(`<!DOCTYPE html><html lang="en"><body><script type="application/json" id="fdVenueData">${big}</script><script>'.json?u='</script></body></html>`), /id="fdVenueData" data-rest="[0-9a-f]{12}"><\/script>/);
+    // The same page minus the swap is the old page: the transformation is only the move.
+    const raw = app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), { types: [], features: [], regions: [] });
+    assert.match(raw, /<script type="application\/json" id="fdVenueData">\{/, 'renderers still write the data inline');
+    // Never a 404 into the edge cache.
+    for (const u of ['/admin/review', '//example.com/', '/kelowna']) {
+      const r = await fetch(`${base}/cards/rest/ffffffffffff.json?u=${encodeURIComponent(u)}`);
+      assert.equal(r.status, 200, u);
+      assert.equal(r.headers.get('cache-control'), 'no-store', u);
+      assert.equal(await r.text(), '{}', u);
+    }
+    const none = await fetch(`${base}/cards/rest/ffffffffffff.json`);
+    assert.equal(none.status, 200);
+    assert.equal(none.headers.get('cache-control'), 'no-store');
+  } finally {
+    srv.close();
+    for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
 });
 
@@ -24239,6 +24372,185 @@ test('Smarter search: /search uses the standard cards, name matches first, Show 
   assert.equal(frIntent.headers.get('location'), '/fr/food-drink?types=restaurant,cocktail&regions=kelowna');
   // The homepage hero box (app.js) sends a French visitor to /fr/browse.
   assert.ok(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8').includes("? '/fr/browse' : '/browse'"));
+}))));
+
+// ---- Search gaps (2026-10-18): weak results found by the live review ----
+// Fixtures that mimic live: a cuisine row named "breakfast" and one named "vegan", Vegan badges, a wine-tour
+// operator, priced places and a beach; on top of withSmartSearchFixtures.
+function withSearchGapFixtures(fn) {
+  const cols = ['name', 'region', 'type', 'slug', 'description', 'rating', 'reviews', 'cuisine', 'price', 'vegan', 'open_early', 'hours'];
+  const add = (row) => {
+    const r = { description: 'Search gap fixture.', rating: 4.3, reviews: 40, cuisine: null, price: null, vegan: 0, open_early: 0, hours: null, ...row };
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c]));
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(r.slug, r.region);
+  };
+  const made = [
+    add({ name: 'SG Plain Coffee', region: 'west-kelowna', type: 'cafe', slug: 'sg-plain-coffee', description: 'Espresso and pastries.' }),
+    add({ name: 'SG Crepe House', region: 'kelowna', type: 'restaurant', slug: 'sg-crepe-house', cuisine: 'Breakfast', description: 'Crêpes and coffee.' }),
+    add({ name: 'SG Plant Kitchen', region: 'kelowna', type: 'restaurant', slug: 'sg-plant-kitchen', cuisine: 'Vegan', vegan: 1, description: 'Bowls and wraps.' }),
+    add({ name: 'SG Burger Barn', region: 'kelowna', type: 'restaurant', slug: 'sg-burger-barn', vegan: 1, description: 'Burgers, with a plant patty on request.' }),
+    add({ name: 'SG Bench Wine Tours', region: 'penticton', type: 'tour', slug: 'sg-bench-wine-tours', description: 'Guided wine tours along the Naramata Bench.' }),
+    add({ name: 'SG Lake Boat Tours', region: 'naramata', type: 'tour', slug: 'sg-lake-boat-tours', description: 'Boat cruises on the lake.' }),
+    add({ name: 'SG Penny Diner', region: 'penticton', type: 'restaurant', slug: 'sg-penny-diner', price: 1, rating: 4.0 }),
+    add({ name: 'SG Middle Bistro', region: 'penticton', type: 'restaurant', slug: 'sg-middle-bistro', price: 2, rating: 4.9, reviews: 900 }),
+    add({ name: 'SG Fancy Room', region: 'penticton', type: 'restaurant', slug: 'sg-fancy-room', price: 3 }),
+    add({ name: 'SG Cheap Beach', region: 'penticton', type: 'beach', slug: 'sg-cheap-beach', description: 'A cheap day out on the sand.' }),
+  ];
+  return withSmartSearchFixtures(fn).finally(() => {
+    for (const v of made) { db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(v.id); db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+  });
+}
+
+test('Search gaps: breakfast lists every café, early openers and places that say breakfast, also in /api/discover', () => withDiscoveryFlag('on', () => withSearchGapFixtures(() => withDiscoveryServer(async (base) => {
+  // As on live, "breakfast" is also a stored cuisine, so the interpreter reads it as one.
+  assert.ok(app.interpretDiscoveryText('breakfast west kelowna').cuisines.includes('breakfast'));
+  const names = app.smartSearchPlan('breakfast west kelowna').list().map((x) => x.row.name);
+  for (const n of ['SG Plain Coffee', 'SS Sunrise Cafe', 'SS Early Diner']) assert.ok(names.includes(n), n);
+  assert.ok(!names.includes('SS Night Bistro') && !names.includes('SS Breakfast Winery'));
+  assert.ok(names.indexOf('SS Sunrise Cafe') < names.indexOf('SG Plain Coffee'), 'a café that says breakfast ranks above one that does not');
+  // A stored breakfast cuisine counts as saying so.
+  assert.ok(app.smartSearchPlan('breakfast kelowna').list().some((x) => x.row.name === 'SG Crepe House'));
+  // The API used to say 0 places here.
+  const api = await (await fetch(`${base}/api/discover?q=${encodeURIComponent('breakfast west kelowna')}&limit=60`)).json();
+  assert.equal(api.plan.key, 'breakfast');
+  assert.equal(api.results.kind, 'venues');
+  assert.ok(api.results.total >= 3);
+  assert.ok(api.results.items.some((i) => i.name === 'SG Plain Coffee'));
+  assert.equal(api.destination.url, '/search?q=breakfast%20west%20kelowna');
+  assert.equal(api.presentation.status, 'results');
+  // French: déjeuner.
+  const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('déjeuner à west kelowna')}`)).text();
+  assert.ok(fr.includes('Déjeuner et brunch à West Kelowna'));
+  assert.ok(fr.includes('data-venue-name="SG Plain Coffee"'));
+}))));
+
+test('Search gaps: a badge word (vegan) is the badge alone, not the badge AND the word', () => withDiscoveryFlag('on', () => withSearchGapFixtures(async () => {
+  const intent = app.interpretDiscoveryText('vegan kelowna');
+  assert.deepEqual(intent.features, ['vegan']);
+  assert.ok(!intent.cuisines.includes('vegan'), 'the Vegan cuisine row does not add a second requirement');
+  const run = app.runDiscovery('vegan kelowna', { limit: 60 });
+  const names = run.results.items.map((i) => i.name);
+  assert.ok(names.includes('SG Plant Kitchen') && names.includes('SG Burger Barn'), 'every Vegan-Friendly place, with or without the word');
+  // The same for other badge words.
+  for (const [q, f] of [['vegetarian kelowna', 'vegetarian'], ['gluten free penticton', 'gluten_free'], ['patio kelowna', 'patio'], ['dog friendly vernon', 'dog_friendly'],
+    ['lake view kelowna', 'lake_view'], ['live music kelowna', 'live_music'], ['happy hour kelowna', 'happy_hour'], ['kid friendly kelowna', 'kid_friendly']]) {
+    const i = app.interpretDiscoveryText(q);
+    assert.ok(i.features.includes(f), q);
+    assert.deepEqual(i.textTerms, [], `${q}: no word to match as well`);
+  }
+  // A real cuisine word is untouched.
+  assert.ok(app.interpretDiscoveryText('breakfast kelowna').cuisines.includes('breakfast'));
+  // French: végétalien / végane on the French site go where "vegan kelowna" goes.
+  const en = app.heroSearchTarget('vegan kelowna').url;
+  assert.equal(app.heroSearchTarget('végétalien kelowna', { lang: 'fr' }).url, en);
+  assert.equal(app.heroSearchTarget('végane kelowna', { lang: 'fr' }).url, en);
+})));
+
+test('Search gaps: a wine tour goes to the town\'s wineries and wine-tour operators, never an unrelated guide', () => withDiscoveryFlag('on', () => withSearchGapFixtures(() => withDiscoveryServer(async (base) => {
+  const intent = app.interpretDiscoveryText('wine tour naramata');
+  assert.deepEqual(intent.types, ['tour'], 'as on live, "wine tour" reads as Tours once tours are listed');
+  const plan = app.smartSearchPlan('wine tour naramata', intent);
+  assert.equal(plan.key, 'wine_tour');
+  const list = plan.list().map((x) => x.row);
+  assert.equal(list[0].name, 'SG Bench Wine Tours', 'the Penticton operator that runs Naramata wine tours comes first');
+  assert.ok(list.some((v) => v.name === 'SS Vine Kitchen Winery') && list.some((v) => v.name === 'SS Tasting Only Winery'));
+  assert.ok(!list.some((v) => v.name === 'SG Lake Boat Tours'), 'not a tour without wine');
+  assert.ok(list.every((v) => v.type === 'tour' || (v.type === 'winery' && v.region === 'naramata')));
+  assert.equal(app.heroSearchTarget('wine tour naramata').url, '/search?q=wine%20tour%20naramata');
+  // No guide that only shares the word "tour" (the sleigh-ride guide was offered).
+  app.resetGuideCache();
+  assert.deepEqual(app.smartGuideMatches('wine tour naramata', intent).filter((g) => !/wine/i.test(g.heading)), []);
+  const html = await (await fetch(`${base}/search?q=${encodeURIComponent('wine tour naramata')}`)).text();
+  assert.ok(html.includes('<strong>Wine tours in Naramata</strong>'));
+  assert.ok(html.includes('data-venue-name="SG Bench Wine Tours"') && html.includes('data-venue-name="SS Vine Kitchen Winery"'));
+  assert.doesNotMatch(html, /sleigh/i);
+  // A town with no wine-tour operator: its wineries page.
+  const oliver = app.getRegionCategoryCounts('oliver').winery || 0;
+  if (oliver >= app.MIN_CATEGORY_VENUES) assert.equal(app.heroSearchTarget('wine tour oliver').url, '/oliver/wineries');
+  // French.
+  const fr = app.discoverySearchText('tour des vignobles à naramata', 'fr');
+  assert.equal(app.smartSearchPlan(fr).key, 'wine_tour');
+  const frHtml = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('tour des vignobles à naramata')}`)).text();
+  assert.ok(frHtml.includes('Tournées des vignobles à Naramata'));
+  assert.ok(frHtml.includes('Organise des tournées des vignobles'));
+}))));
+
+test('Search gaps: cheap eats are places to eat with a listed price, $ first, then $$', () => withDiscoveryFlag('on', () => withSearchGapFixtures(() => withDiscoveryServer(async (base) => {
+  const plan = app.smartSearchPlan('cheap eats penticton');
+  assert.equal(plan.key, 'budget');
+  const list = plan.list().map((x) => x.row);
+  assert.ok(list.length >= 2);
+  assert.ok(list.every((v) => ['restaurant', 'cafe', 'pub'].includes(v.type) && v.region === 'penticton'), 'food places only');
+  assert.ok(list.every((v) => v.price === 1 || v.price === 2), 'a listed $ or $$ price');
+  assert.ok(!list.some((v) => v.name === 'SG Cheap Beach' || v.name === 'SG Fancy Room'));
+  const firstDouble = list.findIndex((v) => v.price === 2);
+  assert.ok(list.slice(firstDouble).every((v) => v.price === 2), '$ before $$, even when a $$ place is rated higher');
+  assert.ok(list.findIndex((v) => v.name === 'SG Penny Diner') < list.findIndex((v) => v.name === 'SG Middle Bistro'));
+  for (const q of ['budget eats penticton', 'affordable restaurants penticton', 'inexpensive penticton', '$ penticton']) assert.equal(app.smartSearchPlan(q).key, 'budget', q);
+  const html = await (await fetch(`${base}/search?q=${encodeURIComponent('cheap eats penticton')}`)).text();
+  assert.ok(html.includes('<strong>Cheap eats in Penticton</strong>'));
+  assert.ok(!html.includes('Budget isn’t applied'));
+  assert.ok(!html.includes('data-venue-name="SG Cheap Beach"'));
+  // French: pas cher, abordable.
+  for (const q of ['pas cher penticton', 'abordable penticton']) {
+    const fr = await fetch(`${base}/fr/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' }); await fr.text();
+    assert.equal(fr.headers.get('location'), `/fr/search?q=${encodeURIComponent(q)}`, q);
+    const page = await (await fetch(`${base}/fr/search?q=${encodeURIComponent(q)}`)).text();
+    assert.ok(page.includes('Bonnes adresses pas chères à Penticton'), q);
+    assert.ok(!page.includes('Le budget ne s’applique pas'), q);
+    assert.ok(page.includes('data-venue-name="SG Penny Diner"'), q);
+  }
+}))));
+
+test('Search gaps: /search shows every match, or says "Showing the top N of M"', () => withDiscoveryFlag('on', () => withSearchGapFixtures(() => {
+  assert.ok(app.SEARCH_PAGE_MAX_RESULTS >= db.prepare('SELECT COUNT(*) AS n FROM venues').get().n, 'the cap is above the whole directory');
+  const all = app.runDiscovery('kelowna', { limit: app.SEARCH_PAGE_MAX_RESULTS });
+  const model = app.searchPageModel(all);
+  assert.equal(model.venues.length, all.results.total, 'nothing left out');
+  const html = app.renderSearchPage(all);
+  assert.ok(html.includes(`<p class="search-count">${model.venues.length} places</p>`));
+  // Past a cap, the count says so in words (no bare "(480)").
+  const capped = app.runDiscovery('kelowna', { limit: 5 });
+  if (capped.results.total > 5) {
+    assert.ok(app.renderSearchPage(capped).includes(`Showing the top 5 of ${capped.results.total} places`));
+    assert.ok(app.renderSearchPage(capped, { lang: 'fr' }).includes(`Voici les 5 meilleurs des ${capped.results.total} endroits`));
+  }
+})));
+
+test('Search gaps: a /search card for a place closed for the season shows the season, not an open/closed time', () => withDiscoveryFlag('on', () => withSearchGapFixtures(() => withDiscoveryServer(async (base) => {
+  seasonInsert.run({ name: 'SG Season Winery', type: 'winery', hours: SEASON_WEEK, slug: 'sg-season-winery' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'sg-season-winery');
+  try {
+    assert.equal(app.guardedSeasonUpdate(v.id, { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: app.todayLocal() }, { reason: 'test', batch_id: 'search-gaps' }).ok, true);
+    const cardOf = (html) => (html.split(`data-venue-id="${v.id}"`)[1] || '').split('</li>')[0];
+    const search = cardOf(await (await fetch(`${base}/search?q=${encodeURIComponent('sg season winery')}`)).text());
+    const list = cardOf(await (await fetch(`${base}/kelowna/wineries`)).text());
+    for (const [where, card] of [['/search', search], ['/kelowna/wineries', list]]) {
+      assert.ok(card, `${where}: the card is there`);
+      assert.match(card, /season-tag season-tag-closed/, `${where}: the season tag`);
+      assert.doesNotMatch(card, /fd-open-status/, `${where}: no "Closed · Opens" line`);
+    }
+    const data = (html) => JSON.parse((/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/.exec(html) || [])[1] || '{}');
+    assert.equal((data(await (await fetch(`${base}/search?q=${encodeURIComponent('sg season winery')}`)).text())[String(v.id)] || {}).h, undefined, 'no hours shipped for the live status');
+  } finally {
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(v.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+}))));
+
+test('Search gaps: "ce week-end" goes to What\'s On from the box, from /search and in /api/discover', () => withDiscoveryFlag('on', () => withSearchGapFixtures(() => withDiscoveryServer(async (base) => {
+  const loc = async (p) => { const r = await fetch(base + p, { redirect: 'manual' }); await r.text(); return [r.status, r.headers.get('location')]; };
+  assert.deepEqual(await loc(`/browse?q=${encodeURIComponent('ce week-end')}`), [302, '/whats-on?when=this-weekend']);
+  assert.deepEqual(await loc(`/search?q=${encodeURIComponent('ce week-end')}`), [302, '/whats-on?when=this-weekend']);
+  assert.deepEqual(await loc(`/fr/search?q=${encodeURIComponent('ce week-end')}`), [302, '/fr/whats-on?when=this-weekend']);
+  assert.deepEqual(await loc(`/fr/browse?q=${encodeURIComponent('musique ce week-end')}`), [302, '/fr/whats-on?when=this-weekend&categories=live-music']);
+  const api = await (await fetch(`${base}/api/discover?q=${encodeURIComponent('ce week-end')}`)).json();
+  assert.equal(api.destination.url, '/whats-on?when=this-weekend');
+  assert.equal(api.plan.key, 'events');
+  // A plain search is unchanged on /search and in the API (no plan field).
+  const plain = await (await fetch(`${base}/api/discover?q=${encodeURIComponent('restaurants in kelowna')}`)).json();
+  assert.equal(plain.plan, undefined);
+  assert.equal((await fetch(`${base}/search?q=${encodeURIComponent('zorbly fizz')}`)).status, 200);
 }))));
 
 // Fix (2026-10-18): a regex inside a server-side template string lost its

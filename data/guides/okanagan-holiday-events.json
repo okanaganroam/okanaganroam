@@ -17,6 +17,7 @@
    "id": "christmas-markets-craft-fairs",
    "jump": "Markets",
    "heading": "Christmas markets & craft fairs",
+   "lead": "The four biggest holiday markets are below. For every Christmas market and craft fair in the valley, town by town, see our {page:/guides/okanagan-christmas-markets|Okanagan Christmas markets guide}.",
    "items": [
     {
      "ref": "event:penticton/yuletide-the-ptcc",
@@ -31,30 +32,6 @@
      "where": "Kelowna, Nov 13 – 15"
     },
     {
-     "ref": "event:kelowna/it-s-christmas-the-red-barn",
-     "name": "It's Christmas @ the Red Barn",
-     "text": "more than 50 local makers selling clothing, gourmet foods, body products, jewelry and home decor. Free admission; Food Bank donations welcome.",
-     "where": "Kelowna, Nov 21 – 22"
-    },
-    {
-     "ref": "event:kelowna/delta-grand-holiday-market",
-     "name": "Delta Grand Holiday Market",
-     "text": "at Delta Hotels by Marriott Grand Okanagan Resort, 10 am to 4 pm. Admission is by donation.",
-     "where": "Kelowna, Nov 22"
-    },
-    {
-     "ref": "event:kelowna/holiday-magic-market",
-     "name": "Holiday Magic Market",
-     "text": "at the Rotary Centre for the Arts, 1 to 7 pm. Admission is by donation.",
-     "where": "Kelowna, Nov 27"
-    },
-    {
-     "ref": "event:osoyoos/christmas-faire",
-     "name": "Christmas Faire",
-     "text": "at the OSCA Osoyoos Activity Centre.",
-     "where": "Osoyoos, Nov 28"
-    },
-    {
      "ref": "event:kelowna/craft-culture-holiday-market",
      "name": "Craft Culture Holiday Market",
      "text": "at Prospera Place, 1 to 7 pm on Dec 4. Admission is $7.",
@@ -65,12 +42,6 @@
      "name": "Christkindl Holiday Market",
      "text": "a traditional European-style Christmas market back at the Laurel Packinghouse, with handmade local gifts, festive treats and hot cider. Admission is by donation to the Food Bank.",
      "where": "Kelowna, Dec 4 – 6"
-    },
-    {
-     "ref": "event:penticton/the-last-chance-holiday-market",
-     "name": "The Last Chance Holiday Market",
-     "text": "handmade gifts from local artisans, specialty foods and festive treats, billed as the last local shopping stop before Christmas. Admission is $3 at the door.",
-     "where": "Penticton, Dec 12 – 13"
     }
    ]
   },
@@ -425,10 +396,10 @@
     ]
    ],
    [
-    "Something by donation",
+    "A market by donation",
     [
-     "event:kelowna/delta-grand-holiday-market|Delta Grand Holiday Market",
-     "event:kelowna/holiday-magic-market|Holiday Magic Market"
+     "event:kelowna/christmas-at-the-laurel|Christmas at the Laurel",
+     "event:kelowna/christkindl-holiday-market|Christkindl Holiday Market"
     ]
    ],
    [

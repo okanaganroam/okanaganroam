@@ -248,6 +248,10 @@ var TRANSLATIONS = {
     'trip.undo': 'Undo',
     'trip.undoLabel': 'Undo: put {name} back in your trip',
     'trip.restored': 'Restored {name}.',
+    'trip.day': 'Day {n}',
+    'trip.otherStops': 'Other stops',
+    'trip.dayRoute': 'Route for day {n}',
+    'trip.routeCapped': 'Google Maps takes up to {n} stops in one route, so this route has the first {n}. Each day in My Trip has its own route.',
 
     'trip.planner.title': 'Build My Trip',
     'trip.planner.subtitle': 'Answer a few questions and we\u2019ll put together a real, day-by-day Okanagan itinerary from actual venues \u2014 no invented places, no AI guesswork.',
@@ -428,6 +432,11 @@ var TRANSLATIONS = {
     'tripv3.daypart.midday': 'Midday',
     'tripv3.daypart.afternoon': 'Afternoon',
     'tripv3.daypart.evening': 'Evening',
+    'tripv3.daypart.late': 'Late afternoon',
+    'tripv3.replaceAsk': 'My Trip already has {stops}. Replace your current trip or add to it?',
+    'tripv3.replace': 'Replace my trip',
+    'tripv3.addToIt': 'Add to it',
+    'tripv3.cancel': 'Cancel',
     'tripv3.type.restaurant': 'Restaurant',
     'tripv3.type.winery': 'Winery',
     'tripv3.type.cafe': 'Cafe',
@@ -707,6 +716,10 @@ var TRANSLATIONS = {
     'trip.undo': 'Annuler',
     'trip.undoLabel': 'Annuler\u00a0: remettre {name} dans votre voyage',
     'trip.restored': '{name} remis dans le voyage.',
+    'trip.day': 'Jour {n}',
+    'trip.otherStops': 'Autres arr\u00eats',
+    'trip.dayRoute': 'Itin\u00e9raire du jour {n}',
+    'trip.routeCapped': 'Google Maps accepte jusqu\u2019\u00e0 {n} arr\u00eats par itin\u00e9raire; celui-ci comprend donc les {n} premiers. Chaque jour de Mon voyage a son propre itin\u00e9raire.',
 
     'trip.planner.title': 'Planifiez mon voyage',
     'trip.planner.subtitle': 'R\u00e9pondez \u00e0 quelques questions et nous cr\u00e9erons un itin\u00e9raire r\u00e9el, jour par jour, dans l\u2019Okanagan \u00e0 partir de vrais \u00e9tablissements \u2014 aucun lieu invent\u00e9, aucune supposition par IA.',
@@ -881,6 +894,11 @@ var TRANSLATIONS = {
     'tripv3.daypart.midday': 'Midi',
     'tripv3.daypart.afternoon': 'Apr\u00e8s-midi',
     'tripv3.daypart.evening': 'Soir',
+    'tripv3.daypart.late': 'Fin d\u2019apr\u00e8s-midi',
+    'tripv3.replaceAsk': 'Mon voyage contient d\u00e9j\u00e0 {stops}. Remplacer votre voyage actuel ou y ajouter ces arr\u00eats?',
+    'tripv3.replace': 'Remplacer mon voyage',
+    'tripv3.addToIt': 'Les ajouter',
+    'tripv3.cancel': 'Annuler',
     'tripv3.type.restaurant': 'Restaurant',
     'tripv3.type.winery': 'Vignoble',
     'tripv3.type.cafe': 'Caf\u00e9',
@@ -2735,14 +2753,57 @@ window.__scrollToVenueCard = function(name){
     // tray's existing small type; a unique name renders exactly as before.
     var nameCount = {};
     trip.forEach(function(x){ nameCount[x.name] = (nameCount[x.name] || 0) + 1; });
-    listEl.innerHTML = trip.map(function(t, i){
+    function itemHtml(t, i, n, next){
       var place = nameCount[t.name] > 1 && t.region ? String((window.CARD_REGION_LABEL && window.CARD_REGION_LABEL[t.region]) || t.region) : '';
-      var item = '<div class="trip-item"><span>' + (i + 1) + '. ' + t.name.replace(/</g, '&lt;') + (place ? '<br><small class="trip-distance">' + place.replace(/</g, '&lt;') + '</small>' : '') + '</span>' +
+      var item = '<div class="trip-item"><span>' + n + '. ' + t.name.replace(/</g, '&lt;') + (place ? '<br><small class="trip-distance">' + place.replace(/</g, '&lt;') + '</small>' : '') + '</span>' +
         '<button class="trip-remove" data-remove-index="' + i + '" aria-label="Remove ' + (place ? t.name + ' (' + place + ')' : t.name).replace(/"/g, '&quot;') + '">✕</button></div>';
-      var nextStop = trip[i + 1];
-      var distanceLine = nextStop ? distanceLineHtml(t.region, nextStop.region) : '';
-      return item + distanceLine;
+      return item + (next ? distanceLineHtml(t.region, next.region) : '');
+    }
+    // Stops saved with a Build My Trip day (okanaganTripDays) are grouped by day, each day numbered from 1 with its own
+    // Google Maps route, as on /my-trip (2026-10-18: "Add whole trip" gave 13 flat stops and one route over Google's
+    // limit). Stops without a day follow as "Other stops". A tray with no days renders exactly as before.
+    var groups = dayGroups();
+    if (!groups) {
+      listEl.innerHTML = trip.map(function(t, i){ return itemHtml(t, i, i + 1, trip[i + 1]); }).join('');
+      return;
+    }
+    listEl.innerHTML = groups.map(function(g){
+      var route = routeUrl(g.items.map(function(x){ return x.t.query; }));
+      var label = g.day ? t('trip.day').replace('{n}', g.day) : t('trip.otherStops');
+      return '<div class="trip-day-head" style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:10px 0 2px;font-weight:800">' +
+        '<span>' + escText(label) + '</span>' +
+        (g.day && route ? '<a class="trip-day-route" href="' + escText(route) + '" target="_blank" rel="noopener" style="font-size:0.85em;font-weight:700">' + escText(t('trip.dayRoute').replace('{n}', g.day)) + '</a>' : '') + '</div>' +
+        g.items.map(function(x, k){ var nx = g.items[k + 1]; return itemHtml(x.t, x.i, k + 1, nx ? nx.t : null); }).join('');
     }).join('');
+  }
+  // The plan days saved for the tray's stops (ref -> day), or null when none has one.
+  function savedDays(){
+    try { var d = JSON.parse(window.localStorage.getItem('okanaganTripDays') || '{}'); return d && typeof d === 'object' && !Array.isArray(d) ? d : {}; } catch (e) { return {}; }
+  }
+  function dayGroups(){
+    var days = savedDays();
+    if (!trip.some(function(x){ return x.ref && days[x.ref] > 0; })) return null;
+    var byDay = {}, order = [];
+    trip.forEach(function(x, i){
+      var d = x.ref && days[x.ref] > 0 ? Number(days[x.ref]) : 0;
+      if (!byDay[d]) { byDay[d] = { day: d, items: [] }; order.push(d); }
+      byDay[d].items.push({ t: x, i: i });
+    });
+    order.sort(function(a, b){ return (a || 1e9) - (b || 1e9); });
+    return order.map(function(d){ return byDay[d]; });
+  }
+  // A Google Maps link through the stops in order, at most MAX_ROUTE_STOPS of them (an origin, nine waypoints and a
+  // destination: Google's limit for one route link).
+  var MAX_ROUTE_STOPS = 11;
+  function routeUrl(queries){
+    var q = queries.filter(Boolean).slice(0, MAX_ROUTE_STOPS);
+    if (!q.length) return null;
+    if (q.length === 1) return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q[0]);
+    var url = 'https://www.google.com/maps/dir/?api=1' +
+      '&origin=' + encodeURIComponent(q[0]) +
+      '&destination=' + encodeURIComponent(q[q.length - 1]);
+    if (q.length > 2) url += '&waypoints=' + encodeURIComponent(q.slice(1, -1).join('|'));
+    return url;
   }
 
   function showMessage(text){
@@ -2907,24 +2968,25 @@ window.__scrollToVenueCard = function(name){
 
   routeBtn.addEventListener('click', function(){
     if (trip.length === 0) return;
-    var queries = trip.map(function(t){ return t.query; });
-
-    if (queries.length === 1) {
-      window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(queries[0]), '_blank', 'noopener');
-      return;
-    }
-
-    var origin = queries[0];
-    var destination = queries[queries.length - 1];
-    var waypoints = queries.slice(1, -1);
-    var url = 'https://www.google.com/maps/dir/?api=1' +
-      '&origin=' + encodeURIComponent(origin) +
-      '&destination=' + encodeURIComponent(destination);
-    if (waypoints.length) {
-      url += '&waypoints=' + encodeURIComponent(waypoints.join('|'));
-    }
-    window.open(url, '_blank', 'noopener');
+    // In day order when the stops have plan days; never more stops than one Google Maps route takes.
+    var groups = dayGroups();
+    var ordered = groups ? groups.reduce(function(all, g){ return all.concat(g.items.map(function(x){ return x.t; })); }, []) : trip;
+    var url = routeUrl(ordered.map(function(t){ return t.query; }));
+    if (url) window.open(url, '_blank', 'noopener');
+    if (ordered.length > MAX_ROUTE_STOPS) showMessage(t('trip.routeCapped').replace(/\{n\}/g, MAX_ROUTE_STOPS));
   });
+
+  // Build My Trip (2026-10-18): "Replace my trip" empties the tray (and its saved days) before the plan's stops are
+  // added; a page that saved new days asks the tray to redraw so they show at once.
+  window.__roamTripReplace = function(){
+    withdrawUndo();
+    trip = [];
+    try { window.localStorage.setItem('okanaganTripDays', '{}'); } catch (e) {}
+    save();
+    syncButtons();
+    render();
+  };
+  window.__roamTripRender = function(){ render(); };
 
   var clearConfirmTimer = null;
   clearBtn.addEventListener('click', function(){

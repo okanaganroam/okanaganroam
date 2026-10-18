@@ -1055,7 +1055,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const isNegated = (hit) => neg.negatedHits.has(hit);
 
   const flags = { event: false, plan: false, recommend: false, scopeAnything: false };
-  const lengthMentions = lengths.map((l) => ({ days: l.days, phrase: l.phrase, start: l.start }));
+  // "3 wineries a day" is a count per day, not a trip length or a day of its own (2026-10-18).
+  const perDayCount = (l) => l.phrase === 'a day' && l.start >= 2 && /^(?:[1-9]|one|two|three|four|five|six|seven|eight|nine)$/.test(tokens[l.start - 2] || '');
+  const lengthMentions = lengths.filter((l) => !perDayCount(l)).map((l) => ({ days: l.days, phrase: l.phrase, start: l.start }));
   const budgetMentions = [], paceMentions = [], occasionMentions = [], whenMentions = [], daypartMentions = [], conceptMentions = [];
   const monthMentions = [], seasonMentions = [];
   const eventCats = [];
@@ -1140,7 +1142,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const longest = lengthMentions.reduce((m, l) => Math.max(m, l.days), 0);
   const themeAnchors = [];
   if (longest > 1) {
-    for (const l of lengths) if (l.days === 1 && /^(one|a)\b/.test(l.phrase)) themeAnchors.push({ start: l.start, end: l.end, phrase: l.phrase });
+    for (const l of lengths) if (l.days === 1 && /^(one|a)\b/.test(l.phrase) && !perDayCount(l)) themeAnchors.push({ start: l.start, end: l.end, phrase: l.phrase });
     for (let i = 0; i + 2 < tokens.length; i++) {
       if (tokens[i] === 'one' && tokens[i + 1] === 'of' && ['them', 'those', 'the'].includes(tokens[i + 2])) {
         const end = tokens[i + 2] === 'the' && tokens[i + 3] === 'days' ? i + 4 : i + 3;
@@ -1258,6 +1260,16 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   for (const w of intent.textTerms.filter((x) => OUTSIDE_PLACES[x])) {
     intent.textTerms = intent.textTerms.filter((x) => x !== w);
     if (!intent.unsupported.includes(OUTSIDE_PLACES[w])) intent.unsupported.push(OUTSIDE_PLACES[w]);
+  }
+
+  // 6a2. Search gaps (2026-10-18): a badge word that is also a stored cuisine on live ("vegan") is the badge alone.
+  // Read as both, the search wanted the cuisine AND the badge, and found 2 of the 224 Vegan-Friendly places.
+  const featurePhrases = new Set(intent.matched.filter((m) => m.field === 'feature').map((m) => m.phrase));
+  const badgeCuisines = intent.matched.filter((m) => m.field === 'cuisine' && featurePhrases.has(m.phrase));
+  if (badgeCuisines.length) {
+    intent.matched = intent.matched.filter((m) => !badgeCuisines.includes(m));
+    const still = new Set(intent.matched.filter((m) => m.field === 'cuisine').map((m) => m.value));
+    intent.cuisines = intent.cuisines.filter((c) => still.has(c) || !badgeCuisines.some((m) => m.value === c));
   }
 
   // 6b. The visitor's own food words, kept for display: "sushi" stays

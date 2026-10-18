@@ -1,0 +1,555 @@
+{
+ "heading": "Comedy & Live Shows in the Okanagan, Fall & Winter 2026–27",
+ "title": "Okanagan Comedy & Live Shows 2026–27 | Okanagan Roam",
+ "description": "John Mulaney, Jim Jefferies, Ron James, Come From Away, Frozen and more: stand-up, musicals, drag and family shows in the Okanagan, 2026–27.",
+ "banner": "whats-on-arts-culture",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "This guide gathers the comedy, theatre and live shows coming to the Okanagan from late October 2026 through spring 2027: big-name stand-up at Prospera Place, comedy nights in pubs and breweries, dinner-theatre musicals, drag brunches and shows the whole family can enjoy. At the end, there are places to eat near the main theatres.",
+  "Each item shows its town and date. Shows sell out, and dates sometimes move, so check the event page before you buy tickets."
+ ],
+ "sections": [
+  {
+   "id": "big-name-stand-up",
+   "jump": "Stand-up",
+   "heading": "Big-name stand-up",
+   "items": [
+    {
+     "ref": "event:kelowna/john-mulaney-mister-whatever-tour",
+     "name": "John Mulaney: Mister Whatever Tour",
+     "text": "the four-time Emmy-winning comedian brings his new stand-up tour to Prospera Place. The show has been rescheduled; tickets already bought are valid for the new date.",
+     "where": "Kelowna, Nov 13"
+    },
+    {
+     "ref": "event:kelowna/jim-jefferies-son-of-a-carpenter-tour",
+     "name": "Jim Jefferies – Son of a Carpenter Tour",
+     "text": "the Australian comedian blends observational comedy about growing up as a carpenter's son with his famously no-topic-off-limits take on modern life, at Prospera Place. He's known for Netflix specials including Two Limb Policy, the FX series Legit and The Jim Jefferies Show.",
+     "where": "Kelowna, Nov 7"
+    },
+    {
+     "ref": "event:oliver/ron-james-the-noise-between-our-ears",
+     "name": "Ron James: The Noise Between Our Ears",
+     "text": "Ron James's new stand-up show takes on politics south of the border, Baby Boomers twenty years from 'the home' and life as a tech-challenged adult, plus classic bits on hand-me-down hockey gear and camping trips with pals. Tickets in Oliver are $82.50. Also in {event:vernon/ron-james-the-noise-between-our-ears|Vernon, Oct 29} and {event:kelowna/ron-james-the-noise-between-our-ears-live|Kelowna, Oct 30}.",
+     "where": "Oliver, Oct 28"
+    },
+    {
+     "ref": "event:kelowna/danny-bhoy-live",
+     "name": "Danny Bhoy Live",
+     "text": "the Scottish comedian returns on his ninth cross-Canada tour with Dear World…, a stand-up and theatre hybrid, at Kelowna Community Theatre. Tickets are about $68–79.",
+     "where": "Kelowna, Oct 21"
+    },
+    {
+     "ref": "event:vernon/alex-mackenzie-s-hungry-for-laughs-comedy-tour",
+     "name": "Alex Mackenzie's Hungry for Laughs Comedy Tour",
+     "text": "a stand-up lineup with Alex Mackenzie, Ola Dada, Brittany Lyseng and Efthimios Nasiopoulous, comics seen on Just for Laughs and CBC's The Debaters. Every ticket supports local charities. Also in {event:kelowna/hungry-for-laughs-comedy-tour-kelowna|Kelowna, Oct 24}.",
+     "where": "Vernon, Oct 23"
+    },
+    {
+     "ref": "event:oliver/james-mullinger",
+     "name": "James Mullinger",
+     "text": "the British-born, Canada-based comedian tours a new stand-up show built on his outsider's take on Canadian life, at Venables Theatre.",
+     "where": "Oliver, Nov 28"
+    },
+    {
+     "ref": "event:vernon/snowed-in-comedy-tour-vernon",
+     "name": "Snowed In Comedy Tour (Vernon)",
+     "text": "the long-running winter stand-up tour, now in its 18th year, brings a lineup of Canadian comedians to the Performing Arts Centre.",
+     "where": "Vernon, Feb 12"
+    },
+    {
+     "ref": "event:oliver/brent-butt",
+     "name": "Brent Butt",
+     "text": "the creator and star of Corner Gas performs stand-up in his laid-back, storytelling style, at Venables Theatre.",
+     "where": "Oliver, Feb 19"
+    }
+   ]
+  },
+  {
+   "id": "comedy-nights-in-pubs-brewerie",
+   "jump": "Comedy nights",
+   "heading": "Comedy nights in pubs, breweries and clubs",
+   "items": [
+    {
+     "ref": "event:kelowna/next-stop-comedy-at-three-lakes-brewing",
+     "name": "Next Stop Comedy at Three Lakes Brewing",
+     "text": "a monthly stand-up night at Three Lakes Brewing, with a new lineup of touring and local comics each show.",
+     "where": "Kelowna, monthly from Oct 24"
+    },
+    {
+     "ref": "event:kelowna/sergei-putinski-russia-s-only-living-comedian-tonics-pub",
+     "name": "Sergei Putinski – Russia's Only Living Comedian (Tonics Pub)",
+     "text": "Train Wreck Comedy presents the viral character comic known for the tracksuit-and-brick-phone act. Tickets are $35.",
+     "where": "Kelowna, Oct 23"
+    },
+    {
+     "ref": "event:penticton/train-wreck-comedy-all-stars-at-the-hub-on-martin",
+     "name": "Train Wreck Comedy: All-Stars at The Hub on Martin",
+     "text": "three touring BC stand-up comics share the bill in downtown Penticton. Early-bird tickets cost less.",
+     "where": "Penticton, Oct 29"
+    },
+    {
+     "ref": "event:kelowna/derek-seguin-train-wreck-comedy",
+     "name": "Derek Seguin - Train Wreck Comedy",
+     "text": "Montreal's Derek Seguin, an 11-time performer at the Just For Laughs Festival, at Kelowna Actors Studio.",
+     "where": "Kelowna, Nov 6 – 7"
+    },
+    {
+     "ref": "event:penticton/maple-laughs-comedy-show-at-the-barley-mill-brew-pub",
+     "name": "Maple Laughs Comedy Show at the Barley Mill Brew Pub",
+     "text": "a touring stand-up show featuring Canadian comics, with a different lineup each time and the occasional surprise act.",
+     "where": "Penticton, Nov 7"
+    },
+    {
+     "ref": "event:kelowna/sick-twisted-comedy-night-2026-11-14",
+     "name": "Sick & Twisted Comedy Night",
+     "text": "a dark comedy night at Dakoda's Comedy Lounge headlined by Kyle Lucey, with local comics. Not for the easily offended.",
+     "where": "Kelowna, Nov 14"
+    },
+    {
+     "ref": "event:penticton/ben-albert-live-in-penticton-at-the-barley-mill-brew-pub",
+     "name": "Ben Albert: Live in Penticton at the Barley Mill Brew Pub",
+     "text": "the stand-up comic brings his touring show to the Barley Mill for a late-evening set.",
+     "where": "Penticton, Nov 19"
+    },
+    {
+     "ref": "event:kelowna/next-stop-comedy-at-unleashed-brewing",
+     "name": "Next Stop Comedy at Unleashed Brewing",
+     "text": "stand-up comedy at Unleashed Brewing in the North End, including a New Year's Eve show.",
+     "where": "Kelowna, Dec 31 and one more date"
+    },
+    {
+     "ref": "event:kelowna/damonde-tschritter-at-kelowna-actors-studio",
+     "name": "Damonde Tschritter at Kelowna Actors Studio",
+     "text": "the Canadian stand-up headlines one of the studio's stand-up comedy weekends.",
+     "where": "Kelowna, Jan 15 and one more date"
+    },
+    {
+     "ref": "event:kelowna/hassan-phills-live-in-kelowna",
+     "name": "Hassan Phills: Live in Kelowna",
+     "text": "the fast-rising Canadian stand-up brings new material and his crowd-work style to Rustic Reel Brewing, with a 9:30 pm show.",
+     "where": "Kelowna, Feb 13"
+    },
+    {
+     "ref": "event:kelowna/lachlan-patterson-train-wreck-comedy",
+     "name": "Lachlan Patterson – Train Wreck Comedy",
+     "text": "the veteran Canadian stand-up brings his laid-back, offbeat style to the Rotary Centre for the Arts.",
+     "where": "Kelowna, Feb 18"
+    }
+   ]
+  },
+  {
+   "id": "improv-hypnosis-and-something-",
+   "jump": "Improv & more",
+   "heading": "Improv, hypnosis and something different",
+   "items": [
+    {
+     "ref": "event:west-kelowna/the-art-of-magic-illusion-with-ryan-michael-magic",
+     "name": "The Art of Magic & Illusion with Ryan Michael Magic",
+     "text": "close-up magic and an interactive stage show of mind reading, illusions and comedy in the Crown & Thieves speakeasy. A fun, intimate date night.",
+     "where": "West Kelowna, several dates from Oct 25"
+    },
+    {
+     "ref": "event:vernon/god-is-a-scottish-drag-queen-halloween-spooktacular-vernon",
+     "name": "God Is a Scottish Drag Queen: Halloween Spooktacular (Vernon)",
+     "text": "Mike Delamont's hit comedy character, God in a power suit and Scottish accent, returns with a Halloween-themed show. For adults.",
+     "where": "Vernon, Oct 27"
+    },
+    {
+     "ref": "event:penticton/the-comic-strippers-at-the-cleland-theatre",
+     "name": "THE COMIC STRIPPERS! at the Cleland Theatre",
+     "text": "a male stripper parody and improv comedy show, semi-undressed and completely unscripted, with no extreme nudity. It won a Canadian Comedy Award for best live production. Strictly 19+. Also in {event:vernon/the-comic-strippers-19-only|Vernon, May 14}.",
+     "where": "Penticton, Nov 7"
+    },
+    {
+     "ref": "event:kelowna/tawanan-night-filipino-comedy",
+     "name": "TAWANAN Night: Filipino Comedy",
+     "text": "a night of stand-up and sketch comedy from well-known Filipino comedians, open to everyone who likes a laugh.",
+     "where": "Kelowna, Nov 21"
+    },
+    {
+     "ref": "event:silverstar/comedy-hypnosis-show-at-silverstar",
+     "name": "Comedy Hypnosis Show at SilverStar",
+     "text": "comedy hypnotist Gavin Hooper brings his clean, interactive show to the NATC auditorium, where volunteers from the crowd become the stars.",
+     "where": "SilverStar, Dec 20"
+    },
+    {
+     "ref": "event:kelowna/couples-clownselling-love-is-a-joke",
+     "name": "Couples Clownselling: Love Is a Joke",
+     "text": "a Valentine's Day comedy in which clown 'counsellors' poke fun at couples and romance. Ages 16 and up.",
+     "where": "Kelowna, Feb 14"
+    },
+    {
+     "ref": "event:kelowna/hyprov-improv-under-hypnosis",
+     "name": "Hyprov: Improv Under Hypnosis",
+     "text": "audience volunteers are hypnotized and then perform improv comedy alongside a professional improviser. Best for adults and teens.",
+     "where": "Kelowna, Mar 25"
+    },
+    {
+     "ref": "event:kelowna/wheeler-walker-jr-pullin-out-farewell-tour",
+     "name": "Wheeler Walker Jr.: Pullin' Out Farewell Tour",
+     "text": "comedian Ben Hoffman's raunchy country-singer character plays a farewell tour show. Explicit humour; strictly for adults.",
+     "where": "Kelowna, Mar 30"
+    }
+   ]
+  },
+  {
+   "id": "musicals-and-plays",
+   "jump": "Musicals & plays",
+   "heading": "Musicals and plays",
+   "items": [
+    {
+     "ref": "event:kelowna/little-shop-of-horrors",
+     "name": "Little Shop of Horrors",
+     "text": "Actors Studio stages the cult-classic musical as a dinner-theatre night. Expect rock, Motown and dark comedy with plenty of camp. Tickets are $82.",
+     "where": "Kelowna, several dates from Oct 18"
+    },
+    {
+     "ref": "event:vernon/bury-the-hatchet",
+     "name": "Bury the Hatchet",
+     "text": "a touring play retelling the Lizzie Borden axe-murder case of 1892. Dark, gripping theatre for the Halloween season.",
+     "where": "Vernon, Oct 21"
+    },
+    {
+     "ref": "event:kelowna/the-dinner-theatre-live",
+     "name": "\"The Dinner Theatre\" Live",
+     "text": "a world-premiere musical about two Broadway veterans reunited at a dinner theatre in Moncton, written by and starring Canadian recording artist Rick Worrall. Despite the title, no dinner is served.",
+     "where": "Kelowna, from Nov 5, three dates"
+    },
+    {
+     "ref": "event:penticton/every-christmas-story-ever-told-and-then-some-many-hats-theatre",
+     "name": "Every Christmas Story Ever Told (and Then Some!) – Many Hats Theatre",
+     "text": "three actors refuse to do A Christmas Carol yet again and race through every holiday story and TV special they can think of instead. It runs four weekends with evening and Sunday matinee shows.",
+     "where": "Penticton, from Nov 13"
+    },
+    {
+     "ref": "event:kelowna/disney-s-frozen-the-musical",
+     "name": "Disney's Frozen the Musical",
+     "text": "Kelowna Actors Studio's holiday-season production, Wednesday to Saturday at 7 pm with weekend matinees. Doors open at 5:30 pm for dinner before evening shows; food is extra. Many shows are close to selling out.",
+     "where": "Kelowna, Nov 25 – Dec 20"
+    },
+    {
+     "ref": "event:kelowna/anne-of-green-gables",
+     "name": "Anne of Green Gables",
+     "text": "New Vintage Theatre's annual holiday play, with a cast of local talent in an all-ages production, at the Rotary Centre for the Arts.",
+     "where": "Kelowna, from Nov 26"
+    },
+    {
+     "ref": "event:armstrong/le-hockey-sweater",
+     "name": "Le Hockey Sweater",
+     "text": "Caravan Farm Theatre's winter show is a joyful, raucous take on Roch Carrier's Canadian classic The Hockey Sweater, bringing an outdoor hockey game to the farm's fields and forests.",
+     "where": "Armstrong, from Dec 1"
+    },
+    {
+     "ref": "event:vernon/palliser-suite-two-one-act-comedies-at-powerhouse-theatre",
+     "name": "Palliser Suite: Two One-Act Comedies at Powerhouse Theatre",
+     "text": "two award-winning one-act comedies set in Calgary's Palliser Hotel, in the spirit of Neil Simon. Light, quick and very funny.",
+     "where": "Vernon, from Jan 21"
+    },
+    {
+     "ref": "event:kelowna/come-from-away",
+     "name": "Come From Away",
+     "text": "the Tony Award-winning musical tells the true story of Gander, Newfoundland, which took in nearly 7,000 stranded passengers on September 11, 2001. Evening shows Wednesday to Saturday plus weekend matinees; tickets $93–$100.",
+     "where": "Kelowna, Feb 3 – 21"
+    },
+    {
+     "ref": "event:vernon/clue-on-stage-at-powerhouse-theatre",
+     "name": "Clue: On Stage at Powerhouse Theatre",
+     "text": "the board game becomes a fast farce. Expect slapstick, rapid-fire jokes and plenty of whodunit twists.",
+     "where": "Vernon, from Feb 12"
+    },
+    {
+     "ref": "event:vernon/vdpac-presents-louisa-may-alcott-s-little-women",
+     "name": "VDPAC Presents: Louisa May Alcott's LITTLE WOMEN",
+     "text": "an Arts Club Theatre Company production of Little Women. Tickets in Vernon are $49–$59, including fees. Also in {event:oliver/little-women-arts-club-theatre|Oliver, Mar 31}.",
+     "where": "Vernon, Mar 30"
+    },
+    {
+     "ref": "event:kelowna/chicago-the-musical",
+     "name": "Chicago The Musical",
+     "text": "the roaring-twenties musical, with a Bob Fosse-style score including “All That Jazz” and “Cell Block Tango”. Tickets are $93–$100.",
+     "where": "Kelowna, from Apr 21 until May 9"
+    }
+   ]
+  },
+  {
+   "id": "shows-for-the-whole-family",
+   "jump": "Family shows",
+   "heading": "Shows for the whole family",
+   "items": [
+    {
+     "ref": "event:kelowna/bunnicula-the-musical",
+     "name": "Bunnicula - The Musical",
+     "text": "a colourful family musical at The Balsam School. The show runs about 60 minutes and suits all ages.",
+     "where": "Kelowna, from Oct 31"
+    },
+    {
+     "ref": "event:vernon/magician-leif-david-magic-show",
+     "name": "Magician Leif David Magic Show",
+     "text": "award-winning magician Leif David presents a family-friendly show of close-up and stage magic with clean comedy. Tickets are $18 including fees.",
+     "where": "Vernon, Nov 14, 2 pm"
+    },
+    {
+     "ref": "event:oliver/luminarium-juggling-saves-the-world",
+     "name": "Luminarium: Juggling Saves the World",
+     "text": "physical theatre with juggling and clowning. Wordless, playful fun for kids and adults.",
+     "where": "Oliver, Jan 22"
+    },
+    {
+     "ref": "event:penticton/harlem-globetrotters-rivalry-tour",
+     "name": "Harlem Globetrotters: Rivalry Tour",
+     "text": "trick-shot basketball and comedy routines at the South Okanagan Events Centre, on a tour marking 100 years of the team.",
+     "where": "Penticton, Jan 25"
+    },
+    {
+     "ref": "event:vernon/yuki-the-juggler",
+     "name": "Yuki the Juggler",
+     "text": "Yuki Ueda blends traditional and modern juggling with freestyle dance, clowning and theatre. Tickets are $18, including fees.",
+     "where": "Vernon, Feb 5"
+    },
+    {
+     "ref": "event:kelowna/the-wilds-by-wonderheads",
+     "name": "The Wilds by Wonderheads",
+     "text": "a wordless mask-theatre adventure. Gentle, magical storytelling for families.",
+     "where": "Kelowna, Feb 25"
+    },
+    {
+     "ref": "event:kelowna/roald-dahl-s-willy-wonka-tya-pixie-dot",
+     "name": "Roald Dahl's Willy Wonka – TYA (Pixie & Dot)",
+     "text": "a family-friendly youth-theatre version of Willy Wonka, with golden tickets, Oompa Loompas and the classic songs.",
+     "where": "Kelowna, from Mar 13"
+    },
+    {
+     "ref": "event:lake-country/magic-at-creekside",
+     "name": "Magic! at Creekside",
+     "text": "three Canadian magicians mix magic, comedy and audience participation for an age-diverse crowd. All seats are $49, including fees and taxes.",
+     "where": "Lake Country, Mar 25"
+    }
+   ]
+  },
+  {
+   "id": "drag-brunches-and-cabaret-nigh",
+   "jump": "Drag & cabaret",
+   "heading": "Drag brunches and cabaret nights",
+   "items": [
+    {
+     "ref": "event:kelowna/ella-s-naughty-drag-brunch",
+     "name": "Ella's Naughty Drag Brunch",
+     "text": "Ella Lamoureux and a rotating cast of drag performers host a brunch at the Unicorn Lounge. Admission is $10; reserve your spot.",
+     "where": "Kelowna, several dates from Oct 25"
+    },
+    {
+     "ref": "event:penticton/ella-s-naughty-drag-bingo-at-the-hub-on-martin",
+     "name": "Ella's Naughty Drag Bingo at The Hub on Martin",
+     "text": "a bawdy, adults-only bingo night with cheeky prizes and nonstop jokes. 19+.",
+     "where": "Penticton, from Oct 22"
+    },
+    {
+     "ref": "event:kelowna/drag-brunch-with-joan-janice",
+     "name": "Drag Brunch with Joan & Janice",
+     "text": "a Sunday drag brunch at Unicorn Lounge starring Joan & Janice Everyday, an intergalactic duo of alien queens. Admission is $10.",
+     "where": "Kelowna, from Nov 1"
+    },
+    {
+     "ref": "event:west-kelowna/a-freida-whales-drag-show",
+     "name": "A Freida Whales Drag Show",
+     "text": "an intimate drag show in The Broken Hearts Club speakeasy at Crown & Thieves. It's a 19+ event; tickets are $40.",
+     "where": "West Kelowna, Nov 20"
+    },
+    {
+     "ref": "event:kelowna/ken-s-kings-night-2nd-anniversary-showcase",
+     "name": "Ken's Kings Night: 2nd Anniversary Showcase",
+     "text": "a drag king cabaret celebrating two years of Kelowna's Ken's Kings Night, in the intimate Black Box Theatre.",
+     "where": "Kelowna, Nov 27"
+    },
+    {
+     "ref": "event:kelowna/war-on-the-catwalk-drag-race-tour",
+     "name": "WAR on the Catwalk: Drag Race Tour",
+     "text": "stars from RuPaul's Drag Race and Canada's Drag Race, hosted by Alyssa Edwards, compete in a glam runway show.",
+     "where": "Kelowna, Feb 28"
+    }
+   ]
+  },
+  {
+   "id": "the-main-stages",
+   "jump": "Theatres",
+   "heading": "The main stages",
+   "items": [
+    {
+     "ref": "kelowna/kelowna-community-theatre",
+     "name": "Kelowna Community Theatre",
+     "text": "a city-run, roughly 850-seat theatre in the Cultural District, with a smaller Black Box space for cabaret and intimate shows.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/rotary-centre-for-the-arts",
+     "name": "Rotary Centre for the Arts",
+     "text": "a community arts hub with the 326-seat Mary Irwin Theatre hosting comedy, concerts and film.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/vernon-district-performing-arts-centre",
+     "name": "Vernon & District Performing Arts Centre",
+     "text": "Vernon's main performing arts venue, with a 750-seat auditorium. Tickets for every show are sold through Ticketseller.ca.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/powerhouse-theatre",
+     "name": "Powerhouse Theatre",
+     "text": "an award-winning community theatre in one of Vernon's historic buildings.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "penticton/cleland-community-theatre",
+     "name": "Cleland Community Theatre",
+     "text": "the city-run, 443-seat theatre inside the Penticton Community Centre on Power Street. Most tickets are sold through ValleyFirst Tix.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "oliver/venables-theatre",
+     "name": "Venables Theatre",
+     "text": "a 400-seat theatre with an on-site lounge and free parking.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "lake-country/creekside-theatre",
+     "name": "Creekside Theatre",
+     "text": "a 250-seat community theatre hosting touring musicians, comedy, dance and magic shows in an intimate room.",
+     "where": "Lake Country"
+    }
+   ]
+  },
+  {
+   "id": "dinner-before-the-show",
+   "jump": "Dinner",
+   "heading": "Dinner before the show",
+   "lead": "Well-rated places to eat a short walk from the main stages: Kelowna's Cultural District (Kelowna Community Theatre, the Rotary Centre for the Arts and Prospera Place), Vernon's Performing Arts Centre, Penticton's Cleland Theatre and Oliver's Venables Theatre.",
+   "items": [
+    {
+     "ref": "kelowna/king-taps",
+     "name": "King Taps",
+     "text": "a lakeside patio, a well-reviewed happy hour menu and a big cocktail list.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/soul-de-cuba-cafe",
+     "name": "Soul De Cuba Cafe",
+     "text": "an authentic Cuban restaurant on Sunset Dr. Order the ropa vieja poutine and the croquettes.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/skinny-duke-s-glorious-emporium",
+     "name": "Skinny Duke's Glorious Emporium",
+     "text": "a retro '70s-themed lounge. Order a spread of shareable Asian-fusion small plates and an inventive cocktail.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/pizza-garden",
+     "name": "Pizza Garden",
+     "text": "a wood-oven pizza shop with a celiac-safe process.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/humo-kelowna",
+     "name": "HUMO Kelowna",
+     "text": "an intimate tasting-menu restaurant, a good pick for a first date or special occasion. Book ahead.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/intermezzo-restaurant-and-wine-cellar",
+     "name": "Intermezzo Restaurant and Wine Cellar",
+     "text": "an elegant Italian restaurant, with live Spanish guitar on select nights.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/kawakubo-vernon",
+     "name": "Kawakubo Vernon",
+     "text": "a Japanese restaurant whose dining room is filled with art.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "penticton/pizzeria-tratto-napoletana",
+     "name": "Pizzeria Tratto Napoletana",
+     "text": "order a Neapolitan pie; the non-alcoholic beer options are tasty too.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "oliver/savvios-family-restaurant",
+     "name": "Savvios Family Restaurant",
+     "text": "Greek-Italian comfort food in generous portions. The souvlaki and spanakopita are the dishes locals come back for.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/auntie-ag-s-seafood-cafe",
+     "name": "Auntie Ag's Seafood Cafe",
+     "text": "a tiny, no-frills cafe focused on fish and chips.",
+     "where": "Oliver"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A big-name comedian",
+    [
+     "event:kelowna/john-mulaney-mister-whatever-tour|John Mulaney: Mister Whatever Tour",
+     "event:kelowna/jim-jefferies-son-of-a-carpenter-tour|Jim Jefferies – Son of a Carpenter Tour"
+    ]
+   ],
+   [
+    "Canadian comedy legends",
+    [
+     "event:oliver/brent-butt|Brent Butt",
+     "event:oliver/ron-james-the-noise-between-our-ears|Ron James: The Noise Between Our Ears"
+    ]
+   ],
+   [
+    "A cheap night of laughs",
+    [
+     "event:kelowna/next-stop-comedy-at-three-lakes-brewing|Next Stop Comedy at Three Lakes Brewing",
+     "event:penticton/maple-laughs-comedy-show-at-the-barley-mill-brew-pub|Maple Laughs Comedy Show at the Barley Mill Brew Pub"
+    ]
+   ],
+   [
+    "Dinner and a musical in one",
+    [
+     "event:kelowna/little-shop-of-horrors|Little Shop of Horrors",
+     "event:kelowna/disney-s-frozen-the-musical|Disney's Frozen the Musical"
+    ]
+   ],
+   [
+    "A show for the kids",
+    [
+     "event:vernon/magician-leif-david-magic-show|Magician Leif David Magic Show",
+     "event:penticton/harlem-globetrotters-rivalry-tour|Harlem Globetrotters: Rivalry Tour"
+    ]
+   ],
+   [
+    "A date night",
+    [
+     "event:west-kelowna/the-art-of-magic-illusion-with-ryan-michael-magic|The Art of Magic & Illusion with Ryan Michael Magic",
+     "event:kelowna/couples-clownselling-love-is-a-joke|Couples Clownselling: Love Is a Joke"
+    ]
+   ],
+   [
+    "A big Broadway hit",
+    [
+     "event:kelowna/come-from-away|Come From Away",
+     "event:kelowna/chicago-the-musical|Chicago The Musical"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on/arts-culture\">Arts &amp; culture events</a>, <a href=\"/whats-on/nightlife\">Nightlife</a>, <a href=\"/whats-on\">What's On</a>"
+}

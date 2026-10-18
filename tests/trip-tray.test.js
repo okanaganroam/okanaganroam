@@ -17,7 +17,7 @@ const APP_JS = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', '
 const START = '/* ---------- Trip planner: build a multi-stop route across saved venues ---------- */';
 const END = '/* ---------- Build My Trip, Stage 2: /trip planner page';
 const TRAY_JS = APP_JS.slice(APP_JS.indexOf(START), APP_JS.indexOf(END));
-const STRINGS = { 'trip.addToTrip': '\u{1F9F3} Add to trip', 'trip.inTrip': '✓ In trip', 'trip.emptyState': 'No venues added yet.', 'trip.sameArea': 'Same area', 'trip.kmToNextStop': 'km to next stop', 'trip.removed': 'Removed {name}.', 'trip.undo': 'Undo', 'trip.undoLabel': 'Undo: put {name} back in your trip', 'trip.restored': 'Restored {name}.' };
+const STRINGS = { 'trip.addToTrip': '\u{1F9F3} Add to trip', 'trip.inTrip': '✓ In trip', 'trip.emptyState': 'No venues added yet.', 'trip.sameArea': 'Same area', 'trip.kmToNextStop': 'km to next stop', 'trip.removed': 'Removed {name}.', 'trip.undo': 'Undo', 'trip.undoLabel': 'Undo: put {name} back in your trip', 'trip.restored': 'Restored {name}.', 'trip.day': 'Day {n}', 'trip.otherStops': 'Other stops', 'trip.dayRoute': 'Route for day {n}', 'trip.routeCapped': 'Google Maps takes up to {n} stops in one route.' };
 const REGION_LABELS = { kelowna: 'Kelowna', penticton: 'Penticton', 'west-kelowna': 'West Kelowna', oliver: 'Oliver', osoyoos: 'Osoyoos', vernon: 'Vernon' };
 
 // A minimal element: dataset, class list, text, innerHTML, closest() by class.
@@ -62,17 +62,18 @@ class El {
 }
 
 // Boot the tray with a given saved trip and the given page buttons.
-function boot({ saved, buttons = [], resolve = null, timers = null } = {}) {
+function boot({ saved, buttons = [], resolve = null, timers = null, days = null } = {}) {
   El.focused = null;
   const els = { tripTrayToggle: new El('tripTrayToggle'), tripTrayPanel: new El('tripTrayPanel'), tripTrayList: new El('tripTrayList'), tripTrayCount: new El('tripTrayCount'), tripRouteBtn: new El('tripRouteBtn'), tripClearBtn: new El('tripClearBtn'), tripTrayMessage: new El('tripTrayMessage') };
   const store = new Map(saved === undefined ? [] : [['okanaganTrip', typeof saved === 'string' ? saved : JSON.stringify(saved)]]);
-  const events = [], requests = [];
+  if (days) store.set('okanaganTripDays', JSON.stringify(days));
+  const events = [], requests = [], opened = [];
   let docClick = null;
   const window = {
     localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) },
     trackEvent: (name, params) => events.push([name, params]),
     CARD_REGION_LABEL: REGION_LABELS,
-    open: () => {},
+    open: (url) => opened.push(url),
     fetch: resolve ? (url) => { requests.push(url); return Promise.resolve(resolve(url)); } : undefined,
   };
   const document = {
@@ -85,7 +86,7 @@ function boot({ saved, buttons = [], resolve = null, timers = null } = {}) {
   vm.runInContext(TRAY_JS, ctx);
   const click = (target) => docClick({ target });
   return {
-    els, events, requests, buttons,
+    els, events, requests, buttons, opened, window, store,
     stored: () => JSON.parse(store.get('okanaganTrip') || 'null'),
     rawStored: () => store.get('okanaganTrip'),
     click,
@@ -435,4 +436,40 @@ test('W14: Undo expires after about 10 seconds; hover and keyboard focus pause i
   h.msg.listeners.focusout();
   tm.advance(10000);
   assert.equal(h.undoBtn(), null);
+});
+
+// ---- My Trip by day (2026-10-18) ----
+test('My Trip by day: stops saved with plan days are grouped Day 1, Day 2, then Other stops, each day with its own capped route', () => {
+  const stop = (i, day) => ({ name: `Stop ${i}`, query: `Stop ${i}, Vernon, BC`, region: 'vernon', ref: `venue:${500 + i}` });
+  const saved = [stop(0)].concat(Array.from({ length: 12 }, (_, k) => stop(k + 1)));
+  const days = {}; saved.slice(1).forEach((x, k) => { days[x.ref] = k < 6 ? 1 : 2; });
+  const t = boot({ saved, days });
+  const html = t.els.tripTrayList.innerHTML;
+  const heads = [...html.matchAll(/<div class="trip-day-head"[^>]*><span>([^<]*)<\/span>/g)].map((m) => m[1]);
+  assert.deepEqual(heads, ['Day 1', 'Day 2', 'Other stops'], 'grouped like /my-trip, the old stop last');
+  assert.equal((html.match(/class="trip-day-route"/g) || []).length, 2, 'a route per day');
+  assert.match(html, /data-remove-index="0"/);
+  assert.ok(html.indexOf('Stop 1<') < html.indexOf('Stop 7<') && html.indexOf('Stop 12<') < html.indexOf('Stop 0<'));
+  assert.match(html, /<span>1\. Stop 7<\/span>/, 'each day numbered from 1');
+  // The whole-trip route never goes past Google's limit (an origin, nine waypoints, a destination) and says so.
+  t.els.tripRouteBtn.listeners.click();
+  const url = new URL(t.opened[0]);
+  assert.equal(url.searchParams.get('waypoints').split('|').length, 9);
+  assert.match(t.els.tripTrayMessage.textContent, /up to 11 stops/);
+  // Without saved days the tray is the flat list it always was.
+  const flat = boot({ saved: saved.slice(0, 3) });
+  assert.ok(!flat.els.tripTrayList.innerHTML.includes('trip-day-head'));
+  // "Replace my trip" (Build My Trip) empties the tray and its saved days.
+  t.window.__roamTripReplace();
+  assert.deepEqual(t.stored(), []);
+  assert.equal(t.store.get('okanaganTripDays'), '{}');
+  assert.equal(t.els.tripTrayCount.textContent, 0);
+});
+
+test('My Trip by day: /trip asks "Replace your current trip or add to it?" before Add whole trip, in English and French', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  for (const marker of ['function askReplaceOrAdd()', "data-t3-replace=\"replace\"", "data-t3-replace=\"add\"", 'function tripDayOffset()', 'window.__roamTripRender', "addStops(null, { offset: tripDayOffset() })"]) assert.ok(src.includes(marker), marker);
+  assert.match(APP_JS, /'tripv3\.replaceAsk': 'My Trip already has \{stops\}\. Replace your current trip or add to it\?'/);
+  assert.match(APP_JS, /'tripv3\.replaceAsk': 'Mon voyage contient d\\u00e9j\\u00e0 \{stops\}\. Remplacer votre voyage actuel ou y ajouter ces arr\\u00eats\?'/);
+  assert.match(APP_JS, /'trip\.dayRoute': 'Itin\\u00e9raire du jour \{n\}'/);
 });

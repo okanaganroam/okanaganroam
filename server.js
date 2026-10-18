@@ -4216,6 +4216,12 @@ function smartStrip(folded, phrases) {
   return s.trim().split(' ').filter(Boolean);
 }
 const SMART_BREAKFAST_WORDS = ['breakfast', 'breakfasts', 'brunch', 'brunches', 'eggs benny', 'pancakes', 'petit dejeuner', 'petits dejeuners', 'dejeuner', 'dejeuners'];
+// Search gaps (2026-10-18): a wine tour is a wine word with a tour word ("wine tour", "winery tours", and the
+// French planner's "tour some vineyards" / "circuit some wines").
+const SMART_WINE_WORDS = ['wine', 'wines', 'winery', 'wineries', 'vineyard', 'vineyards', 'wine tasting', 'wine tastings', 'vin', 'vins', 'vignoble', 'vignobles', 'degustation', 'degustations'];
+const SMART_TOUR_WORDS = ['tour', 'tours', 'touring', 'circuit', 'circuits', 'tournee', 'tournees', 'excursion', 'excursions', 'shuttle', 'shuttles', 'hop on hop off'];
+// Cheap eats: places to eat.
+const SMART_BUDGET_TYPES = ['restaurant', 'cafe', 'pub'];
 const SMART_FAMILY_WORDS = ['kids', 'kid', 'children', 'child', 'family', 'families', 'toddler', 'toddlers', 'little ones', 'enfants', 'enfant', 'famille', 'familles', 'en famille'];
 const SMART_RAINY_WORDS = ['rainy day', 'rainy days', 'rainy', 'rain', 'raining', 'wet day', 'indoor', 'indoors', 'inside', 'jour de pluie', 'pluie', 'pluvieux', 'pluvieuse', 'interieur', 'interieures', 'interieurs', 'a l interieur'];
 const SMART_DATE_WORDS = ['date night', 'date nights', 'date idea', 'date ideas', 'romantic', 'romance', 'anniversary', 'anniversary dinner', 'romantique', 'en amoureux', 'soiree romantique', 'tete a tete'];
@@ -4293,7 +4299,9 @@ function smartGuideMatches(text, intent) {
     const hits = words.filter((w) => tokens.has(w)).length;
     if (!hits) continue;
     const full = hits === words.length;
-    if (!full && hits * 2 < words.length) continue;
+    // Search gaps (2026-10-18): a partial match needs two topic words, so one shared word ("tour") never offers an
+    // unrelated guide ("wine tour naramata" offered the sleigh-ride guide).
+    if (!full && (hits < 2 || hits * 2 < words.length)) continue;
     out.push({ path: g.path, heading: g.heading, full, score: hits / words.length - tokens.size / 1000 });
   }
   return out.sort((a, b) => b.score - a.score);
@@ -4388,12 +4396,15 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
       heading: `Breakfast & brunch${town ? ` in ${town}` : ''}`,
       headingFr: `Déjeuner et brunch${town ? ` à ${town}` : ''}`,
       guides,
+      // Search gaps (2026-10-18): every café counts too (a town with cafés never shows nothing), and a listed
+      // breakfast or brunch cuisine counts as saying so.
       list: () => smartPickVenues((v) => {
         if ((region && v.region !== region) || !hasT(v) || !F.every((f) => v.features[f])) return false;
-        const early = Number(v.row.open_early) === 1, said = smartTextHas(v, re);
-        if (!early && !said) return false;
-        return [early ? 'Opens early' : '', said ? 'Mentions breakfast or brunch' : ''].filter(Boolean).join(' · ');
-      }, (v) => (Number(v.row.open_early) === 1 ? 1 : 0) + (smartTextHas(v, re) ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+        const early = Number(v.row.open_early) === 1, said = smartTextHas(v, re) || re.test(v.cuisine);
+        const cafe = types.includes('cafe') && (v.type === 'cafe' || v.fdTypes.includes('cafe'));
+        if (!early && !said && !cafe) return false;
+        return [said ? 'Mentions breakfast or brunch' : '', early ? 'Opens early' : '', cafe && !said && !early ? 'Café' : ''].filter(Boolean).join(' · ');
+      }, (v) => (Number(v.row.open_early) === 1 ? 1 : 0) + (smartTextHas(v, re) || re.test(v.cuisine) ? 1.5 : 0) + foodDrinkRecommendedScore(v.row) / 10),
     };
   }
 
@@ -4402,6 +4413,52 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
     && getFoodDrinkHubVenues().length >= MIN_CATEGORY_VENUES) {
     const types = T.length ? T : ['restaurant', 'cocktail'];
     return { key: 'date_night', url: `/food-drink${discoveryQueryString({ types, features: F.filter((f) => FD_HUB_FEATURE_KEYS.has(f)), regions: R })}` };
+  }
+
+  // Search gaps (2026-10-18): a wine tour -> the town's wineries, plus the tour operators that run wine tours there
+  // ("wine tour naramata" read as Tours in Naramata found nothing).
+  if (smartHas(folded, SMART_WINE_WORDS) && smartHas(folded, SMART_TOUR_WORDS) && T.every((t) => t === 'tour' || t === 'winery') && !others) {
+    const townFold = town ? smartFold(town) : null;
+    const wineRe = /\b(wine|wines|winery|wineries|vineyards?|tastings?)\b/i;
+    const isTour = (v) => v.type === 'tour' || v.fdTypes.includes('tour');
+    const operators = smartPickVenues((v) => {
+      if (!isTour(v) || !smartTextHas(v, wineRe) || !F.every((f) => v.features[f])) return false;
+      if (region && v.region !== region && !` ${smartFold(`${v.row.name} ${v.row.description || ''}`)} `.includes(` ${townFold} `)) return false;
+      return 'Runs wine tours';
+    }, (v) => foodDrinkRecommendedScore(v.row) / 10);
+    const wineryCount = region ? (getRegionCategoryCounts(region).winery || 0) : 0;
+    if (!operators.length && !F.length) {
+      if (!region) return { key: 'wine_tour', url: '/wineries' };
+      if (wineryCount >= MIN_CATEGORY_VENUES) return { key: 'wine_tour', url: `/${region}/${CATEGORY_SLUGS.winery}` };
+    }
+    return {
+      key: 'wine_tour',
+      heading: `Wine tours${town ? ` in ${town}` : ''}`,
+      headingFr: `Tournées des vignobles${town ? ` à ${town}` : ''}`,
+      guides: [],
+      list: () => [...operators, ...(region ? smartPickVenues((v) => v.type === 'winery' && v.region === region && F.every((f) => v.features[f]) && 'Winery',
+        (v) => foodDrinkRecommendedScore(v.row) / 10) : [])],
+    };
+  }
+
+  // Search gaps (2026-10-18): cheap eats -> places to eat with a listed price, $ first, then $$ (it listed beaches).
+  if (intent.budget === 'budget' && T.every((t) => SMART_BUDGET_TYPES.includes(t)) && !others) {
+    const types = T.length ? T : SMART_BUDGET_TYPES;
+    const hasT = (v) => types.includes(v.type) || v.fdTypes.some((t) => types.includes(t));
+    const pick = () => smartPickVenues((v) => {
+      const price = Number(v.row.price);
+      if ((region && v.region !== region) || !hasT(v) || !F.every((f) => v.features[f]) || !(price === 1 || price === 2)) return false;
+      return price === 1 ? '$' : '$$';
+    }, (v) => (Number(v.row.price) === 1 ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+    if (pick().length) {
+      return {
+        key: 'budget',
+        heading: `Cheap eats${town ? ` in ${town}` : ''}`,
+        headingFr: `Bonnes adresses pas chères${town ? ` à ${town}` : ''}`,
+        guides: [],
+        list: pick,
+      };
+    }
   }
 
   // Dated events: "live music this weekend", "things to do tonight".
@@ -4458,6 +4515,28 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
     if (!d.url || d.kind === 'browse' || (d.kind === 'events' && !intent.when)) return { key: 'guide', url: guides[0].path };
   }
   return null;
+}
+// Search gaps (2026-10-18): /api/discover reports what the search box and /search do for a planned request -- the
+// page it goes to, or the plan's own list (breakfast in West Kelowna listed nothing here while /search had 14).
+// Additive: everything else in the response is as before.
+function withSmartSearchPlan(run, limit = DISCOVERY_DEFAULT_LIMIT) {
+  const plan = smartSearchPlan(run.query, run.intent);
+  if (!plan) return run;
+  run.plan = { key: plan.key, heading: plan.heading || null };
+  if (plan.url) {
+    run.destination = { url: plan.url, kind: 'page', reason: `intent_${plan.key}` };
+    return run;
+  }
+  const picked = plan.list();
+  run.destination = { url: `/search${discoveryQueryString({ q: run.query.trim() })}`, kind: 'search', reason: `intent_${plan.key}` };
+  run.results = {
+    kind: picked.length ? 'venues' : 'none', total: picked.length,
+    items: picked.slice(0, limit).map((x) => discoveryVenueItem(x.row, x.why ? x.why.split(' · ') : [])),
+    exclusions: { applied: [], notApplied: [] },
+  };
+  run.presentation = { ...run.presentation, interpreted: plan.heading || run.presentation.interpreted, status: picked.length ? 'results' : run.presentation.status,
+    notes: run.presentation.notes.filter((n) => !(plan.key === 'budget' && n.field === 'budget')) };
+  return run;
 }
 function smartIndoorCount(region, familyOnly) {
   const notes = getIndoorAlsoNotes();
@@ -4546,7 +4625,9 @@ function discoveryNoteTextFr(n, labels) {
 }
 
 // Smarter search (2026-10-18): everything the /search page shows, worked out once.
-const SEARCH_PAGE_MAX_RESULTS = 480;
+// Search gaps (2026-10-18): every match is on the page (the cards past the first 48 wait in a template and load their
+// photos lazily), so nothing is left out unexplained; past this cap the count says "Showing the top N of M".
+const SEARCH_PAGE_MAX_RESULTS = 3000;
 function searchPageModel(run, now = new Date(), lang = 'en') {
   // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
   // from (a French search goes through the planner's French words first, see discoverySearchText).
@@ -4584,10 +4665,10 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
 }
 // French words for the page's own text (the cards and filters are translated with every French page).
 const SEARCH_PAGE_TEXT = {
-  en: { title: 'Search', h1: 'Search results', searched: 'You searched', showing: 'showing', button: 'Search', label: 'Search Okanagan Roam', places: (n) => `${n} place${n === 1 ? '' : 's'}`,
+  en: { title: 'Search', h1: 'Search results', searched: 'You searched', showing: 'showing', button: 'Search', label: 'Search Okanagan Roam', places: (n) => `${n} place${n === 1 ? '' : 's'}`, topOf: (n, t) => `Showing the top ${n} of ${t} places`,
     guides: 'Our guides', didYouMean: 'Did you mean', tryThese: 'You could also try', popular: (t) => `Popular in ${t}`, browse: (q) => `Search the directory for “${q}”`,
     filter: 'Filter these results', filterPh: 'Filter by name, place or dish...', matched: 'Matched:', allGuides: 'All our guides', none: 'Nothing matched those words. Here are some places to start.' },
-  fr: { title: 'Recherche', h1: 'Résultats de recherche', searched: 'Vous avez cherché', showing: 'résultats', button: 'Chercher', label: 'Chercher sur Okanagan Roam', places: (n) => `${n} endroit${n > 1 ? 's' : ''}`,
+  fr: { title: 'Recherche', h1: 'Résultats de recherche', searched: 'Vous avez cherché', showing: 'résultats', button: 'Chercher', label: 'Chercher sur Okanagan Roam', places: (n) => `${n} endroit${n > 1 ? 's' : ''}`, topOf: (n, t) => `Voici les ${n} meilleurs des ${t} endroits`,
     guides: 'Nos guides', didYouMean: 'Vouliez-vous dire', tryThese: 'Essayez aussi', popular: (t) => `Populaire à ${t}`, browse: (q) => `Chercher « ${q} » dans le répertoire`,
     filter: 'Filtrer ces résultats', filterPh: 'Filtrer par nom, endroit ou plat...', matched: 'Correspond :', allGuides: 'Tous nos guides', none: 'Rien ne correspond à ces mots. Voici quelques idées pour commencer.' },
 };
@@ -4625,7 +4706,8 @@ function searchSummaryHtml(model, lang) {
       : `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>`;
   // Stage 3.5: a sentence is shown once. A plan's own list (2026-10-18)
   // applies its occasion and dates itself, so their notes are left off.
-  const notes = p.notes.filter((n) => !(plan && plan.list && ['occasion', 'when'].includes(n.field)))
+  // Search gaps (2026-10-18): the cheap-eats list applies the budget itself.
+  const notes = p.notes.filter((n) => !(plan && plan.list && (['occasion', 'when'].includes(n.field) || (plan.key === 'budget' && n.field === 'budget'))))
     .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
@@ -4673,7 +4755,7 @@ function renderSearchResultsHubPage(model, lang) {
     extraHead: SEARCH_PAGE_STYLES,
     leadHtml: `${searchFormHtml(q, L)}
   ${searchSummaryHtml(model, lang)}
-  <p class="search-count">${escapeHtml(L.places(total))}${total > venues.length ? ` (${venues.length})` : ''}</p>
+  <p class="search-count">${escapeHtml(total > venues.length ? L.topOf(venues.length, total) : L.places(total))}</p>
   ${searchGuidesHtml(model, lang)}`,
   }, venues, null, model.now);
 }
@@ -4903,7 +4985,7 @@ function tripPlannerLabels() {
 }
 
 const TRIP_PLAN_MAX_IDS = 200;
-const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|evening)$/;
+const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|late|evening)$/; // late: a wine day's late-afternoon tasting (2026-10-18)
 // Validates the POST /api/trip/plan body; returns { error } or { value }.
 function parseTripPlanBody(body) {
   const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides'];
@@ -11185,11 +11267,54 @@ function rememberRestCards(html) {
   return hash;
 }
 const REST_TEMPLATE_RE = /<template id="(fdRest|whatsOnRest)">([\s\S]*?)<\/template>/;
+// Crawlable links (2026-10-18): the waiting cards are no longer in the HTML,
+// so crawlers and visitors without JavaScript could not reach the places
+// and events after the first page. A plain, collapsible list of their names
+// and links (about 40 bytes a link) goes right after the empty template.
+// It stays on the page for everyone, closed by default, so nothing is hidden
+// from anybody and it never duplicates the cards visibly.
+const REST_LINK_RE = /<a class="venue-card-link" href="([^"]+)"><span class="venue-card-name">([^<]*)<\/span>/g;
+const REST_LINKS_CSS = '<style id="rest-links-css">.rest-links{margin:18px 0 6px;font-size:.88rem}.rest-links summary{cursor:pointer;font-weight:700;padding:8px 0}.rest-links ul{columns:15em;column-gap:24px;margin:6px 0 0;padding:0;list-style:none}.rest-links li{break-inside:avoid;padding:2px 0}</style>';
+function restLinksHtml(kind, inner, lang) {
+  const seen = new Set(), links = [];
+  for (const m of inner.matchAll(REST_LINK_RE)) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    links.push({ href: m[1], name: m[2].trim() });
+  }
+  if (!links.length) return '';
+  const fr = lang === 'fr', events = kind === 'whatsOnRest';
+  // Places A-Z; events keep the page's soonest-first order.
+  if (!events) links.sort((a, b) => a.name.localeCompare(b.name, fr ? 'fr' : 'en', { sensitivity: 'base' }));
+  const n = links.length;
+  const summary = events
+    ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `More upcoming events (${n})`)
+    : (fr ? `Toutes les autres adresses, de A \u00e0 Z (${n})` : `All the other places here, A\u2013Z (${n})`);
+  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"><summary>${summary}</summary><ul>${links.map((l) => `<li><a href="${l.href}">${l.name}</a>`).join('')}</ul></details>`;
+}
+// Venue JSON (2026-10-18): the filter data of a list page (#fdVenueData,
+// #bhVenueData) was 0.3-0.5 MB of every page view, mostly search words, and
+// HTML is not cached at the edge. It now leaves the page the same way as the
+// waiting cards: an empty tag marked with its hash, loaded from
+// /cards/rest/<hash>.json (a year-long immutable copy) before the filters
+// start; on a miss that URL renders the page again from ?u=. Only pages
+// whose script knows how to load it (REST_DATA_LOADER) are changed.
+const REST_DATA_RE = /<script type="application\/json" id="(fdVenueData|bhVenueData)">([\s\S]*?)<\/script>/;
+const REST_DATA_MIN = 8000;
+const REST_DATA_LOADER = "'.json?u='";
 function withRestCardsDeferred(html) {
   const m = REST_TEMPLATE_RE.exec(html);
-  if (!m || m[2].length < REST_CARDS_MIN) return html;
-  const hash = rememberRestCards(m[2]);
-  return html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + html.slice(m.index + m[0].length);
+  if (m && m[2].length >= REST_CARDS_MIN) {
+    const hash = rememberRestCards(m[2]);
+    const lang = /^<!DOCTYPE html>\s*<html lang="fr"/i.test(html) ? 'fr' : 'en';
+    html = html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + restLinksHtml(m[1], m[2], lang) + html.slice(m.index + m[0].length);
+  }
+  const d = REST_DATA_RE.exec(html);
+  if (d && d[2].length >= REST_DATA_MIN && html.indexOf(REST_DATA_LOADER) !== -1) {
+    const hash = rememberRestCards(d[2]);
+    html = html.slice(0, d.index) + `<script type="application/json" id="${d[1]}" data-rest="${hash}"></script>` + html.slice(d.index + d[0].length);
+  }
+  return html;
 }
 // Lazy card photos (2026-10-18): list card photos are CSS backgrounds (--fd-ph,
 // --card-ph), and a browser fetches every one it lays out, so a list page
@@ -11236,24 +11361,28 @@ function withLazyCardPhotos(html) {
 // true once answered (a memory hit, or a refused ?u=); on a miss it points
 // the request at the page itself and returns false so it renders as usual.
 function restCardsRequest(req, res) {
-  const m = /^\/cards\/rest\/([0-9a-f]{12})\.html(?:\?(.*))?$/.exec(String(req.url));
+  const m = /^\/cards\/rest\/([0-9a-f]{12})\.(html|json)(?:\?(.*))?$/.exec(String(req.url));
   if (!m) return false;
-  const hash = m[1];
+  const hash = m[1], json = m[2] === 'json';
+  const type = json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8';
   if (restCardsMemo.has(hash)) {
     const html = restCardsMemo.get(hash);
     restCardsMemo.delete(hash); restCardsMemo.set(hash, html);
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' });
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' });
     res.end(req.method === 'HEAD' ? undefined : html);
     return true;
   }
-  const u = String(new URLSearchParams(m[2] || '').get('u') || '');
+  const u = String(new URLSearchParams(m[3] || '').get('u') || '');
   if (!/^\/(?!\/|api\/|admin|owner|cards\/)[^\s#]*$/.test(u)) {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end('Not found');
+    // A JSON miss is never a 404 (Cloudflare would keep it): an empty,
+    // uncached answer, so the page still works with what it has.
+    res.writeHead(json ? 200 : 404, { 'Content-Type': json ? type : 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(json ? '{}' : 'Not found');
     return true;
   }
   req.url = u;
   req.restCardsHash = hash;
+  req.restCardsJson = json;
   return false;
 }
 // The reverse of withSharedStylesheets, for tests that read a served page's
@@ -11286,11 +11415,12 @@ function installSharedStylesheetResponse(res, req = {}) {
       // Only the waiting cards, or nothing for a page without them. A
       // redirect or error already went out as it was.
       if (!held) return realEnd(body, ...rest);
-      const m = body != null && typeof body !== 'function' ? REST_TEMPLATE_RE.exec(String(body)) : null;
+      const m = body != null && typeof body !== 'function' ? (req.restCardsJson ? REST_DATA_RE : REST_TEMPLATE_RE).exec(String(body)) : null;
       held = null;
+      if (!m && req.restCardsJson) { realWriteHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return realEnd('{}'); }
       if (!m) { realWriteHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return realEnd('Not found'); }
       const same = rememberRestCards(m[2]) === req.restCardsHash;
-      realWriteHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'no-store', 'X-Robots-Tag': 'noindex' });
+      realWriteHead(200, { 'Content-Type': req.restCardsJson ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'no-store', 'X-Robots-Tag': 'noindex' });
       return realEnd(m[2]);
     }
     if (held && body != null && typeof body !== 'function') {
@@ -18327,9 +18457,14 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   // Lighter pages (2026-10-18): the cards after the first page arrive right
   // after the page appears (see withRestCardsDeferred); the filters start
   // once they are in, so search and the counts still cover every card.
+  // Venue JSON (2026-10-18): the filter data loads the same way, at the
+  // same time, from /cards/rest/<hash>.json; the filters wait for both.
   var restEl = document.getElementById('fdRest'), restHash = restEl && restEl.getAttribute('data-rest');
-  if (!restHash || !window.fetch) { fdStart(); return; }
-  fetch('/cards/rest/' + restHash + '.html?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
+  var dataTag = document.getElementById('fdVenueData'), dataHash = dataTag && dataTag.getAttribute('data-rest');
+  if ((!restHash && !dataHash) || !window.fetch) { fdStart(); return; }
+  var restU = encodeURIComponent(window.location.pathname + window.location.search);
+  var waits = [];
+  if (restHash) waits.push(fetch('/cards/rest/' + restHash + '.html?u=' + restU, { credentials: 'same-origin', redirect: 'manual' })
     .then(function(r){ if (!r.ok) throw new Error('rest ' + r.status); return r.text(); })
     .then(function(html){
       var have = {};
@@ -18337,8 +18472,12 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       var t = document.createElement('template'); t.innerHTML = html;
       Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) restEl.content.appendChild(c); });
     })
-    .catch(function(){})
-    .then(fdStart);
+    .catch(function(){}));
+  if (dataHash) waits.push(fetch('/cards/rest/' + dataHash + '.json?u=' + restU, { credentials: 'same-origin', redirect: 'manual' })
+    .then(function(r){ if (!r.ok) throw new Error('data ' + r.status); return r.text(); })
+    .then(function(t){ dataTag.textContent = t; })
+    .catch(function(){}));
+  Promise.all(waits).then(fdStart);
 })();
 </script>`;
 }
@@ -23041,10 +23180,15 @@ function frSearchWords(id) {
   }
   return frWordsById.get(String(id)) || '';
 }
+// Tests that add a French description read it at once.
+function resetFrSearchWords() { frWordsById = null; }
 function frSearchData(json) {
   let data; try { data = JSON.parse(json); } catch (e) { return json; }
   if (!data || typeof data !== 'object' || Array.isArray(data)) return json;
-  for (const [id, v] of Object.entries(data)) if (v && typeof v === 'object' && typeof v.k === 'string') v.k = `${v.k} ${frSearchWords(id)}`.trim();
+  // Venue JSON (2026-10-18): a French page carries the French words alone
+  // when the place has a French description (it carried both, 0.5 MB on
+  // /fr/food-drink); the English words stay only where there is no French.
+  for (const [id, v] of Object.entries(data)) if (v && typeof v === 'object' && typeof v.k === 'string') v.k = frSearchWords(id) || v.k;
   return JSON.stringify(data).replace(/</g, '\\u003c');
 }
 // Sitemap (2026-10-14): each main or town page with a French twin lists both addresses, each naming the pair.
@@ -23238,7 +23382,7 @@ function installTwinResponse(res, lang, enPath, search = '') {
     } else if (body != null && status === 200 && lang === 'fr' && /application\/json/.test(type) && enPath === '/browse/cards.json') {
       try {
         const j = JSON.parse(String(body));
-        if (j.k && typeof j.k === 'object') for (const id of Object.keys(j.k)) j.k[id] = `${j.k[id]} ${frSearchWords(id)}`.trim();
+        if (j.k && typeof j.k === 'object') for (const id of Object.keys(j.k)) j.k[id] = frSearchWords(id) || j.k[id];
         j.html = frenchTwinHtml(`<!DOCTYPE html><html lang="en"><body>${j.html}</body></html>`, '/browse').replace(/^[\s\S]*?<body>|<\/body><\/html>$/g, '');
         body = JSON.stringify(j);
       } catch (e) { /* the English rest is better than none */ }
@@ -27059,15 +27203,24 @@ function bhStart(){
   // Only the first page of cards comes with the page (2026-10-14); every
   // other card and the search words load from /browse/cards.json right after
   // it appears, and the filters start once they are in.
+  // Venue JSON (2026-10-18): the filter data loads from
+  // /cards/rest/<hash>.json at the same time; the filters wait for both.
   var tplEl = document.getElementById('bhRest'), src = tplEl && tplEl.getAttribute('data-src');
-  if (!src || !window.fetch) { bhStart(); return; }
-  fetch(src).then(function(r){ return r.json(); }).then(function(d){
+  var dataTag = document.getElementById('bhVenueData'), dataHash = dataTag && dataTag.getAttribute('data-rest');
+  if ((!src && !dataHash) || !window.fetch) { bhStart(); return; }
+  var waits = [];
+  if (src) waits.push(fetch(src).then(function(r){ return r.json(); }).then(function(d){
     var have = {};
     Array.prototype.forEach.call(document.querySelectorAll('#bhResults > .venue-card'), function(c){ have[c.getAttribute('data-venue-id')] = 1; });
     var t = document.createElement('template'); t.innerHTML = d.html || '';
     Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) tplEl.content.appendChild(c); });
     window.__bhWords = d.k || {};
-  }).catch(function(){}).then(bhStart);
+  }).catch(function(){}));
+  if (dataHash) waits.push(fetch('/cards/rest/' + dataHash + '.json?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
+    .then(function(r){ if (!r.ok) throw new Error('data ' + r.status); return r.text(); })
+    .then(function(t){ dataTag.textContent = t; })
+    .catch(function(){}));
+  Promise.all(waits).then(bhStart);
 })();
 </script>`;
 }
@@ -29062,8 +29215,8 @@ function renderFileGuidePage(pathname) {
 // homepage's seasonal link and venue/event "Featured in" links all agree.
 const GUIDE_GROUPS = [
   { key: 'fall', heading: 'Fall in the Okanagan', paths: ['/guides/fall-okanagan', '/guides/fall-farms-u-pick-okanagan', '/guides/okanagan-cideries', '/guides/okanagan-winery-restaurants', '/guides/kokanee-salmon-okanagan', '/guides/okanagan-waterfall-walks', '/guides/halloween-okanagan', '/guides/fall-events-okanagan', '/guides/okanagan-hockey-season'] },
-  { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan'] },
-  { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/ski-season-big-white-silverstar', '/guides/apex-baldy-ski-guide', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-in-january', '/guides/valentines-day-okanagan', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
+  { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan', '/guides/okanagan-comedy-shows'] },
+  { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/ski-season-big-white-silverstar', '/guides/apex-baldy-ski-guide', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-christmas-markets', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-in-january', '/guides/valentines-day-okanagan', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
   { key: 'towns', heading: 'Weekends and town food guides', paths: ['/guides/weekend-in-kelowna', '/guides/penticton-naramata-wine-weekend', '/guides/oliver-osoyoos-wine-weekend', '/guides/best-restaurants-penticton', '/guides/best-restaurants-vernon', '/guides/best-restaurants-west-kelowna'] },
   { key: 'year', heading: 'Food, drink and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna'] },
 ];
@@ -29642,7 +29795,8 @@ ${renderGolfHeaderHtml()}
     return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(','))).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
   }
   function dirUrl(stops){
-    var q = stops.map(function(s){ return s.query || (info[s.ref] && info[s.ref].query) || s.name; });
+    // At most 11 stops: an origin, nine waypoints and a destination, Google's limit for one route link (2026-10-18).
+    var q = stops.map(function(s){ return s.query || (info[s.ref] && info[s.ref].query) || s.name; }).slice(0, 11);
     if (q.length === 1) return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q[0]);
     var u = 'https://www.google.com/maps/dir/?api=1&origin=' + encodeURIComponent(q[0]) + '&destination=' + encodeURIComponent(q[q.length - 1]);
     if (q.length > 2) u += '&waypoints=' + encodeURIComponent(q.slice(1, -1).join('|'));
@@ -38353,6 +38507,14 @@ const server = http.createServer(async (req, res) => {
       // Smarter search (2026-10-18): every match (Show more), in the visitor's language. French gaps (2026-10-18): a
       // French search is read through the planner's French words ("terrasse" -> "patio"); the page shows what was typed.
       const searchText = discoverySearchText(q, res.twinLang);
+      // Search gaps (2026-10-18): a request with a page of its own ("ce week-end" -> What's On) goes there from
+      // /search too, as it does from the search box (a French one to the French page). A guide topic stays here,
+      // where the guide is offered beside any places.
+      const direct = smartSearchPlan(searchText, interpretDiscoveryText(searchText));
+      if (direct && direct.url && direct.key !== 'guide') {
+        res.writeHead(302, { Location: direct.url, 'Cache-Control': 'no-store' });
+        return res.end();
+      }
       const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS });
       run.query = q; run.searchText = searchText;
       const html = renderSearchPage(run, { lang: res.twinLang });
@@ -40119,7 +40281,7 @@ const server = http.createServer(async (req, res) => {
         }
         limit = n;
       }
-      return sendJSON(res, 200, runDiscovery(q, { limit }));
+      return sendJSON(res, 200, withSmartSearchPlan(runDiscovery(q, { limit }), limit));
     }
 
 
@@ -41935,6 +42097,8 @@ module.exports = {
   eventImagePath,
   descExcerpt,
   descSearchWords,
+  resetFrSearchWords,
+  withRestCardsDeferred,
   renderOutdoorActivityShowcaseHtml,
   outdoorsSearchHtml,
   outdoorsActivityChipsHtml,
@@ -42120,6 +42284,9 @@ module.exports = {
   selectDiscoveryVenues,
   heroSearchTarget,
   smartSearchPlan,
+  withSmartSearchPlan,
+  discoverySearchText,
+  SEARCH_PAGE_MAX_RESULTS,
   smartFuzzyVenues,
   smartGuideMatches,
   searchPageModel,
