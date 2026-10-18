@@ -500,7 +500,7 @@ var TRANSLATIONS = {
   },
   fr: {
     'nav.directory': 'R\u00e9pertoire',
-    'nav.listVenue': '\u00c9crivez votre \u00e9tablissement',
+    'nav.listVenue': 'Inscrire votre \u00e9tablissement',
     'nav.appComingSoon': 'Application bient\u00f4t disponible',
     'hero.headline': 'Explorez l\u2019Okanagan',
     // Corrected 2026-09-17: this used to be a leftover translation of an
@@ -512,7 +512,7 @@ var TRANSLATIONS = {
     'hero.headlineFall': 'L\u2019automne dans l\u2019Okanagan',
     'hero.leadFall': 'Okanagan Roam est votre guide de l\u2019automne dans la vall\u00e9e de l\u2019Okanagan, d\u2019Enderby \u00e0 Osoyoos \u2014 vignobles et cidreries en pleine r\u00e9colte, restos chaleureux, randonn\u00e9es d\u2019automne et \u00e9v\u00e9nements saisonniers, le tout au m\u00eame endroit.',
     'hero.leadMobileFall': 'D\u00e9couvrez les vignobles en r\u00e9colte, la cuisine r\u00e9confortante, les randonn\u00e9es d\u2019automne et les \u00e9v\u00e9nements partout dans l\u2019Okanagan.',
-    'mood.heading': "Qu'est-ce qui vous tente aujourd'hui\u00a0?",
+    'mood.heading': "Qu'est-ce qui vous tente aujourd'hui?",
     'mood.lead': 'Commencez par ce qui vous fait envie. On vous aide \u00e0 trouver un endroit qui en vaut la peine.',
     'mood.golf.title': 'Golf',
     'mood.golf.desc': 'Jouez dans un cadre magnifique.',
@@ -576,7 +576,7 @@ var TRANSLATIONS = {
     'homeFooter.facebookAria': 'Okanagan Roam sur Facebook',
     'homeFooter.copyright': '\u00a9 2026 Okanagan Roam. Con\u00e7u pour toute la bande, chien inclus.',
     'search.placeholder': 'Recherchez un lieu, une cuisine ou une envie',
-    'search.mainLine': 'Que recherchez-vous\u00a0?',
+    'search.mainLine': 'Que recherchez-vous?',
     'search.subLine': 'Vignobles, restaurants, randonn\u00e9es, plages, tr\u00e9sors cach\u00e9s\u2026',
     'search.button': 'Rechercher',
 
@@ -588,9 +588,9 @@ var TRANSLATIONS = {
     'status.closingSoon': 'Ferme bient\u00f4t',
     'status.closed': 'Ferm\u00e9',
 
-    'wizard.step1Title': 'O\u00f9 aller\u00a0?',
-    'wizard.step2Title': 'Quel genre\u00a0?',
-    'wizard.step3Title': 'Qu\u2019est-ce qui compte\u00a0?',
+    'wizard.step1Title': 'O\u00f9 aller?',
+    'wizard.step2Title': 'Quel genre?',
+    'wizard.step3Title': 'Qu\u2019est-ce qui compte?',
     'wizard.hint1': 'Choisissez autant de r\u00e9gions que vous le souhaitez, puis continuez \u2014 ou touchez \u00ab\u00a0Utiliser ma position\u00a0\u00bb ci-dessous pour trouver les plus proches.',
     'wizard.hint2': 'Choisissez autant de types que vous le souhaitez, puis continuez.',
     'wizard.hint3': 'Choisissez-en autant que vous voulez, ou passez directement \u00e0 vos r\u00e9sultats.',
@@ -756,14 +756,14 @@ var TRANSLATIONS = {
     'trip.conv.budget.budget': '\u00c9conomique',
     'trip.conv.budget.moderate': 'Mod\u00e9r\u00e9',
     'trip.conv.budget.upscale': 'Haut de gamme',
-    'trip.conv.clarifyRegion': 'Je peux organiser ce voyage \u2014 quelle r\u00e9gion de l\u2019Okanagan aimeriez-vous explorer\u00a0?',
-    'trip.conv.clarifyDays': 'Compris \u2014 combien de jours aimeriez-vous y passer (1 \u00e0 7)\u00a0?',
+    'trip.conv.clarifyRegion': 'Je peux organiser ce voyage \u2014 quelle r\u00e9gion de l\u2019Okanagan aimeriez-vous explorer?',
+    'trip.conv.clarifyDays': 'Compris \u2014 combien de jours aimeriez-vous y passer (1 \u00e0 7)?',
     'trip.conv.clarifyBoth': 'Je peux organiser ce voyage \u2014 j\u2019ai seulement besoin d\u2019une r\u00e9gion et d\u2019un nombre de jours.',
     'trip.conv.unsupportedIntro': 'Quelques \u00e9l\u00e9ments que je ne peux pas encore prendre en charge\u00a0:',
     'trip.conv.unsupportedBeaches': 'Les plages ne sont pas encore offertes comme pr\u00e9f\u00e9rence de planification de voyage.',
     'trip.conv.unsupportedGeneric': '\u00ab\u00a0{term}\u00a0\u00bb n\u2019est pas encore un filtre de planification de voyage pris en charge.',
     'trip.conv.generate': 'G\u00e9n\u00e9rer mon voyage',
-    'trip.conv.wizardToggle': 'Vous pr\u00e9f\u00e9rez tout choisir vous-m\u00eame\u00a0? Planifiez \u00e9tape par \u00e9tape \u2192',
+    'trip.conv.wizardToggle': 'Vous pr\u00e9f\u00e9rez tout choisir vous-m\u00eame? Planifiez \u00e9tape par \u00e9tape \u2192',
     'trip.conv.removeChip': 'Retirer',
     'trip.conv.errorEmpty': 'Dites-nous d\u2019abord un peu \u00e0 propos du voyage que vous souhaitez.',
     'trip.conv.errorGeneric': 'Une erreur est survenue lors de la compr\u00e9hension de votre voyage. Veuillez r\u00e9essayer.',
@@ -811,7 +811,7 @@ var TRANSLATIONS = {
     'tripv3.example3': 'Une fin de semaine romantique d’automne à Naramata avec des vignobles et un excellent souper',
     'tripv3.example4': 'Une fin de semaine d’automne à Vernon avec mon chien',
     'tripv3.example5': 'Café, randonnée d’automne, vignoble et souper à Kelowna',
-    'tripv3.example6': 'Que peut-on faire autour de Penticton s’il pleut ?',
+    'tripv3.example6': 'Que peut-on faire autour de Penticton s’il pleut?',
     'tripv3.howTitle': 'Comment \u00e7a marche',
     'tripv3.how1Title': 'Dites-le \u00e0 votre fa\u00e7on',
     'tripv3.how1Text': '\u00ab\u00a0Trois jours, des vignobles et un bon souper, avec une promenade d’automne.\u00a0\u00bb Les jours, les dates, les enfants, les chiens et les occasions comptent tous.',
@@ -943,7 +943,7 @@ var TRANSLATIONS = {
     'tripv3.added': 'Ajout\u00e9 \u00e0 Mon voyage\u00a0: {stops}.',
     'tripv3.alreadyOne': '1 y \u00e9tait d\u00e9j\u00e0.',
     'tripv3.alreadyMany': '{n} y \u00e9taient d\u00e9j\u00e0.',
-    'tripv3.noRoom': 'Pas de place pour {stops} \u2014 Mon voyage contient au plus {max}\u00a0arr\u00eats\u00a0; retirez-en pour faire de la place.',
+    'tripv3.noRoom': 'Pas de place pour {stops} \u2014 Mon voyage contient au plus {max}\u00a0arr\u00eats; retirez-en pour faire de la place.',
     'tripv3.failed': 'Impossible d\u2019ajouter {stops}. Veuillez r\u00e9essayer.',
     'tripv3.copied': 'Lien copi\u00e9 \u2014 toute personne qui l\u2019a voit ce plan.',
     'tripv3.copyThis': 'Copiez ce lien\u00a0: {link}',
@@ -959,6 +959,11 @@ function getCurrentLang(){
   var pageLang = document.documentElement.getAttribute('data-page-lang');
   if (pageLang) return pageLang;
   try { return window.localStorage.getItem('okanaganLang') || 'en'; } catch (e) { return 'en'; }
+}
+
+// French (2026-10-18): the address prefix that keeps a French visitor on the French pages ('/fr' or '').
+function frPathPrefix(){
+  return /^\/fr(\/|$)/.test(window.location.pathname) ? '/fr' : '';
 }
 
 function t(key){
@@ -2453,7 +2458,7 @@ window.__scrollToVenueCard = function(name){
       // render on this page anymore (see the architecture-change comment
       // on the / route in server.js) -- hand the query to /browse instead.
       var q = heroInput.value.trim();
-      window.location.href = q ? ('/browse?q=' + encodeURIComponent(q)) : '/browse';
+      window.location.href = frPathPrefix() + (q ? ('/browse?q=' + encodeURIComponent(q)) : '/browse');
     }
   });
 })();
@@ -2510,7 +2515,7 @@ window.__scrollToVenueCard = function(name){
   if (openTripBtn) {
     openTripBtn.addEventListener('click', function(e){
       e.stopPropagation();
-      window.location.href = '/trip';
+      window.location.href = frPathPrefix() + '/trip';
     });
   }
 
@@ -2590,8 +2595,8 @@ window.__scrollToVenueCard = function(name){
   if (tripBtn) {
     tripBtn.addEventListener('click', function(e){
       e.stopPropagation();
-      if (window.location.pathname === '/trip') return;
-      window.location.href = '/trip';
+      if (window.location.pathname === frPathPrefix() + '/trip') return;
+      window.location.href = frPathPrefix() + '/trip';
     });
   }
 
