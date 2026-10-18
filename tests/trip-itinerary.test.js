@@ -472,3 +472,10 @@ test('Phase 1 overview: multi-part itineraries keep their own "What to expect" a
   assert.ok(!('headline' in p));
   assert.equal(p.experience.title, 'What to expect');
 });
+
+// ---- summary wording: activity labels are lowercased mid-sentence -----------
+test('summary: an activity part reads in lowercase like the other parts ("Cafes and hiking & trails ...")', () => {
+  const { plan } = run('Coffee and an autumn hike');
+  assert.equal(plan.kind, 'itinerary');
+  assert.match(plan.summary, /^Cafes and hiking & trails\b/, plan.summary);
+});

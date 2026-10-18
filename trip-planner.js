@@ -3717,7 +3717,10 @@ function planItinerary(input) {
   const representedParts = new Set(stops.filter(s => s.kind === 'event' || s.venue).map(s => s.index));
   const partLabels = trip.components.map((c, i) => ({ c, i })).filter(({ i }) => representedParts.has(i)).map(({ c }) => {
     const l = componentLabel(c, baseCtx);
-    return c.kind === 'event' && l !== 'live music' ? article(l) : l;
+    // Activity labels are Title Case ("Hiking & Trails"); in this sentence
+    // they read like the other parts ("Cafes, hiking & trails and dinner").
+    const activityPart = c.kind !== 'event' && c.activities && c.activities.length && l === listText(c.activities.map((a) => activityLabel(baseCtx, a)));
+    return c.kind === 'event' && l !== 'live music' ? article(l) : activityPart ? l.toLowerCase() : l;
   });
   const allDog = trip.components.filter((c) => c.kind === 'venue').every((c) => c.dog) && trip.components.some((c) => c.kind === 'venue' && c.dog);
   const listed = listText(partLabels);
