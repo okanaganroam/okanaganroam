@@ -93,6 +93,12 @@ const FR_TEXT = {
   'Mixed': 'Varié',
   'By town': 'Par ville',
   'Top rated': 'Les mieux notés',
+  // Smarter search (2026-10-18): the /fr/search sort and card notes.
+  'Best match': 'Meilleure correspondance',
+  'Opens early': 'Ouvre tôt',
+  'Mentions breakfast or brunch': 'Mentionne le déjeuner ou le brunch',
+  'Also listed as a restaurant': 'Aussi répertorié comme restaurant',
+  'Mentions its restaurant or dining': 'Mentionne son restaurant ou sa salle à manger',
   'Highest rated': 'Les mieux notés',
   'Biggest first': 'Les plus grands d’abord',
   'By activity': 'Par activité',

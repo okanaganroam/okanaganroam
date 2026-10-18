@@ -10222,7 +10222,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved Tours & Experiences change (2026-10-11): tripv3.type.tour added to TRANSLATIONS (en and fr) only.
   // Approved Sports & Recreation change (2026-10-12): tripv3.type.sport added to TRANSLATIONS (en and fr) only.
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
-  assert.equal(md5('public/scripts/app.js'), '68bb002e9ac341ecdebe54d21ada6403', 'public/scripts/app.js (planner copy, 2026-10-13)');
+  // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
+  assert.equal(md5('public/scripts/app.js'), '49f805518305bbb81a9bfaa2a7c563e3', 'public/scripts/app.js (French hero search, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -10504,7 +10505,9 @@ test('Phase 2: /api/discover over HTTP, and /browse?q redirects only when safe',
   assert.equal(events.headers.get('location'), '/whats-on?when=this-weekend');
   // Not routable. Stage 3.4 (D2): several words no page can show go to the
   // /search results page, in the visitor's own words -- never a dead end.
-  for (const q of ['asdkjfh qwepoiu zxcvb', 'Rotary Beach Park', 'date night in Kelowna']) {
+  // Smarter search (2026-10-18): "date night in Kelowna" now goes to Kelowna's restaurants and cocktail lounges.
+  assert.equal((await fetch(`${base}/browse?q=${encodeURIComponent('date night in Kelowna')}`, { redirect: 'manual' })).headers.get('location'), '/food-drink?types=restaurant,cocktail&regions=kelowna');
+  for (const q of ['asdkjfh qwepoiu zxcvb', 'Rotary Beach Park']) {
     const res = await fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
     assert.equal(res.status, 302, q);
     assert.equal(res.headers.get('location'), `/search?q=${encodeURIComponent(q)}`, q);
@@ -14513,7 +14516,11 @@ test('Stage 3.4: Hero Search sends each kind of request to the right place, neve
   for (const q of ['sushi', 'steak', 'pizza', 'soup', 'ramen', 'dessert', 'tapas', 'ice cream', 'italian']) assert.equal(await go(q), search(q), q);
   // D2: several words no page can show, and exclusions (never routed to a page) -> /search.
   for (const q of ['not wineries', 'no breweries', 'wineries but not in kelowna', "don't want anything fancy", 'restaurants in kelowna nothing fancy',
-    'cheap eats', 'date night', 'things to do', 'something fun this weekend', 'live music tonight', 'xqzvbn plorf']) assert.equal(await go(q), search(q), q);
+    'cheap eats', 'things to do', 'xqzvbn plorf']) assert.equal(await go(q), search(q), q);
+  // Smarter search (2026-10-18): date night and dated events now have pages of their own.
+  assert.equal(await go('date night'), '/food-drink?types=restaurant,cocktail');
+  assert.equal(await go('something fun this weekend'), '/whats-on?when=this-weekend');
+  assert.equal(await go('live music tonight'), '/whats-on?when=today&categories=live-music');
   // D2 / Stage 3.6 (2026-09-30, approved): one word -> /search, whether or not
   // places match (before Stage 3.6 a word with matches stayed on /browse, '200').
   assert.equal(await go('fixture'), search('fixture'));
@@ -14555,11 +14562,11 @@ test('Stage 3.4: /search shows the visitor\'s words, the interpretation, correct
   assert.ok(!only.html.includes('Search the directory for'));
   const none = await page('xqzvbn plorf');
   assert.ok(none.html.includes('We couldn’t find any places whose name, listed cuisine or description mentions those words.'));
-  // Stage 3.6 (2026-09-30, approved): the directory link is plain /browse --
-  // /browse?q=<words> now comes straight back to /search (before Stage 3.6 it
-  // was href="/browse?q=xqzvbn%20plorf").
-  assert.ok(none.html.includes('href="/browse"'), 'the directory is offered');
-  assert.ok(!none.html.includes('href="/browse?q='), 'never a /browse?q= link that loops back to /search');
+  // Smarter search (2026-10-18): the directory link keeps the words (?q=)
+  // plus from=search, so /browse shows them instead of sending a lone ?q=
+  // straight back to /search (Stage 3.6 had made it a plain /browse).
+  assert.ok(none.html.includes('href="/browse?q=xqzvbn%20plorf&amp;from=search"'), 'the directory is offered, with the words');
+  assert.ok(!/href="\/browse\?q=[^"&]*"/.test(none.html), 'never a lone /browse?q= link that loops back to /search');
   // Results explain themselves from stored fields only.
   const it = await page('italian');
   assert.ok(it.html.includes('Listed cuisine: Italian'));
@@ -14715,10 +14722,11 @@ test('Stage 3.6: /browse?q=<one word> goes to /search in one hop; exact names, a
     assert.equal((await go(path)).status, 200, path);
   }
   assert.deepEqual(await go('/browse?openMap=1'), { status: 302, location: '/map' });
-  // Zero results: the directory link is plain /browse, never /browse?q= (which now returns to /search).
+  // Zero results: the directory link keeps the words but never a lone /browse?q= (which returns to /search).
   const empty = await (await fetch(`${base}/search?q=xqzvbnplorf`)).text();
-  assert.match(empty, /href="\/browse"/);
-  assert.doesNotMatch(empty, /href="\/browse\?q=/);
+  assert.match(empty, /href="\/browse\?q=xqzvbnplorf&amp;from=search"/);
+  assert.doesNotMatch(empty, /href="\/browse\?q=[^"&]*"/);
+  assert.equal((await go('/browse?q=xqzvbnplorf&from=search')).status, 200, 'the directory link lands on /browse itself');
 })));
 
 test('Stage 3.6: with discovery search off, /browse?q=<one word> is served in place exactly as before', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
@@ -15272,10 +15280,11 @@ const sidecarCount = (html) => html.split(SIDECAR_MARK).length - 1;
 
 test('Stage 4.3: the capture script is on pages with Favorite controls and nowhere else', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
   const page = async (p) => (await fetch(`${base}${p}`)).text();
-  for (const p of ['/browse', '/kelowna/golf', '/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/wineries', '/food-drink', '/whats-on', '/kelowna/events/test-future-festival', '/kelowna/events/test-past-market', '/trip', '/kelowna/restaurants/test-trattoria']) {
+  // Smarter search (2026-10-18): /search results now use the standard cards with Favorite buttons.
+  for (const p of ['/browse', '/kelowna/golf', '/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/wineries', '/food-drink', '/whats-on', '/kelowna/events/test-future-festival', '/kelowna/events/test-past-market', '/trip', '/kelowna/restaurants/test-trattoria', '/search?q=fixture']) {
     assert.equal(sidecarCount(await page(p)), 1, `${p}: one capture script`);
   }
-  for (const p of ['/', '/browse/classic', '/kelowna', '/search?q=fixture', '/map', '/destinations', '/list-your-venue']) {
+  for (const p of ['/', '/browse/classic', '/kelowna', '/search?q=xqzvbnplorf', '/map', '/destinations', '/list-your-venue']) {
     assert.equal(sidecarCount(await page(p)), 0, `${p}: no capture script`);
   }
   const guide = app.renderGuidePage('kelowna', 'patio', [app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria')]);
@@ -20253,7 +20262,8 @@ test('Owner portal: logins (create from the link, sign in, my listings, edit via
   try {
     assert.match(await get('/owner/login').then((r) => r.text()), /Business login/);
     const venuePage = await get('/kelowna/pubs/owner-login-fixture-a').then((r) => r.text());
-    assert.match(venuePage, /Own this business\? <a href="\/owner\/login" rel="nofollow">Sign in to update this listing<\/a>/);
+    assert.match(venuePage, /Already have a login\? <a href="\/owner\/login" rel="nofollow">Sign in to update this listing<\/a>/);
+    assert.match(venuePage, /<a class="venue-claim-btn" href="\/claim\/kelowna\/pubs\/owner-login-fixture-a" rel="nofollow"[^>]*>Claim this listing<\/a>/);
     assert.match(venuePage, /<a href="\/owner\/login" class="nav-business-login" rel="nofollow">Business login<\/a>/);
     assert.equal((await get('/owner/account')).status, 302);
     // The edit link offers a login; creating one signs the owner in.
@@ -21153,7 +21163,7 @@ test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar an
   }
 });
 
-test('Email me my edit link (2026-10-15): a fresh link to the email on file, the old one stops working; small-phone layout', async () => {
+test('Email me my edit link (2026-10-15): a fresh link to the email on file, the old one works until the new one is opened; small-phone layout', async () => {
   const http = require('node:http');
   seasonInsert.run({ name: 'New Link Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'new-link-fixture' });
   seasonInsert.run({ name: 'New Link Fixture Two', type: 'cafe', hours: SEASON_WEEK, slug: 'new-link-fixture-two' });
@@ -21185,10 +21195,14 @@ test('Email me my edit link (2026-10-15): a fresh link to the email on file, the
     const urls = sent[0].text.match(/https:\/\/okanaganroam\.com\/owner\/[A-Za-z0-9_-]{20,}/g);
     assert.equal(urls.length, 2);
     assert.match(sent[0].text, /New Link Fixture: https/);
-    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 404, 'the old link stops working');
+    // 2026-10-18: asking for a new link no longer kills the one the owner is using...
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 200, 'the old link still works until the new one is opened');
+    assert.match(sent[0].text, /Once you open this link, any older link we sent you stops working\./);
     const fresh = urls.map((u) => u.split('/owner/')[1]);
     const statuses = await Promise.all(fresh.map((t) => fetch(`${base}/owner/${t}`).then((r) => r.status)));
     assert.deepEqual(statuses, [200, 200]);
+    // ...but once the new one is opened, the old one stops.
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 404, 'the old link stops once the new one is used');
     const page = await fetch(`${base}/owner/${fresh[0]}`).then((r) => r.text());
     assert.match(page, /@media \(max-width: 480px\) \{ body\.owner-page \.form-row \{ grid-template-columns: 1fr; \} \}/);
     assert.match(page, /body\.owner-page \.form-row > \* \{ min-width: 0; \}/);
@@ -21199,6 +21213,184 @@ test('Email me my edit link (2026-10-15): a fresh link to the email on file, the
     app.setOwnerEmailTransport(null);
     await new Promise((resolve) => srv.close(resolve));
   }
+});
+
+test('Edit link re-sends (2026-10-18): repeated requests never push out the working link; admin reset still kills it at once', () => {
+  seasonInsert.run({ name: 'Keep Old Link Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'keep-old-link-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'keep-old-link-fixture');
+  const t0 = app.createOwnerLink(v.id, { contact_email: 'keep@old.example' }).token;
+  assert.ok(app.venueForOwnerToken(t0), 'the first link works');
+  const t1 = app.createOwnerLink(v.id, { reset: true, keepOld: true }).token;
+  const t2 = app.createOwnerLink(v.id, { reset: true, keepOld: true }).token;
+  // Two requests in a row (say, by someone else): the owner's working link t0 still works; t1 was never opened and is gone.
+  assert.ok(app.venueForOwnerToken(t0), 'the working link survives two re-sends');
+  assert.equal(app.venueForOwnerToken(t1), null);
+  assert.ok(app.venueForOwnerToken(t2), 'the newest link works');
+  assert.equal(app.venueForOwnerToken(t0), null, 'opening the newest link retires the old one');
+  assert.ok(app.venueForOwnerToken(t2));
+  // An admin reset of a leaked link is immediate.
+  const t3 = app.createOwnerLink(v.id, { reset: true }).token;
+  assert.equal(app.venueForOwnerToken(t2), null);
+  assert.ok(app.venueForOwnerToken(t3));
+});
+
+test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, storage, email to info@, admin approve makes a working link', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Claim Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'claim-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'claim-fixture-cafe');
+  db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://claimfixture.example', description_fr = 'Un café de test pour les demandes.' WHERE id = ?").run(v.id);
+  const oldToken = app.createOwnerLink(v.id, {}).token; // an outreach link nobody could find
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie, origin = base) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin, 'X-Real-IP': `10.31.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const valid = (o = {}) => ({ venue_id: v.id, lang: 'en', started_at: Date.now() - 10000, company_website: '', name: 'Jordan Baker', role: 'owner',
+    email: 'Jordan@ClaimFixture.example', phone: '250 555 0111', verify_method: 'call', verify_detail: '', message: 'We changed our email last year.', ...o });
+  const info = [];
+  const mail = [];
+  app.setVenueSubmissionTransport(async (p) => { info.push(p); });
+  try {
+    // The button on the English and French venue pages.
+    const en = await fetch(`${base}/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
+    assert.match(en, /<a class="venue-claim-btn" href="\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Claim this listing<\/a>/);
+    const frPage = await fetch(`${base}/fr/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
+    assert.match(frPage, /<a class="venue-claim-btn" href="\/fr\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Revendiquer cette fiche<\/a>/);
+    // The form, in each language; unknown listings 404.
+    const form = await fetch(`${base}/claim/kelowna/cafes/claim-fixture-cafe`);
+    assert.equal(form.status, 200);
+    assert.equal(form.headers.get('x-robots-tag'), 'noindex');
+    const formHtml = await form.text();
+    assert.match(formHtml, /<h1>Claim this listing<\/h1>/);
+    assert.match(formHtml, /Call the business number on this listing \(250-555-0199\)/);
+    assert.match(formHtml, /name="company_website"/);
+    const frForm = await fetch(`${base}/fr/claim/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
+    assert.match(frForm, /<html lang="fr-CA">/);
+    assert.match(frForm, /<h1>Revendiquer cette fiche<\/h1>/);
+    assert.match(frForm, /Envoyer ma demande/);
+    assert.equal((await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`)).status, 404);
+
+    // Guards and validation; nothing stored.
+    const before = db.prepare('SELECT COUNT(*) AS n FROM venue_claims').get().n;
+    assert.equal((await post('/api/claims', valid(), null, 'https://evil.example')).status, 403);
+    assert.equal((await post('/api/claims', valid({ company_website: 'spam' }))).status, 201, 'honeypot looks like success');
+    assert.equal((await post('/api/claims', valid({ started_at: Date.now() }))).status, 400, 'too quick');
+    assert.equal((await post('/api/claims', valid({ extra: 1 }))).status, 400, 'unknown keys');
+    const bad = await post('/api/claims', valid({ name: 'J', role: 'boss', email: 'nope', phone: '12', verify_method: 'social', verify_detail: '' }));
+    assert.equal(bad.status, 400);
+    assert.deepEqual(Object.keys(bad.body.errors).sort(), ['email', 'name', 'phone', 'role', 'verify_detail']);
+    const badFr = await post('/api/claims', valid({ lang: 'fr', email: 'nope' }));
+    assert.equal(badFr.body.errors.email, 'Veuillez indiquer une adresse courriel valide.');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_claims').get().n, before);
+    assert.equal(info.length, 0, 'nothing emailed yet');
+
+    // A good claim: stored, and info@ gets the details plus what we have on file.
+    const ok = await post('/api/claims', valid());
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.match(ok.body.message, /email jordan@claimfixture\.example a private link to update Claim Fixture Cafe/);
+    const row = db.prepare('SELECT * FROM venue_claims WHERE id = ?').get(ok.body.id);
+    assert.equal(row.status, 'pending');
+    assert.equal(row.email, 'jordan@claimfixture.example');
+    assert.equal(row.verify_method, 'call');
+    assert.equal(row.notify_status, 'sent');
+    assert.equal(info.length, 1);
+    assert.match(info[0]._subject, new RegExp(`^\\[PENDING REVIEW\\] Listing claim #${ok.body.id}: Claim Fixture Cafe$`));
+    assert.equal(info[0]._replyto, 'jordan@claimfixture.example');
+    assert.equal(info[0]['Their role'], 'Owner');
+    assert.equal(info[0]['Phone on file'], '250-555-0199');
+    assert.equal(info[0]['Website on file'], 'https://claimfixture.example');
+    assert.equal(info[0]['Email check'], 'Their email uses the website’s domain.');
+    assert.match(info[0]['Edit link'], /^Exists \(no email on it\), never used$/);
+    assert.match(info[0]['How to review'], /admin\/review#claims/);
+    // Sending it again: same answer, no second claim or email.
+    const again = await post('/api/claims', valid());
+    assert.equal(again.body.id, ok.body.id);
+    assert.equal(info.length, 1);
+
+    // Admin: listed with the details on file; approve is admin-only.
+    const login = await post('/admin/review/login', { token: LYV_TOKEN });
+    const cookie = login.setCookie.split(';')[0];
+    const review = await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text());
+    assert.match(review, /<a href="#claims">Claims \(1\)<\/a>/);
+    assert.match(review, /<article class="rv-card" data-kind="claim" data-id="\d+">\s*<h3>Claim Fixture Cafe<\/h3>/);
+    assert.match(review, /Call the number on file, <a href="tel:2505550199">250-555-0199<\/a>, and ask for Jordan Baker\./);
+    assert.match(review, /jordan@claimfixture\.example <strong>\(matches the website\)<\/strong>/);
+    assert.equal((await post(`/admin/review/claim/${ok.body.id}/approve`, {})).status, 401, 'needs the admin cookie');
+    assert.equal((await post(`/admin/review/claim/${ok.body.id}/approve`, {}, cookie, 'https://evil.example')).status, 403);
+
+    app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+    const approved = await post(`/admin/review/claim/${ok.body.id}/approve`, {}, cookie);
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    assert.equal(approved.body.emailed, 'sent');
+    assert.equal(mail.length, 1);
+    assert.equal(mail[0].to, 'jordan@claimfixture.example');
+    assert.equal(mail[0].subject, 'Your link to update Claim Fixture Cafe on Okanagan Roam');
+    assert.match(mail[0].text, /^Hi Jordan,/);
+    const link = mail[0].text.match(/https:\/\/okanaganroam\.com\/owner\/[A-Za-z0-9_-]{32}/)[0];
+    assert.equal(link, approved.body.link);
+    assert.equal(db.prepare('SELECT status FROM venue_claims WHERE id = ?').get(ok.body.id).status, 'approved');
+    // The link works, carries the claimant's email (so "Email me my link" works for them), and retires the old one.
+    const ownerPage = await fetch(link.replace('https://okanaganroam.com', base));
+    assert.equal(ownerPage.status, 200);
+    assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'jordan@claimfixture.example');
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 404);
+    assert.equal((await post(`/admin/review/claim/${ok.body.id}/approve`, {}, cookie)).status, 409, 'already reviewed');
+
+    // Reject: nothing sent without a reason; a polite note (in French for a French claim) with one.
+    const c2 = await post('/api/claims', valid({ email: 'someone@else.example', verify_method: 'other', verify_detail: 'I know the owner', lang: 'fr' }));
+    assert.equal(c2.status, 201);
+    assert.match(c2.body.message, /^Nous vérifierons que c’est bien vous et enverrons à someone@else\.example/);
+    const c3 = await post('/api/claims', valid({ email: 'third@else.example', verify_method: 'website' }));
+    mail.length = 0;
+    const r2 = await post(`/admin/review/claim/${c2.body.id}/reject`, { reason: 'Nous n’avons pas pu joindre l’entreprise.' }, cookie);
+    assert.equal(r2.body.emailed, 'sent');
+    assert.equal(mail.length, 1);
+    assert.equal(mail[0].to, 'someone@else.example');
+    assert.match(mail[0].text, /^Bonjour Jordan,[\s\S]*Raison : Nous n’avons pas pu joindre l’entreprise\./);
+    const r3 = await post(`/admin/review/claim/${c3.body.id}/reject`, { reason: '' }, cookie);
+    assert.equal(r3.body.emailed, 'not_told');
+    assert.equal(mail.length, 1, 'no reason, no email');
+
+    // Direct email off: the approved link goes to info@ to forward instead of being lost.
+    app.setOwnerEmailTransport(null);
+    const c4 = await post('/api/claims', valid({ email: 'fourth@claimfixture.example' }));
+    info.length = 0;
+    const a4 = await post(`/admin/review/claim/${c4.body.id}/approve`, {}, cookie);
+    assert.equal(a4.body.emailed, 'forwarded');
+    assert.equal(info.length, 1);
+    assert.match(info[0]._subject, /^\[ACTION\] Approved claim #\d+: forward the edit link to fourth@claimfixture\.example$/);
+    assert.ok(info[0]['Email to forward'].includes(a4.body.link));
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Business help bot (2026-10-18): claim, never got the email and staff logins have answers', () => {
+  const topics = Object.fromEntries(JSON.parse(app.ownerHelpWidgetHtml('login').match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]).topics.map((t) => [t.id, t]));
+  for (const id of ['claim', 'noemail', 'staff']) assert.ok(topics[id], id);
+  assert.match(topics.claim.a, /Claim this listing/);
+  assert.match(topics.noemail.a, /spam/);
+  assert.match(topics.staff.a, /their own<\/strong> email/);
+  assert.doesNotMatch(topics.newlink.a, /replaces the old one/);
+  // The browser's own matcher, run on typed questions from the claim page's widget.
+  const html = app.ownerHelpWidgetHtml('claim');
+  const cfg = JSON.parse(html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]);
+  assert.deepEqual(cfg.start, ['claim', 'noemail', 'staff', 'cost']);
+  const src = html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'));
+  const match = new Function('T', 'cfg', `${src}; return match;`)(cfg.topics, cfg);
+  const top = (q) => match(q)[0];
+  assert.equal(top('how do I claim it'), 'claim');
+  assert.equal(top('Claim my listing'), 'claim');
+  assert.equal(top('my business is listed but I never had a link'), 'claim');
+  assert.equal(top('I never got the email'), 'noemail');
+  assert.equal(top('didnt receive anything, is it in spam?'), 'noemail');
+  assert.equal(top('can two people log in'), 'staff');
+  assert.equal(top('add my staff to the listing'), 'staff');
 });
 
 test('Owner accessibility (2026-10-15): errors announce and tie to their box, description has a label, buttons say Sending…', async () => {
@@ -23222,3 +23414,166 @@ test('Accessibility: Escape closes the open dropdown, then the My Trip tray, the
   assert.equal(doc.activeElement, burger, 'focus back on the menu button');
   assert.equal(esc(), false, 'nothing open: Escape is left alone');
 });
+// ---- Smarter search (2026-10-18): intent routing and the rebuilt /search page ----
+// Fixture places for each intent, removed afterwards.
+function withSmartSearchFixtures(fn) {
+  const add = (name, region, type, slug, extra = {}) => {
+    const row = { description: 'Smart search fixture.', rating: 4.2, reviews: 50, open_early: 0, kid_friendly: 0, ...extra };
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, reviews, open_early, kid_friendly) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(name, region, type, slug, row.description, row.rating, row.reviews, row.open_early, row.kid_friendly);
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(slug, region);
+  };
+  const made = [
+    add('SS Sunrise Cafe', 'west-kelowna', 'cafe', 'ss-sunrise-cafe', { description: 'Eggs and breakfast all day, with a weekend brunch.' }),
+    add('SS Early Diner', 'west-kelowna', 'restaurant', 'ss-early-diner', { open_early: 1, description: 'A neighbourhood diner.' }),
+    add('SS Night Bistro', 'west-kelowna', 'restaurant', 'ss-night-bistro', { description: 'Dinner only, from five.' }),
+    add('SS Breakfast Winery', 'west-kelowna', 'winery', 'ss-breakfast-winery', { description: 'Tastings; no breakfast here.' }),
+    add('SS Vine Kitchen Winery', 'naramata', 'winery', 'ss-vine-kitchen-winery', { description: 'Our restaurant serves lunch on the terrace.' }),
+    add('SS Tasting Only Winery', 'naramata', 'winery', 'ss-tasting-only-winery', { description: 'A small tasting room among the vines.' }),
+    add('SS Trampoline Zone', 'kelowna', 'indoor', 'ss-trampoline-zone', { kid_friendly: 1, description: 'Trampolines and a play area for kids.' }),
+    add('Zebulon Quartzfield Estate Winery', 'oliver', 'winery', 'zebulon-quartzfield', { description: 'A fixture winery.' }),
+    add('Xavier Pelicandro', 'vernon', 'restaurant', 'xavier-pelicandro', { description: 'A fixture restaurant.' }),
+    add('Xavier Pelicandro', 'penticton', 'restaurant', 'xavier-pelicandro', { description: 'A fixture restaurant.' }),
+    add('SS Zorbly Fizz Bar', 'kelowna', 'cocktail', 'ss-zorbly-fizz-bar', { rating: 3.1, reviews: 5, description: 'Cocktails.' }),
+    add('SS Grand Lounge', 'kelowna', 'cocktail', 'ss-grand-lounge', { rating: 4.9, reviews: 900, description: 'Zorbly cocktails with plenty of fizz.' }),
+  ];
+  return Promise.resolve().then(fn).finally(() => {
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  });
+}
+
+test('Smarter search: breakfast, kids and rainy days, date night, dated events and "with a restaurant" each go to the right page', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => {
+  const go = (q) => app.heroSearchTarget(q).url;
+  const search = (q) => `/search?q=${encodeURIComponent(q)}`;
+  // Breakfast and brunch: Kelowna brunch -> our brunch guide; elsewhere -> /search with only the places that fit.
+  assert.equal(go('brunch kelowna'), app.BRUNCH_GUIDE_PATH);
+  assert.equal(go('breakfast west kelowna'), search('breakfast west kelowna'));
+  const breakfast = app.smartSearchPlan('breakfast west kelowna');
+  assert.equal(breakfast.key, 'breakfast');
+  const names = breakfast.list().map((x) => x.row.name);
+  assert.ok(names.includes('SS Sunrise Cafe'), 'a café that mentions breakfast');
+  assert.ok(names.includes('SS Early Diner'), 'a restaurant that opens early');
+  assert.ok(!names.includes('SS Night Bistro'), 'not a dinner-only restaurant');
+  assert.ok(!names.includes('SS Breakfast Winery'), 'only cafés and restaurants');
+  assert.ok(breakfast.list().every((x) => x.row.region === 'west-kelowna'));
+  // French: déjeuner is breakfast.
+  assert.equal(app.smartSearchPlan('déjeuner à west kelowna').key, 'breakfast');
+  // Kids, family and rainy days -> the Indoor hub's Family Fun in that town.
+  assert.equal(go('kids rainy day kelowna'), '/indoor?types=family&regions=kelowna');
+  assert.equal(go('things to do with kids in kelowna'), '/indoor?types=family&regions=kelowna');
+  assert.equal(go('enfants jour de pluie kelowna'), '/indoor?types=family&regions=kelowna');
+  // A town with no family places: the whole Family Fun list rather than an empty one.
+  assert.equal(go('kids rainy day osoyoos'), '/indoor?types=family');
+  // Badge requests keep their own pages.
+  assert.equal(go('kid friendly restaurants kelowna'), app.resolveDiscoveryDestination(app.interpretDiscoveryText('kid friendly restaurants kelowna')).url);
+  // Date night -> the town's restaurants and cocktail lounges.
+  assert.equal(go('date night kelowna'), '/food-drink?types=restaurant,cocktail&regions=kelowna');
+  assert.equal(go('romantic dinner kelowna'), '/food-drink?types=restaurant&regions=kelowna', 'dinner: restaurants');
+  assert.equal(go('soirée romantique kelowna'), '/food-drink?types=restaurant,cocktail&regions=kelowna');
+  // Dated events -> What's On with the window and category.
+  assert.equal(go('live music this weekend'), '/whats-on?when=this-weekend&categories=live-music');
+  assert.equal(go('things to do this weekend'), '/whats-on?when=this-weekend');
+  assert.equal(go('events tonight'), '/whats-on?when=today');
+  assert.equal(go('live music tonight in penticton'), '/whats-on?when=today&regions=penticton&categories=live-music');
+  assert.equal(go('kids events this weekend'), '/whats-on?when=this-weekend&categories=family-kids');
+  assert.equal(go('musique ce soir'), '/whats-on?when=today&categories=live-music');
+  // A place request with a date is not an events search.
+  assert.notEqual(go('patio this weekend').split('?')[0], '/whats-on');
+  // A winery with a restaurant -> only the wineries that have one, not every winery and restaurant.
+  assert.equal(go('winery with restaurant'), search('winery with restaurant'));
+  const wr = app.smartSearchPlan('winery with restaurant').list().map((x) => x.row);
+  assert.ok(wr.some((v) => v.name === 'SS Vine Kitchen Winery'));
+  assert.ok(!wr.some((v) => v.name === 'SS Tasting Only Winery'));
+  assert.ok(wr.every((v) => v.type === 'winery'));
+  assert.equal(app.smartSearchPlan('vignoble avec restaurant').key, 'with_restaurant');
+  // Simple requests are unchanged.
+  assert.equal(go('brewry kelowna'), app.resolveDiscoveryDestination(app.interpretDiscoveryText('brewry kelowna')).url);
+  assert.equal(app.smartSearchPlan('restaurants in kelowna'), null);
+  assert.equal(app.smartSearchPlan('wineries'), null);
+})));
+
+test('Smarter search: guide topics go to the guide; typos in a place name find the place', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => {
+  const go = (q) => app.heroSearchTarget(q).url;
+  app.resetGuideCache();
+  const live = app.liveGuides();
+  // A guide whose topic is the whole request.
+  const halloween = live.find((g) => /halloween/i.test(g.heading));
+  if (halloween) assert.equal(go('halloween'), halloween.path);
+  else assert.equal(go('halloween'), app.resolveDiscoveryDestination(app.interpretDiscoveryText('halloween')).url, 'a thin guide is never the destination');
+  const cideries = live.find((g) => /cideries/i.test(g.heading));
+  if (cideries) {
+    assert.equal(go('cideries'), cideries.path);
+    assert.ok(app.smartGuideMatches('cider', app.interpretDiscoveryText('cider')).some((g) => g.path === cideries.path), 'cider finds the cideries guide');
+  }
+  // A town's own guide is never offered for another town.
+  for (const g of app.smartGuideMatches('brunch penticton', app.interpretDiscoveryText('brunch penticton'))) assert.ok(!/kelowna/i.test(g.heading), g.heading);
+  // A dish or cuisine keeps its list of places.
+  assert.equal(go('ramen'), '/search?q=ramen');
+  // Typos in a name: one clear match -> the place.
+  assert.equal(go('zebulon quartzfeld'), '/oliver/wineries/zebulon-quartzfield');
+  assert.equal(go('zebullon quartzfield winery'), '/oliver/wineries/zebulon-quartzfield');
+  // Two places share the closest name: /search, which lists both.
+  assert.equal(go('xavier pelicando'), '/search?q=xavier%20pelicando');
+  const fuzzy = app.smartFuzzyVenues('xavier pelicando', app.interpretDiscoveryText('xavier pelicando')).map((m) => m.venue.region).sort();
+  assert.deepEqual(fuzzy.slice(0, 2), ['penticton', 'vernon']);
+  const html = app.renderSearchPage(app.runDiscovery('xavier pelicando', { limit: 480 }));
+  assert.ok(html.includes('Did you mean'));
+  assert.ok(html.includes('href="/vernon/restaurants/xavier-pelicandro"') && html.includes('href="/penticton/restaurants/xavier-pelicandro"'));
+  // Nothing close: no guess.
+  assert.equal(go('xqzvbn plorf'), '/search?q=xqzvbn%20plorf');
+})));
+
+test('Smarter search: /search uses the standard cards, name matches first, Show more past 48, helpful empty pages and a French page', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => withDiscoveryServer(async (base) => {
+  const page = async (q, prefix = '') => { const r = await fetch(`${base}${prefix}/search?q=${encodeURIComponent(q)}`, { redirect: 'manual' }); return { r, html: await r.text() }; };
+  // Standard listing cards: photo, Favorite / Add to trip, the sort and noindex.
+  const { r, html } = await page('zorbly fizz');
+  assert.equal(r.status, 200);
+  assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.doesNotMatch(html, /<link rel="canonical"/);
+  assert.match(html, /<li class="venue-card"[^>]*data-venue-name="SS Zorbly Fizz Bar"[^>]*>/);
+  assert.match(html, /<li class="venue-card"[^>]*data-ph="/, 'every card has a photo');
+  assert.ok(html.includes('class="card-actions"'), 'Favorite and Add to trip');
+  assert.ok(html.includes('<option value="recommended" selected>Best match</option>'));
+  assert.ok(html.includes('class="search-count"'));
+  assert.ok(html.includes('You searched “zorbly fizz”'));
+  // The name match ranks above a better-rated place that only mentions the words.
+  assert.ok(html.indexOf('data-venue-name="SS Zorbly Fizz Bar"') < html.indexOf('data-venue-name="SS Grand Lounge"'));
+  // More than 48 results: the first 48 shown, the rest behind Show more (not cut at 60).
+  const model = app.searchPageModel(app.runDiscovery('patio', { limit: 480 }));
+  if (model.venues.length > 60) {
+    const many = (await page('patio')).html;
+    assert.equal((many.split('<template id="fdRest">')[0].match(/<li class="venue-card"/g) || []).length, 48);
+    assert.equal((many.match(/<li class="venue-card"/g) || []).length, model.venues.length, 'every match is on the page');
+    assert.match(many, /<button type="button" class="fd-show-more" id="fdShowMore">Show more<\/button>/);
+  }
+  // A plan's list on /search: breakfast places, with its guide link and what matched.
+  const bf = (await page('breakfast west kelowna')).html;
+  assert.ok(bf.includes('<strong>Breakfast &amp; brunch in West Kelowna</strong>'));
+  assert.ok(bf.includes('data-venue-name="SS Sunrise Cafe"') && bf.includes('data-venue-name="SS Early Diner"'));
+  assert.ok(!bf.includes('data-venue-name="SS Night Bistro"'));
+  assert.ok(bf.includes('Mentions breakfast or brunch') && bf.includes('Opens early'));
+  // Nothing found: real suggestions -- the town's busiest kinds of place and the directory with the words kept.
+  const none = (await page('xqzvbn kelowna')).html;
+  assert.ok(none.includes('You could also try'));
+  assert.match(none, /href="\/kelowna\/[a-z-]+"/);
+  assert.ok(none.includes('href="/browse?q=xqzvbn%20kelowna&amp;from=search"'));
+  const hot = (await page('hot springs')).html;
+  assert.ok(hot.includes('href="/browse?q=hot%20springs&amp;from=search"'));
+  assert.ok(hot.includes('href="/guides"') || hot.includes('Our guides'), 'guides are offered');
+  // French: the hero box on /fr searches in French and lands on French results.
+  const fr = await fetch(`${base}/fr/browse?q=${encodeURIComponent('zorbly fizz')}`, { redirect: 'manual' });
+  assert.equal(fr.status, 302); await fr.text();
+  assert.equal(fr.headers.get('location'), '/fr/search?q=zorbly%20fizz');
+  const frPage = await page('zorbly fizz', '/fr');
+  assert.equal(frPage.r.status, 200);
+  assert.match(frPage.html, /<html lang="fr"/);
+  assert.ok(frPage.html.includes('Résultats de recherche'));
+  assert.ok(frPage.html.includes('Vous avez cherché « zorbly fizz »'));
+  assert.ok(frPage.html.includes('action="/fr/browse"'), 'the search box stays French');
+  assert.ok(frPage.html.includes('href="/search?q=zorbly%20fizz"'), 'the EN / FR switch keeps the words');
+  const frIntent = await fetch(`${base}/fr/browse?q=${encodeURIComponent('date night kelowna')}`, { redirect: 'manual' });
+  await frIntent.text();
+  assert.equal(frIntent.headers.get('location'), '/fr/food-drink?types=restaurant,cocktail&regions=kelowna');
+  // The homepage hero box (app.js) sends a French visitor to /fr/browse.
+  assert.ok(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8').includes("? '/fr/browse' : '/browse'"));
+}))));
