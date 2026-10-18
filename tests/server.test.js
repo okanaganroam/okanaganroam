@@ -23915,3 +23915,36 @@ test('Smarter search: /search uses the standard cards, name matches first, Show 
   // The homepage hero box (app.js) sends a French visitor to /fr/browse.
   assert.ok(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8').includes("? '/fr/browse' : '/browse'"));
 }))));
+
+// Fix (2026-10-18): a regex inside a server-side template string lost its
+// backslashes and broke /my-trip in the browser ("Invalid regular expression
+// flags"). Every inline script on the main pages must parse.
+test('Inline scripts parse on the main pages (EN and FR), incl. My Trip', () => withDiscoveryFlag('on', async () => {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const venue = db.prepare("SELECT region, type, slug FROM venues WHERE type = 'restaurant' AND slug IS NOT NULL LIMIT 1").get();
+  const pages = ['/', '/fr', '/my-trip', '/fr/my-trip', '/trip', '/fr/trip', '/restaurants', '/food-drink', '/fr/food-drink',
+    '/whats-on', '/fr/whats-on', '/search?q=pizza', '/fr/search?q=pizza', '/search?q=restaurants', '/fr/search?q=restaurants', '/browse', '/map', '/guides', '/owner/login', '/fr/owner/login', '/list-your-venue', '/fr/list-your-venue'];
+  if (venue) pages.push(`/${venue.region}/restaurants/${venue.slug}`, `/claim/${venue.region}/restaurants/${venue.slug}`);
+  try {
+    // /search keeps the visitor's q in the URL when filters change.
+    const searchHtml = await (await fetch(base + '/search?q=restaurants')).text();
+    assert.ok(searchHtml.includes("if (KEEP_Q) q.push('q=' + encodeURIComponent(KEEP_Q));"), '/search filter URLs keep q');
+    for (const p of pages) {
+      const res = await fetch(base + p, { redirect: 'manual' });
+      if (res.status !== 200) continue;
+      const html = await res.text();
+      const re = /<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi;
+      let m;
+      while ((m = re.exec(html))) {
+        const attrs = m[1] || '';
+        if (/\bsrc=/i.test(attrs) || /type=["']?(application\/(ld\+)?json|text\/template|importmap|module)/i.test(attrs) || !m[2].trim()) continue;
+        assert.doesNotThrow(() => new vm.Script(m[2]), `inline script on ${p} should parse: ${m[2].slice(0, 80)}`);
+      }
+    }
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+}));
