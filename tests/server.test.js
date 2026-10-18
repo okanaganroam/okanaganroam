@@ -16996,25 +16996,34 @@ test('Seasons everywhere: /map lists untimed multi-day events as "On now" only f
   assert.match(page, /var order = \{ now: 0, later: 1, running: 2, tomorrow: 3, week: 4 \};/);
 });
 
-test('Seasons everywhere: Recommended food lists put places open now ahead of places closed all day today, nothing else moves', () => {
+test('Seasons everywhere: Recommended food lists are open now, then everything else, then closed for the season', () => {
   const ins = db.prepare(`INSERT INTO venues (name, region, type, description, hours, slug, rating, reviews) VALUES (@name, 'kelowna', 'restaurant', 'An open-first fixture.', @hours, @slug, @rating, @reviews)`);
-  // Sunday 2026-10-18, 13:00 in the Okanagan.
-  const now = new Date('2026-10-18T20:00:00Z');
-  const allWeek = SEASON_WEEK;
+  const day = JSON.stringify({ mon: [['11:00', '21:00']], tue: [['11:00', '21:00']], wed: [['11:00', '21:00']], thu: [['11:00', '21:00']], fri: [['11:00', '21:00']], sat: [['11:00', '21:00']], sun: [['11:00', '21:00']] });
   const noSunday = JSON.stringify({ mon: [['11:00', '21:00']], tue: [['11:00', '21:00']], wed: [['11:00', '21:00']], thu: [['11:00', '21:00']], fri: [['11:00', '21:00']], sat: [['11:00', '21:00']], sun: [] });
-  const evening = JSON.stringify({ mon: [['17:00', '22:00']], tue: [['17:00', '22:00']], wed: [['17:00', '22:00']], thu: [['17:00', '22:00']], fri: [['17:00', '22:00']], sat: [['17:00', '22:00']], sun: [['17:00', '22:00']] });
+  // Open from 8 pm to 3 am every night.
+  const late = JSON.stringify({ mon: [['20:00', '27:00']], tue: [['20:00', '27:00']], wed: [['20:00', '27:00']], thu: [['20:00', '27:00']], fri: [['20:00', '27:00']], sat: [['20:00', '27:00']], sun: [['20:00', '27:00']] });
   const rows = [
-    ['Open First A Shut', noSunday, 5, 900], ['Open First B Later', evening, 4.9, 900], ['Open First C None', null, 4.8, 900],
-    ['Open First D Open', allWeek, 4.7, 900], ['Open First E Shut', noSunday, 4.6, 900], ['Open First F Open', allWeek, 4.5, 900],
+    ['Open First A Season', day, 5, 900], ['Open First B Day', day, 4.9, 900], ['Open First C Shut', noSunday, 4.8, 900],
+    ['Open First D None', null, 4.7, 900], ['Open First E Late', late, 4.6, 900], ['Open First F Day', day, 4.5, 900], ['Open First G Late', late, 4.4, 900],
   ];
   const ids = rows.map(([name, hours, rating, reviews]) => Number(ins.run({ name, hours, slug: app.slugify(name), rating, reviews }).lastInsertRowid));
+  const meta = { reason: 'test', batch_id: 'open-first' };
   try {
+    assert.equal(app.guardedSeasonUpdate(ids[0], { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
     const venues = ids.map((id) => db.prepare('SELECT * FROM venues WHERE id = ?').get(id));
-    const sorted = app.sortFoodDrinkVenues(venues, 'recommended', now).map((v) => v.name);
-    assert.deepEqual(sorted, ['Open First D Open', 'Open First B Later', 'Open First C None', 'Open First F Open', 'Open First A Shut', 'Open First E Shut']);
-    assert.deepEqual(app.sortFoodDrinkVenues(venues, 'az', now).map((v) => v.name), rows.map((r) => r[0]), 'A-Z is untouched');
+    // Sunday 2026-10-18, 1:48 am in the Okanagan: only the late-night places are open; the day places read
+    // "Closed · Opens 11 AM" and rank after them.
+    const night = new Date('2026-10-18T08:48:00Z');
+    assert.deepEqual(app.sortFoodDrinkVenues(venues, 'recommended', night).map((v) => v.name),
+      ['Open First E Late', 'Open First G Late', 'Open First B Day', 'Open First C Shut', 'Open First D None', 'Open First F Day', 'Open First A Season']);
+    // Sunday 1 pm: the day places are open; closed today, no hours and the late places follow in rank order.
+    const noon = new Date('2026-10-18T20:00:00Z');
+    assert.deepEqual(app.sortFoodDrinkVenues(venues, 'recommended', noon).map((v) => v.name),
+      ['Open First B Day', 'Open First F Day', 'Open First C Shut', 'Open First D None', 'Open First E Late', 'Open First G Late', 'Open First A Season']);
+    assert.deepEqual(app.sortFoodDrinkVenues(venues, 'az', night).map((v) => v.name), rows.map((r) => r[0]), 'A-Z is untouched');
   } finally {
-    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+    app.guardedSeasonUpdate(ids[0], null, meta, SEASON_NOW);
+    for (const id of ids) { db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id); db.prepare('DELETE FROM venues WHERE id = ?').run(id); }
   }
 });
 

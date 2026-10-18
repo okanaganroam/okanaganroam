@@ -17213,27 +17213,16 @@ function sortFoodDrinkVenues(venues, sort = 'recommended', now = new Date()) {
   // they can actually go to first. Only the Recommended order; Top rated and A-Z stay as named.
   const seasons = getSeasonStates(now);
   const away = (v) => { const st = seasons.get(v.id); return st && st.kind === 'closed' ? 1 : 0; };
-  return openNowBeforeClosedToday(list.sort((a, b) => away(a) - away(b) || score.get(b.id) - score.get(a.id) || byName(a, b)), now);
+  return openNowFirst(list.sort((a, b) => away(a) - away(b) || score.get(b.id) - score.get(a.id) || byName(a, b)), now);
 }
-// Open now first (2026-10-18): in the Recommended order, a place open right now never sits behind one that is closed
-// all day today. Only those two kinds trade places, among the positions they already hold, each kind in its own
-// ranked order; every other place (closed until later today, no hours listed, a notice) keeps its exact position.
-function openNowBeforeClosedToday(list, now = new Date()) {
+// Open now first (2026-10-18): the Recommended order is a stable three-way split -- places open right now, then every
+// other place (closed now, whether it opens later today or not, or no hours listed), then places closed for the
+// season -- each group keeping its ranked order. At 1:48 am the late-night places that are open lead the list.
+function openNowFirst(list, now = new Date()) {
   if (!hoursModule || list.length < 2) return list;
   const info = foodDrinkOpenNowInfo(list, getAdvisoryNotes(now), now, { requireVerified: false });
-  const kindOf = (v) => {
-    const st = info.byId.get(v.id);
-    if (!st || !st.eligible) return null;
-    if (st.state === 'open') return 'open';
-    return st.state === 'closed' && /^Closed today/.test(st.text || '') ? 'shut' : null;
-  };
-  const slots = [], open = [], shut = [];
-  list.forEach((v, i) => { const k = kindOf(v); if (k) { slots.push(i); (k === 'open' ? open : shut).push(v); } });
-  if (!open.length || !shut.length) return list;
-  const moved = [...open, ...shut];
-  const out = list.slice();
-  slots.forEach((i, n) => { out[i] = moved[n]; });
-  return out;
+  const isOpen = (v) => info.openIds.has(v.id);
+  return [...list.filter(isOpen), ...list.filter((v) => !isOpen(v))];
 }
 
 // Card photos (2026-10-14). Every listing card used to carry the same lake
@@ -41814,7 +41803,7 @@ module.exports = {
   seasonTagHtml,
   seasonTagShortText,
   seasonClosedLast,
-  openNowBeforeClosedToday,
+  openNowFirst,
   venueHoursCheckedHtml,
   MAP_EVENT_GROUP_SRC,
   seasonOnlyStates,
