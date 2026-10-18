@@ -4568,7 +4568,7 @@ test('S6 #14-#18/#23: with fixture inventory the page is indexable and real even
   assert.doesNotMatch(lakeside, /example\.com|tel:|Visit Website/, 'no website/phone on the card');
   const pumpkin = markup.match(/<li class="venue-card whatson-event-card"[^>]*data-venue-name="S6 Osoyoos Pumpkin Patch"[\s\S]*?<\/li>/)[0];
   assert.match(pumpkin, new RegExp(`Osoyoos &middot; ${app.formatLocalDateShort(d1, { weekday: false })} – ${app.formatLocalDateShort(d2, { weekday: false })}</p>`), 'all-day span: dates only, no time');
-  assert.match(pumpkin, /<img class="whatson-event-img whatson-event-photo" src="\/images\/guides\/halloween-pumpkins-800\.jpg"/, 'no image of its own -> a photo for its kind of event');
+  assert.match(pumpkin, /<img class="whatson-event-img whatson-event-photo" src="\/images\/events\/pumpkinpatch-2610-800\.jpg"/, 'no image of its own -> a photo for its kind of event (a pumpkin patch)');
   const festival = cards.find((c) => c.valley);
   assert.ok(festival, 'valley-wide card carries the flag for the client filter');
   assert.doesNotMatch(text, /source_url|event_confidence|batch_id|test-fixture-admin-token|\/api\/events/, 'no admin metadata, token or API references in the page');
@@ -16951,7 +16951,7 @@ test('Seasons everywhere: a closed-for-season venue page folds its weekly hours 
     fr = app.renderVenuePage(v, [], [], [], { now, lang: 'fr' });
     assert.match(fr, /Heures vérifiées le 1er mars 2026<\/p><p class="venue-hours-stale">Les heures ont peut-être changé — vérifiez avant d’y aller\.<\/p>/);
     // Open as usual: the plain weekly list, today marked.
-    assert.match(en, /<h2>Hours<\/h2><ul class="hours-list" data-today="\w+">.*class="is-today"/);
+    assert.match(en, /<h2>Hours<\/h2>(?:<p class="venue-hours-daily">.*?<details class="venue-hours-days"><summary>Each day<\/summary>)?<ul class="hours-list" data-today="\w+">.*class="is-today"/);
     // Closed for the season: the notice box, and the usual hours folded under "Closed for the season".
     assert.equal(app.guardedSeasonUpdate(v.id, { status: 'closed', reopens_date: '2027-04-01', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
     en = app.renderVenuePage(v, [], [], [], { now });
@@ -18591,7 +18591,7 @@ test('Dog guide (2026-10-13): /guides/dog-friendly-kelowna uses the shared guide
   assert.match(html, /<title>Dog-Friendly Kelowna: Beaches, Trails &amp; Patios \| Okanagan Roam<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/dog-friendly-kelowna">/);
   assert.match(html, /"@type":"Article","headline":"Dog-Friendly Kelowna"/);
-  assert.match(html, /<div class="category-banner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/guides\/dog-walk-fall\.jpg"/);
   assert.match(html, /"name":"Dog Friendly Finds","item":"https:\/\/okanaganroam\.com\/dog-friendly"/);
   assert.match(html, /<h2>Off-leash dog beaches<\/h2>\s*<p>The City of Kelowna has four official off-leash dog beaches:<\/p>/);
   assert.doesNotMatch(html, /\(Kelowna\):/, 'a Kelowna-only guide does not repeat the town after every name');
@@ -19114,10 +19114,13 @@ test('Guide photos of their own (2026-10-13): each guide-<name> banner has its 1
     // 2026-10-18: guides whose category photo didn't match the guide got their own.
     'best-pizza-kelowna': 'pizza-oven', 'best-sushi-kelowna': 'sushi-board', 'best-brunch-penticton': 'brunch-pancakes-bacon',
     'best-brunch-vernon': 'pancakes-berries', 'okanagan-cideries': 'cider-orchard', 'okanagan-christmas-markets': 'christmas-market-stall',
-    'okanagan-skating': 'outdoor-skating', 'okanagan-in-november': 'okanagan-lake-late-fall', 'winter-in-kelowna': 'frozen-lake-dock',
+    'okanagan-skating': 'outdoor-skating', 'okanagan-in-november': 'misty-lake-fall', 'winter-in-kelowna': 'frozen-lake-dock',
     'okanagan-in-december': 'snowy-lights-park', 'okanagan-ski-season-2026-27': 'chairlift', 'silverstar-restaurants-apres': 'mountain-lodge-restaurant',
-    'okanagan-nordic-snowshoe': 'cross-country-ski', 'kelowna-without-a-car': 'kelowna-downtown-lake', 'cheap-eats-kelowna': 'street-tacos',
-    'okanagan-winery-restaurants': 'vineyard-dinner', 'best-restaurants-kelowna': 'restaurant-dishes', 'best-restaurants-vernon': 'dinner-wine-lights',
+    'okanagan-nordic-snowshoe': 'cross-country-ski', 'kelowna-without-a-car': 'kelowna-boardwalk', 'cheap-eats-kelowna': 'street-tacos',
+    'okanagan-winery-restaurants': 'vineyard-fall-colour', 'best-restaurants-kelowna': 'restaurant-dishes', 'best-restaurants-vernon': 'dinner-wine-lights',
+    // 2026-10-18 season check: no summer boats, beaches or swimming on fall, winter or year-round guides.
+    'fall-okanagan': 'fall-forest-hiker', 'things-to-do-kelowna': 'kelowna-dusk-aerial', 'weekend-in-kelowna': 'kelowna-night',
+    'dog-friendly-penticton': 'dog-walk-fall', 'dog-friendly-vernon': 'dog-walk-fall', 'family-friendly-okanagan': 'family-science-museum',
   };
   for (const [slug, name] of Object.entries(uses)) {
     const html = app.renderFileGuidePage(`/guides/${slug}`);
@@ -23350,6 +23353,176 @@ test('Menus: "My menu is on my website" finds the menu (page or PDF) and never f
   }
 });
 
+// ---- Menu and price-list fixes (2026-10-18): website import tidying, headings, yellow lines, typing it in ----
+function loadMenuAppScript() {
+  // The page's own client code, run with a stand-in page (the scanner and its parser run in the owner's browser).
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  const start = src.indexOf('const MENU_APP_SCRIPT = String.raw`') + 'const MENU_APP_SCRIPT = String.raw`'.length;
+  const win = { MENU_CFG: { t: { diet: {} }, state: { menu: null, published: null, scan: 'device' }, base: '', mode: 'token' }, scrollTo() {} };
+  new Function('window', 'document', src.slice(start, src.indexOf('})();`;', start) + 5))(win, { getElementById: () => ({ addEventListener() {}, innerHTML: '' }), head: { appendChild() {} } });
+  return win;
+}
+function menuFixturePage(name) {
+  return require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'menu-pages', name), 'utf8');
+}
+
+test('Menus (2026-10-18): a website import leaves out blurbs, past events, dates read as prices and repeats (saved real pages)', () => {
+  const win = loadMenuAppScript();
+  const fromPage = (file) => win.__menuTidy(win.__menuParse(app.htmlToMenuLines(menuFixturePage(file)).map((text) => ({ text, conf: 100 }))));
+  const items = (r) => r.sections.flatMap((s) => s.items.map((i) => ({ section: s.name, ...i })));
+
+  // Quails' Gate's Old Vines page: what the import used to publish as dishes is gone.
+  const lines = app.htmlToMenuLines(menuFixturePage('quails-gate-old-vines.html'));
+  assert.equal(lines.filter((l) => /^BEGINS MONDAY/.test(l)).length, 1, 'the copy hidden on every device is left out');
+  const qg = fromPage('quails-gate-old-vines.html');
+  const all = items(qg);
+  const names = all.map((i) => i.name);
+  for (const junk of [/Dine With Us/i, /Ode To 2025/i, /New Year/i, /Begins/i, /Every Saturday/i, /Happy Hour Is Back/i, /Weekend Brunch/i, /per person/i, /Reservation/i, /Seating/i]) {
+    assert.ok(!names.some((n) => junk.test(n)), `no "${junk}" dish: ${names.join(', ')}`);
+    assert.ok(!qg.sections.some((s) => junk.test(s.name)), `no "${junk}" section`);
+  }
+  assert.ok(!all.some((i) => i.price === '1'), 'a date is never a price');
+  const keys = all.map((i) => `${i.name.toLowerCase()}|${i.price}`);
+  assert.equal(new Set(keys).size, keys.length, 'no dish twice at the same price');
+  assert.equal(all.filter((i) => i.check).length, 0, 'nothing left to check');
+  // The headings printed with their hours are kept as sections, the hours as the note.
+  const sec = Object.fromEntries(qg.sections.map((s) => [s.name, s]));
+  assert.deepEqual(Object.keys(sec), ['Appetizers', 'Lunch Mains', 'Dinner Mains', 'Happy Hour', 'Brunch', 'Enhancements']);
+  assert.equal(sec['Lunch Mains'].note, '11:00 AM - 2:30 PM');
+  assert.equal(sec.Brunch.note, 'SAT & SUN 11:00 AM - 2:30 PM');
+  assert.deepEqual(sec['Lunch Mains'].items.map((i) => `${i.name} ${i.price}`), ['Rossdown Farm Chicken Supreme 34', 'Seared Ling Cod 33', '63 Acres Beef Tenderloin 7oz 69', '63 Acres Ribeye 13oz 79']);
+  // What comes on a platter or a flight is part of it; a website's "menu may differ" line is dropped.
+  assert.match(sec['Happy Hour'].items[0].description, /^Includes: 3 Oysters On The Half Shell, Poached Canadian Lobster Salad\.$/);
+  assert.equal(sec['Happy Hour'].items[1].name, 'Food & Wine Flight');
+  assert.equal(sec['Happy Hour'].items[1].price, '40');
+  assert.equal(sec['Dinner Mains'].items.find((i) => i.name === 'Wine Pairings').description, '');
+  // The vintage in a pairing note is not a "past year".
+  assert.match(sec.Appetizers.items[1].description, /2023 Plume Pinot Noir/);
+
+  // Kiki Gardens: prices in their own tag, sizes under a dish, the same dish twice, size-only drink lines.
+  const kiki = items(fromPage('kiki-gardens-menu.html')).map((i) => `${i.section} | ${i.name} | ${i.price}`);
+  assert.deepEqual(kiki, ['Soups | Wonton Soup (For One) | 14.95', 'Soups | Wonton Soup (For Two) | 21.95', 'Soups | Hot & Sour Soup (For One) | 13.95',
+    'Chicken | Lemon Chicken | 21.95', 'Chicken | Almond Chicken | 20.95', 'Beverages | Milk (Small) | 2.50', 'Beverages | Juice (Small) | 2.50']);
+
+  // Tidying keeps a real menu whole: no prices at all, and dishes in capitals with descriptions.
+  const plain = win.__menuTidy(win.__menuParse('SHAREABLES\nSourdough\ncompound butter\nBurrata\nwinter squash, pear vinegar, candied pepitas'.split('\n').map((text) => ({ text, conf: 100 }))));
+  assert.deepEqual(plain.sections[0].items.map((i) => i.name), ['Sourdough', 'Burrata']);
+  // A wine list's vintages stay.
+  const wines = win.__menuTidy(win.__menuParse('WINES BY THE GLASS\n2022 Merlot 14\n2021 Pinot Noir 16\nRiesling 2023 12'.split('\n').map((text) => ({ text, conf: 100 }))));
+  assert.equal(wines.sections[0].items.length, 3);
+});
+
+test('Menus (2026-10-18): the photo scanner keeps section headings (COFFEE / BREAKFAST), even with hours or read faintly', () => {
+  const win = loadMenuAppScript();
+  const flat = (r) => r.sections.flatMap((s) => s.items.map((i) => `${s.name} | ${i.name} | ${i.price}`));
+  // OCR-like lines from a cafe board: a faint decorative heading, a heading with its hours, the usual dishes.
+  const board = [
+    { text: 'COFFEE', conf: 31, wconf: 31 },
+    { text: 'Drip Coffee 3.25', conf: 91 }, { text: 'Latte 5.25', conf: 93 }, { text: 'Mocha 5.50', conf: 90 },
+    { text: 'BREAKFAST 8am - 11am', conf: 88 },
+    { text: 'Eggs Benedict 16', conf: 92 }, { text: 'Breakfast Sandwich 12', conf: 90 },
+    { text: 'LUNCH | 11:30 AM - 3 PM', conf: 90 },
+    { text: 'Soup of the Day 9', conf: 92 },
+  ];
+  const r = win.__menuParse(board);
+  assert.deepEqual(flat(r), ['Coffee | Drip Coffee | 3.25', 'Coffee | Latte | 5.25', 'Coffee | Mocha | 5.50',
+    'Breakfast | Eggs Benedict | 16', 'Breakfast | Breakfast Sandwich | 12', 'Lunch | Soup of the Day | 9']);
+  assert.equal(r.sections[1].note, '8am - 11am');
+  assert.equal(r.sections[2].note, '11:30 AM - 3 PM');
+  // Faint picture noise is still dropped, and opening hours or a phone line are never a heading.
+  const noise = win.__menuParse([{ text: 'MAINS', conf: 95 }, { text: 'Burger 18', conf: 95 }, { text: 'XQZ', conf: 20, wconf: 20 }, { text: 'Open Daily from 11:00 AM to 9:30 PM Phone: 250.769.2500', conf: 95 }, { text: 'Salad 14', conf: 95 }]);
+  assert.deepEqual(flat(noise), ['Mains | Burger | 18', 'Mains | Salad | 14']);
+  // A number after a month is a date, not a price.
+  const dated = win.__menuParse('MAINS\nBurger 18\nBegins Monday, December 1\nSalad 14'.split('\n').map((text) => ({ text, conf: 100 })));
+  assert.ok(!flat(dated).some((x) => /\| 1$/.test(x)), flat(dated).join('; '));
+});
+
+test('Menus (2026-10-18): yellow lines must be checked before going live; "Type it in myself"; tour durations; the French menu screen', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Typed Menu Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'typed-menu-fixture' });
+  seasonInsert.run({ name: 'Typed Tours Fixture', type: 'tour', hours: SEASON_WEEK, slug: 'typed-tours-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'typed-menu-fixture');
+  const tv = app.findVenueBySlug('kelowna', 'tour', 'typed-tours-fixture');
+  const token = app.createOwnerLink(v.id, { contact_email: 'typed@example.com' }).url.split('/owner/')[1];
+  const tokenT = app.createOwnerLink(tv.id, { contact_email: 'tours@example.com' }).url.split('/owner/')[1];
+  const sent = [];
+  app.setVenueSubmissionTransport(async (payload) => { sent.push(payload); });
+  app.setOwnerEmailTransport(async () => {});
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.26.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const get = (p, cookie) => fetch(`${base}${p}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} });
+  try {
+    // The start screen offers typing it in, in English and French; the French screen has the French site header.
+    const tb = `/owner/${token}/menu`;
+    const en = await get(tb).then((r) => r.text());
+    assert.match(en, /Type it in myself/);
+    const fr = await get(`${tb}?lang=fr`).then((r) => r.text());
+    assert.match(fr, /Je le tape moi-m&ecirc;me/);
+    const frHeader = /<header id="top">[\s\S]*?<\/header>/.exec(fr)[0];
+    assert.match(frHeader, /href="\/fr"|href="\/fr\//, 'the French header links to French pages');
+    assert.ok(!/>\s*Business login\s*</.test(frHeader), 'the header reads French');
+    for (const page of [en, fr]) {
+      for (const m of page.matchAll(/<script(?![^>]*(?:src=|application\/(?:ld\+)?json))[^>]*>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]));
+    }
+
+    // A signed-in owner types their menu in.
+    const oc = (await post(`/owner/${token}/account`, { email: 'typed-owner@example.com', password: 'a long enough password' })).setCookie.split(';')[0];
+    const mb = `/owner/account/venue/${v.id}/menu`;
+    const started = await post(`${mb}/manual`, {}, oc);
+    assert.equal(started.status, 200, JSON.stringify(started.body));
+    assert.equal(started.body.menu.status, 'ready');
+    const data = { sections: [
+      { name: 'Starters', note: '', items: [{ name: 'Poutine', price: '14', description: 'Cheese curds, gravy', dietary: [], check: true }, { name: 'Wings', price: '16', description: '', dietary: ['spicy'], check: false }, { name: '', price: '', description: '', dietary: [], check: false }] },
+      { name: 'Mains', note: '', items: [{ name: 'Smash Burger', price: '19', description: 'Two patties, house sauce', dietary: [], check: false }] },
+    ] };
+    assert.equal((await post(`${mb}/save`, { data }, oc)).status, 200);
+    // One yellow line left: not published, and the owner is told why.
+    const blocked = await post(`${mb}/publish`, { data }, oc);
+    assert.equal(blocked.status, 409);
+    assert.equal(blocked.body.needs_check, 1);
+    assert.match(blocked.body.error, /1 line still needs checking/);
+    assert.equal(app.publishedMenu(v.id), null);
+    // Checked: it goes live, the blank line is dropped, and the public menu page shows what was typed.
+    data.sections[0].items[0].check = false;
+    const live = await post(`${mb}/publish`, { data }, oc);
+    assert.equal(live.status, 200, JSON.stringify(live.body));
+    assert.equal(live.body.live, true);
+    assert.equal(app.publishedMenu(v.id).items, 3);
+    const page = await get('/kelowna/restaurants/typed-menu-fixture/menu').then((r) => r.text());
+    for (const want of ['Starters', 'Poutine', '$14', 'Cheese curds, gravy', 'Mains', 'Smash Burger', '$19']) assert.ok(page.includes(want), want);
+
+    // From a private link, a menu with a yellow line is held back too; Dayton can publish it anyway from his editor.
+    const tdata = { sections: [{ name: 'Tours', note: '', items: [
+      { name: 'Naramata Wine Tour', duration: '4 hours', price: '129 per person', description: 'Includes lunch', dietary: [], check: false },
+      { name: 'Sunset Paddle', duration: '2 hours', price: '89', description: '', dietary: [], check: true },
+      { name: 'Private Charter', duration: '', price: '1,299', description: 'Up to 12 guests', dietary: [], check: false }] }] };
+    const tb2 = `/owner/${tokenT}/menu`;
+    assert.equal((await post(`${tb2}/manual`, {})).status, 200);
+    assert.equal((await post(`${tb2}/publish`, { data: tdata })).status, 409);
+    const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
+    const draft = db.prepare("SELECT id FROM venue_menus WHERE venue_id = ? AND status = 'ready' ORDER BY id DESC").get(tv.id);
+    assert.equal((await post(`/admin/review/menu/${draft.id}/publish`, { data: tdata }, cookie)).status, 409, 'Dayton is asked first');
+    const ap = await post(`/admin/review/menu/${draft.id}/publish`, { data: tdata, allow_unchecked: true }, cookie);
+    assert.equal(ap.status, 200, JSON.stringify(ap.body));
+    // The tour's duration is kept and shown with its description, on the page and in its schema.
+    assert.equal(app.normalizeMenuData(tdata).sections[0].items[0].duration, '4 hours');
+    assert.equal('duration' in app.normalizeMenuData(tdata).sections[0].items[2], false);
+    const prices = await get('/kelowna/tours/typed-tours-fixture/prices').then((r) => r.text());
+    assert.match(prices, /4 hours · Includes lunch/);
+    assert.match(prices, /"description":"4 hours · Includes lunch"/);
+    assert.match(prices, /Sunset Paddle/);
+    // The price list's typing screen asks how long a tour takes.
+    assert.match(await get(tb2).then((r) => r.text()), /"kind":"tours"[\s\S]*How long \(optional\)/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
 test('New business (2026-10-17): approval emails the owner their private edit link, and their own single event shows on their page', async () => {
   const http = require('node:http');
   const handler = app.server.listeners('request')[0];
@@ -24823,7 +24996,7 @@ test('Weekend and town food guides (2026-10-18): six file guides, each in the to
   const towns = app.GUIDE_GROUPS.find((g) => g.key === 'towns');
   assert.ok(towns, 'the towns group exists');
   const banners = {
-    'weekend-in-kelowna': 'region-kelowna', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
+    'weekend-in-kelowna': 'guide-kelowna-night', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
     'best-restaurants-penticton': 'region-penticton', 'best-restaurants-vernon': 'guide-dinner-wine-lights', 'best-restaurants-west-kelowna': 'region-west-kelowna',
   };
   for (const [slug, key] of Object.entries(banners)) {
@@ -25095,3 +25268,20 @@ test('Seasonal hours and closures (2026-10-18): owners set them; the venue page 
   const fact = app.buildTripPlannerFacts(false).find((f) => f.id === v.id);
   assert.deepEqual(fact.ownerClosures, [{ from: app.addLocalDays(today, 2), to: app.addLocalDays(today, 2) }]);
 }));
+
+test('Venue page layout (2026-10-18): same hours every day read as one line, the website shows as its address, and the extras follow the facts on phones', () => {
+  seasonInsert.run({ name: 'Layout Fixture Cafe', type: 'cafe', hours: JSON.stringify({ mon: [['09:30', '17:30']], tue: [['09:30', '17:30']], wed: [['09:30', '17:30']], thu: [['09:30', '17:30']], fri: [['09:30', '17:30']], sat: [['09:30', '17:30']], sun: [['09:30', '17:30']] }), slug: 'layout-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe');
+  try {
+    db.prepare("UPDATE venues SET website = 'https://www.example-cafe.ca/' WHERE id = ?").run(v.id);
+    const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z') });
+    assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
+    assert.match(en, />example-cafe\.ca ↗<\/a>/, 'the website row shows the address, not the raw URL');
+    assert.match(en, /<div class="venue-extra">/);
+    assert.match(en, /@media \(max-width: 959px\) \{[\s\S]*?\.venue-aside \{ order: 1;/);
+    const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang: 'fr' });
+    assert.match(fr, /<span>Tous les jours<\/span>/);
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
