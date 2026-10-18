@@ -15697,8 +15697,6 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
   li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
   @media (min-width: 900px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
-  /* Sharper phones (2026-10-18): cards are about 300-560px wide below 900px, so 2x screens take the 960 copy too. */
-  @media (min-width: 340px) and (max-width: 899px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
 </style>
   <ul class="card-grid">
     ${addPhotos(cardHtml(venues))}
@@ -15740,8 +15738,6 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
   li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
   @media (min-width: 900px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
-  /* Sharper phones (2026-10-18): cards are about 300-560px wide below 900px, so 2x screens take the 960 copy too. */
-  @media (min-width: 340px) and (max-width: 899px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
 </style>`;
   if (courses.length) {
     html += `<h2 class="category-subsection-heading">${prefix}Golf Courses</h2>${sortNav}
@@ -17842,8 +17838,6 @@ function renderFoodDrinkHubStyles() {
   body.fd-page li.venue-card[data-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; }
   body.fd-page li.venue-card[data-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--fd-ph) center var(--fd-ph-y, 50%) / cover no-repeat; pointer-events: none; }
   @media (min-width: 900px) and (min-resolution: 1.5dppx) { body.fd-page li.venue-card[data-ph="own"]::before { background-image: var(--fd-ph-2x, var(--fd-ph)); } }
-  /* Sharper phones (2026-10-18): cards are about 300-560px wide below 900px, so 2x screens take the 960 copy too. */
-  @media (min-width: 340px) and (max-width: 899px) and (min-resolution: 1.5dppx) { body.fd-page li.venue-card[data-ph="own"]::before { background-image: var(--fd-ph-2x, var(--fd-ph)); } }
 ${foodDrinkCardPhotoCss()}
   /* The excerpt is already shortened, and the name opens the full page, so
      the list cards drop the inline Read more and keep the text short. */

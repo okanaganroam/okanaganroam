@@ -23515,9 +23515,9 @@ test('Lazy card photos (2026-10-18): the first cards load at once, the rest wait
     const json = await (await fetch(base + '/browse/cards.json')).json();
     const jTags = [...json.html.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]);
     assert.ok(jTags.length && jTags.every((t) => /\sdata-lz\b/.test(t)), '/browse/cards.json cards wait for the screen');
-    // Phones: 2x screens take the 960 copy on cards wider than ~300px; iPhones do not zoom on the sort menu.
+    // Phones keep the 480 copy (speed first); iPhones do not zoom on the sort menu.
     const css = app.inlineSharedStylesheets(await (await fetch(base + '/restaurants')).text());
-    assert.match(css, /@media \(min-width: 340px\) and \(max-width: 899px\) and \(min-resolution: 1\.5dppx\) \{ body\.fd-page li\.venue-card\[data-ph="own"\]::before \{ background-image: var\(--fd-ph-2x, var\(--fd-ph\)\); \} \}/);
+    assert.doesNotMatch(css, /max-width: 899px\) and \(min-resolution/);
     assert.match(css, /body\.fd-page \.fd-sort-select \{ font-size: 16px; \}/);
     // /guides: the first row of guide photos is not lazy.
     const guides = await (await fetch(base + '/guides')).text();
