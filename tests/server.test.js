@@ -17351,10 +17351,10 @@ test('Activity photos: an outdoor place shows the photo that fits the chosen act
   const knox = { id: 1226, name: 'Knox Mountain Park', region: 'kelowna', type: 'outdoor', slug: 'knox-mountain-park', description: 'Fixture park.', image_url: '/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update.jpg?v=x' };
   const other = { id: 987654, name: 'Plain Test Park', region: 'kelowna', type: 'outdoor', slug: 'plain-test-park', description: 'Fixture park.', image_url: '/images/hiking/venues/plain-test-park.jpg' };
   const card = (html, id) => html.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${id}"[^>]*>`))[0];
-  const winterPhoto = /knox-mountain-park-20261016-winter-final\.jpg/;
+  const winterPhoto = /knox-mountain-park-20261016-winter-final(?:-w480)?\.jpg/;
 
   const all = app.renderOutdoorsHubPage([knox, other]);
-  assert.match(card(all, 1226), /--fd-ph:url\('\/images\/hiking\/venues\/knox-mountain-park-20261016-viewpoint-update\.jpg/, 'its usual photo with no activity chosen');
+  assert.match(card(all, 1226), /--fd-ph:url\('\/images\/hiking\/venues\/knox-mountain-park-20261016-viewpoint-update(?:-w480)?\.jpg/, 'its usual photo with no activity chosen');
   assert.match(card(all, 1226), /data-ph-by="[^"]*winter-final/, 'the page can swap to the winter photo');
   assert.doesNotMatch(card(all, 987654), /data-ph-by/, 'places without activity photos are unchanged');
   assert.match(all, /data-ph-now/, 'the swap script is on the outdoors page');
@@ -22968,5 +22968,43 @@ test('Owner help bot: on every business portal page (not admin), answers by topi
   } finally {
     app.setOwnerEmailTransport(null);
     srv.close();
+  }
+});
+
+test('Photo sizes: cards and thumbnails use the 480px copy, the venue photo loads first with a 960px copy for phones', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const http = require('node:http');
+  const dir = path.join(__dirname, '..', 'public', 'images', 'venues');
+  const original = fs.readdirSync(dir).find((f) => /-2610\.jpg$/.test(f) && fs.existsSync(path.join(dir, f.replace(/\.jpg$/, '-w480.jpg'))) && fs.existsSync(path.join(dir, f.replace(/\.jpg$/, '-w960.jpg'))));
+  assert.ok(original, 'a photo with both smaller copies exists');
+  const src = `/images/venues/${original}?v=t1`;
+  assert.equal(app.photoSized(src, 480), src.replace('.jpg?', '-w480.jpg?'));
+  assert.equal(app.photoSized(src, 960), src.replace('.jpg?', '-w960.jpg?'));
+  // No copy, an upload, or something else: the original is kept.
+  assert.equal(app.photoSized('/images/venues/no-such-photo.jpg?v=1', 480), '/images/venues/no-such-photo.jpg?v=1');
+  assert.equal(app.photoSized('/images/owner/abc.jpg', 480), '/images/owner/abc.jpg');
+  assert.equal(app.photoSized('https://example.com/a.jpg', 480), 'https://example.com/a.jpg');
+  assert.equal(app.photoSized(null, 480), null);
+
+  seasonInsert.run({ name: 'Photo Size Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'photo-size-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'photo-size-fixture');
+  db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run(src, v.id);
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const venuePage = await fetch(`${base}/kelowna/restaurants/photo-size-fixture`).then((r) => r.text());
+    const hero = (venuePage.match(/<div class="venue-hero venue-hero-photo"><img[^>]*>/) || [''])[0];
+    assert.match(hero, /fetchpriority="high"/);
+    assert.doesNotMatch(hero, /loading="lazy"/);
+    assert.match(hero, /srcset="[^"]*-w960\.jpg\?v=t1 960w, [^"]*\.jpg\?v=t1 \d+w"/);
+    const list = await fetch(`${base}/kelowna/restaurants`).then((r) => r.text());
+    const card = (list.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${v.id}"[^>]*>`)) || [''])[0];
+    assert.match(card, /--fd-ph:url\((?:'|&#39;)[^'&]*-w480\.jpg\?v=t1(?:'|&#39;)\);--fd-ph-2x:url\((?:'|&#39;)[^'&]*-w960\.jpg\?v=t1(?:'|&#39;)\)/);
+    assert.match(list, /min-resolution: 1\.5dppx/);
+  } finally {
+    srv.close();
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
