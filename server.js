@@ -23627,6 +23627,21 @@ function renderVenuePageLayoutStyles() {
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
+  /* Venue page layout (2026-10-18): on narrower screens the facts (address, phone, hours) come straight after the
+     buttons, and the menu, visitor tips and guide links follow them. */
+  @media (max-width: 959px) {
+    body.golf-page .venue-layout { display: flex; flex-direction: column; }
+    body.golf-page .venue-main { display: contents; }
+    body.golf-page .venue-aside { order: 1; margin-top: 8px; }
+    body.golf-page .venue-extra { order: 2; }
+  }
+  /* The photo leaves room for the name and the open-now line on a laptop screen. */
+  @media (min-width: 641px) {
+    body.golf-page .venue-hero-photo img { max-height: clamp(220px, 42vh, 420px); }
+    body.golf-page .vg-mosaic .venue-hero-photo, body.golf-page .vg-mosaic .venue-hero-photo img { height: clamp(220px, 42vh, 380px); }
+  }
+  body.golf-page .venue-hours-daily { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 4px; font-weight: 800; color: var(--ink); }
+  body.golf-page .venue-hours-days summary { cursor: pointer; font-size: 0.84rem; font-weight: 700; opacity: 0.8; }
   @media (min-width: 960px) {
     body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 40px; align-items: start; }
     body.golf-page .venue-aside { position: sticky; top: 84px; }
@@ -23771,7 +23786,16 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     }).join('');
     hoursHtml = seasonShut
       ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
-      : `<h2>${L('Hours', 'Heures')}</h2><ul class="hours-list" data-today="${today}">${rows}</ul>`;
+      : (() => {
+        // Venue page layout (2026-10-18): seven identical rows read as noise, so a week with the same hours every day
+        // shows one line and keeps the day-by-day list folded under it.
+        const texts = hoursModule.HOURS_WEEKDAYS.map((d) => venueDayHoursText(parsedHours.days[d], fr));
+        const list = `<ul class="hours-list" data-today="${today}">${rows}</ul>`;
+        if (texts.every((t) => t === texts[0])) {
+          return `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${escapeHtml(texts[0])}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
+        }
+        return `<h2>${L('Hours', 'Heures')}</h2>${list}`;
+      })();
     // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
@@ -23810,7 +23834,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // link and the schema keep the stored English.
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
-    venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
+    venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(String(venue.website).replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''))} \u2197</a>`] : null,
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved.
     venueLinkRow.menu_url ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
     venueLinkRow.booking_url ? [L('Book', 'R\u00e9server'), `<a href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book online', 'R\u00e9server en ligne')} \u2197</a>`] : null,
@@ -23841,7 +23865,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const hero960 = photoSized(venue.image_url, 960);
   const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
-  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
+  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;opacity:0.65;text-align:right">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
@@ -24024,9 +24048,11 @@ ${VENUE_MENU_CSS}` : ''}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
+  <div class="venue-extra">
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
+  </div>
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">

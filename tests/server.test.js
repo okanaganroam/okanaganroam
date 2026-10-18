@@ -16950,7 +16950,7 @@ test('Seasons everywhere: a closed-for-season venue page folds its weekly hours 
     fr = app.renderVenuePage(v, [], [], [], { now, lang: 'fr' });
     assert.match(fr, /Heures vérifiées le 1er mars 2026<\/p><p class="venue-hours-stale">Les heures ont peut-être changé — vérifiez avant d’y aller\.<\/p>/);
     // Open as usual: the plain weekly list, today marked.
-    assert.match(en, /<h2>Hours<\/h2><ul class="hours-list" data-today="\w+">.*class="is-today"/);
+    assert.match(en, /<h2>Hours<\/h2>(?:<p class="venue-hours-daily">.*?<details class="venue-hours-days"><summary>Each day<\/summary>)?<ul class="hours-list" data-today="\w+">.*class="is-today"/);
     // Closed for the season: the notice box, and the usual hours folded under "Closed for the season".
     assert.equal(app.guardedSeasonUpdate(v.id, { status: 'closed', reopens_date: '2027-04-01', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
     en = app.renderVenuePage(v, [], [], [], { now });
@@ -24872,4 +24872,21 @@ test('Guides batch 4 (2026-10-18): Kelowna food and things to do, breweries, sus
     assert.ok(g.title.length <= 65, `${p} title fits`);
   }
   assert.equal(app.GUIDE_GROUPS.find((x) => x.key === 'towns').heading, 'Towns, weekends and local food');
+});
+
+test('Venue page layout (2026-10-18): same hours every day read as one line, the website shows as its address, and the extras follow the facts on phones', () => {
+  seasonInsert.run({ name: 'Layout Fixture Cafe', type: 'cafe', hours: JSON.stringify({ mon: [['09:30', '17:30']], tue: [['09:30', '17:30']], wed: [['09:30', '17:30']], thu: [['09:30', '17:30']], fri: [['09:30', '17:30']], sat: [['09:30', '17:30']], sun: [['09:30', '17:30']] }), slug: 'layout-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe');
+  try {
+    db.prepare("UPDATE venues SET website = 'https://www.example-cafe.ca/' WHERE id = ?").run(v.id);
+    const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z') });
+    assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
+    assert.match(en, />example-cafe\.ca ↗<\/a>/, 'the website row shows the address, not the raw URL');
+    assert.match(en, /<div class="venue-extra">/);
+    assert.match(en, /@media \(max-width: 959px\) \{[\s\S]*?\.venue-aside \{ order: 1;/);
+    const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang: 'fr' });
+    assert.match(fr, /<span>Tous les jours<\/span>/);
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
 });
