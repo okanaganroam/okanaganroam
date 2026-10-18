@@ -10371,7 +10371,7 @@ test('Phase 2: Hero Search routing sends each example to an existing page', () =
   assert.equal(route('events this weekend').url, '/whats-on?when=this-weekend');
   assert.equal(route('markets this weekend').url, '/whats-on?when=this-weekend&categories=markets-fairs');
   assert.equal(route('restaurants in Kelowna or Penticton').url, '/food-drink?types=restaurant&regions=kelowna,penticton');
-  assert.equal(route('hiking and fishing near Peachland').url, '/outdoors?regions=peachland&activities=hiking,fishing');
+  assert.equal(route('hiking and fishing near Peachland').url, '/outdoors?regions=peachland&types=hiking,fishing');
   assert.equal(route('dog beaches').url, '/dog-friendly?types=dog-beach');
   assert.equal(route('local favourites in Vernon').url, '/local-favorites?regions=vernon');
   assert.equal(route('Kelowna').url, '/kelowna');
@@ -24287,6 +24287,40 @@ test('Smarter search: breakfast, kids and rainy days, date night, dated events a
   assert.equal(app.smartSearchPlan('restaurants in kelowna'), null);
   assert.equal(app.smartSearchPlan('wineries'), null);
 })));
+
+// Ski search (2026-10-18): "ski" listed every winter spot on /outdoors (and its ?activities= filter was
+// cleared by the page script); it now goes to Ski & Snow's ski resorts.
+test('Smarter search: "ski" and "skiing" go to the Ski & Snow resorts; outdoor activity searches use ?types=', () => withDiscoveryFlag('on', () => {
+  const ins = db.prepare(`INSERT INTO venues (name, region, type, description, slug) VALUES (?, 'big-white', 'outdoor', 'A fixture ski resort with downhill skiing.', ?)`);
+  ins.run('Skifixture Ski Resort', 'skifixture-ski-resort');
+  const resort = db.prepare("SELECT id FROM venues WHERE slug = 'skifixture-ski-resort'").get();
+  // Ski & Snow lists the Winter activity collection.
+  let coll = db.prepare("SELECT id FROM collections WHERE kind = 'activity_winter'").get();
+  const madeColl = !coll;
+  if (madeColl) { db.prepare("INSERT INTO collections (slug, kind, title) VALUES ('skifixture-winter', 'activity_winter', 'Winter fixture')").run(); coll = db.prepare("SELECT id FROM collections WHERE slug = 'skifixture-winter'").get(); }
+  db.prepare("INSERT INTO collection_items (collection_id, content_type, content_id) VALUES (?, 'venue', ?)").run(coll.id, resort.id);
+  try {
+    // Without a ski resort listed, "ski" keeps the Outdoors winter filter.
+    db.prepare("UPDATE venues SET name = 'Skifixture Lodge' WHERE id = ?").run(resort.id);
+    assert.equal(app.heroSearchTarget('ski').url.includes('/ski-snow'), false);
+    db.prepare("UPDATE venues SET name = 'Skifixture Ski Resort' WHERE id = ?").run(resort.id);
+    for (const q of ['ski', 'skiing', 'Ski resorts', 'where to ski']) assert.equal(app.heroSearchTarget(q).url, '/ski-snow?types=resort', q);
+    // A town, a badge or another topic keeps the existing routing.
+    for (const q of ['skiing big white', 'ski lessons', 'dog friendly skiing']) assert.notEqual(app.smartSearchPlan(q)?.key, 'ski', q);
+    // The Outdoors destination writes ?types=, the parameter its filter script reads.
+    const d = app.resolveDiscoveryDestination({ ...app.interpretDiscoveryText('hiking'), activities: ['hiking'], types: [] });
+    if (d.url) assert.doesNotMatch(d.url, /activities=/);
+  } finally {
+    db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id = ?").run(resort.id);
+    if (madeColl) db.prepare('DELETE FROM collections WHERE id = ?').run(coll.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(resort.id);
+  }
+}));
+test('Outdoors and Tours filter scripts honour the older ?activities= / ?activity= link on boot', () => {
+  const html = app.renderOutdoorsHubPage([], null);
+  assert.match(html, /params\.get\('types'\) \|\| params\.get\("activities"\)/);
+  assert.doesNotMatch(app.renderFoodDrinkHubScriptHtml({}), /params\.get\("activities"\)/, 'other hubs unchanged');
+});
 
 test('Smarter search: guide topics go to the guide; typos in a place name find the place', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => {
   const go = (q) => app.heroSearchTarget(q).url;
