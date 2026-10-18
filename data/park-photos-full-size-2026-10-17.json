@@ -1,0 +1,102 @@
+{
+  "reason": "Same CRD park photos at full size: the 2026-10-16 linked batch saved 400px copies (the source URLs had ?w=400), which looked soft stretched across the banner. Found by the 2026-10-17 photo audit.",
+  "batch_id": "park-photos-full-size-2026-10-17",
+  "venues": [
+    {
+      "id": 1220,
+      "name": "Johns Family Nature Conservancy Regional Park",
+      "region": "kelowna",
+      "slug": "johns-family-nature-conservancy-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    },
+    {
+      "id": 1259,
+      "name": "KLO Creek Regional Park",
+      "region": "kelowna",
+      "slug": "klo-creek-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/klo-creek-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/klo-creek-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    },
+    {
+      "id": 1222,
+      "name": "Mill Creek Regional Park",
+      "region": "kelowna",
+      "slug": "mill-creek-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/mill-creek-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mill-creek-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    },
+    {
+      "id": 1216,
+      "name": "Mission Creek Greenway Regional Park",
+      "region": "kelowna",
+      "slug": "mission-creek-greenway-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/mission-creek-greenway-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mission-creek-greenway-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    },
+    {
+      "id": 1217,
+      "name": "Mission Creek Regional Park",
+      "region": "kelowna",
+      "slug": "mission-creek-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/mission-creek-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/mission-creek-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    },
+    {
+      "id": 1218,
+      "name": "Scenic Canyon Regional Park",
+      "region": "kelowna",
+      "slug": "scenic-canyon-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/scenic-canyon-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/scenic-canyon-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    },
+    {
+      "id": 1221,
+      "name": "Woodhaven Nature Conservancy Regional Park",
+      "region": "kelowna",
+      "slug": "woodhaven-nature-conservancy-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/woodhaven-nature-conservancy-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/woodhaven-nature-conservancy-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    },
+    {
+      "id": 1219,
+      "name": "sntsk‘il’ntən–Black Mountain Regional Park",
+      "region": "kelowna",
+      "slug": "sntskilnten-black-mountain-regional-park",
+      "expect": {
+        "image_url": "/images/hiking/venues/sntskilnten-black-mountain-regional-park-20261016-linked.jpg?v=20261016linkedlive"
+      },
+      "set": {
+        "image_url": "/images/hiking/venues/sntskilnten-black-mountain-regional-park-20261017-full.jpg?v=20261017full"
+      }
+    }
+  ]
+}
