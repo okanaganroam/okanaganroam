@@ -18551,7 +18551,7 @@ test('Patio guide (2026-10-13): /guides/best-patios-kelowna renders the approved
   assert.match(html, /<title>Best Patios in Kelowna: Lake Views, Rooftops &amp; More \| Okanagan Roam<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/best-patios-kelowna">/);
   assert.match(html, /"@type":"Article","headline":"Best Patios in Kelowna"/);
-  assert.match(html, /<div class="category-banner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/guides\/patio-mountain-view\.jpg"/);
   assert.match(html, /<h1>Best Patios in Kelowna<\/h1>/);
   for (const sec of app.PATIO_GUIDE.sections) for (const it of sec.items) {
     const v = db.prepare("SELECT * FROM venues WHERE region = 'kelowna' AND slug = ? AND redirect_to IS NULL").get(it.slug);
@@ -19107,9 +19107,16 @@ test('Guide photos of their own (2026-10-13): each guide-<name> banner has its 1
     for (const f of [`/images/guides/${name}.jpg`, `/images/guides/${name}-800.jpg`, `/images/guides/thumbs/${name}.jpg`]) assert.ok(fs.existsSync(pub(f)), `${f} exists`);
   }
   const uses = {
-    'kokanee-salmon-okanagan': 'kokanee-run', 'okanagan-waterfall-walks': 'forest-walk', 'halloween-okanagan': 'halloween-pumpkins',
+    'kokanee-salmon-okanagan': 'kokanee-run', 'halloween-okanagan': 'halloween-pumpkins',
     'fall-events-okanagan': 'fall-fair', 'soup-ramen-pho-okanagan': 'noodle-soup', 'indoor-golf-okanagan': 'indoor-golf-sim',
-    'okanagan-winter-events': 'winter-fireside', 'valentines-day-okanagan': 'valentines-candlelight', 'okanagan-winter-wine': 'icewine-grapes',
+    'okanagan-winter-events': 'winter-fireside', 'valentines-day-okanagan': 'valentines-dinner', 'okanagan-winter-wine': 'icewine-grapes',
+    // 2026-10-18: guides whose category photo didn't match the guide got their own.
+    'best-pizza-kelowna': 'pizza-oven', 'best-sushi-kelowna': 'sushi-board', 'best-brunch-penticton': 'brunch-pancakes-bacon',
+    'best-brunch-vernon': 'pancakes-berries', 'okanagan-cideries': 'cider-orchard', 'okanagan-christmas-markets': 'christmas-market-stall',
+    'okanagan-skating': 'outdoor-skating', 'okanagan-in-november': 'okanagan-lake-late-fall', 'winter-in-kelowna': 'frozen-lake-dock',
+    'okanagan-in-december': 'snowy-lights-park', 'okanagan-ski-season-2026-27': 'chairlift', 'silverstar-restaurants-apres': 'mountain-lodge-restaurant',
+    'okanagan-nordic-snowshoe': 'cross-country-ski', 'kelowna-without-a-car': 'kelowna-downtown-lake', 'cheap-eats-kelowna': 'street-tacos',
+    'okanagan-winery-restaurants': 'vineyard-dinner', 'best-restaurants-kelowna': 'restaurant-dishes', 'best-restaurants-vernon': 'dinner-wine-lights',
   };
   for (const [slug, name] of Object.entries(uses)) {
     const html = app.renderFileGuidePage(`/guides/${slug}`);
@@ -24816,7 +24823,7 @@ test('Weekend and town food guides (2026-10-18): six file guides, each in the to
   assert.ok(towns, 'the towns group exists');
   const banners = {
     'weekend-in-kelowna': 'region-kelowna', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
-    'best-restaurants-penticton': 'region-penticton', 'best-restaurants-vernon': 'restaurant', 'best-restaurants-west-kelowna': 'region-west-kelowna',
+    'best-restaurants-penticton': 'region-penticton', 'best-restaurants-vernon': 'guide-dinner-wine-lights', 'best-restaurants-west-kelowna': 'region-west-kelowna',
   };
   for (const [slug, key] of Object.entries(banners)) {
     const p = `/guides/${slug}`;

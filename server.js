@@ -28238,7 +28238,7 @@ const PATIO_GUIDE = {
   heading: 'Best Patios in Kelowna',
   title: 'Best Patios in Kelowna: Lake Views, Rooftops & More | Okanagan Roam',
   description: 'Rooftop sunsets, lakeside decks, winery terraces and dog-friendly brewery patios: the best places to eat and drink outside in Kelowna, BC.',
-  banner: () => FOOD_DRINK_HUB_BANNER,
+  banner: () => GUIDE_BANNERS['guide-patio-mountain-view'](),
   intro: [
     'When the weather turns warm, Kelowna moves outside. The city has rooftop bars that face the sunset, decks right on Okanagan Lake, winery terraces above the water and brewery lawns where the dog is as welcome as you are.',
     'Okanagan Roam lists more than 160 Kelowna places with a patio. These are the standouts, grouped by the kind of afternoon or evening you’re after.',
@@ -28766,7 +28766,7 @@ const BRUNCH_GUIDE = {
   heading: 'Best Brunch in Kelowna',
   title: 'Best Brunch & Breakfast in Kelowna | Okanagan Roam',
   description: 'Where to brunch in Kelowna: creative Bennys, lake-view terraces, family diners, gluten-free and vegan options, bakeries and even a drag brunch.',
-  banner: () => CATEGORY_BANNER_IMAGES.restaurant,
+  banner: () => GUIDE_BANNERS['guide-brunch-benny'](),
   parent: { name: 'Restaurants', href: '/restaurants' },
   noPlace: true,
   intro: [
@@ -29219,6 +29219,7 @@ const GUIDE_BANNERS = {
   'indoor': () => CATEGORY_BANNER_IMAGES.indoor,
   'food-drink': () => FOOD_DRINK_HUB_BANNER,
   'whats-on': () => WHATS_ON_BANNER,
+  'hidden-gems': () => HIDDEN_GEMS_BANNER,
   'dog-friendly': () => DOG_FRIENDLY_BANNER,
   'hiking': () => OUTDOOR_ACTIVITY_BANNERS.hiking,
   'nature': () => OUTDOOR_ACTIVITY_BANNERS.nature,
@@ -29243,6 +29244,27 @@ const GUIDE_PHOTOS = {
   'winter-fireside': { alt: 'Friends in winter coats gathered around an outdoor fire at night, one playing guitar', pos: 50 }, // Adobe Stock 487200379
   'valentines-candlelight': { alt: 'A couple toasting red wine across a candlelit table with a red rose', pos: 50 }, // Adobe Stock 314863953
   'icewine-grapes': { alt: 'Frozen icewine grapes hanging on the vine in a snowy vineyard', pos: 50 }, // Adobe Stock 243238436
+  'pizza-oven': { alt: 'A pizza baking in a wood-fired brick oven', pos: 55 }, // Adobe Stock 221154727 (2026-10-18)
+  'sushi-board': { alt: 'Nigiri and sushi rolls on a wooden serving board', pos: 50 }, // Adobe Stock 251577264 (2026-10-18)
+  'brunch-benny': { alt: 'Eggs Benedict with avocado on toasted bread', pos: 50 }, // Adobe Stock 804838461 (2026-10-18)
+  'brunch-pancakes-bacon': { alt: 'A breakfast plate of pancakes, fried eggs and bacon', pos: 50 }, // Adobe Stock 170065653 (2026-10-18)
+  'pancakes-berries': { alt: 'A stack of pancakes topped with fresh berries, with a jar of honey', pos: 45 }, // Adobe Stock 186979059 (2026-10-18)
+  'cider-orchard': { alt: 'Apple cider poured into a glass in an orchard at harvest', pos: 45 }, // Adobe Stock 304081257 (2026-10-18)
+  'christmas-market-stall': { alt: 'A couple browsing ornaments at a lit-up Christmas market stall', pos: 40 }, // Adobe Stock 289302551 (2026-10-18)
+  'outdoor-skating': { alt: 'A family skating together on an outdoor rink in falling snow', pos: 45 }, // Adobe Stock 390067702 (2026-10-18)
+  'okanagan-lake-late-fall': { alt: 'A quiet sandy beach on Okanagan Lake at Summerland out of season', pos: 55 }, // Adobe Stock 401895437 (2026-10-18)
+  'frozen-lake-dock': { alt: 'A wooden dock on a frozen lake with snowy mountains behind', pos: 55 }, // Adobe Stock 188154105 (2026-10-18)
+  'snowy-lights-park': { alt: 'A snowy park path lit with lamps and holiday lights at night', pos: 50 }, // Adobe Stock 538003727 (2026-10-18)
+  'chairlift': { alt: 'Skiers riding a chairlift above snowy slopes on a sunny day', pos: 40 }, // Adobe Stock 472620344 (2026-10-18)
+  'mountain-lodge-restaurant': { alt: 'A mountain restaurant with a fireplace and big windows onto the snow', pos: 50 }, // Adobe Stock 470539433 (2026-10-18)
+  'cross-country-ski': { alt: 'Two cross-country skiers on a groomed trail below snowy peaks', pos: 50 }, // Adobe Stock 486451203 (2026-10-18)
+  'kelowna-downtown-lake': { alt: 'Downtown Kelowna across Okanagan Lake, with a boat in the foreground', pos: 50 }, // Adobe Stock 490610824 (2026-10-18)
+  'street-tacos': { alt: 'Street tacos with guacamole and salsa', pos: 55 }, // Adobe Stock 424429904 (2026-10-18)
+  'patio-mountain-view': { alt: 'Wine glasses on a patio table overlooking forested hills', pos: 50 }, // Adobe Stock 593948761 (2026-10-18)
+  'vineyard-dinner': { alt: 'Friends sharing wine at a long table in a vineyard', pos: 40 }, // Adobe Stock 290509701 (2026-10-18)
+  'restaurant-dishes': { alt: 'A restaurant table set with plates, bread and glasses of wine', pos: 50 }, // Adobe Stock 300869026 (2026-10-18)
+  'dinner-wine-lights': { alt: 'Red and white wine with dinner under warm string lights', pos: 55 }, // Adobe Stock 334732450 (2026-10-18)
+  'valentines-dinner': { alt: 'A couple at a candlelit dinner for two', pos: 50 }, // Adobe Stock 473076390 (2026-10-18)
 };
 for (const [name, b] of Object.entries(GUIDE_PHOTOS)) GUIDE_BANNERS[`guide-${name}`] = () => ({ src: `/images/guides/${name}.jpg`, alt: b.alt, pos: b.pos });
 // Town guides (2026-10-18): `region-<town>` uses that town's own photo. Only photos that need no on-page credit.
