@@ -1,0 +1,322 @@
+{
+ "heading": "Date Night in Kelowna",
+ "title": "Date Night in Kelowna: Where to Go | Okanagan Roam",
+ "description": "Date night ideas in Kelowna, any time of year: tasting menus, cozy bistros, speakeasy cocktails, a social sauna, board games, lake views and dessert.",
+ "banner": "cocktail",
+ "parent": {
+  "name": "Food & Drink",
+  "href": "/food-drink"
+ },
+ "noPlace": true,
+ "intro": [
+  "A good date night in Kelowna doesn't need a special occasion. This guide covers the whole year: dinners worth dressing up for, easygoing spots for a weeknight, a drink before or after, dates that aren't dinner at all, places with a lake view, and somewhere to finish with dessert. Most picks are downtown or close to it, with a couple across the bridge in West Kelowna.",
+  "Many patios and lake-view rooms cut back their hours from November to April, so check each listing's hours before you head out. If February 14 is what you're planning for, see our {page:/guides/valentines-day-okanagan|Valentine's Day guide}."
+ ],
+ "sections": [
+  {
+   "id": "dinner-worth-dressing-up-for",
+   "jump": "Special dinners",
+   "heading": "Dinner worth dressing up for",
+   "lead": "For an anniversary, a birthday or a night you want to feel a little special. Book ahead at all of these.",
+   "items": [
+    {
+     "ref": "kelowna/humo-kelowna",
+     "name": "HUMO Kelowna",
+     "text": "an intimate tasting menu where nothing feels rushed, and a good pick for a first date or a special occasion. Mention any dietary needs when you book.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/wildling",
+     "name": "Wildling",
+     "text": "an elevated tasting-menu restaurant, and a strong choice if one of you eats vegetarian. The vegetarian tasting menu is treated with real respect.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bouchons-bistro",
+     "name": "Bouchons Bistro",
+     "text": "the owner greets guests in French, and the evening feels lifted from a Parisian side street. Reviewers rave about the escargot and the duck confit. Take your time.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/waterfront-wines-restaurant",
+     "name": "Waterfront Wines Restaurant",
+     "text": "an award-winning wine bar and fine-dining room. Let the staff guide your pairings. It's a small, lively room that can get loud when busy, so it suits a chatty date more than a quiet one.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/erica-jane-restaurant",
+     "name": "Erica Jane Restaurant",
+     "text": "steak and seafood with lively energy and none of the stuffy steakhouse formula. Order the steak with one of the strong cocktails.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "easygoing-date-spots",
+   "jump": "Easygoing date spots",
+   "heading": "Easygoing date spots",
+   "lead": "No dress code needed. Good for a weeknight, an early date, or when you'd rather share plates than order courses.",
+   "items": [
+    {
+     "ref": "kelowna/habibi-tapas-grill",
+     "name": "Habibi Tapas Grill",
+     "text": "a small, cozy Lebanese kitchen. Order a mezze spread to share, and see if it's one of the Saturday nights with live saxophone or oud.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/casa-de-frida",
+     "name": "Casa de Frida",
+     "text": "Mexican food in an elegant, warm dining room, with a cozy patio for good weather and live music on the second floor.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/ask-pablo-cocktail-bar-kitchen",
+     "name": "Ask Pablo Cocktail Bar + Kitchen",
+     "text": "Mexican and Japanese small plates in a cozy, design-forward room. Order a few to share and let the kitchen surprise you.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/chutney-cuisine-of-india",
+     "name": "Chutney Cuisine of India",
+     "text": "Indian dining with warm ambiance and classical Indian music in the Pandosy area. On a first visit, order the dinner sampler.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "drinks-before-or-after",
+   "jump": "Drinks before or after",
+   "heading": "Drinks before or after",
+   "lead": "A drink before dinner, or one more after. For more warm rooms to settle into, see our {page:/guides/cozy-spots-okanagan|cozy spots guide}.",
+   "items": [
+    {
+     "ref": "kelowna/27",
+     "name": "27",
+     "text": "a speakeasy behind an unmarked door downtown, with low light, hushed conversation and a menu that changes with the seasons. It's easy to miss.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/micro-bar-bites",
+     "name": "Micro Bar + Bites",
+     "text": "a small, intimate bar with a pared-down cocktail list and seasonal small plates.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bts-cocktail-bar-kitchen",
+     "name": "BTS Cocktail Bar + Kitchen",
+     "text": "a mixology-forward bar that also teaches. Book one of its cocktail-making classes for a date with something to do, or just pull up a seat.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/tutt-street-tapas-wine",
+     "name": "Tutt Street Tapas + Wine",
+     "text": "a tiny tapas and wine bar tucked into a strip mall, with a locally sourced menu. If you have allergies, the chef-owner is helpful when you reach out ahead.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/grate-cheesery",
+     "name": "Grate Cheesery",
+     "text": "a wine-and-cheese bar run by a passionate cheesemonger. Book a fondue night or trust the curated pairings, with an intimate patio on a quiet street.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "dates-that-aren-t-dinner",
+   "jump": "Not dinner",
+   "heading": "Dates that aren't dinner",
+   "lead": "Something to do together, before a meal or instead of one. Most of these work year-round.",
+   "items": [
+    {
+     "ref": "kelowna/bernie-s-supper-club-cinema",
+     "name": "Bernie's Supper Club & Cinema",
+     "text": "a speakeasy-style supper club with an oyster bar and an upstairs theatre, with new films every month and full food service in the theatre. Book cinema tickets and your table separately.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/tality-wellness-kelowna",
+     "name": "Tality Wellness Kelowna",
+     "text": "a downtown social bathhouse with a cedar sauna, four cold plunges and a lounge around a vapour firepit. Robes, towels, kombucha and hot tea are included. Book a community session or a private slot. Our {page:/guides/okanagan-saunas-spas|saunas and spas guide} has more.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/twice-the-dice-board-game-cafe-and-bar",
+     "name": "Twice The Dice Board Game Cafe and bar",
+     "text": "more than 1,000 games on the walls, and a Hyderabadi biryani reviewers rave about. Order it between games, then try a boozy milkshake.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/work-of-art-pottery-studio",
+     "name": "Work of Art Pottery Studio",
+     "text": "paint your own pottery, no experience needed. Look for the adult Sip & Paint evenings.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bna-brewing-kelowna",
+     "name": "BNA Brewing Kelowna",
+     "text": "a brewery, a six-lane bowling alley and a cocktail bar under one roof, suited to a first date. Book a lane ahead, bowl, order a flight, then stay for cocktails.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/exit-kelowna-escape-games",
+     "name": "Exit Kelowna Escape Games",
+     "text": "five themed rooms, and teams can be as small as two. Book about a week ahead and arrive 15 minutes early.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-community-theatre",
+     "name": "Kelowna Community Theatre",
+     "text": "home stage of the Okanagan Symphony Orchestra, plus touring comedy and music, with a smaller Black Box space for cabaret and intimate shows. For more nights out, see our {page:/guides/okanagan-comedy-shows|comedy and live shows guide}.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "lake-views",
+   "jump": "Lake views",
+   "heading": "Lake views",
+   "lead": "For sunset, or a drink while the light changes over the water. Patios here are best from spring to fall, so check hours in the cooler months.",
+   "items": [
+    {
+     "ref": "kelowna/perch-sky-lounge",
+     "name": "Perch Sky Lounge",
+     "text": "a rooftop that regulars say has the best patio view in the city. It isn't just drinks: book a rooftop table and order off the full dinner menu.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/earls-kitchen-bar",
+     "name": "Earls Kitchen + Bar",
+     "text": "a rooftop patio with lake and sunset views. Blankets are provided if it cools off, so you can stay outside a little longer.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/19-okanagan-grill-bar",
+     "name": "19 Okanagan Grill + Bar",
+     "text": "a patio above the golf course where twinkle lights come on as the sun drops over Okanagan Lake. Come for sunset; it suits a first date.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/old-vines-restaurant",
+     "name": "Old Vines Restaurant",
+     "text": "the fine-dining room at Quails' Gate Winery, with lake and mountain views. Order the haskap-cured salmon or the 63 Acres beef tenderloin.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "kelowna/dilworth-mountain-park",
+     "name": "Dilworth Mountain Park",
+     "text": "a short, easy walk to a lookout over downtown and Okanagan Lake, and an easy sunset stop between dinner downtown and home. Parking is free. The lookout can close in extreme wildfire risk.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "dessert",
+   "jump": "Dessert",
+   "heading": "Dessert",
+   "lead": "Finish the night with something sweet, or bring a cake home.",
+   "items": [
+    {
+     "ref": "kelowna/karat-chocolate",
+     "name": "Karat Chocolate",
+     "text": "a downtown pastry boutique with chocolate sourced directly from a partner farm in Brazil. Order the viral fruit pastry, or a showstopping cake for a celebration.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/sandrine-french-pastry-and-chocolate",
+     "name": "Sandrine French Pastry and Chocolate",
+     "text": "a French patisserie where regulars call the beignets and macarons the best they've had.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/ice-cream-lab-kelowna",
+     "name": "Ice Cream Lab",
+     "text": "ice cream made in front of you with liquid nitrogen, as much a show as a dessert. It's run by a couple who love to chat.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/d-spot-dessert-cafe-kelowna",
+     "name": "D Spot Dessert Cafe",
+     "text": "a long menu of sweets, crepes and waffles on Bernard Avenue, open late, and a fun after-dinner stop downtown.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A tasting menu for a big night",
+    [
+     "kelowna/humo-kelowna|HUMO Kelowna",
+     "kelowna/wildling|Wildling"
+    ]
+   ],
+   [
+    "A classic French dinner",
+    [
+     "kelowna/bouchons-bistro|Bouchons Bistro"
+    ]
+   ],
+   [
+    "Sharing plates on a weeknight",
+    [
+     "kelowna/habibi-tapas-grill|Habibi Tapas Grill",
+     "kelowna/ask-pablo-cocktail-bar-kitchen|Ask Pablo Cocktail Bar + Kitchen"
+    ]
+   ],
+   [
+    "A secret cocktail bar",
+    [
+     "kelowna/27|27"
+    ]
+   ],
+   [
+    "Dinner and a movie in one place",
+    [
+     "kelowna/bernie-s-supper-club-cinema|Bernie's Supper Club & Cinema"
+    ]
+   ],
+   [
+    "A sauna date",
+    [
+     "kelowna/tality-wellness-kelowna|Tality Wellness Kelowna"
+    ]
+   ],
+   [
+    "A playful first date",
+    [
+     "kelowna/bna-brewing-kelowna|BNA Brewing Kelowna",
+     "kelowna/twice-the-dice-board-game-cafe-and-bar|Twice The Dice Board Game Cafe and bar"
+    ]
+   ],
+   [
+    "A sunset view",
+    [
+     "west-kelowna/19-okanagan-grill-bar|19 Okanagan Grill + Bar",
+     "kelowna/perch-sky-lounge|Perch Sky Lounge"
+    ]
+   ],
+   [
+    "A free sunset walk",
+    [
+     "kelowna/dilworth-mountain-park|Dilworth Mountain Park"
+    ]
+   ],
+   [
+    "Dessert to finish",
+    [
+     "kelowna/karat-chocolate|Karat Chocolate",
+     "kelowna/ice-cream-lab-kelowna|Ice Cream Lab"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna/restaurants\">Kelowna restaurants</a>, <a href=\"/guides/best-patios-kelowna\">Best patios in Kelowna</a>, <a href=\"/guides/weekend-in-kelowna\">Weekend in Kelowna</a>"
+}

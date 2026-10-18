@@ -1,0 +1,325 @@
+{
+ "heading": "Kelowna Without a Car",
+ "title": "Kelowna Without a Car: Walk, Bike & Tour | Okanagan Roam",
+ "description": "How to enjoy Kelowna without a car: walkable downtown and Pandosy stops, lakeside bike routes, wine tours with pickup, and paddle rentals by the beach.",
+ "banner": "outdoor",
+ "parent": {
+  "name": "Kelowna",
+  "href": "/kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "You can have a full, easy visit to Kelowna without ever picking up a set of keys. Downtown packs a beach, a wetland, galleries and tasting rooms into a short walk along the lake. Pandosy, to the south, has its own cafés, gardens and lakefront park. In between and beyond, flat lakeside paths suit a bike, and wine tour companies will pick you up so nobody has to drive.",
+  "This guide groups places by area so you can string them together on foot. Some outfitters only run in the warmer months, and many places cut hours from November to April, so check each listing's hours before you set out. If you'd like a plan built around where you're staying, try the {page:/trip|trip planner}."
+ ],
+ "sections": [
+  {
+   "id": "downtown-on-foot",
+   "jump": "Downtown on foot",
+   "heading": "Downtown on foot",
+   "lead": "The waterfront boardwalk ties most of downtown together. Start at the lake and work inland.",
+   "items": [
+    {
+     "ref": "kelowna/waterfront-park-tugboat-bay-beach",
+     "name": "Waterfront Park – Tugboat Bay Beach",
+     "text": "the beach you can walk to from downtown, with a sandy, shallow swimming area and the boardwalk running along the water all the way to City Park. Good for a swim between other downtown stops in summer.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/rotary-marsh-park",
+     "name": "Rotary Marsh Park",
+     "text": "a restored wetland at the north end of Waterfront Park, with gravel paths and wooden boardwalks between the cattails. It is a five-minute walk from the downtown cafés, free and open year-round. In winter, loons, grebes and diving ducks gather off the point. No dogs.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/knox-mountain-park",
+     "name": "Knox Mountain Park",
+     "text": "the lookouts here are the classic view of the city. The 3 km lakeshore walk to Paul's Tomb is a gentle option; the Apex Trail to the upper lookout is about 5 km round trip, with stairs.",
+     "where": "Kelowna, just north of downtown"
+    },
+    {
+     "ref": "kelowna/kelowna-art-gallery",
+     "name": "Kelowna Art Gallery",
+     "text": "the city's public gallery in the Cultural District, with rotating contemporary and historical shows. Half price on Thursdays.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/okanagan-heritage-museum",
+     "name": "Okanagan Heritage Museum",
+     "text": "the natural and human history of the valley, from syilx culture to settler life. The second Sunday of each month is pay-what-you-wish.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/karat-chocolate",
+     "name": "Karat Chocolate",
+     "text": "a pastry boutique that sources its chocolate directly from a partner farm in Brazil. Stop in for the fruit pastry and an espresso.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/okanagan-spirits-craft-distillery-kelowna",
+     "name": "Okanagan Spirits Craft Distillery Kelowna",
+     "text": "the tasting room of BC's original craft distillery. Book a guided tasting of the gin and whisky lineup.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/kelowna-beer-institute",
+     "name": "Kelowna Beer Institute",
+     "text": "a brewpub with live local music on Mondays and a good patio.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "a free outdoor rink with Okanagan Lake and the Bennett Bridge behind it, and cafés and restaurants on every side. It opens in early December, weather permitting, and has a rental hut if you didn't pack skates.",
+     "where": "Kelowna, downtown waterfront, winter"
+    },
+    {
+     "ref": "kelowna/a-taste-of-kelowna-food-tours",
+     "name": "A Taste of Kelowna Food Tours",
+     "text": "a three-hour guided walking food tour through the Cultural District and along the waterfront boardwalk, with 7 tastings and 4 drinks. It departs from the historic Laurel Packinghouse and runs April to October.",
+     "where": "Kelowna, downtown, seasonal"
+    }
+   ]
+  },
+  {
+   "id": "pandosy-and-the-south-side-on-",
+   "jump": "Pandosy on foot",
+   "heading": "Pandosy and the south side on foot",
+   "lead": "Pandosy Village has a small-neighbourhood feel, with the lake a few blocks away.",
+   "items": [
+    {
+     "ref": "kelowna/black-rabbit-coffee-house",
+     "name": "Black Rabbit Coffee House",
+     "text": "a cozy shop known for its buttery, flaky croissants. The beach is close enough that a coffee here easily turns into a beach walk.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/pulp-fiction-pandosy",
+     "name": "Pulp Fiction – Pandosy",
+     "text": "a coffee house that doubles as a rare and used bookstore. The breakfast menu is strong, and regulars rave about the coffee milkshake.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/sopa-fine-arts",
+     "name": "SOPA Fine Arts",
+     "text": "a free-admission contemporary gallery with rotating solo and group shows. A relaxed stop between the South Pandosy shops and cafés.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/guisachan-heritage-park",
+     "name": "Guisachan Heritage Park",
+     "text": "lush gardens and big mature trees a short walk from Pandosy Village, beside the historic Guisachan House, built in 1891.",
+     "where": "Kelowna, near Pandosy"
+    },
+    {
+     "ref": "kelowna/maude-roxby-wetland-bird-sanctuary",
+     "name": "Maude-Roxby Wetland (Bird Sanctuary)",
+     "text": "a raised boardwalk through willow and cattail marsh to a viewing platform over the lake. It is free, open year-round and wheelchair-friendly. It sits about 4 km south of City Park along Abbott Street, an easy bike ride on the lakeside route. No dogs.",
+     "where": "Kelowna, Pandosy"
+    }
+   ]
+  },
+  {
+   "id": "by-bike-trails-and-rentals",
+   "jump": "By bike",
+   "heading": "By bike: trails and rentals",
+   "lead": "The lakeside route along Abbott Street links downtown and Pandosy, and the Mission Creek Greenway heads inland from the lake. For more ideas, see {page:/tours/bike|bike tours}.",
+   "items": [
+    {
+     "ref": "kelowna/mission-creek-greenway-regional-park",
+     "name": "Mission Creek Greenway Regional Park",
+     "text": "16.5 km of multi-use trail following Mission Creek from Okanagan Lake into the hills. From the lake it is flat and wide, an easy walk or ride. It is a shared trail, so keep right and ring a bell before passing. Some access points get reduced maintenance from November to March.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-bike-rentals",
+     "name": "Kelowna Bike Rentals",
+     "text": "steps from the Mission Creek Greenway, with e-bikes, gravel bikes and adaptive bikes for the waterfront and city pathways. Helmets and locks come with every rental. Closed for the season right now, so check the listing for its reopening.",
+     "where": "Kelowna, Lakeshore, seasonal"
+    },
+    {
+     "ref": "kelowna/lakeside-eco-sports",
+     "name": "Lakeside Eco-Sports",
+     "text": "guided e-bike tours, including a southeast Kelowna winery ride with tastings and lunch, a City Highlights tour and a ride to Knox Mountain. Riders must be 16+, and the season runs April to October.",
+     "where": "Kelowna, downtown, seasonal"
+    },
+    {
+     "ref": "kelowna/the-hot-box",
+     "name": "The Hot Box",
+     "text": "a smash burger and smoked BBQ food truck parked at Pandosy Waterfront Park, and a favourite pit stop for cyclists and walkers on the bike path.",
+     "where": "Kelowna, Pandosy"
+    },
+    {
+     "ref": "kelowna/railside-brewing-ltd",
+     "name": "Railside Brewing Ltd",
+     "text": "a brewery on the rail trail with a fantastic patio and a gluten-free drink menu.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "wine-country-with-a-tour-or-sh",
+   "jump": "Wine tours",
+   "heading": "Wine country with a tour or shuttle",
+   "lead": "A tour is the simplest way to visit wineries when nobody wants to drive. These companies offer pickup; ask about yours when you book. For tips on what to expect, see our {page:/guides/okanagan-wineries-first-timers|first-timers' winery guide}.",
+   "items": [
+    {
+     "ref": "kelowna/vivid-tours",
+     "name": "Vivid Tours",
+     "text": "half-day and full-day guided tasting tours of West Kelowna, East Kelowna, Lake Country and the Naramata Bench, with tastings, pickup and a guide included. Full days include a winery lunch reservation.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bare-wine-tours",
+     "name": "Bare Wine Tours",
+     "text": "public shared and private tours with tasting fees included, typically 4-5 wineries, with hotel pickup. Beer, cider and wine combos too.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/wicked-wine-tours",
+     "name": "Wicked Wine Tours",
+     "text": "an Indigenous-owned company running half-day and full-day tours of West Kelowna, East Kelowna and Lake Country, visiting 3-5 wineries with pickup.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/toast-the-okanagan-wine-tours",
+     "name": "Toast the Okanagan Wine Tours",
+     "text": "a small company with over 10 years of guided tasting tours and hotel pickup. It also offers winter wine tours departing from Big White.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/discover-okanagan-tours",
+     "name": "Discover Okanagan Tours",
+     "text": "guided wine tours with pickup around town, plus private ski shuttles in winter.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "on-the-water",
+   "jump": "On the water",
+   "heading": "On the water",
+   "lead": "Most lake rentals are a summer thing. In the cooler months, a floating sauna is the easiest way to get onto the lake.",
+   "items": [
+    {
+     "ref": "kelowna/kelowna-paddle-centre",
+     "name": "Kelowna Paddle Centre",
+     "text": "a non-profit paddling hub at Pandosy Waterfront Park renting paddleboards, kayaks and outrigger canoes. Every rental includes a PFD, paddle and a brief intro lesson, and the calm bay suits first-timers. Closed for the season right now.",
+     "where": "Kelowna, Pandosy, seasonal"
+    },
+    {
+     "ref": "kelowna/okanagan-beach-rentals",
+     "name": "Okanagan Beach Rentals",
+     "text": "sets up on the sand at Rotary Beach and at Tugboat Bay in Waterfront Park, with paddleboards, kayaks, canoes and pedal boats. Closed for the season right now.",
+     "where": "Kelowna, seasonal"
+    },
+    {
+     "ref": "kelowna/lakefront-sports-centre",
+     "name": "Lakefront Sports Centre",
+     "text": "a waterfront rental base on Water Street for boats, paddleboards, kayaks and bikes. Check the listing for its current season.",
+     "where": "Kelowna, downtown"
+    },
+    {
+     "ref": "kelowna/loyly-floating-sauna",
+     "name": "Löyly Floating Sauna",
+     "text": "a Finnish-style cedar sauna at the Downtown Marina, with a lake cold plunge and a warm solarium lounge. Book a session online, since walk-ins aren't guaranteed space. Check the listing for its current season. Our {page:/guides/okanagan-saunas-spas|saunas and spas guide} has more.",
+     "where": "Kelowna, downtown"
+    }
+   ]
+  },
+  {
+   "id": "getting-around",
+   "jump": "Getting around",
+   "heading": "Getting around",
+   "items": [
+    {
+     "lead": "Buses:",
+     "tip": "Kelowna has a city bus system. Check BC Transit for routes and times before you go."
+    },
+    {
+     "lead": "Pick a walkable base:",
+     "tip": "Downtown and Pandosy are the easiest areas to explore on foot. Staying in or near one of them keeps most of this guide within walking distance."
+    },
+    {
+     "lead": "Book tours ahead:",
+     "tip": "Wine tours with pickup can fill up. Book ahead and confirm where you'll be picked up."
+    },
+    {
+     "lead": "Dress for the season:",
+     "tip": "Winter mornings can be cold and paths can be icy. Wear good shoes and layers, and remember that daylight is short in December and January."
+    },
+    {
+     "lead": "Check hours:",
+     "tip": "Many places cut hours or close from November to April. Check each listing before you head out."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A walk with wildlife, right downtown",
+    [
+     "kelowna/rotary-marsh-park|Rotary Marsh Park"
+    ]
+   ],
+   [
+    "The classic view of the city",
+    [
+     "kelowna/knox-mountain-park|Knox Mountain Park"
+    ]
+   ],
+   [
+    "A rainy-day stop downtown",
+    [
+     "kelowna/kelowna-art-gallery|Kelowna Art Gallery"
+    ]
+   ],
+   [
+    "Coffee and a book in Pandosy",
+    [
+     "kelowna/pulp-fiction-pandosy|Pulp Fiction – Pandosy"
+    ]
+   ],
+   [
+    "A flat, easy bike ride",
+    [
+     "kelowna/mission-creek-greenway-regional-park|Mission Creek Greenway Regional Park"
+    ]
+   ],
+   [
+    "Wine tasting with no driving",
+    [
+     "kelowna/vivid-tours|Vivid Tours",
+     "kelowna/bare-wine-tours|Bare Wine Tours"
+    ]
+   ],
+   [
+    "A wine tour from the ski hill",
+    [
+     "kelowna/toast-the-okanagan-wine-tours|Toast the Okanagan Wine Tours"
+    ]
+   ],
+   [
+    "A paddle for first-timers (summer)",
+    [
+     "kelowna/kelowna-paddle-centre|Kelowna Paddle Centre"
+    ]
+   ],
+   [
+    "A free winter skate",
+    [
+     "kelowna/stuart-park-outdoor-rink|Stuart Park Outdoor Rink"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna\">Kelowna</a> · <a href=\"/guides/weekend-in-kelowna\">Weekend in Kelowna</a> · <a href=\"/tours/wine\">Wine tours</a> · <a href=\"/trip\">Trip planner</a>"
+}

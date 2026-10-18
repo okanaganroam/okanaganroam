@@ -1,0 +1,373 @@
+{
+ "heading": "The Okanagan in November, 2026",
+ "title": "The Okanagan in November 2026 | Okanagan Roam",
+ "description": "Things to do in the Okanagan in November 2026: shows, first light-ups, quiet-season wine, saunas, soup and ramen, and ski hills opening late in the month.",
+ "banner": "whats-on",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "November is the in-between month in the Okanagan. The harvest is in, the summer crowds are long gone, and the ski hills are getting ready to open. It's a quiet, easy time to visit: tasting rooms are calm, the arts season is in full swing, and the first holiday lights go on near the end of the month.",
+  "This guide picks a handful of November events, then adds quiet-season wine, indoor warm-ups, cozy food and the start of ski season. For every dated event, see {page:/whats-on|What's On}. For the holidays, see our {page:/guides/okanagan-holiday-events|holiday events guide} and our {page:/guides/okanagan-christmas-markets|Christmas markets guide}."
+ ],
+ "sections": [
+  {
+   "id": "on-the-calendar-in-november",
+   "jump": "Events",
+   "heading": "On the calendar in November",
+   "lead": "A few of the month's strongest dates, from festivals to dance and music.",
+   "items": [
+    {
+     "ref": "event:west-kelowna/2026-okanagan-mushroom-festival",
+     "name": "2026 Okanagan Mushroom Festival",
+     "text": "artisans, crafters, growers and mushroom fans at the Westbank Lions Community Centre from 11 am. Entry is by donation, with proceeds going to Stars Piggly Wiggly Animal Sanctuary.",
+     "where": "West Kelowna, Nov 1"
+    },
+    {
+     "ref": "event:penticton/penticton-farmers-market-2026",
+     "name": "Penticton Farmers’ Market 2026",
+     "text": "90+ stalls of South Okanagan produce, honey, baking and preserves. In November and December the market moves indoors to Cherry Lane Mall.",
+     "where": "Penticton, Saturdays from Nov 7"
+    },
+    {
+     "ref": "event:kelowna/ballet-kelowna-four-voices",
+     "name": "Ballet Kelowna: Four Voices",
+     "text": "the season opener at Kelowna Community Theatre, a mixed program of four works including Acts of Remembrance, which honours Canadians who served in the First World War, and two world premieres. There are 150 pay-what-you-wish seats per show.",
+     "where": "Kelowna, from Nov 6"
+    },
+    {
+     "ref": "event:vernon/miigis-red-sky-performance-vernon",
+     "name": "Miigis – Red Sky Performance (Vernon)",
+     "text": "a contemporary Indigenous dance work inspired by the Anishinaabe journey along ancient water routes, at 2 pm at the Vernon & District Performing Arts Centre. It runs under an hour.",
+     "where": "Vernon, Nov 8"
+    },
+    {
+     "ref": "event:west-kelowna/remembrance-day-ceremony-west-kelowna",
+     "name": "Remembrance Day Ceremony, West Kelowna",
+     "text": "the Royal Canadian Legion Branch 288 service, held indoors at Royal LePage Place. Be seated by 10:30; the service begins at 10:45.",
+     "where": "West Kelowna, Nov 11"
+    },
+    {
+     "ref": "event:kelowna/jan-lisiecki-piano-chamber-music-kelowna",
+     "name": "Jan Lisiecki, piano – Chamber Music Kelowna",
+     "text": "a solo recital at the Rotary Centre for the Arts at 7:30 pm. One of the season's biggest classical draws, so seats are scarce.",
+     "where": "Kelowna, Nov 13"
+    }
+   ]
+  },
+  {
+   "id": "the-first-lights-of-the-season",
+   "jump": "First lights",
+   "heading": "The first lights of the season",
+   "lead": "The holidays start in the last two weeks of November. Here are a few of the first light-ups; the full list is in our {page:/guides/okanagan-holiday-events|holiday events guide} and {page:/guides/okanagan-christmas-markets|Christmas markets guide}.",
+   "items": [
+    {
+     "ref": "event:oliver/village-light-up-at-district-wine-village",
+     "name": "Village Light-Up at District Wine Village",
+     "text": "live music, free skating on the outdoor rink, s'mores by the fire and winery tastings from 3 pm, with the lights on at 5 pm. Bring a food-bank donation for a free tasting.",
+     "where": "Oliver, Nov 14"
+    },
+    {
+     "ref": "event:vernon/frostival-downtown-vernon-winter-street-festival",
+     "name": "Frostival: Downtown Vernon Winter Street Festival",
+     "text": "four blocks of 30th Avenue close for a free street festival from 4 pm, with live music, vendors and food trucks. Parking meters are free for the day.",
+     "where": "Vernon, Nov 27"
+    },
+    {
+     "ref": "event:kelowna/downtown-kelowna-winter-street-market-light-up",
+     "name": "Downtown Kelowna Winter Street Market & Light Up",
+     "text": "a free afternoon of vendors, family activities and stage shows in Stuart Park from noon, then the park's lights go on at 5 pm. Hot chocolate sales and donations go to the Central Okanagan Food Bank.",
+     "where": "Kelowna, Nov 28"
+    }
+   ]
+  },
+  {
+   "id": "quiet-season-wine",
+   "jump": "Quiet-season wine",
+   "heading": "Quiet-season wine",
+   "lead": "November is a calm month on the wine trails. Many wineries cut their hours from November to April, so check each listing's hours before you set out. The wineries below show regular hours on their pages, and two wine weekends add some holiday cheer. Browse more on our {page:/wineries|wineries page}.",
+   "items": [
+    {
+     "ref": "event:naramata/naramata-bench-winterfest",
+     "name": "Naramata Bench Winterfest",
+     "text": "Naramata Bench wineries and neighbours open their doors for a festive weekend of holiday tastings, treats and shopping. You hop between participating tasting rooms.",
+     "where": "Naramata, Nov 20 – 21"
+    },
+    {
+     "ref": "event:lake-country/wineries-for-the-holidays-on-the-scenic-sip-trail",
+     "name": "Wineries for the Holidays on the Scenic Sip Trail",
+     "text": "from 11 am, 50th Parallel, Intrigue, Ex Nihilo and Gray Monk each host their own festive experience, from holiday markets to fire pits and food-and-wine pairings. Pay per stop.",
+     "where": "Lake Country, Nov 21"
+    },
+    {
+     "ref": "kelowna/summerhill-pyramid-winery",
+     "name": "Summerhill Pyramid Winery",
+     "text": "a certified-organic estate built around an actual pyramid. The on-site restaurant has a heated lake-view terrace.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/quails-gate-winery",
+     "name": "Quails' Gate Winery",
+     "text": "family-farmed since 1956, with a dog-friendly patio over Okanagan Lake.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "naramata/red-rooster-winery",
+     "name": "Red Rooster Winery",
+     "text": "a Naramata Bench winery with a wide-ranging wine list and unpushy tasting staff. From fall to spring the wine shop is open Friday to Sunday.",
+     "where": "Naramata"
+    },
+    {
+     "ref": "oliver/hester-creek-estate-winery",
+     "name": "Hester Creek Estate Winery",
+     "text": "a winery with a patio restaurant. Reviewers rave about the gnocchi and the Golden Mile reds.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "osoyoos/nk-mip-cellars",
+     "name": "Nk'Mip Cellars",
+     "text": "North America's first Indigenous-owned winery, with a restaurant terrace over the desert and lake.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "warm-up-indoors",
+   "jump": "Warm up indoors",
+   "heading": "Warm up indoors",
+   "lead": "November can be grey and damp. Head inside for heat, art and local history. Our {page:/guides/okanagan-saunas-spas|saunas & spas guide} and {page:/guides/rainy-day-okanagan|rainy-day guide} have more.",
+   "items": [
+    {
+     "ref": "kelowna/tality-wellness-kelowna",
+     "name": "Tality Wellness Kelowna",
+     "text": "a downtown social bathhouse with a 20-person cedar sauna, four cold plunges and a lounge around a vapour firepit. Robes, towels, kombucha and hot tea are included. Book a shared or private session.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cleopatra-s-rituals-thermal-spa-and-steam",
+     "name": "Cleopatra's Rituals Thermal Spa and Steam",
+     "text": "a hot-cold circuit of sauna, steam, thermal showers and a falling-snow room. There are no walk-ins, so book ahead.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/shelter-floating-sauna",
+     "name": "Shelter Floating Sauna",
+     "text": "a cedar sauna floating at the Lakeside Resort marina, where you cycle between heat, a cold plunge in the lake and rest. Sessions last 70 minutes and are booked online.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "west-kelowna/sncewips-heritage-museum",
+     "name": "Sncewips Heritage Museum",
+     "text": "Westbank First Nation's living museum, sharing syilx history, language and present-day cultural practice. Drop in by donation, or pre-book a guided tour.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "kelowna/okanagan-wine-orchard-museum-laurel-packinghouse",
+     "name": "Okanagan Wine & Orchard Museum (Laurel Packinghouse)",
+     "text": "the valley's fruit and wine story, told in the historic 1918 Laurel Packinghouse. Admission is by donation, and it's a good primer before a winery day.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "event:penticton/briar-craig-conversations-at-the-penticton-art-gallery",
+     "name": "Briar Craig: Conversations at the Penticton Art Gallery",
+     "text": "a solo show of layered screen prints that play with words and images, filling the gallery's Okanagan and Skaha rooms.",
+     "where": "Penticton, all month"
+    },
+    {
+     "ref": "vernon/vernon-public-art-gallery",
+     "name": "Vernon Public Art Gallery",
+     "text": "the largest public art gallery in the North Okanagan, with changing contemporary exhibitions and admission by donation. An easy, low-cost stop on a grey afternoon.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "cozy-food",
+   "jump": "Cozy food",
+   "heading": "Cozy food",
+   "lead": "Soup, ramen and warm dining rooms for short, cool days. Our {page:/guides/cozy-spots-okanagan|cozy spots guide} has more.",
+   "items": [
+    {
+     "ref": "kelowna/bon-ga-korean-cuisine",
+     "name": "Bon Ga Korean Cuisine",
+     "text": "a family-owned kitchen. Build your order around the hot bone soup, especially on a cold day.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mad-mango-cafe",
+     "name": "Mad Mango Cafe",
+     "text": "a cozy, colourful pan-Asian soup spot on Bernard Ave. Order the laksa.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/two-brothers-mexican-restaurant",
+     "name": "Two Brothers Mexican Restaurant",
+     "text": "a small, cozy Mexican spot. The pozole is the dish that keeps regulars coming back.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "penticton/brodo-kitchen",
+     "name": "BRODO Kitchen",
+     "text": "a lunch-only soup and sandwich spot. Order the soup and sandwich combo.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/theo-s-restaurant",
+     "name": "Theo's Restaurant",
+     "text": "a traditional Greek dining room with timber beams and a wood-smoke atmosphere. Plant-based diners can order the vegan moussaka.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "vernon/raku-rice-noodle-bar",
+     "name": "Raku Rice & Noodle Bar",
+     "text": "widely called the best ramen in Vernon. Dine in or take it home.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/farmhouse-cafe",
+     "name": "Farmhouse Cafe",
+     "text": "a café that grows what it cooks on site. Order the soup and sandwich, and add a fresh-baked scone.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "ski-season-is-coming",
+   "jump": "Ski season",
+   "heading": "Ski season is coming",
+   "lead": "The hills open near the end of the month. Our {page:/guides/ski-season-big-white-silverstar|ski season guide to Big White and SilverStar} covers lifts, lessons and where to eat on the mountain.",
+   "items": [
+    {
+     "ref": "event:kelowna/warren-miller-s-days-off",
+     "name": "Warren Miller's Days Off",
+     "text": "the Big White Ski Club screens the latest Warren Miller ski and snowboard film at the Rotary Centre for the Arts at 6:30 pm. A classic way to kick off ski season.",
+     "where": "Kelowna, Nov 7"
+    },
+    {
+     "ref": "event:big-white/big-white-opening-day-2026-27",
+     "name": "Big White Opening Day 2026/27",
+     "text": "the planned start of the winter season. Opening depends on snow conditions, so check the resort's latest news before you drive up.",
+     "where": "Big White, Nov 26"
+    },
+    {
+     "ref": "event:silverstar/silverstar-alpine-opening-day-2026",
+     "name": "SilverStar Alpine Opening Day 2026",
+     "text": "the first day of lift-served skiing and snowboarding on the mountain.",
+     "where": "SilverStar, Nov 27"
+    },
+    {
+     "ref": "event:silverstar/sovereign-canada-cup-cross-country-ski-races",
+     "name": "Sovereign Canada Cup Cross-Country Ski Races",
+     "text": "Canada's top cross-country skiers open the domestic race season at Sovereign Lake Nordic Centre. It's free to watch from the trailside.",
+     "where": "SilverStar, Nov 27 – 29"
+    },
+    {
+     "ref": "kelowna/discover-okanagan-tours",
+     "name": "Discover Okanagan Tours",
+     "text": "a Kelowna operator that runs private ski shuttles in winter, as well as guided wine tours with pickup around town.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "know-before-you-go",
+   "jump": "Know before you go",
+   "heading": "Know before you go",
+   "items": [
+    {
+     "lead": "Expect shorter hours:",
+     "tip": "many wineries, patios and seasonal attractions cut back from November to April. Check each listing's hours, and call ahead if a stop matters."
+    },
+    {
+     "lead": "Pack layers:",
+     "tip": "November is cool, often grey in the valley and colder up the hills. A warm jacket, a rain layer and good shoes cover most days."
+    },
+    {
+     "lead": "Plan for early dark:",
+     "tip": "the days are short, so put outdoor stops and winery visits early in the day."
+    },
+    {
+     "lead": "Mountain roads:",
+     "tip": "roads to the ski hills can be snowy in late November. Drive with winter-ready tires and check road conditions before you go."
+    },
+    {
+     "lead": "Plan a trip:",
+     "tip": "the {page:/trip|trip planner} can build a custom plan around the places you pick."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A November festival",
+    [
+     "event:west-kelowna/2026-okanagan-mushroom-festival|2026 Okanagan Mushroom Festival"
+    ]
+   ],
+   [
+    "A night of dance or music",
+    [
+     "event:kelowna/ballet-kelowna-four-voices|Ballet Kelowna: Four Voices",
+     "event:kelowna/jan-lisiecki-piano-chamber-music-kelowna|Jan Lisiecki",
+     "event:kelowna/jan-lisiecki-piano-chamber-music-kelowna|piano – Chamber Music Kelowna"
+    ]
+   ],
+   [
+    "An early holiday light-up",
+    [
+     "event:oliver/village-light-up-at-district-wine-village|Village Light-Up at District Wine Village"
+    ]
+   ],
+   [
+    "A wine weekend",
+    [
+     "event:naramata/naramata-bench-winterfest|Naramata Bench Winterfest"
+    ]
+   ],
+   [
+    "A tasting with a lake view",
+    [
+     "west-kelowna/quails-gate-winery|Quails' Gate Winery"
+    ]
+   ],
+   [
+    "A hot sauna and a cold plunge",
+    [
+     "kelowna/tality-wellness-kelowna|Tality Wellness Kelowna",
+     "penticton/shelter-floating-sauna|Shelter Floating Sauna"
+    ]
+   ],
+   [
+    "Local history on a grey day",
+    [
+     "west-kelowna/sncewips-heritage-museum|Sncewips Heritage Museum"
+    ]
+   ],
+   [
+    "A bowl of soup or ramen",
+    [
+     "kelowna/bon-ga-korean-cuisine|Bon Ga Korean Cuisine",
+     "vernon/raku-rice-noodle-bar|Raku Rice & Noodle Bar"
+    ]
+   ],
+   [
+    "The first ski day of the season",
+    [
+     "event:big-white/big-white-opening-day-2026-27|Big White Opening Day 2026/27",
+     "event:silverstar/silverstar-alpine-opening-day-2026|SilverStar Alpine Opening Day 2026"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>, <a href=\"/guides/okanagan-holiday-events\">Holiday events</a>, <a href=\"/guides/cozy-spots-okanagan\">Cozy spots</a>, <a href=\"/guides/ski-season-big-white-silverstar\">Ski season</a>"
+}

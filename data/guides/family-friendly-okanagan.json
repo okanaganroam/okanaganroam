@@ -1,0 +1,351 @@
+{
+ "heading": "Family-Friendly Okanagan: Things to Do with Kids",
+ "title": "Things to Do with Kids in the Okanagan | Okanagan Roam",
+ "description": "Things to do with kids in the Okanagan, all year: indoor waterparks, play spaces, beaches, farms with animals, climbing gyms, rinks, tube parks and family food.",
+ "banner": "beach",
+ "parent": {
+  "name": "Things to Do",
+  "href": "/categories"
+ },
+ "noPlace": true,
+ "intro": [
+  "The Okanagan is an easy place to travel with kids. Summer brings warm lakes, sandy beaches and spray parks. The cooler months bring indoor waterparks, play spaces, rinks and, once the snow comes, tube parks on the ski hills. This guide gathers places that suit families, from Enderby and Vernon down through Kelowna, West Kelowna and Penticton to Okanagan Falls and Osoyoos.",
+  "Some of these places are seasonal, and we've flagged the ones that are. Many farms and outdoor attractions cut back or close from late fall to spring, so check each listing's hours before you drive out. For dated family events, see {page:/whats-on/family-kids|Family & kids on What's On}."
+ ],
+ "sections": [
+  {
+   "id": "rainy-day-and-indoor-fun",
+   "jump": "Rainy-day and indoor fun",
+   "heading": "Rainy-day and indoor fun",
+   "lead": "When the weather turns, these keep everyone busy. Our {page:/guides/rainy-day-okanagan|rainy-day guide} has more ideas.",
+   "items": [
+    {
+     "ref": "vernon/okanagan-science-centre",
+     "name": "Okanagan Science Centre",
+     "text": "a hands-on science centre in Polson Park with interactive exhibits, planetarium shows and live animals. Just drop in and pay at the front desk; free for kids under three. Planetarium shows need pre-registration.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "kelowna/h2o-adventure-fitness-centre",
+     "name": "H2O Adventure + Fitness Centre",
+     "text": "a YMCA-run indoor waterpark with waterslides, a FlowRider, a wave pool, a lazy river and a splash park. A go-to for families on a cold or rainy day, and under-3s swim free.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/scandia-golf-games",
+     "name": "Scandia Golf & Games",
+     "text": "an indoor jungle-themed mini golf course and an arcade of over 140 games. In summer it adds outdoor mini golf, go-karts and batting cages.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/funspace-kids",
+     "name": "FunSpace Kids",
+     "text": "an indoor playground for kids 1 to 12, with slides, a trampoline, a Lego wall and separate zones for toddlers and bigger kids. An adult supervises at all times, so grab a coffee at the café, and bring socks.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "penticton/ss-sicamous-museum-heritage-park",
+     "name": "SS Sicamous Museum & Heritage Park",
+     "text": "a restored 1914 sternwheeler at the west end of Okanagan Beach that you can explore deck by deck, from the cabins to the wheelhouse. It closes to visitors on some days, especially Saturdays, so check first.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/roll-n-stones-fun-centre",
+     "name": "Roll N Stones Fun Centre",
+     "text": "bowling, glow-in-the-dark laser bowling on Friday and Saturday nights, billiards, darts and an arcade, with pizza and wings served lane-side.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "parks-beaches-and-easy-walks",
+   "jump": "Parks & beaches",
+   "heading": "Parks, beaches and easy walks",
+   "lead": "The beaches and spray parks are summer outings. Water parks, splash pads and lifeguards run in the warm months only, but most of these parks are pleasant for a walk or a playground stop year-round.",
+   "items": [
+    {
+     "ref": "kelowna/city-park-hot-sands-beach",
+     "name": "City Park – Hot Sands Beach",
+     "text": "a long sandy beach inside City Park, with a playground, sand volleyball and a skateboard park. The children's waterpark runs from May long weekend to early September (summer only).",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mission-creek-regional-park",
+     "name": "Mission Creek Regional Park",
+     "text": "a park that works in every season, with gentle trails, a playground and the kokanee spawning channel. The Environmental Education Centre makes a walk here double as a nature lesson. Some trails are closed for bridge work, so follow the detour signs.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/westbank-centre-park-julia-s-junction-kids-care-spray-park",
+     "name": "Westbank Centre Park (Julia's Junction & Kids Care Spray Park)",
+     "text": "West Kelowna's first fully inclusive playground, built so kids of all abilities can play side by side, plus a spray park, a walking track and a big grassy play area.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "vernon/polson-park",
+     "name": "Polson Park",
+     "text": "Vernon's central green space, with the Floral Clock, a Japanese Garden, two ponds full of waterfowl and a wheelchair-accessible playground. The Science Centre is right in the park, so it's easy to fill an afternoon.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "penticton/skaha-beach",
+     "name": "Skaha Beach",
+     "text": "Penticton's family beach, a long stretch of sand on a calm lake with warm water, backed by playgrounds and a water park. The main washrooms are open year-round (swimming is a summer thing).",
+     "where": "Penticton"
+    },
+    {
+     "ref": "okanagan-falls/kenyon-park",
+     "name": "Kenyon Park",
+     "text": "a two-acre family park at the south end of Skaha Lake, built around children, with a smooth sandy beach and a shallow shoreline, a playground and a water park (summer only).",
+     "where": "Okanagan Falls"
+    },
+    {
+     "ref": "peachland/swim-bay",
+     "name": "Swim Bay",
+     "text": "the beach where the kids never want to leave, with a wharf fitted with a diving board, a zip line and a rope swing. Lifeguards are on duty from mid-June to late August (summer only).",
+     "where": "Peachland"
+    }
+   ]
+  },
+  {
+   "id": "farms-and-animals",
+   "jump": "Farms and animals",
+   "heading": "Farms and animals",
+   "lead": "Most farms are busiest from summer through fall. Our {page:/guides/fall-farms-u-pick-okanagan|fall farms and u-pick guide} covers the harvest season.",
+   "items": [
+    {
+     "ref": "penticton/gottagoat-farm",
+     "name": "GottaGoat Farm",
+     "text": "a family-run farm about 20 minutes from downtown with dozens of miniature, full-size and fainting goats. Visits run year-round: drop in on Saturdays or book a weekday visit to meet and cuddle the goats.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "kelowna/don-o-ray-farm-adventure",
+     "name": "Don-O-Ray Farm Adventure",
+     "text": "a petting zoo where you can feed goats, a pony, ducks and bunnies, plus a 7,000-square-foot hedge maze, archery and a market with baked goods and ice cream.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kangaroo-creek-farm",
+     "name": "Kangaroo Creek Farm",
+     "text": "walk into open paddocks with red kangaroos and wallabies, plus emus, goats, potbellied pigs and capybaras. Feeding the animals and holding a joey are included. The 2026 season ran June 27 to October 12, so plan it for summer.",
+     "where": "Kelowna, seasonal"
+    },
+    {
+     "ref": "vernon/davison-orchards",
+     "name": "Davison Orchards",
+     "text": "a family farm with free admission, the free Crazy Cow Kids Corral play area, an animal barn and tractor-pulled train tours through the orchards. In season you can u-pick apples and pumpkins.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "west-kelowna/paynter-s-fruit-market",
+     "name": "Paynter's Fruit Market",
+     "text": "a family farm growing fruit since 1919, with u-pick in season, farm tours and ice cream at the café. In fall the pumpkin patch makes an easy family outing.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "active-days",
+   "jump": "Active days",
+   "heading": "Active days",
+   "lead": "For kids with energy to burn.",
+   "items": [
+    {
+     "ref": "kelowna/beyond-the-crux-climbing-gym",
+     "name": "Beyond the Crux Climbing Gym",
+     "text": "over 5,000 sq ft of bouldering, plus roped walls. Kids get a cheaper day pass, and rentals make it easy for beginners. Fill out the online waiver first.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/the-rock-garden-climbing-centre",
+     "name": "The Rock Garden Climbing Centre",
+     "text": "bouldering and roped routes for beginners up, with a quick orientation from staff and kids' programs.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "penticton/ethos-parkour-movement",
+     "name": "Ethos Parkour & Movement",
+     "text": "an indoor parkour gym with vaults, bars and walls, where kids, teens and adults can join supervised open-gym drop-ins.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "kelowna/kelowna-driving-range-mini-golf",
+     "name": "Kelowna Driving Range & Mini Golf",
+     "text": "an 18-hole championship mini-golf course for the whole family, next to a covered driving range. Open daily to the public.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "summerland/kettle-valley-steam-railway",
+     "name": "Kettle Valley Steam Railway",
+     "text": "a 90-minute ride behind a restored 1912 steam locomotive, crossing the Trout Creek Bridge 238 ft above the canyon. It runs May to October, plus the Christmas Express in December.",
+     "where": "Summerland, seasonal"
+    }
+   ]
+  },
+  {
+   "id": "winter-fun",
+   "jump": "Winter fun",
+   "heading": "Winter fun",
+   "lead": "Rinks, then tube parks once the ski hills open. For more places to skate, see our {page:/guides/okanagan-skating|skating guide}.",
+   "items": [
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "a free outdoor rink on the downtown waterfront, opening in early December, weather permitting. The rental hut has kids' skates and push-along skate aids.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "enderby/enderby-arena",
+     "name": "Enderby Arena",
+     "text": "free public skating several afternoons a week from mid-September through March, with strollers welcome. There's no skate rental, so bring your own.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "osoyoos/sun-bowl-arena",
+     "name": "Sun Bowl Arena",
+     "text": "free public skating on weekends, and the lobby Skate Library lends skates free. Bring a helmet, which is required.",
+     "where": "Osoyoos"
+    },
+    {
+     "ref": "silverstar/tube-town-silverstar-tube-park",
+     "name": "Tube Town – SilverStar Tube Park",
+     "text": "big tubes, several lanes of packed snow and a tube lift back to the top. Kids need to be at least three, and next door is a fenced mini-snowmobile track for ages six to twelve.",
+     "where": "SilverStar, winter only"
+    },
+    {
+     "ref": "big-white/big-white-tube-park",
+     "name": "Big White Tube Park (Happy Valley)",
+     "text": "five groomed lanes and a tube lift, open into the evening. Tickets are sold for timed two-hour windows, so book online ahead.",
+     "where": "Big White, winter only"
+    },
+    {
+     "ref": "apex/tim-hortons-tube-park-apex",
+     "name": "Tim Hortons Tube Park – Apex",
+     "text": "at the base area beside the beginner slopes, on weekends and holidays, with lights on Friday and Saturday nights. There's a family rate for up to six.",
+     "where": "Apex, winter only"
+    }
+   ]
+  },
+  {
+   "id": "kid-friendly-places-to-eat",
+   "jump": "Places to eat",
+   "heading": "Kid-friendly places to eat",
+   "lead": "Places with play areas, kids' menus or a welcome for little ones.",
+   "items": [
+    {
+     "ref": "lake-country/the-jammery",
+     "name": "The Jammery",
+     "text": "an all-day breakfast and brunch spot famous for its scones with Devonshire cream. Kids get a play area and their own menu.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "kelowna/bright-jenny-coffee",
+     "name": "Bright Jenny Coffee",
+     "text": "a Mission-area café with a dedicated kids' play area, so parents can finish their coffee while it's still hot.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/smitty-s",
+     "name": "Smitty's",
+     "text": "a welcoming family restaurant with a Ukrainian menu alongside classic diner fare, and a dedicated play area for the kids.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "penticton/barley-mill-brew-pub",
+     "name": "Barley Mill Brew Pub",
+     "text": "a brewpub with a dedicated kids' menu upstairs, so everyone gets fed well.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "summerland/country-cafe",
+     "name": "Country Café",
+     "text": "a cash-only, kid-friendly breakfast spot downtown. Order the Ukrainian breakfast or the perogies.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "osoyoos/miks-food-studio",
+     "name": "Miks Food Studio",
+     "text": "a spotlessly clean, halal-friendly Mediterranean spot downtown with a kids' corner.",
+     "where": "Osoyoos"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "An indoor waterpark",
+    [
+     "kelowna/h2o-adventure-fitness-centre|H2O Adventure + Fitness Centre"
+    ]
+   ],
+   [
+    "Hands-on science",
+    [
+     "vernon/okanagan-science-centre|Okanagan Science Centre"
+    ]
+   ],
+   [
+    "A play space for little ones",
+    [
+     "west-kelowna/funspace-kids|FunSpace Kids"
+    ]
+   ],
+   [
+    "Mini golf on a rainy day",
+    [
+     "kelowna/scandia-golf-games|Scandia Golf & Games"
+    ]
+   ],
+   [
+    "A summer beach day",
+    [
+     "penticton/skaha-beach|Skaha Beach",
+     "peachland/swim-bay|Swim Bay"
+    ]
+   ],
+   [
+    "Animals to meet year-round",
+    [
+     "penticton/gottagoat-farm|GottaGoat Farm"
+    ]
+   ],
+   [
+    "A climbing day",
+    [
+     "kelowna/beyond-the-crux-climbing-gym|Beyond the Crux Climbing Gym",
+     "vernon/the-rock-garden-climbing-centre|The Rock Garden Climbing Centre"
+    ]
+   ],
+   [
+    "A free skate",
+    [
+     "kelowna/stuart-park-outdoor-rink|Stuart Park Outdoor Rink",
+     "osoyoos/sun-bowl-arena|Sun Bowl Arena"
+    ]
+   ],
+   [
+    "Tubing in the snow",
+    [
+     "big-white/big-white-tube-park|Big White Tube Park (Happy Valley)"
+    ]
+   ],
+   [
+    "Breakfast with a play area",
+    [
+     "lake-country/the-jammery|The Jammery",
+     "west-kelowna/smitty-s|Smitty's"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on/family-kids\">Family &amp; kids events</a>, <a href=\"/indoor\">Indoor things to do</a>, <a href=\"/beaches\">Beaches</a>, <a href=\"/trip\">Trip planner</a>"
+}
