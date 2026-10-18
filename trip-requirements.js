@@ -224,7 +224,8 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       add('type_count',type,scopeText,{count:Number(count[1])||WORD_DAYS[count[1]]});
     }
     const singleDinner=/\b(?:a|an|one)\s+(?:(?:relaxed|casual|romantic|special|easygoing|quiet|nice|great)\s+){0,2}(?:dinner|supper)\b/.exec(c);
-    if(singleDinner&&!/\b(?:lunch|breakfast|meals?|dinners?|suppers?)\b/.test(c.replace(singleDinner[0],'')))explicitMealCount=1;
+    // "A nice dinner each night" is a dinner every night, not one dinner (2026-10-18).
+    if(singleDinner&&!/\b(?:lunch|breakfast|meals?|dinners?|suppers?)\b/.test(c.replace(singleDinner[0],''))&&!/\b(?:each|every|per) (?:night|evening|day)\b|\bnightly\b|\bnights? in a row\b/.test(c))explicitMealCount=1;
     // 2026-10-14: only a large group is worth a note (seating and bookings); "our two kids" was reported as an
     // unverifiable party size on every family trip.
     if (/\b(?:[89]|[1-9]\d+|eight|nine|ten|eleven|twelve|fifteen|twenty)\s+(?:people|adults|guests|of us|friends|guys|girls|ladies)\b/.test(c)) add('unsupported','party size',scopeText);

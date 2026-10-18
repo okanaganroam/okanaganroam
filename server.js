@@ -4843,6 +4843,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
       // whether that covers today for plans with no date of their own.
       seasonClosed: seasons.has(v.id) ? seasonClosedRange(seasons.get(v.id)) : null,
       seasonClosedToday: seasons.has(v.id) ? (seasonStateOn(seasons.get(v.id), seasonToday) || {}).kind === 'closed' : false,
+      seasonReopens: seasons.has(v.id) ? (seasons.get(v.id).reopens_date || null) : undefined, // the listed reopening date; null = not announced (2026-10-18)
       dogNote: dogNotes.get(v.id) || null,
       golfSeasons: v.type === 'golf' ? (golfWindows.get(`${v.region}/${v.slug}`) || []) : [],
     });
@@ -5149,6 +5150,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // the single-request path below, unchanged.
   let trip = discoveryIntentModule().interpretTripComponents(interpretationText, taxonomy, intent);
   const extracted = requirementModule.extractTripRequirements({ text: requirementsText, intent, trip, taxonomy, referenceDate:todayLocal(now) });
+  // "Wine tour" means wineries unless a tour company or shuttle was asked for (2026-10-18); planTrip applies it too.
+  tripPlannerModule().applyWineTourMeaning(requirementsText, intent, extracted);
   if (selectedNamedEvent) {
     const normalizedTitle = discoveryIntentModule().normalizeDiscoveryText(selectedNamedEvent.name || '');
     const filler = new Set('the a an and of return experience tribute show night day live music dinner lunch date plan with in at to'.split(' '));
@@ -10233,7 +10236,7 @@ function golfEngagementHeadHtml(type, themed = usesThemedCategoryLayout(type), p
 // the two page scripts below, which each define ctx()/track() first.
 function golfFavTripScriptBody(type = 'golf') {
   return `
-  var MAX_STOPS = 10;
+  var MAX_STOPS = 30; // the tray limit in /scripts/app.js (2026-10-18: up from 10)
   var HOLDER = '${themedCardHolderSelector(type)}';
   function readList(key){
     try { var v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
@@ -24610,7 +24613,7 @@ function renderTripPlannerV2Script() {
   // storage, de-duplication, tray and pressed state exactly as for a single
   // click. A stop already in My Trip is never clicked (that would remove it),
   // and nothing is clicked once My Trip is full.
-  var TRIP_MAX_STOPS = 10; // the tray's own limit (MAX_STOPS in /scripts/app.js); not changed here
+  var TRIP_MAX_STOPS = 30; // the tray's own limit (MAX_STOPS in /scripts/app.js; 30 since 2026-10-18)
   function tripSize(){
     var c = document.getElementById('tripTrayCount');
     var n = c ? parseInt(c.textContent, 10) : NaN;
@@ -24989,7 +24992,10 @@ function tripV3MapHeaders(dir = TRIP_V3_MAPS_DIR) {
       const n = [x.cssSize.w, x.cssSize.h, x.markerOffsetPx.dx, x.markerOffsetPx.dy, x.switchBelowPx || 721].map(Number);
       if (!n.every(Number.isFinite) || n[0] < 1 || n[1] < 1) return null; // these numbers go into inline CSS on the page
       if (!fs.existsSync(path.join(dir, x.file))) return null;
-      return { src: `/images/regions/maps/${x.file}?v=${encodeURIComponent(String(x.version || ''))}`, w: n[0], h: n[1], dx: n[2], dy: n[3], below: n[4] };
+      // z and view (2026-10-18): the picture's zoom and centre, so the page can place each stop on it.
+      const z = Number(x.zoom), view = Array.isArray(x.view) ? x.view.map(Number) : null;
+      const geo = Number.isFinite(z) && view && view.length === 2 && view.every(Number.isFinite) ? { z, view } : {};
+      return { src: `/images/regions/maps/${x.file}?v=${encodeURIComponent(String(x.version || ''))}`, w: n[0], h: n[1], dx: n[2], dy: n[3], below: n[4], ...geo };
     };
     const desktop = asset('desktop'), narrow = asset('narrow');
     if (!desktop || !narrow) continue;
@@ -28841,7 +28847,7 @@ function tripShareParams(query) {
 function tripShareSearch(query) {
   const { refs, days } = tripShareParams(query);
   if (!refs.length) return '';
-  return `?stops=${refs.join(',')}` + (refs.every((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i]).join(',')}` : '');
+  return `?stops=${refs.join(',')}` + (refs.some((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i] || 0).join(',')}` : '');
 }
 function tripShareTowns(towns, fr) {
   if (towns.length <= 1) return towns[0] || '';
@@ -28877,7 +28883,7 @@ function tripShareSummary(query, lang = 'en') {
   const description = tripShareClip(fr
     ? `${live.length} ${stopWord} : ${nameText}. Voyez le plan sur la carte et enregistrez-le dans Mon voyage.`
     : `${live.length} ${stopWord}: ${nameText}. See the plan on a map and save it to your own trip.`, 160);
-  const query_ = `stops=${refs.join(',')}` + (refs.every((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i]).join(',')}` : '');
+  const query_ = `stops=${refs.join(',')}` + (refs.some((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i] || 0).join(',')}` : '');
   const more2 = names.length - 2;
   const card = {
     label: (dayCount ? `${dayLabel} · ${townText}` : `${live.length} ${stopWord} · ${townText}`).toUpperCase(),
@@ -29103,8 +29109,9 @@ ${renderGolfHeaderHtml()}
     el('mtShared').hidden = viewing !== 'shared';
     el('mtSummary').textContent = stops.length ? (stops.length + ' ' + (stops.length === 1 ? T.stop : T.stops) + (viewing === 'shared' ? T.inShared : T.inMine)) : T.nothing;
     if (viewing === 'shared') el('mtSharedText').textContent = trip.length ? T.replaces.replace('{n}', trip.length + ' ' + (trip.length === 1 ? T.stop : T.stops)) : T.saveKeep;
-    // Group by day only when every stop has one; otherwise one list in order.
-    var byDay = stops.length && stops.every(function(s){ return s.day > 0; });
+    // Stops saved with a planner day are grouped by day (each with its own directions link); stops saved without
+    // one stay together as "Your stops" (2026-10-18: one older stop used to flatten a planned trip into one list).
+    var byDay = stops.length && stops.some(function(s){ return s.day > 0; });
     var groups = [];
     stops.forEach(function(s, i){
       var key = byDay ? s.day : 0;
@@ -29149,7 +29156,7 @@ ${renderGolfHeaderHtml()}
   function tripLink(){
     var refs = trip.filter(function(x){ return x.ref; });
     var url = location.origin + (document.documentElement.lang === 'fr' ? '/fr' : '') + '/my-trip?stops=' + refs.map(function(x){ return x.ref; }).join(',');
-    if (refs.length && refs.every(function(x){ return days[x.ref]; })) url += '&days=' + refs.map(function(x){ return days[x.ref]; }).join(',');
+    if (refs.length && refs.some(function(x){ return days[x.ref]; })) url += '&days=' + refs.map(function(x){ return days[x.ref] || 0; }).join(',');
     return { url: url, refs: refs };
   }
   function copyNote(refs){

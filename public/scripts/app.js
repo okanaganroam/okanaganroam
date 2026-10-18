@@ -2666,7 +2666,7 @@ window.__scrollToVenueCard = function(name){
 
 /* ---------- Trip planner: build a multi-stop route across saved venues ---------- */
 (function(){
-  var MAX_STOPS = 10;
+  var MAX_STOPS = 30; // 2026-10-18: up from 10 so a planned 3-day trip fits (My Trip and share links hold 30)
   var toggleBtn = document.getElementById('tripTrayToggle');
   var panel = document.getElementById('tripTrayPanel');
   var listEl = document.getElementById('tripTrayList');
