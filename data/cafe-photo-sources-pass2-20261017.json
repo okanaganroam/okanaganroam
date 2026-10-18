@@ -1,0 +1,52 @@
+[
+  {
+    "id": 661,
+    "name": "The Artisan's Den at Apex",
+    "file": "/images/venues/the-artisan-s-den-at-apex-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.facebook.com/photo/?fbid=122095325984683041&set=pb.61570491235581.-2207520000",
+    "image_url": null,
+    "source_kind": "facebook",
+    "note": "Exterior of the shop in the Apex village in falling snow: grey board-and-batten wall, two hand-painted 'The Artisan's Den at Apex' signs, lit OPEN sign, windows with snowflake decals, icicles along the roof and a snowed-in picnic table. Name readable in the 3:1 strip. Source is the café's own Facebook Page (photo is 2048px; the fbcdn URL is signed and expires, re-fetch from the source page if needed). Bottom strip is a little busy with the snow-covered table."
+  },
+  {
+    "id": 1066,
+    "name": "Francuccino's Gelato and Fries",
+    "file": "/images/venues/francuccino-s-gelato-and-fries-2610.jpg",
+    "dimensions": "1536x768",
+    "source_page": "https://www.facebook.com/photo.php?fbid=122145830912720291&set=pb.61571608757873.-2207520000&type=3",
+    "image_url": null,
+    "source_kind": "facebook",
+    "note": "Interior of the shop (inside Gallery Artiva, Lord Aberdeen Hotel): turquoise wall with open shelving, espresso machine, coffee brewers, cone stand, OPEN sign in the window and the glass-topped gelato case across the front. One staff member seen from behind, no faces. From the shop's own Facebook Page (fbcdn URL is signed and expires). Other FB options: hanging 'Francuccinos Gelato' sign over snowy Main St (2048x1536)."
+  },
+  {
+    "id": 636,
+    "name": "Sweet Cloud Ice Cream Rolls",
+    "file": "/images/venues/sweet-cloud-ice-cream-rolls-2610.jpg",
+    "dimensions": "1800x900",
+    "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df529615f75e9:0xf481c7d9f79ea62d",
+    "image_url": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9RbKgAlSOl6977Q18nyrYur-TY2JzscGCKAHXq461bshc3uBQfVZ7qlAOr-_lhfGxmE4I04Jj8GVG63gEA3GK5UB4M5rrtBt9hhkUGaMWpE52YFjlU2bGHzRvMtfpcCdYJrhLk3RDxL7zE=w2400",
+    "source_kind": "google_maps",
+    "note": "Fallback storefront, new Oct 2026 Google upload of the open Water St shop: big lit 'Sweet Cloud ICE CREAM ROLLS' sign under the wood soffit, windows showing the colourful 'Let the good times roll' mural, red brick fire hall at right. Name clearly readable, but the strip is mostly sign and soffit. Cropped above the staff member holding a tray (her face is excluded). Website (sweet-cloud.ca) and IG @sweetcloudicecream only have truck photos or 360px reel covers of the interior mural; Castanet photo is 640px."
+  },
+  {
+    "id": 233,
+    "name": "Gallagher Lake Cafe",
+    "file": "/images/venues/gallagher-lake-cafe-2610.jpg",
+    "dimensions": "1798x899",
+    "source_page": "https://www.facebook.com/people/Gallagher-Lake-Cafe/61553419114723/",
+    "image_url": null,
+    "source_kind": "facebook",
+    "note": "Near-pass; Dayton should decide. This is the café's own Facebook cover. The strip shows the whole white building with a green roof, the orange CAFE sign, the door and the patio picnic table, on a sunny day with pines behind. The lower half of the strip is a row of five parked motorbikes. The sign reads CAFE, not the café's name. The window also has 'The DOG' lettering, which may be a neighbouring business. Everything else on the page is food plates and CLOSED notices."
+  },
+  {
+    "id": 312,
+    "name": "Junction 3 Coffee House",
+    "file": "/images/venues/junction-3-coffee-house-2610.jpg",
+    "dimensions": "1620x800",
+    "source_page": "https://www.facebook.com/photo/?fbid=1256550825536074",
+    "image_url": null,
+    "source_kind": "facebook",
+    "note": "Strip shows the coffee house at night: the JUNCTION 3 COFFEEHOUSE fascia lit with coloured bulbs, five glowing patio igloo domes in front, an OPEN sign in the window and a lit tree on the right. Name readable, patio with atmosphere. Dark night shot. 1620px wide, from the café's own Facebook cover. A 2020 Summerland Review sunset dome photo (raw/.../n1.jpg) is also good but only 897px wide."
+  }
+]
