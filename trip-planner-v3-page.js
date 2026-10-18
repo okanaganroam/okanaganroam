@@ -172,8 +172,8 @@ function t3KmText(km) {
 function t3StateToQuery(s) {
   const p = [];
   const add = (k, v) => p.push(k + '=' + encodeURIComponent(v));
-  const KEY = /^[1-7]-(morning|midday|afternoon|evening)$/;
-  const PARTS = ['morning', 'midday', 'afternoon', 'evening'];
+  const KEY = /^[1-7]-(morning|midday|afternoon|late|evening)$/;
+  const PARTS = ['morning', 'midday', 'afternoon', 'late', 'evening'];
   const byKey = (a, b) => (Number(a[0]) - Number(b[0])) || (PARTS.indexOf(a.slice(2)) - PARTS.indexOf(b.slice(2)));
   const id = (x) => Number.isInteger(x) && x > 0 && x < 1e9;
   const slots = (m) => Object.keys(m || {}).filter((k) => KEY.test(k) && id(m[k])).sort(byKey).map((k) => k + ':' + m[k]);
@@ -219,7 +219,7 @@ function t3QueryToState(search, regions) {
   if (!text) return null;
   let invalid = !!q.__bad;
   const ID = '[1-9]\\d{0,8}';
-  const SLOT = new RegExp('^([1-7]-(?:morning|midday|afternoon|evening)):(' + ID + ')$');
+  const SLOT = new RegExp('^([1-7]-(?:morning|midday|afternoon|late|evening)):(' + ID + ')$');
   const seedOk = /^\d{1,7}$/.test(q.seed || '') && Number(q.seed) <= 1000000;
   const seed = seedOk ? Number(q.seed) : 0;
   if (q.seed !== undefined && !seedOk) invalid = true;
@@ -256,7 +256,7 @@ function t3QueryToState(search, regions) {
   const pinned = slotMap(q.pin, 28);
   const avoid = idList(q.avoid, 200);
   const removed = [];
-  if (q.rm !== undefined) String(q.rm).split(',').forEach((k) => { if (/^[1-7]-(morning|midday|afternoon|evening)$/.test(k)) { if (removed.indexOf(k) === -1) removed.push(k); } else invalid = true; });
+  if (q.rm !== undefined) String(q.rm).split(',').forEach((k) => { if (/^[1-7]-(morning|midday|afternoon|late|evening)$/.test(k)) { if (removed.indexOf(k) === -1) removed.push(k); } else invalid = true; });
   return { text, seed, overrides, locks, exclude, pinned: pinned && Object.keys(pinned).length ? pinned : null, avoid, removed, invalid };
 }
 // A Google Maps directions link through the given stops, in order, using
@@ -1069,7 +1069,7 @@ function renderScript(d) {
   // The hours-derived badges have no key in app.js's frozen dictionary, so
   // their French names live here (same approach as DH_TEXT above).
   var BADGE_FR_EXTRA = { open_early: 'Ouvert t\u00f4t', open_late: 'Ouvert tard' };
-  var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', evening: 'Evening' };
+  var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', late: 'Late afternoon', evening: 'Evening' };
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
   function whenLabel(s){ return DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; }
   // Stop photos: each card in a plan gets a different photo where we have more than one for that kind of place, and a
@@ -1252,7 +1252,8 @@ function renderScript(d) {
       + (layout.fits ? pinsHtml : '<span class="t3-dh-ring"></span>') + '</div>'
       + '<span class="t3-dh-attr"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">' + esc(dh('osm')) + '</a><span class="t3-dh-sep" aria-hidden="true">\u00b7</span><a href="https://www.geoapify.com/" target="_blank" rel="noopener">' + esc(dh('geo')) + '</a></span></div>';
   }
-  function mapHeadHtml(d, mh, maps){
+  // "N stops · About N km" for a day (2026-10-18: every day shows it, not only the first day in a town).
+  function dayMeta(d){
     var shown = d.stops.filter(function(s){ return (s.venue || (s.kind === 'event' && s.event)) && !state.removed[d.day + '-' + s.daypart]; }).length;
     var pts = ((t3MapPoints([d], state.removed).days[0] || {}).points) || [];
     var km = 0;
@@ -1260,6 +1261,10 @@ function renderScript(d) {
     // Straight-line distance, and only when every shown stop has a location.
     var meta = [shown === 1 ? dh('stop1') : dh('stopN', { n: shown })];
     if (shown > 1 && pts.length === shown) meta.push(kmText(km));
+    return shown ? meta : [];
+  }
+  function mapHeadHtml(d, mh, maps){
+    var meta = dayMeta(d);
     var group = mh.group ? (lang() === 'fr' ? tx(mh.group.key) : mh.group.label) : '';
     return '<div class="t3-day-head t3-day-head--map" data-t3-map-header>'
       + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
@@ -1327,10 +1332,12 @@ function renderScript(d) {
     var imgHtml = img ? '<img class="t3-day-img" src="' + esc(img.src) + '"' + (img.srcset ? ' srcset="' + esc(img.srcset) + '" sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1180px) calc(100vw - 64px), 1116px"' : '') + ' alt="" loading="lazy" decoding="async">' : '';
     var dayStops = d.stops.filter(function(s){ return s.venue && !state.removed[d.day + '-' + s.daypart]; });
     var maps = t3MapsUrl(dayStops.map(function(s){ return tripQuery(s.venue); }));
-    // The town map shows on the first day in that town; a later day there shows the town's photo instead of the same map again.
-    var firstInRegion = !img || !days().some(function(x){ return x.region === d.region && x.day < d.day; });
-    var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets && firstInRegion ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
+    // Every day gets the same header (2026-10-18): its own map with its stops, and "N stops · km". A later day in the same
+    // town used to show the town photo with neither. A region without a map keeps the photo header, with the same line.
+    var meta = dayMeta(d);
+    var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
       + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + (meta.length ? '<p class="t3-dh-meta">' + meta.map(esc).join(' \u00b7 ') + '</p>' : '')
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
@@ -1596,18 +1603,61 @@ function renderScript(d) {
   // My Trip keeps the plan's days (2026-10-18): each stop's day goes in okanaganTripDays (ref -> day), the same store
   // the older planner used, so /my-trip groups the stops by day with a directions link per day. Saved trips without
   // days still show as one list.
-  function rememberDays(buttons){
+  function readDays(){
+    try { var m = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
+  }
+  // offset: "Add to it" puts this plan's days after the days already in My Trip (Day 1 of a second trip is Day 3).
+  function rememberDays(buttons, offset){
     try {
-      var dayMap = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {};
-      if (typeof dayMap !== 'object' || Array.isArray(dayMap)) dayMap = {};
+      var dayMap = readDays();
       buttons.forEach(function(b){
         var ref = b.getAttribute('data-trip-ref'), d = parseInt(b.getAttribute('data-plan-day'), 10);
-        if (ref && d > 0 && b.classList.contains('in-trip')) dayMap[ref] = d;
+        if (ref && d > 0 && b.classList.contains('in-trip') && !(offset && dayMap[ref] > 0)) dayMap[ref] = d + (offset || 0);
       });
       localStorage.setItem('okanaganTripDays', JSON.stringify(dayMap));
     } catch (e) {}
+    if (window.__roamTripRender) window.__roamTripRender();
   }
-  function addStops(day){
+  // The last day already used by stops in My Trip that are not in this plan (0 when none has a day).
+  function tripDayOffset(){
+    var days = readDays(), plan = {}, max = 0;
+    planStopButtons().forEach(function(b){ var r = b.getAttribute('data-trip-ref'); if (r) plan[r] = true; });
+    try {
+      (JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []).forEach(function(x){ if (x && x.ref && !plan[x.ref] && days[x.ref] > max) max = Number(days[x.ref]); });
+    } catch (e) {}
+    return max;
+  }
+  // "Add whole trip" when My Trip already holds other stops (2026-10-18: an old Vernon stop and a new 12-stop plan were
+  // mixed into one list): ask first whether to replace the current trip or add to it.
+  function askReplaceOrAdd(){
+    var st = addState();
+    var others = tripSize() - (st.total - st.missing);
+    if (st.state !== 'ready' || others <= 0 || !window.__roamTripReplace) { addStops(null, { offset: tripDayOffset() }); return; }
+    var box = resultEl.querySelector('[data-t3-replace-ask]');
+    if (box) { box.hidden = false; var f = box.querySelector('button'); if (f) f.focus(); return; }
+    var btn = resultEl.querySelector('[data-t3-add-all]');
+    if (!btn) return;
+    box = document.createElement('div');
+    box.className = 't3-replace-ask';
+    box.setAttribute('data-t3-replace-ask', '');
+    box.setAttribute('role', 'group');
+    box.style.cssText = 'grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 0';
+    box.innerHTML = '<p style="flex-basis:100%;margin:0">' + esc(tx('tripv3.replaceAsk', { stops: stopsText(others) })) + '</p>'
+      + '<button type="button" class="t3-btn" data-t3-replace="replace">' + esc(tx('tripv3.replace')) + '</button>'
+      + '<button type="button" class="t3-btn" data-t3-replace="add">' + esc(tx('tripv3.addToIt')) + '</button>'
+      + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-replace="cancel">' + esc(tx('tripv3.cancel')) + '</button>';
+    btn.parentNode.insertBefore(box, btn.nextSibling);
+    box.querySelector('button').focus();
+  }
+  function answerReplace(choice){
+    var box = resultEl.querySelector('[data-t3-replace-ask]');
+    if (box) box.parentNode.removeChild(box);
+    if (choice === 'replace') { window.__roamTripReplace(); refreshAddAll(); addStops(null); }
+    else if (choice === 'add') addStops(null, { offset: tripDayOffset() });
+    var btn = resultEl.querySelector('[data-t3-add-all]');
+    if (btn && btn.focus) btn.focus();
+  }
+  function addStops(day, opts){
     var st = addState(day);
     if (st.state !== 'ready') {
       announce(st.state === 'added' ? tx('tripv3.alreadyAll') : st.state === 'full' ? tx('tripv3.fullMsg', { max: TRIP_MAX_STOPS }) : tx('tripv3.noStops'));
@@ -1626,7 +1676,7 @@ function renderScript(d) {
         if (b.classList.contains('in-trip') || tripSize() > before) added += 1; else failed += 1;
       });
     } finally { window.__roamTripSource = null; }
-    rememberDays(planStopButtons(day));
+    rememberDays(planStopButtons(day), opts && opts.offset);
     if (added && !day) track('add_whole_trip', { added_count: added, already_in_trip_count: already, no_room_count: noRoom, failed_count: failed, trip_size: tripSize(), plan_kind: planFacts(state.last).plan_kind });
     refreshAddAll();
     var msg = tx('tripv3.added', { stops: stopsText(added) });
@@ -1699,7 +1749,8 @@ function renderScript(d) {
       request({pinned:preserved},{ requestType: 'refine', trigger: b, focus: false });return;
     }
     if ((b=t.closest('[data-t3-later-start]'))) { state.overrides.startMinutes=Number(b.getAttribute('data-t3-later-start')); request(Object.keys(state.locks).length?{pinned:state.locks}:{},{ requestType: 'refine', trigger: b, focus: false }); return; }
-    if ((b = t.closest('[data-t3-add-all]'))) { addStops(null); return; }
+    if ((b = t.closest('[data-t3-add-all]'))) { askReplaceOrAdd(); return; }
+    if ((b = t.closest('[data-t3-replace]'))) { answerReplace(b.getAttribute('data-t3-replace')); return; }
     if ((b = t.closest('[data-t3-add-day]'))) { addStops(b.getAttribute('data-t3-add-day')); return; }
     if ((b = t.closest('[data-t3-view-trip]'))) {
       var panel = document.getElementById('tripTrayPanel'), toggle = document.getElementById('tripTrayToggle');

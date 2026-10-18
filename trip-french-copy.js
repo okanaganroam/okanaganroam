@@ -86,6 +86,13 @@ function t3FrenchText(value){
  ['First tasting of the day','Première dégustation de la journée'],['Second tasting of the day','Deuxième dégustation de la journée'],['Lunch between the wineries','Dîner entre les vignobles'],['Lunch at the hill','Dîner à la station'],['A lunch stop for the day','Un arrêt pour le dîner'],['A lunch stop between the morning and afternoon','Un arrêt pour le dîner entre le matin et l’après-midi'],
  ['Après-ski and dinner at the hill','Après-ski et souper à la station'],['A sit-down dinner to end the day','Un souper au restaurant pour finir la journée'],['Optional: something different after the lifts close','Facultatif : autre chose après la fermeture des remontées'],['Optional — skip it to keep skiing','Facultatif — sautez-le pour continuer à skier'],
  ['A viewpoint or walk before the tastings','Un point de vue ou une promenade avant les dégustations'],['Also planned on an earlier evening — few dinner spots at the hill are listed on Okanagan Roam','Déjà prévu un autre soir — peu de restaurants de la station sont répertoriés sur Okanagan Roam'],
+ // Build My Trip gaps (2026-10-18): counted wine days, the late-afternoon tasting, special dinners, empty results.
+ ['Late afternoon','Fin d’après-midi'],['Third tasting of the day','Troisième dégustation de la journée'],['Fourth tasting of the day','Quatrième dégustation de la journée'],['Another tasting','Une autre dégustation'],
+ ['Lunch at a winery’s own kitchen, so it is a tasting too','Dîner à la cuisine d’un vignoble : c’est aussi une dégustation'],
+ ['No $$$ or fine-dining restaurant open that evening is listed nearby on Okanagan Roam, so this is the best sit-down dinner left','Aucun restaurant $$$ ou gastronomique ouvert ce soir-là n’est répertorié à proximité sur Okanagan Roam; voici le meilleur souper au restaurant restant'],
+ ['No Okanagan Roam listings match every part of that request.','Aucune fiche d’Okanagan Roam ne correspond à toutes les parties de cette demande.'],
+ ['We couldn’t work out a plan from that request yet.','Nous n’avons pas encore pu établir un plan à partir de cette demande.'],
+ ['Avoids pubs, cocktail bars and technical climbing for a family trip','Évite les pubs, les bars à cocktails et l’escalade technique pour un voyage en famille'],
  ['No matching event was scheduled for the requested dates.','Aucun événement correspondant n’a été prévu aux dates demandées.'],['Not met:','Non satisfait :'],['Not verified:','Non vérifié :'],['hockey game','match de hockey'],['live music','musique en direct'],['sports event','événement sportif']
  ];
  for(const [a,b] of phrases)text=text.split(a).join(b);
@@ -132,6 +139,15 @@ function t3FrenchText(value){
  text=text.replace(/^No dinner spot open that evening was found at the hill for day (\d+)\.$/,'Aucun restaurant ouvert ce soir-là n’a été trouvé à la station pour le jour $1.');
  text=text.replace(/^No ski resort is listed on Okanagan Roam( in (.+))?\.$/,(_,w,t)=>'Aucune station de ski n’est répertoriée sur Okanagan Roam'+(t?' à '+t:'')+'.');
  text=text.replace(/^You asked for (\d+) dinners, so the other evenings are left free\.$/,'Vous avez demandé $1 soupers; les autres soirées restent libres.');
+ text=text.replace(/^(.+) hasn’t announced its opening day yet; ski season usually starts in late November or December, so check before you book\.$/,'$1 n’a pas encore annoncé sa date d’ouverture; la saison de ski commence habituellement à la fin novembre ou en décembre, alors vérifiez avant de réserver.');
+ text=text.replace(/^Only (\d+) of the (\d+) wineries you asked for( in (.+))? fit day (\d+); their listed hours or the plan's other days left no more\.$/,(_,n,w,x,t,d)=>'Seulement '+n+' des '+w+' vignobles demandés'+(t?' à '+t.replace(/ and (?!.* and )/,' et '):'')+' conviennent au jour '+d+'; leurs horaires indiqués ou les autres jours du plan n’en laissent pas d’autres.');
+ text=text.replace(/^Up to (\d+) winery visits fit in one day, so each day has (\d+) rather than (\d+)\.$/,'Une journée compte au plus $1 visites de vignobles; chaque jour en prévoit donc $2 au lieu de $3.');
+ const frStop=(n,w)=>{const one={winery:'vignoble',brewery:'microbrasserie',restaurant:'restaurant',cafe:'café',distillery:'distillerie'}[w]||w;return n+' '+(n==='1'?one:one+'s');};
+ text=text.replace(/Requested (\d+) (\w+) stops? a day; scheduled ([\d, ]+) \(day by day\)\.( (\d+) a day is more than one day holds, so the plan uses (\d+)\.)?/g,(_,n,w,list,x,r,u)=>'Demandé : '+frStop(n,w)+' par jour; prévu : '+list.trim()+' (jour par jour).'+(x?' '+r+' par jour, c’est plus qu’une journée ne peut contenir; le plan en prévoit '+u+'.':''));
+ text=text.replace(/Requested (\d+) (\w+) stops?; scheduled (\d+)\./g,(_,n,w,m)=>'Demandé : '+frStop(n,w)+'; prévu : '+m+'.');
+ text=text.replace(/^Places that mention (.+) in (.+?)(?:, ranked by how closely they match and by their ratings)?\.$/,(_,w,t)=>'Lieux qui mentionnent '+w.replace(/“/g,'« ').replace(/”/g,' »').replace(/ and (?!.* and )/,' et ')+(t==='the Okanagan'?' dans l’Okanagan':' à '+t.replace(/ and (?!.* and )/,' et '))+'.');
+ text=text.replace(/^Ideas for (.+)\.$/,(_,t)=>'Idées pour '+(t==='the Okanagan'?'l’Okanagan':t.replace(/ and (?!.* and )/,' et '))+'.');
+ text=text.replace(/^What’s on in (.+)\.$/,(_,t)=>'À l’affiche '+(t==='the Okanagan'?'dans l’Okanagan':'à '+t.replace(/ and (?!.* and )/,' et '))+'.');
  text=text.replace(/^A ski day at (.+)$/,'Une journée de ski à $1');
  text=text.replace(/^About (<?\d+) km \(straight line\) from (.+)$/,(_,k,w)=>'Environ '+k+' km (à vol d’oiseau) '+({'the previous stop':'de l’arrêt précédent','the wineries':'des vignobles','the morning and afternoon stops':'des arrêts du matin et de l’après-midi'}[w]||'de '+w));
  text=text.replace(/ on (\d{4}-\d{2}-\d{2})/g,' le $1');

@@ -4985,7 +4985,7 @@ function tripPlannerLabels() {
 }
 
 const TRIP_PLAN_MAX_IDS = 200;
-const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|evening)$/;
+const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|late|evening)$/; // late: a wine day's late-afternoon tasting (2026-10-18)
 // Validates the POST /api/trip/plan body; returns { error } or { value }.
 function parseTripPlanBody(body) {
   const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides'];
@@ -29790,7 +29790,8 @@ ${renderGolfHeaderHtml()}
     return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(','))).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
   }
   function dirUrl(stops){
-    var q = stops.map(function(s){ return s.query || (info[s.ref] && info[s.ref].query) || s.name; });
+    // At most 11 stops: an origin, nine waypoints and a destination, Google's limit for one route link (2026-10-18).
+    var q = stops.map(function(s){ return s.query || (info[s.ref] && info[s.ref].query) || s.name; }).slice(0, 11);
     if (q.length === 1) return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q[0]);
     var u = 'https://www.google.com/maps/dir/?api=1&origin=' + encodeURIComponent(q[0]) + '&destination=' + encodeURIComponent(q[q.length - 1]);
     if (q.length > 2) u += '&waypoints=' + encodeURIComponent(q.slice(1, -1).join('|'));

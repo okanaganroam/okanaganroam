@@ -29,6 +29,7 @@ const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'t
 const WALKING_TRANSPORT = /\b(?:no car|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const WORD_DAYS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7};
+const PER_DAY_MAX = 4; // the most tastings (wineries, breweries) one day can hold (2026-10-18)
 // Taxonomies are rebuilt for every edit; reuse only name normalization,
 // keyed by the actual stored name so listing edits cannot leave stale matches.
 const venueNames = new Map();
@@ -218,10 +219,15 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:/\bbeach(?:es)?\b/,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/})) {
       const m=re.exec(value==='golf'&&taxonomy?.types?.includes('sport')?c.replace(/\bdisc golf\b/g,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:{});
     }
-    for (const count of c.matchAll(/\b([1-7]|one|two|three|four|five|six|seven)\s+(wineries|winery|vineyards?|cafes?|restaurants?|breweries|distilleries)\b/g)) {
+    // "3 wineries a day" / "two breweries per day" is a count for every day (2026-10-18), capped at
+    // PER_DAY_MAX (more tastings than that do not fit a day); "3 wineries" alone is a count for the trip.
+    for (const count of c.matchAll(/\b([1-9]|one|two|three|four|five|six|seven|eight|nine)\s+(wineries|winery|vineyards?|cafes?|restaurants?|breweries|brewery|distilleries|distillery)\b/g)) {
       if (/\b(?:no|not|without|avoid|skip|exclude)\b.*$/.test(c.slice(0,count.index))) continue;
       const type=/win|vineyard/.test(count[2])?'winery':/cafe/.test(count[2])?'cafe':/restaurant/.test(count[2])?'restaurant':/brewer/.test(count[2])?'brewery':'distillery';
-      add('type_count',type,scopeText,{count:Number(count[1])||WORD_DAYS[count[1]]});
+      const n=Number(count[1])||WORD_DAYS[count[1]]||{eight:8,nine:9}[count[1]];
+      const perDay=/^\s*(?:a|per|each|every)\s+(?:day|days)\b|^\s*daily\b/.test(c.slice(count.index+count[0].length));
+      if(perDay)add('type_count',type,scopeText,{count:Math.min(n,PER_DAY_MAX),perDay:true,...(n>PER_DAY_MAX?{requestedCount:n}:{})});
+      else if(n<=7)add('type_count',type,scopeText,{count:n});
     }
     const singleDinner=/\b(?:a|an|one)\s+(?:(?:relaxed|casual|romantic|special|easygoing|quiet|nice|great)\s+){0,2}(?:dinner|supper)\b/.exec(c);
     // "A nice dinner each night" is a dinner every night, not one dinner (2026-10-18).
@@ -594,7 +600,15 @@ function evaluateTripRequirements({requirements,plan,facts,tripDate}){
   return (requirements?.items||[]).map(i=>{
     const pool=selected.filter(s=>applicable(i,s.day,tripDate));let status='unmet',reason='';
     if(i.kind==='event'){const events=[...selectedStops(plan),...(plan.kind==='events'?(plan.events||[]).map(event=>({kind:'event',event,day:1})):[])].filter(s=>s.kind==='event'&&s.event&&applicable(i,s.day,tripDate));status=events.some(s=>eventMatches(s.event,i))?'satisfied':'unmet';reason=status==='satisfied'?'Matched a dated event occurrence.':'No matching event was scheduled for the requested dates.';}
-    else if(i.kind==='type_count'){const found=pool.filter(s=>matches(s.v,i)).length;status=found===i.count?'satisfied':'unmet';reason=`Requested ${i.count} ${i.value} stop${i.count===1?'':'s'}; scheduled ${found}.`;}
+    else if(i.kind==='type_count'&&i.perDay){
+      // A count per day is checked day by day; some but fewer than asked is "needs confirmation", never "missing" (2026-10-18).
+      const dayNumbers=(plan.days||[]).map(d=>d.day).filter(d=>applicable(i,d,tripDate));
+      const perDay=dayNumbers.map(d=>({day:d,found:pool.filter(s=>s.day===d&&matches(s.v,i)).length}));
+      const short=perDay.filter(x=>x.found<i.count);
+      status=!perDay.length||perDay.every(x=>x.found===0)?'unmet':short.length?'unverified':'satisfied';
+      reason=`Requested ${i.count} ${i.value} stop${i.count===1?'':'s'} a day; scheduled ${perDay.map(x=>x.found).join(', ')} (day by day).`+(i.requestedCount?` ${i.requestedCount} a day is more than one day holds, so the plan uses ${i.count}.`:'');
+    }
+    else if(i.kind==='type_count'){const found=pool.filter(s=>matches(s.v,i)).length;status=found===i.count?'satisfied':found>0?'unverified':'unmet';reason=`Requested ${i.count} ${i.value} stop${i.count===1?'':'s'}; scheduled ${found}.`;}
     else if(i.kind==='transport'){
       const tooFar=pool.some((s,k)=>k>0&&s.day===pool[k-1].day&&[s.v.lat,s.v.lng,pool[k-1].v.lat,pool[k-1].v.lng].every(Number.isFinite)&&km(pool[k-1].v,s.v)>i.limitKm);
       status=tooFar?'unmet':'unverified';reason=tooFar?`The final sequence exceeds the ${i.limitKm} km straight-line limit; a practical walking itinerary could not be verified.`:`Car-free suggestions use a maximum ${i.limitKm} km straight-line gap between stops. Actual walking routes, crossings, accessibility and travel times are not verified.`;

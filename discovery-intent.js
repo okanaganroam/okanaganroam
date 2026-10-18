@@ -1055,7 +1055,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const isNegated = (hit) => neg.negatedHits.has(hit);
 
   const flags = { event: false, plan: false, recommend: false, scopeAnything: false };
-  const lengthMentions = lengths.map((l) => ({ days: l.days, phrase: l.phrase, start: l.start }));
+  // "3 wineries a day" is a count per day, not a trip length or a day of its own (2026-10-18).
+  const perDayCount = (l) => l.phrase === 'a day' && l.start >= 2 && /^(?:[1-9]|one|two|three|four|five|six|seven|eight|nine)$/.test(tokens[l.start - 2] || '');
+  const lengthMentions = lengths.filter((l) => !perDayCount(l)).map((l) => ({ days: l.days, phrase: l.phrase, start: l.start }));
   const budgetMentions = [], paceMentions = [], occasionMentions = [], whenMentions = [], daypartMentions = [], conceptMentions = [];
   const monthMentions = [], seasonMentions = [];
   const eventCats = [];
@@ -1140,7 +1142,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const longest = lengthMentions.reduce((m, l) => Math.max(m, l.days), 0);
   const themeAnchors = [];
   if (longest > 1) {
-    for (const l of lengths) if (l.days === 1 && /^(one|a)\b/.test(l.phrase)) themeAnchors.push({ start: l.start, end: l.end, phrase: l.phrase });
+    for (const l of lengths) if (l.days === 1 && /^(one|a)\b/.test(l.phrase) && !perDayCount(l)) themeAnchors.push({ start: l.start, end: l.end, phrase: l.phrase });
     for (let i = 0; i + 2 < tokens.length; i++) {
       if (tokens[i] === 'one' && tokens[i + 1] === 'of' && ['them', 'those', 'the'].includes(tokens[i + 2])) {
         const end = tokens[i + 2] === 'the' && tokens[i + 3] === 'days' ? i + 4 : i + 3;

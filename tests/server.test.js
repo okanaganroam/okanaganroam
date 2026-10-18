@@ -10224,7 +10224,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
-  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'public/scripts/app.js (French hero search; My Trip holds 30 stops, 2026-10-18)');
+  // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
+  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85', 'public/scripts/app.js (My Trip tray by day, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12118,7 +12119,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
+  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -14083,7 +14084,7 @@ test('map day headers: the page uses static <picture> maps with both credits as 
   // The whole-trip interactive map and "Map this day" are unchanged.
   assert.ok(page.includes('function loadLeaflet') && page.includes('L.tileLayer(MAP_TILES') && page.includes('tripMap'));
   assert.ok(page.includes('data-t3-map-day') && page.includes("esc(tx('tripv3.mapDay'))") && page.includes('data-t3-regen-day') && page.includes('data-t3-add-day'));
-  assert.ok(page.includes("var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets && firstInRegion ? mapHeadHtml("), 'a region without a map, or a later day in the same town, keeps the photo header');
+  assert.ok(page.includes("var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml("), 'every day with a map gets the map header (2026-10-18); a region without a map keeps the photo header');
   // The served images are real WebP, and nothing else carries any of it.
   const res = await fetch(`${base}${mh.penticton.assets.desktop.src}`);
   assert.equal(res.status, 200); assert.equal(res.headers.get('content-type'), 'image/webp');
@@ -16368,7 +16369,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
+  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16461,7 +16462,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
