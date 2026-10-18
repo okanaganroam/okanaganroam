@@ -1,0 +1,414 @@
+{
+ "heading": "Okanagan Christmas Markets & Holiday Craft Fairs 2026",
+ "title": "Okanagan Christmas Markets 2026 | Okanagan Roam",
+ "description": "Every Okanagan Christmas market and holiday craft fair for 2026, town by town: Kelowna, Vernon, Penticton, Lake Country, Oliver, Osoyoos and winery markets.",
+ "banner": "whats-on-markets-fairs",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "This guide lists the 2026 Christmas markets and holiday craft fairs across the Okanagan, from November into mid-December: big weekend markets at Prospera Place and the Laurel Packinghouse, small church and school fairs, markets at wineries and cideries, and hands-on workshops where you make your own wreath or ornament. Many are free or by donation, often to the local food bank.",
+  "Markets are grouped by area, in date order. Each one shows its town and date. Check the event page for hours before you go."
+ ],
+ "sections": [
+  {
+   "id": "kelowna-s-big-holiday-markets",
+   "jump": "Kelowna",
+   "heading": "Kelowna's big holiday markets",
+   "items": [
+    {
+     "ref": "event:kelowna/a-merry-little-christmas-market",
+     "name": "A Merry Little Christmas Market",
+     "text": "a curated holiday market inside an executive home in the Upper Mission, with local makers' decor, candles, jewellery, coffee and kids' keepsakes. Two VIP evenings include a glass of wine; the weekend is general admission with timed entry.",
+     "where": "Kelowna, from Nov 5, four dates"
+    },
+    {
+     "ref": "event:kelowna/winter-warm-up-market",
+     "name": "Winter Warm-Up Market",
+     "text": "more than 60 vendors sell handcrafted gifts, artisanal goods, festive treats and one-of-a-kind decorations at the Rotary Centre for the Arts. Admission is by donation.",
+     "where": "Kelowna, Nov 7"
+    },
+    {
+     "ref": "event:kelowna/christmas-at-the-laurel",
+     "name": "Christmas at the Laurel",
+     "text": "a three-day, European-style holiday market in the historic Laurel Packinghouse, with handmade gifts from local artisans and festive treats. Admission by donation to the Food Bank.",
+     "where": "Kelowna, Nov 13 – 15"
+    },
+    {
+     "ref": "event:kelowna/it-s-christmas-the-red-barn",
+     "name": "It's Christmas @ the Red Barn",
+     "text": "a two-day holiday market with more than 50 local makers selling clothing, gourmet foods, body products, jewelry and home decor. Free admission; Food Bank donations welcome.",
+     "where": "Kelowna, Nov 21 – 22"
+    },
+    {
+     "ref": "event:kelowna/delta-grand-holiday-market",
+     "name": "Delta Grand Holiday Market",
+     "text": "about 100 vendors fill the Delta Hotels Grand Okanagan Resort for a day of festive shopping in a lakeside setting. Admission is by donation.",
+     "where": "Kelowna, Nov 22"
+    },
+    {
+     "ref": "event:kelowna/holiday-magic-market",
+     "name": "Holiday Magic Market",
+     "text": "around 60 local makers take over the Rotary Centre for the Arts. Admission is by donation.",
+     "where": "Kelowna, Nov 27, from 1 pm"
+    },
+    {
+     "ref": "event:kelowna/downtown-kelowna-winter-street-market-light-up",
+     "name": "Downtown Kelowna Winter Street Market & Light Up",
+     "text": "Downtown Kelowna's free kick-off to the holidays fills Stuart Park with a vendor market, family activities and stage performances, then the park's lights are switched on at 5 pm.",
+     "where": "Kelowna, Nov 28"
+    },
+    {
+     "ref": "event:kelowna/craft-culture-holiday-market",
+     "name": "Craft Culture Holiday Market",
+     "text": "Kelowna's largest holiday market fills Prospera Place with more than 200 local crafters and artisans. The market runs all weekend, and admission is $7.",
+     "where": "Kelowna, Dec 4 – 6"
+    },
+    {
+     "ref": "event:kelowna/christkindl-holiday-market",
+     "name": "Christkindl Holiday Market",
+     "text": "a traditional European-style Christmas market in the Laurel Packinghouse, with handmade local gifts, festive treats and hot cider. Admission by donation to the Food Bank.",
+     "where": "Kelowna, Dec 4 – 6"
+    }
+   ]
+  },
+  {
+   "id": "kelowna-church-school-and-comm",
+   "jump": "Kelowna fairs",
+   "heading": "Kelowna church, school and community fairs",
+   "items": [
+    {
+     "ref": "event:kelowna/st-pius-x-community-christmas-bazaar",
+     "name": "St. Pius X Community Christmas Bazaar",
+     "text": "a parish Christmas bazaar selling decorated trees, ornaments, lights, wreaths and gifts. A low-key, budget-friendly holiday shopping stop.",
+     "where": "Kelowna, Nov 7, from 9 am"
+    },
+    {
+     "ref": "event:kelowna/glenmore-christmas-artisan-fair",
+     "name": "Glenmore Christmas Artisan Fair",
+     "text": "a free Christmas artisan fair at Mountainview Church with local makers, door prizes, a coffee bar and a bake sale.",
+     "where": "Kelowna, Nov 7"
+    },
+    {
+     "ref": "event:kelowna/immaculata-annual-christmas-craft-fair",
+     "name": "Immaculata Annual Christmas Craft Fair",
+     "text": "vendors and artisans, plus a bake sale, children's activities, refreshments and door prizes. Admission is free.",
+     "where": "Kelowna, Nov 14"
+    },
+    {
+     "ref": "event:kelowna/canyon-falls-middle-school-winter-market",
+     "name": "Canyon Falls Middle School Winter Market",
+     "text": "student makers alongside local artisans and businesses. Admission by donation.",
+     "where": "Kelowna, Nov 15"
+    },
+    {
+     "ref": "event:kelowna/ellison-elementary-winter-market",
+     "name": "Ellison Elementary Winter Market",
+     "text": "an evening winter market with 20+ local artisans and food vendors near the airport.",
+     "where": "Kelowna, Nov 19, 5:30 pm"
+    },
+    {
+     "ref": "event:kelowna/18th-annual-christmas-extravaganza",
+     "name": "18th Annual Christmas Extravaganza",
+     "text": "a two-day Christmas craft and gift market at Rutland Centennial Hall with about 65 local vendors, a bake sale and door prizes.",
+     "where": "Kelowna, Nov 21 – 22"
+    },
+    {
+     "ref": "event:kelowna/central-okanagan-united-church-craft-fair",
+     "name": "Central Okanagan United Church Craft Fair",
+     "text": "a downtown church craft fair on Bernard Avenue with local vendors selling handmade gifts.",
+     "where": "Kelowna, Nov 28"
+    },
+    {
+     "ref": "event:kelowna/springvalley-elementary-christmas-craft-market",
+     "name": "Springvalley Elementary Christmas Craft Market",
+     "text": "crafters, food vendors and photos with Santa.",
+     "where": "Kelowna, Nov 29"
+    },
+    {
+     "ref": "event:kelowna/okanagan-golf-club-holiday-market",
+     "name": "Okanagan Golf Club Holiday Market",
+     "text": "a Sunday holiday market at the Okanagan Golf Club clubhouse, home of Table Nineteen.",
+     "where": "Kelowna, Nov 29"
+    },
+    {
+     "ref": "event:kelowna/east-kelowna-christmas-in-the-country-market",
+     "name": "East Kelowna Christmas in the Country Market",
+     "text": "more than 70 local artisans, crafters and bakers inside the historic East Kelowna Hall. Entry is a loonie or toonie, and proceeds support the hall.",
+     "where": "Kelowna, Dec 5"
+    }
+   ]
+  },
+  {
+   "id": "west-kelowna-lake-country-peac",
+   "jump": "West Kelowna & Lake Country",
+   "heading": "West Kelowna, Lake Country & Peachland",
+   "items": [
+    {
+     "ref": "event:west-kelowna/christmas-ornament-and-arts-crafts-show-sale",
+     "name": "Christmas Ornament and Arts/Crafts Show & Sale",
+     "text": "the 5th annual holiday sale at the West Kelowna Yacht Club, with handmade Christmas ornaments, art and crafts from local makers.",
+     "where": "West Kelowna, from Nov 7, two dates"
+    },
+    {
+     "ref": "event:lake-country/wineries-for-the-holidays-on-the-scenic-sip-trail",
+     "name": "Wineries for the Holidays on the Scenic Sip Trail",
+     "text": "Lake Country's Scenic Sip wineries each host their own festive experience for one day: holiday markets, Santa photos, fire pits and seasonal food-and-wine pairings. Pay per stop.",
+     "where": "Lake Country, Nov 21"
+    },
+    {
+     "ref": "event:lake-country/german-christmas-market-at-gray-monk",
+     "name": "German Christmas Market at Gray Monk",
+     "text": "Gray Monk's 4th annual German-style Christmas market brings 40+ local vendors, German baking, free photos with Santa and lunch at The Lookout. Free entry, with a free parking shuttle from Jack Seaton Park.",
+     "where": "Lake Country, from Nov 28, two dates"
+    },
+    {
+     "ref": "event:peachland/peachland-artisan-christmas-market",
+     "name": "Peachland Artisan Christmas Market",
+     "text": "the Peachland Arts Council's holiday market of handmade goods from local artisans on Beach Avenue.",
+     "where": "Peachland, Nov 28"
+    }
+   ]
+  },
+  {
+   "id": "markets-at-wineries-and-cideri",
+   "jump": "Wineries",
+   "heading": "Markets at wineries and cideries",
+   "items": [
+    {
+     "ref": "event:kelowna/market-at-summerhill",
+     "name": "Market at Summerhill",
+     "text": "a weekend artisan market of handmade gifts and local products at Summerhill Pyramid Winery, with bookable hands-on workshops. Shop, sip organic wine and take in the view.",
+     "where": "Kelowna, Nov 21 – 22"
+    },
+    {
+     "ref": "event:oliver/home-for-the-holidays-at-river-stone",
+     "name": "Home for the Holidays at River Stone",
+     "text": "River Stone Estate Winery's holiday afternoon with an artisan market, live music and seasonal activities for all ages.",
+     "where": "Oliver, Nov 28"
+    },
+    {
+     "ref": "event:naramata/christmas-in-the-barn-holiday-market-at-red-rooster-winery",
+     "name": "Christmas in the Barn Holiday Market at Red Rooster Winery",
+     "text": "Red Rooster's first Christmas market fills the barn with local makers and gift vendors, plus mulled wine and charcuterie. Small entry fee; kids under 12 free.",
+     "where": "Naramata, Nov 29"
+    },
+    {
+     "ref": "event:oliver/hester-creek-holiday-market",
+     "name": "Hester Creek Holiday Market",
+     "text": "a free, family-friendly holiday market with local vendors selling handmade gifts, live music and comfort food from the Terrafina kitchen.",
+     "where": "Oliver, Dec 5"
+    }
+   ]
+  },
+  {
+   "id": "vernon-armstrong-lumby",
+   "jump": "North Okanagan",
+   "heading": "Vernon, Armstrong & Lumby",
+   "items": [
+    {
+     "ref": "event:lumby/lumby-holiday-market",
+     "name": "Lumby Holiday Market",
+     "text": "more than 30 local crafters, makers and bakers fill the White Valley Community Centre.",
+     "where": "Lumby, Nov 7 – 8"
+    },
+    {
+     "ref": "event:armstrong/christmas-markets-at-farmstrong-cider",
+     "name": "Christmas Markets at Farmstrong Cider",
+     "text": "dozens of local vendors, festive food and drink and wagon rides on the cidery's farm. Park at the IPE grounds and ride the $5 shuttle, as there's no parking at the cidery.",
+     "where": "Armstrong, from Nov 21, two Saturdays"
+    },
+    {
+     "ref": "event:vernon/discover-yuletide-fair-at-allan-brooks-nature-centre",
+     "name": "Discover Yuletide Fair at Allan Brooks Nature Centre",
+     "text": "a free holiday fair with local makers selling jewellery, ceramics, prints, textiles, woodwork and candles, plus food trucks. A calm, nature-themed alternative to the busy mall.",
+     "where": "Vernon, from Nov 21, two dates"
+    },
+    {
+     "ref": "event:vernon/artsolutely-holiday-artisan-market",
+     "name": "Artsolutely Holiday Artisan Market",
+     "text": "the Vernon Community Arts Centre turns into a holiday shop of handmade work by 45+ local artists, with new pieces arriving through the season.",
+     "where": "Vernon, Nov 28 – Dec 24"
+    },
+    {
+     "ref": "event:vernon/shoparama-holiday-gift-sale",
+     "name": "Shoparama Holiday Gift Sale",
+     "text": "crafters, small home businesses and bakers under one roof at the Vernon Recreation Centre, plus entertainment, door prizes and food trucks. Admission is free.",
+     "where": "Vernon, from Dec 5, two days"
+    }
+   ]
+  },
+  {
+   "id": "penticton-summerland-the-south",
+   "jump": "South Okanagan",
+   "heading": "Penticton, Summerland & the South Okanagan",
+   "items": [
+    {
+     "ref": "event:penticton/yuletide-the-ptcc",
+     "name": "Yuletide @ the PTCC",
+     "text": "a three-day holiday market with local artisans, gift vendors and specialty food sellers, plus the kids-only Little Elf Shop where young shoppers can pick out gifts for family. Admission is $3 a day.",
+     "where": "Penticton, Nov 6 – 8"
+    },
+    {
+     "ref": "event:penticton/the-hallway-social-at-the-cannery-trade-centre",
+     "name": "The Hallway Social at the Cannery Trade Centre",
+     "text": "businesses in the Cannery Trade Centre each host guest makers, vintage sellers and food vendors, so the whole building becomes a walkable local shopping day with wine tastings and music. Free to attend.",
+     "where": "Penticton, from Nov 7, two dates"
+    },
+    {
+     "ref": "event:penticton/penticton-farmers-market-2026",
+     "name": "Penticton Farmers’ Market 2026",
+     "text": "the market moves indoors to Cherry Lane Mall in November and December, with South Okanagan produce, eggs, honey, baking and preserves.",
+     "where": "Penticton, Saturdays until Dec 12"
+    },
+    {
+     "ref": "event:summerland/annual-christmas-craft-fair",
+     "name": "Annual Christmas Craft Fair",
+     "text": "two floors of vendors fill the Summerland Community Centre with quality handcrafted gifts. Admission is by donation to the food bank.",
+     "where": "Summerland, Nov 14, from 9 am"
+    },
+    {
+     "ref": "event:oliver/a-textile-christmas-craft-fair",
+     "name": "A Textile Christmas Craft Fair",
+     "text": "the South Okanagan Stitchers show and sell handmade textile art and seasonal crafts from eight local makers. Free entry.",
+     "where": "Oliver, Nov 14 – 15"
+    },
+    {
+     "ref": "event:osoyoos/christmas-faire",
+     "name": "Christmas Faire",
+     "text": "the OSCA Osoyoos Activity Centre hosts a Christmas Faire, a chance to browse seasonal goods and pick up holiday gifts close to home.",
+     "where": "Osoyoos, Nov 28"
+    },
+    {
+     "ref": "event:osoyoos/fire-ice-holiday-market-taste-of-osoyoos",
+     "name": "Fire & Ice Holiday Market & Taste of Osoyoos",
+     "text": "Watermark Beach Resort hosts a free holiday market of local makers and treats, while Taste of Osoyoos sends shoppers to six downtown Main Street stops.",
+     "where": "Osoyoos, Nov 28"
+    },
+    {
+     "ref": "event:penticton/the-last-chance-holiday-market",
+     "name": "The Last Chance Holiday Market",
+     "text": "handmade gifts from local artisans, specialty foods and festive treats, billed as the last local shopping stop before Christmas. Admission $3 at the door.",
+     "where": "Penticton, Dec 12 – 13"
+    },
+    {
+     "ref": "event:penticton/west-bench-holiday-market",
+     "name": "West Bench Holiday Market",
+     "text": "a holiday market of local vendors that raises money for West Bench Elementary's parent council. Entry by donation.",
+     "where": "Penticton, from Dec 12, two dates"
+    }
+   ]
+  },
+  {
+   "id": "make-it-yourself-holiday-craft",
+   "jump": "Workshops",
+   "heading": "Make it yourself: holiday craft workshops",
+   "items": [
+    {
+     "ref": "event:okanagan-falls/sip-craft-workshops-at-see-ya-later-ranch",
+     "name": "Sip & Craft Workshops at See Ya Later Ranch",
+     "text": "evening craft nights in the tasting room, each with charcuterie and a glass of wine, including painting holiday wine glasses, a Yule-log centrepiece and gingerbread cookie decorating. Beginner-friendly, $40–$60.",
+     "where": "Okanagan Falls, several dates"
+    },
+    {
+     "ref": "event:okanagan-falls/workshop-holiday-wreath-workshop-and-barrel-sampling-noble-ridge-vineyard-and-winery",
+     "name": "Workshop: Holiday Wreath Workshop and Barrel Sampling @ Noble Ridge Vineyard and Winery",
+     "text": "craft your own holiday wreath, then move into the barrel room for a barrel tasting. The cost is $85.",
+     "where": "Okanagan Falls, Nov 15"
+    },
+    {
+     "ref": "event:lake-country/christmas-gnome-workshop",
+     "name": "Christmas Gnome Crafting",
+     "text": "design your own whimsical gnome at Gray Monk. Arrive early for a complimentary glass of wine before you start.",
+     "where": "Lake Country, Nov 22"
+    },
+    {
+     "ref": "event:oliver/holiday-workshops-at-ward-s-wine-country-kitchen",
+     "name": "Holiday Workshops at Ward's Wine Country Kitchen",
+     "text": "a fresh wreath workshop in November and a table centrepiece workshop in December. Supplies, a glass of wine and a cheese plate are included; no experience needed.",
+     "where": "Oliver, from Nov 22"
+    },
+    {
+     "ref": "event:penticton/grinch-tree-workshop-at-yellow-dog-brewing",
+     "name": "Grinch Tree Workshop at Yellow Dog Brewing",
+     "text": "decorate a small cypress into a whimsical Grinch-style tree to take home, with all decorations provided and a drink included. Also at {event:penticton/grinch-tree-workshop-at-neighbourhood-brewing|Neighbourhood Brewing, Dec 8}.",
+     "where": "Penticton, Dec 1"
+    },
+    {
+     "ref": "event:vernon/handmade-holiday-at-the-vernon-library",
+     "name": "Handmade Holiday at the Vernon Library",
+     "text": "a free drop-in afternoon of making handmade holiday gifts and crafts, open to all ages.",
+     "where": "Vernon, Dec 5"
+    },
+    {
+     "ref": "event:oliver/poinsettia-ornament-workshop",
+     "name": "Poinsettia Ornament Workshop",
+     "text": "make a poinsettia ornament to take home or hang on the tree, at Phantom Creek Estates.",
+     "where": "Oliver, Dec 6"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "The biggest market",
+    [
+     "event:kelowna/craft-culture-holiday-market|Craft Culture Holiday Market"
+    ]
+   ],
+   [
+    "A European-style Christmas market",
+    [
+     "event:kelowna/christkindl-holiday-market|Christkindl Holiday Market",
+     "event:lake-country/german-christmas-market-at-gray-monk|German Christmas Market at Gray Monk"
+    ]
+   ],
+   [
+    "Shopping with a glass of wine",
+    [
+     "event:kelowna/market-at-summerhill|Market at Summerhill",
+     "event:naramata/christmas-in-the-barn-holiday-market-at-red-rooster-winery|Christmas in the Barn Holiday Market at Red Rooster Winery"
+    ]
+   ],
+   [
+    "Free entry",
+    [
+     "event:kelowna/it-s-christmas-the-red-barn|It's Christmas @ the Red Barn",
+     "event:vernon/discover-yuletide-fair-at-allan-brooks-nature-centre|Discover Yuletide Fair at Allan Brooks Nature Centre"
+    ]
+   ],
+   [
+    "A market with the kids",
+    [
+     "event:penticton/yuletide-the-ptcc|Yuletide @ the PTCC",
+     "event:kelowna/downtown-kelowna-winter-street-market-light-up|Downtown Kelowna Winter Street Market & Light Up"
+    ]
+   ],
+   [
+    "A last-minute shop",
+    [
+     "event:penticton/the-last-chance-holiday-market|The Last Chance Holiday Market",
+     "event:vernon/artsolutely-holiday-artisan-market|Artsolutely Holiday Artisan Market"
+    ]
+   ],
+   [
+    "Make your own gifts",
+    [
+     "event:oliver/holiday-workshops-at-ward-s-wine-country-kitchen|Holiday Workshops at Ward's Wine Country Kitchen",
+     "event:vernon/handmade-holiday-at-the-vernon-library|Handmade Holiday at the Vernon Library"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guides/okanagan-holiday-events\">Holiday events guide</a>, <a href=\"/whats-on/markets-fairs\">Markets &amp; fairs</a>, <a href=\"/whats-on/holiday-seasonal\">Holiday &amp; seasonal events</a>"
+}
