@@ -11186,10 +11186,10 @@ test('Open Now on /browse follows stored hours + the Okanagan clock with no prov
   }
 });
 
-test('Open Now is /food-drink only: destination category pages carry none of it, and the browser clock equals okanaganClock()', () => {
+test('Open Now on the food & drink pages: the type pages carry it too (2026-10-18), and the browser clock equals okanaganClock()', () => {
   const v = app.getFoodDrinkHubVenues().find((x) => ['restaurant', 'cafe', 'pub'].includes(x.type));
   const scoped = app.renderFoodDrinkHubPage(app.getVenuesByRegionCategory(v.region, v.type), { types: [], features: [], regions: [] }, { region: v.region, type: v.type, categoryCounts: app.getRegionCategoryCounts(v.region) });
-  for (const needle of ['fd-open-status', 'fdOpenNow', 'fd-open-note', 'hoursStatusLabel', 'open=now', 'data-fd-remove-open']) assert.ok(!scoped.includes(needle), needle);
+  for (const needle of ['fdOpenNow', 'hoursStatusLabel', 'open=now']) assert.ok(scoped.includes(needle), needle);
   // The page script builds okanaganClock() from the same function and options.
   const vm = require('node:vm');
   const ctx = { Intl };
@@ -23006,5 +23006,50 @@ test('Photo sizes: cards and thumbnails use the 480px copy, the venue photo load
   } finally {
     srv.close();
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('Food & drink type pages: Open now toggle, open/closed line on cards, sort, and places closed for the season last', async () => {
+  const http = require('node:http');
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver' }).format(new Date());
+  const shut = JSON.stringify({ mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] });
+  seasonInsert.run({ name: 'Open Now Fixture Always', type: 'restaurant', hours: SEASON_WEEK, slug: 'open-now-fixture-always' });
+  seasonInsert.run({ name: 'Open Now Fixture Shut', type: 'restaurant', hours: shut, slug: 'open-now-fixture-shut' });
+  seasonInsert.run({ name: 'Open Now Fixture Seasonal', type: 'restaurant', hours: SEASON_WEEK, slug: 'open-now-fixture-seasonal' });
+  const a = app.findVenueBySlug('kelowna', 'restaurant', 'open-now-fixture-always');
+  const b = app.findVenueBySlug('kelowna', 'restaurant', 'open-now-fixture-shut');
+  const c = app.findVenueBySlug('kelowna', 'restaurant', 'open-now-fixture-seasonal');
+  db.prepare('UPDATE venues SET rating = 4.6, reviews = 300 WHERE id = ?').run(a.id);
+  db.prepare('UPDATE venues SET rating = 4.0, reviews = 50 WHERE id = ?').run(b.id);
+  db.prepare('UPDATE venues SET rating = 5.0, reviews = 900 WHERE id = ?').run(c.id);
+  assert.equal(app.guardedSeasonUpdate(c.id, { status: 'closed', reopens_date: null, source_url: 'https://example.com/', checked_at: today }, { reason: 'test', batch_id: 'test' }).ok, true);
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const get = (p) => fetch(`${base}${p}`).then((r) => r.text());
+  const order = (html) => [...html.matchAll(/data-venue-id="(\d+)"/g)].map((m) => Number(m[1])).filter((id) => [a.id, b.id, c.id].includes(id));
+  try {
+    for (const path of ['/kelowna/restaurants', '/restaurants']) {
+      const html = await get(path);
+      assert.match(html, /id="fdOpenNow"/, path);
+      assert.match(html, /<select id="fdSort"/, path);
+      // Recommended: the 5.0-rated place is closed for the season, so it comes after the others.
+      const ids = [...new Set(order(html))];
+      assert.ok(ids.indexOf(c.id) > ids.indexOf(a.id) && ids.indexOf(c.id) > ids.indexOf(b.id), `${path}: seasonal closure last (${ids})`);
+      const cardA = html.slice(html.indexOf(`data-venue-id="${a.id}"`), html.indexOf(`data-venue-id="${a.id}"`) + 4000);
+      assert.match(cardA, /class="fd-open-status" data-fd-open="open"/, `${path}: open line on the card`);
+    }
+    // Top rated keeps its name: the 5.0 place first among the three.
+    assert.equal(order(await get('/kelowna/restaurants?sort=rating'))[0], c.id);
+    // Open now: the always-open place is in the first batch, the shut one is not.
+    const open = await get('/kelowna/restaurants?open=now');
+    assert.match(open, /id="fdOpenNow"[^>]*aria-pressed="true"/);
+    const firstBatch = open.slice(open.indexOf('id="fdResults"'), open.indexOf('<template'));
+    assert.ok(firstBatch.includes(`data-venue-id="${a.id}"`));
+    assert.ok(!firstBatch.includes(`data-venue-id="${b.id}"`));
+  } finally {
+    srv.close();
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(c.id);
+    for (const v of [a, b, c]) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });

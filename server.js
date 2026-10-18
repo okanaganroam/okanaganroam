@@ -16322,7 +16322,11 @@ function sortFoodDrinkVenues(venues, sort = 'recommended') {
   if (sort === 'az') return list.sort(byName);
   if (sort === 'rating') return list.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0) || (Number(b.reviews) || 0) - (Number(a.reviews) || 0) || byName(a, b));
   const score = new Map(list.map((v) => [v.id, foodDrinkRecommendedScore(v)]));
-  return list.sort((a, b) => score.get(b.id) - score.get(a.id) || byName(a, b));
+  // Closed for the season (2026-10-18): kept on the list but moved to the end, so a visitor this week sees places
+  // they can actually go to first. Only the Recommended order; Top rated and A-Z stay as named.
+  const seasons = getSeasonStates();
+  const away = (v) => { const st = seasons.get(v.id); return st && st.kind === 'closed' ? 1 : 0; };
+  return list.sort((a, b) => away(a) - away(b) || score.get(b.id) - score.get(a.id) || byName(a, b));
 }
 
 // Card photos (2026-10-14). Every listing card used to carry the same lake
@@ -17598,6 +17602,13 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   const valleyText = FD_HUB_HEADINGS[type];
   const path = valleyWide ? `/${catSlug}` : `/${region}/${catSlug}`;
 
+  // Open now, status and sort (2026-10-18): the same as /food-drink -- Recommended order (places closed for the
+  // season last), Top rated, A-Z; an Open now toggle over stored hours; each card's open/closed line.
+  const q0 = filter || {};
+  const sort = FD_SORT_KEYS.has(q0.sort) ? q0.sort : 'recommended';
+  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended').map((v, i) => [v.id, i]));
+  venues = sortFoodDrinkVenues(venues, sort);
+  const openNow = !!q0.openNow;
   // Only primary type counts: every card answers to this page's category.
   const catsById = new Map(venues.map((v) => [v.id, [v.type]]));
   const featsById = foodDrinkFeaturesByVenue(venues);
@@ -17607,11 +17618,15 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   const scopeFeatures = FD_HUB_FEATURES.map((x) => x.key).filter((k) => present.has(k));
   const q = filter || { features: [] };
   const f = { types: [], regions: [], features: (q.features || []).filter((k) => present.has(k)) };
-  const matching = filterFoodDrinkVenues(venues, f, catsById, featsById);
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false });
+  const pool = openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
+  const matching = filterFoodDrinkVenues(pool, f, catsById, featsById);
   const matchIds = new Set(matching.map((v) => v.id));
-  const counts = foodDrinkChipCounts(venues, f, catsById, featsById);
-  const filtered = f.features.length > 0;
-  const state = { types: [], features: f.features, regions: [], counts };
+  const counts = foodDrinkChipCounts(pool, f, catsById, featsById);
+  const openCount = filterFoodDrinkVenues(venues.filter((v) => openInfo.openIds.has(v.id)), f, catsById, featsById).length;
+  const filtered = f.features.length > 0 || openNow;
+  const state = { types: [], features: f.features, regions: [], counts, openNow };
 
   const title = valleyWide ? `${valleyText.heading} | Okanagan Roam` : `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
   const description = valleyWide ? valleyText.intro : venues.length === 0
@@ -17636,10 +17651,15 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
     })),
   };
   const payload = {};
-  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description) };
+  for (const v of venues) {
+    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description), o: recommendedRank.get(v.id) };
+    if (Number(v.rating)) payload[String(v.id)].g = Number(v.rating);
+    if (Number(v.reviews)) payload[String(v.id)].n = Number(v.reviews);
+    const st = openInfo.byId.get(v.id);
+    if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+  }
 
-  const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false) : '';
+  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false, openInfo.byId) : '';
   const emptyHtml = venues.length === 0
     ? `<p class="fd-no-results" id="fdNoResults">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel || 'the Okanagan')} right now.</p>`
     : `<p class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(label.plural.toLowerCase())} here match that combination yet. <a href="${path}" id="fdNoResultsClear">Clear the filters</a> to see all of them.</p>`;
@@ -17660,6 +17680,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
+${renderFoodDrinkOpenNowStyles()}
 ${golfEngagementHeadHtml('fd', true, 'category')}
 </head>
 <body class="golf-page outdoor-page fd-page fd-scoped-page">
@@ -17678,10 +17699,10 @@ ${renderGolfHeaderHtml()}
     : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
   ${venues.length ? foodDrinkSearchHtml() : ''}
-  ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures) : ''}
+  ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`) : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
-  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state)}
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state, venues.length > 1 ? sort : null)}
   ${emptyHtml}
   ${cardsHtml}
   <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
@@ -17692,7 +17713,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
-  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category' })}
+  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category', openNow: true })}
 </body>
 </html>`;
 }
@@ -38874,7 +38895,7 @@ const server = http.createServer(async (req, res) => {
       const type = SLUG_TO_TYPE[fdTypeSlug];
       const typeVenues = getVenuesByCategory(type);
       if (typeVenues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderFoodDrinkHubPage(typeVenues, parseFoodDrinkFilterQuery(query), { region: null, type });
+        const html = renderFoodDrinkHubPage(typeVenues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' }, { region: null, type });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -39517,7 +39538,7 @@ const server = http.createServer(async (req, res) => {
           // directories built on the /food-drink filters; wineries, golf,
           // beaches and outdoors keep their existing page unchanged.
           const html = FD_CATEGORY_KIND_BY_TYPE[type]
-            ? renderFoodDrinkHubPage(venues, parseFoodDrinkFilterQuery(query), { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
+            ? renderFoodDrinkHubPage(venues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' }, { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
             : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', sportsAlso });
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
