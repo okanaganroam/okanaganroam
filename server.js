@@ -30923,6 +30923,19 @@ function revokeOwnerLink(venueId) {
   return db.prepare('DELETE FROM venue_owner_links WHERE venue_id = ?').run(venueId).changes > 0;
 }
 
+// Logins on a listing (2026-10-18), for disputes ("someone else has my listing"): list them, or take one login
+// off the listing. The account itself stays (it may manage other businesses); access is checked on every request
+// (venueForOwnerAccount), so a removed login loses the listing at once.
+function ownerLoginsForVenue(venueId) {
+  return db.prepare(`SELECT a.email, av.added_at FROM owner_account_venues av JOIN owner_accounts a ON a.id = av.account_id
+    WHERE av.venue_id = ? ORDER BY a.email`).all(venueId).map((r) => ({ email: r.email, added_at: r.added_at || null }));
+}
+function removeOwnerLoginFromVenue(venueId, email) {
+  const account = db.prepare('SELECT id FROM owner_accounts WHERE email = ?').get(String(email || '').trim().toLowerCase());
+  if (!account) return false;
+  return db.prepare('DELETE FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').run(account.id, venueId).changes > 0;
+}
+
 // The venue behind an edit-link token, or null for a malformed, unknown or
 // revoked token (and for a venue that has since been retired).
 function venueForOwnerToken(token) {
@@ -35033,8 +35046,19 @@ const OWNER_HELP_TOPICS = [
     keys: ['never got', 'didnt get', 'did not get', 'didnt receive', 'not received', 'never received', 'havent received', 'havent got', 'no email', 'didnt arrive', 'hasnt arrived', 'not arrived', 'where is the email', 'spam', 'junk', 'promotions', 'never came', 'didnt come'],
     a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>' },
   { id: 'staff', q: 'Can my staff or a partner log in too?', pages: ['account', 'edit', 'login', 'settings'],
-    keys: ['staff', 'employee', 'employees', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'same login'],
+    keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'same login'],
     a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password.</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don\u2019t share one password between people. Each person can take a business off their own login in <a href="/owner/account/settings">Account settings</a>; to remove someone else, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>' },
+  // Dispute (2026-10-18): "someone else claimed my business" used to match the staff topic ("Yes. Each person can
+  // have their own login…"), which read like approval of a possible hijack. Its keys are longer phrases than the
+  // staff ones ('someone else', 'another person', 'my manager') so it wins whenever access or a change is disputed.
+  { id: 'dispute', q: 'Someone else has my listing, or changed it without asking', pages: ['account', 'edit', 'login', 'settings', 'claim', 'link', 'invalid'],
+    keys: ['dispute', 'hijack', 'hijacked', 'someone else claimed', 'someone claimed', 'already claimed', 'claimed my business', 'claimed my listing', 'who claimed', 'claimed by someone',
+      'another person has access', 'someone else has access', 'someone has access', 'who has access', 'has access to my', 'still has access', 'still have access', 'still has a login', 'access to my listing',
+      'didnt give', 'didnt authorize', 'didnt authorise', 'not authorized', 'unauthorized', 'unauthorised', 'didnt allow', 'without permission', 'without my permission', 'without asking', 'without telling',
+      'someone changed', 'somebody changed', 'changed without', 'wasnt me', 'not one of us',
+      'remove a person', 'remove someone', 'remove a login', 'remove their access', 'remove access', 'take away access', 'revoke', 'kick out', 'lock them out',
+      'old manager', 'former manager', 'ex manager', 'old owner', 'former owner', 'previous owner', 'former employee', 'ex employee', 'old employee'],
+    a: '<p>Thanks for telling us. <strong>Okanagan Roam will check it.</strong> Nobody should have access to your listing without your say-so.</p><ol><li>Tap <strong>Message us</strong> below (it goes to info@okanaganroam.com).</li><li>Say <strong>which listing</strong> it is and <strong>who you are</strong>: your name, your role, and a phone number or email we can check against the listing.</li><li>If anything was <strong>changed without permission</strong>, tell us what (hours, photos, description, an event) so we can put it right.</li></ol><p>Once we’ve checked, Dayton can <strong>take other people’s logins off the listing</strong> and <strong>send you a fresh edit link</strong>, so the old link stops working.</p>' },
   { id: 'login-create', q: 'How do I make a login?', pages: ['edit', 'login'],
     keys: ['create login', 'make login', 'account', 'make an account', 'sign up', 'register', 'why login'],
     a: '<ol><li>Open your listing with the edit link we emailed you.</li><li>Find <strong>Create a login</strong> near the top, then enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, photos and menus you add from <strong>My listings</strong> go live straight away.</p>' },
@@ -35129,7 +35153,7 @@ const OWNER_HELP_START = {
   edit: ['photo-add', 'hours', 'event-add', 'menu-add', 'changes-review', 'photo-pending'],
   menu: ['menu-add', 'menu-blurry', 'menu-website', 'photo-pending'],
   invalid: ['newlink', 'claim', 'signin'],
-  claim: ['claim', 'noemail', 'staff', 'cost'],
+  claim: ['claim', 'noemail', 'staff', 'dispute', 'cost'],
 };
 const OWNER_HELP_CSS = `
   .ohb-btn { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; background: #1F3A5F; background: var(--ref-navy, #1F3A5F); color: #fff; border: 0; border-radius: 999px; padding: 12px 18px 12px 14px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 28px -10px rgba(0,0,0,0.5); }
@@ -35990,6 +36014,7 @@ function buildClaimEmail(claim) {
   if (v.website && claimEmailMatchesWebsite(claim.email, v.website)) payload['Email check'] = 'Their email uses the website’s domain.';
   payload['Edit link'] = f.link ? `Exists${f.link.contact_email ? ` (sent to ${f.link.contact_email})` : ' (no email on it)'}${f.link.last_used_at ? `, last used ${f.link.last_used_at} UTC` : ', never used'}` : 'None yet';
   payload['Logins on this listing'] = f.logins.length ? f.logins.join(', ') : 'None';
+  if (f.link || f.logins.length) payload['Warning'] = 'This listing already has an edit link or logins. Check before approving: it could be someone else trying to take it over.';
   if (claim.lang === 'fr') payload['Language'] = 'Sent from the French page';
   payload['How to review'] = `Open ${ADMIN_REVIEW_URL}#claims and approve or reject claim #${claim.id}.`;
   return payload;
@@ -36139,6 +36164,9 @@ function renderAdminClaimCard(c) {
     social: `Wait for a message from <strong>${esc(c.verify_detail || '')}</strong>, and check it is the account linked from the listing or website.`,
     other: `They said: <strong>${esc(c.verify_detail || '')}</strong>`,
   }[c.verify_method] || '';
+  // Already managed (2026-10-18): a claim on a listing someone already has could be a hijack, so say so up top.
+  const held = [f.link ? 'an edit link' : '', f.logins.length ? `${f.logins.length} login${f.logins.length === 1 ? '' : 's'} (${f.logins.join(', ')})` : ''].filter(Boolean);
+  const heldLine = held.length ? `<div class="rv-warn rv-held" role="note"><strong>This listing already has ${esc(held.join(' and '))}. Check before approving.</strong> If the claimant isn’t the same business, contact the people already on it first. Approving doesn’t remove existing logins; take one off with POST /admin/owner-links/logins.</div>` : '';
   const linkLine = f.link ? `An edit link exists${f.link.contact_email ? ` (sent to ${esc(f.link.contact_email)})` : ''}${f.link.last_used_at ? `, last used ${esc(adminReviewTime(f.link.last_used_at))}` : ', never used'}. Approving sends a new one to ${esc(c.email)}; the old one stops working once they open it. Logins already made keep working.` : '';
   return `<article class="rv-card" data-kind="claim" data-id="${c.id}">
       <h3>${esc(c.venue_name)}</h3>
@@ -36149,6 +36177,7 @@ function renderAdminClaimCard(c) {
         <tr><th>Phone</th><td>${tel(c.phone)}</td><td>${tel(v.phone)}</td></tr>
         <tr><th>Website</th><td></td><td>${site}</td></tr>
       </table>
+      ${heldLine}
       <div class="rv-warn"><strong>How to check:</strong> ${check}</div>
       ${c.message ? `<p class="rv-text"><strong>Message:</strong> ${esc(c.message)}</p>` : ''}
       ${linkLine ? `<p class="rv-meta">${linkLine}</p>` : ''}
@@ -36740,6 +36769,7 @@ const ADMIN_REVIEW_CSS = `
   .rv-photo { max-width: 100%; max-height: 320px; border-radius: 10px; display: block; margin: 6px 0 10px; }
   .rv-text { white-space: pre-wrap; font-size: 0.88rem; margin: 6px 0 10px; }
   .rv-warn { background: #FFF4D6; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 6px 0 10px; }
+  .rv-warn.rv-held { background: #FDE2DD; border: 1px solid #C0392B; }
   .rv-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
   .rv-actions input[type=text] { flex: 1 1 220px; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.2); font: inherit; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ }
   .rv-btn { border: 0; border-radius: 10px; padding: 9px 16px; font-weight: 800; cursor: pointer; font: inherit; font-weight: 800; }
@@ -40763,6 +40793,21 @@ const server = http.createServer(async (req, res) => {
       }
       return sendJSON(res, 200, out);
     }
+    // POST { venue_id } lists the logins on a listing; add remove_email to take that login off it (2026-10-18).
+    if (pathname === '/admin/owner-links/logins' && method === 'POST') {
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const unexpected = Object.keys(body || {}).filter((k) => !['venue_id', 'remove_email'].includes(k));
+      if (unexpected.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+      if (!body || !Number.isInteger(body.venue_id) || body.venue_id <= 0) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
+      let removed;
+      if (body.remove_email != null) {
+        if (typeof body.remove_email !== 'string' || !body.remove_email.trim()) return sendJSON(res, 400, { error: 'remove_email must be an email address.' });
+        removed = removeOwnerLoginFromVenue(body.venue_id, body.remove_email);
+      }
+      return sendJSON(res, 200, { venue_id: body.venue_id, ...(removed === undefined ? {} : { removed }), logins: ownerLoginsForVenue(body.venue_id) });
+    }
     if (pathname === '/admin/owner-links/revoke' && method === 'POST') {
       if (!requireAdminToken(req, res)) return;
       let body;
@@ -41535,7 +41580,11 @@ module.exports = {
   guardedCuisineUpdate,
   createOwnerLink,
   revokeOwnerLink,
+  ownerLoginsForVenue,
+  renderAdminClaimCard,
+  removeOwnerLoginFromVenue,
   venueForOwnerToken,
+  venueForOwnerAccount,
   validateOwnerChanges,
   approveOwnerChange,
   rejectOwnerChange,

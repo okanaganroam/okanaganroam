@@ -21648,7 +21648,7 @@ test('Business help bot (2026-10-18): claim, never got the email and staff login
   // The browser's own matcher, run on typed questions from the claim page's widget.
   const html = app.ownerHelpWidgetHtml('claim');
   const cfg = JSON.parse(html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]);
-  assert.deepEqual(cfg.start, ['claim', 'noemail', 'staff', 'cost']);
+  assert.deepEqual(cfg.start, ['claim', 'noemail', 'staff', 'dispute', 'cost']);
   const src = html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'));
   const match = new Function('T', 'cfg', `${src}; return match;`)(cfg.topics, cfg);
   const top = (q) => match(q)[0];
@@ -21659,6 +21659,76 @@ test('Business help bot (2026-10-18): claim, never got the email and staff login
   assert.equal(top('didnt receive anything, is it in spam?'), 'noemail');
   assert.equal(top('can two people log in'), 'staff');
   assert.equal(top('add my staff to the listing'), 'staff');
+});
+
+test('Business help bot (2026-10-18): a disputed claim or login gets the "we will check it" answer, not the staff one', () => {
+  const pages = ['login', 'link', 'forgot', 'reset', 'account', 'settings', 'edit', 'menu', 'invalid', 'claim'];
+  const disputes = ['someone else claimed my business', 'another person has access to my listing', 'who claimed my listing', 'I didn\u2019t give them access',
+    'remove a person', 'someone changed my hours without asking', 'my old manager still has access'];
+  const staff = ['how do my staff log in', 'can two people log in', 'add my staff to the listing', 'can another person log in too'];
+  for (const page of pages) {
+    const html = app.ownerHelpWidgetHtml(page);
+    const cfg = JSON.parse(html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]);
+    const src = html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'));
+    const match = new Function('T', 'cfg', `${src}; return match;`)(cfg.topics, cfg);
+    for (const q of disputes) assert.equal(match(q)[0], 'dispute', `${page}: ${q}`);
+    for (const q of staff) assert.equal(match(q)[0], 'staff', `${page}: ${q}`);
+    assert.notEqual(match('I changed my hours but nothing happened')[0], 'dispute', `${page}: own changes are not a dispute`);
+    assert.notEqual(match('my link no longer works')[0], 'dispute', `${page}: a broken link is not a dispute`);
+  }
+  const topics = Object.fromEntries(JSON.parse(app.ownerHelpWidgetHtml('account').match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]).topics.map((t) => [t.id, t]));
+  assert.match(topics.dispute.a, /Okanagan Roam will check it/);
+  assert.match(topics.dispute.a, /Message us/);
+  assert.match(topics.dispute.a, /which listing<\/strong> it is and <strong>who you are/);
+  assert.match(topics.dispute.a, /changed without permission<\/strong>, tell us what/);
+  assert.match(topics.dispute.a, /Dayton can <strong>take other people\u2019s logins off the listing<\/strong> and <strong>send you a fresh edit link/);
+});
+
+test('Disputes (2026-10-18): the claim card warns when the listing already has an edit link or logins; admin can list and remove a login', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Held Claim Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'held-claim-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'held-claim-fixture');
+  const claimId = Number(db.prepare(`INSERT INTO venue_claims (venue_id, name, role, email, phone, verify_method, verify_detail, message, lang, ip_hash)
+    VALUES (?, 'Sam Taker', 'owner', 'sam@taker.example', '250-555-0100', 'other', 'trust me', NULL, 'en', 'x')`).run(v.id).lastInsertRowid);
+  const card = () => app.renderAdminClaimCard(db.prepare('SELECT c.*, v.name AS venue_name FROM venue_claims c JOIN venues v ON v.id = c.venue_id WHERE c.id = ?').get(claimId));
+  assert.doesNotMatch(card(), /rv-held/, 'nobody on it yet: no warning');
+  const first = app.createOwnerLink(v.id, { contact_email: 'real@owner.example' });
+  assert.match(card(), /<div class="rv-warn rv-held" role="note"><strong>This listing already has an edit link\. Check before approving\.<\/strong>/);
+  const addLogin = (email) => {
+    const id = Number(db.prepare('INSERT INTO owner_accounts (email, password_hash) VALUES (?, ?)').run(email, 'x').lastInsertRowid);
+    db.prepare('INSERT INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(id, v.id);
+  };
+  addLogin('real@owner.example');
+  addLogin('oldmanager@owner.example');
+  assert.match(card(), /This listing already has an edit link and 2 logins \(oldmanager@owner\.example, real@owner\.example\)\. Check before approving\./);
+
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const admin = (path, body, auth = true) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  try {
+    assert.equal((await admin('/admin/owner-links/logins', { venue_id: v.id }, false)).status, 401);
+    assert.equal((await admin('/admin/owner-links/logins', { venue_id: v.id, extra: 1 })).status, 400);
+    const listed = await admin('/admin/owner-links/logins', { venue_id: v.id });
+    assert.equal(listed.status, 200);
+    assert.deepEqual(listed.body.logins.map((l) => l.email), ['oldmanager@owner.example', 'real@owner.example']);
+    const removed = await admin('/admin/owner-links/logins', { venue_id: v.id, remove_email: 'OldManager@owner.example' });
+    assert.equal(removed.body.removed, true);
+    assert.deepEqual(removed.body.logins.map((l) => l.email), ['real@owner.example']);
+    const acct = db.prepare('SELECT id, email FROM owner_accounts WHERE email = ?').get('oldmanager@owner.example');
+    assert.ok(acct, 'the account itself stays');
+    assert.equal(app.venueForOwnerAccount(acct, v.id), null, 'and loses the listing at once');
+    assert.equal((await admin('/admin/owner-links/logins', { venue_id: v.id, remove_email: 'nobody@owner.example' })).body.removed, false);
+    // Re-issuing the edit link: the old one stops at once.
+    const oldToken = first.url.split('/owner/')[1];
+    const reset = await admin('/admin/owner-links', { venue_id: v.id, reset: true });
+    assert.equal(reset.status, 201);
+    assert.equal(app.venueForOwnerToken(oldToken), null);
+    assert.match(card(), /already has an edit link and 1 login \(real@owner\.example\)/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
 });
 
 test('Owner accessibility (2026-10-15): errors announce and tie to their box, description has a label, buttons say Sending…', async () => {
