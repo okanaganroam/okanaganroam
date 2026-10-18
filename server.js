@@ -28578,7 +28578,7 @@ const DOG_GUIDE = {
   heading: 'Dog-Friendly Kelowna',
   title: 'Dog-Friendly Kelowna: Beaches, Trails & Patios | Okanagan Roam',
   description: 'Off-leash dog beaches, on-leash trails, and breweries, caf\u00e9s and wineries that welcome dogs in Kelowna, BC, with the dog rules for each.',
-  banner: () => DOG_FRIENDLY_BANNER,
+  banner: () => GUIDE_BANNERS['guide-dog-walk-fall'](),
   parent: { name: 'Dog Friendly Finds', href: '/dog-friendly' },
   noPlace: true,
   intro: [
@@ -29252,19 +29252,24 @@ const GUIDE_PHOTOS = {
   'cider-orchard': { alt: 'Apple cider poured into a glass in an orchard at harvest', pos: 45 }, // Adobe Stock 304081257 (2026-10-18)
   'christmas-market-stall': { alt: 'A couple browsing ornaments at a lit-up Christmas market stall', pos: 40 }, // Adobe Stock 289302551 (2026-10-18)
   'outdoor-skating': { alt: 'A family skating together on an outdoor rink in falling snow', pos: 45 }, // Adobe Stock 390067702 (2026-10-18)
-  'okanagan-lake-late-fall': { alt: 'A quiet sandy beach on Okanagan Lake at Summerland out of season', pos: 55 }, // Adobe Stock 401895437 (2026-10-18)
   'frozen-lake-dock': { alt: 'A wooden dock on a frozen lake with snowy mountains behind', pos: 55 }, // Adobe Stock 188154105 (2026-10-18)
   'snowy-lights-park': { alt: 'A snowy park path lit with lamps and holiday lights at night', pos: 50 }, // Adobe Stock 538003727 (2026-10-18)
   'chairlift': { alt: 'Skiers riding a chairlift above snowy slopes on a sunny day', pos: 40 }, // Adobe Stock 472620344 (2026-10-18)
   'mountain-lodge-restaurant': { alt: 'A mountain restaurant with a fireplace and big windows onto the snow', pos: 50 }, // Adobe Stock 470539433 (2026-10-18)
   'cross-country-ski': { alt: 'Two cross-country skiers on a groomed trail below snowy peaks', pos: 50 }, // Adobe Stock 486451203 (2026-10-18)
-  'kelowna-downtown-lake': { alt: 'Downtown Kelowna across Okanagan Lake, with a boat in the foreground', pos: 50 }, // Adobe Stock 490610824 (2026-10-18)
   'street-tacos': { alt: 'Street tacos with guacamole and salsa', pos: 55 }, // Adobe Stock 424429904 (2026-10-18)
   'patio-mountain-view': { alt: 'Wine glasses on a patio table overlooking forested hills', pos: 50 }, // Adobe Stock 593948761 (2026-10-18)
-  'vineyard-dinner': { alt: 'Friends sharing wine at a long table in a vineyard', pos: 40 }, // Adobe Stock 290509701 (2026-10-18)
   'restaurant-dishes': { alt: 'A restaurant table set with plates, bread and glasses of wine', pos: 50 }, // Adobe Stock 300869026 (2026-10-18)
   'dinner-wine-lights': { alt: 'Red and white wine with dinner under warm string lights', pos: 55 }, // Adobe Stock 334732450 (2026-10-18)
   'valentines-dinner': { alt: 'A couple at a candlelit dinner for two', pos: 50 }, // Adobe Stock 473076390 (2026-10-18)
+  'fall-forest-hiker': { alt: 'A hiker walking a road through golden fall forest', pos: 12 }, // Adobe Stock 277081912 (2026-10-18, season check)
+  'vineyard-fall-colour': { alt: 'Vineyard rows in red and gold fall colour', pos: 50 }, // Adobe Stock 408049776 (2026-10-18, season check)
+  'misty-lake-fall': { alt: 'A misty lake at dawn, with fall colour on the far shore', pos: 50 }, // Adobe Stock 360380096 (2026-10-18, season check)
+  'kelowna-dusk-aerial': { alt: 'Kelowna and Okanagan Lake at dusk, with the city lights coming on', pos: 50 }, // Adobe Stock 116567515 (2026-10-18, season check)
+  'kelowna-night': { alt: 'Downtown Kelowna and the bridge lit up at night', pos: 50 }, // Adobe Stock 392530143 (2026-10-18, season check)
+  'kelowna-boardwalk': { alt: 'The lakeside boardwalk in downtown Kelowna', pos: 50 }, // Adobe Stock 511981475 (2026-10-18, season check)
+  'dog-walk-fall': { alt: 'A man walking his dog on a path through fall leaves', pos: 80 }, // Adobe Stock 540450689 (2026-10-18, season check)
+  'family-science-museum': { alt: 'A mother and two kids exploring a science museum', pos: 55 }, // Adobe Stock 705548393 (2026-10-18, season check)
 };
 for (const [name, b] of Object.entries(GUIDE_PHOTOS)) GUIDE_BANNERS[`guide-${name}`] = () => ({ src: `/images/guides/${name}.jpg`, alt: b.alt, pos: b.pos });
 // Town guides (2026-10-18): `region-<town>` uses that town's own photo. Only photos that need no on-page credit.

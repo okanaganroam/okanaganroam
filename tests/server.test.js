@@ -18590,7 +18590,7 @@ test('Dog guide (2026-10-13): /guides/dog-friendly-kelowna uses the shared guide
   assert.match(html, /<title>Dog-Friendly Kelowna: Beaches, Trails &amp; Patios \| Okanagan Roam<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/dog-friendly-kelowna">/);
   assert.match(html, /"@type":"Article","headline":"Dog-Friendly Kelowna"/);
-  assert.match(html, /<div class="category-banner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/guides\/dog-walk-fall\.jpg"/);
   assert.match(html, /"name":"Dog Friendly Finds","item":"https:\/\/okanaganroam\.com\/dog-friendly"/);
   assert.match(html, /<h2>Off-leash dog beaches<\/h2>\s*<p>The City of Kelowna has four official off-leash dog beaches:<\/p>/);
   assert.doesNotMatch(html, /\(Kelowna\):/, 'a Kelowna-only guide does not repeat the town after every name');
@@ -19113,10 +19113,13 @@ test('Guide photos of their own (2026-10-13): each guide-<name> banner has its 1
     // 2026-10-18: guides whose category photo didn't match the guide got their own.
     'best-pizza-kelowna': 'pizza-oven', 'best-sushi-kelowna': 'sushi-board', 'best-brunch-penticton': 'brunch-pancakes-bacon',
     'best-brunch-vernon': 'pancakes-berries', 'okanagan-cideries': 'cider-orchard', 'okanagan-christmas-markets': 'christmas-market-stall',
-    'okanagan-skating': 'outdoor-skating', 'okanagan-in-november': 'okanagan-lake-late-fall', 'winter-in-kelowna': 'frozen-lake-dock',
+    'okanagan-skating': 'outdoor-skating', 'okanagan-in-november': 'misty-lake-fall', 'winter-in-kelowna': 'frozen-lake-dock',
     'okanagan-in-december': 'snowy-lights-park', 'okanagan-ski-season-2026-27': 'chairlift', 'silverstar-restaurants-apres': 'mountain-lodge-restaurant',
-    'okanagan-nordic-snowshoe': 'cross-country-ski', 'kelowna-without-a-car': 'kelowna-downtown-lake', 'cheap-eats-kelowna': 'street-tacos',
-    'okanagan-winery-restaurants': 'vineyard-dinner', 'best-restaurants-kelowna': 'restaurant-dishes', 'best-restaurants-vernon': 'dinner-wine-lights',
+    'okanagan-nordic-snowshoe': 'cross-country-ski', 'kelowna-without-a-car': 'kelowna-boardwalk', 'cheap-eats-kelowna': 'street-tacos',
+    'okanagan-winery-restaurants': 'vineyard-fall-colour', 'best-restaurants-kelowna': 'restaurant-dishes', 'best-restaurants-vernon': 'dinner-wine-lights',
+    // 2026-10-18 season check: no summer boats, beaches or swimming on fall, winter or year-round guides.
+    'fall-okanagan': 'fall-forest-hiker', 'things-to-do-kelowna': 'kelowna-dusk-aerial', 'weekend-in-kelowna': 'kelowna-night',
+    'dog-friendly-penticton': 'dog-walk-fall', 'dog-friendly-vernon': 'dog-walk-fall', 'family-friendly-okanagan': 'family-science-museum',
   };
   for (const [slug, name] of Object.entries(uses)) {
     const html = app.renderFileGuidePage(`/guides/${slug}`);
@@ -24822,7 +24825,7 @@ test('Weekend and town food guides (2026-10-18): six file guides, each in the to
   const towns = app.GUIDE_GROUPS.find((g) => g.key === 'towns');
   assert.ok(towns, 'the towns group exists');
   const banners = {
-    'weekend-in-kelowna': 'region-kelowna', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
+    'weekend-in-kelowna': 'guide-kelowna-night', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
     'best-restaurants-penticton': 'region-penticton', 'best-restaurants-vernon': 'guide-dinner-wine-lights', 'best-restaurants-west-kelowna': 'region-west-kelowna',
   };
   for (const [slug, key] of Object.entries(banners)) {
