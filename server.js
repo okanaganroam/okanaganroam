@@ -11185,11 +11185,54 @@ function rememberRestCards(html) {
   return hash;
 }
 const REST_TEMPLATE_RE = /<template id="(fdRest|whatsOnRest)">([\s\S]*?)<\/template>/;
+// Crawlable links (2026-10-18): the waiting cards are no longer in the HTML,
+// so crawlers and visitors without JavaScript could not reach the places
+// and events after the first page. A plain, collapsible list of their names
+// and links (about 40 bytes a link) goes right after the empty template.
+// It stays on the page for everyone, closed by default, so nothing is hidden
+// from anybody and it never duplicates the cards visibly.
+const REST_LINK_RE = /<a class="venue-card-link" href="([^"]+)"><span class="venue-card-name">([^<]*)<\/span>/g;
+const REST_LINKS_CSS = '<style id="rest-links-css">.rest-links{margin:18px 0 6px;font-size:.88rem}.rest-links summary{cursor:pointer;font-weight:700;padding:8px 0}.rest-links ul{columns:15em;column-gap:24px;margin:6px 0 0;padding:0;list-style:none}.rest-links li{break-inside:avoid;padding:2px 0}</style>';
+function restLinksHtml(kind, inner, lang) {
+  const seen = new Set(), links = [];
+  for (const m of inner.matchAll(REST_LINK_RE)) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    links.push({ href: m[1], name: m[2].trim() });
+  }
+  if (!links.length) return '';
+  const fr = lang === 'fr', events = kind === 'whatsOnRest';
+  // Places A-Z; events keep the page's soonest-first order.
+  if (!events) links.sort((a, b) => a.name.localeCompare(b.name, fr ? 'fr' : 'en', { sensitivity: 'base' }));
+  const n = links.length;
+  const summary = events
+    ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `More upcoming events (${n})`)
+    : (fr ? `Toutes les autres adresses, de A \u00e0 Z (${n})` : `All the other places here, A\u2013Z (${n})`);
+  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"><summary>${summary}</summary><ul>${links.map((l) => `<li><a href="${l.href}">${l.name}</a>`).join('')}</ul></details>`;
+}
+// Venue JSON (2026-10-18): the filter data of a list page (#fdVenueData,
+// #bhVenueData) was 0.3-0.5 MB of every page view, mostly search words, and
+// HTML is not cached at the edge. It now leaves the page the same way as the
+// waiting cards: an empty tag marked with its hash, loaded from
+// /cards/rest/<hash>.json (a year-long immutable copy) before the filters
+// start; on a miss that URL renders the page again from ?u=. Only pages
+// whose script knows how to load it (REST_DATA_LOADER) are changed.
+const REST_DATA_RE = /<script type="application\/json" id="(fdVenueData|bhVenueData)">([\s\S]*?)<\/script>/;
+const REST_DATA_MIN = 8000;
+const REST_DATA_LOADER = "'.json?u='";
 function withRestCardsDeferred(html) {
   const m = REST_TEMPLATE_RE.exec(html);
-  if (!m || m[2].length < REST_CARDS_MIN) return html;
-  const hash = rememberRestCards(m[2]);
-  return html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + html.slice(m.index + m[0].length);
+  if (m && m[2].length >= REST_CARDS_MIN) {
+    const hash = rememberRestCards(m[2]);
+    const lang = /^<!DOCTYPE html>\s*<html lang="fr"/i.test(html) ? 'fr' : 'en';
+    html = html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + restLinksHtml(m[1], m[2], lang) + html.slice(m.index + m[0].length);
+  }
+  const d = REST_DATA_RE.exec(html);
+  if (d && d[2].length >= REST_DATA_MIN && html.indexOf(REST_DATA_LOADER) !== -1) {
+    const hash = rememberRestCards(d[2]);
+    html = html.slice(0, d.index) + `<script type="application/json" id="${d[1]}" data-rest="${hash}"></script>` + html.slice(d.index + d[0].length);
+  }
+  return html;
 }
 // Lazy card photos (2026-10-18): list card photos are CSS backgrounds (--fd-ph,
 // --card-ph), and a browser fetches every one it lays out, so a list page
@@ -11236,24 +11279,28 @@ function withLazyCardPhotos(html) {
 // true once answered (a memory hit, or a refused ?u=); on a miss it points
 // the request at the page itself and returns false so it renders as usual.
 function restCardsRequest(req, res) {
-  const m = /^\/cards\/rest\/([0-9a-f]{12})\.html(?:\?(.*))?$/.exec(String(req.url));
+  const m = /^\/cards\/rest\/([0-9a-f]{12})\.(html|json)(?:\?(.*))?$/.exec(String(req.url));
   if (!m) return false;
-  const hash = m[1];
+  const hash = m[1], json = m[2] === 'json';
+  const type = json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8';
   if (restCardsMemo.has(hash)) {
     const html = restCardsMemo.get(hash);
     restCardsMemo.delete(hash); restCardsMemo.set(hash, html);
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' });
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' });
     res.end(req.method === 'HEAD' ? undefined : html);
     return true;
   }
-  const u = String(new URLSearchParams(m[2] || '').get('u') || '');
+  const u = String(new URLSearchParams(m[3] || '').get('u') || '');
   if (!/^\/(?!\/|api\/|admin|owner|cards\/)[^\s#]*$/.test(u)) {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end('Not found');
+    // A JSON miss is never a 404 (Cloudflare would keep it): an empty,
+    // uncached answer, so the page still works with what it has.
+    res.writeHead(json ? 200 : 404, { 'Content-Type': json ? type : 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(json ? '{}' : 'Not found');
     return true;
   }
   req.url = u;
   req.restCardsHash = hash;
+  req.restCardsJson = json;
   return false;
 }
 // The reverse of withSharedStylesheets, for tests that read a served page's
@@ -11286,11 +11333,12 @@ function installSharedStylesheetResponse(res, req = {}) {
       // Only the waiting cards, or nothing for a page without them. A
       // redirect or error already went out as it was.
       if (!held) return realEnd(body, ...rest);
-      const m = body != null && typeof body !== 'function' ? REST_TEMPLATE_RE.exec(String(body)) : null;
+      const m = body != null && typeof body !== 'function' ? (req.restCardsJson ? REST_DATA_RE : REST_TEMPLATE_RE).exec(String(body)) : null;
       held = null;
+      if (!m && req.restCardsJson) { realWriteHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return realEnd('{}'); }
       if (!m) { realWriteHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return realEnd('Not found'); }
       const same = rememberRestCards(m[2]) === req.restCardsHash;
-      realWriteHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'no-store', 'X-Robots-Tag': 'noindex' });
+      realWriteHead(200, { 'Content-Type': req.restCardsJson ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'no-store', 'X-Robots-Tag': 'noindex' });
       return realEnd(m[2]);
     }
     if (held && body != null && typeof body !== 'function') {
@@ -18327,9 +18375,14 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   // Lighter pages (2026-10-18): the cards after the first page arrive right
   // after the page appears (see withRestCardsDeferred); the filters start
   // once they are in, so search and the counts still cover every card.
+  // Venue JSON (2026-10-18): the filter data loads the same way, at the
+  // same time, from /cards/rest/<hash>.json; the filters wait for both.
   var restEl = document.getElementById('fdRest'), restHash = restEl && restEl.getAttribute('data-rest');
-  if (!restHash || !window.fetch) { fdStart(); return; }
-  fetch('/cards/rest/' + restHash + '.html?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
+  var dataTag = document.getElementById('fdVenueData'), dataHash = dataTag && dataTag.getAttribute('data-rest');
+  if ((!restHash && !dataHash) || !window.fetch) { fdStart(); return; }
+  var restU = encodeURIComponent(window.location.pathname + window.location.search);
+  var waits = [];
+  if (restHash) waits.push(fetch('/cards/rest/' + restHash + '.html?u=' + restU, { credentials: 'same-origin', redirect: 'manual' })
     .then(function(r){ if (!r.ok) throw new Error('rest ' + r.status); return r.text(); })
     .then(function(html){
       var have = {};
@@ -18337,8 +18390,12 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       var t = document.createElement('template'); t.innerHTML = html;
       Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) restEl.content.appendChild(c); });
     })
-    .catch(function(){})
-    .then(fdStart);
+    .catch(function(){}));
+  if (dataHash) waits.push(fetch('/cards/rest/' + dataHash + '.json?u=' + restU, { credentials: 'same-origin', redirect: 'manual' })
+    .then(function(r){ if (!r.ok) throw new Error('data ' + r.status); return r.text(); })
+    .then(function(t){ dataTag.textContent = t; })
+    .catch(function(){}));
+  Promise.all(waits).then(fdStart);
 })();
 </script>`;
 }
@@ -23041,10 +23098,15 @@ function frSearchWords(id) {
   }
   return frWordsById.get(String(id)) || '';
 }
+// Tests that add a French description read it at once.
+function resetFrSearchWords() { frWordsById = null; }
 function frSearchData(json) {
   let data; try { data = JSON.parse(json); } catch (e) { return json; }
   if (!data || typeof data !== 'object' || Array.isArray(data)) return json;
-  for (const [id, v] of Object.entries(data)) if (v && typeof v === 'object' && typeof v.k === 'string') v.k = `${v.k} ${frSearchWords(id)}`.trim();
+  // Venue JSON (2026-10-18): a French page carries the French words alone
+  // when the place has a French description (it carried both, 0.5 MB on
+  // /fr/food-drink); the English words stay only where there is no French.
+  for (const [id, v] of Object.entries(data)) if (v && typeof v === 'object' && typeof v.k === 'string') v.k = frSearchWords(id) || v.k;
   return JSON.stringify(data).replace(/</g, '\\u003c');
 }
 // Sitemap (2026-10-14): each main or town page with a French twin lists both addresses, each naming the pair.
@@ -23238,7 +23300,7 @@ function installTwinResponse(res, lang, enPath, search = '') {
     } else if (body != null && status === 200 && lang === 'fr' && /application\/json/.test(type) && enPath === '/browse/cards.json') {
       try {
         const j = JSON.parse(String(body));
-        if (j.k && typeof j.k === 'object') for (const id of Object.keys(j.k)) j.k[id] = `${j.k[id]} ${frSearchWords(id)}`.trim();
+        if (j.k && typeof j.k === 'object') for (const id of Object.keys(j.k)) j.k[id] = frSearchWords(id) || j.k[id];
         j.html = frenchTwinHtml(`<!DOCTYPE html><html lang="en"><body>${j.html}</body></html>`, '/browse').replace(/^[\s\S]*?<body>|<\/body><\/html>$/g, '');
         body = JSON.stringify(j);
       } catch (e) { /* the English rest is better than none */ }
@@ -27059,15 +27121,24 @@ function bhStart(){
   // Only the first page of cards comes with the page (2026-10-14); every
   // other card and the search words load from /browse/cards.json right after
   // it appears, and the filters start once they are in.
+  // Venue JSON (2026-10-18): the filter data loads from
+  // /cards/rest/<hash>.json at the same time; the filters wait for both.
   var tplEl = document.getElementById('bhRest'), src = tplEl && tplEl.getAttribute('data-src');
-  if (!src || !window.fetch) { bhStart(); return; }
-  fetch(src).then(function(r){ return r.json(); }).then(function(d){
+  var dataTag = document.getElementById('bhVenueData'), dataHash = dataTag && dataTag.getAttribute('data-rest');
+  if ((!src && !dataHash) || !window.fetch) { bhStart(); return; }
+  var waits = [];
+  if (src) waits.push(fetch(src).then(function(r){ return r.json(); }).then(function(d){
     var have = {};
     Array.prototype.forEach.call(document.querySelectorAll('#bhResults > .venue-card'), function(c){ have[c.getAttribute('data-venue-id')] = 1; });
     var t = document.createElement('template'); t.innerHTML = d.html || '';
     Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) tplEl.content.appendChild(c); });
     window.__bhWords = d.k || {};
-  }).catch(function(){}).then(bhStart);
+  }).catch(function(){}));
+  if (dataHash) waits.push(fetch('/cards/rest/' + dataHash + '.json?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
+    .then(function(r){ if (!r.ok) throw new Error('data ' + r.status); return r.text(); })
+    .then(function(t){ dataTag.textContent = t; })
+    .catch(function(){}));
+  Promise.all(waits).then(bhStart);
 })();
 </script>`;
 }
@@ -41930,6 +42001,8 @@ module.exports = {
   eventImagePath,
   descExcerpt,
   descSearchWords,
+  resetFrSearchWords,
+  withRestCardsDeferred,
   renderOutdoorActivityShowcaseHtml,
   outdoorsSearchHtml,
   outdoorsActivityChipsHtml,
