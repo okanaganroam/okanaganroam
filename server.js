@@ -11191,6 +11191,47 @@ function withRestCardsDeferred(html) {
   const hash = rememberRestCards(m[2]);
   return html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + html.slice(m.index + m[0].length);
 }
+// Lazy card photos (2026-10-18): list card photos are CSS backgrounds (--fd-ph,
+// --card-ph), and a browser fetches every one it lays out, so a list page
+// downloaded 49-75 photos (1.9-2.8 MB) at first paint. Every photo card is
+// rendered with data-lz; this keeps the first LAZY_CARD_EAGER cards outside a
+// <template> as they were, and adds a small head script that hides the photo
+// of the other cards (the teal placeholder shows, as it does while any photo
+// loads) until the card is within 300px of the screen. Cards added later
+// (Show more, filters, /cards/rest/, /browse/cards.json) are picked up by a
+// MutationObserver. Without the script (no JS, no IntersectionObserver) the
+// html.lzp class is never set, so every photo loads as before.
+const LAZY_CARD_EAGER = 4;
+const LAZY_CARD_PHOTO_HEAD = `<style id="lazy-card-photos">html.lzp li.venue-card[data-lz]::before{background-image:none!important}</style>
+<script>
+(function(){
+  var d = document.documentElement;
+  if (!window.IntersectionObserver || !window.MutationObserver) return;
+  var io = new IntersectionObserver(function(es){
+    for (var i = 0; i < es.length; i++) if (es[i].isIntersecting) { es[i].target.removeAttribute('data-lz'); io.unobserve(es[i].target); }
+  }, { rootMargin: '300px 0px' });
+  var watch = function(n){
+    if (n.nodeType !== 1) return;
+    if (n.hasAttribute('data-lz')) io.observe(n);
+    if (n.firstElementChild) { var l = n.querySelectorAll('[data-lz]'); for (var i = 0; i < l.length; i++) io.observe(l[i]); }
+  };
+  new MutationObserver(function(ms){
+    for (var i = 0; i < ms.length; i++) for (var j = 0; j < ms[i].addedNodes.length; j++) watch(ms[i].addedNodes[j]);
+  }).observe(d, { childList: true, subtree: true });
+  d.className += ' lzp';
+})();
+</script>`;
+function withLazyCardPhotos(html) {
+  if (typeof html !== 'string' || html.indexOf(' data-lz') === -1 && html.indexOf('id="bhRest"') === -1) return html;
+  let eager = 0;
+  html = html.replace(/<template\b[\s\S]*?<\/template>|<li class="venue-card"[^>]*? data-lz(?=[\s>])/g, (m) => {
+    if (m.charCodeAt(1) === 116 /* t */ || eager >= LAZY_CARD_EAGER) return m;
+    eager++;
+    return m.slice(0, -' data-lz'.length);
+  });
+  const head = html.indexOf('</head>');
+  return head === -1 ? html : html.slice(0, head) + LAZY_CARD_PHOTO_HEAD + '\n' + html.slice(head);
+}
 // GET /cards/rest/<hash>.html?u=<page path and query>: see above. Returns
 // true once answered (a memory hit, or a refused ?u=); on a miss it points
 // the request at the page itself and returns false so it renders as usual.
@@ -11253,7 +11294,7 @@ function installSharedStylesheetResponse(res, req = {}) {
       return realEnd(m[2]);
     }
     if (held && body != null && typeof body !== 'function') {
-      try { body = withRestCardsDeferred(withSharedStylesheets(String(body))); } catch (e) { /* the inline page is still correct */ }
+      try { body = withRestCardsDeferred(withSharedStylesheets(withLazyCardPhotos(String(body)))); } catch (e) { /* the inline page is still correct */ }
     }
     flush();
     return realEnd(body, ...rest);
@@ -15691,7 +15732,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     const addPhotos = (html) => html.replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (match, id) => {
       const src = photoById.get(Number(id)) || '';
       return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(src)
-        ? `${match} data-card-ph style="${cardPhotoVars('card-ph', src)}"`
+        ? `${match} data-card-ph style="${cardPhotoVars('card-ph', src)}" data-lz`
         : match;
     });
     return `<style id="sport-card-photos">
@@ -15715,7 +15756,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     const v = venues.find((x) => x.id === Number(id));
     const own = v ? String(v.image_url || '').trim() : '';
     const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v || { id: Number(id), type: 'golf' }, isIndoorGolfVenue(v || {}) ? null : 'golf')) || '';
-    return src ? `${m} data-card-ph style="${cardPhotoVars('card-ph', src)}"` : m;
+    return src ? `${m} data-card-ph style="${cardPhotoVars('card-ph', src)}" data-lz` : m;
   });
   const cardHtmlBase = cardHtml;
   cardHtml = (list) => golfPhoto(cardHtmlBase(list));
@@ -17840,6 +17881,8 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-sort-select { font: inherit; font-weight: 800; color: var(--ref-navy); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 6px 30px 6px 12px; min-height: 40px; cursor: pointer; appearance: none; -webkit-appearance: none;
     background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
   body.fd-page .fd-sort-select:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
+  /* iPhones zoom into a select under 16px (2026-10-18), so the sort menu is 16px. */
+  body.fd-page .fd-sort-select { font-size: 16px; }
 
   /* Card photos (2026-10-14): an example photo of the card's kind of place
      (or the venue's own) instead of the one lake illustration on every card.
@@ -18346,9 +18389,9 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       const shown = (alts && extra.photoType && alts[extra.photoType]) || own;
       const pair = (u) => `${photoSized(u, 480)}|${photoSized(u, 960)}`;
       const by = alts && extra.altPhotos === 'swap' ? ` data-ph-by="${escapeHtml(JSON.stringify(Object.fromEntries(Object.entries({ ...alts, '': own }).map(([k, u]) => [k, pair(u)]))))}"` : '';
-      return ` data-ph="own" style="${cardPhotoVars('fd-ph', shown)}"${by}`;
+      return ` data-ph="own" style="${cardPhotoVars('fd-ph', shown)}"${by} data-lz`;
     }
-    return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}"`;
+    return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}" data-lz`;
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, keepOrder: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
@@ -26582,8 +26625,8 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     const v = venueById.get(Number(id));
     if (!v) return '';
     const own = String(v.image_url || '').trim();
-    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="${cardPhotoVars('fd-ph', own)}"`;
-    return ` data-ph="${spread(curatedPhotoKey(v))}"`;
+    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="${cardPhotoVars('fd-ph', own)}" data-lz`;
+    return ` data-ph="${spread(curatedPhotoKey(v))}" data-lz`;
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true, hideSocial: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
@@ -29128,9 +29171,12 @@ function renderGuidesIndexPage(now = new Date()) {
     name: 'Okanagan Roam guides',
     itemListElement: listed.map((x, i) => ({ '@type': 'ListItem', position: i + 1, url: `https://okanaganroam.com${x.path}`, name: x.heading })),
   };
+  // Speed (2026-10-18): the first row of guide photos (up to 4 across) is on the first
+  // screen, so it loads right away; the rest stay lazy.
+  let cardIndex = 0;
   const card = (x) => `
         <li class="guide-card"><a href="${x.path}">
-          <span class="guide-card-img"><img src="${guideCardImage(x.banner)}" alt="" width="800" height="533" loading="lazy" decoding="async" style="object-position: 50% ${x.banner.pos || 50}%"></span>
+          <span class="guide-card-img"><img src="${guideCardImage(x.banner)}" alt="" width="800" height="533" ${cardIndex++ < 4 ? (cardIndex === 1 ? 'fetchpriority="high"' : 'loading="eager"') : 'loading="lazy"'} decoding="async" style="object-position: 50% ${x.banner.pos || 50}%"></span>
           <span class="guide-card-body"><span class="guide-card-title">${escapeHtml(x.heading)}</span><span class="guide-card-desc">${escapeHtml(x.description)}</span></span>
         </a></li>`;
   return `<!DOCTYPE html>
@@ -41370,6 +41416,9 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Lazy card photos (2026-10-18)
+  withLazyCardPhotos,
+  LAZY_CARD_EAGER,
   // Lighter pages (2026-10-18)
   capItemListSchema,
   ITEM_LIST_SCHEMA_CAP,

@@ -23674,6 +23674,63 @@ test('Lighter pages: /food-drink loads its waiting cards from /cards/rest/, the 
   }
 });
 
+test('Lazy card photos (2026-10-18): the first cards load at once, the rest wait for the screen, on every list path', async () => {
+  // Unit: the first LAZY_CARD_EAGER photo cards outside a <template> lose data-lz; template cards keep it.
+  const card = (i) => `<li class="venue-card" data-venue-id="${i}" data-ph="own" style="--fd-ph:url('/x${i}.jpg')" data-lz>`;
+  const page = `<html><head><title>t</title></head><body><ul>${[1, 2, 3, 4, 5, 6].map(card).join('')}</ul><template id="fdRest">${card(7)}</template></body></html>`;
+  const out = app.withLazyCardPhotos(page);
+  assert.equal(app.LAZY_CARD_EAGER, 4);
+  const lz = (id) => new RegExp(`data-venue-id="${id}"[^>]* data-lz>`).test(out);
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(lz), [false, false, false, false, true, true, true]);
+  assert.ok(out.indexOf('id="lazy-card-photos"') < out.indexOf('</head>'), 'the lazy script sits in the head, before any card');
+  assert.match(out, /html\.lzp li\.venue-card\[data-lz\]::before\{background-image:none!important\}/, 'only hidden once the script has run (no JS: every photo loads)');
+  assert.match(out, /new IntersectionObserver\([\s\S]*rootMargin: '300px 0px'/);
+  assert.match(out, /new MutationObserver\([\s\S]*childList: true, subtree: true/, 'cards added later (Show more, filters, deferred cards) are observed');
+  assert.match(out, /if \(!window\.IntersectionObserver \|\| !window\.MutationObserver\) return;/, 'old browsers load every photo');
+  assert.equal(app.withLazyCardPhotos('<html><head></head><body><li class="venue-card"></li></body></html>'), '<html><head></head><body><li class="venue-card"></li></body></html>', 'pages without photo cards are unchanged');
+
+  const made = [];
+  for (let i = 0; i < 70; i++) made.push(app.createVenue({ name: `LZ Kitchen ${i}`, region: ['kelowna', 'penticton'][i % 2], type: 'restaurant', description: `A lazy-photo fixture kitchen ${i}.`, slug: `lz-kitchen-${i}` }).id);
+  for (const id of made) db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run(`/images/venues/lz-fixture-${id}.jpg`, id);
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const p of ['/restaurants', '/kelowna/restaurants', '/food-drink', '/fr/restaurants', '/browse']) {
+      const html = await (await fetch(base + p)).text();
+      const tags = [...html.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]).filter((t) => /data-(?:card-)?ph[ =]/.test(t));
+      assert.ok(tags.length > 8, `${p}: photo cards on the page`);
+      assert.deepEqual(tags.slice(0, 4).map((t) => /\sdata-lz\b/.test(t)), [false, false, false, false], `${p}: the first four load at once`);
+      assert.ok(tags.slice(4).every((t) => /\sdata-lz\b/.test(t)), `${p}: every later card waits`);
+      assert.equal((html.match(/id="lazy-card-photos"/g) || []).length, 1, `${p}: one lazy script`);
+      const rest = html.match(/<template id="fdRest" data-rest="([0-9a-f]{12})"><\/template>/);
+      if (rest) {
+        const part = await (await fetch(`${base}/cards/rest/${rest[1]}.html?u=${encodeURIComponent(p)}`)).text();
+        const restTags = [...part.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]);
+        assert.ok(restTags.length && restTags.every((t) => /\sdata-lz\b/.test(t)), `${p}: deferred cards wait too`);
+      }
+    }
+    const json = await (await fetch(base + '/browse/cards.json')).json();
+    const jTags = [...json.html.matchAll(/<li class="venue-card"[^>]*>/g)].map((m) => m[0]);
+    assert.ok(jTags.length && jTags.every((t) => /\sdata-lz\b/.test(t)), '/browse/cards.json cards wait for the screen');
+    // Phones keep the 480 copy (speed first); iPhones do not zoom on the sort menu.
+    const css = app.inlineSharedStylesheets(await (await fetch(base + '/restaurants')).text());
+    assert.doesNotMatch(css, /max-width: 899px\) and \(min-resolution/);
+    assert.match(css, /body\.fd-page \.fd-sort-select \{ font-size: 16px; \}/);
+    // /guides: the first row of guide photos is not lazy.
+    const guides = await (await fetch(base + '/guides')).text();
+    const imgs = [...guides.matchAll(/<span class="guide-card-img"><img [^>]*>/g)].map((m) => m[0]);
+    if (imgs.length > 4) {
+      assert.ok(imgs.slice(0, 4).every((t) => !/loading="lazy"/.test(t)), 'first row eager');
+      assert.match(imgs[0], /fetchpriority="high"/);
+      assert.ok(imgs.slice(4).every((t) => /loading="lazy"/.test(t)), 'later guides lazy');
+    }
+  } finally {
+    srv.close();
+    for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
 test("Lighter pages: What's On ships its first page of events and every other item waits with its place in the list", async () => {
   const made = [];
   const regions = ['kelowna', 'penticton', 'vernon', 'oliver'];
