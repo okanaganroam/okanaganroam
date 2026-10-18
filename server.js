@@ -17357,6 +17357,27 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
 // inert <template> holding the rest (see the incremental-rendering note in
 // renderFoodDrinkHubPage). Shared by /food-drink and the destination
 // category pages so "Show more" works identically on both.
+// Venue id -> outdoor activity -> card photo (see data/activity-photos.json).
+// Optional like the other photo data: isolated test copies of server.js have no data/ folder.
+const ACTIVITY_PHOTOS = Object.freeze((() => {
+  try { return Object.fromEntries(Object.entries(require('./data/activity-photos.json')).filter(([k]) => /^\d+$/.test(k))); } catch (e) { return {}; }
+})());
+// Outdoors hub: keeps each card's activity photo in step with the type chips.
+const ACTIVITY_PHOTO_SWAP_SCRIPT = `<script>
+(function(){
+  var sync = function(){
+    var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-fd-type'); });
+    var t = on.length === 1 ? on[0] : '';
+    Array.prototype.forEach.call(document.querySelectorAll('li.venue-card[data-ph-by]'), function(li){
+      var m; try { m = JSON.parse(li.getAttribute('data-ph-by')); } catch (e) { return; }
+      var u = m[t] || m[''];
+      if (u && li.getAttribute('data-ph-now') !== u) { li.setAttribute('data-ph-now', u); li.style.setProperty('--fd-ph', "url('" + u + "')"); }
+    });
+  };
+  try { new MutationObserver(sync).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
+  sync();
+})();
+</script>`;
 const FD_HEART_SYMBOL = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="fdHeart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></symbol></svg>';
 const FD_HEART_USE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#fdHeart"/></svg>';
 function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion, openStatusById = null, extra = {}) {
@@ -17369,7 +17390,16 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     const v = venueById.get(Number(id));
     if (!v) return '';
     const own = String(v.image_url || '').trim();
-    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
+    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) {
+      // Activity photos (2026-10-17): a place listed under several outdoor
+      // activities shows the photo that fits the one chosen (extra.photoType),
+      // e.g. Knox Mountain in snow under Winter. With extra.altPhotos 'swap',
+      // data-ph-by lets the page change it as the filter changes ('' = usual photo).
+      const alts = extra.altPhotos ? ACTIVITY_PHOTOS[v.id] : null;
+      const shown = (alts && extra.photoType && alts[extra.photoType]) || own;
+      const by = alts && extra.altPhotos === 'swap' ? ` data-ph-by="${escapeHtml(JSON.stringify({ ...alts, '': own }))}"` : '';
+      return ` data-ph="own" style="--fd-ph:url('${escapeHtml(shown)}')"${by}`;
+    }
     return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}"`;
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
@@ -19805,6 +19835,9 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, cfg.openNow ? openInfo.byId : null, {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {},
+    // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
+    altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
+    photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
   });
   const selected = new Set(f.types);
   const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
@@ -19883,6 +19916,7 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml(cfg.surface, true)}
   ${renderFoodDrinkHubScriptHtml({ openNow: !!cfg.openNow, surface: cfg.surface, typeLabels, searchLabels: cfg.searchLabels || {} })}
+  ${cfg.activityPhotos === 'swap' ? ACTIVITY_PHOTO_SWAP_SCRIPT : ''}
 </body>
 </html>`;
 }
@@ -20038,6 +20072,7 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
     types: live.map((a) => ({ type: a.slug, label: a.label })),
     catsFor: (v) => acts.get(v.id) || [],
     photoKeyFor: (v) => curatedPhotoKey(v, v.type === 'beach' ? 'beach' : OUTDOOR_PHOTO_SET[(acts.get(v.id) || [])[0]] || 'park'),
+    activityPhotos: 'swap',
     cardNotes: getDogFriendlyNotes(),
     cardNoteLabel: 'Dogs:',
     features: ['dog_friendly', 'kid_friendly', 'lake_view'],
@@ -20161,6 +20196,7 @@ function renderSkiSnowHubPage(venues, eats, filter = null, now = new Date()) {
     catsFor: skiKinds,
     pinFirst: (v) => (isResort(v) ? SKI_RESORT_ORDER.indexOf(v.region) + 1 : 0),
     photoKeyFor: (v) => curatedPhotoKey(v, 'winter'),
+    activityPhotos: 'winter',
     cardNotes: getToursAlsoNotes(),
     cardNoteLabel: 'Experience:',
     features: ['kid_friendly', 'dog_friendly'],

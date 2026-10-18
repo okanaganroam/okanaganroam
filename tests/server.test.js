@@ -17347,6 +17347,47 @@ test('Indoor & Rainy Day: discovery sends museum/escape room/bowling/gallery/the
   }
 }));
 
+test('Activity photos: an outdoor place shows the photo that fits the chosen activity (Knox Mountain in snow under Winter)', () => {
+  const knox = { id: 1226, name: 'Knox Mountain Park', region: 'kelowna', type: 'outdoor', slug: 'knox-mountain-park', description: 'Fixture park.', image_url: '/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update.jpg?v=x' };
+  const other = { id: 987654, name: 'Plain Test Park', region: 'kelowna', type: 'outdoor', slug: 'plain-test-park', description: 'Fixture park.', image_url: '/images/hiking/venues/plain-test-park.jpg' };
+  const card = (html, id) => html.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${id}"[^>]*>`))[0];
+  const winterPhoto = /knox-mountain-park-20261016-winter-final\.jpg/;
+
+  const all = app.renderOutdoorsHubPage([knox, other]);
+  assert.match(card(all, 1226), /--fd-ph:url\('\/images\/hiking\/venues\/knox-mountain-park-20261016-viewpoint-update\.jpg/, 'its usual photo with no activity chosen');
+  assert.match(card(all, 1226), /data-ph-by="[^"]*winter-final/, 'the page can swap to the winter photo');
+  assert.doesNotMatch(card(all, 987654), /data-ph-by/, 'places without activity photos are unchanged');
+  assert.match(all, /data-ph-now/, 'the swap script is on the outdoors page');
+
+  const winterList = db.prepare("SELECT id FROM collections WHERE kind = 'activity_winter'").get();
+  // Winter is a live chip once three places are in it.
+  const made = [1, 2, 3].map((n) => app.createVenue({ name: `Activity Photo Snow Spot ${n}`, region: 'kelowna', type: 'outdoor', description: 'Fixture.', slug: `activity-photo-snow-spot-${n}` }));
+  for (const v of made) db.prepare("INSERT INTO collection_items (collection_id, content_type, content_id, position) VALUES (?, 'venue', ?, 0)").run(winterList.id, v.id);
+  try {
+    const winter = app.renderOutdoorsHubPage([knox, other], { types: ['winter'] });
+    assert.match(card(winter, 1226).match(/--fd-ph:url\('([^']+)'/)[1], winterPhoto, '?types=winter renders the winter photo');
+    const hiking = app.renderOutdoorsHubPage([knox, other], { types: ['hiking'] });
+    assert.doesNotMatch(card(hiking, 1226).match(/--fd-ph:url\('([^']+)'/)[1], winterPhoto, 'no winter photo for an activity it has none for');
+  } finally {
+    for (const v of made) {
+      db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id = ?").run(v.id);
+      db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+    }
+  }
+
+  const ski = app.renderSkiSnowHubPage([knox], []);
+  assert.match(card(ski, 1226).match(/--fd-ph:url\('([^']+)'/)[1], winterPhoto, 'Ski & Snow always shows the winter photo');
+  assert.doesNotMatch(card(ski, 1226), /data-ph-by/);
+
+  // Every listed photo is a published file.
+  const fs = require('fs');
+  const path = require('path');
+  for (const [id, byAct] of Object.entries(require('../data/activity-photos.json'))) {
+    if (!/^\d+$/.test(id)) continue;
+    for (const u of Object.values(byAct)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', u.split('?')[0])), u);
+  }
+});
+
 test('Ski & Snow: /ski-snow lists the winter collection, après eats on the four ski hills, the guide links, and renders with an empty collection', async () => {
   const winter = db.prepare("SELECT id FROM collections WHERE kind = 'activity_winter'").get();
   assert.ok(winter, 'activity_winter is bootstrapped');

@@ -1,0 +1,27 @@
+{
+  "_note": "Venue id -> outdoor activity -> card photo. A place listed under several activities shows the matching photo when that one activity is chosen (a winter photo under Winter, a summer one under Hiking). Every photo here is one already approved for that venue in the per-activity photo batches (data/*-photos-*.json); the venue's own image_url stays its photo everywhere else.",
+  "1226": { "winter": "/images/hiking/venues/knox-mountain-park-20261016-winter-final.jpg?v=20261016winterfinal" },
+  "1220": { "winter": "/images/hiking/venues/johns-family-nature-conservancy-regional-park-20261016-winter-final.jpg?v=20261016winterfinal" },
+  "1212": { "winter": "/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261016-winter-final.jpg?v=20261016winterfinal" },
+  "1272": { "winter": "/images/hiking/venues/carmi-recreational-trails-20261016-winter-final.jpg?v=20261016winterfinal" },
+  "1278": { "winter": "/images/hiking/venues/crawford-trails-myra-bellevue-provincial-park-20261016-winter-final.jpg?v=20261016winterfinal" },
+  "1240": {
+    "hiking": "/images/hiking/venues/silverstar-mountain-resort-20261015-b3.jpg?v=20261015h3live",
+    "viewpoints": "/images/hiking/venues/silverstar-mountain-resort-20261015-b3.jpg?v=20261015h3live",
+    "cycling": "/images/hiking/venues/silverstar-mountain-resort-20261015-b3.jpg?v=20261015h3live"
+  },
+  "1233": {
+    "hiking": "/images/hiking/venues/big-white-ski-resort-20261015.jpg?v=20261015h1live",
+    "viewpoints": "/images/hiking/venues/big-white-ski-resort-20261015.jpg?v=20261015h1live",
+    "cycling": "/images/hiking/venues/big-white-ski-resort-20261016-cycling.jpg?v=20261016cyclinglive"
+  },
+  "1260": {
+    "hiking": "/images/hiking/venues/kuipers-peak-mountain-park-20261015.jpg?v=20261015h1live",
+    "viewpoints": "/images/hiking/venues/kuipers-peak-mountain-park-20261015.jpg?v=20261015h1live"
+  },
+  "1280": {
+    "nature": "/images/hiking/venues/predator-ridge-trails-20261016-nature.jpg?v=20261016naturelive",
+    "cycling": "/images/hiking/venues/predator-ridge-trails-20261016-nature.jpg?v=20261016naturelive"
+  },
+  "1392": { "cycling": "/images/hiking/venues/big-white-nordic-wilderness-trails-20261016-cycling-final.jpg?v=20261016cyclingfinallive" }
+}
