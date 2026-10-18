@@ -4568,7 +4568,7 @@ test('S6 #14-#18/#23: with fixture inventory the page is indexable and real even
   assert.doesNotMatch(lakeside, /example\.com|tel:|Visit Website/, 'no website/phone on the card');
   const pumpkin = markup.match(/<li class="venue-card whatson-event-card"[^>]*data-venue-name="S6 Osoyoos Pumpkin Patch"[\s\S]*?<\/li>/)[0];
   assert.match(pumpkin, new RegExp(`Osoyoos &middot; ${app.formatLocalDateShort(d1, { weekday: false })} – ${app.formatLocalDateShort(d2, { weekday: false })}</p>`), 'all-day span: dates only, no time');
-  assert.match(pumpkin, /<img class="whatson-event-img whatson-event-photo" src="\/images\/guides\/halloween-pumpkins-800\.jpg"/, 'no image of its own -> a photo for its kind of event');
+  assert.match(pumpkin, /<img class="whatson-event-img whatson-event-photo" src="\/images\/events\/pumpkinpatch-2610-800\.jpg"/, 'no image of its own -> a photo for its kind of event (a pumpkin patch)');
   const festival = cards.find((c) => c.valley);
   assert.ok(festival, 'valley-wide card carries the flag for the client filter');
   assert.doesNotMatch(text, /source_url|event_confidence|batch_id|test-fixture-admin-token|\/api\/events/, 'no admin metadata, token or API references in the page');
@@ -16950,7 +16950,7 @@ test('Seasons everywhere: a closed-for-season venue page folds its weekly hours 
     fr = app.renderVenuePage(v, [], [], [], { now, lang: 'fr' });
     assert.match(fr, /Heures vérifiées le 1er mars 2026<\/p><p class="venue-hours-stale">Les heures ont peut-être changé — vérifiez avant d’y aller\.<\/p>/);
     // Open as usual: the plain weekly list, today marked.
-    assert.match(en, /<h2>Hours<\/h2><ul class="hours-list" data-today="\w+">.*class="is-today"/);
+    assert.match(en, /<h2>Hours<\/h2>(?:<p class="venue-hours-daily">.*?<details class="venue-hours-days"><summary>Each day<\/summary>)?<ul class="hours-list" data-today="\w+">.*class="is-today"/);
     // Closed for the season: the notice box, and the usual hours folded under "Closed for the season".
     assert.equal(app.guardedSeasonUpdate(v.id, { status: 'closed', reopens_date: '2027-04-01', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
     en = app.renderVenuePage(v, [], [], [], { now });
@@ -18590,7 +18590,7 @@ test('Dog guide (2026-10-13): /guides/dog-friendly-kelowna uses the shared guide
   assert.match(html, /<title>Dog-Friendly Kelowna: Beaches, Trails &amp; Patios \| Okanagan Roam<\/title>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/guides\/dog-friendly-kelowna">/);
   assert.match(html, /"@type":"Article","headline":"Dog-Friendly Kelowna"/);
-  assert.match(html, /<div class="category-banner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"/);
+  assert.match(html, /<div class="category-banner"><img src="\/images\/guides\/dog-walk-fall\.jpg"/);
   assert.match(html, /"name":"Dog Friendly Finds","item":"https:\/\/okanaganroam\.com\/dog-friendly"/);
   assert.match(html, /<h2>Off-leash dog beaches<\/h2>\s*<p>The City of Kelowna has four official off-leash dog beaches:<\/p>/);
   assert.doesNotMatch(html, /\(Kelowna\):/, 'a Kelowna-only guide does not repeat the town after every name');
@@ -19113,10 +19113,13 @@ test('Guide photos of their own (2026-10-13): each guide-<name> banner has its 1
     // 2026-10-18: guides whose category photo didn't match the guide got their own.
     'best-pizza-kelowna': 'pizza-oven', 'best-sushi-kelowna': 'sushi-board', 'best-brunch-penticton': 'brunch-pancakes-bacon',
     'best-brunch-vernon': 'pancakes-berries', 'okanagan-cideries': 'cider-orchard', 'okanagan-christmas-markets': 'christmas-market-stall',
-    'okanagan-skating': 'outdoor-skating', 'okanagan-in-november': 'okanagan-lake-late-fall', 'winter-in-kelowna': 'frozen-lake-dock',
+    'okanagan-skating': 'outdoor-skating', 'okanagan-in-november': 'misty-lake-fall', 'winter-in-kelowna': 'frozen-lake-dock',
     'okanagan-in-december': 'snowy-lights-park', 'okanagan-ski-season-2026-27': 'chairlift', 'silverstar-restaurants-apres': 'mountain-lodge-restaurant',
-    'okanagan-nordic-snowshoe': 'cross-country-ski', 'kelowna-without-a-car': 'kelowna-downtown-lake', 'cheap-eats-kelowna': 'street-tacos',
-    'okanagan-winery-restaurants': 'vineyard-dinner', 'best-restaurants-kelowna': 'restaurant-dishes', 'best-restaurants-vernon': 'dinner-wine-lights',
+    'okanagan-nordic-snowshoe': 'cross-country-ski', 'kelowna-without-a-car': 'kelowna-boardwalk', 'cheap-eats-kelowna': 'street-tacos',
+    'okanagan-winery-restaurants': 'vineyard-fall-colour', 'best-restaurants-kelowna': 'restaurant-dishes', 'best-restaurants-vernon': 'dinner-wine-lights',
+    // 2026-10-18 season check: no summer boats, beaches or swimming on fall, winter or year-round guides.
+    'fall-okanagan': 'fall-forest-hiker', 'things-to-do-kelowna': 'kelowna-dusk-aerial', 'weekend-in-kelowna': 'kelowna-night',
+    'dog-friendly-penticton': 'dog-walk-fall', 'dog-friendly-vernon': 'dog-walk-fall', 'family-friendly-okanagan': 'family-science-museum',
   };
   for (const [slug, name] of Object.entries(uses)) {
     const html = app.renderFileGuidePage(`/guides/${slug}`);
@@ -24822,7 +24825,7 @@ test('Weekend and town food guides (2026-10-18): six file guides, each in the to
   const towns = app.GUIDE_GROUPS.find((g) => g.key === 'towns');
   assert.ok(towns, 'the towns group exists');
   const banners = {
-    'weekend-in-kelowna': 'region-kelowna', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
+    'weekend-in-kelowna': 'guide-kelowna-night', 'penticton-naramata-wine-weekend': 'region-naramata', 'oliver-osoyoos-wine-weekend': 'region-osoyoos',
     'best-restaurants-penticton': 'region-penticton', 'best-restaurants-vernon': 'guide-dinner-wine-lights', 'best-restaurants-west-kelowna': 'region-west-kelowna',
   };
   for (const [slug, key] of Object.entries(banners)) {
@@ -25151,4 +25154,21 @@ test('Claim form timer (2026-10-18): fields are checked in the page first, a qui
     const frFast = await s.post('/api/claims', { venue_id: v.id, lang: 'fr', ...ok, company_website: '', started_at: Date.now() - 500 });
     assert.equal(frFast.body.error, 'Désolé, c’était plus rapide que prévu. Appuyez de nouveau sur Envoyer.');
   } finally { await s.close(); }
+});
+
+test('Venue page layout (2026-10-18): same hours every day read as one line, the website shows as its address, and the extras follow the facts on phones', () => {
+  seasonInsert.run({ name: 'Layout Fixture Cafe', type: 'cafe', hours: JSON.stringify({ mon: [['09:30', '17:30']], tue: [['09:30', '17:30']], wed: [['09:30', '17:30']], thu: [['09:30', '17:30']], fri: [['09:30', '17:30']], sat: [['09:30', '17:30']], sun: [['09:30', '17:30']] }), slug: 'layout-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe');
+  try {
+    db.prepare("UPDATE venues SET website = 'https://www.example-cafe.ca/' WHERE id = ?").run(v.id);
+    const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z') });
+    assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
+    assert.match(en, />example-cafe\.ca ↗<\/a>/, 'the website row shows the address, not the raw URL');
+    assert.match(en, /<div class="venue-extra">/);
+    assert.match(en, /@media \(max-width: 959px\) \{[\s\S]*?\.venue-aside \{ order: 1;/);
+    const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang: 'fr' });
+    assert.match(fr, /<span>Tous les jours<\/span>/);
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
 });

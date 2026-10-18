@@ -7930,13 +7930,17 @@ const EVENT_PHOTO_RULES = [
   ['halloweenkids', /(hallowe'?en|spook|trick[- ]or[- ]treat|gnome-a-ween).*(famil|kids|children|little|all ages|non-scary)|(famil|kids|children).*(hallowe'?en|trick[- ]or[- ]treat)/],
   ['candlelight', /candlelight/], ['drag', /\bdrag\b/], ['burlesque', /burlesque/],
   ['comedy', /comed(y|ian)|stand-up|stand up|comic strippers|improv/], ['magic', /magician|magic show/],
+  ['swim', /across the lake swim|open[- ]water swim|triathlon|polar (bear )?(dip|plunge|swim)/], ['nordic', /cross[- ]country ski|\bnordic\b|biathlon/],
+  ['snowboard', /snowboard|rail jam|terrain park/], ['chairlift', /(alpine|ski|mountain|big white|silverstar|apex|baldy)[^.]{0,30}opening day|opening day[^.]{0,30}(ski|lifts?)\b/],
+  ['ski', /\bski (race|day|with|challenge|cup|games)|skiing|skiers|snowcross|downhill (race|ski)/],
+  ['rodeo', /rodeo|stampede/], ['ring', /wrestling|\bmma\b|fight night/], ['remembrance', /remembrance|cenotaph|poppies/],
   ['hockey', /\bhockey\b|\bwhl\b|\bbchl\b|\bkijhl\b|puck drop/], ['basketball', /basketball/], ['volleyball', /volleyball/], ['rugby', /\brugby\b/],
   ['pickleball', /pickleball|tennis/], ['golf', /\bgolf\b/], ['skating', /figure skat|skate canada/],
   ['mtbrace', /mountain bike|enduro|downhill race|pedalfest/], ['speedway', /speedway|stock car|race car/],
   ['kickboxing', /kickboxing|muay thai|boxing|martial arts/],
   ['soundbath', /sound (bath|healing|journey)|singing bowls|\bgongs?\b/], ['yoga', /\byoga\b|breathwork|meditation|asana/],
   // Shows and screenings.
-  ['aerial', /aerial|acrobat|circus/], ['carnival', /sideshow|carnival of/], ['ballet', /ballet|contemporary dance|dance work/],
+  ['aerial', /aerial (silks|arts|show|acrobat)|acrobat|circus/], ['carnival', /sideshow|carnival of/], ['ballet', /ballet|contemporary dance|dance work/],
   ['kidstheatre', /puppet|theatre for young|(family|kids|children'?s) (musical|theatre|play)/],
   ['outdoormovie', /movie night|movies in the|outdoor (movie|cinema)|cinema series/], ['cinema', /film festival|film series|\bfilm\b|screening|cinema|\bmovie/],
   // Books, food and drink outings, markets, classes and gatherings.
@@ -7945,14 +7949,14 @@ const EVENT_PHOTO_RULES = [
   ['cookingclass', /cooking class|culinary class/], ['charcuterie', /charcuterie|cheese (class|tasting|pairing)/],
   ['tea', /afternoon tea|high tea/], ['smores', /s'mores|smores/], ['baking', /bake sale|baking|\bbake\b/],
   ['market', /farmers.? market/], ['xmasmarket', /christmas market|holiday market|yuletide|winter (warm-up )?market|christmas at the/],
-  ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage|antique|rummage|retromania|collectibles|flea market/],
-  ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/],
+  ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage (fair|market|fashion|clothing|sale)|antique|rummage|retromania|collectibles|flea market|closet/],
+  ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/], ['santa', /\bsanta\b/], ['pumpkinpatch', /pumpkin (patch|picking)/],
   ['storytime', /storytime|story time/], ['games', /video game|mario kart|minecraft|gaming|esports/],
   ['artgallery', /exhibition|art show|art walk|art gallery|artists?'? (show|sale)/],
   ['wreath', /wreath/], ['ceramics', /ceramic|pottery/],
   ['crafts', /craft(ing|s)?\b.*(night|workshop|session|class)|workshop|mosaic|silk scarf|make your own|frankenstuff/],
-  ['techclass', /android|iphone|computer|tablet|tech help|digital literacy/], ['language', /language|nsyilx/],
-  ['moms', /\bmoms?\b|motherhood/], ['gala', /\bgala\b/], ['talk', /tedx|\btalks?\b|lecture|open house|speakers?\b/],
+  ['techclass', /android|iphone|computer|tablet|tech help|digital literacy/], ['language', /language (class|course|lesson)|learning a language|nsyilx/],
+  ['moms', /\bmoms?\b|motherhood/], ['gala', /\bgala\b/], ['talk', /tedx|\btalks?\b|lecture|open house|speaker series/],
   ['coffee', /coffee social|networking|forget-me-not|dementia/], ['pubnight', /bingo|trivia|quiz night/],
   ['dinner', /dinner|long table|feast|friendsgiving|four courses|pasta/], ['wine', /wine (tasting|info)|holiday cheer|barrel|wine club/],
   // Music, by sound; a big-arena show gets the crowd photo.
@@ -7968,9 +7972,24 @@ const EVENT_PHOTO_RULES = [
   ['halloweenparty', /hallowe'?en|spook|howl-?oween|hallowine|haunting|witches/],
   ['theatre', /theatre|musical|\bplay\b|stage thriller/], ['heritage', /heritage house|historic house|guided tours?|house tour/],
 ];
-const EVENT_PHOTO_SPECIAL = Object.freeze({ golf: '/images/golf/golf-courses-800.jpg', pickleball: '/images/sports/activity-courts-800.jpg' });
-let EVENT_PHOTO_BY_ID = {};
-try { EVENT_PHOTO_BY_ID = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'event-photo-themes.json'), 'utf8')).events || {}; } catch (e) { EVENT_PHOTO_BY_ID = {}; }
+// Photos that live elsewhere on the site. `wo-<category>` keys are the What's On category photos, so an event can be
+// pinned to one in data/event-photo-themes.json (2026-10-18 photo review).
+const EVENT_PHOTO_SPECIAL = Object.freeze({
+  golf: '/images/golf/golf-courses-800.jpg', pickleball: '/images/sports/activity-courts-800.jpg', courts: '/images/sports/activity-courts-800.jpg',
+  pumpkins: '/images/guides/halloween-pumpkins-800.jpg', ski: '/images/ski-snow/ski-snow-800.jpg', trail: '/images/outdoors/activity-hiking-800.jpg',
+  ...Object.fromEntries(['arts-culture', 'community-events', 'events-festivals', 'family-kids', 'food-drink-events', 'holiday-seasonal', 'markets-fairs', 'nightlife', 'sports-recreation', 'wineries-wine-events']
+    .map((c) => [`wo-${c}`, `/images/whats-on/${c}-800.jpg`])),
+  'wo-workshops-pottery-wheel': '/images/whats-on/workshops-pottery-wheel-800.jpg', 'wo-whats-on': '/images/whats-on/whats-on-800.jpg',
+});
+let EVENT_PHOTO_BY_ID = {}, EVENT_PHOTO_NAMES = {};
+try {
+  const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'event-photo-themes.json'), 'utf8'));
+  EVENT_PHOTO_BY_ID = themes.events || {};
+  EVENT_PHOTO_NAMES = themes.names || {};
+} catch (e) { EVENT_PHOTO_BY_ID = {}; EVENT_PHOTO_NAMES = {}; }
+// A pinned photo only applies while the event still has the name it was chosen for, so a renamed event (or a test
+// database whose ids overlap) falls back to the keyword rules instead of showing another event's photo.
+const eventPhotoName = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const eventPhotoReady = new Map();
 function eventThemePhoto(key) {
   const src = EVENT_PHOTO_SPECIAL[key] || `/images/events/${key}-2610-800.jpg`;
@@ -7982,7 +8001,8 @@ function eventThemePhoto(key) {
 // band on stage.
 function eventKindPhoto(e) {
   const byId = EVENT_PHOTO_BY_ID[String(e.id)];
-  if (byId) return eventThemePhoto(byId);
+  const pinnedName = EVENT_PHOTO_NAMES[String(e.id)];
+  if (byId && (!e.name || !pinnedName || eventPhotoName(e.name) === eventPhotoName(pinnedName))) return eventThemePhoto(byId);
   for (const field of [e.name, e.description]) {
     const text = String(field || '').toLowerCase().replace(/[’‘]/g, "'");
     for (const [key, re] of EVENT_PHOTO_RULES) if (re.test(text) && eventThemePhoto(key)) return eventThemePhoto(key);
@@ -23607,6 +23627,23 @@ function renderVenuePageLayoutStyles() {
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
+  /* Venue page layout (2026-10-18): on narrower screens the facts (address, phone, hours) come straight after the
+     buttons, and the menu, visitor tips and guide links follow them. */
+  @media (max-width: 959px) {
+    body.golf-page .venue-layout { display: flex; flex-direction: column; }
+    body.golf-page .venue-main { display: contents; }
+    body.golf-page .venue-aside { order: 1; margin-top: 8px; }
+    body.golf-page .venue-extra { order: 2; }
+  }
+  /* The photo leaves room for the name and the open-now line on a laptop screen. */
+  @media (min-width: 641px) {
+    body.golf-page .venue-hero-photo img { max-height: clamp(220px, 42vh, 420px); }
+    body.golf-page .vg-mosaic .venue-hero-photo, body.golf-page .vg-mosaic .venue-hero-photo img { height: clamp(220px, 42vh, 380px); }
+  }
+  /* Gallery pages: the 2x2 thumbnails beside the photo keep the photo's height. */
+  @media (min-width: 900px) { body.golf-page .vg-mosaic .vg-strip { height: clamp(220px, 42vh, 380px); } }
+  body.golf-page .venue-hours-daily { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 4px; font-weight: 800; color: var(--ink); }
+  body.golf-page .venue-hours-days summary { cursor: pointer; font-size: 0.84rem; font-weight: 700; opacity: 0.8; }
   @media (min-width: 960px) {
     body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 40px; align-items: start; }
     body.golf-page .venue-aside { position: sticky; top: 84px; }
@@ -23751,7 +23788,16 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     }).join('');
     hoursHtml = seasonShut
       ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
-      : `<h2>${L('Hours', 'Heures')}</h2><ul class="hours-list" data-today="${today}">${rows}</ul>`;
+      : (() => {
+        // Venue page layout (2026-10-18): seven identical rows read as noise, so a week with the same hours every day
+        // shows one line and keeps the day-by-day list folded under it.
+        const texts = hoursModule.HOURS_WEEKDAYS.map((d) => venueDayHoursText(parsedHours.days[d], fr));
+        const list = `<ul class="hours-list" data-today="${today}">${rows}</ul>`;
+        if (texts.every((t) => t === texts[0])) {
+          return `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${escapeHtml(texts[0])}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
+        }
+        return `<h2>${L('Hours', 'Heures')}</h2>${list}`;
+      })();
     // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
@@ -23790,7 +23836,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // link and the schema keep the stored English.
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
-    venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
+    venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(String(venue.website).replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''))} \u2197</a>`] : null,
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved.
     venueLinkRow.menu_url ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
     venueLinkRow.booking_url ? [L('Book', 'R\u00e9server'), `<a href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book online', 'R\u00e9server en ligne')} \u2197</a>`] : null,
@@ -23821,7 +23867,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const hero960 = photoSized(venue.image_url, 960);
   const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
-  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
+  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;opacity:0.65;text-align:right">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
@@ -24004,9 +24050,11 @@ ${VENUE_MENU_CSS}` : ''}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
+  <div class="venue-extra">
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
+  </div>
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
@@ -28588,7 +28636,7 @@ const DOG_GUIDE = {
   heading: 'Dog-Friendly Kelowna',
   title: 'Dog-Friendly Kelowna: Beaches, Trails & Patios | Okanagan Roam',
   description: 'Off-leash dog beaches, on-leash trails, and breweries, caf\u00e9s and wineries that welcome dogs in Kelowna, BC, with the dog rules for each.',
-  banner: () => DOG_FRIENDLY_BANNER,
+  banner: () => GUIDE_BANNERS['guide-dog-walk-fall'](),
   parent: { name: 'Dog Friendly Finds', href: '/dog-friendly' },
   noPlace: true,
   intro: [
@@ -29262,19 +29310,24 @@ const GUIDE_PHOTOS = {
   'cider-orchard': { alt: 'Apple cider poured into a glass in an orchard at harvest', pos: 45 }, // Adobe Stock 304081257 (2026-10-18)
   'christmas-market-stall': { alt: 'A couple browsing ornaments at a lit-up Christmas market stall', pos: 40 }, // Adobe Stock 289302551 (2026-10-18)
   'outdoor-skating': { alt: 'A family skating together on an outdoor rink in falling snow', pos: 45 }, // Adobe Stock 390067702 (2026-10-18)
-  'okanagan-lake-late-fall': { alt: 'A quiet sandy beach on Okanagan Lake at Summerland out of season', pos: 55 }, // Adobe Stock 401895437 (2026-10-18)
   'frozen-lake-dock': { alt: 'A wooden dock on a frozen lake with snowy mountains behind', pos: 55 }, // Adobe Stock 188154105 (2026-10-18)
   'snowy-lights-park': { alt: 'A snowy park path lit with lamps and holiday lights at night', pos: 50 }, // Adobe Stock 538003727 (2026-10-18)
   'chairlift': { alt: 'Skiers riding a chairlift above snowy slopes on a sunny day', pos: 40 }, // Adobe Stock 472620344 (2026-10-18)
   'mountain-lodge-restaurant': { alt: 'A mountain restaurant with a fireplace and big windows onto the snow', pos: 50 }, // Adobe Stock 470539433 (2026-10-18)
   'cross-country-ski': { alt: 'Two cross-country skiers on a groomed trail below snowy peaks', pos: 50 }, // Adobe Stock 486451203 (2026-10-18)
-  'kelowna-downtown-lake': { alt: 'Downtown Kelowna across Okanagan Lake, with a boat in the foreground', pos: 50 }, // Adobe Stock 490610824 (2026-10-18)
   'street-tacos': { alt: 'Street tacos with guacamole and salsa', pos: 55 }, // Adobe Stock 424429904 (2026-10-18)
   'patio-mountain-view': { alt: 'Wine glasses on a patio table overlooking forested hills', pos: 50 }, // Adobe Stock 593948761 (2026-10-18)
-  'vineyard-dinner': { alt: 'Friends sharing wine at a long table in a vineyard', pos: 40 }, // Adobe Stock 290509701 (2026-10-18)
   'restaurant-dishes': { alt: 'A restaurant table set with plates, bread and glasses of wine', pos: 50 }, // Adobe Stock 300869026 (2026-10-18)
   'dinner-wine-lights': { alt: 'Red and white wine with dinner under warm string lights', pos: 55 }, // Adobe Stock 334732450 (2026-10-18)
   'valentines-dinner': { alt: 'A couple at a candlelit dinner for two', pos: 50 }, // Adobe Stock 473076390 (2026-10-18)
+  'fall-forest-hiker': { alt: 'A hiker walking a road through golden fall forest', pos: 12 }, // Adobe Stock 277081912 (2026-10-18, season check)
+  'vineyard-fall-colour': { alt: 'Vineyard rows in red and gold fall colour', pos: 50 }, // Adobe Stock 408049776 (2026-10-18, season check)
+  'misty-lake-fall': { alt: 'A misty lake at dawn, with fall colour on the far shore', pos: 50 }, // Adobe Stock 360380096 (2026-10-18, season check)
+  'kelowna-dusk-aerial': { alt: 'Kelowna and Okanagan Lake at dusk, with the city lights coming on', pos: 50 }, // Adobe Stock 116567515 (2026-10-18, season check)
+  'kelowna-night': { alt: 'Downtown Kelowna and the bridge lit up at night', pos: 50 }, // Adobe Stock 392530143 (2026-10-18, season check)
+  'kelowna-boardwalk': { alt: 'The lakeside boardwalk in downtown Kelowna', pos: 50 }, // Adobe Stock 511981475 (2026-10-18, season check)
+  'dog-walk-fall': { alt: 'A man walking his dog on a path through fall leaves', pos: 80 }, // Adobe Stock 540450689 (2026-10-18, season check)
+  'family-science-museum': { alt: 'A mother and two kids exploring a science museum', pos: 55 }, // Adobe Stock 705548393 (2026-10-18, season check)
 };
 for (const [name, b] of Object.entries(GUIDE_PHOTOS)) GUIDE_BANNERS[`guide-${name}`] = () => ({ src: `/images/guides/${name}.jpg`, alt: b.alt, pos: b.pos });
 // Town guides (2026-10-18): `region-<town>` uses that town's own photo. Only photos that need no on-page credit.
@@ -31984,7 +32037,7 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-thumb { position: relative; flex: 1 1 0; min-width: 0; max-width: 96px; height: 64px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: #EAE6D9; }
         .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
-        .vg-mosaic + .venue-photo-credit { margin-bottom: 14px !important; }
+        .vg-mosaic + .venue-photo-credit { margin-top: 6px !important; margin-bottom: 14px !important; }
         .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1rem 'Nunito', sans-serif; }
         /* Wide screens: main photo on the left, the other photos as a 2x2
            grid on the right at the same height, so the venue name below is
