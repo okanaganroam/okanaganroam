@@ -23074,3 +23074,29 @@ test('Town winery pages use the food & drink page: site header, photo cards, sea
     for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
+
+test('A listing moved to another town or category: old English and French addresses 301 to its page now', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Moved Listing Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'moved-listing-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'moved-listing-fixture');
+  db.prepare("UPDATE venues SET region = 'west-kelowna' WHERE id = ?").run(v.id);
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const go = (p) => fetch(`${base}${p}`, { redirect: 'manual' });
+  try {
+    for (const p of ['/kelowna/wineries/moved-listing-fixture', '/fr/kelowna/wineries/moved-listing-fixture']) {
+      const r = await go(p);
+      assert.equal(r.status, 301, p);
+      assert.match(r.headers.get('location'), /^(\/fr)?\/west-kelowna\/wineries\/moved-listing-fixture$/, p);
+    }
+    db.prepare("UPDATE venues SET type = 'restaurant' WHERE id = ?").run(v.id);
+    const r = await go('/fr/west-kelowna/wineries/moved-listing-fixture');
+    assert.equal(r.status, 301);
+    assert.match(r.headers.get('location'), /\/west-kelowna\/restaurants\/moved-listing-fixture$/);
+    assert.equal((await go('/fr/kelowna/wineries/no-such-place-anywhere')).status, 404);
+  } finally {
+    srv.close();
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
