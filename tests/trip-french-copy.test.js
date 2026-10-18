@@ -106,5 +106,5 @@ test('French timing copy separates own hours from inherited uncertainty',()=>{
 });
 test('French conditional dinner window preserves uncertainty and times',()=>{
  const text=t3FrenchText('Possible dinner arrival window 20:00–22:30, if travel permits. Allows 90 minutes for dinner within listed opening hours. This is not a scheduled visit: confirm the event-to-restaurant journey and kitchen service before booking.');
- assert.match(text,/20:00–22:30/);assert.match(text,/si le trajet le permet/);assert.match(text,/90 minutes/);assert.match(text,/Aucune visite n’est programmée/);assert.match(text,/service en cuisine/);assert.doesNotMatch(text,/Possible dinner|Allows|scheduled visit/);
+ assert.match(text,/20 h–22 h 30/);assert.match(text,/si le trajet le permet/);assert.match(text,/90 minutes/);assert.match(text,/Aucune visite n’est programmée/);assert.match(text,/service en cuisine/);assert.doesNotMatch(text,/Possible dinner|Allows|scheduled visit/);
 });

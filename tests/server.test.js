@@ -10221,7 +10221,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved Sports & Recreation change (2026-10-12): tripv3.type.sport added to TRANSLATIONS (en and fr) only.
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
-  assert.equal(md5('public/scripts/app.js'), '49f805518305bbb81a9bfaa2a7c563e3', 'public/scripts/app.js (French hero search, 2026-10-18)');
+  // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
+  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd', 'public/scripts/app.js (French hero search, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12113,7 +12114,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '68bb002e9ac341ecdebe54d21ada6403');
+  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16358,7 +16359,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '68bb002e9ac341ecdebe54d21ada6403');
+  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16451,7 +16452,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '68bb002e9ac341ecdebe54d21ada6403', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -19906,7 +19907,7 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   }
   assert.ok(Array.isArray(data.e));
   const fr = await (await fetch(`${base}/fr/map`)).text();
-  assert.match(fr, /<h1 class="visually-hidden">Roam Now : carte de ce qui est ouvert près de vous dans l’Okanagan<\/h1>/);
+  assert.match(fr, /<h1 class="visually-hidden">Carte de ce qui est ouvert près de vous dans l’Okanagan \(Roam Now\)<\/h1>/);
   assert.match(fr, /<h2 id="pmPanelTitle">Filtres<\/h2>/);
   // The Okanagan only, and a pin to drop for visitors who are elsewhere (or without location).
   assert.match(html, /<button type="button" class="pm-pinbtn" id="pmPinBtn" aria-pressed="false">/);
@@ -21257,6 +21258,7 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
     assert.match(en, /<a class="venue-claim-btn" href="\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Claim this listing<\/a>/);
     const frPage = await fetch(`${base}/fr/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
     assert.match(frPage, /<a class="venue-claim-btn" href="\/fr\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Revendiquer cette fiche<\/a>/);
+    assert.match(frPage, /<a href="\/fr\/owner\/login" rel="nofollow">Connectez-vous pour modifier cette fiche<\/a>/, 'French gaps (2026-10-18): the sign-in link stays French');
     // The form, in each language; unknown listings 404.
     const form = await fetch(`${base}/claim/kelowna/cafes/claim-fixture-cafe`);
     assert.equal(form.status, 200);
@@ -23307,6 +23309,95 @@ test('session replay stays disabled by default and reaches both page renderers w
     else process.env.CLARITY_PROJECT_ID = previous;
   }
 });
+
+// ---------- French gaps (2026-10-18) ----------
+// The review's French leftovers: What's On descriptions and chips, the date form, the business login link, Roam Now,
+// the contact hints, /fr/list-your-venue, /fr/search, the trip address, number formats and the owner entry pages.
+test('French gaps (2026-10-18): What\'s On chips, the date form and the header words read French', () => {
+  assert.equal(app.frText('Enderby · Today + 4 more dates · Times vary'), 'Enderby · Aujourd’hui + 4 autres dates · Heures variables');
+  assert.equal(app.frText('Oliver · Wed Oct 21 + 1 more date · 17 h'), 'Oliver · mer. 21 oct. + 1 autre date · 17 h');
+  assert.equal(app.frText('Kelowna · Sun Nov 1 + 3 more dates'), 'Kelowna · dim. 1er nov. + 3 autres dates');
+  assert.equal(app.frText('Kelowna · Thursdays until Dec 17 · today · 17 h'), 'Kelowna · Les jeudis jusqu’au 17 déc. · aujourd’hui · 17 h');
+  assert.equal(app.frText('Vernon · Tous les soirs du 24 au 30 oct., 19 h · next Sat Oct 24 · 19 h'), 'Vernon · Tous les soirs du 24 au 30 oct., 19 h · prochaine : sam. 24 oct. · 19 h');
+  assert.equal(app.frText('From'), 'Du', 'the custom-dates form no longer reads "selon"');
+  assert.equal(app.frText('Times vary'), 'Heures variables');
+  assert.equal(app.frText('Business login'), 'Espace entreprises');
+  assert.equal(app.frText('Roam Now: what’s open near me'), 'Ce qui est ouvert près de moi · Roam Now');
+  for (const [en, fr] of [['Soup', 'Soupes'], ['Coffee', 'Café'], ['West Coast', 'Cuisine de la côte Ouest'], ['Vegan', 'Végane'], ['Dessert', 'Desserts']]) assert.equal(app.frCuisine(en), fr, en);
+});
+
+test('French gaps (2026-10-18): every newly translated event description resolves to its French', () => {
+  const file = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'french', 'events-2026-10-18.json'), 'utf8'));
+  const entries = Object.entries(file);
+  assert.ok(entries.length >= 150, `${entries.length} descriptions`);
+  for (const [en, fr] of entries) {
+    assert.equal(app.frText(en), fr, en.slice(0, 60));
+    assert.notEqual(fr, en);
+    assert.doesNotMatch(fr, /'| [?!;]/, `typography: ${fr.slice(0, 60)}`);
+  }
+});
+
+test('French gaps (2026-10-18): trip planner French copy uses French numbers and hours', () => {
+  const { t3FrenchText } = require('../trip-french-copy');
+  assert.equal(t3FrenchText('Rated 4.7 from 1,234 reviews'), 'Note de 4,7 selon 1\u00a0234 avis');
+  assert.equal(t3FrenchText('Listed hours: 07:00–17:00 Mon–Fri; 10:30–22:00 Sat'), 'Horaires indiqués : 7 h–17 h lun.–ven.; 10 h 30–22 h sam.');
+  const page = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(page, /\? '\/fr\/trip' : '\/trip'/, 'a plan made on /fr/trip keeps its French address');
+  assert.match(page, /\^\(Listed hours\|Horaires indiqu/, 'the hours line is not repeated in the French reasons');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(appJs, /window\.location\.href = frPathPrefix\(\) \+ '\/trip'/, 'the trip buttons keep /fr');
+  assert.doesNotMatch(appJs, /\\u00a0[?;]/, 'no space before ? or ; (the Canadian style the rest of the site uses)');
+  assert.match(appJs, /'nav\.listVenue': 'Inscrire votre \\u00e9tablissement'/);
+});
+
+test('French gaps (2026-10-18): French pages have no English chrome, and /fr/list-your-venue is French', () => withDiscoveryServer(async (base) => {
+  const home = await (await fetch(`${base}/fr`)).text();
+  const body = (h) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '');
+  assert.doesNotMatch(body(home), />Business login</);
+  assert.match(home, /href="\/fr\/owner\/login"[^>]*>Espace entreprises</);
+  assert.match(home, /Le plus rapide : utilisez le formulaire <a href="\/fr\/list-your-venue">Inscrire votre établissement<\/a>/, 'contact topic hint');
+  assert.doesNotMatch(home, /Quickest: use the/);
+  const lyv = await (await fetch(`${base}/fr/list-your-venue`)).text();
+  const text = body(lyv);
+  for (const en of ['>Address<', '>Phone<', '>Owner<', '>Manager<', '>Other<', 'Own a restaurant', 'Photos, your menu', 'Écrivez votre', 'Business login']) assert.ok(!text.includes(en), en);
+  assert.match(lyv, /› Inscrire votre établissement<\/nav>/);
+  assert.match(lyv, /<meta name="description" content="Vous possédez un restaurant/);
+  for (const m of lyv.matchAll(/<script(?![^>]*(?:src=|application\/(?:ld\+)?json))[^>]*>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]));
+}));
+
+test('French gaps (2026-10-18): /fr/search is French and the French hero search stays French', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const html = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('restaurants à Kelowna')}`)).text();
+  assert.match(html, /<html lang="fr" data-page-lang="fr">/);
+  assert.match(html, /<h1>Résultats de recherche<\/h1>/);
+  assert.match(html, /Vous avez cherché « restaurants à Kelowna »/);
+  assert.match(html, /id="langToggle" href="\/search\?q=restaurants%20%C3%A0%20Kelowna"/, 'the English switch keeps the search');
+  for (const en of ['Search results', 'You searched', 'showing the first', ' place<', ' places<']) assert.ok(!html.replace(/<script[\s\S]*?<\/script>/g, '').includes(en), en);
+  const r = await fetch(`${base}/fr/browse?q=${encodeURIComponent('zzqx yyqv')}`, { redirect: 'manual' });
+  assert.equal(r.status, 302);
+  assert.match(r.headers.get('location'), /^\/fr\/search\?q=/, 'a French hero search lands on the French results');
+  const en = await (await fetch(`${base}/search?q=${encodeURIComponent('restaurants in Kelowna')}`)).text();
+  assert.match(en, /<h1>Search results<\/h1>/, 'the English page is unchanged');
+})));
+
+test('French gaps (2026-10-18): the owner login, new-link and forgot pages have French twins', () => withDiscoveryServer(async (base) => {
+  for (const [p, h1] of [['/fr/owner/login', 'Espace entreprises'], ['/fr/owner/link', 'Recevoir votre lien de modification'], ['/fr/owner/forgot', 'Réinitialiser votre mot de passe']]) {
+    const res = await fetch(base + p);
+    assert.equal(res.status, 200, p);
+    const html = await res.text();
+    assert.match(html, /<html lang="fr" data-page-lang="fr">/, p);
+    assert.ok(html.includes(`<h1>${h1}</h1>`), p);
+    const text = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '');
+    for (const en of ['For businesses', 'Sign in', 'Forgot your password', 'No login yet', 'Business login', 'Email me', 'Back to sign in']) assert.ok(!text.includes(en), `${p}: ${en}`);
+    for (const m of html.matchAll(/<script(?![^>]*(?:src=|application\/(?:ld\+)?json))[^>]*>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new Function(m[1]), p);
+  }
+  const login = await (await fetch(`${base}/fr/owner/login`)).text();
+  assert.match(login, /href="\/fr\/owner\/forgot"/);
+  assert.match(login, /href="\/fr\/list-your-venue"/);
+  assert.match(login, /"Please try again\.":"Veuillez réessayer\."/, 'server messages are shown in French');
+  const en = await (await fetch(`${base}/owner/login`)).text();
+  assert.match(en, /<h1>Business login<\/h1>/);
+  assert.match(en, /id="ohbBtn"/, 'the English page keeps its help bot');
+}));
 
 // ---- Smarter search (2026-10-18): intent routing and the rebuilt /search page ----
 // Fixture places for each intent, removed afterwards.

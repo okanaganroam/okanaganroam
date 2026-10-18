@@ -4101,10 +4101,18 @@ function discoveryPresentation(run) {
 //     rather than /browse's raw substring filter, which found "low" in
 //     "follow" and nothing for "Earl's")
 // Returns { url, reason }; url null = serve /browse as typed.
-function heroSearchTarget(text) {
+// French (2026-10-18): from a French page (lang 'fr') the words are read through the planner's French vocabulary
+// ("terrasse" -> "patio"), and the /search link keeps the visitor's own words.
+function discoverySearchText(text, lang) {
+  if (lang !== 'fr') return text;
+  try { return tripPlannerFrModule().tripPlannerText(text, buildDiscoveryTaxonomy()); } catch (e) { return text; }
+}
+function heroSearchTarget(text, { lang = 'en' } = {}) {
+  const typed = text;
+  text = discoverySearchText(text, lang);
   const intent = interpretDiscoveryText(text);
   const destination = resolveDiscoveryDestination(intent);
-  const search = `/search${discoveryQueryString({ q: text.trim() })}`;
+  const search = `/search${discoveryQueryString({ q: typed.trim() })}`;
   if (intent.mode === 'navigate' && destination.url) return { url: destination.url, reason: 'exact_venue' };
   // Smarter search (2026-10-18): breakfast, kids and rainy days, date night,
   // dated events, guide topics and "a winery with a restaurant" (smartSearchPlan).
@@ -4462,14 +4470,85 @@ function smartIndoorCount(region, familyOnly) {
 
 function renderSearchPage(run, opts = {}) {
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const model = searchPageModel(run, opts.now || new Date());
+  const model = searchPageModel(run, opts.now || new Date(), lang);
   return model.venues.length ? renderSearchResultsHubPage(model, lang) : renderSearchSimplePage(model, lang);
 }
+// French search results (2026-10-18): /fr/search writes its own sentences in French (what it understood, why each
+// place matched, counts and notes); labels go through the French word list (frTextOr), place and town names stay.
+const SEARCH_EMPTY_TEXT_FR = {
+  exclusion_only: 'Nous avons compris ce que vous ne voulez pas, mais cela seul ne précise rien. Dites-nous plutôt ce que vous aimeriez, par exemple « restaurants à Kelowna ».',
+  needs_more: 'Ajoutez un type de lieu ou une ville, par exemple « vignobles à Naramata » ou « plages à Penticton », et nous vous montrerons de vrais lieux.',
+  no_match_for_words: 'Aucun lieu dont le nom, la cuisine indiquée ou la description mentionne ces mots.',
+  no_results: 'Aucun lieu ne correspond à tout cela. Essayez avec moins de mots ou une autre ville.',
+  ambiguous: 'Plusieurs lieux portent ce nom. Choisissez celui que vous cherchez :',
+};
+function frSearchLabel(t) { return frTextOr(String(t)); }
+function frSearchTypePlural(t, labels) {
+  return (CATEGORY_LABELS_FR[t] ? CATEGORY_LABELS_FR[t].plural : frSearchLabel(labels.types[t] ? labels.types[t].plural : t)).toLowerCase();
+}
+const FR_SEARCH_COLLECTIONS = { hidden_gem: 'trésors cachés', local_favorite: 'coups de cœur locaux', dog_friendly: 'plages pour chiens' };
+function discoveryInterpretedTextFr(intent, labels) {
+  const foodWords = uniqueList((intent.foodTerms || []).filter((f) => f.cuisine && intent.cuisines.includes(f.cuisine)).map((f) => `« ${f.term} »`));
+  const parts = [
+    ...intent.collections.map((c) => FR_SEARCH_COLLECTIONS[c] || c),
+    ...foodWords,
+    ...intent.types.map((t) => frSearchTypePlural(t, labels)),
+    ...intent.activities.map((a) => frSearchLabel(labels.activities[a] || a).toLowerCase()),
+    ...intent.textTerms.map((w) => `« ${w} »`),
+  ];
+  if (!(parts.length + intent.features.length + intent.regions.length)) return null;
+  let text = parts.length ? parts.join(', ') : 'lieux';
+  if (intent.features.length) text += intent.features.length > 1
+    ? ` avec les badges ${intent.features.map((f) => frSearchLabel(labels.features[f] || f)).join(', ')}`
+    : ` avec le badge ${frSearchLabel(labels.features[intent.features[0]] || intent.features[0])}`;
+  if (intent.regions.length) text += ` à ${intent.regions.map((r) => labels.regions[r] || r).join(' ou ')}`;
+  const ex = intent.excluded;
+  const not = [
+    ...ex.types.map((t) => `sans ${frSearchTypePlural(t, labels)}`),
+    ...ex.regions.map((r) => `pas à ${labels.regions[r] || r}`),
+    ...ex.cuisines.map((c) => `sans ${frCuisine(c).toLowerCase()}`),
+    ...ex.collections.map((c) => `sauf ${FR_SEARCH_COLLECTIONS[c] || c}`),
+    ...ex.activities.map((a) => `sans ${frSearchLabel(labels.activities[a] || a).toLowerCase()}`),
+    ...(ex.budget === 'upscale' ? ['rien de haut de gamme'] : []),
+  ];
+  if (not.length) text += `, ${not.join(', ')}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+function discoveryMatchedOnTextFr(m) {
+  const i = m.indexOf(':');
+  const key = m.slice(0, i), value = m.slice(i + 1);
+  if (key === 'cuisine') return `Cuisine indiquée : ${frCuisine(value.charAt(0).toUpperCase() + value.slice(1))}`;
+  if (key === 'feature') return BADGE_LABELS[value] ? `A le badge ${frSearchLabel(BADGE_LABELS[value].title)}` : null;
+  if (key === 'collection') return value === 'hidden_gem' ? 'Un des trésors cachés d’Okanagan Roam' : value === 'local_favorite' ? 'Un coup de cœur local d’Okanagan Roam' : value === 'dog_friendly' ? 'Sur la liste officielle des lieux qui acceptent les chiens' : null;
+  const where = value.split('+').map((w) => (w === 'name' ? 'son nom' : w === 'cuisine' ? 'sa cuisine indiquée' : 'sa description'));
+  return `Mentionne « ${key} » dans ${where.join(' et ')}`;
+}
+function discoveryNoteTextFr(n, labels) {
+  const what = (f, v) => (f === 'region' ? `pas à ${labels.regions[v] || v}` : f === 'type' ? `sans ${frSearchTypePlural(v, labels)}` : f === 'cuisine' ? `sans ${v}`
+    : f === 'collection' ? `sauf ${FR_SEARCH_COLLECTIONS[v] || v}` : f === 'activity' ? `sans ${frSearchLabel(labels.activities[v] || v).toLowerCase()}`
+      : f === 'budget' ? 'rien de haut de gamme' : f === 'feature' ? `sans « ${frSearchLabel(labels.features[v] || v)} »` : `pas « ${v} »`);
+  if (n.code === 'exclusion_applied') return n.field === 'budget'
+    ? 'Rien de haut de gamme : les lieux au niveau de prix le plus élevé ($$) sont exclus. Les lieux sans prix indiqué sont conservés.'
+    : `Compris : « ${what(n.field, n.value)} ». Ces lieux ont été exclus.`;
+  if (n.code === 'exclusion_understood') return `Compris : « ${what(n.field, n.value)} ».`;
+  if (n.code === 'exclusion_not_applied') return n.field === 'feature'
+    ? `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas exclure de lieux selon un badge; aucun n’a été retiré.`
+    : `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas l’appliquer; aucun lieu n’a été retiré pour cette raison.`;
+  if (n.field === 'occasion') return `Les occasions comme « ${String(n.value).replace(/_/g, ' ')} » ne s’appliquent pas à la recherche. Planifier mon voyage peut en tenir compte.`;
+  if (n.field === 'budget') return 'Le budget ne s’applique pas à la recherche : tous les lieux n’indiquent pas leurs prix.';
+  if (n.field === 'when') return 'Les dates et les heures ne sont pas vérifiées ici. La page À l’affiche présente les événements datés.';
+  if (n.field === 'days' || n.field === 'pace') return 'La durée et le rythme du voyage servent à Planifier mon voyage, pas à la recherche.';
+  if (n.field === 'phrase') return `La recherche ne peut pas encore appliquer « ${n.value} ».`;
+  return null;
+}
+
 // Smarter search (2026-10-18): everything the /search page shows, worked out once.
 const SEARCH_PAGE_MAX_RESULTS = 480;
-function searchPageModel(run, now = new Date()) {
-  const q = run.query.trim();
-  const plan = smartSearchPlan(q, run.intent, now);
+function searchPageModel(run, now = new Date(), lang = 'en') {
+  // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
+  // from (a French search goes through the planner's French words first, see discoverySearchText).
+  const q = run.query.trim(), sq = String(run.searchText || run.query).trim();
+  const plan = smartSearchPlan(sq, run.intent, now);
   let venues = [], why = new Map();
   if (plan && plan.list) {
     const picked = plan.list().slice(0, SEARCH_PAGE_MAX_RESULTS);
@@ -4479,7 +4558,7 @@ function searchPageModel(run, now = new Date()) {
     // Name matches first (2026-10-18): the whole request in the name, then
     // every word in the name, then the rest in the retrieval's own order.
     const byId = new Map(discoverySearchVenues().map((v) => [v.id, v]));
-    const phrase = smartTopicWords(smartFold(q), run.intent).join(' ');
+    const phrase = smartTopicWords(smartFold(sq), run.intent).join(' ');
     const tier = (item) => {
       const v = byId.get(item.id);
       const name = v ? smartFold(v.row.name) : '';
@@ -4492,12 +4571,12 @@ function searchPageModel(run, now = new Date()) {
       const v = byId.get(item.id);
       if (!v) continue;
       venues.push(v.row);
-      const text = (item.matchedOn || []).map(discoveryMatchedOnText).filter(Boolean).join(' · ');
+      const text = (item.matchedOn || []).map(lang === 'fr' ? discoveryMatchedOnTextFr : discoveryMatchedOnText).filter(Boolean).join(' · ');
       if (text) why.set(v.id, text);
     }
   }
-  const guides = plan && plan.guides ? plan.guides : smartGuideMatches(q, run.intent).slice(0, 3);
-  const fuzzy = !venues.length && run.results.kind !== 'events' ? smartFuzzyVenues(q, run.intent).slice(0, 5).map((m) => m.venue) : [];
+  const guides = plan && plan.guides ? plan.guides : smartGuideMatches(sq, run.intent).slice(0, 3);
+  const fuzzy = !venues.length && run.results.kind !== 'events' ? smartFuzzyVenues(sq, run.intent).slice(0, 5).map((m) => m.venue) : [];
   return { run, q, plan, venues, why, guides, fuzzy, now };
 }
 // French words for the page's own text (the cards and filters are translated with every French page).
@@ -4535,13 +4614,16 @@ const SEARCH_PAGE_STYLES = `<style id="search-page">
 // The visitor's words, the interpretation, corrections and notes.
 function searchSummaryHtml(model, lang) {
   const { run, q, plan } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], labels = tripPlannerLabels(), esc = escapeHtml;
-  const interpreted = plan && plan.heading ? (lang === 'fr' ? plan.headingFr : plan.heading) : (lang === 'fr' ? null : p.interpreted);
-  const correctionText = p.corrections.length && lang === 'en'
-    ? `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>` : '';
+  // French gaps (2026-10-18): the French page says what it understood, its corrections and notes in French too.
+  const interpreted = plan && plan.heading ? (lang === 'fr' ? plan.headingFr : plan.heading)
+    : (lang === 'fr' ? (p.status === 'ambiguous' ? null : discoveryInterpretedTextFr(run.intent, labels)) : p.interpreted);
+  const correctionText = !p.corrections.length ? ''
+    : lang === 'fr' ? `<p class="search-corrected">Nous avons lu ${p.corrections.map((c) => `« ${esc(c.from)} » comme « ${esc(c.to)} »`).join(', ')}.</p>`
+      : `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>`;
   // Stage 3.5: a sentence is shown once. A plan's own list (2026-10-18)
   // applies its occasion and dates itself, so their notes are left off.
-  const notes = lang === 'fr' ? [] : p.notes.filter((n) => !(plan && plan.list && ['occasion', 'when'].includes(n.field)))
-    .map((n) => discoveryNoteText(n, labels)).filter((t, i, all) => t && all.indexOf(t) === i);
+  const notes = p.notes.filter((n) => !(plan && plan.list && ['occasion', 'when'].includes(n.field)))
+    .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
   return `<p class="search-interpreted">${esc(L.searched)} ${quote}${interpreted ? `${lang === 'fr' ? ' : ' : ': showing '}<strong>${esc(interpreted)}</strong>` : ''}</p>
@@ -4566,8 +4648,8 @@ function renderSearchResultsHubPage(model, lang) {
   return renderCuratedHubPage({
     path: `/search?q=${encodeURIComponent(q)}`,
     name: L.title,
-    title: `${L.title}: ${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`,
-    description: 'Search results on Okanagan Roam.',
+    title: `${L.title}${lang === 'fr' ? ' : ' : ': '}${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`,
+    description: lang === 'fr' ? 'Résultats de recherche sur Okanagan Roam.' : 'Search results on Okanagan Roam.',
     bodyClass: 'region-page search-page',
     surface: 'search',
     pageType: 'search',
@@ -4596,18 +4678,18 @@ function renderSearchResultsHubPage(model, lang) {
 // any events, then real ways forward -- a place the words nearly spell, our
 // guides, the town's busiest kinds of place and the directory with ?q= kept.
 function renderSearchSimplePage(model, lang) {
-  const { run, q } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], esc = escapeHtml;
+  const { run, q } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], esc = escapeHtml, fr = lang === 'fr';
   const total = run.results.total || 0;
   const items = run.results.items || [];
   let resultsHtml = '';
   if (run.results.kind === 'events' && items.length) {
-    resultsHtml = `<p class="search-count">${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}</p>
+    resultsHtml = `<p class="search-count">${fr ? `${total} événement${total === 1 ? '' : 's'}${total > items.length ? `, voici les ${items.length} premiers` : ''}` : `${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}`}</p>
   <ul class="card-grid">${items.map((e) => `
     <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
       <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
   </ul>`;
   } else {
-    const text = lang === 'fr' ? L.none : (SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results);
+    const text = lang === 'fr' ? (SEARCH_EMPTY_TEXT_FR[p.status] || SEARCH_EMPTY_TEXT_FR.no_results) : (SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results);
     resultsHtml = `<p class="search-empty">${esc(text)}</p>`;
   }
   const blocks = [];
@@ -4640,11 +4722,11 @@ function renderSearchSimplePage(model, lang) {
   if (moreUnique.length) blocks.push([L.tryThese, moreUnique]);
   const blockHtml = blocks.map(([heading, list]) => `<h2 class="category-subsection-heading">${esc(heading)}</h2>
   <ul class="search-suggestions">${list.map((sg) => `<li><a href="${esc(sg.url)}">${esc(sg.label)}</a></li>`).join('')}</ul>`).join('\n  ');
-  const title = `${L.title}: ${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`;
+  const title = `${L.title}${fr ? ' : ' : ': '}${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, 'Search results on Okanagan Roam.', null, [], { golfTheme: true, noindex: true })}
+${pageHead(title, fr ? 'Résultats de recherche sur Okanagan Roam.' : 'Search results on Okanagan Roam.', null, [], { golfTheme: true, noindex: true })}
 ${renderOutdoorThemeStyles()}
 ${renderAnalyticsHeadHtml('search')}
 ${SEARCH_PAGE_STYLES}
@@ -7909,6 +7991,8 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (total < 100) return '';
   const fmt = (x) => Number(x).toLocaleString('en-CA');
+  // French (2026-10-18): "1 766 vrais lieux", with a no-break space, not "1,766".
+  const fmtFr = (x) => fmt(x).replace(/,/g, '\u00a0');
   const items = [
     [total, '/destinations', 'real places', 'vrais lieux'],
     [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 30 days
@@ -7918,7 +8002,7 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
     [n(['golf']), '/golf', 'golf courses', 'terrains de golf'],
     [n(['outdoor']), '/outdoors', 'trails, parks & lookouts', 'sentiers, parcs et points de vue'],
   ].filter(([v]) => v > 0);
-  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v)}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
+  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v) === fmtFr(v) ? fmt(v) : `<span class="home-en">${fmt(v)}</span><span class="home-fr" lang="fr">${fmtFr(v)}</span>`}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
 }
 function renderBuildTripCTAHTML({ now = homepageNow() } = {}) {
   const fall = isFallHeroSeason(now);
@@ -22112,7 +22196,11 @@ function frBadgeLabel(field) {
 // A stored cuisine ("Italian") -> its French name through app.js's cuisine.* keys; unknown values stay as stored.
 function frCuisine(cuisine) {
   const key = Object.keys(APP_TRANSLATIONS.en).find((k) => k.startsWith('cuisine.') && APP_TRANSLATIONS.en[k] === cuisine);
-  return (key && APP_TRANSLATIONS.fr[key]) || cuisine;
+  if (key && APP_TRANSLATIONS.fr[key]) return APP_TRANSLATIONS.fr[key];
+  // French gaps (2026-10-18): cuisines app.js has no key for ("Soup", "Coffee", "West Coast" ...) use french-text.js's list.
+  let list = {};
+  try { list = frenchText.FR_CUISINE || {}; } catch (e) { list = {}; }
+  return list[cuisine] || list[String(cuisine).replace(/^./, (c) => c.toUpperCase())] || cuisine;
 }
 // Server-side twin of app.js applyTranslations(): the shared header/footer carry data-i18n keys, so a French page swaps
 // their text (and data-i18n-aria/-title/-placeholder attributes) before it leaves the server.
@@ -22246,7 +22334,9 @@ const FR_TWIN_STATIC = new Set(['/', '/food-drink', '/restaurants', '/cafes', '/
   // Phase 2 and 3 (2026-10-14): What's On, the guides, the map, the trip pages, the forms and the info pages.
   '/whats-on', '/guides', '/map', '/trip', '/my-trip', '/favorites', '/list-your-venue', '/list-an-event', '/about', '/contact', '/privacy', '/terms',
   // Smarter search (2026-10-18): a French search lands on French results (/fr/search), not the English page.
-  '/search']);
+  // French gaps (2026-10-18): the business login, new-link and forgot-password pages (the signed-in portal stays
+  // English for now).
+  '/search', '/owner/login', '/owner/link', '/owner/forgot']);
 const FR_TWIN_SECTIONS = new Set(['outdoors', 'tours', 'indoor', 'sports', 'whats-on', 'guides']);
 // A place page (/kelowna/restaurants/slug): it has its own French route.
 function frIsVenuePath(p) {
@@ -23190,9 +23280,9 @@ ${VENUE_MENU_CSS}` : ''}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
   ${venue.redirect_to ? '' : `<div class="venue-owner-cta" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
-    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise\u00a0?')}</p>
+    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
     <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Revendiquer cette fiche')}</a>
-    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte\u00a0?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
+    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
   </div>`}
   </aside>
   </div>
@@ -29090,7 +29180,7 @@ ${renderGolfHeaderHtml()}
     shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) days[r] = sharedDays[i]; });
     save(); store(DAYS, days);
     viewing = 'mine';
-    history.replaceState(null, '', '/my-trip');
+    history.replaceState(null, '', /^\/fr(\/|$)/.test(location.pathname) ? '/fr/my-trip' : '/my-trip');
     status(T.saved);
     track('shared_trip_save', { stop_count: trip.length });
     render();
@@ -34051,7 +34141,7 @@ ${VENUE_MENU_CSS}
     ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
-  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise ?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
+  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
   <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} à ${escapeHtml(regionLabel)}` : `More ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
   </div>
   ${themedShell ? '</main>' : ''}
@@ -34740,11 +34830,15 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
   'Business login': ['login', false], 'My listings': ['account', true], 'Account settings': ['settings', true],
   'Get your edit link': ['link', false], 'Claim this listing': ['claim', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
 });
-function ownerSimplePage(title, inner, extraHead = '') {
+// French entry pages (2026-10-18): lang 'fr' gives the page a French title and description; the help bot is English
+// only, so those pages point to info@ in French instead (see ownerEntryHelpFr).
+function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
+  const fr = lang === 'fr';
+  const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
   return ownerA11y(`<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(`${title} | Okanagan Roam`, 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
+${pageHead(`${title} | Okanagan Roam`, fr ? 'Espace entreprises des fiches Okanagan Roam.' : 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
 ${extraHead}
 <style>
   body.owner-page .op-wrap { max-width: 560px; margin: 0 auto; padding: 24px 0 56px; }
@@ -34766,26 +34860,55 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main"><div class="op-wrap">
 ${inner}
   </div></main>
-${OWNER_SIMPLE_PAGE_HELP[title] ? ownerHelpWidgetHtml(OWNER_SIMPLE_PAGE_HELP[title][0], { signedIn: OWNER_SIMPLE_PAGE_HELP[title][1] }) : ''}
+${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
 </body>
 </html>`);
 }
 
-function renderOwnerLoginPage() {
-  return ownerSimplePage('Business login', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Business login</h1>
-    <p>Sign in to update your listing on Okanagan Roam, add events and send photos.</p>
+// The server's messages on the French entry pages, in French (the JSON replies stay English for the English pages).
+const OWNER_ENTRY_MESSAGES_FR = {
+  'That email and password don\u2019t match. Forgot your password? Reset it at okanaganroam.com/owner/forgot.': 'Ce courriel et ce mot de passe ne correspondent pas. Mot de passe oublié? Réinitialisez-le à okanaganroam.com/fr/owner/forgot.',
+  [OWNER_LOCKED_MESSAGE]: `Trop de mots de passe erronés. Réessayez dans ${OWNER_LOGIN_LOCK_MINUTES} minutes ou réinitialisez votre mot de passe à okanaganroam.com/fr/owner/forgot.`,
+  'Please enter the email you sign in with.': 'Entrez le courriel que vous utilisez pour vous connecter.',
+  'Please enter the email we have for your business.': 'Entrez le courriel que nous avons pour votre entreprise.',
+  'Please enter your email address.': 'Entrez votre adresse courriel.',
+  'Please use the Okanagan Roam website.': 'Veuillez utiliser le site Okanagan Roam.',
+  'Too many attempts. Please wait a while and try again.': 'Trop de tentatives. Patientez un moment, puis réessayez.',
+  'Please try again.': 'Veuillez réessayer.',
+};
+// A JSON block, not a script literal: the French twin translates English strings inside page scripts, which would
+// turn this list's English keys French.
+function ownerEntryMessagesJson(fr) {
+  return fr ? `<script type="application/json" id="oeFr">${JSON.stringify(OWNER_ENTRY_MESSAGES_FR).replace(/</g, '\\u003c')}</script>\n` : '';
+}
+function ownerEntryMessagesScript(fr) {
+  return fr ? "var OE_FR = {}; try { OE_FR = JSON.parse(document.getElementById('oeFr').textContent); } catch (e) {} function oeMsg(t){ return (t && OE_FR[t]) || t; }"
+    : 'function oeMsg(t){ return t; }';
+}
+function ownerEntryHelpFr() {
+  return '<p class="op-hint" style="margin-top:14px">Besoin d’aide? Écrivez-nous à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>; nous répondons en français ou en anglais.</p>';
+}
+function renderOwnerLoginPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Business login', 'Espace entreprises'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Business login', 'Espace entreprises')}</h1>
+    <p>${L('Sign in to update your listing on Okanagan Roam, add events and send photos.', 'Connectez-vous pour mettre à jour votre fiche sur Okanagan Roam, ajouter des événements et envoyer des photos.')}</p>
     <form class="venue-form" id="olForm" novalidate>
-      <div class="form-field"><label for="olEmail">Email</label><input type="email" id="olEmail" autocomplete="username" maxlength="254"></div>
-      <div class="form-field"><label for="olPassword">Password</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
+      <div class="form-field"><label for="olEmail">${L('Email', 'Courriel')}</label><input type="email" id="olEmail" autocomplete="username" maxlength="254"></div>
+      <div class="form-field"><label for="olPassword">${L('Password', 'Mot de passe')}</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
       <p class="lyv-error" id="olError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="olSubmit">Sign in</button>
-      <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">Forgot your password?</a></p>
+      <button type="submit" class="venue-form-submit" id="olSubmit">${L('Sign in', 'Se connecter')}</button>
+      <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">${L('Forgot your password?', 'Mot de passe oublié?')}</a></p>
     </form>
-    <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
-    <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>
-<script>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé par courriel et choisissez-y un mot de passe. Vous ne le trouvez pas? <a href="${OWNER_NEW_LINK_PATH}">Recevoir un nouveau lien par courriel</a>.
+    <br><strong>Pas encore inscrit?</strong> <a href="/list-your-venue">Inscrivez votre entreprise gratuitement</a>.</p>
+    <p class="op-hint">Après la connexion, la gestion de vos fiches s’affiche en anglais pour l’instant.</p>
+    ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
+    <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('olForm'), err = document.getElementById('olError'), btn = document.getElementById('olSubmit');
   f.addEventListener('submit', function(e){
@@ -34793,11 +34916,11 @@ function renderOwnerLoginPage() {
     fetch('/owner/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ email: document.getElementById('olEmail').value, password: document.getElementById('olPassword').value }) })
       .then(function(r){ return r.json(); })
-      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = (j && j.error) || 'Please try again.'; err.hidden = false; })
-      .catch(function(){ btn.disabled = false; err.textContent = 'Could not sign in. Please check your connection.'; err.hidden = false; });
+      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = oeMsg((j && j.error) || 'Please try again.'); err.hidden = false; })
+      .catch(function(){ btn.disabled = false; err.textContent = ${fr ? "'Connexion impossible. Vérifiez votre connexion Internet.'" : "'Could not sign in. Please check your connection.'"}; err.hidden = false; });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Business login' });
 }
 
 function renderOwnerAccountPage(account) {
@@ -35128,21 +35251,27 @@ async function handleOwnerNewLink(req, res) {
   return sendSubmissionResponse(res, 200, { ok: true });
 }
 
-function renderOwnerNewLinkPage() {
-  return ownerSimplePage('Get your edit link', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Get your edit link</h1>
-    <p>Can&rsquo;t find the private link we emailed you? Enter the email address we have for your business and we&rsquo;ll send you a new one straight away.</p>
+function renderOwnerNewLinkPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Get your edit link', 'Recevoir votre lien de modification'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Get your edit link', 'Recevoir votre lien de modification')}</h1>
+    <p>${L('Can&rsquo;t find the private link we emailed you? Enter the email address we have for your business and we&rsquo;ll send you a new one straight away.', 'Vous ne trouvez plus le lien privé que nous vous avons envoyé? Entrez l’adresse courriel que nous avons pour votre entreprise et nous vous en enverrons un nouveau tout de suite.')}</p>
     <form class="venue-form" id="onlForm" novalidate>
-      <div class="form-field"><label for="onlEmail">Your business email</label><input type="email" id="onlEmail" autocomplete="email" maxlength="254"><p class="lyv-error" id="onlEmailError" hidden></p></div>
+      <div class="form-field"><label for="onlEmail">${L('Your business email', 'Courriel de votre entreprise')}</label><input type="email" id="onlEmail" autocomplete="email" maxlength="254"><p class="lyv-error" id="onlEmailError" hidden></p></div>
       <p class="lyv-error" id="onlError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="onlSubmit">Email me my link</button>
+      <button type="submit" class="venue-form-submit" id="onlSubmit">${L('Email me my link', 'M’envoyer mon lien')}</button>
     </form>
-    <p class="op-done" id="onlDone" hidden>If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.</p>
-    <p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
+    <p class="op-done" id="onlDone" hidden>${L('If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.', 'Si nous avons ce courriel pour une entreprise, un nouveau lien est en route. Vérifiez votre boîte de réception (et vos courriels indésirables). Votre ancien lien fonctionne jusqu’à ce que vous ouvriez le nouveau.')}</p>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Nous n’avons pas votre courriel, ou il a changé?</strong> Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong>. Nous vérifierons qu’il s’agit bien de vous et vous enverrons un lien.
+    <br><strong>Vous ne savez pas quel courriel nous avons?</strong> Écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous réglerons la question.
+    <br><strong>Vous avez déjà un compte?</strong> <a href="/owner/login">Connectez-vous ici</a>.</p>
+    <p class="op-hint">La page de modification de votre fiche s’affiche en anglais pour l’instant.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
     <br><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
-    <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>
-<script>
+    <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('onlForm'), btn = document.getElementById('onlSubmit');
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
@@ -35155,13 +35284,13 @@ function renderOwnerNewLinkPage() {
         btn.disabled = false;
         if (j && j.ok) { f.hidden = true; document.getElementById('onlDone').hidden = false; return; }
         var errs = (j && j.errors) || {};
-        show('onlEmailError', errs.email);
-        if (!errs.email) show('onlError', (j && j.error) || 'Please try again.');
+        show('onlEmailError', oeMsg(errs.email));
+        if (!errs.email) show('onlError', oeMsg((j && j.error) || 'Please try again.'));
       })
-      .catch(function(){ btn.disabled = false; show('onlError', 'Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; show('onlError', ${fr ? "'Connexion impossible. Veuillez réessayer.'" : "'Could not connect. Please try again.'"}); });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Get your edit link' });
 }
 
 // ---------- Claim this listing (2026-10-18) ----------
@@ -35436,7 +35565,7 @@ function renderClaimPage(venue, lang) {
   body.owner-page .cl-radio input[type=radio] { flex: 0 0 auto; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; padding: 0; }
   body.owner-page .cl-radio span { flex: 1 1 auto; min-width: 0; }
   body.owner-page [hidden] { display: none !important; }
-</style>`);
+</style>`, { lang, helpKey: 'Claim this listing' });
   return fr ? page.replace('<html lang="en">', '<html lang="fr-CA">') : page;
 }
 
@@ -35568,20 +35697,25 @@ async function handleOwnerReset(req, res, value) {
   return res.end(JSON.stringify({ ok: true }));
 }
 
-function renderOwnerForgotPage() {
-  return ownerSimplePage('Reset your password', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Reset your password</h1>
-    <p>Enter the email you sign in with. We&rsquo;ll send you a link to choose a new password.</p>
+function renderOwnerForgotPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Reset your password', 'Réinitialiser votre mot de passe'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Reset your password', 'Réinitialiser votre mot de passe')}</h1>
+    <p>${L('Enter the email you sign in with. We&rsquo;ll send you a link to choose a new password.', 'Entrez le courriel que vous utilisez pour vous connecter. Nous vous enverrons un lien pour choisir un nouveau mot de passe.')}</p>
     <form class="venue-form" id="ofgForm" novalidate>
-      <div class="form-field"><label for="ofgEmail">Email</label><input type="email" id="ofgEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="ofgEmailError" hidden></p></div>
+      <div class="form-field"><label for="ofgEmail">${L('Email', 'Courriel')}</label><input type="email" id="ofgEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="ofgEmailError" hidden></p></div>
       <p class="lyv-error" id="ofgError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="ofgSubmit">Send reset link</button>
+      <button type="submit" class="venue-form-submit" id="ofgSubmit">${L('Send reset link', 'Envoyer le lien de réinitialisation')}</button>
     </form>
-    <p class="op-done" id="ofgDone" hidden>If that email has a login, a reset link is on its way. Check your inbox (and spam folder). <span id="ofgSlow" hidden>It can take a few hours to arrive.</span></p>
-    <p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
-    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there, or <a href="${OWNER_NEW_LINK_PATH}">get a new link</a>.</p>
-<script>
+    <p class="op-done" id="ofgDone" hidden>${L('If that email has a login, a reset link is on its way. Check your inbox (and spam folder).', 'Si ce courriel est associé à un compte, un lien de réinitialisation est en route. Vérifiez votre boîte de réception (et vos courriels indésirables).')} <span id="ofgSlow" hidden>${L('It can take a few hours to arrive.', 'Il peut prendre quelques heures à arriver.')}</span></p>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Retour à la connexion</a>
+    <br><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé et choisissez-y un mot de passe, ou <a href="${OWNER_NEW_LINK_PATH}">recevez un nouveau lien</a>.</p>
+    ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
+    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there, or <a href="${OWNER_NEW_LINK_PATH}">get a new link</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('ofgForm'), btn = document.getElementById('ofgSubmit');
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
@@ -35594,13 +35728,13 @@ function renderOwnerForgotPage() {
         btn.disabled = false;
         if (j && j.ok) { f.hidden = true; document.getElementById('ofgDone').hidden = false; document.getElementById('ofgSlow').hidden = !!j.direct; return; }
         var errs = (j && j.errors) || {};
-        show('ofgEmailError', errs.email);
-        if (!errs.email) show('ofgError', (j && j.error) || 'Please try again.');
+        show('ofgEmailError', oeMsg(errs.email));
+        if (!errs.email) show('ofgError', oeMsg((j && j.error) || 'Please try again.'));
       })
-      .catch(function(){ btn.disabled = false; show('ofgError', 'Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; show('ofgError', ${fr ? "'Connexion impossible. Veuillez réessayer.'" : "'Could not connect. Please try again.'"}); });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Reset your password' });
 }
 
 function renderOwnerResetPage(valid) {
@@ -37622,8 +37756,12 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: '/browse', 'Cache-Control': 'no-store' });
         return res.end();
       }
-      // Smarter search (2026-10-18): every match (Show more), in the visitor's language.
-      const html = renderSearchPage(runDiscovery(q, { limit: SEARCH_PAGE_MAX_RESULTS }), { lang: res.twinLang });
+      // Smarter search (2026-10-18): every match (Show more), in the visitor's language. French gaps (2026-10-18): a
+      // French search is read through the planner's French words ("terrasse" -> "patio"); the page shows what was typed.
+      const searchText = discoverySearchText(q, res.twinLang);
+      const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS });
+      run.query = q; run.searchText = searchText;
+      const html = renderSearchPage(run, { lang: res.twinLang });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
       return res.end(html);
     }
@@ -37681,7 +37819,7 @@ const server = http.createServer(async (req, res) => {
           && query.q.length <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
           // Stage 3.4: heroSearchTarget() decides (see its comment); a null
           // url keeps today's /browse, as typed.
-          const target = heroSearchTarget(query.q);
+          const target = heroSearchTarget(query.q, { lang: res.twinLang });
           if (target.url) {
             res.writeHead(302, { Location: target.url, 'Cache-Control': 'no-store' });
             return res.end();
@@ -39909,21 +40047,21 @@ const server = http.createServer(async (req, res) => {
       if (method === 'GET' || method === 'HEAD') {
         if (ownerAccountForRequest(req)) { res.writeHead(302, { Location: '/owner/account', 'Cache-Control': 'no-store' }); return res.end(); }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname === OWNER_NEW_LINK_PATH || pathname === `${OWNER_NEW_LINK_PATH}/`) {
       if (method === 'POST') return await handleOwnerNewLink(req, res);
       if (method === 'GET' || method === 'HEAD') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerNewLinkPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerNewLinkPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname === '/owner/forgot' || pathname === '/owner/forgot/') {
       if (method === 'POST') return await handleOwnerForgot(req, res);
       if (method === 'GET' || method === 'HEAD') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerForgotPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerForgotPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname.startsWith(OWNER_RESET_PATH)) {
@@ -40851,6 +40989,7 @@ module.exports = {
   frText,
   frenchTwinHtml,
   frTextOr,
+  frCuisine,
   englishTwinHtml,
   withFrenchTwinEntries,
   venuePagePath,
