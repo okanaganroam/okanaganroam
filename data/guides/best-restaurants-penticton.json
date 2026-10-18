@@ -9,7 +9,7 @@
  },
  "noPlace": true,
  "intro": [
-  "Penticton sits between two lakes, and a lot of its food does too. This guide covers the whole day: diner breakfasts and crêpes, small-batch coffee and bakery bread, lunch counters, dinners worth booking, lakeside patios, and a strong run of breweries and cocktail bars. Most picks are in Penticton itself, with a couple of dinners up the road in Naramata.",
+  "Penticton sits between two lakes, and a lot of its food does too. This guide covers the whole day: diner breakfasts and weekend brunch, small-batch coffee and bakery bread, lunch counters, dinners worth booking, lakeside patios, and a strong run of breweries and cocktail bars. Most picks are in Penticton itself, with a couple of dinners up the road in Naramata.",
   "Patios, winery restaurants and beachside spots often cut back their hours from November to April, so check each listing's hours before you head out. For the full list, see all {page:/penticton/restaurants|Penticton restaurants}."
  ],
  "sections": [
@@ -17,14 +17,8 @@
    "id": "breakfast-brunch",
    "jump": "Breakfast & brunch",
    "heading": "Breakfast & brunch",
-   "lead": "From big diner plates to a French crêpe room.",
+   "lead": "Three favourites from big diner plates to a beachfront brunch. For every brunch spot in town, see our {page:/guides/best-brunch-penticton|Penticton brunch guide}.",
    "items": [
-    {
-     "ref": "penticton/bench-market",
-     "name": "Bench Market",
-     "text": "a busy cafeteria-style breakfast and brunch spot with a market, and a handy stop before a day on the Naramata Bench. The gluten-free options are excellent, and dogs are welcome on the outdoor terrace.",
-     "where": "Penticton"
-    },
     {
      "ref": "penticton/terry-s-comfort-food",
      "name": "Terry's Comfort Food",
@@ -35,12 +29,6 @@
      "ref": "penticton/tootsies-diner",
      "name": "Tootsies Diner",
      "text": "a vintage locals' favourite in the industrial park, with oldies playing, a retro record table and fluffy pancakes.",
-     "where": "Penticton"
-    },
-    {
-     "ref": "penticton/creperie-ooolala-bistro",
-     "name": "Creperie Ooolala Bistro",
-     "text": "a tiny room where the staff speak French. Regulars say it feels like a trip to Paris, so let the staff guide your order.",
      "where": "Penticton"
     },
     {
