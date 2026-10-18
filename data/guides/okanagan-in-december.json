@@ -1,0 +1,380 @@
+{
+ "heading": "The Okanagan in December, 2026",
+ "title": "The Okanagan in December 2026 | Okanagan Roam",
+ "description": "Things to do in the Okanagan in December 2026: holiday theatre, concerts, New Year's Eve, ski hills and outdoor rinks, saunas, and cozy food for cold days.",
+ "banner": "ski-snow",
+ "parent": {
+  "name": "What's On",
+  "href": "/whats-on"
+ },
+ "noPlace": true,
+ "intro": [
+  "December is when the Okanagan turns to winter. The ski hills are up and running, outdoor rinks freeze over in town, and the theatres fill with holiday shows. The valley stays quieter than the mountains, so it's an easy month to mix a ski day with a show, a sauna and a long dinner.",
+  "This guide picks a handful of December events, then adds the mountains, skating, indoor warm-ups and cozy food. For every holiday market, light-up and Christmas concert, see our {page:/guides/okanagan-holiday-events|holiday events guide}, our {page:/guides/okanagan-christmas-markets|Christmas markets guide} and our {page:/guides/okanagan-winter-events|winter events guide}. Every dated event is also on {page:/whats-on|What's On}."
+ ],
+ "sections": [
+  {
+   "id": "on-the-calendar-in-december",
+   "jump": "Events",
+   "heading": "On the calendar in December",
+   "lead": "Theatre, dance and music through the month, from a farm-field hockey show to a sing-along Messiah.",
+   "items": [
+    {
+     "ref": "event:armstrong/le-hockey-sweater",
+     "name": "Le Hockey Sweater",
+     "text": "Caravan Farm Theatre's winter show, a joyful, raucous take on Roch Carrier's The Hockey Sweater that brings an outdoor hockey game to the farm's fields and forests. There are several performances a day. Tickets are $57.75 to $73.50.",
+     "where": "Armstrong, daily from Dec 1"
+    },
+    {
+     "ref": "event:kelowna/anne-of-green-gables",
+     "name": "Anne of Green Gables",
+     "text": "New Vintage Theatre's annual holiday play at the Rotary Centre for the Arts, with a cast of local talent in an all-ages production.",
+     "where": "Kelowna, from Dec 1"
+    },
+    {
+     "ref": "event:penticton/laila-biali-wintersongs-at-the-dream",
+     "name": "Laila Biali: Wintersongs at The Dream",
+     "text": "the Grammy-nominated jazz singer and pianist plays songs from her holiday album Wintersongs, as a duo with bassist Jodi Proznick, at 7 pm.",
+     "where": "Penticton, Dec 4"
+    },
+    {
+     "ref": "event:kelowna/handel-s-messiah-live-2026-12-11",
+     "name": "Handel's Messiah Live",
+     "text": "the Okanagan Festival Singers close their 40th-anniversary season with a sing-along Messiah at 7 pm, where the audience is invited to join in. Admission is $15.",
+     "where": "Kelowna, Dec 11"
+    },
+    {
+     "ref": "event:kelowna/the-nutcracker-canadian-school-of-ballet",
+     "name": "The Nutcracker – Canadian School of Ballet",
+     "text": "the holiday classic at Kelowna Community Theatre, with guest dancers from Miami City Ballet. There are matinee and evening shows.",
+     "where": "Kelowna, from Dec 11"
+    },
+    {
+     "ref": "event:vernon/little-women-the-broadway-musical",
+     "name": "Little Women: The Broadway Musical",
+     "text": "the musical version of the four March sisters' story at Vernon's historic Powerhouse Theatre. A heartfelt holiday-season show for families and musical fans.",
+     "where": "Vernon, from Dec 15"
+    }
+   ]
+  },
+  {
+   "id": "a-few-lights-and-markets",
+   "jump": "Lights & markets",
+   "heading": "A few lights and markets",
+   "lead": "Only a small sample here. The full lists are in the {page:/guides/okanagan-holiday-events|holiday events} and {page:/guides/okanagan-christmas-markets|Christmas markets} guides.",
+   "items": [
+    {
+     "ref": "event:enderby/enderby-christmas-light-up-parade",
+     "name": "Enderby Christmas Light-Up & Parade",
+     "text": "downtown Enderby lights up with a free Christmas parade and festive evening from 5:30 pm. A cheerful small-town start to the holidays.",
+     "where": "Enderby, Dec 4"
+    },
+    {
+     "ref": "event:kelowna/east-kelowna-christmas-in-the-country-market",
+     "name": "East Kelowna Christmas in the Country Market",
+     "text": "more than 70 local artisans, crafters and bakers inside the historic East Kelowna Hall. Entry is a loonie or toonie, and proceeds support the hall.",
+     "where": "Kelowna, Dec 5"
+    },
+    {
+     "ref": "event:oliver/winter-solstice-light-up-trail-nights",
+     "name": "Winter Solstice Light-Up Trail Nights",
+     "text": "Riding 4 Life Ranch lights up its trail course from 5 pm. Ride your own horse through it ($20) or just come for the fire, a warm drink and a treat.",
+     "where": "Oliver, from Dec 19"
+    }
+   ]
+  },
+  {
+   "id": "new-year-s-eve",
+   "jump": "New Year's Eve",
+   "heading": "New Year's Eve",
+   "items": [
+    {
+     "ref": "event:kelowna/valley-first-new-york-new-year-s-2026",
+     "name": "Valley First New York New Year's 2026",
+     "text": "a free, all-ages party at the Stuart Park rink from 6 pm, with live bands, skating, food trucks and an early fireworks countdown at 9 pm. Made for families who want to ring in the year before bedtime.",
+     "where": "Kelowna, Dec 31"
+    },
+    {
+     "ref": "event:kelowna/next-stop-comedy-at-unleashed-brewing",
+     "name": "Next Stop Comedy at Unleashed Brewing",
+     "text": "stand-up comedy in the North End at 8 pm, with a New Year's Eve show.",
+     "where": "Kelowna, Dec 31"
+    }
+   ]
+  },
+  {
+   "id": "first-turns-on-the-mountain",
+   "jump": "Ski hills",
+   "heading": "First turns on the mountain",
+   "lead": "Big White and SilverStar list their 2026/27 seasons as starting in late November, so both should be running through December, snow permitting. Apex and Baldy run in winter only; check their listings for opening dates. Our {page:/guides/ski-season-big-white-silverstar|Big White and SilverStar guide} and {page:/guides/apex-baldy-ski-guide|Apex and Baldy guide} cover lifts, lessons and where to eat.",
+   "items": [
+    {
+     "ref": "big-white/big-white-ski-resort",
+     "name": "Big White Ski Resort",
+     "text": "the Okanagan's big mountain resort, with 2,834 acres of patrolled terrain. The season runs November 26, 2026 to April 4, 2027, and from December 18 the resort runs the largest night-skiing operation in Western Canada. Free Snow Host tours leave the Village Centre at 10:15 each morning.",
+     "where": "Big White"
+    },
+    {
+     "ref": "silverstar/silverstar-mountain-resort",
+     "name": "SilverStar Mountain Resort",
+     "text": "133 runs on 3,304 acres, with night skiing on Friday and Saturday nights. The My1Pass day ticket also covers cross-country skiing, snowshoeing, fat biking, skating and tubing. The alpine season runs November 27, 2026 to April 4, 2027.",
+     "where": "SilverStar, above Vernon"
+    },
+    {
+     "ref": "apex/apex-mountain-resort",
+     "name": "Apex Mountain Resort",
+     "text": "Penticton's home mountain, a 30-minute drive from town, with 85 runs. Friday and Saturday nights bring night skiing, night tubing and the skating loop under lights from 4 to 9 pm. It runs in winter only.",
+     "where": "Apex, near Penticton"
+    },
+    {
+     "ref": "baldy/baldy-mountain-resort",
+     "name": "Baldy Mountain Resort",
+     "text": "a small, friendly family hill known for its tree runs and short lift lines. New this winter is cat skiing to Baldy's upper terrain, Friday to Sunday. The access road turns to gravel near the top, and winter tires are strongly recommended.",
+     "where": "Baldy, near Oliver"
+    },
+    {
+     "ref": "event:big-white/big-white-winter-rally",
+     "name": "Big White Winter Rally",
+     "text": "rally cars compete on winter roads in the Big White area. Check the official spectator guide for viewing spots and road closures.",
+     "where": "Big White, Dec 4 – 5"
+    },
+    {
+     "ref": "event:big-white/the-loose-moose-challenge-december",
+     "name": "The Loose Moose Challenge – December",
+     "text": "a family scavenger hunt across Big White's blue runs. Pick up an adventure card at the Events Tent in the Village Centre from 10 am.",
+     "where": "Big White, Dec 26 – 27"
+    },
+    {
+     "ref": "event:silverstar/salomon-holiday-rail-jam-at-silverstar",
+     "name": "Salomon Holiday Rail Jam at SilverStar",
+     "text": "skiers and snowboarders show off on a custom rail setup while a DJ plays, from 2:30 pm. Free to watch.",
+     "where": "SilverStar, Dec 27"
+    }
+   ]
+  },
+  {
+   "id": "skating-and-snow-days",
+   "jump": "Skating & snow",
+   "heading": "Skating and snow days",
+   "lead": "Outdoor ice depends on the weather, so check each listing before you go. Our {page:/guides/okanagan-skating|skating guide} lists every rink and arena.",
+   "items": [
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "a free outdoor rink on the downtown waterfront, with Okanagan Lake and the Bennett Bridge behind it. It opens in early December, weather permitting, and a rental hut has skates and helmets.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/penticton-outdoor-skating-rink-gyro-park",
+     "name": "Penticton Outdoor Skating Rink (Gyro Park)",
+     "text": "a free family rink at the foot of Martin Street, near the beach and downtown cafés. The park's holiday lights are up from early December. There are no rentals, so bring skates and a helmet.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "vernon/vernon-recreation-complex-priest-valley-arena-centennial-outdoor-rink",
+     "name": "Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink",
+     "text": "the Centennial Outdoor Rink is free from December through February, weather permitting, and the indoor arena next door has public skating. Bring skates: there are no rentals.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "big-white/happy-valley-ice-skating-rink",
+     "name": "Happy Valley Ice Skating Rink – Big White",
+     "text": "what the resort calls Canada's highest outdoor skating rink, lit for night skating, with a bonfire beside it every afternoon after 3 pm. The Tube Park and Twinkling Trail are next door.",
+     "where": "Big White"
+    }
+   ]
+  },
+  {
+   "id": "warm-up-indoors",
+   "jump": "Warm up indoors",
+   "heading": "Warm up indoors",
+   "lead": "After a cold day outside, head in for heat, water and a museum or two. Our {page:/guides/okanagan-saunas-spas|saunas & spas guide} and {page:/guides/rainy-day-okanagan|rainy-day guide} have more.",
+   "items": [
+    {
+     "ref": "kelowna/loyly-floating-sauna",
+     "name": "Löyly Floating Sauna",
+     "text": "a Finnish-style cedar sauna floating at the Downtown Marina, with a lake cold plunge and a warm solarium lounge over Okanagan Lake. Book an 80-minute community session online, since walk-ins aren't guaranteed space.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "penticton/penticton-community-centre-pool-lazy-river",
+     "name": "Penticton Community Centre (Pool & Lazy River)",
+     "text": "a leisure pool with a lazy river and waterslide during Public Swim, plus a big whirlpool, sauna and steam room for warming up on a cold day.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "kelowna/kelowna-curling-club",
+     "name": "Kelowna Curling Club",
+     "text": "one-hour Try Curling sessions with an instructor and all equipment supplied, about $25 a person, booked online.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/okanagan-heritage-museum",
+     "name": "Okanagan Heritage Museum",
+     "text": "the natural and human history of the Okanagan, from syilx culture to settler life, with exhibits such as Dinosaurs of BC. The second Sunday of each month is pay-what-you-wish.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/okanagan-science-centre",
+     "name": "Okanagan Science Centre",
+     "text": "hands-on exhibits, planetarium shows and live animals in Polson Park. Just drop in and pay at the front desk; planetarium shows need pre-registration.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "cozy-food-and-drink",
+   "jump": "Cozy food and drink",
+   "heading": "Cozy food and drink",
+   "lead": "Fireplaces, fondue, books and board games for short, cold days. Our {page:/guides/cozy-spots-okanagan|cozy spots guide} and {page:/guides/soup-ramen-pho-okanagan|soup, ramen and pho guide} have more.",
+   "items": [
+    {
+     "ref": "kelowna/grate-cheesery",
+     "name": "Grate Cheesery",
+     "text": "a wine-and-cheese bar run by a passionate cheesemonger. Book one of the fondue nights, or trust the curated pairings.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/pulp-fiction-pandosy",
+     "name": "Pulp Fiction – Pandosy",
+     "text": "a coffee house that doubles as a rare and used bookstore, with a cozy, vintage feel. Order the coffee milkshake and browse the shelves.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "vernon/the-boarding-house-cafe",
+     "name": "The Boarding House Cafe",
+     "text": "a family-friendly board game café with more than 300 games. Order a hot chocolate, pick a game and settle in for a proper game night.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "enderby/kaze-japanese-restaurant",
+     "name": "Kaze Japanese Restaurant",
+     "text": "a family-run spot in a converted old home, with a fireplace in the dining room. Reviewers call the miso ramen spectacular.",
+     "where": "Enderby"
+    },
+    {
+     "ref": "penticton/gusto-ferrari",
+     "name": "Gusto Ferrari",
+     "text": "a small Italian deli and restaurant that makes everything from scratch. Order the homemade pasta or the wood-fired margherita pizza.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "osoyoos/campo-marina",
+     "name": "Campo Marina",
+     "text": "a cozy downtown Italian spot that stays busy. The house focaccia alone is worth the visit, and portions are generous.",
+     "where": "Osoyoos"
+    }
+   ]
+  },
+  {
+   "id": "know-before-you-go",
+   "jump": "Know before you go",
+   "heading": "Know before you go",
+   "items": [
+    {
+     "lead": "Valley and mountain are two different winters:",
+     "tip": "the valley towns are often grey and cool in December, while the ski hills are much colder and snowier. Pack for both if you plan to do both."
+    },
+    {
+     "lead": "Winter driving:",
+     "tip": "roads up to the ski hills can be snowy and icy. Drive with winter-ready tires, leave extra time and check road conditions before you go."
+    },
+    {
+     "lead": "Expect shorter hours:",
+     "tip": "many wineries, patios and seasonal attractions cut back from November to April, and some places close over the holidays. Check each listing's hours, and call ahead if a stop matters."
+    },
+    {
+     "lead": "Outdoor ice and snow are weather-dependent:",
+     "tip": "rinks, tube parks and ski runs can close in a warm spell or a storm. Have an indoor backup."
+    },
+    {
+     "lead": "Book the holidays early:",
+     "tip": "popular shows, saunas and holiday-week dinners fill up. Book ahead where a listing says to."
+    },
+    {
+     "lead": "Plan for early dark:",
+     "tip": "December days are the shortest of the year, so put drives and outdoor stops early in the day."
+    },
+    {
+     "lead": "Plan a trip:",
+     "tip": "the {page:/trip|trip planner} can build a custom plan around the places you pick."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A holiday show for the family",
+    [
+     "event:kelowna/the-nutcracker-canadian-school-of-ballet|The Nutcracker – Canadian School of Ballet",
+     "event:vernon/little-women-the-broadway-musical|Little Women: The Broadway Musical"
+    ]
+   ],
+   [
+    "Theatre outdoors in the snow",
+    [
+     "event:armstrong/le-hockey-sweater|Le Hockey Sweater"
+    ]
+   ],
+   [
+    "A festive concert",
+    [
+     "event:penticton/laila-biali-wintersongs-at-the-dream|Laila Biali: Wintersongs at The Dream",
+     "event:kelowna/handel-s-messiah-live-2026-12-11|Handel's Messiah Live"
+    ]
+   ],
+   [
+    "A family New Year's Eve",
+    [
+     "event:kelowna/valley-first-new-york-new-year-s-2026|Valley First New York New Year's 2026"
+    ]
+   ],
+   [
+    "A big ski day",
+    [
+     "big-white/big-white-ski-resort|Big White Ski Resort",
+     "silverstar/silverstar-mountain-resort|SilverStar Mountain Resort"
+    ]
+   ],
+   [
+    "A smaller, quieter hill",
+    [
+     "baldy/baldy-mountain-resort|Baldy Mountain Resort"
+    ]
+   ],
+   [
+    "A free skate by the lake",
+    [
+     "kelowna/stuart-park-outdoor-rink|Stuart Park Outdoor Rink"
+    ]
+   ],
+   [
+    "A hot sauna and a cold plunge",
+    [
+     "kelowna/loyly-floating-sauna|Löyly Floating Sauna"
+    ]
+   ],
+   [
+    "Dinner by a fireplace",
+    [
+     "enderby/kaze-japanese-restaurant|Kaze Japanese Restaurant"
+    ]
+   ],
+   [
+    "A rainy-day game night",
+    [
+     "vernon/the-boarding-house-cafe|The Boarding House Cafe"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/whats-on\">What's On</a>, <a href=\"/guides/okanagan-holiday-events\">Holiday events</a>, <a href=\"/guides/okanagan-winter-events\">Winter events</a>, <a href=\"/guides/okanagan-skating\">Skating</a>"
+}

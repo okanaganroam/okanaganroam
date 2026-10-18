@@ -1,0 +1,366 @@
+{
+ "heading": "Where to Eat in Kelowna",
+ "title": "Where to Eat in Kelowna: Restaurants & Cafés | Okanagan Roam",
+ "description": "Where to eat in Kelowna: dinners worth booking, Pandosy and Rutland favourites, global flavours, fish and chips, family spots, coffee and plant-based picks.",
+ "banner": "restaurant",
+ "parent": {
+  "name": "Kelowna",
+  "href": "/kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "Kelowna has more places to eat than any other town in the valley, and the good ones aren't all on Bernard Avenue. This guide spreads out across the city: special-occasion dinners, neighbourhood kitchens in Pandosy and Rutland, cooking from Cuba to the Philippines, old-school fish and chips, easy family meals, serious coffee and fully plant-based menus.",
+  "We've kept this list mostly to places our other Kelowna guides don't cover, so use them together. For mornings, see {page:/guides/best-brunch-kelowna|the best brunch in Kelowna}. For eating outside, try {page:/guides/best-patios-kelowna|Kelowna's best patios}. For drinks and deals, there's {page:/guides/happy-hour-kelowna|happy hour in Kelowna} and {page:/guides/cheap-eats-kelowna|cheap eats in Kelowna}, and for a night out for two, {page:/guides/date-night-kelowna|date night in Kelowna}. Some kitchens, especially winery restaurants, cut back their hours from November to April, so check each listing first."
+ ],
+ "sections": [
+  {
+   "id": "dinner-worth-booking",
+   "jump": "Dinner worth booking",
+   "heading": "Dinner worth booking",
+   "lead": "For a celebration, or a night when the meal is the plan.",
+   "items": [
+    {
+     "ref": "kelowna/la-bussola-restaurant",
+     "name": "La Bussola Restaurant",
+     "text": "fine-dining Italian built on a slow-cooked tomato sauce. The kitchen takes dietary needs seriously and once served a gluten-free, dairy-sensitive guest real gnocchi.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/gather-restaurant",
+     "name": "Gather Restaurant",
+     "text": "an elegant room that blends Italian and Korean cooking into one ambitious, strikingly plated menu. Order a dish that leans into both.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/okanagan-table",
+     "name": "Okanagan Table",
+     "text": "a farm-to-table event kitchen on Pandosy St, run by chef Rod and Audrey, with 25 years of local reputation behind it. Book one of the Signature Friday dinners or a private hosted meal.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/journey-restaurant",
+     "name": "Journey Restaurant",
+     "text": "the winery restaurant at Azhadi Vineyards, led by Group Executive Chef Alain Leger, blending Persian heritage with classical French technique.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/home-block-at-cedarcreek-estate-winery",
+     "name": "Home Block at CedarCreek Estate Winery",
+     "text": "fine dining at the winery, with panoramic views of West Kelowna and a rotating menu. Ask what's on now.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "neighbourhood-favourites",
+   "jump": "Neighbourhood favourites",
+   "heading": "Neighbourhood favourites",
+   "lead": "The places locals keep going back to, from Pandosy and the Mission to Rutland and downtown.",
+   "items": [
+    {
+     "ref": "kelowna/mr-lu-s-kitchen",
+     "name": "Mr. Lu's Kitchen",
+     "text": "a Chinese kitchen serving regional flavour rather than a generalized version. It's open most days for lunch, and the cumin lamb is the dish to order.",
+     "where": "Pandosy"
+    },
+    {
+     "ref": "kelowna/zabb-thai-restaurant",
+     "name": "Zabb Thai Restaurant",
+     "text": "years of dependable, consistently excellent Thai cooking. For two people, the dinner-for-two preset menu is the easy order.",
+     "where": "Pandosy"
+    },
+    {
+     "ref": "kelowna/bright-jenny-coffee",
+     "name": "Bright Jenny Coffee",
+     "text": "a neighbourhood hub for families and coffee purists, with a kids' play area, excellent latte art and a roomy, unhurried space.",
+     "where": "the Mission"
+    },
+    {
+     "ref": "kelowna/taki-japanese-grill",
+     "name": "Taki Japanese Grill",
+     "text": "a longtime Rutland favourite. Order a bento box: big portions at reasonable prices.",
+     "where": "Rutland"
+    },
+    {
+     "ref": "kelowna/shambhu-s-spice-house-cuisine-of-india",
+     "name": "Shambhu's Spice House Cuisine of India",
+     "text": "the owner once walked a family through an onion- and garlic-free meal. Mention any restrictions freely.",
+     "where": "Rutland"
+    },
+    {
+     "ref": "kelowna/wasabi-ramen-and-izakaya",
+     "name": "Wasabi Ramen and Izakaya",
+     "text": "tucked off Bernard Ave, with a quiet, devoted following. Order the okonomiyaki and one of the rich ramen broths.",
+     "where": "downtown"
+    }
+   ]
+  },
+  {
+   "id": "global-flavours",
+   "jump": "Global flavours",
+   "heading": "Global flavours",
+   "lead": "A short tour of the world without leaving town.",
+   "items": [
+    {
+     "ref": "kelowna/soul-de-cuba-cafe",
+     "name": "Soul De Cuba Cafe",
+     "text": "authentic Cuban on Sunset Dr that draws visitors from as far as Vancouver. Order the ropa vieja poutine and the croquettes.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/salsa-sabor",
+     "name": "Salsa & Sabor",
+     "text": "a hole-in-the-wall in a residential area serving fresh Latin American and Colombian cooking. Get the tacos or arepas, and expect a short wait.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/jeepney-republiq",
+     "name": "Jeepney Republiq",
+     "text": "Filipino cooking in a hotel setting, with a nostalgic, homestyle menu. Order the generous pancit palabok.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/yamas-taverna",
+     "name": "Yamas Taverna",
+     "text": "a lively Greek taverna with music keeping the meal upbeat. The roast lamb and the calamari both come in generous portions.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bon-ga-korean-cuisine",
+     "name": "Bon Ga Korean Cuisine",
+     "text": "a wholesome, family-owned kitchen. Build your order around the hot bone soup, especially on a cold day, and the spicy rice cake.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/sushi-hayashi",
+     "name": "SUSHI HAYASHI",
+     "text": "a tiny counter where you watch the chef work up close. The sushi tower and the katsu both get specific praise.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "seafood-steak",
+   "jump": "Seafood & steak",
+   "heading": "Seafood & steak",
+   "lead": "From a fish and chips shop open since 1948 to a new oyster bar.",
+   "items": [
+    {
+     "ref": "kelowna/raw-action-oyster-co",
+     "name": "Raw Action Oyster Co.",
+     "text": "a buzzing new oyster bar with fresh west coast oysters, scallops and caviar. Gluten-free options are thought through, and the caviar makes it something extra special.",
+     "where": "downtown"
+    },
+    {
+     "ref": "kelowna/shady-rest-fish-chips",
+     "name": "Shady Rest Fish & Chips",
+     "text": "serving Kelowna since 1948, now with its fourth family of owners. Fries are cut in-house, and the halibut and cod are fresh.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/broken-anchor-cafe-and-catering",
+     "name": "Broken Anchor Cafe and Catering",
+     "text": "a small, spotless shop where every fish and chips option is gluten-free. Regulars mention the tartar sauce, and the gluten-free pineapple fritters surprise people.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/codfather-s-seafood-market",
+     "name": "Codfather's Seafood Market",
+     "text": "a fish market and counter in one, with halibut and chips in a light, crisp batter and whatever's fresh that day.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/derrick-s-steakhouse",
+     "name": "Derrick's Steakhouse",
+     "text": "an upscale steakhouse with a special-occasion feel that still works with kids at the table. Book it for a family celebration.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "casual-family",
+   "jump": "Casual & family",
+   "heading": "Casual & family",
+   "lead": "Easy meals where nobody minds a bit of noise.",
+   "items": [
+    {
+     "ref": "kelowna/antico-pizza-napoletana",
+     "name": "Antico Pizza Napoletana",
+     "text": "reviewers say it feels like eating pizza in Italy, with the char and chew of a proper Neapolitan crust. Staff are patient with families.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bna-burger",
+     "name": "BNA Burger",
+     "text": "order at the counter, get a proper smash burger and find a seat on the patio. No reservation, no fuss.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/thyme-at-ellison-lake",
+     "name": "THYME at Ellison Lake",
+     "text": "a friendly, reasonably priced family restaurant near Ellison Lake Park. Order the flatbread and a homemade cinnamon bun.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cecil-s-perogy-palace",
+     "name": "Cecil's Perogy Palace",
+     "text": "fresh, generously portioned perogies for years, consistent rather than trendy. Comfort food that tastes like home cooking.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/convair-cafe",
+     "name": "Convair Cafe",
+     "text": "an aviation-themed cafe near the airport hangars, with airplane seating and a highchair for babies. The pesto turkey croissant is the beloved order.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "coffee-bakeries",
+   "jump": "Coffee & bakeries",
+   "heading": "Coffee & bakeries",
+   "lead": "For your morning cup, or something to carry out the door.",
+   "items": [
+    {
+     "ref": "kelowna/anarchy-coffee-roasters",
+     "name": "Anarchy Coffee Roasters",
+     "text": "locals fiercely defend it as the home of Kelowna's best cappuccino. Art-covered walls, a worn-in couch and a little free library.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/twin-sparks-coffee-roasters",
+     "name": "Twin Sparks Coffee Roasters",
+     "text": "a hole-in-the-wall roastery with a creative streak. Order the torched banana latte.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/polene-bakery-bistro",
+     "name": "Polene Bakery & Bistro",
+     "text": "a tiny Bernard Ave counter that reviewers call the best sandwich shop in Kelowna, built on excellent house-made bread.",
+     "where": "downtown"
+    },
+    {
+     "ref": "kelowna/cake-otaku",
+     "name": "Cake Otaku",
+     "text": "a new Japanese bakery whose curry buns and mochi sell out within hours of opening. Arrive right at open.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/sprout-bread",
+     "name": "Sprout Bread",
+     "text": "the bakery-cafe locals head to after a hike or ride, for excellent coffee and fresh-baked pastries. Expect a lineup.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "plant-based",
+   "jump": "Plant-based",
+   "heading": "Plant-based",
+   "lead": "Full vegan menus that non-vegans enjoy too.",
+   "items": [
+    {
+     "ref": "kelowna/frankie-we-salute-you",
+     "name": "Frankie We Salute You!",
+     "text": "vegan fine dining in an industrial-feel room, with family-sourced and local Okanagan produce, gluten-free items and a thoughtful lapsang mocktail.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/naked-cafe",
+     "name": "Naked Cafe",
+     "text": "a dedicated vegan cafe and a Kelowna favourite for years. Its reputation rests on the sushi bowls and the Japanese curry.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/zen-s-plant-based-cuisine",
+     "name": "Zen's Plant-Based Cuisine",
+     "text": "a newly opened, entirely vegan restaurant. Every meal starts with a complimentary tea or soy-milk coffee; order the cashew Alfredo or a mushroom bowl.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/nature-s-table-at-summerhill",
+     "name": "Nature's Table at Summerhill",
+     "text": "the restaurant at Summerhill Pyramid Winery, with a thoughtful vegan and vegetarian menu. Pair it with the certified organic wine.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A special-occasion dinner",
+    [
+     "kelowna/la-bussola-restaurant|La Bussola Restaurant",
+     "kelowna/gather-restaurant|Gather Restaurant"
+    ]
+   ],
+   [
+    "A winery dinner",
+    [
+     "kelowna/home-block-at-cedarcreek-estate-winery|Home Block at CedarCreek Estate Winery",
+     "kelowna/journey-restaurant|Journey Restaurant"
+    ]
+   ],
+   [
+    "A Pandosy local",
+    [
+     "kelowna/mr-lu-s-kitchen|Mr. Lu's Kitchen",
+     "kelowna/zabb-thai-restaurant|Zabb Thai Restaurant"
+    ]
+   ],
+   [
+    "Something you can't get at home",
+    [
+     "kelowna/soul-de-cuba-cafe|Soul De Cuba Cafe",
+     "kelowna/jeepney-republiq|Jeepney Republiq"
+    ]
+   ],
+   [
+    "Oysters",
+    [
+     "kelowna/raw-action-oyster-co|Raw Action Oyster Co."
+    ]
+   ],
+   [
+    "Classic fish and chips",
+    [
+     "kelowna/shady-rest-fish-chips|Shady Rest Fish & Chips"
+    ]
+   ],
+   [
+    "Dinner with the kids",
+    [
+     "kelowna/antico-pizza-napoletana|Antico Pizza Napoletana",
+     "kelowna/thyme-at-ellison-lake|THYME at Ellison Lake"
+    ]
+   ],
+   [
+    "A great cappuccino",
+    [
+     "kelowna/anarchy-coffee-roasters|Anarchy Coffee Roasters"
+    ]
+   ],
+   [
+    "A big sandwich",
+    [
+     "kelowna/polene-bakery-bistro|Polene Bakery & Bistro"
+    ]
+   ],
+   [
+    "A fully vegan dinner",
+    [
+     "kelowna/frankie-we-salute-you|Frankie We Salute You!"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna/restaurants\">Kelowna restaurants</a>, <a href=\"/kelowna/cafes\">Kelowna cafés</a>, <a href=\"/guide/kelowna/vegan\">Vegan-friendly in Kelowna</a>, <a href=\"/guides/best-restaurants-west-kelowna\">Where to eat in West Kelowna</a>"
+}

@@ -24621,3 +24621,20 @@ test('Guides batch 3 (2026-10-18): happy hour, date night, cheap eats, family, N
   }
   for (const key of ['pub', 'cocktail', 'beach']) assert.ok(app.GUIDE_BANNERS[key]().src.startsWith('/images/'), `${key} banner`);
 });
+
+test('Guides batch 4 (2026-10-18): Kelowna food and things to do, breweries, sushi, pizza, Vernon weekend, Summerland day trip and December are on /guides with known banners', () => {
+  const where = {
+    'best-restaurants-kelowna': 'towns', 'things-to-do-kelowna': 'towns', 'best-sushi-kelowna': 'towns', 'best-pizza-kelowna': 'towns',
+    'vernon-silverstar-weekend': 'towns', 'summerland-peachland-day-trip': 'towns', 'okanagan-breweries': 'year', 'okanagan-in-december': 'winter',
+  };
+  for (const [slug, group] of Object.entries(where)) {
+    const p = `/guides/${slug}`;
+    const g = app.FILE_GUIDES[p];
+    assert.ok(g, `${p} is a file guide`);
+    assert.ok(app.GUIDE_GROUPS.find((x) => x.key === group).paths.includes(p), `${p} is in the ${group} group`);
+    const json = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'data', 'guides', `${slug}.json`), 'utf8'));
+    assert.ok(app.GUIDE_BANNERS[json.banner], `${p} names a known banner (${json.banner})`);
+    assert.ok(g.title.length <= 65, `${p} title fits`);
+  }
+  assert.equal(app.GUIDE_GROUPS.find((x) => x.key === 'towns').heading, 'Towns, weekends and local food');
+});

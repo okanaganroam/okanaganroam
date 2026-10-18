@@ -1,0 +1,298 @@
+{
+ "heading": "A Summerland & Peachland Day Trip",
+ "title": "A Summerland & Peachland Day Trip | Okanagan Roam",
+ "description": "One easy day on the lake: coffee and a waterfront walk in Peachland, a waterfall, lunch in Summerland, Bottleneck Drive wineries and Giant's Head.",
+ "banner": "region-peachland",
+ "parent": {
+  "name": "Summerland",
+  "href": "/summerland"
+ },
+ "noPlace": true,
+ "intro": [
+  "Peachland and Summerland sit side by side on the west shore of Okanagan Lake, a short drive apart. That makes them an easy day out: start with coffee and a lakeside walk in Peachland, stop at a waterfall on the way south, then spend the afternoon in Summerland among wineries, orchards and the old Kettle Valley Railway line.",
+  "The plan below works year-round. Some stops are summer only, and many wineries and patios cut their hours from November to April, so check each listing's hours before you set out. If you'd like a plan built around your own dates, the {page:/trip|trip planner} can make one for you."
+ ],
+ "sections": [
+  {
+   "id": "morning-in-peachland",
+   "jump": "Morning in Peachland",
+   "heading": "Morning in Peachland",
+   "lead": "Park once along Beach Avenue and do the morning on foot.",
+   "items": [
+    {
+     "ref": "peachland/bliss-bakery-and-bistro",
+     "name": "Bliss Bakery and Bistro",
+     "text": "start on Beach Ave with fresh pastries and a coffee. Locals come for the quiche and hearty soups too, so it doubles as a lunch stop if you linger.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "peachland/peachland-heritage-park",
+     "name": "Peachland Heritage Park",
+     "text": "the downtown waterfront park, on the site of the old Walter's packinghouse, with a playground, a splash pad and a bat interpretive trail. Walk out on the Ray Kandola Heritage Pier next door for lake views.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "peachland/13th-street-viewpoint-centennial-way",
+     "name": "13th Street Viewpoint & Centennial Way",
+     "text": "Centennial Way follows the shoreline from Heritage Park to this small beach at the north end. It makes an easy lakeside walk, and leashed dogs are welcome.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "peachland/peachland-museum",
+     "name": "Peachland Museum",
+     "text": "a volunteer-run museum in an 8-sided former Baptist church on the waterfront, built in 1910. Upstairs, a model railway recreates the Kettle Valley Railway as it ran in the 1950s and '60s. Entry is by donation.",
+     "where": "Peachland"
+    }
+   ]
+  },
+  {
+   "id": "midday-the-drive-to-summerland",
+   "jump": "Midday",
+   "heading": "Midday: the drive to Summerland and lunch",
+   "lead": "Head south along the lake. Hardy Falls is at the south end of Peachland, so it's a natural first stop.",
+   "items": [
+    {
+     "ref": "peachland/hardy-falls-regional-park",
+     "name": "Hardy Falls Regional Park",
+     "text": "a flat, shaded 430-metre walk each way that crosses Deep Creek on a series of bridges to a viewing platform below the falls. In the fall, watch for kokanee salmon returning to spawn in the creek.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "peachland/fitzpatrick-family-vineyards-at-greata-ranch",
+     "name": "Fitzpatrick Family Vineyards at Greata Ranch",
+     "text": "fire-grilled pizza and wine tastings on a patio with lake and vineyard views in every direction. A good lunch if you'd rather sit with a view.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "summerland/sunflower-ukrainian-cafe",
+     "name": "Sunflower Ukrainian Cafe",
+     "text": "a family-run bakery-cafe for borscht, cabbage rolls and pierogies that taste homemade.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/bread-cheese-co",
+     "name": "Bread & Cheese Co",
+     "text": "a small, unassuming counter where the pulled pork poutine is the order. Check its hours first, since it doesn't open every day.",
+     "where": "Summerland"
+    }
+   ]
+  },
+  {
+   "id": "afternoon-in-summerland",
+   "jump": "Afternoon in Summerland",
+   "heading": "Afternoon in Summerland",
+   "lead": "Pick one or two of these, not all of them. Giant's Head is near town, the Bottleneck Drive stops are together, and the Trout Creek stops sit at the south end of Summerland.",
+   "items": [
+    {
+     "ref": "summerland/giants-head-mountain-park",
+     "name": "Giant's Head Mountain Park",
+     "text": "the remnant of a volcano, with a 360-degree view of the lake, orchards and mountains from the 845-metre summit. Drive to the parking area a kilometre from the top, or take the moderate Friendly Giant Trail. The road is closed to cars on Sundays from mid-April to the end of October, which makes Sunday the quiet day to walk it.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/heaven-s-gate-estate-winery",
+     "name": "Heaven's Gate Estate Winery",
+     "text": "a log-cabin winery with a lake-view picnic area. There's live music on summer Saturdays, so bring a picnic and make an afternoon of it.",
+     "where": "Summerland, Bottleneck Drive"
+    },
+    {
+     "ref": "summerland/lightning-rock-winery",
+     "name": "Lightning Rock Winery",
+     "text": "a relaxed, down-to-earth stop with a dog-friendly, lake-view patio. You can also order fish and chips with a pint of local beer.",
+     "where": "Summerland, Bottleneck Drive"
+    },
+    {
+     "ref": "summerland/controlled-entropy-distilling",
+     "name": "Controlled Entropy Distilling",
+     "text": "a small-batch distillery run by a local couple, with everything fermented and distilled on site. Add the tasting room to a Bottleneck Drive day; the lineup runs from a dry-hopped gin to a cold brew coffee liqueur.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/kettle-valley-steam-railway",
+     "name": "Kettle Valley Steam Railway",
+     "text": "a 90-minute ride behind a restored 1912 steam locomotive on the only preserved section of the Kettle Valley Railway, crossing the Trout Creek Bridge high above the canyon. It runs May to October, plus a Christmas Express in December.",
+     "where": "Summerland, seasonal"
+    },
+    {
+     "ref": "summerland/trout-creek-trestle-trout-creek-bridge",
+     "name": "Trout Creek Trestle (Trout Creek Bridge)",
+     "text": "the highest bridge span ever built on the Kettle Valley Railway, about 73 metres above the creek. Drive to the north end off Canyon View Road for a rest area and photos, and take care near the tracks, since the line is still active.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/summerland-ornamental-gardens",
+     "name": "Summerland Ornamental Gardens",
+     "text": "fifteen acres of heritage trees, lawns and native-plant beds above Trout Creek, planted in 1916. The plants are labelled with their Syilx Okanagan names alongside the Latin. Admission is by donation, and hours are shorter in winter.",
+     "where": "Summerland"
+    }
+   ]
+  },
+  {
+   "id": "early-evening",
+   "jump": "Early evening",
+   "heading": "Early evening",
+   "lead": "Finish at the lake in Summerland, or head back north and have dinner in Peachland.",
+   "items": [
+    {
+     "ref": "summerland/peach-orchard-beach-park",
+     "name": "Peach Orchard Beach Park",
+     "text": "Summerland's main lakefront, with a sandy beach, big grassy areas and a floating dock. A good spot for a walk before dinner, and from roughly October to April dogs may run on the main beach too.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/shaughnessy-s-cove",
+     "name": "Shaughnessy's Cove",
+     "text": "a waterfront spot that mixes French bistro and speakeasy cocktail bar. It's dressed up enough for a proper night out, and one of the few places in the area open late for dinner.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/zias-stonehouse-restaurant",
+     "name": "Zias Stonehouse Restaurant",
+     "text": "a longtime local favourite with a patio many call one of the best in the area. Order the seafood feast.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/giant-s-head-brewing",
+     "name": "Giant's Head Brewing",
+     "text": "a cozy brewpub with a large street-side patio. The wood-fired pizza holds up, and reviewers single out the fish and chips.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "peachland/the-edgewater-bar-and-grill",
+     "name": "The Edgewater Bar and Grill",
+     "text": "a lakeside Peachland icon with live music and a lake-view patio, if you'd rather eat on the way home. Guests under 19 can't sit on the licensed side, but staff will pack takeout.",
+     "where": "Peachland"
+    }
+   ]
+  },
+  {
+   "id": "if-the-weather-turns",
+   "jump": "Rainy day",
+   "heading": "If the weather turns",
+   "lead": "Swap the outdoor stops for these. Most are small, so check their days and hours.",
+   "items": [
+    {
+     "ref": "summerland/summerland-museum-archives",
+     "name": "Summerland Museum & Archives",
+     "text": "Syilx history, early orchard farming and the Kettle Valley Railway, with the Giant's Head Model Railway upstairs. Admission is by donation.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/summerland-arts-council-gallery-george-ryga-arts-culture-centre",
+     "name": "Summerland Arts Council Gallery (George Ryga Arts & Culture Centre)",
+     "text": "a community gallery and gift gallery next door to the museum, with about six exhibitions a year by regional and BC artists.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "peachland/peachland-art-gallery",
+     "name": "Peachland Art Gallery",
+     "text": "the arts council gallery on the waterfront, with rotating shows of Okanagan artists. Admission is by donation.",
+     "where": "Peachland"
+    },
+    {
+     "ref": "summerland/alchemist-distiller",
+     "name": "Alchemist Distiller",
+     "text": "an apple-based craft distillery with guided tastings of gin, brandy and herb liqueurs. It's weekends only, so plan for it.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/sleeping-giant-fruit-winery",
+     "name": "Sleeping Giant Fruit Winery",
+     "text": "a family-friendly fruit winery and gift shop with jam, pottery, a free syrup tasting room and an ice cream counter.",
+     "where": "Summerland"
+    }
+   ]
+  },
+  {
+   "id": "make-it-a-weekend",
+   "jump": "Make it a weekend",
+   "heading": "Make it a weekend",
+   "items": [
+    {
+     "lead": "Head south:",
+     "tip": "Penticton and Naramata are the next stop down the lake. Our {page:/guides/penticton-naramata-wine-weekend|Penticton & Naramata wine weekend} picks up where this day ends."
+    },
+    {
+     "lead": "Head north:",
+     "tip": "Peachland is the closest of the two to Kelowna. Pair this day with our {page:/guides/weekend-in-kelowna|weekend in Kelowna} guide."
+    },
+    {
+     "lead": "More to see:",
+     "tip": "browse everything in {page:/summerland|Summerland} and {page:/peachland|Peachland}, or let the {page:/trip|trip planner} build a plan for your dates."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Coffee and a pastry by the lake",
+    [
+     "peachland/bliss-bakery-and-bistro|Bliss Bakery and Bistro"
+    ]
+   ],
+   [
+    "A short, easy walk",
+    [
+     "peachland/hardy-falls-regional-park|Hardy Falls Regional Park",
+     "peachland/13th-street-viewpoint-centennial-way|13th Street Viewpoint & Centennial Way"
+    ]
+   ],
+   [
+    "A big view",
+    [
+     "summerland/giants-head-mountain-park|Giant's Head Mountain Park"
+    ]
+   ],
+   [
+    "Lunch with a lake view",
+    [
+     "peachland/fitzpatrick-family-vineyards-at-greata-ranch|Fitzpatrick Family Vineyards at Greata Ranch"
+    ]
+   ],
+   [
+    "Comfort food for lunch",
+    [
+     "summerland/sunflower-ukrainian-cafe|Sunflower Ukrainian Cafe",
+     "summerland/bread-cheese-co|Bread & Cheese Co"
+    ]
+   ],
+   [
+    "A winery on Bottleneck Drive",
+    [
+     "summerland/heaven-s-gate-estate-winery|Heaven's Gate Estate Winery",
+     "summerland/lightning-rock-winery|Lightning Rock Winery"
+    ]
+   ],
+   [
+    "Railway history",
+    [
+     "summerland/kettle-valley-steam-railway|Kettle Valley Steam Railway",
+     "summerland/summerland-museum-archives|Summerland Museum & Archives"
+    ]
+   ],
+   [
+    "A night out for dinner",
+    [
+     "summerland/shaughnessy-s-cove|Shaughnessy's Cove",
+     "summerland/zias-stonehouse-restaurant|Zias Stonehouse Restaurant"
+    ]
+   ],
+   [
+    "A rainy-day stop",
+    [
+     "peachland/peachland-museum|Peachland Museum",
+     "summerland/alchemist-distiller|Alchemist Distiller"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/summerland\">Summerland</a>, <a href=\"/peachland\">Peachland</a>, <a href=\"/wineries\">Wineries</a>, <a href=\"/whats-on\">What's On</a>"
+}
