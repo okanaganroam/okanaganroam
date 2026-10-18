@@ -28,7 +28,9 @@ const STRONG = new Set(('musee musees evasion guidee guidees visites atelier ate
   + 'resto restos bouffe manger dejeuner deux trois quatre cinq huit dix planifie planifiez planifier organisez '
   + 'suggere suggerez recommande recommandez proposez vignes cave caves vinerie vineries distillerie '
   + 'nager peche plein exterieur interieur matin soir midi nuits beaucoup quelques sans pas une vue parcs joyaux favoris locaux '
-  + 'chers cheres filles gars amis anniversaire musique planche pagaie voiture voitures auto pied conduite').split(' '));
+  + 'chers cheres filles gars amis anniversaire musique planche pagaie voiture voitures auto pied conduite '
+  // Search gaps (2026-10-18): "végétalien kelowna" and "abordable penticton" were read as unknown words.
+  + 'vegetalien vegetalienne vegetaliens vegetaliennes vegane veganes abordable abordables').split(' '));
 // Common French function words: two different ones are needed.
 const WEAK = new Set(('le la les l des du de d un une et ou au aux en dans sur chez pour mon ma mes nos notre votre vos est sont '
   + 'que qui ce cette ces il y').split(' '));
@@ -207,7 +209,7 @@ const PHRASES = [
   ['marcher entre les endroits', 'walk between places'],
   // dietary
   ['sans gluten', 'gluten free'], ['coeliaque', 'celiac'], ['vegetalien', 'vegan'], ['vegetalienne', 'vegan'],
-  ['vegetaliens', 'vegan'], ['vegane', 'vegan'], ['vegetarien', 'vegetarian'], ['vegetarienne', 'vegetarian'],
+  ['vegetaliens', 'vegan'], ['vegetaliennes', 'vegan'], ['vegane', 'vegan'], ['veganes', 'vegan'], ['vegetarien', 'vegetarian'], ['vegetarienne', 'vegetarian'],
   ['vegetariens', 'vegetarian'], ['vegetariennes', 'vegetarian'],
   // places worth finding
   ['joyau cache', 'hidden gem'], ['joyaux caches', 'hidden gems'], ['perle rare', 'hidden gem'], ['perles rares', 'hidden gems'],

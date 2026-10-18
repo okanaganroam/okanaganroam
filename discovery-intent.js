@@ -1260,6 +1260,16 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     if (!intent.unsupported.includes(OUTSIDE_PLACES[w])) intent.unsupported.push(OUTSIDE_PLACES[w]);
   }
 
+  // 6a2. Search gaps (2026-10-18): a badge word that is also a stored cuisine on live ("vegan") is the badge alone.
+  // Read as both, the search wanted the cuisine AND the badge, and found 2 of the 224 Vegan-Friendly places.
+  const featurePhrases = new Set(intent.matched.filter((m) => m.field === 'feature').map((m) => m.phrase));
+  const badgeCuisines = intent.matched.filter((m) => m.field === 'cuisine' && featurePhrases.has(m.phrase));
+  if (badgeCuisines.length) {
+    intent.matched = intent.matched.filter((m) => !badgeCuisines.includes(m));
+    const still = new Set(intent.matched.filter((m) => m.field === 'cuisine').map((m) => m.value));
+    intent.cuisines = intent.cuisines.filter((c) => still.has(c) || !badgeCuisines.some((m) => m.value === c));
+  }
+
   // 6b. The visitor's own food words, kept for display: "sushi" stays
   // "sushi" even though it matches the Japanese cuisine internally.
   for (const m of intent.matched) if (m.field === 'cuisine' && !intent.foodTerms.some((f) => f.term === m.phrase)) intent.foodTerms.push({ term: m.phrase, cuisine: m.value });
