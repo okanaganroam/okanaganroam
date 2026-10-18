@@ -1,0 +1,242 @@
+{
+ "heading": "Best Brunch in Penticton",
+ "title": "Best Brunch & Breakfast in Penticton | Okanagan Roam",
+ "description": "Where to brunch in Penticton: a beachfront Turkish brunch, lakeside patios, big diner breakfasts, vegan and gluten-free spots, bakeries and good coffee.",
+ "banner": "cafe",
+ "parent": {
+  "name": "Penticton",
+  "href": "/penticton"
+ },
+ "noPlace": true,
+ "intro": [
+  "Penticton does weekend mornings well. You can book a Turkish brunch on the beach, eat eggs Benny on a lakeside patio, order a breakfast poutine at a diner the hotel concierges recommend, or carry coffee and cake across the road to the grass beside Okanagan Lake.",
+  "These are the brunch and breakfast spots worth knowing, grouped by the kind of morning you're after."
+ ],
+ "sections": [
+  {
+   "id": "worth-the-trip",
+   "jump": "Worth the trip",
+   "heading": "Worth the trip",
+   "items": [
+    {
+     "ref": "penticton/bench-market",
+     "name": "Bench Market",
+     "text": "a popular cafeteria-style breakfast, brunch and market spot, and a handy pitstop on a Naramata Bench wine tour. The gluten-free options are excellent, and dogs are welcome on the outdoor terrace.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/mack-s-social-house",
+     "name": "Mack's Social House",
+     "text": "a dog-friendly restaurant with a swing indoors. The $3 Sunday mimosas are poured with visible generosity, and the Pavé potatoes are good enough to order on their own.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/creperie-ooolala-bistro",
+     "name": "Creperie Ooolala Bistro",
+     "text": "regulars say it feels like a trip to Paris. The room is tiny, the staff speak French and the atmosphere isn't put on for tourists. Let the staff guide your order.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/creperie-ooolala-food-truck",
+     "name": "Creperie Ooolala - Food truck",
+     "text": "the original food truck behind the bistro, where French staff turn out traditional buckwheat crêpes that taste straight out of Brittany.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "with-a-view-or-a-patio",
+   "jump": "With a view or a patio",
+   "heading": "With a view or a patio",
+   "items": [
+    {
+     "ref": "penticton/elma",
+     "name": "Elma",
+     "text": "a beachfront Turkish restaurant with an exceptional weekend brunch. Book ahead, and come back another night for the charcoal octopus.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/palmer-kitchen-spirits",
+     "name": "Palmer Kitchen + Spirits",
+     "text": "a hotel restaurant worth visiting on purpose, with a lake view and a patio. The duck confit Benny is surprisingly good, and the room stays quiet and unhurried.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/bufflehead-cafe",
+     "name": "Bufflehead Café",
+     "text": "the breakfast spot inside Penticton Lakeside Resort, with a lakeside patio. The eggs Benny are the standout and the Starbucks coffee refills are free. The patio can run short on shade, so bring sun protection.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/match-eatery-public-house",
+     "name": "MATCH Eatery & Public House",
+     "text": "weekend brunch inside Cascades Casino Penticton, with a rooftop patio, backyard games and valley views.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/all-roads-cafe",
+     "name": "All Roads Cafe",
+     "text": "order a coffee and a slice of housemade cake, then walk it across the road to lawn seating right on Okanagan Lake.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "family-breakfasts",
+   "jump": "Family breakfasts",
+   "heading": "Family breakfasts",
+   "items": [
+    {
+     "ref": "penticton/terry-s-comfort-food",
+     "name": "Terry's Comfort Food",
+     "text": "a classic, no-frills diner on Main St with enormous breakfast portions like the King Omelette. Kids love the free jellybean machine.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/bear-s-den-restaurant",
+     "name": "Bear's Den Restaurant",
+     "text": "a reliable diner that local hotel concierges recommend, with generous portions and friendly service. The specialties are the Bear Meal and the Hunter's Surprise breakfast poutine.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/tootsies-diner",
+     "name": "Tootsies Diner",
+     "text": "a cool, vintage locals' favourite in the industrial park. Classic oldies play, there's a retro record table, and the pancakes are fluffy.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/shades-on-main-restaurant",
+     "name": "Shades on Main Restaurant",
+     "text": "a family-style breakfast spot with large private booths. Order the onion rings for the dill sauce reviewers mention most.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "vegan-and-gluten-free-friendly",
+   "jump": "Vegan & gluten-free",
+   "heading": "Vegan and gluten-free friendly",
+   "items": [
+    {
+     "ref": "penticton/stillfood-bistro-cappuccino-bar",
+     "name": "Stillfood Bistro & Cappuccino Bar",
+     "text": "a fully vegan brunch bistro confident enough to win over skeptics. Celiac guests can trust the gluten-free options too.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/maku",
+     "name": "MAKU",
+     "text": "a gluten-free-friendly sushi burrito spot with vegan options and a dog-friendly patio. Bring the dog along.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/marmalade-bakery",
+     "name": "Marmalade Bakery",
+     "text": "a from-scratch cake shop run by sisters Kyra and Caelin, inside Skaha Pizza in the Yorkton Plaza, with dedicated vegan and gluten-free lines. Drop in for daily baked goods, grab-and-go lunch and specialty coffee. It was voted Best Cake Shop in the 2026 Best of Penticton.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/one14-coffee-co",
+     "name": "One14 Coffee Co.",
+     "text": "small-batch roasted coffee inside a converted industrial complex. Reviewers call the gluten-free oat cookie good in its own right, not a token dietary option.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "bakeries-and-a-quick-coffee",
+   "jump": "Bakeries & coffee",
+   "heading": "Bakeries and a quick coffee",
+   "items": [
+    {
+     "ref": "penticton/petrasek-bakery",
+     "name": "Petrasek Bakery",
+     "text": "a charming artisan bakery and café on Main St that feels like stepping into Paris. Order fresh bread or pastries, and expect the owners to know you by name after a visit or two.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/south-main-market",
+     "name": "South Main Market",
+     "text": "a family-run neighbourhood grocery with a from-scratch bakery at its heart. Locals line up for the cinnamon buns, and it was voted Best Bakery in the 2026 Best of Penticton. Grab a sandwich on house-made buns for an easy beach lunch.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/wayne-freda",
+     "name": "Wayne & Freda",
+     "text": "a bustling café attached to a mercantile shop, with a patio where dogs are welcome. It's right by the farmers market.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/atomic-coffee-house",
+     "name": "Atomic Coffee House",
+     "text": "a stylish Main St coffee shop with cool decor and a jazz soundtrack. The Nanaimo bar is pleasantly not too sweet.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/soe-cafe",
+     "name": "soe cafe",
+     "text": "an eclectic spot filled with pottery and built around music, with vinyl for sale. Order the matcha.",
+     "where": "Penticton"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A brunch worth booking",
+    [
+     "penticton/elma|Elma"
+    ]
+   ],
+   [
+    "Sunday mimosas",
+    [
+     "penticton/mack-s-social-house|Mack's Social House"
+    ]
+   ],
+   [
+    "A big family breakfast",
+    [
+     "penticton/terry-s-comfort-food|Terry's Comfort Food",
+     "penticton/bear-s-den-restaurant|Bear's Den Restaurant"
+    ]
+   ],
+   [
+    "Vegan or gluten-free",
+    [
+     "penticton/stillfood-bistro-cappuccino-bar|Stillfood Bistro & Cappuccino Bar",
+     "penticton/bench-market|Bench Market"
+    ]
+   ],
+   [
+    "Breakfast by the lake",
+    [
+     "penticton/bufflehead-cafe|Bufflehead Café",
+     "penticton/all-roads-cafe|All Roads Cafe"
+    ]
+   ],
+   [
+    "A taste of Paris",
+    [
+     "penticton/creperie-ooolala-bistro|Creperie Ooolala Bistro",
+     "penticton/petrasek-bakery|Petrasek Bakery"
+    ]
+   ],
+   [
+    "Cinnamon buns and fresh bread",
+    [
+     "penticton/south-main-market|South Main Market"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/penticton/restaurants\">All Penticton restaurants</a> and <a href=\"/penticton/cafes\">cafés</a>, or places that <a href=\"/guide/penticton/open_early\">open early</a>."
+}
