@@ -110,7 +110,7 @@ const pressed = (b) => b.classList.contains('in-trip');
 test('Stage 5C: the tray module slice is the real app.js tray (both markers found once)', () => {
   assert.equal(APP_JS.split(START).length, 2);
   assert.equal(APP_JS.split(END).length, 2);
-  assert.ok(TRAY_JS.includes('var MAX_STOPS = 10;') && TRAY_JS.includes('function sameStop(x, s)'));
+  assert.ok(TRAY_JS.includes('var MAX_STOPS = 30;') && TRAY_JS.includes('function sameStop(x, s)'));
 });
 
 test('Stage 5C tray: unique venues add and remove; each button shows its own state', () => {
@@ -143,17 +143,17 @@ test('Stage 5C tray: two same-name venues coexist, are pressed independently, an
   assert.ok(pressed(k) && !pressed(p));
 });
 
-test('Stage 5C tray: the same ref is never added twice; the cap of 10 still holds', () => {
+test('Stage 5C tray: the same ref is never added twice; the cap of 30 still holds (10 before 2026-10-18)', () => {
   const k = OVG_K(), k2 = OVG_K();
   const t = boot({ buttons: [k, k2] });
   t.click(k); t.click(k2);                                       // a second button for the same venue toggles it off
   assert.deepEqual(t.stored(), []);
-  const many = Array.from({ length: 11 }, (_, i) => tripBtn(`Place ${i}`, 'kelowna', `venue:${100 + i}`));
+  const many = Array.from({ length: 31 }, (_, i) => tripBtn(`Place ${i}`, 'kelowna', `venue:${100 + i}`));
   const c = boot({ buttons: many });
   many.forEach((b) => c.click(b));
-  assert.equal(c.stored().length, 10);
-  assert.ok(!pressed(many[10]));
-  assert.match(c.els.tripTrayMessage.textContent, /capped at 10 stops/);
+  assert.equal(c.stored().length, 30);
+  assert.ok(!pressed(many[30]));
+  assert.match(c.els.tripTrayMessage.textContent, /capped at 30 stops/);
 });
 
 test('Stage 5C tray: duplicate names get their region in the existing small type; unique names render exactly as before', () => {

@@ -7214,7 +7214,7 @@ test('REGRESSION: non-Golf venue cards have no Favorite / Add to Trip row', () =
 test('Golf category page script reuses the homepage storage keys and reports the four engagement events', () => {
   const rows = app.getVenuesByRegionCategory('kelowna', 'golf');
   const html = app.renderCategoryPage('kelowna', 'golf', rows, []);
-  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'venue_unfavorite'", "'add_to_trip'", "'remove_from_trip'", 'MAX_STOPS = 10', "window.__syncTripButtons", "'[data-venue-category=\"golf\"]'"]) {
+  for (const needle of ["'okanaganFavorites'", "'okanaganTrip'", "'venue_favorite'", "'venue_unfavorite'", "'add_to_trip'", "'remove_from_trip'", 'MAX_STOPS = 30', "window.__syncTripButtons", "'[data-venue-category=\"golf\"]'"]) {
     assert.ok(html.includes(needle), `expected ${needle} in golf category page script`);
   }
   const restaurantHtml = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
@@ -10224,7 +10224,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Planner copy updates: empty-day messaging and fall/autumn examples (2026-10-13), EN/FR only.
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
-  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd', 'public/scripts/app.js (French hero search, 2026-10-18)');
+  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'public/scripts/app.js (French hero search; My Trip holds 30 stops, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12116,7 +12116,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd');
+  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -12917,7 +12917,7 @@ test('Phase 2 /trip: recommendations keep "Show others"; empty results have no R
 // ==== Build My Trip Phase 3 (2026-09-27): "Add whole trip to My Trip" =========
 // Runs the real whole-trip functions from the /trip script against a small
 // fake page whose Add to trip buttons behave like app.js's own handler:
-// toggle by name, de-duplicated, and no add past MAX_STOPS (10).
+// toggle by name, de-duplicated, and no add past MAX_STOPS (30 since 2026-10-18; it was 10).
 function wholeTripHarness(stopNames, initialTrip = []) {
   const page = app.renderTripPlannerPage(true);
   const script = page.match(/<script>\s*\(function\(\)\{\s*var form = document\.getElementById\('tripPlanForm'\)[\s\S]*?<\/script>/)[0];
@@ -12932,7 +12932,7 @@ function wholeTripHarness(stopNames, initialTrip = []) {
       app_.clicks.push(name);
       app_.sourceAtClick.push(win.__roamTripSource);
       if (app_.trip.includes(name)) app_.trip = app_.trip.filter((n) => n !== name);
-      else if (app_.trip.length >= 10) app_.capMessages += 1;
+      else if (app_.trip.length >= 30) app_.capMessages += 1;
       else app_.trip.push(name);
       sync();
     };
@@ -12990,30 +12990,30 @@ test('Phase 3 whole trip: when every stop is already in My Trip, nothing is clic
   assert.equal(h.status.textContent, 'All 3 stops are already in My Trip — nothing new was added.');
 });
 
-test('Phase 3 whole trip: more stops than room -- adds what fits, reports added and not added, never trips the 10-stop limit', () => {
-  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(8));
+test('Phase 3 whole trip: more stops than room -- adds what fits, reports added and not added, never trips the 30-stop limit', () => {
+  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(28));
   h.addWholeTrip();
-  assert.equal(h.app.trip.length, 10);
-  assert.deepEqual(h.app.trip.slice(8), ['A', 'B']);
+  assert.equal(h.app.trip.length, 30);
+  assert.deepEqual(h.app.trip.slice(28), ['A', 'B']);
   assert.equal(h.app.capMessages, 0, 'no click is made once My Trip is full');
-  assert.equal(h.status.textContent, 'Added 2 stops to My Trip. 2 stops couldn’t be added because My Trip holds up to 10 stops — remove some to make room.');
+  assert.equal(h.status.textContent, 'Added 2 stops to My Trip. 2 stops couldn’t be added because My Trip holds up to 30 stops — remove some to make room.');
   assert.equal(h.attrs['data-state'], 'full');
   assert.equal(h.addAllBtn.textContent, 'My Trip is full');
 });
 
-test('Phase 3 whole trip: exactly reaching 10 stops, and trying again when already at 10', () => {
-  const exact = wholeTripHarness(['A', 'B', 'C', 'D'], others(6));
+test('Phase 3 whole trip: exactly reaching 30 stops, and trying again when already at 30', () => {
+  const exact = wholeTripHarness(['A', 'B', 'C', 'D'], others(26));
   exact.addWholeTrip();
-  assert.equal(exact.app.trip.length, 10);
+  assert.equal(exact.app.trip.length, 30);
   assert.equal(exact.status.textContent, 'Added 4 stops to My Trip.');
   assert.equal(exact.attrs['data-state'], 'added');
-  const full = wholeTripHarness(['A', 'B'], others(10));
+  const full = wholeTripHarness(['A', 'B'], others(30));
   assert.equal(full.attrs['data-state'], 'full');
   assert.equal(full.attrs['aria-disabled'], 'true');
   full.addWholeTrip();
   assert.deepEqual(full.app.clicks, []);
-  assert.equal(full.app.trip.length, 10);
-  assert.equal(full.status.textContent, 'My Trip is full (10 stops), so nothing new was added. Remove a stop from My Trip to make room.');
+  assert.equal(full.app.trip.length, 30);
+  assert.equal(full.status.textContent, 'My Trip is full (30 stops), so nothing new was added. Remove a stop from My Trip to make room.');
 });
 
 test('Phase 3 whole trip: duplicate stop names are added once', () => {
@@ -13024,9 +13024,9 @@ test('Phase 3 whole trip: duplicate stop names are added once', () => {
 });
 
 test('Phase 3 whole trip: removing a tray stop or adding one individually recalculates the room; Regenerate keeps My Trip intact', () => {
-  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(7));
+  const h = wholeTripHarness(['A', 'B', 'C', 'D'], others(27));
   h.addWholeTrip();
-  assert.deepEqual(h.app.trip.slice(7), ['A', 'B', 'C']);
+  assert.deepEqual(h.app.trip.slice(27), ['A', 'B', 'C']);
   assert.equal(h.attrs['data-state'], 'full');
   h.remove('Other 1');                                   // tray remove
   assert.equal(h.addAllBtn.textContent, 'Add the remaining 1 stop to My Trip');
@@ -13044,7 +13044,7 @@ test('Phase 3 whole trip: removing a tray stop or adding one individually recalc
   h.addWholeTrip();
   assert.deepEqual(h.app.trip.slice(0, before.length), before, 'nothing already in My Trip is removed or reordered');
   assert.equal(h.app.trip.filter((n) => n === 'D').length, 1, 'no duplicate');
-  assert.equal(h.app.trip.length, Math.min(10, before.length + 2));
+  assert.equal(h.app.trip.length, Math.min(30, before.length + 2));
 });
 
 test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip and the plan-stop markers render where they should', () => {
@@ -13066,10 +13066,10 @@ test('Phase 3 /trip: the whole-trip action, its status region, event Add to trip
   assert.ok(itin.indexOf('data-plan-add-all') < itin.indexOf('data-plan-regenerate'), 'primary action first');
   const recs = render({ kind: 'discover', summary: 'x', overview: {}, notes: [], warnings: [], unsupported: [], recommendations: [{ venue: tripVenue(4, 'Solo', 'cafe'), why: [], caveats: [] }] });
   assert.doesNotMatch(recs, /data-plan-add-all|data-plan-stop/, 'a list of ideas is not a trip');
-  // The page's limit matches the tray's own limit in app.js (unchanged).
+  // The page's limit matches the tray's own limit in app.js (30 since 2026-10-18).
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
-  assert.match(appJs, /var MAX_STOPS = 10;/);
-  assert.equal(wholeTripHarness([]).TRIP_MAX_STOPS, 10);
+  assert.match(appJs, /var MAX_STOPS = 30;/);
+  assert.equal(wholeTripHarness([]).TRIP_MAX_STOPS, 30);
 });
 
 // ==== Measurement Phase A (2026-09-27): GA4 on every public server template ====
@@ -14071,8 +14071,12 @@ test('map day headers: the page uses static <picture> maps with both credits as 
   // Both required credits are real links beside the map.
   assert.ok(page.includes('href="https://www.openstreetmap.org/copyright"') && page.includes('href="https://www.geoapify.com/"'));
   assert.ok(page.includes("Powered by Geoapify") && page.includes('\u00a9 OpenStreetMap contributors'));
-  // No live map or API traffic for day headers: no Leaflet bootstrap for headers, no tile or Geoapify request, no key.
-  for (const gone of ['initDayMaps', 'destroyDayMaps', 'data-t3-dhmap', 't3-dh-canvas', 't3-dh-pin', 'dayMapData']) assert.ok(!page.includes(gone), `${gone} is gone`);
+  // No Geoapify API traffic for day headers (the old live header maps stay gone).
+  for (const gone of ['initDayMaps', 'destroyDayMaps', 'data-t3-dhmap', 't3-dh-canvas', 'dayMapData']) assert.ok(!page.includes(gone), `${gone} is gone`);
+  // 2026-10-18: each day's stops are placed on its header map (numbered pins on the picture, from its zoom and centre);
+  // a day spread wider than the picture gets a small OpenStreetMap map fitted to its stops, only once it scrolls near.
+  assert.ok(page.includes('t3-dh-pin') && page.includes('function fitDayMaps') && page.includes('IntersectionObserver') && page.includes('data-t3-fit-day'));
+  assert.ok(Number.isFinite(mh.penticton.assets.desktop.z) && mh.penticton.assets.desktop.view.length === 2, 'zoom and centre reach the page');
   assert.ok(!/maps\.geoapify\.com|apiKey/i.test(page), 'the browser never talks to the Geoapify API');
   // The whole-trip interactive map and "Map this day" are unchanged.
   assert.ok(page.includes('function loadLeaflet') && page.includes('L.tileLayer(MAP_TILES') && page.includes('tripMap'));
@@ -16361,7 +16365,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd');
+  assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
 }));
 
@@ -16454,7 +16458,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '30d035f190df9605097ed4e647eb3bfd', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), '6cc583cc69464aed7bcfeb1ca823f04f', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -16821,6 +16825,66 @@ test('Season writes: set, no-op, change and clear are audited; cards, pages, Ope
   assert.equal(app.getAdvisoryNotes(SEASON_NOW).has(openUntil.id), false);
   assert.equal(logRows(openUntil.id).length, 2);
   assert.equal(logRows(openUntil.id)[1].new_value, null);
+});
+
+// Build My Trip ski trips (2026-10-18): "ski Big White 3 days in January" never included the resort, because a
+// resort closed for the season today was left out of every plan. It is now planned on every ski day, with lunch and
+// dinner at the hill, and the season row's reopening date is named when the trip is before it.
+test('Build My Trip ski trip (server): a resort closed for the season today is still the ski day, with its opening date', () => {
+  const resortInsert = db.prepare(`INSERT INTO venues (name, region, type, description, slug) VALUES (@name, 'big-white', 'outdoor', @description, @slug)`);
+  resortInsert.run({ name: 'Snowfixture Ski Resort', description: 'A fixture ski resort with skiing on every run.', slug: 'snowfixture-ski-resort' });
+  const resort = app.findVenueBySlug('big-white', 'outdoor', 'snowfixture-ski-resort');
+  const meta = { reason: 'test', batch_id: 'ski-trip-test' };
+  try {
+    assert.equal(app.guardedSeasonUpdate(resort.id, { status: 'closed', reopens_date: '2027-11-26', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
+    const facts = app.buildTripPlannerFacts();
+    assert.equal(facts.find((f) => f.id === resort.id).seasonReopens, '2027-11-26');
+    const p = app.runTripPlan({ text: 'ski Big White 2 days in January' }, SEASON_NOW);
+    assert.equal(p.days.length, 2);
+    for (const day of p.days) {
+      assert.equal(day.stops.find((s) => s.daypart === 'morning').venue.id, resort.id, `day ${day.day} skis at the resort`);
+      assert.ok(day.stops.filter((s) => s.venue).every((s) => s.venue.region === 'big-white'), 'everything at the hill');
+    }
+    assert.ok(p.warnings.some((w) => w.startsWith('Snowfixture Ski Resort opens for the season on November 26')), p.warnings.join(' | '));
+    // The French page asks the same planner.
+    const frPlan = app.runTripPlan({ text: 'Planifie 2 jours de ski à Big White en janvier' }, SEASON_NOW);
+    assert.ok(frPlan.days.length >= 1 && frPlan.days.every((day) => day.stops.find((s) => s.daypart === 'morning')?.venue?.id === resort.id));
+  } finally {
+    app.guardedSeasonUpdate(resort.id, null, meta, SEASON_NOW);
+    db.prepare("DELETE FROM venue_enrichment_log WHERE venue_id = ?").run(resort.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(resort.id);
+  }
+});
+
+test('Build My Trip wine tour (server): "wine tour Oliver Osoyoos 2 days" plans wineries with lunch and dinner, never tour companies', () => {
+  const ins = db.prepare(`INSERT INTO venues (name, region, type, description, slug, rating, price, latitude, longitude) VALUES (@name, @region, @type, 'A wine tour fixture.', @slug, @rating, @price, @lat, @lng)`);
+  const made = [];
+  const mk = (name, region, type, rating, price, lat, lng) => { const slug = app.slugify(name); ins.run({ name, region, type, slug, rating, price, lat, lng }); made.push(app.findVenueBySlug(region, type, slug).id); };
+  for (const [region, lat, lng] of [['oliver', 49.18, -119.55], ['osoyoos', 49.03, -119.47]]) {
+    for (let i = 0; i < 3; i++) mk(`WT ${region} Winery ${i}`, region, 'winery', 5, null, lat + i * 0.01, lng);
+    for (let i = 0; i < 3; i++) mk(`WT ${region} Bistro ${i}`, region, 'restaurant', 4.8, 3, lat + i * 0.01, lng + 0.01);
+    mk(`WT ${region} Wine Tours`, region, 'tour', 5, null, lat, lng);
+  }
+  try {
+    const p = app.runTripPlan({ text: 'wine tour Oliver Osoyoos 2 days' });
+    assert.equal(p.kind, 'multi_day');
+    assert.ok(p.understood.interests.some((x) => /wineries/i.test(x)) && !p.understood.interests.some((x) => /tours/i.test(x)), p.understood.interests.join(', '));
+    for (const day of p.days) {
+      const types = day.stops.filter((s) => s.venue).map((s) => db.prepare('SELECT type FROM venues WHERE id = ?').get(s.venue.id).type);
+      assert.ok(types.filter((t) => t === 'winery').length >= 2, `day ${day.day}: ${types.join(', ')}`);
+      assert.ok(!types.includes('tour') && !types.includes('pub'), types.join(', '));
+      assert.equal(types[types.length - 1], 'restaurant', 'the day ends at dinner');
+    }
+  } finally {
+    for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('My Trip page: stops saved with a planner day are grouped by day even when older stops have none', () => {
+  const html = app.renderMyTripPage({ lang: 'en' });
+  assert.match(html, /var byDay = stops\.length && stops\.some\(function\(s\)\{ return s\.day > 0; \}\);/);
+  assert.match(html, /refs\.some\(function\(x\)\{ return days\[x\.ref\]; \}\)/);
+  assert.match(app.renderMyTripPage({ lang: 'fr' }), /Itinéraire du jour \{d\} dans Google Maps/);
 });
 
 test('POST /admin/set-season: auth, validation and a write, on a private server instance', async () => {
