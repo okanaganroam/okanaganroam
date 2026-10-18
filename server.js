@@ -35275,116 +35275,351 @@ async function handleOwnerLogin(req, res) {
 // they are on first. If a portal error is showing it explains that error. Anything it can't answer goes to
 // info@okanaganroam.com through POST /owner/help, with the business and page attached so Dayton can reply.
 // Pages: login, link, forgot, reset, account, settings, edit, menu, invalid, claim.
+//
+// Help bot v2 (2026-10-18): the portal review found 8 of 23 owner questions answered wrongly with confidence.
+//   - New topics: reviews, price range, repeating events, log out, holiday closures, seasonal hours, name/address,
+//     how fast changes go live, who has access, and visit numbers.
+//   - The matcher forgives typos ("chnage the adress"), ignores accents, and only answers when it is sure; below the
+//     threshold it says so and offers 2-3 topics plus Message us.
+//   - Every topic and the start chips have French (vous, Canadian French). French pages get the bot in French, and
+//     French typed on an English page is answered in French.
+//   - Answers know how the owner got here: signed in ('in'), the emailed edit link ('link') or signed out ('out').
+//     {ON} and {LIVE} in an answer are filled in for that (see OWNER_HELP_FILL); an answer can also be
+//     { in, link, out } with 'out' as the fallback.
+// The answers describe the edit page with instant publishing for signed-in owners, seasonal hours, special closures,
+// price range, People with access and "Type it in myself" on the menu page (all 2026-10-18).
+const OWNER_HELP_DAYS_EN = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const OWNER_HELP_DAYS_FR = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+const OWNER_HELP_FILL = {
+  en: {
+    ON: {
+      in: 'On your edit page (<a href="/owner/account">My listings</a> \u2192 <strong>Edit listing</strong>)',
+      link: 'On your edit page (the private link we emailed you)',
+      out: 'On your edit page (sign in at <a href="/owner/login">Business login</a>, then <strong>My listings</strong> \u2192 <strong>Edit listing</strong>, or open the edit link we emailed you)',
+    },
+    LIVE: {
+      in: 'You\u2019re signed in, so it goes live as soon as you send it.',
+      link: 'From the edit link we check changes first, usually within a day. <strong>Create a login</strong> (near the top of the page) and changes like this go live straight away.',
+      out: 'Signed in, it goes live as soon as you send it. From the emailed edit link we check it first, usually within a day.',
+    },
+  },
+  fr: {
+    ON: {
+      in: 'Sur votre page de modification (<a href="/owner/account">My listings</a> \u2192 <strong>Edit listing</strong>)',
+      link: 'Sur votre page de modification (le lien privé que nous vous avons envoyé par courriel)',
+      out: 'Sur votre page de modification (connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis <strong>My listings</strong> \u2192 <strong>Edit listing</strong>, ou ouvrez le lien de modification reçu par courriel)',
+    },
+    LIVE: {
+      in: 'Comme vous utilisez votre compte, c\u2019est en ligne dès l\u2019envoi.',
+      link: 'Avec le lien de modification, nous vérifions d\u2019abord, en général d\u2019ici un jour. Créez un compte (<strong>Create a login</strong>, en haut de la page) et ce genre de modification sera en ligne tout de suite.',
+      out: 'Avec votre compte, c\u2019est en ligne dès l\u2019envoi. Avec le lien de modification reçu par courriel, nous vérifions d\u2019abord, en général d\u2019ici un jour.',
+    },
+  },
+};
 const OWNER_HELP_TOPICS = [
-  { id: 'signin', q: 'I can\u2019t sign in', pages: ['login', 'account'],
-    keys: ['sign in', 'signin', 'log in', 'login', 'cant get in', 'password wrong', 'dont match', 'locked', 'locked out', 'cannot log'],
-    a: '<p>Check the email is the one you used to make your login, and that Caps Lock is off.</p><ul><li>After 5 wrong tries the login is paused for 15 minutes. Wait, then try again.</li><li>Forgot it? <a href="/owner/forgot">Reset your password</a>.</li><li>Never made a login? Open the edit link we emailed you, then use <strong>Create a login</strong> on that page. No link? <a href="/owner/link">Email me a new link</a>.</li></ul>' },
-  { id: 'forgot', q: 'I forgot my password', pages: ['login', 'forgot', 'reset', 'settings'],
-    keys: ['forgot', 'forgotten', 'reset', 'new password', 'password', 'change password'],
-    a: '<ol><li>Go to <a href="/owner/forgot">Reset your password</a> and enter your login email.</li><li>Open the email from Okanagan Roam (check spam or promotions if it isn\u2019t there in a few minutes).</li><li>Choose a new password: at least 10 characters, typed twice.</li></ol><p>The reset link works once and expires after an hour. Resetting signs you out on your other devices.</p>' },
-  { id: 'newlink', q: 'I lost my edit link, or it doesn\u2019t work', pages: ['invalid', 'login', 'link'],
-    keys: ['link', 'edit link', 'lost link', 'link not valid', 'isnt valid', 'expired', 'old link', 'new link', 'email link'],
-    a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>Your old link keeps working until you open the new one; after that, use the newest email. If no email comes, we may not have your email, or have a different one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, or use <strong>Message us</strong> below.</p>' },
+  { id: 'signin', q: 'I can\u2019t sign in', qFr: 'Je n\u2019arrive pas à me connecter', pages: ['login', 'account'],
+    keys: ['sign in', 'signin', 'log in', 'login', 'cant get in', 'password wrong', 'wrong password', 'dont match', 'locked', 'locked out', 'cannot log', 'cant log'],
+    keysFr: ['connexion', 'me connecter', 'se connecter', 'connecter', 'arrive pas a me connecter', 'impossible de me connecter', 'mot de passe incorrect', 'ne correspondent pas', 'bloque', 'acces refuse'],
+    a: {
+      in: '<p>You\u2019re signed in on this device. On another phone or computer, sign in at <a href="/owner/login">Business login</a> with the same email and password.</p><ul><li>After 5 wrong tries the login is paused for 15 minutes. Wait, then try again.</li><li>Forgot it? <a href="/owner/forgot">Reset your password</a>.</li></ul>',
+      out: '<p>Check the email is the one you used to make your login, and that Caps Lock is off.</p><ul><li>After 5 wrong tries the login is paused for 15 minutes. Wait, then try again.</li><li>Forgot it? <a href="/owner/forgot">Reset your password</a>.</li><li>Never made a login? Open the edit link we emailed you, then use <strong>Create a login</strong> on that page. No link? <a href="/owner/link">Email me a new link</a>.</li></ul>',
+    },
+    aFr: {
+      in: '<p>Votre compte est ouvert sur cet appareil. Sur un autre téléphone ou ordinateur, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> avec le même courriel et le même mot de passe.</p><ul><li>Après 5 essais erronés, la connexion est bloquée 15 minutes. Patientez, puis réessayez.</li><li>Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez-le</a>.</li></ul>',
+      out: '<p>Vérifiez que le courriel est bien celui de votre compte et que la touche Verr. Maj. est désactivée.</p><ul><li>Après 5 essais erronés, la connexion est bloquée 15 minutes. Patientez, puis réessayez.</li><li>Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez votre mot de passe</a>.</li><li>Jamais créé de compte? Ouvrez le lien de modification reçu par courriel, puis utilisez <strong>Create a login</strong> sur cette page. Pas de lien? <a href="/fr/owner/link">Recevoir un nouveau lien</a>.</li></ul>',
+    } },
+  { id: 'forgot', q: 'I forgot my password', qFr: 'J\u2019ai oublié mon mot de passe', pages: ['login', 'forgot', 'reset', 'settings'],
+    keys: ['forgot', 'forgotten', 'reset', 'new password', 'password', 'change password', 'reset password'],
+    keysFr: ['oublie', 'mot de passe oublie', 'reinitialiser', 'reinitialisation', 'nouveau mot de passe', 'mot de passe', 'changer mon mot de passe'],
+    a: '<ol><li>Go to <a href="/owner/forgot">Reset your password</a> and enter your login email.</li><li>Open the email from Okanagan Roam (check spam or promotions if it isn\u2019t there in a few minutes).</li><li>Choose a new password: at least 10 characters, typed twice.</li></ol><p>The reset link works once and expires after an hour. Resetting signs you out on your other devices.</p>',
+    aFr: '<ol><li>Allez à <a href="/fr/owner/forgot">Réinitialiser votre mot de passe</a> et entrez le courriel de votre compte.</li><li>Ouvrez le courriel d\u2019Okanagan Roam (s\u2019il n\u2019arrive pas d\u2019ici quelques minutes, vérifiez les courriels indésirables ou l\u2019onglet Promotions).</li><li>Choisissez un nouveau mot de passe d\u2019au moins 10 caractères, tapé deux fois.</li></ol><p>Le lien de réinitialisation fonctionne une seule fois et expire après une heure. La réinitialisation ferme votre session sur vos autres appareils.</p>' },
+  { id: 'newlink', q: 'I lost my edit link, or it doesn\u2019t work', qFr: 'J\u2019ai perdu mon lien de modification, ou il ne fonctionne pas', pages: ['invalid', 'login', 'link'],
+    keys: ['link', 'edit link', 'lost link', 'lost my link', 'link not valid', 'isnt valid', 'expired', 'old link', 'new link', 'email link', 'link doesnt work', 'link no longer works'],
+    keysFr: ['lien', 'lien de modification', 'perdu mon lien', 'lien perdu', 'lien expire', 'lien ne fonctionne pas', 'lien ne marche pas', 'ancien lien', 'nouveau lien', 'lien invalide'],
+    a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>Your old link keeps working until you open the new one; after that, use the newest email. If no email comes, we may not have your email, or have a different one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, or use <strong>Message us</strong> below.</p>',
+    aFr: '<p>Allez à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et entrez le courriel de l\u2019entreprise que nous avons au dossier. Un nouveau lien arrive en une minute ou deux.</p><p>Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau; ensuite, utilisez le courriel le plus récent. Aucun courriel? Nous n\u2019avons peut-être pas votre courriel, ou nous en avons un autre. Ouvrez la page de votre entreprise et touchez <strong>Revendiquer cette fiche</strong>, ou utilisez <strong>Écrivez-nous</strong> ci-dessous.</p>' },
   // Claim this listing (2026-10-18): owners with no edit link, no email on file, or a changed email.
-  { id: 'claim', q: 'How do I claim my listing?', pages: ['login', 'link', 'invalid', 'account', 'claim'],
+  { id: 'claim', q: 'How do I claim my listing?', qFr: 'Comment revendiquer ma fiche?', pages: ['login', 'link', 'invalid', 'account', 'claim'],
     keys: ['claim', 'claim my listing', 'claim this listing', 'claim my business', 'take over', 'takeover', 'my business is listed', 'business is on your site', 'ownership', 'prove', 'verify', 'own this business', 'get access', 'access my listing', 'no edit link', 'never had a link', 'manage my listing', 'control my listing'],
-    a: '<ol><li>Open your business\u2019s page on Okanagan Roam and tap <strong>Claim this listing</strong> (beside the opening hours).</li><li>Tell us your name, your role and your business email, and how we can check it\u2019s you, for example by calling the number on your listing.</li><li>Once we\u2019ve checked, usually within a day or two, we email you a private edit link. On that page you can also create a login.</li></ol><p>It\u2019s free. Already got an email from us before? <a href="/owner/link">Email me a new link</a> is faster. Not listed at all? <a href="/list-your-venue">List your business</a>.</p>' },
-  { id: 'noemail', q: 'I never got the email', pages: ['login', 'link', 'forgot', 'invalid'],
-    keys: ['never got', 'didnt get', 'did not get', 'didnt receive', 'not received', 'never received', 'havent received', 'havent got', 'no email', 'didnt arrive', 'hasnt arrived', 'not arrived', 'where is the email', 'spam', 'junk', 'promotions', 'never came', 'didnt come'],
-    a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>' },
-  { id: 'staff', q: 'Can my staff or a partner log in too?', pages: ['account', 'edit', 'login', 'settings'],
-    keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'same login'],
-    a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password.</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don\u2019t share one password between people. Each person can take a business off their own login in <a href="/owner/account/settings">Account settings</a>; to remove someone else, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>' },
+    keysFr: ['revendiquer', 'revendiquer ma fiche', 'revendiquer cette fiche', 'reclamer', 'reclamer ma fiche', 'mon entreprise est sur votre site', 'mon entreprise est affichee', 'prouver', 'verifier', 'je suis le proprietaire', 'je suis la proprietaire', 'acceder a ma fiche', 'gerer ma fiche', 'pas de lien', 'jamais eu de lien'],
+    a: '<ol><li>Open your business\u2019s page on Okanagan Roam and tap <strong>Claim this listing</strong> (beside the opening hours).</li><li>Tell us your name, your role and your business email, and how we can check it\u2019s you, for example by calling the number on your listing.</li><li>Once we\u2019ve checked, usually within a day or two, we email you a private edit link. On that page you can also create a login.</li></ol><p>It\u2019s free. Already got an email from us before? <a href="/owner/link">Email me a new link</a> is faster. Not listed at all? <a href="/list-your-venue">List your business</a>.</p>',
+    aFr: '<ol><li>Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong> (à côté des heures d\u2019ouverture).</li><li>Indiquez votre nom, votre rôle et le courriel de l\u2019entreprise, et comment nous pouvons vérifier que c\u2019est bien vous, par exemple en appelant le numéro de votre fiche.</li><li>Après vérification, en général d\u2019ici un jour ou deux, nous vous envoyons par courriel un lien de modification privé. Sur cette page, vous pouvez aussi créer un compte.</li></ol><p>C\u2019est gratuit. Vous avez déjà reçu un courriel de nous? <a href="/fr/owner/link">Recevoir un nouveau lien</a> est plus rapide. Pas encore inscrit? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>.</p>' },
+  { id: 'noemail', over: ['forgot', 'newlink'], q: 'I never got the email', qFr: 'Je n\u2019ai jamais reçu le courriel', pages: ['login', 'link', 'forgot', 'invalid'],
+    keys: ['never got', 'didnt get', 'did not get', 'didnt receive', 'not received', 'never received', 'havent received', 'havent got', 'no email', 'didnt arrive', 'hasnt arrived', 'not arrived', 'where is the email', 'spam', 'junk', 'promotions', 'never came', 'didnt come', 'didnt get the email', 'reset email', 'no reset email'],
+    keysFr: ['jamais recu', 'pas recu', 'rien recu', 'aucun courriel', 'pas de courriel', 'courriel pas arrive', 'pas arrive', 'indesirables', 'courriels indesirables', 'pourriel', 'spam', 'toujours rien'],
+    a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>',
+    aFr: '<ul><li><strong>Vérifiez les courriels indésirables et l\u2019onglet Promotions</strong>, et cherchez « Okanagan Roam » dans votre boîte de réception. Ça peut prendre quelques minutes.</li><li><strong>Redemandez-le :</strong> <a href="/fr/owner/link">Recevoir un nouveau lien</a> avec le courriel de l\u2019entreprise que nous avons au dossier. Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau.</li><li><strong>Toujours rien?</strong> Nous n\u2019avons peut-être pas votre courriel, ou un ancien. Ouvrez la page de votre entreprise et touchez <strong>Revendiquer cette fiche</strong> : nous vérifierons que c\u2019est bien vous et enverrons un lien au courriel que vous nous donnerez.</li></ul><p>Les courriels de réinitialisation du mot de passe fonctionnent de la même façon : vérifiez d\u2019abord les indésirables, puis <a href="/fr/owner/forgot">redemandez-le</a>.</p>' },
+  { id: 'staff', over: ['signin', 'login-create'], q: 'Can my staff or a partner log in too?', qFr: 'Mon personnel ou un associé peut-il se connecter aussi?', pages: ['account', 'edit', 'login', 'settings'],
+    keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', '2 people', '2 logins', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'add a person', 'add someone', 'same login'],
+    keysFr: ['employe', 'employes', 'mon personnel', 'personnel', 'mon equipe', 'equipe', 'gerant', 'gerante', 'associe', 'associee', 'partenaire', 'deux personnes', 'une autre personne', 'quelqu un d autre', 'collegue', 'partager l acces', 'deuxieme compte', 'ajouter un utilisateur', 'ajouter une personne', 'plusieurs personnes', 'meme compte'],
+    a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password (already signed in? they tap <strong>Add to my login</strong>).</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don’t share one password between people. Everyone already on the listing gets an email when a new login is added. Signed in, <strong>People with access</strong> on your edit page shows who can update it: you can remove anyone added after you; for someone added before you, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>',
+    aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Elle l’ouvre et utilise <strong>Create a login</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Add to my login</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>My listings</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>People with access</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Revendiquer cette fiche</strong> sur votre page.</p>' },
   // Dispute (2026-10-18): "someone else claimed my business" used to match the staff topic ("Yes. Each person can
   // have their own login…"), which read like approval of a possible hijack. Its keys are longer phrases than the
   // staff ones ('someone else', 'another person', 'my manager') so it wins whenever access or a change is disputed.
-  { id: 'dispute', q: 'Someone else has my listing, or changed it without asking', pages: ['account', 'edit', 'login', 'settings', 'claim', 'link', 'invalid'],
+  // Help bot v2: a former manager or "who has access" goes to the access topic (People with access, Remove).
+  { id: 'dispute', over: ['staff'], q: 'Someone else has my listing, or changed it without asking', qFr: 'Quelqu\u2019un d\u2019autre a ma fiche, ou l\u2019a modifiée sans permission', pages: ['account', 'edit', 'login', 'settings', 'claim', 'link', 'invalid'],
     keys: ['dispute', 'hijack', 'hijacked', 'someone else claimed', 'someone claimed', 'already claimed', 'claimed my business', 'claimed my listing', 'who claimed', 'claimed by someone',
-      'another person has access', 'someone else has access', 'someone has access', 'who has access', 'has access to my', 'still has access', 'still have access', 'still has a login', 'access to my listing',
+      'another person has access', 'someone else has access', 'someone has access', 'stranger has access', 'dont know who',
       'didnt give', 'didnt authorize', 'didnt authorise', 'not authorized', 'unauthorized', 'unauthorised', 'didnt allow', 'without permission', 'without my permission', 'without asking', 'without telling',
-      'someone changed', 'somebody changed', 'changed without', 'wasnt me', 'not one of us',
-      'remove a person', 'remove someone', 'remove a login', 'remove their access', 'remove access', 'take away access', 'revoke', 'kick out', 'lock them out',
-      'old manager', 'former manager', 'ex manager', 'old owner', 'former owner', 'previous owner', 'former employee', 'ex employee', 'old employee'],
-    a: '<p>Thanks for telling us. <strong>Okanagan Roam will check it.</strong> Nobody should have access to your listing without your say-so.</p><ol><li>Tap <strong>Message us</strong> below (it goes to info@okanaganroam.com).</li><li>Say <strong>which listing</strong> it is and <strong>who you are</strong>: your name, your role, and a phone number or email we can check against the listing.</li><li>If anything was <strong>changed without permission</strong>, tell us what (hours, photos, description, an event) so we can put it right.</li></ol><p>Once we’ve checked, Dayton can <strong>take other people’s logins off the listing</strong> and <strong>send you a fresh edit link</strong>, so the old link stops working.</p>' },
-  { id: 'login-create', q: 'How do I make a login?', pages: ['edit', 'login'],
-    keys: ['create login', 'make login', 'account', 'make an account', 'sign up', 'register', 'why login'],
-    a: '<ol><li>Open your listing with the edit link we emailed you.</li><li>Find <strong>Create a login</strong> near the top, then enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, photos and menus you add from <strong>My listings</strong> go live straight away.</p>' },
-  { id: 'photo-add', q: 'How do I add photos?', pages: ['edit'],
-    keys: ['photo', 'photos', 'picture', 'pictures', 'image', 'upload', 'add photo', 'gallery'],
-    a: '<ol><li>Scroll to <a href="#photos">Photos</a>.</li><li>Tap <strong>Choose photos</strong> and pick up to 5 at a time.</li><li>Fill in who to credit (your business or the photographer).</li><li>Tick the box to confirm you took them or have permission, then upload.</li></ol><p>Best photos: the inside of your place, your patio or view, or your storefront with the name. Wide photos work best for the banner.</p>' },
-  { id: 'photo-small', q: 'My photo won\u2019t upload', pages: ['edit'],
-    keys: ['too small', 'too large', 'wont upload', 'upload failed', 'could not be read', 'heic', '800 pixels', 'photo error', 'photo wont'],
-    a: '<ul><li><strong>Too small:</strong> photos must be at least 800 pixels wide. Use the original from your phone or camera, not a screenshot or a photo saved from social media.</li><li><strong>Can\u2019t be read:</strong> try a JPG or PNG. On an iPhone you can set Camera \u2192 Formats \u2192 Most Compatible, or share the photo to yourself as a JPG.</li><li><strong>Waiting for review:</strong> you can have up to 12 photos waiting at once. Wait until we\u2019ve looked at those.</li><li><strong>Connection:</strong> large photos need a good signal, so try again on Wi-Fi.</li></ul>' },
-  { id: 'photo-pending', q: 'My photo or menu isn\u2019t showing yet', pages: ['edit', 'menu', 'account'],
-    keys: ['not showing', 'not live', 'waiting', 'pending', 'review', 'when will', 'still not', 'not appear', 'not on my page', 'not updated'],
-    a: '<p>It depends how you opened your listing:</p><ul><li><strong>From the emailed edit link:</strong> new photos and menus wait for us to check them, usually within a day.</li><li><strong>Signed in, from My listings:</strong> photos and menus go live straight away. Text changes (hours, description, links) are still checked first.</li></ul><p>Already live but you still see the old version? Refresh the page. It can take a minute to show everywhere.</p>' },
-  { id: 'photo-main', q: 'Change my main photo or remove one', pages: ['edit'],
-    keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'delete photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo'],
-    a: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. In <a href="#photos">Photos</a>, each live photo has <strong>Make main</strong> and <strong>Remove</strong>.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main</strong> once it\u2019s live. If it isn\u2019t yours to change, <strong>Message us</strong> and we\u2019ll swap it.</p>' },
-  { id: 'hours', q: 'How do I set my hours?', pages: ['edit'],
-    keys: ['hours', 'opening hours', 'open', 'close', 'closing', 'times', 'closed', 'schedule', 'split', 'lunch', 'time'],
-    a: '<ol><li>In <strong>Opening hours</strong>, enter the open and close time for each day, or tick <strong>Closed</strong>.</li><li>Closed in the afternoon? Tap <strong>+ second time</strong> for a second range that day.</li><li>Same every weekday? Fill in Monday, then tap <strong>Copy Monday to Tue\u2013Fri</strong> (or every day).</li><li>Tap <strong>Send changes</strong> at the bottom.</li></ol><p>Every day you\u2019re open needs both times. Open past midnight? Use the real closing time, like 1:00 AM.</p>' },
-  { id: 'season', q: 'I\u2019m only open some months', pages: ['edit'],
-    keys: ['season', 'seasonal', 'months', 'winter', 'summer', 'closed in winter', 'closed for winter', 'closed for the season', 'off season', 'reopen', 'open some months', 'only open'],
-    a: '<p>Under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then <strong>Send changes</strong>.</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Closed for a short time? <strong>Message us</strong> and we\u2019ll add a notice.</p>' },
-  { id: 'changes-review', q: 'I sent changes but nothing changed', pages: ['edit', 'account'],
-    keys: ['sent changes', 'my changes', 'changes not showing', 'changes not', 'didnt change', 'not changed', 'still old', 'update not', 'saved', 'submitted', 'approve', 'approval', 'hours not updated', 'description not'],
-    a: '<p>Changes to your hours, description, contact details and links are checked by us before they go live, usually within a day. <strong>Your updates</strong> at the top of your listing shows what\u2019s waiting and what\u2019s live.</p><p>Photos and menus sent while signed in from <strong>My listings</strong> go live straight away.</p>' },
-  { id: 'nothing-changed', q: '\u201cNothing has changed yet\u201d', pages: ['edit'],
+      'someone changed', 'somebody changed', 'changed without', 'wasnt me', 'not one of us', 'old owner', 'former owner', 'previous owner'],
+    keysFr: ['quelqu un a revendique', 'deja revendique', 'revendique ma fiche', 'qui a revendique', 'sans permission', 'sans ma permission', 'sans mon accord', 'sans autorisation', 'pas autorise', 'quelqu un a modifie', 'quelqu un a change', 'ce n etait pas moi', 'pirate', 'usurpation', 'litige', 'ancien proprietaire', 'inconnu a acces'],
+    a: '<p>Thanks for telling us. <strong>Okanagan Roam will check it.</strong> Nobody should have access to your listing without your say-so.</p><ol><li>Tap <strong>Message us</strong> below (it goes to info@okanaganroam.com).</li><li>Say <strong>which listing</strong> it is and <strong>who you are</strong>: your name, your role, and a phone number or email we can check against the listing.</li><li>If anything was <strong>changed without permission</strong>, tell us what (hours, photos, description, an event) so we can put it right.</li></ol><p>Once we\u2019ve checked, Dayton can <strong>take other people\u2019s logins off the listing</strong> and <strong>send you a fresh edit link</strong>, so the old link stops working.</p><p>Signed in, you can also see every login under <strong>People with access</strong> on your edit page and remove anyone added after you. Anyone added before you, Dayton handles.</p>',
+    aFr: '<p>Merci de nous le signaler. <strong>Okanagan Roam va vérifier.</strong> Personne ne devrait avoir accès à votre fiche sans votre accord.</p><ol><li>Touchez <strong>Écrivez-nous</strong> ci-dessous (le message va à info@okanaganroam.com).</li><li>Dites-nous <strong>de quelle fiche</strong> il s\u2019agit et <strong>qui vous êtes</strong> : votre nom, votre rôle, et un numéro de téléphone ou un courriel que nous pouvons comparer à la fiche.</li><li>Si quelque chose a été <strong>modifié sans permission</strong>, dites-nous quoi (heures, photos, description, un événement) pour que nous puissions corriger.</li></ol><p>Après vérification, Dayton peut <strong>retirer les comptes des autres personnes</strong> et <strong>vous envoyer un nouveau lien de modification</strong>, pour que l\u2019ancien cesse de fonctionner.</p><p>Avec votre compte, vous voyez aussi tous les comptes sous <strong>People with access</strong>, sur votre page de modification, et pouvez retirer toute personne ajoutée après vous. Pour les personnes ajoutées avant vous, Dayton s\u2019en occupe.</p>' },
+  // Help bot v2 (2026-10-18): People with access lists every login on the listing, with Remove.
+  { id: 'access', over: ['staff'], q: 'Who has access to my listing? Remove someone', qFr: 'Qui a accès à ma fiche? Retirer quelqu\u2019un', pages: ['account', 'edit', 'settings'],
+    keys: ['who has access', 'who can edit', 'who else can edit', 'people with access', 'who has a login', 'remove a person', 'remove someone', 'remove a login', 'remove their access', 'remove access', 'remove staff', 'remove an employee', 'remove my manager', 'take away access', 'take someone off', 'revoke', 'kick out', 'lock them out',
+      'still has access', 'still have access', 'still has a login', 'old manager', 'former manager', 'ex manager', 'former employee', 'ex employee', 'old employee', 'former staff', 'left the company', 'no longer works here', 'doesnt work here anymore', 'doesnt work here'],
+    keysFr: ['qui a acces', 'qui peut modifier', 'personnes qui ont acces', 'retirer une personne', 'retirer quelqu un', 'retirer l acces', 'enlever l acces', 'supprimer un compte', 'retirer un employe', 'ancien gerant', 'ancienne gerante', 'ancien employe', 'ancienne employee', 'a toujours acces', 'encore acces', 'ne travaille plus ici', 'ne travaille plus pour nous'],
+    a: {
+      in: '<p>{ON}, open <strong>People with access</strong>. It lists every login that can update this listing (other people’s emails are partly hidden).</p><ul><li><strong>Added after you</strong>, like a former manager or staff member? Tap <strong>Remove</strong> beside them. They get an email saying so, and so does Dayton.</li><li><strong>Added before you?</strong> You can’t remove them yourself: tap <strong>Message us</strong> and Dayton will check it.</li><li><strong>Remove me</strong> takes your own login off the listing.</li></ul><p>Worried someone kept an old edit link? Ask for a fresh one at <a href="/owner/link">Email me a new link</a> and open it, so the old one stops working. Everyone on the listing gets an email whenever a new login is added.</p>',
+      link: '<p><strong>People with access</strong> is for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open the listing from <strong>My listings</strong> to see every login that can update it.</p><p>You can remove people added after you. A login added <strong>before</strong> yours (a former manager, say) only Dayton can remove: tap <strong>Message us</strong> and say who it is.</p><p>Worried someone kept an old edit link? Ask for a fresh one at <a href="/owner/link">Email me a new link</a> and open it, so the old one stops working.</p>',
+      out: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. <strong>People with access</strong> lists every login that can update it.</p><ul><li>Someone added <strong>after</strong> you? Tap <strong>Remove</strong> beside them. They and Dayton get an email.</li><li>Someone added <strong>before</strong> you? Tap <strong>Message us</strong> and Dayton will check it.</li></ul><p>Worried someone kept an old edit link? Ask for a fresh one at <a href="/owner/link">Email me a new link</a> and open it, so the old one stops working.</p>',
+    },
+    aFr: {
+      in: '<p>{ON}, ouvrez <strong>People with access</strong> (personnes qui ont accès). On y voit tous les comptes qui peuvent modifier cette fiche (les courriels des autres sont en partie masqués).</p><ul><li><strong>Ajoutée après vous</strong>, comme un ancien gérant ou employé? Touchez <strong>Remove</strong> à côté de son nom. Elle reçoit un courriel pour l’en informer, et Dayton aussi.</li><li><strong>Ajoutée avant vous?</strong> Vous ne pouvez pas la retirer vous-même : touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li><li><strong>Remove me</strong> retire votre propre compte de la fiche.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner. Toutes les personnes sur la fiche reçoivent un courriel chaque fois qu’un compte s’ajoute.</p>',
+      link: '<p><strong>People with access</strong> est réservé aux comptes. Utilisez <strong>Create a login</strong> en haut de cette page, puis ouvrez la fiche depuis <strong>My listings</strong> pour voir tous les comptes qui peuvent la modifier.</p><p>Vous pouvez retirer les personnes ajoutées après vous. Un compte ajouté <strong>avant</strong> le vôtre (un ancien gérant, par exemple), seul Dayton peut le retirer : touchez <strong>Écrivez-nous</strong> et dites-nous de qui il s’agit.</p><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
+      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>. <strong>People with access</strong> montre tous les comptes qui peuvent la modifier.</p><ul><li>Une personne ajoutée <strong>après</strong> vous? Touchez <strong>Remove</strong> à côté de son nom. Elle et Dayton reçoivent un courriel.</li><li>Une personne ajoutée <strong>avant</strong> vous? Touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
+    } },
+  { id: 'login-create', q: 'How do I make a login?', qFr: 'Comment créer un compte?', pages: ['edit', 'login'],
+    keys: ['create login', 'create a login', 'make login', 'make a login', 'make an account', 'create an account', 'sign up', 'register', 'why login', 'need a login', 'set up a login', 'set up an account', 'get a login'],
+    keysFr: ['creer un compte', 'creer un login', 'ouvrir un compte', 'faire un compte', 'inscription', 's inscrire', 'pourquoi un compte', 'besoin d un compte'],
+    a: {
+      in: '<p>You already have one: you\u2019re signed in. To add another business to it, open that business\u2019s edit link on this device and tap <strong>Add to my login</strong>.</p>',
+      link: '<ol><li>Near the top of this page, open <strong>Create a login</strong>.</li><li>Enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, your hours, closures, phone, description, features, price range, photos and menu go live as soon as you send them. Name, address and website changes are still checked first.</p>',
+      out: '<ol><li>Open your listing with the edit link we emailed you.</li><li>Find <strong>Create a login</strong> near the top, then enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, your hours, closures, phone, description, features, price range, photos and menu go live as soon as you send them. Name, address and website changes are still checked first.</p>',
+    },
+    aFr: {
+      in: '<p>Vous en avez déjà un, et il est ouvert sur cet appareil. Pour y ajouter une autre entreprise, ouvrez le lien de modification de cette entreprise sur cet appareil et touchez <strong>Add to my login</strong>.</p>',
+      link: '<ol><li>En haut de cette page, ouvrez <strong>Create a login</strong> (créer un compte).</li><li>Entrez votre courriel et un mot de passe (au moins 10 caractères).</li><li>Ensuite, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>.</li></ol><p>Avec un compte, vos heures, fermetures, téléphone, description, caractéristiques, gamme de prix, photos et menu sont en ligne dès l\u2019envoi. Le nom, l\u2019adresse et le site Web sont encore vérifiés d\u2019abord.</p>',
+      out: '<ol><li>Ouvrez votre fiche avec le lien de modification reçu par courriel.</li><li>Trouvez <strong>Create a login</strong> (créer un compte) en haut, puis entrez votre courriel et un mot de passe (au moins 10 caractères).</li><li>Ensuite, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>.</li></ol><p>Avec un compte, vos heures, fermetures, téléphone, description, caractéristiques, gamme de prix, photos et menu sont en ligne dès l\u2019envoi. Le nom, l\u2019adresse et le site Web sont encore vérifiés d\u2019abord.</p>',
+    } },
+  { id: 'logout', over: ['settings', 'signin'], q: 'How do I log out?', qFr: 'Comment me déconnecter?', pages: ['account', 'settings', 'edit'],
+    keys: ['log out', 'logout', 'log off', 'logoff', 'sign out', 'signout', 'sign off', 'logging out', 'signing out', 'exit my account', 'leave my account', 'shared computer', 'public computer', 'lost my phone', 'sign out everywhere', 'sign out other devices', 'log out other devices'],
+    keysFr: ['deconnexion', 'deconnecter', 'me deconnecter', 'se deconnecter', 'fermer la session', 'fermer ma session', 'quitter mon compte', 'ordinateur partage', 'telephone perdu'],
+    a: {
+      in: '<p>Go to <a href="/owner/account">My listings</a> and tap <strong>Log out</strong> at the top. You\u2019ll need your email and password to sign in again.</p><p>Lost a phone, or signed in on a shared computer? Use <strong>Sign out everywhere else</strong> in <a href="/owner/account/settings">Account settings</a>.</p>',
+      link: '<p>You\u2019re using your private edit link, so there\u2019s nothing to log out of: just close the page. Anyone with this link can suggest changes, so don\u2019t leave it open on a shared computer, and don\u2019t forward the email.</p><p>Signed in on this device too? Go to <a href="/owner/account">My listings</a> and tap <strong>Log out</strong>.</p>',
+      out: '<p>You\u2019re not signed in on this page. If you are signed in, go to <a href="/owner/account">My listings</a> and tap <strong>Log out</strong> at the top. To sign out every other phone and computer, use <strong>Sign out everywhere else</strong> in <a href="/owner/account/settings">Account settings</a>.</p>',
+    },
+    aFr: {
+      in: '<p>Allez à <a href="/owner/account">My listings</a> et touchez <strong>Log out</strong> (se déconnecter) en haut. Il vous faudra votre courriel et votre mot de passe pour vous reconnecter.</p><p>Téléphone perdu, ou compte ouvert sur un ordinateur partagé? Utilisez <strong>Sign out everywhere else</strong> dans <a href="/owner/account/settings">Account settings</a>.</p>',
+      link: '<p>Vous utilisez votre lien de modification privé : il n\u2019y a pas de session à fermer, il suffit de fermer la page. Toute personne qui a ce lien peut proposer des modifications; ne le laissez pas ouvert sur un ordinateur partagé et ne transférez pas le courriel.</p><p>Votre compte est aussi ouvert sur cet appareil? Allez à <a href="/owner/account">My listings</a> et touchez <strong>Log out</strong>.</p>',
+      out: '<p>Aucun compte n\u2019est ouvert sur cette page. Si le vôtre l\u2019est, allez à <a href="/owner/account">My listings</a> et touchez <strong>Log out</strong> en haut. Pour fermer la session sur tous vos autres téléphones et ordinateurs, utilisez <strong>Sign out everywhere else</strong> dans <a href="/owner/account/settings">Account settings</a>.</p>',
+    } },
+  { id: 'live-speed', q: 'How fast do my changes go live?', qFr: 'Quand mes modifications seront-elles en ligne?', pages: ['edit', 'account', 'menu'],
+    keys: ['how fast', 'how long', 'how soon', 'how quickly', 'go live', 'goes live', 'going live', 'live straight away', 'instant', 'instantly', 'right away', 'straight away', 'immediately', 'how long does it take', 'when does it show', 'approval time', 'review time', 'do you check', 'do you approve', 'need approval', 'publish', 'without waiting', 'waiting for approval', 'without approval', 'wait for approval'],
+    keysFr: ['combien de temps', 'en ligne quand', 'quand sera', 'tout de suite', 'immediatement', 'instantane', 'rapidement', 'delai', 'approbation', 'verification', 'publier', 'mis en ligne', 'mise en ligne'],
+    a: {
+      in: '<p>You\u2019re signed in, so these go live <strong>as soon as you send them</strong>: hours, seasonal hours, special closures, phone, description, features, price range, photos and menus.</p><p><strong>Business name, address and website</strong> changes are checked by us first, usually within a day, so nobody can point your listing somewhere else by mistake. Events are checked before they go on What\u2019s On, also usually within a day.</p>',
+      link: '<p>From the emailed edit link, <strong>we check every change first</strong>, usually within a day.</p><p>With a login (<strong>Create a login</strong>, near the top of this page) your hours, closures, phone, description, features, price range, photos and menus go live as soon as you send them. Name, address and website changes, and events, are always checked first.</p>',
+      out: '<p><strong>Signed in:</strong> hours, seasonal hours, special closures, phone, description, features, price range, photos and menus go live as soon as you send them.</p><p><strong>From the emailed edit link:</strong> we check every change first, usually within a day.</p><p>Business name, address and website changes, and events, are always checked first, usually within a day.</p>',
+    },
+    aFr: {
+      in: '<p>Comme vous utilisez votre compte, ceci est en ligne <strong>dès l\u2019envoi</strong> : heures, heures saisonnières, fermetures spéciales, téléphone, description, caractéristiques, gamme de prix, photos et menus.</p><p>Les changements de <strong>nom, d\u2019adresse et de site Web</strong> sont d\u2019abord vérifiés par nous, en général d\u2019ici un jour, pour que personne ne redirige votre fiche par erreur. Les événements sont aussi vérifiés avant de paraître dans What\u2019s On, en général d\u2019ici un jour.</p>',
+      link: '<p>Avec le lien de modification reçu par courriel, <strong>nous vérifions chaque modification d\u2019abord</strong>, en général d\u2019ici un jour.</p><p>Avec un compte (<strong>Create a login</strong>, en haut de cette page), vos heures, fermetures, téléphone, description, caractéristiques, gamme de prix, photos et menus sont en ligne dès l\u2019envoi. Le nom, l\u2019adresse, le site Web et les événements sont toujours vérifiés d\u2019abord.</p>',
+      out: '<p><strong>Avec un compte :</strong> heures, heures saisonnières, fermetures spéciales, téléphone, description, caractéristiques, gamme de prix, photos et menus sont en ligne dès l\u2019envoi.</p><p><strong>Avec le lien de modification reçu par courriel :</strong> nous vérifions chaque modification d\u2019abord, en général d\u2019ici un jour.</p><p>Le nom, l\u2019adresse, le site Web et les événements sont toujours vérifiés d\u2019abord, en général d\u2019ici un jour.</p>',
+    } },
+  { id: 'photo-add', q: 'How do I add photos?', qFr: 'Comment ajouter des photos?', pages: ['edit'],
+    keys: ['photo', 'photos', 'picture', 'pictures', 'pics', 'image', 'images', 'upload', 'add photo', 'add photos', 'gallery'],
+    keysFr: ['photo', 'photos', 'image', 'images', 'televerser', 'ajouter des photos', 'ajouter une photo', 'mettre des photos', 'galerie'],
+    a: '<ol><li>{ON}, go to <strong>Photos</strong>.</li><li>Tap <strong>Choose photos</strong> and pick up to 5 at a time.</li><li>Fill in who to credit (your business or the photographer).</li><li>Tick the box to confirm you took them or have permission, then upload.</li></ol><p>{LIVE}</p><p>Best photos: the inside of your place, your patio or view, or your storefront with the name. Wide photos work best for the banner.</p>',
+    aFr: '<ol><li>{ON}, allez à <strong>Photos</strong>.</li><li>Touchez <strong>Choose photos</strong> et choisissez jusqu\u2019à 5 photos à la fois.</li><li>Indiquez à qui attribuer le crédit (votre entreprise ou le photographe).</li><li>Cochez la case pour confirmer que vous les avez prises ou que vous avez la permission, puis téléversez-les.</li></ol><p>{LIVE}</p><p>Les meilleures photos : l\u2019intérieur de votre établissement, votre terrasse ou la vue, ou votre devanture avec le nom. Les photos à l\u2019horizontale conviennent le mieux à la bannière.</p>' },
+  { id: 'photo-small', over: ['photo-add'], q: 'My photo won\u2019t upload', qFr: 'Ma photo ne se téléverse pas', pages: ['edit'],
+    keys: ['too small', 'too large', 'too big', 'wont upload', 'upload failed', 'could not be read', 'heic', '800 pixels', 'photo error', 'photo wont', 'cant upload', 'failing', 'failed', 'fails', 'error', 'keeps failing'],
+    keysFr: ['trop petite', 'trop grande', 'trop lourde', 'ne se televerse pas', 'televersement echoue', 'erreur photo', 'illisible', 'heic', 'photo ne marche pas', 'photo ne fonctionne pas'],
+    a: '<ul><li><strong>Too small:</strong> photos must be at least 800 pixels wide. Use the original from your phone or camera, not a screenshot or a photo saved from social media.</li><li><strong>Can\u2019t be read:</strong> try a JPG or PNG. On an iPhone you can set Camera \u2192 Formats \u2192 Most Compatible, or share the photo to yourself as a JPG.</li><li><strong>Waiting for review:</strong> you can have up to 12 photos waiting at once. Wait until we\u2019ve looked at those.</li><li><strong>Connection:</strong> large photos need a good signal, so try again on Wi-Fi.</li></ul>',
+    aFr: '<ul><li><strong>Trop petite :</strong> les photos doivent faire au moins 800 pixels de large. Utilisez l\u2019original de votre téléphone ou de votre appareil photo, pas une capture d\u2019écran ni une photo enregistrée depuis les réseaux sociaux.</li><li><strong>Illisible :</strong> essayez un JPG ou un PNG. Sur iPhone, réglez Appareil photo \u2192 Formats \u2192 Le plus compatible, ou envoyez-vous la photo en JPG.</li><li><strong>En attente de vérification :</strong> vous pouvez avoir jusqu\u2019à 12 photos en attente à la fois. Attendez que nous les ayons regardées.</li><li><strong>Connexion :</strong> les grandes photos demandent un bon signal; réessayez en Wi-Fi.</li></ul>' },
+  { id: 'photo-pending', over: ['photo-add', 'menu-add'], q: 'My photo or menu isn\u2019t showing yet', qFr: 'Ma photo ou mon menu ne s\u2019affiche pas encore', pages: ['edit', 'menu', 'account'],
+    keys: ['not showing', 'not live', 'waiting', 'pending', 'waiting for review', 'under review', 'when will', 'still not', 'not appear', 'not on my page', 'not updated', 'photo not showing', 'menu not showing', 'cant see my photo'],
+    keysFr: ['pas en ligne', 'ne s affiche pas', 's affiche pas', 'n apparait pas', 'en attente', 'pas encore visible', 'toujours pas', 'pas sur ma page', 'je ne vois pas'],
+    a: {
+      in: '<p>You\u2019re signed in, so photos and menus go live straight away. Refresh your page: it can take a minute to show everywhere.</p><p>Still not there? <strong>Your updates</strong> at the top of your edit page shows anything that\u2019s waiting, like photos sent from the edit link before you signed in. We check those within a day.</p>',
+      link: '<p>From the emailed edit link, new photos and menus wait for us to check them, usually within a day. <strong>Your updates</strong> at the top of this page shows what\u2019s waiting and what\u2019s live.</p><p><strong>Create a login</strong> near the top of this page, and next time they go live straight away.</p>',
+      out: '<p>It depends how you opened your listing:</p><ul><li><strong>From the emailed edit link:</strong> new photos and menus wait for us to check them, usually within a day.</li><li><strong>Signed in, from My listings:</strong> photos and menus go live straight away.</li></ul><p>Already live but you still see the old version? Refresh the page. It can take a minute to show everywhere.</p>',
+    },
+    aFr: {
+      in: '<p>Comme vous utilisez votre compte, les photos et les menus sont en ligne tout de suite. Actualisez la page : l\u2019affichage peut prendre une minute.</p><p>Toujours rien? <strong>Your updates</strong>, en haut de votre page de modification, montre ce qui est en attente, par exemple des photos envoyées avec le lien de modification avant votre connexion. Nous les vérifions d\u2019ici un jour.</p>',
+      link: '<p>Avec le lien de modification reçu par courriel, les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour. <strong>Your updates</strong>, en haut de cette page, montre ce qui est en attente et ce qui est en ligne.</p><p>Créez un compte (<strong>Create a login</strong>, en haut de cette page) et la prochaine fois, ce sera en ligne tout de suite.</p>',
+      out: '<p>Ça dépend de la façon dont vous avez ouvert votre fiche :</p><ul><li><strong>Avec le lien de modification reçu par courriel :</strong> les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour.</li><li><strong>Avec votre compte, depuis My listings :</strong> les photos et les menus sont en ligne tout de suite.</li></ul><p>C\u2019est en ligne, mais vous voyez encore l\u2019ancienne version? Actualisez la page. L\u2019affichage peut prendre une minute.</p>',
+    } },
+  { id: 'photo-main', over: ['photo-add'], q: 'Change my main photo or remove one', qFr: 'Changer ma photo principale ou en retirer une', pages: ['edit'],
+    keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'remove a photo', 'delete photo', 'delete a photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo', 'reorder photos', 'photo order', 'change the picture', 'change the photo', 'picture at the top', 'photo at the top', 'top photo', 'header photo', 'big photo'],
+    keysFr: ['photo principale', 'photo de couverture', 'banniere', 'retirer une photo', 'supprimer une photo', 'enlever une photo', 'changer la photo', 'mauvaise photo', 'remplacer la photo', 'premiere photo'],
+    a: {
+      in: '<p>{ON}, in <strong>Photos</strong>, each live photo has <strong>Make main photo</strong>, <strong>Remove</strong> and <strong>↑ ↓</strong> arrows to change the order.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main photo</strong> once it’s live. If it isn’t yours to change, <strong>Message us</strong> and we’ll swap it.</p>',
+      link: '<p><strong>Make main photo</strong>, <strong>Remove</strong> and the <strong>↑ ↓</strong> order arrows are for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open your listing from <strong>My listings</strong>: they’re on each live photo in <strong>Photos</strong>.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main photo</strong> once it’s live. If it isn’t yours to change, <strong>Message us</strong> and we’ll swap it.</p>',
+      out: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. In <strong>Photos</strong>, each live photo has <strong>Make main photo</strong>, <strong>Remove</strong> and <strong>↑ ↓</strong> arrows to change the order.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main photo</strong> once it’s live. If it isn’t yours to change, <strong>Message us</strong> and we’ll swap it.</p>',
+    },
+    aFr: {
+      in: '<p>{ON}, dans <strong>Photos</strong>, chaque photo en ligne a les boutons <strong>Make main photo</strong> (photo principale), <strong>Remove</strong> (retirer) et les flèches <strong>↑ ↓</strong> pour changer l’ordre.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Make main photo</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
+      link: '<p><strong>Make main photo</strong> (photo principale), <strong>Remove</strong> (retirer) et les flèches <strong>↑ ↓</strong> sont réservés aux comptes. Utilisez <strong>Create a login</strong> en haut de cette page, puis ouvrez votre fiche depuis <strong>My listings</strong> : ils sont sur chaque photo en ligne, dans <strong>Photos</strong>.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Make main photo</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
+      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>. Dans <strong>Photos</strong>, chaque photo en ligne a les boutons <strong>Make main photo</strong> (photo principale), <strong>Remove</strong> (retirer) et les flèches <strong>↑ ↓</strong> pour changer l’ordre.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Make main photo</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
+    } },
+  { id: 'hours', q: 'How do I set my hours?', qFr: 'Comment changer mes heures d\u2019ouverture?', pages: ['edit'],
+    keys: ['hours', 'opening hours', 'open', 'close', 'closing', 'times', 'closed', 'schedule', 'split', 'lunch', 'time', 'change hours', 'change my hours', 'change our hours', 'update hours', 'update our hours', 'set hours', 'closing time', 'opening time', 'open late', 'past midnight'],
+    keysFr: ['heures', 'heure', 'heures d ouverture', 'horaire', 'horaires', 'heure d ouverture', 'heure de fermeture', 'ouvert', 'ouverts', 'ouverture', 'changer mes heures', 'changer nos heures', 'modifier mes heures', 'modifier nos heures', 'modifier les heures', 'changer l horaire', 'modifier l horaire', 'changer les heures', 'midi', 'apres minuit'],
+    a: '<ol><li>{ON}, find <strong>Opening hours</strong> (<strong>Hours</strong> in the bar at the top jumps there). Enter the open and close time for each day, or tick <strong>Closed</strong>.</li><li>Closed in the afternoon? Tap <strong>+ second time</strong> for a second range that day.</li><li>Same every weekday? Fill in Monday, then tap <strong>Copy Monday to Tue\u2013Fri</strong> (or every day).</li><li>Tap <strong>Send changes</strong> at the bottom.</li></ol><p>{LIVE} Every day you\u2019re open needs both times. Open past midnight? Use the real closing time, like 1:00 AM.</p><p>Different summer and winter hours, or closed on a holiday? Ask me about <strong>seasonal hours</strong> or <strong>holiday closures</strong>.</p>',
+    aFr: '<ol><li>{ON}, trouvez <strong>Opening hours</strong> (heures d\u2019ouverture; le bouton <strong>Hours</strong> en haut de la page y mène). Entrez l\u2019heure d\u2019ouverture et de fermeture de chaque jour, ou cochez <strong>Closed</strong> (fermé).</li><li>Fermé l\u2019après-midi? Touchez <strong>+ second time</strong> pour une deuxième plage horaire ce jour-là.</li><li>Même horaire tous les jours de semaine? Remplissez lundi, puis touchez <strong>Copy Monday to Tue\u2013Fri</strong> (ou <strong>every day</strong> pour tous les jours).</li><li>Touchez <strong>Send changes</strong> (envoyer les modifications) au bas de la page.</li></ol><p>{LIVE} Chaque jour d\u2019ouverture demande les deux heures. Ouvert après minuit? Indiquez l\u2019heure réelle de fermeture, comme 1:00 AM.</p><p>Heures différentes l\u2019été et l\u2019hiver, ou fermé un jour férié? Demandez-moi les <strong>heures saisonnières</strong> ou les <strong>fermetures des fêtes</strong>.</p>' },
+  // Help bot v2 (2026-10-18): seasonal hour sets and special closure dates on the edit page.
+  { id: 'seasonal-hours', over: ['hours', 'season'], q: 'Different summer and winter hours', qFr: 'Heures différentes l\u2019été et l\u2019hiver', pages: ['edit'],
+    keys: ['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'holiday hours', 'christmas hours', 'hours over the holidays', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on'],
+    keysFr: ['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison', 'heures des fetes', 'horaire des fetes'],
+    a: '<ol><li>{ON}, in <strong>Opening hours</strong>, tap <strong>Add seasonal hours</strong>.</li><li>Pick the dates that season starts and ends (for example June 15 to September 15) and enter its hours for each day.</li><li>Add another season if you need one (holiday hours work the same way), then tap <strong>Send changes</strong>.</li></ol><p>Your regular hours apply the rest of the year, and your listing switches by itself on the start date. {LIVE}</p><p>Closed for the whole off-season instead? Choose <strong>Open some months only</strong>. Closed for just a day or two? Use <strong>Special closures</strong>.</p>',
+    aFr: '<ol><li>{ON}, dans <strong>Opening hours</strong>, touchez <strong>Add seasonal hours</strong> (ajouter des heures saisonnières).</li><li>Choisissez les dates de début et de fin de la saison (par exemple du 15 juin au 15 septembre) et entrez les heures de chaque jour.</li><li>Ajoutez une autre saison au besoin (les heures des fêtes fonctionnent de la même façon), puis touchez <strong>Send changes</strong>.</li></ol><p>Vos heures habituelles s\u2019appliquent le reste de l\u2019année, et votre fiche change d\u2019elle-même à la date de début. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Open some months only</strong>. Fermé un jour ou deux seulement? Utilisez <strong>Special closures</strong>.</p>' },
+  { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],
+    keys: ['holiday', 'holidays', 'stat', 'stat holiday', 'statutory holiday', 'christmas', 'christmas day', 'christmas eve', 'xmas', 'boxing day', 'new years', 'new years day', 'new years eve', 'thanksgiving', 'easter', 'good friday', 'victoria day', 'canada day', 'bc day', 'labour day', 'labor day', 'remembrance day', 'family day',
+      'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days'],
+    keysFr: ['ferie', 'jour ferie', 'jours feries', 'conge', 'noel', 'jour de noel', 'veille de noel', 'lendemain de noel', 'jour de l an', 'nouvel an', 'action de grace', 'paques', 'vendredi saint', 'fete du canada', 'fete du travail', 'fetes',
+      'fermeture speciale', 'fermetures speciales', 'ferme le', 'fermes le', 'ferme un jour', 'fermes un jour', 'fermeture temporaire', 'temporairement ferme', 'temporairement fermes', 'vacances', 'renovation', 'renovations', 'evenement prive', 'ferme demain', 'ferme aujourd hui', 'fermeture', 'quelques jours'],
+    a: '<ol><li>{ON}, in <strong>Opening hours</strong>, find <strong>Special closures</strong> and tap <strong>Add a date</strong>.</li><li>Pick the day (for example December 25), or a first and last day for a longer break like renovations or a vacation. Add a short note if you like (\u201cClosed for Christmas\u201d).</li><li>Tap <strong>Send changes</strong>.</li></ol><p>On those days your listing shows you as closed, and visitors won\u2019t see you as \u201copen now\u201d. Your usual hours come back by themselves the day after. {LIVE}</p><p>Open on a holiday, just with different hours? Use <strong>Add seasonal hours</strong> for those dates.</p>',
+    aFr: '<ol><li>{ON}, dans <strong>Opening hours</strong>, trouvez <strong>Special closures</strong> (fermetures spéciales) et touchez <strong>Add a date</strong>.</li><li>Choisissez le jour (par exemple le 25 décembre), ou un premier et un dernier jour pour une pause plus longue, comme des rénovations ou des vacances. Ajoutez une courte note si vous voulez (« Fermé pour Noël »).</li><li>Touchez <strong>Send changes</strong>.</li></ol><p>Ces jours-là, votre fiche indique que vous êtes fermé, et les visiteurs ne vous verront pas « ouvert maintenant ». Vos heures habituelles reviennent d\u2019elles-mêmes le lendemain. {LIVE}</p><p>Ouvert un jour férié, mais avec d\u2019autres heures? Utilisez <strong>Add seasonal hours</strong> pour ces dates.</p>' },
+  { id: 'season', over: ['hours'], q: 'I\u2019m only open some months', qFr: 'Nous sommes ouverts seulement certains mois', pages: ['edit'],
+    keys: ['season', 'seasonal', 'months', 'open some months', 'only open', 'closed in winter', 'closed for winter', 'closed for the winter', 'closed all winter', 'closed in the winter', 'closed for the season', 'off season', 'reopen', 'reopening', 'seasonal business', 'summer only', 'open in summer only', 'only in summer', 'opening day', 'season opens'],
+    keysFr: ['saison', 'saisonnier', 'saisonniere', 'certains mois', 'seulement l ete', 'ferme l hiver', 'fermes l hiver', 'ferme pour l hiver', 'fermes pour l hiver', 'ferme pour la saison', 'hors saison', 'reouverture', 'rouvrir', 'rouvre', 'mois'],
+    a: '<p>{ON}, under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then tap <strong>Send changes</strong>. {LIVE}</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Different hours in summer and winter? Use <strong>Add seasonal hours</strong>. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p>',
+    aFr: '<p>{ON}, sous les heures, choisissez <strong>Open some months only</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Touchez ensuite <strong>Send changes</strong>. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Add seasonal hours</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Special closures</strong>.</p>' },
+  { id: 'changes-review', q: 'I sent changes but nothing changed', qFr: 'J\u2019ai envoyé des modifications, mais rien n\u2019a changé', pages: ['edit', 'account'],
+    keys: ['sent changes', 'my changes', 'changes not showing', 'changes not', 'didnt change', 'not changed', 'still old', 'still shows', 'update not', 'saved', 'submitted', 'approve', 'approval', 'hours not updated', 'description not', 'nothing happened', 'didnt save', 'didnt work'],
+    keysFr: ['mes modifications', 'modifications envoyees', 'rien n a change', 'pas change', 'toujours l ancienne', 'pas mis a jour', 'pas a jour', 'enregistre', 'envoye', 'rien ne s est passe'],
+    a: {
+      in: '<p>Refresh your page first: a change can take a minute to show everywhere.</p><p>Still the old version? Look at <strong>Your updates</strong> at the top of your edit page. A <strong>name, address or website</strong> change waits for us to check it, usually within a day; the rest go live as soon as you send them. Anything sent from the edit link before you signed in is also checked first.</p>',
+      link: '<p>From the emailed edit link, we check changes before they go live, usually within a day. <strong>Your updates</strong> at the top of this page shows what\u2019s waiting and what\u2019s live.</p><p>With a login most changes go live straight away: use <strong>Create a login</strong> near the top of this page.</p>',
+      out: '<p>Signed in, most changes go live as soon as you send them (refresh the page to see them). Name, address and website changes, and anything sent from the emailed edit link, are checked first, usually within a day. <strong>Your updates</strong> at the top of your edit page shows what\u2019s waiting and what\u2019s live.</p>',
+    },
+    aFr: {
+      in: '<p>Actualisez d\u2019abord la page : une modification peut prendre une minute à s\u2019afficher partout.</p><p>Toujours l\u2019ancienne version? Regardez <strong>Your updates</strong> en haut de votre page de modification. Un changement de <strong>nom, d\u2019adresse ou de site Web</strong> attend notre vérification, en général d\u2019ici un jour; le reste est en ligne dès l\u2019envoi. Ce qui a été envoyé avec le lien de modification avant votre connexion est aussi vérifié d\u2019abord.</p>',
+      link: '<p>Avec le lien de modification reçu par courriel, nous vérifions les modifications avant de les mettre en ligne, en général d\u2019ici un jour. <strong>Your updates</strong>, en haut de cette page, montre ce qui est en attente et ce qui est en ligne.</p><p>Avec un compte, la plupart des modifications sont en ligne tout de suite : utilisez <strong>Create a login</strong> en haut de cette page.</p>',
+      out: '<p>Avec un compte, la plupart des modifications sont en ligne dès l\u2019envoi (actualisez la page pour les voir). Le nom, l\u2019adresse, le site Web, et tout ce qui est envoyé avec le lien de modification reçu par courriel, sont vérifiés d\u2019abord, en général d\u2019ici un jour. <strong>Your updates</strong>, en haut de votre page de modification, montre ce qui est en attente et ce qui est en ligne.</p>',
+    } },
+  { id: 'nothing-changed', q: '\u201cNothing has changed yet\u201d', qFr: '« Nothing has changed yet » (rien n\u2019a changé)', pages: ['edit'],
     keys: ['nothing has changed', 'nothing changed', 'edit a field'],
-    a: '<p>The form only sends fields you\u2019ve changed. Edit something (hours, description, a link), then tap <strong>Send changes</strong>. Want to add photos or an event? Those have their own buttons further down the page.</p>' },
-  { id: 'too-fast', q: '\u201cToo many attempts\u201d or \u201cthat was very quick\u201d', pages: ['edit', 'login', 'forgot', 'link', 'settings'],
-    keys: ['too many', 'too fast', 'very quick', 'wait a while', 'try again later', 'rate'],
-    a: '<p>These are spam guards.</p><ul><li><strong>Very quick:</strong> wait a few seconds after the page loads, then send again.</li><li><strong>Too many attempts:</strong> wait an hour (15 minutes after wrong passwords), then try again.</li></ul><p>If it keeps happening, <strong>Message us</strong>.</p>' },
-  { id: 'description', q: 'Edit my description', pages: ['edit'],
-    keys: ['description', 'about', 'blurb', 'text', 'write', 'words', 'characters', 'too short'],
-    a: '<p>Write 30 to 1,200 characters in <strong>Description</strong>. Say what you serve or offer, what makes you special, and who you suit. Leave out &lt; and &gt; characters. Then tap <strong>Send changes</strong>; we check it before it goes live.</p>' },
-  { id: 'links', q: 'Add a booking, menu or social link', pages: ['edit'],
-    keys: ['booking', 'book', 'reservation', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'menu link', 'url', 'address', 'phone', 'name'],
-    a: '<p>Open <strong>Name, address &amp; links</strong> on your listing. There you can change your business name and address and add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap <strong>Send changes</strong>.</p>' },
-  { id: 'event-add', q: 'How do I add an event?', pages: ['edit'],
-    keys: ['event', 'events', 'live music', 'whats on', 'concert', 'special', 'add event', 'promotion'],
-    a: '<ol><li>Scroll to <a href="#events">Add an event</a>.</li><li>Enter the name, date and start time (or tick <strong>All day</strong>).</li><li>Choose 1 to 3 categories and add a short description.</li><li>Tap <strong>Send event</strong>.</li></ol><p>We check events before they go on What\u2019s On, usually within a day. Dates must be in the next year.</p>' },
-  { id: 'event-change', q: 'Change or cancel an event', pages: ['edit'],
-    keys: ['change event', 'cancel event', 'cancel my event', 'event cancelled', 'wrong date', 'edit event', 'postpone', 'remove event', 'cancel', 'cancelled'],
-    a: '<p>At the top of your listing, under <strong>Your updates</strong>, each event you sent has <strong>Change</strong> and <strong>Cancel</strong>. Change opens the event form with your details filled in. Once an event has passed it can\u2019t be changed. Send it as a new one instead.</p>' },
-  { id: 'menu-add', q: 'How do I add my menu or prices?', pages: ['edit', 'menu'],
-    keys: ['menu', 'menus', 'prices', 'price list', 'rates', 'green fees', 'tours and prices', 'add menu', 'scan'],
-    a: '<p>Tap <strong>Add your menu</strong> (or prices) on your listing. Then either:</p><ul><li><strong>My menu is on my website:</strong> paste the link and we read it in, or</li><li><strong>Take a photo</strong> of each page (or upload a PDF).</li></ul><p>Check the result, fix anything in yellow, then tap <strong>Publish</strong>. Busy? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up.</p>' },
-  { id: 'menu-blurry', q: 'The menu scan didn\u2019t work', pages: ['menu'],
-    keys: ['hard to read', 'blurry', 'scan is blurry', 'menu scan', 'scan failed', 'scan didnt', 'didnt work', 'not a menu', 'wrong prices', 'mistakes', 'yellow'],
-    a: '<ul><li>Use good light, hold the phone straight above the page, and fill the screen with the menu.</li><li>One page per photo; avoid glare on glossy menus.</li><li>A PDF of your menu usually reads best.</li><li>Anything in <strong>yellow</strong> needs a quick check: tap it to fix it.</li></ul><p>Still stuck? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up for you, free.</p>' },
-  { id: 'menu-website', q: '\u201cWe couldn\u2019t find a menu on that page\u201d', pages: ['menu'],
-    keys: ['website', 'couldnt find', 'couldnt reach', 'import', 'from my website', 'menu link', 'not found'],
-    a: '<ul><li>Paste the link to the <strong>menu page itself</strong> (or the menu PDF), not your home page.</li><li>Some menus are built in a way we can\u2019t read (ordering systems, images). Take a photo of the menu instead.</li><li>Or tap <strong>Can you do it for me?</strong></li></ul>' },
-  { id: 'menu-change', q: 'Change or remove my menu', pages: ['menu', 'edit'],
-    keys: ['change menu', 'update menu', 'new menu', 'old menu', 'take down', 'remove menu', 'edit menu'],
-    a: '<p>Open <strong>Add your menu</strong> from your listing. On the published screen tap <strong>Make a change</strong> to edit dishes and prices, <strong>Replace</strong> for a whole new menu, or <strong>Take it off my page</strong>.</p>' },
-  { id: 'settings', q: 'Change my login email or password', pages: ['account', 'settings'],
-    keys: ['change email', 'change my email', 'new email', 'login email', 'email address', 'settings', 'change password', 'sign out', 'other devices'],
-    a: '<p>Signed in, open <a href="/owner/account/settings">Account settings</a>. You can change your email or password there (you\u2019ll need your current password) and sign out other devices.</p>' },
-  { id: 'more-businesses', q: 'I manage more than one business', pages: ['account', 'edit', 'settings'],
-    keys: ['another business', 'two businesses', 'two restaurants', 'two locations', 'second location', 'more than one', 'other listing', 'add listing', 'multiple', 'businesses', 'restaurants', 'locations'],
-    a: '<p>Open the other business\u2019s edit link and use <strong>Create a login</strong> with the <strong>same email and password</strong>. It joins your login, and <a href="/owner/account">My listings</a> shows them all.</p><p>Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>' },
-  { id: 'remove', q: 'We closed, moved or changed names', pages: ['edit', 'account'],
-    keys: ['closed for good', 'closed down', 'closed permanently', 'closing down', 'moved', 'new owner', 'sold', 'sold the business', 'rename', 'renamed', 'new name', 'remove listing', 'delete listing', 'out of business'],
-    a: '<p>Moved or renamed? Update <strong>Name, address &amp; links</strong> and tap <strong>Send changes</strong>.</p><p>Closed for good, sold, or need the listing removed? <strong>Message us</strong> below and we\u2019ll take care of it.</p>' },
-  { id: 'features', q: 'What are the features and badges?', pages: ['edit'],
-    keys: ['features', 'badges', 'dog friendly', 'patio', 'kid friendly', 'wheelchair', 'vegan', 'gluten', 'happy hour', 'amenities'],
-    a: '<p>Tick the features that genuinely apply (patio, dog-friendly, kid-friendly and so on). Visitors use them to filter. If you serve alcohol you can also add your <strong>happy hour</strong> days and times. Then tap <strong>Send changes</strong>.</p>' },
-  { id: 'cost', q: 'Does this cost anything?', pages: ['edit', 'account', 'login'],
-    keys: ['cost', 'price', 'pay', 'free', 'charge', 'fee', 'subscription', 'featured', 'advertise'],
-    a: '<p>Your listing, photos, menu and events are all <strong>free</strong>. Want more visibility? <strong>Message us</strong> and ask about featured spots.</p>' },
+    keysFr: ['rien n a encore change', 'nothing has changed'],
+    a: '<p>The form only sends fields you\u2019ve changed. Edit something (hours, description, a link), then tap <strong>Send changes</strong>. Want to add photos or an event? Those have their own buttons further down the page.</p>',
+    aFr: '<p>Le formulaire n\u2019envoie que les champs que vous avez modifiés. Changez quelque chose (heures, description, un lien), puis touchez <strong>Send changes</strong>. Pour ajouter des photos ou un événement, il y a des boutons à part plus bas sur la page.</p>' },
+  { id: 'too-fast', q: '\u201cToo many attempts\u201d or \u201cthat was very quick\u201d', qFr: '« Trop de tentatives » ou « c\u2019était très rapide »', pages: ['edit', 'login', 'forgot', 'link', 'settings'],
+    keys: ['too many', 'too fast', 'very quick', 'wait a while', 'try again later', 'rate limit'],
+    keysFr: ['trop de tentatives', 'tres rapide', 'trop rapide', 'reessayer plus tard', 'patientez'],
+    a: '<p>These are spam guards.</p><ul><li><strong>Very quick:</strong> wait a few seconds after the page loads, then send again.</li><li><strong>Too many attempts:</strong> wait an hour (15 minutes after wrong passwords), then try again.</li></ul><p>If it keeps happening, <strong>Message us</strong>.</p>',
+    aFr: '<p>Ce sont des protections contre le pourriel.</p><ul><li><strong>Très rapide :</strong> attendez quelques secondes après le chargement de la page, puis envoyez de nouveau.</li><li><strong>Trop de tentatives :</strong> attendez une heure (15 minutes après des mots de passe erronés), puis réessayez.</li></ul><p>Si ça continue, <strong>écrivez-nous</strong>.</p>' },
+  { id: 'description', q: 'Edit my description', qFr: 'Modifier ma description', pages: ['edit'],
+    keys: ['description', 'describe', 'blurb', 'about us', 'about section', 'characters', 'too short', 'our story', 'write up'],
+    keysFr: ['description', 'decrire', 'texte de presentation', 'presentation', 'a propos', 'caracteres', 'trop court'],
+    a: '<p>{ON}, write 30 to 1,200 characters in <strong>Description</strong>. Say what you serve or offer, what makes you special, and who you suit. Leave out &lt; and &gt; characters. Then tap <strong>Send changes</strong>. {LIVE}</p>',
+    aFr: '<p>{ON}, écrivez de 30 à 1 200 caractères dans <strong>Description</strong>. Dites ce que vous servez ou offrez, ce qui vous distingue et à qui vous convenez. La description s\u2019affiche en anglais et en français; écrivez-la dans la langue de votre choix. Évitez les caractères &lt; et &gt;. Touchez ensuite <strong>Send changes</strong>. {LIVE}</p>' },
+  { id: 'links', q: 'Add a booking, menu or social link', qFr: 'Ajouter un lien de réservation, de menu ou de réseau social', pages: ['edit'],
+    keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'phone', 'phone number', 'change website', 'change our website', 'new website', 'tiktok'],
+    keysFr: ['reservation', 'reservations', 'reserver', 'billets', 'lien', 'site web', 'site internet', 'instagram', 'facebook', 'reseaux sociaux', 'telephone', 'numero de telephone', 'nouveau site'],
+    a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap <strong>Send changes</strong>. {LIVE} A new <strong>website</strong> address is always checked first, usually within a day.</p>',
+    aFr: '<p>{ON}, ouvrez <strong>Name, address &amp; links</strong> (nom, adresse et liens). Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Book)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite <strong>Send changes</strong>. {LIVE} Une nouvelle adresse de <strong>site Web</strong> est toujours vérifiée d\u2019abord, en général d\u2019ici un jour.</p>' },
+  // Help bot v2 (2026-10-18): name and address changes are always reviewed, even for signed-in owners.
+  { id: 'name-address', over: ['links'], q: 'Change our business name or address', qFr: 'Changer le nom ou l\u2019adresse de l\u2019entreprise', pages: ['edit'],
+    keys: ['address', 'change address', 'change the address', 'change our address', 'change my address', 'update address', 'new address', 'wrong address', 'street address', 'moved', 'we moved', 'new location', 'relocated', 'moving',
+      'name', 'business name', 'change name', 'change the name', 'change our name', 'change my business name', 'new name', 'wrong name', 'rename', 'renamed', 'spelling', 'misspelled', 'spelled wrong', 'name is wrong'],
+    keysFr: ['adresse', 'changer l adresse', 'changer notre adresse', 'changer mon adresse', 'modifier l adresse', 'nouvelle adresse', 'mauvaise adresse', 'demenage', 'demenagement', 'nous avons demenage',
+      'nom', 'nom de l entreprise', 'changer le nom', 'changer notre nom', 'modifier le nom', 'nouveau nom', 'mauvais nom', 'faute', 'orthographe'],
+    a: '<ol><li>{ON}, open <strong>Name, address &amp; links</strong>.</li><li>Change the <strong>business name</strong> or the <strong>street address</strong>. Moved? Enter the new address.</li><li>Tap <strong>Send changes</strong>.</li></ol><p>Name, address and website changes are <strong>always checked by us first</strong>, usually within a day, even when you\u2019re signed in. That stops anyone pointing your listing somewhere else by mistake. <strong>Your updates</strong> shows the change as waiting until then.</p><p>New owners, or closed for good? <strong>Message us</strong>.</p>',
+    aFr: '<ol><li>{ON}, ouvrez <strong>Name, address &amp; links</strong> (nom, adresse et liens).</li><li>Changez le <strong>nom de l\u2019entreprise</strong> ou l\u2019<strong>adresse</strong>. Vous avez déménagé? Entrez la nouvelle adresse.</li><li>Touchez <strong>Send changes</strong>.</li></ol><p>Les changements de nom, d\u2019adresse et de site Web sont <strong>toujours vérifiés par nous d\u2019abord</strong>, en général d\u2019ici un jour, même avec un compte. Ça empêche qu\u2019une fiche soit redirigée ailleurs par erreur. D\u2019ici là, <strong>Your updates</strong> indique que le changement est en attente.</p><p>Nouveaux propriétaires, ou fermé pour de bon? <strong>Écrivez-nous</strong>.</p>' },
+  { id: 'event-add', q: 'How do I add an event?', qFr: 'Comment ajouter un événement?', pages: ['edit'],
+    keys: ['event', 'events', 'live music', 'whats on', 'concert', 'add event', 'add an event', 'post an event', 'promotion', 'tasting', 'tastings', 'class', 'classes', 'workshop', 'trivia', 'festival', 'karaoke', 'comedy', 'open mic', 'dinner event', 'pop up'],
+    keysFr: ['evenement', 'evenements', 'ajouter un evenement', 'spectacle', 'musique', 'concert', 'degustation', 'degustations', 'atelier', 'soiree', 'festival', 'promotion', 'quiz', 'humour'],
+    a: '<ol><li>{ON}, scroll to <strong>Add an event</strong>.</li><li>Enter the name, date and start time (or tick <strong>All-day event</strong>).</li><li>Choose 1 to 3 categories and add a short description.</li><li>Tap <strong>Send event</strong>.</li></ol><p>We check events before they go on What\u2019s On, usually within a day. Dates must be within the next year. Happens every week? Ask me about <strong>repeating events</strong>.</p>',
+    aFr: '<ol><li>{ON}, descendez jusqu\u2019à <strong>Add an event</strong> (ajouter un événement).</li><li>Entrez le nom, la date et l\u2019heure de début (ou cochez <strong>All-day event</strong> pour toute la journée).</li><li>Choisissez de 1 à 3 catégories et ajoutez une courte description.</li><li>Touchez <strong>Send event</strong>.</li></ol><p>Nous vérifions les événements avant de les afficher dans What\u2019s On, en général d\u2019ici un jour. Les dates doivent être dans la prochaine année. Ça revient chaque semaine? Demandez-moi les <strong>événements récurrents</strong>.</p>' },
+  // Help bot v2 (2026-10-18): one event with a "Repeats or other dates?" note; we add the other dates.
+  { id: 'event-repeat', over: ['event-add'], q: 'Add a repeating or weekly event', qFr: 'Ajouter un événement récurrent ou hebdomadaire', pages: ['edit'],
+    keys: ['every week', 'every weekend', 'weekly', 'weekly event', 'repeat', 'repeats', 'repeating', 'recurring', 'reoccurring', 'each week', 'monthly', 'every month', 'once a month', 'once a week', 'every other week', 'multiple dates', 'several dates', 'more than one date', 'other dates', 'same event', 'series', 'ongoing', 'every night', 'every evening', 'each night'].concat(OWNER_HELP_DAYS_EN.map((d) => `every ${d}`), OWNER_HELP_DAYS_EN.map((d) => `each ${d}`)),
+    keysFr: ['chaque semaine', 'toutes les semaines', 'hebdomadaire', 'chaque mois', 'tous les mois', 'mensuel', 'recurrent', 'recurrente', 'repeter', 'se repete', 'plusieurs dates', 'autres dates', 'serie', 'chaque soir', 'tous les soirs'].concat(OWNER_HELP_DAYS_FR.map((d) => `chaque ${d}`), OWNER_HELP_DAYS_FR.map((d) => `tous les ${d}s`)),
+    a: '<p>Send it once and tell us how it repeats:</p><ol><li>{ON}, go to <strong>Add an event</strong> and fill it in with the <strong>first date</strong>.</li><li>In <strong>Repeats or other dates?</strong>, write the pattern, for example \u201cevery Saturday 2\u20135 pm until December 20\u201d or \u201cfirst Friday of each month\u201d.</li><li>Tap <strong>Send event</strong>.</li></ol><p>We add the other dates for you when we check it, usually within a day. Several days in a row, like a 3-day festival? Use <strong>End date (multi-day)</strong> instead.</p>',
+    aFr: '<p>Envoyez-le une seule fois en nous disant comment il se répète :</p><ol><li>{ON}, allez à <strong>Add an event</strong> et remplissez-le avec la <strong>première date</strong>.</li><li>Dans <strong>Repeats or other dates?</strong> (répétitions ou autres dates), décrivez le rythme, par exemple « tous les samedis de 14 h à 17 h jusqu\u2019au 20 décembre » ou « le premier vendredi de chaque mois ».</li><li>Touchez <strong>Send event</strong>.</li></ol><p>Nous ajoutons les autres dates pour vous en le vérifiant, en général d\u2019ici un jour. Plusieurs jours de suite, comme un festival de 3 jours? Utilisez plutôt <strong>End date (multi-day)</strong>.</p>' },
+  { id: 'event-change', over: ['event-add'], q: 'Change or cancel an event', qFr: 'Modifier ou annuler un événement', pages: ['edit'],
+    keys: ['change event', 'change an event', 'change my event', 'cancel event', 'cancel an event', 'cancel my event', 'event cancelled', 'wrong date', 'edit event', 'edit my event', 'postpone', 'postponed', 'remove event', 'delete event', 'cancel', 'cancelled'],
+    keysFr: ['modifier un evenement', 'modifier mon evenement', 'changer un evenement', 'annuler', 'annuler un evenement', 'annuler mon evenement', 'evenement annule', 'reporter', 'reporte', 'mauvaise date', 'supprimer un evenement'],
+    a: '<p>At the top of your edit page, under <strong>Your updates</strong>, each event you sent has <strong>Change</strong> and <strong>Cancel</strong>. Change opens the event form with your details filled in. Once an event has passed it can\u2019t be changed. Send it as a new one instead.</p>',
+    aFr: '<p>En haut de votre page de modification, sous <strong>Your updates</strong>, chaque événement envoyé a les boutons <strong>Change</strong> (modifier) et <strong>Cancel</strong> (annuler). Change ouvre le formulaire avec vos renseignements déjà remplis. Un événement passé ne peut plus être modifié; envoyez-le plutôt comme un nouvel événement.</p>' },
+  { id: 'menu-add', q: 'How do I add my menu or prices?', qFr: 'Comment ajouter mon menu ou mes prix?', pages: ['edit', 'menu'],
+    keys: ['menu', 'menus', 'prices', 'price list', 'rates', 'green fees', 'tours and prices', 'add menu', 'add my menu', 'add our menu', 'scan', 'type my menu', 'type it in', 'type it myself', 'type it in myself', 'by hand', 'manually', 'enter my menu', 'food menu', 'drinks menu', 'drink menu', 'wine list', 'dishes'],
+    keysFr: ['menu', 'menus', 'carte', 'la carte', 'liste de prix', 'tarifs', 'nos prix', 'mes prix', 'ajouter nos prix', 'ajouter le menu', 'ajouter mon menu', 'ajouter notre menu', 'numeriser', 'carte des vins', 'moi meme', 'a la main', 'manuellement', 'plats'],
+    a: '<p>{ON}, tap <strong>Add your menu</strong> (or prices). Then choose one:</p><ul><li><strong>My menu is on my website:</strong> paste the link and we read it in,</li><li><strong>Take a photo</strong> of each page (or upload a PDF), or</li><li><strong>Type it in myself:</strong> add sections, dishes and prices by hand.</li></ul><p>Check the result: tap each <strong>yellow</strong> line, fix it if needed and press <strong>Done</strong> (or delete it). <strong>Publish</strong> works once every yellow line is checked. Busy? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up, free.</p>',
+    aFr: '<p>{ON}, touchez <strong>Add your menu</strong> (ajouter votre menu ou vos prix). Choisissez ensuite :</p><ul><li><strong>My menu is on my website</strong> (mon menu est sur mon site) : collez le lien et nous le lisons,</li><li><strong>Take a photo</strong> : photographiez chaque page (ou téléversez un PDF), ou</li><li><strong>Type it in myself</strong> (je le tape moi-même) : ajoutez les sections, les plats et les prix à la main.</li></ul><p>Vérifiez le résultat : touchez chaque ligne en <strong>jaune</strong>, corrigez-la au besoin et appuyez sur <strong>Done</strong> (ou supprimez-la). <strong>Publish</strong> fonctionne une fois toutes les lignes jaunes vérifiées. Pas le temps? Touchez <strong>Can you do it for me?</strong> et nous le taperons pour vous, gratuitement.</p>' },
+  { id: 'menu-blurry', over: ['menu-add'], q: 'The menu scan didn\u2019t work', qFr: 'La numérisation du menu n\u2019a pas fonctionné', pages: ['menu'],
+    keys: ['hard to read', 'blurry', 'scan is blurry', 'menu scan', 'scan failed', 'scan didnt', 'didnt work', 'not a menu', 'wrong prices', 'mistakes', 'yellow', 'yellow lines', 'missing dishes', 'cant publish', 'publish button', 'wont publish', 'lines still need checking', 'still need checking'],
+    keysFr: ['difficile a lire', 'flou', 'floue', 'numerisation', 'n a pas fonctionne', 'ne marche pas', 'mauvais prix', 'erreurs', 'jaune'],
+    a: '<ul><li>Use good light, hold the phone straight above the page, and fill the screen with the menu.</li><li>One page per photo; avoid glare on glossy menus.</li><li>A PDF of your menu usually reads best.</li><li>Each <strong>yellow</strong> line needs a quick check before you can publish: tap it, fix it if needed and press <strong>Done</strong>, or delete it.</li></ul><p>Short menu? <strong>Type it in myself</strong> can be quicker. Still stuck? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up for you, free.</p>',
+    aFr: '<ul><li>Utilisez un bon éclairage, tenez le téléphone bien droit au-dessus de la page et remplissez l\u2019écran avec le menu.</li><li>Une page par photo; évitez les reflets sur les menus glacés.</li><li>Un PDF de votre menu se lit généralement le mieux.</li><li>Chaque ligne en <strong>jaune</strong> doit être vérifiée avant la publication : touchez-la, corrigez-la au besoin et appuyez sur <strong>Done</strong>, ou supprimez-la.</li></ul><p>Menu court? <strong>Type it in myself</strong> (je le tape moi-même) peut être plus rapide. Toujours bloqué? Touchez <strong>Can you do it for me?</strong> et nous le taperons pour vous, gratuitement.</p>' },
+  { id: 'menu-website', over: ['menu-add', 'links'], q: '\u201cWe couldn\u2019t find a menu on that page\u201d', qFr: '« We couldn\u2019t find a menu on that page » (menu introuvable)', pages: ['menu'],
+    keys: ['couldnt find', 'couldnt reach', 'import', 'from my website', 'menu from website', 'menu on my website', 'not found'],
+    keysFr: ['introuvable', 'importer', 'depuis mon site', 'menu sur mon site'],
+    a: '<ul><li>Paste the link to the <strong>menu page itself</strong> (or the menu PDF), not your home page.</li><li>Some menus are built in a way we can\u2019t read (ordering systems, images). Take a photo of the menu instead, or use <strong>Type it in myself</strong>.</li><li>Or tap <strong>Can you do it for me?</strong></li></ul>',
+    aFr: '<ul><li>Collez le lien de la <strong>page du menu elle-même</strong> (ou du PDF du menu), pas celui de votre page d\u2019accueil.</li><li>Certains menus sont faits d\u2019une façon que nous ne pouvons pas lire (systèmes de commande, images). Photographiez plutôt le menu, ou utilisez <strong>Type it in myself</strong>.</li><li>Ou touchez <strong>Can you do it for me?</strong></li></ul>' },
+  { id: 'menu-change', over: ['menu-add'], q: 'Change or remove my menu', qFr: 'Modifier ou retirer mon menu', pages: ['menu', 'edit'],
+    keys: ['change menu', 'change my menu', 'update menu', 'update my menu', 'new menu', 'old menu', 'take down', 'remove menu', 'remove my menu', 'edit menu', 'edit my menu', 'change a price', 'change prices', 'menu prices', 'update prices', 'update our menu', 'menu is out of date', 'old prices'],
+    keysFr: ['modifier le menu', 'modifier mon menu', 'changer le menu', 'changer mon menu', 'nouveau menu', 'ancien menu', 'retirer le menu', 'retirer mon menu', 'mettre a jour le menu', 'changer un prix'],
+    a: '<p>Open <strong>Add your menu</strong> from your edit page. On the published screen tap <strong>Make a change</strong> to edit dishes and prices, <strong>Replace</strong> for a whole new menu, or <strong>Take it off my page</strong>.</p>',
+    aFr: '<p>Ouvrez <strong>Add your menu</strong> depuis votre page de modification. Sur l\u2019écran du menu publié, touchez <strong>Make a change</strong> pour modifier les plats et les prix, <strong>Replace</strong> pour un tout nouveau menu, ou <strong>Take it off my page</strong> pour le retirer.</p>' },
+  { id: 'settings', q: 'Change my login email or password', qFr: 'Changer le courriel ou le mot de passe de mon compte', pages: ['account', 'settings'],
+    keys: ['change email', 'change my email', 'new email', 'login email', 'email address', 'settings', 'account settings', 'change password', 'change my password', 'other devices'],
+    keysFr: ['changer mon courriel', 'changer le courriel', 'nouveau courriel', 'adresse courriel', 'parametres', 'reglages', 'changer mon mot de passe', 'autres appareils'],
+    a: {
+      in: '<p>Open <a href="/owner/account/settings">Account settings</a>. You can change your email or password there (you\u2019ll need your current password) and sign out other devices.</p>',
+      out: '<p>Sign in at <a href="/owner/login">Business login</a>, then open <strong>Account settings</strong> at the top of My listings. You can change your email or password there (you\u2019ll need your current password) and sign out other devices. Forgot the password? <a href="/owner/forgot">Reset it</a>.</p>',
+    },
+    aFr: {
+      in: '<p>Ouvrez <a href="/owner/account/settings">Account settings</a> (paramètres du compte). Vous pouvez y changer votre courriel ou votre mot de passe (il faut votre mot de passe actuel) et fermer la session sur vos autres appareils.</p>',
+      out: '<p>Connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis ouvrez <strong>Account settings</strong> (paramètres du compte) en haut de My listings. Vous pouvez y changer votre courriel ou votre mot de passe (il faut votre mot de passe actuel) et fermer la session sur vos autres appareils. Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez-le</a>.</p>',
+    } },
+  { id: 'more-businesses', q: 'I manage more than one business', qFr: 'Je gère plus d\u2019une entreprise', pages: ['account', 'edit', 'settings'],
+    keys: ['another business', 'two businesses', 'two restaurants', 'two locations', 'second location', 'second business', 'more than one business', 'more than one location', 'other listing', 'add listing', 'add another listing', 'multiple businesses', 'multiple locations', 'several businesses', 'locations', 'businesses'],
+    keysFr: ['autre entreprise', 'deux entreprises', 'deux restaurants', 'deux succursales', 'deuxieme succursale', 'plusieurs entreprises', 'plusieurs succursales', 'autre fiche', 'ajouter une fiche'],
+    a: {
+      in: '<p>Open the other business’s private edit link on this device while you’re signed in, and tap <strong>Add to my login</strong>. <a href="/owner/account">My listings</a> then shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
+      out: '<p>Sign in first, then open the other business’s private edit link on the same device and tap <strong>Add to my login</strong>. (No login yet? Use <strong>Create a login</strong> on the first one, then do this for the others.) <a href="/owner/account">My listings</a> shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
+    },
+    aFr: {
+      in: '<p>Ouvrez le lien de modification privé de l’autre entreprise sur cet appareil, avec votre compte ouvert, et touchez <strong>Add to my login</strong>. <a href="/owner/account">My listings</a> les montre ensuite toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
+      out: '<p>Connectez-vous d’abord, puis ouvrez le lien de modification privé de l’autre entreprise sur le même appareil et touchez <strong>Add to my login</strong>. (Pas encore de compte? Utilisez <strong>Create a login</strong> sur la première, puis faites de même pour les autres.) <a href="/owner/account">My listings</a> les montre toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
+    } },
+  { id: 'remove', q: 'We closed for good or sold the business', qFr: 'Nous avons fermé pour de bon ou vendu l\u2019entreprise', pages: ['edit', 'account'],
+    keys: ['closed for good', 'closed down', 'closed permanently', 'permanently closed', 'closing down', 'closing for good', 'new owner', 'new owners', 'sold', 'sold the business', 'remove listing', 'remove my listing', 'delete listing', 'delete my listing', 'out of business', 'no longer in business', 'shut down', 'went out of business'],
+    keysFr: ['ferme pour de bon', 'fermes pour de bon', 'ferme definitivement', 'fermeture definitive', 'nouveau proprietaire', 'nouveaux proprietaires', 'vendu', 'vendu l entreprise', 'supprimer ma fiche', 'retirer ma fiche', 'supprimer la fiche'],
+    a: '<p>Closed for good, sold, or need the listing removed? <strong>Message us</strong> below and we\u2019ll take care of it. New owners can then claim the listing for themselves.</p><p>Just moved or renamed? Change it in <strong>Name, address &amp; links</strong> and tap <strong>Send changes</strong>.</p>',
+    aFr: '<p>Fermé pour de bon, entreprise vendue, ou fiche à retirer? <strong>Écrivez-nous</strong> ci-dessous et nous nous en occupons. Les nouveaux propriétaires pourront ensuite revendiquer la fiche.</p><p>Vous avez seulement déménagé ou changé de nom? Modifiez-le dans <strong>Name, address &amp; links</strong> et touchez <strong>Send changes</strong>.</p>' },
+  { id: 'features', q: 'What are the features and badges?', qFr: 'À quoi servent les caractéristiques et les badges?', pages: ['edit'],
+    keys: ['features', 'badges', 'badge', 'dog friendly', 'dogs', 'patio', 'kid friendly', 'kids', 'wheelchair', 'accessible', 'vegan', 'vegetarian', 'gluten', 'gluten free', 'happy hour', 'amenities', 'lake view', 'live music badge'],
+    keysFr: ['caracteristiques', 'badges', 'badge', 'chiens', 'chien', 'animaux', 'terrasse', 'enfants', 'fauteuil roulant', 'accessible', 'vegetalien', 'vegane', 'vegetarien', 'sans gluten', 'cinq a sept', '5 a 7', 'happy hour', 'commodites', 'vue sur le lac'],
+    a: '<p>{ON}, tick the features that genuinely apply (patio, dog-friendly, kid-friendly and so on). Visitors use them to filter. If you serve alcohol you can also add your <strong>happy hour</strong> days and times. Then tap <strong>Send changes</strong>. {LIVE}</p>',
+    aFr: '<p>{ON}, cochez les caractéristiques qui s\u2019appliquent vraiment (terrasse, chiens bienvenus, familles, etc.). Les visiteurs s\u2019en servent pour filtrer. Si vous servez de l\u2019alcool, vous pouvez aussi indiquer les jours et les heures de votre <strong>happy hour</strong> (5 à 7). Touchez ensuite <strong>Send changes</strong>. {LIVE}</p>' },
+  // Help bot v2 (2026-10-18): the $ to $$$$ price range on the edit page. "$$" is read as the word 'dollarsign'.
+  { id: 'price-range', over: ['cost', 'menu-add'], q: 'Set our price range ($ to $$$$)', qFr: 'Indiquer notre gamme de prix ($ à $$$$)', pages: ['edit'],
+    keys: ['price range', 'pricerange', 'price level', 'price point', 'dollarsign', 'dollar sign', 'dollar signs', 'how expensive', 'expensive', 'cheap', 'affordable', 'budget', 'pricey', 'upscale', 'change our price', 'change the price range', 'wrong price range'],
+    keysFr: ['gamme de prix', 'fourchette de prix', 'niveau de prix', 'echelle de prix', 'prix', 'cher', 'pas cher', 'abordable', 'haut de gamme', 'signe de dollar', 'signes de dollar'],
+    a: '<ol><li>{ON}, find <strong>Price range</strong>.</li><li>Pick the one that fits a typical visit: <strong>$</strong> inexpensive, <strong>$$</strong> moderate, <strong>$$$</strong> pricier, <strong>$$$$</strong> high-end.</li><li>Tap <strong>Send changes</strong>.</li></ol><p>{LIVE} It shows on your listing, and visitors can filter by it. Want your actual dishes and prices listed? Use <strong>Add your menu</strong>.</p>',
+    aFr: '<ol><li>{ON}, trouvez <strong>Price range</strong> (gamme de prix).</li><li>Choisissez celle qui correspond à une visite typique : <strong>$</strong> économique, <strong>$$</strong> modéré, <strong>$$$</strong> plus cher, <strong>$$$$</strong> haut de gamme.</li><li>Touchez <strong>Send changes</strong>.</li></ol><p>{LIVE} Elle s\u2019affiche sur votre fiche, et les visiteurs peuvent filtrer par prix. Vous voulez afficher vos plats et vos prix? Utilisez <strong>Add your menu</strong>.</p>' },
+  // Help bot v2 (2026-10-18): the stars come from Google; owners can't reply on Okanagan Roam.
+  { id: 'reviews', over: ['photo-pending'], q: 'Reviews and star ratings', qFr: 'Avis et étoiles', pages: ['edit', 'account'],
+    keys: ['review', 'reviews', 'get reviews', 'more reviews', 'get more reviews', 'reply to a review', 'reply to reviews', 'respond to a review', 'respond to reviews', 'answer a review', 'reply', 'respond', 'bad review', 'negative review', 'fake review', 'unfair review', 'remove a review', 'delete a review', 'rating', 'ratings', 'star rating', 'stars', 'google rating', 'google reviews', 'tripadvisor', 'yelp', 'visitor tips', 'tips from visitors', 'comments'],
+    keysFr: ['avis', 'commentaires', 'commentaire', 'evaluation', 'evaluations', 'etoiles', 'cote', 'repondre', 'repondre a un avis', 'repondre aux avis', 'obtenir des avis', 'plus d avis', 'mauvais avis', 'faux avis', 'avis google', 'note google'],
+    a: '<p>The star rating and review count on your listing come from <strong>Google</strong>. We refresh them from time to time, and they can\u2019t be edited here.</p><ul><li><strong>More reviews:</strong> ask happy customers to review you on Google (your Google Business Profile has a link to share). New ones show here after our next refresh.</li><li><strong>Replying:</strong> you can\u2019t reply to reviews on Okanagan Roam. Reply on Google, where the review was written.</li><li><strong>Visitor tips:</strong> visitors can also share tips and photos on your page. We check them first, and new ones show under <strong>New from visitors</strong> in My listings.</li><li><strong>Something wrong or unfair?</strong> Report a Google review to Google. For a tip on our site, or a rating that doesn\u2019t match Google, <strong>Message us</strong>.</li></ul>',
+    aFr: '<p>La note en étoiles et le nombre d\u2019avis de votre fiche viennent de <strong>Google</strong>. Nous les actualisons de temps en temps, et ils ne peuvent pas être modifiés ici.</p><ul><li><strong>Plus d\u2019avis :</strong> invitez vos clients satisfaits à vous laisser un avis sur Google (votre profil d\u2019entreprise Google a un lien à partager). Les nouveaux avis s\u2019affichent ici après notre prochaine actualisation.</li><li><strong>Répondre :</strong> il n\u2019est pas possible de répondre aux avis sur Okanagan Roam. Répondez sur Google, là où l\u2019avis a été écrit.</li><li><strong>Conseils des visiteurs :</strong> les visiteurs peuvent aussi partager des conseils et des photos sur votre page. Nous les vérifions d\u2019abord, et les nouveaux s\u2019affichent sous <strong>New from visitors</strong> dans My listings.</li><li><strong>Quelque chose d\u2019inexact ou d\u2019injuste?</strong> Signalez un avis Google à Google. Pour un conseil sur notre site, ou une note qui ne correspond pas à Google, <strong>écrivez-nous</strong>.</li></ul>' },
+  { id: 'stats', q: 'How many people see my listing?', qFr: 'Combien de personnes voient ma fiche?', pages: ['account', 'edit'],
+    keys: ['how many people', 'how many visitors', 'how many views', 'views', 'page views', 'visitors to my page', 'stats', 'statistics', 'analytics', 'traffic', 'clicks', 'insights', 'how many clicks'],
+    keysFr: ['combien de personnes', 'combien de visiteurs', 'combien de vues', 'vues', 'statistiques', 'stats', 'clics', 'achalandage', 'trafic'],
+    a: '<p>Visit numbers aren\u2019t in the business portal yet. <strong>Message us</strong> and Dayton can tell you roughly how many people have looked at your listing and tapped through to your website or phone.</p>',
+    aFr: '<p>Le nombre de visites n\u2019est pas encore dans l\u2019espace entreprises. <strong>Écrivez-nous</strong> et Dayton pourra vous dire à peu près combien de personnes ont consulté votre fiche et touché votre site Web ou votre numéro.</p>' },
+  { id: 'cost', q: 'Does this cost anything?', qFr: 'Est-ce que c\u2019est payant?', pages: ['edit', 'account', 'login', 'claim'],
+    keys: ['cost', 'costs', 'does it cost', 'how much does', 'pay', 'paid', 'free', 'charge', 'fee', 'fees', 'subscription', 'featured', 'advertise', 'advertising', 'premium', 'sponsored'],
+    keysFr: ['gratuit', 'cout', 'coute', 'combien ca coute', 'payer', 'payant', 'frais', 'abonnement', 'publicite', 'en vedette', 'commandite'],
+    a: '<p>Your listing, photos, menu and events are all <strong>free</strong>. Want more visibility? <strong>Message us</strong> and ask about featured spots.</p>',
+    aFr: '<p>Votre fiche, vos photos, votre menu et vos événements sont entièrement <strong>gratuits</strong>. Vous voulez plus de visibilité? <strong>Écrivez-nous</strong> pour en savoir plus sur les places en vedette.</p>' },
 ];
-// Portal error messages the bot recognises on the page -> the topic that explains them.
+// Portal error messages the bot recognises on the page -> the topic that explains them (English and French pages).
 const OWNER_HELP_ERROR_RULES = [
-  [/don.t match|wrong password|that password isn.t right|locked/i, 'signin'],
+  [/don.t match|wrong password|that password isn.t right|locked|ne correspondent pas|mots de passe erron/i, 'signin'],
   [/isn.t valid|not valid any more|expired or was already used|link has expired|page has expired/i, 'newlink'],
   [/too small|at least 800|could not be read|too large|waiting for review|choose up to 5/i, 'photo-small'],
   [/both times|add the times|time we could not read|same time|at least one open day/i, 'hours'],
   [/first and last month|two different months/i, 'season'],
   [/nothing has changed/i, 'nothing-changed'],
-  [/too many|very quick|wait a while/i, 'too-fast'],
+  [/too many|very quick|wait a while|trop de tentatives|très rapide/i, 'too-fast'],
   [/between 30 and 1200|leave out </i, 'description'],
   [/hard to read|doesn.t look like a menu|didn.t work this time/i, 'menu-blurry'],
   [/couldn.t find a menu|couldn.t reach|can.t open that address/i, 'menu-website'],
@@ -35393,14 +35628,54 @@ const OWNER_HELP_ERROR_RULES = [
 const OWNER_HELP_START = {
   login: ['signin', 'forgot', 'newlink', 'claim', 'login-create'],
   link: ['newlink', 'noemail', 'claim', 'signin'],
-  forgot: ['forgot', 'signin'],
+  forgot: ['forgot', 'signin', 'noemail'],
   reset: ['forgot', 'signin'],
-  account: ['photo-pending', 'more-businesses', 'staff', 'settings', 'changes-review'],
-  settings: ['settings', 'more-businesses', 'forgot'],
-  edit: ['photo-add', 'hours', 'event-add', 'menu-add', 'changes-review', 'photo-pending'],
+  account: ['live-speed', 'access', 'more-businesses', 'staff', 'logout', 'reviews'],
+  settings: ['settings', 'logout', 'access', 'more-businesses', 'forgot'],
+  edit: ['photo-add', 'hours', 'closures', 'event-add', 'menu-add', 'live-speed'],
   menu: ['menu-add', 'menu-blurry', 'menu-website', 'photo-pending'],
   invalid: ['newlink', 'claim', 'signin'],
   claim: ['claim', 'noemail', 'staff', 'dispute', 'cost'],
+};
+// The widget's own words. A JSON block on the page, not script literals, so the French twin leaves them alone.
+const OWNER_HELP_UI = {
+  en: {
+    button: 'Help', title: 'Help', sub: 'Okanagan Roam business help', close: 'Close help', dialog: 'Help with your listing',
+    inputLabel: 'Type your question', placeholder: 'Type your question\u2026', ask: 'Ask',
+    greet: '<p>Hi! I can help with your listing: photos, hours, events, menus, logins and links. Tap a topic or type your question.</p>',
+    more: '<p>Did that help? Pick another topic, type a question, or message us.</p>',
+    unsure: '<p>I\u2019m not sure \u2014 tap <strong>Message us</strong> and Dayton will reply.</p><p>Or is it one of these?</p>',
+    seeErr: '<p>I can see this message on your page:</p>', other: '<p>Something else? Pick a topic or type a question.</p>',
+    human: 'Message us',
+    contactIntro: 'Tell us what\u2019s wrong and we\u2019ll reply by email, usually within a day. We\u2019ll see which listing and page you\u2019re on.',
+    noteLabel: 'What do you need help with?', emailLabel: 'Your email (so we can reply)', send: 'Send message', sending: 'Sending\u2026',
+    thanks: '<p><strong>Thanks, your message is on its way.</strong> We\u2019ll reply by email, usually within a day.</p>',
+    errShort: 'Please tell us a little about the problem.', errEmail: 'Please add your email so we can reply.',
+    errSend: 'Sorry, that didn\u2019t send. Please email info@okanaganroam.com.', errNet: 'Could not connect. Please check your connection, or email info@okanaganroam.com.',
+  },
+  fr: {
+    button: 'Aide', title: 'Aide', sub: 'Aide aux entreprises, Okanagan Roam', close: 'Fermer l\u2019aide', dialog: 'Aide pour votre fiche',
+    inputLabel: 'Tapez votre question', placeholder: 'Tapez votre question\u2026', ask: 'Demander',
+    greet: '<p>Bonjour! Je peux vous aider avec votre fiche : photos, heures, événements, menus, connexion et liens. Touchez un sujet ou tapez votre question.</p>',
+    more: '<p>Est-ce que ça vous aide? Choisissez un autre sujet, tapez une question ou écrivez-nous.</p>',
+    unsure: '<p>Je ne suis pas certain \u2014 touchez <strong>Écrivez-nous</strong> et Dayton vous répondra.</p><p>Ou est-ce l\u2019un de ces sujets?</p>',
+    seeErr: '<p>Je vois ce message sur votre page :</p>', other: '<p>Autre chose? Choisissez un sujet ou tapez une question.</p>',
+    human: 'Écrivez-nous',
+    contactIntro: 'Dites-nous ce qui ne va pas et nous vous répondrons par courriel, en général d\u2019ici un jour, en français ou en anglais. Nous verrons la fiche et la page où vous êtes.',
+    noteLabel: 'Avec quoi avez-vous besoin d\u2019aide?', emailLabel: 'Votre courriel (pour vous répondre)', send: 'Envoyer le message', sending: 'Envoi\u2026',
+    thanks: '<p><strong>Merci, votre message est en route.</strong> Nous vous répondrons par courriel, en général d\u2019ici un jour.</p>',
+    errShort: 'Dites-nous-en un peu plus sur le problème.', errEmail: 'Ajoutez votre courriel pour que nous puissions vous répondre.',
+    errSend: 'Désolé, le message n\u2019est pas parti. Écrivez à info@okanaganroam.com.', errNet: 'Connexion impossible. Vérifiez votre connexion Internet, ou écrivez à info@okanaganroam.com.',
+    // The server's English replies, shown in French.
+    srv: {
+      'Please tell us a little about the problem.': 'Dites-nous-en un peu plus sur le problème.',
+      'Please add your email so we can reply.': 'Ajoutez votre courriel pour que nous puissions vous répondre.',
+      'Too many messages. Please email info@okanaganroam.com instead.': 'Trop de messages. Écrivez plutôt à info@okanaganroam.com.',
+      'Please use the Okanagan Roam website.': 'Veuillez utiliser le site Okanagan Roam.',
+      'Please try again.': 'Veuillez réessayer.',
+      'Sorry, that didn\u2019t send. Please email info@okanaganroam.com.': 'Désolé, le message n\u2019est pas parti. Écrivez à info@okanaganroam.com.',
+    },
+  },
 };
 const OWNER_HELP_CSS = `
   .ohb-btn { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; background: #1F3A5F; background: var(--ref-navy, #1F3A5F); color: #fff; border: 0; border-radius: 999px; padding: 12px 18px 12px 14px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 28px -10px rgba(0,0,0,0.5); }
@@ -35421,6 +35696,7 @@ const OWNER_HELP_CSS = `
   .ohb-msg ul, .ohb-msg ol { margin: 4px 0 8px; padding-left: 20px; } .ohb-msg li { margin: 2px 0; }
   .ohb-msg a { color: #1F3A5F; font-weight: 700; }
   .ohb-alert { background: #FFF1D6; border: 1px solid #F2C14E; }
+  .ohb-unsure { background: #FFF8E8; border-color: rgba(242,193,78,0.7); }
   .ohb-chips { display: flex; flex-wrap: wrap; gap: 6px; align-self: flex-start; }
   .ohb-chip { background: #fff; border: 1px solid rgba(31,58,95,0.35); color: #1F3A5F; border-radius: 999px; padding: 7px 11px; font: inherit; font-size: 0.86rem; font-weight: 700; cursor: pointer; text-align: left; }
   .ohb-chip.ohb-human { background: #1F3A5F; color: #fff; border-color: #1F3A5F; }
@@ -35439,58 +35715,157 @@ const OWNER_HELP_CSS = `
   }
   @media print { .ohb-btn, .ohb-panel { display: none !important; } }
 `;
+// The browser side. Everything from "function norm(s)" to "function ask(q)" is the matcher, which needs only T (the
+// topics) and cfg; the tests run that part on its own in a VM with the real page config.
 const OWNER_HELP_SCRIPT = String.raw`
 (function(){
-  var cfg = window.OHB_CFG || {}; var T = cfg.topics || []; var byId = {}; T.forEach(function(t){ byId[t.id] = t; });
+  var cfg = {}; try { cfg = JSON.parse(document.getElementById('ohbCfg').textContent); } catch (e) {}
+  var T = cfg.topics || []; var byId = {}; T.forEach(function(t){ byId[t.id] = t; });
   var btn = document.getElementById('ohbBtn'), panel = document.getElementById('ohbPanel'), log = document.getElementById('ohbLog');
   var form = document.getElementById('ohbForm'), input = document.getElementById('ohbInput');
   if (!btn || !panel) return;
-  var started = false;
+  var started = false, curLang = cfg.lang === 'fr' ? 'fr' : 'en';
+  function ui(k, lang){ var u = cfg.ui || {}; return ((u[lang || curLang] || {})[k]) || ((u.en || {})[k]) || ''; }
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function scroll(){ log.scrollTop = log.scrollHeight; }
-  function say(html, cls){ var d = document.createElement('div'); d.className = 'ohb-msg ' + (cls || 'ohb-bot'); d.innerHTML = html; log.appendChild(d); scroll(); return d; }
+  function say(html, cls){ var d = document.createElement('div'); d.className = 'ohb-msg ' + (cls || 'ohb-bot'); if (!cls || cls.indexOf('ohb-bot') === 0) d.lang = curLang; d.innerHTML = html; log.appendChild(d); scroll(); return d; }
   function chips(ids, human){
     var d = document.createElement('div'); d.className = 'ohb-chips';
-    ids.forEach(function(id){ var t = byId[id]; if (!t) return; var b = document.createElement('button'); b.type = 'button'; b.className = 'ohb-chip'; b.textContent = t.q; b.addEventListener('click', function(){ answer(id, t.q); }); d.appendChild(b); });
-    if (human !== false) { var h = document.createElement('button'); h.type = 'button'; h.className = 'ohb-chip ohb-human'; h.textContent = 'Message us'; h.addEventListener('click', contact); d.appendChild(h); }
+    ids.forEach(function(id){ var t = byId[id]; if (!t) return; var label = curLang === 'fr' ? t.qFr : t.q; var b = document.createElement('button'); b.type = 'button'; b.className = 'ohb-chip'; b.textContent = label; b.addEventListener('click', function(){ answer(id, label); }); d.appendChild(b); });
+    if (human !== false) { var h = document.createElement('button'); h.type = 'button'; h.className = 'ohb-chip ohb-human'; h.textContent = ui('human'); h.addEventListener('click', contact); d.appendChild(h); }
     log.appendChild(d); scroll();
   }
   function answer(id, asked, related){
     var t = byId[id]; if (!t) return;
     var first = asked ? say(esc(asked), 'ohb-me') : null;
-    var a = say(t.a);
+    var a = say(curLang === 'fr' ? t.aFr : t.a);
     var seen = {}; seen[id] = 1;
     var more = (related || []).concat(cfg.start || []).filter(function(x){ if (seen[x]) return false; seen[x] = 1; return true; }).slice(0, 3);
-    say('<p>Did that help? Pick another topic, type a question, or message us.</p>');
+    say(ui('more'));
     chips(more);
     var top = first || a; log.scrollTop = Math.max(0, top.offsetTop - 8);
   }
-  function norm(s){ return ' ' + String(s).toLowerCase().replace(/[\u2019']/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
-  function match(q){
-    var n = norm(q), words = n.trim().split(' ').filter(function(w){ return w.length > 2; });
-    var scored = T.map(function(t){
-      var s = 0;
-      t.keys.forEach(function(k){
-        var nk = norm(k), kw = nk.trim().split(' ');
-        if (n.indexOf(nk) >= 0) s += kw.length * 3;
-        else if (kw.length > 1 && kw.every(function(w){ return n.indexOf(' ' + w + ' ') >= 0; })) s += kw.length * 2;
-      });
-      var title = norm(t.q); words.forEach(function(w){ if (title.indexOf(' ' + w) >= 0) s += 1; });
-      if (s && (t.pages || []).indexOf(cfg.page) >= 0) s += 1;
-      return { id: t.id, s: s };
-    }).filter(function(x){ return x.s > 0; }).sort(function(a, b){ return b.s - a.s; });
-    return scored.map(function(x){ return x.id; });
+  function norm(s){
+    var x = String(s == null ? '' : s).toLowerCase();
+    if (x.normalize) x = x.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    x = x.replace(/\u0153/g, 'oe').replace(/\u00e6/g, 'ae');
+    // French elisions keep their word (d'ouverture -> d ouverture); English contractions join (can't -> cant).
+    x = x.replace(/\b(qu|l|d|j|n|s|c|m|t)['\u2019](?=[a-z])/g, '$1 ').replace(/['\u2019]/g, '');
+    return x.replace(/\$+/g, ' dollarsign ').replace(/[^a-z0-9]+/g, ' ').trim();
   }
+  function toks(s){ var n = norm(s); return n ? n.split(' ') : []; }
+  var STOP = {};
+  ('a an the i me my we our us you your to of in on at for and or is are was were be been it its this that these those do does did can could how what when where why which who whom will would should shall may might must have has had get got not no yes with from by as if so but just please hi hello hey im ive id dont cant its thats there here them they he she his her up out about all any some one also like many much very still too then than into over now there want need wanna would '
+    + 'le la les l un une des de du d et ou au aux en dans sur pour par avec sans ce cet cette ces mon ma mes ton ta tes son sa ses notre nos votre vos leur leurs je j tu il elle on nous vous ils elles me m te t se s ne n pas plus que qu qui quoi est sont suis ai as avons avez ont etre avoir faire fait comment pourquoi quand oui non bonjour merci svp si mais donc ca cela c y peux peut puis veux voudrais')
+    .split(' ').forEach(function(w){ STOP[w] = 1; });
+  var KEYS = [], VOCAB = {}, VLIST = [];
+  T.forEach(function(t, i){
+    var had = {};
+    (t.keys || []).concat(t.keysFr || []).forEach(function(k){
+      var kt = toks(k), id = kt.join(' '); if (!kt.length || had[id]) return; had[id] = 1;
+      KEYS.push({ i: i, kt: kt }); kt.forEach(function(w){ if (!VOCAB[w]) { VOCAB[w] = 1; VLIST.push(w); } });
+    });
+  });
+  // Optimal string alignment distance (a swap of two letters counts as one edit), stopping early past max.
+  function dist(a, b, max){
+    if (Math.abs(a.length - b.length) > max) return max + 1;
+    var prev2 = null, prev = [], cur, i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      cur = [i]; var low = i;
+      for (j = 1; j <= b.length; j++) {
+        var c = a[i - 1] === b[j - 1] ? 0 : 1;
+        var v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + c);
+        if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+        cur[j] = v; if (v < low) low = v;
+      }
+      if (low > max) return max + 1;
+      prev2 = prev; prev = cur;
+    }
+    return prev[b.length];
+  }
+  // How well a typed word stands for a key word: 1 exact, 0.7 a typo (one edit for 4-7 letters, two for 8+, same first
+  // letter, and only for words that are not themselves key or common words), 0 no match.
+  var fuzzyMemo = {};
+  function credit(w, k){
+    if (w === k) return 1;
+    if (w.length < 4 || k.length < 4 || STOP[w] || VOCAB[w] || w[0] !== k[0] || /\d/.test(w)) return 0;
+    var memo = w + '|' + k; if (memo in fuzzyMemo) return fuzzyMemo[memo];
+    var max = k.length >= 8 ? 2 : 1;
+    return (fuzzyMemo[memo] = dist(w, k, max) <= max ? 0.7 : 0);
+  }
+  // A key in the question: its words side by side score 3 a word, all present but apart 2 a word (returned as a
+  // negative number, so a topic can tell whether any key matched side by side).
+  function keyScore(kt, qt){
+    var best = 0, i, j, s, c;
+    for (i = 0; i + kt.length <= qt.length; i++) {
+      s = 0;
+      for (j = 0; j < kt.length; j++) { c = credit(qt[i + j], kt[j]); if (!c) { s = 0; break; } s += c; }
+      if (s * 3 > best) best = s * 3;
+    }
+    if (best || kt.length < 2) return best;
+    s = 0;
+    for (j = 0; j < kt.length; j++) {
+      c = 0; for (i = 0; i < qt.length; i++) c = Math.max(c, credit(qt[i], kt[j]));
+      if (!c) return 0; s += c;
+    }
+    return -s * 2;
+  }
+  var FR_WORDS = 'comment je j nous vous mes mon ma nos notre votre vos est les des une pour avec dans pas puis peux peut quand pourquoi quoi ou au aux du le la et qui que mettre changer modifier ajouter enlever retirer supprimer heures heure horaire horaires ferme fermes fermee ouvert ouverts courriel mot passe lien fiche entreprise bonjour merci aide svp connexion connecter deconnecter avis prix evenement evenements semaine chaque samedi dimanche noel ete hiver adresse nom ai sommes sont personnel'.split(' ');
+  var EN_WORDS = 'the my how do i can is our we to what where why change add hours password link login closed open are it you your me and of for with not dont cant im were get set edit remove photo photos event events menu'.split(' ');
+  // Which language a question is in; the page's language when it could be either.
+  function langOf(q){
+    var w = toks(q), fr = /[\u00e0\u00e2\u00e7\u00e8\u00e9\u00ea\u00eb\u00ee\u00ef\u00f4\u00f9\u00fb\u00fc\u0153]/i.test(q) ? 2 : 0, en = 0;
+    w.forEach(function(x){ if (FR_WORDS.indexOf(x) >= 0) fr++; if (EN_WORDS.indexOf(x) >= 0) en++; });
+    return fr > en ? 'fr' : en > fr ? 'en' : (cfg.lang === 'fr' ? 'fr' : 'en');
+  }
+  // Words that are neither common words nor (a typo of) a word in any key: "build" and "bakery" in "can you build me
+  // a website for my bakery".
+  function unknownWords(qt){
+    return qt.filter(function(w){
+      if (w.length < 3 || STOP[w] || VOCAB[w] || /^\d+$/.test(w)) return false;
+      for (var i = 0; i < VLIST.length; i++) if (credit(w, VLIST[i])) return false;
+      return true;
+    }).length;
+  }
+  function refines(a, b){ return !!a && !!b && (byIdM[a.id].over || []).indexOf(b.id) >= 0; }
+  var byIdM = {}; T.forEach(function(t){ byIdM[t.id] = t; });
+  // -> { id: the topic when sure (null when not), hits: topic ids best first, lang }
+  function best(q){
+    var qt = toks(q), sums = T.map(function(){ return 0; }), side = T.map(function(){ return 0; });
+    KEYS.forEach(function(k){
+      var s = keyScore(k.kt, qt); if (!s) return;
+      if (s < 0) s = -s; else side[k.i] = Math.max(side[k.i], s);
+      sums[k.i] += s;
+    });
+    var scored = T.map(function(t, i){ return { id: t.id, s: sums[i], c: side[i], b: (t.pages || []).indexOf(cfg.page) >= 0 ? 1 : 0 }; })
+      .filter(function(x){ return x.s > 0; }).sort(function(a, b){ return (b.s + b.b) - (a.s + a.b) || b.s - a.s; });
+    // A narrower topic that matched a whole key word goes above the broader one it refines ("closed on Thanksgiving"
+    // is a holiday closure, not the weekly hours).
+    for (var i = 1; i < scored.length; i++) {
+      if (scored[i].c < 3) continue;
+      for (var j = 0; j < i; j++) if (refines(scored[i], scored[j]) && scored[i].s * 2 >= scored[j].s) { scored.splice(j, 0, scored.splice(i, 1)[0]); break; }
+    }
+    var top = scored[0], next = scored[1];
+    // Sure: a whole key word matched (3); not a low tie between two unrelated topics; and a weak match is not taken
+    // when the question is mostly about something else.
+    var sure = !!top && top.s >= 3
+      && !(next && top.s < 6 && next.s + next.b >= top.s + top.b && !refines(top, next))
+      && !(top.s < 6 && unknownWords(qt) >= 2);
+    return { id: sure ? top.id : null, hits: scored.map(function(x){ return x.id; }), lang: langOf(q) };
+  }
+  function match(q){ return best(q).hits; }
   function ask(q){
     q = String(q || '').trim(); if (!q) return;
-    var hits = match(q);
-    if (!hits.length) {
+    var r = best(q); curLang = r.lang;
+    if (!r.id) {
       say(esc(q), 'ohb-me');
-      say('<p>Sorry, I\u2019m not sure about that one. Here are the most common questions. Or tap <strong>Message us</strong> and we\u2019ll reply by email.</p>');
-      chips(cfg.start || []);
+      say(ui('unsure'), 'ohb-bot ohb-unsure');
+      var seen = {}, sugg = r.hits.concat(cfg.start || []).filter(function(x){ if (seen[x] || !byId[x]) return false; seen[x] = 1; return true; }).slice(0, 3);
+      chips(sugg);
       return;
     }
-    answer(hits[0], q, hits.slice(1, 3));
+    answer(r.id, q, r.hits.slice(1, 3));
   }
   function pageError(){
     var els = document.querySelectorAll('.lyv-error, [role="alert"], .mn-warn, .mn-err, .op-error');
@@ -35506,38 +35881,40 @@ const OWNER_HELP_SCRIPT = String.raw`
     started = true;
     var err = pageError();
     if (err) {
-      say('<p>I can see this message on your page:</p><p><em>\u201c' + esc(err.text.slice(0, 220)) + '\u201d</em></p>', 'ohb-bot ohb-alert');
-      if (err.id) { say(byId[err.id].a); say('<p>Something else? Pick a topic or type a question.</p>'); chips(cfg.start || []); log.scrollTop = 0; return; }
+      say(ui('seeErr') + '<p><em>\u201c' + esc(err.text.slice(0, 220)) + '\u201d</em></p>', 'ohb-bot ohb-alert');
+      if (err.id && byId[err.id]) { say(curLang === 'fr' ? byId[err.id].aFr : byId[err.id].a); say(ui('other')); chips(cfg.start || []); log.scrollTop = 0; return; }
     }
-    say('<p>Hi! I can help with your listing: photos, hours, events, menus, logins and links. Tap a topic or type your question.</p>');
+    say(ui('greet'));
     chips(cfg.start || []);
   }
   function contact(){
-    say('Message us', 'ohb-me');
+    say(esc(ui('human')), 'ohb-me');
     var d = say('<form class="ohb-contact" novalidate>'
-      + '<p>Tell us what\u2019s wrong and we\u2019ll reply by email, usually within a day. We\u2019ll see which listing and page you\u2019re on.</p>'
-      + '<label for="ohbNote">What do you need help with?</label><textarea id="ohbNote" maxlength="1500" required></textarea>'
-      + (cfg.signedIn ? '' : '<label for="ohbEmail">Your email (so we can reply)</label><input id="ohbEmail" type="email" autocomplete="email" maxlength="200">')
+      + '<p>' + esc(ui('contactIntro')) + '</p>'
+      + '<label for="ohbNote">' + esc(ui('noteLabel')) + '</label><textarea id="ohbNote" maxlength="1500" required></textarea>'
+      + (cfg.signedIn ? '' : '<label for="ohbEmail">' + esc(ui('emailLabel')) + '</label><input id="ohbEmail" type="email" autocomplete="email" maxlength="200">')
       + '<input class="ohb-hp" name="company_website" tabindex="-1" autocomplete="off" aria-hidden="true">'
-      + '<button type="submit" class="ohb-send">Send message</button><div class="ohb-err" role="alert"></div></form>');
+      + '<button type="submit" class="ohb-send">' + esc(ui('send')) + '</button><div class="ohb-err" role="alert"></div></form>');
     var f = d.querySelector('form'), note = d.querySelector('#ohbNote'), em = d.querySelector('#ohbEmail'), hp = d.querySelector('.ohb-hp'), errEl = d.querySelector('.ohb-err'), send = d.querySelector('.ohb-send');
-    var t0 = Date.now(); setTimeout(function(){ note.focus(); }, 50);
+    var t0 = Date.now(), lang = curLang; setTimeout(function(){ note.focus(); }, 50);
+    function srv(m){ var map = ui('srv', lang); return (m && map && map[m]) || m; }
     f.addEventListener('submit', function(e){
       e.preventDefault(); errEl.textContent = '';
       var msg = note.value.trim(), mail = em ? em.value.trim() : '';
-      if (msg.length < 5) { errEl.textContent = 'Please tell us a little about the problem.'; note.focus(); return; }
-      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) { errEl.textContent = 'Please add your email so we can reply.'; em.focus(); return; }
+      if (msg.length < 5) { errEl.textContent = ui('errShort', lang); note.focus(); return; }
+      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) { errEl.textContent = ui('errEmail', lang); em.focus(); return; }
       var pe = pageError();
-      send.disabled = true; send.textContent = 'Sending\u2026';
+      send.disabled = true; send.textContent = ui('sending', lang);
+      // The page's address goes to the server, which works out the listing and keeps an edit link out of the email.
       fetch('/owner/help', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
-        body: JSON.stringify({ message: msg, email: mail || null, path: location.pathname, page: cfg.page || '', page_error: pe ? pe.text.slice(0, 300) : null, started_at: t0, company_website: hp.value }) })
+        body: JSON.stringify({ message: msg, email: mail || null, path: location.pathname, page: cfg.page || '', page_error: pe ? pe.text.slice(0, 300) : null, started_at: t0, lang: lang, company_website: hp.value }) })
         .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok: r.ok, j: j }; }); })
         .then(function(x){
-          if (x.ok && x.j && x.j.ok) { d.innerHTML = '<p><strong>Thanks, your message is on its way.</strong> We\u2019ll reply by email, usually within a day.</p>'; scroll(); return; }
-          send.disabled = false; send.textContent = 'Send message';
-          errEl.textContent = (x.j && x.j.error) || 'Sorry, that didn\u2019t send. Please email info@okanaganroam.com.';
+          if (x.ok && x.j && x.j.ok) { d.innerHTML = ui('thanks', lang); scroll(); return; }
+          send.disabled = false; send.textContent = ui('send', lang);
+          errEl.textContent = srv(x.j && x.j.error) || ui('errSend', lang);
         })
-        .catch(function(){ send.disabled = false; send.textContent = 'Send message'; errEl.textContent = 'Could not connect. Please check your connection, or email info@okanaganroam.com.'; });
+        .catch(function(){ send.disabled = false; send.textContent = ui('send', lang); errEl.textContent = ui('errNet', lang); });
     });
   }
   function open(){ panel.hidden = false; btn.hidden = true; btn.setAttribute('aria-expanded', 'true'); if (!started) begin(); setTimeout(function(){ input.focus(); }, 30); }
@@ -35546,27 +35923,47 @@ const OWNER_HELP_SCRIPT = String.raw`
   document.getElementById('ohbClose').addEventListener('click', close);
   panel.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
   form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
-  window.__ohbMatch = match;
+  window.__ohbMatch = match; window.__ohbBest = best;
 })();
 `;
-// The help button + panel for a business portal page (page: one of the OWNER_HELP_START keys).
+// One answer for how the owner got here (mode 'in' signed in, 'link' the emailed edit link, 'out' signed out), with
+// {ON} and {LIVE} filled in.
+function ownerHelpAnswer(a, lang, mode) {
+  const text = typeof a === 'string' ? a : (a[mode] || a.out);
+  const fill = OWNER_HELP_FILL[lang];
+  return text.replace(/\{(ON|LIVE)\}/g, (m, k) => fill[k][mode] || fill[k].out);
+}
+// How the owner reached this page: signed in, the edit link (the edit and menu pages without a login), or neither.
+function ownerHelpMode(page, signedIn) {
+  if (signedIn) return 'in';
+  return page === 'edit' || page === 'menu' ? 'link' : 'out';
+}
+// The help button + panel for a business portal page (page: one of the OWNER_HELP_START keys; lang 'fr' on the
+// French entry pages and the French claim form).
 function ownerHelpWidgetHtml(page, opts = {}) {
   if (!OWNER_HELP_START[page]) return '';
+  const lang = opts.lang === 'fr' ? 'fr' : 'en';
+  const mode = ownerHelpMode(page, !!opts.signedIn);
   const cfg = {
     page,
+    lang,
+    mode,
     signedIn: !!opts.signedIn,
     start: OWNER_HELP_START[page],
-    topics: OWNER_HELP_TOPICS.map((t) => ({ id: t.id, q: t.q, keys: t.keys, pages: t.pages, a: t.a })),
+    topics: OWNER_HELP_TOPICS.map((t) => ({ id: t.id, q: t.q, qFr: t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [],
+      a: ownerHelpAnswer(t.a, 'en', mode), aFr: ownerHelpAnswer(t.aFr, 'fr', mode) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
+    ui: OWNER_HELP_UI,
   };
+  const u = OWNER_HELP_UI[lang];
   return `<style>${OWNER_HELP_CSS}</style>
-<button type="button" class="ohb-btn" id="ohbBtn" aria-controls="ohbPanel" aria-expanded="false"><span class="ohb-q" aria-hidden="true">?</span>Help</button>
-<section class="ohb-panel" id="ohbPanel" role="dialog" aria-label="Help with your listing" hidden>
-  <div class="ohb-head"><div><strong>Help</strong><span>Okanagan Roam business help</span></div><button type="button" class="ohb-x" id="ohbClose" aria-label="Close help">&times;</button></div>
+<button type="button" class="ohb-btn" id="ohbBtn" aria-controls="ohbPanel" aria-expanded="false"><span class="ohb-q" aria-hidden="true">?</span>${escapeHtml(u.button)}</button>
+<section class="ohb-panel" id="ohbPanel" role="dialog" aria-label="${escapeHtml(u.dialog)}" lang="${lang}" hidden>
+  <div class="ohb-head"><div><strong>${escapeHtml(u.title)}</strong><span>${escapeHtml(u.sub)}</span></div><button type="button" class="ohb-x" id="ohbClose" aria-label="${escapeHtml(u.close)}">&times;</button></div>
   <div class="ohb-log" id="ohbLog" aria-live="polite"></div>
-  <form class="ohb-form" id="ohbForm"><label for="ohbInput" class="sr-only" style="position:absolute;left:-9999px">Type your question</label><input id="ohbInput" type="text" maxlength="300" placeholder="Type your question\u2026" autocomplete="off"><button type="submit">Ask</button></form>
+  <form class="ohb-form" id="ohbForm"><label for="ohbInput" class="sr-only" style="position:absolute;left:-9999px">${escapeHtml(u.inputLabel)}</label><input id="ohbInput" type="text" maxlength="300" placeholder="${escapeHtml(u.placeholder)}" autocomplete="off"><button type="submit">${escapeHtml(u.ask)}</button></form>
 </section>
-<script>window.OHB_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
+<script type="application/json" id="ohbCfg">${JSON.stringify(cfg).replace(/</g, '\\u003c')}</script>
 <script>${OWNER_HELP_SCRIPT}</script>`;
 }
 
@@ -35587,7 +35984,7 @@ async function handleOwnerHelpMessage(req, res) {
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: 'Please try again.' });
   let body;
   try { body = await readLimitedJsonBody(req, 8192); } catch (err) { return sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' }); }
-  const keys = ['message', 'email', 'path', 'page', 'page_error', 'started_at', 'company_website'];
+  const keys = ['message', 'email', 'path', 'page', 'page_error', 'started_at', 'lang', 'company_website'];
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !keys.includes(k))) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' });
   if (body.company_website) return sendSubmissionResponse(res, 200, { ok: true });
   const clean = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').trim().slice(0, max);
@@ -35629,6 +36026,8 @@ async function handleOwnerHelpMessage(req, res) {
   };
   const pageError = clean(body.page_error, 300);
   if (pageError) fields['Error on their page'] = pageError;
+  // Help bot v2 (2026-10-18): the bot answered them in French, so a reply in French is welcome.
+  if (body.lang === 'fr') fields['Language'] = 'French (they used the help bot in French)';
   const text = Object.entries(fields).filter(([k]) => !k.startsWith('_')).map(([k, v]) => `${k}: ${v}`).join('\n\n');
   try {
     const direct = ownerDirectEmail();
@@ -35651,8 +36050,8 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
   'Business login': ['login', false], 'My listings': ['account', true], 'Account settings': ['settings', true],
   'Get your edit link': ['link', false], 'Claim this listing': ['claim', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
 });
-// French entry pages (2026-10-18): lang 'fr' gives the page a French title and description; the help bot is English
-// only, so those pages point to info@ in French instead (see ownerEntryHelpFr).
+// French entry pages (2026-10-18): lang 'fr' gives the page a French title and description, and (help bot v2) the help
+// bot in French. They also keep a line pointing to info@ in French (see ownerEntryHelpFr).
 function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
   const fr = lang === 'fr';
   const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
@@ -35681,7 +36080,7 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main"><div class="op-wrap">
 ${inner}
   </div></main>
-${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
+${help ? ownerHelpWidgetHtml(help[0], { signedIn: help[1], lang: fr ? 'fr' : 'en' }) : ''}
 </body>
 </html>`));
 }
