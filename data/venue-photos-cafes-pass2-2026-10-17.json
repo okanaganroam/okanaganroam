@@ -1,0 +1,66 @@
+{
+  "reason": "Café listing photos, second pass: the cafés own Facebook Pages and Google Maps (that exact location); Dayton picked 1, 3, 7, 10 and 11 from the contact sheet on 2026-10-17.",
+  "batch_id": "venue-photos-cafes-pass2-2026-10-17",
+  "venues": [
+    {
+      "id": 661,
+      "name": "The Artisan's Den at Apex",
+      "region": "apex",
+      "slug": "the-artisan-s-den-at-apex",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-artisan-s-den-at-apex-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 1066,
+      "name": "Francuccino's Gelato and Fries",
+      "region": "silverstar",
+      "slug": "francuccino-s-gelato-and-fries",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/francuccino-s-gelato-and-fries-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 636,
+      "name": "Sweet Cloud Ice Cream Rolls",
+      "region": "kelowna",
+      "slug": "sweet-cloud-ice-cream-rolls",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/sweet-cloud-ice-cream-rolls-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 233,
+      "name": "Gallagher Lake Cafe",
+      "region": "oliver",
+      "slug": "gallagher-lake-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/gallagher-lake-cafe-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 312,
+      "name": "Junction 3 Coffee House",
+      "region": "osoyoos",
+      "slug": "junction-3-coffee-house",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/junction-3-coffee-house-2610.jpg?v=20261017b"
+      }
+    }
+  ]
+}
