@@ -18080,8 +18080,12 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     selectedBox.innerHTML = html;
     selectedBox.hidden = !any;
   }
+  // Fix (2026-10-18): /search and /fr/search use this script too; keep the
+  // visitor's q in the URL so reload, Back and sharing keep the search.
+  var KEEP_Q = (location.pathname === '/search' || location.pathname === '/fr/search') ? (new URLSearchParams(location.search).get('q') || '') : '';
   function queryFor(types, features, regions){
     var q = [];
+    if (KEEP_Q) q.push('q=' + encodeURIComponent(KEEP_Q));
     if (types.length) q.push('types=' + types.join(','));
     if (features.length) q.push('features=' + features.join(','));
     if (regions.length) q.push('regions=' + regions.join(','));${O(`

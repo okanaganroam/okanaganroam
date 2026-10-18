@@ -23926,9 +23926,12 @@ test('Inline scripts parse on the main pages (EN and FR), incl. My Trip', () => 
   const base = `http://localhost:${srv.address().port}`;
   const venue = db.prepare("SELECT region, type, slug FROM venues WHERE type = 'restaurant' AND slug IS NOT NULL LIMIT 1").get();
   const pages = ['/', '/fr', '/my-trip', '/fr/my-trip', '/trip', '/fr/trip', '/restaurants', '/food-drink', '/fr/food-drink',
-    '/whats-on', '/fr/whats-on', '/search?q=pizza', '/fr/search?q=pizza', '/browse', '/map', '/guides', '/owner/login', '/fr/owner/login', '/list-your-venue', '/fr/list-your-venue'];
+    '/whats-on', '/fr/whats-on', '/search?q=pizza', '/fr/search?q=pizza', '/search?q=restaurants', '/fr/search?q=restaurants', '/browse', '/map', '/guides', '/owner/login', '/fr/owner/login', '/list-your-venue', '/fr/list-your-venue'];
   if (venue) pages.push(`/${venue.region}/restaurants/${venue.slug}`, `/claim/${venue.region}/restaurants/${venue.slug}`);
   try {
+    // /search keeps the visitor's q in the URL when filters change.
+    const searchHtml = await (await fetch(base + '/search?q=restaurants')).text();
+    assert.ok(searchHtml.includes("if (KEEP_Q) q.push('q=' + encodeURIComponent(KEEP_Q));"), '/search filter URLs keep q');
     for (const p of pages) {
       const res = await fetch(base + p, { redirect: 'manual' });
       if (res.status !== 200) continue;
