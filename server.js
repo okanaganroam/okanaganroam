@@ -16815,7 +16815,7 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null) {
     if (!scopeFeatures.length) return '';
     return `<div class="fd-controls">
     <div class="fd-pop">
-      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">✨</span> What are you looking for?<span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
+      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">✨</span> <span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span><span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
       <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
@@ -17696,10 +17696,10 @@ ${renderGolfHeaderHtml()}
   ])}
   ${valleyWide
     ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
-    : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}`)}
+    : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}${type === 'winery' ? `\n  <p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a> &middot; <a href="/wineries">All Okanagan wineries</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
   ${venues.length ? foodDrinkSearchHtml() : ''}
-  ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`) : ''}
+  ${venues.length ? (foodDrinkFilterBarHtml(venues, state, scopeFeatures) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`) : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state, venues.length > 1 ? sort : null)}
@@ -39537,7 +39537,9 @@ const server = http.createServer(async (req, res) => {
           // Food & drink categories (2026-09-25) are destination mini-
           // directories built on the /food-drink filters; wineries, golf,
           // beaches and outdoors keep their existing page unchanged.
-          const html = FD_CATEGORY_KIND_BY_TYPE[type]
+          // Town winery pages (2026-10-18) use the same page as the town restaurant, cafe and brewery pages: site
+          // header, each winery's own photo, search, filters, Open now and sort (they had none of it).
+          const html = FD_CATEGORY_KIND_BY_TYPE[type] || type === 'winery'
             ? renderFoodDrinkHubPage(venues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' }, { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
             : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', sportsAlso });
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });

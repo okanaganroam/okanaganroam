@@ -5339,8 +5339,9 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // back-link or the split-section rendering.
   const wineryPage = await fetch(`${base}/kelowna/wineries`);
   const wineryBody = await wineryPage.text();
-  assert.match(wineryBody, /<a class="category-back-link" href="\/wineries">← All Wineries<\/a>/, 'winery region pages link back to the /wineries hub now that winery is in ALL_REGIONS_CATEGORIES');
-  assert.doesNotMatch(wineryBody, /class="golf-page/, 'winery REGION pages must stay unthemed -- the Beaches-style treatment is hub-only');
+  // Town winery pages use the food & drink page since 2026-10-18 (site header, photo cards, filters, Open now).
+  assert.match(wineryBody, /<a href="\/wineries">All Okanagan wineries<\/a>/, 'winery region pages link back to the /wineries hub');
+  assert.match(wineryBody, /class="golf-page outdoor-page fd-page fd-scoped-page"/, 'winery REGION pages use the food & drink page');
   assert.doesNotMatch(wineryBody, /<h2 class="category-subsection-heading">/, 'non-golf category pages must not render the Golf/Indoor split');
 
   // Food & Drink SEO pages (2026-10-13): a dedicated valley-wide restaurant
@@ -23051,5 +23052,25 @@ test('Food & drink type pages: Open now toggle, open/closed line on cards, sort,
     srv.close();
     db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(c.id);
     for (const v of [a, b, c]) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('Town winery pages use the food & drink page: site header, photo cards, search, filters, Open now, sort, guide link', async () => {
+  const http = require('node:http');
+  for (let i = 1; i <= 3; i++) seasonInsert.run({ name: `Town Winery Fixture ${i}`, type: 'winery', hours: SEASON_WEEK, slug: `town-winery-fixture-${i}` });
+  const made = [1, 2, 3].map((i) => app.findVenueBySlug('kelowna', 'winery', `town-winery-fixture-${i}`));
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  try {
+    const res = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /<body class="golf-page outdoor-page fd-page fd-scoped-page">/);
+    assert.match(html, /<h1>Wineries in Kelowna, BC<\/h1>/);
+    for (const needle of ['id="fdOpenNow"', '<select id="fdSort"', 'id="fdResults"', 'data-ph="', 'first-timer', 'href="/wineries"']) assert.ok(html.includes(needle), needle);
+    for (const v of made) assert.ok(html.includes(`data-venue-id="${v.id}"`), v.name);
+  } finally {
+    srv.close();
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
