@@ -3161,7 +3161,7 @@ function setEventOccurrenceStatus(eventId, occId, status, meta) {
 // keys; `custom` (or bare from/to) uses customDateWindow's validation; an
 // invalid or absent selection falls back to the rolling default window
 // (today -> today + WHATSON_DEFAULT_WINDOW_DAYS) and reports `fallback`.
-const WHATSON_DEFAULT_WINDOW_DAYS = 30;
+const WHATSON_DEFAULT_WINDOW_DAYS = 90; // 90 since 2026-10-18 (was 30)
 function resolveWhatsOnWindow(params = {}, now = new Date()) {
   const today = todayLocal(now);
   const when = typeof params.when === 'string' ? params.when : null;
@@ -8100,7 +8100,7 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   const fmtFr = (x) => fmt(x).replace(/,/g, '\u00a0');
   const items = [
     [total, '/destinations', 'real places', 'vrais lieux'],
-    [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 30 days
+    [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 90 days
     [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), '/food-drink', 'places to eat & drink', 'endroits où manger et boire'],
     [n(['winery']), '/wineries', 'wineries', 'vignobles'],
     [n(['beach']), '/beaches', 'beaches', 'plages'],
@@ -15629,7 +15629,7 @@ function categoryDirectoryEntries() {
   // each apart -- locals' regulars, places most visitors miss, and quiet
   // outdoor spots -- instead of three ways of saying "away from the crowds".
   const upcomingEvents = (() => { try { return getWhatsOnEvents().length; } catch (e) { return 0; } })();
-  const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', count: upcomingEvents, noun: ['event in the next 30 days', 'events in the next 30 days'], image: categoryCardImage(WHATS_ON_BANNER) }];
+  const discovery = [{ label: 'What’s On', href: '/whats-on', tagline: 'Festivals, markets, concerts and events around the Okanagan.', count: upcomingEvents, noun: [`event in the next ${WHATSON_DEFAULT_WINDOW_DAYS} days`, `events in the next ${WHATSON_DEFAULT_WINDOW_DAYS} days`], image: categoryCardImage(WHATS_ON_BANNER) }];
   if (has(countDogFriendlyHubVenues())) discovery.push({ label: 'Dog-Friendly Finds', href: '/dog-friendly', tagline: 'Patios, wineries and beaches where your dog is welcome.', count: countDogFriendlyHubVenues(), image: categoryCardImage(DOG_FRIENDLY_BANNER) });
   if (has(countLocalFavouriteVenues())) discovery.push({ label: 'Local Favourites', href: '/local-favorites', tagline: 'The places Okanagan locals keep going back to.', count: countLocalFavouriteVenues(), image: categoryCardImage(LOCAL_FAVOURITES_BANNER) });
   if (has(countHiddenGemCollectionVenues())) discovery.push({ label: 'Hidden Gems', href: '/hidden-gems', tagline: 'Small, under-the-radar places most visitors drive right past.', count: countHiddenGemCollectionVenues(), image: categoryCardImage(HIDDEN_GEMS_BANNER) });
@@ -22616,7 +22616,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const basePath = scope ? whatsOnScopePath(scope) : '/whats-on';
   const whatsOnBanner = (selectedCategories.length === 1 && WHATSON_CATEGORY_BANNERS[selectedCategories[0]]) || WHATS_ON_BANNER;
   // Step 6: the date window is resolved server-side from ?when= / ?from=&to=
-  // (default: the rolling next 30 days) and selects the events rendered;
+  // (default: the rolling next 90 days) and selects the events rendered;
   // region/category chips then filter that set exactly as before.
   const window = weekendWindow || (scope && !scope.weekend && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {}));
   const allEvents = getWhatsOnEvents(window);
@@ -22653,7 +22653,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const comingUp = scope && scope.weekend && scopeList.length < WHATSON_SCOPE_MIN_EVENTS
     ? filterWhatsOnEvents(getWhatsOnEvents({ from: addLocalDays(window.to, 1), to: addLocalDays(window.to, 30) }), townScope ? [townScope] : selectedRegions, []).slice(0, 6)
     : [];
-  // Further ahead (SEO audit 2, 2026-10-17): events whose next date is past this page's window (30 days here, 90 on a
+  // Further ahead (SEO audit 2, 2026-10-17): events whose next date is past this page's window (90 days, as on a
   // town or type page) had a page and a sitemap entry but no link from anywhere. The unfiltered page lists them as plain
   // links, the town's or type's own first, the valley page capped.
   const furtherAhead = hasInventory && !queryDates && !filtered && !(scope && scope.weekend) ? (() => {

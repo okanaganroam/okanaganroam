@@ -3556,10 +3556,10 @@ test('S3 #21: window resolution -- presets, custom ranges, the 366-day cap, and 
   assert.deepEqual(app.resolveWhatsOnWindow({ from: '2027-01-01', to: '2027-01-31' }, now), { from: '2027-01-01', to: '2027-01-31', preset: 'custom', fallback: false });
   assert.deepEqual(app.resolveWhatsOnWindow({ when: 'custom', from: '2026-10-01', to: '2027-10-02' }, now).preset, 'custom', '366 days allowed');
   const tooLong = app.resolveWhatsOnWindow({ when: 'custom', from: '2026-10-01', to: '2027-10-03' }, now);
-  assert.deepEqual([tooLong.preset, tooLong.fallback, tooLong.from, tooLong.to], ['upcoming', true, '2026-09-22', '2026-10-22'], '>366 days -> rejected, default window with fallback flag');
-  assert.deepEqual(app.resolveWhatsOnWindow({}, now), { from: '2026-09-22', to: '2026-10-22', preset: 'upcoming', fallback: false });
+  assert.deepEqual([tooLong.preset, tooLong.fallback, tooLong.from, tooLong.to], ['upcoming', true, '2026-09-22', '2026-12-21'], '>366 days -> rejected, default window with fallback flag');
+  assert.deepEqual(app.resolveWhatsOnWindow({}, now), { from: '2026-09-22', to: '2026-12-21', preset: 'upcoming', fallback: false });
   assert.equal(app.resolveWhatsOnWindow({ when: 'someday' }, now).fallback, true);
-  assert.equal(app.WHATSON_DEFAULT_WINDOW_DAYS, 30);
+  assert.equal(app.WHATSON_DEFAULT_WINDOW_DAYS, 90);
 });
 
 test('S3 #22: every write is logged; updates record old/new; result rows carry the card fields', () => {
@@ -3819,7 +3819,7 @@ test('S4 #10-#12: custom from/to, invalid custom ranges and >366-day ranges fall
   assert.deepEqual(ok.json.window, { from: '2031-10-01', to: '2031-10-31', preset: 'custom', fallback: false });
   const single = await s4request('GET', '/api/events?when=custom&from=2031-10-11&to=2031-10-11');
   assert.deepEqual([single.json.count, single.json.events[0].dateLabel, single.json.events[0].time], [1, 'Sat Oct 11', '6:05 pm'], 'the series shows its occurrence inside the window');
-  const expectDefault = { from: today, to: app.addLocalDays(today, 30), preset: 'upcoming', fallback: true };
+  const expectDefault = { from: today, to: app.addLocalDays(today, app.WHATSON_DEFAULT_WINDOW_DAYS), preset: 'upcoming', fallback: true };
   for (const q of ['from=2031-10-31&to=2031-10-01', 'from=2031-02-30&to=2031-03-01', 'from=abc&to=2031-03-01', 'from=2031-10-01', 'when=custom', 'from=2031-01-01&to=2032-01-03']) {
     const res = await s4request('GET', `/api/events?${q}`);
     assert.deepEqual(res.json.window, expectDefault, q);
@@ -4553,7 +4553,7 @@ test('S6 #14-#18/#23: with fixture inventory the page is indexable and real even
   assert.match(markup, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>/);
   assert.match(markup, /<button type="button" class="whatson-pop-btn" id="whatsOnDateBtn"/, 'the Date control appears once inventory exists');
   const cards = s6cards(text);
-  assert.deepEqual(cards.map((c) => c.region), ['osoyoos', 'kelowna', 'kelowna', 'vernon'], 'default window (next 30 days) lists the four near events ordered by first occurrence (all-day first on a day); the 2033 gala is outside it');
+  assert.deepEqual(cards.map((c) => c.region), ['osoyoos', 'kelowna', 'kelowna', 'vernon'], 'default window (next 90 days) lists the four near events ordered by first occurrence (all-day first on a day); the 2033 gala is outside it');
   assert.match(markup, /aria-live="polite">4 events<\/p>/);
   const lakeside = markup.match(/<li class="venue-card whatson-event-card"[^>]*data-venue-name="S6 Lakeside Concert"[\s\S]*?<\/li>/)[0];
   assert.match(lakeside, /<h2><a class="venue-card-link" href="\/kelowna\/events\/s6-lakeside-concert"><span class="venue-card-name">S6 Lakeside Concert<\/span><span class="venue-card-cue" aria-hidden="true">View details &rarr;<\/span><\/a><\/h2>/, 'canonical detail URL, single link');
@@ -4587,7 +4587,7 @@ test('S6 #2-#8: the date step renders in the reserved slot; presets and custom r
   assert.match(markup, /id="whatsOnCustomToggle" data-when="custom" aria-pressed="false" aria-expanded="false"/);
   assert.match(markup, /<form class="whatson-custom-dates" id="whatsOnCustomDates" method="get" action="\/whats-on" hidden>/);
   assert.match(markup, /<input type="date" name="from" id="whatsOnFrom" value="" required>/);
-  assert.match(markup, new RegExp(`Showing the next 30 days: ${app.formatLocalDateShort(today, { weekday: false })} – ${app.formatLocalDateShort(app.addLocalDays(today, 30), { weekday: false })}`));
+  assert.match(markup, new RegExp(`Showing the next 90 days: ${app.formatLocalDateShort(today, { weekday: false })} – ${app.formatLocalDateShort(app.addLocalDays(today, 90), { weekday: false })}`));
   assert.match(text, /var DATE = \{"when":"","from":"","to":""\};/);
   for (const when of ['today', 'this-weekend', 'this-week', 'this-month']) {
     const win = app.dateWindowForPreset(when, today);
@@ -4610,7 +4610,7 @@ test('S6 #2-#8: the date step renders in the reserved slot; presets and custom r
   for (const q of ['when=custom&from=2033-03-31&to=2033-03-01', 'when=custom&from=2033-02-30&to=2033-03-01', 'when=custom&from=2033-01-01&to=2034-01-03', 'when=custom&from=x&to=y']) {
     const fb = s6markup((await s6get(`/whats-on?${q}`)).text);
     assert.match(fb, /class="whatson-date-note" role="status">Those dates weren’t a valid range/, q);
-    assert.match(fb, /Showing the next 30 days:/, `${q} -> default window`);
+    assert.match(fb, /Showing the next 90 days:/, `${q} -> default window`);
     assert.match(fb, /aria-live="polite">4 events<\/p>/, `${q} -> default window results`);
   }
   const okMax = s6markup((await s6get('/whats-on?when=custom&from=2033-01-01&to=2034-01-02')).text);
