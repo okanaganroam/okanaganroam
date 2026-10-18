@@ -1,0 +1,304 @@
+{
+ "heading": "Okanagan Ski Season 2026–27: Opening Days & Events",
+ "title": "Okanagan Ski Season 2026–27: Opening Days | Okanagan Roam",
+ "description": "Big White opens Nov 26 and SilverStar Nov 27. Every listed 2026–27 ski-hill event: Welcome to Winter, Big Reds, light-ups, Christmas Eve and races.",
+ "banner": "ski-snow",
+ "parent": {
+  "name": "Ski & Snow",
+  "href": "/ski-snow"
+ },
+ "noPlace": true,
+ "intro": [
+  "Big White's opening day is Thursday, November 26, and SilverStar's alpine opening day is Friday, November 27. This guide lists those two dates and every event we have on the calendar at both mountains for the 2026–27 season: the opening-weekend parties, Big Reds at Big White, the village light-ups, Christmas Eve and New Year's Eve on the hill, the Loose Moose Challenge scavenger hunts, the holiday rail jam, and the races and family days that fill out January to March.",
+  "Events are grouped by time of season, in date order, and each one shows its mountain and date. Apex and Baldy have no events listed yet, so they get a short section of their own at the end. Snow decides opening days, so check the resort before you drive up."
+ ],
+ "sections": [
+  {
+   "id": "opening-week",
+   "jump": "Opening week",
+   "heading": "Opening week",
+   "items": [
+    {
+     "ref": "event:big-white/big-white-opening-day-2026-27",
+     "name": "Big White Opening Day 2026/27",
+     "text": "Big White's 2026/27 winter season opens on November 26. Opening depends on snow conditions, so check bigwhite.com for the latest before you book.",
+     "where": "Big White, Thu Nov 26"
+    },
+    {
+     "ref": "event:silverstar/silverstar-alpine-opening-day-2026",
+     "name": "SilverStar Alpine Opening Day 2026",
+     "text": "the first day of lift-served skiing and snowboarding on the mountain, when SilverStar opens its alpine terrain for the winter.",
+     "where": "SilverStar, Fri Nov 27"
+    },
+    {
+     "ref": "event:silverstar/sovereign-canada-cup-cross-country-ski-races",
+     "name": "Sovereign Canada Cup Cross-Country Ski Races",
+     "text": "Canada's top cross-country skiers open the domestic race season at {silverstar/sovereign-lake-nordic-centre|Sovereign Lake Nordic Centre}: a classic individual race, a freestyle sprint and a 15 km mass start. Free to watch from the trailside.",
+     "where": "SilverStar, Nov 27 – Nov 29"
+    },
+    {
+     "ref": "event:big-white/welcome-to-winter-big-white-2026",
+     "name": "Welcome to Winter at Big White",
+     "text": "Big White's season-opening celebration in the village, with family activities and festivities to kick off winter 2026–27. It runs 5:00–7:05 pm.",
+     "where": "Big White, Sat Nov 28"
+    },
+    {
+     "ref": "event:silverstar/vancouver-international-mountain-film-festival-night-at-silverstar",
+     "name": "Vancouver International Mountain Film Festival Night at SilverStar",
+     "text": "an opening-weekend night of adventure and nature films from the VIMFF tour at the NATC Auditorium, starting at 7 pm. Tickets are $10, popcorn and drinks are on sale, and proceeds go to the SilverStar Bear Stewardship Society.",
+     "where": "SilverStar, Sat Nov 28"
+    }
+   ]
+  },
+  {
+   "id": "early-december-rally-cars-red-",
+   "jump": "Early December",
+   "heading": "Early December: rally cars, red wine and light-ups",
+   "items": [
+    {
+     "ref": "event:big-white/big-white-winter-rally",
+     "name": "Big White Winter Rally",
+     "text": "rally cars compete on winter roads in the Big White area, presented by the West Coast Rally Association. Check the official spectator guide for viewing spots, road access and the schedule.",
+     "where": "Big White, Dec 4 – Dec 5"
+    },
+    {
+     "ref": "event:big-white/big-reds-at-big-white",
+     "name": "Big Reds at Big White",
+     "text": "a red-wine festival on the mountain. The VIP private tasting runs 6–9 pm in the {big-white/kettle-valley-steakhouse|Kettle Valley Steakhouse} ($150), and the Grand Tasting runs 7–9 pm in the Happy Valley Day Lodge ($100). Tickets go on sale Nov 1.",
+     "where": "Big White, Sat Dec 5"
+    },
+    {
+     "ref": "event:silverstar/silverstar-annual-light-up-2026",
+     "name": "SilverStar Annual Light Up",
+     "text": "the village is lit up for the holiday season, and everyone is invited to come and help switch on the lights.",
+     "where": "SilverStar, Sat Dec 5"
+    },
+    {
+     "ref": "event:big-white/big-white-s-twinkling-trail-light-up",
+     "name": "Big White's Twinkling Trail Light Up",
+     "text": "the season's first lighting of the Twinkling Trail, an illuminated walk through the forest from the Adventure Park trailhead in Happy Valley. Meet at 5 pm.",
+     "where": "Big White, Sat Dec 12"
+    }
+   ]
+  },
+  {
+   "id": "the-holidays",
+   "jump": "The holidays",
+   "heading": "The holidays",
+   "items": [
+    {
+     "ref": "event:big-white/santa-s-workshop",
+     "name": "Santa's Workshop",
+     "text": "Santa is in the Village Centre daily from 11 am, with a free photo, elf crafts and storytime from 3:30 to 4 pm (Dec 18–23). On Christmas Eve it's photos only, 11 am to 1 pm.",
+     "where": "Big White, Dec 18 – Dec 24"
+    },
+    {
+     "ref": "event:silverstar/comedy-hypnosis-show-at-silverstar",
+     "name": "Comedy Hypnosis Show at SilverStar",
+     "text": "comedy hypnotist Gavin Hooper brings his clean, interactive show to the NATC auditorium, where volunteers from the crowd become the stars. Doors 6:30, show 7; drinks on sale.",
+     "where": "SilverStar, Sun Dec 20"
+    },
+    {
+     "ref": "event:silverstar/silverstar-12-days-of-holidays",
+     "name": "SilverStar 12 Days of Holidays",
+     "text": "twelve days of holiday programming in the village over the Christmas break. Check the resort's events page for the daily schedule.",
+     "where": "SilverStar, Dec 21 – Jan 1"
+    },
+    {
+     "ref": "event:silverstar/vaz-art-paint-sip-at-silverstar",
+     "name": "Vaz Art Paint & Sip at SilverStar",
+     "text": "a two-hour guided painting class in SilverStar's Town Hall, where you paint and take home a scene inspired by the mountain and the Okanagan. $55 includes supplies and a glass of wine or a non-alcoholic drink.",
+     "where": "SilverStar, Mon Dec 21 + 3 more dates"
+    },
+    {
+     "ref": "event:big-white/big-white-s-christmas-eve-festival",
+     "name": "Big White's Christmas Eve Festival",
+     "text": "Christmas Eve in the Village Centre from 4:30 pm, with booths, a Loose Moose dance party and fireworks at 7 pm. The Glow Stick Parade needs pre-registration, a lift ticket and a helmet (ages 6+).",
+     "where": "Big White, Thu Dec 24"
+    },
+    {
+     "ref": "event:big-white/ski-with-santa",
+     "name": "Ski with Santa",
+     "text": "meet Santa at 10:30 am in front of the Big Chair, ski Sun Run together, then warm up with hot chocolate at Santa's Workshop.",
+     "where": "Big White, Fri Dec 25"
+    },
+    {
+     "ref": "event:big-white/the-loose-moose-challenge-december",
+     "name": "The Loose Moose Challenge – December",
+     "text": "a family scavenger hunt on the slopes. Pick up an adventure card at the Events Tent in the Village Centre, follow Lucy Moose's riddles across Big White's blue runs to find hidden letters, then return your card on the second afternoon for a sticker and a chance at prizes.",
+     "where": "Big White, Dec 26 – Dec 27"
+    },
+    {
+     "ref": "event:silverstar/salomon-holiday-rail-jam-at-silverstar",
+     "name": "Salomon Holiday Rail Jam at SilverStar",
+     "text": "skiers and snowboarders show off on a custom setup while a DJ plays, with U16 and open categories. Free to watch; competitors pay a small entry fee.",
+     "where": "SilverStar, Sun Dec 27"
+    },
+    {
+     "ref": "event:silverstar/silverstar-new-year-s-eve",
+     "name": "SilverStar New Year’s Eve",
+     "text": "ring out the year in SilverStar's village with an evening of festivities on the mountain.",
+     "where": "SilverStar, Thu Dec 31"
+    }
+   ]
+  },
+  {
+   "id": "january-to-march",
+   "jump": "January to March",
+   "heading": "January to March",
+   "items": [
+    {
+     "ref": "event:big-white/jr-chef-challenge",
+     "name": "Jr. Chef Challenge",
+     "text": "a cooking contest for ages 5–13 on the top floor of the Happy Valley Day Lodge; contestants assemble at 3:15 pm. Tickets go on sale in November.",
+     "where": "Big White, Wed Jan 13 + 1 more date"
+    },
+    {
+     "ref": "event:big-white/the-loose-moose-challenge-january",
+     "name": "The Loose Moose Challenge – January",
+     "text": "a village scavenger hunt. Pick up a card at the Events Tent in the Village Centre from 9 am, then return it the next afternoon (Jan 17, 2–4 pm).",
+     "where": "Big White, Jan 16 – Jan 17"
+    },
+    {
+     "ref": "event:big-white/2027-special-olympics-bc-winter-games-snow-sports",
+     "name": "2027 Special Olympics BC Winter Games: Snow Sports",
+     "text": "athletes from across BC and the Yukon race in alpine skiing at Big White, with cross-country skiing and snowshoeing at West Kelowna's Telemark Nordic Club. The Games qualify athletes for the 2028 national Winter Games in Kelowna, so come out and cheer.",
+     "where": "Big White, Feb 5 – Feb 7"
+    },
+    {
+     "ref": "event:silverstar/over-the-hill-downhill-2027",
+     "name": "Over The Hill Downhill 2027",
+     "text": "Canada's longest-running recreational downhill ski race returns for a weekend of racing on SilverStar's slopes.",
+     "where": "SilverStar, Feb 5 – Feb 7"
+    },
+    {
+     "ref": "event:big-white/the-loose-moose-challenge-february",
+     "name": "The Loose Moose Challenge – February",
+     "text": "the village scavenger hunt again: pick up a card at the Events Tent in the Village Centre from 9 am, then return it the next afternoon.",
+     "where": "Big White, Feb 13 – Feb 14"
+    },
+    {
+     "ref": "event:big-white/telus-kelowna-cup-at-big-white",
+     "name": "TELUS Kelowna Cup at Big White",
+     "text": "a family-friendly snowcross race at TELUS Park for skiers and snowboarders of all skill levels. Racers try to match their first-run time on a second run, and the closest match wins; there's a Best Dressed prize too. It supports the Powderhounds, the adaptive snowsports program of People in Motion. Big White says full details are coming soon.",
+     "where": "Big White, Sat Feb 20"
+    },
+    {
+     "ref": "event:big-white/mission-hill-chef-collaboration-dinner",
+     "name": "Mission Hill Chef Collaboration Dinner",
+     "text": "chefs Boddie Macklin-Shaw and Patrick Gayler cook a dinner paired with Mission Hill wines in the {big-white/kettle-valley-steakhouse|Kettle Valley Steakhouse}. More details to come from Big White.",
+     "where": "Big White, Thu Feb 25"
+    },
+    {
+     "ref": "event:big-white/mountain-glow-women-s-ski-day-with-kelsey-serwa",
+     "name": "Mountain Glow: Women's Ski Day with Kelsey Serwa",
+     "text": "a women's ski day with Olympian Kelsey Serwa: skiing, a wine lunch, spa extras and champagne après, supporting the Kelowna Women's Shelter. Full details to come.",
+     "where": "Big White, Sat Mar 13"
+    },
+    {
+     "ref": "event:big-white/the-loose-moose-challenge-march",
+     "name": "The Loose Moose Challenge – March",
+     "text": "the last village scavenger hunt of the listed season: pick up a card at the Events Tent in the Village Centre from 9 am and return it the next afternoon.",
+     "where": "Big White, Mar 20 – Mar 21"
+    }
+   ]
+  },
+  {
+   "id": "apex-and-baldy",
+   "jump": "Apex and Baldy",
+   "heading": "Apex and Baldy",
+   "lead": "Neither Apex nor Baldy has events listed yet for 2026–27, so there are no dates here. For lifts, lodges and where to eat on both hills, see our {page:/guides/apex-baldy-ski-guide|Apex & Baldy ski guide}. These are the places to know for a day on either one.",
+   "items": [
+    {
+     "ref": "apex/apex-mountain-resort",
+     "name": "Apex Mountain Resort",
+     "text": "Penticton's home mountain, about a 30-minute drive from town, with 2,000 vertical feet and 85 runs. Friday and Saturday nights are its signature: from 4 to 9 pm the T-bar and Magic Carpet run under lights for night skiing, and Friday nights come with half-price lift tickets and rentals. A winter shuttle runs from Penticton on weekends.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/tim-hortons-tube-park-apex",
+     "name": "Tim Hortons Tube Park – Apex",
+     "text": "at the base area beside the beginner slopes, running on weekends and holidays through the season and under lights on Friday and Saturday nights. 2026/27 tickets are sold in two-hour blocks: $30 for adults, $20 for juniors aged 8 to 12, a $15 Friday Night Special for all ages and a $75 family rate for up to six.",
+     "where": "Apex"
+    },
+    {
+     "ref": "apex/adventure-skating-loop-apex",
+     "name": "Adventure Skating Loop & Shinny Pond – Apex",
+     "text": "a kilometre of Zamboni-smoothed ice looping through the forest, with the Shinny Pond beside it for pickup hockey. For 2026/27 a full-day skate pass is $15 for ages 13 and up and $7.50 for 12 and under; it's weather-dependent natural ice.",
+     "where": "Apex"
+    },
+    {
+     "ref": "baldy/baldy-mountain-resort",
+     "name": "Baldy Mountain Resort",
+     "text": "the South Okanagan's ski hill: a small, friendly, family hill with short lift lines, famous for its tree runs. New this winter is cat skiing from the top of the Eagle Chair to Baldy's upper terrain, Friday to Sunday. The Magic Carpet stays open until 7 pm on Friday and Saturday nights for tubing and beginner skiing under the lights. Winter tyres are strongly recommended for the road up.",
+     "where": "Baldy"
+    },
+    {
+     "ref": "baldy/baldy-snowshoe-trails",
+     "name": "Baldy Snowshoe Trails",
+     "text": "about 13 kilometres of marked trail through the high forest around the day lodge, with snowshoe rentals and guided tours. An easy add-on when only some of your group wants to ride the lifts, with the {baldy/corduroy-cafe|Corduroy Cafe} for the warm-up afterwards.",
+     "where": "Baldy"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "The first chair of the season",
+    [
+     "event:big-white/big-white-opening-day-2026-27|Big White Opening Day 2026/27",
+     "event:silverstar/silverstar-alpine-opening-day-2026|SilverStar Alpine Opening Day 2026"
+    ]
+   ],
+   [
+    "An opening-weekend party",
+    [
+     "event:big-white/welcome-to-winter-big-white-2026|Welcome to Winter at Big White"
+    ]
+   ],
+   [
+    "A grown-up night out",
+    [
+     "event:big-white/big-reds-at-big-white|Big Reds at Big White",
+     "event:big-white/mission-hill-chef-collaboration-dinner|Mission Hill Chef Collaboration Dinner"
+    ]
+   ],
+   [
+    "Christmas on the mountain with kids",
+    [
+     "event:big-white/big-white-s-christmas-eve-festival|Big White's Christmas Eve Festival",
+     "event:big-white/ski-with-santa|Ski with Santa"
+    ]
+   ],
+   [
+    "New Year's Eve on the hill",
+    [
+     "event:silverstar/silverstar-new-year-s-eve|SilverStar New Year’s Eve"
+    ]
+   ],
+   [
+    "Free racing to watch",
+    [
+     "event:silverstar/sovereign-canada-cup-cross-country-ski-races|Sovereign Canada Cup Cross-Country Ski Races",
+     "event:silverstar/salomon-holiday-rail-jam-at-silverstar|Salomon Holiday Rail Jam at SilverStar"
+    ]
+   ],
+   [
+    "Night tubing and skiing in the South Okanagan",
+    [
+     "apex/tim-hortons-tube-park-apex|Tim Hortons Tube Park – Apex",
+     "baldy/baldy-mountain-resort|Baldy Mountain Resort"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guides/ski-season-big-white-silverstar\">Big White &amp; SilverStar ski guide</a>, <a href=\"/guides/apex-baldy-ski-guide\">Apex &amp; Baldy ski guide</a>, <a href=\"/guides/okanagan-holiday-events\">Holiday events guide</a>, <a href=\"/whats-on/sports-recreation\">Sports &amp; recreation events</a>"
+}

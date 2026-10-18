@@ -1,0 +1,189 @@
+{
+ "heading": "Where to Eat & Après at SilverStar",
+ "title": "SilverStar Restaurants, Cafés & Après | Okanagan Roam",
+ "description": "Where to eat and après at SilverStar: pubs, a cocktail bar, Italian and village dinners, a bakery-café, pizza by the slice and snowcat dinners.",
+ "banner": "ski-snow",
+ "parent": {
+  "name": "SilverStar",
+  "href": "/silverstar"
+ },
+ "noPlace": true,
+ "intro": [
+  "SilverStar's places to eat and drink are mostly in the village: two pubs and a cocktail bar for the end of the ski day, an Italian dining room and a couple of village restaurants for dinner, a bakery-café and a slice shop for quick fuel, and a backside lodge, Paradise Camp, up on the mountain. For a night that's nothing like the others, there are dinners you reach by snowcat or on snowshoes.",
+  "Places are grouped by the kind of meal you're after. Price levels run from $ (cheap and quick) to $$$$ (a splurge), where the listing has one."
+ ],
+ "sections": [
+  {
+   "id": "apr-s-ski-pubs",
+   "jump": "Après-ski & pubs",
+   "heading": "Après-ski & pubs",
+   "items": [
+    {
+     "ref": "silverstar/long-john-s-pub",
+     "name": "Long John's Pub",
+     "text": "a longtime SilverStar favourite, known for the best burger and onion rings on the hill. Regulars call the gravy fries a game changer, and service stays warm and welcoming even when it's crowded. Kids are welcome, there's a patio and live music, and it suits a big group. $$",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/the-bulldog-grand-cafe-silver-star",
+     "name": "The Bulldog Grand Cafe Silver Star",
+     "text": "a quaint pub with a large split patio and four gas fireplaces. Warm up by the fire between runs and catch a game on the TVs; kids are welcome.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/black-pine",
+     "name": "Black Pine",
+     "text": "an upscale-casual après-ski restaurant with alpine charm. It hosts live bingo nights and can set up a table for a group of 12, and the brownie is the dessert to finish on. $$",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/la-plata",
+     "name": "La Plata",
+     "text": "SilverStar's cocktail bar: tapas and cocktails in the village, with more creativity than standard mountain-lodge fare. Work through the tasting menu with a cocktail made with homemade spruce syrup, or the prickly pear mocktail if you're not drinking. There's a happy hour. $$$",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/tube-town-cafe-bar",
+     "name": "Tube Town Café & Bar",
+     "text": "a picturesque café and bar at the tubing area, popular with families and staff parties alike. After a session on the {silverstar/tube-town-silverstar-tube-park|tubes}, warm up with a mulled wine. $$",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "sit-down-dinners",
+   "jump": "Sit-down dinners",
+   "heading": "Sit-down dinners",
+   "items": [
+    {
+     "ref": "silverstar/d-argento",
+     "name": "d'argento",
+     "text": "an upscale, premium-casual Italian restaurant known for its wine-paired dinners. The squid ink pasta is worth the splurge, though reviews are split on value since portions run smaller. $$$$",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/the-red-antler",
+     "name": "The Red Antler",
+     "text": "a village restaurant with both healthy and indulgent options. Order the well-loved quinoa avocado power bowl, then finish with the brownie regulars recommend. It's dog-friendly, opens early, has vegan and gluten-free choices, and runs a happy hour. $$",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/the-den",
+     "name": "The Den",
+     "text": "called the classiest spot to eat in SilverStar village, with great views and friendly staff. The avo tartine and parfait are the classics to order, though reviews are mixed on recent menu quality. $$",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "caf-s-quick-bites",
+   "jump": "Cafés & quick bites",
+   "heading": "Cafés & quick bites",
+   "items": [
+    {
+     "ref": "silverstar/bugaboos-bakery-cafe",
+     "name": "Bugaboos Bakery Cafe",
+     "text": "the only bakery-cafe in SilverStar Village. Plant-based baking is taken seriously here, with vegan soy mochas and a vegan banana lava cake, and locals call the mountain view magical. It opens early and dogs are welcome. $",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/paradise-camp",
+     "name": "Paradise Camp",
+     "text": "SilverStar's backside lodge, a cosy, rustic cabin on the Putnam Creek side of the mountain with views out to the Monashees. Skiers know it for its soups, its mountain stew made with wild meat and its signature cinnamon buns. Gluten-free and dairy-free changes carry a small upcharge, so ask first.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/pizza-gratta",
+     "name": "Pizza Gratta",
+     "text": "a favourite sourdough pizza-by-the-slice spot on the mountain, with a fresh crust and plenty of vegetarian and vegan options. Seating is mostly outdoors. $",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/francuccino-s-gelato-and-fries",
+     "name": "Francuccino's Gelato and Fries",
+     "text": "the village's year-round quick treat stop: fries and hot dogs after a winter day on the slopes, ice cream or gelato in summer.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/town-hall",
+     "name": "Town Hall",
+     "text": "a quick-serve breakfast and lunch spot with burgers, hot dogs and Sloppy Joes. Reviews are sharply split on portion sizes and food quality under the recent ownership, so keep expectations reasonable. $",
+     "where": "SilverStar"
+    }
+   ]
+  },
+  {
+   "id": "special-experiences",
+   "jump": "Special experiences",
+   "heading": "Special experiences",
+   "items": [
+    {
+     "ref": "silverstar/paradise-camp-snowcat-dinner-tours-silverstar",
+     "name": "Paradise Camp Snowcat Dinner Tours – SilverStar",
+     "text": "an evening snowcat ride from the village to {silverstar/paradise-camp|Paradise Camp} on the back side of the mountain, followed by a candlelit multi-course dinner. The half-hour ride climbs about 8 km through the snowy forest; a night out for couples and groups. Season: Dec–Apr, select evenings.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/ravenwood-snowshoe-dinner-tours",
+     "name": "Ravenwood Snowshoe Dinner Tours – SilverStar",
+     "text": "a guided snowshoe through the darkening forest to the new Ravenwood Cabin, where dinner cooked by the resort's kitchen team is waiting. Dates, seatings and pricing for the coming winter are announced by the resort and booked through Guest Services, so dress for a night walk in the mountains and check before you plan around it.",
+     "where": "SilverStar"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Burgers and a pint after skiing",
+    [
+     "silverstar/long-john-s-pub|Long John's Pub"
+    ]
+   ],
+   [
+    "A drink by the fire",
+    [
+     "silverstar/the-bulldog-grand-cafe-silver-star|The Bulldog Grand Cafe Silver Star"
+    ]
+   ],
+   [
+    "Cocktails and tapas",
+    [
+     "silverstar/la-plata|La Plata"
+    ]
+   ],
+   [
+    "A dinner splurge",
+    [
+     "silverstar/d-argento|d'argento"
+    ]
+   ],
+   [
+    "Vegan baking and coffee",
+    [
+     "silverstar/bugaboos-bakery-cafe|Bugaboos Bakery Cafe"
+    ]
+   ],
+   [
+    "Lunch on the backside",
+    [
+     "silverstar/paradise-camp|Paradise Camp"
+    ]
+   ],
+   [
+    "A night out by snowcat",
+    [
+     "silverstar/paradise-camp-snowcat-dinner-tours-silverstar|Paradise Camp Snowcat Dinner Tours – SilverStar"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guides/ski-season-big-white-silverstar\">Big White &amp; SilverStar ski guide</a>, <a href=\"/guides/okanagan-ski-season-2026-27\">Okanagan ski season 2026–27</a>, <a href=\"/guides/big-white-restaurants-apres\">Where to eat &amp; après at Big White</a>"
+}

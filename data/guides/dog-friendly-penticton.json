@@ -1,0 +1,223 @@
+{
+ "heading": "Dog-Friendly Penticton",
+ "title": "Dog-Friendly Penticton: Beaches, Trails & Patios | Okanagan Roam",
+ "description": "Off-leash dog beaches, viewpoint walks, and breweries, wineries, cafés and patios that welcome dogs in Penticton, BC, with the dog rules for each.",
+ "banner": "dog-friendly",
+ "parent": {
+  "name": "Penticton",
+  "href": "/penticton"
+ },
+ "noPlace": true,
+ "intro": [
+  "Penticton sits between two lakes, and your dog can enjoy both. There are off-leash beaches on Okanagan Lake and Skaha Lake, short viewpoint walks above town, and plenty of patios, tasting rooms and breweries where dogs are welcome.",
+  "One rule to know before you go: dogs aren't allowed on Penticton's main swimming beaches, including Okanagan Beach and Skaha Beach. Head to the dog beaches below instead, and always check the signs posted when you arrive."
+ ],
+ "sections": [
+  {
+   "id": "off-leash-dog-beaches",
+   "jump": "Off-leash dog beaches",
+   "heading": "Off-leash dog beaches",
+   "items": [
+    {
+     "ref": "penticton/okanagan-lake-park-beach",
+     "name": "Okanagan Lake Park Beach",
+     "text": "Penticton's fenced off-leash dog beach, a small sandy beach east of the Lakeside Resort where dogs can run off leash inside the fence. The park around it has washrooms and picnic areas.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/skaha-lake-dog-beach",
+     "name": "Skaha Lake Dog Beach (Lakeside Road)",
+     "text": "the only off-leash beach on Skaha Lake, about 3 km south of the Skaha Marina. Dogs aren't allowed on the city's other beaches, including Skaha Beach, so this is where to bring yours to enjoy the lake. Keep your dog under control and clean up after it.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/three-mile-beach",
+     "name": "Three Mile Beach",
+     "text": "two beaches on one peninsula off Naramata Road. Dogs may run off leash on the rockier South (boating) beach, but they aren't allowed on the swimming beach. There are no listed facilities, and the area is well known as a nudist spot.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "walks-and-viewpoints",
+   "jump": "Walks and viewpoints",
+   "heading": "Walks and viewpoints",
+   "items": [
+    {
+     "ref": "penticton/munson-mountain",
+     "name": "Munson Mountain",
+     "text": "the hill with the giant PENTICTON sign and the city's easiest big view, over Penticton and Okanagan Lake. It's only about 1 km round trip on packed gravel, and dogs are welcome on leash.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/skaha-bluffs-provincial-park",
+     "name": "Skaha Bluffs Provincial Park",
+     "text": "sun-warmed cliffs above the east side of Skaha Lake, and essential habitat for bighorn sheep. Dogs must be leashed at all times to protect the fragile ecosystem. The access-road gate is closed from mid-November to mid-March.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/ellis-ridge-canyon-view-trails",
+     "name": "Ellis Ridge & Canyon View Trails",
+     "text": "two short walks above town with lookouts over Penticton and the Ellis Creek canyon: a 3.5 km out-and-back and a 2 km easy loop. There are cliff edges, so keep children close. Pets must be kept quiet and under control; no leash rule is published.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/carmi-recreational-trails",
+     "name": "Carmi Recreational Trails",
+     "text": "a loop network on the plateau east of town. The Okanagan View Loop is 7 km of packed gravel with a warming hut, benches and a vista point, and the Carmi Loop is an easier 3 km. Pets must be kept quiet and under control; no leash rule is published.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "breweries-and-pubs",
+   "jump": "Breweries and pubs",
+   "heading": "Breweries and pubs",
+   "items": [
+    {
+     "ref": "penticton/abandoned-rail-brewing-co",
+     "name": "Abandoned Rail Brewing Co.",
+     "text": "dogs are welcome to join you at the table on a patio that looks out toward the mountains. The gluten-free cauliflower-crust pizza and GF beer sit right on the regular menu.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/highway-97-brewing",
+     "name": "Highway 97 Brewing",
+     "text": "a road-trip-friendly brewery that welcomes travellers with dogs and pours consistently well-crafted beer. Order the pulled pork nachos.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/dragonboat-pub",
+     "name": "Dragonboat Pub",
+     "text": "marina-side on Skaha Lake, with a patio that welcomes both dogs and kids.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/the-hub-on-martin",
+     "name": "The Hub on Martin",
+     "text": "a lively bar and grill with regular local performers on its stage. Dogs are welcome on the patio, so check the schedule for who's playing.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/cue-s-game-room",
+     "name": "Cue's Game Room",
+     "text": "a billiards hall and sports bar on Main Street with darts and board games. Well-behaved dogs are welcome on the patio.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "wineries",
+   "jump": "Wineries",
+   "heading": "Wineries",
+   "items": [
+    {
+     "ref": "penticton/la-frenz-winery",
+     "name": "La Frenz Winery",
+     "text": "a covered, dog-friendly patio, so you can taste whatever the weather. Staff bring out a water bowl for your pup without being asked.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/ruby-blues-winery",
+     "name": "Ruby Blues Winery",
+     "text": "a funky, boutique winery where your leashed pup is welcome at an outdoor table surrounded by the vineyard.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/three-sisters-winery",
+     "name": "Three Sisters Winery",
+     "text": "a dog-friendly patio and hot sandwiches made fresh on site to pair with the rosé.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "caf-s-and-restaurants-with-dog",
+   "jump": "Cafés & patios",
+   "heading": "Cafés and restaurants with dog-friendly patios",
+   "items": [
+    {
+     "ref": "penticton/bench-market",
+     "name": "Bench Market",
+     "text": "a popular breakfast, brunch and market spot, and a handy pitstop on a Naramata Bench wine tour. Dogs are welcome on the outdoor terrace.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/wayne-freda",
+     "name": "Wayne & Freda",
+     "text": "a bustling café attached to a mercantile shop, with a patio where dogs are welcome. It's right by the farmers market.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/maku",
+     "name": "MAKU",
+     "text": "a sushi burrito spot with a dog-friendly patio, the kind of place your dog will pull you toward on a walk.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/mack-s-social-house",
+     "name": "Mack's Social House",
+     "text": "a dog-friendly restaurant with a swing indoors and $3 Sunday mimosas.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/cambo-beach-restaurant",
+     "name": "Cambo Beach Restaurant",
+     "text": "a dog-friendly, family-run spot on Lakeshore Dr blending Vietnamese, Thai and American comfort food, with generous portions and a beautiful lake view. It closes seasonally in winter.",
+     "where": "Penticton"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A fenced off-leash beach",
+    [
+     "penticton/okanagan-lake-park-beach|Okanagan Lake Park Beach"
+    ]
+   ],
+   [
+    "Skaha Lake with your dog",
+    [
+     "penticton/skaha-lake-dog-beach|Skaha Lake Dog Beach"
+    ]
+   ],
+   [
+    "A short walk with a big view",
+    [
+     "penticton/munson-mountain|Munson Mountain"
+    ]
+   ],
+   [
+    "A pint with the dog",
+    [
+     "penticton/abandoned-rail-brewing-co|Abandoned Rail Brewing Co.",
+     "penticton/highway-97-brewing|Highway 97 Brewing"
+    ]
+   ],
+   [
+    "Wine with the dog",
+    [
+     "penticton/la-frenz-winery|La Frenz Winery",
+     "penticton/ruby-blues-winery|Ruby Blues Winery"
+    ]
+   ],
+   [
+    "Breakfast on a dog-friendly patio",
+    [
+     "penticton/bench-market|Bench Market",
+     "penticton/wayne-freda|Wayne & Freda"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See every dog-friendly place in Penticton:</strong> <a href=\"/guide/penticton/dog_friendly\">Dog-friendly venues in Penticton</a>, or <a href=\"/dog-friendly\">Dog Friendly Finds</a> across the whole valley."
+}

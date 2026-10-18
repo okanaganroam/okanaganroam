@@ -1,0 +1,247 @@
+{
+ "heading": "Best Brunch in Vernon",
+ "title": "Best Brunch & Breakfast in Vernon | Okanagan Roam",
+ "description": "Where to brunch in Vernon: breakfast poutine, Filipino breakfasts, a patio at Predator Ridge, family cafés, vegan cinnamon rolls and scratch bakeries.",
+ "banner": "cafe",
+ "parent": {
+  "name": "Vernon",
+  "href": "/vernon"
+ },
+ "noPlace": true,
+ "intro": [
+  "Vernon does breakfast the friendly way. Most of the best mornings here happen in locally run diners where the owners know the regulars, with a few surprises mixed in: Filipino breakfast plates, chilaquiles, a café built for toddlers and a vegan café with its own cinnamon rolls.",
+  "These are the brunch and breakfast spots worth knowing, grouped by the kind of morning you're after."
+ ],
+ "sections": [
+  {
+   "id": "worth-the-wait",
+   "jump": "Worth the wait",
+   "heading": "Worth the wait",
+   "items": [
+    {
+     "ref": "vernon/diner-on-six",
+     "name": "Diner On Six",
+     "text": "a cheerful diner with an upbeat atmosphere people look forward to. Two dishes carry the reputation, the breakfast poutine and the fluffy pancake combo, so add the second if you're extra hungry.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/rosalinda-s",
+     "name": "Rosalinda's",
+     "text": "a family-run diner serving authentic Filipino breakfast dishes alongside Western classics. Reviewers say the Filipino plates are worth the drive from Kelowna, and the classics are covered well too.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/chill-go-tacos",
+     "name": "Chill&Go Tacos",
+     "text": "fresh chilaquiles and an owner who shares stories with guests rather than just taking orders. Order the chilaquiles and expect a story or two.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/eatology",
+     "name": "Eatology",
+     "text": "a quaint order-at-the-counter diner that wins on quality rather than atmosphere. Order the corned beef hash and save room for a slice of home-baked pie.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "old-school-diners",
+   "jump": "Old-school diners",
+   "heading": "Old-school diners",
+   "items": [
+    {
+     "ref": "vernon/hot-spot-on-6th-restaurant",
+     "name": "Hot Spot on 6th Restaurant",
+     "text": "a friendly, locally owned diner that cooks with local ingredients. The menu runs from eggs Benny to Salisbury steak skillets and pistachio lasagna, and there's a kids' menu.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/mug-n-muffin",
+     "name": "Mug N Muffin",
+     "text": "a mom-and-pop diner that Barb and Al have run for years, with its history on the walls. Expect homemade food, generous portions and fair prices.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/lunch-matters-breakfast-too",
+     "name": "Lunch Matters... Breakfast Too",
+     "text": "an old-school diner with 60s style that hasn't cut corners to save money. The club sandwich is made with real turkey rather than processed deli meat.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "with-a-view-or-a-patio",
+   "jump": "With a view or a patio",
+   "heading": "With a view or a patio",
+   "items": [
+    {
+     "ref": "vernon/range-restaurant-bar-patio",
+     "name": "RANGE restaurant, bar + patio",
+     "text": "at Predator Ridge Resort, with an expansive patio and a stellar view. A shuttle runs from nearby Sparkling Hill, so you don't need your own car to get there.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/spallumcheen-golf-country-club",
+     "name": "The Rusty Putter (Spallumcheen Golf & Country Club)",
+     "text": "the clubhouse breakfast spot at Spallumcheen Golf & Country Club, with a warm welcome. Pair your meal with a round on the championship course, before or after.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/cabana-bar-kitchen",
+     "name": "Cabana Bar + Kitchen",
+     "text": "a stream runs right through the courtyard at this Vernon Lodge restaurant, so book a courtyard table near the water feature. The kitchen has a reputation for handling allergies thoughtfully; mention yours upfront.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/east-hill-crossing-cafe",
+     "name": "East Hill Crossing Cafe",
+     "text": "a cozy coffee shop and poutinerie with seating indoors and on the patio. Alongside coffee and pastries, the specialty is a Canadian poutine with bacon and maple syrup.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "family-mornings",
+   "jump": "Family mornings",
+   "heading": "Family mornings",
+   "items": [
+    {
+     "ref": "vernon/cora",
+     "name": "Cora",
+     "text": "a bright, family-friendly breakfast and lunch spot with an extensive menu and big fruit-topped plates. Some guests have found the kids' fruit bowls small, so check before you order one.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/elodie-s-playhouse-cafe",
+     "name": "Elodie's Playhouse Cafe",
+     "text": "built around families, with four little playhouses, toys and open play for kids up to age five. The coffee bar pours real espresso and lattes for the grown-ups. Play is $16 for the first child and $14 for each sibling, with two adults free per paid child, and it's socks on, shoes off, grown-ups too.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/crepe-bistro",
+     "name": "Crepe Bistro",
+     "text": "a food truck that has become a Sunday ritual at Sovereign Park. Order one savoury and one sweet crepe while the kids burn off energy in the park nearby.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/white-spot-vernon",
+     "name": "White Spot Vernon",
+     "text": "the classic B.C. family restaurant, on 32nd Street, serving everything from breakfast through dinner, with a patio for warmer days.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "vegan-and-gluten-free-friendly",
+   "jump": "Vegan & gluten-free",
+   "heading": "Vegan and gluten-free friendly",
+   "items": [
+    {
+     "ref": "vernon/the-roxy-cafe-vegan-and-vegetarian-restaurant-cafe",
+     "name": "The Roxy Cafe - Vegan and Vegetarian Restaurant Cafe",
+     "text": "it calls itself Vernon's favourite vegan café. Order at the counter, then settle into the bright, cheerful dining room with the butter chick'n or one of the vegan cinnamon rolls.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/two-donkeys-bakery",
+     "name": "Two Donkeys Bakery",
+     "text": "a greenery-filled scratch bakery best known for its sourdough, with gluten-free options you can trust.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/bean-scene-coffee-house",
+     "name": "Bean Scene Coffee House",
+     "text": "three quirky levels, each with its own cozy nook, built for lingering rather than grab-and-go. The orange raspberry muffin is gluten-free.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "coffee-bakeries-and-a-quick-bi",
+   "jump": "Coffee & bakeries",
+   "heading": "Coffee, bakeries and a quick bite",
+   "items": [
+    {
+     "ref": "vernon/bean-to-cup",
+     "name": "Bean to Cup",
+     "text": "the café locals default to, with strong coffee, homemade food and an unpretentious warmth. Dogs are always welcome on the front terrace.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/ratio-coffee-pastry",
+     "name": "Ratio Coffee & Pastry",
+     "text": "a converted rail station with a vintage vibe and beans roasted in house. Eclairs are baked fresh on Tuesdays only, so that's the day to go.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/triumph-coffee",
+     "name": "Triumph Coffee",
+     "text": "a cozy downtown roastery-café with an unusual pairing: curry tacos alongside the coffee. Claim one of the few sidewalk tables if the weather's nice.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/farmhouse-cafe",
+     "name": "Farmhouse Cafe",
+     "text": "grows what it cooks, sourcing ingredients right on site for a simple menu. Order the soup and sandwich, and don't skip a scone, baked fresh.",
+     "where": "Vernon"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A big diner breakfast",
+    [
+     "vernon/diner-on-six|Diner On Six"
+    ]
+   ],
+   [
+    "Something different",
+    [
+     "vernon/rosalinda-s|Rosalinda's (Filipino breakfast)"
+    ]
+   ],
+   [
+    "Brunch with a view",
+    [
+     "vernon/range-restaurant-bar-patio|RANGE restaurant, bar + patio"
+    ]
+   ],
+   [
+    "A morning with small kids",
+    [
+     "vernon/elodie-s-playhouse-cafe|Elodie's Playhouse Cafe",
+     "vernon/crepe-bistro|Crepe Bistro"
+    ]
+   ],
+   [
+    "A vegan brunch",
+    [
+     "vernon/the-roxy-cafe-vegan-and-vegetarian-restaurant-cafe|The Roxy Cafe - Vegan and Vegetarian Restaurant Cafe"
+    ]
+   ],
+   [
+    "Gluten-free baking",
+    [
+     "vernon/two-donkeys-bakery|Two Donkeys Bakery",
+     "vernon/bean-scene-coffee-house|Bean Scene Coffee House"
+    ]
+   ],
+   [
+    "Coffee and a pastry",
+    [
+     "vernon/ratio-coffee-pastry|Ratio Coffee & Pastry"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/vernon/restaurants\">All Vernon restaurants</a> and <a href=\"/vernon/cafes\">cafés</a>, or places that <a href=\"/guide/vernon/open_early\">open early</a>."
+}
