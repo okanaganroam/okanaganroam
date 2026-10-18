@@ -4105,7 +4105,7 @@ function discoveryPresentation(run) {
 // ("terrasse" -> "patio"), and the /search link keeps the visitor's own words.
 function discoverySearchText(text, lang) {
   if (lang !== 'fr') return text;
-  try { return tripPlannerFrModule().tripPlannerText(text, buildDiscoveryTaxonomy()); } catch (e) { return text; }
+  try { return tripPlannerFrModule().tripPlannerText(text, buildDiscoveryTaxonomy(), { frenchPage: true }); } catch (e) { return text; }
 }
 function heroSearchTarget(text, { lang = 'en' } = {}) {
   const typed = text;
@@ -11125,15 +11125,22 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
     var info = {}, busy = false;
     function stored(){ try { return JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []; } catch (e) { return []; } }
     function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    // Each row is matched to its stop by the stored index on its remove button, and keeps the number app.js gave it:
+    // when the tray is grouped by plan day the rows are not in stored order (2026-10-18: matching by row position
+    // put the wrong names under each day, so the list contradicted its own "Route for day" links).
+    var fr = document.documentElement.lang === 'fr';
     function decorate(){
       var items = list.querySelectorAll('.trip-item'), trip = stored();
       full.hidden = !items.length;
       Array.prototype.forEach.call(items, function(item, i){
-        var t = trip[i], d = t && t.ref && info[t.ref];
+        var rm = item.querySelector('[data-remove-index]');
+        var at = rm ? parseInt(rm.getAttribute('data-remove-index'), 10) : i;
+        var t = trip[at], d = t && t.ref && info[t.ref];
         var span = item.querySelector('span');
         if (!d || !span || item.getAttribute('data-linked') === t.ref) return;
+        var num = /^\\s*(\\d+)\\./.exec(span.textContent);
         item.setAttribute('data-linked', t.ref);
-        span.innerHTML = (i + 1) + '. <a href="' + esc(d.url) + '">' + esc(d.name) + '</a><br><small class="trip-distance">' + esc([d.type, d.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</small>';
+        span.innerHTML = (num ? num[1] : at + 1) + '. <a href="' + esc((fr && d.urlFr) || d.url) + '">' + esc(d.name) + '</a><br><small class="trip-distance">' + esc([(fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</small>';
       });
     }
     function refresh(){
@@ -22878,6 +22885,8 @@ function localizeHtml(html, lang) {
 // text nodes and a few attributes, never inside <script> or <style>.
 const FR_STATIC_TEXT = {
   'Favorites': 'Favoris',
+  // French gaps (2026-10-18): the header's business link on French place pages.
+  'Business login': 'Espace entreprises',
   'List an Event': 'Inscrire un \u00e9v\u00e9nement',
   'Coming soon': 'Bient\u00f4t disponible',
   'This directory is becoming the Okanagan Roam app': 'Ce r\u00e9pertoire devient l\u2019application Okanagan Roam',
@@ -22921,7 +22930,7 @@ const FR_STATIC_TEXT = {
   'Your email': 'Votre courriel',
   'Prefer email?': 'Vous pr\u00e9f\u00e9rez le courriel?',
 };
-const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'aria-label="Main menu"': 'aria-label="Menu principal"', 'aria-label="Breadcrumb"': 'aria-label="Fil d\u2019Ariane"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
+const FR_STATIC_ATTRS = { 'aria-label="Search all places"': 'aria-label="Rechercher tous les lieux"', 'aria-label="Close"': 'aria-label="Fermer"', 'aria-label="Main menu"': 'aria-label="Menu principal"', 'aria-label="Breadcrumb"': 'aria-label="Fil d\u2019Ariane"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
 // A seasonal notice in French ("Closed for the season. Reopens November 26." -> "Fermé pour la saison. Réouverture le
 // 26 novembre."), from french-text.js's season patterns; null for any other text.
 function frSeasonText(t) {
@@ -23225,6 +23234,8 @@ function frMarkup(part) {
       return t == null ? m : `${a}${escapeHtml(t)}"`;
     })
     .replace(/>([^<>]+)</g, (m, text) => {
+      // A bare rating ("4.9\u2605", a winery card with no cuisine) has no letters but reads "4,9\u2605" (2026-10-18).
+      if (/^\s*\d\.\d\u2605\s*$/.test(text)) return m.replace('.', ',');
       if (!/[A-Za-z]/.test(text) || frIsVenueName(frDecode(text))) return m;
       const t = frText(frDecode(text));
       if (t == null) return m;
@@ -23232,27 +23243,46 @@ function frMarkup(part) {
       return `>${lead}${escapeHtml(t)}${trail}<`;
     });
 }
-// String literals inside page scripts: JSON-style "..." strings that are whole entries in the list (banner text,
-// headings, chip labels), plus the script fragments in FR_SCRIPT ("Show N results" ...).
-// Text in single quotes that is wording, not logic: the hours labels are left to the hoursStatusLabel wrapper.
-const FR_SCRIPT_KEEP = new Set(['Closed today', 'Closed', 'Closed now', 'Open 24 hours', 'Hours not listed for today', 'Open now', 'Open Now']);
+// Page scripts on a French twin (2026-10-18). The script's code is never rewritten by guesswork: a single-quoted
+// 'tomorrow ' read as wording became 'demain', which broke the open-status line after load ("ouvre demain8:6 h").
+// A script changes only by
+//   1. the FR_SCRIPT fragments (exact pieces of source, e.g. the hoursStatusLabel French wrapper),
+//   2. FR_SCRIPT_STRINGS: whole string literals, exactly as listed, spaces kept,
+//   3. data values the server embedded as JSON (banner text, headings, labels): a double-quoted string that is a
+//      value in an object or array literal ({"h":"Breweries in the Okanagan"}), never a key or code.
+// Pages with their own French (the map, the trip tray) pick it from html[lang] at run time.
+const frScriptChars = (x) => x.replace(/\\u([0-9a-fA-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+// Each fragment as written in the source and, when it has \\uXXXX escapes, with them as characters (a template
+// literal serves those). Applied once each: a fragment's French may contain its own English (the hours wrapper).
+function frScriptFragments(src) {
+  let out = src;
+  for (const [en, fr] of frenchText.FR_SCRIPT) {
+    out = out.split(en).join(fr);
+    const ce = frScriptChars(en);
+    if (ce !== en) out = out.split(ce).join(frScriptChars(fr));
+  }
+  return out;
+}
+function frScriptString(plain) {
+  return Object.prototype.hasOwnProperty.call(frenchText.FR_SCRIPT_STRINGS, plain) ? frenchText.FR_SCRIPT_STRINGS[plain] : null;
+}
 function frScript(src) {
-  src = src.replace(/'((?:[^'\\\n]|\\.){2,400})'/g, (m, body) => {
+  let out = frScriptFragments(src);
+  out = out.replace(/'((?:[^'\\\n]|\\.){1,400})'/g, (m, body) => {
     let plain; try { plain = JSON.parse(`"${body.replace(/\\'/g, "'").replace(/"/g, '\\"')}"`); } catch (e) { return m; }
-    if (!/[A-Za-z]{2}/.test(plain) || !/[ .!?]/.test(plain) || FR_SCRIPT_KEEP.has(plain.trim()) || /^(Open now|Open 24|Closed|Hours not| · Opens)/.test(plain)) return m;
-    const t = frText(plain);
+    const t = frScriptString(plain);
     return t == null ? m : `'${t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')}'`;
   });
-  let out = src.replace(/"((?:[^"\\\n]|\\.){2,400})"/g, (m, body) => {
+  return out.replace(/"((?:[^"\\\n]|\\.){2,400})"/g, (m, body, at, whole) => {
     let plain; try { plain = JSON.parse(m); } catch (e) { return m; }
+    const listed = frScriptString(plain);
+    if (listed != null) return JSON.stringify(listed).replace(/</g, '\\u003c');
     if (!/[A-Za-z]{2}/.test(plain) || /^[a-z0-9_.\-\/#:]+$/.test(plain)) return m;
+    const isValue = /[[,:]\s*$/.test(whole.slice(Math.max(0, at - 8), at)) && /^\s*[,\]}]/.test(whole.slice(at + m.length, at + m.length + 8));
+    if (!isValue) return m;
     const t = frText(plain);
     return t == null ? m : JSON.stringify(t).replace(/</g, '\\u003c');
   });
-  // Each fragment as written in the source and with its \\uXXXX escapes as characters (a template literal serves those).
-  const chars = (x) => x.replace(/\\u([0-9a-fA-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
-  for (const [en, fr] of frenchText.FR_SCRIPT) out = out.split(en).join(fr).split(chars(en)).join(chars(fr));
-  return out;
 }
 function frJsonLd(json) {
   let data; try { data = JSON.parse(json); } catch (e) { return json; }
@@ -23508,9 +23538,12 @@ function frStatusText(text) {
     .replace('Closed \u00b7 Opens ', 'Ferm\u00e9 \u00b7 ouvre ')
     .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
     .replace('Closed now', 'Ferm\u00e9 en ce moment')
+    .replace('Hours not listed for today', 'Heures non indiqu\u00e9es pour aujourd\u2019hui')
     .replace(/\btomorrow /, 'demain \u00e0 ')
     .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, (m, d) => `${FR_STATUS_DAYS[d]} \u00e0 `)
-    .replace(/ouvre (\d)/, 'ouvre \u00e0 $1'));
+    .replace(/ouvre (\d)/, 'ouvre \u00e0 $1')
+    // A close after midnight on another day: "ferme demain \u00e0 1 h 30", not "ferme \u00e0 demain \u00e0" (2026-10-18).
+    .replace(/ferme \u00e0 (demain|lun\.|mar\.|mer\.|jeu\.|ven\.|sam\.|dim\.) /, 'ferme $1 '));
 }
 const HOURS_STALE_DAYS = 183;
 const FR_SHORT_MONTHS = ['janv.', 'f\u00e9vr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'ao\u00fbt', 'sept.', 'oct.', 'nov.', 'd\u00e9c.'];
@@ -29512,6 +29545,8 @@ function tripStopsFor(refs) {
       const own = String(v.image_url || '').trim();
       out.push({
         ref, kind: 'venue', name: v.name, type: CATEGORY_LABELS[v.type].singular, region: v.region, regionLabel: REGION_LABELS[v.region],
+        // French tray and /fr/my-trip (2026-10-18): the French type label and page.
+        typeFr: (CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular, urlFr: frHref(`/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`),
         url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
         photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? photoSized(own, 480) : cardPhotoKeyUrl(curatedPhotoKey(v)),
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
@@ -29523,7 +29558,8 @@ function tripStopsFor(refs) {
       if (!e || !REGION_LABELS[e.region] || !e.slug) { out.push({ ref, missing: true }); continue; }
       const host = e.venue_id ? venueQ.get(e.venue_id) : null;
       out.push({
-        ref, kind: 'event', name: e.name, type: 'Event', region: e.region, regionLabel: REGION_LABELS[e.region],
+        ref, kind: 'event', name: e.name, type: 'Event', typeFr: '\u00c9v\u00e9nement', region: e.region, regionLabel: REGION_LABELS[e.region],
+        urlFr: frHref(`/${e.region}/events/${e.slug}`),
         url: `/${e.region}/events/${e.slug}`,
         photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(e.image_url || '')) ? e.image_url : WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'),
         lat: host && host.latitude !== null ? Number(host.latitude) : null,
@@ -29685,6 +29721,8 @@ function renderMyTripPage(opts = {}) {
     day: L('Day', 'Jour'), yourStops: L('Your stops', 'Vos arrêts'),
     dirDay: L('Directions for Day {d} in Google Maps', 'Itinéraire du jour {d} dans Google Maps'),
     dirAll: L('Directions in Google Maps', 'Itinéraire dans Google Maps'),
+    // A planned trip's stops without a day (2026-10-18): their link maps only them, so it says so.
+    otherStops: L('Other stops', 'Autres arrêts'), dirOther: L('Directions for other stops', 'Itinéraire des autres arrêts'),
     gone: L('No longer listed', 'N’est plus répertorié'),
     moveUp: L('Move {name} up', 'Monter {name}'), moveDown: L('Move {name} down', 'Descendre {name}'), remove: L('Remove {name}', 'Retirer {name}'),
     movedUp: L('Moved {name} up.', '{name} déplacé vers le haut.'), movedDown: L('Moved {name} down.', '{name} déplacé vers le bas.'),
@@ -29815,27 +29853,33 @@ ${renderGolfHeaderHtml()}
     if (viewing === 'shared') el('mtSharedText').textContent = trip.length ? T.replaces.replace('{n}', trip.length + ' ' + (trip.length === 1 ? T.stop : T.stops)) : T.saveKeep;
     // Stops saved with a planner day are grouped by day (each with its own directions link); stops saved without
     // one stay together as "Your stops" (2026-10-18: one older stop used to flatten a planned trip into one list).
+    // Days in order, then the stops without a day as "Other stops" (2026-10-18), the same groups as the tray; the
+    // numbers (and map pins) follow the list as shown.
     var byDay = stops.length && stops.some(function(s){ return s.day > 0; });
-    var groups = [];
+    var groups = [], byKey = {};
     stops.forEach(function(s, i){
       var key = byDay ? s.day : 0;
-      var g = groups.length && groups[groups.length - 1].key === key ? groups[groups.length - 1] : null;
-      if (!g) { g = { key: key, stops: [] }; groups.push(g); }
+      var g = byKey[key];
+      if (!g) { g = byKey[key] = { key: key, stops: [] }; groups.push(g); }
       g.stops.push({ s: s, i: i });
     });
+    groups.sort(function(a, b){ return (a.key || 1e9) - (b.key || 1e9); });
+    var shown = [];
+    groups.forEach(function(g){ g.stops.forEach(function(x){ shown.push(x.s); x.n = shown.length; }); });
     var mine = viewing === 'mine';
     el('mtDays').innerHTML = groups.map(function(g){
-      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key : T.yourStops) + '</h2>' +
-        '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : T.dirAll) + '</a></div>' +
+      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
+        '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
         '<ol class="mt-list">' + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
-          var name = d.url ? '<a class="mt-name" href="' + esc(d.url) + '">' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
-          var meta = d.missing ? T.gone : [d.type, d.regionLabel].filter(Boolean).join(' · ');
+          var name = d.url ? '<a class="mt-name" href="' + esc((document.documentElement.lang === 'fr' && d.urlFr) || d.url) + '">' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
+          var fr = document.documentElement.lang === 'fr';
+          var meta = d.missing ? T.gone : [(fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
-          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + (x.i + 1) + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p></div>' + tools + '</li>';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p></div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
-    drawMap(stops);
+    drawMap(shown);
   }
   function drawMap(stops){
     var pts = stops.map(function(s, i){ var d = info[s.ref]; return d && d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng, n: i + 1, name: d.name } : null; }).filter(Boolean);
@@ -41791,6 +41835,8 @@ module.exports = {
   frenchTwinRequest,
   frText,
   frenchTwinHtml,
+  frScript,
+  frScriptFragments,
   frTextOr,
   frCuisine,
   englishTwinHtml,

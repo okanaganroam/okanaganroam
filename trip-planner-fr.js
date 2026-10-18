@@ -38,6 +38,9 @@ const WEAK = new Set(('le la les l des du de d un une et ou au aux en dans sur c
   + 'que qui ce cette ces il y').split(' '));
 // Of the STRONG words, the ones that are also English words some visitors type.
 const STRONG_ENGLISH_TOO = new Set(['cave', 'caves', 'plein', 'peche']);
+// French search words (2026-10-18): on a French page, a request with one of these is French too. They are left out
+// of STRONG because an English visitor may type "brasserie" (a restaurant) or "distilleries" in the planner.
+const STRONG_ON_FRENCH_PAGE = new Set(['brasserie', 'brasseries', 'cidrerie', 'cidreries', 'distillerie', 'distilleries']);
 
 // French -> English, longest phrase first at every position. Values are the
 // interpreter's own English phrases (discovery-intent.js), so nothing here
@@ -151,6 +154,7 @@ const PHRASES = [
   ['biere artisanale', 'craft beer'], ['bieres artisanales', 'craft beer'], ['brasserie artisanale', 'brewery'],
   ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['brasserie', 'brewery'], ['brasseries', 'breweries'],
   ['biere', 'beer'], ['bieres', 'beers'], ['distillerie', 'distillery'], ['distilleries', 'distilleries'],
+  ['cidrerie', 'cidery'], ['cidreries', 'cideries'],
   ['bar a cocktails', 'cocktail bar'], ['bar a cocktail', 'cocktail bar'], ['bars a cocktails', 'cocktail bars'],
   ['cinq a sept', 'happy hour'], ['5 a 7', 'happy hour'], ['apero', 'happy hour'], ['aperitif', 'happy hour'],
   ['sans alcool', 'non alcoholic'], ['bar sportif', 'sports bar'], ['bars sportifs', 'sports bars'],
@@ -338,13 +342,13 @@ function regionAt(tokens, at, regions) {
 // A standalone "à" ("3 jours à Kelowna") is French; English borrows it only
 // in "à la carte" and "à la mode".
 const A_GRAVE = /(?:^|[\s,;:(\[«"'])\u00e0(?=$|[\s,;:.!?)\]»"'])(?!\s+la\s+(?:carte|mode)\b)/i;
-function isFrenchTokens(tokens, keep, text) {
+function isFrenchTokens(tokens, keep, text, frenchPage = false) {
   if (A_GRAVE.test(String(text).normalize('NFC'))) return true;
   let strong = 0;
   const weak = new Set();
   tokens.forEach((w, i) => {
     if (keep.has(i)) return;
-    if (STRONG.has(w) && !STRONG_ENGLISH_TOO.has(w)) strong += 1;
+    if ((STRONG.has(w) && !STRONG_ENGLISH_TOO.has(w)) || (frenchPage && STRONG_ON_FRENCH_PAGE.has(w))) strong += 1;
     else if (WEAK.has(w)) weak.add(w);
   });
   return strong >= 1 || weak.size >= 2;
@@ -354,8 +358,8 @@ function isFrenchTokens(tokens, keep, text) {
 // French whatever the venue list holds, and the list is never prepared for
 // it -- the ordinary English request takes this path.
 const NO_PROTECTION = new Set();
-function mayBeFrench(tokens, text) {
-  return isFrenchTokens(tokens, NO_PROTECTION, text);
+function mayBeFrench(tokens, text, frenchPage = false) {
+  return isFrenchTokens(tokens, NO_PROTECTION, text, frenchPage);
 }
 function isFrenchTripRequest(text, taxonomy) {
   if (typeof text !== 'string') return false;
@@ -365,14 +369,15 @@ function isFrenchTripRequest(text, taxonomy) {
 }
 
 // The request the planner reads: the English rewrite of a French request, or
-// the original string, unchanged, for anything else.
-function tripPlannerText(text, taxonomy) {
+// the original string, unchanged, for anything else. { frenchPage: true } (a
+// search from a French page) also counts the French-only drink words.
+function tripPlannerText(text, taxonomy, { frenchPage = false } = {}) {
   if (typeof text !== 'string') return text;
   const tokens = tokenize(text);
-  if (!mayBeFrench(tokens, text)) return text;
+  if (!mayBeFrench(tokens, text, frenchPage)) return text;
   const places = placesFor(taxonomy);
   const keep = protectedPositions(tokens, places.names);
-  if (!isFrenchTokens(tokens, keep, text)) return text;
+  if (!isFrenchTokens(tokens, keep, text, frenchPage)) return text;
   const out = [];
   let fromOpen = false;
   for (let i = 0; i < tokens.length;) {
