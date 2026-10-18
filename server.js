@@ -39403,6 +39403,15 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': 'fr-CA' });
         return res.end(html);
       }
+      // A place whose category or town was corrected (2026-10-18): the old French address 301s to its page now (French
+      // when it has one), the same exactly-one-match rule as the English route below.
+      if (!venue && REGION_LABELS[region] && type) {
+        const moved = findActiveVenueBySlugAcrossTypes(region, slug) || findActiveVenueBySlugAcrossRegions(type, slug);
+        if (moved && CATEGORY_SLUGS[moved.type] && (moved.type !== type || moved.region !== region)) {
+          res.writeHead(301, { Location: withCampaignParams(venueHasFrench(moved) ? venuePagePath(moved, 'fr') : venuePagePath(moved), parsed.search) });
+          return res.end();
+        }
+      }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
     }
