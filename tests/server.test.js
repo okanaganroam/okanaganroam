@@ -21784,7 +21784,8 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
         assert.doesNotMatch(t.a + t.aFr, /\{(ON|LIVE)\}/, `${t.id}: filled in`);
         // French answers send owners to the French entry pages.
         assert.doesNotMatch(t.aFr, /href="\/owner\/(login|link|forgot)"/, `${t.id}: French links`);
-        assert.doesNotMatch(t.aFr, /\b(the|and|you’re|we’ll)\b/, `${t.id}: no English left in the French`);
+        // Button names on the (English) edit page are quoted in bold, as they appear there.
+        assert.doesNotMatch(t.aFr.replace(/<strong>[^<]*<\/strong>/g, ''), /\b(the|and|you’re|we’ll)\b/, `${t.id}: no English left in the French`);
       }
       assert.ok(cfg.start.every((id) => cfg.topics.some((t) => t.id === id)), page);
       assert.ok(cfg.ui.en.unsure.includes('I’m not sure — tap <strong>Message us</strong> and Dayton will reply.'));
@@ -21813,11 +21814,16 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
   assert.match(signedIn['more-businesses'].a, /<strong>Add to my login<\/strong>/);
   assert.match(signedIn['photo-main'].a, /<strong>Make main photo<\/strong>, <strong>Remove<\/strong> and <strong>\u2191 \u2193<\/strong>/);
   assert.match(out['menu-add'].a, /<strong>Publish<\/strong> works once every yellow line is checked/);
-  assert.match(signedIn.hours.a, /signed in, so it goes live as soon as you send it/);
+  assert.match(signedIn.hours.a, /signed in, so it goes live as soon as you save it/);
+  // The button is "Save changes" signed in and "Send changes" on the edit link (#359).
+  assert.match(signedIn.hours.a, /Tap <strong>Save changes<\/strong> at the bottom/);
+  assert.match(link.hours.a, /Tap <strong>Send changes<\/strong> at the bottom/);
+  assert.doesNotMatch(link.hours.a, /Save changes/);
   assert.match(link.hours.a, /we check changes first/);
-  assert.match(out.hours.a, /Signed in, it goes live as soon as you send it\. From the emailed edit link we check it first/);
-  assert.match(signedIn['live-speed'].a, /as soon as you send them<\/strong>: hours, seasonal hours, special closures, phone, description/);
-  assert.match(signedIn['live-speed'].a, /Business name, address and website<\/strong> changes are checked by us first/);
+  assert.match(out.hours.a, /Signed in, it goes live as soon as you save it\. From the emailed edit link we check it first/);
+  assert.match(signedIn['live-speed'].a, /as soon as you tap Save changes<\/strong>: hours, open months, seasonal hours, special closures, phone, description, features, happy hour and price range/);
+  assert.match(signedIn['live-speed'].a, /After 30 saves on one listing in a day/);
+  assert.match(signedIn['live-speed'].a, /business name, address, website or link<\/strong> is checked by us first/);
   assert.match(link['live-speed'].a, /we check every change first/);
   assert.match(signedIn['name-address'].a, /always checked by us first<\/strong>, usually within a day, even when you’re signed in/);
   assert.match(signedIn['login-create'].a, /You already have one/);
@@ -21827,9 +21833,11 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
   assert.match(out.reviews.a, /come from <strong>Google<\/strong>/);
   assert.match(out.reviews.a, /can’t reply to reviews on Okanagan Roam/);
   assert.match(out['event-repeat'].a, /Repeats or other dates\?/);
-  assert.match(out['price-range'].a, /<strong>\$\$\$\$<\/strong> high-end/);
+  assert.match(out['price-range'].a, /<strong>\$\$\$\$<\/strong> over \$60/);
   assert.match(out['menu-add'].a, /Type it in myself/);
-  assert.match(out.closures.a, /Special closures/);
+  assert.match(out.closures.a, /Special closures<\/strong>[\s\S]*<strong>\+ Add a closed day<\/strong>[\s\S]*\u201cClosed today \(Christmas\)\u201d/);
+  assert.match(out['seasonal-hours'].a, /We have different hours part of the year/);
+  assert.match(signedIn['changes-review'].a, /Waiting for review<\/strong> chip/);
 });
 
 test('Help bot v2 (2026-10-18): the page script answers, says "not sure", switches to French and keeps Message us private', async () => {
