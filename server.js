@@ -7930,13 +7930,17 @@ const EVENT_PHOTO_RULES = [
   ['halloweenkids', /(hallowe'?en|spook|trick[- ]or[- ]treat|gnome-a-ween).*(famil|kids|children|little|all ages|non-scary)|(famil|kids|children).*(hallowe'?en|trick[- ]or[- ]treat)/],
   ['candlelight', /candlelight/], ['drag', /\bdrag\b/], ['burlesque', /burlesque/],
   ['comedy', /comed(y|ian)|stand-up|stand up|comic strippers|improv/], ['magic', /magician|magic show/],
+  ['swim', /across the lake swim|open[- ]water swim|triathlon|polar (bear )?(dip|plunge|swim)/], ['nordic', /cross[- ]country ski|\bnordic\b|biathlon/],
+  ['snowboard', /snowboard|rail jam|terrain park/], ['chairlift', /(alpine|ski|mountain|big white|silverstar|apex|baldy)[^.]{0,30}opening day|opening day[^.]{0,30}(ski|lifts?)\b/],
+  ['ski', /\bski (race|day|with|challenge|cup|games)|skiing|skiers|snowcross|downhill (race|ski)/],
+  ['rodeo', /rodeo|stampede/], ['ring', /wrestling|\bmma\b|fight night/], ['remembrance', /remembrance|cenotaph|poppies/],
   ['hockey', /\bhockey\b|\bwhl\b|\bbchl\b|\bkijhl\b|puck drop/], ['basketball', /basketball/], ['volleyball', /volleyball/], ['rugby', /\brugby\b/],
   ['pickleball', /pickleball|tennis/], ['golf', /\bgolf\b/], ['skating', /figure skat|skate canada/],
   ['mtbrace', /mountain bike|enduro|downhill race|pedalfest/], ['speedway', /speedway|stock car|race car/],
   ['kickboxing', /kickboxing|muay thai|boxing|martial arts/],
   ['soundbath', /sound (bath|healing|journey)|singing bowls|\bgongs?\b/], ['yoga', /\byoga\b|breathwork|meditation|asana/],
   // Shows and screenings.
-  ['aerial', /aerial|acrobat|circus/], ['carnival', /sideshow|carnival of/], ['ballet', /ballet|contemporary dance|dance work/],
+  ['aerial', /aerial (silks|arts|show|acrobat)|acrobat|circus/], ['carnival', /sideshow|carnival of/], ['ballet', /ballet|contemporary dance|dance work/],
   ['kidstheatre', /puppet|theatre for young|(family|kids|children'?s) (musical|theatre|play)/],
   ['outdoormovie', /movie night|movies in the|outdoor (movie|cinema)|cinema series/], ['cinema', /film festival|film series|\bfilm\b|screening|cinema|\bmovie/],
   // Books, food and drink outings, markets, classes and gatherings.
@@ -7945,14 +7949,14 @@ const EVENT_PHOTO_RULES = [
   ['cookingclass', /cooking class|culinary class/], ['charcuterie', /charcuterie|cheese (class|tasting|pairing)/],
   ['tea', /afternoon tea|high tea/], ['smores', /s'mores|smores/], ['baking', /bake sale|baking|\bbake\b/],
   ['market', /farmers.? market/], ['xmasmarket', /christmas market|holiday market|yuletide|winter (warm-up )?market|christmas at the/],
-  ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage|antique|rummage|retromania|collectibles|flea market/],
-  ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/],
+  ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage (fair|market|fashion|clothing|sale)|antique|rummage|retromania|collectibles|flea market|closet/],
+  ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/], ['santa', /\bsanta\b/], ['pumpkinpatch', /pumpkin (patch|picking)/],
   ['storytime', /storytime|story time/], ['games', /video game|mario kart|minecraft|gaming|esports/],
   ['artgallery', /exhibition|art show|art walk|art gallery|artists?'? (show|sale)/],
   ['wreath', /wreath/], ['ceramics', /ceramic|pottery/],
   ['crafts', /craft(ing|s)?\b.*(night|workshop|session|class)|workshop|mosaic|silk scarf|make your own|frankenstuff/],
-  ['techclass', /android|iphone|computer|tablet|tech help|digital literacy/], ['language', /language|nsyilx/],
-  ['moms', /\bmoms?\b|motherhood/], ['gala', /\bgala\b/], ['talk', /tedx|\btalks?\b|lecture|open house|speakers?\b/],
+  ['techclass', /android|iphone|computer|tablet|tech help|digital literacy/], ['language', /language (class|course|lesson)|learning a language|nsyilx/],
+  ['moms', /\bmoms?\b|motherhood/], ['gala', /\bgala\b/], ['talk', /tedx|\btalks?\b|lecture|open house|speaker series/],
   ['coffee', /coffee social|networking|forget-me-not|dementia/], ['pubnight', /bingo|trivia|quiz night/],
   ['dinner', /dinner|long table|feast|friendsgiving|four courses|pasta/], ['wine', /wine (tasting|info)|holiday cheer|barrel|wine club/],
   // Music, by sound; a big-arena show gets the crowd photo.
@@ -7968,9 +7972,24 @@ const EVENT_PHOTO_RULES = [
   ['halloweenparty', /hallowe'?en|spook|howl-?oween|hallowine|haunting|witches/],
   ['theatre', /theatre|musical|\bplay\b|stage thriller/], ['heritage', /heritage house|historic house|guided tours?|house tour/],
 ];
-const EVENT_PHOTO_SPECIAL = Object.freeze({ golf: '/images/golf/golf-courses-800.jpg', pickleball: '/images/sports/activity-courts-800.jpg' });
-let EVENT_PHOTO_BY_ID = {};
-try { EVENT_PHOTO_BY_ID = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'event-photo-themes.json'), 'utf8')).events || {}; } catch (e) { EVENT_PHOTO_BY_ID = {}; }
+// Photos that live elsewhere on the site. `wo-<category>` keys are the What's On category photos, so an event can be
+// pinned to one in data/event-photo-themes.json (2026-10-18 photo review).
+const EVENT_PHOTO_SPECIAL = Object.freeze({
+  golf: '/images/golf/golf-courses-800.jpg', pickleball: '/images/sports/activity-courts-800.jpg', courts: '/images/sports/activity-courts-800.jpg',
+  pumpkins: '/images/guides/halloween-pumpkins-800.jpg', ski: '/images/ski-snow/ski-snow-800.jpg', trail: '/images/outdoors/activity-hiking-800.jpg',
+  ...Object.fromEntries(['arts-culture', 'community-events', 'events-festivals', 'family-kids', 'food-drink-events', 'holiday-seasonal', 'markets-fairs', 'nightlife', 'sports-recreation', 'wineries-wine-events']
+    .map((c) => [`wo-${c}`, `/images/whats-on/${c}-800.jpg`])),
+  'wo-workshops-pottery-wheel': '/images/whats-on/workshops-pottery-wheel-800.jpg', 'wo-whats-on': '/images/whats-on/whats-on-800.jpg',
+});
+let EVENT_PHOTO_BY_ID = {}, EVENT_PHOTO_NAMES = {};
+try {
+  const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'event-photo-themes.json'), 'utf8'));
+  EVENT_PHOTO_BY_ID = themes.events || {};
+  EVENT_PHOTO_NAMES = themes.names || {};
+} catch (e) { EVENT_PHOTO_BY_ID = {}; EVENT_PHOTO_NAMES = {}; }
+// A pinned photo only applies while the event still has the name it was chosen for, so a renamed event (or a test
+// database whose ids overlap) falls back to the keyword rules instead of showing another event's photo.
+const eventPhotoName = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const eventPhotoReady = new Map();
 function eventThemePhoto(key) {
   const src = EVENT_PHOTO_SPECIAL[key] || `/images/events/${key}-2610-800.jpg`;
@@ -7982,7 +8001,8 @@ function eventThemePhoto(key) {
 // band on stage.
 function eventKindPhoto(e) {
   const byId = EVENT_PHOTO_BY_ID[String(e.id)];
-  if (byId) return eventThemePhoto(byId);
+  const pinnedName = EVENT_PHOTO_NAMES[String(e.id)];
+  if (byId && (!e.name || !pinnedName || eventPhotoName(e.name) === eventPhotoName(pinnedName))) return eventThemePhoto(byId);
   for (const field of [e.name, e.description]) {
     const text = String(field || '').toLowerCase().replace(/[’‘]/g, "'");
     for (const [key, re] of EVENT_PHOTO_RULES) if (re.test(text) && eventThemePhoto(key)) return eventThemePhoto(key);

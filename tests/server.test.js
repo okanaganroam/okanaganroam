@@ -4568,7 +4568,7 @@ test('S6 #14-#18/#23: with fixture inventory the page is indexable and real even
   assert.doesNotMatch(lakeside, /example\.com|tel:|Visit Website/, 'no website/phone on the card');
   const pumpkin = markup.match(/<li class="venue-card whatson-event-card"[^>]*data-venue-name="S6 Osoyoos Pumpkin Patch"[\s\S]*?<\/li>/)[0];
   assert.match(pumpkin, new RegExp(`Osoyoos &middot; ${app.formatLocalDateShort(d1, { weekday: false })} – ${app.formatLocalDateShort(d2, { weekday: false })}</p>`), 'all-day span: dates only, no time');
-  assert.match(pumpkin, /<img class="whatson-event-img whatson-event-photo" src="\/images\/guides\/halloween-pumpkins-800\.jpg"/, 'no image of its own -> a photo for its kind of event');
+  assert.match(pumpkin, /<img class="whatson-event-img whatson-event-photo" src="\/images\/events\/pumpkinpatch-2610-800\.jpg"/, 'no image of its own -> a photo for its kind of event (a pumpkin patch)');
   const festival = cards.find((c) => c.valley);
   assert.ok(festival, 'valley-wide card carries the flag for the client filter');
   assert.doesNotMatch(text, /source_url|event_confidence|batch_id|test-fixture-admin-token|\/api\/events/, 'no admin metadata, token or API references in the page');
