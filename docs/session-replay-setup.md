@@ -15,7 +15,7 @@ The owner explicitly requested â€œrecord visitors automatically without asking,â
 - Prior recording refusals remain respected. GPC and DNT browser signals also suppress replay. Failure to read the legacy preference fails closed.
 - The replay integration writes no local-storage preference or persistent visitor ID. Cookie consent denial prevents Clarity's persistent cookies; pageviews are not joined into a visitor journey.
 - Privacy disclosure describes the automatic mode and its exclusions. Google Analytics settings are unchanged.
-- Navigation protections preserve new tabs and modified clicks; same-document fragment navigation unloads the recorder.
+- Navigation protections preserve new tabs and modified clicks. Same-page query or fragment changes (filters, sort, ?q=, #main) stop the recorder for the rest of that page view without reloading (2026-10-18); private destinations on another path still navigate fully.
 
 ## Validation
 
