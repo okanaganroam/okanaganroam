@@ -22841,7 +22841,11 @@ ${VENUE_MENU_CSS}` : ''}
   </div>` : ''}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
-  <p class="venue-owner-cta" style="font-size:.88rem;margin:16px 0 0;opacity:.85">${L('Own this business?', 'C\u2019est votre entreprise?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
+  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
+    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
+    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Revendiquer cette fiche')}</a>
+    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
+  </div>`}
   </aside>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
@@ -28775,9 +28779,9 @@ function renderPrivacyPage() {
     </ul>
     <h2>Analytics</h2>
     <p>We use Google Analytics to understand how the site is used in general &mdash; which pages are popular, roughly where visitors come from and what devices they use. Google Analytics uses cookies to do this. We use the reports to improve the site, not to identify you. You can learn more in <a href="https://policies.google.com/technologies/partner-sites" rel="noopener" target="_blank">how Google uses information from sites that use its services</a>, or install the <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener" target="_blank">Google Analytics opt-out add-on</a>.</p>
-    ${process.env.CLARITY_PROJECT_ID ? `<h2>Optional session recordings</h2>
-    <p>If you choose Allow recordings, Microsoft Clarity records interactions such as clicks, scrolling and navigation on selected public pages to help us improve the site. Text and form fields are masked. Recording does not load before you agree. We exclude private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments. Use Recording preferences on public pages to change your choice; declining reloads the page to stop recording. This choice applies to session recordings and does not change Google Analytics settings.</p>
-    <p>Clarity processes usage, device and network data and may use cookies after you consent. See the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. Your recording preference is stored in your browser.</p>` : ''}
+    ${process.env.CLARITY_PROJECT_ID ? `<h2>Masked session recordings</h2>
+    <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
+    <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
     <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email.</p>
     <h2>Services that help run the site</h2>
@@ -29909,21 +29913,28 @@ function venueListingUrl(v) {
 
 // Creates (or, with reset, replaces) a venue's edit link. Returns
 // { ok: true, token, url } -- the only time the token is ever visible.
+// keepOld (2026-10-18): the link being replaced keeps working until the new
+// one is first opened (venueForOwnerToken), so someone who knows a business's
+// email can't kill the owner's working link just by asking for a new one. If
+// the replaced link was itself never opened, the one before it stays the
+// fallback, so repeated requests can't push the working link out either.
+// Without keepOld (admin reset of a leaked link) the old link stops at once.
 function createOwnerLink(venueId, opts = {}) {
   const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(venueId);
   if (!venue) return { ok: false, reason: 'venue_not_found' };
   if (venue.redirect_to) return { ok: false, reason: 'venue_redirected' };
   const email = opts.contact_email == null ? null : String(opts.contact_email).trim().slice(0, 254) || null;
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, reason: 'invalid_email' };
-  const existing = db.prepare('SELECT venue_id FROM venue_owner_links WHERE venue_id = ?').get(venueId);
+  const existing = db.prepare('SELECT venue_id, token_hash, prev_token_hash FROM venue_owner_links WHERE venue_id = ?').get(venueId);
   if (existing && !opts.reset) return { ok: false, reason: 'link_exists' };
+  const prev = existing && opts.keepOld ? (existing.prev_token_hash || existing.token_hash) : null;
   const token = crypto.randomBytes(24).toString('base64url');
-  db.prepare(`INSERT INTO venue_owner_links (venue_id, token_hash, contact_email, created_at, last_used_at)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP, NULL)
+  db.prepare(`INSERT INTO venue_owner_links (venue_id, token_hash, contact_email, created_at, last_used_at, prev_token_hash)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, NULL, ?)
     ON CONFLICT(venue_id) DO UPDATE SET token_hash = excluded.token_hash,
       contact_email = COALESCE(excluded.contact_email, venue_owner_links.contact_email),
-      created_at = CURRENT_TIMESTAMP, last_used_at = NULL`).run(venueId, ownerTokenHash(token), email);
-  return { ok: true, token, url: ownerLinkUrl(token), replaced: !!existing };
+      created_at = CURRENT_TIMESTAMP, last_used_at = NULL, prev_token_hash = excluded.prev_token_hash`).run(venueId, ownerTokenHash(token), email, prev);
+  return { ok: true, token, url: ownerLinkUrl(token), replaced: !!existing, oldStillWorks: !!prev };
 }
 
 function revokeOwnerLink(venueId) {
@@ -29934,7 +29945,12 @@ function revokeOwnerLink(venueId) {
 // revoked token (and for a venue that has since been retired).
 function venueForOwnerToken(token) {
   if (typeof token !== 'string' || !OWNER_TOKEN_RE.test(token)) return null;
-  const link = db.prepare('SELECT venue_id, contact_email FROM venue_owner_links WHERE token_hash = ?').get(ownerTokenHash(token));
+  const hash = ownerTokenHash(token);
+  let link = db.prepare('SELECT venue_id, contact_email, prev_token_hash FROM venue_owner_links WHERE token_hash = ?').get(hash);
+  // The newest link was opened: the one it replaced stops working now (2026-10-18).
+  if (link && link.prev_token_hash) db.prepare('UPDATE venue_owner_links SET prev_token_hash = NULL WHERE venue_id = ?').run(link.venue_id);
+  // The link before a re-send still works until the new one is opened.
+  if (!link) link = db.prepare('SELECT venue_id, contact_email FROM venue_owner_links WHERE prev_token_hash = ?').get(hash);
   if (!link) return null;
   const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(link.venue_id);
   if (!row || row.redirect_to) return null;
@@ -34016,7 +34032,7 @@ async function handleOwnerLogin(req, res) {
 // answers below, matched in the owner's browser to what they type or tap, with the most likely topics for the page
 // they are on first. If a portal error is showing it explains that error. Anything it can't answer goes to
 // info@okanaganroam.com through POST /owner/help, with the business and page attached so Dayton can reply.
-// Pages: login, link, forgot, reset, account, settings, edit, menu, invalid.
+// Pages: login, link, forgot, reset, account, settings, edit, menu, invalid, claim.
 const OWNER_HELP_TOPICS = [
   { id: 'signin', q: 'I can\u2019t sign in', pages: ['login', 'account'],
     keys: ['sign in', 'signin', 'log in', 'login', 'cant get in', 'password wrong', 'dont match', 'locked', 'locked out', 'cannot log'],
@@ -34026,7 +34042,17 @@ const OWNER_HELP_TOPICS = [
     a: '<ol><li>Go to <a href="/owner/forgot">Reset your password</a> and enter your login email.</li><li>Open the email from Okanagan Roam (check spam or promotions if it isn\u2019t there in a few minutes).</li><li>Choose a new password: at least 10 characters, typed twice.</li></ol><p>The reset link works once and expires after an hour. Resetting signs you out on your other devices.</p>' },
   { id: 'newlink', q: 'I lost my edit link, or it doesn\u2019t work', pages: ['invalid', 'login', 'link'],
     keys: ['link', 'edit link', 'lost link', 'link not valid', 'isnt valid', 'expired', 'old link', 'new link', 'email link'],
-    a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>A new link replaces the old one, so always use the newest email. If no email comes, your business may be listed with a different email. Use <strong>Message us</strong> below and we\u2019ll sort it out.</p>' },
+    a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>Your old link keeps working until you open the new one; after that, use the newest email. If no email comes, we may not have your email, or have a different one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, or use <strong>Message us</strong> below.</p>' },
+  // Claim this listing (2026-10-18): owners with no edit link, no email on file, or a changed email.
+  { id: 'claim', q: 'How do I claim my listing?', pages: ['login', 'link', 'invalid', 'account', 'claim'],
+    keys: ['claim', 'claim my listing', 'claim this listing', 'claim my business', 'take over', 'takeover', 'my business is listed', 'business is on your site', 'ownership', 'prove', 'verify', 'own this business', 'get access', 'access my listing', 'no edit link', 'never had a link', 'manage my listing', 'control my listing'],
+    a: '<ol><li>Open your business\u2019s page on Okanagan Roam and tap <strong>Claim this listing</strong> (beside the opening hours).</li><li>Tell us your name, your role and your business email, and how we can check it\u2019s you, for example by calling the number on your listing.</li><li>Once we\u2019ve checked, usually within a day or two, we email you a private edit link. On that page you can also create a login.</li></ol><p>It\u2019s free. Already got an email from us before? <a href="/owner/link">Email me a new link</a> is faster. Not listed at all? <a href="/list-your-venue">List your business</a>.</p>' },
+  { id: 'noemail', q: 'I never got the email', pages: ['login', 'link', 'forgot', 'invalid'],
+    keys: ['never got', 'didnt get', 'did not get', 'didnt receive', 'not received', 'never received', 'havent received', 'havent got', 'no email', 'didnt arrive', 'hasnt arrived', 'not arrived', 'where is the email', 'spam', 'junk', 'promotions', 'never came', 'didnt come'],
+    a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>' },
+  { id: 'staff', q: 'Can my staff or a partner log in too?', pages: ['account', 'edit', 'login', 'settings'],
+    keys: ['staff', 'employee', 'employees', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'same login'],
+    a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password.</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don\u2019t share one password between people. Each person can take a business off their own login in <a href="/owner/account/settings">Account settings</a>; to remove someone else, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>' },
   { id: 'login-create', q: 'How do I make a login?', pages: ['edit', 'login'],
     keys: ['create login', 'make login', 'account', 'make an account', 'sign up', 'register', 'why login'],
     a: '<ol><li>Open your listing with the edit link we emailed you.</li><li>Find <strong>Create a login</strong> near the top, then enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, photos and menus you add from <strong>My listings</strong> go live straight away.</p>' },
@@ -34112,15 +34138,16 @@ const OWNER_HELP_ERROR_RULES = [
   [/event date has already passed|1 to 3 categories|start time, or tick all day/i, 'event-add'],
 ];
 const OWNER_HELP_START = {
-  login: ['signin', 'forgot', 'newlink', 'login-create'],
-  link: ['newlink', 'signin'],
+  login: ['signin', 'forgot', 'newlink', 'claim', 'login-create'],
+  link: ['newlink', 'noemail', 'claim', 'signin'],
   forgot: ['forgot', 'signin'],
   reset: ['forgot', 'signin'],
-  account: ['photo-pending', 'more-businesses', 'settings', 'changes-review'],
+  account: ['photo-pending', 'more-businesses', 'staff', 'settings', 'changes-review'],
   settings: ['settings', 'more-businesses', 'forgot'],
   edit: ['photo-add', 'hours', 'event-add', 'menu-add', 'changes-review', 'photo-pending'],
   menu: ['menu-add', 'menu-blurry', 'menu-website', 'photo-pending'],
-  invalid: ['newlink', 'signin'],
+  invalid: ['newlink', 'claim', 'signin'],
+  claim: ['claim', 'noemail', 'staff', 'cost'],
 };
 const OWNER_HELP_CSS = `
   .ohb-btn { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; background: #1F3A5F; background: var(--ref-navy, #1F3A5F); color: #fff; border: 0; border-radius: 999px; padding: 12px 18px 12px 14px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 28px -10px rgba(0,0,0,0.5); }
@@ -34327,6 +34354,12 @@ async function handleOwnerHelpMessage(req, res) {
     const found = venueForOwnerAccount(account, Number(accountVenue[1]));
     if (found) venues = [found.venue];
   }
+  // From a claim form (2026-10-18): the listing they are claiming.
+  const claimMatch = /^(?:\/fr)?\/claim\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)/.exec(path);
+  if (!venues.length && claimMatch && SLUG_TO_TYPE[claimMatch[2]]) {
+    const found = findVenueBySlug(claimMatch[1], SLUG_TO_TYPE[claimMatch[2]], claimMatch[3]);
+    if (found && !found.redirect_to) venues = [found];
+  }
   if (!venues.length && account) venues = ownerAccountVenues(account.id);
   const replyTo = account ? account.email : clean(body.email, 200);
   if (!account && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please add your email so we can reply.' });
@@ -34363,7 +34396,7 @@ async function handleOwnerHelpMessage(req, res) {
 // The help bot on the simple portal pages, picked by page title (admin and visitor pages get none).
 const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
   'Business login': ['login', false], 'My listings': ['account', true], 'Account settings': ['settings', true],
-  'Get your edit link': ['link', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
+  'Get your edit link': ['link', false], 'Claim this listing': ['claim', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
 });
 // French entry pages (2026-10-18): lang 'fr' gives the page a French title and description; the help bot is English
 // only, so those pages point to info@ in French instead (see ownerEntryHelpFr).
@@ -34738,8 +34771,9 @@ async function handleOwnerForgot(req, res) {
 //
 // /owner/link: an owner who can't find the private link we emailed enters the
 // email we have on file for their business (venue_owner_links.contact_email).
-// For each business with that email we make a fresh link (the old one stops
-// working) and email it straight to that address. The page says the same thing
+// For each business with that email we make a fresh link and email it straight
+// to that address. The old link keeps working until the new one is first
+// opened (2026-10-18), so a request from someone else can't lock the owner out. The page says the same thing
 // whether or not the email is on file. At most 3 requests per email per hour.
 const OWNER_NEW_LINK_PATH = '/owner/link';
 const ownerNewLinkRecent = new Map();
@@ -34749,7 +34783,7 @@ function ownerNewLinkEmailText(items) {
     ? `Here's a new private link to update ${items[0].name} on Okanagan Roam:`
     : 'Here are new private links to update your businesses on Okanagan Roam:',
   '', ...items.map((it) => (items.length === 1 ? it.url : `${it.name}: ${it.url}`)), '',
-  'No password needed. Keep the link private; anyone with it can suggest changes. Any older link we sent you no longer works.',
+  'No password needed. Keep the link private; anyone with it can suggest changes. Once you open this link, any older link we sent you stops working.',
   '', 'Tip: on that page you can create a login, so next time you can sign in at https://okanaganroam.com/owner/login instead.',
   '', 'If you didn’t ask for this, you can ignore this email.', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n');
 }
@@ -34767,7 +34801,7 @@ async function handleOwnerNewLink(req, res) {
     recent.push(now); ownerNewLinkRecent.set(email, recent);
     const items = [];
     for (const v of venues) {
-      const r = createOwnerLink(v.id, { reset: true });
+      const r = createOwnerLink(v.id, { reset: true, keepOld: true });
       if (r.ok) items.push({ name: v.name, url: r.url });
     }
     const direct = ownerDirectEmail();
@@ -34797,10 +34831,12 @@ function renderOwnerNewLinkPage({ lang = 'en' } = {}) {
       <p class="lyv-error" id="onlError" hidden></p>
       <button type="submit" class="venue-form-submit" id="onlSubmit">${L('Email me my link', 'M’envoyer mon lien')}</button>
     </form>
-    <p class="op-done" id="onlDone" hidden>${L('If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Any older link stops working.', 'Si nous avons ce courriel pour une entreprise, un nouveau lien est en route. Vérifiez votre boîte de réception (et vos courriels indésirables). Les anciens liens ne fonctionnent plus.')}</p>
-    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Vous ne savez pas quel courriel nous avons?</strong> Écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous réglerons la question.
+    <p class="op-done" id="onlDone" hidden>${L('If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.', 'Si nous avons ce courriel pour une entreprise, un nouveau lien est en route. Vérifiez votre boîte de réception (et vos courriels indésirables). Votre ancien lien fonctionne jusqu’à ce que vous ouvriez le nouveau.')}</p>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Nous n’avons pas votre courriel, ou il a changé?</strong> Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong>. Nous vérifierons qu’il s’agit bien de vous et vous enverrons un lien.
+    <br><strong>Vous ne savez pas quel courriel nous avons?</strong> Écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous réglerons la question.
     <br><strong>Vous avez déjà un compte?</strong> <a href="/owner/login">Connectez-vous ici</a>.</p>
-    <p class="op-hint">La page de modification de votre fiche s’affiche en anglais pour l’instant.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
+    <p class="op-hint">La page de modification de votre fiche s’affiche en anglais pour l’instant.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
+    <br><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
     <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>`}
 ${ownerEntryMessagesJson(fr)}<script>
 ${ownerEntryMessagesScript(fr)}
@@ -34823,6 +34859,385 @@ ${ownerEntryMessagesScript(fr)}
   });
 })();
 </script>`, '', { lang, helpKey: 'Get your edit link' });
+}
+
+// ---------- Claim this listing (2026-10-18) ----------
+//
+// Owners who never got an edit link (about 331 phone-only listings have no
+// email on file) or whose email changed had no way in: /owner/link only mails
+// an email we already have. Every venue page now has a "Claim this listing"
+// button -> /claim/<region>/<category>/<slug> (French: /fr/claim/...). The
+// claim is stored in venue_claims and emailed to info@okanaganroam.com;
+// Dayton checks it against the phone, website and email on file and approves
+// it on /admin/review, which makes an edit link for the claimant's email and
+// emails it to them. Nothing on the listing changes until then.
+const CLAIM_PATH = '/claim/';
+const CLAIM_ROLES = { owner: ['Owner', 'Propriétaire'], manager: ['Manager', 'Gérant ou gérante'], staff: ['Staff', 'Employé ou employée'], other: ['Other', 'Autre'] };
+const CLAIM_VERIFY = {
+  call: ['Call the business number on this listing', 'Appelez le numéro de l’entreprise indiqué sur cette fiche'],
+  website: ['Our website shows the email I gave above', 'Notre site Web affiche l’adresse courriel indiquée ci-dessus'],
+  social: ['I’ll message you from the business’s Instagram or Facebook', 'Je vous écrirai depuis l’Instagram ou le Facebook de l’entreprise'],
+  other: ['Something else', 'Autre chose'],
+};
+const CLAIM_KEYS = new Set(['venue_id', 'name', 'role', 'email', 'phone', 'verify_method', 'verify_detail', 'message', 'lang', 'company_website', 'started_at']);
+const CLAIM_RATE_LIMIT = 10; // claim attempts per IP per hour
+const claimAttempts = new Map();
+
+const CLAIM_TEXT = {
+  en: {
+    title: 'Claim this listing', eyebrow: 'For businesses',
+    intro: 'Own or manage {name}? Tell us who you are and how we can check it’s you. Once we have, we’ll email you a private link to update the listing: photos, hours, menu or prices, and events. It’s free.',
+    name: 'Your name', role: 'Your role', choose: 'Choose one', email: 'Business email', emailHint: 'We’ll send the edit link here.',
+    phone: 'Phone number', verify: 'How can we check it’s you?', detailSocial: 'Which account? (for example @yourbusiness)', detailOther: 'Tell us how',
+    message: 'Anything else? (optional)', submit: 'Send my claim', sending: 'Sending…',
+    callNumber: ' ({phone})', already: 'Already have a login?', signIn: 'Sign in', haveEmail: 'Got an email from us before?', newLink: 'Email me a new link',
+    doneTitle: 'Thanks, we’ve got it',
+    done: 'We’ll check it’s you{how} and email {email} a private link to update {name}, usually within a day or two. Nothing on the listing changes until then.',
+    doneCall: ' (we may call the business)', back: 'Back to {name}', noJs: 'This form needs JavaScript. You can also email info@okanaganroam.com.',
+    errName: 'Please enter your name.', errRole: 'Please choose your role.', errEmail: 'Please enter a valid email address.',
+    errPhone: 'Please enter a valid phone number, like 250-555-0123.', errVerify: 'Please choose how we can check it’s you.',
+    errDetail: 'Please tell us a little more (up to 300 characters).', errMessage: 'Please keep your message under 1,000 characters.',
+    errFix: 'Please fix the highlighted fields.', errFast: 'That was very quick. Please check your details and press Send again.',
+    errExpired: 'This form has expired. Please reload the page and try again.', errRate: 'Too many requests from your connection. Please try again in an hour, or email info@okanaganroam.com.',
+    errOrigin: 'Please use the form on okanaganroam.com.', errGeneric: 'Sorry, something went wrong. Please try again, or email info@okanaganroam.com.',
+    errVenue: 'We couldn’t find that listing.', errConnect: 'Could not connect. Please try again.',
+  },
+  fr: {
+    title: 'Revendiquer cette fiche', eyebrow: 'Pour les entreprises',
+    intro: 'Vous êtes propriétaire ou gérant de {name} ? Dites-nous qui vous êtes et comment vérifier que c’est bien vous. Ensuite, nous vous enverrons par courriel un lien privé pour modifier la fiche : photos, heures, menu ou tarifs, et événements. C’est gratuit.',
+    name: 'Votre nom', role: 'Votre rôle', choose: 'Choisissez', email: 'Courriel de l’entreprise', emailHint: 'Nous enverrons le lien de modification à cette adresse.',
+    phone: 'Numéro de téléphone', verify: 'Comment vérifier que c’est bien vous ?', detailSocial: 'Quel compte ? (par exemple @votreentreprise)', detailOther: 'Expliquez-nous',
+    message: 'Autre chose ? (facultatif)', submit: 'Envoyer ma demande', sending: 'Envoi…',
+    callNumber: ' ({phone})', already: 'Vous avez déjà un compte ?', signIn: 'Connectez-vous', haveEmail: 'Vous avez déjà reçu un courriel de nous ?', newLink: 'Recevoir un nouveau lien',
+    doneTitle: 'Merci, c’est reçu',
+    done: 'Nous vérifierons que c’est bien vous{how} et enverrons à {email} un lien privé pour modifier {name}, en général d’ici un jour ou deux. Rien ne change sur la fiche d’ici là.',
+    doneCall: ' (nous appellerons peut-être l’entreprise)', back: 'Retour à {name}', noJs: 'Ce formulaire a besoin de JavaScript. Vous pouvez aussi écrire à info@okanaganroam.com.',
+    errName: 'Veuillez indiquer votre nom.', errRole: 'Veuillez choisir votre rôle.', errEmail: 'Veuillez indiquer une adresse courriel valide.',
+    errPhone: 'Veuillez indiquer un numéro valide, comme 250-555-0123.', errVerify: 'Veuillez choisir comment vérifier que c’est bien vous.',
+    errDetail: 'Veuillez nous en dire un peu plus (300 caractères au plus).', errMessage: 'Veuillez écrire moins de 1 000 caractères.',
+    errFix: 'Veuillez corriger les champs indiqués.', errFast: 'C’était très rapide. Vérifiez vos renseignements et appuyez de nouveau sur Envoyer.',
+    errExpired: 'Ce formulaire a expiré. Rechargez la page et réessayez.', errRate: 'Trop de demandes depuis votre connexion. Réessayez dans une heure, ou écrivez à info@okanaganroam.com.',
+    errOrigin: 'Veuillez utiliser le formulaire sur okanaganroam.com.', errGeneric: 'Désolé, un problème est survenu. Réessayez, ou écrivez à info@okanaganroam.com.',
+    errVenue: 'Nous n’avons pas trouvé cette fiche.', errConnect: 'Connexion impossible. Veuillez réessayer.',
+  },
+};
+function claimText(lang, key, vars = {}) {
+  const t = (CLAIM_TEXT[lang] || CLAIM_TEXT.en)[key] || CLAIM_TEXT.en[key] || '';
+  return t.replace(/\{(\w+)\}/g, (m, k) => (vars[k] == null ? '' : String(vars[k])));
+}
+
+function claimPagePath(venue, lang = 'en') {
+  return `${lang === 'fr' ? '/fr' : ''}${CLAIM_PATH}${venue.region}/${CATEGORY_SLUGS[venue.type]}/${venue.slug}`;
+}
+
+function claimRateLimited(ip, now = Date.now()) {
+  const recent = (claimAttempts.get(ip) || []).filter((t) => now - t < 3600000);
+  recent.push(now);
+  claimAttempts.set(ip, recent);
+  if (claimAttempts.size > 5000) for (const [k, times] of claimAttempts) if (!times.some((t) => now - t < 3600000)) claimAttempts.delete(k);
+  return recent.length > CLAIM_RATE_LIMIT;
+}
+
+// -> { data, errors } with messages in the claimant's language.
+function validateClaim(body, venue, lang) {
+  const errors = {}, data = {};
+  const str = (k) => (typeof body[k] === 'string' ? cleanSubmissionText(body[k], { multiline: k === 'message' }) : '');
+  const name = str('name');
+  if (name.length < 2 || name.length > 100 || /[<>]/.test(name)) errors.name = claimText(lang, 'errName'); else data.name = name;
+  if (!Object.prototype.hasOwnProperty.call(CLAIM_ROLES, body.role)) errors.role = claimText(lang, 'errRole'); else data.role = body.role;
+  const email = validOwnerEmail(body.email);
+  if (!email) errors.email = claimText(lang, 'errEmail'); else data.email = email;
+  const phone = str('phone');
+  const digits = phone.replace(/\D/g, '').length;
+  if (!/^[0-9+().\-\s]{7,40}$/.test(phone) || digits < 7 || digits > 15) errors.phone = claimText(lang, 'errPhone'); else data.phone = phone;
+  const method = body.verify_method;
+  const offered = claimVerifyOptions(venue);
+  if (!offered.includes(method)) errors.verify_method = claimText(lang, 'errVerify'); else data.verify_method = method;
+  const detail = str('verify_detail');
+  if (detail.length > 300 || /[<>]/.test(detail) || ((method === 'social' || method === 'other') && detail.length < 2)) errors.verify_detail = claimText(lang, 'errDetail');
+  else data.verify_detail = detail || null;
+  const message = str('message');
+  if (message.length > 1000 || /[<>]/.test(message)) errors.message = claimText(lang, 'errMessage'); else data.message = message || null;
+  return { data, errors };
+}
+
+// "Call us" only when we have a number to call; "our website" only when we have a website.
+function claimVerifyOptions(venue) {
+  return Object.keys(CLAIM_VERIFY).filter((k) => (k === 'call' ? !!(venue && venue.phone) : k === 'website' ? !!(venue && venue.website) : true));
+}
+
+// What we already know about the listing, so Dayton can check a claim against it.
+function claimOnFile(venueId) {
+  const v = db.prepare('SELECT id, name, phone, website, region, type, slug, redirect_to FROM venues WHERE id = ?').get(venueId) || {};
+  const link = db.prepare('SELECT contact_email, created_at, last_used_at FROM venue_owner_links WHERE venue_id = ?').get(venueId) || null;
+  const logins = db.prepare('SELECT a.email FROM owner_account_venues av JOIN owner_accounts a ON a.id = av.account_id WHERE av.venue_id = ? ORDER BY a.email').all(venueId).map((r) => r.email);
+  return { venue: v, link, logins };
+}
+
+// The claimant's email domain is the website's domain: a strong sign it's them.
+function claimEmailMatchesWebsite(email, website) {
+  try {
+    const host = new URL(website).hostname.toLowerCase().replace(/^www\./, '');
+    const domain = String(email || '').split('@')[1] || '';
+    return !!host && !!domain && (domain === host || domain.endsWith(`.${host}`));
+  } catch (e) { return false; }
+}
+
+function buildClaimEmail(claim) {
+  const f = claimOnFile(claim.venue_id);
+  const v = f.venue;
+  const payload = {
+    _subject: `[PENDING REVIEW] Listing claim #${claim.id}: ${v.name || `venue #${claim.venue_id}`}`,
+    _template: 'table',
+    _captcha: 'false',
+    _replyto: claim.email,
+    'Status': 'PENDING REVIEW. Nobody gets an edit link until you approve this claim.',
+    'Claim ID': String(claim.id),
+    'Submitted': formatSubmissionTimestamp(claim.submitted_at),
+    'Listing': `${v.name || ''} (venue #${claim.venue_id}) ${v.slug ? venueListingUrl(v) : ''}`.trim(),
+    'Their name': claim.name,
+    'Their role': CLAIM_ROLES[claim.role] ? CLAIM_ROLES[claim.role][0] : claim.role,
+    'Their email': claim.email,
+    'Their phone': claim.phone,
+    'How to check': CLAIM_VERIFY[claim.verify_method] ? CLAIM_VERIFY[claim.verify_method][0] : claim.verify_method,
+  };
+  if (claim.verify_detail) payload['Their details'] = claim.verify_detail;
+  if (claim.message) payload['Message'] = claim.message;
+  payload['Phone on file'] = v.phone || '(none)';
+  payload['Website on file'] = v.website || '(none)';
+  if (v.website && claimEmailMatchesWebsite(claim.email, v.website)) payload['Email check'] = 'Their email uses the website’s domain.';
+  payload['Edit link'] = f.link ? `Exists${f.link.contact_email ? ` (sent to ${f.link.contact_email})` : ' (no email on it)'}${f.link.last_used_at ? `, last used ${f.link.last_used_at} UTC` : ', never used'}` : 'None yet';
+  payload['Logins on this listing'] = f.logins.length ? f.logins.join(', ') : 'None';
+  if (claim.lang === 'fr') payload['Language'] = 'Sent from the French page';
+  payload['How to review'] = `Open ${ADMIN_REVIEW_URL}#claims and approve or reject claim #${claim.id}.`;
+  return payload;
+}
+
+async function notifyClaim(id) {
+  const claim = db.prepare('SELECT * FROM venue_claims WHERE id = ?').get(id);
+  try {
+    await venueSubmissionTransport(buildClaimEmail(claim));
+    db.prepare("UPDATE venue_claims SET notify_status = 'sent', notify_error = NULL WHERE id = ?").run(id);
+    return true;
+  } catch (err) {
+    const message = String((err && err.message) || err).slice(0, 300);
+    db.prepare("UPDATE venue_claims SET notify_status = 'failed', notify_error = ? WHERE id = ?").run(message, id);
+    console.error(`[claims] notification for claim #${id} failed (claim kept as pending): ${message}`);
+    return false;
+  }
+}
+
+// POST /api/claims
+async function handleClaimSubmission(req, res) {
+  let lang = /^\/fr\//.test(String(req.headers.referer || '').replace(/^https?:\/\/[^/]+/, '')) ? 'fr' : 'en';
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: claimText(lang, 'errOrigin') });
+  const ip = requestClientIp(req);
+  if (claimRateLimited(ip)) return sendSubmissionResponse(res, 429, { ok: false, error: claimText(lang, 'errRate') });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: claimText(lang, 'errGeneric') });
+  let body;
+  try { body = await readLimitedJsonBody(req, 8192); } catch (err) { return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: claimText(lang, 'errGeneric') }, err.status === 413); }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !CLAIM_KEYS.has(k))) {
+    return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errGeneric') });
+  }
+  if (body.lang === 'fr' || body.lang === 'en') lang = body.lang;
+  // Honeypot: answer like a success, store nothing.
+  if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
+  const startedAt = Number(body.started_at);
+  const elapsed = Date.now() - startedAt;
+  if (!Number.isFinite(startedAt) || elapsed > VENUE_SUBMISSION_MAX_FORM_AGE_MS || elapsed < -60000) return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errExpired') });
+  if (elapsed < VENUE_SUBMISSION_MIN_FILL_MS) return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errFast') });
+  const row = Number.isInteger(body.venue_id) ? db.prepare('SELECT * FROM venues WHERE id = ?').get(body.venue_id) : null;
+  if (!row || row.redirect_to || !CATEGORY_SLUGS[row.type] || !row.slug) return sendSubmissionResponse(res, 404, { ok: false, error: claimText(lang, 'errVenue') });
+  const { data, errors } = validateClaim(body, row, lang);
+  if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: claimText(lang, 'errFix'), errors });
+  const message = claimText(lang, 'done', { how: data.verify_method === 'call' ? claimText(lang, 'doneCall') : '', email: data.email, name: row.name });
+  // The same person sending twice: one claim, one email to Dayton.
+  const dup = db.prepare("SELECT id FROM venue_claims WHERE venue_id = ? AND email = ? AND status = 'pending'").get(row.id, data.email);
+  if (dup) return sendSubmissionResponse(res, 201, { ok: true, id: dup.id, message });
+  const info = db.prepare(`INSERT INTO venue_claims (venue_id, name, role, email, phone, verify_method, verify_detail, message, lang, ip_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.id, data.name, data.role, data.email, data.phone, data.verify_method, data.verify_detail, data.message, lang,
+    crypto.createHash('sha256').update(`okanagan-roam-claim:${ip}`).digest('hex'));
+  const id = Number(info.lastInsertRowid);
+  await notifyClaim(id);
+  return sendSubmissionResponse(res, 201, { ok: true, id, message });
+}
+
+// GET /claim/<region>/<category>/<slug> and /fr/claim/...
+function renderClaimPage(venue, lang) {
+  const T = (k, vars) => escapeHtml(claimText(lang, k, vars));
+  const fr = lang === 'fr';
+  const listing = fr && venueHasFrench(venue) ? venuePagePath(venue, 'fr') : venuePagePath(venue);
+  const roles = Object.entries(CLAIM_ROLES).map(([k, l]) => `<option value="${k}">${escapeHtml(l[fr ? 1 : 0])}</option>`).join('');
+  const verify = claimVerifyOptions(venue).map((k, i) => `<label class="cl-radio"><input type="radio" name="verify_method" value="${k}"${i === 0 ? ' checked' : ''}> <span>${escapeHtml(CLAIM_VERIFY[k][fr ? 1 : 0])}${k === 'call' ? escapeHtml(claimText(lang, 'callNumber', { phone: venue.phone })) : ''}</span></label>`).join('');
+  const field = (id, key, label, input, hint) => `<div class="form-field" id="${id}Field"><label for="${id}">${label}</label>${input}${hint ? `<p class="op-hint" style="margin:4px 0 0">${hint}</p>` : ''}<p class="lyv-error" role="alert" id="${id}Error" hidden></p></div>`;
+  const page = ownerSimplePage(claimText(lang, 'title'), `
+    <span class="eyebrow">${T('eyebrow')}</span>
+    <h1>${T('title')}</h1>
+    <p><strong>${escapeHtml(venue.name)}</strong> &middot; ${escapeHtml(REGION_LABELS[venue.region] || venue.region)}</p>
+    <p>${T('intro', { name: venue.name })}</p>
+    <form class="venue-form" id="clForm" novalidate>
+      <div class="lyv-hp" aria-hidden="true"><label>Leave this empty <input type="text" id="clCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off"></label></div>
+      ${field('clName', 'name', T('name'), '<input type="text" id="clName" autocomplete="name" maxlength="100" required>')}
+      ${field('clRole', 'role', T('role'), `<select id="clRole" required><option value="">${T('choose')}</option>${roles}</select>`)}
+      ${field('clEmail', 'email', T('email'), '<input type="email" id="clEmail" autocomplete="email" maxlength="254" required>', T('emailHint'))}
+      ${field('clPhone', 'phone', T('phone'), '<input type="tel" id="clPhone" autocomplete="tel" maxlength="40" required>')}
+      <fieldset class="form-field cl-verify" id="clVerifyField"><legend>${T('verify')}</legend>${verify}<p class="lyv-error" role="alert" id="clVerifyError" hidden></p></fieldset>
+      <div class="form-field" id="clDetailField" hidden><label for="clDetail" id="clDetailLabel">${T('detailSocial')}</label><input type="text" id="clDetail" maxlength="300"><p class="lyv-error" role="alert" id="clDetailError" hidden></p></div>
+      ${field('clMessage', 'message', T('message'), '<textarea id="clMessage" rows="3" maxlength="1000"></textarea>')}
+      <p class="lyv-error" role="alert" id="clError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="clSubmit">${T('submit')}</button>
+    </form>
+    <div class="op-done" id="clDone" role="status" tabindex="-1" hidden><strong>${T('doneTitle')}</strong><p id="clDoneText" style="margin:6px 0 0"></p></div>
+    <noscript><p class="op-hint">${T('noJs')}</p></noscript>
+    <p class="op-hint" style="margin-top:20px"><a href="${escapeHtml(listing)}">${T('back', { name: venue.name })}</a>
+    <br><strong>${T('haveEmail')}</strong> <a href="${OWNER_NEW_LINK_PATH}">${T('newLink')}</a>
+    <br><strong>${T('already')}</strong> <a href="/owner/login">${T('signIn')}</a></p>
+<script>
+(function(){
+  var f = document.getElementById('clForm'), btn = document.getElementById('clSubmit');
+  if (!f || !window.fetch) return;
+  var startedAt = Date.now();
+  var LABELS = { social: ${JSON.stringify(claimText(lang, 'detailSocial'))}, other: ${JSON.stringify(claimText(lang, 'detailOther'))} };
+  var IDS = { name: 'clName', role: 'clRole', email: 'clEmail', phone: 'clPhone', verify_method: 'clVerify', verify_detail: 'clDetail', message: 'clMessage' };
+  function method(){ var r = f.querySelector('input[name=verify_method]:checked'); return r ? r.value : ''; }
+  function syncDetail(){ var m = method(), box = document.getElementById('clDetailField'); box.hidden = !LABELS[m]; if (LABELS[m]) document.getElementById('clDetailLabel').textContent = LABELS[m]; }
+  f.addEventListener('change', function(e){ if (e.target.name === 'verify_method') syncDetail(); });
+  syncDetail();
+  function show(id, text){ var e = document.getElementById(id + 'Error'); if (!e) return; e.textContent = text || ''; e.hidden = !text; var input = document.getElementById(id); if (input && input.setAttribute) { if (text) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid'); } }
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    Object.keys(IDS).forEach(function(k){ show(IDS[k], ''); }); show('cl', '');
+    var m = method();
+    var body = { venue_id: ${Number(venue.id)}, lang: ${JSON.stringify(fr ? 'fr' : 'en')}, started_at: startedAt, company_website: document.getElementById('clCompanyWebsite').value,
+      name: document.getElementById('clName').value, role: document.getElementById('clRole').value, email: document.getElementById('clEmail').value,
+      phone: document.getElementById('clPhone').value, verify_method: m, verify_detail: LABELS[m] ? document.getElementById('clDetail').value : '', message: document.getElementById('clMessage').value };
+    btn.disabled = true; btn.textContent = ${JSON.stringify(claimText(lang, 'sending'))};
+    fetch('/api/claims', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        btn.disabled = false; btn.textContent = ${JSON.stringify(claimText(lang, 'submit'))};
+        if (j && j.ok) { f.hidden = true; var d = document.getElementById('clDone'); document.getElementById('clDoneText').textContent = j.message || ''; d.hidden = false; d.focus(); return; }
+        var errs = (j && j.errors) || {}, first = null;
+        Object.keys(errs).forEach(function(k){ if (IDS[k]) { show(IDS[k], errs[k]); if (!first) first = document.getElementById(IDS[k]); } });
+        show('cl', (j && j.error) || ${JSON.stringify(claimText(lang, 'errGeneric'))});
+        if (first && first.focus) first.focus();
+      })
+      .catch(function(){ btn.disabled = false; btn.textContent = ${JSON.stringify(claimText(lang, 'submit'))}; show('cl', ${JSON.stringify(claimText(lang, 'errConnect'))}); });
+  });
+})();
+</script>`, `<style>
+  body.owner-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+  body.owner-page .cl-verify { border: 0; padding: 0; margin: 0 0 14px; }
+  body.owner-page .cl-verify legend { font-size: 0.82rem; font-weight: 700; color: rgb(74, 52, 40); margin-bottom: 6px; padding: 0; }
+  body.owner-page .cl-radio { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; font-weight: 500; margin: 8px 0; cursor: pointer; }
+  body.owner-page .cl-radio input[type=radio] { flex: 0 0 auto; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; padding: 0; }
+  body.owner-page .cl-radio span { flex: 1 1 auto; min-width: 0; }
+  body.owner-page [hidden] { display: none !important; }
+</style>`, { lang, helpKey: 'Claim this listing' });
+  return fr ? page.replace('<html lang="en">', '<html lang="fr-CA">') : page;
+}
+
+// --- admin side ---
+
+function listPendingClaims() {
+  return db.prepare(`SELECT c.*, v.name AS venue_name FROM venue_claims c JOIN venues v ON v.id = c.venue_id
+    WHERE c.status = 'pending' ORDER BY c.submitted_at, c.id`).all();
+}
+
+function renderAdminClaimCard(c) {
+  const f = claimOnFile(c.venue_id);
+  const v = f.venue;
+  const esc = adminReviewEsc;
+  const tel = (p) => (p ? `<a href="tel:${esc(String(p).replace(/[^0-9+]/g, ''))}">${esc(p)}</a>` : '<em>none</em>');
+  const site = v.website ? `<a href="${esc(v.website)}" target="_blank" rel="noopener nofollow">${esc(v.website)}</a>` : '<em>none</em>';
+  const match = v.website && claimEmailMatchesWebsite(c.email, v.website);
+  const check = {
+    call: `Call the number on file, ${tel(v.phone)}, and ask for ${esc(c.name)}.`,
+    website: `Look on ${site} for <strong>${esc(c.email)}</strong>.`,
+    social: `Wait for a message from <strong>${esc(c.verify_detail || '')}</strong>, and check it is the account linked from the listing or website.`,
+    other: `They said: <strong>${esc(c.verify_detail || '')}</strong>`,
+  }[c.verify_method] || '';
+  const linkLine = f.link ? `An edit link exists${f.link.contact_email ? ` (sent to ${esc(f.link.contact_email)})` : ''}${f.link.last_used_at ? `, last used ${esc(adminReviewTime(f.link.last_used_at))}` : ', never used'}. Approving sends a new one to ${esc(c.email)}; the old one stops working once they open it. Logins already made keep working.` : '';
+  return `<article class="rv-card" data-kind="claim" data-id="${c.id}">
+      <h3>${esc(c.venue_name)}</h3>
+      <p class="rv-meta">Claim #${c.id} · sent ${esc(adminReviewTime(c.submitted_at))}${c.lang === 'fr' ? ' · from the French page' : ''}${v.slug ? ` · <a href="${esc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}${c.notify_status === 'failed' ? ' · <strong>email to info@ failed</strong>' : ''}</p>
+      <table class="rv-diff"><tr><th></th><th>They told us</th><th>We have on file</th></tr>
+        <tr><th>Who</th><td>${esc(c.name)} (${esc(CLAIM_ROLES[c.role] ? CLAIM_ROLES[c.role][0] : c.role)})</td><td>${f.logins.length ? `Logins: ${esc(f.logins.join(', '))}` : 'No logins yet'}</td></tr>
+        <tr><th>Email</th><td>${esc(c.email)}${match ? ' <strong>(matches the website)</strong>' : ''}</td><td>${f.link && f.link.contact_email ? esc(f.link.contact_email) : '<em>none</em>'}</td></tr>
+        <tr><th>Phone</th><td>${tel(c.phone)}</td><td>${tel(v.phone)}</td></tr>
+        <tr><th>Website</th><td></td><td>${site}</td></tr>
+      </table>
+      <div class="rv-warn"><strong>How to check:</strong> ${check}</div>
+      ${c.message ? `<p class="rv-text"><strong>Message:</strong> ${esc(c.message)}</p>` : ''}
+      ${linkLine ? `<p class="rv-meta">${linkLine}</p>` : ''}
+      ${adminReviewActions('claim', c.id, { approveLabel: 'Approve and email them a link', reasonPlaceholder: 'Reason if rejecting (only emailed to them if you write one)' })}
+    </article>`;
+}
+
+function claimApprovalEmail(claim, venue, url) {
+  const first = String(claim.name || '').split(/\s+/)[0];
+  if (claim.lang === 'fr') {
+    return {
+      subject: `Votre lien pour modifier ${venue.name} sur Okanagan Roam`,
+      text: [`Bonjour ${first},`, '', `Merci d’avoir revendiqué ${venue.name} sur Okanagan Roam. Nous avons vérifié que c’est bien vous. Voici votre lien privé pour modifier la fiche (aucun mot de passe requis) :`, url, '',
+        `Sur cette page (en anglais), vous pouvez ajouter vos photos, vos heures d’ouverture, ${ownerExtrasFor(venue)} et vos événements, et créer un compte pour vous connecter ensuite à ${OWNER_LOGIN_URL}.`, '',
+        `Gardez ce lien privé : toute personne qui l’a peut proposer des modifications. Vous l’avez perdu ? Demandez-en un nouveau à https://okanaganroam.com${OWNER_NEW_LINK_PATH} avec cette adresse courriel.`, '',
+        'Merci,', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n'),
+    };
+  }
+  return {
+    subject: `Your link to update ${venue.name} on Okanagan Roam`,
+    text: [`Hi ${first},`, '', `Thanks for claiming ${venue.name} on Okanagan Roam. We’ve checked it’s you, so here’s your private link to update the listing (no password needed):`, url, '',
+      `On that page you can add your photos, opening hours, ${ownerExtrasFor(venue)} and events, and create a login so next time you just sign in at ${OWNER_LOGIN_URL}.`, '',
+      `Keep the link private: anyone with it can suggest changes. Lost it? Get a new one at https://okanaganroam.com${OWNER_NEW_LINK_PATH} with this email address.`, '',
+      'Thanks,', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n'),
+  };
+}
+
+function claimRejectionEmail(claim, venue, reason) {
+  const first = String(claim.name || '').split(/\s+/)[0];
+  if (claim.lang === 'fr') {
+    return { subject: `Votre demande pour ${venue.name}`, text: [`Bonjour ${first},`, '', `Merci pour votre demande concernant ${venue.name}. Nous n’avons pas pu confirmer que la fiche vous revient, alors nous ne pouvons pas envoyer de lien de modification pour l’instant.`, '', `Raison : ${reason}`, '',
+      'Si c’est une erreur, répondez à info@okanaganroam.com et nous verrons ensemble.', '', 'Merci,', 'Okanagan Roam'].join('\n') };
+  }
+  return { subject: `Your request for ${venue.name}`, text: [`Hi ${first},`, '', `Thanks for your request about ${venue.name}. We weren’t able to confirm the listing is yours, so we can’t send an edit link just now.`, '', `Reason: ${reason}`, '',
+    'If we’ve got this wrong, email info@okanaganroam.com and we’ll sort it out together.', '', 'Thanks,', 'Okanagan Roam'].join('\n') };
+}
+
+// Approve: a new edit link for the claimant's email, emailed to them (or to
+// info@ to forward when direct email is off). Reject: a polite note only when
+// a reason is given. -> { status, body }
+async function adminClaimAction(id, action, body, reviewer) {
+  if (action !== 'approve' && action !== 'reject') return { status: 400, body: { error: 'Unknown action.' } };
+  const claim = db.prepare('SELECT * FROM venue_claims WHERE id = ?').get(id);
+  if (!claim) return { status: 404, body: { error: ADMIN_REVIEW_ERRORS.not_found } };
+  if (claim.status !== 'pending') return { status: 409, body: { error: ADMIN_REVIEW_ERRORS.not_pending } };
+  const venue = db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(claim.venue_id);
+  const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+  if (action === 'reject') {
+    db.prepare("UPDATE venue_claims SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ? AND status = 'pending'").run(reviewer, reason || null, id);
+    if (!reason || !venue) return { status: 200, body: { ok: true, emailed: 'not_told' } };
+    return { status: 200, body: { ok: true, emailed: await sendOwnerDecision([claim.email], claimRejectionEmail(claim, venue, reason)) } };
+  }
+  if (!venue || venue.redirect_to) return { status: 409, body: { error: ADMIN_REVIEW_ERRORS.venue_unavailable } };
+  const made = createOwnerLink(venue.id, { contact_email: claim.email, reset: true, keepOld: true });
+  if (!made.ok) return { status: 409, body: { error: made.reason } };
+  db.prepare("UPDATE venue_claims SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ? AND status = 'pending'").run(reviewer, id);
+  const message = claimApprovalEmail(claim, venue, made.url);
+  let emailed;
+  if (ownerDirectEmail()) {
+    emailed = await sendOwnerDecision([claim.email], message);
+  } else {
+    try {
+      await venueSubmissionTransport({ _subject: `[ACTION] Approved claim #${id}: forward the edit link to ${claim.email}`, _template: 'table', _captcha: 'false',
+        'What to do': `Forward the email below to ${claim.email} from info@okanaganroam.com.`, 'Subject': message.subject, 'Email to forward': message.text });
+      emailed = 'forwarded';
+    } catch (err) {
+      console.error(`[claims] forwarding the link for claim #${id} failed: ${String((err && err.message) || err).slice(0, 200)}`);
+      emailed = 'failed';
+    }
+  }
+  return { status: 200, body: { ok: true, emailed, link: made.url } };
 }
 
 // POST /owner/reset/<token>
@@ -35242,6 +35657,7 @@ const ADMIN_REVIEW_ERRORS = {
 
 // One decision from the review page -> { status, body }.
 async function adminReviewAction(kind, id, action, body) {
+  if (kind === 'claim') return adminClaimAction(id, action, body, ADMIN_REVIEWER);
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
   let r;
   if (kind === 'change') {
@@ -35374,7 +35790,7 @@ function adminReviewActions(kind, id, opts = {}) {
   const approve = opts.remove ? '' : `<button type="button" class="rv-btn rv-approve" data-act="approve">${opts.approveLabel || 'Approve'}</button>`;
   const reject = `<button type="button" class="rv-btn rv-reject" data-act="${opts.remove ? 'remove' : 'reject'}">${opts.remove ? 'Remove from site' : 'Reject'}</button>`;
   return `<div class="rv-actions">${opts.options || ''}</div>
-      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)'}">${reject}</div>
+      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.reasonPlaceholder || (opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)')}">${reject}</div>
       <p class="rv-result" hidden></p>`;
 }
 
@@ -35517,7 +35933,8 @@ function renderAdminReviewPage() {
   const visitor = listVisitorContributions('pending');
   const visitorReported = listVisitorContributions('reported');
   const visitorLive = listVisitorContributions('live').filter((c) => !c.reported_count);
-  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length;
+  const claims = listPendingClaims();
+  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
   const mail = ownerDirectEmail()
@@ -35527,12 +35944,13 @@ function renderAdminReviewPage() {
     <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a></nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a></nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
     ${eventChanges.length ? section('eventchanges', 'Changes to live events', eventChanges, renderAdminEventChangeCard, '') : ''}
     ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
+    ${section('claims', 'Listing claims', claims, renderAdminClaimCard, 'No claims waiting.')}
     ${section('menus', 'Menus', menus, renderAdminMenuCard, 'No menus waiting.')}
     ${liveMenus.length ? section('livemenus', 'Menus owners published (last 14 days)', liveMenus, renderAdminMenuCard, '') : ''}
     ${section('visitor', 'Visitor photos &amp; tips', visitor, (c) => renderAdminVisitorCard(c, 'pending'), 'No visitor photos or tips waiting.')}
@@ -35547,7 +35965,7 @@ function renderAdminReviewPage() {
   document.addEventListener('input', function(e){
     if (e.target.classList && e.target.classList.contains('rv-edit')) e.target.classList.toggle('rv-changed', e.target.value !== e.target.getAttribute('data-orig'));
   });
-  var EMAIL = { sent: ' They were emailed.', failed: ' The email to them failed.', email_off: '', no_address: ' (No email address to tell them.)' };
+  var EMAIL = { sent: ' They were emailed.', failed: ' The email to them failed.', email_off: '', no_address: ' (No email address to tell them.)', forwarded: ' Their link went to info@okanaganroam.com to forward.', not_told: ' Nothing was sent to them.' };
   document.addEventListener('click', function(e){
     var btn = e.target.closest('button[data-act]'); if (!btn) return;
     var card = btn.closest('.rv-card'), act = btn.getAttribute('data-act'), out = card.querySelector('.rv-result');
@@ -35570,7 +35988,7 @@ function renderAdminReviewPage() {
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(x){
         out.hidden = false;
-        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || ''); card.classList.add('rv-done'); return; }
+        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
       })
@@ -39140,6 +39558,21 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(infoPage());
     }
+    // Claim this listing (2026-10-18): see renderClaimPage.
+    {
+      const cm = method === 'GET' ? /^(\/fr)?\/claim\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/.exec(pathname) : null;
+      if (cm) {
+        const type = SLUG_TO_TYPE[cm[3]];
+        const venue = REGION_LABELS[cm[2]] && type ? findVenueBySlug(cm[2], type, cm[4]) : null;
+        if (!venue || venue.redirect_to) {
+          res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+          return res.end(render404Page(pathname));
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', ...(cm[1] ? { 'Content-Language': 'fr-CA' } : {}) });
+        return res.end(renderClaimPage(venue, cm[1] ? 'fr' : 'en'));
+      }
+      if (pathname === '/api/claims' && method === 'POST') return await handleClaimSubmission(req, res);
+    }
     if ((pathname === '/list-your-venue' || pathname === '/list-your-venue/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderListYourVenuePage());
@@ -39355,7 +39788,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     {
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });

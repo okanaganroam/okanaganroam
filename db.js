@@ -1017,4 +1017,45 @@ CREATE TABLE IF NOT EXISTS visitor_contribution_photos (
 CREATE INDEX IF NOT EXISTS idx_visitor_contribution_photos_contribution ON visitor_contribution_photos (contribution_id);
 `);
 
+// Edit links survive a re-send (2026-10-18): asking /owner/link for a new link
+// no longer kills the one the owner is using. The old link's hash moves to
+// prev_token_hash and keeps working until the new link is first opened.
+{
+  const cols = db.prepare('PRAGMA table_info(venue_owner_links)').all().map((c) => c.name);
+  if (!cols.includes('prev_token_hash')) db.exec('ALTER TABLE venue_owner_links ADD COLUMN prev_token_hash TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_venue_owner_links_prev ON venue_owner_links (prev_token_hash)');
+}
+
+// Claim this listing (2026-10-18): a business owner with no edit link (no
+// email on file, or a changed email) asks to take over their listing. Dayton
+// checks it against the phone, website and email we have, then approves it on
+// /admin/review, which makes an edit link for the claimant's email. role is
+// owner/manager/staff/other; verify_method is how we can check them (call the
+// listed number, the website shows their email, a message from the business's
+// social account, or other). lang is the page they sent it from.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'staff', 'other')),
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  verify_method TEXT NOT NULL CHECK (verify_method IN ('call', 'website', 'social', 'other')),
+  verify_detail TEXT,
+  message TEXT,
+  lang TEXT NOT NULL DEFAULT 'en',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  ip_hash TEXT,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  notify_status TEXT,
+  notify_error TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_venue_claims_status ON venue_claims (status, submitted_at);
+CREATE INDEX IF NOT EXISTS idx_venue_claims_venue ON venue_claims (venue_id, status);
+`);
+
 module.exports = db;

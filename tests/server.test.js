@@ -20251,7 +20251,8 @@ test('Owner portal: logins (create from the link, sign in, my listings, edit via
   try {
     assert.match(await get('/owner/login').then((r) => r.text()), /Business login/);
     const venuePage = await get('/kelowna/pubs/owner-login-fixture-a').then((r) => r.text());
-    assert.match(venuePage, /Own this business\? <a href="\/owner\/login" rel="nofollow">Sign in to update this listing<\/a>/);
+    assert.match(venuePage, /Already have a login\? <a href="\/owner\/login" rel="nofollow">Sign in to update this listing<\/a>/);
+    assert.match(venuePage, /<a class="venue-claim-btn" href="\/claim\/kelowna\/pubs\/owner-login-fixture-a" rel="nofollow"[^>]*>Claim this listing<\/a>/);
     assert.match(venuePage, /<a href="\/owner\/login" class="nav-business-login" rel="nofollow">Business login<\/a>/);
     assert.equal((await get('/owner/account')).status, 302);
     // The edit link offers a login; creating one signs the owner in.
@@ -21151,7 +21152,7 @@ test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar an
   }
 });
 
-test('Email me my edit link (2026-10-15): a fresh link to the email on file, the old one stops working; small-phone layout', async () => {
+test('Email me my edit link (2026-10-15): a fresh link to the email on file, the old one works until the new one is opened; small-phone layout', async () => {
   const http = require('node:http');
   seasonInsert.run({ name: 'New Link Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'new-link-fixture' });
   seasonInsert.run({ name: 'New Link Fixture Two', type: 'cafe', hours: SEASON_WEEK, slug: 'new-link-fixture-two' });
@@ -21183,10 +21184,14 @@ test('Email me my edit link (2026-10-15): a fresh link to the email on file, the
     const urls = sent[0].text.match(/https:\/\/okanaganroam\.com\/owner\/[A-Za-z0-9_-]{20,}/g);
     assert.equal(urls.length, 2);
     assert.match(sent[0].text, /New Link Fixture: https/);
-    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 404, 'the old link stops working');
+    // 2026-10-18: asking for a new link no longer kills the one the owner is using...
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 200, 'the old link still works until the new one is opened');
+    assert.match(sent[0].text, /Once you open this link, any older link we sent you stops working\./);
     const fresh = urls.map((u) => u.split('/owner/')[1]);
     const statuses = await Promise.all(fresh.map((t) => fetch(`${base}/owner/${t}`).then((r) => r.status)));
     assert.deepEqual(statuses, [200, 200]);
+    // ...but once the new one is opened, the old one stops.
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 404, 'the old link stops once the new one is used');
     const page = await fetch(`${base}/owner/${fresh[0]}`).then((r) => r.text());
     assert.match(page, /@media \(max-width: 480px\) \{ body\.owner-page \.form-row \{ grid-template-columns: 1fr; \} \}/);
     assert.match(page, /body\.owner-page \.form-row > \* \{ min-width: 0; \}/);
@@ -21197,6 +21202,184 @@ test('Email me my edit link (2026-10-15): a fresh link to the email on file, the
     app.setOwnerEmailTransport(null);
     await new Promise((resolve) => srv.close(resolve));
   }
+});
+
+test('Edit link re-sends (2026-10-18): repeated requests never push out the working link; admin reset still kills it at once', () => {
+  seasonInsert.run({ name: 'Keep Old Link Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'keep-old-link-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'keep-old-link-fixture');
+  const t0 = app.createOwnerLink(v.id, { contact_email: 'keep@old.example' }).token;
+  assert.ok(app.venueForOwnerToken(t0), 'the first link works');
+  const t1 = app.createOwnerLink(v.id, { reset: true, keepOld: true }).token;
+  const t2 = app.createOwnerLink(v.id, { reset: true, keepOld: true }).token;
+  // Two requests in a row (say, by someone else): the owner's working link t0 still works; t1 was never opened and is gone.
+  assert.ok(app.venueForOwnerToken(t0), 'the working link survives two re-sends');
+  assert.equal(app.venueForOwnerToken(t1), null);
+  assert.ok(app.venueForOwnerToken(t2), 'the newest link works');
+  assert.equal(app.venueForOwnerToken(t0), null, 'opening the newest link retires the old one');
+  assert.ok(app.venueForOwnerToken(t2));
+  // An admin reset of a leaked link is immediate.
+  const t3 = app.createOwnerLink(v.id, { reset: true }).token;
+  assert.equal(app.venueForOwnerToken(t2), null);
+  assert.ok(app.venueForOwnerToken(t3));
+});
+
+test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, storage, email to info@, admin approve makes a working link', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Claim Fixture Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'claim-fixture-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'claim-fixture-cafe');
+  db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://claimfixture.example', description_fr = 'Un café de test pour les demandes.' WHERE id = ?").run(v.id);
+  const oldToken = app.createOwnerLink(v.id, {}).token; // an outreach link nobody could find
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie, origin = base) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin, 'X-Real-IP': `10.31.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.get('set-cookie') || '' }));
+  const valid = (o = {}) => ({ venue_id: v.id, lang: 'en', started_at: Date.now() - 10000, company_website: '', name: 'Jordan Baker', role: 'owner',
+    email: 'Jordan@ClaimFixture.example', phone: '250 555 0111', verify_method: 'call', verify_detail: '', message: 'We changed our email last year.', ...o });
+  const info = [];
+  const mail = [];
+  app.setVenueSubmissionTransport(async (p) => { info.push(p); });
+  try {
+    // The button on the English and French venue pages.
+    const en = await fetch(`${base}/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
+    assert.match(en, /<a class="venue-claim-btn" href="\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Claim this listing<\/a>/);
+    const frPage = await fetch(`${base}/fr/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
+    assert.match(frPage, /<a class="venue-claim-btn" href="\/fr\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Revendiquer cette fiche<\/a>/);
+    // The form, in each language; unknown listings 404.
+    const form = await fetch(`${base}/claim/kelowna/cafes/claim-fixture-cafe`);
+    assert.equal(form.status, 200);
+    assert.equal(form.headers.get('x-robots-tag'), 'noindex');
+    const formHtml = await form.text();
+    assert.match(formHtml, /<h1>Claim this listing<\/h1>/);
+    assert.match(formHtml, /Call the business number on this listing \(250-555-0199\)/);
+    assert.match(formHtml, /name="company_website"/);
+    const frForm = await fetch(`${base}/fr/claim/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
+    assert.match(frForm, /<html lang="fr-CA">/);
+    assert.match(frForm, /<h1>Revendiquer cette fiche<\/h1>/);
+    assert.match(frForm, /Envoyer ma demande/);
+    assert.equal((await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`)).status, 404);
+
+    // Guards and validation; nothing stored.
+    const before = db.prepare('SELECT COUNT(*) AS n FROM venue_claims').get().n;
+    assert.equal((await post('/api/claims', valid(), null, 'https://evil.example')).status, 403);
+    assert.equal((await post('/api/claims', valid({ company_website: 'spam' }))).status, 201, 'honeypot looks like success');
+    assert.equal((await post('/api/claims', valid({ started_at: Date.now() }))).status, 400, 'too quick');
+    assert.equal((await post('/api/claims', valid({ extra: 1 }))).status, 400, 'unknown keys');
+    const bad = await post('/api/claims', valid({ name: 'J', role: 'boss', email: 'nope', phone: '12', verify_method: 'social', verify_detail: '' }));
+    assert.equal(bad.status, 400);
+    assert.deepEqual(Object.keys(bad.body.errors).sort(), ['email', 'name', 'phone', 'role', 'verify_detail']);
+    const badFr = await post('/api/claims', valid({ lang: 'fr', email: 'nope' }));
+    assert.equal(badFr.body.errors.email, 'Veuillez indiquer une adresse courriel valide.');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_claims').get().n, before);
+    assert.equal(info.length, 0, 'nothing emailed yet');
+
+    // A good claim: stored, and info@ gets the details plus what we have on file.
+    const ok = await post('/api/claims', valid());
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.match(ok.body.message, /email jordan@claimfixture\.example a private link to update Claim Fixture Cafe/);
+    const row = db.prepare('SELECT * FROM venue_claims WHERE id = ?').get(ok.body.id);
+    assert.equal(row.status, 'pending');
+    assert.equal(row.email, 'jordan@claimfixture.example');
+    assert.equal(row.verify_method, 'call');
+    assert.equal(row.notify_status, 'sent');
+    assert.equal(info.length, 1);
+    assert.match(info[0]._subject, new RegExp(`^\\[PENDING REVIEW\\] Listing claim #${ok.body.id}: Claim Fixture Cafe$`));
+    assert.equal(info[0]._replyto, 'jordan@claimfixture.example');
+    assert.equal(info[0]['Their role'], 'Owner');
+    assert.equal(info[0]['Phone on file'], '250-555-0199');
+    assert.equal(info[0]['Website on file'], 'https://claimfixture.example');
+    assert.equal(info[0]['Email check'], 'Their email uses the website’s domain.');
+    assert.match(info[0]['Edit link'], /^Exists \(no email on it\), never used$/);
+    assert.match(info[0]['How to review'], /admin\/review#claims/);
+    // Sending it again: same answer, no second claim or email.
+    const again = await post('/api/claims', valid());
+    assert.equal(again.body.id, ok.body.id);
+    assert.equal(info.length, 1);
+
+    // Admin: listed with the details on file; approve is admin-only.
+    const login = await post('/admin/review/login', { token: LYV_TOKEN });
+    const cookie = login.setCookie.split(';')[0];
+    const review = await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text());
+    assert.match(review, /<a href="#claims">Claims \(1\)<\/a>/);
+    assert.match(review, /<article class="rv-card" data-kind="claim" data-id="\d+">\s*<h3>Claim Fixture Cafe<\/h3>/);
+    assert.match(review, /Call the number on file, <a href="tel:2505550199">250-555-0199<\/a>, and ask for Jordan Baker\./);
+    assert.match(review, /jordan@claimfixture\.example <strong>\(matches the website\)<\/strong>/);
+    assert.equal((await post(`/admin/review/claim/${ok.body.id}/approve`, {})).status, 401, 'needs the admin cookie');
+    assert.equal((await post(`/admin/review/claim/${ok.body.id}/approve`, {}, cookie, 'https://evil.example')).status, 403);
+
+    app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+    const approved = await post(`/admin/review/claim/${ok.body.id}/approve`, {}, cookie);
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    assert.equal(approved.body.emailed, 'sent');
+    assert.equal(mail.length, 1);
+    assert.equal(mail[0].to, 'jordan@claimfixture.example');
+    assert.equal(mail[0].subject, 'Your link to update Claim Fixture Cafe on Okanagan Roam');
+    assert.match(mail[0].text, /^Hi Jordan,/);
+    const link = mail[0].text.match(/https:\/\/okanaganroam\.com\/owner\/[A-Za-z0-9_-]{32}/)[0];
+    assert.equal(link, approved.body.link);
+    assert.equal(db.prepare('SELECT status FROM venue_claims WHERE id = ?').get(ok.body.id).status, 'approved');
+    // The link works, carries the claimant's email (so "Email me my link" works for them), and retires the old one.
+    const ownerPage = await fetch(link.replace('https://okanaganroam.com', base));
+    assert.equal(ownerPage.status, 200);
+    assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'jordan@claimfixture.example');
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 404);
+    assert.equal((await post(`/admin/review/claim/${ok.body.id}/approve`, {}, cookie)).status, 409, 'already reviewed');
+
+    // Reject: nothing sent without a reason; a polite note (in French for a French claim) with one.
+    const c2 = await post('/api/claims', valid({ email: 'someone@else.example', verify_method: 'other', verify_detail: 'I know the owner', lang: 'fr' }));
+    assert.equal(c2.status, 201);
+    assert.match(c2.body.message, /^Nous vérifierons que c’est bien vous et enverrons à someone@else\.example/);
+    const c3 = await post('/api/claims', valid({ email: 'third@else.example', verify_method: 'website' }));
+    mail.length = 0;
+    const r2 = await post(`/admin/review/claim/${c2.body.id}/reject`, { reason: 'Nous n’avons pas pu joindre l’entreprise.' }, cookie);
+    assert.equal(r2.body.emailed, 'sent');
+    assert.equal(mail.length, 1);
+    assert.equal(mail[0].to, 'someone@else.example');
+    assert.match(mail[0].text, /^Bonjour Jordan,[\s\S]*Raison : Nous n’avons pas pu joindre l’entreprise\./);
+    const r3 = await post(`/admin/review/claim/${c3.body.id}/reject`, { reason: '' }, cookie);
+    assert.equal(r3.body.emailed, 'not_told');
+    assert.equal(mail.length, 1, 'no reason, no email');
+
+    // Direct email off: the approved link goes to info@ to forward instead of being lost.
+    app.setOwnerEmailTransport(null);
+    const c4 = await post('/api/claims', valid({ email: 'fourth@claimfixture.example' }));
+    info.length = 0;
+    const a4 = await post(`/admin/review/claim/${c4.body.id}/approve`, {}, cookie);
+    assert.equal(a4.body.emailed, 'forwarded');
+    assert.equal(info.length, 1);
+    assert.match(info[0]._subject, /^\[ACTION\] Approved claim #\d+: forward the edit link to fourth@claimfixture\.example$/);
+    assert.ok(info[0]['Email to forward'].includes(a4.body.link));
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Business help bot (2026-10-18): claim, never got the email and staff logins have answers', () => {
+  const topics = Object.fromEntries(JSON.parse(app.ownerHelpWidgetHtml('login').match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]).topics.map((t) => [t.id, t]));
+  for (const id of ['claim', 'noemail', 'staff']) assert.ok(topics[id], id);
+  assert.match(topics.claim.a, /Claim this listing/);
+  assert.match(topics.noemail.a, /spam/);
+  assert.match(topics.staff.a, /their own<\/strong> email/);
+  assert.doesNotMatch(topics.newlink.a, /replaces the old one/);
+  // The browser's own matcher, run on typed questions from the claim page's widget.
+  const html = app.ownerHelpWidgetHtml('claim');
+  const cfg = JSON.parse(html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]);
+  assert.deepEqual(cfg.start, ['claim', 'noemail', 'staff', 'cost']);
+  const src = html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'));
+  const match = new Function('T', 'cfg', `${src}; return match;`)(cfg.topics, cfg);
+  const top = (q) => match(q)[0];
+  assert.equal(top('how do I claim it'), 'claim');
+  assert.equal(top('Claim my listing'), 'claim');
+  assert.equal(top('my business is listed but I never had a link'), 'claim');
+  assert.equal(top('I never got the email'), 'noemail');
+  assert.equal(top('didnt receive anything, is it in spam?'), 'noemail');
+  assert.equal(top('can two people log in'), 'staff');
+  assert.equal(top('add my staff to the listing'), 'staff');
 });
 
 test('Owner accessibility (2026-10-15): errors announce and tie to their box, description has a label, buttons say Sending…', async () => {
