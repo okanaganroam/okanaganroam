@@ -1089,4 +1089,11 @@ CREATE TABLE IF NOT EXISTS venue_hours_extra (
   }
 }
 
+// French portal (2026-10-18): the language of the page an owner sent something from ('fr', or NULL for English), so
+// the email telling them it was approved or not is in that language.
+for (const t of ['owner_change_requests', 'owner_photos', 'event_submissions', 'owner_event_changes', 'venue_menus']) {
+  const cols = db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+  if (cols.length && !cols.includes('lang')) db.exec(`ALTER TABLE ${t} ADD COLUMN lang TEXT`);
+}
+
 module.exports = db;

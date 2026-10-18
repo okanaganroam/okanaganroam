@@ -21233,7 +21233,8 @@ test('Owner follow-ups (2026-10-15): pending note says new changes are added; ev
     const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
     assert.match(page, /waiting for review and show below, marked &ldquo;Waiting for review&rdquo;\. Anything else you send now is added to them\./);
     assert.match(page, /Thanks! Your event is in for review, usually within a day\. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On\./);
-    assert.match(page, /and email you when ' \+ \(sent === 1 \? 'it’s' : 'they’re'\) \+ ' live\./);
+    // French portal (2026-10-18): the script's words are in its T object, one per language.
+    assert.match(page, /"upMail1":", and email you when it’s live\.","upMailN":", and email you when they’re live\."/);
     assert.match(page, /\['opEmail', 'ofEmail', 'oeContactEmail'\]\.forEach\(function\(id\)\{ var el = document\.getElementById\(id\); if \(el\) el\.value = v; \}\)/);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
@@ -21801,7 +21802,7 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
   for (const id of ['hours', 'photo-add', 'closures', 'seasonal-hours', 'price-range', 'access', 'description']) {
     assert.match(signedIn[id].a, /My listings<\/a> → <strong>Edit listing<\/strong>/, id);
     assert.doesNotMatch(signedIn[id].a, /edit link we emailed you/, id);
-    assert.match(signedIn[id].aFr, /My listings<\/a> → <strong>Edit listing<\/strong>/, id);
+    assert.match(signedIn[id].aFr, /href="\/fr\/owner\/account">Mes fiches<\/a> → <strong>Modifier la fiche<\/strong>/, id);
     if (id !== 'access') assert.match(link[id].a, /the private link we emailed you/, id);
   }
   // People with access (PR #358): remove people added after you; anyone added before you goes to Dayton.
@@ -21884,7 +21885,7 @@ test('Help bot v2 (2026-10-18): the page script answers, says "not sure", switch
   // French typed on an English page: answered in French, with French chips.
   page.ask('comment ajouter des photos');
   const fr = page.said().slice(-3);
-  assert.match(fr[0], /Touchez <strong>Choose photos<\/strong>/);
+  assert.match(fr[0], /Touchez <strong>Choisir des photos<\/strong>/, 'the French answer names the French button (2026-10-18)');
   assert.match(fr[1], /Est-ce que ça vous aide/);
   assert.match(fr[2], /Écrivez-nous$/);
   // Message us from a private edit link (in French now): the browser sends the page address to our server only.
@@ -25743,7 +25744,8 @@ test('Owner portal conveniences (2026-10-18): one-tap Add to my login, event nam
     assert.match(listings, /tap <strong>Add to my login<\/strong>/);
     // Settings: "Tap" on touch screens, and a message once the last business is gone.
     const settings = await (await s.get('/owner/account/settings', me.cookie)).text();
-    assert.match(settings, /\(tap \? 'Tap' : 'Click'\) \+ ' again to remove '/);
+    assert.match(settings, /"tap":"Tap again to remove ","click":"Click again to remove "/);
+    assert.match(settings, /\(tap \? T\.tap : T\.click\) \+ b\.getAttribute\('data-name'\)/);
     assert.match(settings, /<p class="op-done" id="osNoVenues" hidden>/);
     assert.match(settings, /if \(!document\.querySelector\('#osVenues li'\)\)/);
     for (const code of ownerUiInlineScripts(settings).concat(ownerUiInlineScripts(listings))) assert.doesNotThrow(() => new vm.Script(code), code.slice(0, 80));
@@ -25819,4 +25821,298 @@ test('Venue page layout (2026-10-18): same hours every day read as one line, the
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
+});
+
+// ---------- French business portal (2026-10-18) ----------
+// Every signed-in page has a French address; forms posted from it get French messages and French emails; the
+// EN / FR switch links the two; the English pages keep their English.
+const PFR_ENGLISH_LABELS = ['Save changes', 'Send changes', 'Opening hours', 'Closed', 'second time', 'Copy Monday', 'every day', 'Seasonal hours', 'We have different hours',
+  'Special closures', 'Add a closed day', 'First day', 'Last day', 'Price range', 'per person', 'Not set', 'Badges', 'Anything else', 'Your name', 'Your email', 'Note for us',
+  'Make more changes', 'Choose photos', 'Credit photos to', 'Upload photos', 'I took these photos', 'Add an event', 'Event name', 'Categories', 'Start time', 'End time', 'All-day',
+  'Repeats or other dates', 'Send event', 'People with access', 'Remove me', 'Your updates', 'Waiting for review', 'Listing update', 'Withdraw', 'Signed in as', 'My listings',
+  'Account settings', 'Log out', 'View your page', 'Edit listing', 'Only you', 'Up to date', 'Change email', 'Change password', 'Current password', 'New password', 'Devices',
+  'Sign out everywhere', 'Your businesses', 'Remove from my login', 'Last updated', 'Owner edit page', 'Create a login', 'Create login', 'Business name', 'Street address', 'Website',
+  'Phone', 'Privacy', 'Terms', 'Business login', 'Build My Trip', 'What’s On', "What's On", 'Things to Do', 'Message us', 'Choose a new password', 'Type it again', 'This edit link',
+  'Add your menu', 'Take a photo', 'Type it in myself', 'Event or ticket link', 'Booking or tickets link', 'Menu link', 'Facebook page', 'optional', 'Skip the link', 'Thanks!',
+  'Parts of this page', 'Open menu', 'Skip to content', 'View this page in French', 'Sending…', 'Uploading…', 'Signing in…'];
+// The visible words of a page: text and labels outside <script>/<style>, without the owner's own description.
+function pfrVisible(html) {
+  const body = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<textarea[^>]*id="opDescription"[\s\S]*?<\/textarea>/g, '');
+  const attrs = [...body.matchAll(/\s(?:aria-label|placeholder|title|alt)="([^"]*)"/g)].map((m) => m[1]);
+  return `${body.replace(/<[^>]+>/g, ' ')} ${attrs.join(' ')}`.replace(/&rsquo;/g, '’').replace(/&amp;/g, '&').replace(/&hellip;/g, '…').replace(/\s+/g, ' ');
+}
+function pfrEnglishLeft(html) {
+  const text = pfrVisible(html);
+  return PFR_ENGLISH_LABELS.filter((en) => new RegExp(`(^|[^A-Za-z])${en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z]|$)`).test(text));
+}
+function pfrScriptsParse(html, label) {
+  const vm = require('node:vm');
+  for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
+    if (/type="application\/(ld\+)?json"|src=/.test(m[1] || '')) continue;
+    assert.doesNotThrow(() => new vm.Script(m[2]), `${label}: ${m[2].slice(0, 80)}`);
+  }
+}
+async function withFrenchPortal(fn) {
+  const mails = [];
+  app.setOwnerEmailTransport(async (m) => { mails.push(m); });
+  seasonInsert.run({ name: 'Portail Fixture', type: 'cafe', hours: SEASON_WEEK, slug: `portail-fixture-${Date.now()}` });
+  const v = db.prepare("SELECT * FROM venues WHERE name = 'Portail Fixture' ORDER BY id DESC LIMIT 1").get();
+  seasonInsert.run({ name: 'Portail Deux', type: 'restaurant', hours: SEASON_WEEK, slug: `portail-deux-${Date.now()}` });
+  const v2 = db.prepare("SELECT * FROM venues WHERE name = 'Portail Deux' ORDER BY id DESC LIMIT 1").get();
+  const token = app.createOwnerLink(v.id, { contact_email: 'portail@example.com' }).url.split('/owner/')[1];
+  const token2 = app.createOwnerLink(v2.id, {}).url.split('/owner/')[1];
+  const s = await ownerUiServer();
+  try {
+    return await fn({ ...s, v, v2, token, token2, mails });
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await s.close();
+    for (const id of [v.id, v2.id]) {
+      for (const t of ['owner_account_venues', 'venue_owner_links', 'owner_change_requests', 'venue_hours_extra', 'owner_photos', 'venue_links']) {
+        try { db.prepare(`DELETE FROM ${t} WHERE venue_id = ?`).run(id); } catch (e) { /* table missing */ }
+      }
+      db.prepare('DELETE FROM event_submissions WHERE owner_venue_id = ?').run(id);
+      db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+    }
+    const accounts = "SELECT id FROM owner_accounts WHERE email = 'portail@example.com'";
+    for (const t of ['owner_sessions', 'owner_password_resets']) db.prepare(`DELETE FROM ${t} WHERE account_id IN (${accounts})`).run();
+    db.prepare("DELETE FROM owner_accounts WHERE email = 'portail@example.com'").run();
+  }
+}
+
+test('French portal (2026-10-18): every signed-in page has a French address with no English left, French dates and working scripts', () => withFrenchPortal(async ({ get, post, v, token, token2 }) => {
+  // A French login sets the session for /owner and /fr/owner.
+  const made = await fetch(`${(await get('/')).url.replace(/\/$/, '')}/fr/owner/${token}/account`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: (await get('/')).url.replace(/\/$/, '') }, body: JSON.stringify({ email: 'portail@example.com', password: 'a long enough password' }) });
+  assert.equal(made.status, 201);
+  const setCookie = made.headers.get('set-cookie');
+  assert.match(setCookie, /okr_owner=[^;]+; Path=\/owner;/);
+  assert.match(setCookie, /okr_owner=[^;]+; Path=\/fr\/owner;/);
+  const cookie = setCookie.split(';')[0];
+  // Something waiting for review and an event, so "Your updates", the chips and the pending note show.
+  const sent = await post(`/fr/owner/account/venue/${v.id}/changes`, { changes: { website: 'portail-fixture.example.com', phone: '250-555-0199' }, started_at: Date.now() - 60000 }, cookie);
+  assert.equal(sent.status, 201);
+  assert.deepEqual(sent.body.live, ['phone']);
+  const ev = await post(`/fr/owner/account/venue/${v.id}/events`, { name: 'Soirée fixture', categories: ['live-music'], description: 'Une soirée de musique pour le test du portail.', start_date: app.addLocalDays(app.todayLocal(), 5), start_time: '19:00', contact_name: 'Dayton', contact_email: 'portail@example.com', started_at: Date.now() - 60000 }, cookie);
+  assert.equal(ev.status, 201);
+  const pages = {
+    account: '/fr/owner/account', settings: '/fr/owner/account/settings', edit: `/fr/owner/account/venue/${v.id}`, menu: `/fr/owner/account/venue/${v.id}/menu`,
+    link: `/fr/owner/${token}`, linkMenu: `/fr/owner/${token}/menu`, addToLogin: `/fr/owner/${token2}`,
+  };
+  for (const [name, p] of Object.entries(pages)) {
+    const r = await get(p, name === 'link' || name === 'linkMenu' ? null : cookie);
+    assert.equal(r.status, 200, p);
+    assert.equal(r.headers.get('content-language'), 'fr-CA', p);
+    const html = await r.text();
+    assert.match(html, /<html lang="fr"/, p);
+    assert.deepEqual(pfrEnglishLeft(html), [], `${p}: English left`);
+    pfrScriptsParse(html, p);
+    assert.match(html, /"lang":"fr"/, `${p}: the help bot is French`);
+  }
+  const edit = await (await get(pages.edit, cookie)).text();
+  assert.match(edit, /id="opSubmit">Enregistrer les modifications</);
+  assert.match(edit, /<span class="lyv-section-label">Heures d’ouverture/);
+  assert.match(edit, /<span class="op-status op-status-wait op-wait-chip">En attente de vérification<\/span>/, 'the waiting chip on the website field');
+  assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche : Site web/i);
+  assert.match(edit, /Envoyé le \d{1,2} [a-zéû]+\.?</, 'French short dates ("18 oct.")');
+  assert.match(edit, /Personnes ayant accès[\s\S]*Ajouté le \d{1,2} [a-zéû]+\.?/);
+  assert.match(edit, /\$\$ &mdash; 15 à 30 \$ par personne/);
+  assert.match(edit, /Copier le lundi sur :/);
+  assert.match(edit, /<option value="11" selected>novembre<\/option>/, 'French month names');
+  assert.match(edit, /"liveNow":"En ligne maintenant : \{fields\}\. Votre page l’affiche tout de suite\. "/);
+  assert.match(edit, /"review":"Nous vérifierons ceci d’ici un jour : \{fields\}\. "/);
+  assert.match(edit, /href="\/fr\/owner\/account\/venue\/\d+\/menu" id="opMenuCard"/);
+  assert.match(edit, /<footer class="op-footer"><a href="\/fr\/privacy">Confidentialité<\/a>/);
+  assert.doesNotMatch(edit, /href="\/owner\/(account|login|forgot)[^"]*"(?! hreflang)/, 'portal links stay French (the EN switch aside)');
+  const account = await (await get(pages.account, cookie)).text();
+  assert.match(account, /En attente de vérification : 1 mise à jour, 1 événement/);
+  assert.match(account, /href="\/fr\/owner\/account\/venue\/\d+">Modifier la fiche/);
+  const link = await (await get(pages.link)).text();
+  assert.match(link, /<strong>Créer un compte<\/strong> \(30 secondes\)/);
+  assert.match(link, /id="opSubmit">Envoyer les modifications</);
+  const add = await (await get(pages.addToLogin, cookie)).text();
+  assert.match(add, /id="olsAdd">Ajouter à mon compte \(portail@example\.com\)</);
+  // An invalid link and an expired reset link are French too.
+  const bad = await get(`/fr/owner/${'z'.repeat(32)}`);
+  assert.equal(bad.status, 404);
+  assert.deepEqual(pfrEnglishLeft(await bad.text()), []);
+  const expired = await get(`/fr/owner/reset/${'a'.repeat(43)}`);
+  assert.equal(expired.status, 410);
+  const exp = await expired.text();
+  assert.match(exp, /<h1>Ce lien a expiré<\/h1>/);
+  assert.deepEqual(pfrEnglishLeft(exp), []);
+  // The French entry pages no longer say the portal is English.
+  for (const p of ['/fr/owner/login', '/fr/owner/link']) assert.doesNotMatch(await (await get(p)).text(), /en anglais pour l’instant/, p);
+}));
+
+test('French portal (2026-10-18): forms post from French pages, messages and emails come back in French, English stays English', () => withFrenchPortal(async ({ get, post, base, v, token, token2, mails }) => {
+  const made = await post(`/fr/owner/${token}/account`, { email: 'portail@example.com', password: 'a long enough password' });
+  assert.equal(made.status, 201);
+  const cookie = made.cookie;
+  const old = Date.now() - 60000;
+  // Edit page: server checks in French; the same post to the English address stays English.
+  const fr = await post(`/fr/owner/account/venue/${v.id}/changes`, { changes: { phone: 'x', description: 'trop court', closures: [{ from: '2020-01-01', to: '2020-01-02', note: '' }] }, started_at: old }, cookie);
+  assert.equal(fr.status, 400);
+  assert.equal(fr.body.errors.phone, 'Entrez un numéro de téléphone, comme 250-555-0123.');
+  assert.match(fr.body.errors.description, /^Votre description doit compter de 30 à 1\s200 caractères\.$/);
+  assert.equal(fr.body.errors.closures, 'Une fermeture est déjà passée. Retirez-la ou choisissez une date à partir d’aujourd’hui.');
+  const week = await post(`/fr/owner/account/venue/${v.id}/changes`, { changes: { hours: { mon: [['10:00', '10:00']] } }, started_at: old }, cookie);
+  assert.equal(week.body.errors.hours, 'Heures : le lundi ouvre et ferme à la même heure.');
+  const nothing = await post(`/fr/owner/account/venue/${v.id}/changes`, { changes: {}, started_at: old }, cookie);
+  assert.equal(nothing.body.errors.form, 'Rien n’a encore changé. Modifiez un champ, puis envoyez-le.');
+  const en = await post(`/owner/account/venue/${v.id}/changes`, { changes: { phone: 'x' }, started_at: old }, cookie);
+  assert.equal(en.body.errors.phone, 'Please enter a phone number, like 250-555-0123.');
+  // A good change from the French page goes live as usual.
+  const ok = await post(`/fr/owner/account/venue/${v.id}/changes`, { changes: { phone: '250-555-0142', price_range: '2' }, started_at: old }, cookie);
+  assert.equal(ok.status, 201);
+  assert.deepEqual(ok.body.live.sort(), ['phone', 'price_range']);
+  assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(v.id).phone, '250-555-0142');
+  // Events, photos, settings, access and the help bot.
+  const ev = await post(`/fr/owner/account/venue/${v.id}/events`, { name: '', started_at: old }, cookie);
+  assert.equal(ev.body.error, 'Corrigez les champs indiqués.');
+  assert.equal(ev.body.errors.name, 'Entrez le nom de l’événement.');
+  assert.equal(ev.body.errors.start_time, 'Entrez l’heure de début ou cochez « Toute la journée ».');
+  const ph = await post(`/fr/owner/account/venue/${v.id}/photos`, { image: '', credit: 'Portail', rights: false, started_at: old }, cookie);
+  assert.equal(ph.body.errors.rights, 'Confirmez que vous avez pris ces photos ou que vous avez la permission de les partager.');
+  const pw = await post('/fr/owner/account/password', { current: 'not the password', password: 'another long password' }, cookie);
+  assert.equal(pw.body.errors.current, 'Ce mot de passe n’est pas le bon.');
+  const gone = await post(`/fr/owner/account/venue/${v.id}/logins/999999/remove`, {}, cookie);
+  assert.equal(gone.body.error, 'Cette personne n’a plus accès à cette fiche.');
+  const login = await post('/fr/owner/login', { email: 'portail@example.com', password: 'wrong wrong wrong' });
+  assert.match(login.body.error, /^Ce courriel et ce mot de passe ne correspondent pas\./);
+  // One tap "Ajouter à mon compte" lands on the French edit page.
+  const added = await post(`/fr/owner/${token2}/account`, { add: true }, cookie);
+  assert.equal(added.status, 201);
+  assert.match(added.body.href, /^\/fr\/owner\/account\/venue\/\d+$/);
+  // Our decision on something sent from the French page is emailed in French.
+  const waiting = await post(`/fr/owner/account/venue/${v.id}/changes`, { changes: { website: 'portail-fr.example.com' }, started_at: old }, cookie);
+  assert.equal(waiting.status, 201);
+  assert.deepEqual(waiting.body.review, ['website']);
+  mails.length = 0;
+  await app.notifyReviewDecision('change', waiting.body.id, 'reject', { reason: 'Test' });
+  assert.ok(mails.some((m) => m.subject === `Non publié : votre mise à jour (site web) pour ${v.name}` && /^Bonjour,/.test(m.text) && /fr\/owner\/login/.test(m.text)), JSON.stringify(mails));
+  const enWaiting = await post(`/owner/account/venue/${v.id}/changes`, { changes: { website: 'portail-en.example.com' }, started_at: old }, cookie);
+  mails.length = 0;
+  await app.notifyReviewDecision('change', enWaiting.body.id, 'reject', { reason: 'Test' });
+  assert.ok(mails.some((m) => /^Not published: your website update/.test(m.subject)), JSON.stringify(mails));
+  // Redirects stay French.
+  const out = await get('/fr/owner/account');
+  assert.equal(out.status, 302);
+  assert.equal(out.headers.get('location'), '/fr/owner/login');
+  const inn = await get('/fr/owner/login', cookie);
+  assert.equal(inn.status, 302);
+  assert.equal(inn.headers.get('location'), '/fr/owner/account');
+  // Emails: a password reset and a new edit link asked for on the French pages come in French, with French links.
+  mails.length = 0;
+  assert.equal((await post('/fr/owner/forgot', { email: 'portail@example.com' })).status, 200);
+  const reset = mails.find((m) => /Réinitialiser/.test(m.subject));
+  assert.ok(reset, 'a French reset email');
+  assert.match(reset.text, /^Bonjour,/);
+  const resetUrl = /https:\/\/okanaganroam\.com(\/fr\/owner\/reset\/[A-Za-z0-9_-]{43})/.exec(reset.text)[1];
+  const resetPage = await get(resetUrl);
+  assert.equal(resetPage.status, 200);
+  const rp = await resetPage.text();
+  assert.match(rp, /<h1>Choisir un nouveau mot de passe<\/h1>/);
+  assert.deepEqual(pfrEnglishLeft(rp), []);
+  pfrScriptsParse(rp, resetUrl);
+  const short = await post(resetUrl, { password: 'short' });
+  assert.equal(short.body.errors.password, 'Utilisez au moins 10 caractères.');
+  mails.length = 0;
+  assert.equal((await post(resetUrl, { password: 'a brand new long password' })).status, 200);
+  assert.ok(mails.some((m) => /a été changé/.test(m.subject) && /fr\/owner\/forgot/.test(m.text)), 'the "password changed" email is French');
+  mails.length = 0;
+  assert.equal((await post('/fr/owner/link', { email: 'portail@example.com' })).status, 200);
+  const linkMail = mails.find((m) => /lien de modification/.test(m.subject));
+  assert.ok(linkMail, 'a French new-link email');
+  assert.match(linkMail.text, /https:\/\/okanaganroam\.com\/fr\/owner\/[A-Za-z0-9_-]{32}/);
+  // The same requests from the English pages keep English emails.
+  mails.length = 0;
+  await post('/owner/forgot', { email: 'portail@example.com' });
+  assert.ok(mails.some((m) => m.subject === 'Reset your Okanagan Roam password' && /https:\/\/okanaganroam\.com\/owner\/reset\//.test(m.text)));
+  // The help bot's Message us from a French edit page still finds the listing.
+  assert.equal(base.startsWith('http://localhost'), true);
+}));
+
+test('French portal (2026-10-18): the EN / FR switch round-trips, remembers the choice, and English pages are unchanged', () => withFrenchPortal(async ({ get, post, v, token }) => {
+  const vm = require('node:vm');
+  const made = await post(`/owner/${token}/account`, { email: 'portail@example.com', password: 'a long enough password' });
+  const cookie = made.cookie;
+  assert.equal(made.status, 201);
+  for (const [enPath, frPath] of [['/owner/account', '/fr/owner/account'], ['/owner/account/settings', '/fr/owner/account/settings'], [`/owner/account/venue/${v.id}`, `/fr/owner/account/venue/${v.id}`], [`/owner/${token}`, `/fr/owner/${token}`]]) {
+    const en = await (await get(enPath, cookie)).text();
+    const fr = await (await get(frPath, cookie)).text();
+    assert.match(en, new RegExp(`id="langToggle" href="${frPath}" hreflang="fr"`), enPath);
+    assert.match(fr, new RegExp(`id="langToggle" href="${enPath}" hreflang="en"`), frPath);
+    // Someone who chose French is sent from the English address to the French one.
+    assert.ok(en.includes(`location.replace(${JSON.stringify(frPath)}+location.search+location.hash)`), enPath);
+    assert.ok(!fr.includes('location.replace('), frPath);
+    // Clicking the switch stores the language picked, so the English page doesn't bounce back to French.
+    for (const [page, want] of [[en, 'fr'], [fr, 'en']]) {
+      const code = /<script>\n\(function\(\)\{\n  var t = document\.getElementById\('langToggle'\)[\s\S]*?<\/script>/.exec(page)[0].replace(/<\/?script>/g, '');
+      const store = {};
+      let click;
+      const toggle = { getAttribute: () => want, addEventListener: (e, f) => { click = f; } };
+      vm.runInNewContext(code, { document: { getElementById: () => toggle }, localStorage: { setItem: (k, x) => { store[k] = x; } } });
+      click();
+      assert.equal(store.okanaganLang, want);
+    }
+    // The English page is still English.
+    assert.match(en, /<html lang="en"/);
+    assert.doesNotMatch(pfrVisible(en), /Enregistrer les modifications|Mes fiches|Paramètres du compte|Connecté en tant que/, enPath);
+  }
+  const en = await (await get(`/owner/account/venue/${v.id}`, cookie)).text();
+  assert.match(en, /id="opSubmit">Save changes</);
+  assert.match(en, /<span class="lyv-section-label">Opening hours/);
+  assert.match(en, /"liveNow":"Live now: \{fields\}\. Your page shows it straight away\. "/);
+  assert.match(en, /<footer class="op-footer"><a href="\/privacy">Privacy<\/a>/);
+  // The menu screen: /fr/... is French; its switches go to the English address with ?lang=en (a French browser
+  // still gets French on the English address without it), and ?lang=fr still works.
+  const menuFr = await (await get(`/fr/owner/account/venue/${v.id}/menu`, cookie)).text();
+  assert.match(menuFr, /<html lang="fr"/);
+  assert.match(menuFr, new RegExp(`<p class="mn-lang"><a href="/owner/account/venue/${v.id}/menu\\?lang=en"`));
+  assert.match(menuFr, new RegExp(`id="langToggle" href="/owner/account/venue/${v.id}/menu\\?lang=en"`));
+  assert.match(menuFr, /"base":"\/fr\/owner\/account\/venue\/\d+\/menu"/, 'the menu screen posts to its French address');
+  const menuEn = await (await get(`/owner/account/venue/${v.id}/menu?lang=en`, cookie)).text();
+  assert.match(menuEn, /<html lang="en"/);
+  assert.match(menuEn, new RegExp(`<p class="mn-lang"><a href="/fr/owner/account/venue/${v.id}/menu"`));
+  assert.match(await (await get(`/owner/account/venue/${v.id}/menu?lang=fr`, cookie)).text(), /<html lang="fr"/);
+  // The French login pages' own switch script works the same way.
+  const login = await (await get('/fr/owner/login')).text();
+  assert.match(login, /localStorage\.setItem\('okanaganLang'/);
+  assert.match(login, /fetch\('\/fr\/owner\/login'[\s\S]*location\.href = '\/fr\/owner\/account'/, 'a French sign-in lands on the French account page');
+  assert.match(await (await get('/owner/login')).text(), /fetch\('\/owner\/login'[\s\S]*location\.href = '\/owner\/account'/);
+}));
+
+test('French portal (2026-10-18): the help bot answers in French with the French button names and says the edit page is French', () => {
+  const cfg = (html) => JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(html)[1]);
+  const english = ['Save changes', 'Send changes', 'Create a login', 'Add to my login', 'My listings', 'Edit listing', 'People with access', 'Remove', 'Log out', 'Account settings',
+    'Waiting for review', 'What’s On', 'Choose photos', 'Your updates', 'Make main photo', 'Opening hours', 'Hours', 'Closed', 'second time', 'Copy Monday', 'Seasonal hours',
+    'Special closures', 'Add a closed day', 'Open some months only', 'Name, address', 'Price range', 'Add an event', 'Send event', 'All-day', 'Repeats or other dates', 'End date',
+    'Add your menu', 'Type it in myself', 'Take a photo', 'Publish', 'Can you do it for me', 'Make a change', 'Replace', 'Take it off', 'New from visitors', 'Done'];
+  for (const page of ['edit', 'account', 'settings', 'menu']) {
+    for (const signedIn of [true, false]) {
+      const c = cfg(app.ownerHelpWidgetHtml(page, { signedIn, lang: 'fr' }));
+      assert.equal(c.lang, 'fr');
+      for (const t of c.topics) {
+        const bold = [...t.aFr.matchAll(/<strong>([^<]*)<\/strong>/g)].map((m) => m[1]).join(' | ');
+        for (const en of english) assert.ok(!new RegExp(`(^|[^A-Za-z])${en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^A-Za-z]|$)`).test(bold), `${page} ${t.id}: "${en}" in ${bold}`);
+        assert.doesNotMatch(t.aFr, /href="\/owner\//, `${t.id}: French links`);
+      }
+      const french = c.topics.find((t) => t.id === 'french');
+      assert.ok(french, 'the "is it in French?" topic');
+      assert.match(french.aFr, /Toutes les pages de l’espace entreprises sont en français/);
+      assert.match(french.aFr, /<strong>Enregistrer les modifications<\/strong>/);
+    }
+  }
+  const signedIn = Object.fromEntries(cfg(app.ownerHelpWidgetHtml('edit', { signedIn: true, lang: 'fr' })).topics.map((t) => [t.id, t]));
+  assert.match(signedIn.hours.aFr, /Touchez <strong>Enregistrer les modifications<\/strong> au bas de la page/);
+  assert.match(signedIn.access.aFr, /<strong>Personnes ayant accès<\/strong>[\s\S]*<strong>Retirer<\/strong>/);
+  assert.match(signedIn['menu-add'].aFr, /<strong>Je le tape moi-même<\/strong>/);
+  const link = Object.fromEntries(cfg(app.ownerHelpWidgetHtml('edit', { signedIn: false, lang: 'fr' })).topics.map((t) => [t.id, t]));
+  assert.match(link.hours.aFr, /Touchez <strong>Envoyer les modifications<\/strong>/);
+  // A French error on the page still points the bot at the right topic.
+  const rules = cfg(app.ownerHelpWidgetHtml('edit', { lang: 'fr' })).rules.map(([re, id]) => [new RegExp(re, 'i'), id]);
+  const topicFor = (msg) => (rules.find(([re]) => re.test(msg)) || [])[1];
+  assert.equal(topicFor('Heures : le lundi ouvre et ferme à la même heure.'), 'hours');
+  assert.equal(topicFor('Rien n’a encore changé. Modifiez un champ, puis envoyez-le.'), 'nothing-changed');
+  assert.equal(topicFor('Cette photo est trop petite. Utilisez-en une d’au moins 800 pixels de large.'), 'photo-small');
 });
