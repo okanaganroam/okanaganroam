@@ -10409,6 +10409,170 @@ function withVersionedAppJs(html) {
 }
 const GOLF_APP_SCRIPT_TAG = APP_JS_SCRIPT_TAG;
 
+// Lighter pages (2026-10-18): the big <style> blocks that every list page
+// repeats (SEO_PAGE_CSS, the Golf/Outdoor/... themes, the Food & Drink and
+// What's On styles) went out inline on every request, 80-137 KB a page that
+// nothing could cache because HTML is not edge-cached. On the way out, each
+// block whose text is exactly one of these is swapped, in place (so the
+// cascade order is unchanged), for a <link> to /styles/shared/<name>.css
+// with the content hash in the URL; that URL is cached for a year as
+// immutable. The renderers themselves are untouched (their output and the
+// tests that read it stay the same), and a block that ever differs from the
+// registered text simply stays inline. French pages are translated before
+// this runs and never touch <style> text, so they share the same files.
+// The shared-file route always answers 200 with the current text (a stale
+// hash gets a short cache), so an old page can never cache a 404.
+const SHARED_STYLE_BLOCKS = [
+  ['seo-page', () => `<style>${SEO_PAGE_CSS}</style>`],
+  ['golf-theme', () => renderGolfThemeStyles()],
+  ['beach-theme', () => renderBeachThemeStyles()],
+  ['outdoor-theme', () => renderOutdoorThemeStyles()],
+  ['indoor-theme', () => renderIndoorThemeStyles()],
+  ['tour-theme', () => renderTourThemeStyles()],
+  ['sport-theme', () => renderSportThemeStyles()],
+  ['golf-venue', () => renderGolfVenuePolishStyles()],
+  ['food-drink', () => renderFoodDrinkHubStyles()],
+  ['whats-on', () => renderWhatsOnStyles()],
+  ['dog-hub', () => renderDogHubStyles()],
+  ['local-favourites', () => renderLocalFavouritesStyles()],
+  ['outdoors-simple', () => renderOutdoorsSimplifiedStyles()],
+  ['browse-hub', () => renderBrowseHubStyles()],
+];
+let sharedStyleTable = null;
+function sharedStyles() {
+  if (sharedStyleTable) return sharedStyleTable;
+  const byName = new Map();
+  for (const [name, render] of SHARED_STYLE_BLOCKS) {
+    let block;
+    try { block = render(); } catch (e) { continue; }
+    const m = /^<style>([\s\S]*)<\/style>$/.exec(block || '');
+    if (!m || m[1].length < 2000) continue;
+    const css = m[1];
+    const hash = crypto.createHash('md5').update(css).digest('hex').slice(0, 12);
+    byName.set(name, { name, block, css, hash, href: `/styles/shared/${name}.css?v=${hash}` });
+  }
+  return (sharedStyleTable = byName);
+}
+// tokens.css and app.css get the same content-hash URLs.
+const STYLE_FILE_HASHES = {};
+function styleFileHash(file) {
+  if (!(file in STYLE_FILE_HASHES)) {
+    try { STYLE_FILE_HASHES[file] = crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'styles', file))).digest('hex').slice(0, 12); } catch (e) { STYLE_FILE_HASHES[file] = null; }
+  }
+  return STYLE_FILE_HASHES[file];
+}
+function withSharedStylesheets(html) {
+  if (typeof html !== 'string' || html.indexOf('<style>') === -1 && html.indexOf('href="/styles/') === -1) return html;
+  for (const s of sharedStyles().values()) {
+    if (html.indexOf(s.block) !== -1) html = html.split(s.block).join(`<link rel="stylesheet" href="${s.href}">`);
+  }
+  return html.replace(/(<link rel="stylesheet" href=")\/styles\/(tokens|app)\.css"/g, (m, a, f) => {
+    const h = styleFileHash(f + '.css');
+    return h ? `${a}/styles/${f}.css?v=${h}"` : m;
+  });
+}
+// Lighter pages (2026-10-18): the Food & Drink style hubs (/food-drink,
+// /restaurants, /wineries, /dog-friendly, the town category pages...) ship
+// their first page of cards and keep every other card in an inert
+// <template id="fdRest"> so search, filters and counts run over all of them.
+// That template was most of the page (0.7-1.2 MB). It now leaves the HTML
+// empty, marked with the hash of what it held, and the page script loads
+// it from /cards/rest/<hash>.html right after the page appears (as /browse
+// does with /browse/cards.json), then starts the filters over the full set.
+// The text is kept in memory under its hash; if it is gone (a restart, a
+// second instance) that URL renders the page again from ?u= and answers
+// with the same part, translated for French pages like the page itself.
+const REST_CARDS_MIN = 8000;
+const REST_CARDS_MAX_BYTES = 48 * 1024 * 1024;
+const restCardsMemo = new Map(); // hash -> template inner HTML
+let restCardsMemoBytes = 0;
+function rememberRestCards(html) {
+  const hash = crypto.createHash('md5').update(html).digest('hex').slice(0, 12);
+  if (restCardsMemo.has(hash)) { restCardsMemo.delete(hash); restCardsMemo.set(hash, html); return hash; }
+  restCardsMemo.set(hash, html);
+  restCardsMemoBytes += html.length;
+  while (restCardsMemoBytes > REST_CARDS_MAX_BYTES && restCardsMemo.size > 1) {
+    const [k, v] = restCardsMemo.entries().next().value;
+    restCardsMemo.delete(k); restCardsMemoBytes -= v.length;
+  }
+  return hash;
+}
+const REST_TEMPLATE_RE = /<template id="(fdRest|whatsOnRest)">([\s\S]*?)<\/template>/;
+function withRestCardsDeferred(html) {
+  const m = REST_TEMPLATE_RE.exec(html);
+  if (!m || m[2].length < REST_CARDS_MIN) return html;
+  const hash = rememberRestCards(m[2]);
+  return html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + html.slice(m.index + m[0].length);
+}
+// GET /cards/rest/<hash>.html?u=<page path and query>: see above. Returns
+// true once answered (a memory hit, or a refused ?u=); on a miss it points
+// the request at the page itself and returns false so it renders as usual.
+function restCardsRequest(req, res) {
+  const m = /^\/cards\/rest\/([0-9a-f]{12})\.html(?:\?(.*))?$/.exec(String(req.url));
+  if (!m) return false;
+  const hash = m[1];
+  if (restCardsMemo.has(hash)) {
+    const html = restCardsMemo.get(hash);
+    restCardsMemo.delete(hash); restCardsMemo.set(hash, html);
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' });
+    res.end(req.method === 'HEAD' ? undefined : html);
+    return true;
+  }
+  const u = String(new URLSearchParams(m[2] || '').get('u') || '');
+  if (!/^\/(?!\/|api\/|admin|owner|cards\/)[^\s#]*$/.test(u)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end('Not found');
+    return true;
+  }
+  req.url = u;
+  req.restCardsHash = hash;
+  return false;
+}
+// The reverse of withSharedStylesheets, for tests that read a served page's
+// CSS: the links become the inline blocks they replaced.
+function inlineSharedStylesheets(html) {
+  if (typeof html !== 'string') return html;
+  for (const s of sharedStyles().values()) html = html.split(`<link rel="stylesheet" href="${s.href}">`).join(s.block);
+  return html.replace(/(<link rel="stylesheet" href="\/styles\/(?:tokens|app)\.css)\?v=[0-9a-f]{12}"/g, '$1"');
+}
+// Wraps one response so a 200 text/html body goes through
+// withSharedStylesheets. writeHead is held until end (like
+// installTwinResponse) so the body can change; anything that writes in
+// pieces, or sets its own Content-Length, is passed straight through.
+// A /cards/rest/ request (req.restCardsHash) answers with the page's
+// waiting cards only.
+function installSharedStylesheetResponse(res, req = {}) {
+  const realWriteHead = res.writeHead.bind(res), realEnd = res.end.bind(res), realWrite = res.write.bind(res);
+  let held = null;
+  const flush = () => { if (held) { const h = held; held = null; realWriteHead(...h); } };
+  res.writeHead = (code, ...rest) => {
+    const h = rest.length === 1 && rest[0] && typeof rest[0] === 'object' ? rest[0] : null;
+    const type = h ? String(h['Content-Type'] || h['content-type'] || '') : '';
+    if (code === 200 && h && /text\/html/.test(type) && !h['Content-Length'] && !h['content-length']) { held = [code, h]; return res; }
+    flush();
+    return realWriteHead(code, ...rest);
+  };
+  res.write = (...a) => { flush(); return realWrite(...a); };
+  res.end = (body, ...rest) => {
+    if (req.restCardsHash) {
+      // Only the waiting cards, or nothing for a page without them. A
+      // redirect or error already went out as it was.
+      if (!held) return realEnd(body, ...rest);
+      const m = body != null && typeof body !== 'function' ? REST_TEMPLATE_RE.exec(String(body)) : null;
+      held = null;
+      if (!m) { realWriteHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return realEnd('Not found'); }
+      const same = rememberRestCards(m[2]) === req.restCardsHash;
+      realWriteHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'no-store', 'X-Robots-Tag': 'noindex' });
+      return realEnd(m[2]);
+    }
+    if (held && body != null && typeof body !== 'function') {
+      try { body = withRestCardsDeferred(withSharedStylesheets(String(body))); } catch (e) { /* the inline page is still correct */ }
+    }
+    flush();
+    return realEnd(body, ...rest);
+  };
+}
+
 // Body class for themed pages. Golf keeps exactly its deployed
 // `class="golf-page"`; Beach pages carry the same theme class (the
 // body.golf-page rules ARE the design system these pages share) plus a
@@ -11798,6 +11962,16 @@ const SITE_WEBMANIFEST = JSON.stringify({
     { name: 'What’s on this week', short_name: 'What’s on', url: '/map#events', icons: [{ src: '/images/icons/okanagan-roam-icon-192.png', sizes: '192x192' }] },
   ],
 });
+// Lighter pages (2026-10-18): a list page's ItemList schema repeated every
+// card on the page (130 KB on /food-drink). It now names the first
+// ITEM_LIST_SCHEMA_CAP places, in page order, and numberOfItems keeps the
+// full count. Shorter lists are unchanged.
+const ITEM_LIST_SCHEMA_CAP = 50;
+function capItemListSchema(block) {
+  if (!block || block['@type'] !== 'ItemList' || !Array.isArray(block.itemListElement) || block.itemListElement.length <= ITEM_LIST_SCHEMA_CAP) return block;
+  const total = Math.max(Number(block.numberOfItems) || 0, block.itemListElement.length);
+  return { ...block, numberOfItems: total, itemListElement: block.itemListElement.slice(0, ITEM_LIST_SCHEMA_CAP) };
+}
 function pageHead(title, description, canonical, jsonLdBlocks, opts = {}) {
   // golfTheme (2026-09-19): Golf pages also load the homepage stylesheet
   // (before the inline SEO CSS, so existing SEO rules still win ties) and
@@ -11829,7 +12003,7 @@ ${canonical === null ? '' : `<link rel="canonical" href="${canonical}">\n`}${alt
 ${shareImageSize ? `<meta property="og:image:width" content="${shareImageSize[0]}">\n<meta property="og:image:height" content="${shareImageSize[1]}">\n` : ''}${canonical === null ? '' : `<meta property="og:url" content="${canonical}">\n`}<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
 <meta name="twitter:description" content="${escapeHtml(description)}">
-${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.stringify(block)}\n</script>`).join('\n')}
+${jsonLdBlocks.map((block) => `<script type="application/ld+json">\n${JSON.stringify(capItemListSchema(block))}\n</script>`).join('\n')}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17011,6 +17185,8 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
   return `<script>
 (function(){
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
+  // Lighter pages (2026-10-18): runs once the waiting cards are in (below).
+  function fdStart(){
   // What each type chip adds to a card's searchable text, when that differs
   // from its label ("Games & Escape Rooms" must not make every games place
   // answer to "escape room").
@@ -17383,6 +17559,22 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     paintOpenCount(pressed(typeChips, 'data-fd-type'), pressed(featureChips, 'data-fd-feature'), pressed(regionChips, 'data-region'));
   }, 60000);`)}
   apply('replace');
+}
+  // Lighter pages (2026-10-18): the cards after the first page arrive right
+  // after the page appears (see withRestCardsDeferred); the filters start
+  // once they are in, so search and the counts still cover every card.
+  var restEl = document.getElementById('fdRest'), restHash = restEl && restEl.getAttribute('data-rest');
+  if (!restHash || !window.fetch) { fdStart(); return; }
+  fetch('/cards/rest/' + restHash + '.html?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
+    .then(function(r){ if (!r.ok) throw new Error('rest ' + r.status); return r.text(); })
+    .then(function(html){
+      var have = {};
+      Array.prototype.forEach.call(document.querySelectorAll('#fdResults > .venue-card'), function(c){ have[c.getAttribute('data-venue-id')] = 1; });
+      var t = document.createElement('template'); t.innerHTML = html;
+      Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) restEl.content.appendChild(c); });
+    })
+    .catch(function(){})
+    .then(fdStart);
 })();
 </script>`;
 }
@@ -21052,8 +21244,10 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   // chosen window. Both default to the shell-phase values.
   const inventory = state.hasInventory === true;
   const dateState = state.dateState || { when: '', from: '', to: '' };
+  // Lighter pages (2026-10-18): starts once the waiting events are back in
+  // the list (WHATSON_REST_SCRIPT); straight away where there are none.
   return `<script>
-(function(){
+(window.__whatsOnReady || function(fn){ fn(); })(function(){
   var LABELS = ${JSON.stringify(labels).replace(/</g, '\\u003c')};
   var INVENTORY = ${inventory ? 'true' : 'false'};
   var DATE = ${JSON.stringify(dateState).replace(/</g, '\\u003c')};
@@ -21329,7 +21523,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     readMoreScrolling = true;
     window.addEventListener('scroll', readMoreOnScreen, { passive: true });
   }
-})();
+});
 </script>`;
 }
 // GET /whats-on -- the page. `filter` is parseWhatsOnFilterQuery(query).
@@ -21422,8 +21616,42 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
   body.whatson-page .whatson-show-more[hidden] { display: none; }
   @media (max-width: 640px) { body.whatson-page .whatson-event-card > .whatson-event-photo { height: 96px; margin: -18px -20px 10px; } }
 </style>`;
-const WHATSON_LIST_SCRIPT = `<script>
+// Lighter pages (2026-10-18): puts the waiting events (whatsOnRest) back at
+// the end of the list, then runs whatever waited on window.__whatsOnReady
+// (the paging script below and the filter script).
+const WHATSON_REST_SCRIPT = `<script>
 (function(){
+  var list = document.getElementById('whatsOnResults'), el = document.getElementById('whatsOnRest');
+  // The paging script (last = true) runs after the filter script has set
+  // each card's hidden state, so it lays out the final list directly.
+  var queue = [], late = [], ready = false;
+  window.__whatsOnReady = function(fn, last){ if (ready) fn(); else (last ? late : queue).push(fn); };
+  function finish(){ ready = true; var q = queue.concat(late); queue = []; late = []; q.forEach(function(fn){ fn(); }); }
+  var hash = el && el.getAttribute('data-rest');
+  if (!el || !list) { finish(); return; }
+  var kids = Array.prototype.slice.call(list.children);
+  function place(frag){
+    Array.prototype.slice.call(frag.children).forEach(function(li){
+      var at = Number(li.getAttribute('data-wo-at'));
+      li.removeAttribute('data-wo-at');
+      list.insertBefore(li, kids[at] || null);
+    });
+  }
+  if (!hash || !window.fetch) { place(el.content); finish(); return; }
+  fetch('/cards/rest/' + hash + '.html?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
+    .then(function(r){ if (!r.ok) throw new Error('rest ' + r.status); return r.text(); })
+    .then(function(html){
+      var t = document.createElement('template'); t.innerHTML = html; place(t.content);
+      // Favorite / Add to trip state for the cards that just arrived.
+      if (window.__syncFavButtons) window.__syncFavButtons();
+      if (window.__syncTripButtons) window.__syncTripButtons();
+    })
+    .catch(function(){})
+    .then(finish);
+})();
+</script>`;
+const WHATSON_LIST_SCRIPT = `<script>
+(window.__whatsOnReady || function(fn){ fn(); })(function(){
   var list = document.getElementById('whatsOnResults'), more = document.getElementById('whatsOnShowMore');
   if (!list) return;
   var page = 1, busy = false, PAGE = ${WHATSON_PAGE_SIZE};
@@ -21448,7 +21676,7 @@ const WHATSON_LIST_SCRIPT = `<script>
       .observe(list, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
   } catch (e) {}
   layout();
-})();
+}, true);
 </script>`;
 function renderWhatsOnPage(filter = null, opts = {}) {
   // opts.scope ({ category } or { region }) renders a scoped page (see whatsOnScopeFromPath): it pre-selects that chip unless the
@@ -21535,16 +21763,41 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const grouped = events.map((e, i) => ({ e, i, g: whatsOnGroupOf(e, today) }))
     .sort((a, b) => a.g.rank - b.g.rank || (a.g.key === 'ongoing' ? String(a.e.endDate).localeCompare(String(b.e.endDate)) : 0) || a.i - b.i);
   let lastGroup = null;
-  const listHtml = grouped.map(({ e, g }) => {
-    const card = matchingIds.has(e.id) ? whatsOnEventCardHtml(e, today) : whatsOnEventCardHtml(e, today).replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden');
-    const head = g.key !== lastGroup ? `\n      <li class="whatson-group-head" data-group="${g.key}" aria-hidden="false"><h3>${escapeHtml(g.label)}</h3></li>` : '';
+  // Lighter pages (2026-10-18): the HTML carries only what a visitor sees
+  // before "Show more": the first WHATSON_PAGE_SIZE shown events and their
+  // headings. Every other item (hidden events, later ones, empty headings)
+  // waits in <template id="whatsOnRest">, which the response leaves empty
+  // and the page loads right after it appears (withRestCardsDeferred). Each
+  // waiting item carries data-wo-at, the number of items before it in the
+  // page's list, so the loader puts it back in its exact place before the
+  // filter and paging scripts start: they still see every event in order.
+  const items = [];
+  for (const { e, g } of grouped) {
+    const shown = matchingIds.has(e.id);
+    const card = shown ? whatsOnEventCardHtml(e, today) : whatsOnEventCardHtml(e, today).replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden');
+    if (g.key !== lastGroup) items.push({ g: g.key, head: true, html: `\n      <li class="whatson-group-head" data-group="${g.key}" aria-hidden="false"><h3>${escapeHtml(g.label)}</h3></li>` });
     lastGroup = g.key;
-    return head + card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`);
-  }).join('');
+    items.push({ g: g.key, shown, html: card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`) });
+  }
+  let firstShown = 0;
+  const groupsInFirst = new Set();
+  for (const it of items) if (!it.head && it.shown && firstShown < WHATSON_PAGE_SIZE) { it.first = true; firstShown++; groupsInFirst.add(it.g); }
+  let lastFirst = -1;
+  items.forEach((it, i) => { if (it.first) lastFirst = i; });
+  items.forEach((it, i) => { if (it.head && i < lastFirst && groupsInFirst.has(it.g)) it.first = true; });
+  let before = 0;
+  const firstHtml = [], restParts = [];
+  for (const it of items) {
+    if (it.first) { firstHtml.push(it.html); before++; continue; }
+    restParts.push(it.html.replace(/(<li class="(?:whatson-group-head|venue-card whatson-event-card)"[^>]*)>/, `$1 data-wo-at="${before}">`));
+  }
+  const listHtml = firstHtml.join('');
+  const restHtml = restParts.join('');
   const cardsHtml = events.length
     ? `<ul class="card-grid" id="whatsOnResults"${matching.length ? '' : ' hidden'}>${listHtml}
-  </ul>
+  </ul>${restHtml ? `\n  <template id="whatsOnRest">${restHtml}</template>` : ''}
   <div class="whatson-more-row"><button type="button" class="whatson-show-more" id="whatsOnShowMore" hidden>Show more</button></div>
+  ${WHATSON_REST_SCRIPT}
   ${WHATSON_LIST_SCRIPT}`
     : `<ul class="card-grid" id="whatsOnResults" hidden></ul>`;
   // Body classes: `golf-page` is the site's themed category-page namespace
@@ -36556,6 +36809,12 @@ ${renderGolfHeaderHtml()}
 }
 
 const server = http.createServer(async (req, res) => {
+  // Lighter pages (2026-10-18): shared CSS goes out as cached files, and a
+  // hub's waiting cards load after the page (see withRestCardsDeferred).
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    if (restCardsRequest(req, res)) return;
+    installSharedStylesheetResponse(res, req);
+  }
   // One address per page (2026-10-16): /kelowna/ redirects to /kelowna.
   if ((req.method === 'GET' || req.method === 'HEAD') && /^\/(?!api\/|images\/|styles\/|scripts\/)[^?#]*[^/]\/(\?|$)/.test(req.url)) {
     const [p, q] = String(req.url).split('?');
@@ -37222,12 +37481,26 @@ const server = http.createServer(async (req, res) => {
       '/styles/app.css': { file: 'public/styles/app.css', type: 'text/css; charset=utf-8' },
       '/scripts/app.js': { file: 'public/scripts/app.js', type: 'application/javascript; charset=utf-8' },
     };
+    // Lighter pages (2026-10-18): the shared page styles (see
+    // withSharedStylesheets). Always 200 for a known name, so a page from an
+    // older deploy can never leave a cached 404 at the edge.
+    const sharedStyleMatch = method === 'GET' && /^\/styles\/shared\/([a-z0-9-]+)\.css$/.exec(pathname);
+    if (sharedStyleMatch && sharedStyles().has(sharedStyleMatch[1])) {
+      const sheet = sharedStyles().get(sharedStyleMatch[1]);
+      res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': query.v && String(query.v) === sheet.hash ? 'public, max-age=31536000, immutable' : 'public, max-age=300' });
+      return res.end(sheet.css);
+    }
     if (STATIC_ASSETS[pathname] && method === 'GET') {
       const asset = STATIC_ASSETS[pathname];
       const assetPath = path.join(__dirname, asset.file);
       if (fs.existsSync(assetPath)) {
         const body = fs.readFileSync(assetPath, 'utf8');
-        res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': 'public, max-age=3600' });
+        // Lighter pages (2026-10-18): a URL carrying this file's own content
+        // hash (?v=) never changes, so it is cached for a year; the plain
+        // URL and an old hash keep the short cache.
+        const current = crypto.createHash('md5').update(body).digest('hex').slice(0, 12);
+        const cache = query.v && String(query.v) === current ? 'public, max-age=31536000, immutable' : 'public, max-age=3600';
+        res.writeHead(200, { 'Content-Type': asset.type, 'Cache-Control': cache });
         return res.end(body);
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -39834,6 +40107,13 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Lighter pages (2026-10-18)
+  capItemListSchema,
+  ITEM_LIST_SCHEMA_CAP,
+  sharedStyles,
+  withSharedStylesheets,
+  inlineSharedStylesheets,
+  WHATSON_PAGE_SIZE,
   recurringSeasonRow,
   // Visitor photos & tips (2026-10-17)
   visitorDisplayName,
