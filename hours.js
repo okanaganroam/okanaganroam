@@ -103,7 +103,62 @@ function parseHours(raw) {
       days[d] = { status: 'unknown' };
     }
   }
-  return { known, days };
+  const out = { known, days };
+  // Seasonal hours and special closures (2026-10-18): an owner can add a second week of hours for a date range
+  // ("_seasons", month-day from/to, every year, may run over New Year) and dated closures ("_closures"). They ride
+  // along in the same JSON (server.js hoursWithExtras); a plain week parses exactly as before. statusAt() applies
+  // them when the clock carries a date.
+  if (Array.isArray(obj._seasons)) {
+    const seasons = obj._seasons.filter((x) => x && /^\d{2}-\d{2}$/.test(x.from) && /^\d{2}-\d{2}$/.test(x.to) && x.hours && typeof x.hours === 'object')
+      .map((x) => ({ from: x.from, to: x.to, label: typeof x.label === 'string' ? x.label : '', days: parseHours(x.hours).days }));
+    if (seasons.length) out.seasons = seasons;
+  }
+  if (Array.isArray(obj._closures)) {
+    const closures = obj._closures.filter((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(x.from) && /^\d{4}-\d{2}-\d{2}$/.test(x.to || x.from))
+      .map((x) => ({ from: x.from, to: x.to || x.from, note: typeof x.note === 'string' ? x.note : '' }));
+    if (closures.length) out.closures = closures;
+  }
+  return out;
+}
+
+// ---- Dates (2026-10-18): which hours apply on a calendar day ----
+// 'YYYY-MM-DD' -> 'mon'..'sun', and the date `offset` days later. UTC arithmetic on the calendar date only, so no
+// timezone is involved (the date itself comes from okanaganClock()).
+function dateWeekday(date) {
+  const t = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+  return WEEKDAYS[(new Date(t).getUTCDay() + 6) % 7];
+}
+function shiftDate(date, offset) {
+  const t = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))) + offset * 86400000;
+  return new Date(t).toISOString().slice(0, 10);
+}
+function closureOn(parsed, date) {
+  return (parsed && parsed.closures || []).find((c) => date >= c.from && date <= c.to) || null;
+}
+// The seasonal set covering a date: Nov 1 - Apr 30 runs over New Year.
+function seasonOn(parsed, date) {
+  const md = date.slice(5);
+  return (parsed && parsed.seasons || []).find((s) => (s.from <= s.to ? md >= s.from && md <= s.to : md >= s.from || md <= s.to)) || null;
+}
+// One calendar day: a closure wins, then a seasonal set, then the usual week.
+function dayOnDate(parsed, date) {
+  if (!parsed || !parsed.days) return { status: 'unknown' };
+  const wd = dateWeekday(date);
+  const c = closureOn(parsed, date);
+  if (c) return { status: 'closed', closure: c };
+  const s = seasonOn(parsed, date);
+  return s ? s.days[wd] : parsed.days[wd];
+}
+// The week as it really runs from `clock.date`: today and the next five days by date, and yesterday (for a night
+// that runs past midnight) in the seventh weekday slot. Without a date, or with nothing extra, it is `parsed`.
+function hoursForClock(parsed, clock) {
+  if (!parsed || !(parsed.seasons || parsed.closures) || !clock || !/^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) return parsed;
+  const days = {};
+  for (let off = -1; off <= 5; off++) {
+    const d = shiftDate(clock.date, off);
+    days[dateWeekday(d)] = dayOnDate(parsed, d);
+  }
+  return { known: parsed.known, days };
 }
 
 function isOpenAllDay(day) {
@@ -167,6 +222,7 @@ function nextOpening(parsed, weekday, now) {
 function statusAt(parsed, clock) {
   const base = { state: 'unknown', closesAt: null, opensAt: null, closedToday: false, allDay: false };
   if (!parsed || !parsed.days || !validClock(clock)) return base;
+  parsed = hoursForClock(parsed, clock);
   const today = clock.weekday;
   const now = clock.minutes;
   const yesterdayKey = shiftWeekday(today, -1);
@@ -187,12 +243,15 @@ function statusAt(parsed, clock) {
     }
   }
   if (!current || current.status === 'unknown') return base;
-  return {
+  const out = {
     ...base,
     state: 'closed',
     opensAt: nextOpening(parsed, today, now),
     closedToday: current.status === 'closed',
   };
+  // A special closure today names itself: "Closed today (Thanksgiving)", or "(holiday)" without a note.
+  if (current.closure) out.closedNote = current.closure.note || 'holiday';
+  return out;
 }
 
 // ---- Wording (Open Now, 2026-09-26) ----
@@ -227,8 +286,9 @@ function hoursStatusLabel(status, clock) {
       : when(status.closesAt);
     return { state: 'open', text: 'Open now · Closes ' + closes };
   }
-  const lead = status.closedToday ? 'Closed today' : 'Closed';
-  return { state: 'closed', text: status.opensAt ? lead + ' · Opens ' + when(status.opensAt) : (status.closedToday ? 'Closed today' : 'Closed now') };
+  const today = status.closedNote ? 'Closed today (' + status.closedNote + ')' : 'Closed today';
+  const lead = status.closedToday ? today : 'Closed';
+  return { state: 'closed', text: status.opensAt ? lead + ' · Opens ' + when(status.opensAt) : (status.closedToday ? today : 'Closed now') };
 }
 
 // ---- Listing and structured data (Stage 2, 2026-09-29) ----
@@ -284,7 +344,7 @@ function openingPeriods(parsed) {
 // server and the browser can never read hours differently.
 const HOURS_CLIENT_SRC = [
   `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES};`,
-  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, isOpenAllDay, shiftWeekday,
+  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, seasonOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
     validClock, resolveClose, nextOpening, statusAt, formatClockMinutes, hoursStatusLabel].map((fn) => fn.toString()),
 ].join('\n');
 
@@ -293,6 +353,10 @@ module.exports = {
   HOURS_CLIENT_SRC,
   hoursTimeToMinutes,
   parseHours,
+  dateWeekday,
+  shiftDate,
+  dayOnDate,
+  hoursForClock,
   statusAt,
   formatClockMinutes,
   hoursStatusLabel,

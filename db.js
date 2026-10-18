@@ -1064,4 +1064,29 @@ CREATE INDEX IF NOT EXISTS idx_venue_claims_status ON venue_claims (status, subm
 CREATE INDEX IF NOT EXISTS idx_venue_claims_venue ON venue_claims (venue_id, status);
 `);
 
+// Seasonal hours and special closures (2026-10-18), set by owners on their edit page. Kept off the venues table so
+// hours research that rewrites venues.hours never wipes them. seasons: JSON list of
+// { from: 'MM-DD', to: 'MM-DD', label, hours: { mon: [["10:00","16:00"]], ... } } (every year; may run over New
+// Year). closures: JSON list of { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD', note }. server.js hoursWithExtras() hands
+// them to hours.js with the weekly hours.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_hours_extra (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  seasons TEXT,
+  closures TEXT,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
+// Instant owner edits (2026-10-18): a signed-in owner's hours, season, phone, description, badges, happy hour and
+// price range go live at once. The row is still written to owner_change_requests (status 'approved', instant = 1,
+// reviewed_by 'owner:<email>') as the audit trail, with what it replaced in `previous`; undo_meta keeps the hours
+// provenance it replaced, and undone_at / undone_by record an Undo from /admin/review.
+{
+  const cols = db.prepare('PRAGMA table_info(owner_change_requests)').all().map((c) => c.name);
+  for (const [name, type] of [['instant', 'INTEGER NOT NULL DEFAULT 0'], ['undo_meta', 'TEXT'], ['undone_at', 'TEXT'], ['undone_by', 'TEXT']]) {
+    if (!cols.includes(name)) db.exec(`ALTER TABLE owner_change_requests ADD COLUMN ${name} ${type}`);
+  }
+}
+
 module.exports = db;
