@@ -5339,8 +5339,9 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // back-link or the split-section rendering.
   const wineryPage = await fetch(`${base}/kelowna/wineries`);
   const wineryBody = await wineryPage.text();
-  assert.match(wineryBody, /<a class="category-back-link" href="\/wineries">← All Wineries<\/a>/, 'winery region pages link back to the /wineries hub now that winery is in ALL_REGIONS_CATEGORIES');
-  assert.doesNotMatch(wineryBody, /class="golf-page/, 'winery REGION pages must stay unthemed -- the Beaches-style treatment is hub-only');
+  // Town winery pages use the food & drink page since 2026-10-18 (site header, photo cards, filters, Open now).
+  assert.match(wineryBody, /<a href="\/wineries">All Okanagan wineries<\/a>/, 'winery region pages link back to the /wineries hub');
+  assert.match(wineryBody, /class="golf-page outdoor-page fd-page fd-scoped-page"/, 'winery REGION pages use the food & drink page');
   assert.doesNotMatch(wineryBody, /<h2 class="category-subsection-heading">/, 'non-golf category pages must not render the Golf/Indoor split');
 
   // Food & Drink SEO pages (2026-10-13): a dedicated valley-wide restaurant
@@ -11186,10 +11187,10 @@ test('Open Now on /browse follows stored hours + the Okanagan clock with no prov
   }
 });
 
-test('Open Now is /food-drink only: destination category pages carry none of it, and the browser clock equals okanaganClock()', () => {
+test('Open Now on the food & drink pages: the type pages carry it too (2026-10-18), and the browser clock equals okanaganClock()', () => {
   const v = app.getFoodDrinkHubVenues().find((x) => ['restaurant', 'cafe', 'pub'].includes(x.type));
   const scoped = app.renderFoodDrinkHubPage(app.getVenuesByRegionCategory(v.region, v.type), { types: [], features: [], regions: [] }, { region: v.region, type: v.type, categoryCounts: app.getRegionCategoryCounts(v.region) });
-  for (const needle of ['fd-open-status', 'fdOpenNow', 'fd-open-note', 'hoursStatusLabel', 'open=now', 'data-fd-remove-open']) assert.ok(!scoped.includes(needle), needle);
+  for (const needle of ['fdOpenNow', 'hoursStatusLabel', 'open=now']) assert.ok(scoped.includes(needle), needle);
   // The page script builds okanaganClock() from the same function and options.
   const vm = require('node:vm');
   const ctx = { Intl };
@@ -17351,10 +17352,10 @@ test('Activity photos: an outdoor place shows the photo that fits the chosen act
   const knox = { id: 1226, name: 'Knox Mountain Park', region: 'kelowna', type: 'outdoor', slug: 'knox-mountain-park', description: 'Fixture park.', image_url: '/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update.jpg?v=x' };
   const other = { id: 987654, name: 'Plain Test Park', region: 'kelowna', type: 'outdoor', slug: 'plain-test-park', description: 'Fixture park.', image_url: '/images/hiking/venues/plain-test-park.jpg' };
   const card = (html, id) => html.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${id}"[^>]*>`))[0];
-  const winterPhoto = /knox-mountain-park-20261016-winter-final\.jpg/;
+  const winterPhoto = /knox-mountain-park-20261016-winter-final(?:-w480)?\.jpg/;
 
   const all = app.renderOutdoorsHubPage([knox, other]);
-  assert.match(card(all, 1226), /--fd-ph:url\('\/images\/hiking\/venues\/knox-mountain-park-20261016-viewpoint-update\.jpg/, 'its usual photo with no activity chosen');
+  assert.match(card(all, 1226), /--fd-ph:url\('\/images\/hiking\/venues\/knox-mountain-park-20261016-viewpoint-update(?:-w480)?\.jpg/, 'its usual photo with no activity chosen');
   assert.match(card(all, 1226), /data-ph-by="[^"]*winter-final/, 'the page can swap to the winter photo');
   assert.doesNotMatch(card(all, 987654), /data-ph-by/, 'places without activity photos are unchanged');
   assert.match(all, /data-ph-now/, 'the swap script is on the outdoors page');
@@ -22896,6 +22897,207 @@ test('Owner season (2026-10-17): an owner sets "open May to October"; out of sea
   } finally {
     app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
     await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner help bot: on every business portal page (not admin), answers by topic, and "Message us" reaches info@ with the listing', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Help Bot Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'help-bot-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'help-bot-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, extra = {}) => fetch(`${base}${path}`, { method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': extra.ip || `10.77.0.${ip++}`, ...(extra.cookie ? { Cookie: extra.cookie } : {}), ...(extra.headers || {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  const sent = [];
+  app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+  const page = (html) => (html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s) || [])[1];
+  try {
+    // Present on the portal pages, with the start topics for that page.
+    for (const [path, key] of [['/owner/login', 'login'], ['/owner/link', 'link'], ['/owner/forgot', 'forgot'], [`/owner/${token}`, 'edit'], [`/owner/${token}/menu`, 'menu'], ['/owner/' + 'x'.repeat(32), 'invalid']]) {
+      const html = await get(path);
+      assert.match(html, /id="ohbBtn"/, path);
+      assert.equal(JSON.parse(page(html)).page, key, path);
+    }
+    const edit = JSON.parse(page(await get(`/owner/${token}`)));
+    assert.equal(edit.signedIn, false);
+    assert.deepEqual(edit.start.slice(0, 2), ['photo-add', 'hours']);
+    assert.ok(edit.topics.length >= 20 && edit.topics.every((t) => t.id && t.q && t.keys.length && t.a));
+    assert.ok(edit.start.every((id) => edit.topics.some((t) => t.id === id)));
+    // Not on admin pages or visitor pages.
+    assert.doesNotMatch(await get('/admin/review'), /id="ohbBtn"/);
+    assert.doesNotMatch(await get('/kelowna/restaurants/help-bot-fixture'), /id="ohbBtn"/);
+
+    // "Message us" from the edit link: the server works out the listing; the link itself is never emailed.
+    assert.equal((await post('/owner/help', { message: 'My photo will not upload', email: 'pat@example.com', path: `/owner/${token}`, page: 'edit', page_error: 'That photo is too small.', started_at: Date.now() })).status, 200);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, 'info@okanaganroam.com');
+    assert.equal(sent[0].replyTo, 'pat@example.com');
+    assert.match(sent[0].subject, /\[OWNER HELP\] Help Bot Fixture/);
+    assert.match(sent[0].text, /My photo will not upload/);
+    assert.match(sent[0].text, new RegExp(`Help Bot Fixture \\(venue #${v.id}\\)`));
+    assert.match(sent[0].text, /Error on their page: That photo is too small\./);
+    assert.ok(!sent[0].text.includes(token), 'the private edit link is not in the email');
+
+    // Signed out with no email: asked for one. Honeypot: accepted silently, nothing sent.
+    assert.equal((await post('/owner/help', { message: 'Help please', path: '/owner/login', page: 'login' })).status, 400);
+    assert.equal((await post('/owner/help', { message: 'Help please', email: 'x@example.com', path: '/owner/login', company_website: 'spam' })).status, 200);
+    assert.equal(sent.length, 1);
+    // Too short, unknown fields, other sites, and the hourly limit.
+    assert.equal((await post('/owner/help', { message: 'hi', email: 'x@example.com', path: '/owner/login' })).status, 400);
+    assert.equal((await post('/owner/help', { message: 'Help please', email: 'x@example.com', venue_id: 1 })).status, 400);
+    assert.equal((await post('/owner/help', { message: 'Help please', email: 'x@example.com' }, { headers: { Origin: 'https://evil.example' } })).status, 403);
+    const statuses = [];
+    for (let i = 0; i < 6; i++) statuses.push((await post('/owner/help', { message: `Help number ${i}`, email: 'x@example.com', path: '/owner/login' }, { ip: '10.77.9.9' })).status);
+    assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429]);
+
+    // Signed in: replies go to the login email and the listings come from the login.
+    const made = await post(`/owner/${token}/account`, { email: 'help.owner@example.com', password: 'a long enough password' });
+    assert.equal(made.status, 201);
+    const mine = JSON.parse(page(await get('/owner/account', made.cookie)));
+    assert.equal(mine.page, 'account');
+    assert.equal(mine.signedIn, true);
+    sent.length = 0;
+    assert.equal((await post('/owner/help', { message: 'Where are my listings?', path: '/owner/account', page: 'account' }, { cookie: made.cookie })).status, 200);
+    assert.equal(sent[0].replyTo, 'help.owner@example.com');
+    assert.match(sent[0].text, /Signed in: yes, as help\.owner@example\.com/);
+    assert.match(sent[0].text, /Help Bot Fixture/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    srv.close();
+  }
+});
+
+test('Photo sizes: cards and thumbnails use the 480px copy, the venue photo loads first with a 960px copy for phones', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const http = require('node:http');
+  const dir = path.join(__dirname, '..', 'public', 'images', 'venues');
+  const original = fs.readdirSync(dir).find((f) => /-2610\.jpg$/.test(f) && fs.existsSync(path.join(dir, f.replace(/\.jpg$/, '-w480.jpg'))) && fs.existsSync(path.join(dir, f.replace(/\.jpg$/, '-w960.jpg'))));
+  assert.ok(original, 'a photo with both smaller copies exists');
+  const src = `/images/venues/${original}?v=t1`;
+  assert.equal(app.photoSized(src, 480), src.replace('.jpg?', '-w480.jpg?'));
+  assert.equal(app.photoSized(src, 960), src.replace('.jpg?', '-w960.jpg?'));
+  // No copy, an upload, or something else: the original is kept.
+  assert.equal(app.photoSized('/images/venues/no-such-photo.jpg?v=1', 480), '/images/venues/no-such-photo.jpg?v=1');
+  assert.equal(app.photoSized('/images/owner/abc.jpg', 480), '/images/owner/abc.jpg');
+  assert.equal(app.photoSized('https://example.com/a.jpg', 480), 'https://example.com/a.jpg');
+  assert.equal(app.photoSized(null, 480), null);
+
+  seasonInsert.run({ name: 'Photo Size Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'photo-size-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'photo-size-fixture');
+  db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run(src, v.id);
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    const venuePage = await fetch(`${base}/kelowna/restaurants/photo-size-fixture`).then((r) => r.text());
+    const hero = (venuePage.match(/<div class="venue-hero venue-hero-photo"><img[^>]*>/) || [''])[0];
+    assert.match(hero, /fetchpriority="high"/);
+    assert.doesNotMatch(hero, /loading="lazy"/);
+    assert.match(hero, /srcset="[^"]*-w960\.jpg\?v=t1 960w, [^"]*\.jpg\?v=t1 \d+w"/);
+    const list = await fetch(`${base}/kelowna/restaurants`).then((r) => r.text());
+    const card = (list.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${v.id}"[^>]*>`)) || [''])[0];
+    assert.match(card, /--fd-ph:url\((?:'|&#39;)[^'&]*-w480\.jpg\?v=t1(?:'|&#39;)\);--fd-ph-2x:url\((?:'|&#39;)[^'&]*-w960\.jpg\?v=t1(?:'|&#39;)\)/);
+    assert.match(list, /min-resolution: 1\.5dppx/);
+  } finally {
+    srv.close();
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('Food & drink type pages: Open now toggle, open/closed line on cards, sort, and places closed for the season last', async () => {
+  const http = require('node:http');
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver' }).format(new Date());
+  const shut = JSON.stringify({ mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] });
+  seasonInsert.run({ name: 'Open Now Fixture Always', type: 'restaurant', hours: SEASON_WEEK, slug: 'open-now-fixture-always' });
+  seasonInsert.run({ name: 'Open Now Fixture Shut', type: 'restaurant', hours: shut, slug: 'open-now-fixture-shut' });
+  seasonInsert.run({ name: 'Open Now Fixture Seasonal', type: 'restaurant', hours: SEASON_WEEK, slug: 'open-now-fixture-seasonal' });
+  const a = app.findVenueBySlug('kelowna', 'restaurant', 'open-now-fixture-always');
+  const b = app.findVenueBySlug('kelowna', 'restaurant', 'open-now-fixture-shut');
+  const c = app.findVenueBySlug('kelowna', 'restaurant', 'open-now-fixture-seasonal');
+  db.prepare('UPDATE venues SET rating = 4.6, reviews = 300 WHERE id = ?').run(a.id);
+  db.prepare('UPDATE venues SET rating = 4.0, reviews = 50 WHERE id = ?').run(b.id);
+  db.prepare('UPDATE venues SET rating = 5.0, reviews = 900 WHERE id = ?').run(c.id);
+  assert.equal(app.guardedSeasonUpdate(c.id, { status: 'closed', reopens_date: null, source_url: 'https://example.com/', checked_at: today }, { reason: 'test', batch_id: 'test' }).ok, true);
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const get = (p) => fetch(`${base}${p}`).then((r) => r.text());
+  const order = (html) => [...html.matchAll(/data-venue-id="(\d+)"/g)].map((m) => Number(m[1])).filter((id) => [a.id, b.id, c.id].includes(id));
+  try {
+    for (const path of ['/kelowna/restaurants', '/restaurants']) {
+      const html = await get(path);
+      assert.match(html, /id="fdOpenNow"/, path);
+      assert.match(html, /<select id="fdSort"/, path);
+      // Recommended: the 5.0-rated place is closed for the season, so it comes after the others.
+      const ids = [...new Set(order(html))];
+      assert.ok(ids.indexOf(c.id) > ids.indexOf(a.id) && ids.indexOf(c.id) > ids.indexOf(b.id), `${path}: seasonal closure last (${ids})`);
+      const cardA = html.slice(html.indexOf(`data-venue-id="${a.id}"`), html.indexOf(`data-venue-id="${a.id}"`) + 4000);
+      assert.match(cardA, /class="fd-open-status" data-fd-open="open"/, `${path}: open line on the card`);
+    }
+    // Top rated keeps its name: the 5.0 place first among the three.
+    assert.equal(order(await get('/kelowna/restaurants?sort=rating'))[0], c.id);
+    // Open now: the always-open place is in the first batch, the shut one is not.
+    const open = await get('/kelowna/restaurants?open=now');
+    assert.match(open, /id="fdOpenNow"[^>]*aria-pressed="true"/);
+    const firstBatch = open.slice(open.indexOf('id="fdResults"'), open.indexOf('<template'));
+    assert.ok(firstBatch.includes(`data-venue-id="${a.id}"`));
+    assert.ok(!firstBatch.includes(`data-venue-id="${b.id}"`));
+  } finally {
+    srv.close();
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(c.id);
+    for (const v of [a, b, c]) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('Town winery pages use the food & drink page: site header, photo cards, search, filters, Open now, sort, guide link', async () => {
+  const http = require('node:http');
+  for (let i = 1; i <= 3; i++) seasonInsert.run({ name: `Town Winery Fixture ${i}`, type: 'winery', hours: SEASON_WEEK, slug: `town-winery-fixture-${i}` });
+  const made = [1, 2, 3].map((i) => app.findVenueBySlug('kelowna', 'winery', `town-winery-fixture-${i}`));
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  try {
+    const res = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /<body class="golf-page outdoor-page fd-page fd-scoped-page">/);
+    assert.match(html, /<h1>Wineries in Kelowna, BC<\/h1>/);
+    for (const needle of ['id="fdOpenNow"', '<select id="fdSort"', 'id="fdResults"', 'data-ph="', 'first-timer', 'href="/wineries"']) assert.ok(html.includes(needle), needle);
+    for (const v of made) assert.ok(html.includes(`data-venue-id="${v.id}"`), v.name);
+  } finally {
+    srv.close();
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('A listing moved to another town or category: old English and French addresses 301 to its page now', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Moved Listing Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'moved-listing-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'moved-listing-fixture');
+  db.prepare("UPDATE venues SET region = 'west-kelowna' WHERE id = ?").run(v.id);
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const go = (p) => fetch(`${base}${p}`, { redirect: 'manual' });
+  try {
+    for (const p of ['/kelowna/wineries/moved-listing-fixture', '/fr/kelowna/wineries/moved-listing-fixture']) {
+      const r = await go(p);
+      assert.equal(r.status, 301, p);
+      assert.match(r.headers.get('location'), /^(\/fr)?\/west-kelowna\/wineries\/moved-listing-fixture$/, p);
+    }
+    db.prepare("UPDATE venues SET type = 'restaurant' WHERE id = ?").run(v.id);
+    const r = await go('/fr/west-kelowna/wineries/moved-listing-fixture');
+    assert.equal(r.status, 301);
+    assert.match(r.headers.get('location'), /\/west-kelowna\/restaurants\/moved-listing-fixture$/);
+    assert.equal((await go('/fr/kelowna/wineries/no-such-place-anywhere')).status, 404);
+  } finally {
+    srv.close();
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
 

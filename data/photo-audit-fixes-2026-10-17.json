@@ -1,0 +1,510 @@
+{
+  "reason": "Photo audit fixes (2026-10-17): listings that showed someone else’s business, generic scenery or a bad photo now show the business itself; three with nothing usable go back to the site’s example photo. Dayton accepted the suggested set from the before/after sheets.",
+  "batch_id": "photo-audit-fixes-2026-10-17",
+  "venues": [
+    {
+      "id": 1341,
+      "name": "Kingfisher Interpretive Centre",
+      "region": "enderby",
+      "slug": "kingfisher-interpretive-centre",
+      "expect": {
+        "image_url": "/images/hiking/venues/kingfisher-interpretive-centre-20261016-nature.jpg?v=20261016naturelive"
+      },
+      "set": {
+        "image_url": "/images/venues/kingfisher-interpretive-centre-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1130,
+      "name": "Predator Ridge SIM Lounge",
+      "region": "vernon",
+      "slug": "predator-ridge-sim-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/predator-ridge-sim-lounge-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1373,
+      "name": "Cabana Beach Campground & RV Park",
+      "region": "osoyoos",
+      "slug": "cabana-beach-campground-rv-park",
+      "expect": {
+        "image_url": "/images/venues/osoyoos-lake-sandy-beach.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/cabana-beach-campground-rv-park-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1355,
+      "name": "Peach Orchard Campground",
+      "region": "summerland",
+      "slug": "peach-orchard-campground",
+      "expect": {
+        "image_url": "/images/venues/summerland-beach-okanagan-lake.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/peach-orchard-campground-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1676,
+      "name": "Oliver Community Park",
+      "region": "oliver",
+      "slug": "oliver-community-park",
+      "expect": {
+        "image_url": "/images/sports/venues/oliver-oliver-community-park.jpg?v=sports-photo-2"
+      },
+      "set": {
+        "image_url": "/images/venues/oliver-community-park-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1290,
+      "name": "Splash BC Floating Water Park – Kelowna",
+      "region": "kelowna",
+      "slug": "splash-bc-floating-water-park-kelowna",
+      "expect": {
+        "image_url": "/images/venues/hot-sands-beach-kelowna.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/splash-bc-floating-water-park-kelowna-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1232,
+      "name": "Pelmewash Parkway",
+      "region": "lake-country",
+      "slug": "pelmewash-parkway",
+      "expect": {
+        "image_url": "/images/hiking/venues/pelmewash-parkway-20261016-b5.jpg?v=20261016h5live"
+      },
+      "set": {
+        "image_url": "/images/venues/pelmewash-parkway-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1802,
+      "name": "Fun 4 Rent (Rent4Fun)",
+      "region": "osoyoos",
+      "slug": "fun-4-rent-rent4fun",
+      "expect": {
+        "image_url": "/images/venues/gyro-beach-osoyoos.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/fun-4-rent-rent4fun-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 951,
+      "name": "Hot Spot on 6th Restaurant",
+      "region": "vernon",
+      "slug": "hot-spot-on-6th-restaurant",
+      "expect": {
+        "image_url": "/images/venues/hot-spot-on-6th-restaurant-2610.jpg?v=20261017"
+      },
+      "set": {
+        "image_url": "/images/venues/hot-spot-on-6th-restaurant-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 319,
+      "name": "Kaiso Japanese and Thai Cuisine",
+      "region": "west-kelowna",
+      "slug": "kaiso-japanese-and-thai-cuisine",
+      "expect": {
+        "image_url": "/images/venues/kaiso-japanese-and-thai-cuisine-2610.jpg?v=20261017b"
+      },
+      "set": {
+        "image_url": "/images/venues/kaiso-japanese-and-thai-cuisine-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1295,
+      "name": "Kalavida Surf Shop",
+      "region": "coldstream",
+      "slug": "kalavida-surf-shop",
+      "expect": {
+        "image_url": "/images/venues/kalamalka-lake-colours.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/kalavida-surf-shop-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1580,
+      "name": "Smile Cycle Tours",
+      "region": "kelowna",
+      "slug": "smile-cycle-tours",
+      "expect": {
+        "image_url": "/images/venues/kelowna-downtown-waterfront.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/smile-cycle-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1377,
+      "name": "Peachland RV Park",
+      "region": "peachland",
+      "slug": "peachland-rv-park",
+      "expect": {
+        "image_url": "/images/venues/okanagan-lake-peachland.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/peachland-rv-park-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1383,
+      "name": "Island View RV Resort",
+      "region": "osoyoos",
+      "slug": "island-view-rv-resort",
+      "expect": {
+        "image_url": "/images/venues/osoyoos-town-and-lake.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/island-view-rv-resort-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1771,
+      "name": "Vine49 Wine Tours",
+      "region": "kelowna",
+      "slug": "vine49-wine-tours",
+      "expect": {
+        "image_url": "/images/venues/quails-gate-winery-building.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/vine49-wine-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1369,
+      "name": "Wright's Beach Camp",
+      "region": "penticton",
+      "slug": "wrights-beach-camp",
+      "expect": {
+        "image_url": "/images/venues/skaha-beach-penticton.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/wrights-beach-camp-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1371,
+      "name": "Barefoot Beach Resort",
+      "region": "penticton",
+      "slug": "barefoot-beach-resort",
+      "expect": {
+        "image_url": "/images/venues/skaha-lake-sunset.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/barefoot-beach-resort-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1822,
+      "name": "Turtle Bay Marina Boat Rentals",
+      "region": "lake-country",
+      "slug": "turtle-bay-marina-boat-rentals",
+      "expect": {
+        "image_url": "/images/venues/wood-lake-shore-lake-country.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/turtle-bay-marina-boat-rentals-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1298,
+      "name": "SWR Boat & SUP Rentals",
+      "region": "summerland",
+      "slug": "swr-boat-and-sup-rentals",
+      "expect": {
+        "image_url": "/images/venues/okanagan-lake-summerland.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/swr-boat-and-sup-rentals-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1357,
+      "name": "Noisy Creek Recreation Site (Mabel Lake)",
+      "region": "enderby",
+      "slug": "noisy-creek-recreation-site-mabel-lake",
+      "expect": {
+        "image_url": "/images/venues/mabel-lake-campground-sunset.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/noisy-creek-recreation-site-mabel-lake-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1708,
+      "name": "Lakers Park Disc Golf Course",
+      "region": "vernon",
+      "slug": "lakers-park-disc-golf-course",
+      "expect": {
+        "image_url": "/images/sports/venues/vernon-lakers-park-disc-golf-course.jpg?v=sports-photo-2"
+      },
+      "set": {
+        "image_url": "/images/venues/lakers-park-disc-golf-course-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1447,
+      "name": "Luxury Lake Tours",
+      "region": "kelowna",
+      "slug": "luxury-lake-tours",
+      "expect": {
+        "image_url": "/images/venues/boats-off-city-park-kelowna.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/luxury-lake-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1599,
+      "name": "DeVino Wine Tours",
+      "region": "oliver",
+      "slug": "devino-wine-tours",
+      "expect": {
+        "image_url": "/images/venues/burrowing-owl-black-sage-road.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/devino-wine-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1610,
+      "name": "Elite Mile Shuttle & Wine Tours",
+      "region": "vernon",
+      "slug": "elite-mile-shuttle-wine-tours",
+      "expect": {
+        "image_url": "/images/venues/gray-monk-vineyards-okanagan-lake.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/elite-mile-shuttle-wine-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1579,
+      "name": "Cheers! Okanagan Tours and Transportation",
+      "region": "kelowna",
+      "slug": "cheers-okanagan-tours-and-transportation",
+      "expect": {
+        "image_url": "/images/venues/kelowna-vineyards-hillside.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/cheers-okanagan-tours-and-transportation-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1581,
+      "name": "Signature Connections (formerly Kelowna Concierge)",
+      "region": "kelowna",
+      "slug": "signature-connections-formerly-kelowna-concierge",
+      "expect": {
+        "image_url": "/images/venues/mission-hill-winery-grapes.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/signature-connections-formerly-kelowna-concierge-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1615,
+      "name": "Gostlin Keefer Lake Lodge – Catskiing",
+      "region": "lumby",
+      "slug": "gostlin-keefer-lake-lodge-catskiing",
+      "expect": {
+        "image_url": "/images/venues/monashee-mountains-winter.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/gostlin-keefer-lake-lodge-catskiing-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1601,
+      "name": "Epic Cycling",
+      "region": "penticton",
+      "slug": "epic-cycling",
+      "expect": {
+        "image_url": "/images/venues/naramata-bench-view.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/epic-cycling-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1597,
+      "name": "Grape Escapes Wine Tours",
+      "region": "penticton",
+      "slug": "grape-escapes-wine-tours",
+      "expect": {
+        "image_url": "/images/venues/naramata-vineyards.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/grape-escapes-wine-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1606,
+      "name": "Top Cat Tours",
+      "region": "penticton",
+      "slug": "top-cat-tours",
+      "expect": {
+        "image_url": "/images/venues/naramata-wineries-lake-view.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/top-cat-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1793,
+      "name": "Pedego Electric Bikes Oyama",
+      "region": "lake-country",
+      "slug": "pedego-electric-bikes-oyama",
+      "expect": {
+        "image_url": "/images/venues/okanagan-rail-trail-oyama.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/pedego-electric-bikes-oyama-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1607,
+      "name": "Corks & Cactus Tours",
+      "region": "osoyoos",
+      "slug": "corks-cactus-tours",
+      "expect": {
+        "image_url": "/images/venues/osoyoos-desert-vineyard.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/corks-cactus-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1372,
+      "name": "Nk'Mip Campground & RV Resort",
+      "region": "osoyoos",
+      "slug": "nkmip-campground-rv-resort",
+      "expect": {
+        "image_url": "/images/venues/osoyoos-lake-shore.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/nkmip-campground-rv-resort-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1602,
+      "name": "Swiws Spirit Tours",
+      "region": "osoyoos",
+      "slug": "swiws-spirit-tours",
+      "expect": {
+        "image_url": "/images/venues/osoyoos-vineyards-and-lake.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/swiws-spirit-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1367,
+      "name": "Cooke Creek Recreation Site (Shuswap River)",
+      "region": "enderby",
+      "slug": "cooke-creek-recreation-site-shuswap-river",
+      "expect": {
+        "image_url": "/images/venues/shuswap-river-enderby.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/cooke-creek-recreation-site-shuswap-river-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1294,
+      "name": "Sun n’ SUP",
+      "region": "naramata",
+      "slug": "sun-n-sup",
+      "expect": {
+        "image_url": "/images/venues/okanagan-lake-from-naramata.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/sun-n-sup-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1293,
+      "name": "Pier Water Sports",
+      "region": "penticton",
+      "slug": "pier-water-sports",
+      "expect": {
+        "image_url": "/images/venues/okanagan-beach-penticton.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/pier-water-sports-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1608,
+      "name": "Wake the Lake Penticton",
+      "region": "penticton",
+      "slug": "wake-the-lake-penticton",
+      "expect": {
+        "image_url": "/images/venues/skaha-lake-park-penticton.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": null
+      }
+    },
+    {
+      "id": 1296,
+      "name": "Oyama General Store Paddle Rentals",
+      "region": "lake-country",
+      "slug": "oyama-general-store-paddle-rentals",
+      "expect": {
+        "image_url": "/images/venues/kalamalka-lake-oyama.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/oyama-general-store-paddle-rentals-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1593,
+      "name": "Canadian Craft Tours (Kelowna)",
+      "region": "kelowna",
+      "slug": "canadian-craft-tours-kelowna",
+      "expect": {
+        "image_url": "/images/venues/mission-hill-winery-arches.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": null
+      }
+    },
+    {
+      "id": 1591,
+      "name": "Wicked Wine Tours",
+      "region": "kelowna",
+      "slug": "wicked-wine-tours",
+      "expect": {
+        "image_url": "/images/venues/okanagan-lake-from-quails-gate.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/wicked-wine-tours-20261017.jpg?v=20261017fix"
+      }
+    },
+    {
+      "id": 1723,
+      "name": "Tiki Water Bikes (Peachland)",
+      "region": "peachland",
+      "slug": "tiki-water-bikes-peachland",
+      "expect": {
+        "image_url": "/images/venues/peachland-beach.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": null
+      }
+    }
+  ]
+}

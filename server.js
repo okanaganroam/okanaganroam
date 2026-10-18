@@ -4325,7 +4325,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       hours: v.hours || null, // the stored JSON; parsed (never modified) by the planner
-      imageUrl: v.image_url || null, // the venue's own photo, shown on its stop card instead of the example photo
+      imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
       // course's published rate windows.
@@ -12091,6 +12091,28 @@ function regionHeading(region) {
   return ski ? ski.heading : `${REGION_LABELS[region]}, BC`;
 }
 // The URL of a card's example photo key ("cafe-1", "noodle", "indoorall-0").
+// Smaller copies of listing photos (2026-10-18): next to each original in these folders sit <name>-w480.jpg
+// (cards, thumbnails) and <name>-w960.jpg (the venue photo on phones), made with the scratchpad thumbs tool. A
+// photo without a copy (owner and visitor uploads, new files) keeps its original, so nothing breaks.
+const PHOTO_SIZE_DIRS = ['venues', 'hiking/venues', 'beaches/venues', 'sports/venues'];
+const PHOTO_SIZE_FILES = (() => {
+  const set = new Set();
+  for (const d of PHOTO_SIZE_DIRS) {
+    try { for (const f of fs.readdirSync(path.join(__dirname, 'public', 'images', d))) if (/-w(480|960)\.jpg$/.test(f)) set.add(`/images/${d}/${f}`); } catch (e) { /* folder missing in test copies */ }
+  }
+  return set;
+})();
+function photoSized(src, width) {
+  const m = /^(\/images\/(?:venues|hiking\/venues|beaches\/venues|sports\/venues)\/[^?#]+?)\.(?:jpe?g|png|webp)(\?[^#]*)?$/i.exec(String(src || ''));
+  if (!m) return src;
+  const sized = `${m[1]}-w${width}.jpg`;
+  return PHOTO_SIZE_FILES.has(sized) ? sized + (m[2] || '') : src;
+}
+// Card photo CSS variables: the 480px copy, plus a 960px copy for sharp large screens (see PHOTO_2X_CSS).
+function cardPhotoVars(name, src) {
+  const small = photoSized(src, 480), big = photoSized(src, 960);
+  return `--${name}:url('${escapeHtml(small)}')${big !== small ? `;--${name}-2x:url('${escapeHtml(big)}')` : ''}`;
+}
 function cardPhotoKeyUrl(key) {
   if (key === 'noodle') return '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg';
   const m = /^([a-z]+)-(\d+|dog)$/.exec(key || '');
@@ -12127,7 +12149,7 @@ function regionPlacesToStartHtml(region) {
       <li class="category-card region-start-card">
         <h3><a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a></h3>
         <p class="venue-meta">${escapeHtml(type)}</p>${src ? `
-        <div class="region-card-photo"><img src="${escapeHtml(src)}" alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
+        <div class="region-card-photo"><img src="${escapeHtml(photoSized(src, 480))}" alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
       </li>`;
   }).join('');
   return `<section class="region-start" aria-labelledby="regionStartHeading">
@@ -14788,12 +14810,13 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     const addPhotos = (html) => html.replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (match, id) => {
       const src = photoById.get(Number(id)) || '';
       return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(src)
-        ? `${match} data-card-ph style="--card-ph:url('${escapeHtml(src)}')"`
+        ? `${match} data-card-ph style="${cardPhotoVars('card-ph', src)}"`
         : match;
     });
     return `<style id="sport-card-photos">
   li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
   li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
+  @media (min-width: 900px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
 </style>
   <ul class="card-grid">
     ${addPhotos(cardHtml(venues))}
@@ -14811,7 +14834,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     const v = venues.find((x) => x.id === Number(id));
     const own = v ? String(v.image_url || '').trim() : '';
     const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v || { id: Number(id), type: 'golf' }, isIndoorGolfVenue(v || {}) ? null : 'golf')) || '';
-    return src ? `${m} data-card-ph style="--card-ph:url('${escapeHtml(src)}')"` : m;
+    return src ? `${m} data-card-ph style="${cardPhotoVars('card-ph', src)}"` : m;
   });
   const cardHtmlBase = cardHtml;
   cardHtml = (list) => golfPhoto(cardHtmlBase(list));
@@ -14834,6 +14857,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   let html = `<style id="golf-card-photos">
   li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
   li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
+  @media (min-width: 900px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
 </style>`;
   if (courses.length) {
     html += `<h2 class="category-subsection-heading">${prefix}Golf Courses</h2>${sortNav}
@@ -16303,7 +16327,11 @@ function sortFoodDrinkVenues(venues, sort = 'recommended') {
   if (sort === 'az') return list.sort(byName);
   if (sort === 'rating') return list.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0) || (Number(b.reviews) || 0) - (Number(a.reviews) || 0) || byName(a, b));
   const score = new Map(list.map((v) => [v.id, foodDrinkRecommendedScore(v)]));
-  return list.sort((a, b) => score.get(b.id) - score.get(a.id) || byName(a, b));
+  // Closed for the season (2026-10-18): kept on the list but moved to the end, so a visitor this week sees places
+  // they can actually go to first. Only the Recommended order; Top rated and A-Z stay as named.
+  const seasons = getSeasonStates();
+  const away = (v) => { const st = seasons.get(v.id); return st && st.kind === 'closed' ? 1 : 0; };
+  return list.sort((a, b) => away(a) - away(b) || score.get(b.id) - score.get(a.id) || byName(a, b));
 }
 
 // Card photos (2026-10-14). Every listing card used to carry the same lake
@@ -16335,7 +16363,7 @@ const EXAMPLE_ACTIVITY_FILES = Object.freeze({
   tourebike: 'tour-ebikes',
   tourbikes: 'tour-bike-rentals',
   tourfatbike: 'tour-fat-bike',
-  tourcruise: 'tour-cruise',
+  tourcruise: 'tour-lake-cruise',
   tourmotorboat: 'tour-motorboat',
   tourboatfriends: 'tour-boat-friends',
   tourpontoon: 'tour-pontoon',
@@ -16468,7 +16496,7 @@ const EXAMPLE_ACTIVITY_PHOTOS = Object.freeze({
   tourebike: { alt: 'A row of e-bikes ready to ride', pos: 55 },
   tourbikes: { alt: 'Rows of rental bikes', pos: 50 },
   tourfatbike: { alt: 'Riding a fat bike through the snow', pos: 55 },
-  tourcruise: { alt: 'Friends on a cruise boat at sunset', pos: 45 },
+  tourcruise: { alt: 'A tour boat cruising across a calm lake at sunset', pos: 55 },
   tourmotorboat: { alt: 'A runabout motorboat on the lake', pos: 50 },
   tourboatfriends: { alt: 'Friends out on a boat', pos: 45 },
   tourpontoon: { alt: 'A pontoon boat heading across a lake', pos: 55 },
@@ -16792,7 +16820,7 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null) {
     if (!scopeFeatures.length) return '';
     return `<div class="fd-controls">
     <div class="fd-pop">
-      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">✨</span> What are you looking for?<span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
+      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">✨</span> <span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span><span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
       <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
@@ -16927,6 +16955,7 @@ function renderFoodDrinkHubStyles() {
      Only cards carrying data-ph (the Food & Drink lists) change. */
   body.fd-page li.venue-card[data-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; }
   body.fd-page li.venue-card[data-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--fd-ph) center var(--fd-ph-y, 50%) / cover no-repeat; pointer-events: none; }
+  @media (min-width: 900px) and (min-resolution: 1.5dppx) { body.fd-page li.venue-card[data-ph="own"]::before { background-image: var(--fd-ph-2x, var(--fd-ph)); } }
 ${foodDrinkCardPhotoCss()}
   /* The excerpt is already shortened, and the name opens the full page, so
      the list cards drop the inline Read more and keep the text short. */
@@ -17376,7 +17405,7 @@ const ACTIVITY_PHOTO_SWAP_SCRIPT = `<script>
     Array.prototype.forEach.call(document.querySelectorAll('li.venue-card[data-ph-by]'), function(li){
       var m; try { m = JSON.parse(li.getAttribute('data-ph-by')); } catch (e) { return; }
       var u = m[t] || m[''];
-      if (u && li.getAttribute('data-ph-now') !== u) { li.setAttribute('data-ph-now', u); li.style.setProperty('--fd-ph', "url('" + u + "')"); }
+      if (u && li.getAttribute('data-ph-now') !== u) { var p = u.split('|'); li.setAttribute('data-ph-now', u); li.style.setProperty('--fd-ph', "url('" + p[0] + "')"); li.style.setProperty('--fd-ph-2x', "url('" + (p[1] || p[0]) + "')"); }
     });
   };
   try { new MutationObserver(sync).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
@@ -17402,8 +17431,9 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       // data-ph-by lets the page change it as the filter changes ('' = usual photo).
       const alts = extra.altPhotos ? ACTIVITY_PHOTOS[v.id] : null;
       const shown = (alts && extra.photoType && alts[extra.photoType]) || own;
-      const by = alts && extra.altPhotos === 'swap' ? ` data-ph-by="${escapeHtml(JSON.stringify({ ...alts, '': own }))}"` : '';
-      return ` data-ph="own" style="--fd-ph:url('${escapeHtml(shown)}')"${by}`;
+      const pair = (u) => `${photoSized(u, 480)}|${photoSized(u, 960)}`;
+      const by = alts && extra.altPhotos === 'swap' ? ` data-ph-by="${escapeHtml(JSON.stringify(Object.fromEntries(Object.entries({ ...alts, '': own }).map(([k, u]) => [k, pair(u)]))))}"` : '';
+      return ` data-ph="own" style="${cardPhotoVars('fd-ph', shown)}"${by}`;
     }
     return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}"`;
   };
@@ -17577,6 +17607,13 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   const valleyText = FD_HUB_HEADINGS[type];
   const path = valleyWide ? `/${catSlug}` : `/${region}/${catSlug}`;
 
+  // Open now, status and sort (2026-10-18): the same as /food-drink -- Recommended order (places closed for the
+  // season last), Top rated, A-Z; an Open now toggle over stored hours; each card's open/closed line.
+  const q0 = filter || {};
+  const sort = FD_SORT_KEYS.has(q0.sort) ? q0.sort : 'recommended';
+  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended').map((v, i) => [v.id, i]));
+  venues = sortFoodDrinkVenues(venues, sort);
+  const openNow = !!q0.openNow;
   // Only primary type counts: every card answers to this page's category.
   const catsById = new Map(venues.map((v) => [v.id, [v.type]]));
   const featsById = foodDrinkFeaturesByVenue(venues);
@@ -17586,11 +17623,15 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   const scopeFeatures = FD_HUB_FEATURES.map((x) => x.key).filter((k) => present.has(k));
   const q = filter || { features: [] };
   const f = { types: [], regions: [], features: (q.features || []).filter((k) => present.has(k)) };
-  const matching = filterFoodDrinkVenues(venues, f, catsById, featsById);
+  const advisoryNotes = getAdvisoryNotes();
+  const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false });
+  const pool = openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
+  const matching = filterFoodDrinkVenues(pool, f, catsById, featsById);
   const matchIds = new Set(matching.map((v) => v.id));
-  const counts = foodDrinkChipCounts(venues, f, catsById, featsById);
-  const filtered = f.features.length > 0;
-  const state = { types: [], features: f.features, regions: [], counts };
+  const counts = foodDrinkChipCounts(pool, f, catsById, featsById);
+  const openCount = filterFoodDrinkVenues(venues.filter((v) => openInfo.openIds.has(v.id)), f, catsById, featsById).length;
+  const filtered = f.features.length > 0 || openNow;
+  const state = { types: [], features: f.features, regions: [], counts, openNow };
 
   const title = valleyWide ? `${valleyText.heading} | Okanagan Roam` : `${label.plural} in ${regionLabel}, BC | Okanagan Roam`;
   const description = valleyWide ? valleyText.intro : venues.length === 0
@@ -17615,10 +17656,15 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
     })),
   };
   const payload = {};
-  for (const v of venues) payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description) };
+  for (const v of venues) {
+    payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(v.description), o: recommendedRank.get(v.id) };
+    if (Number(v.rating)) payload[String(v.id)].g = Number(v.rating);
+    if (Number(v.reviews)) payload[String(v.id)].n = Number(v.reviews);
+    const st = openInfo.byId.get(v.id);
+    if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+  }
 
-  const advisoryNotes = getAdvisoryNotes();
-  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false) : '';
+  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false, openInfo.byId) : '';
   const emptyHtml = venues.length === 0
     ? `<p class="fd-no-results" id="fdNoResults">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel || 'the Okanagan')} right now.</p>`
     : `<p class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(label.plural.toLowerCase())} here match that combination yet. <a href="${path}" id="fdNoResultsClear">Clear the filters</a> to see all of them.</p>`;
@@ -17639,6 +17685,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
+${renderFoodDrinkOpenNowStyles()}
 ${golfEngagementHeadHtml('fd', true, 'category')}
 </head>
 <body class="golf-page outdoor-page fd-page fd-scoped-page">
@@ -17654,13 +17701,13 @@ ${renderGolfHeaderHtml()}
   ])}
   ${valleyWide
     ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
-    : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}`)}
+    : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}${type === 'winery' ? `\n  <p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a> &middot; <a href="/wineries">All Okanagan wineries</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
   ${venues.length ? foodDrinkSearchHtml() : ''}
-  ${venues.length ? foodDrinkFilterBarHtml(venues, state, scopeFeatures) : ''}
+  ${venues.length ? (foodDrinkFilterBarHtml(venues, state, scopeFeatures) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`) : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
-  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state)}
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state, venues.length > 1 ? sort : null)}
   ${emptyHtml}
   ${cardsHtml}
   <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
@@ -17671,7 +17718,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
-  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category' })}
+  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category', openNow: true })}
 </body>
 </html>`;
 }
@@ -22212,7 +22259,7 @@ function venueHeroPhoto(venue) {
 // the type's list, so related cards do not repeat one stock picture.
 function venueThumbPhoto(v, used) {
   const own = String(v.image_url || '').trim();
-  if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return own;
+  if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return photoSized(own, 480);
   if (VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]) return FD_CARD_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]][0];
   if (used && FD_CARD_PHOTOS[v.type]) {
     const first = venueThumbPhoto(v);
@@ -22505,7 +22552,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // button and a thumbnail row that open a full-screen viewer.
   const galleryPhotos = venue.image_url ? venueGalleryPhotos(venue, L) : [];
   const galleryHtml = venueGalleryHtml(venue, galleryPhotos, L);
-  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
+  // The venue photo is the biggest thing on the page, so it loads first (not lazily), and phones get the 960px copy.
+  const heroW = Number((/width="(\d+)"/.exec(imgDimsAttr(venue.image_url)) || [])[1]) || 0;
+  const hero960 = photoSized(venue.image_url, 960);
+  const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
+  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
@@ -25499,7 +25550,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     const v = venueById.get(Number(id));
     if (!v) return '';
     const own = String(v.image_url || '').trim();
-    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
+    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="${cardPhotoVars('fd-ph', own)}"`;
     return ` data-ph="${spread(curatedPhotoKey(v))}"`;
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true, hideSocial: true })
@@ -28221,7 +28272,7 @@ function tripStopsFor(refs) {
       out.push({
         ref, kind: 'venue', name: v.name, type: CATEGORY_LABELS[v.type].singular, region: v.region, regionLabel: REGION_LABELS[v.region],
         url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v)),
+        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? photoSized(own, 480) : cardPhotoKeyUrl(curatedPhotoKey(v)),
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
@@ -30433,7 +30484,7 @@ function venueGalleryHtml(venue, photos, L) {
   const thumbs = shown.map((p, i) => {
     const hidden = rest.length - shown.length;
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
-    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
+    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
   }).join('');
   const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo', 'Photo')}: ${escapeHtml(p.credit)}</figcaption>` : ''}</figure>`).join('');
   return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
@@ -33313,6 +33364,7 @@ ${renderGolfHeaderHtml()}
   </div></main>
 <script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${MENU_APP_SCRIPT}</script>
+${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account' })}
 </body>
 </html>`;
 }
@@ -33863,6 +33915,360 @@ async function handleOwnerLogin(req, res) {
   return res.end(JSON.stringify({ ok: true }));
 }
 
+// ----- Business portal help bot (2026-10-17) -----
+// A help button in the bottom-right corner of every business portal page. Free to run: no AI service, just the
+// answers below, matched in the owner's browser to what they type or tap, with the most likely topics for the page
+// they are on first. If a portal error is showing it explains that error. Anything it can't answer goes to
+// info@okanaganroam.com through POST /owner/help, with the business and page attached so Dayton can reply.
+// Pages: login, link, forgot, reset, account, settings, edit, menu, invalid.
+const OWNER_HELP_TOPICS = [
+  { id: 'signin', q: 'I can\u2019t sign in', pages: ['login', 'account'],
+    keys: ['sign in', 'signin', 'log in', 'login', 'cant get in', 'password wrong', 'dont match', 'locked', 'locked out', 'cannot log'],
+    a: '<p>Check the email is the one you used to make your login, and that Caps Lock is off.</p><ul><li>After 5 wrong tries the login is paused for 15 minutes. Wait, then try again.</li><li>Forgot it? <a href="/owner/forgot">Reset your password</a>.</li><li>Never made a login? Open the edit link we emailed you, then use <strong>Create a login</strong> on that page. No link? <a href="/owner/link">Email me a new link</a>.</li></ul>' },
+  { id: 'forgot', q: 'I forgot my password', pages: ['login', 'forgot', 'reset', 'settings'],
+    keys: ['forgot', 'forgotten', 'reset', 'new password', 'password', 'change password'],
+    a: '<ol><li>Go to <a href="/owner/forgot">Reset your password</a> and enter your login email.</li><li>Open the email from Okanagan Roam (check spam or promotions if it isn\u2019t there in a few minutes).</li><li>Choose a new password: at least 10 characters, typed twice.</li></ol><p>The reset link works once and expires after an hour. Resetting signs you out on your other devices.</p>' },
+  { id: 'newlink', q: 'I lost my edit link, or it doesn\u2019t work', pages: ['invalid', 'login', 'link'],
+    keys: ['link', 'edit link', 'lost link', 'link not valid', 'isnt valid', 'expired', 'old link', 'new link', 'email link'],
+    a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>A new link replaces the old one, so always use the newest email. If no email comes, your business may be listed with a different email. Use <strong>Message us</strong> below and we\u2019ll sort it out.</p>' },
+  { id: 'login-create', q: 'How do I make a login?', pages: ['edit', 'login'],
+    keys: ['create login', 'make login', 'account', 'make an account', 'sign up', 'register', 'why login'],
+    a: '<ol><li>Open your listing with the edit link we emailed you.</li><li>Find <strong>Create a login</strong> near the top, then enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, photos and menus you add from <strong>My listings</strong> go live straight away.</p>' },
+  { id: 'photo-add', q: 'How do I add photos?', pages: ['edit'],
+    keys: ['photo', 'photos', 'picture', 'pictures', 'image', 'upload', 'add photo', 'gallery'],
+    a: '<ol><li>Scroll to <a href="#photos">Photos</a>.</li><li>Tap <strong>Choose photos</strong> and pick up to 5 at a time.</li><li>Fill in who to credit (your business or the photographer).</li><li>Tick the box to confirm you took them or have permission, then upload.</li></ol><p>Best photos: the inside of your place, your patio or view, or your storefront with the name. Wide photos work best for the banner.</p>' },
+  { id: 'photo-small', q: 'My photo won\u2019t upload', pages: ['edit'],
+    keys: ['too small', 'too large', 'wont upload', 'upload failed', 'could not be read', 'heic', '800 pixels', 'photo error', 'photo wont'],
+    a: '<ul><li><strong>Too small:</strong> photos must be at least 800 pixels wide. Use the original from your phone or camera, not a screenshot or a photo saved from social media.</li><li><strong>Can\u2019t be read:</strong> try a JPG or PNG. On an iPhone you can set Camera \u2192 Formats \u2192 Most Compatible, or share the photo to yourself as a JPG.</li><li><strong>Waiting for review:</strong> you can have up to 12 photos waiting at once. Wait until we\u2019ve looked at those.</li><li><strong>Connection:</strong> large photos need a good signal, so try again on Wi-Fi.</li></ul>' },
+  { id: 'photo-pending', q: 'My photo or menu isn\u2019t showing yet', pages: ['edit', 'menu', 'account'],
+    keys: ['not showing', 'not live', 'waiting', 'pending', 'review', 'when will', 'still not', 'not appear', 'not on my page', 'not updated'],
+    a: '<p>It depends how you opened your listing:</p><ul><li><strong>From the emailed edit link:</strong> new photos and menus wait for us to check them, usually within a day.</li><li><strong>Signed in, from My listings:</strong> photos and menus go live straight away. Text changes (hours, description, links) are still checked first.</li></ul><p>Already live but you still see the old version? Refresh the page. It can take a minute to show everywhere.</p>' },
+  { id: 'photo-main', q: 'Change my main photo or remove one', pages: ['edit'],
+    keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'delete photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo'],
+    a: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. In <a href="#photos">Photos</a>, each live photo has <strong>Make main</strong> and <strong>Remove</strong>.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main</strong> once it\u2019s live. If it isn\u2019t yours to change, <strong>Message us</strong> and we\u2019ll swap it.</p>' },
+  { id: 'hours', q: 'How do I set my hours?', pages: ['edit'],
+    keys: ['hours', 'opening hours', 'open', 'close', 'closing', 'times', 'closed', 'schedule', 'split', 'lunch', 'time'],
+    a: '<ol><li>In <strong>Opening hours</strong>, enter the open and close time for each day, or tick <strong>Closed</strong>.</li><li>Closed in the afternoon? Tap <strong>+ second time</strong> for a second range that day.</li><li>Same every weekday? Fill in Monday, then tap <strong>Copy Monday to Tue\u2013Fri</strong> (or every day).</li><li>Tap <strong>Send changes</strong> at the bottom.</li></ol><p>Every day you\u2019re open needs both times. Open past midnight? Use the real closing time, like 1:00 AM.</p>' },
+  { id: 'season', q: 'I\u2019m only open some months', pages: ['edit'],
+    keys: ['season', 'seasonal', 'months', 'winter', 'summer', 'closed in winter', 'closed for winter', 'closed for the season', 'off season', 'reopen', 'open some months', 'only open'],
+    a: '<p>Under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then <strong>Send changes</strong>.</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Closed for a short time? <strong>Message us</strong> and we\u2019ll add a notice.</p>' },
+  { id: 'changes-review', q: 'I sent changes but nothing changed', pages: ['edit', 'account'],
+    keys: ['sent changes', 'my changes', 'changes not showing', 'changes not', 'didnt change', 'not changed', 'still old', 'update not', 'saved', 'submitted', 'approve', 'approval', 'hours not updated', 'description not'],
+    a: '<p>Changes to your hours, description, contact details and links are checked by us before they go live, usually within a day. <strong>Your updates</strong> at the top of your listing shows what\u2019s waiting and what\u2019s live.</p><p>Photos and menus sent while signed in from <strong>My listings</strong> go live straight away.</p>' },
+  { id: 'nothing-changed', q: '\u201cNothing has changed yet\u201d', pages: ['edit'],
+    keys: ['nothing has changed', 'nothing changed', 'edit a field'],
+    a: '<p>The form only sends fields you\u2019ve changed. Edit something (hours, description, a link), then tap <strong>Send changes</strong>. Want to add photos or an event? Those have their own buttons further down the page.</p>' },
+  { id: 'too-fast', q: '\u201cToo many attempts\u201d or \u201cthat was very quick\u201d', pages: ['edit', 'login', 'forgot', 'link', 'settings'],
+    keys: ['too many', 'too fast', 'very quick', 'wait a while', 'try again later', 'rate'],
+    a: '<p>These are spam guards.</p><ul><li><strong>Very quick:</strong> wait a few seconds after the page loads, then send again.</li><li><strong>Too many attempts:</strong> wait an hour (15 minutes after wrong passwords), then try again.</li></ul><p>If it keeps happening, <strong>Message us</strong>.</p>' },
+  { id: 'description', q: 'Edit my description', pages: ['edit'],
+    keys: ['description', 'about', 'blurb', 'text', 'write', 'words', 'characters', 'too short'],
+    a: '<p>Write 30 to 1,200 characters in <strong>Description</strong>. Say what you serve or offer, what makes you special, and who you suit. Leave out &lt; and &gt; characters. Then tap <strong>Send changes</strong>; we check it before it goes live.</p>' },
+  { id: 'links', q: 'Add a booking, menu or social link', pages: ['edit'],
+    keys: ['booking', 'book', 'reservation', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'menu link', 'url', 'address', 'phone', 'name'],
+    a: '<p>Open <strong>Name, address &amp; links</strong> on your listing. There you can change your business name and address and add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap <strong>Send changes</strong>.</p>' },
+  { id: 'event-add', q: 'How do I add an event?', pages: ['edit'],
+    keys: ['event', 'events', 'live music', 'whats on', 'concert', 'special', 'add event', 'promotion'],
+    a: '<ol><li>Scroll to <a href="#events">Add an event</a>.</li><li>Enter the name, date and start time (or tick <strong>All day</strong>).</li><li>Choose 1 to 3 categories and add a short description.</li><li>Tap <strong>Send event</strong>.</li></ol><p>We check events before they go on What\u2019s On, usually within a day. Dates must be in the next year.</p>' },
+  { id: 'event-change', q: 'Change or cancel an event', pages: ['edit'],
+    keys: ['change event', 'cancel event', 'cancel my event', 'event cancelled', 'wrong date', 'edit event', 'postpone', 'remove event', 'cancel', 'cancelled'],
+    a: '<p>At the top of your listing, under <strong>Your updates</strong>, each event you sent has <strong>Change</strong> and <strong>Cancel</strong>. Change opens the event form with your details filled in. Once an event has passed it can\u2019t be changed. Send it as a new one instead.</p>' },
+  { id: 'menu-add', q: 'How do I add my menu or prices?', pages: ['edit', 'menu'],
+    keys: ['menu', 'menus', 'prices', 'price list', 'rates', 'green fees', 'tours and prices', 'add menu', 'scan'],
+    a: '<p>Tap <strong>Add your menu</strong> (or prices) on your listing. Then either:</p><ul><li><strong>My menu is on my website:</strong> paste the link and we read it in, or</li><li><strong>Take a photo</strong> of each page (or upload a PDF).</li></ul><p>Check the result, fix anything in yellow, then tap <strong>Publish</strong>. Busy? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up.</p>' },
+  { id: 'menu-blurry', q: 'The menu scan didn\u2019t work', pages: ['menu'],
+    keys: ['hard to read', 'blurry', 'scan is blurry', 'menu scan', 'scan failed', 'scan didnt', 'didnt work', 'not a menu', 'wrong prices', 'mistakes', 'yellow'],
+    a: '<ul><li>Use good light, hold the phone straight above the page, and fill the screen with the menu.</li><li>One page per photo; avoid glare on glossy menus.</li><li>A PDF of your menu usually reads best.</li><li>Anything in <strong>yellow</strong> needs a quick check: tap it to fix it.</li></ul><p>Still stuck? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up for you, free.</p>' },
+  { id: 'menu-website', q: '\u201cWe couldn\u2019t find a menu on that page\u201d', pages: ['menu'],
+    keys: ['website', 'couldnt find', 'couldnt reach', 'import', 'from my website', 'menu link', 'not found'],
+    a: '<ul><li>Paste the link to the <strong>menu page itself</strong> (or the menu PDF), not your home page.</li><li>Some menus are built in a way we can\u2019t read (ordering systems, images). Take a photo of the menu instead.</li><li>Or tap <strong>Can you do it for me?</strong></li></ul>' },
+  { id: 'menu-change', q: 'Change or remove my menu', pages: ['menu', 'edit'],
+    keys: ['change menu', 'update menu', 'new menu', 'old menu', 'take down', 'remove menu', 'edit menu'],
+    a: '<p>Open <strong>Add your menu</strong> from your listing. On the published screen tap <strong>Make a change</strong> to edit dishes and prices, <strong>Replace</strong> for a whole new menu, or <strong>Take it off my page</strong>.</p>' },
+  { id: 'settings', q: 'Change my login email or password', pages: ['account', 'settings'],
+    keys: ['change email', 'change my email', 'new email', 'login email', 'email address', 'settings', 'change password', 'sign out', 'other devices'],
+    a: '<p>Signed in, open <a href="/owner/account/settings">Account settings</a>. You can change your email or password there (you\u2019ll need your current password) and sign out other devices.</p>' },
+  { id: 'more-businesses', q: 'I manage more than one business', pages: ['account', 'edit', 'settings'],
+    keys: ['another business', 'two businesses', 'two restaurants', 'two locations', 'second location', 'more than one', 'other listing', 'add listing', 'multiple', 'businesses', 'restaurants', 'locations'],
+    a: '<p>Open the other business\u2019s edit link and use <strong>Create a login</strong> with the <strong>same email and password</strong>. It joins your login, and <a href="/owner/account">My listings</a> shows them all.</p><p>Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>' },
+  { id: 'remove', q: 'We closed, moved or changed names', pages: ['edit', 'account'],
+    keys: ['closed for good', 'closed down', 'closed permanently', 'closing down', 'moved', 'new owner', 'sold', 'sold the business', 'rename', 'renamed', 'new name', 'remove listing', 'delete listing', 'out of business'],
+    a: '<p>Moved or renamed? Update <strong>Name, address &amp; links</strong> and tap <strong>Send changes</strong>.</p><p>Closed for good, sold, or need the listing removed? <strong>Message us</strong> below and we\u2019ll take care of it.</p>' },
+  { id: 'features', q: 'What are the features and badges?', pages: ['edit'],
+    keys: ['features', 'badges', 'dog friendly', 'patio', 'kid friendly', 'wheelchair', 'vegan', 'gluten', 'happy hour', 'amenities'],
+    a: '<p>Tick the features that genuinely apply (patio, dog-friendly, kid-friendly and so on). Visitors use them to filter. If you serve alcohol you can also add your <strong>happy hour</strong> days and times. Then tap <strong>Send changes</strong>.</p>' },
+  { id: 'cost', q: 'Does this cost anything?', pages: ['edit', 'account', 'login'],
+    keys: ['cost', 'price', 'pay', 'free', 'charge', 'fee', 'subscription', 'featured', 'advertise'],
+    a: '<p>Your listing, photos, menu and events are all <strong>free</strong>. Want more visibility? <strong>Message us</strong> and ask about featured spots.</p>' },
+];
+// Portal error messages the bot recognises on the page -> the topic that explains them.
+const OWNER_HELP_ERROR_RULES = [
+  [/don.t match|wrong password|that password isn.t right|locked/i, 'signin'],
+  [/isn.t valid|not valid any more|expired or was already used|link has expired|page has expired/i, 'newlink'],
+  [/too small|at least 800|could not be read|too large|waiting for review|choose up to 5/i, 'photo-small'],
+  [/both times|add the times|time we could not read|same time|at least one open day/i, 'hours'],
+  [/first and last month|two different months/i, 'season'],
+  [/nothing has changed/i, 'nothing-changed'],
+  [/too many|very quick|wait a while/i, 'too-fast'],
+  [/between 30 and 1200|leave out </i, 'description'],
+  [/hard to read|doesn.t look like a menu|didn.t work this time/i, 'menu-blurry'],
+  [/couldn.t find a menu|couldn.t reach|can.t open that address/i, 'menu-website'],
+  [/event date has already passed|1 to 3 categories|start time, or tick all day/i, 'event-add'],
+];
+const OWNER_HELP_START = {
+  login: ['signin', 'forgot', 'newlink', 'login-create'],
+  link: ['newlink', 'signin'],
+  forgot: ['forgot', 'signin'],
+  reset: ['forgot', 'signin'],
+  account: ['photo-pending', 'more-businesses', 'settings', 'changes-review'],
+  settings: ['settings', 'more-businesses', 'forgot'],
+  edit: ['photo-add', 'hours', 'event-add', 'menu-add', 'changes-review', 'photo-pending'],
+  menu: ['menu-add', 'menu-blurry', 'menu-website', 'photo-pending'],
+  invalid: ['newlink', 'signin'],
+};
+const OWNER_HELP_CSS = `
+  .ohb-btn { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: inline-flex; align-items: center; gap: 8px; background: #1F3A5F; background: var(--ref-navy, #1F3A5F); color: #fff; border: 0; border-radius: 999px; padding: 12px 18px 12px 14px; font: inherit; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 28px -10px rgba(0,0,0,0.5); }
+  .ohb-btn:focus-visible, .ohb-panel button:focus-visible, .ohb-panel a:focus-visible, .ohb-panel textarea:focus-visible, .ohb-panel input:focus-visible { outline: 3px solid #F2C14E; outline-offset: 2px; }
+  .ohb-btn .ohb-q { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #F2C14E; color: #1F2A36; font-size: 0.95rem; }
+  body:has(.op-unsent:not([hidden])) .ohb-btn { bottom: 84px; }
+  .ohb-panel { position: fixed; right: 16px; bottom: 16px; z-index: 61; width: 370px; max-width: calc(100vw - 32px); height: min(600px, calc(100vh - 32px)); background: #FFFCF6; border-radius: 18px; box-shadow: 0 24px 60px -18px rgba(0,0,0,0.55); display: flex; flex-direction: column; overflow: hidden; color: #2A2019; font-size: 0.93rem; line-height: 1.45; }
+  .ohb-panel[hidden], .ohb-btn[hidden] { display: none; }
+  .ohb-head { background: #1F3A5F; background: var(--ref-navy, #1F3A5F); color: #fff; padding: 12px 12px 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ohb-head strong { font-size: 1rem; }
+  .ohb-head span { display: block; font-size: 0.8rem; opacity: 0.8; font-weight: 600; }
+  .ohb-x { background: rgba(255,255,255,0.14); color: #fff; border: 0; border-radius: 10px; width: 36px; height: 36px; font-size: 1.2rem; cursor: pointer; }
+  .ohb-log { position: relative; flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .ohb-msg { max-width: 92%; padding: 10px 12px; border-radius: 14px; }
+  .ohb-bot { background: #fff; border: 1px solid rgba(42,32,25,0.1); align-self: flex-start; border-bottom-left-radius: 4px; }
+  .ohb-me { background: #E8EEF6; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .ohb-msg p { margin: 0 0 8px; } .ohb-msg p:last-child { margin: 0; }
+  .ohb-msg ul, .ohb-msg ol { margin: 4px 0 8px; padding-left: 20px; } .ohb-msg li { margin: 2px 0; }
+  .ohb-msg a { color: #1F3A5F; font-weight: 700; }
+  .ohb-alert { background: #FFF1D6; border: 1px solid #F2C14E; }
+  .ohb-chips { display: flex; flex-wrap: wrap; gap: 6px; align-self: flex-start; }
+  .ohb-chip { background: #fff; border: 1px solid rgba(31,58,95,0.35); color: #1F3A5F; border-radius: 999px; padding: 7px 11px; font: inherit; font-size: 0.86rem; font-weight: 700; cursor: pointer; text-align: left; }
+  .ohb-chip.ohb-human { background: #1F3A5F; color: #fff; border-color: #1F3A5F; }
+  .ohb-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid rgba(42,32,25,0.12); background: #fff; }
+  .ohb-form input { flex: 1; min-width: 0; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 10px 12px; font: inherit; }
+  .ohb-form button, .ohb-send { background: #1F3A5F; color: #fff; border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 800; cursor: pointer; }
+  .ohb-contact label { display: block; font-weight: 700; font-size: 0.86rem; margin: 8px 0 4px; }
+  .ohb-contact textarea, .ohb-contact input { width: 100%; box-sizing: border-box; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 9px 10px; font: inherit; }
+  .ohb-contact textarea { min-height: 96px; resize: vertical; }
+  .ohb-contact .ohb-hp { position: absolute; left: -9999px; }
+  .ohb-contact .ohb-send { margin-top: 10px; }
+  .ohb-err { color: #C0392B; font-weight: 700; font-size: 0.86rem; margin-top: 6px; }
+  @media (max-width: 480px) {
+    .ohb-btn { right: 12px; bottom: 12px; }
+    .ohb-panel { right: 0; left: 0; bottom: 0; width: auto; max-width: none; height: min(78vh, 600px); border-radius: 18px 18px 0 0; }
+  }
+  @media print { .ohb-btn, .ohb-panel { display: none !important; } }
+`;
+const OWNER_HELP_SCRIPT = String.raw`
+(function(){
+  var cfg = window.OHB_CFG || {}; var T = cfg.topics || []; var byId = {}; T.forEach(function(t){ byId[t.id] = t; });
+  var btn = document.getElementById('ohbBtn'), panel = document.getElementById('ohbPanel'), log = document.getElementById('ohbLog');
+  var form = document.getElementById('ohbForm'), input = document.getElementById('ohbInput');
+  if (!btn || !panel) return;
+  var started = false;
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function scroll(){ log.scrollTop = log.scrollHeight; }
+  function say(html, cls){ var d = document.createElement('div'); d.className = 'ohb-msg ' + (cls || 'ohb-bot'); d.innerHTML = html; log.appendChild(d); scroll(); return d; }
+  function chips(ids, human){
+    var d = document.createElement('div'); d.className = 'ohb-chips';
+    ids.forEach(function(id){ var t = byId[id]; if (!t) return; var b = document.createElement('button'); b.type = 'button'; b.className = 'ohb-chip'; b.textContent = t.q; b.addEventListener('click', function(){ answer(id, t.q); }); d.appendChild(b); });
+    if (human !== false) { var h = document.createElement('button'); h.type = 'button'; h.className = 'ohb-chip ohb-human'; h.textContent = 'Message us'; h.addEventListener('click', contact); d.appendChild(h); }
+    log.appendChild(d); scroll();
+  }
+  function answer(id, asked, related){
+    var t = byId[id]; if (!t) return;
+    var first = asked ? say(esc(asked), 'ohb-me') : null;
+    var a = say(t.a);
+    var seen = {}; seen[id] = 1;
+    var more = (related || []).concat(cfg.start || []).filter(function(x){ if (seen[x]) return false; seen[x] = 1; return true; }).slice(0, 3);
+    say('<p>Did that help? Pick another topic, type a question, or message us.</p>');
+    chips(more);
+    var top = first || a; log.scrollTop = Math.max(0, top.offsetTop - 8);
+  }
+  function norm(s){ return ' ' + String(s).toLowerCase().replace(/[\u2019']/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
+  function match(q){
+    var n = norm(q), words = n.trim().split(' ').filter(function(w){ return w.length > 2; });
+    var scored = T.map(function(t){
+      var s = 0;
+      t.keys.forEach(function(k){
+        var nk = norm(k), kw = nk.trim().split(' ');
+        if (n.indexOf(nk) >= 0) s += kw.length * 3;
+        else if (kw.length > 1 && kw.every(function(w){ return n.indexOf(' ' + w + ' ') >= 0; })) s += kw.length * 2;
+      });
+      var title = norm(t.q); words.forEach(function(w){ if (title.indexOf(' ' + w) >= 0) s += 1; });
+      if (s && (t.pages || []).indexOf(cfg.page) >= 0) s += 1;
+      return { id: t.id, s: s };
+    }).filter(function(x){ return x.s > 0; }).sort(function(a, b){ return b.s - a.s; });
+    return scored.map(function(x){ return x.id; });
+  }
+  function ask(q){
+    q = String(q || '').trim(); if (!q) return;
+    var hits = match(q);
+    if (!hits.length) {
+      say(esc(q), 'ohb-me');
+      say('<p>Sorry, I\u2019m not sure about that one. Here are the most common questions. Or tap <strong>Message us</strong> and we\u2019ll reply by email.</p>');
+      chips(cfg.start || []);
+      return;
+    }
+    answer(hits[0], q, hits.slice(1, 3));
+  }
+  function pageError(){
+    var els = document.querySelectorAll('.lyv-error, [role="alert"], .mn-warn, .mn-err, .op-error');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]; if (el.closest && el.closest('#ohbPanel')) continue;
+      var txt = (el.textContent || '').trim(); if (!txt || el.offsetParent === null) continue;
+      for (var j = 0; j < (cfg.rules || []).length; j++) { if (new RegExp(cfg.rules[j][0], 'i').test(txt)) return { text: txt, id: cfg.rules[j][1] }; }
+      return { text: txt, id: null };
+    }
+    return null;
+  }
+  function begin(){
+    started = true;
+    var err = pageError();
+    if (err) {
+      say('<p>I can see this message on your page:</p><p><em>\u201c' + esc(err.text.slice(0, 220)) + '\u201d</em></p>', 'ohb-bot ohb-alert');
+      if (err.id) { say(byId[err.id].a); say('<p>Something else? Pick a topic or type a question.</p>'); chips(cfg.start || []); log.scrollTop = 0; return; }
+    }
+    say('<p>Hi! I can help with your listing: photos, hours, events, menus, logins and links. Tap a topic or type your question.</p>');
+    chips(cfg.start || []);
+  }
+  function contact(){
+    say('Message us', 'ohb-me');
+    var d = say('<form class="ohb-contact" novalidate>'
+      + '<p>Tell us what\u2019s wrong and we\u2019ll reply by email, usually within a day. We\u2019ll see which listing and page you\u2019re on.</p>'
+      + '<label for="ohbNote">What do you need help with?</label><textarea id="ohbNote" maxlength="1500" required></textarea>'
+      + (cfg.signedIn ? '' : '<label for="ohbEmail">Your email (so we can reply)</label><input id="ohbEmail" type="email" autocomplete="email" maxlength="200">')
+      + '<input class="ohb-hp" name="company_website" tabindex="-1" autocomplete="off" aria-hidden="true">'
+      + '<button type="submit" class="ohb-send">Send message</button><div class="ohb-err" role="alert"></div></form>');
+    var f = d.querySelector('form'), note = d.querySelector('#ohbNote'), em = d.querySelector('#ohbEmail'), hp = d.querySelector('.ohb-hp'), errEl = d.querySelector('.ohb-err'), send = d.querySelector('.ohb-send');
+    var t0 = Date.now(); setTimeout(function(){ note.focus(); }, 50);
+    f.addEventListener('submit', function(e){
+      e.preventDefault(); errEl.textContent = '';
+      var msg = note.value.trim(), mail = em ? em.value.trim() : '';
+      if (msg.length < 5) { errEl.textContent = 'Please tell us a little about the problem.'; note.focus(); return; }
+      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) { errEl.textContent = 'Please add your email so we can reply.'; em.focus(); return; }
+      var pe = pageError();
+      send.disabled = true; send.textContent = 'Sending\u2026';
+      fetch('/owner/help', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify({ message: msg, email: mail || null, path: location.pathname, page: cfg.page || '', page_error: pe ? pe.text.slice(0, 300) : null, started_at: t0, company_website: hp.value }) })
+        .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok: r.ok, j: j }; }); })
+        .then(function(x){
+          if (x.ok && x.j && x.j.ok) { d.innerHTML = '<p><strong>Thanks, your message is on its way.</strong> We\u2019ll reply by email, usually within a day.</p>'; scroll(); return; }
+          send.disabled = false; send.textContent = 'Send message';
+          errEl.textContent = (x.j && x.j.error) || 'Sorry, that didn\u2019t send. Please email info@okanaganroam.com.';
+        })
+        .catch(function(){ send.disabled = false; send.textContent = 'Send message'; errEl.textContent = 'Could not connect. Please check your connection, or email info@okanaganroam.com.'; });
+    });
+  }
+  function open(){ panel.hidden = false; btn.hidden = true; btn.setAttribute('aria-expanded', 'true'); if (!started) begin(); setTimeout(function(){ input.focus(); }, 30); }
+  function close(){ panel.hidden = true; btn.hidden = false; btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
+  btn.addEventListener('click', open);
+  document.getElementById('ohbClose').addEventListener('click', close);
+  panel.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
+  window.__ohbMatch = match;
+})();
+`;
+// The help button + panel for a business portal page (page: one of the OWNER_HELP_START keys).
+function ownerHelpWidgetHtml(page, opts = {}) {
+  if (!OWNER_HELP_START[page]) return '';
+  const cfg = {
+    page,
+    signedIn: !!opts.signedIn,
+    start: OWNER_HELP_START[page],
+    topics: OWNER_HELP_TOPICS.map((t) => ({ id: t.id, q: t.q, keys: t.keys, pages: t.pages, a: t.a })),
+    rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
+  };
+  return `<style>${OWNER_HELP_CSS}</style>
+<button type="button" class="ohb-btn" id="ohbBtn" aria-controls="ohbPanel" aria-expanded="false"><span class="ohb-q" aria-hidden="true">?</span>Help</button>
+<section class="ohb-panel" id="ohbPanel" role="dialog" aria-label="Help with your listing" hidden>
+  <div class="ohb-head"><div><strong>Help</strong><span>Okanagan Roam business help</span></div><button type="button" class="ohb-x" id="ohbClose" aria-label="Close help">&times;</button></div>
+  <div class="ohb-log" id="ohbLog" aria-live="polite"></div>
+  <form class="ohb-form" id="ohbForm"><label for="ohbInput" class="sr-only" style="position:absolute;left:-9999px">Type your question</label><input id="ohbInput" type="text" maxlength="300" placeholder="Type your question\u2026" autocomplete="off"><button type="submit">Ask</button></form>
+</section>
+<script>window.OHB_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
+<script>${OWNER_HELP_SCRIPT}</script>`;
+}
+
+// POST /owner/help: "Message us" from the help bot. Goes to info@ (Brevo; FormSubmit if Brevo is missing or
+// fails), with the listing worked out on the server from the page they were on (an edit link or their login),
+// never from what the browser claims.
+const OWNER_HELP_RATE_LIMIT = 5; // messages per IP per hour
+const ownerHelpAttempts = new Map();
+function ownerHelpRateLimited(ip, now = Date.now()) {
+  const recent = (ownerHelpAttempts.get(ip) || []).filter((t) => now - t < 60 * 60 * 1000);
+  recent.push(now);
+  ownerHelpAttempts.set(ip, recent);
+  if (ownerHelpAttempts.size > 5000) for (const [k, t] of ownerHelpAttempts) if (!t.some((x) => now - x < 60 * 60 * 1000)) ownerHelpAttempts.delete(k);
+  return recent.length > OWNER_HELP_RATE_LIMIT;
+}
+async function handleOwnerHelpMessage(req, res) {
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: 'Please try again.' });
+  let body;
+  try { body = await readLimitedJsonBody(req, 8192); } catch (err) { return sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' }); }
+  const keys = ['message', 'email', 'path', 'page', 'page_error', 'started_at', 'company_website'];
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !keys.includes(k))) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' });
+  if (body.company_website) return sendSubmissionResponse(res, 200, { ok: true });
+  const clean = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').trim().slice(0, max);
+  const message = clean(body.message, 1500);
+  if (message.length < 5) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please tell us a little about the problem.' });
+  if (ownerHelpRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many messages. Please email info@okanaganroam.com instead.' });
+  const path = clean(body.path, 300);
+  const account = ownerAccountForRequest(req);
+  let venues = [];
+  const tokenMatch = /^\/owner\/([A-Za-z0-9_-]+)/.exec(path);
+  if (tokenMatch && OWNER_TOKEN_RE.test(tokenMatch[1])) {
+    const found = venueForOwnerToken(tokenMatch[1]);
+    if (found) venues = [found.venue];
+  }
+  const accountVenue = /^\/owner\/account\/venue\/(\d+)/.exec(path);
+  if (!venues.length && account && accountVenue) {
+    const found = venueForOwnerAccount(account, Number(accountVenue[1]));
+    if (found) venues = [found.venue];
+  }
+  if (!venues.length && account) venues = ownerAccountVenues(account.id);
+  const replyTo = account ? account.email : clean(body.email, 200);
+  if (!account && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please add your email so we can reply.' });
+  const listing = venues.length ? venues.map((v) => `${v.name} (venue #${v.id}) ${venueListingUrl(v)}`).join('\n') : 'Not known (they were not on a listing page and not signed in).';
+  const fields = {
+    _subject: `[OWNER HELP] ${venues.length === 1 ? venues[0].name : (account ? account.email : 'A business owner')} needs a hand`,
+    _template: 'table',
+    _captcha: 'false',
+    'Message': message,
+    'Reply to': replyTo || 'not given',
+    'Signed in': account ? `yes, as ${account.email}` : 'no',
+    'Listing': listing,
+    'Page': `${clean(body.page, 20) || 'unknown'}: https://okanaganroam.com${path.replace(/^\/owner\/[A-Za-z0-9_-]{32}/, '/owner/<edit link>')}`,
+  };
+  const pageError = clean(body.page_error, 300);
+  if (pageError) fields['Error on their page'] = pageError;
+  const text = Object.entries(fields).filter(([k]) => !k.startsWith('_')).map(([k, v]) => `${k}: ${v}`).join('\n\n');
+  try {
+    const direct = ownerDirectEmail();
+    let sent = false;
+    if (direct) {
+      try { await direct({ to: INFO_CONTACT_EMAIL, subject: fields._subject, text, replyTo: replyTo || undefined }); sent = true; } catch (err) {
+        console.error(`[owner-help] email to info@ failed: ${String((err && err.message) || err).slice(0, 300)}`);
+      }
+    }
+    if (!sent) await venueSubmissionTransport(fields);
+  } catch (err) {
+    console.error(`[owner-help] could not send: ${String((err && err.message) || err).slice(0, 300)}`);
+    return sendSubmissionResponse(res, 502, { ok: false, error: 'Sorry, that didn\u2019t send. Please email info@okanaganroam.com.' });
+  }
+  return sendSubmissionResponse(res, 200, { ok: true });
+}
+
+// The help bot on the simple portal pages, picked by page title (admin and visitor pages get none).
+const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
+  'Business login': ['login', false], 'My listings': ['account', true], 'Account settings': ['settings', true],
+  'Get your edit link': ['link', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
+});
 function ownerSimplePage(title, inner, extraHead = '') {
   return ownerA11y(`<!DOCTYPE html>
 <html lang="en">
@@ -33889,6 +34295,7 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main"><div class="op-wrap">
 ${inner}
   </div></main>
+${OWNER_SIMPLE_PAGE_HELP[title] ? ownerHelpWidgetHtml(OWNER_SIMPLE_PAGE_HELP[title][0], { signedIn: OWNER_SIMPLE_PAGE_HELP[title][1] }) : ''}
 </body>
 </html>`);
 }
@@ -34105,11 +34512,11 @@ function brevoApiKey() {
   return String(process.env.BREVO_API_KEY || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
 }
 
-async function sendOwnerEmailViaBrevo({ to, subject, text }) {
+async function sendOwnerEmailViaBrevo({ to, subject, text, replyTo }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': brevoApiKey(), 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text }),
+    body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text, ...(replyTo ? { replyTo: { email: replyTo } } : {}) }),
   });
   if (!res.ok) {
     // Brevo's own reason (e.g. "Key not found"), never the key itself.
@@ -35206,6 +35613,7 @@ ${renderGolfHeaderHtml()}
     <h1>This edit link isn&rsquo;t valid</h1>
     <p>It may have been replaced with a newer link. <a href="${OWNER_NEW_LINK_PATH}"><strong>Email me a new link</strong></a> (it arrives in a minute), or email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
   </main>
+${ownerHelpWidgetHtml('invalid')}
 </body>
 </html>`;
 }
@@ -35892,6 +36300,7 @@ ${renderGolfHeaderHtml()}
   });
 })();
 </script>
+${ownerHelpWidgetHtml('edit', { signedIn: !token })}
 </body>
 </html>`;
 }
@@ -38494,7 +38903,7 @@ const server = http.createServer(async (req, res) => {
       const type = SLUG_TO_TYPE[fdTypeSlug];
       const typeVenues = getVenuesByCategory(type);
       if (typeVenues.length >= MIN_CATEGORY_VENUES) {
-        const html = renderFoodDrinkHubPage(typeVenues, parseFoodDrinkFilterQuery(query), { region: null, type });
+        const html = renderFoodDrinkHubPage(typeVenues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' }, { region: null, type });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
@@ -38623,6 +39032,7 @@ const server = http.createServer(async (req, res) => {
     // List an Event, Phase 1 (2026-09-25) -- see renderListAnEventPage
     // and handleEventSubmission above.
     // Owner logins (2026-10-15): checked before the /owner/<token> routes.
+    if (pathname === '/owner/help' && method === 'POST') return await handleOwnerHelpMessage(req, res);
     if (pathname === '/owner/login' || pathname === '/owner/login/') {
       if (method === 'POST') return await handleOwnerLogin(req, res);
       if (method === 'GET' || method === 'HEAD') {
@@ -39001,6 +39411,15 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': 'fr-CA' });
         return res.end(html);
       }
+      // A place whose category or town was corrected (2026-10-18): the old French address 301s to its page now (French
+      // when it has one), the same exactly-one-match rule as the English route below.
+      if (!venue && REGION_LABELS[region] && type) {
+        const moved = findActiveVenueBySlugAcrossTypes(region, slug) || findActiveVenueBySlugAcrossRegions(type, slug);
+        if (moved && CATEGORY_SLUGS[moved.type] && (moved.type !== type || moved.region !== region)) {
+          res.writeHead(301, { Location: withCampaignParams(venueHasFrench(moved) ? venuePagePath(moved, 'fr') : venuePagePath(moved), parsed.search) });
+          return res.end();
+        }
+      }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
     }
@@ -39135,8 +39554,10 @@ const server = http.createServer(async (req, res) => {
           // Food & drink categories (2026-09-25) are destination mini-
           // directories built on the /food-drink filters; wineries, golf,
           // beaches and outdoors keep their existing page unchanged.
-          const html = FD_CATEGORY_KIND_BY_TYPE[type]
-            ? renderFoodDrinkHubPage(venues, parseFoodDrinkFilterQuery(query), { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
+          // Town winery pages (2026-10-18) use the same page as the town restaurant, cafe and brewery pages: site
+          // header, each winery's own photo, search, filters, Open now and sort (they had none of it).
+          const html = FD_CATEGORY_KIND_BY_TYPE[type] || type === 'winery'
+            ? renderFoodDrinkHubPage(venues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' }, { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
             : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', sportsAlso });
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
@@ -40090,6 +40511,8 @@ module.exports = {
   getSkiSnowVenues,
   getSkiSnowEatVenues,
   renderSkiSnowPage,
+  photoSized,
+  ownerHelpWidgetHtml,
   getIndoorGolfVenues,
   getIndoorAlsoVenues,
   INDOOR_ALSO_COLLECTION_KIND,
