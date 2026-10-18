@@ -4369,7 +4369,10 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   if (R.length > 1) return null;
   const region = R[0] || null;
   const town = region ? REGION_LABELS[region] : null;
-  const others = intent.cuisines.length || intent.collections.length || intent.activities.length;
+  // Fix (2026-10-18): on live a listing has "brunch" as its cuisine, so the
+  // interpreter reads "brunch" as a cuisine too; that must not count as some
+  // other request and block the breakfast/brunch routing below.
+  const others = intent.cuisines.filter((c) => !/^(breakfast|brunch)/i.test(c)).length || intent.collections.length || intent.activities.length;
 
   // Breakfast and brunch.
   if (smartHas(folded, SMART_BREAKFAST_WORDS) && T.every((t) => t === 'cafe' || t === 'restaurant') && !others) {

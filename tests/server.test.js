@@ -23789,6 +23789,11 @@ test('Smarter search: breakfast, kids and rainy days, date night, dated events a
   assert.ok(!names.includes('SS Night Bistro'), 'not a dinner-only restaurant');
   assert.ok(!names.includes('SS Breakfast Winery'), 'only cafés and restaurants');
   assert.ok(breakfast.list().every((x) => x.row.region === 'west-kelowna'));
+  // Live data has a listing whose cuisine is "brunch", so the interpreter also reads it as a cuisine; still the guide.
+  const brunchAsCuisine = { ...app.interpretDiscoveryText('brunch kelowna'), cuisines: ['brunch'] };
+  assert.equal(app.smartSearchPlan('brunch kelowna', brunchAsCuisine).url, app.BRUNCH_GUIDE_PATH);
+  const breakfastAsCuisine = { ...app.interpretDiscoveryText('breakfast west kelowna'), cuisines: ['breakfast'] };
+  assert.equal(app.smartSearchPlan('breakfast west kelowna', breakfastAsCuisine).key, 'breakfast');
   // French: déjeuner is breakfast.
   assert.equal(app.smartSearchPlan('déjeuner à west kelowna').key, 'breakfast');
   // Kids, family and rainy days -> the Indoor hub's Family Fun in that town.
