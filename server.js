@@ -36375,8 +36375,8 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
   'Business login': ['login', false], 'My listings': ['account', true], 'Account settings': ['settings', true],
   'Get your edit link': ['link', false], 'Claim this listing': ['claim', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
 });
-// French entry pages (2026-10-18): lang 'fr' gives the page a French title and description, and (help bot v2) the help
-// bot in French. They also keep a line pointing to info@ in French (see ownerEntryHelpFr).
+// French entry pages (2026-10-18): lang 'fr' gives the page a French title and description; the help bot is English
+// only, so those pages point to info@ in French instead (see ownerEntryHelpFr).
 function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
   const fr = lang === 'fr';
   const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
@@ -36405,7 +36405,8 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main"><div class="op-wrap">
 ${inner}
   </div></main>
-${help ? ownerHelpWidgetHtml(help[0], { signedIn: help[1], lang: fr ? 'fr' : 'en' }) : ''}
+${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
+${help && fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1], lang: 'fr' }) /* Help bot v2 (2026-10-18): French pages get it in French too, and keep the info@ line */ : ''}
 </body>
 </html>`));
 }
