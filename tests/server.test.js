@@ -22898,3 +22898,18 @@ test('Owner season (2026-10-17): an owner sets "open May to October"; out of sea
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+// Replay opt-in must reach both server templates and the frozen homepage.
+test('session replay stays disabled by default and reaches both page renderers when configured', () => {
+  const previous = process.env.CLARITY_PROJECT_ID;
+  try {
+    delete process.env.CLARITY_PROJECT_ID;
+    assert.doesNotMatch(app.renderAnalyticsHeadHtml('hub'), /www\.clarity\.ms/);
+    process.env.CLARITY_PROJECT_ID = 'project123';
+    assert.match(app.renderAnalyticsHeadHtml('hub'), /www\.clarity\.ms/);
+    assert.match(app.applyHomepageAnalyticsHead('<head></head>'), /www\.clarity\.ms/);
+  } finally {
+    if (previous === undefined) delete process.env.CLARITY_PROJECT_ID;
+    else process.env.CLARITY_PROJECT_ID = previous;
+  }
+});
