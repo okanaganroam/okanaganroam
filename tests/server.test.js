@@ -15989,9 +15989,10 @@ test('Browse hub: the page script keeps /browse\'s GA4 events (names and paramet
   assert.ok(html.includes("track('description_expand'") || html.includes("'description_expand'"), 'Read more events are the hub\'s own');
   // Favorite / Add to Trip still come from app.js (add_to_favorites / add_to_trip) and the card script (venue_favorite).
   assert.match(html, /<button type="button" class="card-action fav-btn"/); assert.match(html, /<button type="button" class="card-action trip-btn"/);
-  // Its only request is the rest of its own cards, from this site (2026-10-14).
+  // Its only requests are the rest of its own cards and (Venue JSON,
+  // 2026-10-18) its filter data, both from this site (2026-10-14).
   assert.doesNotMatch(script, /XMLHttpRequest|sendBeacon/, 'no network of its own');
-  assert.deepEqual(script.match(/fetch\([^)]*\)/g), ['fetch(src)'], 'the one fetch is the cards file named in the page');
+  assert.deepEqual(script.match(/fetch\([^)]*\)/g), ['fetch(src)', "fetch('/cards/rest/' + dataHash + '.json?u=' + encodeURIComponent(window.location.pathname + window.location.search)"], 'the cards file named in the page and the filter data');
   assert.doesNotMatch(script, /MutationObserver/, 'no body-wide observer');
   assert.equal((script.match(/setInterval\(/g) || []).length, 1, 'one 60-second clock tick, like the other hubs');
 })));
@@ -23650,6 +23651,13 @@ test('session replay stays disabled by default and reaches both page renderers w
 
 // ---- Lighter pages (2026-10-18) ----
 const lpHttp = require('node:http');
+// Venue JSON (2026-10-18): a served list page's filter data, inline or from /cards/rest/<hash>.json.
+async function lpVenueData(base, html, id, pagePath) {
+  const m = new RegExp(`<script type="application/json" id="${id}"( data-rest="([0-9a-f]{12})")?>([\\s\\S]*?)</script>`).exec(html);
+  if (!m) return null;
+  if (!m[2]) return JSON.parse(m[3]);
+  return (await fetch(`${base}/cards/rest/${m[2]}.json?u=${encodeURIComponent(pagePath)}`)).json();
+}
 // Shared CSS as versioned cached files, a capped ItemList, and the cards and
 // events after the first page loaded after the page appears.
 test('Lighter pages: shared page CSS is a versioned, year-cached file in the same place as the inline block was', async () => {
@@ -23731,7 +23739,7 @@ test('Lighter pages: /food-drink loads its waiting cards from /cards/rest/, the 
       assert.equal(miss.status, 200);
       assert.equal(miss.headers.get('cache-control'), 'no-store');
       assert.equal(await miss.text(), rest, `${p}: a re-render gives the same cards`);
-      const dataIds = Object.keys(JSON.parse(html.match(/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/)[1]));
+      const dataIds = Object.keys(await lpVenueData(base, html, 'fdVenueData', p));
       assert.deepEqual([...first, ...ids(rest)].sort(), dataIds.sort(), `${p}: the page plus the waiting cards are every place`);
       if (p.startsWith('/fr/')) assert.ok(rest.includes('Voir les détails') && !rest.includes('View details'), 'French cards for the French page');
       assert.match(html, /fetch\('\/cards\/rest\/' \+ restHash/, 'the page script loads them');
@@ -23861,6 +23869,130 @@ test("Lighter pages: What's On ships its first page of events and every other it
       db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
       db.prepare('DELETE FROM events WHERE id = ?').run(id);
     }
+  }
+});
+
+
+// ---- Crawlable links and Venue JSON (2026-10-18) ----
+// The raw HTML a crawler (or a visitor without JavaScript) sees: no scripts, no templates.
+const crawlLinks = (html) => new Set([...html.replace(/<script[\s\S]*?<\/script>|<template[\s\S]*?<\/template>/g, '').matchAll(/<a\b[^>]*\shref="([^"#?]+)/g)].map((m) => m[1]));
+
+test('Lighter pages: crawlable links: every place and event waiting for "Show more" is linked from its hub without JavaScript, in English and French', async () => {
+  const made = [], events = [];
+  for (let i = 0; i < 120; i++) made.push(app.createVenue({ name: `CR Kitchen ${String(i).padStart(3, '0')}`, region: 'kelowna', type: 'restaurant', description: `A crawlable-links fixture kitchen number ${i}.`, slug: `cr-kitchen-${i}` }));
+  const pad = (x) => String(x).padStart(2, '0'), today = new Date();
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (let i = 0; i < 110; i++) {
+      const d = new Date(today.getTime() + (i % 20) * 86400000);
+      const data = { name: `CR Fixture Show ${i}`, region: 'kelowna', description: 'A crawlable-links fixture event.', venue_name_text: `CR Hall ${i}`,
+        source_type: 'official_venue', source_name: 'CR', source_url: `https://example.com/cr-${i}`, categories: ['live-music'],
+        occurrences: [{ start_date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, start_time: '19:00', end_time: '21:00' }] };
+      let r = app.createEvent(data, { reason: 'crawlable links fixture', batch_id: 'test-cr' });
+      if (r && r.reason === 'possible_duplicate') r = app.createEvent(data, { reason: 'crawlable links fixture', batch_id: 'test-cr', reviewed_duplicates: r.detail.map((x) => x.event_id) });
+      assert.ok(r && r.ok !== false, JSON.stringify(r));
+    }
+    events.push(...db.prepare("SELECT id, slug, region FROM events WHERE name LIKE 'CR Fixture Show %'").all());
+    // Every active place in the fixture set, from its town hub and the valley-wide ones.
+    for (const [p, fr] of [['/kelowna/restaurants', false], ['/fr/kelowna/restaurants', true], ['/restaurants', false], ['/food-drink', false], ['/fr/food-drink', true]]) {
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /<template id="fdRest" data-rest="[0-9a-f]{12}"><\/template>/, `${p}: cards are deferred`);
+      const links = crawlLinks(html);
+      const missing = made.filter((v) => !links.has(`${fr ? '/fr' : ''}/kelowna/restaurants/${v.slug}`)).map((v) => v.slug);
+      assert.deepEqual(missing, [], `${p}: every fixture place is linked in the raw HTML`);
+      // A visible, closed <details> list right after the empty template: no hiding tricks.
+      const list = html.match(/<template id="fdRest" data-rest="[0-9a-f]{12}"><\/template>\n  <style id="rest-links-css">[^<]*<\/style><details class="rest-links" id="fdRestLinks"><summary>([^<]*)<\/summary><ul>([\s\S]*?)<\/ul><\/details>/);
+      assert.ok(list, `${p}: the A-Z list follows the template`);
+      assert.match(list[1], fr ? /^Toutes les autres adresses, de A à Z \(\d+\)$/ : /^All the other places here, A–Z \(\d+\)$/);
+      const names = [...list[2].matchAll(/<li><a href="[^"]+">([^<]*)<\/a>/g)].map((m) => m[1]);
+      assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b, fr ? 'fr' : 'en', { sensitivity: 'base' })), `${p}: A to Z`);
+      assert.doesNotMatch(list[0], /display:\s*none|hidden/, `${p}: nothing is hidden`);
+      assert.ok(list[2].length / names.length < 100, `${p}: light (${Math.round(list[2].length / names.length)} bytes a link)`);
+      if (fr) assert.ok(names.length && !/href="\/kelowna\//.test(list[2]), `${p}: French addresses`);
+    }
+    // Events: /whats-on keeps the soonest-first order.
+    for (const p of ['/whats-on', '/fr/whats-on']) {
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /<template id="whatsOnRest" data-rest="[0-9a-f]{12}"><\/template>/, `${p}: events are deferred`);
+      const links = crawlLinks(html);
+      const missing = events.filter((e) => !links.has(`/${e.region}/events/${e.slug}`) && !links.has(`/fr/${e.region}/events/${e.slug}`)).map((e) => e.slug);
+      assert.deepEqual(missing, [], `${p}: every upcoming fixture event is linked`);
+      assert.match(html, p === '/whats-on' ? /<details class="rest-links" id="whatsOnRestLinks"><summary>More upcoming events \(\d+\)<\/summary>/ : /<details class="rest-links" id="whatsOnRestLinks"><summary>Autres événements à venir \(\d+\)<\/summary>/);
+    }
+    // A page whose cards all ship gets no list.
+    assert.doesNotMatch(await (await fetch(base + '/kelowna')).text(), /class="rest-links"/);
+  } finally {
+    srv.close();
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+    for (const e of events) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(e.id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(e.id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(e.id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+    }
+  }
+});
+
+test('Lighter pages: venue JSON: /food-drink, /browse and their French twins load the filter data from a year-cached /cards/rest/<hash>.json that never 404s', async () => {
+  const made = [];
+  for (let i = 0; i < 90; i++) made.push(app.createVenue({ name: `VJ Kitchen ${i}`, region: ['kelowna', 'penticton'][i % 2], type: 'restaurant', description: `A venue-json fixture kitchen with a sunny lakeside patio number ${i}.`, slug: `vj-kitchen-${i}` }).id);
+  db.prepare('UPDATE venues SET description_fr = ? WHERE id = ?').run('Une cuisine d’essai avec une terrasse ensoleillée au bord du lac.', made[0]);
+  app.resetFrSearchWords();
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const [p, id] of [['/food-drink', 'fdVenueData'], ['/fr/food-drink', 'fdVenueData'], ['/restaurants', 'fdVenueData'], ['/browse', 'bhVenueData'], ['/fr/browse', 'bhVenueData']]) {
+      const html = await (await fetch(base + p)).text();
+      const m = html.match(new RegExp(`<script type="application/json" id="${id}" data-rest="([0-9a-f]{12})"></script>`));
+      assert.ok(m, `${p}: the data tag ships empty with its hash ${(html.match(new RegExp(`<script type="application/json" id="${id}"[^>]*>[^<]{0,40}`)) || [])[0]}`);
+      assert.match(html, /fetch\('\/cards\/rest\/' \+ dataHash \+ '\.json\?u=' \+ /, `${p}: the page script loads it`);
+      assert.match(html, /Promise\.all\(waits\)\.then\((?:fd|bh)Start\)/, `${p}: the filters start once it is in`);
+      const hit = await fetch(`${base}/cards/rest/${m[1]}.json?u=${encodeURIComponent(p)}`);
+      assert.equal(hit.status, 200);
+      assert.match(hit.headers.get('content-type'), /application\/json/);
+      assert.equal(hit.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      const text = await hit.text();
+      const data = JSON.parse(text);
+      for (const v of made) assert.ok(data[String(v)], `${p}: ${v} has its filter data`);
+      // After a restart the hash is unknown: the page is rendered again from ?u=, the same data.
+      const miss = await fetch(`${base}/cards/rest/ffffffffffff.json?u=${encodeURIComponent(p)}`);
+      assert.equal(miss.status, 200);
+      assert.equal(miss.headers.get('cache-control'), 'no-store');
+      assert.equal(await miss.text(), text, `${p}: a re-render gives the same data`);
+      if (id === 'fdVenueData') {
+        const fr = p.startsWith('/fr/');
+        assert.match(data[String(made[0])].k, fr ? /terrasse/ : /lakeside/, `${p}: search words in the page's language`);
+        if (fr) assert.doesNotMatch(data[String(made[0])].k, /lakeside|sunny/, 'French pages carry the French words only');
+        if (fr) assert.match(data[String(made[1])].k, /lakeside/, 'a place without French keeps its English words');
+        assert.ok(['c', 'f', 'r', 'o'].every((k) => k in data[String(made[1])]), `${p}: everything the filters need`);
+      }
+    }
+    // Small data stays in the page (under 8 KB it is not worth a request).
+    const small = app.withRestCardsDeferred(`<!DOCTYPE html><html lang="en"><body><script type="application/json" id="fdVenueData">{"1":{}}</script><script>'.json?u='</script></body></html>`);
+    assert.match(small, /id="fdVenueData">\{"1":\{\}\}<\/script>/);
+    // A page whose script cannot load it keeps it inline.
+    const big = `{"1":{"k":"${'x'.repeat(9000)}"}}`;
+    assert.ok(app.withRestCardsDeferred(`<!DOCTYPE html><html lang="en"><body><script type="application/json" id="fdVenueData">${big}</script></body></html>`).includes(big));
+    assert.match(app.withRestCardsDeferred(`<!DOCTYPE html><html lang="en"><body><script type="application/json" id="fdVenueData">${big}</script><script>'.json?u='</script></body></html>`), /id="fdVenueData" data-rest="[0-9a-f]{12}"><\/script>/);
+    // The same page minus the swap is the old page: the transformation is only the move.
+    const raw = app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), { types: [], features: [], regions: [] });
+    assert.match(raw, /<script type="application\/json" id="fdVenueData">\{/, 'renderers still write the data inline');
+    // Never a 404 into the edge cache.
+    for (const u of ['/admin/review', '//example.com/', '/kelowna']) {
+      const r = await fetch(`${base}/cards/rest/ffffffffffff.json?u=${encodeURIComponent(u)}`);
+      assert.equal(r.status, 200, u);
+      assert.equal(r.headers.get('cache-control'), 'no-store', u);
+      assert.equal(await r.text(), '{}', u);
+    }
+    const none = await fetch(`${base}/cards/rest/ffffffffffff.json`);
+    assert.equal(none.status, 200);
+    assert.equal(none.headers.get('cache-control'), 'no-store');
+  } finally {
+    srv.close();
+    for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
 });
 
