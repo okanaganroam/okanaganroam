@@ -5705,7 +5705,7 @@ function seasonStateOn(s, today) {
     text = `Reopening for the season ${seasonDateText(s.reopens_date, today)}. Check current hours with the venue before you go.`;
   }
   if (!kind) return null;
-  return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text };
+  return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text, until: kind === 'open_until' ? s.until_date : null };
 }
 
 // "5-10" -> "May \u2013 October" (fr: "mai \u2013 octobre").
@@ -5795,9 +5795,26 @@ function seasonOnlyStates(now = new Date()) {
   for (const [id, st] of getSeasonStates(now)) if (!advisories.has(id)) map.set(id, st);
   return map;
 }
+// Seasons everywhere (2026-10-18): places closed for the season move to the end of a list, every other place keeping
+// its order. Used by the default (Recommended) order of every list page, not by A-Z, Top rated or a price sort.
+function seasonClosedLast(list, now = new Date(), states = null) {
+  const seasons = states || getSeasonStates(now);
+  if (!seasons.size) return list.slice();
+  const away = (v) => { const st = seasons.get(v.id); return !!(st && st.kind === 'closed'); };
+  return [...list.filter((v) => !away(v)), ...list.filter(away)];
+}
 const SEASON_TAG_ICON = { closed: '\u{1F342}', open_until: '\u23F3', reopening: '\u{1F331}' };
+// "Open until Oct 31" (2026-10-18): the card tag's short form of "Open for the season until October 31."; the venue
+// page keeps the full sentence.
+const SEASON_TAG_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function seasonTagShortText(st) {
+  if (st.kind === 'open_until' && st.until && parseLocalDate(st.until)) {
+    return `Open until ${SEASON_TAG_MONTHS[Number(st.until.slice(5, 7)) - 1]} ${Number(st.until.slice(8, 10))}`;
+  }
+  return st.text.replace(' The reopening date has not been announced yet.', '').replace(/ Check current hours.*$/, '');
+}
 function seasonTagHtml(st) {
-  const short = st.text.replace(' The reopening date has not been announced yet.', '').replace(/ Check current hours.*$/, '');
+  const short = seasonTagShortText(st);
   return `<p class="season-tag season-tag-${st.kind}"><span aria-hidden="true">${SEASON_TAG_ICON[st.kind] || ''}</span> ${escapeHtml(short)}</p>`;
 }
 
@@ -9923,6 +9940,12 @@ const SEO_PAGE_CSS = `
     padding: 4px 0; border-bottom: 1px dotted rgba(74,52,40,0.14);
   }
   .hours-list li:last-child { border-bottom: none; }
+  /* Seasons and hours checked (2026-10-18). */
+  .venue-hours-season { margin: 4px 0 6px; font-weight: 800; }
+  .venue-hours-usual summary { cursor: pointer; font-size: 0.9rem; font-weight: 700; opacity: 0.8; }
+  .venue-hours-usual .hours-list { opacity: 0.75; }
+  .venue-hours-checked { margin: 8px 0 0; font-size: 0.8rem; opacity: 0.7; }
+  .venue-hours-stale { margin: 4px 0 0; font-size: 0.84rem; font-weight: 700; color: #8A4B1F; }
 
   footer.site-footer {
     margin-top: 48px; padding-top: 20px;
@@ -13770,6 +13793,24 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   @keyframes pm-pulse { 0% { box-shadow: 0 0 0 0 rgba(29,78,216,0.5); } 70% { box-shadow: 0 0 0 14px rgba(29,78,216,0); } 100% { box-shadow: 0 0 0 0 rgba(29,78,216,0); } }
   @media (prefers-reduced-motion: reduce) { .pm-me span { animation: none; } }
 </style>`;
+// The /map events tab's grouping, as page script (also read by the tests with a fixed clock). Each day of an event
+// runs from its start time (for a multi-day run, its daily start), so an evening event is "later today" in the
+// afternoon, and one that has finished for the day moves to tomorrow if it runs on. Untimed multi-day runs
+// (exhibitions, season-long events; 2026-10-18) are "On now" only in the daytime, 10:00-17:00; outside those hours
+// they are listed as running until their last day, never "On now" at 2 am.
+const MAP_EVENT_GROUP_SRC = `function eventGroup(e, today, nowMin){
+    if (e.sd > today) return e.sd === addDays(today, 1) ? 'tomorrow' : 'week';
+    if (e.ed < today) return null;
+    var sm = mins(e.st), em = mins(e.et), next = e.ed > today ? (e.ed >= addDays(today, 1) ? 'tomorrow' : null) : null;
+    if (sm == null && e.ed > e.sd) {
+      if (nowMin >= 600 && nowMin < 1020) return 'now';
+      return e.ed === today && nowMin >= 1020 ? null : 'running';
+    }
+    if (sm != null && nowMin < sm) return 'later';
+    if (sm != null && em != null && em > sm && nowMin >= em) return next;
+    if (sm != null && em == null && nowMin >= sm + 180) return next;
+    return 'now';
+  }`;
 const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FR = document.documentElement.lang === 'fr';
   var T = FR ? {
@@ -13796,7 +13837,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     zoomHint: 'Touchez le bouton de position pour voir ce qui est près de vous.',
     none: 'Rien ne correspond ici. Essayez une plus grande distance ou retirez un filtre.', noEvents: 'Aucun événement cette semaine ici. Essayez une plus grande distance.',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
-    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
+    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: '🍂 Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
     walk: 'Walk', drive: 'Drive', bike: 'Bike', to: 'To', endRoute: 'End', howGo: 'How are you getting there?', routing: 'Working out the route…',
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
@@ -13821,7 +13862,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     zoomHint: 'Tap the locate button to see what’s near you.',
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
-    today: 'Today', until: 'until', onNow: 'On now', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
+    today: 'Today', until: 'until', onNow: 'On now', seasonClosed: '🍂 Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
   };
   var TYPES = CONF.t[FR ? 'fr' : 'en'];
   var mapEl = document.getElementById('okMap');
@@ -13889,6 +13930,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function iconFor(kind){ return ICONS[kind] || (ICONS[kind] = icon(kind)); }
   // Opening status, from the listed hours on the Okanagan clock (same rules as the hub pages).
   function statusOf(p){
+    // Seasons everywhere (2026-10-18): a place closed for the season says so, and is never open now.
+    if (p.sc) return { state: 'closed', text: T.seasonClosed, season: true };
     if (!p.h) return null;
     try { var clock = okanaganClock(new Date()); var l = hoursStatusLabel(statusAt(parseHours(expandFoodDrinkHours(p.h)), clock), clock); return l.state === 'unknown' ? null : l; } catch (e) { return null; }
   }
@@ -13915,21 +13958,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function mins(t){ if (!t) return null; var p = t.split(':'); return Number(p[0]) * 60 + Number(p[1]); }
   function timeText(t){ var m = mins(t); if (m == null) return ''; var h = Math.floor(m / 60), mm = m % 60, pad = (mm < 10 ? '0' : '') + mm; if (FR) return h + ' h' + (mm ? ' ' + pad : ''); return (h % 12 || 12) + (mm ? ':' + pad : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
   function dayText(d){ return new Date(d + 'T12:00:00Z').toLocaleDateString(FR ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); }
-  // Each day of an event runs from its start time (for a multi-day run, its daily start), so an evening event is
-  // "later today" in the afternoon, and one that has finished for the day moves to tomorrow if it runs on.
-  function eventGroup(e, today, nowMin){
-    if (e.sd > today) return e.sd === addDays(today, 1) ? 'tomorrow' : 'week';
-    if (e.ed < today) return null;
-    var sm = mins(e.st), em = mins(e.et), next = e.ed > today ? (e.ed >= addDays(today, 1) ? 'tomorrow' : null) : null;
-    if (sm != null && nowMin < sm) return 'later';
-    if (sm != null && em != null && em > sm && nowMin >= em) return next;
-    if (sm != null && em == null && nowMin >= sm + 180) return next;
-    return 'now';
-  }
+  ${MAP_EVENT_GROUP_SRC}
   function whenText(e, g){
     var times = e.st ? timeText(e.st) + (e.et ? '–' + timeText(e.et) : '') : '';
     if (g === 'now') return e.ed > e.sd && !e.st ? T.onNow + ' · ' + T.until + ' ' + dayText(e.ed) : T.onNow + (times ? ' · ' + times : '') + (e.ed > e.sd ? ' · ' + T.until + ' ' + dayText(e.ed) : '');
     if (g === 'later') return T.today + ' · ' + times;
+    if (g === 'running') return T.runningUntil + ' ' + dayText(e.ed);
     if (g === 'tomorrow') return T.tomorrow + (times ? ' · ' + times : '');
     return dayText(e.sd) + (times ? ' · ' + times : '');
   }
@@ -13986,7 +14020,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
     return !term || term.split(' ').every(function(w){ return p.key.indexOf(w) !== -1; });
   }
-  var isOpen = function(p){ return p.st && p.st.state === 'open' ? 0 : 1; };
+  // Open first, then closed, then closed for the season (2026-10-18).
+  var isOpen = function(p){ return p.st && p.st.state === 'open' ? 0 : p.st && p.st.season ? 2 : 1; };
   // Open at a given time today ("open at 9 PM"), from the listed hours; unknown hours never count.
   var WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   function dayKey(d){ var c = okanaganClock(new Date()); return d === '+1' ? WEEK[(WEEK.indexOf(c.weekday) + 1) % 7] : d || c.weekday; }
@@ -14014,13 +14049,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (me) items = onMap.slice().sort(function(a, b){ return isOpen(a) - isOpen(b) || a.d - b.d; });
       else {
         var b = map.getBounds();
-        items = town ? onMap.slice().sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : map.getZoom() >= 12 || term || anyOn(kinds) || anyOn(feats) ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return (c.st && c.st.state === 'open' ? 1 : 0) - (a.st && a.st.state === 'open' ? 1 : 0) || a.name.localeCompare(c.name); }) : [];
+        items = town ? onMap.slice().sort(function(a, c){ return isOpen(a) - isOpen(c) || a.name.localeCompare(c.name); }) : map.getZoom() >= 12 || term || anyOn(kinds) || anyOn(feats) ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return isOpen(a) - isOpen(c) || a.name.localeCompare(c.name); }) : [];
       }
       var filtering = anyOn(kinds) || anyOn(feats) || openOnly || term;
       countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (items.length || map.getZoom() >= 12 || filtering ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
-      var order = { now: 0, later: 1, tomorrow: 2, week: 3 };
+      var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4 };
       // An event without a pin counts as near when its town centre is within the distance.
       var nearTown = function(e){ var c = CONF.c[e.region]; return c && distKm(me.lat, me.lng, c[0], c[1]) <= radiusKm; };
       items = events.filter(function(e){ return e.g && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
@@ -14688,7 +14723,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
       places.push(p);
     });
@@ -14728,7 +14763,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
-const MAP_DATA_FORMAT = 6;
+const MAP_DATA_FORMAT = 7;
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -14822,6 +14857,7 @@ function mapPlacesData(now = new Date()) {
   const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description, happy_hour_times, price FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
+  const seasons = getSeasonStates(now);
   const dogNotes = getDogPolicyNotes();
   return venues.map((v) => {
     const st = open.byId.get(v.id);
@@ -14833,7 +14869,9 @@ function mapPlacesData(now = new Date()) {
       // [11] happy hour times (researched, compact like the hours), or 0; none while the place has a closure notice.
       v.happy_hour_times && !(st && st.reason === 'advisory') ? mapHappyHourTimes(v.happy_hour_times) : 0,
       // [12] price level 1-4 ($ to $$$$), or 0 when not listed.
-      Number(v.price) >= 1 && Number(v.price) <= 4 ? Number(v.price) : 0];
+      Number(v.price) >= 1 && Number(v.price) <= 4 ? Number(v.price) : 0,
+      // [13] 1 when the place is closed for the season today (2026-10-18), else 0.
+      seasons.has(v.id) && seasons.get(v.id).kind === 'closed' ? 1 : 0];
   });
 }
 // Events in the next week, one entry each (its next date):
@@ -15642,6 +15680,10 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   };
   // Season-only notices render as a compact tag on list cards (2026-10-11).
   const seasonTags = seasonOnlyStates();
+  // Seasons everywhere (2026-10-18): places closed for the season are listed last. cardOpts.keepOrder: the caller
+  // has its own order (the Food & Drink style hubs, which rank and page the cards themselves).
+  const keepOrder = !!cardOpts.keepOrder;
+  if (!keepOrder && type !== 'golf') venues = seasonClosedLast(venues);
   let cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
 
   if (type === 'sport') {
@@ -15680,7 +15722,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
 
   const isPractice = (v) => !!(golfData && golfData.isPracticeFacility(golfDetails.get(`${v.region}/${v.slug}`)));
   const listedCourses = venues.filter((v) => !isIndoorGolfVenue(v) && !isPractice(v));
-  const practice = venues.filter((v) => !isIndoorGolfVenue(v) && isPractice(v));
+  const practice = keepOrder ? venues.filter((v) => !isIndoorGolfVenue(v) && isPractice(v)) : seasonClosedLast(venues.filter((v) => !isIndoorGolfVenue(v) && isPractice(v)));
   const indoor = venues.filter((v) => isIndoorGolfVenue(v));
   const sort = golfOpts.sort || 'recommended';
   // Recommended (2026-10-14): rating weighted by review count, as on Food &
@@ -15688,7 +15730,8 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   const ranked = sort === 'recommended'
     ? listedCourses.slice().sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || String(a.name).localeCompare(String(b.name)))
     : listedCourses;
-  const courses = golfData ? golfData.sortGolfCourses(ranked, golfDetails, sort, golfOpts.today) : ranked;
+  const sortedCourses = golfData ? golfData.sortGolfCourses(ranked, golfDetails, sort, golfOpts.today) : ranked;
+  const courses = sort === 'recommended' && !keepOrder ? seasonClosedLast(sortedCourses) : sortedCourses;
   const sortNav = (golfData && golfOpts.basePath && listedCourses.length > 1 && golfData.hasSortablePrices(listedCourses, golfDetails, golfOpts.today))
     ? '\n  ' + golfData.golfSortNavHtml(golfOpts.basePath, sort)
     : '';
@@ -17160,7 +17203,7 @@ function foodDrinkRecommendedScore(v) {
   const weighted = (rating * n + prior * m) / (n + m);
   return weighted + (v.hours ? 0.04 : 0) + (String(v.description || '').length >= 120 ? 0.04 : 0);
 }
-function sortFoodDrinkVenues(venues, sort = 'recommended') {
+function sortFoodDrinkVenues(venues, sort = 'recommended', now = new Date()) {
   const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
   const list = venues.slice();
   if (sort === 'az') return list.sort(byName);
@@ -17168,9 +17211,29 @@ function sortFoodDrinkVenues(venues, sort = 'recommended') {
   const score = new Map(list.map((v) => [v.id, foodDrinkRecommendedScore(v)]));
   // Closed for the season (2026-10-18): kept on the list but moved to the end, so a visitor this week sees places
   // they can actually go to first. Only the Recommended order; Top rated and A-Z stay as named.
-  const seasons = getSeasonStates();
+  const seasons = getSeasonStates(now);
   const away = (v) => { const st = seasons.get(v.id); return st && st.kind === 'closed' ? 1 : 0; };
-  return list.sort((a, b) => away(a) - away(b) || score.get(b.id) - score.get(a.id) || byName(a, b));
+  return openNowBeforeClosedToday(list.sort((a, b) => away(a) - away(b) || score.get(b.id) - score.get(a.id) || byName(a, b)), now);
+}
+// Open now first (2026-10-18): in the Recommended order, a place open right now never sits behind one that is closed
+// all day today. Only those two kinds trade places, among the positions they already hold, each kind in its own
+// ranked order; every other place (closed until later today, no hours listed, a notice) keeps its exact position.
+function openNowBeforeClosedToday(list, now = new Date()) {
+  if (!hoursModule || list.length < 2) return list;
+  const info = foodDrinkOpenNowInfo(list, getAdvisoryNotes(now), now, { requireVerified: false });
+  const kindOf = (v) => {
+    const st = info.byId.get(v.id);
+    if (!st || !st.eligible) return null;
+    if (st.state === 'open') return 'open';
+    return st.state === 'closed' && /^Closed today/.test(st.text || '') ? 'shut' : null;
+  };
+  const slots = [], open = [], shut = [];
+  list.forEach((v, i) => { const k = kindOf(v); if (k) { slots.push(i); (k === 'open' ? open : shut).push(v); } });
+  if (!open.length || !shut.length) return list;
+  const moved = [...open, ...shut];
+  const out = list.slice();
+  slots.forEach((i, n) => { out[i] = moved[n]; });
+  return out;
 }
 
 // Card photos (2026-10-14). Every listing card used to carry the same lake
@@ -18298,7 +18361,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     }
     return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}"`;
   };
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, keepOrder: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
   // Page weight (2026-10-14): the card markup is the same, minus its source
   // indentation, and the Favorite heart points at one shared <symbol>
@@ -18455,7 +18518,7 @@ function foodDrinkHubBannerHtml(types) {
   </script>
   `;
 }
-function renderFoodDrinkScopedPage(venues, filter, scope) {
+function renderFoodDrinkScopedPage(venues, filter, scope, now = new Date()) {
   const { region, type, categoryCounts, categoryGuidePages = [] } = scope;
   // Valley-wide type pages (SEO, 2026-10-13): with no region, the same page
   // renders /restaurants, /cafes, /pubs, /cocktail-lounges, /breweries and
@@ -18472,8 +18535,8 @@ function renderFoodDrinkScopedPage(venues, filter, scope) {
   // season last), Top rated, A-Z; an Open now toggle over stored hours; each card's open/closed line.
   const q0 = filter || {};
   const sort = FD_SORT_KEYS.has(q0.sort) ? q0.sort : 'recommended';
-  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended').map((v, i) => [v.id, i]));
-  venues = sortFoodDrinkVenues(venues, sort);
+  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended', now).map((v, i) => [v.id, i]));
+  venues = sortFoodDrinkVenues(venues, sort, now);
   const openNow = !!q0.openNow;
   // Only primary type counts: every card answers to this page's category.
   const catsById = new Map(venues.map((v) => [v.id, [v.type]]));
@@ -18634,8 +18697,8 @@ function renderFoodDrinkHubPage(venues, filter = null, scope = null, now = new D
   // chosen order; the payload carries each venue's Recommended rank so the
   // page can switch order without a reload.
   const sort = FD_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
-  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended').map((v, i) => [v.id, i]));
-  venues = sortFoodDrinkVenues(venues, sort);
+  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended', now).map((v, i) => [v.id, i]));
+  venues = sortFoodDrinkVenues(venues, sort, now);
   const openNow = !!f.openNow;
   const catsById = foodDrinkCategoriesByVenue(venues);
   const featsById = foodDrinkFeaturesByVenue(venues);
@@ -18766,8 +18829,8 @@ const WINE_HUB_MIN_FEATURE = 5;
 function renderWineriesHubPage(venues, filter = null, now = new Date()) {
   const f = { types: [], features: [], regions: [], ...(filter || {}), types: [] };
   const sort = FD_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
-  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended').map((v, i) => [v.id, i]));
-  venues = sortFoodDrinkVenues(venues, sort);
+  const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended', now).map((v, i) => [v.id, i]));
+  venues = sortFoodDrinkVenues(venues, sort, now);
   const openNow = !!f.openNow;
   const catsById = new Map(venues.map((v) => [v.id, ['winery']]));
   const featsById = foodDrinkFeaturesByVenue(venues);
@@ -18974,6 +19037,8 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
     seenLead[leadOf(v)] = (seenLead[leadOf(v)] || 0) + 1;
     recommended.push(v);
   }
+  // Seasons everywhere (2026-10-18): places closed for the season last.
+  recommended.splice(0, recommended.length, ...seasonClosedLast(recommended));
   const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
   const venues = sort === 'az' ? all.slice().sort(byName)
     : sort === 'town' ? all.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -19165,6 +19230,8 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   const scale = new Map(all.map((v) => [v.id, sportScaleScore(v, notes.get(v.id))]));
   const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
   const recommended = all.slice().sort((a, b) => scale.get(b.id) - scale.get(a.id) || byName(a, b));
+  // Seasons everywhere (2026-10-18): places closed for the season last.
+  recommended.splice(0, recommended.length, ...seasonClosedLast(recommended));
   const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
   const venues = sort === 'az' ? all.slice().sort(byName)
     : sort === 'town' ? all.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -19895,6 +19962,8 @@ function renderDogHubPage(venues, filter = null, now = new Date()) {
     seenLead[leadOf(v)] = (seenLead[leadOf(v)] || 0) + 1;
     recommended.push(v);
   }
+  // Seasons everywhere (2026-10-18): places closed for the season last.
+  recommended.splice(0, recommended.length, ...seasonClosedLast(recommended));
   const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -20701,7 +20770,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const pinned = cfg.pinFirst ? venues.filter(cfg.pinFirst).sort((a, b) => cfg.pinFirst(a) - cfg.pinFirst(b)) : [];
   const pinnedIds = new Set(pinned.map((v) => v.id));
   // cfg.keepOrder (2026-10-18): the list is already ranked (search results), so its first order is the given one.
-  const mixed = cfg.keepOrder ? venues.slice() : [...pinned, ...curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now)];
+  // Seasons everywhere (2026-10-18): places closed for the season go last in this first order (pinned places stay first).
+  const mixed = cfg.keepOrder ? seasonClosedLast(venues, now) : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), now)];
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -22684,12 +22754,12 @@ const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'aria-lab
 // A seasonal notice in French ("Closed for the season. Reopens November 26." -> "Fermé pour la saison. Réouverture le
 // 26 novembre."), from french-text.js's season patterns; null for any other text.
 function frSeasonText(t) {
-  if (!/^(Closed for the season|Open for the season until|Reopening for the season)/.test(t)) return null;
+  if (!/^(Closed for the season|Open for the season until|Reopening for the season|Open until )/.test(t)) return null;
   // Only the season patterns (2026-10-16): a notice with a comma in its date
   // ("Reopens May 1, 2027.") also fits the general list pattern, which needs
   // the translate helper -- it crashed the whole French page.
   for (const [rx, fn] of frenchText.FR_PATTERNS || []) {
-    if (!/season|Reopen/i.test(rx.source)) continue;
+    if (!/season|Reopen|Open until/i.test(rx.source)) continue;
     const m = t.match(rx);
     if (!m) continue;
     try { return fn(m, (x) => frTextOr(x), FR_CTX); } catch (e) { return null; }
@@ -23266,6 +23336,22 @@ function frStatusText(text) {
     .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, (m, d) => `${FR_STATUS_DAYS[d]} \u00e0 `)
     .replace(/ouvre (\d)/, 'ouvre \u00e0 $1'));
 }
+const HOURS_STALE_DAYS = 183;
+const FR_SHORT_MONTHS = ['janv.', 'f\u00e9vr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'ao\u00fbt', 'sept.', 'oct.', 'nov.', 'd\u00e9c.'];
+// "Hours checked Oct 18, 2026" (fr: "Heures v\u00e9rifi\u00e9es le 18 oct. 2026") under a venue page's hours, from
+// hours_checked_at; '' when the hours were never verified.
+function venueHoursCheckedHtml(venueId, fr, now = new Date()) {
+  let checked = null;
+  try { checked = (db.prepare('SELECT hours_checked_at FROM venues WHERE id = ?').get(venueId) || {}).hours_checked_at; } catch (e) { checked = null; }
+  if (!checked || !parseLocalDate(checked)) return '';
+  const y = checked.slice(0, 4), m = Number(checked.slice(5, 7)) - 1, d = Number(checked.slice(8, 10));
+  const date = fr ? `${d === 1 ? '1er' : d} ${FR_SHORT_MONTHS[m]} ${y}` : `${SEASON_TAG_MONTHS[m]} ${d}, ${y}`;
+  const age = localDateToDayNumber(todayLocal(now)) - localDateToDayNumber(checked);
+  const stale = age > HOURS_STALE_DAYS
+    ? `<p class="venue-hours-stale">${fr ? 'Les heures ont peut-\u00eatre chang\u00e9 \u2014 v\u00e9rifiez avant d\u2019y aller.' : 'Hours may have changed \u2014 check before you go.'}</p>`
+    : '';
+  return `<p class="venue-hours-checked">${fr ? `Heures v\u00e9rifi\u00e9es le ${date}` : `Hours checked ${date}`}</p>${stale}`;
+}
 function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
   if (!hoursModule || !pageHours || hasAdvisory) return null;
   const clock = okanaganClock(now);
@@ -23428,11 +23514,19 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   if (parsedHours && parsedHours.known) {
     const dayNames = fr ? FR_DAY_NAMES : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
     const today = okanaganClock(opts.now || new Date()).weekday;
+    // Seasons everywhere (2026-10-18): closed for the season, the weekly hours are only the usual ones, so they
+    // fold away under that heading and no day is marked as today; the page never reads as open.
+    const seasonShut = !venue.redirect_to && (getSeasonStates(opts.now || new Date()).get(venue.id) || {}).kind === 'closed';
     const rows = hoursModule.HOURS_WEEKDAYS.map((d) => {
       const text = venueDayHoursText(parsedHours.days[d], fr);
-      return `<li${d === today ? ' class="is-today"' : ''}><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
+      return `<li${d === today && !seasonShut ? ' class="is-today"' : ''}><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
     }).join('');
-    hoursHtml = `<h2>${L('Hours', 'Heures')}</h2><ul class="hours-list" data-today="${today}">${rows}</ul>`;
+    hoursHtml = seasonShut
+      ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
+      : `<h2>${L('Hours', 'Heures')}</h2><ul class="hours-list" data-today="${today}">${rows}</ul>`;
+    // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
+    // soft note when that was more than about six months ago.
+    if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
   }
   // An owner's yearly season ("Open May \u2013 October") goes with the hours.
   const openMonths = venue.redirect_to ? null : venueLinks(venue.id).open_months;
@@ -26947,7 +27041,8 @@ function bhStart(){
 }
 
 function browseRecommendedOrder(venues) {
-  return venues.slice().sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || String(a.name).localeCompare(String(b.name)));
+  // Seasons everywhere (2026-10-18): places closed for the season last.
+  return seasonClosedLast(venues.slice().sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || String(a.name).localeCompare(String(b.name))));
 }
 // /browse/cards.json (2026-10-14): every card (Favorite / Add to trip built on
 // show) and every place's search words. The page asks for it with a version
@@ -41717,6 +41812,11 @@ module.exports = {
   dogFriendlyBadgeHtml,
   advisoryNoticeHtml,
   seasonTagHtml,
+  seasonTagShortText,
+  seasonClosedLast,
+  openNowBeforeClosedToday,
+  venueHoursCheckedHtml,
+  MAP_EVENT_GROUP_SRC,
   seasonOnlyStates,
   parseAdvisoryNote,
   renderAdvisoryStyles,
