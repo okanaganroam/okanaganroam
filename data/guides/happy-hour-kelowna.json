@@ -1,0 +1,291 @@
+{
+ "heading": "Happy Hour in Kelowna",
+ "title": "Happy Hour in Kelowna | Okanagan Roam",
+ "description": "Where to find happy hour in Kelowna: rooftop patios, pubs, cocktail bars, brewery taprooms, oyster deals and early-dinner specials around town.",
+ "banner": "pub",
+ "parent": {
+  "name": "Food & Drink",
+  "href": "/food-drink"
+ },
+ "noPlace": true,
+ "intro": [
+  "Kelowna does happy hour well. You can catch the late-afternoon deals on a rooftop over the lake, at a neighbourhood pub, in a small cocktail room on Bernard Avenue or in a brewery taproom in the north-end brewery district. This guide gathers the places whose listings mention a happy hour, a social hour or a drink deal.",
+  "Where a listing gives the times, we've included them. Where it doesn't, check the listing for times. Many patios close or shorten their hours from November to April, so check each listing's hours in the cooler months. For more outdoor seating, see our {page:/guides/best-patios-kelowna|best patios in Kelowna guide}."
+ ],
+ "sections": [
+  {
+   "id": "downtown-patios-lake-views",
+   "jump": "Patios & views",
+   "heading": "Downtown patios & lake views",
+   "lead": "For a drink with the water in sight. The rooftops fill up on warm evenings, so arrive early. Our {page:/guides/best-patios-kelowna|patios guide} has more.",
+   "items": [
+    {
+     "ref": "kelowna/king-taps",
+     "name": "King Taps",
+     "text": "a lakeside patio, a well-reviewed happy hour menu and a big cocktail list. Time your visit for happy hour and order a cocktail while you take in the lake. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelly-carlos-o-bryans-restaurant",
+     "name": "Kelly & Carlos O'Bryans Restaurant",
+     "text": "an Irish pub on Bernard Ave with a covered rooftop patio and an extensive drink menu. Daily happy hour runs 2 to 5 pm and again from 9 pm to close.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/craft-beer-market-kelowna",
+     "name": "CRAFT Beer Market Kelowna",
+     "text": "a downtown rooftop patio widely called one of the best in Kelowna, with lake and sunset views. Order a pint and arrive early to claim a rooftop seat. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/earls-kitchen-bar",
+     "name": "Earls Kitchen + Bar",
+     "text": "a rooftop patio with lake and sunset views. Blankets are handed out if it cools off, so you can stay outside. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/perch-sky-lounge",
+     "name": "Perch Sky Lounge",
+     "text": "a rooftop that regulars say has the best patio view in the city. It isn't just a drinks stop, either; you can book a rooftop table and order off the full dinner menu. Check the listing for times.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "pubs-sports-bars",
+   "jump": "Pubs & sports bars",
+   "heading": "Pubs & sports bars",
+   "lead": "Pool tables, wings, big screens and a cheap pint after work.",
+   "items": [
+    {
+     "ref": "kelowna/97-street-pub",
+     "name": "97 Street Pub",
+     "text": "the sports-friendly pub at the Best Western Plus on Highway 97, with 16 TVs and 18 draught taps. Daily happy hour runs 3 to 6 pm, pool is free with a drink, and Wednesday is trivia night.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/packing-house-pub",
+     "name": "Packing House Pub",
+     "text": "one of Kelowna's longest-running neighbourhood pubs, out in Rutland on Finns Road. Happy hour runs daily from 3 to 5 pm, there's a pool table in the back room, and wing night is a regular draw.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/original-joe-s",
+     "name": "Original Joe's",
+     "text": "a patio-forward pub with a well-liked happy hour. It's comfortable with families and babies in tow. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/tonics-pub-grill",
+     "name": "Tonics Pub & Grill",
+     "text": "a welcoming sports pub on Ellis St with big TVs and wings regulars call some of the best in the area. It's especially popular on Rockets game days. Check the listing for times.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "cocktail-wine-bars",
+   "jump": "Cocktail & wine bars",
+   "heading": "Cocktail & wine bars",
+   "lead": "Smaller rooms where the drinks are the point.",
+   "items": [
+    {
+     "ref": "kelowna/bar-travelling-man",
+     "name": "Bar Travelling Man",
+     "text": "a 28-seat Bernard Avenue room where every cocktail tells a story from somewhere in the world, with globally inspired street-food tapas. Owner-confirmed happy hours run all day Monday, 4 to 9 pm, and Wednesday to Sunday, 3 to 5 pm.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/room-272-bar-bites",
+     "name": "Room 272 Bar + Bites",
+     "text": "a relaxed bar on the Bernard strip with comfortable outdoor seating and inventive cocktails that go beyond the typical bar menu. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/skinny-duke-s-glorious-emporium",
+     "name": "Skinny Duke's Glorious Emporium",
+     "text": "a retro '70s-themed lounge packed with vintage decor. Order a spread of shareable Asian-fusion small plates and an inventive cocktail. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/cantina-del-centro-kelowna",
+     "name": "Cantina del Centro - Kelowna",
+     "text": "a downtown taco-and-tequila bar where the cocktail program comes first and the mezcal selection matters as much as the tacos. Let the bartender guide you if you're unsure. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/tutt-street-tapas-wine",
+     "name": "Tutt Street Tapas + Wine",
+     "text": "a tiny tapas and wine bar tucked into a strip mall, with a locally sourced menu. Reach out ahead with allergy concerns. Check the listing for times.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "breweries-taprooms",
+   "jump": "Breweries & taprooms",
+   "heading": "Breweries & taprooms",
+   "lead": "House beer, flights and a few games to go with them.",
+   "items": [
+    {
+     "ref": "kelowna/bna-brewing-kelowna",
+     "name": "BNA Brewing Kelowna",
+     "text": "a brewery, a six-lane bowling alley and a cocktail bar in one building. Happy hour runs 4 to 6 pm daily. Bowl, order a flight, then stay for cocktails.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/the-office-brewery",
+     "name": "The Office Brewery",
+     "text": "a craft brewery and taproom on Clement Avenue that calls itself \"your best meeting of the week.\" Weekday happy hour runs Monday to Friday, 2 to 5 pm, and dogs are welcome on the patio.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/copper-brewing-co",
+     "name": "Copper Brewing Co.",
+     "text": "an independently owned brewery and kitchen in the Landmark District, with a weekday happy hour and weekly specials like Monday mac and cheese and Sunday wings. Board games, Nintendo booths and LEGO keep the kids busy. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/rustic-reel-brewing-co",
+     "name": "Rustic Reel Brewing Co",
+     "text": "a brewery, taproom and coffee bar on Vaughan Avenue in the north-end brewery district. From Wednesday to Sunday the taproom pours house beers with food and happy hour menus. Seating is first-come, first-served. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/freddys-brewpub",
+     "name": "Freddy's Brewpub",
+     "text": "the pub side of the Bowl and Brew complex on McCurdy Road, pouring more than a dozen in-house craft beers, with daily features and bowling next door. Check the listing for its deals and times.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "restaurants-with-happy-hour-fo",
+   "jump": "Happy-hour food",
+   "heading": "Restaurants with happy-hour food",
+   "lead": "For an early dinner on a deal.",
+   "items": [
+    {
+     "ref": "kelowna/west-coast-seafood-raw-bar-kelowna",
+     "name": "West Coast Seafood & Raw Bar Kelowna",
+     "text": "a downtown seafood spot with a patio. Time your visit for the lively $2.50 oyster happy hour, and order the generous cioppino.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/yuzu-bowl-and-bistro",
+     "name": "Yuzu Bowl and Bistro",
+     "text": "a Japanese bistro that welcomes kids. Time your visit for the happy hour roll deal, which is hard to beat. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/table-nineteen-kelowna",
+     "name": "Table Nineteen Kelowna",
+     "text": "a newly renovated golf-course restaurant with patio seating overlooking the 19th hole. Order one of the handmade pizzas and time your visit for the lively happy hour. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/moxies-kelowna-restaurant",
+     "name": "Moxies Kelowna Restaurant",
+     "text": "a polished bar-and-grill that feels upscale but relaxed. Drop in for the good happy hour deals. Check the listing for times.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/milestones-kelowna",
+     "name": "Milestones Kelowna",
+     "text": "a sit-down grill and bar on Harvey Avenue near Orchard Park, with a daily happy hour from 3 to 6 pm plus a late-night menu from 9 pm.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/browns-socialhouse-harvey",
+     "name": "Browns Socialhouse Harvey",
+     "text": "a casual neighbourhood restaurant and bar in midtown. Its daily social hour runs 2 to 5 pm and again from 9 pm to close.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/the-old-spaghetti-factory",
+     "name": "The Old Spaghetti Factory",
+     "text": "the classic family pasta house on Capri Street. A daily happy hour runs 2 to 5 pm, which makes it an easy early dinner with a group.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Happy hour with a lake view",
+    [
+     "kelowna/king-taps|King Taps",
+     "kelowna/kelly-carlos-o-bryans-restaurant|Kelly & Carlos O'Bryans Restaurant"
+    ]
+   ],
+   [
+    "A rooftop at sunset",
+    [
+     "kelowna/craft-beer-market-kelowna|CRAFT Beer Market Kelowna",
+     "kelowna/perch-sky-lounge|Perch Sky Lounge"
+    ]
+   ],
+   [
+    "A cheap pint and pool",
+    [
+     "kelowna/97-street-pub|97 Street Pub",
+     "kelowna/packing-house-pub|Packing House Pub"
+    ]
+   ],
+   [
+    "A cocktail on Bernard",
+    [
+     "kelowna/bar-travelling-man|Bar Travelling Man",
+     "kelowna/room-272-bar-bites|Room 272 Bar + Bites"
+    ]
+   ],
+   [
+    "Beer and bowling",
+    [
+     "kelowna/bna-brewing-kelowna|BNA Brewing Kelowna",
+     "kelowna/freddys-brewpub|Freddy's Brewpub"
+    ]
+   ],
+   [
+    "An after-work brewery stop",
+    [
+     "kelowna/the-office-brewery|The Office Brewery"
+    ]
+   ],
+   [
+    "Oysters on a deal",
+    [
+     "kelowna/west-coast-seafood-raw-bar-kelowna|West Coast Seafood & Raw Bar Kelowna"
+    ]
+   ],
+   [
+    "Sushi rolls on a deal",
+    [
+     "kelowna/yuzu-bowl-and-bistro|Yuzu Bowl and Bistro"
+    ]
+   ],
+   [
+    "An early dinner with a group",
+    [
+     "kelowna/the-old-spaghetti-factory|The Old Spaghetti Factory",
+     "kelowna/milestones-kelowna|Milestones Kelowna"
+    ]
+   ],
+   [
+    "A late-night social hour",
+    [
+     "kelowna/browns-socialhouse-harvey|Browns Socialhouse Harvey"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/guides/best-patios-kelowna\">Best patios in Kelowna</a>, <a href=\"/kelowna/breweries\">Kelowna breweries</a>, <a href=\"/kelowna/pubs\">Kelowna pubs</a>, <a href=\"/kelowna/cocktail-lounges\">Kelowna cocktail lounges</a>"
+}

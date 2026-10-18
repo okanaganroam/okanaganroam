@@ -1,0 +1,352 @@
+{
+ "heading": "Cheap Eats in Kelowna",
+ "title": "Cheap Eats in Kelowna | Okanagan Roam",
+ "description": "Where to eat well for less in Kelowna: diner breakfasts, banh mi and subs, pho and curry, food-truck tacos, bakeries, late-night slices and vegan picks.",
+ "banner": "food-drink",
+ "parent": {
+  "name": "Food & Drink",
+  "href": "/food-drink"
+ },
+ "noPlace": true,
+ "intro": [
+  "You don't need a big budget to eat well in Kelowna. This guide sticks to independent, mostly family-run and owner-run places: diners, sandwich counters, pho shops, food trucks, bakeries and late-night slice shops. Most are the cheapest price level on our site, and the few that aren't are here because their listings single out the value.",
+  "The picks spread across downtown, Pandosy, Rutland, Glenmore and the Lower Mission. Food trucks and patio spots often cut back their hours from November to April, so check each listing's hours before you head out."
+ ],
+ "sections": [
+  {
+   "id": "breakfast-for-less",
+   "jump": "Breakfast for less",
+   "heading": "Breakfast for less",
+   "lead": "For a sit-down brunch with all the trimmings, see our {page:/guides/best-brunch-kelowna|best brunch in Kelowna guide}. These are the easier-on-the-wallet mornings.",
+   "items": [
+    {
+     "ref": "kelowna/norman-s-diner-kelowna",
+     "name": "Norman's Diner",
+     "text": "an old-fashioned diner that regulars call one of the most welcoming, affordable family breakfast spots in town. Prices haven't crept up the way they have elsewhere.",
+     "where": "Rutland"
+    },
+    {
+     "ref": "kelowna/pulp-fiction-pandosy",
+     "name": "Pulp Fiction",
+     "text": "a coffee house that doubles as a rare and used bookstore, with a strong breakfast menu. Order the coffee milkshake regulars rave about and browse while you eat.",
+     "where": "Pandosy"
+    },
+    {
+     "ref": "kelowna/the-sandwich-company",
+     "name": "The Sandwich Company",
+     "text": "a breakfast-and-lunch sandwich shop with a loyal following, anchored by a well-loved breakfast burrito. There are proper vegan options too.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/specialty-bakery-bistro-finns-road",
+     "name": "Specialty Bakery & Bistro",
+     "text": "a scratch bakery with a bistro serving all-day breakfast and daily lunch specials on weekdays. Grab a cream-filled Kelonut on the way out.",
+     "where": "Rutland"
+    }
+   ]
+  },
+  {
+   "id": "sandwiches-and-quick-lunches",
+   "jump": "Quick lunches",
+   "heading": "Sandwiches and quick lunches",
+   "items": [
+    {
+     "ref": "kelowna/little-hobo-soup-sandwich-shop",
+     "name": "Little Hobo Soup & Sandwich Shop",
+     "text": "a hole-in-the-wall that's been a local staple since the 1970s. Order the grilled cheese or the three-soup flight. More bowls like this are in our {page:/guides/soup-ramen-pho-okanagan|soup, ramen and pho guide}.",
+     "where": "Downtown"
+    },
+    {
+     "ref": "kelowna/banh-mi-bo-bakery",
+     "name": "Banh Mi Bo Bakery",
+     "text": "a dedicated banh mi bakery with baguettes baked fresh daily and a focused menu. Start with the classic.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/italian-sandwich-co",
+     "name": "Italian Sandwich Co.",
+     "text": "easy to walk past in a food court near the office district, but the sandwiches are built with imported meats and cheeses.",
+     "where": "Downtown"
+    },
+    {
+     "ref": "kelowna/rocket-subs",
+     "name": "Rocket Subs",
+     "text": "a small sub shop with a cult following for fresh ingredients and generous portions. It can sell out on weekends, so arrive early.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/press-d-sandwich-shop",
+     "name": "Press'd Sandwich Shop",
+     "text": "an owner-run shop near Landmark. Order one of the creatively named signature sandwiches.",
+     "where": "Landmark"
+    },
+    {
+     "ref": "kelowna/wood-fire-bakery",
+     "name": "Wood Fire Bakery",
+     "text": "a German bakery-cafe with generous portions and fair prices. It's open weekdays only for a short midday window, so plan ahead and order the borscht and ham hock.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "noodles-pho-and-curry",
+   "jump": "Noodles, pho and curry",
+   "heading": "Noodles, pho and curry",
+   "lead": "Big bowls that go a long way. Our {page:/guides/soup-ramen-pho-okanagan|soup, ramen and pho guide} covers the whole valley.",
+   "items": [
+    {
+     "ref": "kelowna/bamboo-chopsticks-downtown",
+     "name": "Bamboo Chopsticks Downtown",
+     "text": "a vegan-friendly Vietnamese spot with big portions for the price. The customizable pho is what regulars swear by.",
+     "where": "Downtown"
+    },
+    {
+     "ref": "kelowna/basil-leaf-asian-fusion-restaurant-glenmore",
+     "name": "Basil Leaf Asian Fusion",
+     "text": "quick, affordable Vietnamese-Thai food. Order the pho, whose broth tastes like it took hours.",
+     "where": "Glenmore"
+    },
+    {
+     "ref": "kelowna/natsukashi-neighbourhood-store-eatery",
+     "name": "Natsukashi Neighbourhood Store & Eatery",
+     "text": "a nostalgic Japanese corner store stocked with snacks, where you can sit down for bowls of udon and fresh onigiri.",
+     "where": "Downtown"
+    },
+    {
+     "ref": "kelowna/yellow-star-snack-house",
+     "name": "Yellow Star Snack House",
+     "text": "a casual Vietnamese spot for banh mi, vermicelli bowls, spring rolls and bao buns, with kind staff and vegetarian options.",
+     "where": "Harvey Avenue"
+    },
+    {
+     "ref": "kelowna/made-in-india-restaurant-klo",
+     "name": "Made in India",
+     "text": "a budget-friendly Indian restaurant that suits families and groups. Reviewers mention butter chicken, rogan josh, korma and garlic naan.",
+     "where": "KLO Road"
+    },
+    {
+     "ref": "kelowna/pick-thai-restaurant",
+     "name": "Pick Thai Restaurant",
+     "text": "a small, family-run spot on Bernard Ave where mom does the cooking, so every dish tastes homemade.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "tacos-burgers-and-pizza",
+   "jump": "Tacos, burgers and pizza",
+   "heading": "Tacos, burgers and pizza",
+   "items": [
+    {
+     "ref": "kelowna/charros-takos",
+     "name": "Charros Takos",
+     "text": "street tacos from a food truck, on fresh handmade corn tortillas. Try the tofu pastor and the bean soup on the side.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/streats-harvey-kitchen",
+     "name": "Streats Harvey Kitchen",
+     "text": "a smash burger and taco counter. The cauliflower tacos and crispy halloumi make it good for vegetarians too.",
+     "where": "Harvey Avenue"
+    },
+    {
+     "ref": "kelowna/the-hot-box",
+     "name": "The Hot Box",
+     "text": "a smash burger and smoked BBQ food truck by the bike path, a favourite pit stop for cyclists and walkers.",
+     "where": "Pandosy Waterfront Park"
+    },
+    {
+     "ref": "kelowna/latin-fiesta",
+     "name": "Latin Fiesta",
+     "text": "affordable, authentic Latin American food. Order the chilaquiles or the pozole, and there's a proper kids' menu.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/pandosy-pizza",
+     "name": "Pandosy Pizza",
+     "text": "known for a homemade-tasting tomato sauce on a generous, non-greasy pie.",
+     "where": "Pandosy"
+    },
+    {
+     "ref": "kelowna/panjabi-pizzeria",
+     "name": "Panjabi Pizzeria",
+     "text": "halal Indian-fusion pizza with dine-in tables. Reviewers say the Achari Chicken pizza is worth the wait.",
+     "where": "Rutland"
+    }
+   ]
+  },
+  {
+   "id": "bakeries-and-sweet-stops",
+   "jump": "Bakeries and sweet stops",
+   "heading": "Bakeries and sweet stops",
+   "items": [
+    {
+     "ref": "kelowna/350-bakehouse-and-cafe",
+     "name": "350° Bakehouse and Cafe",
+     "text": "a from-scratch bakery for donuts, cronuts, lemon tarts, scones and sausage rolls, plus deli sandwiches and a daily soup.",
+     "where": "Spall Road"
+    },
+    {
+     "ref": "kelowna/jaide-joel-s-baking-co",
+     "name": "Jaide & Joel's Baking Co.",
+     "text": "fresh baking, lunch options and coffee, with free parking behind the building.",
+     "where": "Rutland"
+    },
+    {
+     "ref": "kelowna/tripke-bakery-too",
+     "name": "Tripke Bakery Too",
+     "text": "big muffins, flaky pastries, sausage rolls and a good selection of gluten-free treats, close to a walking trail.",
+     "where": "North Glenmore"
+    },
+    {
+     "ref": "kelowna/milk-shed-coffeehouse",
+     "name": "Milk Shed Coffeehouse",
+     "text": "a heritage barn attached to a brewery, with cinnamon buns famous enough to justify the trip.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/empire-crepe",
+     "name": "Empire Crepe",
+     "text": "a family-run counter that makes everything hot to order. Start savory, then finish with the salted caramel crepe.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "late-night-bites",
+   "jump": "Late-night bites",
+   "heading": "Late-night bites",
+   "items": [
+    {
+     "ref": "kelowna/city-pizza",
+     "name": "City Pizza",
+     "text": "open past midnight, with slices on a light sauce and a fluffy crust. It's well loved for supporting the local homeless community with warm meals.",
+     "where": "Pandosy"
+    },
+    {
+     "ref": "kelowna/halfmoon-pizzeria-donair",
+     "name": "Halfmoon Pizzeria + Donair",
+     "text": "pizza and donair under one roof, and neither feels like an afterthought. Order one of each.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mashawi-shawarma-grill",
+     "name": "MASHAWI - Shawarma & Grill",
+     "text": "authentic Turkish food from a hardworking young couple, open well past typical dinner hours, with generous portions.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/misato-s-kitchen",
+     "name": "Misato's Kitchen",
+     "text": "a cozy, wood-panelled Japanese spot on Ellis St that stays open late. The rolls are unbeatably priced.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "vegan-on-a-budget",
+   "jump": "Vegan on a budget",
+   "heading": "Vegan on a budget",
+   "items": [
+    {
+     "ref": "kelowna/king-s-vegetarian-food",
+     "name": "King's Vegetarian Food",
+     "text": "a beloved, family-run market stall. Order the sweet and sour veggie and add a few steamed buns.",
+     "where": "Kelowna farmers market"
+    },
+    {
+     "ref": "kelowna/eye-tasty-food",
+     "name": "Eye Tasty Food",
+     "text": "an Ethiopian food truck run by a husband-and-wife team, with fresh, healthy home cooking worth seeking out.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/reggaefusionfood",
+     "name": "reggaefusionfood",
+     "text": "a food truck with live music playing. The chickpea curry is well loved.",
+     "where": "UBCO area"
+    },
+    {
+     "ref": "kelowna/goods-health-and-wellness",
+     "name": "Goods Health and Wellness",
+     "text": "a wellness store and smoothie bar run by people who know the vegan landscape well, with a bring-your-own-cup option.",
+     "where": "Kelowna"
+    },
+    {
+     "lead": "Food trucks and market stalls:",
+     "tip": "trucks move and markets change their schedules with the season, so check each listing before you go."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A cheap diner breakfast",
+    [
+     "kelowna/norman-s-diner-kelowna|Norman's Diner"
+    ]
+   ],
+   [
+    "Soup and a sandwich",
+    [
+     "kelowna/little-hobo-soup-sandwich-shop|Little Hobo Soup & Sandwich Shop"
+    ]
+   ],
+   [
+    "A banh mi",
+    [
+     "kelowna/banh-mi-bo-bakery|Banh Mi Bo Bakery"
+    ]
+   ],
+   [
+    "A big bowl of pho",
+    [
+     "kelowna/bamboo-chopsticks-downtown|Bamboo Chopsticks Downtown",
+     "kelowna/basil-leaf-asian-fusion-restaurant-glenmore|Basil Leaf Asian Fusion"
+    ]
+   ],
+   [
+    "Street tacos",
+    [
+     "kelowna/charros-takos|Charros Takos"
+    ]
+   ],
+   [
+    "A smash burger",
+    [
+     "kelowna/streats-harvey-kitchen|Streats Harvey Kitchen",
+     "kelowna/the-hot-box|The Hot Box"
+    ]
+   ],
+   [
+    "A treat from the bakery",
+    [
+     "kelowna/350-bakehouse-and-cafe|350° Bakehouse and Cafe",
+     "kelowna/milk-shed-coffeehouse|Milk Shed Coffeehouse"
+    ]
+   ],
+   [
+    "A slice after midnight",
+    [
+     "kelowna/city-pizza|City Pizza"
+    ]
+   ],
+   [
+    "Vegan food for less",
+    [
+     "kelowna/eye-tasty-food|Eye Tasty Food",
+     "kelowna/king-s-vegetarian-food|King's Vegetarian Food"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna/restaurants\">Kelowna restaurants</a>, <a href=\"/kelowna/cafes\">Kelowna cafés</a>, <a href=\"/guides/best-brunch-kelowna\">Best brunch in Kelowna</a>, <a href=\"/guides/soup-ramen-pho-okanagan\">Soup, ramen &amp; pho</a>"
+}
