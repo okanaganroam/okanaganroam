@@ -16829,6 +16829,204 @@ test('Season writes: set, no-op, change and clear are audited; cards, pages, Ope
   assert.equal(logRows(openUntil.id)[1].new_value, null);
 });
 
+// ---- Seasons everywhere (2026-10-18) ---------------------------------------
+// Season notices on every list page: closed-for-season outdoor, golf, tour, beach, indoor and sport listings carry the
+// tag, sort last in the default order, never count as Open now, and are left out of trip plans.
+test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listings are tagged, last, never Open now', async () => {
+  const today = app.todayLocal();
+  const meta = { reason: 'test', batch_id: 'seasons-everywhere' };
+  const types = ['outdoor', 'golf', 'tour', 'beach', 'indoor', 'sport'];
+  const made = [];
+  const closed = {}, open = {};
+  for (const t of types) {
+    for (const kind of ['closed', 'open']) {
+      const slug = `seasons-everywhere-${kind}-${t}`;
+      seasonInsert.run({ name: `Seasons Everywhere ${kind} ${t}`, type: t, hours: SEASON_WEEK, slug });
+      const v = app.findVenueBySlug('kelowna', t, slug);
+      // The closed one ranks best on every score, so only the season rule can move it down.
+      db.prepare('UPDATE venues SET rating = ?, reviews = ?, latitude = 49.88, longitude = -119.49 WHERE id = ?').run(kind === 'closed' ? 5 : 4.1, kind === 'closed' ? 5000 : 12, v.id);
+      made.push(v.id);
+      (kind === 'closed' ? closed : open)[t] = v.id;
+    }
+    assert.equal(app.guardedSeasonUpdate(closed[t], { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: today }, meta).ok, true);
+  }
+  const cardIds = (html) => [...html.matchAll(/<li class="venue-card"[^>]*?data-venue-id="(\d+)"/g)].map((m) => Number(m[1]));
+  const cardOf = (html, id) => (html.split(`data-venue-id="${id}"`)[1] || '').split('</li>')[0];
+  try {
+    await withDiscoveryServer(async (base) => {
+      const pages = [
+        ['/outdoors', 'outdoor'], ['/kelowna/outdoors', 'outdoor'], ['/golf', 'golf'], ['/kelowna/golf', 'golf'],
+        ['/tours', 'tour'], ['/kelowna/tours', 'tour'], ['/beaches', 'beach'], ['/kelowna/beaches', 'beach'],
+        ['/indoor', 'indoor'], ['/kelowna/indoor', 'indoor'], ['/sports', 'sport'], ['/kelowna/sports', 'sport'],
+        ['/fr/outdoors', 'outdoor'], ['/fr/kelowna/golf', 'golf'],
+      ];
+      for (const [path, t] of pages) {
+        const html = await (await fetch(base + path)).text();
+        const ids = cardIds(html);
+        assert.ok(ids.includes(closed[t]) && ids.includes(open[t]), `${path}: both fixtures listed`);
+        assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
+        const card = cardOf(html, closed[t]);
+        assert.match(card, /class="season-tag season-tag-closed"><span aria-hidden="true">\u{1F342}<\/span> (Closed for the season|Fermé pour la saison)/u, `${path}: the tag`);
+        assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
+        if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\./);
+      }
+      // /browse: last in its Recommended order (the first cards, then the rest from cards.json).
+      const bh = (await (await fetch(base + '/browse')).text()) + (await (await fetch(base + '/browse/cards.json')).json()).html;
+      for (const t of types) assert.ok(cardIds(bh).indexOf(closed[t]) > cardIds(bh).indexOf(open[t]) && cardIds(bh).indexOf(open[t]) >= 0, `/browse: closed ${t} after open`);
+      // Open now never lists it.
+      for (const path of ['/indoor?open=now', '/browse?open=now']) {
+        const html = await (await fetch(base + path)).text();
+        const data = JSON.parse((/<script type="application\/json" id="(?:fdVenueData|bhVenueData)">([\s\S]*?)<\/script>/.exec(html) || [])[1] || '{}');
+        for (const t of types) if (data[String(closed[t])]) assert.equal(data[String(closed[t])].h, undefined, `${path}: no hours shipped for the closed ${t}`);
+      }
+    });
+    const venues = made.map((id) => db.prepare('SELECT * FROM venues WHERE id = ?').get(id));
+    const info = app.foodDrinkOpenNowInfo(venues, app.getAdvisoryNotes(), new Date(), { requireVerified: false });
+    for (const t of types) {
+      assert.equal(info.byId.get(closed[t]).eligible, false, `${t}: closed for the season is never Open now`);
+      assert.equal(info.openIds.has(open[t]), true, `${t}: the open fixture is open (24/7 hours)`);
+    }
+    // /map says so and never shows it open.
+    const mapRows = app.mapPlacesData();
+    for (const t of types) {
+      const row = mapRows.find((r) => r[2] === `Seasons Everywhere closed ${t}`);
+      assert.equal(row[6], 0, `${t}: no hours on the map`);
+      assert.equal(row[13], 1, `${t}: flagged closed for the season on the map`);
+      assert.equal(mapRows.find((r) => r[2] === `Seasons Everywhere open ${t}`)[13], 0);
+    }
+    assert.match(app.renderPlacesMapPage(), /seasonClosed: '\u{1F342} Closed for the season'/u);
+    // Trip planner: a closed outdoor, golf or tour place is never a stop.
+    const facts = app.buildTripPlannerFacts();
+    for (const t of ['outdoor', 'golf', 'tour']) assert.equal(facts.find((f) => f.id === closed[t]).seasonClosedToday, true, t);
+    for (const t of types) { const f = facts.find((x) => x.id === closed[t]); if (f) assert.equal(f.seasonClosedToday, true, t); }
+    for (const text of ['golf in Kelowna', 'outdoor adventure in Kelowna for 2 days', 'tours in Kelowna', 'things to do in Kelowna 2 days']) {
+      const p = app.runTripPlan({ text });
+      // Every place the plan names: day stops, recommendations and outing stops.
+      const stopIds = [...JSON.stringify(p).matchAll(/"venue":\{"id":(\d+)/g)].map((m) => Number(m[1]));
+      for (const t of types) assert.ok(!stopIds.includes(closed[t]), `${text}: never plans the closed ${t}`);
+      if (text === 'golf in Kelowna') assert.ok(stopIds.includes(open.golf), 'the open course is recommended');
+    }
+  } finally {
+    for (const id of made) {
+      db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+    }
+  }
+});
+
+test('Seasons everywhere: the card tag reads "Open until Oct 31" (fr "Ouvert jusqu’au 31 oct."); seasonClosedLast keeps every other place in order', () => {
+  const st = app.seasonStateOn({ status: 'open_until', until_date: '2026-10-31', reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
+  assert.equal(st.text, 'Open for the season until October 31.', 'the venue page keeps the sentence');
+  assert.match(app.seasonTagHtml(st), /season-tag-open_until"><span aria-hidden="true">⏳<\/span> Open until Oct 31<\/p>/u);
+  assert.equal(app.frText('Open until Oct 31'), 'Ouvert jusqu’au 31 oct.');
+  assert.equal(app.frText('Open until Nov 1'), 'Ouvert jusqu’au 1er nov.');
+  const closedSt = app.seasonStateOn({ status: 'closed', until_date: null, reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
+  assert.match(app.seasonTagHtml(closedSt), /\u{1F342}<\/span> Closed for the season\.<\/p>/u);
+  const states = new Map([[2, { kind: 'closed' }], [4, { kind: 'open_until' }], [5, { kind: 'closed' }]]);
+  assert.deepEqual(app.seasonClosedLast([1, 2, 3, 4, 5, 6].map((id) => ({ id })), new Date(), states).map((v) => v.id), [1, 3, 4, 6, 2, 5]);
+});
+
+test('Seasons everywhere: a closed-for-season venue page folds its weekly hours away; "Hours checked" in English and French', () => {
+  seasonInsert.run({ name: 'Hours Checked Fixture Golf', type: 'golf', hours: SEASON_WEEK, slug: 'hours-checked-fixture-golf' });
+  const v = app.findVenueBySlug('kelowna', 'golf', 'hours-checked-fixture-golf');
+  const meta = { reason: 'test', batch_id: 'hours-checked' };
+  const now = new Date('2026-10-18T19:00:00Z');
+  try {
+    let en = app.renderVenuePage(v, [], [], [], { now });
+    assert.doesNotMatch(en, /<p class="venue-hours-checked"/, 'never checked: no line');
+    db.prepare("UPDATE venues SET hours_source = 'official_website', hours_checked_at = '2026-10-18' WHERE id = ?").run(v.id);
+    en = app.renderVenuePage(v, [], [], [], { now });
+    assert.match(en, /<p class="venue-hours-checked">Hours checked Oct 18, 2026<\/p>/);
+    assert.doesNotMatch(en, /<p class="venue-hours-stale"/);
+    let fr = app.renderVenuePage(v, [], [], [], { now, lang: 'fr' });
+    assert.match(fr, /<p class="venue-hours-checked">Heures vérifiées le 18 oct\. 2026<\/p>/);
+    // Older than about six months: a soft note.
+    db.prepare("UPDATE venues SET hours_checked_at = '2026-03-01' WHERE id = ?").run(v.id);
+    en = app.renderVenuePage(v, [], [], [], { now });
+    assert.match(en, /Hours checked Mar 1, 2026<\/p><p class="venue-hours-stale">Hours may have changed — check before you go\.<\/p>/);
+    fr = app.renderVenuePage(v, [], [], [], { now, lang: 'fr' });
+    assert.match(fr, /Heures vérifiées le 1er mars 2026<\/p><p class="venue-hours-stale">Les heures ont peut-être changé — vérifiez avant d’y aller\.<\/p>/);
+    // Open as usual: the plain weekly list, today marked.
+    assert.match(en, /<h2>Hours<\/h2><ul class="hours-list" data-today="\w+">.*class="is-today"/);
+    // Closed for the season: the notice box, and the usual hours folded under "Closed for the season".
+    assert.equal(app.guardedSeasonUpdate(v.id, { status: 'closed', reopens_date: '2027-04-01', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
+    en = app.renderVenuePage(v, [], [], [], { now });
+    assert.match(en, /Check before you go/);
+    assert.match(en, /Closed for the season\. Reopens April 1, 2027\./);
+    assert.match(en, /<h2>Hours<\/h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}<\/span> Closed for the season<\/p><details class="venue-hours-usual"><summary>Usual hours when open<\/summary><ul class="hours-list">/u);
+    assert.doesNotMatch(en.split('id="venueHours"')[1] || '', /is-today/, 'no day reads as today');
+    assert.doesNotMatch(en, /id="venueOpenStatus"/, 'no open status line');
+    fr = app.renderVenuePage(v, [], [], [], { now, lang: 'fr' });
+    assert.match(fr, /Fermé pour la saison<\/p><details class="venue-hours-usual"><summary>Heures habituelles en saison<\/summary>/);
+  } finally {
+    app.guardedSeasonUpdate(v.id, null, meta, SEASON_NOW);
+    db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(v.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('Seasons everywhere: /map lists untimed multi-day events as "On now" only from 10:00 to 17:00, otherwise "Running until"', () => {
+  const eventGroup = new Function(`function addDays(d, n){ var x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+    function mins(t){ if (!t) return null; var p = t.split(':'); return Number(p[0]) * 60 + Number(p[1]); }
+    ${app.MAP_EVENT_GROUP_SRC}
+    return eventGroup;`)();
+  const today = '2026-10-18';
+  const at = (h, m = 0) => h * 60 + m;
+  const exhibition = { sd: '2026-09-01', ed: '2026-11-30', st: null, et: null };
+  assert.equal(eventGroup(exhibition, today, at(2)), 'running', '2 am: not "On now"');
+  assert.equal(eventGroup(exhibition, today, at(9, 59)), 'running');
+  assert.equal(eventGroup(exhibition, today, at(10)), 'now');
+  assert.equal(eventGroup(exhibition, today, at(16, 59)), 'now');
+  assert.equal(eventGroup(exhibition, today, at(17)), 'running');
+  assert.equal(eventGroup({ ...exhibition, ed: today }, today, at(18)), null, 'its last day is over after 17:00');
+  assert.equal(eventGroup({ ...exhibition, ed: today }, today, at(12)), 'now');
+  // Timed events keep their own times.
+  const concert = { sd: today, ed: today, st: '19:00', et: '22:00' };
+  assert.equal(eventGroup(concert, today, at(2)), 'later');
+  assert.equal(eventGroup(concert, today, at(20)), 'now');
+  assert.equal(eventGroup(concert, today, at(23)), null);
+  const nightly = { sd: '2026-10-01', ed: '2026-10-31', st: '19:00', et: '21:00' };
+  assert.equal(eventGroup(nightly, today, at(2)), 'later');
+  assert.equal(eventGroup(nightly, today, at(22)), 'tomorrow');
+  assert.equal(eventGroup({ sd: '2026-10-19', ed: '2026-10-19', st: null, et: null }, today, at(2)), 'tomorrow');
+  const page = app.renderPlacesMapPage();
+  assert.match(page, /if \(g === 'running'\) return T\.runningUntil \+ ' ' \+ dayText\(e\.ed\);/);
+  assert.match(page, /running: 'Exhibitions & multi-day events', runningUntil: 'Running until'/);
+  assert.match(page, /var order = \{ now: 0, later: 1, running: 2, tomorrow: 3, week: 4 \};/);
+});
+
+test('Seasons everywhere: Recommended food lists are open now, then everything else, then closed for the season', () => {
+  const ins = db.prepare(`INSERT INTO venues (name, region, type, description, hours, slug, rating, reviews) VALUES (@name, 'kelowna', 'restaurant', 'An open-first fixture.', @hours, @slug, @rating, @reviews)`);
+  const day = JSON.stringify({ mon: [['11:00', '21:00']], tue: [['11:00', '21:00']], wed: [['11:00', '21:00']], thu: [['11:00', '21:00']], fri: [['11:00', '21:00']], sat: [['11:00', '21:00']], sun: [['11:00', '21:00']] });
+  const noSunday = JSON.stringify({ mon: [['11:00', '21:00']], tue: [['11:00', '21:00']], wed: [['11:00', '21:00']], thu: [['11:00', '21:00']], fri: [['11:00', '21:00']], sat: [['11:00', '21:00']], sun: [] });
+  // Open from 8 pm to 3 am every night.
+  const late = JSON.stringify({ mon: [['20:00', '27:00']], tue: [['20:00', '27:00']], wed: [['20:00', '27:00']], thu: [['20:00', '27:00']], fri: [['20:00', '27:00']], sat: [['20:00', '27:00']], sun: [['20:00', '27:00']] });
+  const rows = [
+    ['Open First A Season', day, 5, 900], ['Open First B Day', day, 4.9, 900], ['Open First C Shut', noSunday, 4.8, 900],
+    ['Open First D None', null, 4.7, 900], ['Open First E Late', late, 4.6, 900], ['Open First F Day', day, 4.5, 900], ['Open First G Late', late, 4.4, 900],
+  ];
+  const ids = rows.map(([name, hours, rating, reviews]) => Number(ins.run({ name, hours, slug: app.slugify(name), rating, reviews }).lastInsertRowid));
+  const meta = { reason: 'test', batch_id: 'open-first' };
+  try {
+    assert.equal(app.guardedSeasonUpdate(ids[0], { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
+    const venues = ids.map((id) => db.prepare('SELECT * FROM venues WHERE id = ?').get(id));
+    // Sunday 2026-10-18, 1:48 am in the Okanagan: only the late-night places are open; the day places read
+    // "Closed · Opens 11 AM" and rank after them.
+    const night = new Date('2026-10-18T08:48:00Z');
+    assert.deepEqual(app.sortFoodDrinkVenues(venues, 'recommended', night).map((v) => v.name),
+      ['Open First E Late', 'Open First G Late', 'Open First B Day', 'Open First C Shut', 'Open First D None', 'Open First F Day', 'Open First A Season']);
+    // Sunday 1 pm: the day places are open; closed today, no hours and the late places follow in rank order.
+    const noon = new Date('2026-10-18T20:00:00Z');
+    assert.deepEqual(app.sortFoodDrinkVenues(venues, 'recommended', noon).map((v) => v.name),
+      ['Open First B Day', 'Open First F Day', 'Open First C Shut', 'Open First D None', 'Open First E Late', 'Open First G Late', 'Open First A Season']);
+    assert.deepEqual(app.sortFoodDrinkVenues(venues, 'az', night).map((v) => v.name), rows.map((r) => r[0]), 'A-Z is untouched');
+  } finally {
+    app.guardedSeasonUpdate(ids[0], null, meta, SEASON_NOW);
+    for (const id of ids) { db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id); db.prepare('DELETE FROM venues WHERE id = ?').run(id); }
+  }
+});
+
 // Build My Trip ski trips (2026-10-18): "ski Big White 3 days in January" never included the resort, because a
 // resort closed for the season today was left out of every plan. It is now planned on every ski day, with lunch and
 // dinner at the hill, and the season row's reopening date is named when the trip is before it.

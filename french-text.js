@@ -983,6 +983,8 @@ const FR_PATTERNS = [
   [new RegExp(`^Closed for the season\\. Reopens ${SEASON_DATE}\\.$`), (m) => `Fermé pour la saison. Réouverture le ${seasonDate(m, 1)}.`],
   [new RegExp(`^Open for the season until ${SEASON_DATE}\\.$`), (m) => `Ouvert pour la saison jusqu’au ${seasonDate(m, 1)}.`],
   [new RegExp(`^Reopening for the season ${SEASON_DATE}\\. Check current hours with the venue before you go\\.$`), (m) => `Réouverture pour la saison le ${seasonDate(m, 1)}. Vérifiez les heures auprès de l’établissement avant d’y aller.`],
+  // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
+  [/^Open until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
   [/^Places to start in (.+)$/, (m) => `Par où commencer à ${m[1]}`],
   [/^Read more about (.+)$/, (m) => `En savoir plus sur ${m[1]}`],
