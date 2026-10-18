@@ -38183,7 +38183,7 @@ ${renderGolfHeaderHtml()}
       <h1>${escapeHtml(venue.name)}</h1>
       <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : '<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span>'}</p>
       <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it.</p>
-      ${ownerMenuCardHtml(venue, token ? `${OWNER_LINK_PATH}${token}/menu` : `/owner/account/venue/${venue.id}/menu`).replace('<a class="op-menu-card"', '<a class="op-menu-card" id="opMenuCard"')}
+      ${ownerMenuCardHtml(venue, token ? `${OWNER_LINK_PATH}${token}/menu` : `/owner/account/venue/${venue.id}/menu`).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}
     </div>
     <nav class="op-secnav" id="opSecNav" aria-label="Parts of this page"><a href="#hours">Hours</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? 'Prices' : 'Menu'}</a>` : ''}<a href="#events">Events</a></nav>
     <div class="op-head">
