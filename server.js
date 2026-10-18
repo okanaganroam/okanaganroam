@@ -3648,7 +3648,9 @@ function resolveDiscoveryDestination(intent) {
   // Outdoor activities -> the Outdoors directory.
   if (A.length) {
     if (subset(T, ['outdoor']) && !F.length && !Q.length && hasHub('outdoor')) {
-      return { url: `/outdoors${discoveryQueryString({ regions: R, activities: A })}`, kind: 'outdoors', reason: 'activities' };
+      // Fix (2026-10-18): emit ?types=, the parameter the Outdoors filter script
+      // reads (the server still accepts the older ?activities=).
+      return { url: `/outdoors${discoveryQueryString({ regions: R, types: A })}`, kind: 'outdoors', reason: 'activities' };
     }
     return none('activity_combination');
   }
@@ -4254,6 +4256,10 @@ function smartRegionWords() {
   for (const [slug, label] of Object.entries(REGION_LABELS)) { words.push(smartFold(label), smartFold(slug.replace(/-/g, ' '))); }
   return uniqueList(words.filter(Boolean));
 }
+// Ski requests (2026-10-18) and the words that add nothing to one.
+const SMART_SKI_WORDS = ['ski', 'skiing', 'skis', 'ski hill', 'ski hills', 'ski resort', 'ski resorts', 'downhill skiing', 'ski area', 'ski areas'];
+const SMART_SKI_GENERIC = ['go', 'going', 'where', 'to', 'the', 'in', 'near', 'okanagan', 'best', 'downhill', 'hill', 'hills', 'resort', 'resorts', 'area', 'areas',
+  'faire', 'du', 'de', 'station', 'stations', 'stations de', 'ou'];
 // The words a request is about once its town, dates and any typo the
 // interpreter already corrected are taken out.
 function smartTopicWords(folded, intent, extra = []) {
@@ -4505,6 +4511,14 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
         return smartTextHas(v, re) ? 'Mentions its restaurant or dining' : false;
       }, (v) => (v.fdTypes.includes('restaurant') ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
     };
+  }
+
+  // Fix (2026-10-18): "ski" / "skiing" alone -> Ski & Snow's ski resorts, so
+  // the four resorts lead instead of every winter spot on /outdoors.
+  if (!region && smartHas(folded, SMART_SKI_WORDS) && T.every((t) => t === 'outdoor') && !F.length && !intent.cuisines.length && !intent.collections.length
+    && !smartTopicWords(folded, intent, [...SMART_SKI_WORDS, ...SMART_SKI_GENERIC]).length
+    && getSkiSnowVenues().some((v) => skiKinds(v).includes('resort'))) {
+    return { key: 'ski', url: `${SKI_SNOW_PATH}?types=resort` };
   }
 
   // A guide topic ("halloween", "cideries", "kokanee salmon"), when no
@@ -18433,7 +18447,10 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   function readUrlIntoChips(){
     try {
       var params = new URLSearchParams(window.location.search);
-      var pre = { t: (params.get('types') || '').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
+      // Fix (2026-10-18): honour the page's older single-choice parameter
+      // (?activities= on Outdoors, ?activity= on Tours) like the server does,
+      // so a pre-filtered first paint is not cleared on boot.
+      var pre = { t: (params.get('types') || ${opts.legacyTypesParam ? `params.get(${JSON.stringify(opts.legacyTypesParam)}) || ` : ''}'').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
       typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-fd-type')) !== -1 ? 'true' : 'false'); });
       featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-fd-feature')) !== -1 ? 'true' : 'false'); });
       regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
@@ -21080,7 +21097,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml(cfg.surface, true)}
-  ${renderFoodDrinkHubScriptHtml({ openNow: !!cfg.openNow, surface: cfg.surface, typeLabels, searchLabels: cfg.searchLabels || {} })}
+  ${renderFoodDrinkHubScriptHtml({ openNow: !!cfg.openNow, surface: cfg.surface, typeLabels, searchLabels: cfg.searchLabels || {}, legacyTypesParam: cfg.legacyTypesParam || null })}
   ${cfg.activityPhotos === 'swap' ? ACTIVITY_PHOTO_SWAP_SCRIPT : ''}
 </body>
 </html>`;
@@ -21234,6 +21251,7 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
         : `${venues.length} outdoor destinations across the Okanagan Valley: hiking, viewpoints, nature, cycling, winter, adventure, fishing, camping and water, from Enderby to Osoyoos.`,
     bodyClass: 'outdoors-hub-page',
     surface: 'outdoors',
+    legacyTypesParam: 'activities', // older single-choice ?activities= links
     types: live.map((a) => ({ type: a.slug, label: a.label })),
     catsFor: (v) => acts.get(v.id) || [],
     photoKeyFor: (v) => curatedPhotoKey(v, v.type === 'beach' ? 'beach' : OUTDOOR_PHOTO_SET[(acts.get(v.id) || [])[0]] || 'park'),
@@ -21315,6 +21333,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
         : `${all.length} tours and experiences in the Okanagan: wine tours, lake cruises, guided hikes, bike tours, farm visits, sleigh rides and more, booked with local operators.`,
     bodyClass: 'tours-hub-page',
     surface: 'tours',
+    legacyTypesParam: 'activity', // older single-choice ?activity= links
     types: TOUR_ACTIVITIES.map((a) => ({ type: a.slug, label: a.label })),
     catsFor: (v) => { const a = tourActivityOf(v); return a ? [a] : []; },
     photoKeyFor: (v) => { const a = tourActivityOf(v); return curatedPhotoKey(v, a ? `tour${a}` : 'tour'); },

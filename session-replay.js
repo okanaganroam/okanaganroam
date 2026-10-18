@@ -1,7 +1,7 @@
 // Disabled unless CLARITY_PROJECT_ID is explicitly supplied by the host.
 // Automatic cookieless replay: never grant cookie storage on a visitor's behalf.
 function replayClient(projectId) {
-  var w = window, d = document, key = 'roam_replay_v1', loaded = false;
+  var w = window, d = document, key = 'roam_replay_v1', loaded = false, halted = false;
   function allowed(u) {
     var p = u.pathname.replace(/^\/fr(?=\/|$)/, '') || '/';
     return u.protocol === 'https:' && u.hostname === 'okanaganroam.com' && !u.search && !u.hash &&
@@ -18,7 +18,7 @@ function replayClient(projectId) {
     if (privacy.globalPrivacyControl === true || privacy.doNotTrack === '1' || privacy.doNotTrack === 'yes' || w.doNotTrack === '1') return;
   } catch (err) { return; }
   function start() {
-    if (loaded || !allowed(w.location) || /(?:^|;\s*)roam_internal=1(?:;|$)/.test(d.cookie)) return;
+    if (loaded || halted || !allowed(w.location) || /(?:^|;\s*)roam_internal=1(?:;|$)/.test(d.cookie)) return;
     loaded = true;
     d.body.setAttribute('data-clarity-mask', 'true');
     w.clarity = w.clarity || function(){ (w.clarity.q = w.clarity.q || []).push(Array.prototype.slice.call(arguments)); };
@@ -26,32 +26,60 @@ function replayClient(projectId) {
     var s = d.createElement('script'); s.async = true; s.src = 'https://www.clarity.ms/tag/' + projectId;
     d.head.appendChild(s);
   }
-  function navigateAway(next) {
-    var sameDocument = next.hostname === w.location.hostname && next.pathname === w.location.pathname && next.search === w.location.search;
-    w.location.assign(next.href);
-    // Fragment-only navigation does not unload the recorder on its own.
-    if (sameDocument) w.location.reload();
+  // Fix (2026-10-18): same-page URL changes (filter chips, sort, ?q=, #main,
+  // #venueHours) used to force location.reload(), so every filter tap reloaded
+  // the page. The privacy rule is unchanged -- a URL with a query or fragment is
+  // never recorded -- but on the same path we now stop the recorder for the rest
+  // of this page view instead of reloading. halt() runs before the URL changes
+  // (history wrappers) or before Clarity's own listeners (popstate/hashchange).
+  function halt() {
+    if (halted) return;
+    halted = true;
+    if (!loaded) return;
+    // A running recorder stops synchronously; a queued stub would replay a
+    // later "start" from the vendor tag, so the global is replaced with a
+    // locked no-op and any queued commands are dropped. Fails closed.
+    try { if (typeof w.clarity === 'function') w.clarity('stop'); } catch (err) {}
+    var off = function(){};
+    try { Object.freeze(off); Object.defineProperty(w, 'clarity', { value: off, writable: false, configurable: false }); }
+    catch (err) { try { w.clarity = off; } catch (e) {} }
   }
+  function samePath(next) {
+    return next.protocol === w.location.protocol && next.hostname === w.location.hostname && next.pathname === w.location.pathname;
+  }
+  function navigateAway(next) { w.location.assign(next.href); }
   function boot() {
-    // Install before the vendor so private SPA destinations trigger a full
-    // navigation before their URL or rendered contents enter this document.
+    // Install before the vendor so private SPA destinations on another path
+    // trigger a full navigation before their URL or rendered contents enter
+    // this document, and same-path query/fragment changes halt the recorder
+    // before the vendor's own history hooks see the new URL.
     ['pushState', 'replaceState'].forEach(function(name){
       var original = w.history[name];
       w.history[name] = function(state, unused, destination){
-        if (loaded && destination != null) {
+        if (loaded && !halted && destination != null) {
           var next = new URL(destination, w.location.href);
-          if (!allowed(next)) { navigateAway(next); return; }
+          if (!allowed(next)) {
+            if (samePath(next)) halt();
+            else { navigateAway(next); return; }
+          }
         }
         return original.apply(this, arguments);
       };
     });
+    // Back/forward and fragment jumps change the URL without pushState.
+    ['popstate', 'hashchange'].forEach(function(type){
+      w.addEventListener(type, function(){ if (loaded && !allowed(w.location)) halt(); }, true);
+    });
     d.addEventListener('click', function(e){
-      if (!loaded || !e.target.closest || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      if (!loaded || halted || !e.target.closest || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
       var a = e.target.closest('a[href]');
       if (!a || (a.target && a.target.toLowerCase() !== '_self') || (a.hasAttribute && a.hasAttribute('download'))) return;
       var next;
       try { next = new URL(a.href, w.location.href); } catch (err) { return; }
       if (next.hostname === w.location.hostname && !allowed(next)) {
+        // Same-path links (#main, #venueHours, ?filter=) stay with the browser
+        // and page scripts; stop recording first so the new URL is never seen.
+        if (samePath(next)) { halt(); return; }
         e.preventDefault(); e.stopImmediatePropagation(); navigateAway(next);
       }
     }, true);

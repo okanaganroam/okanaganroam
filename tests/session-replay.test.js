@@ -32,12 +32,58 @@ test('cross-tab recording refusal unloads the recorder',()=>{const v=visit();v.e
 test('disabled or invalid config emits no code',()=>{for(const id of ['',undefined,'</script>'])assert.equal(render(id),'');});
 test('internal, preview, private and parameterized pages never load or prompt',()=>{for(const options of [{host:'localhost'},{cookie:'roam_internal=1'},{pathname:'/admin'},{pathname:'/trip'},{pathname:'/contact'},{pathname:'/list-your-venue'},{search:'?q=private'},{hash:'#private'}]){const v=visit({...options,choice:'granted'});assert.equal(v.scripts.length,0,JSON.stringify(options));assert.equal(v.elements.length,0);}});
 test('storage failure fails closed',()=>{const v=visit({storageError:true});assert.equal(v.scripts.length,0);assert.equal(v.elements.length,0);});
-test('unsafe history change navigates without exposing query to running recorder',()=>{const v=visit({choice:'granted'});v.window.history.pushState({},'', '/outdoors?q=private');assert.equal(v.location.assigned,'https://okanaganroam.com/outdoors?q=private');assert.equal(v.location.search,'');});
+test('unsafe history change on another path navigates without exposing query to running recorder',()=>{const v=visit({choice:'granted'});v.window.history.pushState({},'', '/trip?token=private');assert.equal(v.location.assigned,'https://okanaganroam.com/trip?token=private');assert.equal(v.location.search,'');});
 test('denied visits retain normal SPA navigation',()=>{const v=visit({choice:'denied'});v.window.history.pushState({},'', '/outdoors?types=hiking');assert.equal(v.location.assigned,undefined);});
 test('private referrer query prevents vendor requests',()=>{const v=visit({choice:'granted',referrer:'https://okanaganroam.com/search?q=private'});assert.equal(v.scripts.length,0);assert.equal(v.elements.length,0);});
 test('private link navigation unloads before click capture',()=>{const v=visit({choice:'granted'});let prevented=false,stopped=false;v.events.click({target:{closest:()=>({href:'https://okanaganroam.com/trip?token=private'})},preventDefault(){prevented=true;},stopImmediatePropagation(){stopped=true;}});assert.equal(prevented,true);assert.equal(stopped,true);assert.equal(v.location.assigned,'https://okanaganroam.com/trip?token=private');});
 test('external business links retain their native navigation behavior',()=>{const v=visit({choice:'granted'});let prevented=false;v.events.click({target:{closest:()=>({href:'https://example.com/menu'})},preventDefault(){prevented=true;},stopImmediatePropagation(){}});assert.equal(prevented,false);assert.equal(v.location.assigned,undefined);});
-test('fragment-only destinations force document reload rather than leaving recorder active',()=>{const v=visit({choice:'granted'});v.window.history.pushState({},'', '/outdoors#private');assert.equal(v.location.reloaded,true);assert.equal(v.location.assigned,'https://okanaganroam.com/outdoors#private');});
+// Fix (2026-10-18): same-page query/fragment changes stop the recorder instead of reloading.
+function calls(v){return (v.window.clarity&&v.window.clarity.q)||[];}
+test('same-path query via pushState stops recording without reloading',()=>{
+  for (const name of ['pushState','replaceState']) {
+    const v=visit();let passed=null;const orig=v.window.history[name];
+    // Simulate the vendor having installed: the real global runs commands immediately.
+    const run=[];v.window.clarity=function(){run.push([...arguments]);};
+    v.window.history[name]({},'', '/outdoors?types=hiking');
+    assert.equal(v.location.reloaded,undefined,name);assert.equal(v.location.assigned,undefined,name);
+    assert.deepEqual(run,[['stop']],name);
+    // The global is locked to a no-op so a later vendor "start" cannot resume recording.
+    v.window.clarity('start');assert.equal(run.length,1,name);
+    try{v.window.clarity=function(){run.push('resumed');};}catch(e){}
+    v.window.clarity('start');assert.equal(run.length,1,name);
+  }
+});
+test('same-path query before the vendor loads drops the queued start',()=>{
+  const v=visit();assert.ok(calls(v).length>0);
+  v.window.history.pushState({},'', '/outdoors?q=private');
+  assert.equal(v.location.reloaded,undefined);assert.equal(v.location.assigned,undefined);
+  assert.equal(v.window.clarity.q,undefined);
+  // The vendor tag's own stub cannot re-create a queue on the locked global.
+  const c=v.window.clarity;c.q=[['start']];assert.equal(c.q,undefined);
+});
+test('hash-only link clicks stay with the browser and stop the recorder',()=>{
+  for (const href of ['https://okanaganroam.com/outdoors#main','https://okanaganroam.com/outdoors#venueHours','https://okanaganroam.com/outdoors?activities=winter']) {
+    const v=visit();let prevented=false,stopped=false;
+    v.events.click({target:{closest:()=>({href})},preventDefault(){prevented=true;},stopImmediatePropagation(){stopped=true;}});
+    assert.equal(prevented,false,href);assert.equal(stopped,false,href);
+    assert.equal(v.location.assigned,undefined,href);assert.equal(v.location.reloaded,undefined,href);
+    assert.equal(typeof v.window.clarity,'function');assert.equal(v.window.clarity.q,undefined,href);
+  }
+});
+test('fragment and back/forward changes halt via hashchange/popstate without reloading',()=>{
+  for (const type of ['hashchange','popstate']) {
+    const v=visit();v.location.hash='#top';v.location.href+='#top';
+    v.events[type]({});
+    assert.equal(v.location.reloaded,undefined);assert.equal(v.window.clarity.q,undefined,type);
+  }
+  const v=visit();v.events.popstate({});assert.ok(calls(v).length>0,'clean URL keeps recording');
+});
+test('after a halt, later navigation is ordinary and never reloads',()=>{
+  const v=visit();v.window.history.pushState({},'', '/outdoors#main');
+  v.window.history.pushState({},'', '/trip?token=x');assert.equal(v.location.assigned,undefined);
+  v.events.click({target:{closest:()=>({href:'https://okanaganroam.com/trip?token=x'})},preventDefault(){throw Error('should not intercept');},stopImmediatePropagation(){}});
+});
+test('allowed same-path changes keep recording',()=>{const v=visit();v.window.history.pushState({},'', '/outdoors/hiking');assert.equal(v.location.assigned,undefined);assert.ok(calls(v).length>0);});
 test('private links keep new-tab, modified-click and download behavior',()=>{
   for (const extra of [{ctrlKey:true},{metaKey:true},{shiftKey:true},{altKey:true},{button:1},{link:{target:'_blank'}},{link:{hasAttribute:k=>k==='download'}}]) {
     const v=visit({choice:'granted'});let prevented=false;
