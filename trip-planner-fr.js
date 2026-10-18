@@ -28,7 +28,9 @@ const STRONG = new Set(('musee musees evasion guidee guidees visites atelier ate
   + 'resto restos bouffe manger dejeuner deux trois quatre cinq huit dix planifie planifiez planifier organisez '
   + 'suggere suggerez recommande recommandez proposez vignes cave caves vinerie vineries distillerie '
   + 'nager peche plein exterieur interieur matin soir midi nuits beaucoup quelques sans pas une vue parcs joyaux favoris locaux '
-  + 'chers cheres filles gars amis anniversaire musique planche pagaie voiture voitures auto pied conduite').split(' '));
+  + 'chers cheres filles gars amis anniversaire musique planche pagaie voiture voitures auto pied conduite '
+  // 2026-10-18: "un week-end vinicole", "où les chiens sont acceptés" (ouu is the tokenizer's où).
+  + 'vinicole vinicoles viticole viticoles oenologique acceptes admis bienvenus ouu').split(' '));
 // Common French function words: two different ones are needed.
 const WEAK = new Set(('le la les l des du de d un une et ou au aux en dans sur chez pour mon ma mes nos notre votre vos est sont '
   + 'que qui ce cette ces il y').split(' '));
@@ -51,6 +53,19 @@ const PHRASES = [
   ['obligatoirement', 'must'], ['obligatoire', 'must'], ['seulement', 'only'], ['idealement', 'ideally'],
   ['repas vegetariens', 'vegetarian meals'], ['repas vegetariens seulement', 'only vegetarian meals'],
   ['jour 1', 'day 1'], ['jour 2', 'day 2'], ['jour 3', 'day 3'], ['jour 4', 'day 4'],
+
+  // 2026-10-18: wine, dogs, "par jour" and "où" from the site review's French requests.
+  ['week end vinicole', 'wine weekend'], ['weekend vinicole', 'wine weekend'], ['fin de semaine vinicole', 'wine weekend'],
+  ['sejour vinicole', 'wine trip'], ['voyage vinicole', 'wine trip'], ['escapade vinicole', 'wine getaway'], ['circuit vinicole', 'wine tour'],
+  ['region vinicole', 'wine country'], ['vinicole', 'wine'], ['vinicoles', 'wine'], ['viticole', 'wine'], ['viticoles', 'wine'], ['oenologique', 'wine'],
+  ['week end de ski', 'ski weekend'], ['fin de semaine de ski', 'ski weekend'], ['sejour de ski', 'ski trip'], ['voyage de ski', 'ski trip'],
+  ['pendant', 'for'], ['durant', 'for'], ['par jour', 'a day'], ['chaque jour', 'each day'], ['par journee', 'a day'],
+  ['les chiens sont acceptes', 'dogs allowed'], ['chiens sont acceptes', 'dogs allowed'], ['les chiens sont admis', 'dogs allowed'], ['chiens sont admis', 'dogs allowed'],
+  ['les chiens sont les bienvenus', 'dogs welcome'], ['chiens sont les bienvenus', 'dogs welcome'], ['les chiens sont bienvenus', 'dogs welcome'], ['chiens sont bienvenus', 'dogs welcome'],
+  ['chiens acceptes', 'dogs allowed'], ['chiens admis', 'dogs allowed'], ['chiens bienvenus', 'dogs welcome'], ['chiens permis', 'dogs allowed'],
+  ['acceptes', 'allowed'], ['admis', 'allowed'], ['bienvenus', 'welcome'], ['bienvenue', 'welcome'],
+  ['ouu manger', 'places to eat'], ['ouu aller', 'places to go'], ['ouu vont les gens du coin', 'where locals go'], ['ouu vont les locaux', 'where locals go'], ['ouu', ''],
+  ['jours de pluie', 'rainy days'], ['un jour de pluie', 'a rainy day'], ['pas cher', 'cheap'], ['abordable', 'affordable'],
 
   // length
   ['longue fin de semaine', 'long weekend'], ['fin de semaine prolongee', 'long weekend'], ['long week end', 'long weekend'],
@@ -263,6 +278,8 @@ const REGION_FRENCH = { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'we
 function tokenize(text) {
   return String(text)
     .slice(0, di.DISCOVERY_MAX_TEXT_LENGTH)
+    // 2026-10-18: "où" (where) is not "ou" (or): "terrasse où les chiens sont acceptés" lost its meaning.
+    .normalize('NFC').replace(/(^|[^a-zà-ÿ])où(?![a-zà-ÿ])/gi, '$1 ouu ')
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
