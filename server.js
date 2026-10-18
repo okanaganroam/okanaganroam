@@ -8888,6 +8888,10 @@ function renderCanonicalFooterStyles() {
   .home-footer-legal { font-family: 'Nunito', sans-serif; font-size: 0.84rem; text-align: center; margin: 0 0 8px; color: rgba(245,243,237,0.55); }
   .home-footer-legal a, .home-footer-legal .home-footer-link-btn { color: rgba(245,243,237,0.78); text-decoration: none; font-size: 0.84rem; }
   .home-footer-legal a:hover, .home-footer-legal .home-footer-link-btn:hover { color: var(--ref-gold); }
+  /* Fix (2026-10-18): body.golf-page a (navy) out-ranks the rule above on list
+     pages, so Privacy and Terms vanished into the navy footer. */
+  .home-footer .home-footer-legal a { color: rgba(245,243,237,0.78); }
+  .home-footer .home-footer-legal a:hover { color: var(--ref-gold); }
   .home-footer-fold > summary { list-style: none; cursor: default; pointer-events: none; }
   .home-footer-fold > summary::-webkit-details-marker { display: none; }
   .home-footer-all-regions { margin: 14px 0 0; }
@@ -29590,7 +29594,8 @@ ${renderGolfHeaderHtml()}
     shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) days[r] = sharedDays[i]; });
     save(); store(DAYS, days);
     viewing = 'mine';
-    history.replaceState(null, '', /^\/fr(\/|$)/.test(location.pathname) ? '/fr/my-trip' : '/my-trip');
+    // Fix (2026-10-18): no regex here; this sits in a template string, which ate the backslashes.
+    history.replaceState(null, '', (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip');
     status(T.saved);
     track('shared_trip_save', { stop_count: trip.length });
     render();
