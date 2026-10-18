@@ -10253,11 +10253,12 @@ test('app.js cache busting: every page loads app.js by its content hash; a chang
         for (const t of tags) assert.equal(t, tag, `${p}: the current version`);
       }
       assert.match(await (await fetch(base + '/trip')).text(), /id="tripV3"/, 'V3 /trip carries it too');
-      // The static route ignores the query: same file, same headers as before.
+      // Same file either way; the versioned URL is cached for a year as
+      // immutable (Lighter pages, 2026-10-18), the plain one for an hour.
       for (const u of [app.APP_JS_SRC, '/scripts/app.js']) {
         const r = await fetch(base + u);
         assert.equal(r.status, 200, u);
-        assert.equal(r.headers.get('cache-control'), 'public, max-age=3600', u);
+        assert.equal(r.headers.get('cache-control'), u === app.APP_JS_SRC ? 'public, max-age=31536000, immutable' : 'public, max-age=3600', u);
         assert.equal(await r.text(), file.toString('utf8'), u);
       }
     });
@@ -10580,8 +10581,9 @@ test('Phase 3: the planner flag is off by default and /trip is unchanged without
   assert.match(legacy, /id="tripConvHero"/, 'the original conversational hero');
   assert.doesNotMatch(legacy, /tripPlanForm|trip-plan-summary/);
   const page = await (await fetch(`${base}/trip`)).text();
-  // French twins (2026-10-14): only the EN / FR switch and hreflang are added on the way out.
-  assert.equal(page, app.tidySeoHead(app.englishTwinHtml(legacy, '/trip')), 'GET /trip serves the unchanged page');
+  // French twins (2026-10-14): only the EN / FR switch and hreflang are added on the way out
+  // (and the shared CSS is linked, 2026-10-18).
+  assert.equal(page, app.withSharedStylesheets(app.tidySeoHead(app.englishTwinHtml(legacy, '/trip'))), 'GET /trip serves the unchanged page');
   const api = await fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Plan 3 days in Kelowna' }) });
   assert.equal(api.status, 404, 'the route does not exist when the flag is off');
 })));
@@ -11750,7 +11752,7 @@ const lyvSubmissionCount = () => db.prepare('SELECT COUNT(*) AS n FROM venue_sub
 test('List Your Venue: the page renders the form with the canonical types, regions and features in the site shell', () => withDiscoveryServer(async (base) => {
   const res = await fetch(`${base}/list-your-venue`);
   assert.equal(res.status, 200);
-  const html = await res.text();
+  const html = app.inlineSharedStylesheets(await res.text());
   assert.match(html, /<h1>List Your Venue on Okanagan Roam<\/h1>/);
   assert.match(html, /reviewed by a person before anything appears/);
   assert.match(html, /<header id="top">/, 'approved site header');
@@ -14959,7 +14961,7 @@ const stripScript = (html) => html.replace(/^\s*<script>|<\/script>\s*$/g, '');
 const SPECS = [{ overflow: true }, { overflow: false }, { overflow: true }, { noDesc: true }, { overflow: false }, { overflow: true, hidden: true }];
 const RESULT = [false, true, false, true, true]; // Read more shown only where the clamped text overflows (first five cards)
 const hiddenStates = (h) => h.cards.map((c) => c.btn.hidden);
-const whatsOnReadMore = () => { const s = app.renderWhatsOnFilterScriptHtml({}); return s.slice(s.indexOf("  var MORE = 'Read more"), s.lastIndexOf('})();')); };
+const whatsOnReadMore = () => { const s = app.renderWhatsOnFilterScriptHtml({}); return s.slice(s.indexOf("  var MORE = 'Read more"), s.lastIndexOf('\n});')); };
 
 for (const type of ['fd', 'winery', 'outdoor', 'dog']) {
   test(`Read more (${type}): clamped at load, measured near the viewport first, the rest in background slices, each once; buttons and events as before`, () => {
@@ -16047,7 +16049,7 @@ test('Browse hub: cards are discovery cards -- badges, Favorite and Add to Trip,
 
 test('Browse hub: the whole card opens the venue page through one title link (no wrapping anchor, no nested interactive markup, no new script)', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
   const f = seedBrowseFixture();
-  const html = await (await fetch(`${base}/browse`)).text();
+  const html = app.inlineSharedStylesheets(await (await fetch(`${base}/browse`)).text());
   const cards = html.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
   for (const c of cards) {
     assert.equal((c.match(/<a\b/g) || []).filter(Boolean).length >= 1, true);
@@ -17217,7 +17219,8 @@ async function withWinterServer(fn) {
     await new Promise((resolve) => srv.close(resolve));
   }
 }
-const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); return { status: r.status, text: await r.text() }; };
+// Lighter pages (2026-10-18): shared CSS is linked, not inline; read it back in place.
+const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); return { status: r.status, text: app.inlineSharedStylesheets(await r.text()) }; };
 const winterMood = (iso) => app.renderMoodCardsHTML({ now: new Date(`${iso}T19:00:00Z`) });
 const moodKeys = (html) => Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
 
@@ -23260,7 +23263,7 @@ test('Photo sizes: cards and thumbnails use the 480px copy, the venue photo load
     assert.match(hero, /fetchpriority="high"/);
     assert.doesNotMatch(hero, /loading="lazy"/);
     assert.match(hero, /srcset="[^"]*-w960\.jpg\?v=t1 960w, [^"]*\.jpg\?v=t1 \d+w"/);
-    const list = await fetch(`${base}/kelowna/restaurants`).then((r) => r.text());
+    const list = app.inlineSharedStylesheets(await fetch(`${base}/kelowna/restaurants`).then((r) => r.text()));
     const card = (list.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${v.id}"[^>]*>`)) || [''])[0];
     assert.match(card, /--fd-ph:url\((?:'|&#39;)[^'&]*-w480\.jpg\?v=t1(?:'|&#39;)\);--fd-ph-2x:url\((?:'|&#39;)[^'&]*-w960\.jpg\?v=t1(?:'|&#39;)\)/);
     assert.match(list, /min-resolution: 1\.5dppx/);
@@ -23375,6 +23378,166 @@ test('session replay stays disabled by default and reaches both page renderers w
     else process.env.CLARITY_PROJECT_ID = previous;
   }
 });
+
+// ---- Lighter pages (2026-10-18) ----
+const lpHttp = require('node:http');
+// Shared CSS as versioned cached files, a capped ItemList, and the cards and
+// events after the first page loaded after the page appears.
+test('Lighter pages: shared page CSS is a versioned, year-cached file in the same place as the inline block was', async () => {
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const p of ['/food-drink', '/fr/food-drink', '/kelowna']) {
+      const html = await (await fetch(base + p)).text();
+      const seo = app.sharedStyles().get('seo-page');
+      assert.ok(seo, 'SEO_PAGE_CSS is registered');
+      assert.ok(!html.includes(seo.block), `${p}: the big inline block is gone`);
+      assert.ok(html.includes(`<link rel="stylesheet" href="${seo.href}">`), `${p}: linked by content hash`);
+      assert.ok(html.indexOf(seo.href) < html.indexOf('</head>'), `${p}: in the head`);
+      assert.match(html, /<link rel="stylesheet" href="\/styles\/tokens\.css\?v=[0-9a-f]{12}">/, `${p}: tokens.css is versioned`);
+    }
+    const fd = await (await fetch(base + '/food-drink')).text();
+    const order = ['seo-page', 'golf-theme', 'outdoor-theme', 'food-drink'].map((n) => fd.indexOf(app.sharedStyles().get(n).href));
+    assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), 'the cascade order is unchanged');
+    // The same transformation as a pure function: the rendered page minus the swap is the old page.
+    const raw = app.renderFoodDrinkHubPage(app.getFoodDrinkHubVenues(), { types: [], features: [], regions: [] });
+    if (raw.includes('<style>')) {
+      let back = app.withSharedStylesheets(raw);
+      for (const s of app.sharedStyles().values()) back = back.split(`<link rel="stylesheet" href="${s.href}">`).join(s.block);
+      back = back.replace(/(\/styles\/(?:tokens|app)\.css)\?v=[0-9a-f]{12}/g, '$1');
+      assert.equal(back, raw, 'nothing but the style blocks and CSS URLs changes');
+    }
+    for (const s of app.sharedStyles().values()) {
+      const r = await fetch(base + s.href);
+      assert.equal(r.status, 200, s.name);
+      assert.match(r.headers.get('content-type'), /text\/css/);
+      assert.equal(r.headers.get('cache-control'), 'public, max-age=31536000, immutable', s.name);
+      assert.equal(await r.text(), s.css, `${s.name} serves exactly the inline text`);
+    }
+    const stale = await fetch(`${base}/styles/shared/seo-page.css?v=000000000000`);
+    assert.equal(stale.status, 200, 'an old hash never 404s');
+    assert.equal(stale.headers.get('cache-control'), 'public, max-age=300');
+    const tokensHref = fd.match(/\/styles\/tokens\.css\?v=[0-9a-f]{12}/)[0];
+    assert.equal((await fetch(base + tokensHref)).headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    assert.equal((await fetch(base + '/styles/tokens.css')).headers.get('cache-control'), 'public, max-age=3600', 'unversioned stays short');
+    assert.equal((await fetch(base + '/styles/tokens.css?v=nothash')).headers.get('cache-control'), 'public, max-age=3600');
+  } finally {
+    srv.close();
+  }
+});
+
+test('Lighter pages: a long ItemList schema names the first 50 places and keeps the full count', () => {
+  const list = (n) => ({ '@context': 'https://schema.org', '@type': 'ItemList', name: 'x', itemListElement: Array.from({ length: n }, (_, i) => ({ '@type': 'ListItem', position: i + 1, url: `https://okanaganroam.com/p${i}`, name: `P${i}` })) });
+  const capped = app.capItemListSchema(list(120));
+  assert.equal(capped.itemListElement.length, app.ITEM_LIST_SCHEMA_CAP);
+  assert.equal(capped.numberOfItems, 120);
+  assert.deepEqual(capped.itemListElement.map((x) => x.position), Array.from({ length: 50 }, (_, i) => i + 1), 'page order kept');
+  const short = list(12);
+  assert.equal(app.capItemListSchema(short), short, 'a short list is unchanged');
+  const crumbs = { '@type': 'BreadcrumbList', itemListElement: list(80).itemListElement };
+  assert.equal(app.capItemListSchema(crumbs), crumbs, 'only ItemList blocks are capped');
+});
+
+test('Lighter pages: /food-drink loads its waiting cards from /cards/rest/, the same cards in English and French', async () => {
+  // Enough places that most of them wait for "Show more".
+  const made = [];
+  for (let i = 0; i < 90; i++) made.push(app.createVenue({ name: `LP Kitchen ${i}`, region: ['kelowna', 'penticton', 'vernon'][i % 3], type: i % 5 ? 'restaurant' : 'pub', description: `A lighter-pages fixture kitchen number ${i}.`, slug: `lp-kitchen-${i}` }).id);
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const p of ['/food-drink', '/fr/food-drink', '/restaurants?types=pub']) {
+      const html = await (await fetch(base + p)).text();
+      const m = html.match(/<template id="fdRest" data-rest="([0-9a-f]{12})"><\/template>/);
+      assert.ok(m, `${p}: the template ships empty with its hash ${(html.match(/<template id="fdRest"[^>]*>[\s\S]{0,80}/) || [])[0]}`);
+      const ids = (s) => [...s.matchAll(/<li class="venue-card"[^>]*data-venue-id="(\d+)"/g)].map((x) => x[1]);
+      const first = ids(html.slice(html.indexOf('id="fdResults"'), html.indexOf('id="fdRest"')));
+      const hit = await fetch(`${base}/cards/rest/${m[1]}.html?u=${encodeURIComponent(p)}`);
+      assert.equal(hit.status, 200);
+      assert.equal(hit.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      const rest = await hit.text();
+      // After a restart (or on another instance) the hash is unknown: the page is rendered again from ?u=.
+      const miss = await fetch(`${base}/cards/rest/ffffffffffff.html?u=${encodeURIComponent(p)}`);
+      assert.equal(miss.status, 200);
+      assert.equal(miss.headers.get('cache-control'), 'no-store');
+      assert.equal(await miss.text(), rest, `${p}: a re-render gives the same cards`);
+      const dataIds = Object.keys(JSON.parse(html.match(/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/)[1]));
+      assert.deepEqual([...first, ...ids(rest)].sort(), dataIds.sort(), `${p}: the page plus the waiting cards are every place`);
+      if (p.startsWith('/fr/')) assert.ok(rest.includes('Voir les détails') && !rest.includes('View details'), 'French cards for the French page');
+      assert.match(html, /fetch\('\/cards\/rest\/' \+ restHash/, 'the page script loads them');
+    }
+    assert.equal((await fetch(`${base}/cards/rest/ffffffffffff.html?u=${encodeURIComponent('/admin/review')}`)).status, 404, 'no admin pages');
+    assert.equal((await fetch(`${base}/cards/rest/ffffffffffff.html?u=${encodeURIComponent('//example.com/')}`)).status, 404);
+    assert.equal((await fetch(`${base}/cards/rest/ffffffffffff.html?u=${encodeURIComponent('/kelowna')}`)).status, 404, 'a page without waiting cards');
+  } finally {
+    srv.close();
+    for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test("Lighter pages: What's On ships its first page of events and every other item waits with its place in the list", async () => {
+  const made = [];
+  const regions = ['kelowna', 'penticton', 'vernon', 'oliver'];
+  const cats = ['live-music', 'markets-fairs', 'arts-culture', 'family-kids'];
+  const today = new Date();
+  const pad = (x) => String(x).padStart(2, '0');
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (let i = 0; i < 130; i++) {
+      const d = new Date(today.getTime() + (i % 20) * 86400000);
+      const data = { name: `LP Fixture ${i} ${cats[i % 4]}`, region: regions[i % 4], description: 'A lighter-pages fixture event.', venue_name_text: `LP Hall ${i}`,
+        source_type: 'official_venue', source_name: 'LP', source_url: `https://example.com/lp-${i}`, categories: [cats[i % 4]],
+        occurrences: [{ start_date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, start_time: '19:00', end_time: '21:00' }] };
+      let r = app.createEvent(data, { reason: 'lighter pages fixture', batch_id: 'test-lp' });
+      if (r && r.reason === 'possible_duplicate') r = app.createEvent(data, { reason: 'lighter pages fixture', batch_id: 'test-lp', reviewed_duplicates: r.detail.map((x) => x.event_id) });
+      assert.ok(r && r.ok !== false, JSON.stringify(r));
+    }
+    made.push(...db.prepare("SELECT id FROM events WHERE name LIKE 'LP Fixture %'").all().map((x) => x.id));
+    for (const [p, filter] of [['/whats-on', null], ['/whats-on?categories=live-music', { regions: [], categories: ['live-music'] }]]) {
+      const page = app.renderWhatsOnPage(filter);
+      const list = page.slice(page.indexOf('id="whatsOnResults"'), page.indexOf('</ul>', page.indexOf('id="whatsOnResults"')));
+      const tpl = (page.match(/<template id="whatsOnRest">([\s\S]*?)<\/template>/) || [])[1];
+      assert.ok(tpl, `${p}: later events wait in the template`);
+      const items = (s) => [...s.matchAll(/<li class="(whatson-group-head|venue-card whatson-event-card)"([^>]*?)(?: data-wo-at="(\d+)")?>/g)].map((x) => ({ at: x[3] == null ? null : Number(x[3]), head: x[1] === 'whatson-group-head', hidden: /^\s*hidden/.test(x[2]), key: (x[2].match(/data-(?:venue-id|group)="([^"]+)"/) || [])[1] }));
+      const first = items(list), rest = items(tpl);
+      const shownFirst = first.filter((x) => !x.head);
+      assert.ok(shownFirst.every((x) => !x.hidden), `${p}: only shown events in the HTML`);
+      const shownAll = (page.match(/<li class="venue-card whatson-event-card" data-venue-id/g) || []).length;
+      assert.equal(shownFirst.length, Math.min(app.WHATSON_PAGE_SIZE, shownAll), `${p}: one page of them`);
+      assert.ok(rest.every((x) => x.at !== null && x.at >= 0 && x.at <= first.length), `${p}: every waiting item knows its place`);
+      // Put the list back together the way the page does and check it is whole and in date-group order.
+      const merged = [];
+      let r = 0;
+      for (let k = 0; k <= first.length; k++) {
+        while (r < rest.length && rest[r].at === k) merged.push(rest[r++]);
+        if (k < first.length) merged.push(first[k]);
+      }
+      assert.equal(merged.length, first.length + rest.length);
+      const heads = merged.filter((x) => x.head).map((x) => x.key);
+      assert.equal(new Set(heads).size, heads.length, `${p}: each heading once`);
+      let group = null;
+      for (const x of merged) { if (x.head) group = x.key; else assert.ok(group, 'every event sits under a heading'); }
+      const cardGroups = merged.filter((x) => !x.head);
+      const allCards = (page.match(/data-surface="whatson_card" data-group="/g) || []).length;
+      assert.equal(cardGroups.length, allCards, `${p}: no event lost`);
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /<template id="whatsOnRest" data-rest="[0-9a-f]{12}"><\/template>/, `${p}: the response ships it empty`);
+      assert.match(html, /\(window\.__whatsOnReady \|\| function\(fn\)\{ fn\(\); \}\)\(function\(\)\{\n  var LABELS/, 'the filter script waits for them');
+    }
+  } finally {
+    srv.close();
+    for (const id of made) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
+});
+
 
 // ---- Accessibility: skip link, main landmark, menu keyboard (2026-10-18) ----
 test('Accessibility: shared header has a skip link, a labelled main menu and real <button> dropdown triggers', () => {
