@@ -4216,6 +4216,12 @@ function smartStrip(folded, phrases) {
   return s.trim().split(' ').filter(Boolean);
 }
 const SMART_BREAKFAST_WORDS = ['breakfast', 'breakfasts', 'brunch', 'brunches', 'eggs benny', 'pancakes', 'petit dejeuner', 'petits dejeuners', 'dejeuner', 'dejeuners'];
+// Search gaps (2026-10-18): a wine tour is a wine word with a tour word ("wine tour", "winery tours", and the
+// French planner's "tour some vineyards" / "circuit some wines").
+const SMART_WINE_WORDS = ['wine', 'wines', 'winery', 'wineries', 'vineyard', 'vineyards', 'wine tasting', 'wine tastings', 'vin', 'vins', 'vignoble', 'vignobles', 'degustation', 'degustations'];
+const SMART_TOUR_WORDS = ['tour', 'tours', 'touring', 'circuit', 'circuits', 'tournee', 'tournees', 'excursion', 'excursions', 'shuttle', 'shuttles', 'hop on hop off'];
+// Cheap eats: places to eat.
+const SMART_BUDGET_TYPES = ['restaurant', 'cafe', 'pub'];
 const SMART_FAMILY_WORDS = ['kids', 'kid', 'children', 'child', 'family', 'families', 'toddler', 'toddlers', 'little ones', 'enfants', 'enfant', 'famille', 'familles', 'en famille'];
 const SMART_RAINY_WORDS = ['rainy day', 'rainy days', 'rainy', 'rain', 'raining', 'wet day', 'indoor', 'indoors', 'inside', 'jour de pluie', 'pluie', 'pluvieux', 'pluvieuse', 'interieur', 'interieures', 'interieurs', 'a l interieur'];
 const SMART_DATE_WORDS = ['date night', 'date nights', 'date idea', 'date ideas', 'romantic', 'romance', 'anniversary', 'anniversary dinner', 'romantique', 'en amoureux', 'soiree romantique', 'tete a tete'];
@@ -4293,7 +4299,9 @@ function smartGuideMatches(text, intent) {
     const hits = words.filter((w) => tokens.has(w)).length;
     if (!hits) continue;
     const full = hits === words.length;
-    if (!full && hits * 2 < words.length) continue;
+    // Search gaps (2026-10-18): a partial match needs two topic words, so one shared word ("tour") never offers an
+    // unrelated guide ("wine tour naramata" offered the sleigh-ride guide).
+    if (!full && (hits < 2 || hits * 2 < words.length)) continue;
     out.push({ path: g.path, heading: g.heading, full, score: hits / words.length - tokens.size / 1000 });
   }
   return out.sort((a, b) => b.score - a.score);
@@ -4388,12 +4396,15 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
       heading: `Breakfast & brunch${town ? ` in ${town}` : ''}`,
       headingFr: `Déjeuner et brunch${town ? ` à ${town}` : ''}`,
       guides,
+      // Search gaps (2026-10-18): every café counts too (a town with cafés never shows nothing), and a listed
+      // breakfast or brunch cuisine counts as saying so.
       list: () => smartPickVenues((v) => {
         if ((region && v.region !== region) || !hasT(v) || !F.every((f) => v.features[f])) return false;
-        const early = Number(v.row.open_early) === 1, said = smartTextHas(v, re);
-        if (!early && !said) return false;
-        return [early ? 'Opens early' : '', said ? 'Mentions breakfast or brunch' : ''].filter(Boolean).join(' · ');
-      }, (v) => (Number(v.row.open_early) === 1 ? 1 : 0) + (smartTextHas(v, re) ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+        const early = Number(v.row.open_early) === 1, said = smartTextHas(v, re) || re.test(v.cuisine);
+        const cafe = types.includes('cafe') && (v.type === 'cafe' || v.fdTypes.includes('cafe'));
+        if (!early && !said && !cafe) return false;
+        return [said ? 'Mentions breakfast or brunch' : '', early ? 'Opens early' : '', cafe && !said && !early ? 'Café' : ''].filter(Boolean).join(' · ');
+      }, (v) => (Number(v.row.open_early) === 1 ? 1 : 0) + (smartTextHas(v, re) || re.test(v.cuisine) ? 1.5 : 0) + foodDrinkRecommendedScore(v.row) / 10),
     };
   }
 
@@ -4402,6 +4413,52 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
     && getFoodDrinkHubVenues().length >= MIN_CATEGORY_VENUES) {
     const types = T.length ? T : ['restaurant', 'cocktail'];
     return { key: 'date_night', url: `/food-drink${discoveryQueryString({ types, features: F.filter((f) => FD_HUB_FEATURE_KEYS.has(f)), regions: R })}` };
+  }
+
+  // Search gaps (2026-10-18): a wine tour -> the town's wineries, plus the tour operators that run wine tours there
+  // ("wine tour naramata" read as Tours in Naramata found nothing).
+  if (smartHas(folded, SMART_WINE_WORDS) && smartHas(folded, SMART_TOUR_WORDS) && T.every((t) => t === 'tour' || t === 'winery') && !others) {
+    const townFold = town ? smartFold(town) : null;
+    const wineRe = /\b(wine|wines|winery|wineries|vineyards?|tastings?)\b/i;
+    const isTour = (v) => v.type === 'tour' || v.fdTypes.includes('tour');
+    const operators = smartPickVenues((v) => {
+      if (!isTour(v) || !smartTextHas(v, wineRe) || !F.every((f) => v.features[f])) return false;
+      if (region && v.region !== region && !` ${smartFold(`${v.row.name} ${v.row.description || ''}`)} `.includes(` ${townFold} `)) return false;
+      return 'Runs wine tours';
+    }, (v) => foodDrinkRecommendedScore(v.row) / 10);
+    const wineryCount = region ? (getRegionCategoryCounts(region).winery || 0) : 0;
+    if (!operators.length && !F.length) {
+      if (!region) return { key: 'wine_tour', url: '/wineries' };
+      if (wineryCount >= MIN_CATEGORY_VENUES) return { key: 'wine_tour', url: `/${region}/${CATEGORY_SLUGS.winery}` };
+    }
+    return {
+      key: 'wine_tour',
+      heading: `Wine tours${town ? ` in ${town}` : ''}`,
+      headingFr: `Tournées des vignobles${town ? ` à ${town}` : ''}`,
+      guides: [],
+      list: () => [...operators, ...(region ? smartPickVenues((v) => v.type === 'winery' && v.region === region && F.every((f) => v.features[f]) && 'Winery',
+        (v) => foodDrinkRecommendedScore(v.row) / 10) : [])],
+    };
+  }
+
+  // Search gaps (2026-10-18): cheap eats -> places to eat with a listed price, $ first, then $$ (it listed beaches).
+  if (intent.budget === 'budget' && T.every((t) => SMART_BUDGET_TYPES.includes(t)) && !others) {
+    const types = T.length ? T : SMART_BUDGET_TYPES;
+    const hasT = (v) => types.includes(v.type) || v.fdTypes.some((t) => types.includes(t));
+    const pick = () => smartPickVenues((v) => {
+      const price = Number(v.row.price);
+      if ((region && v.region !== region) || !hasT(v) || !F.every((f) => v.features[f]) || !(price === 1 || price === 2)) return false;
+      return price === 1 ? '$' : '$$';
+    }, (v) => (Number(v.row.price) === 1 ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+    if (pick().length) {
+      return {
+        key: 'budget',
+        heading: `Cheap eats${town ? ` in ${town}` : ''}`,
+        headingFr: `Bonnes adresses pas chères${town ? ` à ${town}` : ''}`,
+        guides: [],
+        list: pick,
+      };
+    }
   }
 
   // Dated events: "live music this weekend", "things to do tonight".
@@ -4458,6 +4515,28 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
     if (!d.url || d.kind === 'browse' || (d.kind === 'events' && !intent.when)) return { key: 'guide', url: guides[0].path };
   }
   return null;
+}
+// Search gaps (2026-10-18): /api/discover reports what the search box and /search do for a planned request -- the
+// page it goes to, or the plan's own list (breakfast in West Kelowna listed nothing here while /search had 14).
+// Additive: everything else in the response is as before.
+function withSmartSearchPlan(run, limit = DISCOVERY_DEFAULT_LIMIT) {
+  const plan = smartSearchPlan(run.query, run.intent);
+  if (!plan) return run;
+  run.plan = { key: plan.key, heading: plan.heading || null };
+  if (plan.url) {
+    run.destination = { url: plan.url, kind: 'page', reason: `intent_${plan.key}` };
+    return run;
+  }
+  const picked = plan.list();
+  run.destination = { url: `/search${discoveryQueryString({ q: run.query.trim() })}`, kind: 'search', reason: `intent_${plan.key}` };
+  run.results = {
+    kind: picked.length ? 'venues' : 'none', total: picked.length,
+    items: picked.slice(0, limit).map((x) => discoveryVenueItem(x.row, x.why ? x.why.split(' · ') : [])),
+    exclusions: { applied: [], notApplied: [] },
+  };
+  run.presentation = { ...run.presentation, interpreted: plan.heading || run.presentation.interpreted, status: picked.length ? 'results' : run.presentation.status,
+    notes: run.presentation.notes.filter((n) => !(plan.key === 'budget' && n.field === 'budget')) };
+  return run;
 }
 function smartIndoorCount(region, familyOnly) {
   const notes = getIndoorAlsoNotes();
@@ -4546,7 +4625,9 @@ function discoveryNoteTextFr(n, labels) {
 }
 
 // Smarter search (2026-10-18): everything the /search page shows, worked out once.
-const SEARCH_PAGE_MAX_RESULTS = 480;
+// Search gaps (2026-10-18): every match is on the page (the cards past the first 48 wait in a template and load their
+// photos lazily), so nothing is left out unexplained; past this cap the count says "Showing the top N of M".
+const SEARCH_PAGE_MAX_RESULTS = 3000;
 function searchPageModel(run, now = new Date(), lang = 'en') {
   // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
   // from (a French search goes through the planner's French words first, see discoverySearchText).
@@ -4584,10 +4665,10 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
 }
 // French words for the page's own text (the cards and filters are translated with every French page).
 const SEARCH_PAGE_TEXT = {
-  en: { title: 'Search', h1: 'Search results', searched: 'You searched', showing: 'showing', button: 'Search', label: 'Search Okanagan Roam', places: (n) => `${n} place${n === 1 ? '' : 's'}`,
+  en: { title: 'Search', h1: 'Search results', searched: 'You searched', showing: 'showing', button: 'Search', label: 'Search Okanagan Roam', places: (n) => `${n} place${n === 1 ? '' : 's'}`, topOf: (n, t) => `Showing the top ${n} of ${t} places`,
     guides: 'Our guides', didYouMean: 'Did you mean', tryThese: 'You could also try', popular: (t) => `Popular in ${t}`, browse: (q) => `Search the directory for “${q}”`,
     filter: 'Filter these results', filterPh: 'Filter by name, place or dish...', matched: 'Matched:', allGuides: 'All our guides', none: 'Nothing matched those words. Here are some places to start.' },
-  fr: { title: 'Recherche', h1: 'Résultats de recherche', searched: 'Vous avez cherché', showing: 'résultats', button: 'Chercher', label: 'Chercher sur Okanagan Roam', places: (n) => `${n} endroit${n > 1 ? 's' : ''}`,
+  fr: { title: 'Recherche', h1: 'Résultats de recherche', searched: 'Vous avez cherché', showing: 'résultats', button: 'Chercher', label: 'Chercher sur Okanagan Roam', places: (n) => `${n} endroit${n > 1 ? 's' : ''}`, topOf: (n, t) => `Voici les ${n} meilleurs des ${t} endroits`,
     guides: 'Nos guides', didYouMean: 'Vouliez-vous dire', tryThese: 'Essayez aussi', popular: (t) => `Populaire à ${t}`, browse: (q) => `Chercher « ${q} » dans le répertoire`,
     filter: 'Filtrer ces résultats', filterPh: 'Filtrer par nom, endroit ou plat...', matched: 'Correspond :', allGuides: 'Tous nos guides', none: 'Rien ne correspond à ces mots. Voici quelques idées pour commencer.' },
 };
@@ -4625,7 +4706,8 @@ function searchSummaryHtml(model, lang) {
       : `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>`;
   // Stage 3.5: a sentence is shown once. A plan's own list (2026-10-18)
   // applies its occasion and dates itself, so their notes are left off.
-  const notes = p.notes.filter((n) => !(plan && plan.list && ['occasion', 'when'].includes(n.field)))
+  // Search gaps (2026-10-18): the cheap-eats list applies the budget itself.
+  const notes = p.notes.filter((n) => !(plan && plan.list && (['occasion', 'when'].includes(n.field) || (plan.key === 'budget' && n.field === 'budget'))))
     .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
@@ -4673,7 +4755,7 @@ function renderSearchResultsHubPage(model, lang) {
     extraHead: SEARCH_PAGE_STYLES,
     leadHtml: `${searchFormHtml(q, L)}
   ${searchSummaryHtml(model, lang)}
-  <p class="search-count">${escapeHtml(L.places(total))}${total > venues.length ? ` (${venues.length})` : ''}</p>
+  <p class="search-count">${escapeHtml(total > venues.length ? L.topOf(venues.length, total) : L.places(total))}</p>
   ${searchGuidesHtml(model, lang)}`,
   }, venues, null, model.now);
 }
@@ -38349,6 +38431,14 @@ const server = http.createServer(async (req, res) => {
       // Smarter search (2026-10-18): every match (Show more), in the visitor's language. French gaps (2026-10-18): a
       // French search is read through the planner's French words ("terrasse" -> "patio"); the page shows what was typed.
       const searchText = discoverySearchText(q, res.twinLang);
+      // Search gaps (2026-10-18): a request with a page of its own ("ce week-end" -> What's On) goes there from
+      // /search too, as it does from the search box (a French one to the French page). A guide topic stays here,
+      // where the guide is offered beside any places.
+      const direct = smartSearchPlan(searchText, interpretDiscoveryText(searchText));
+      if (direct && direct.url && direct.key !== 'guide') {
+        res.writeHead(302, { Location: direct.url, 'Cache-Control': 'no-store' });
+        return res.end();
+      }
       const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS });
       run.query = q; run.searchText = searchText;
       const html = renderSearchPage(run, { lang: res.twinLang });
@@ -40115,7 +40205,7 @@ const server = http.createServer(async (req, res) => {
         }
         limit = n;
       }
-      return sendJSON(res, 200, runDiscovery(q, { limit }));
+      return sendJSON(res, 200, withSmartSearchPlan(runDiscovery(q, { limit }), limit));
     }
 
 
@@ -42116,6 +42206,9 @@ module.exports = {
   selectDiscoveryVenues,
   heroSearchTarget,
   smartSearchPlan,
+  withSmartSearchPlan,
+  discoverySearchText,
+  SEARCH_PAGE_MAX_RESULTS,
   smartFuzzyVenues,
   smartGuideMatches,
   searchPageModel,

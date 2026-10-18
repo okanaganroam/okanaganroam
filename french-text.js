@@ -99,6 +99,12 @@ const FR_TEXT = {
   'Mentions breakfast or brunch': 'Mentionne le déjeuner ou le brunch',
   'Also listed as a restaurant': 'Aussi répertorié comme restaurant',
   'Mentions its restaurant or dining': 'Mentionne son restaurant ou sa salle à manger',
+  // Search gaps (2026-10-18): the new /fr/search card notes.
+  'Runs wine tours': 'Organise des tournées des vignobles',
+  'Winery': 'Vignoble',
+  'Café': 'Café',
+  '$': '$',
+  '$$': '$$',
   'Highest rated': 'Les mieux notés',
   'Biggest first': 'Les plus grands d’abord',
   'By activity': 'Par activité',
