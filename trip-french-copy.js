@@ -92,7 +92,8 @@ function t3FrenchText(value){
  text=text.replace(/Day (\d+) has no additional matching activity available\. The optional afternoon meal was left out; dinner remains\. Consider a different activity or a shorter trip\./g,'Le jour $1 ne comporte aucune autre activité correspondante disponible. Le repas facultatif de l’après-midi a été retiré; le souper reste au programme. Envisagez une autre activité ou un voyage plus court.');
  text=text.replace(/\beasy walks?\b/gi,match=>match.toLowerCase().endsWith('s')?'promenades faciles':'promenade facile');
  text=text.replace(/^In (.+), where you asked to go$/, 'À $1, où vous souhaitez aller');
- text=text.replace(/\bRated ([\d.]+) from ([\d,]+) reviews/g,'Note de $1 selon $2 avis').replace(/\bRated ([\d.]+)/g,'Note de $1');
+ // French number style (2026-10-18): "Note de 4,7 selon 1 234 avis", as on the place pages.
+ text=text.replace(/\bRated ([\d.]+) from ([\d,]+) reviews/g,(_,r,n)=>'Note de '+r.replace('.',',')+' selon '+n.replace(/,/g,'\u00a0')+' avis').replace(/\bRated ([\d.]+)/g,(_,r)=>'Note de '+r.replace('.',','));
  text=text.replace(/; includes (\d+) minutes waiting for the scheduled slot or opening/g,'; comprend $1 minutes d’attente pour le créneau prévu ou l’ouverture');
  text=text.replace(/Placed in the (morning|afternoon|evening) slot/g,(_,p)=>'Prévu '+({morning:'le matin',afternoon:'l’après-midi',evening:'le soir'}[p]));
  text=text.replace(/No selected stop meets (.+)\./g,'Aucun arrêt choisi ne satisfait $1.');
@@ -139,6 +140,8 @@ function t3FrenchText(value){
  text=text.replace(/^In (.+), où a lieu l’événement$/, 'À $1, où a lieu l’événement');
  // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
  if(/\d{2}:\d{2}/.test(text))text=text.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d]));
+ // Hour ranges read like the place pages (2026-10-18): "07:00–17:00" -> "7 h–17 h", "10:30–22:00" -> "10 h 30–22 h".
+ if(/\b\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2}\b/.test(text))text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>Number(h)+' h'+(m==='00'?'':' '+m));
  return text;
 }
 function t3FrenchEvent(event){

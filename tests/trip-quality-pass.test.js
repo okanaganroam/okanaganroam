@@ -140,7 +140,7 @@ test('"something fun to do" lists things to do before food and drink; teens get 
 
 test('French copy for the new notes and headlines', () => {
   assert.equal(t3FrenchText('If it rains: Penticton Museum is indoors nearby, so swap it in for a beach or outdoor stop.'), 'S’il pleut : Penticton Museum est une option intérieure à proximité; remplacez une plage ou une sortie en plein air par celle-ci.');
-  assert.equal(t3FrenchText('Listed hours: 11:00–22:00 Mon–Fri; 10:00–20:00 Sun'), 'Horaires indiqués : 11:00–22:00 lun.–ven.; 10:00–20:00 dim.');
+  assert.equal(t3FrenchText('Listed hours: 11:00–22:00 Mon–Fri; 10:00–20:00 Sun'), 'Horaires indiqués : 11 h–22 h lun.–ven.; 10 h–20 h dim.');
   const fr = t3FrenchPlan({ summary: 'Dog-friendly cafes and dinner in Vernon.', itinerary: { stops: [{ venue: { name: 'Bean to Cup', regionLabel: 'Vernon' } }] } });
   assert.equal(fr.headline, 'Votre itinéraire à Vernon');
   assert.equal(t3FrenchPlan({ understood: { when: 'Sat, Oct 24 – Sun, Oct 25' }, days: [] }).understood.when, 'sam. 24 oct. – dim. 25 oct.');

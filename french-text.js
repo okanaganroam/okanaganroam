@@ -93,6 +93,12 @@ const FR_TEXT = {
   'Mixed': 'Varié',
   'By town': 'Par ville',
   'Top rated': 'Les mieux notés',
+  // Smarter search (2026-10-18): the /fr/search sort and card notes.
+  'Best match': 'Meilleure correspondance',
+  'Opens early': 'Ouvre tôt',
+  'Mentions breakfast or brunch': 'Mentionne le déjeuner ou le brunch',
+  'Also listed as a restaurant': 'Aussi répertorié comme restaurant',
+  'Mentions its restaurant or dining': 'Mentionne son restaurant ou sa salle à manger',
   'Highest rated': 'Les mieux notés',
   'Biggest first': 'Les plus grands d’abord',
   'By activity': 'Par activité',
@@ -755,9 +761,10 @@ const FR_TEXT = {
   'Find what’s open near you in the Okanagan: {0} restaurants, wineries, beaches, trails and more on one map, with directions and what’s on this week.': 'Trouvez ce qui est ouvert près de vous dans l’Okanagan : {0} restaurants, vignobles, plages, sentiers et plus sur une seule carte, avec l’itinéraire et ce qui se passe cette semaine.',
   'Map of the Okanagan': 'Carte de l’Okanagan',
   // Roam Now is the feature's name (2026-10-14), kept in French like the site name.
-  'Roam Now': 'Roam Now', 'Roam Now: what’s open near me': 'Roam Now : ce qui est ouvert près de moi',
-  'Roam Now: Okanagan Map of What’s Open Near You | Okanagan Roam': 'Roam Now : carte de ce qui est ouvert près de vous | Okanagan Roam',
-  'Roam Now: map of what’s open near you in the Okanagan': 'Roam Now : carte de ce qui est ouvert près de vous dans l’Okanagan',
+  // 2026-10-18: the hero link reads French first, with the Roam Now name after it.
+  'Roam Now': 'Roam Now', 'Roam Now: what’s open near me': 'Ce qui est ouvert près de moi · Roam Now',
+  'Roam Now: Okanagan Map of What’s Open Near You | Okanagan Roam': 'Carte de ce qui est ouvert près de vous · Roam Now | Okanagan Roam',
+  'Roam Now: map of what’s open near you in the Okanagan': 'Carte de ce qui est ouvert près de vous dans l’Okanagan (Roam Now)',
   'Find what’s open near you, get directions, and see what’s on.': 'Trouvez ce qui est ouvert près de vous, obtenez l’itinéraire et voyez ce qui se passe.',
   'Near me': 'Près de moi',
   'Places': 'Lieux',
@@ -1100,6 +1107,12 @@ const FR_SCRIPT = [
 // Event pages (2026-10-17): the labels around an event, and the long dates its schedule uses
 // ("Friday, October 16, 2026 · 19 h", "Saturday, June 13 – Sunday, October 25, 2026 · All day").
 Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
+  // What's On chips and the custom-dates form (2026-10-18). "From" alone read "selon" through app.js's lower-case list.
+  'today': 'aujourd’hui',
+  'tomorrow': 'demain',
+  'Times vary': 'Heures variables',
+  'From': 'Du',
+  'From:': 'Du :',
   'Example photo': 'Photo d’exemple',
   'Get directions': 'Itinéraire',
   'Add to calendar': 'Ajouter au calendrier',
@@ -1132,6 +1145,12 @@ FR_PATTERNS.unshift(
   [/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (January|February|March|April|May|June|July|August|September|October|November|December) \d/, (m) => frLongDates(m.input)],
   [/^(\d+) dates · next: (.+)$/, (m) => `${m[1]} dates · prochaine : ${frLongDates(m[2])}`],
   [/^Next: (Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(.*)$/, (m) => `Prochaine : ${DAYS[m[1]]} ${m[3]} ${MONTHS[m[2]]}${frLongDates(m[4])}`],
+  // What's On card chips (2026-10-18): "Sat Oct 17 + 1 more date", "Today + 3 more dates", "next Tue Oct 20".
+  [/^(Today|Tomorrow|(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})) \+ (\d+) more dates?$/, (m) => {
+    const first = m[1] === 'Today' ? 'Aujourd’hui' : m[1] === 'Tomorrow' ? 'Demain' : `${DAYS[m[2]]} ${m[4] === '1' ? '1er' : m[4]} ${MONTHS[m[3]]}`;
+    return `${first} + ${m[5]} ${m[5] === '1' ? 'autre date' : 'autres dates'}`;
+  }],
+  [/^next (Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => `prochaine : ${DAYS[m[1]]} ${m[3] === '1' ? '1er' : m[3]} ${MONTHS[m[2]]}`],
   [/^Show (\d+) past dates?$/, (m) => (m[1] === '1' ? 'Afficher 1 date passée' : `Afficher ${m[1]} dates passées`)],
   [/^Event series in (.+), BC$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `Série d’événements à ${m[1]} (C.-B.)` : null)],
   [/^More events in (.+)$/, (m, tr, c) => (Object.values(c.regions).includes(m[1]) ? `Plus d’événements à ${m[1]}` : null)],

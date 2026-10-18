@@ -247,5 +247,5 @@ test('The /trip page script parses (a regex slip inside the page template once s
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   assert.ok(scripts.length >= 1);
   for (const src of scripts) assert.doesNotThrow(() => new Function(src));
-  assert.match(html, /location\.pathname\.indexOf\('\/fr\/'\) === 0 \? '\/fr\/trip' : '\/trip'/, 'the French page keeps /fr/trip in its address');
+  assert.match(html, /\? '\/fr\/trip' : '\/trip'/, 'the French page keeps /fr/trip in its address');
 });

@@ -857,8 +857,9 @@ function renderScript(d) {
     var r = state.lastReq;
     var s = r ? { text: state.text, seed: r.seed, overrides: r.overrides, locks: state.locks, exclude: r.exclude, pinned: r.pinned, avoid: r.avoid, removed: state.removed }
       : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
-    // The French page keeps its /fr/trip address (2026-10-18: it was rewritten to /trip).
-    try { history.replaceState(null, '', (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0 ? '/fr/trip' : '/trip') + t3StateToQuery(s)); } catch (e) {}
+    // French (2026-10-18): a plan made on /fr/trip keeps its French address, so a reload or a shared link stays French.
+    var base = (location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip';
+    try { history.replaceState(null, '', base + t3StateToQuery(s)); } catch (e) {}
   }
 
   // ---- plan helpers ----
@@ -1111,8 +1112,8 @@ function renderScript(d) {
     var cardAnchor = v.id != null && !renderedVenueCardAnchors[v.id] ? ' id="' + esc(t3VenueCardId(v.id)) + '"' : '';
     if (v.id != null) renderedVenueCardAnchors[v.id] = true;
     var kept = key && state.locks[key] === v.id;
-    // The listed hours are shown once, as the fact line above the reasons.
-    var why = (stop.why || []).filter(function(w){ return !(v.listedHours && /^Listed hours/.test(w)) && !/\(straight line\)/.test(w); }).slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
+    // The listed hours are shown once, as the fact line above the reasons (in French too, 2026-10-18).
+    var why = (stop.why || []).filter(function(w){ return !(v.listedHours && /^(Listed hours|Horaires indiqu\u00e9s)/.test(w)) && !/\(straight line\)/.test(w); }).slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
     // A dated plan's timing ("Provisional visit 09:00–10:00 ...") is already in the timeline and the Before you go list.
     var cav = (stop.caveats || []).filter(function(c){ return !/No usable hours listed|Aucun horaire utilisable|No map location on file|emplacement.*carte|^Provisional visit|^Visite provisoire/i.test(c); }).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
     var same = counts[v.name] > 1;

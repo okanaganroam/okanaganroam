@@ -4101,11 +4101,24 @@ function discoveryPresentation(run) {
 //     rather than /browse's raw substring filter, which found "low" in
 //     "follow" and nothing for "Earl's")
 // Returns { url, reason }; url null = serve /browse as typed.
-function heroSearchTarget(text) {
+// French (2026-10-18): from a French page (lang 'fr') the words are read through the planner's French vocabulary
+// ("terrasse" -> "patio"), and the /search link keeps the visitor's own words.
+function discoverySearchText(text, lang) {
+  if (lang !== 'fr') return text;
+  try { return tripPlannerFrModule().tripPlannerText(text, buildDiscoveryTaxonomy()); } catch (e) { return text; }
+}
+function heroSearchTarget(text, { lang = 'en' } = {}) {
+  const typed = text;
+  text = discoverySearchText(text, lang);
   const intent = interpretDiscoveryText(text);
   const destination = resolveDiscoveryDestination(intent);
-  const search = `/search${discoveryQueryString({ q: text.trim() })}`;
+  const search = `/search${discoveryQueryString({ q: typed.trim() })}`;
   if (intent.mode === 'navigate' && destination.url) return { url: destination.url, reason: 'exact_venue' };
+  // Smarter search (2026-10-18): breakfast, kids and rainy days, date night,
+  // dated events, guide topics and "a winery with a restaurant" (smartSearchPlan).
+  const plan = smartSearchPlan(text, intent);
+  if (plan && plan.url) return { url: plan.url, reason: `intent_${plan.key}` };
+  if (plan && plan.list) return { url: search, reason: `intent_${plan.key}` };
   if (intent.cuisines.length) return { url: search, reason: 'cuisine' };
   // A plain one-word text search (/browse?q=<word>, nothing else) is not a
   // page of its own: the one-word rule below decides, so "Poutine" is never
@@ -4121,8 +4134,15 @@ function heroSearchTarget(text) {
   // search; neither is anything that normalizes to several words
   // ("dog-friendly-patios", "joe's patio").
   if (hasDiscoveryExclusion(intent.excluded)) return { url: search, reason: 'exclusion' };
-  if (discoveryIntentModule().normalizeDiscoveryText(text).split(' ').filter(Boolean).length > 1) return { url: search, reason: 'multi_word' };
   const found = selectDiscoveryVenues(intent, 1).total;
+  // A typo in a place's name ("mision hill"), when nothing else matches:
+  // straight to the place when one name is clearly closest (2026-10-18).
+  if (!found && intent.mode !== 'events') {
+    const venue = smartFuzzyWinner(smartFuzzyVenues(text, intent));
+    const url = venue && discoveryVenueUrl(venue);
+    if (url) return { url, reason: 'fuzzy_venue' };
+  }
+  if (discoveryIntentModule().normalizeDiscoveryText(text).split(' ').filter(Boolean).length > 1) return { url: search, reason: 'multi_word' };
   return { url: search, reason: found > 0 ? 'single_word' : 'single_word_no_results' };
 }
 
@@ -4164,59 +4184,552 @@ const SEARCH_EMPTY_TEXT = {
   ambiguous: 'More than one place has that name. Pick the one you mean:',
 };
 
-function renderSearchPage(run) {
-  const p = run.presentation, labels = tripPlannerLabels();
-  const q = run.query.trim();
-  const esc = escapeHtml;
-  const total = run.results.total || 0;
-  const items = run.results.items || [];
-  const title = `Search: ${q.length > 60 ? q.slice(0, 60) + '…' : q} | Okanagan Roam`;
-  const correctionText = p.corrections.length
-    ? `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>` : '';
-  // Stage 3.5: a sentence is shown once ("Trip length and pace are used by
-  // Build My Trip, not search." covers both the length and the pace note).
-  const notes = p.notes.map((n) => discoveryNoteText(n, labels)).filter((t, i, all) => t && all.indexOf(t) === i);
-  const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
-  let resultsHtml = '';
-  if (run.results.kind === 'events' && items.length) {
-    resultsHtml = `<p class="search-count">${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}</p>
-  <ul class="card-grid">${items.map((e) => `
-    <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
-      <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
-  </ul>`;
-  } else if (items.length) {
-    resultsHtml = `<p class="search-count">${total} place${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}</p>
-  <ul class="card-grid">${items.map((v) => {
-      const why = (v.matchedOn || []).map(discoveryMatchedOnText).filter(Boolean);
-      return `
-    <li class="category-card"><h2><a href="${esc(v.url)}">${esc(v.name)}</a></h2>
-      <p class="venue-meta">${esc(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)} · ${esc(REGION_LABELS[v.region] || v.region)}</p>${why.length ? `
-      <p class="venue-meta search-why">${esc(why.join(' · '))}</p>` : ''}</li>`;
-    }).join('')}
-  </ul>`;
-  } else {
-    resultsHtml = `<p class="search-empty">${esc(SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results)}</p>`;
+// ---------- Smarter search (2026-10-18) ----------
+//
+// An intent layer over the interpreter for the requests the structured
+// routing above cannot place on one page (site review, 2026-10-18):
+//   breakfast / brunch          -> cafés and restaurants that open early or
+//                                  mention breakfast or brunch (Kelowna brunch
+//                                  -> the brunch guide)
+//   kids / family / rainy day   -> /indoor?types=family&regions=<town>
+//   date night / romantic       -> restaurants and cocktail lounges in the town
+//   live music / things to do + a date ("this weekend", "tonight")
+//                               -> What's On for that window and category
+//   a winery (brewery, distillery) with a restaurant
+//                               -> only those that have one
+//   a guide topic ("halloween") -> that guide
+//   a typo in a place's name ("mision hill") -> the place, when nothing else matches
+// Rules over the site's own data only: no external search service.
+
+// Lower case, accent-free, apostrophe-free, single-spaced words.
+function smartFold(text) {
+  return String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['‘’`]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+const smartHas = (folded, phrases) => phrases.some((p) => ` ${folded} `.includes(` ${p} `));
+// The folded text with each phrase removed (longest first), as single-spaced words.
+function smartStrip(folded, phrases) {
+  let s = ` ${folded} `;
+  for (const p of phrases.slice().sort((a, b) => b.length - a.length)) {
+    while (s.includes(` ${p} `)) s = s.replace(` ${p} `, ' ');
   }
-  const suggestionHtml = p.suggestions.length ? `<h2 class="category-subsection-heading">${p.status === 'ambiguous' ? 'Places with that name' : 'You could also try'}</h2>
-  <ul class="search-suggestions">${p.suggestions.map((sg) => `<li><a href="${esc(sg.url)}">${esc(sg.label)}</a></li>`).join('')}</ul>` : '';
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-${pageHead(title, 'Search results on Okanagan Roam.', null, [], { golfTheme: true, noindex: true })}
-${renderOutdoorThemeStyles()}
-${renderAnalyticsHeadHtml('search')}
-<style>
+  return s.trim().split(' ').filter(Boolean);
+}
+const SMART_BREAKFAST_WORDS = ['breakfast', 'breakfasts', 'brunch', 'brunches', 'eggs benny', 'pancakes', 'petit dejeuner', 'petits dejeuners', 'dejeuner', 'dejeuners'];
+const SMART_FAMILY_WORDS = ['kids', 'kid', 'children', 'child', 'family', 'families', 'toddler', 'toddlers', 'little ones', 'enfants', 'enfant', 'famille', 'familles', 'en famille'];
+const SMART_RAINY_WORDS = ['rainy day', 'rainy days', 'rainy', 'rain', 'raining', 'wet day', 'indoor', 'indoors', 'inside', 'jour de pluie', 'pluie', 'pluvieux', 'pluvieuse', 'interieur', 'interieures', 'interieurs', 'a l interieur'];
+const SMART_DATE_WORDS = ['date night', 'date nights', 'date idea', 'date ideas', 'romantic', 'romance', 'anniversary', 'anniversary dinner', 'romantique', 'en amoureux', 'soiree romantique', 'tete a tete'];
+// French date words the interpreter does not read; the English ones it does.
+const SMART_WHEN_FR = [['ce soir', 'today'], ['aujourd hui', 'today'], ['ce week end', 'this-weekend'], ['ce weekend', 'this-weekend'],
+  ['cette fin de semaine', 'this-weekend'], ['fin de semaine', 'this-weekend'], ['cette semaine', 'this-week'], ['ce mois ci', 'this-month'], ['ce mois', 'this-month']];
+const SMART_WHEN_WORDS = ['tonight', 'today', 'tomorrow', 'this weekend', 'weekend', 'this week', 'this month', 'next week', 'this evening', 'tonite',
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'on', 'this', 'night', 'evening', ...SMART_WHEN_FR.map((x) => x[0])];
+// Words that ask for What's On categories.
+const SMART_EVENT_CATEGORY_WORDS = [
+  ['live-music', ['live music', 'music', 'concert', 'concerts', 'gig', 'gigs', 'band', 'bands', 'musique', 'musique live', 'spectacle', 'spectacles']],
+  ['family-kids', SMART_FAMILY_WORDS],
+  ['markets-fairs', ['market', 'markets', 'farmers market', 'farmers markets', 'marche', 'marches', 'fair', 'fairs']],
+  ['holiday-seasonal', ['halloween', 'christmas', 'xmas', 'noel', 'holiday', 'holidays']],
+  ['arts-culture', ['art', 'arts', 'theatre', 'theater', 'comedy', 'show', 'shows', 'gallery', 'galleries']],
+  ['nightlife', ['nightlife', 'party', 'parties', 'dance', 'dancing', 'dj']],
+  ['events-festivals', ['festival', 'festivals']],
+  ['workshops-classes', ['workshop', 'workshops', 'class', 'classes']],
+];
+// Words that add nothing to a "what's on" request.
+const SMART_EVENT_GENERIC = ['things to do', 'thing to do', 'what to do', 'stuff to do', 'something to do', 'what s on', 'whats on', 'whats happening', 'what s happening',
+  'things', 'thing', 'to', 'do', 'fun', 'something', 'what', 'whats', 'happening', 'going', 'events', 'event', 'activities', 'activity', 'stuff',
+  'in', 'the', 'a', 'an', 'near', 'me', 'okanagan', 'see', 'any', 'for', 'and', 'with', 'live', 'local', 'free', 'at', 'around',
+  'quoi', 'faire', 'que', 'sortir', 'evenements', 'evenement', 'activites', 'a', 'au', 'dans', 'la', 'le', 'les', 'de', 'du', 'des', 'et', 'pour', 'avec'];
+// Words that add nothing to a kids / rainy-day request.
+const SMART_FAMILY_GENERIC = [...SMART_EVENT_GENERIC, 'day', 'days', 'go', 'places', 'place', 'spots', 'spot', 'ideas', 'idea', 'where', 'take', 'my', 'our', 'kids activities',
+  'jour', 'journee', 'endroits', 'idees', 'mes', 'nos'];
+function smartRegionWords() {
+  const words = [];
+  for (const [slug, label] of Object.entries(REGION_LABELS)) { words.push(smartFold(label), smartFold(slug.replace(/-/g, ' '))); }
+  return uniqueList(words.filter(Boolean));
+}
+// The words a request is about once its town, dates and any typo the
+// interpreter already corrected are taken out.
+function smartTopicWords(folded, intent, extra = []) {
+  const corrected = (intent.corrections || []).map((c) => smartFold(c.from));
+  return smartStrip(folded, [...smartRegionWords(), ...corrected, ...SMART_WHEN_WORDS, ...extra]);
+}
+// A What's On window for the request: the interpreter's, or a French date phrase.
+function smartWhenParams(folded, intent, now = new Date()) {
+  if (intent.when) return discoveryWhatsOnWindowParams(intent.when, now);
+  const fr = SMART_WHEN_FR.find(([p]) => smartHas(folded, [p]));
+  return fr ? { when: fr[1] } : null;
+}
+
+// Guides (2026-10-18): a request whose topic words all appear in a guide's
+// title goes to that guide; the /search page lists the guides that fit.
+const SMART_GUIDE_STOP = new Set(['the', 'a', 'an', 'in', 'of', 'for', 'and', 'to', 'best', 'top', 'okanagan', 'bc', 'guide', 'guides', 'things', 'thing', 'do',
+  'with', 'near', 'me', 'where', 'what', 'how', 'our', 'your', 'my', 'on', 'at', 'is', 'are', 'spots', 'spot', 'places', 'place', 'visit', 'go', 'see', 'this',
+  'day', 'days', 'cool', 'time', 'new', 'year', 'season', 'seasons', 'without', 'beyond', 'catch', 'smaller', 'events', 'event', 'more', 'fun', 'ideas',
+  'le', 'la', 'les', 'de', 'du', 'des', 'au', 'aux', 'en', 'et', 'pour', 'meilleur', 'meilleurs', 'meilleure', 'meilleures', 'ou', 'quoi', 'faire']);
+const SMART_GUIDE_ALIASES = [['hot springs', 'spas soaks'], ['hot spring', 'spas soaks'], ['hot tub', 'soaks'], ['hot tubs', 'soaks'], ['xmas', 'christmas'], ['noel', 'christmas'],
+  ['skiing', 'ski'], ['snowboarding', 'ski'], ['snowshoeing', 'snowshoe'], ['salmon run', 'kokanee'], ['salmon', 'kokanee'], ['cider', 'cideries'], ['ciders', 'cideries'],
+  ['u pick', 'pick'], ['upick', 'pick'], ['apple picking', 'pick'], ['pumpkin patch', 'farms pick'], ['sauna', 'saunas'], ['spa', 'spas'], ['skate', 'skating'],
+  ['waterfall', 'waterfall'], ['waterfalls', 'waterfall'], ['sleigh ride', 'sleigh'], ['dog sledding', 'sledding'], ['valentines', 'valentine']];
+const smartStem = (w) => (w.length > 4 && w.endsWith('ies') ? `${w.slice(0, -3)}y` : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+function smartGuideQueryWords(folded) {
+  let s = ` ${folded} `;
+  for (const [from, to] of SMART_GUIDE_ALIASES) s = s.split(` ${from} `).join(` ${to} `);
+  const regionSet = new Set(smartRegionWords().flatMap((r) => r.split(' ')));
+  return uniqueList(s.trim().split(' ').filter((w) => w && !SMART_GUIDE_STOP.has(w) && !regionSet.has(w) && !/^\d+$/.test(w)).map(smartStem));
+}
+// The live guides that fit, best first: { path, heading, full } (full = every topic word is in the title).
+function smartGuideMatches(text, intent) {
+  const words = smartGuideQueryWords(smartFold(text));
+  if (!words.length) return [];
+  const regionFolds = Object.entries(REGION_LABELS).map(([slug, label]) => [slug, smartFold(label)]);
+  const out = [];
+  for (const g of liveGuides()) {
+    const title = smartFold(g.heading);
+    // A town's own guide ("Best Brunch in Kelowna") only for that town or no town.
+    const towns = regionFolds.filter(([, f]) => ` ${title} `.includes(` ${f} `)).map(([slug]) => slug);
+    if (towns.length && intent.regions.length && !intent.regions.some((r) => towns.includes(r))) continue;
+    const tokens = new Set(`${title} ${smartFold(g.path.split('/').pop().replace(/-/g, ' '))}`.split(' ').map(smartStem));
+    const hits = words.filter((w) => tokens.has(w)).length;
+    if (!hits) continue;
+    const full = hits === words.length;
+    if (!full && hits * 2 < words.length) continue;
+    out.push({ path: g.path, heading: g.heading, full, score: hits / words.length - tokens.size / 1000 });
+  }
+  return out.sort((a, b) => b.score - a.score);
+}
+
+// Fuzzy place names (2026-10-18): "mision hill" -> Mission Hill. Only when
+// nothing else matches; within two edits of the name, its first words, or the
+// name without generic words like "winery" or "estate".
+function smartEditDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < best) best = cur[j];
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+const SMART_NAME_GENERIC = new Set(['the', 'a', 'winery', 'wineries', 'estate', 'estates', 'family', 'vineyard', 'vineyards', 'cellars', 'cellar', 'wines', 'wine',
+  'restaurant', 'cafe', 'coffee', 'brewing', 'brewery', 'company', 'co', 'inc', 'ltd', 'bistro', 'bar', 'grill', 'kitchen', 'house', 'and', 'at', 'of', 'distillery', 'distilling']);
+const smartCore = (folded) => { const w = folded.split(' ').filter((x) => !SMART_NAME_GENERIC.has(x)); return w.length ? w.join(' ') : folded; };
+function smartFuzzyVenues(text, intent) {
+  const raw = smartFold(text);
+  const variants = uniqueList([smartCore(raw), smartCore(smartTopicWords(raw, intent).join(' '))]).filter((q) => q.replace(/ /g, '').length >= 4 && q.split(' ').length <= 5);
+  if (!variants.length) return [];
+  const found = [];
+  for (const v of discoverySearchVenues()) {
+    const name = smartFold(v.row.name), core = smartCore(name);
+    let best = 99;
+    for (const q of variants) {
+      const k = q.split(' ').length;
+      const max = q.length >= 8 ? 2 : 1;
+      const cands = [name, core];
+      // A name's first words only for a request of two or more words ("mision hill").
+      if (k >= 2) cands.push(name.split(' ').slice(0, k).join(' '), core.split(' ').slice(0, k).join(' '));
+      for (const c of cands) { const d = smartEditDistance(q, c, max); if (d <= max && d < best) best = d; }
+    }
+    if (best < 99) found.push({ venue: v.row, distance: best });
+  }
+  return found.sort((a, b) => a.distance - b.distance || (Number(b.venue.reviews) || 0) - (Number(a.venue.reviews) || 0) || String(a.venue.name).localeCompare(String(b.venue.name)));
+}
+// One clear winner: a single place (or one name) at the smallest distance.
+function smartFuzzyWinner(matches) {
+  if (!matches.length) return null;
+  const top = matches.filter((m) => m.distance === matches[0].distance);
+  return top.length === 1 ? top[0].venue : null;
+}
+
+// Venues for a plan's own list (breakfast, a winery with a restaurant), best first.
+function smartPickVenues(test, rank) {
+  const out = [];
+  for (const v of discoverySearchVenues()) {
+    const why = test(v);
+    if (why) out.push({ row: v.row, why: why === true ? '' : why, rank: rank(v) });
+  }
+  return out.sort((a, b) => b.rank - a.rank || String(a.row.name).localeCompare(String(b.row.name)));
+}
+const smartTextHas = (v, re) => re.test(String(v.row.name || '')) || re.test(String(v.row.description || ''));
+
+// The plan for a request, or null to keep the routing above:
+//   { key, url } -> send the visitor straight to that page
+//   { key, list() } -> /search shows exactly that list (heading, headingFr)
+function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new Date()) {
+  if (!intent || (intent.mode === 'navigate' && intent.exactVenue) || hasDiscoveryExclusion(intent.excluded)) return null;
+  const folded = smartFold(text);
+  if (!folded) return null;
+  const R = intent.regions, T = intent.types, F = intent.features;
+  if (R.length > 1) return null;
+  const region = R[0] || null;
+  const town = region ? REGION_LABELS[region] : null;
+  const others = intent.cuisines.length || intent.collections.length || intent.activities.length;
+
+  // Breakfast and brunch.
+  if (smartHas(folded, SMART_BREAKFAST_WORDS) && T.every((t) => t === 'cafe' || t === 'restaurant') && !others) {
+    if (smartHas(folded, ['brunch', 'brunches']) && region === 'kelowna' && !T.length && !F.length) return { key: 'brunch_guide', url: BRUNCH_GUIDE_PATH };
+    const types = T.length ? T : ['cafe', 'restaurant'];
+    const re = /\b(breakfasts?|brunch(es)?)\b/i;
+    const hasT = (v) => types.includes(v.type) || v.fdTypes.some((t) => types.includes(t));
+    const guides = [];
+    if (region && listGuideCombos(MIN_GUIDE_VENUES).some((c) => c.region === region && c.badge === 'open_early')) guides.push({ path: `/guide/${region}/open_early`, heading: guideBadgeHeading(region, 'open_early').heading });
+    if (!region || region === 'kelowna') guides.push({ path: BRUNCH_GUIDE_PATH, heading: 'Best Brunch in Kelowna' });
+    return {
+      key: 'breakfast',
+      heading: `Breakfast & brunch${town ? ` in ${town}` : ''}`,
+      headingFr: `Déjeuner et brunch${town ? ` à ${town}` : ''}`,
+      guides,
+      list: () => smartPickVenues((v) => {
+        if ((region && v.region !== region) || !hasT(v) || !F.every((f) => v.features[f])) return false;
+        const early = Number(v.row.open_early) === 1, said = smartTextHas(v, re);
+        if (!early && !said) return false;
+        return [early ? 'Opens early' : '', said ? 'Mentions breakfast or brunch' : ''].filter(Boolean).join(' · ');
+      }, (v) => (Number(v.row.open_early) === 1 ? 1 : 0) + (smartTextHas(v, re) ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+    };
+  }
+
+  // Date night: restaurants and cocktail lounges, best rated first.
+  if ((smartHas(folded, SMART_DATE_WORDS) || intent.occasion === 'date_night') && T.every((t) => t === 'restaurant' || t === 'cocktail') && !others
+    && getFoodDrinkHubVenues().length >= MIN_CATEGORY_VENUES) {
+    const types = T.length ? T : ['restaurant', 'cocktail'];
+    return { key: 'date_night', url: `/food-drink${discoveryQueryString({ types, features: F.filter((f) => FD_HUB_FEATURE_KEYS.has(f)), regions: R })}` };
+  }
+
+  // Dated events: "live music this weekend", "things to do tonight".
+  const whenParams = smartWhenParams(folded, intent, now);
+  const rainy = smartHas(folded, SMART_RAINY_WORDS) || intent.occasion === 'rainy_day';
+  if (whenParams && !rainy && !T.length && !others && F.every((f) => f === 'live_music' || f === 'kid_friendly')) {
+    const catWords = SMART_EVENT_CATEGORY_WORDS.flatMap(([, w]) => w);
+    const left = smartTopicWords(folded, intent, [...SMART_EVENT_GENERIC, ...catWords]);
+    if (!left.length) {
+      const categories = uniqueList([...intent.eventCategories, ...SMART_EVENT_CATEGORY_WORDS.filter(([, w]) => smartHas(folded, w)).map(([k]) => k),
+        ...(F.includes('live_music') ? ['live-music'] : []), ...(F.includes('kid_friendly') ? ['family-kids'] : [])]).filter((k) => WHATSON_CATEGORY_BY_KEY[k]);
+      return { key: 'events', url: `/whats-on${discoveryQueryString({ ...whenParams, regions: R, categories })}` };
+    }
+  }
+
+  // Kids, family and rainy days -> the Indoor hub's Family Fun (or all of Indoor for a rainy day alone).
+  const family = smartHas(folded, SMART_FAMILY_WORDS) && !smartHas(folded, ['family friendly', 'kid friendly', 'kids friendly', 'child friendly']);
+  if ((family || rainy) && T.every((t) => t === 'indoor') && !others && F.every((f) => f === 'kid_friendly') && countIndoorHubVenues() >= MIN_CATEGORY_VENUES
+    && !smartTopicWords(folded, intent, [...SMART_FAMILY_WORDS, ...SMART_RAINY_WORDS, ...SMART_FAMILY_GENERIC, 'indoor activities', 'kid friendly', 'family friendly']).length) {
+    if (!family) {
+      // A rainy day alone keeps the routing above (/indoor or the town's Indoor page) when it has one.
+      const d = resolveDiscoveryDestination(intent);
+      if (d.url) return null;
+      return { key: 'rainy', url: `/indoor${discoveryQueryString({ regions: region && smartIndoorCount(region, false) ? [region] : [] })}` };
+    }
+    return { key: 'family', url: `/indoor${discoveryQueryString({ types: ['family'], regions: region && smartIndoorCount(region, true) ? [region] : [] })}` };
+  }
+
+  // A winery, brewery or distillery with a restaurant: only the ones that have one.
+  const frBase = smartHas(folded, ['vignoble', 'vignobles', 'domaine viticole', 'domaines viticoles']) ? ['winery'] : smartHas(folded, ['brasserie', 'brasseries', 'microbrasserie', 'microbrasseries']) ? ['brewery'] : smartHas(folded, ['distillerie', 'distilleries']) ? ['distillery'] : [];
+  const typedBase = T.filter((t) => t === 'winery' || t === 'brewery' || t === 'distillery');
+  const base = typedBase.length ? typedBase : frBase;
+  const wantsFood = T.includes('restaurant') || smartHas(folded, ['restaurant', 'restaurants', 'dining', 'dinner', 'lunch', 'bistro', 'kitchen', 'food', 'eat', 'meal']);
+  if (base.length === 1 && wantsFood && T.every((t) => t === base[0] || t === 'restaurant') && !others) {
+    const re = /\b(restaurants?|bistro|kitchen|dining|lunch|dinner|chef|eatery|tasting menu|farm-to-table|small plates)\b/i;
+    const label = CATEGORY_LABELS[base[0]].plural, labelFr = CATEGORY_LABELS_FR[base[0]].plural;
+    return {
+      key: 'with_restaurant',
+      heading: `${label} with a restaurant${town ? ` in ${town}` : ''}`,
+      headingFr: `${labelFr} avec restaurant${town ? ` à ${town}` : ''}`,
+      list: () => smartPickVenues((v) => {
+        if (v.type !== base[0] || (region && v.region !== region) || !F.every((f) => v.features[f])) return false;
+        if (v.fdTypes.includes('restaurant')) return 'Also listed as a restaurant';
+        return smartTextHas(v, re) ? 'Mentions its restaurant or dining' : false;
+      }, (v) => (v.fdTypes.includes('restaurant') ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+    };
+  }
+
+  // A guide topic ("halloween", "cideries", "kokanee salmon"), when no
+  // structured page shows the request.
+  const guides = smartGuideMatches(text, intent).filter((g) => g.full);
+  if (guides.length && !T.length && !F.length && !others) {
+    const d = resolveDiscoveryDestination(intent);
+    if (!d.url || d.kind === 'browse' || (d.kind === 'events' && !intent.when)) return { key: 'guide', url: guides[0].path };
+  }
+  return null;
+}
+function smartIndoorCount(region, familyOnly) {
+  const notes = getIndoorAlsoNotes();
+  const seen = new Set();
+  let n = 0;
+  for (const v of [...getVenuesByCategory('indoor'), ...getIndoorGolfVenues(), ...getIndoorAlsoVenues()]) {
+    if (seen.has(v.id)) continue;
+    seen.add(v.id);
+    if (v.region === region && (!familyOnly || indoorExperiencesOf(v, notes.get(v.id)).includes('family'))) n += 1;
+  }
+  return n;
+}
+
+function renderSearchPage(run, opts = {}) {
+  const lang = opts.lang === 'fr' ? 'fr' : 'en';
+  const model = searchPageModel(run, opts.now || new Date(), lang);
+  return model.venues.length ? renderSearchResultsHubPage(model, lang) : renderSearchSimplePage(model, lang);
+}
+// French search results (2026-10-18): /fr/search writes its own sentences in French (what it understood, why each
+// place matched, counts and notes); labels go through the French word list (frTextOr), place and town names stay.
+const SEARCH_EMPTY_TEXT_FR = {
+  exclusion_only: 'Nous avons compris ce que vous ne voulez pas, mais cela seul ne précise rien. Dites-nous plutôt ce que vous aimeriez, par exemple « restaurants à Kelowna ».',
+  needs_more: 'Ajoutez un type de lieu ou une ville, par exemple « vignobles à Naramata » ou « plages à Penticton », et nous vous montrerons de vrais lieux.',
+  no_match_for_words: 'Aucun lieu dont le nom, la cuisine indiquée ou la description mentionne ces mots.',
+  no_results: 'Aucun lieu ne correspond à tout cela. Essayez avec moins de mots ou une autre ville.',
+  ambiguous: 'Plusieurs lieux portent ce nom. Choisissez celui que vous cherchez :',
+};
+function frSearchLabel(t) { return frTextOr(String(t)); }
+function frSearchTypePlural(t, labels) {
+  return (CATEGORY_LABELS_FR[t] ? CATEGORY_LABELS_FR[t].plural : frSearchLabel(labels.types[t] ? labels.types[t].plural : t)).toLowerCase();
+}
+const FR_SEARCH_COLLECTIONS = { hidden_gem: 'trésors cachés', local_favorite: 'coups de cœur locaux', dog_friendly: 'plages pour chiens' };
+function discoveryInterpretedTextFr(intent, labels) {
+  const foodWords = uniqueList((intent.foodTerms || []).filter((f) => f.cuisine && intent.cuisines.includes(f.cuisine)).map((f) => `« ${f.term} »`));
+  const parts = [
+    ...intent.collections.map((c) => FR_SEARCH_COLLECTIONS[c] || c),
+    ...foodWords,
+    ...intent.types.map((t) => frSearchTypePlural(t, labels)),
+    ...intent.activities.map((a) => frSearchLabel(labels.activities[a] || a).toLowerCase()),
+    ...intent.textTerms.map((w) => `« ${w} »`),
+  ];
+  if (!(parts.length + intent.features.length + intent.regions.length)) return null;
+  let text = parts.length ? parts.join(', ') : 'lieux';
+  if (intent.features.length) text += intent.features.length > 1
+    ? ` avec les badges ${intent.features.map((f) => frSearchLabel(labels.features[f] || f)).join(', ')}`
+    : ` avec le badge ${frSearchLabel(labels.features[intent.features[0]] || intent.features[0])}`;
+  if (intent.regions.length) text += ` à ${intent.regions.map((r) => labels.regions[r] || r).join(' ou ')}`;
+  const ex = intent.excluded;
+  const not = [
+    ...ex.types.map((t) => `sans ${frSearchTypePlural(t, labels)}`),
+    ...ex.regions.map((r) => `pas à ${labels.regions[r] || r}`),
+    ...ex.cuisines.map((c) => `sans ${frCuisine(c).toLowerCase()}`),
+    ...ex.collections.map((c) => `sauf ${FR_SEARCH_COLLECTIONS[c] || c}`),
+    ...ex.activities.map((a) => `sans ${frSearchLabel(labels.activities[a] || a).toLowerCase()}`),
+    ...(ex.budget === 'upscale' ? ['rien de haut de gamme'] : []),
+  ];
+  if (not.length) text += `, ${not.join(', ')}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+function discoveryMatchedOnTextFr(m) {
+  const i = m.indexOf(':');
+  const key = m.slice(0, i), value = m.slice(i + 1);
+  if (key === 'cuisine') return `Cuisine indiquée : ${frCuisine(value.charAt(0).toUpperCase() + value.slice(1))}`;
+  if (key === 'feature') return BADGE_LABELS[value] ? `A le badge ${frSearchLabel(BADGE_LABELS[value].title)}` : null;
+  if (key === 'collection') return value === 'hidden_gem' ? 'Un des trésors cachés d’Okanagan Roam' : value === 'local_favorite' ? 'Un coup de cœur local d’Okanagan Roam' : value === 'dog_friendly' ? 'Sur la liste officielle des lieux qui acceptent les chiens' : null;
+  const where = value.split('+').map((w) => (w === 'name' ? 'son nom' : w === 'cuisine' ? 'sa cuisine indiquée' : 'sa description'));
+  return `Mentionne « ${key} » dans ${where.join(' et ')}`;
+}
+function discoveryNoteTextFr(n, labels) {
+  const what = (f, v) => (f === 'region' ? `pas à ${labels.regions[v] || v}` : f === 'type' ? `sans ${frSearchTypePlural(v, labels)}` : f === 'cuisine' ? `sans ${v}`
+    : f === 'collection' ? `sauf ${FR_SEARCH_COLLECTIONS[v] || v}` : f === 'activity' ? `sans ${frSearchLabel(labels.activities[v] || v).toLowerCase()}`
+      : f === 'budget' ? 'rien de haut de gamme' : f === 'feature' ? `sans « ${frSearchLabel(labels.features[v] || v)} »` : `pas « ${v} »`);
+  if (n.code === 'exclusion_applied') return n.field === 'budget'
+    ? 'Rien de haut de gamme : les lieux au niveau de prix le plus élevé ($$) sont exclus. Les lieux sans prix indiqué sont conservés.'
+    : `Compris : « ${what(n.field, n.value)} ». Ces lieux ont été exclus.`;
+  if (n.code === 'exclusion_understood') return `Compris : « ${what(n.field, n.value)} ».`;
+  if (n.code === 'exclusion_not_applied') return n.field === 'feature'
+    ? `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas exclure de lieux selon un badge; aucun n’a été retiré.`
+    : `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas l’appliquer; aucun lieu n’a été retiré pour cette raison.`;
+  if (n.field === 'occasion') return `Les occasions comme « ${String(n.value).replace(/_/g, ' ')} » ne s’appliquent pas à la recherche. Planifier mon voyage peut en tenir compte.`;
+  if (n.field === 'budget') return 'Le budget ne s’applique pas à la recherche : tous les lieux n’indiquent pas leurs prix.';
+  if (n.field === 'when') return 'Les dates et les heures ne sont pas vérifiées ici. La page À l’affiche présente les événements datés.';
+  if (n.field === 'days' || n.field === 'pace') return 'La durée et le rythme du voyage servent à Planifier mon voyage, pas à la recherche.';
+  if (n.field === 'phrase') return `La recherche ne peut pas encore appliquer « ${n.value} ».`;
+  return null;
+}
+
+// Smarter search (2026-10-18): everything the /search page shows, worked out once.
+const SEARCH_PAGE_MAX_RESULTS = 480;
+function searchPageModel(run, now = new Date(), lang = 'en') {
+  // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
+  // from (a French search goes through the planner's French words first, see discoverySearchText).
+  const q = run.query.trim(), sq = String(run.searchText || run.query).trim();
+  const plan = smartSearchPlan(sq, run.intent, now);
+  let venues = [], why = new Map();
+  if (plan && plan.list) {
+    const picked = plan.list().slice(0, SEARCH_PAGE_MAX_RESULTS);
+    venues = picked.map((x) => x.row);
+    why = new Map(picked.filter((x) => x.why).map((x) => [x.row.id, x.why]));
+  } else if (run.results.kind === 'venues' && run.results.items.length) {
+    // Name matches first (2026-10-18): the whole request in the name, then
+    // every word in the name, then the rest in the retrieval's own order.
+    const byId = new Map(discoverySearchVenues().map((v) => [v.id, v]));
+    const phrase = smartTopicWords(smartFold(sq), run.intent).join(' ');
+    const tier = (item) => {
+      const v = byId.get(item.id);
+      const name = v ? smartFold(v.row.name) : '';
+      if (phrase && ` ${name} `.includes(` ${phrase} `)) return 0;
+      const terms = (item.matchedOn || []).filter((m) => !/^(feature|collection|cuisine):/.test(m));
+      return terms.length && terms.every((m) => /:name/.test(m)) ? 1 : 2;
+    };
+    const ranked = run.results.items.map((item, i) => ({ item, i, t: tier(item) })).sort((a, b) => a.t - b.t || a.i - b.i);
+    for (const { item } of ranked) {
+      const v = byId.get(item.id);
+      if (!v) continue;
+      venues.push(v.row);
+      const text = (item.matchedOn || []).map(lang === 'fr' ? discoveryMatchedOnTextFr : discoveryMatchedOnText).filter(Boolean).join(' · ');
+      if (text) why.set(v.id, text);
+    }
+  }
+  const guides = plan && plan.guides ? plan.guides : smartGuideMatches(sq, run.intent).slice(0, 3);
+  const fuzzy = !venues.length && run.results.kind !== 'events' ? smartFuzzyVenues(sq, run.intent).slice(0, 5).map((m) => m.venue) : [];
+  return { run, q, plan, venues, why, guides, fuzzy, now };
+}
+// French words for the page's own text (the cards and filters are translated with every French page).
+const SEARCH_PAGE_TEXT = {
+  en: { title: 'Search', h1: 'Search results', searched: 'You searched', showing: 'showing', button: 'Search', label: 'Search Okanagan Roam', places: (n) => `${n} place${n === 1 ? '' : 's'}`,
+    guides: 'Our guides', didYouMean: 'Did you mean', tryThese: 'You could also try', popular: (t) => `Popular in ${t}`, browse: (q) => `Search the directory for “${q}”`,
+    filter: 'Filter these results', filterPh: 'Filter by name, place or dish...', matched: 'Matched:', allGuides: 'All our guides', none: 'Nothing matched those words. Here are some places to start.' },
+  fr: { title: 'Recherche', h1: 'Résultats de recherche', searched: 'Vous avez cherché', showing: 'résultats', button: 'Chercher', label: 'Chercher sur Okanagan Roam', places: (n) => `${n} endroit${n > 1 ? 's' : ''}`,
+    guides: 'Nos guides', didYouMean: 'Vouliez-vous dire', tryThese: 'Essayez aussi', popular: (t) => `Populaire à ${t}`, browse: (q) => `Chercher « ${q} » dans le répertoire`,
+    filter: 'Filtrer ces résultats', filterPh: 'Filtrer par nom, endroit ou plat...', matched: 'Correspond :', allGuides: 'Tous nos guides', none: 'Rien ne correspond à ces mots. Voici quelques idées pour commencer.' },
+};
+// The directory link keeps the visitor's words (?q=); the extra parameter
+// stops /browse from sending a lone ?q= straight back here.
+const searchDirectoryHref = (q) => `/browse?q=${encodeURIComponent(q)}&from=search`;
+function searchFormHtml(q, L) {
+  return `<form class="search-form" action="/browse" method="get" role="search">
+    <input type="search" name="q" value="${escapeHtml(q)}" aria-label="${escapeHtml(L.label)}" maxlength="${discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH}">
+    <button type="submit">${escapeHtml(L.button)}</button>
+  </form>`;
+}
+const SEARCH_PAGE_STYLES = `<style id="search-page">
   body.search-page .search-form { display: flex; gap: 10px; max-width: 640px; margin: 8px 0 18px; }
-  body.search-page .search-form input { flex: 1; min-width: 0; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); font: inherit; background: var(--ref-white, #fff); }
+  body.search-page .search-form input { flex: 1; min-width: 0; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); font: inherit; font-size: 16px; background: var(--ref-white, #fff); }
   body.search-page .search-form button { padding: 12px 22px; border-radius: 999px; border: 0; cursor: pointer; font-weight: 800; background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); font-family: 'Nunito', sans-serif; }
   body.search-page .search-interpreted { font-size: 1.05rem; margin: 0 0 6px; }
   body.search-page .search-corrected, body.search-page .search-count { color: rgba(42,32,25,0.72); margin: 0 0 8px; }
   body.search-page .search-notes { margin: 6px 0 16px; padding-left: 18px; color: rgba(42,32,25,0.72); font-size: 0.92rem; }
   body.search-page .search-empty { font-size: 1.02rem; margin: 18px 0; }
   body.search-page .search-why { font-size: 0.85rem; }
-  body.search-page .search-suggestions { list-style: none; padding: 0; margin: 8px 0 30px; display: flex; flex-wrap: wrap; gap: 10px; }
-  body.search-page .search-suggestions a { display: inline-block; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); text-decoration: none; font-weight: 700; background: var(--ref-white, #fff); }
-</style>
+  body.search-page .search-suggestions { list-style: none; padding: 0; margin: 8px 0 22px; display: flex; flex-wrap: wrap; gap: 10px; }
+  body.search-page .search-suggestions a { display: inline-block; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); text-decoration: none; font-weight: 700; background: var(--ref-white, #fff); color: var(--ink, #2a2019); }
+  body.search-page .search-guides { margin: 4px 0 14px; font-weight: 800; }
+  body.search-page .search-guides a { color: var(--teal-deep, #1F5450); }
+</style>`;
+// The visitor's words, the interpretation, corrections and notes.
+function searchSummaryHtml(model, lang) {
+  const { run, q, plan } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], labels = tripPlannerLabels(), esc = escapeHtml;
+  // French gaps (2026-10-18): the French page says what it understood, its corrections and notes in French too.
+  const interpreted = plan && plan.heading ? (lang === 'fr' ? plan.headingFr : plan.heading)
+    : (lang === 'fr' ? (p.status === 'ambiguous' ? null : discoveryInterpretedTextFr(run.intent, labels)) : p.interpreted);
+  const correctionText = !p.corrections.length ? ''
+    : lang === 'fr' ? `<p class="search-corrected">Nous avons lu ${p.corrections.map((c) => `« ${esc(c.from)} » comme « ${esc(c.to)} »`).join(', ')}.</p>`
+      : `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>`;
+  // Stage 3.5: a sentence is shown once. A plan's own list (2026-10-18)
+  // applies its occasion and dates itself, so their notes are left off.
+  const notes = p.notes.filter((n) => !(plan && plan.list && ['occasion', 'when'].includes(n.field)))
+    .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
+  const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
+  const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
+  return `<p class="search-interpreted">${esc(L.searched)} ${quote}${interpreted ? `${lang === 'fr' ? ' : ' : ': showing '}<strong>${esc(interpreted)}</strong>` : ''}</p>
+  ${correctionText}
+  ${noteHtml}`;
+}
+function searchGuidesHtml(model, lang) {
+  if (!model.guides.length) return '';
+  const L = SEARCH_PAGE_TEXT[lang];
+  return `<p class="search-guides">${escapeHtml(L.guides)}${lang === 'fr' ? ' :' : ':'} ${model.guides.map((g) => `<a href="${g.path}">${escapeHtml(lang === 'fr' ? frTextOr(g.heading) : g.heading)} &rarr;</a>`).join(' · ')}</p>`;
+}
+// Results: the site's standard listing cards on the shared directory engine
+// (photo, open status, Favorite and Add to trip, Show more past 48, type
+// chips, Regions, filters and a sort), in best-match order.
+function renderSearchResultsHubPage(model, lang) {
+  const { q, venues, why } = model, L = SEARCH_PAGE_TEXT[lang];
+  const tally = {};
+  for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
+  const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
+    .map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural }));
+  const total = model.plan && model.plan.list ? venues.length : (model.run.results.total || venues.length);
+  return renderCuratedHubPage({
+    path: `/search?q=${encodeURIComponent(q)}`,
+    name: L.title,
+    title: `${L.title}${lang === 'fr' ? ' : ' : ': '}${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`,
+    description: lang === 'fr' ? 'Résultats de recherche sur Okanagan Roam.' : 'Search results on Okanagan Roam.',
+    bodyClass: 'region-page search-page',
+    surface: 'search',
+    pageType: 'search',
+    noindex: true,
+    noBanner: true,
+    keepOrder: true,
+    sorts: [{ key: 'recommended', label: 'Best match' }, { key: 'rating', label: 'Top rated' }, { key: 'town', label: 'By town' }, { key: 'az', label: 'A–Z' }],
+    types,
+    catsFor: (v) => [v.type],
+    photoKeyFor: (v) => curatedPhotoKey(v),
+    features: ['patio', 'dog_friendly', 'kid_friendly', 'lake_view', 'great_groups', 'live_music', 'happy_hour', 'vegetarian', 'open_early', 'open_late'],
+    openNow: true,
+    // French: each note piece the word list knows, in French; the rest left off.
+    cardNotes: lang === 'fr' ? new Map([...why].map(([id, t]) => [id, t.split(' · ').map((x) => frText(x)).filter(Boolean).join(' · ')]).filter(([, t]) => t)) : why,
+    cardNoteLabel: L.matched,
+    search: { label: L.filter, placeholder: L.filterPh },
+    categoryContent: { all: { banner: FOOD_DRINK_HUB_BANNER, heading: L.h1, intro: '' } },
+    extraHead: SEARCH_PAGE_STYLES,
+    leadHtml: `${searchFormHtml(q, L)}
+  ${searchSummaryHtml(model, lang)}
+  <p class="search-count">${escapeHtml(L.places(total))}${total > venues.length ? ` (${venues.length})` : ''}</p>
+  ${searchGuidesHtml(model, lang)}`,
+  }, venues, null, model.now);
+}
+// No places (an event search, or nothing matched): the visitor's words,
+// any events, then real ways forward -- a place the words nearly spell, our
+// guides, the town's busiest kinds of place and the directory with ?q= kept.
+function renderSearchSimplePage(model, lang) {
+  const { run, q } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], esc = escapeHtml, fr = lang === 'fr';
+  const total = run.results.total || 0;
+  const items = run.results.items || [];
+  let resultsHtml = '';
+  if (run.results.kind === 'events' && items.length) {
+    resultsHtml = `<p class="search-count">${fr ? `${total} événement${total === 1 ? '' : 's'}${total > items.length ? `, voici les ${items.length} premiers` : ''}` : `${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}`}</p>
+  <ul class="card-grid">${items.map((e) => `
+    <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
+      <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
+  </ul>`;
+  } else {
+    const text = lang === 'fr' ? (SEARCH_EMPTY_TEXT_FR[p.status] || SEARCH_EMPTY_TEXT_FR.no_results) : (SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results);
+    resultsHtml = `<p class="search-empty">${esc(text)}</p>`;
+  }
+  const blocks = [];
+  if (model.fuzzy.length) {
+    blocks.push([L.didYouMean, model.fuzzy.map((v) => ({ label: `${v.name} (${REGION_LABELS[v.region]})`, url: discoveryVenueUrl(v) })).filter((x) => x.url)]);
+  }
+  const suggestions = p.status === 'ambiguous' ? p.suggestions : [];
+  if (suggestions.length) blocks.push([lang === 'fr' ? 'Endroits portant ce nom' : 'Places with that name', suggestions]);
+  if (model.guides.length) blocks.push([L.guides, model.guides.map((g) => ({ label: lang === 'fr' ? frTextOr(g.heading) : g.heading, url: g.path }))]);
+  const others = p.status === 'ambiguous' ? [] : p.suggestions.filter((s) => s.kind !== 'directory');
+  const more = [...others];
+  if (run.results.kind !== 'events' && p.status !== 'exclusion_only') {
+    const region = run.intent.regions.length === 1 ? run.intent.regions[0] : null;
+    if (region) {
+      const counts = getRegionCategoryCounts(region);
+      const labels = lang === 'fr' ? CATEGORY_LABELS_FR : CATEGORY_LABELS;
+      for (const t of Object.keys(counts).filter((t) => counts[t] >= MIN_CATEGORY_VENUES).sort((a, b) => counts[b] - counts[a]).slice(0, 4)) {
+        more.push({ label: `${labels[t].plural} · ${REGION_LABELS[region]}`, url: `/${region}/${CATEGORY_SLUGS[t]}` });
+      }
+      more.push({ label: lang === 'fr' ? `${REGION_LABELS[region]} : tout voir` : `Everything in ${REGION_LABELS[region]}`, url: `/${region}` });
+    } else if (p.status !== 'needs_more') {
+      for (const h of SEARCH_HUB_SUGGESTIONS) more.push({ kind: 'page', ...h });
+    }
+    if (!model.guides.length) more.push({ label: L.allGuides, url: '/guides' });
+    // The directory, with the visitor's words kept (2026-10-18).
+    if (run.intent.textTerms.length || !total) more.push({ label: L.browse(q), url: searchDirectoryHref(q) });
+  }
+  const seen = new Set();
+  const moreUnique = more.filter((s) => s.url && !seen.has(s.url) && seen.add(s.url));
+  if (moreUnique.length) blocks.push([L.tryThese, moreUnique]);
+  const blockHtml = blocks.map(([heading, list]) => `<h2 class="category-subsection-heading">${esc(heading)}</h2>
+  <ul class="search-suggestions">${list.map((sg) => `<li><a href="${esc(sg.url)}">${esc(sg.label)}</a></li>`).join('')}</ul>`).join('\n  ');
+  const title = `${L.title}${fr ? ' : ' : ': '}${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, fr ? 'Résultats de recherche sur Okanagan Roam.' : 'Search results on Okanagan Roam.', null, [], { golfTheme: true, noindex: true })}
+${renderOutdoorThemeStyles()}
+${renderAnalyticsHeadHtml('search')}
+${SEARCH_PAGE_STYLES}
 </head>
 <body class="golf-page outdoor-page region-page search-page">
   ${renderGolfTripTrayHtml()}
@@ -4225,18 +4738,13 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
-    { name: 'Search' },
+    { name: L.title },
   ])}
-  <h1>Search results</h1>
-  <form class="search-form" action="/browse" method="get" role="search">
-    <input type="search" name="q" value="${esc(q)}" aria-label="Search Okanagan Roam" maxlength="${discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH}">
-    <button type="submit">Search</button>
-  </form>
-  <p class="search-interpreted">You searched “${esc(q)}”${p.interpreted ? `: showing <strong>${esc(p.interpreted)}</strong>` : ''}</p>
-  ${correctionText}
-  ${noteHtml}
+  <h1>${esc(L.h1)}</h1>
+  ${searchFormHtml(q, L)}
+  ${searchSummaryHtml(model, lang)}
   ${resultsHtml}
-  ${suggestionHtml}
+  ${blockHtml}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
@@ -7486,6 +7994,8 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (total < 100) return '';
   const fmt = (x) => Number(x).toLocaleString('en-CA');
+  // French (2026-10-18): "1 766 vrais lieux", with a no-break space, not "1,766".
+  const fmtFr = (x) => fmt(x).replace(/,/g, '\u00a0');
   const items = [
     [total, '/destinations', 'real places', 'vrais lieux'],
     [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 30 days
@@ -7495,7 +8005,7 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
     [n(['golf']), '/golf', 'golf courses', 'terrains de golf'],
     [n(['outdoor']), '/outdoors', 'trails, parks & lookouts', 'sentiers, parcs et points de vue'],
   ].filter(([v]) => v > 0);
-  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v)}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
+  return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v) === fmtFr(v) ? fmt(v) : `<span class="home-en">${fmt(v)}</span><span class="home-fr" lang="fr">${fmtFr(v)}</span>`}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
 }
 function renderBuildTripCTAHTML({ now = homepageNow() } = {}) {
   const fall = isFallHeroSeason(now);
@@ -11549,7 +12059,7 @@ function themedCardHolderSelector(type) {
   // 'guide' (Stage 5B) is a guide page, whose one list can hold any venue
   // type -- the same set as 'lf', but its events report each card's own
   // venue_category (see golfCardEngagementScriptHtml).
-  if (type === 'guide') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
+  if (type === 'guide' || type === 'search') return `:is(${Object.keys(CATEGORY_SLUGS).map((t) => `[data-venue-category="${t}"]`).join(',')})`;
   // 'indoor': the /indoor hub also lists the indoor golf simulators (type golf)
   // and, in "Also good on a rainy day", tagged venues of any other type (an
   // arena, a brewery with bowling, a board-game cafe), so it wires every type
@@ -19832,7 +20342,9 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const typeKeys = new Set(allTypes.map((t) => t.type));
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   f.types = f.types.filter((t) => typeKeys.has(t));
-  const sort = CURATED_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
+  // cfg.sorts (2026-10-18): the page's own sort choices (search adds Top rated).
+  const sorts = cfg.sorts || CURATED_SORTS;
+  const sort = sorts.some((x) => x.key === f.sort) ? f.sort : 'recommended';
   const openNowOn = !!cfg.openNow && !!f.openNow;
   const catsById = new Map(venues.map((v) => [v.id, cfg.catsFor(v)]));
   const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
@@ -19840,7 +20352,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   // (the four ski resorts on Ski & Snow), in their own given order.
   const pinned = cfg.pinFirst ? venues.filter(cfg.pinFirst).sort((a, b) => cfg.pinFirst(a) - cfg.pinFirst(b)) : [];
   const pinnedIds = new Set(pinned.map((v) => v.id));
-  const mixed = [...pinned, ...curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now)];
+  // cfg.keepOrder (2026-10-18): the list is already ranked (search results), so its first order is the given one.
+  const mixed = cfg.keepOrder ? venues.slice() : [...pinned, ...curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now)];
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -19887,6 +20400,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     payload[String(v.id)] = { c: catsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: mixedRank.get(v.id) };
     const st = openInfo.byId.get(v.id);
     if (cfg.openNow && st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
+    if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, cfg.openNow ? openInfo.byId : null, {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {},
@@ -19915,7 +20429,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(cfg.title, cfg.description, canonical, [breadcrumb, itemList], { shareImage: content.banner.src, golfTheme: true, beachTheme: list.some((v) => v.type === 'beach'), advisoryStyles: list.some((v) => advisoryNotes.has(v.id)), savedSidecar: true })}
+${pageHead(cfg.title, cfg.description, cfg.noindex ? null : canonical, cfg.noindex ? [] : [breadcrumb, itemList], { shareImage: content.banner.src, golfTheme: true, beachTheme: list.some((v) => v.type === 'beach'), advisoryStyles: list.some((v) => advisoryNotes.has(v.id)), savedSidecar: true, noindex: !!cfg.noindex })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
@@ -19933,7 +20447,7 @@ ${CATEGORY_BANNER_STYLE}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, ...crumbs, { name: cfg.name }])}
-  ${categoryHeroHtml(`<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(content.banner.credit)}</div>
+  ${categoryHeroHtml(cfg.noBanner ? '' : `<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(content.banner.credit)}</div>
   <script>
   (function(){
     var c = ${JSON.stringify(cfg.categoryContent).replace(/</g, '\\u003c')};
@@ -19950,7 +20464,7 @@ ${renderGolfHeaderHtml()}
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
   </script>`, `<h1>${escapeHtml(content.heading)}</h1>
-  <p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>${cfg.heroExtraHtml || ''}`)}
+  ${content.intro ? `<p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>` : ''}${cfg.heroExtraHtml || ''}`)}
   ${cfg.leadHtml || ''}
   ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
   ${chips}
@@ -19958,7 +20472,7 @@ ${renderGolfHeaderHtml()}
   ${cfg.openNow ? `<p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>` : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
-  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, CURATED_SORTS)}
+  ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, sorts)}
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">Nothing matches that combination yet.</span> <a href="${cfg.path}" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   ${tryHtml ? `<p class="fd-no-results-try">Try one word, like ${tryHtml}.</p>` : ''}</div>
@@ -21685,7 +22199,11 @@ function frBadgeLabel(field) {
 // A stored cuisine ("Italian") -> its French name through app.js's cuisine.* keys; unknown values stay as stored.
 function frCuisine(cuisine) {
   const key = Object.keys(APP_TRANSLATIONS.en).find((k) => k.startsWith('cuisine.') && APP_TRANSLATIONS.en[k] === cuisine);
-  return (key && APP_TRANSLATIONS.fr[key]) || cuisine;
+  if (key && APP_TRANSLATIONS.fr[key]) return APP_TRANSLATIONS.fr[key];
+  // French gaps (2026-10-18): cuisines app.js has no key for ("Soup", "Coffee", "West Coast" ...) use french-text.js's list.
+  let list = {};
+  try { list = frenchText.FR_CUISINE || {}; } catch (e) { list = {}; }
+  return list[cuisine] || list[String(cuisine).replace(/^./, (c) => c.toUpperCase())] || cuisine;
 }
 // Server-side twin of app.js applyTranslations(): the shared header/footer carry data-i18n keys, so a French page swaps
 // their text (and data-i18n-aria/-title/-placeholder attributes) before it leaves the server.
@@ -21817,7 +22335,11 @@ const FR_TWIN_STATIC = new Set(['/', '/food-drink', '/restaurants', '/cafes', '/
   '/wineries', '/golf', '/beaches', '/outdoors', '/tours', '/ski-snow', '/indoor', '/sports', '/dog-friendly', '/local-favorites',
   '/secret-spots', '/hidden-gems', '/destinations', '/browse', '/categories',
   // Phase 2 and 3 (2026-10-14): What's On, the guides, the map, the trip pages, the forms and the info pages.
-  '/whats-on', '/guides', '/map', '/trip', '/my-trip', '/favorites', '/list-your-venue', '/list-an-event', '/about', '/contact', '/privacy', '/terms']);
+  '/whats-on', '/guides', '/map', '/trip', '/my-trip', '/favorites', '/list-your-venue', '/list-an-event', '/about', '/contact', '/privacy', '/terms',
+  // Smarter search (2026-10-18): a French search lands on French results (/fr/search), not the English page.
+  // French gaps (2026-10-18): the business login, new-link and forgot-password pages (the signed-in portal stays
+  // English for now).
+  '/search', '/owner/login', '/owner/link', '/owner/forgot']);
 const FR_TWIN_SECTIONS = new Set(['outdoors', 'tours', 'indoor', 'sports', 'whats-on', 'guides']);
 // A place page (/kelowna/restaurants/slug): it has its own French route.
 function frIsVenuePath(p) {
@@ -21885,6 +22407,12 @@ function frEventHead(html, ev) {
   return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
     .replace(/(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*"/g, (m, a) => `${a}${title}"`)
     .replace(/(<meta (?:name="description"|property="og:description"|name="twitter:description") content=")[^"]*"/g, (m, a) => (desc ? `${a}${desc}"` : m));
+}
+// The query string an EN / FR switch keeps: a shared trip's stops, or the words searched (2026-10-18).
+function twinSearchFor(enPath, rawUrl) {
+  if (enPath === '/my-trip') return tripShareSearch(url.parse(rawUrl, true).query);
+  if (enPath === '/search') { const q = url.parse(rawUrl, true).query.q; return typeof q === 'string' && q.trim() ? `?q=${encodeURIComponent(q)}` : ''; }
+  return '';
 }
 function frTwinPath(enPath) { return enPath === '/' ? '/fr' : `/fr${enPath}`; }
 // A /fr request for a main or town page -> the English address it is rendered from (place pages have their own route).
@@ -22755,9 +23283,9 @@ ${VENUE_MENU_CSS}` : ''}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
   ${venue.redirect_to ? '' : `<div class="venue-owner-cta" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
-    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise\u00a0?')}</p>
+    <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
     <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Revendiquer cette fiche')}</a>
-    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte\u00a0?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
+    <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
   </div>`}
   </aside>
   </div>
@@ -28659,7 +29187,7 @@ ${renderGolfHeaderHtml()}
     shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) days[r] = sharedDays[i]; });
     save(); store(DAYS, days);
     viewing = 'mine';
-    history.replaceState(null, '', '/my-trip');
+    history.replaceState(null, '', /^\/fr(\/|$)/.test(location.pathname) ? '/fr/my-trip' : '/my-trip');
     status(T.saved);
     track('shared_trip_save', { stop_count: trip.length });
     render();
@@ -33620,7 +34148,7 @@ ${VENUE_MENU_CSS}
     ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
-  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise ?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
+  <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
   <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} à ${escapeHtml(regionLabel)}` : `More ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
   </div>
   ${themedShell ? '</main>' : ''}
@@ -34309,11 +34837,15 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
   'Business login': ['login', false], 'My listings': ['account', true], 'Account settings': ['settings', true],
   'Get your edit link': ['link', false], 'Claim this listing': ['claim', false], 'Reset your password': ['forgot', false], 'Reset link expired': ['reset', false], 'Choose a new password': ['reset', false],
 });
-function ownerSimplePage(title, inner, extraHead = '') {
+// French entry pages (2026-10-18): lang 'fr' gives the page a French title and description; the help bot is English
+// only, so those pages point to info@ in French instead (see ownerEntryHelpFr).
+function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
+  const fr = lang === 'fr';
+  const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
   return ownerA11y(`<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(`${title} | Okanagan Roam`, 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
+${pageHead(`${title} | Okanagan Roam`, fr ? 'Espace entreprises des fiches Okanagan Roam.' : 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
 ${extraHead}
 <style>
   body.owner-page .op-wrap { max-width: 560px; margin: 0 auto; padding: 24px 0 56px; }
@@ -34335,26 +34867,55 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main"><div class="op-wrap">
 ${inner}
   </div></main>
-${OWNER_SIMPLE_PAGE_HELP[title] ? ownerHelpWidgetHtml(OWNER_SIMPLE_PAGE_HELP[title][0], { signedIn: OWNER_SIMPLE_PAGE_HELP[title][1] }) : ''}
+${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
 </body>
 </html>`);
 }
 
-function renderOwnerLoginPage() {
-  return ownerSimplePage('Business login', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Business login</h1>
-    <p>Sign in to update your listing on Okanagan Roam, add events and send photos.</p>
+// The server's messages on the French entry pages, in French (the JSON replies stay English for the English pages).
+const OWNER_ENTRY_MESSAGES_FR = {
+  'That email and password don\u2019t match. Forgot your password? Reset it at okanaganroam.com/owner/forgot.': 'Ce courriel et ce mot de passe ne correspondent pas. Mot de passe oublié? Réinitialisez-le à okanaganroam.com/fr/owner/forgot.',
+  [OWNER_LOCKED_MESSAGE]: `Trop de mots de passe erronés. Réessayez dans ${OWNER_LOGIN_LOCK_MINUTES} minutes ou réinitialisez votre mot de passe à okanaganroam.com/fr/owner/forgot.`,
+  'Please enter the email you sign in with.': 'Entrez le courriel que vous utilisez pour vous connecter.',
+  'Please enter the email we have for your business.': 'Entrez le courriel que nous avons pour votre entreprise.',
+  'Please enter your email address.': 'Entrez votre adresse courriel.',
+  'Please use the Okanagan Roam website.': 'Veuillez utiliser le site Okanagan Roam.',
+  'Too many attempts. Please wait a while and try again.': 'Trop de tentatives. Patientez un moment, puis réessayez.',
+  'Please try again.': 'Veuillez réessayer.',
+};
+// A JSON block, not a script literal: the French twin translates English strings inside page scripts, which would
+// turn this list's English keys French.
+function ownerEntryMessagesJson(fr) {
+  return fr ? `<script type="application/json" id="oeFr">${JSON.stringify(OWNER_ENTRY_MESSAGES_FR).replace(/</g, '\\u003c')}</script>\n` : '';
+}
+function ownerEntryMessagesScript(fr) {
+  return fr ? "var OE_FR = {}; try { OE_FR = JSON.parse(document.getElementById('oeFr').textContent); } catch (e) {} function oeMsg(t){ return (t && OE_FR[t]) || t; }"
+    : 'function oeMsg(t){ return t; }';
+}
+function ownerEntryHelpFr() {
+  return '<p class="op-hint" style="margin-top:14px">Besoin d’aide? Écrivez-nous à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>; nous répondons en français ou en anglais.</p>';
+}
+function renderOwnerLoginPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Business login', 'Espace entreprises'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Business login', 'Espace entreprises')}</h1>
+    <p>${L('Sign in to update your listing on Okanagan Roam, add events and send photos.', 'Connectez-vous pour mettre à jour votre fiche sur Okanagan Roam, ajouter des événements et envoyer des photos.')}</p>
     <form class="venue-form" id="olForm" novalidate>
-      <div class="form-field"><label for="olEmail">Email</label><input type="email" id="olEmail" autocomplete="username" maxlength="254"></div>
-      <div class="form-field"><label for="olPassword">Password</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
+      <div class="form-field"><label for="olEmail">${L('Email', 'Courriel')}</label><input type="email" id="olEmail" autocomplete="username" maxlength="254"></div>
+      <div class="form-field"><label for="olPassword">${L('Password', 'Mot de passe')}</label><input type="password" id="olPassword" autocomplete="current-password" maxlength="200"></div>
       <p class="lyv-error" id="olError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="olSubmit">Sign in</button>
-      <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">Forgot your password?</a></p>
+      <button type="submit" class="venue-form-submit" id="olSubmit">${L('Sign in', 'Se connecter')}</button>
+      <p class="op-hint" style="margin:10px 0 0"><a href="/owner/forgot">${L('Forgot your password?', 'Mot de passe oublié?')}</a></p>
     </form>
-    <p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
-    <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>
-<script>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé par courriel et choisissez-y un mot de passe. Vous ne le trouvez pas? <a href="${OWNER_NEW_LINK_PATH}">Recevoir un nouveau lien par courriel</a>.
+    <br><strong>Pas encore inscrit?</strong> <a href="/list-your-venue">Inscrivez votre entreprise gratuitement</a>.</p>
+    <p class="op-hint">Après la connexion, la gestion de vos fiches s’affiche en anglais pour l’instant.</p>
+    ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
+    <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('olForm'), err = document.getElementById('olError'), btn = document.getElementById('olSubmit');
   f.addEventListener('submit', function(e){
@@ -34362,11 +34923,11 @@ function renderOwnerLoginPage() {
     fetch('/owner/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ email: document.getElementById('olEmail').value, password: document.getElementById('olPassword').value }) })
       .then(function(r){ return r.json(); })
-      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = (j && j.error) || 'Please try again.'; err.hidden = false; })
-      .catch(function(){ btn.disabled = false; err.textContent = 'Could not sign in. Please check your connection.'; err.hidden = false; });
+      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = oeMsg((j && j.error) || 'Please try again.'); err.hidden = false; })
+      .catch(function(){ btn.disabled = false; err.textContent = ${fr ? "'Connexion impossible. Vérifiez votre connexion Internet.'" : "'Could not sign in. Please check your connection.'"}; err.hidden = false; });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Business login' });
 }
 
 function renderOwnerAccountPage(account) {
@@ -34697,21 +35258,27 @@ async function handleOwnerNewLink(req, res) {
   return sendSubmissionResponse(res, 200, { ok: true });
 }
 
-function renderOwnerNewLinkPage() {
-  return ownerSimplePage('Get your edit link', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Get your edit link</h1>
-    <p>Can&rsquo;t find the private link we emailed you? Enter the email address we have for your business and we&rsquo;ll send you a new one straight away.</p>
+function renderOwnerNewLinkPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Get your edit link', 'Recevoir votre lien de modification'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Get your edit link', 'Recevoir votre lien de modification')}</h1>
+    <p>${L('Can&rsquo;t find the private link we emailed you? Enter the email address we have for your business and we&rsquo;ll send you a new one straight away.', 'Vous ne trouvez plus le lien privé que nous vous avons envoyé? Entrez l’adresse courriel que nous avons pour votre entreprise et nous vous en enverrons un nouveau tout de suite.')}</p>
     <form class="venue-form" id="onlForm" novalidate>
-      <div class="form-field"><label for="onlEmail">Your business email</label><input type="email" id="onlEmail" autocomplete="email" maxlength="254"><p class="lyv-error" id="onlEmailError" hidden></p></div>
+      <div class="form-field"><label for="onlEmail">${L('Your business email', 'Courriel de votre entreprise')}</label><input type="email" id="onlEmail" autocomplete="email" maxlength="254"><p class="lyv-error" id="onlEmailError" hidden></p></div>
       <p class="lyv-error" id="onlError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="onlSubmit">Email me my link</button>
+      <button type="submit" class="venue-form-submit" id="onlSubmit">${L('Email me my link', 'M’envoyer mon lien')}</button>
     </form>
-    <p class="op-done" id="onlDone" hidden>If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.</p>
-    <p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
+    <p class="op-done" id="onlDone" hidden>${L('If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.', 'Si nous avons ce courriel pour une entreprise, un nouveau lien est en route. Vérifiez votre boîte de réception (et vos courriels indésirables). Votre ancien lien fonctionne jusqu’à ce que vous ouvriez le nouveau.')}</p>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Nous n’avons pas votre courriel, ou il a changé?</strong> Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong>. Nous vérifierons qu’il s’agit bien de vous et vous enverrons un lien.
+    <br><strong>Vous ne savez pas quel courriel nous avons?</strong> Écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous réglerons la question.
+    <br><strong>Vous avez déjà un compte?</strong> <a href="/owner/login">Connectez-vous ici</a>.</p>
+    <p class="op-hint">La page de modification de votre fiche s’affiche en anglais pour l’instant.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
     <br><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
-    <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>
-<script>
+    <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('onlForm'), btn = document.getElementById('onlSubmit');
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
@@ -34724,13 +35291,13 @@ function renderOwnerNewLinkPage() {
         btn.disabled = false;
         if (j && j.ok) { f.hidden = true; document.getElementById('onlDone').hidden = false; return; }
         var errs = (j && j.errors) || {};
-        show('onlEmailError', errs.email);
-        if (!errs.email) show('onlError', (j && j.error) || 'Please try again.');
+        show('onlEmailError', oeMsg(errs.email));
+        if (!errs.email) show('onlError', oeMsg((j && j.error) || 'Please try again.'));
       })
-      .catch(function(){ btn.disabled = false; show('onlError', 'Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; show('onlError', ${fr ? "'Connexion impossible. Veuillez réessayer.'" : "'Could not connect. Please try again.'"}); });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Get your edit link' });
 }
 
 // ---------- Claim this listing (2026-10-18) ----------
@@ -35005,7 +35572,7 @@ function renderClaimPage(venue, lang) {
   body.owner-page .cl-radio input[type=radio] { flex: 0 0 auto; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; padding: 0; }
   body.owner-page .cl-radio span { flex: 1 1 auto; min-width: 0; }
   body.owner-page [hidden] { display: none !important; }
-</style>`);
+</style>`, { lang, helpKey: 'Claim this listing' });
   return fr ? page.replace('<html lang="en">', '<html lang="fr-CA">') : page;
 }
 
@@ -35137,20 +35704,25 @@ async function handleOwnerReset(req, res, value) {
   return res.end(JSON.stringify({ ok: true }));
 }
 
-function renderOwnerForgotPage() {
-  return ownerSimplePage('Reset your password', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Reset your password</h1>
-    <p>Enter the email you sign in with. We&rsquo;ll send you a link to choose a new password.</p>
+function renderOwnerForgotPage({ lang = 'en' } = {}) {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  return ownerSimplePage(L('Reset your password', 'Réinitialiser votre mot de passe'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Reset your password', 'Réinitialiser votre mot de passe')}</h1>
+    <p>${L('Enter the email you sign in with. We&rsquo;ll send you a link to choose a new password.', 'Entrez le courriel que vous utilisez pour vous connecter. Nous vous enverrons un lien pour choisir un nouveau mot de passe.')}</p>
     <form class="venue-form" id="ofgForm" novalidate>
-      <div class="form-field"><label for="ofgEmail">Email</label><input type="email" id="ofgEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="ofgEmailError" hidden></p></div>
+      <div class="form-field"><label for="ofgEmail">${L('Email', 'Courriel')}</label><input type="email" id="ofgEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="ofgEmailError" hidden></p></div>
       <p class="lyv-error" id="ofgError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="ofgSubmit">Send reset link</button>
+      <button type="submit" class="venue-form-submit" id="ofgSubmit">${L('Send reset link', 'Envoyer le lien de réinitialisation')}</button>
     </form>
-    <p class="op-done" id="ofgDone" hidden>If that email has a login, a reset link is on its way. Check your inbox (and spam folder). <span id="ofgSlow" hidden>It can take a few hours to arrive.</span></p>
-    <p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
-    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there, or <a href="${OWNER_NEW_LINK_PATH}">get a new link</a>.</p>
-<script>
+    <p class="op-done" id="ofgDone" hidden>${L('If that email has a login, a reset link is on its way. Check your inbox (and spam folder).', 'Si ce courriel est associé à un compte, un lien de réinitialisation est en route. Vérifiez votre boîte de réception (et vos courriels indésirables).')} <span id="ofgSlow" hidden>${L('It can take a few hours to arrive.', 'Il peut prendre quelques heures à arriver.')}</span></p>
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Retour à la connexion</a>
+    <br><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé et choisissez-y un mot de passe, ou <a href="${OWNER_NEW_LINK_PATH}">recevez un nouveau lien</a>.</p>
+    ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
+    <br><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there, or <a href="${OWNER_NEW_LINK_PATH}">get a new link</a>.</p>`}
+${ownerEntryMessagesJson(fr)}<script>
+${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('ofgForm'), btn = document.getElementById('ofgSubmit');
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
@@ -35163,13 +35735,13 @@ function renderOwnerForgotPage() {
         btn.disabled = false;
         if (j && j.ok) { f.hidden = true; document.getElementById('ofgDone').hidden = false; document.getElementById('ofgSlow').hidden = !!j.direct; return; }
         var errs = (j && j.errors) || {};
-        show('ofgEmailError', errs.email);
-        if (!errs.email) show('ofgError', (j && j.error) || 'Please try again.');
+        show('ofgEmailError', oeMsg(errs.email));
+        if (!errs.email) show('ofgError', oeMsg((j && j.error) || 'Please try again.'));
       })
-      .catch(function(){ btn.disabled = false; show('ofgError', 'Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; show('ofgError', ${fr ? "'Connexion impossible. Veuillez réessayer.'" : "'Could not connect. Please try again.'"}); });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Reset your password' });
 }
 
 function renderOwnerResetPage(valid) {
@@ -36992,10 +37564,10 @@ const server = http.createServer(async (req, res) => {
     const frTwinReq = frenchTwinRequest(req.url);
     if (frTwinReq) {
       req.url = frTwinReq.enUrl;
-      installTwinResponse(res, 'fr', frTwinReq.enPath, frTwinReq.enPath === '/my-trip' ? tripShareSearch(url.parse(req.url, true).query) : '');
+      installTwinResponse(res, 'fr', frTwinReq.enPath, twinSearchFor(frTwinReq.enPath, req.url));
     } else {
       const p = String(req.url).split('?')[0].replace(/(.)\/$/, '$1');
-      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p, p === '/my-trip' ? tripShareSearch(url.parse(req.url, true).query) : '');
+      if (hasFrenchTwin(p) && !frIsVenuePath(p)) installTwinResponse(res, 'en', p, twinSearchFor(p, req.url));
     }
   }
   const parsed = url.parse(req.url, true);
@@ -37191,7 +37763,12 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: '/browse', 'Cache-Control': 'no-store' });
         return res.end();
       }
-      const html = renderSearchPage(runDiscovery(q, { limit: DISCOVERY_MAX_LIMIT }));
+      // Smarter search (2026-10-18): every match (Show more), in the visitor's language. French gaps (2026-10-18): a
+      // French search is read through the planner's French words ("terrasse" -> "patio"); the page shows what was typed.
+      const searchText = discoverySearchText(q, res.twinLang);
+      const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS });
+      run.query = q; run.searchText = searchText;
+      const html = renderSearchPage(run, { lang: res.twinLang });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
       return res.end(html);
     }
@@ -37249,7 +37826,7 @@ const server = http.createServer(async (req, res) => {
           && query.q.length <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) {
           // Stage 3.4: heroSearchTarget() decides (see its comment); a null
           // url keeps today's /browse, as typed.
-          const target = heroSearchTarget(query.q);
+          const target = heroSearchTarget(query.q, { lang: res.twinLang });
           if (target.url) {
             res.writeHead(302, { Location: target.url, 'Cache-Control': 'no-store' });
             return res.end();
@@ -39477,21 +40054,21 @@ const server = http.createServer(async (req, res) => {
       if (method === 'GET' || method === 'HEAD') {
         if (ownerAccountForRequest(req)) { res.writeHead(302, { Location: '/owner/account', 'Cache-Control': 'no-store' }); return res.end(); }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname === OWNER_NEW_LINK_PATH || pathname === `${OWNER_NEW_LINK_PATH}/`) {
       if (method === 'POST') return await handleOwnerNewLink(req, res);
       if (method === 'GET' || method === 'HEAD') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerNewLinkPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerNewLinkPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname === '/owner/forgot' || pathname === '/owner/forgot/') {
       if (method === 'POST') return await handleOwnerForgot(req, res);
       if (method === 'GET' || method === 'HEAD') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerForgotPage());
+        return res.end(method === 'HEAD' ? undefined : renderOwnerForgotPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
     }
     if (pathname.startsWith(OWNER_RESET_PATH)) {
@@ -40419,6 +40996,7 @@ module.exports = {
   frText,
   frenchTwinHtml,
   frTextOr,
+  frCuisine,
   englishTwinHtml,
   withFrenchTwinEntries,
   venuePagePath,
@@ -40904,6 +41482,10 @@ module.exports = {
   resolveDiscoveryDestination,
   selectDiscoveryVenues,
   heroSearchTarget,
+  smartSearchPlan,
+  smartFuzzyVenues,
+  smartGuideMatches,
+  searchPageModel,
   discoveryPresentation,
   renderSearchPage,
   renderMapPage,
