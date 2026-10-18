@@ -2458,7 +2458,9 @@ window.__scrollToVenueCard = function(name){
       // render on this page anymore (see the architecture-change comment
       // on the / route in server.js) -- hand the query to /browse instead.
       var q = heroInput.value.trim();
-      window.location.href = frPathPrefix() + (q ? ('/browse?q=' + encodeURIComponent(q)) : '/browse');
+      // Smarter search (2026-10-18): the French homepage searches in French (/fr/browse -> /fr/search).
+      var base = /^\/fr(\/|$)/.test(window.location.pathname) ? '/fr/browse' : '/browse';
+      window.location.href = q ? (base + '?q=' + encodeURIComponent(q)) : base;
     }
   });
 })();
