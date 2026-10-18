@@ -212,6 +212,17 @@ function rowToVenue(row) {
   for (const f of BOOL_FIELDS) {
     v[f] = !!row[f];
   }
+  // Seasonal hours and special closures (2026-10-18), only on the few venues that have them (keeps API pages
+  // small): the lists themselves, and hours_live -- the hours JSON hours.js reads with both applied.
+  if (row.hours) {
+    const x = hoursExtrasMap().get(row.id);
+    if (x) {
+      const closures = upcomingClosures(x.closures);
+      if (x.seasons.length) v.hours_seasonal = x.seasons;
+      if (closures.length) v.special_closures = closures;
+      if (x.seasons.length || closures.length) v.hours_live = hoursWithExtras(v);
+    }
+  }
   return v;
 }
 
@@ -4931,7 +4942,10 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
       plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds(v) : [],
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
-      hours: v.hours || null, // the stored JSON; parsed (never modified) by the planner
+      // The stored JSON, parsed (never modified) by the planner -- or, in an owner's seasonal hours (2026-10-18), that
+      // week instead. The owner's special closures are dated, like the season below.
+      hours: weekJsonOn(v, seasonToday) || null,
+      ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from })) : undefined; })(),
       imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
@@ -5090,17 +5104,18 @@ function tripPlanDate(when, now = new Date()) {
 // and `now` is injectable so tests can freeze it.
 // The formatter options are a named constant so a page script can build the
 // identical clock in the browser (the Food & Drink Open Now status).
-const OKANAGAN_CLOCK_FORMAT = { timeZone: OKANAGAN_TIME_ZONE, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+// The clock also carries the Okanagan calendar date (2026-10-18), so hours.js can apply seasonal hours and closures.
+const OKANAGAN_CLOCK_FORMAT = { timeZone: OKANAGAN_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
 const okanaganClockFormatter = new Intl.DateTimeFormat('en-US', OKANAGAN_CLOCK_FORMAT);
 function okanaganClock(now = new Date()) {
   // This function is serialized into browser scripts with toString(), so keep
   // the cutoff self-contained instead of depending on a server-only helper.
   if (now instanceof Date && now.getTime() >= Date.UTC(2026, 10, 1, 9, 0)) {
     const local = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-    return { weekday: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][local.getUTCDay()], minutes: local.getUTCHours() * 60 + local.getUTCMinutes() };
+    return { weekday: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][local.getUTCDay()], minutes: local.getUTCHours() * 60 + local.getUTCMinutes(), date: local.toISOString().slice(0, 10) };
   }
   const parts = Object.fromEntries(okanaganClockFormatter.formatToParts(now).map((x) => [x.type, x.value]));
-  return { weekday: parts.weekday.slice(0, 3).toLowerCase(), minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute) };
+  return { weekday: parts.weekday.slice(0, 3).toLowerCase(), minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute), date: `${parts.year}-${parts.month}-${parts.day}` };
 }
 
 // A venue's listed-hours status at an instant on the Okanagan wall clock
@@ -17836,9 +17851,11 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
       byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null });
       continue;
     }
-    const parsed = hoursModule.parseHours(v.hours);
+    // Seasonal hours and special closures ride along (2026-10-18), so the cards' and the map's live status apply them too.
+    const raw = hoursWithExtras(v, now);
+    const parsed = hoursModule.parseHours(raw);
     const label = hoursModule.hoursStatusLabel(hoursModule.statusAt(parsed, clock), clock);
-    byId.set(v.id, { eligible: true, reason: 'ok', state: label.state, text: label.text, hours: JSON.parse(v.hours) });
+    byId.set(v.id, { eligible: true, reason: 'ok', state: label.state, text: label.text, hours: JSON.parse(raw) });
     if (label.state === 'open') openIds.add(v.id);
   }
   return { byId, openIds };
@@ -23576,6 +23593,9 @@ function frStatusText(text) {
     .replace('Closed today \u00b7 Opens ', 'Ferm\u00e9 aujourd\u2019hui \u00b7 ouvre ')
     .replace('Closed \u00b7 Opens ', 'Ferm\u00e9 \u00b7 ouvre ')
     .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
+    // A special closure (2026-10-18): "Closed today (holiday) \u00b7 Opens ..." -> "Ferm\u00e9 aujourd\u2019hui (jour f\u00e9ri\u00e9) \u00b7 ouvre ...".
+    .replace(' (holiday)', ' (jour f\u00e9ri\u00e9)')
+    .replace(') \u00b7 Opens ', ') \u00b7 ouvre ')
     .replace('Closed now', 'Ferm\u00e9 en ce moment')
     .replace('Hours not listed for today', 'Heures non indiqu\u00e9es pour aujourd\u2019hui')
     .replace(/\btomorrow /, 'demain \u00e0 ')
@@ -23599,6 +23619,31 @@ function venueHoursCheckedHtml(venueId, fr, now = new Date()) {
     ? `<p class="venue-hours-stale">${fr ? 'Les heures ont peut-\u00eatre chang\u00e9 \u2014 v\u00e9rifiez avant d\u2019y aller.' : 'Hours may have changed \u2014 check before you go.'}</p>`
     : '';
   return `<p class="venue-hours-checked">${fr ? `Heures v\u00e9rifi\u00e9es le ${date}` : `Hours checked ${date}`}</p>${stale}`;
+}
+// Under a venue page's hours (2026-10-18): the owner's seasonal hours (the set in use now, or the other one folded
+// away) and the special closures coming up. French pages use their own words, not the owner's English label.
+function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames) {
+  const L = (en, frText) => (fr ? frText : en);
+  const out = [];
+  const list = (days) => `<ul class="hours-list">${hoursModule.HOURS_WEEKDAYS.map((d) => `<li><span>${dayNames[d]}</span><span>${dayText(days[d])}</span></li>`).join('')}</ul>`;
+  const nowSeason = (parsed.seasons || []).find((s) => {
+    const md = clock.date.slice(5);
+    return s.from <= s.to ? md >= s.from && md <= s.to : md >= s.from || md <= s.to;
+  });
+  for (const s of parsed.seasons || []) {
+    const name = fr ? 'Heures saisonnières' : escapeHtml(s.label || 'Seasonal hours');
+    const range = escapeHtml(hoursExtraRangeText(s.from, s.to, fr));
+    if (s === nowSeason) {
+      out.push(`<p class="venue-hours-note"><strong>${name}</strong> (${range}) ${L('apply now', 'en vigueur')}.</p><details class="venue-hours-usual"><summary>${L('Usual hours', 'Heures habituelles')}</summary>${list(parsed.days)}</details>`);
+    } else {
+      out.push(`<details class="venue-hours-usual"><summary>${name} (${range})</summary>${list(s.days)}</details>`);
+    }
+  }
+  const soon = (parsed.closures || []).filter((c) => c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
+  if (soon.length) {
+    out.push(`<p class="venue-hours-closures"><strong>${L('Special closures', 'Fermetures spéciales')}:</strong> ${soon.map((c) => `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${c.note ? ` (${escapeHtml(c.note)})` : ''}`).join(' &middot; ')}</p>`);
+  }
+  return out.join('');
 }
 function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
   if (!hoursModule || !pageHours || hasAdvisory) return null;
@@ -23654,6 +23699,7 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-aside .map-link { display: inline-block; margin-top: 4px; font-weight: 800; font-size: 0.86rem; }
   body.golf-page .venue-hours h2 { margin-bottom: 6px; }
   body.golf-page .hours-list li.is-today { font-weight: 800; color: var(--ink); }
+  body.golf-page .venue-hours-note, body.golf-page .venue-hours-closures { margin: 10px 0 0; font-size: 0.9rem; }
   body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 today"; font-weight: 700; opacity: 0.6; }
   html[lang="fr"] body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 aujourd\u2019hui"; }
   /* Actions: one primary button, then the rest two by two on a phone. */
@@ -23703,6 +23749,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
           ? require('./data/toncini-pasta-bar.json') : null
     : null;
   const pageHours = editorial && editorial.hours ? JSON.stringify(editorial.hours) : venue.hours;
+  // The owner's seasonal hours and special closures (2026-10-18) apply to the stored hours (not to editorial ones).
+  const statusHours = pageHours === venue.hours && !venue.redirect_to ? hoursWithExtras(venue, opts.now || new Date()) : pageHours;
   const regionLabel = REGION_LABELS[venue.region];
   const catSlug = CATEGORY_SLUGS[venue.type];
   const label = (fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[venue.type];
@@ -23775,29 +23823,42 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // an all-day day stays 00:00–23:59 (the list restates the stored hours, it
   // never rewords them as "Open 24 hours"). No list when nothing is readable.
   let hoursHtml = '';
-  const parsedHours = pageHours && hoursModule ? hoursModule.parseHours(pageHours) : null;
+  const parsedHours = statusHours && hoursModule ? hoursModule.parseHours(statusHours) : null;
   if (parsedHours && parsedHours.known) {
     const dayNames = fr ? FR_DAY_NAMES : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
-    const today = okanaganClock(opts.now || new Date()).weekday;
+    const clockNow = okanaganClock(opts.now || new Date());
+    const today = clockNow.weekday;
     // Seasons everywhere (2026-10-18): closed for the season, the weekly hours are only the usual ones, so they
     // fold away under that heading and no day is marked as today; the page never reads as open.
     const seasonShut = !venue.redirect_to && (getSeasonStates(opts.now || new Date()).get(venue.id) || {}).kind === 'closed';
-    const rows = hoursModule.HOURS_WEEKDAYS.map((d) => {
-      const text = venueDayHoursText(parsedHours.days[d], fr);
-      return `<li${d === today && !seasonShut ? ' class="is-today"' : ''}><span>${dayNames[d]}</span><span>${escapeHtml(text)}</span></li>`;
+    // Seasonal hours and special closures (2026-10-18): each row is that weekday's next date in the coming week, so
+    // a seasonal set shows on its dates and a closed day reads "Closed (Thanksgiving)".
+    const datedWeek = !!(parsedHours.seasons || parsedHours.closures) && !seasonShut && clockNow.date;
+    const dateOf = (d) => hoursModule.shiftDate(clockNow.date, (hoursModule.HOURS_WEEKDAYS.indexOf(d) - hoursModule.HOURS_WEEKDAYS.indexOf(today) + 7) % 7);
+    const closedWord = (c) => `${L('Closed', 'Fermé')} (${escapeHtml(c.note || L('holiday', 'jour férié'))})`;
+    const rowsFor = (dayOf) => hoursModule.HOURS_WEEKDAYS.map((d) => {
+      const day = dayOf(d);
+      const text = day && day.closure ? closedWord(day.closure) : escapeHtml(venueDayHoursText(day, fr));
+      return `<li${d === today && !seasonShut ? ' class="is-today"' : ''}${day && day.closure ? ' data-closed-date="1"' : ''}><span>${dayNames[d]}</span><span>${text}</span></li>`;
     }).join('');
+    const rows = datedWeek ? rowsFor((d) => hoursModule.dayOnDate(parsedHours, dateOf(d))) : rowsFor((d) => parsedHours.days[d]);
     hoursHtml = seasonShut
       ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
       : (() => {
         // Venue page layout (2026-10-18): seven identical rows read as noise, so a week with the same hours every day
-        // shows one line and keeps the day-by-day list folded under it.
-        const texts = hoursModule.HOURS_WEEKDAYS.map((d) => venueDayHoursText(parsedHours.days[d], fr));
+        // shows one line and keeps the day-by-day list folded under it. With seasonal hours or closures the rows are
+        // this coming week's dates, so a closed day breaks the run and the full list shows.
+        const texts = hoursModule.HOURS_WEEKDAYS.map((d) => {
+          const day = datedWeek ? hoursModule.dayOnDate(parsedHours, dateOf(d)) : parsedHours.days[d];
+          return day && day.closure ? `closed:${day.closure.note}` : venueDayHoursText(day, fr);
+        });
         const list = `<ul class="hours-list" data-today="${today}">${rows}</ul>`;
         if (texts.every((t) => t === texts[0])) {
           return `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${escapeHtml(texts[0])}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
         }
         return `<h2>${L('Hours', 'Heures')}</h2>${list}`;
       })();
+    if (datedWeek) hoursHtml += venueHoursExtrasHtml(parsedHours, clockNow, fr, (d) => escapeHtml(venueDayHoursText(d, fr)), dayNames);
     // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
@@ -24017,7 +24078,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // region field, never hardcoded to any one venue/region.
   // Every type (2026-10-14), not only the ALL_REGIONS_CATEGORIES ones.
   const venueBackLink = `<a class="category-back-link" href="/${venue.region}/${catSlug}">\u2190 ${fr ? `${escapeHtml(label.plural)} \u00e0 ${escapeHtml(regionLabel)}` : `${escapeHtml(regionLabel)} ${escapeHtml(ALL_REGIONS_BACK_LABEL[venue.type] || label.plural)}`}</a>`;
-  const openStatus = venueOpenStatus(pageHours, venueAdvisoryNote !== undefined, opts.now || new Date());
+  const openStatus = venueOpenStatus(statusHours, venueAdvisoryNote !== undefined, opts.now || new Date());
   const openStatusHtml = openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '';
@@ -31123,12 +31184,98 @@ function ownerOptionalEmail(value) {
 function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
-const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months'];
+const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
+  'price_range', 'hours_seasons', 'closures'];
+const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
+// Price range (2026-10-18): the owner picks one, per person.
+const OWNER_PRICE_SCALE = { 1: 'under $15', 2: '$15–30', 3: '$30–60', 4: 'over $60' };
+const OWNER_PRICE_SCALE_FR = { 1: 'moins de 15 $', 2: '15 à 30 $', 3: '30 à 60 $', 4: 'plus de 60 $' };
+// 'MM-DD' for a real day of the year (Feb 29 allowed), or null.
+function ownerMonthDay(value) {
+  const m = /^(\d{2})-(\d{2})$/.exec(typeof value === 'string' ? value.trim() : '');
+  if (!m) return null;
+  const mo = Number(m[1]), d = Number(m[2]);
+  const len = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1];
+  return len && d >= 1 && d <= len ? `${m[1]}-${m[2]}` : null;
+}
 // Name, address and links (2026-10-15). Links live in venue_links.
 const OWNER_LINK_FIELDS = ['menu_url', 'booking_url', 'instagram_url', 'facebook_url'];
 function venueLinks(venueId) {
   return db.prepare('SELECT menu_url, booking_url, instagram_url, facebook_url, open_months FROM venue_links WHERE venue_id = ?').get(venueId)
     || { menu_url: null, booking_url: null, instagram_url: null, facebook_url: null, open_months: null };
+}
+// ---------- Seasonal hours and special closures (2026-10-18) ----------
+// An owner can add one second week of hours for part of every year (winter hours Nov 1 - Apr 30) and dated special
+// closures with an optional note (venue_hours_extra, db.js). hoursWithExtras() hands them to hours.js inside the
+// hours JSON (_seasons / _closures), so every surface that reads hours through hours.js (Open Now on cards and the
+// map, the venue page, Build My Trip, the classic browse cards) applies them on the right dates. Read once a minute
+// from the small table and dropped on every write, like venueSocialLinks.
+const HOURS_SEASON_MAX = 2;
+const HOURS_CLOSURE_MAX = 20;
+const HOURS_EXTRA_NOTE_MAX = 60;
+let hoursExtraCache = null;
+function hoursExtrasMap() {
+  if (!hoursExtraCache || Date.now() - hoursExtraCache.at > 60000) {
+    const map = new Map();
+    try {
+      for (const r of db.prepare('SELECT venue_id, seasons, closures FROM venue_hours_extra').all()) {
+        let seasons = [], closures = [];
+        try { seasons = JSON.parse(r.seasons || '[]') || []; } catch (e) { seasons = []; }
+        try { closures = JSON.parse(r.closures || '[]') || []; } catch (e) { closures = []; }
+        if (!Array.isArray(seasons)) seasons = [];
+        if (!Array.isArray(closures)) closures = [];
+        if (seasons.length || closures.length) map.set(r.venue_id, { seasons, closures });
+      }
+    } catch (e) { /* table missing in an old copy: no extras */ }
+    hoursExtraCache = { at: Date.now(), map };
+  }
+  return hoursExtraCache.map;
+}
+function clearHoursExtraCache() { hoursExtraCache = null; }
+// -> { seasons: [...], closures: [...] } (both lists empty when the venue has none).
+function venueHoursExtras(venueId) {
+  const x = hoursExtrasMap().get(venueId);
+  return x ? { seasons: x.seasons, closures: x.closures } : { seasons: [], closures: [] };
+}
+// Closures that haven't ended yet (yesterday's is kept for a night that ran past midnight).
+function upcomingClosures(list, now = new Date()) {
+  const from = addLocalDays(todayLocal(now), -1);
+  return (list || []).filter((c) => c && (c.to || c.from) >= from);
+}
+// The venue's hours JSON with its seasonal set and upcoming closures added, or the stored hours unchanged when it
+// has none (nearly every venue) or no weekly hours at all.
+function hoursWithExtras(v, now = new Date()) {
+  const raw = v ? v.hours : null;
+  const x = v && raw ? hoursExtrasMap().get(v.id) : null;
+  if (!x) return raw;
+  const closures = upcomingClosures(x.closures, now);
+  if (!x.seasons.length && !closures.length) return raw;
+  let obj;
+  try { obj = JSON.parse(raw); } catch (e) { return raw; }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return raw;
+  if (x.seasons.length) obj._seasons = x.seasons;
+  if (closures.length) obj._closures = closures;
+  return JSON.stringify(obj);
+}
+// The plain week that applies on a date (a seasonal set, or the usual hours), for readers that only know weekdays
+// (Build My Trip). Closures are handled separately (venueClosedOn).
+function weekJsonOn(v, date) {
+  const x = v && v.hours ? hoursExtrasMap().get(v.id) : null;
+  if (!x || !x.seasons.length) return v ? v.hours : null;
+  const md = String(date).slice(5);
+  const s = x.seasons.find((p) => (p.from <= p.to ? md >= p.from && md <= p.to : md >= p.from || md <= p.to));
+  return s ? JSON.stringify(s.hours) : v.hours;
+}
+// "Nov 1" / "1er nov." from 'MM-DD' or 'YYYY-MM-DD'.
+function hoursExtraDayText(value, fr = false) {
+  const s = String(value || '');
+  const md = s.length === 10 ? s.slice(5) : s;
+  const m = Number(md.slice(0, 2)) - 1, d = Number(md.slice(3, 5));
+  if (!(m >= 0 && m < 12) || !d) return s;
+  return fr ? `${d === 1 ? '1er' : d} ${FR_SHORT_MONTHS[m]}` : `${SEASON_TAG_MONTHS[m]} ${d}`;
+}
+function hoursExtraRangeText(from, to, fr = false) {
+  return !to || to === from ? hoursExtraDayText(from, fr) : `${hoursExtraDayText(from, fr)} – ${hoursExtraDayText(to, fr)}`;
 }
 // Instagram/Facebook links for listing cards (2026-10-16): one read of the
 // small venue_links table, kept for a minute and dropped whenever a link is
@@ -31376,6 +31523,10 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     name: venue.name || '',
     address: venue.address || '',
     ...Object.fromEntries(Object.entries(venueLinks(venue.id)).map(([k, x]) => [k, x || ''])),
+    // Price range, seasonal hours and special closures (2026-10-18). Closures already over are left out.
+    price_range: venue.price ? String(venue.price) : '',
+    hours_seasons: venueHoursExtras(venue.id).seasons,
+    closures: venueHoursExtras(venue.id).closures.filter((c) => (c.to || c.from) >= todayLocal()),
   };
 }
 
@@ -31512,12 +31663,64 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       else if (!sameJsonWeek(w.json, current.happy_hour)) changes.happy_hour = w.json;
     }
   }
+  if ('price_range' in input) {
+    const raw = input.price_range == null ? '' : String(input.price_range).trim();
+    if (raw && !/^[1-4]$/.test(raw)) errors.price_range = 'Please pick a price range from the list.';
+    else if (raw !== current.price_range) changes.price_range = raw ? Number(raw) : null;
+  }
+  // Seasonal hours (2026-10-18): up to HOURS_SEASON_MAX weeks, each for a day range every year.
+  if ('hours_seasons' in input) {
+    const list = input.hours_seasons;
+    if (!Array.isArray(list) || list.length > HOURS_SEASON_MAX) errors.hours_seasons = 'The seasonal hours could not be read. Please reload the page and try again.';
+    else {
+      const out = [];
+      for (const x of list) {
+        if (!x || typeof x !== 'object' || Array.isArray(x)) { errors.hours_seasons = 'The seasonal hours could not be read. Please reload the page and try again.'; break; }
+        const from = ownerMonthDay(x.from), to = ownerMonthDay(x.to);
+        if (!from || !to) { errors.hours_seasons = 'Please pick the first and last day of your seasonal hours.'; break; }
+        if (from === to) { errors.hours_seasons = 'Please pick two different days for your seasonal hours.'; break; }
+        const label = typeof x.label === 'string' ? x.label.trim().replace(/\s+/g, ' ') : '';
+        if (label.length > 40 || /[<>&]/.test(label)) { errors.hours_seasons = 'Please keep the name of your seasonal hours short (up to 40 characters), without < > or &.'; break; }
+        const w = ownerWeekJson(x.hours, 'Seasonal hours', { allowEmptyWeek: false });
+        if (!w.ok) { errors.hours_seasons = w.detail; break; }
+        out.push({ from, to, label, hours: JSON.parse(w.json) });
+      }
+      if (!errors.hours_seasons && JSON.stringify(out) !== JSON.stringify(current.hours_seasons || [])) changes.hours_seasons = out;
+    }
+  }
+  // Special closures (2026-10-18): dates or date ranges from today on, with an optional short note.
+  if ('closures' in input) {
+    const list = input.closures;
+    const today = todayLocal();
+    if (!Array.isArray(list) || list.length > HOURS_CLOSURE_MAX) errors.closures = `You can list up to ${HOURS_CLOSURE_MAX} closures.`;
+    else {
+      const out = [];
+      for (const x of list) {
+        const from = x && typeof x.from === 'string' && parseLocalDate(x.from) ? x.from : null;
+        const to = x && typeof x.to === 'string' && x.to ? (parseLocalDate(x.to) ? x.to : null) : from;
+        if (!from || !to) { errors.closures = 'Please pick a date for each closure.'; break; }
+        if (to < from) { errors.closures = 'A closure can\u2019t end before it starts.'; break; }
+        if (to < today) { errors.closures = 'One closure is already over. Remove it, or pick a date from today on.'; break; }
+        if (from > addLocalDays(today, 730)) { errors.closures = 'Please add closures for the next two years only.'; break; }
+        if (localDateToDayNumber(to) - localDateToDayNumber(from) > 366) { errors.closures = 'A closure can be up to a year long. For a longer break, use the Season setting.'; break; }
+        const note = x && typeof x.note === 'string' ? x.note.trim().replace(/\s+/g, ' ') : '';
+        if (note.length > HOURS_EXTRA_NOTE_MAX || /[<>&()]/.test(note)) { errors.closures = `Please keep each note short (up to ${HOURS_EXTRA_NOTE_MAX} characters), without < > & or brackets.`; break; }
+        out.push({ from, to, note });
+      }
+      out.sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+      if (!errors.closures && JSON.stringify(out) !== JSON.stringify(current.closures || [])) changes.closures = out;
+    }
+  }
   const previous = {};
   for (const k of Object.keys(changes)) {
     previous[k] = k === 'badges' ? Object.fromEntries(Object.keys(changes.badges).map((f) => [f, current.badges[f]])) : current[k];
   }
-  if (!Object.keys(errors).length && !Object.keys(changes).length) errors.form = 'Nothing has changed yet. Edit a field, then send it.';
-  return { changes, previous, errors };
+  // Sent but the same as the live listing (2026-10-18): a field still waiting for review that the owner set back to
+  // what is live leaves the waiting request.
+  const same = Object.keys(input).filter((k) => k !== 'badges' && OWNER_CHANGE_FIELDS.includes(k) && !errors[k] && !(k in changes));
+  const badgesSame = !errors.badges && input.badges && typeof input.badges === 'object' ? Object.keys(input.badges).filter((k) => !(changes.badges && k in changes.badges)) : [];
+  if (!Object.keys(errors).length && !Object.keys(changes).length) errors.form = OWNER_NOTHING_CHANGED;
+  return { changes, previous, errors, same, badgesSame };
 }
 
 const ownerChangeAttempts = new Map(); // ip -> [timestamps]
@@ -31540,7 +31743,7 @@ function getOwnerChange(id) {
 }
 
 function pendingOwnerChange(venueId) {
-  return db.prepare("SELECT id, submitted_at FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1").get(venueId) || null;
+  return db.prepare("SELECT id, submitted_at FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 1").get(venueId) || null;
 }
 
 function listOwnerChanges(status = 'pending') {
@@ -31554,7 +31757,8 @@ function listOwnerChanges(status = 'pending') {
 }
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
-  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season' };
+  name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
+  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures' };
 function ownerWeekText(json) {
   if (!json) return '(none)';
   try {
@@ -31565,6 +31769,15 @@ function ownerWeekText(json) {
 function ownerValueText(field, value) {
   if (field === 'hours' || field === 'happy_hour') return ownerWeekText(value);
   if (field === 'open_months') return value ? openMonthsText(value) : 'Open all year';
+  if (field === 'price_range') return value ? `${'$'.repeat(Number(value))} (${OWNER_PRICE_SCALE[Number(value)] || ''} per person)` : '(none)';
+  if (field === 'hours_seasons') {
+    return Array.isArray(value) && value.length
+      ? value.map((x) => `${x.label || 'Seasonal hours'} ${hoursExtraRangeText(x.from, x.to)}: ${ownerWeekText(JSON.stringify(x.hours))}`).join(' | ')
+      : '(none)';
+  }
+  if (field === 'closures') {
+    return Array.isArray(value) && value.length ? value.map((c) => `${hoursExtraRangeText(c.from, c.to)}${c.note ? ` (${c.note})` : ''}`).join('; ') : '(none)';
+  }
   if (field === 'badges') return Object.entries(value).map(([k, on]) => `${on ? 'add' : 'remove'} ${BADGE_LABELS[k] ? BADGE_LABELS[k].title : k}`).join(', ');
   return value == null || value === '' ? '(none)' : String(value);
 }
@@ -31626,35 +31839,70 @@ async function handleOwnerChangeSubmission(req, res, token) {
     return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check your changes and send them again.' });
   }
   const { venue, happyHourTimes } = found;
-  const { changes, previous, errors } = validateOwnerChanges(venue, happyHourTimes, body);
+  const checked = validateOwnerChanges(venue, happyHourTimes, body);
+  const { changes, previous, errors } = checked;
   const contact = found.account ? { email: found.account.email } : ownerOptionalEmail(body.contact_email);
   if (contact.error) errors.contact_email = contact.error;
+  const waiting = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 1").get(venue.id);
+  const waitingChanges = waiting ? JSON.parse(waiting.changes) : {};
+  // A field still waiting for review that the owner set back to what is live (2026-10-18).
+  const reverts = checked.same.filter((f) => f in waitingChanges);
+  const badgeReverts = waitingChanges.badges ? checked.badgesSame.filter((k) => k in waitingChanges.badges) : [];
+  if (errors.form === OWNER_NOTHING_CHANGED && (reverts.length || badgeReverts.length)) delete errors.form;
   if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, errors });
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 1000) || null : null;
   const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
   const ipHash = crypto.createHash('sha256').update(`okanagan-roam-owner-change:${requestClientIp(req)}`).digest('hex');
-  let id;
+  // Instant (2026-10-18): a signed-in owner's own facts go live now; the rest waits for review as before.
+  const instantOk = !!found.account && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT;
+  const live = {}, livePrev = {}, review = {}, reviewPrev = {};
+  for (const k of Object.keys(changes)) {
+    if (instantOk && OWNER_INSTANT_FIELDS.has(k)) { live[k] = changes[k]; livePrev[k] = previous[k]; } else { review[k] = changes[k]; reviewPrev[k] = previous[k]; }
+  }
+  let id = null, liveId = null;
   db.exec('BEGIN');
   try {
-    // A newer request is ADDED to one still waiting for review (2026-10-15): the
-    // form starts from the live listing, so anything the owner didn't touch this
-    // time keeps what they sent before; a field sent again takes the newer value.
-    // The combined request replaces the old one, so you review it once.
-    const waiting = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1").get(venue.id);
-    let all = changes, prev = previous, allNote = note, name = contactName, email = contact.email;
+    // A newer request is ADDED to one still waiting for review (2026-10-15): anything the owner didn't touch this
+    // time keeps what they sent before; a field sent again takes the newer value. The combined request replaces the
+    // old one, so you review it once. A field that just went live, or was set back to the live value, leaves it.
+    let all = review, prev = reviewPrev, allNote = note, name = contactName, email = contact.email;
+    let touchedWaiting = false;
     if (waiting) {
-      const before = JSON.parse(waiting.changes), beforePrev = JSON.parse(waiting.previous);
-      all = { ...before, ...changes };
-      if (before.badges && changes.badges) all.badges = { ...before.badges, ...changes.badges };
-      prev = { ...beforePrev, ...previous };
-      if (beforePrev.badges && previous.badges) prev.badges = { ...beforePrev.badges, ...previous.badges };
-      allNote = [waiting.note, note].filter(Boolean).join('\n\n').slice(0, 2000) || null;
+      const before = { ...waitingChanges }, beforePrev = { ...JSON.parse(waiting.previous) };
+      for (const f of [...Object.keys(live).filter((f) => f !== 'badges'), ...reverts]) {
+        if (f in before) { delete before[f]; delete beforePrev[f]; touchedWaiting = true; }
+      }
+      if (before.badges) {
+        before.badges = { ...before.badges };
+        beforePrev.badges = { ...(beforePrev.badges || {}) };
+        for (const k of [...Object.keys(live.badges || {}), ...badgeReverts]) {
+          if (k in before.badges) { delete before.badges[k]; delete beforePrev.badges[k]; touchedWaiting = true; }
+        }
+        if (!Object.keys(before.badges).length) { delete before.badges; delete beforePrev.badges; }
+      }
+      all = { ...before, ...review };
+      if (before.badges && review.badges) all.badges = { ...before.badges, ...review.badges };
+      prev = { ...beforePrev, ...reviewPrev };
+      if (beforePrev.badges && reviewPrev.badges) prev.badges = { ...beforePrev.badges, ...reviewPrev.badges };
+      allNote = [waiting.note, Object.keys(review).length ? note : null].filter(Boolean).join('\n\n').slice(0, 2000) || null;
       name = contactName || waiting.contact_name;
       email = contact.email || waiting.contact_email;
     }
-    db.prepare("UPDATE owner_change_requests SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status = 'pending'").run(venue.id);
-    id = Number(db.prepare('INSERT INTO owner_change_requests (venue_id, changes, previous, note, contact_name, contact_email, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(venue.id, JSON.stringify(all), JSON.stringify(prev), allNote, name, email, ipHash).lastInsertRowid);
+    if (Object.keys(review).length || touchedWaiting) {
+      db.prepare("UPDATE owner_change_requests SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND status = 'pending' AND instant = 0").run(venue.id);
+      if (Object.keys(all).length) {
+        id = Number(db.prepare('INSERT INTO owner_change_requests (venue_id, changes, previous, note, contact_name, contact_email, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(venue.id, JSON.stringify(all), JSON.stringify(prev), allNote, name, email, ipHash).lastInsertRowid);
+      }
+    }
+    if (Object.keys(live).length) {
+      // The audit row: what changed, what it replaced, who (the login's email), and the hours provenance it
+      // replaced so an Undo can put that back too.
+      const prov = db.prepare('SELECT hours_source, hours_checked_at FROM venues WHERE id = ?').get(venue.id) || {};
+      liveId = Number(db.prepare('INSERT INTO owner_change_requests (venue_id, changes, previous, note, contact_name, contact_email, ip_hash, instant, undo_meta) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)')
+        .run(venue.id, JSON.stringify(live), JSON.stringify(livePrev), Object.keys(review).length ? null : note, contactName, contact.email, ipHash,
+          JSON.stringify({ hours_source: prov.hours_source || null, hours_checked_at: prov.hours_checked_at || null })).lastInsertRowid);
+    }
     if (!found.account) rememberOwnerContact(venue.id, contact.email);
     db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
     db.exec('COMMIT');
@@ -31663,8 +31911,17 @@ async function handleOwnerChangeSubmission(req, res, token) {
     console.error(`[owner-portal] storing a request for venue #${venue.id} failed: ${err.message}`);
     return sendSubmissionResponse(res, 500, { ok: false, error: generic });
   }
-  await notifyOwnerChange(id);
-  return sendSubmissionResponse(res, 201, { ok: true, id, fields: Object.keys(changes) });
+  if (liveId) {
+    const r = approveOwnerChange(liveId, `owner:${found.account.email}`);
+    if (!r.ok) {
+      db.prepare("UPDATE owner_change_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = 'system', rejection_reason = ? WHERE id = ?")
+        .run(`instant save failed: ${r.reason}${r.detail ? ` (${String(r.detail).slice(0, 120)})` : ''}`, liveId);
+      console.error(`[owner-portal] instant save #${liveId} for venue #${venue.id} failed: ${r.reason} ${r.detail || ''}`);
+      return sendSubmissionResponse(res, 500, { ok: false, error: 'Sorry, your changes could not be saved. Please reload the page and try again.' });
+    }
+  }
+  if (id && Object.keys(review).length) await notifyOwnerChange(id);
+  return sendSubmissionResponse(res, 201, { ok: true, id: id || liveId, live_id: liveId, fields: Object.keys(changes), live: Object.keys(live), review: Object.keys(review) });
 }
 
 // An event from the owner edit page: the venue, region and organizer come
@@ -37117,6 +37374,16 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
   const chosen = Array.isArray(fields) && fields.length ? fields.filter((f) => f in req.changes) : Object.keys(req.changes);
   if (!chosen.length) return { ok: false, reason: 'no_fields' };
   const meta = { reason: `owner request #${id}`, batch_id: `owner-${todayLocal(now)}`, reviewed_by: reviewer };
+  const r = applyOwnerFields(venue, req.changes, chosen, meta, reviewer, now);
+  if (!r.ok) return r;
+  db.prepare("UPDATE owner_change_requests SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
+  return { ok: true, applied: r.applied, listing: r.listing };
+}
+
+// Writes owner fields onto a venue (`venue` is its raw row) through each field's guarded writer, logging every one
+// to venue_enrichment_log as 'venue_owner'. Used by approval, by a signed-in owner's instant save (2026-10-18), and
+// by Undo (opts.undo: `values` are the old values; hours get their old provenance back from opts.undoMeta).
+function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(), opts = {}) {
   const listing = venueListingUrl(venue);
   const applied = [];
   const log = db.prepare(`INSERT INTO venue_enrichment_log
@@ -37125,7 +37392,7 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
   db.exec('SAVEPOINT owner_approve');
   try {
     for (const field of chosen) {
-      const value = req.changes[field];
+      const value = values[field];
       if (field === 'hours') {
         // guardedHoursVerifyUpdate runs its own BEGIN/COMMIT, which SQLite
         // does not allow inside a savepoint -- so hours are written last,
@@ -37135,9 +37402,29 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
       if (field === 'happy_hour') continue; // same reason; written below
       if (OWNER_LINK_FIELDS.includes(field) || field === 'open_months') {
         const before = venueLinks(venue.id)[field];
-        db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, value);
+        const next = value === '' ? null : value;
+        db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, next);
         clearVenueSocialCache();
-        log.run(venue.id, field, before == null ? null : String(before), value == null ? null : String(value), meta.reason, meta.batch_id, reviewer);
+        log.run(venue.id, field, before == null ? null : String(before), next == null ? null : String(next), meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
+      // Price range (2026-10-18): venues.price, 1-4 ($ to $$$$).
+      if (field === 'price_range') {
+        const next = value === '' || value == null ? null : Number(value);
+        updateVenue(venue.id, { price: next });
+        log.run(venue.id, 'price', venue.price == null ? null : String(venue.price), next == null ? null : String(next), meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
+      // Seasonal hours and special closures (2026-10-18): venue_hours_extra.
+      if (field === 'hours_seasons' || field === 'closures') {
+        const col = field === 'hours_seasons' ? 'seasons' : 'closures';
+        const beforeRow = db.prepare(`SELECT ${col} AS v FROM venue_hours_extra WHERE venue_id = ?`).get(venue.id);
+        const json = Array.isArray(value) && value.length ? JSON.stringify(value) : null;
+        db.prepare(`INSERT INTO venue_hours_extra (venue_id, ${col}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${col} = excluded.${col}, updated_at = CURRENT_TIMESTAMP`).run(venue.id, json);
+        clearHoursExtraCache();
+        log.run(venue.id, field === 'hours_seasons' ? 'hours_seasons' : 'hours_closures', beforeRow ? beforeRow.v : null, json, meta.reason, meta.batch_id, reviewer);
         applied.push(field);
         continue;
       }
@@ -37149,10 +37436,22 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
         }
         updateVenue(venue.id, update);
       } else {
-        updateVenue(venue.id, { [field]: value });
-        log.run(venue.id, field, venue[field] == null ? null : String(venue[field]), value == null ? null : String(value), meta.reason, meta.batch_id, reviewer);
+        const next = value === '' ? null : value;
+        updateVenue(venue.id, { [field]: next });
+        log.run(venue.id, field, venue[field] == null ? null : String(venue[field]), next == null ? null : String(next), meta.reason, meta.batch_id, reviewer);
       }
       applied.push(field);
+    }
+    // New seasonal hours or closures from the owner also count as the owner checking the hours (2026-10-18): the
+    // venue page then says "Hours checked" with today's date. Undo puts the old provenance back instead.
+    const extrasTouched = chosen.includes('hours_seasons') || chosen.includes('closures');
+    if (extrasTouched && !chosen.includes('hours') && venue.hours) {
+      const u = opts.undo ? (opts.undoMeta || {}) : { hours_source: 'venue_owner', hours_checked_at: todayLocal(now) };
+      const next = { hours_source: u.hours_source || null, hours_checked_at: u.hours_checked_at || null };
+      db.prepare('UPDATE venues SET hours_source = ?, hours_checked_at = ? WHERE id = ?').run(next.hours_source, next.hours_checked_at, venue.id);
+      for (const f of ['hours_source', 'hours_checked_at']) {
+        if ((venue[f] || null) !== next[f]) log.run(venue.id, f, venue[f] == null ? null : String(venue[f]), next[f], meta.reason, meta.batch_id, reviewer);
+      }
     }
     db.exec('RELEASE owner_approve');
   } catch (err) {
@@ -37160,24 +37459,91 @@ function approveOwnerChange(id, reviewer, fields, now = new Date()) {
     return { ok: false, reason: 'write_failed', detail: String(err.message || err) };
   }
   if (chosen.includes('hours')) {
-    const r = guardedHoursVerifyUpdate(venue.id, venue.hours, { hours: req.changes.hours, hours_source: 'venue_owner', hours_checked_at: todayLocal(now) }, meta, now);
-    if (!r.ok) return { ok: false, reason: 'hours_failed', detail: r.reason, applied };
+    if (opts.undo) {
+      // Back to exactly what was there, which may be no hours at all (the guarded writer only takes valid hours).
+      const u = opts.undoMeta || {};
+      const next = values.hours || null;
+      const info = db.prepare('UPDATE venues SET hours = ?, hours_source = ?, hours_checked_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND hours IS ?')
+        .run(next, next ? (u.hours_source || null) : null, next ? (u.hours_checked_at || null) : null, venue.id, venue.hours);
+      if (info.changes !== 1) return { ok: false, reason: 'hours_failed', detail: 'mismatch', applied };
+      syncDerivedHoursBadges(venue.id);
+      log.run(venue.id, 'hours', venue.hours == null ? null : String(venue.hours), next, meta.reason, meta.batch_id, reviewer);
+    } else {
+      const r = guardedHoursVerifyUpdate(venue.id, venue.hours, { hours: values.hours, hours_source: 'venue_owner', hours_checked_at: todayLocal(now) }, meta, now);
+      if (!r.ok) return { ok: false, reason: 'hours_failed', detail: r.reason, applied };
+    }
     applied.push('hours');
   }
   if (chosen.includes('happy_hour')) {
-    const value = req.changes.happy_hour;
+    const value = values.happy_hour;
     let times = null;
     if (value) {
       const o = JSON.parse(value);
       times = {};
       for (const d of OWNER_DAYS) if (o[d] && o[d].length) times[d] = o[d];
+      if (!Object.keys(times).length) times = null;
     }
     const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer }, now);
     if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };
     applied.push('happy_hour');
   }
-  db.prepare("UPDATE owner_change_requests SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
   return { ok: true, applied, listing };
+}
+
+// ---------- Instant owner edits and Undo (2026-10-18) ----------
+// A signed-in owner's own facts go live at once; a new name, address, website or link still waits for review (they
+// change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
+// fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
+const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures']);
+// More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
+const OWNER_INSTANT_DAILY_LIMIT = 30;
+function ownerInstantCountToday(venueId) {
+  return db.prepare("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND instant = 1 AND submitted_at > datetime('now', '-1 day')").get(venueId).n;
+}
+// Does a live value still match what an instant change set? (Undo only touches fields nobody changed since.)
+function ownerFieldEquals(field, a, b) {
+  if (field === 'hours' || field === 'happy_hour') return sameJsonWeek(a || null, b || null);
+  if (field === 'hours_seasons' || field === 'closures') return JSON.stringify(a || []) === JSON.stringify(b || []);
+  return String(a == null ? '' : a) === String(b == null ? '' : b);
+}
+// Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
+// owner set. -> { ok, restored, skipped } or { ok: false, reason }.
+function undoOwnerInstantChange(id, reviewer, now = new Date()) {
+  const req = getOwnerChange(id);
+  if (!req) return { ok: false, reason: 'not_found' };
+  if (!req.instant || req.status !== 'approved') return { ok: false, reason: 'not_instant' };
+  if (req.undone_at) return { ok: false, reason: 'already_undone' };
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(req.venue_id);
+  if (!row || row.redirect_to) return { ok: false, reason: 'venue_unavailable' };
+  const current = ownerVenueSnapshot(rowToVenue(row), row.happy_hour_times || null);
+  const restore = {};
+  const skipped = [];
+  for (const [f, val] of Object.entries(req.changes)) {
+    if (f === 'badges') {
+      const b = {};
+      for (const [k, on] of Object.entries(val)) {
+        if (current.badges[k] === on) b[k] = !!(req.previous.badges || {})[k]; else skipped.push(k);
+      }
+      if (Object.keys(b).length) restore.badges = b;
+      continue;
+    }
+    if (ownerFieldEquals(f, current[f], val)) restore[f] = req.previous[f]; else skipped.push(f);
+  }
+  if (!Object.keys(restore).length) return { ok: false, reason: 'changed_since' };
+  let undoMeta = null;
+  try { undoMeta = req.undo_meta ? JSON.parse(req.undo_meta) : null; } catch (e) { undoMeta = null; }
+  const meta = { reason: `undo owner change #${id}`, batch_id: `owner-undo-${todayLocal(now)}`, reviewed_by: reviewer };
+  const r = applyOwnerFields(row, restore, Object.keys(restore), meta, reviewer, now, { undo: true, undoMeta });
+  if (!r.ok) return r;
+  db.prepare('UPDATE owner_change_requests SET undone_at = CURRENT_TIMESTAMP, undone_by = ? WHERE id = ?').run(reviewer, id);
+  return { ok: true, restored: r.applied, skipped };
+}
+// Instant changes from the last 14 days, newest first, for /admin/review.
+function recentInstantOwnerChanges() {
+  return db.prepare("SELECT * FROM owner_change_requests WHERE instant = 1 AND status = 'approved' AND submitted_at > datetime('now', '-14 days') ORDER BY id DESC LIMIT 100").all().map((r) => {
+    const v = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(r.venue_id) || {};
+    return { ...r, changes: JSON.parse(r.changes), previous: JSON.parse(r.previous), venue_name: v.name, listing_url: venueListingUrl(v) };
+  });
 }
 
 function rejectOwnerChange(id, reviewer, reason) {
@@ -37419,6 +37785,17 @@ async function adminReviewAction(kind, id, action, body) {
   if (kind === 'claim') return adminClaimAction(id, action, body, ADMIN_REVIEWER);
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
   let r;
+  if (action === 'undo') {
+    // Undo a signed-in owner's instant change (2026-10-18). The owner isn't emailed.
+    if (kind !== 'change') return { status: 400, body: { error: 'Unknown action.' } };
+    const u = undoOwnerInstantChange(id, ADMIN_REVIEWER);
+    if (!u.ok) {
+      const msg = { not_found: 'This was already removed.', not_instant: 'Only changes that went live straight away can be undone here.', already_undone: 'This was already undone.',
+        changed_since: 'Nothing to undo: every field was changed again since.', venue_unavailable: 'The listing no longer exists.' }[u.reason] || ADMIN_REVIEW_ERRORS[u.reason] || u.reason;
+      return { status: u.reason === 'not_found' ? 404 : 409, body: { error: msg, detail: u.detail } };
+    }
+    return { status: 200, body: { ok: true, restored: u.restored, skipped: u.skipped, emailed: 'not_told' } };
+  }
   if (kind === 'change') {
     if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
     let fields = Array.isArray(body.fields) ? body.fields.filter((f) => typeof f === 'string') : undefined;
@@ -37582,6 +37959,22 @@ function renderAdminChangeCard(r) {
     </article>`;
 }
 
+// A signed-in owner's change that went live straight away (2026-10-18): what it replaced, who, and Undo.
+function renderAdminInstantCard(r) {
+  const rows = Object.keys(r.changes).map((f) => {
+    const before = f === 'badges' ? '' : ownerValueText(f, r.previous[f]);
+    return `<tr><th>${adminReviewEsc(OWNER_FIELD_LABELS[f] || f)}</th><td class="rv-old">${adminReviewEsc(before)}</td><td class="rv-new">${adminReviewEsc(ownerValueText(f, r.changes[f]))}</td></tr>`;
+  }).join('');
+  const done = r.undone_at ? `<p class="rv-result">Undone ${adminReviewEsc(adminReviewTime(r.undone_at))}.</p>` : '';
+  return `<article class="rv-card${r.undone_at ? ' rv-done' : ''}" data-kind="change" data-id="${r.id}">
+      <h3>${adminReviewEsc(r.venue_name)}</h3>
+      <p class="rv-meta">Live change #${r.id} · ${adminReviewEsc(adminReviewTime(r.submitted_at))} by ${adminReviewEsc(String(r.reviewed_by || '').replace(/^owner:/, '') || r.contact_email || 'owner')}${r.contact_name ? ` (${adminReviewEsc(r.contact_name)})` : ''} · <a href="${adminReviewEsc(r.listing_url)}" target="_blank" rel="noopener">listing</a></p>
+      <table class="rv-diff"><tr><th>Change</th><th>Before</th><th>Now</th></tr>${rows}</table>
+      ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
+      ${done || `<div class="rv-actions"><button type="button" class="rv-btn rv-reject" data-act="undo">Undo</button><span class="rv-meta">Puts back what was there before (fields changed again since are left alone). The owner isn\u2019t emailed.</span></div><p class="rv-result" hidden></p>`}
+    </article>`;
+}
+
 // Menus waiting for Dayton: "do it for me" requests and menus sent from a private link.
 function listMenusForReview() {
   return db.prepare(`SELECT m.*, v.name AS venue_name FROM venue_menus m JOIN venues v ON v.id = m.venue_id
@@ -37694,6 +38087,7 @@ function renderAdminReviewPage() {
   const visitorReported = listVisitorContributions('reported');
   const visitorLive = listVisitorContributions('live').filter((c) => !c.reported_count);
   const claims = listPendingClaims();
+  const instant = recentInstantOwnerChanges();
   const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
@@ -37704,7 +38098,7 @@ function renderAdminReviewPage() {
     <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a></nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a></nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
@@ -37717,6 +38111,7 @@ function renderAdminReviewPage() {
     ${visitorReported.length ? section('visitorreported', 'Reported visitor tips', visitorReported, (c) => renderAdminVisitorCard(c, 'reported'), '') : ''}
     ${visitorLive.length ? section('visitorlive', 'Visitor photos &amp; tips live (last 30 days)', visitorLive, (c) => renderAdminVisitorCard(c, 'live'), '') : ''}
     ${section('live', 'Photos owners published (last 14 days)', live, (p) => renderAdminPhotoCard(p, true), 'None in the last 14 days.')}
+    ${section('liveupdates', 'Changes owners made live (last 14 days)', instant, renderAdminInstantCard, 'None in the last 14 days.')}
 <script>
 (function(){
   document.getElementById('rvLogout').addEventListener('click', function(){
@@ -37729,7 +38124,7 @@ function renderAdminReviewPage() {
   document.addEventListener('click', function(e){
     var btn = e.target.closest('button[data-act]'); if (!btn) return;
     var card = btn.closest('.rv-card'), act = btn.getAttribute('data-act'), out = card.querySelector('.rv-result');
-    var body = { reason: card.querySelector('input[name=reason]').value };
+    var reasonBox = card.querySelector('input[name=reason]'), body = { reason: reasonBox ? reasonBox.value : '' };
     var kind = card.getAttribute('data-kind');
     if (kind === 'change') body.fields = Array.prototype.map.call(card.querySelectorAll('input[name=field]:checked'), function(i){ return i.value; });
     var main = card.querySelector('input[name=main]'); if (main) body.main = main.checked;
@@ -37748,7 +38143,7 @@ function renderAdminReviewPage() {
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(x){
         out.hidden = false;
-        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
+        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'undo' ? 'Undone: the old values are back.' + (x.j.skipped && x.j.skipped.length ? ' Left alone (changed again since): ' + x.j.skipped.join(', ') + '.' : '') : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
       })
@@ -37800,10 +38195,10 @@ function ownerVenueMainImage(venueId) {
 // Everything sent for this venue, newest first.
 function ownerVenueActivity(venueId, limit = 12) {
   const items = [];
-  for (const r of db.prepare("SELECT id, status, changes, submitted_at, reviewed_at, rejection_reason FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
+  for (const r of db.prepare("SELECT id, status, changes, submitted_at, reviewed_at, rejection_reason, undone_at FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
     let fields = [];
     try { fields = Object.keys(JSON.parse(r.changes)).map((f) => OWNER_FIELD_LABELS[f] || f); } catch (e) { /* unreadable */ }
-    items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.status, reason: r.rejection_reason,
+    items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.rejection_reason,
       title: fields.length ? `Listing update: ${fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}` : 'Listing update' });
   }
   const today = todayLocal();
@@ -37835,6 +38230,7 @@ function ownerStatusLabel(item) {
   if (item.status === 'withdrawn') return { cls: 'off', text: 'Withdrawn by you' };
   if (item.status === 'cancelled') return { cls: 'off', text: 'Cancelled' };
   if (item.status === 'changewait') return { cls: 'wait', text: 'Change waiting for review' };
+  if (item.status === 'undone') return { cls: 'off', text: 'Changed back by us' };
   return { cls: 'no', text: 'Not approved' };
 }
 
@@ -37878,8 +38274,11 @@ function ownerUpdatedDate(utc, fr = false) {
 function ownerVenueSummary(venueId) {
   const n = (sql) => db.prepare(sql).get(venueId).n;
   const waiting = [
-    [n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'pending'"), 'update', 'updates'],
-    [n("SELECT COUNT(*) AS n FROM event_submissions WHERE owner_venue_id = ? AND status = 'pending'"), 'event', 'events'],
+    [n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0"), 'update', 'updates'],
+    // Menus and event changes count too (2026-10-18), so the chip never says "Up to date" while one waits.
+    [n("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND status IN ('pending', 'help')"), 'menu', 'menus'],
+    [n("SELECT COUNT(*) AS n FROM event_submissions WHERE owner_venue_id = ? AND status = 'pending'")
+      + n("SELECT COUNT(*) AS n FROM owner_event_changes WHERE venue_id = ? AND status = 'pending'"), 'event', 'events'],
     [n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'pending'"), 'photo', 'photos'],
   ].filter(([c]) => c > 0).map(([c, one, many]) => `${c} ${c === 1 ? one : many}`);
   const notApproved = n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'rejected' AND reviewed_at > datetime('now', '-30 days')")
@@ -37890,6 +38289,10 @@ function ownerVenueSummary(venueId) {
   if (waiting.length) parts.push(`<span class="op-status op-status-wait">Waiting for review: ${waiting.join(', ')}</span>`);
   if (notApproved) parts.push(`<span class="op-status op-status-no">${notApproved} not approved</span>`);
   if (live) parts.push(`<span class="op-status op-status-live">${live} photo${live === 1 ? '' : 's'} live</span>`);
+  if (n("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND status = 'published'")) {
+    const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+    parts.push(`<span class="op-status op-status-live">${v && PRICE_LIST_WORDS[menuKind(v)] ? 'Prices live' : 'Menu live'}</span>`);
+  }
   const last = ownerLastUpdatedAt(venueId);
   const lastHtml = last ? `<br><span class="op-last">Last updated ${ownerUpdatedDate(last)}</span>` : '';
   return (parts.length ? parts.join(' ') : '<span class="op-status op-status-live">Up to date</span>') + lastHtml;
@@ -38012,6 +38415,47 @@ function ownerMenuCardHtml(venue, href) {
 // Businesses people book (tours, golf, activities): the booking link comes first on the owner page.
 const OWNER_BOOKING_FIRST_TYPES = new Set(['tour', 'golf', 'indoor', 'sport', 'outdoor']);
 
+// Seasonal hours on the owner page (2026-10-18): one second week of hours for part of every year. `dayRows` is the
+// page's own day-row builder, so the rows look and work like the usual hours.
+function ownerSeasonalHoursHtml(season, dayRows, chip) {
+  const from = season ? season.from : '11-01', to = season ? season.to : '04-30';
+  const monthOpts = (sel) => MONTH_NAMES.en.map((n, i) => `<option value="${String(i + 1).padStart(2, '0')}"${sel === String(i + 1).padStart(2, '0') ? ' selected' : ''}>${n}</option>`).join('');
+  const dayOpts = (sel) => Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => `<option value="${d}"${sel === d ? ' selected' : ''}>${Number(d)}</option>`).join('');
+  return `<details class="op-fold" id="opSeasonalBox"${season ? ' open' : ''}>
+      <summary><span class="lyv-section-label">Seasonal hours${chip}</span> <span class="op-fold-hint">Different hours part of the year, like winter hours from November to April</span></summary>
+      <label class="op-closed" style="width:auto"><input type="checkbox" id="opSeasonalOn"${season ? ' checked' : ''}> We have different hours part of the year</label>
+      <div id="opSeasonalFields"${season ? '' : ' hidden'}>
+        <div class="op-season"><label for="opSeasonalLabel"><strong>Name</strong> (optional)</label> <input type="text" id="opSeasonalLabel" maxlength="40" placeholder="Winter hours" value="${escapeHtml(season ? season.label || '' : '')}"></div>
+        <div class="op-season"><strong>From</strong> <select id="opSeasonalFromM" aria-label="Seasonal hours start month">${monthOpts(from.slice(0, 2))}</select> <select id="opSeasonalFromD" aria-label="Seasonal hours start day">${dayOpts(from.slice(3))}</select>
+          <strong>to</strong> <select id="opSeasonalToM" aria-label="Seasonal hours last month">${monthOpts(to.slice(0, 2))}</select> <select id="opSeasonalToD" aria-label="Seasonal hours last day">${dayOpts(to.slice(3))}</select>
+          <p class="op-hint">Every year between these days (both included), your page shows the hours below instead of your usual hours.</p></div>
+        <div id="opSeasonHours">${dayRows('season', season ? season.hours : {}, true, !!season)}</div>
+      </div>
+      <p class="lyv-error" id="opSeasonalError" hidden></p>
+    </details>`;
+}
+
+// Special closures on the owner page (2026-10-18): one row per date or date range, with an optional note.
+function ownerClosureRowHtml(c, today) {
+  return `<div class="op-closure">
+          <label>First day <input type="date" class="op-cl-from" min="${today}" value="${escapeHtml(c ? c.from : '')}"></label>
+          <label>Last day (optional) <input type="date" class="op-cl-to" min="${today}" value="${escapeHtml(c && c.to !== c.from ? c.to : '')}"></label>
+          <label class="op-cl-note-l">Note (optional) <input type="text" class="op-cl-note" maxlength="${HOURS_EXTRA_NOTE_MAX}" placeholder="Thanksgiving" value="${escapeHtml(c ? c.note || '' : '')}"></label>
+          <button type="button" class="op-cl-remove">Remove</button>
+        </div>`;
+}
+function ownerClosuresHtml(closures, chip) {
+  const today = todayLocal();
+  return `<details class="op-fold" id="opClosuresBox"${closures.length ? ' open' : ''}>
+      <summary><span class="lyv-section-label">Special closures${chip}</span> <span class="op-fold-hint">Holidays, renovations or private events: days you&rsquo;re closed</span></summary>
+      <div id="opClosures">${closures.map((c) => ownerClosureRowHtml(c, today)).join('')}</div>
+      <template id="opClosureTpl">${ownerClosureRowHtml(null, today)}</template>
+      <button type="button" class="op-cl-add" id="opClosureAdd">+ Add a closed day</button>
+      <p class="op-hint">On these days your page says &ldquo;Closed today&rdquo;, with your note (for example &ldquo;Closed today (Thanksgiving)&rdquo;). Past closures drop off by themselves.</p>
+      <p class="lyv-error" id="opClosuresError" hidden></p>
+    </details>`;
+}
+
 // The owner's photo grid, in the order the venue page shows them: the main photo, then the rest
 // (2026-10-18). Signed-in owners get Make main, Remove and the earlier/later arrows. The page
 // fetches itself again and swaps this in after an upload or a change, instead of reloading.
@@ -38039,17 +38483,34 @@ function renderOwnerPage(found, token, pending) {
 
 function renderOwnerPageHtml(found, token, pending) {
   const { venue, happyHourTimes } = found;
-  const snap = ownerVenueSnapshot(venue, happyHourTimes);
+  const live = ownerVenueSnapshot(venue, happyHourTimes);
+  // Pending pre-fill (2026-10-18): what is waiting for review shows in the form, marked "Waiting for review", so an
+  // owner never sees their sent hours vanish. The form then starts from those values.
+  const waitingReq = pending ? getOwnerChange(pending.id) : null;
+  const waitingFields = new Set();
+  const snap = { ...live, badges: { ...live.badges } };
+  if (waitingReq && waitingReq.status === 'pending') {
+    for (const [k, v] of Object.entries(waitingReq.changes)) {
+      if (!(k in snap)) continue;
+      waitingFields.add(k);
+      if (k === 'badges') Object.assign(snap.badges, v);
+      else if (k === 'price_range') snap.price_range = v ? String(v) : '';
+      else snap[k] = v == null ? (k === 'hours' || k === 'happy_hour' ? null : Array.isArray(live[k]) ? [] : '') : v;
+    }
+  }
+  const waitChip = (...fields) => (fields.some((f) => waitingFields.has(f)) ? ' <span class="op-status op-status-wait op-wait-chip">Waiting for review</span>' : '');
+  const instantOn = !!found.account;
   const listing = venueListingUrl(venue);
   const showHappyHour = OWNER_HAPPY_HOUR_TYPES.has(venue.type);
-  const parseWeek = (json) => { try { return json ? JSON.parse(json) : null; } catch (e) { return null; } };
+  const parseWeek = (json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
   // No hours on file yet: start every day blank, not ticked "Closed".
   const hoursKnown = !!parseWeek(snap.hours);
   const hh = parseWeek(snap.happy_hour) || {};
-  const dayRows = (prefix, week, emptyMeansClosed) => OWNER_DAYS.map((d) => {
+  const season0 = (snap.hours_seasons || [])[0] || null;
+  const dayRows = (prefix, week, emptyMeansClosed, known = hoursKnown) => OWNER_DAYS.map((d) => {
     const w = week[d] && week[d].length ? week[d] : [];
-    const closed = emptyMeansClosed ? (hoursKnown && !w.length) : false;
+    const closed = emptyMeansClosed ? (known && !w.length) : false;
     const w1 = w[0] || ['', ''];
     const w2 = w[1] || ['', ''];
     return `<div class="op-day" data-day="${d}" data-prefix="${prefix}">
@@ -38070,7 +38531,7 @@ function renderOwnerPageHtml(found, token, pending) {
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
           <label class="amenity-check"${foodOnly.has(f) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(BADGE_LABELS[f].title)}</label>`).join('');
   const pendingNote = pending
-    ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review. Anything else you send now is added to them.</p>`
+    ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.</p>`
     : '';
   const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
   // Events the owner can still change or cancel, with what the Change form starts from.
@@ -38092,6 +38553,16 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-wrap { max-width: 760px; margin: 0 auto; padding: 16px 0 48px; }
   body.owner-page .op-head p { color: rgba(42,32,25,0.75); }
   body.owner-page .op-pending { background: #FFF6E5; border-radius: 12px; padding: 12px 16px; font-weight: 600; }
+  body.owner-page .op-wait-chip { text-transform: none; letter-spacing: 0; margin-left: 8px; vertical-align: middle; font-size: 0.74rem; }
+  body.owner-page .op-closure { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; padding: 10px 0; border-bottom: 1px solid rgba(42,32,25,0.08); }
+  body.owner-page .op-closure label { display: flex; flex-direction: column; gap: 4px; font-size: 0.84rem; font-weight: 700; }
+  body.owner-page .op-closure input { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); font: inherit; font-size: 1rem; background: #fff; }
+  body.owner-page .op-closure .op-cl-note-l { flex: 1 1 180px; }
+  body.owner-page .op-closure .op-cl-note { width: 100%; box-sizing: border-box; }
+  body.owner-page .op-cl-remove, body.owner-page .op-cl-add { background: none; border: 0; color: var(--ref-navy); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 10px 4px; min-height: 44px; }
+  body.owner-page .op-cl-remove { color: #9C2F22; }
+  body.owner-page #opSeasonalFields .op-season input[type=text] { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); font: inherit; font-size: 1rem; }
+  body.owner-page #opPrice { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; font-size: 1rem; max-width: 100%; }
   body.owner-page .op-season { margin: 14px 0 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
   body.owner-page .op-season select { width: auto; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.25); background: #fff; font: inherit; }
   body.owner-page .op-season .op-hint { flex-basis: 100%; margin: 2px 0 0; }
@@ -38181,8 +38652,11 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">Owner edit page</span>
       <h1>${escapeHtml(venue.name)}</h1>
-      <p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.${found.account ? '' : '<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span>'}</p>
-      <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it.</p>
+      ${instantOn
+    ? `<p>Update your listing below and press <strong>Save changes</strong>. Your hours, season, phone, description, badges${showHappyHour ? ', happy hour' : ''} and price range go live on <a href="${escapeHtml(listing)}">your page</a> straight away. A new name, address, website or link is checked first, usually within a day.</p>
+      <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`
+    : `<p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
+      <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it. Signed-in owners&rsquo; hours and details go live straight away.</p>`}
       ${ownerMenuCardHtml(venue, token ? `${OWNER_LINK_PATH}${token}/menu` : `/owner/account/venue/${venue.id}/menu`).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}
     </div>
     <nav class="op-secnav" id="opSecNav" aria-label="Parts of this page"><a href="#hours">Hours</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? 'Prices' : 'Menu'}</a>` : ''}<a href="#events">Events</a></nav>
@@ -38213,7 +38687,7 @@ ${renderGolfHeaderHtml()}
     </div>
     <form class="venue-form" id="opForm" novalidate>
       <details class="op-fold op-sec" id="hours" open>
-      <summary><span class="lyv-section-label">Opening hours</span></summary>
+      <summary><span class="lyv-section-label">Opening hours${waitChip('hours')}</span></summary>
       <p class="op-hint">${hoursKnown ? '' : '<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. '}${hoursKnown ? 'Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ' : ''}Closing after midnight? Just enter the closing time, like 01:00.</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>
@@ -38222,7 +38696,7 @@ ${renderGolfHeaderHtml()}
         const om = /^(\d{1,2})-(\d{1,2})$/.exec(snap.open_months || '');
         const opts = (sel) => MONTH_NAMES.en.map((n, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${n}</option>`).join('');
         return `<div class="op-season">
-        <label for="opSeasonMode"><strong>Season</strong></label>
+        <label for="opSeasonMode"><strong>Season</strong>${waitChip('open_months')}</label>
         <select id="opSeasonMode" onchange="document.getElementById('opSeasonMonths').hidden = !this.value"><option value="">Open all year</option><option value="season"${om ? ' selected' : ''}>Open some months only</option></select>
         <span id="opSeasonMonths"${om ? '' : ' hidden'}>from <select id="opSeasonFrom" aria-label="First month open">${opts(om ? Number(om[1]) : 5)}</select>
         to <select id="opSeasonTo" aria-label="Last month open">${opts(om ? Number(om[2]) : 10)}</select></span>
@@ -38230,19 +38704,22 @@ ${renderGolfHeaderHtml()}
         <p class="op-hint">Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.</p>
       </div>`;
       })()}
+      ${ownerSeasonalHoursHtml(season0, dayRows, waitChip('hours_seasons'))}
+      ${ownerClosuresHtml(snap.closures || [], waitChip('closures'))}
       </details>
 
       <p class="lyv-section-label">Contact</p>
       <div class="form-row">
-        <div class="form-field"><label for="opPhone">Phone</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
-        <div class="form-field"><label for="opWebsite">Website</label><input type="url" id="opWebsite" maxlength="300" placeholder="yourbusiness.com" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
+        <div class="form-field"><label for="opPhone">Phone${waitChip('phone')}</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
+        <div class="form-field"><label for="opWebsite">Website${waitChip('website')}${instantOn ? ' <span class="op-hint">(checked first)</span>' : ''}</label><input type="url" id="opWebsite" maxlength="300" placeholder="yourbusiness.com" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
       <details class="op-fold" id="opLinksBox"${OWNER_BOOKING_FIRST_TYPES.has(venue.type) && !snap.booking_url ? ' open' : ''}>
-      <summary><span class="lyv-section-label">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Booking link, name, address &amp; links' : 'Name, address &amp; links'}</span> <span class="op-fold-hint">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Add your booking link so visitors get a &ldquo;Book&rdquo; button' : 'Change your business name, address, menu, booking or social links'}</span></summary>
+      <summary><span class="lyv-section-label">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Booking link, name, address &amp; links' : 'Name, address &amp; links'}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Add your booking link so visitors get a &ldquo;Book&rdquo; button' : 'Change your business name, address, menu, booking or social links'}</span></summary>
       <div class="form-row">
-        <div class="form-field"><label for="opBizName">Business name</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
-        <div class="form-field"><label for="opAddress">Street address</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
+        ${instantOn ? '<p class="op-hint" style="grid-column:1/-1;margin:0">We check a new name, address or link before it goes live, usually within a day.</p>' : ''}
+        <div class="form-field"><label for="opBizName">Business name${waitChip('name')}</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
+        <div class="form-field"><label for="opAddress">Street address${waitChip('address')}</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
       </div>
       <div class="form-row">
         <div class="form-field"><label for="opMenu">Menu link (optional)</label><input type="url" id="opMenu" maxlength="300" placeholder="yourbusiness.com/menu" autocapitalize="off" value="${escapeHtml(snap.menu_url)}"><p class="lyv-error" id="opMenuError" hidden></p></div>
@@ -38254,24 +38731,35 @@ ${renderGolfHeaderHtml()}
       </div>
       </details>
 
-      <p class="lyv-section-label" id="opDescriptionLabel">Description</p>
+      <p class="lyv-section-label" id="opDescriptionLabel">Description${waitChip('description')}</p>
       <div class="form-row full"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}" aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">${escapeHtml(snap.description)}</textarea>
-        <p class="op-hint">A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match. We may lightly edit for length and style.</p>
+        <p class="op-hint">A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
       <details class="op-fold op-sec" id="badges">
-      <summary><span class="lyv-section-label">Badges</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? `${n} ticked, like dog friendly or patio` : 'Dog friendly, patio, vegan options and more'; })()}</span></summary>
+      <summary><span class="lyv-section-label">Badges${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? `${n} ticked, like dog friendly or patio` : 'Dog friendly, patio, vegan options and more'; })()}</span></summary>
       <p class="op-hint">Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
+      ${venue.type === 'golf' ? '' : `
+      <details class="op-fold op-sec" id="price"${waitingFields.has('price_range') ? ' open' : ''}>
+      <summary><span class="lyv-section-label" id="opPriceLabel">Price range${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}: ${escapeHtml(OWNER_PRICE_SCALE[Number(snap.price_range)])} per person` : 'Not set: what one person usually spends'}</span></summary>
+      <div class="form-row full"><div class="form-field">
+        <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
+          <option value="">Not set</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml(OWNER_PRICE_SCALE[n])} per person</option>`).join('')}
+        </select>
+        <p class="op-hint" id="opPriceScale">What one person usually spends: $ under $15, $$ $15&ndash;30, $$$ $30&ndash;60, $$$$ over $60 per person.</p>
+        <p class="lyv-error" id="opPriceError" hidden></p>
+      </div></div>
+      </details>`}
       ${showHappyHour ? `
       <details class="op-fold op-sec" id="happy">
-      <summary><span class="lyv-section-label">Happy hour</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? `Set for ${n} day${n === 1 ? '' : 's'}` : 'Not set'; })()}</span></summary>
+      <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? `Set for ${n} day${n === 1 ? '' : 's'}` : 'Not set'; })()}</span></summary>
       <p class="op-hint">Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.</p>
       <div id="opHappy">${dayRows('happy', hh, false)}</div>
       <p class="lyv-error" id="opHappyError" hidden></p>
@@ -38288,12 +38776,12 @@ ${renderGolfHeaderHtml()}
       </div></div>
       <div class="lyv-hp" aria-hidden="true"><label>Company website <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="opFormError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="opSubmit">Send changes</button>
+      <button type="submit" class="venue-form-submit" id="opSubmit">${instantOn ? 'Save changes' : 'Send changes'}</button>
     </form>
-    <div class="op-done" id="opDone">Thanks! We&rsquo;ve got your changes and will review them, usually within a day.<span id="opDoneMail"${found.account ? '' : ' hidden'}> We&rsquo;ll email you when they&rsquo;re live.</span>
+    <div class="op-done" id="opDone" role="status"><span id="opDoneText">Thanks! We&rsquo;ve got your changes and will review them, usually within a day.</span><span id="opDoneMail"${found.account ? '' : ' hidden'}> We&rsquo;ll email you when they&rsquo;re live.</span>
       <button type="button" class="op-more" id="opMore">Make more changes</button>${found.account || viewer ? '' : `
       <span class="op-done-login" id="opDoneLogin"><strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.</span>`}</div>
-    <div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t sent yet.</span> <button type="button" id="opUnsentSend">Send changes</button></div>
+    <div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t ${instantOn ? 'saved' : 'sent'} yet.</span> <button type="button" id="opUnsentSend">${instantOn ? 'Save changes' : 'Send changes'}</button></div>
     <details class="op-fold op-sec" id="photos" open>
     <summary><h2 class="lyv-section-label">Photos</h2></summary>
     <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. ${found.account ? 'Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.' : 'We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.'}</p>
@@ -38370,7 +38858,7 @@ ${ownerFooterHtml()}
   var form = document.getElementById('opForm');
   function rows(id){ var el = document.getElementById(id); return el ? Array.prototype.slice.call(el.querySelectorAll('.op-day')) : []; }
   function syncRow(row){ row.classList.toggle('is-off', row.querySelector('.op-off').checked); }
-  rows('opHours').concat(rows('opHappy')).forEach(function(row){
+  rows('opHours').concat(rows('opHappy'), rows('opSeasonHours')).forEach(function(row){
     syncRow(row);
     row.querySelector('.op-off').addEventListener('change', function(){ syncRow(row); });
     var add = row.querySelector('.op-add');
@@ -38452,9 +38940,54 @@ ${ownerFooterHtml()}
   function savedName(){ try { return localStorage.getItem(NAME_KEY) || ''; } catch (e) { return ''; } }
   function rememberName(v){ try { if (v && v.trim()) localStorage.setItem(NAME_KEY, v.trim().slice(0, 100)); } catch (e) {} }
   ['opName', 'oeContactName'].forEach(function(id){ var el = document.getElementById(id); if (el && !el.value) el.value = savedName(); });
+  // Seasonal hours and special closures (2026-10-18).
+  var INSTANT = ${instantOn ? 'true' : 'false'};
+  var seasonalOn = document.getElementById('opSeasonalOn');
+  if (seasonalOn) seasonalOn.addEventListener('change', function(){ document.getElementById('opSeasonalFields').hidden = !seasonalOn.checked; });
+  var clBox = document.getElementById('opClosures'), clTpl = document.getElementById('opClosureTpl');
+  var clAdd = document.getElementById('opClosureAdd');
+  if (clAdd) clAdd.addEventListener('click', function(){
+    var wrap = document.createElement('div'); wrap.innerHTML = clTpl.innerHTML;
+    var row = wrap.firstElementChild; clBox.appendChild(row); row.querySelector('.op-cl-from').focus(); setListingDirty(true);
+  });
+  if (clBox) clBox.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.op-cl-remove') : null; if (!b) return;
+    b.closest('.op-closure').parentNode.removeChild(b.closest('.op-closure')); setListingDirty(true);
+  });
+  function seasonalValue(){
+    if (!seasonalOn) return { list: undefined };
+    var rest = (initial.hours_seasons || []).slice(1);
+    if (!seasonalOn.checked) return { list: rest };
+    var w = week('opSeasonHours');
+    if (w.bad) return { error: 'Please fill in both times for each day of your seasonal hours.' };
+    if (w.blank) return { error: 'Seasonal hours: add the times for ' + w.blank + ', or tick Closed.' };
+    var val = function(id){ return document.getElementById(id).value; };
+    var from = val('opSeasonalFromM') + '-' + val('opSeasonalFromD'), to = val('opSeasonalToM') + '-' + val('opSeasonalToD');
+    if (from === to) return { error: 'Please pick two different days for your seasonal hours.' };
+    return { list: [{ label: val('opSeasonalLabel').trim(), from: from, to: to, hours: w.week }].concat(rest) };
+  }
+  function closuresValue(){
+    if (!clBox) return { list: undefined };
+    var out = [], err = '';
+    Array.prototype.forEach.call(clBox.querySelectorAll('.op-closure'), function(row){
+      var f = row.querySelector('.op-cl-from').value, t = row.querySelector('.op-cl-to').value, n = row.querySelector('.op-cl-note').value.trim();
+      if (!f && !t && !n) return;
+      if (!f) { err = 'Please pick the first day of each closure.'; return; }
+      if (t && t < f) { err = 'A closure can\u2019t end before it starts.'; return; }
+      out.push({ from: f, to: t || f, note: n });
+    });
+    if (err) return { error: err };
+    out.sort(function(a, b){ return a.from < b.from ? -1 : a.from > b.from ? 1 : (a.to < b.to ? -1 : a.to > b.to ? 1 : 0); });
+    return { list: out };
+  }
+  var FIELD_NAMES = { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
+    name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures' };
+  function fieldList(list){ var n = (list || []).map(function(f){ return FIELD_NAMES[f] || f; }); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : (n[0] || ''); }
+  function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
+    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', 'Please fill in both times for each day you are open.'); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', 'Add the times for ' + h.blank + ', or tick Closed.'); jumpToError(form); return; }
@@ -38471,6 +39004,14 @@ ${ownerFooterHtml()}
     };
     if (changes.open_months && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', 'Please pick two different months, or choose Open all year.'); jumpToError(form); return; }
     Array.prototype.forEach.call(document.querySelectorAll('#opBadges input'), function(b){ changes.badges[b.value] = b.checked; });
+    var sv = seasonalValue();
+    if (sv.error) { show('opSeasonalError', sv.error); var sb = document.getElementById('opSeasonalBox'); if (sb) sb.open = true; jumpToError(form); return; }
+    if (sv.list !== undefined && JSON.stringify(sv.list) !== JSON.stringify(initial.hours_seasons || [])) changes.hours_seasons = sv.list;
+    var cv = closuresValue();
+    if (cv.error) { show('opClosuresError', cv.error); var cb = document.getElementById('opClosuresBox'); if (cb) cb.open = true; jumpToError(form); return; }
+    if (cv.list !== undefined && JSON.stringify(cv.list) !== JSON.stringify(initial.closures || [])) changes.closures = cv.list;
+    var priceEl = document.getElementById('opPrice');
+    if (priceEl && priceEl.value !== (initial.price_range || '')) changes.price_range = priceEl.value;
     if (document.getElementById('opHappy')) {
       var hh = week('opHappy');
       if (hh.bad) { show('opHappyError', 'Please fill in both times for each happy hour.'); jumpToError(form); return; }
@@ -38494,6 +39035,17 @@ ${ownerFooterHtml()}
           rememberName(document.getElementById('opName').value); rememberEmail(emailVal('opEmail'));
           if (emailVal('opEmail').trim()) document.getElementById('opDoneMail').hidden = false;
           shareEmail(emailVal('opEmail'));
+          // Instant saves (2026-10-18): say what is live now and what still waits for review.
+          var liveF = r.body.live || [], revF = r.body.review || [];
+          if (INSTANT) {
+            var msg = '';
+            if (liveF.length) msg += 'Live now: ' + fieldList(liveF) + '. Your page shows it straight away. ';
+            if (revF.length) msg += 'We\u2019ll review this within a day: ' + fieldList(revF) + '. ';
+            if (!liveF.length && !revF.length) msg = 'Saved. ';
+            document.getElementById('opDoneText').textContent = msg.trim();
+            document.getElementById('opDoneMail').hidden = !revF.length;
+          }
+          Object.keys(changes).forEach(function(k){ initial[k] = k === 'hours' || k === 'happy_hour' ? JSON.stringify(changes[k]) : changes[k]; });
           setListingDirty(false);
           form.style.display = 'none'; document.getElementById('opDone').classList.add('show'); window.scrollTo(0, 0); return; }
         var errs = (r.body && r.body.errors) || {};
@@ -38501,6 +39053,7 @@ ${ownerFooterHtml()}
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
         show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opEmailError', errs.contact_email);
+        show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? 'Please fix the highlighted fields.' : 'Sorry, something went wrong. Please try again.'));
         jumpToError(form);
       })
@@ -41761,7 +42314,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     {
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim)\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim)\/(\d+)\/(approve|reject|remove|undo)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
@@ -42509,6 +43062,17 @@ module.exports = {
   venueForOwnerAccount,
   validateOwnerChanges,
   approveOwnerChange,
+  // Instant owner edits, seasonal hours and closures (2026-10-18).
+  undoOwnerInstantChange,
+  recentInstantOwnerChanges,
+  pendingOwnerChange,
+  OWNER_INSTANT_FIELDS,
+  hoursWithExtras,
+  venueHoursExtras,
+  clearHoursExtraCache,
+  weekJsonOn,
+  ownerVenueSummary,
+  renderAdminReviewPage,
   rejectOwnerChange,
   listOwnerChanges,
   getOwnerChange,

@@ -508,6 +508,7 @@ function eligible(v, ctx, strict) {
   // A venue closed for the season today is left out the same way (dated
   // itineraries check the trip's own date in advisoryFit instead).
   if (!ctx.itinerary && !ctx.requirements && v.seasonClosedToday) return false;
+  if (!ctx.itinerary && !ctx.requirements && v.ownerClosures && seasonClosedOnTrip({ ownerClosures: v.ownerClosures }, null)) return false;
   // A budget request (cheap, budget, affordable) is about food, not wine tastings (2026-10-18).
   if (ctx.budget === 'budget' && BUDGET_SKIPPED_TYPES.includes(v.type) && !ctx.types.has(v.type)) return false;
   const occasionExcluded = OCCASION_EXCLUDED_TYPES[ctx.occasion];
@@ -3345,10 +3346,16 @@ function advisoryExcerpt(note) {
 }
 // Closed for the season on the trip's date (the venue's own dated range), or
 // today when the plan has no date.
+// Today on the Okanagan calendar (America/Vancouver), for owner closures on plans with no date.
+function ownerClosureToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
 const OPERATING_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
 const OPERATING_PERIOD_RE = new RegExp(`\\b(?:opens?|operates?|runs?)\\s+(?:daily\\s+)?(?:from\\s+)?(${OPERATING_MONTHS.join('|')})\\s+(?:to|through|until|into)\\s+(?:(?:early|mid|late)\\s+)?(${OPERATING_MONTHS.join('|')})\\b`);
 function seasonClosedOnTrip(v, season) {
   const d = season && season.date;
+  // An owner's special closure (2026-10-18): closed on those dates, or today when the plan has no date.
+  if (v.ownerClosures && v.ownerClosures.some((c) => (d || ownerClosureToday()) >= c.from && (d || ownerClosureToday()) <= c.to)) return true;
   if (v.seasonClosed) {
     if (!d) return !!v.seasonClosedToday;
     return d >= v.seasonClosed.from && d <= v.seasonClosed.to;

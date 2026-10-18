@@ -10785,13 +10785,14 @@ test('Phase 3: the planner and interpreter make no network or AI calls', () => {
 // Phase 3.5: the planner's "tonight"/"right now" clock is the Okanagan wall
 // clock (America/Vancouver), never the machine's timezone.
 test('Phase 3.5: okanaganClock converts fixed instants to America/Vancouver weekday and minutes', () => {
-  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T04:06:00Z')), { weekday: 'thu', minutes: 21 * 60 + 6 });
-  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T03:30:00Z')), { weekday: 'thu', minutes: 20 * 60 + 30 });
-  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T01:00:00Z')), { weekday: 'thu', minutes: 18 * 60 });
-  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T07:30:00Z')), { weekday: 'fri', minutes: 30 });
+  // The clock carries the Okanagan calendar date too (2026-10-18), for seasonal hours and closures.
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T04:06:00Z')), { weekday: 'thu', minutes: 21 * 60 + 6, date: '2026-09-24' });
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T03:30:00Z')), { weekday: 'thu', minutes: 20 * 60 + 30, date: '2026-09-24' });
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T01:00:00Z')), { weekday: 'thu', minutes: 18 * 60, date: '2026-09-24' });
+  assert.deepEqual(app.okanaganClock(new Date('2026-09-25T07:30:00Z')), { weekday: 'fri', minutes: 30, date: '2026-09-25' });
   // Independent of the process timezone.
   const tz = process.env.TZ;
-  try { process.env.TZ = 'Asia/Bangkok'; assert.deepEqual(app.okanaganClock(new Date('2026-09-25T04:06:00Z')), { weekday: 'thu', minutes: 1266 }); }
+  try { process.env.TZ = 'Asia/Bangkok'; assert.deepEqual(app.okanaganClock(new Date('2026-09-25T04:06:00Z')), { weekday: 'thu', minutes: 1266, date: '2026-09-24' }); }
   finally { if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; }
 });
 
@@ -10865,11 +10866,11 @@ test('hours.js scope: guarded load; one reading for the venue page, structured d
 test('Stage 2: the Okanagan clock across 2026-11-01 -- America/Vancouver stays on UTC-7 (no fall-back hour), and Open Now reads it the same in any server timezone', () => {
   const clock = (iso) => app.okanaganClock(new Date(iso));
   // PDT before, permanent UTC-7 after (tz 2026b+): 01:59 -> 02:00 -> 03:00 with no repeated hour.
-  assert.deepEqual(clock('2026-11-01T08:59:00Z'), { weekday: 'sun', minutes: 1 * 60 + 59 });
-  assert.deepEqual(clock('2026-11-01T09:00:00Z'), { weekday: 'sun', minutes: 2 * 60 });
-  assert.deepEqual(clock('2026-11-01T10:00:00Z'), { weekday: 'sun', minutes: 3 * 60 });
-  assert.deepEqual(clock('2026-11-15T20:00:00Z'), { weekday: 'sun', minutes: 13 * 60 });
-  assert.deepEqual(clock('2027-01-15T20:00:00Z'), { weekday: 'fri', minutes: 13 * 60 });
+  assert.deepEqual(clock('2026-11-01T08:59:00Z'), { weekday: 'sun', minutes: 1 * 60 + 59, date: '2026-11-01' });
+  assert.deepEqual(clock('2026-11-01T09:00:00Z'), { weekday: 'sun', minutes: 2 * 60, date: '2026-11-01' });
+  assert.deepEqual(clock('2026-11-01T10:00:00Z'), { weekday: 'sun', minutes: 3 * 60, date: '2026-11-01' });
+  assert.deepEqual(clock('2026-11-15T20:00:00Z'), { weekday: 'sun', minutes: 13 * 60, date: '2026-11-15' });
+  assert.deepEqual(clock('2027-01-15T20:00:00Z'), { weekday: 'fri', minutes: 13 * 60, date: '2027-01-15' });
   assert.equal(app.todayLocal(new Date('2026-11-02T07:30:00Z')), '2026-11-02', 'the Okanagan date stays UTC-7 after midnight');
   assert.equal(app.toVancouverIso('2026-11-08', '02:30'), '2026-11-08T02:30:00-07:00', 'event wall times use permanent UTC-7');
   // A 12:00-26:00 venue on Saturday night is open at 01:30 Sunday before and after the change.
@@ -21145,7 +21146,7 @@ test('Owner first visit polish (2026-10-15): copy Monday hours, login prompt aft
   try {
     const page = await get(`/owner/${token}`);
     assert.match(page, /Copy Monday to: <button type="button" data-copy="weekdays">Tue&ndash;Fri<\/button> <button type="button" data-copy="all">every day<\/button>/);
-    assert.equal((page.match(/class="op-copy"/g) || []).length, 1, 'hours only (no happy hour for a cafe)');
+    assert.equal((page.match(/class="op-copy"/g) || []).length, 2, 'hours and seasonal hours (2026-10-18), no happy hour for a cafe');
     assert.match(page, /id="opDoneLogin"><strong>Skip the link next time:<\/strong> <a href="#opLogin">create a login<\/a>/);
     assert.match(page, /<span id="opDoneMail" hidden> We&rsquo;ll email you when they&rsquo;re live\.<\/span>/);
     assert.match(page, /<span id="opLinkNote"> Keep this link private/);
@@ -21230,7 +21231,7 @@ test('Owner follow-ups (2026-10-15): pending note says new changes are added; ev
     assert.equal(merged.note, 'First note\n\nSecond note');
     assert.equal(merged.contact_email, 'fu@example.com');
     const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
-    assert.match(page, /waiting for review\. Anything else you send now is added to them\./);
+    assert.match(page, /waiting for review and show below, marked &ldquo;Waiting for review&rdquo;\. Anything else you send now is added to them\./);
     assert.match(page, /Thanks! Your event is in for review, usually within a day\. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On\./);
     assert.match(page, /and email you when ' \+ \(sent === 1 \? 'it’s' : 'they’re'\) \+ ' live\./);
     assert.match(page, /\['opEmail', 'ofEmail', 'oeContactEmail'\]\.forEach\(function\(id\)\{ var el = document\.getElementById\(id\); if \(el\) el\.value = v; \}\)/);
@@ -21431,7 +21432,7 @@ test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar an
   const base = `http://localhost:${srv.address().port}`;
   try {
     const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
-    assert.match(page, /<p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it\.<\/p>/);
+    assert.match(page, /<p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it\. Signed-in owners&rsquo; hours and details go live straight away\.<\/p>/);
     assert.match(page, /<div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t sent yet\.<\/span> <button type="button" id="opUnsentSend">Send changes<\/button><\/div>/);
     assert.match(page, /<button type="button" class="op-more" id="opMore">Make more changes<\/button>/);
     assert.match(page, /window\.addEventListener\('beforeunload', function\(e\)\{/);
@@ -25044,6 +25045,229 @@ test('Guides batch 4 (2026-10-18): Kelowna food and things to do, breweries, sus
   assert.equal(app.GUIDE_GROUPS.find((x) => x.key === 'towns').heading, 'Towns, weekends and local food');
 });
 
+// ---- Instant owner edits, pending pre-fill, seasonal hours, closures, price range (2026-10-18) ----------
+const PE_WEEK = JSON.stringify({ mon: [['09:00', '17:00']], tue: [['09:00', '17:00']], wed: [['09:00', '17:00']], thu: [['09:00', '17:00']], fri: [['09:00', '17:00']], sat: [['09:00', '17:00']], sun: [['09:00', '17:00']] });
+async function withOwnerPortalServer(fn) {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (p, body, cookie) => fetch(`${base}${p}`, { method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.77.0.${ip++ % 250}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const get = (p, cookie) => fetch(`${base}${p}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  try { return await fn({ base, post, get }); } finally {
+    srv.closeAllConnections();
+    await new Promise((resolve) => srv.close(resolve));
+  }
+}
+
+test('Instant owner edits (2026-10-18): signed-in hours, phone, description, badges and price go live with an audit row; name and website wait; link edits wait', () => withOwnerPortalServer(async ({ post, get }) => {
+  seasonInsert.run({ name: 'Instant Edit Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'instant-edit-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'instant-edit-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const made = await post(`/owner/${token}/account`, { email: 'instant@example.com', password: 'a long enough password' });
+  assert.equal(made.status, 201);
+  const cookie = made.cookie;
+  const page = await get(`/owner/account/venue/${v.id}`, cookie);
+  assert.match(page, /go live on <a href="[^"]+">your page<\/a> straight away/);
+  assert.match(page, /id="opSubmit">Save changes</);
+  assert.match(page, /\$\$ &mdash; \$15–30 per person/, 'price range selector with its scale');
+  assert.match(page, /What one person usually spends: \$ under \$15, \$\$ \$15&ndash;30, \$\$\$ \$30&ndash;60, \$\$\$\$ over \$60 per person\./);
+  const week = (w) => ({ mon: [w], tue: [w], wed: [w], thu: [w], fri: [w], sat: [], sun: [] });
+  const r = await post(`/owner/account/venue/${v.id}/changes`, { changes: {
+    phone: '250-555-0181', description: 'A cosy fixture restaurant with a wood oven, a patio and a short local wine list.',
+    hours: week(['11:00', '21:00']), price_range: '2', badges: { patio: true }, name: 'Instant Edit Fixture Bistro', website: 'instantfixture.example',
+  }, contact_name: 'Pat', started_at: Date.now() - 10000 }, cookie);
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.deepEqual(r.body.live.sort(), ['badges', 'description', 'hours', 'phone', 'price_range']);
+  assert.deepEqual(r.body.review.sort(), ['name', 'website']);
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id);
+  assert.equal(row.phone, '250-555-0181');
+  assert.equal(row.price, 2);
+  assert.equal(row.patio, 1);
+  assert.equal(row.name, 'Instant Edit Fixture', 'the name waits for review');
+  assert.equal(row.hours_source, 'venue_owner');
+  assert.equal(row.hours_checked_at, app.todayLocal());
+  assert.equal(JSON.parse(row.hours).sat, null);
+  // The audit row: instant, approved by the login, with what it replaced.
+  const audit = app.recentInstantOwnerChanges().find((x) => x.venue_id === v.id);
+  assert.equal(audit.reviewed_by, 'owner:instant@example.com');
+  assert.equal(audit.previous.phone, '');
+  assert.equal(audit.changes.phone, '250-555-0181');
+  assert.equal(audit.previous.price_range, '');
+  assert.equal(JSON.parse(audit.undo_meta).hours_source, null);
+  const logged = db.prepare("SELECT field_name, old_value, new_value FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner' AND reviewed_by = 'owner:instant@example.com'").all(v.id);
+  assert.ok(logged.some((l) => l.field_name === 'phone' && l.new_value === '250-555-0181'));
+  assert.ok(logged.some((l) => l.field_name === 'price' && l.new_value === '2'));
+  const waiting = app.getOwnerChange(app.pendingOwnerChange(v.id).id);
+  assert.deepEqual(Object.keys(waiting.changes).sort(), ['name', 'website']);
+  // The venue page shows "Hours checked" and the new price; the review page lists the live change with Undo.
+  const vp = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'instant-edit-fixture'), [], [], []);
+  assert.match(vp, /Hours checked/);
+  const review = app.renderAdminReviewPage();
+  assert.match(review, /Changes owners made live \(last 14 days\)/);
+  assert.match(review, new RegExp(`data-kind="change" data-id="${audit.id}"[\\s\\S]*?data-act="undo">Undo<`));
+  // Still-pending fields pre-fill the form, marked as waiting.
+  const again = await get(`/owner/account/venue/${v.id}`, cookie);
+  assert.match(again, /id="opBizName" maxlength="100" value="Instant Edit Fixture Bistro"/);
+  assert.match(again, /Business name <span class="op-status op-status-wait op-wait-chip">Waiting for review<\/span>/);
+  assert.match(again, /<option value="2" selected>/);
+  // Safety checks stay: HTML is refused, a bad price is refused.
+  const bad = await post(`/owner/account/venue/${v.id}/changes`, { changes: { description: 'Our <b>great</b> place with a patio and the best views in town.', price_range: '7' }, started_at: Date.now() - 10000 }, cookie);
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.errors.description, /< and >/);
+  assert.match(bad.body.errors.price_range, /price range/);
+  // Undo puts the old values back (hours with their old provenance); a second Undo is refused.
+  const u = app.undoOwnerInstantChange(audit.id, 'dayton');
+  assert.equal(u.ok, true, JSON.stringify(u));
+  const back = db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id);
+  assert.equal(back.phone, null);
+  assert.equal(back.price, null);
+  assert.equal(back.patio, 0);
+  assert.equal(back.hours, PE_WEEK);
+  assert.equal(back.hours_source, null);
+  assert.equal(app.undoOwnerInstantChange(audit.id, 'dayton').reason, 'already_undone');
+  assert.match(app.renderAdminReviewPage(), /Undone /);
+  // A bare edit link (not signed in) still waits for review, for every field.
+  const viaLink = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0199' }, started_at: Date.now() - 10000 });
+  assert.equal(viaLink.status, 201);
+  assert.deepEqual(viaLink.body.live, []);
+  assert.deepEqual(viaLink.body.review, ['phone']);
+  assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(v.id).phone, null);
+  const linkPage = await get(`/owner/${token}`);
+  assert.match(linkPage, /id="opPhone" maxlength="40" value="250-555-0199"/, 'the pending phone, not the live (empty) one');
+  assert.match(linkPage, /Phone <span class="op-status op-status-wait op-wait-chip">Waiting for review<\/span>/);
+  assert.match(linkPage, /nothing changes on your page until we&rsquo;ve checked it/);
+  // Inline scripts on the edit pages and the review page parse (regexes in template literals keep their backslashes).
+  const vm = require('node:vm');
+  for (const html of [page, again, linkPage, app.renderAdminReviewPage()]) {
+    for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+      if (/\bsrc=|application\/(ld\+)?json/i.test(m[1] || '') || !m[2].trim()) continue;
+      assert.doesNotThrow(() => new vm.Script(m[2]), m[2].slice(0, 80));
+    }
+  }
+  // Setting a waiting field back to the live value takes it out of the waiting request.
+  const revert = await post(`/owner/${token}/changes`, { changes: { phone: '' }, started_at: Date.now() - 10000 });
+  assert.equal(revert.status, 400, 'an empty phone is still refused');
+  await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0123' }, started_at: Date.now() - 10000 });
+  assert.equal(app.getOwnerChange(app.pendingOwnerChange(v.id).id).changes.phone, '250-555-0123');
+  const liveDesc = db.prepare('SELECT description FROM venues WHERE id = ?').get(v.id).description;
+  await post(`/owner/${token}/changes`, { changes: { description: 'A brand new description for this fixture, long enough to pass.' }, started_at: Date.now() - 10000 });
+  assert.deepEqual(Object.keys(app.getOwnerChange(app.pendingOwnerChange(v.id).id).changes).sort(), ['description', 'name', 'phone', 'website']);
+  const back2 = await post(`/owner/${token}/changes`, { changes: { description: liveDesc }, started_at: Date.now() - 10000 });
+  assert.equal(back2.status, 201, JSON.stringify(back2.body));
+  assert.deepEqual(Object.keys(app.getOwnerChange(app.pendingOwnerChange(v.id).id).changes).sort(), ['name', 'phone', 'website'], 'set back to the live text: no longer waiting');
+}));
+
+test('Owner status chip (2026-10-18): counts waiting menus and event changes, never "Up to date" while one waits; a live menu shows as live', () => {
+  seasonInsert.run({ name: 'Status Chip Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'status-chip-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'status-chip-fixture');
+  assert.match(app.ownerVenueSummary(v.id), /Up to date/);
+  const menu = Number(db.prepare("INSERT INTO venue_menus (venue_id, status, data) VALUES (?, 'pending', '{}')").run(v.id).lastInsertRowid);
+  let chip = app.ownerVenueSummary(v.id);
+  assert.match(chip, /Waiting for review: 1 menu/);
+  assert.doesNotMatch(chip, /Up to date/);
+  db.prepare("UPDATE venue_menus SET status = 'published', published_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu);
+  chip = app.ownerVenueSummary(v.id);
+  assert.match(chip, /Menu live/);
+  assert.doesNotMatch(chip, /Waiting for review/);
+});
+
+test('Seasonal hours and special closures (2026-10-18): hours.js applies them by date, on the server and in the browser', () => {
+  const vm = require('node:vm');
+  const hours = require('../hours.js');
+  const raw = JSON.stringify({ ...JSON.parse(PE_WEEK), _seasons: [{ from: '11-01', to: '04-30', label: 'Winter hours', hours: { mon: [['10:00', '16:00']], tue: [['10:00', '16:00']], wed: [['10:00', '16:00']], thu: [['10:00', '16:00']], fri: [['10:00', '16:00']], sat: null, sun: null } }],
+    _closures: [{ from: '2026-10-12', to: '2026-10-12', note: 'Thanksgiving' }, { from: '2026-12-25', to: '2026-12-26', note: '' }] });
+  const label = (iso) => { const c = app.okanaganClock(new Date(iso)); return hours.hoursStatusLabel(hours.statusAt(hours.parseHours(raw), c), c).text; };
+  assert.equal(app.okanaganClock(new Date('2026-10-12T19:00:00Z')).date, '2026-10-12');
+  assert.equal(label('2026-10-12T19:00:00Z'), 'Closed today (Thanksgiving) · Opens tomorrow 9 AM');
+  assert.equal(label('2026-10-13T19:00:00Z'), 'Open now · Closes 5 PM', 'the usual hours the next day');
+  assert.equal(label('2026-12-25T19:00:00Z'), 'Closed today (holiday) · Opens Mon 10 AM', 'no note: holiday; the winter set after');
+  assert.equal(label('2026-11-02T23:30:00Z'), 'Closed · Opens tomorrow 10 AM', 'winter hours: 4:30 PM is after the 4 PM close');
+  assert.equal(label('2026-11-02T20:00:00Z'), 'Open now · Closes 4 PM');
+  // Without a date (old callers), or without extras, nothing changes.
+  assert.equal(hours.statusAt(hours.parseHours(raw), { weekday: 'mon', minutes: 720 }).state, 'open');
+  assert.deepEqual(hours.parseHours(PE_WEEK), hours.parseHours(JSON.parse(PE_WEEK)));
+  assert.equal(hours.parseHours(PE_WEEK).seasons, undefined);
+  // The browser copy reads them the same way, with the page's own okanaganClock().
+  const ctx = {};
+  vm.runInNewContext(`var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(app.OKANAGAN_CLOCK_FORMAT)}); ${app.okanaganClock.toString()}\n${hours.HOURS_CLIENT_SRC}
+    this.at = function(iso, raw){ var c = okanaganClock(new Date(iso)); return hoursStatusLabel(statusAt(parseHours(raw), c), c).text; };`, ctx);
+  for (const iso of ['2026-10-12T19:00:00Z', '2026-12-25T19:00:00Z', '2026-11-02T23:30:00Z', '2026-10-13T19:00:00Z']) assert.equal(ctx.at(iso, raw), label(iso), iso);
+  // The French page script turns the closure label French.
+  const fr = require('../french-text.js');
+  assert.ok(fr);
+  assert.equal(app.frStatusText('Closed today (holiday) · Opens tomorrow 9 AM'), 'Fermé aujourd’hui (jour férié) · ouvre demain à 9 h');
+  assert.equal(app.frStatusText('Closed today (Thanksgiving) · Opens Mon 10 AM'), 'Fermé aujourd’hui (Thanksgiving) · ouvre lun. à 10 h');
+});
+
+test('Seasonal hours and closures (2026-10-18): owners set them; the venue page (EN and FR), cards, map and trip facts respect them', () => withOwnerPortalServer(async ({ post, get }) => {
+  seasonInsert.run({ name: 'Season Set Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'season-set-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'season-set-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const cookie = (await post(`/owner/${token}/account`, { email: 'seasons@example.com', password: 'a long enough password' })).cookie;
+  const today = app.todayLocal();
+  const winter = { mon: [['10:00', '16:00']], tue: [['10:00', '16:00']], wed: [['10:00', '16:00']], thu: [['10:00', '16:00']], fri: [['10:00', '16:00']], sat: [], sun: [] };
+  // Checks: a past closure, a bad note and a one-day season are refused.
+  let r = await post(`/owner/account/venue/${v.id}/changes`, { changes: { closures: [{ from: app.addLocalDays(today, -3), to: '', note: '' }] }, started_at: Date.now() - 10000 }, cookie);
+  assert.match(r.body.errors.closures, /already over/);
+  r = await post(`/owner/account/venue/${v.id}/changes`, { changes: { closures: [{ from: today, to: '', note: '<script>' }] }, started_at: Date.now() - 10000 }, cookie);
+  assert.match(r.body.errors.closures, /without < > &/);
+  r = await post(`/owner/account/venue/${v.id}/changes`, { changes: { hours_seasons: [{ from: '11-01', to: '11-01', label: '', hours: winter }] }, started_at: Date.now() - 10000 }, cookie);
+  assert.match(r.body.errors.hours_seasons, /two different days/);
+  r = await post(`/owner/account/venue/${v.id}/changes`, { changes: {
+    hours_seasons: [{ from: '11-01', to: '04-30', label: 'Winter hours', hours: winter }],
+    closures: [{ from: app.addLocalDays(today, 20), to: app.addLocalDays(today, 21), note: 'Renovations' }],
+  }, started_at: Date.now() - 10000 }, cookie);
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.deepEqual(r.body.live.sort(), ['closures', 'hours_seasons']);
+  const x = app.venueHoursExtras(v.id);
+  assert.equal(x.seasons[0].label, 'Winter hours');
+  assert.equal(x.seasons[0].hours.sat, null);
+  assert.equal(x.closures[0].note, 'Renovations');
+  assert.equal(db.prepare('SELECT hours_checked_at FROM venues WHERE id = ?').get(v.id).hours_checked_at, today, 'counts as the owner checking the hours');
+  // The edit page shows them again.
+  const page = await get(`/owner/account/venue/${v.id}`, cookie);
+  assert.match(page, /id="opSeasonalOn" checked/);
+  assert.match(page, /id="opSeasonalLabel" maxlength="40" placeholder="Winter hours" value="Winter hours"/);
+  assert.match(page, new RegExp(`class="op-cl-from" min="${today}" value="${app.addLocalDays(today, 20)}"`));
+  // Fixed clock for the surfaces: Thanksgiving 2026 as a closure, put straight in the table.
+  db.prepare('UPDATE venue_hours_extra SET closures = ? WHERE venue_id = ?').run(JSON.stringify([{ from: '2026-10-12', to: '2026-10-12', note: 'Thanksgiving' }]), v.id);
+  app.clearHoursExtraCache();
+  const now = new Date('2026-10-12T19:00:00Z');
+  const fresh = app.findVenueBySlug('kelowna', 'restaurant', 'season-set-fixture');
+  assert.ok(fresh.hours_live && fresh.hours_seasonal, 'the API venue carries them');
+  assert.equal(fresh.special_closures, undefined, 'a closure already over (on the real clock) is left out');
+  const en = app.renderVenuePage(fresh, [], [], [], { now });
+  assert.match(en, /id="venueOpenStatus">Closed today \(Thanksgiving\) · Opens tomorrow 9 AM/);
+  assert.match(en, /<li class="is-today" data-closed-date="1"><span>Monday<\/span><span>Closed \(Thanksgiving\)<\/span><\/li>/);
+  assert.match(en, /<summary>Winter hours \(Nov 1 – Apr 30\)<\/summary>/);
+  assert.match(en, /Special closures:<\/strong> Oct 12 \(Thanksgiving\)/);
+  const frPage = app.renderVenuePage(fresh, [], [], [], { now, lang: 'fr' });
+  assert.match(frPage, /Fermé aujourd’hui \(Thanksgiving\) · ouvre demain à 9 h/);
+  assert.match(frPage, /<span>Fermé \(Thanksgiving\)<\/span>/);
+  assert.match(frPage, /<summary>Heures saisonnières \(1er nov\. – 30 avr\.\)<\/summary>/);
+  assert.match(frPage, /Fermetures spéciales:<\/strong>/);
+  // In winter the seasonal set is the week shown, and the usual hours fold away.
+  const nov = app.renderVenuePage(fresh, [], [], [], { now: new Date('2026-11-02T20:00:00Z') });
+  assert.match(nov, /<li class="is-today"><span>Monday<\/span><span>10 AM – 4 PM<\/span><\/li>/);
+  assert.match(nov, /<strong>Winter hours<\/strong> \(Nov 1 – Apr 30\) apply now\./);
+  assert.match(nov, /id="venueOpenStatus">Open now · Closes 4 PM/);
+  // Cards and the map (foodDrinkOpenNowInfo) carry them, so the live browser status applies them too.
+  const info = app.foodDrinkOpenNowInfo([fresh], new Map(), now, { requireVerified: false }).byId.get(v.id);
+  assert.equal(info.state, 'closed');
+  assert.equal(info.text, 'Closed today (Thanksgiving) · Opens tomorrow 9 AM');
+  assert.equal(info.hours._closures[0].note, 'Thanksgiving');
+  // Build My Trip: the winter week in winter, and the closure as a dated closure.
+  assert.equal(JSON.parse(app.weekJsonOn(fresh, '2026-12-01')).mon[0][0], '10:00');
+  assert.equal(JSON.parse(app.weekJsonOn(fresh, '2026-07-01')).mon[0][0], '09:00');
+  db.prepare('UPDATE venue_hours_extra SET closures = ? WHERE venue_id = ?').run(JSON.stringify([{ from: app.addLocalDays(today, 2), to: app.addLocalDays(today, 2), note: '' }]), v.id);
+  app.clearHoursExtraCache();
+  const fact = app.buildTripPlannerFacts(false).find((f) => f.id === v.id);
+  assert.deepEqual(fact.ownerClosures, [{ from: app.addLocalDays(today, 2), to: app.addLocalDays(today, 2) }]);
+}));
 // ---------- Owner portal phone pass and access (2026-10-18) ----------
 function ownerUiServer() {
   const http = require('node:http');
