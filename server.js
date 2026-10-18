@@ -31454,21 +31454,22 @@ function ownerAccountName(email) {
   return row ? row.name : '';
 }
 // The panel's rows for one viewer.
-function ownerAccessRows(venueId, viewerId) {
+function ownerAccessRows(venueId, viewerId, lang = 'en') {
   const logins = ownerVenueLogins(venueId);
   const me = logins.find((l) => l.account_id === viewerId);
   return logins.map((l) => ({ id: l.account_id, you: l.account_id === viewerId, email: l.account_id === viewerId ? l.email : maskOwnerEmail(l.email),
-    added: l.added_at ? ownerLocalDate(l.added_at) : '', canRemove: l.account_id !== viewerId && ownerCanRemoveLogin(me, l) }));
+    added: l.added_at ? ownerLocalDate(l.added_at, lang === 'fr') : '', canRemove: l.account_id !== viewerId && ownerCanRemoveLogin(me, l) }));
 }
-function ownerAccessPanelHtml(venue, account) {
-  const rows = ownerAccessRows(venue.id, account.id);
-  const items = rows.map((r) => `<li><span class="op-act-main"><span><strong>${escapeHtml(r.email)}</strong>${r.you ? ' (you)' : ''}</span><span class="op-act-date">${r.added ? `Added ${escapeHtml(r.added)}` : ''}${!r.you && !r.canRemove ? ' &middot; added before you' : ''}</span></span>${
-    r.you ? '<button type="button" class="op-btn" id="opRemoveMe">Remove me</button>'
-      : r.canRemove ? `<button type="button" class="op-btn op-btn-danger" data-login-remove="${r.id}" data-label="${escapeHtml(r.email)}">Remove</button>` : ''}</li>`).join('');
+function ownerAccessPanelHtml(venue, account, lang = 'en') {
+  const L = (en, f) => (lang === 'fr' ? f : en);
+  const rows = ownerAccessRows(venue.id, account.id, lang);
+  const items = rows.map((r) => `<li><span class="op-act-main"><span><strong>${escapeHtml(r.email)}</strong>${r.you ? L(' (you)', ' (vous)') : ''}</span><span class="op-act-date">${r.added ? `${L('Added', 'Ajouté le')} ${escapeHtml(r.added)}` : ''}${!r.you && !r.canRemove ? L(' &middot; added before you', ' &middot; ajouté avant vous') : ''}</span></span>${
+    r.you ? `<button type="button" class="op-btn" id="opRemoveMe">${L('Remove me', 'Me retirer')}</button>`
+      : r.canRemove ? `<button type="button" class="op-btn op-btn-danger" data-login-remove="${r.id}" data-label="${escapeHtml(r.email)}">${L('Remove', 'Retirer')}</button>` : ''}</li>`).join('');
   return `<details class="op-fold" id="access">
-      <summary><span class="lyv-section-label">People with access</span> <span class="op-fold-hint">${rows.length === 1 ? 'Only you can update this listing' : `${rows.length} logins can update this listing`}</span></summary>
+      <summary><span class="lyv-section-label">${L('People with access', 'Personnes ayant accès')}</span> <span class="op-fold-hint">${rows.length === 1 ? L('Only you can update this listing', 'Vous seul pouvez modifier cette fiche') : L(`${rows.length} logins can update this listing`, `${rows.length} comptes peuvent modifier cette fiche`)}</span></summary>
       <ul class="op-access" id="opAccessList">${items}</ul>
-      <p class="op-hint">Each person signs in with their own login. Anyone with this listing&rsquo;s private edit link can add one, and everyone already here gets an email when that happens. You can remove people added after you; to remove someone added before you, email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
+      <p class="op-hint">${L('Each person signs in with their own login. Anyone with this listing&rsquo;s private edit link can add one, and everyone already here gets an email when that happens. You can remove people added after you; to remove someone added before you, email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.', 'Chaque personne se connecte avec son propre compte. Toute personne qui a le lien de modification privé de cette fiche peut en ajouter un, et tous ceux qui ont déjà accès reçoivent alors un courriel. Vous pouvez retirer les personnes ajoutées après vous; pour retirer quelqu’un ajouté avant vous, écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.')}</p>
       <p class="lyv-error" id="opAccessError" hidden></p>
       <p class="op-hint" id="opAccessStatus" role="status"></p>
     </details>`;
@@ -31920,6 +31921,8 @@ async function handleOwnerChangeSubmission(req, res, token) {
       return sendSubmissionResponse(res, 500, { ok: false, error: 'Sorry, your changes could not be saved. Please reload the page and try again.' });
     }
   }
+  ownerMarkFrench(res, 'owner_change_requests', id);
+  ownerMarkFrench(res, 'owner_change_requests', liveId);
   if (id && Object.keys(review).length) await notifyOwnerChange(id);
   return sendSubmissionResponse(res, 201, { ok: true, id: id || liveId, live_id: liveId, fields: Object.keys(changes), live: Object.keys(live), review: Object.keys(review) });
 }
@@ -31985,6 +31988,7 @@ async function handleOwnerEventChange(req, res, venue, subId, data) {
       WHERE id = ? AND status = 'pending'`).run(data.name, JSON.stringify(data.categories), data.description, data.start_date, data.end_date,
       data.start_time, data.end_time, data.all_day, data.ends_next_day, data.event_url, data.schedule_notes || null, data.price_text || null,
       data.image_link || null, data.contact_name, data.contact_email, sub.id);
+    ownerMarkFrench(res, 'event_submissions', sub.id);
     await notifyEventSubmission(sub.id);
     return sendSubmissionResponse(res, 200, { ok: true, id: sub.id, updated: true });
   }
@@ -31995,6 +31999,7 @@ async function handleOwnerEventChange(req, res, venue, subId, data) {
   db.prepare("UPDATE owner_event_changes SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP WHERE submission_id = ? AND status = 'pending'").run(sub.id);
   const id = Number(db.prepare('INSERT INTO owner_event_changes (submission_id, event_id, venue_id, data, contact_email) VALUES (?, ?, ?, ?, ?)')
     .run(sub.id, event.id, venue.id, JSON.stringify(keep), data.contact_email || null).lastInsertRowid);
+  ownerMarkFrench(res, 'owner_event_changes', id);
   await notifyOwnerEventAction(`[PENDING REVIEW] Event change #${id}: ${data.name} (${venue.name})`, {
     'Status': 'PENDING REVIEW. The live event has not changed yet.', 'Venue': venue.name, 'Event': sub.name,
     'New details': `${data.name}; ${data.start_date}${data.start_time ? ` ${data.start_time}` : ''}${data.end_time ? `-${data.end_time}` : ''}`,
@@ -32132,6 +32137,7 @@ async function handleOwnerEventSubmission(req, res, token) {
   ).get(venue.id, data.start_date, data.name);
   if (duplicate) return sendSubmissionResponse(res, 409, { ok: false, error: 'You already sent this event. It is waiting for review.' });
   const id = insertEventSubmission(data, ip, req.headers['user-agent'], venue.id);
+  ownerMarkFrench(res, 'event_submissions', id);
   await notifyEventSubmission(id);
   return sendSubmissionResponse(res, 201, { ok: true, id });
 }
@@ -32421,6 +32427,7 @@ async function handleOwnerPhotoUpload(req, res, token) {
     crypto.createHash('sha256').update(`okanagan-roam-owner-photo:${ip}`).digest('hex')).lastInsertRowid);
   db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
   rememberOwnerContact(venue.id, contact.email);
+  ownerMarkFrench(res, 'owner_photos', id);
   // Signed-in owners (who first came in through Dayton's emailed link and set a
   // password) publish straight away; link-only uploads wait for review. Either
   // way the notification goes out, and photo-remove takes any photo down.
@@ -33227,7 +33234,8 @@ function renderAdminVisitorCard(c, mode) {
 }
 
 // What a signed-in owner sees on "My listings": visitor items that went live in the last 30 days.
-function ownerVisitorItemsHtml(venueId) {
+function ownerVisitorItemsHtml(venueId, lang = 'en') {
+  const fr = lang === 'fr';
   const rows = db.prepare(`SELECT id, display_name, tip, reviewed_at FROM visitor_contributions
     WHERE venue_id = ? AND status = 'approved' AND reviewed_at > datetime('now', '-30 days') ORDER BY reviewed_at DESC, id DESC LIMIT 5`).all(venueId);
   if (!rows.length) return '';
@@ -33235,9 +33243,9 @@ function ownerVisitorItemsHtml(venueId) {
     const photos = visitorPhotosFor(r.id);
     const thumbs = photos.map((p) => `<img src="/images/visitor/${escapeHtml(p.file)}" alt="" loading="lazy" style="width:56px;height:42px;object-fit:cover;border-radius:6px;margin:4px 4px 0 0;vertical-align:top">`).join('');
     const tip = r.tip ? (Array.from(r.tip).length > 160 ? `${Array.from(r.tip).slice(0, 157).join('')}…` : r.tip) : '';
-    return `<span style="display:block;margin:6px 0"><strong>${escapeHtml(visitorCredit(r.display_name))}</strong>, ${escapeHtml(ownerUpdatedDate(r.reviewed_at))}${tip ? `: “${escapeHtml(tip)}”` : ''}${thumbs ? `<br>${thumbs}` : ''}</span>`;
+    return `<span style="display:block;margin:6px 0"><strong>${escapeHtml(visitorCredit(r.display_name, fr ? (en, f) => f : undefined))}</strong>, ${escapeHtml(ownerUpdatedDate(r.reviewed_at, fr))}${tip ? (fr ? ` : « ${escapeHtml(tip)} »` : `: “${escapeHtml(tip)}”`) : ''}${thumbs ? `<br>${thumbs}` : ''}</span>`;
   }).join('');
-  return `<span class="op-visitor" style="display:block;margin-top:10px;font-size:0.86rem"><strong>New from visitors</strong>${items}</span>`;
+  return `<span class="op-visitor" style="display:block;margin-top:10px;font-size:0.86rem"><strong>${fr ? 'Nouveautés des visiteurs' : 'New from visitors'}</strong>${items}</span>`;
 }
 
 // ---------- Menus (2026-10-17) ----------
@@ -35334,11 +35342,14 @@ function renderMenuAppPage(found, opts) {
     state,
   };
   const other = lang === 'fr' ? 'en' : 'fr';
-  const switcher = opts.mode === 'admin' ? '' : `<p class="mn-lang"><a href="?lang=${other}">${t.other}</a></p>`;
+  // French portal (2026-10-18): the switch goes to the other language's address (/fr/owner/.../menu and back).
+  const enBase = String(opts.base || '').replace(/^\/fr(?=\/owner\/)/, '');
+  const switchHref = other === 'fr' ? `/fr${enBase}` : `${enBase}?lang=en`;
+  const switcher = opts.mode === 'admin' ? '' : `<p class="mn-lang"><a href="${escapeHtml(switchHref)}" hreflang="${other}" lang="${other}">${t.other}</a></p>`;
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
-${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}: ${venue.name} | Okanagan Roam`, 'Add your menu to your Okanagan Roam page.', null, [], { golfTheme: true, noindex: true })}
+${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}${lang === 'fr' ? ' ' : ''}: ${venue.name} | Okanagan Roam`, lang === 'fr' ? 'Ajoutez votre menu à votre page Okanagan Roam.' : 'Add your menu to your Okanagan Roam page.', null, [], { golfTheme: true, noindex: true })}
 <meta name="referrer" content="no-referrer">
 <style>
   body.owner-page .mn-wrap { max-width: 560px; margin: 0 auto; padding: 12px 0 64px; }
@@ -35424,11 +35435,11 @@ ${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeade
   <main class="wrap-wide golf-main" id="main"><div class="mn-wrap">
     ${switcher}
     <div id="mnApp"><p class="mn-lead">${t.adding}</p></div>
-    <noscript><p class="mn-card mn-warn">Please turn on JavaScript, or email your menu to <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</p></noscript>
+    <noscript><p class="mn-card mn-warn">${lang === 'fr' ? 'Activez JavaScript, ou envoyez votre menu par courriel à' : 'Please turn on JavaScript, or email your menu to'} <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</p></noscript>
   </div></main>
 <script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${MENU_APP_SCRIPT}</script>
-${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account' })}
+${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang })}
 </body>
 </html>`;
 }
@@ -35438,12 +35449,14 @@ ${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode
 async function handleMenuRoute(req, res, method, sub, ctx) {
   const htmlHeaders = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
   if (!ctx.found) {
-    if (method === 'GET' && !sub) { res.writeHead(404, htmlHeaders); return res.end(renderOwnerInvalidLinkPage()); }
+    if (method === 'GET' && !sub) { res.writeHead(404, htmlHeaders); return res.end(renderOwnerInvalidLinkPage(res.ownerLang)); }
     return sendSubmissionResponse(res, 404, { ok: false, error: 'This link is not valid any more. Please sign in again or ask us at info@okanaganroam.com.' });
   }
   if (!sub && (method === 'GET' || method === 'HEAD')) {
+    // French portal (2026-10-18): /fr/owner/.../menu is French; ?lang=fr / ?lang=en and a French browser still
+    // pick the language on the English address, as before.
     const q = new URL(req.url, 'http://x').searchParams.get('lang');
-    const lang = q === 'fr' || q === 'en' ? q : /^fr\b/i.test(String(req.headers['accept-language'] || '')) ? 'fr' : 'en';
+    const lang = res.ownerLang === 'fr' ? 'fr' : q === 'fr' || q === 'en' ? q : /^fr\b/i.test(String(req.headers['accept-language'] || '')) ? 'fr' : 'en';
     res.writeHead(200, htmlHeaders);
     return res.end(method === 'HEAD' ? undefined : renderMenuAppPage(ctx.found, { ...ctx, lang }));
   }
@@ -35453,7 +35466,13 @@ async function handleMenuRoute(req, res, method, sub, ctx) {
   if (rp) return handleMenuApi(req, res, ctx, 'remove-page', Number(rp[1]));
   const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit', '/import': 'import', '/manual': 'manual' }[sub];
   if (!action || (ctx.mode === 'admin' && ['help', 'restart', 'unpublish', 'edit', 'manual'].includes(action))) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
-  return handleMenuApi(req, res, ctx, action);
+  const out = await handleMenuApi(req, res, ctx, action);
+  // Sent from the French menu screen (2026-10-18): the decision email is French.
+  if (res.ownerLang === 'fr' && ['publish', 'help'].includes(action) && ctx.found && ctx.found.venue) {
+    const last = db.prepare('SELECT MAX(id) AS id FROM venue_menus WHERE venue_id = ?').get(ctx.found.venue.id);
+    ownerMarkFrench(res, 'venue_menus', last && last.id);
+  }
+  return out;
 }
 
 // ----- Public menu pages -----
@@ -35839,9 +35858,11 @@ function readCookie(req, name) {
   return null;
 }
 
+// French portal (2026-10-18): the same session cookie is set twice, for /owner and for /fr/owner, so the French
+// pages (/fr/owner/account ...) are signed in too. Both carry the same value; logging out clears both.
 function ownerCookieHeader(req, value, maxAgeSeconds) {
   const secure = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https' || /okanaganroam\.com$/.test(String(req.headers.host || ''));
-  return `${OWNER_SESSION_COOKIE}=${encodeURIComponent(value)}; Path=/owner; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
+  return ['/owner', '/fr/owner'].map((p) => `${OWNER_SESSION_COOKIE}=${encodeURIComponent(value)}; Path=${p}; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`);
 }
 
 function startOwnerSession(accountId) {
@@ -36031,18 +36052,18 @@ const OWNER_HELP_FILL = {
   },
   fr: {
     ON: {
-      in: 'Sur votre page de modification (<a href="/owner/account">My listings</a> \u2192 <strong>Edit listing</strong>)',
+      in: 'Sur votre page de modification (<a href="/fr/owner/account">Mes fiches</a> \u2192 <strong>Modifier la fiche</strong>)',
       link: 'Sur votre page de modification (le lien privé que nous vous avons envoyé par courriel)',
-      out: 'Sur votre page de modification (connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis <strong>My listings</strong> \u2192 <strong>Edit listing</strong>, ou ouvrez le lien de modification reçu par courriel)',
+      out: 'Sur votre page de modification (connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis <strong>Mes fiches</strong> \u2192 <strong>Modifier la fiche</strong>, ou ouvrez le lien de modification reçu par courriel)',
     },
     SEND: {
-      in: '<strong>Save changes</strong> (enregistrer)',
-      link: '<strong>Send changes</strong> (envoyer)',
-      out: '<strong>Save changes</strong> (<strong>Send changes</strong> avec le lien de modification)',
+      in: '<strong>Enregistrer les modifications</strong>',
+      link: '<strong>Envoyer les modifications</strong>',
+      out: '<strong>Enregistrer les modifications</strong> (<strong>Envoyer les modifications</strong> avec le lien de modification)',
     },
     LIVE: {
       in: 'Comme vous utilisez votre compte, c\u2019est en ligne dès que vous enregistrez.',
-      link: 'Avec le lien de modification, nous vérifions d\u2019abord, en général d\u2019ici un jour. Créez un compte (<strong>Create a login</strong>, en haut de la page) et ce genre de modification sera en ligne tout de suite.',
+      link: 'Avec le lien de modification, nous vérifions d\u2019abord, en général d\u2019ici un jour. Touchez <strong>Créer un compte</strong>, en haut de la page, et ce genre de modification sera en ligne tout de suite.',
       out: 'Avec votre compte, c\u2019est en ligne dès l\u2019enregistrement. Avec le lien de modification reçu par courriel, nous vérifions d\u2019abord, en général d\u2019ici un jour.',
     },
   },
@@ -36057,7 +36078,7 @@ const OWNER_HELP_TOPICS = [
     },
     aFr: {
       in: '<p>Votre compte est ouvert sur cet appareil. Sur un autre téléphone ou ordinateur, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> avec le même courriel et le même mot de passe.</p><ul><li>Après 5 essais erronés, la connexion est bloquée 15 minutes. Patientez, puis réessayez.</li><li>Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez-le</a>.</li></ul>',
-      out: '<p>Vérifiez que le courriel est bien celui de votre compte et que la touche Verr. Maj. est désactivée.</p><ul><li>Après 5 essais erronés, la connexion est bloquée 15 minutes. Patientez, puis réessayez.</li><li>Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez votre mot de passe</a>.</li><li>Jamais créé de compte? Ouvrez le lien de modification reçu par courriel, puis utilisez <strong>Create a login</strong> sur cette page. Pas de lien? <a href="/fr/owner/link">Recevoir un nouveau lien</a>.</li></ul>',
+      out: '<p>Vérifiez que le courriel est bien celui de votre compte et que la touche Verr. Maj. est désactivée.</p><ul><li>Après 5 essais erronés, la connexion est bloquée 15 minutes. Patientez, puis réessayez.</li><li>Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez votre mot de passe</a>.</li><li>Jamais créé de compte? Ouvrez le lien de modification reçu par courriel, puis utilisez <strong>Créer un compte</strong> sur cette page. Pas de lien? <a href="/fr/owner/link">Recevoir un nouveau lien</a>.</li></ul>',
     } },
   { id: 'forgot', q: 'I forgot my password', qFr: 'J\u2019ai oublié mon mot de passe', pages: ['login', 'forgot', 'reset', 'settings'],
     keys: ['forgot', 'forgotten', 'reset', 'new password', 'password', 'change password', 'reset password'],
@@ -36084,7 +36105,7 @@ const OWNER_HELP_TOPICS = [
     keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', '2 people', '2 logins', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'add a person', 'add someone', 'same login'],
     keysFr: ['employe', 'employes', 'mon personnel', 'personnel', 'mon equipe', 'equipe', 'gerant', 'gerante', 'associe', 'associee', 'partenaire', 'deux personnes', 'une autre personne', 'quelqu un d autre', 'collegue', 'partager l acces', 'deuxieme compte', 'ajouter un utilisateur', 'ajouter une personne', 'plusieurs personnes', 'meme compte'],
     a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password (already signed in? they tap <strong>Add to my login</strong>).</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don’t share one password between people. Everyone already on the listing gets an email when a new login is added. Signed in, <strong>People with access</strong> on your edit page shows who can update it: you can remove anyone added after you; for someone added before you, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>',
-    aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Elle l’ouvre et utilise <strong>Create a login</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Add to my login</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>My listings</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>People with access</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Revendiquer cette fiche</strong> sur votre page.</p>' },
+    aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Elle l’ouvre et utilise <strong>Créer un compte</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Ajouter à mon compte</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>Mes fiches</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>Personnes ayant accès</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Revendiquer cette fiche</strong> sur votre page.</p>' },
   // Dispute (2026-10-18): "someone else claimed my business" used to match the staff topic ("Yes. Each person can
   // have their own login…"), which read like approval of a possible hijack. Its keys are longer phrases than the
   // staff ones ('someone else', 'another person', 'my manager') so it wins whenever access or a change is disputed.
@@ -36096,7 +36117,7 @@ const OWNER_HELP_TOPICS = [
       'someone changed', 'somebody changed', 'changed without', 'wasnt me', 'not one of us', 'old owner', 'former owner', 'previous owner'],
     keysFr: ['quelqu un a revendique', 'deja revendique', 'revendique ma fiche', 'qui a revendique', 'sans permission', 'sans ma permission', 'sans mon accord', 'sans autorisation', 'pas autorise', 'quelqu un a modifie', 'quelqu un a change', 'ce n etait pas moi', 'pirate', 'usurpation', 'litige', 'ancien proprietaire', 'inconnu a acces'],
     a: '<p>Thanks for telling us. <strong>Okanagan Roam will check it.</strong> Nobody should have access to your listing without your say-so.</p><ol><li>Tap <strong>Message us</strong> below (it goes to info@okanaganroam.com).</li><li>Say <strong>which listing</strong> it is and <strong>who you are</strong>: your name, your role, and a phone number or email we can check against the listing.</li><li>If anything was <strong>changed without permission</strong>, tell us what (hours, photos, description, an event) so we can put it right.</li></ol><p>Once we\u2019ve checked, Dayton can <strong>take other people\u2019s logins off the listing</strong> and <strong>send you a fresh edit link</strong>, so the old link stops working.</p><p>Signed in, you can also see every login under <strong>People with access</strong> on your edit page and remove anyone added after you. Anyone added before you, Dayton handles.</p>',
-    aFr: '<p>Merci de nous le signaler. <strong>Okanagan Roam va vérifier.</strong> Personne ne devrait avoir accès à votre fiche sans votre accord.</p><ol><li>Touchez <strong>Écrivez-nous</strong> ci-dessous (le message va à info@okanaganroam.com).</li><li>Dites-nous <strong>de quelle fiche</strong> il s\u2019agit et <strong>qui vous êtes</strong> : votre nom, votre rôle, et un numéro de téléphone ou un courriel que nous pouvons comparer à la fiche.</li><li>Si quelque chose a été <strong>modifié sans permission</strong>, dites-nous quoi (heures, photos, description, un événement) pour que nous puissions corriger.</li></ol><p>Après vérification, Dayton peut <strong>retirer les comptes des autres personnes</strong> et <strong>vous envoyer un nouveau lien de modification</strong>, pour que l\u2019ancien cesse de fonctionner.</p><p>Avec votre compte, vous voyez aussi tous les comptes sous <strong>People with access</strong>, sur votre page de modification, et pouvez retirer toute personne ajoutée après vous. Pour les personnes ajoutées avant vous, Dayton s\u2019en occupe.</p>' },
+    aFr: '<p>Merci de nous le signaler. <strong>Okanagan Roam va vérifier.</strong> Personne ne devrait avoir accès à votre fiche sans votre accord.</p><ol><li>Touchez <strong>Écrivez-nous</strong> ci-dessous (le message va à info@okanaganroam.com).</li><li>Dites-nous <strong>de quelle fiche</strong> il s\u2019agit et <strong>qui vous êtes</strong> : votre nom, votre rôle, et un numéro de téléphone ou un courriel que nous pouvons comparer à la fiche.</li><li>Si quelque chose a été <strong>modifié sans permission</strong>, dites-nous quoi (heures, photos, description, un événement) pour que nous puissions corriger.</li></ol><p>Après vérification, Dayton peut <strong>retirer les comptes des autres personnes</strong> et <strong>vous envoyer un nouveau lien de modification</strong>, pour que l\u2019ancien cesse de fonctionner.</p><p>Avec votre compte, vous voyez aussi tous les comptes sous <strong>Personnes ayant accès</strong>, sur votre page de modification, et pouvez retirer toute personne ajoutée après vous. Pour les personnes ajoutées avant vous, Dayton s\u2019en occupe.</p>' },
   // Help bot v2 (2026-10-18): People with access lists every login on the listing, with Remove.
   { id: 'access', over: ['staff'], q: 'Who has access to my listing? Remove someone', qFr: 'Qui a accès à ma fiche? Retirer quelqu\u2019un', pages: ['account', 'edit', 'settings'],
     keys: ['who has access', 'who can edit', 'who else can edit', 'people with access', 'who has a login', 'remove a person', 'remove someone', 'remove a login', 'remove their access', 'remove access', 'remove staff', 'remove an employee', 'remove my manager', 'take away access', 'take someone off', 'revoke', 'kick out', 'lock them out',
@@ -36108,9 +36129,9 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. <strong>People with access</strong> lists every login that can update it.</p><ul><li>Someone added <strong>after</strong> you? Tap <strong>Remove</strong> beside them. They and Dayton get an email.</li><li>Someone added <strong>before</strong> you? Tap <strong>Message us</strong> and Dayton will check it.</li></ul><p>Worried someone kept an old edit link? Ask for a fresh one at <a href="/owner/link">Email me a new link</a> and open it, so the old one stops working.</p>',
     },
     aFr: {
-      in: '<p>{ON}, ouvrez <strong>People with access</strong> (personnes qui ont accès). On y voit tous les comptes qui peuvent modifier cette fiche (les courriels des autres sont en partie masqués).</p><ul><li><strong>Ajoutée après vous</strong>, comme un ancien gérant ou employé? Touchez <strong>Remove</strong> à côté de son nom. Elle reçoit un courriel pour l’en informer, et Dayton aussi.</li><li><strong>Ajoutée avant vous?</strong> Vous ne pouvez pas la retirer vous-même : touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li><li><strong>Remove me</strong> retire votre propre compte de la fiche.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner. Toutes les personnes sur la fiche reçoivent un courriel chaque fois qu’un compte s’ajoute.</p>',
-      link: '<p><strong>People with access</strong> est réservé aux comptes. Utilisez <strong>Create a login</strong> en haut de cette page, puis ouvrez la fiche depuis <strong>My listings</strong> pour voir tous les comptes qui peuvent la modifier.</p><p>Vous pouvez retirer les personnes ajoutées après vous. Un compte ajouté <strong>avant</strong> le vôtre (un ancien gérant, par exemple), seul Dayton peut le retirer : touchez <strong>Écrivez-nous</strong> et dites-nous de qui il s’agit.</p><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
-      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>. <strong>People with access</strong> montre tous les comptes qui peuvent la modifier.</p><ul><li>Une personne ajoutée <strong>après</strong> vous? Touchez <strong>Remove</strong> à côté de son nom. Elle et Dayton reçoivent un courriel.</li><li>Une personne ajoutée <strong>avant</strong> vous? Touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
+      in: '<p>{ON}, ouvrez <strong>Personnes ayant accès</strong>. On y voit tous les comptes qui peuvent modifier cette fiche (les courriels des autres sont en partie masqués).</p><ul><li><strong>Ajoutée après vous</strong>, comme un ancien gérant ou employé? Touchez <strong>Retirer</strong> à côté de son nom. Elle reçoit un courriel pour l’en informer, et Dayton aussi.</li><li><strong>Ajoutée avant vous?</strong> Vous ne pouvez pas la retirer vous-même : touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li><li><strong>Me retirer</strong> retire votre propre compte de la fiche.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner. Toutes les personnes sur la fiche reçoivent un courriel chaque fois qu’un compte s’ajoute.</p>',
+      link: '<p><strong>Personnes ayant accès</strong> est réservé aux comptes. Utilisez <strong>Créer un compte</strong> en haut de cette page, puis ouvrez la fiche depuis <strong>Mes fiches</strong> pour voir tous les comptes qui peuvent la modifier.</p><p>Vous pouvez retirer les personnes ajoutées après vous. Un compte ajouté <strong>avant</strong> le vôtre (un ancien gérant, par exemple), seul Dayton peut le retirer : touchez <strong>Écrivez-nous</strong> et dites-nous de qui il s’agit.</p><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
+      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>. <strong>Personnes ayant accès</strong> montre tous les comptes qui peuvent la modifier.</p><ul><li>Une personne ajoutée <strong>après</strong> vous? Touchez <strong>Retirer</strong> à côté de son nom. Elle et Dayton reçoivent un courriel.</li><li>Une personne ajoutée <strong>avant</strong> vous? Touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
     } },
   { id: 'login-create', q: 'How do I make a login?', qFr: 'Comment créer un compte?', pages: ['edit', 'login'],
     keys: ['create login', 'create a login', 'make login', 'make a login', 'make an account', 'create an account', 'sign up', 'register', 'why login', 'need a login', 'set up a login', 'set up an account', 'get a login'],
@@ -36121,9 +36142,9 @@ const OWNER_HELP_TOPICS = [
       out: '<ol><li>Open your listing with the edit link we emailed you.</li><li>Find <strong>Create a login</strong> near the top, then enter your email and a password (at least 10 characters).</li><li>From then on sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>.</li></ol><p>With a login, your hours, closures, phone, description, features, price range, photos and menu go live as soon as you save them. A new name, address, website or link is still checked first.</p>',
     },
     aFr: {
-      in: '<p>Vous en avez déjà un, et il est ouvert sur cet appareil. Pour y ajouter une autre entreprise, ouvrez le lien de modification de cette entreprise sur cet appareil et touchez <strong>Add to my login</strong>.</p>',
-      link: '<ol><li>En haut de cette page, ouvrez <strong>Create a login</strong> (créer un compte).</li><li>Entrez votre courriel et un mot de passe (au moins 10 caractères).</li><li>Ensuite, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>.</li></ol><p>Avec un compte, vos heures, fermetures, téléphone, description, caractéristiques, gamme de prix, photos et menu sont en ligne dès l\u2019enregistrement. Un nouveau nom, une nouvelle adresse, un site Web ou un lien sont encore vérifiés d\u2019abord.</p>',
-      out: '<ol><li>Ouvrez votre fiche avec le lien de modification reçu par courriel.</li><li>Trouvez <strong>Create a login</strong> (créer un compte) en haut, puis entrez votre courriel et un mot de passe (au moins 10 caractères).</li><li>Ensuite, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>.</li></ol><p>Avec un compte, vos heures, fermetures, téléphone, description, caractéristiques, gamme de prix, photos et menu sont en ligne dès l\u2019enregistrement. Un nouveau nom, une nouvelle adresse, un site Web ou un lien sont encore vérifiés d\u2019abord.</p>',
+      in: '<p>Vous en avez déjà un, et il est ouvert sur cet appareil. Pour y ajouter une autre entreprise, ouvrez le lien de modification de cette entreprise sur cet appareil et touchez <strong>Ajouter à mon compte</strong>.</p>',
+      link: '<ol><li>En haut de cette page, ouvrez <strong>Créer un compte</strong>.</li><li>Entrez votre courriel et un mot de passe (au moins 10 caractères).</li><li>Ensuite, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>.</li></ol><p>Avec un compte, vos heures, fermetures, téléphone, description, caractéristiques, gamme de prix, photos et menu sont en ligne dès l\u2019enregistrement. Un nouveau nom, une nouvelle adresse, un site Web ou un lien sont encore vérifiés d\u2019abord.</p>',
+      out: '<ol><li>Ouvrez votre fiche avec le lien de modification reçu par courriel.</li><li>Trouvez <strong>Créer un compte</strong> en haut, puis entrez votre courriel et un mot de passe (au moins 10 caractères).</li><li>Ensuite, connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>.</li></ol><p>Avec un compte, vos heures, fermetures, téléphone, description, caractéristiques, gamme de prix, photos et menu sont en ligne dès l\u2019enregistrement. Un nouveau nom, une nouvelle adresse, un site Web ou un lien sont encore vérifiés d\u2019abord.</p>',
     } },
   { id: 'logout', over: ['settings', 'signin'], q: 'How do I log out?', qFr: 'Comment me déconnecter?', pages: ['account', 'settings', 'edit'],
     keys: ['log out', 'logout', 'log off', 'logoff', 'sign out', 'signout', 'sign off', 'logging out', 'signing out', 'exit my account', 'leave my account', 'shared computer', 'public computer', 'lost my phone', 'sign out everywhere', 'sign out other devices', 'log out other devices'],
@@ -36134,9 +36155,9 @@ const OWNER_HELP_TOPICS = [
       out: '<p>You\u2019re not signed in on this page. If you are signed in, go to <a href="/owner/account">My listings</a> and tap <strong>Log out</strong> at the top. To sign out every other phone and computer, use <strong>Sign out everywhere else</strong> in <a href="/owner/account/settings">Account settings</a>.</p>',
     },
     aFr: {
-      in: '<p>Allez à <a href="/owner/account">My listings</a> et touchez <strong>Log out</strong> (se déconnecter) en haut. Il vous faudra votre courriel et votre mot de passe pour vous reconnecter.</p><p>Téléphone perdu, ou compte ouvert sur un ordinateur partagé? Utilisez <strong>Sign out everywhere else</strong> dans <a href="/owner/account/settings">Account settings</a>.</p>',
-      link: '<p>Vous utilisez votre lien de modification privé : il n\u2019y a pas de session à fermer, il suffit de fermer la page. Toute personne qui a ce lien peut proposer des modifications; ne le laissez pas ouvert sur un ordinateur partagé et ne transférez pas le courriel.</p><p>Votre compte est aussi ouvert sur cet appareil? Allez à <a href="/owner/account">My listings</a> et touchez <strong>Log out</strong>.</p>',
-      out: '<p>Aucun compte n\u2019est ouvert sur cette page. Si le vôtre l\u2019est, allez à <a href="/owner/account">My listings</a> et touchez <strong>Log out</strong> en haut. Pour fermer la session sur tous vos autres téléphones et ordinateurs, utilisez <strong>Sign out everywhere else</strong> dans <a href="/owner/account/settings">Account settings</a>.</p>',
+      in: '<p>Allez à <a href="/fr/owner/account">Mes fiches</a> et touchez <strong>Se déconnecter</strong> en haut. Il vous faudra votre courriel et votre mot de passe pour vous reconnecter.</p><p>Téléphone perdu, ou compte ouvert sur un ordinateur partagé? Utilisez <strong>Me déconnecter partout ailleurs</strong> dans <a href="/fr/owner/account/settings">Paramètres du compte</a>.</p>',
+      link: '<p>Vous utilisez votre lien de modification privé : il n\u2019y a pas de session à fermer, il suffit de fermer la page. Toute personne qui a ce lien peut proposer des modifications; ne le laissez pas ouvert sur un ordinateur partagé et ne transférez pas le courriel.</p><p>Votre compte est aussi ouvert sur cet appareil? Allez à <a href="/fr/owner/account">Mes fiches</a> et touchez <strong>Se déconnecter</strong>.</p>',
+      out: '<p>Aucun compte n\u2019est ouvert sur cette page. Si le vôtre l\u2019est, allez à <a href="/fr/owner/account">Mes fiches</a> et touchez <strong>Se déconnecter</strong> en haut. Pour fermer la session sur tous vos autres téléphones et ordinateurs, utilisez <strong>Me déconnecter partout ailleurs</strong> dans <a href="/fr/owner/account/settings">Paramètres du compte</a>.</p>',
     } },
   { id: 'live-speed', q: 'How fast do my changes go live?', qFr: 'Quand mes modifications seront-elles en ligne?', pages: ['edit', 'account', 'menu'],
     keys: ['how fast', 'how long', 'how soon', 'how quickly', 'go live', 'goes live', 'going live', 'live straight away', 'instant', 'instantly', 'right away', 'straight away', 'immediately', 'how long does it take', 'when does it show', 'approval time', 'review time', 'do you check', 'do you approve', 'need approval', 'publish', 'without waiting', 'waiting for approval', 'without approval', 'wait for approval'],
@@ -36147,15 +36168,15 @@ const OWNER_HELP_TOPICS = [
       out: '<p><strong>Signed in:</strong> hours, open months, seasonal hours, special closures, phone, description, features, happy hour, price range, photos and menus go live as soon as you save them.</p><p><strong>From the emailed edit link:</strong> we check every change first, usually within a day.</p><p>A new business name, address, website or link, and events, are always checked first, usually within a day. Anything waiting shows <strong>Waiting for review</strong> in the form.</p>',
     },
     aFr: {
-      in: '<p>Comme vous utilisez votre compte, ceci est en ligne <strong>dès que vous touchez Save changes</strong> : heures, mois d’ouverture, heures saisonnières, fermetures spéciales, téléphone, description, caractéristiques, happy hour et gamme de prix. Les photos et les menus sont aussi en ligne tout de suite.</p><p>Un nouveau <strong>nom, adresse, site Web ou lien</strong> est d’abord vérifié par nous, en général d’ici un jour, pour que personne ne redirige votre fiche par erreur. D’ici là, le champ affiche <strong>Waiting for review</strong> (en attente de vérification). Les événements sont aussi vérifiés avant de paraître dans What’s On, en général d’ici un jour.</p><p>Après 30 enregistrements sur une même fiche dans une journée, les modifications suivantes attendent aussi notre vérification.</p>',
-      link: '<p>Avec le lien de modification reçu par courriel, <strong>nous vérifions chaque modification d’abord</strong>, en général d’ici un jour. Les champs en attente affichent <strong>Waiting for review</strong> dans le formulaire.</p><p>Avec un compte (<strong>Create a login</strong>, en haut de cette page), vos heures, mois d’ouverture, heures saisonnières, fermetures, téléphone, description, caractéristiques, happy hour, gamme de prix, photos et menus sont en ligne dès l’enregistrement. Un nouveau nom, une nouvelle adresse, un site Web ou un lien, ainsi que les événements, sont toujours vérifiés d’abord.</p>',
-      out: '<p><strong>Avec un compte :</strong> heures, mois d’ouverture, heures saisonnières, fermetures spéciales, téléphone, description, caractéristiques, happy hour, gamme de prix, photos et menus sont en ligne dès l’enregistrement.</p><p><strong>Avec le lien de modification reçu par courriel :</strong> nous vérifions chaque modification d’abord, en général d’ici un jour.</p><p>Un nouveau nom, une nouvelle adresse, un site Web ou un lien, ainsi que les événements, sont toujours vérifiés d’abord, en général d’ici un jour. Ce qui est en attente affiche <strong>Waiting for review</strong> dans le formulaire.</p>',
+      in: '<p>Comme vous utilisez votre compte, ceci est en ligne <strong>dès que vous touchez Enregistrer les modifications</strong> : heures, mois d’ouverture, heures saisonnières, fermetures spéciales, téléphone, description, caractéristiques, happy hour et gamme de prix. Les photos et les menus sont aussi en ligne tout de suite.</p><p>Un nouveau <strong>nom, adresse, site Web ou lien</strong> est d’abord vérifié par nous, en général d’ici un jour, pour que personne ne redirige votre fiche par erreur. D’ici là, le champ affiche <strong>En attente de vérification</strong>. Les événements sont aussi vérifiés avant de paraître dans À l’affiche, en général d’ici un jour.</p><p>Après 30 enregistrements sur une même fiche dans une journée, les modifications suivantes attendent aussi notre vérification.</p>',
+      link: '<p>Avec le lien de modification reçu par courriel, <strong>nous vérifions chaque modification d’abord</strong>, en général d’ici un jour. Les champs en attente affichent <strong>En attente de vérification</strong> dans le formulaire.</p><p>Avec un compte (<strong>Créer un compte</strong>, en haut de cette page), vos heures, mois d’ouverture, heures saisonnières, fermetures, téléphone, description, caractéristiques, happy hour, gamme de prix, photos et menus sont en ligne dès l’enregistrement. Un nouveau nom, une nouvelle adresse, un site Web ou un lien, ainsi que les événements, sont toujours vérifiés d’abord.</p>',
+      out: '<p><strong>Avec un compte :</strong> heures, mois d’ouverture, heures saisonnières, fermetures spéciales, téléphone, description, caractéristiques, happy hour, gamme de prix, photos et menus sont en ligne dès l’enregistrement.</p><p><strong>Avec le lien de modification reçu par courriel :</strong> nous vérifions chaque modification d’abord, en général d’ici un jour.</p><p>Un nouveau nom, une nouvelle adresse, un site Web ou un lien, ainsi que les événements, sont toujours vérifiés d’abord, en général d’ici un jour. Ce qui est en attente affiche <strong>En attente de vérification</strong> dans le formulaire.</p>',
     } },
   { id: 'photo-add', q: 'How do I add photos?', qFr: 'Comment ajouter des photos?', pages: ['edit'],
     keys: ['photo', 'photos', 'picture', 'pictures', 'pics', 'image', 'images', 'upload', 'add photo', 'add photos', 'gallery'],
     keysFr: ['photo', 'photos', 'image', 'images', 'televerser', 'ajouter des photos', 'ajouter une photo', 'mettre des photos', 'galerie'],
     a: '<ol><li>{ON}, go to <strong>Photos</strong>.</li><li>Tap <strong>Choose photos</strong> and pick up to 5 at a time.</li><li>Fill in who to credit (your business or the photographer).</li><li>Tick the box to confirm you took them or have permission, then upload.</li></ol><p>{LIVE}</p><p>Best photos: the inside of your place, your patio or view, or your storefront with the name. Wide photos work best for the banner.</p>',
-    aFr: '<ol><li>{ON}, allez à <strong>Photos</strong>.</li><li>Touchez <strong>Choose photos</strong> et choisissez jusqu\u2019à 5 photos à la fois.</li><li>Indiquez à qui attribuer le crédit (votre entreprise ou le photographe).</li><li>Cochez la case pour confirmer que vous les avez prises ou que vous avez la permission, puis téléversez-les.</li></ol><p>{LIVE}</p><p>Les meilleures photos : l\u2019intérieur de votre établissement, votre terrasse ou la vue, ou votre devanture avec le nom. Les photos à l\u2019horizontale conviennent le mieux à la bannière.</p>' },
+    aFr: '<ol><li>{ON}, allez à <strong>Photos</strong>.</li><li>Touchez <strong>Choisir des photos</strong> et choisissez jusqu\u2019à 5 photos à la fois.</li><li>Indiquez à qui attribuer le crédit (votre entreprise ou le photographe).</li><li>Cochez la case pour confirmer que vous les avez prises ou que vous avez la permission, puis téléversez-les.</li></ol><p>{LIVE}</p><p>Les meilleures photos : l\u2019intérieur de votre établissement, votre terrasse ou la vue, ou votre devanture avec le nom. Les photos à l\u2019horizontale conviennent le mieux à la bannière.</p>' },
   { id: 'photo-small', over: ['photo-add'], q: 'My photo won\u2019t upload', qFr: 'Ma photo ne se téléverse pas', pages: ['edit'],
     keys: ['too small', 'too large', 'too big', 'wont upload', 'upload failed', 'could not be read', 'heic', '800 pixels', 'photo error', 'photo wont', 'cant upload', 'failing', 'failed', 'fails', 'error', 'keeps failing'],
     keysFr: ['trop petite', 'trop grande', 'trop lourde', 'ne se televerse pas', 'televersement echoue', 'erreur photo', 'illisible', 'heic', 'photo ne marche pas', 'photo ne fonctionne pas'],
@@ -36170,9 +36191,9 @@ const OWNER_HELP_TOPICS = [
       out: '<p>It depends how you opened your listing:</p><ul><li><strong>From the emailed edit link:</strong> new photos and menus wait for us to check them, usually within a day.</li><li><strong>Signed in, from My listings:</strong> photos and menus go live straight away.</li></ul><p>Already live but you still see the old version? Refresh the page. It can take a minute to show everywhere.</p>',
     },
     aFr: {
-      in: '<p>Comme vous utilisez votre compte, les photos et les menus sont en ligne tout de suite. Actualisez la page : l\u2019affichage peut prendre une minute.</p><p>Toujours rien? <strong>Your updates</strong>, en haut de votre page de modification, montre ce qui est en attente, par exemple des photos envoyées avec le lien de modification avant votre connexion. Nous les vérifions d\u2019ici un jour.</p>',
-      link: '<p>Avec le lien de modification reçu par courriel, les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour. <strong>Your updates</strong>, en haut de cette page, montre ce qui est en attente et ce qui est en ligne.</p><p>Créez un compte (<strong>Create a login</strong>, en haut de cette page) et la prochaine fois, ce sera en ligne tout de suite.</p>',
-      out: '<p>Ça dépend de la façon dont vous avez ouvert votre fiche :</p><ul><li><strong>Avec le lien de modification reçu par courriel :</strong> les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour.</li><li><strong>Avec votre compte, depuis My listings :</strong> les photos et les menus sont en ligne tout de suite.</li></ul><p>C\u2019est en ligne, mais vous voyez encore l\u2019ancienne version? Actualisez la page. L\u2019affichage peut prendre une minute.</p>',
+      in: '<p>Comme vous utilisez votre compte, les photos et les menus sont en ligne tout de suite. Actualisez la page : l\u2019affichage peut prendre une minute.</p><p>Toujours rien? <strong>Vos mises à jour</strong>, en haut de votre page de modification, montre ce qui est en attente, par exemple des photos envoyées avec le lien de modification avant votre connexion. Nous les vérifions d\u2019ici un jour.</p>',
+      link: '<p>Avec le lien de modification reçu par courriel, les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour. <strong>Vos mises à jour</strong>, en haut de cette page, montre ce qui est en attente et ce qui est en ligne.</p><p>Touchez <strong>Créer un compte</strong>, en haut de cette page, et la prochaine fois, ce sera en ligne tout de suite.</p>',
+      out: '<p>Ça dépend de la façon dont vous avez ouvert votre fiche :</p><ul><li><strong>Avec le lien de modification reçu par courriel :</strong> les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour.</li><li><strong>Avec votre compte, depuis Mes fiches :</strong> les photos et les menus sont en ligne tout de suite.</li></ul><p>C\u2019est en ligne, mais vous voyez encore l\u2019ancienne version? Actualisez la page. L\u2019affichage peut prendre une minute.</p>',
     } },
   { id: 'photo-main', over: ['photo-add'], q: 'Change my main photo or remove one', qFr: 'Changer ma photo principale ou en retirer une', pages: ['edit'],
     keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'remove a photo', 'delete photo', 'delete a photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo', 'reorder photos', 'photo order', 'change the picture', 'change the photo', 'picture at the top', 'photo at the top', 'top photo', 'header photo', 'big photo'],
@@ -36183,33 +36204,33 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. In <strong>Photos</strong>, each live photo has <strong>Make main photo</strong>, <strong>Remove</strong> and <strong>↑ ↓</strong> arrows to change the order.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main photo</strong> once it’s live. If it isn’t yours to change, <strong>Message us</strong> and we’ll swap it.</p>',
     },
     aFr: {
-      in: '<p>{ON}, dans <strong>Photos</strong>, chaque photo en ligne a les boutons <strong>Make main photo</strong> (photo principale), <strong>Remove</strong> (retirer) et les flèches <strong>↑ ↓</strong> pour changer l’ordre.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Make main photo</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
-      link: '<p><strong>Make main photo</strong> (photo principale), <strong>Remove</strong> (retirer) et les flèches <strong>↑ ↓</strong> sont réservés aux comptes. Utilisez <strong>Create a login</strong> en haut de cette page, puis ouvrez votre fiche depuis <strong>My listings</strong> : ils sont sur chaque photo en ligne, dans <strong>Photos</strong>.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Make main photo</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
-      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>My listings</strong>. Dans <strong>Photos</strong>, chaque photo en ligne a les boutons <strong>Make main photo</strong> (photo principale), <strong>Remove</strong> (retirer) et les flèches <strong>↑ ↓</strong> pour changer l’ordre.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Make main photo</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
+      in: '<p>{ON}, dans <strong>Photos</strong>, chaque photo en ligne a les boutons <strong>Choisir comme photo principale</strong>, <strong>Retirer</strong> et les flèches <strong>↑ ↓</strong> pour changer l’ordre.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Choisir comme photo principale</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
+      link: '<p><strong>Choisir comme photo principale</strong>, <strong>Retirer</strong> et les flèches <strong>↑ ↓</strong> sont réservés aux comptes. Utilisez <strong>Créer un compte</strong> en haut de cette page, puis ouvrez votre fiche depuis <strong>Mes fiches</strong> : ils sont sur chaque photo en ligne, dans <strong>Photos</strong>.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Choisir comme photo principale</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
+      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>. Dans <strong>Photos</strong>, chaque photo en ligne a les boutons <strong>Choisir comme photo principale</strong>, <strong>Retirer</strong> et les flèches <strong>↑ ↓</strong> pour changer l’ordre.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Choisir comme photo principale</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
     } },
   { id: 'hours', q: 'How do I set my hours?', qFr: 'Comment changer mes heures d\u2019ouverture?', pages: ['edit'],
     keys: ['hours', 'opening hours', 'open', 'close', 'closing', 'times', 'closed', 'schedule', 'split', 'lunch', 'time', 'change hours', 'change my hours', 'change our hours', 'update hours', 'update our hours', 'set hours', 'closing time', 'opening time', 'open late', 'past midnight'],
     keysFr: ['heures', 'heure', 'heures d ouverture', 'horaire', 'horaires', 'heure d ouverture', 'heure de fermeture', 'ouvert', 'ouverts', 'ouverture', 'changer mes heures', 'changer nos heures', 'modifier mes heures', 'modifier nos heures', 'modifier les heures', 'changer l horaire', 'modifier l horaire', 'changer les heures', 'midi', 'apres minuit'],
     a: '<ol><li>{ON}, find <strong>Opening hours</strong> (<strong>Hours</strong> in the bar at the top jumps there). Enter the open and close time for each day, or tick <strong>Closed</strong>.</li><li>Closed in the afternoon? Tap <strong>+ second time</strong> for a second range that day.</li><li>Same every weekday? Fill in Monday, then tap <strong>Copy Monday to Tue\u2013Fri</strong> (or every day).</li><li>Tap {SEND} at the bottom.</li></ol><p>{LIVE} Every day you\u2019re open needs both times. Open past midnight? Use the real closing time, like 1:00 AM.</p><p>Different summer and winter hours, or closed on a holiday? Ask me about <strong>seasonal hours</strong> or <strong>holiday closures</strong>.</p>',
-    aFr: '<ol><li>{ON}, trouvez <strong>Opening hours</strong> (heures d\u2019ouverture; le bouton <strong>Hours</strong> en haut de la page y mène). Entrez l\u2019heure d\u2019ouverture et de fermeture de chaque jour, ou cochez <strong>Closed</strong> (fermé).</li><li>Fermé l\u2019après-midi? Touchez <strong>+ second time</strong> pour une deuxième plage horaire ce jour-là.</li><li>Même horaire tous les jours de semaine? Remplissez lundi, puis touchez <strong>Copy Monday to Tue\u2013Fri</strong> (ou <strong>every day</strong> pour tous les jours).</li><li>Touchez {SEND} au bas de la page.</li></ol><p>{LIVE} Chaque jour d\u2019ouverture demande les deux heures. Ouvert après minuit? Indiquez l\u2019heure réelle de fermeture, comme 1:00 AM.</p><p>Heures différentes l\u2019été et l\u2019hiver, ou fermé un jour férié? Demandez-moi les <strong>heures saisonnières</strong> ou les <strong>fermetures des fêtes</strong>.</p>' },
+    aFr: '<ol><li>{ON}, trouvez <strong>Heures d\u2019ouverture</strong> (le bouton <strong>Heures</strong> en haut de la page y mène). Entrez l\u2019heure d\u2019ouverture et de fermeture de chaque jour, ou cochez <strong>Fermé</strong>.</li><li>Fermé l\u2019après-midi? Touchez <strong>+ deuxième plage</strong> pour une deuxième plage horaire ce jour-là.</li><li>Même horaire tous les jours de semaine? Remplissez lundi, puis touchez <strong>Copier le lundi sur mar.\u2013ven.</strong> (ou <strong>tous les jours</strong>).</li><li>Touchez {SEND} au bas de la page.</li></ol><p>{LIVE} Chaque jour d\u2019ouverture demande les deux heures. Ouvert après minuit? Indiquez l\u2019heure réelle de fermeture, comme 01:00.</p><p>Heures différentes l\u2019été et l\u2019hiver, ou fermé un jour férié? Demandez-moi les <strong>heures saisonnières</strong> ou les <strong>fermetures des fêtes</strong>.</p>' },
   // Help bot v2 (2026-10-18): seasonal hour sets and special closure dates on the edit page.
   { id: 'seasonal-hours', over: ['hours', 'season'], q: 'Different summer and winter hours', qFr: 'Heures différentes l\u2019été et l\u2019hiver', pages: ['edit'],
     keys: ['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'holiday hours', 'christmas hours', 'hours over the holidays', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on'],
     keysFr: ['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison', 'heures des fetes', 'horaire des fetes'],
     a: '<ol><li>{ON}, open <strong>Seasonal hours</strong> (with your opening hours) and tick <strong>We have different hours part of the year</strong>.</li><li>Give it a name if you like (“Winter hours”), pick the first and last day (for example November 1 to April 30), and fill in that season’s hours for each day.</li><li>Tap {SEND}.</li></ol><p>Every year between those days your page shows these hours instead of your usual ones, then switches back by itself. {LIVE}</p><p>Closed for the whole off-season instead? Choose <strong>Open some months only</strong>. Closed for a day or two? Use <strong>Special closures</strong>. Different hours on just one holiday? <strong>Message us</strong> with the date and times.</p>',
-    aFr: '<ol><li>{ON}, ouvrez <strong>Seasonal hours</strong> (heures saisonnières, avec vos heures d’ouverture) et cochez <strong>We have different hours part of the year</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Open some months only</strong>. Fermé un jour ou deux? Utilisez <strong>Special closures</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
+    aFr: '<ol><li>{ON}, ouvrez <strong>Heures saisonnières</strong> (sous vos heures d’ouverture) et cochez <strong>Nous avons d’autres heures pendant une partie de l’année</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Ouvert certains mois seulement</strong>. Fermé un jour ou deux? Utilisez <strong>Fermetures spéciales</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],
     keys: ['holiday', 'holidays', 'stat', 'stat holiday', 'statutory holiday', 'christmas', 'christmas day', 'christmas eve', 'xmas', 'boxing day', 'new years', 'new years day', 'new years eve', 'thanksgiving', 'easter', 'good friday', 'victoria day', 'canada day', 'bc day', 'labour day', 'labor day', 'remembrance day', 'family day',
       'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days'],
     keysFr: ['ferie', 'jour ferie', 'jours feries', 'conge', 'noel', 'jour de noel', 'veille de noel', 'lendemain de noel', 'jour de l an', 'nouvel an', 'action de grace', 'paques', 'vendredi saint', 'fete du canada', 'fete du travail', 'fetes',
       'fermeture speciale', 'fermetures speciales', 'ferme le', 'fermes le', 'ferme un jour', 'fermes un jour', 'fermeture temporaire', 'temporairement ferme', 'temporairement fermes', 'vacances', 'renovation', 'renovations', 'evenement prive', 'ferme demain', 'ferme aujourd hui', 'fermeture', 'quelques jours'],
     a: '<ol><li>{ON}, open <strong>Special closures</strong> (with your opening hours) and tap <strong>+ Add a closed day</strong>.</li><li>Pick the <strong>First day</strong> (for example December 25). Closed for longer, like renovations or a vacation? Add a <strong>Last day</strong> too. Add a short <strong>Note</strong> if you like (“Christmas”).</li><li>Tap {SEND}.</li></ol><p>On those days your page says “Closed today” with your note, for example “Closed today (Christmas)”, and visitors won’t see you as open. Past closures drop off by themselves. {LIVE}</p><p>Open on a holiday, just with different hours? <strong>Message us</strong> with the date and times.</p>',
-    aFr: '<ol><li>{ON}, ouvrez <strong>Special closures</strong> (fermetures spéciales, avec vos heures d’ouverture) et touchez <strong>+ Add a closed day</strong>.</li><li>Choisissez le premier jour, <strong>First day</strong> (par exemple le 25 décembre). Fermé plus longtemps, pour des rénovations ou des vacances? Ajoutez aussi un dernier jour, <strong>Last day</strong>. Ajoutez une courte note, <strong>Note</strong>, si vous voulez (« Noël »).</li><li>Touchez {SEND}.</li></ol><p>Ces jours-là, votre page indique « Fermé aujourd’hui » avec votre note, par exemple « Fermé aujourd’hui (Noël) », et les visiteurs ne vous verront pas ouvert. Les fermetures passées disparaissent d’elles-mêmes. {LIVE}</p><p>Ouvert un jour férié, mais avec d’autres heures? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
+    aFr: '<ol><li>{ON}, ouvrez <strong>Fermetures spéciales</strong> (sous vos heures d’ouverture) et touchez <strong>+ Ajouter un jour de fermeture</strong>.</li><li>Choisissez le <strong>Premier jour</strong> (par exemple le 25 décembre). Fermé plus longtemps, pour des rénovations ou des vacances? Ajoutez aussi un <strong>Dernier jour</strong>. Ajoutez une courte <strong>Note</strong> si vous voulez (« Noël »).</li><li>Touchez {SEND}.</li></ol><p>Ces jours-là, votre page indique « Fermé aujourd’hui » avec votre note, par exemple « Fermé aujourd’hui (Noël) », et les visiteurs ne vous verront pas ouvert. Les fermetures passées disparaissent d’elles-mêmes. {LIVE}</p><p>Ouvert un jour férié, mais avec d’autres heures? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'season', over: ['hours'], q: 'I\u2019m only open some months', qFr: 'Nous sommes ouverts seulement certains mois', pages: ['edit'],
     keys: ['season', 'seasonal', 'months', 'open some months', 'only open', 'closed in winter', 'closed for winter', 'closed for the winter', 'closed all winter', 'closed in the winter', 'closed for the season', 'off season', 'reopen', 'reopening', 'seasonal business', 'summer only', 'open in summer only', 'only in summer', 'opening day', 'season opens'],
     keysFr: ['saison', 'saisonnier', 'saisonniere', 'certains mois', 'seulement l ete', 'ferme l hiver', 'fermes l hiver', 'ferme pour l hiver', 'fermes pour l hiver', 'ferme pour la saison', 'hors saison', 'reouverture', 'rouvrir', 'rouvre', 'mois'],
     a: '<p>{ON}, under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then tap {SEND}. {LIVE}</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Different hours in summer and winter? Use <strong>Seasonal hours</strong>. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p>',
-    aFr: '<p>{ON}, sous les heures, choisissez <strong>Open some months only</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Touchez ensuite {SEND}. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Seasonal hours</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Special closures</strong>.</p>' },
+    aFr: '<p>{ON}, sous les heures, choisissez <strong>Ouvert certains mois seulement</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Touchez ensuite {SEND}. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Heures saisonnières</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Fermetures spéciales</strong>.</p>' },
   { id: 'changes-review', q: 'I sent changes but nothing changed', qFr: 'J\u2019ai envoyé des modifications, mais rien n\u2019a changé', pages: ['edit', 'account'],
     keys: ['sent changes', 'my changes', 'changes not showing', 'changes not', 'didnt change', 'not changed', 'still old', 'still shows', 'update not', 'saved', 'submitted', 'approve', 'approval', 'hours not updated', 'description not', 'nothing happened', 'didnt save', 'didnt work', 'waiting for review chip', 'review chip', 'what does waiting for review mean'],
     keysFr: ['mes modifications', 'modifications envoyees', 'rien n a change', 'pas change', 'toujours l ancienne', 'pas mis a jour', 'pas a jour', 'enregistre', 'envoye', 'rien ne s est passe'],
@@ -36219,9 +36240,9 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Signed in, most changes go live as soon as you save them (refresh the page to see them). A new name, address, website or link, and anything sent from the emailed edit link, is checked first, usually within a day. Anything still waiting shows a <strong>Waiting for review</strong> chip in the form.</p>',
     },
     aFr: {
-      in: '<p>Actualisez d’abord la page : une modification peut prendre une minute à s’afficher partout.</p><p>Toujours l’ancienne version? Regardez le formulaire : ce qui attend encore porte l’étiquette <strong>Waiting for review</strong>. Un nouveau <strong>nom, adresse, site Web ou lien</strong> attend notre vérification, en général d’ici un jour; le reste est en ligne dès que vous touchez <strong>Save changes</strong>. Ce qui a été envoyé avec le lien de modification avant votre connexion, et ce qui dépasse 30 enregistrements sur une même fiche dans une journée, est aussi vérifié d’abord.</p>',
-      link: '<p>Avec le lien de modification reçu par courriel, nous vérifions les modifications avant de les mettre en ligne, en général d’ici un jour. Ce qui attend encore porte l’étiquette <strong>Waiting for review</strong> dans le formulaire, et <strong>Your updates</strong>, en haut de cette page, montre ce qui est en attente et ce qui est en ligne.</p><p>Avec un compte, la plupart des modifications sont en ligne tout de suite : utilisez <strong>Create a login</strong> en haut de cette page.</p>',
-      out: '<p>Avec un compte, la plupart des modifications sont en ligne dès l’enregistrement (actualisez la page pour les voir). Un nouveau nom, une nouvelle adresse, un site Web ou un lien, et tout ce qui est envoyé avec le lien de modification reçu par courriel, sont vérifiés d’abord, en général d’ici un jour. Ce qui attend encore porte l’étiquette <strong>Waiting for review</strong> dans le formulaire.</p>',
+      in: '<p>Actualisez d’abord la page : une modification peut prendre une minute à s’afficher partout.</p><p>Toujours l’ancienne version? Regardez le formulaire : ce qui attend encore porte l’étiquette <strong>En attente de vérification</strong>. Un nouveau <strong>nom, adresse, site Web ou lien</strong> attend notre vérification, en général d’ici un jour; le reste est en ligne dès que vous touchez <strong>Enregistrer les modifications</strong>. Ce qui a été envoyé avec le lien de modification avant votre connexion, et ce qui dépasse 30 enregistrements sur une même fiche dans une journée, est aussi vérifié d’abord.</p>',
+      link: '<p>Avec le lien de modification reçu par courriel, nous vérifions les modifications avant de les mettre en ligne, en général d’ici un jour. Ce qui attend encore porte l’étiquette <strong>En attente de vérification</strong> dans le formulaire, et <strong>Vos mises à jour</strong>, en haut de cette page, montre ce qui est en attente et ce qui est en ligne.</p><p>Avec un compte, la plupart des modifications sont en ligne tout de suite : utilisez <strong>Créer un compte</strong> en haut de cette page.</p>',
+      out: '<p>Avec un compte, la plupart des modifications sont en ligne dès l’enregistrement (actualisez la page pour les voir). Un nouveau nom, une nouvelle adresse, un site Web ou un lien, et tout ce qui est envoyé avec le lien de modification reçu par courriel, sont vérifiés d’abord, en général d’ici un jour. Ce qui attend encore porte l’étiquette <strong>En attente de vérification</strong> dans le formulaire.</p>',
     } },
   { id: 'nothing-changed', q: '\u201cNothing has changed yet\u201d', qFr: '« Nothing has changed yet » (rien n\u2019a changé)', pages: ['edit'],
     keys: ['nothing has changed', 'nothing changed', 'edit a field'],
@@ -36242,7 +36263,7 @@ const OWNER_HELP_TOPICS = [
     keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'phone', 'phone number', 'change website', 'change our website', 'new website', 'tiktok'],
     keysFr: ['reservation', 'reservations', 'reserver', 'billets', 'lien', 'site web', 'site internet', 'instagram', 'facebook', 'reseaux sociaux', 'telephone', 'numero de telephone', 'nouveau site'],
     a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
-    aFr: '<p>{ON}, ouvrez <strong>Name, address &amp; links</strong> (nom, adresse et liens). Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Book)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>Waiting for review</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
+    aFr: '<p>{ON}, ouvrez <strong>Nom, adresse et liens</strong>. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
   // Help bot v2 (2026-10-18): name and address changes are always reviewed, even for signed-in owners.
   { id: 'name-address', over: ['links'], q: 'Change our business name or address', qFr: 'Changer le nom ou l\u2019adresse de l\u2019entreprise', pages: ['edit'],
     keys: ['address', 'change address', 'change the address', 'change our address', 'change my address', 'update address', 'new address', 'wrong address', 'street address', 'moved', 'we moved', 'new location', 'relocated', 'moving',
@@ -36250,43 +36271,43 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['adresse', 'changer l adresse', 'changer notre adresse', 'changer mon adresse', 'modifier l adresse', 'nouvelle adresse', 'mauvaise adresse', 'demenage', 'demenagement', 'nous avons demenage',
       'nom', 'nom de l entreprise', 'changer le nom', 'changer notre nom', 'modifier le nom', 'nouveau nom', 'mauvais nom', 'faute', 'orthographe'],
     a: '<ol><li>{ON}, open <strong>Name, address &amp; links</strong>.</li><li>Change the <strong>business name</strong> or the <strong>street address</strong>. Moved? Enter the new address.</li><li>Tap {SEND}.</li></ol><p>A new name, address, website or link is <strong>always checked by us first</strong>, usually within a day, even when you’re signed in. That stops anyone pointing your listing somewhere else by mistake. Until then the field shows <strong>Waiting for review</strong>.</p><p>New owners, or closed for good? <strong>Message us</strong>.</p>',
-    aFr: '<ol><li>{ON}, ouvrez <strong>Name, address &amp; links</strong> (nom, adresse et liens).</li><li>Changez le <strong>nom de l’entreprise</strong> ou l’<strong>adresse</strong>. Vous avez déménagé? Entrez la nouvelle adresse.</li><li>Touchez {SEND}.</li></ol><p>Un nouveau nom, une nouvelle adresse, un site Web ou un lien est <strong>toujours vérifié par nous d’abord</strong>, en général d’ici un jour, même avec un compte. Ça empêche qu’une fiche soit redirigée ailleurs par erreur. D’ici là, le champ affiche <strong>Waiting for review</strong> (en attente de vérification).</p><p>Nouveaux propriétaires, ou fermé pour de bon? <strong>Écrivez-nous</strong>.</p>' },
+    aFr: '<ol><li>{ON}, ouvrez <strong>Nom, adresse et liens</strong>.</li><li>Changez le <strong>nom de l’entreprise</strong> ou l’<strong>adresse</strong>. Vous avez déménagé? Entrez la nouvelle adresse.</li><li>Touchez {SEND}.</li></ol><p>Un nouveau nom, une nouvelle adresse, un site Web ou un lien est <strong>toujours vérifié par nous d’abord</strong>, en général d’ici un jour, même avec un compte. Ça empêche qu’une fiche soit redirigée ailleurs par erreur. D’ici là, le champ affiche <strong>En attente de vérification</strong>.</p><p>Nouveaux propriétaires, ou fermé pour de bon? <strong>Écrivez-nous</strong>.</p>' },
   { id: 'event-add', q: 'How do I add an event?', qFr: 'Comment ajouter un événement?', pages: ['edit'],
     keys: ['event', 'events', 'live music', 'whats on', 'concert', 'add event', 'add an event', 'post an event', 'promotion', 'tasting', 'tastings', 'class', 'classes', 'workshop', 'trivia', 'festival', 'karaoke', 'comedy', 'open mic', 'dinner event', 'pop up'],
     keysFr: ['evenement', 'evenements', 'ajouter un evenement', 'spectacle', 'musique', 'concert', 'degustation', 'degustations', 'atelier', 'soiree', 'festival', 'promotion', 'quiz', 'humour'],
     a: '<ol><li>{ON}, scroll to <strong>Add an event</strong>.</li><li>Enter the name, date and start time (or tick <strong>All-day event</strong>).</li><li>Choose 1 to 3 categories and add a short description.</li><li>Tap <strong>Send event</strong>.</li></ol><p>We check events before they go on What\u2019s On, usually within a day. Dates must be within the next year. Happens every week? Ask me about <strong>repeating events</strong>.</p>',
-    aFr: '<ol><li>{ON}, descendez jusqu\u2019à <strong>Add an event</strong> (ajouter un événement).</li><li>Entrez le nom, la date et l\u2019heure de début (ou cochez <strong>All-day event</strong> pour toute la journée).</li><li>Choisissez de 1 à 3 catégories et ajoutez une courte description.</li><li>Touchez <strong>Send event</strong>.</li></ol><p>Nous vérifions les événements avant de les afficher dans What\u2019s On, en général d\u2019ici un jour. Les dates doivent être dans la prochaine année. Ça revient chaque semaine? Demandez-moi les <strong>événements récurrents</strong>.</p>' },
+    aFr: '<ol><li>{ON}, descendez jusqu\u2019à <strong>Ajouter un événement</strong>.</li><li>Entrez le nom, la date et l\u2019heure de début (ou cochez <strong>Toute la journée</strong>).</li><li>Choisissez de 1 à 3 catégories et ajoutez une courte description.</li><li>Touchez <strong>Envoyer l’événement</strong>.</li></ol><p>Nous vérifions les événements avant de les afficher dans À l\u2019affiche, en général d\u2019ici un jour. Les dates doivent être dans la prochaine année. Ça revient chaque semaine? Demandez-moi les <strong>événements récurrents</strong>.</p>' },
   // Help bot v2 (2026-10-18): one event with a "Repeats or other dates?" note; we add the other dates.
   { id: 'event-repeat', over: ['event-add'], q: 'Add a repeating or weekly event', qFr: 'Ajouter un événement récurrent ou hebdomadaire', pages: ['edit'],
     keys: ['every week', 'every weekend', 'weekly', 'weekly event', 'repeat', 'repeats', 'repeating', 'recurring', 'reoccurring', 'each week', 'monthly', 'every month', 'once a month', 'once a week', 'every other week', 'multiple dates', 'several dates', 'more than one date', 'other dates', 'same event', 'series', 'ongoing', 'every night', 'every evening', 'each night'].concat(OWNER_HELP_DAYS_EN.map((d) => `every ${d}`), OWNER_HELP_DAYS_EN.map((d) => `each ${d}`)),
     keysFr: ['chaque semaine', 'toutes les semaines', 'hebdomadaire', 'chaque mois', 'tous les mois', 'mensuel', 'recurrent', 'recurrente', 'repeter', 'se repete', 'plusieurs dates', 'autres dates', 'serie', 'chaque soir', 'tous les soirs'].concat(OWNER_HELP_DAYS_FR.map((d) => `chaque ${d}`), OWNER_HELP_DAYS_FR.map((d) => `tous les ${d}s`)),
     a: '<p>Send it once and tell us how it repeats:</p><ol><li>{ON}, go to <strong>Add an event</strong> and fill it in with the <strong>first date</strong>.</li><li>In <strong>Repeats or other dates?</strong>, write the pattern, for example \u201cevery Saturday 2\u20135 pm until December 20\u201d or \u201cfirst Friday of each month\u201d.</li><li>Tap <strong>Send event</strong>.</li></ol><p>We add the other dates for you when we check it, usually within a day. Several days in a row, like a 3-day festival? Use <strong>End date (multi-day)</strong> instead.</p>',
-    aFr: '<p>Envoyez-le une seule fois en nous disant comment il se répète :</p><ol><li>{ON}, allez à <strong>Add an event</strong> et remplissez-le avec la <strong>première date</strong>.</li><li>Dans <strong>Repeats or other dates?</strong> (répétitions ou autres dates), décrivez le rythme, par exemple « tous les samedis de 14 h à 17 h jusqu\u2019au 20 décembre » ou « le premier vendredi de chaque mois ».</li><li>Touchez <strong>Send event</strong>.</li></ol><p>Nous ajoutons les autres dates pour vous en le vérifiant, en général d\u2019ici un jour. Plusieurs jours de suite, comme un festival de 3 jours? Utilisez plutôt <strong>End date (multi-day)</strong>.</p>' },
+    aFr: '<p>Envoyez-le une seule fois en nous disant comment il se répète :</p><ol><li>{ON}, allez à <strong>Ajouter un événement</strong> et remplissez-le avec la <strong>première date</strong>.</li><li>Dans <strong>Récurrent ou autres dates?</strong>, décrivez le rythme, par exemple « tous les samedis de 14 h à 17 h jusqu\u2019au 20 décembre » ou « le premier vendredi de chaque mois ».</li><li>Touchez <strong>Envoyer l’événement</strong>.</li></ol><p>Nous ajoutons les autres dates pour vous en le vérifiant, en général d\u2019ici un jour. Plusieurs jours de suite, comme un festival de 3 jours? Utilisez plutôt <strong>Date de fin (plusieurs jours)</strong>.</p>' },
   { id: 'event-change', over: ['event-add'], q: 'Change or cancel an event', qFr: 'Modifier ou annuler un événement', pages: ['edit'],
     keys: ['change event', 'change an event', 'change my event', 'cancel event', 'cancel an event', 'cancel my event', 'event cancelled', 'wrong date', 'edit event', 'edit my event', 'postpone', 'postponed', 'remove event', 'delete event', 'cancel', 'cancelled'],
     keysFr: ['modifier un evenement', 'modifier mon evenement', 'changer un evenement', 'annuler', 'annuler un evenement', 'annuler mon evenement', 'evenement annule', 'reporter', 'reporte', 'mauvaise date', 'supprimer un evenement'],
     a: '<p>At the top of your edit page, under <strong>Your updates</strong>, each event you sent has <strong>Change</strong> and <strong>Cancel</strong>. Change opens the event form with your details filled in. Once an event has passed it can\u2019t be changed. Send it as a new one instead.</p>',
-    aFr: '<p>En haut de votre page de modification, sous <strong>Your updates</strong>, chaque événement envoyé a les boutons <strong>Change</strong> (modifier) et <strong>Cancel</strong> (annuler). Change ouvre le formulaire avec vos renseignements déjà remplis. Un événement passé ne peut plus être modifié; envoyez-le plutôt comme un nouvel événement.</p>' },
+    aFr: '<p>En haut de votre page de modification, sous <strong>Vos mises à jour</strong>, chaque événement envoyé a les boutons <strong>Modifier</strong> et <strong>Annuler l’événement</strong> (<strong>Retirer</strong> s’il attend encore notre vérification). Modifier ouvre le formulaire avec vos renseignements déjà remplis. Un événement passé ne peut plus être modifié; envoyez-le plutôt comme un nouvel événement.</p>' },
   { id: 'menu-add', q: 'How do I add my menu or prices?', qFr: 'Comment ajouter mon menu ou mes prix?', pages: ['edit', 'menu'],
     keys: ['menu', 'menus', 'prices', 'price list', 'rates', 'green fees', 'tours and prices', 'add menu', 'add my menu', 'add our menu', 'scan', 'type my menu', 'type it in', 'type it myself', 'type it in myself', 'by hand', 'manually', 'enter my menu', 'food menu', 'drinks menu', 'drink menu', 'wine list', 'dishes'],
     keysFr: ['menu', 'menus', 'carte', 'la carte', 'liste de prix', 'tarifs', 'nos prix', 'mes prix', 'ajouter nos prix', 'ajouter le menu', 'ajouter mon menu', 'ajouter notre menu', 'numeriser', 'carte des vins', 'moi meme', 'a la main', 'manuellement', 'plats'],
     a: '<p>{ON}, tap <strong>Add your menu</strong> (or prices). Then choose one:</p><ul><li><strong>My menu is on my website:</strong> paste the link and we read it in,</li><li><strong>Take a photo</strong> of each page (or upload a PDF), or</li><li><strong>Type it in myself:</strong> add sections, dishes and prices by hand.</li></ul><p>Check the result: tap each <strong>yellow</strong> line, fix it if needed and press <strong>Done</strong> (or delete it). <strong>Publish</strong> works once every yellow line is checked. Busy? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up, free.</p>',
-    aFr: '<p>{ON}, touchez <strong>Add your menu</strong> (ajouter votre menu ou vos prix). Choisissez ensuite :</p><ul><li><strong>My menu is on my website</strong> (mon menu est sur mon site) : collez le lien et nous le lisons,</li><li><strong>Take a photo</strong> : photographiez chaque page (ou téléversez un PDF), ou</li><li><strong>Type it in myself</strong> (je le tape moi-même) : ajoutez les sections, les plats et les prix à la main.</li></ul><p>Vérifiez le résultat : touchez chaque ligne en <strong>jaune</strong>, corrigez-la au besoin et appuyez sur <strong>Done</strong> (ou supprimez-la). <strong>Publish</strong> fonctionne une fois toutes les lignes jaunes vérifiées. Pas le temps? Touchez <strong>Can you do it for me?</strong> et nous le taperons pour vous, gratuitement.</p>' },
+    aFr: '<p>{ON}, touchez <strong>Ajouter votre menu</strong> (ou vos prix). Choisissez ensuite :</p><ul><li><strong>Mon menu est sur mon site</strong> : collez le lien et nous le lisons,</li><li><strong>Prendre votre menu en photo</strong> : photographiez chaque page (ou téléversez un PDF), ou</li><li><strong>Je le tape moi-même</strong> : ajoutez les sections, les plats et les prix à la main.</li></ul><p>Vérifiez le résultat : touchez chaque ligne en <strong>jaune</strong>, corrigez-la au besoin et appuyez sur <strong>Terminé</strong> (ou supprimez-la). <strong>C’est bon, publier!</strong> fonctionne une fois toutes les lignes jaunes vérifiées. Pas le temps? Touchez <strong>Pouvez-vous le faire pour moi?</strong> et nous le taperons pour vous, gratuitement.</p>' },
   { id: 'menu-blurry', over: ['menu-add'], q: 'The menu scan didn\u2019t work', qFr: 'La numérisation du menu n\u2019a pas fonctionné', pages: ['menu'],
     keys: ['hard to read', 'blurry', 'scan is blurry', 'menu scan', 'scan failed', 'scan didnt', 'didnt work', 'not a menu', 'wrong prices', 'mistakes', 'yellow', 'yellow lines', 'missing dishes', 'cant publish', 'publish button', 'wont publish', 'lines still need checking', 'still need checking'],
     keysFr: ['difficile a lire', 'flou', 'floue', 'numerisation', 'n a pas fonctionne', 'ne marche pas', 'mauvais prix', 'erreurs', 'jaune'],
     a: '<ul><li>Use good light, hold the phone straight above the page, and fill the screen with the menu.</li><li>One page per photo; avoid glare on glossy menus.</li><li>A PDF of your menu usually reads best.</li><li>Each <strong>yellow</strong> line needs a quick check before you can publish: tap it, fix it if needed and press <strong>Done</strong>, or delete it.</li></ul><p>Short menu? <strong>Type it in myself</strong> can be quicker. Still stuck? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up for you, free.</p>',
-    aFr: '<ul><li>Utilisez un bon éclairage, tenez le téléphone bien droit au-dessus de la page et remplissez l\u2019écran avec le menu.</li><li>Une page par photo; évitez les reflets sur les menus glacés.</li><li>Un PDF de votre menu se lit généralement le mieux.</li><li>Chaque ligne en <strong>jaune</strong> doit être vérifiée avant la publication : touchez-la, corrigez-la au besoin et appuyez sur <strong>Done</strong>, ou supprimez-la.</li></ul><p>Menu court? <strong>Type it in myself</strong> (je le tape moi-même) peut être plus rapide. Toujours bloqué? Touchez <strong>Can you do it for me?</strong> et nous le taperons pour vous, gratuitement.</p>' },
+    aFr: '<ul><li>Utilisez un bon éclairage, tenez le téléphone bien droit au-dessus de la page et remplissez l\u2019écran avec le menu.</li><li>Une page par photo; évitez les reflets sur les menus glacés.</li><li>Un PDF de votre menu se lit généralement le mieux.</li><li>Chaque ligne en <strong>jaune</strong> doit être vérifiée avant la publication : touchez-la, corrigez-la au besoin et appuyez sur <strong>Terminé</strong>, ou supprimez-la.</li></ul><p>Menu court? <strong>Je le tape moi-même</strong> peut être plus rapide. Toujours bloqué? Touchez <strong>Pouvez-vous le faire pour moi?</strong> et nous le taperons pour vous, gratuitement.</p>' },
   { id: 'menu-website', over: ['menu-add', 'links'], q: '\u201cWe couldn\u2019t find a menu on that page\u201d', qFr: '« We couldn\u2019t find a menu on that page » (menu introuvable)', pages: ['menu'],
     keys: ['couldnt find', 'couldnt reach', 'import', 'from my website', 'menu from website', 'menu on my website', 'not found'],
     keysFr: ['introuvable', 'importer', 'depuis mon site', 'menu sur mon site'],
     a: '<ul><li>Paste the link to the <strong>menu page itself</strong> (or the menu PDF), not your home page.</li><li>Some menus are built in a way we can\u2019t read (ordering systems, images). Take a photo of the menu instead, or use <strong>Type it in myself</strong>.</li><li>Or tap <strong>Can you do it for me?</strong></li></ul>',
-    aFr: '<ul><li>Collez le lien de la <strong>page du menu elle-même</strong> (ou du PDF du menu), pas celui de votre page d\u2019accueil.</li><li>Certains menus sont faits d\u2019une façon que nous ne pouvons pas lire (systèmes de commande, images). Photographiez plutôt le menu, ou utilisez <strong>Type it in myself</strong>.</li><li>Ou touchez <strong>Can you do it for me?</strong></li></ul>' },
+    aFr: '<ul><li>Collez le lien de la <strong>page du menu elle-même</strong> (ou du PDF du menu), pas celui de votre page d\u2019accueil.</li><li>Certains menus sont faits d\u2019une façon que nous ne pouvons pas lire (systèmes de commande, images). Photographiez plutôt le menu, ou utilisez <strong>Je le tape moi-même</strong>.</li><li>Ou touchez <strong>Pouvez-vous le faire pour moi?</strong></li></ul>' },
   { id: 'menu-change', over: ['menu-add'], q: 'Change or remove my menu', qFr: 'Modifier ou retirer mon menu', pages: ['menu', 'edit'],
     keys: ['change menu', 'change my menu', 'update menu', 'update my menu', 'new menu', 'old menu', 'take down', 'remove menu', 'remove my menu', 'edit menu', 'edit my menu', 'change a price', 'change prices', 'menu prices', 'update prices', 'update our menu', 'menu is out of date', 'old prices'],
     keysFr: ['modifier le menu', 'modifier mon menu', 'changer le menu', 'changer mon menu', 'nouveau menu', 'ancien menu', 'retirer le menu', 'retirer mon menu', 'mettre a jour le menu', 'changer un prix'],
     a: '<p>Open <strong>Add your menu</strong> from your edit page. On the published screen tap <strong>Make a change</strong> to edit dishes and prices, <strong>Replace</strong> for a whole new menu, or <strong>Take it off my page</strong>.</p>',
-    aFr: '<p>Ouvrez <strong>Add your menu</strong> depuis votre page de modification. Sur l\u2019écran du menu publié, touchez <strong>Make a change</strong> pour modifier les plats et les prix, <strong>Replace</strong> pour un tout nouveau menu, ou <strong>Take it off my page</strong> pour le retirer.</p>' },
+    aFr: '<p>Ouvrez <strong>Ajouter votre menu</strong> depuis votre page de modification. Sur l\u2019écran du menu publié, touchez <strong>Faire une modification</strong> pour modifier les plats et les prix, <strong>Le remplacer par un nouveau menu</strong> pour un tout nouveau menu, ou <strong>Le retirer de ma page</strong> pour le retirer.</p>' },
   { id: 'settings', q: 'Change my login email or password', qFr: 'Changer le courriel ou le mot de passe de mon compte', pages: ['account', 'settings'],
     keys: ['change email', 'change my email', 'new email', 'login email', 'email address', 'settings', 'account settings', 'change password', 'change my password', 'other devices'],
     keysFr: ['changer mon courriel', 'changer le courriel', 'nouveau courriel', 'adresse courriel', 'parametres', 'reglages', 'changer mon mot de passe', 'autres appareils'],
@@ -36295,8 +36316,8 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Sign in at <a href="/owner/login">Business login</a>, then open <strong>Account settings</strong> at the top of My listings. You can change your email or password there (you\u2019ll need your current password) and sign out other devices. Forgot the password? <a href="/owner/forgot">Reset it</a>.</p>',
     },
     aFr: {
-      in: '<p>Ouvrez <a href="/owner/account/settings">Account settings</a> (paramètres du compte). Vous pouvez y changer votre courriel ou votre mot de passe (il faut votre mot de passe actuel) et fermer la session sur vos autres appareils.</p>',
-      out: '<p>Connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis ouvrez <strong>Account settings</strong> (paramètres du compte) en haut de My listings. Vous pouvez y changer votre courriel ou votre mot de passe (il faut votre mot de passe actuel) et fermer la session sur vos autres appareils. Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez-le</a>.</p>',
+      in: '<p>Ouvrez <a href="/fr/owner/account/settings">Paramètres du compte</a>. Vous pouvez y changer votre courriel ou votre mot de passe (il faut votre mot de passe actuel) et fermer la session sur vos autres appareils.</p>',
+      out: '<p>Connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis ouvrez <strong>Paramètres du compte</strong> en haut de Mes fiches. Vous pouvez y changer votre courriel ou votre mot de passe (il faut votre mot de passe actuel) et fermer la session sur vos autres appareils. Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez-le</a>.</p>',
     } },
   { id: 'more-businesses', q: 'I manage more than one business', qFr: 'Je gère plus d\u2019une entreprise', pages: ['account', 'edit', 'settings'],
     keys: ['another business', 'two businesses', 'two restaurants', 'two locations', 'second location', 'second business', 'more than one business', 'more than one location', 'other listing', 'add listing', 'add another listing', 'multiple businesses', 'multiple locations', 'several businesses', 'locations', 'businesses'],
@@ -36306,14 +36327,14 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Sign in first, then open the other business’s private edit link on the same device and tap <strong>Add to my login</strong>. (No login yet? Use <strong>Create a login</strong> on the first one, then do this for the others.) <a href="/owner/account">My listings</a> shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
     },
     aFr: {
-      in: '<p>Ouvrez le lien de modification privé de l’autre entreprise sur cet appareil, avec votre compte ouvert, et touchez <strong>Add to my login</strong>. <a href="/owner/account">My listings</a> les montre ensuite toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
-      out: '<p>Connectez-vous d’abord, puis ouvrez le lien de modification privé de l’autre entreprise sur le même appareil et touchez <strong>Add to my login</strong>. (Pas encore de compte? Utilisez <strong>Create a login</strong> sur la première, puis faites de même pour les autres.) <a href="/owner/account">My listings</a> les montre toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
+      in: '<p>Ouvrez le lien de modification privé de l’autre entreprise sur cet appareil, avec votre compte ouvert, et touchez <strong>Ajouter à mon compte</strong>. <a href="/fr/owner/account">Mes fiches</a> les montre ensuite toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
+      out: '<p>Connectez-vous d’abord, puis ouvrez le lien de modification privé de l’autre entreprise sur le même appareil et touchez <strong>Ajouter à mon compte</strong>. (Pas encore de compte? Utilisez <strong>Créer un compte</strong> sur la première, puis faites de même pour les autres.) <a href="/fr/owner/account">Mes fiches</a> les montre toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
     } },
   { id: 'remove', q: 'We closed for good or sold the business', qFr: 'Nous avons fermé pour de bon ou vendu l\u2019entreprise', pages: ['edit', 'account'],
     keys: ['closed for good', 'closed down', 'closed permanently', 'permanently closed', 'closing down', 'closing for good', 'new owner', 'new owners', 'sold', 'sold the business', 'remove listing', 'remove my listing', 'delete listing', 'delete my listing', 'out of business', 'no longer in business', 'shut down', 'went out of business'],
     keysFr: ['ferme pour de bon', 'fermes pour de bon', 'ferme definitivement', 'fermeture definitive', 'nouveau proprietaire', 'nouveaux proprietaires', 'vendu', 'vendu l entreprise', 'supprimer ma fiche', 'retirer ma fiche', 'supprimer la fiche'],
     a: '<p>Closed for good, sold, or need the listing removed? <strong>Message us</strong> below and we\u2019ll take care of it. New owners can then claim the listing for themselves.</p><p>Just moved or renamed? Change it in <strong>Name, address &amp; links</strong> and tap {SEND}.</p>',
-    aFr: '<p>Fermé pour de bon, entreprise vendue, ou fiche à retirer? <strong>Écrivez-nous</strong> ci-dessous et nous nous en occupons. Les nouveaux propriétaires pourront ensuite revendiquer la fiche.</p><p>Vous avez seulement déménagé ou changé de nom? Modifiez-le dans <strong>Name, address &amp; links</strong> et touchez {SEND}.</p>' },
+    aFr: '<p>Fermé pour de bon, entreprise vendue, ou fiche à retirer? <strong>Écrivez-nous</strong> ci-dessous et nous nous en occupons. Les nouveaux propriétaires pourront ensuite revendiquer la fiche.</p><p>Vous avez seulement déménagé ou changé de nom? Modifiez-le dans <strong>Nom, adresse et liens</strong> et touchez {SEND}.</p>' },
   { id: 'features', q: 'What are the features and badges?', qFr: 'À quoi servent les caractéristiques et les badges?', pages: ['edit'],
     keys: ['features', 'badges', 'badge', 'dog friendly', 'dogs', 'patio', 'kid friendly', 'kids', 'wheelchair', 'accessible', 'vegan', 'vegetarian', 'gluten', 'gluten free', 'happy hour', 'amenities', 'lake view', 'live music badge'],
     keysFr: ['caracteristiques', 'badges', 'badge', 'chiens', 'chien', 'animaux', 'terrasse', 'enfants', 'fauteuil roulant', 'accessible', 'vegetalien', 'vegane', 'vegetarien', 'sans gluten', 'cinq a sept', '5 a 7', 'happy hour', 'commodites', 'vue sur le lac'],
@@ -36324,18 +36345,24 @@ const OWNER_HELP_TOPICS = [
     keys: ['price range', 'pricerange', 'price level', 'price point', 'dollarsign', 'dollar sign', 'dollar signs', 'how expensive', 'expensive', 'cheap', 'affordable', 'budget', 'pricey', 'upscale', 'change our price', 'change the price range', 'wrong price range'],
     keysFr: ['gamme de prix', 'fourchette de prix', 'niveau de prix', 'echelle de prix', 'prix', 'cher', 'pas cher', 'abordable', 'haut de gamme', 'signe de dollar', 'signes de dollar'],
     a: '<ol><li>{ON}, open <strong>Price range</strong>.</li><li>Pick what one person usually spends: <strong>$</strong> under $15, <strong>$$</strong> $15–30, <strong>$$$</strong> $30–60, <strong>$$$$</strong> over $60.</li><li>Tap {SEND}.</li></ol><p>{LIVE} It shows on your listing. Want your actual dishes and prices listed? Use <strong>Add your menu</strong>.</p>',
-    aFr: '<ol><li>{ON}, ouvrez <strong>Price range</strong> (gamme de prix).</li><li>Choisissez ce qu’une personne dépense habituellement : <strong>$</strong> moins de 15 $, <strong>$$</strong> 15 à 30 $, <strong>$$$</strong> 30 à 60 $, <strong>$$$$</strong> plus de 60 $.</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Elle s’affiche sur votre fiche. Vous voulez afficher vos plats et vos prix? Utilisez <strong>Add your menu</strong>.</p>' },
+    aFr: '<ol><li>{ON}, ouvrez <strong>Gamme de prix</strong>.</li><li>Choisissez ce qu’une personne dépense habituellement : <strong>$</strong> moins de 15 $, <strong>$$</strong> 15 à 30 $, <strong>$$$</strong> 30 à 60 $, <strong>$$$$</strong> plus de 60 $.</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Elle s’affiche sur votre fiche. Vous voulez afficher vos plats et vos prix? Utilisez <strong>Ajouter votre menu</strong>.</p>' },
   // Help bot v2 (2026-10-18): the stars come from Google; owners can't reply on Okanagan Roam.
   { id: 'reviews', over: ['photo-pending'], q: 'Reviews and star ratings', qFr: 'Avis et étoiles', pages: ['edit', 'account'],
     keys: ['review', 'reviews', 'get reviews', 'more reviews', 'get more reviews', 'reply to a review', 'reply to reviews', 'respond to a review', 'respond to reviews', 'answer a review', 'reply', 'respond', 'bad review', 'negative review', 'fake review', 'unfair review', 'remove a review', 'delete a review', 'rating', 'ratings', 'star rating', 'stars', 'google rating', 'google reviews', 'tripadvisor', 'yelp', 'visitor tips', 'tips from visitors', 'comments'],
     keysFr: ['avis', 'commentaires', 'commentaire', 'evaluation', 'evaluations', 'etoiles', 'cote', 'repondre', 'repondre a un avis', 'repondre aux avis', 'obtenir des avis', 'plus d avis', 'mauvais avis', 'faux avis', 'avis google', 'note google'],
     a: '<p>The star rating and review count on your listing come from <strong>Google</strong>. We refresh them from time to time, and they can\u2019t be edited here.</p><ul><li><strong>More reviews:</strong> ask happy customers to review you on Google (your Google Business Profile has a link to share). New ones show here after our next refresh.</li><li><strong>Replying:</strong> you can\u2019t reply to reviews on Okanagan Roam. Reply on Google, where the review was written.</li><li><strong>Visitor tips:</strong> visitors can also share tips and photos on your page. We check them first, and new ones show under <strong>New from visitors</strong> in My listings.</li><li><strong>Something wrong or unfair?</strong> Report a Google review to Google. For a tip on our site, or a rating that doesn\u2019t match Google, <strong>Message us</strong>.</li></ul>',
-    aFr: '<p>La note en étoiles et le nombre d\u2019avis de votre fiche viennent de <strong>Google</strong>. Nous les actualisons de temps en temps, et ils ne peuvent pas être modifiés ici.</p><ul><li><strong>Plus d\u2019avis :</strong> invitez vos clients satisfaits à vous laisser un avis sur Google (votre profil d\u2019entreprise Google a un lien à partager). Les nouveaux avis s\u2019affichent ici après notre prochaine actualisation.</li><li><strong>Répondre :</strong> il n\u2019est pas possible de répondre aux avis sur Okanagan Roam. Répondez sur Google, là où l\u2019avis a été écrit.</li><li><strong>Conseils des visiteurs :</strong> les visiteurs peuvent aussi partager des conseils et des photos sur votre page. Nous les vérifions d\u2019abord, et les nouveaux s\u2019affichent sous <strong>New from visitors</strong> dans My listings.</li><li><strong>Quelque chose d\u2019inexact ou d\u2019injuste?</strong> Signalez un avis Google à Google. Pour un conseil sur notre site, ou une note qui ne correspond pas à Google, <strong>écrivez-nous</strong>.</li></ul>' },
+    aFr: '<p>La note en étoiles et le nombre d\u2019avis de votre fiche viennent de <strong>Google</strong>. Nous les actualisons de temps en temps, et ils ne peuvent pas être modifiés ici.</p><ul><li><strong>Plus d\u2019avis :</strong> invitez vos clients satisfaits à vous laisser un avis sur Google (votre profil d\u2019entreprise Google a un lien à partager). Les nouveaux avis s\u2019affichent ici après notre prochaine actualisation.</li><li><strong>Répondre :</strong> il n\u2019est pas possible de répondre aux avis sur Okanagan Roam. Répondez sur Google, là où l\u2019avis a été écrit.</li><li><strong>Conseils des visiteurs :</strong> les visiteurs peuvent aussi partager des conseils et des photos sur votre page. Nous les vérifions d\u2019abord, et les nouveaux s\u2019affichent sous <strong>Nouveautés des visiteurs</strong> dans Mes fiches.</li><li><strong>Quelque chose d\u2019inexact ou d\u2019injuste?</strong> Signalez un avis Google à Google. Pour un conseil sur notre site, ou une note qui ne correspond pas à Google, <strong>écrivez-nous</strong>.</li></ul>' },
   { id: 'stats', q: 'How many people see my listing?', qFr: 'Combien de personnes voient ma fiche?', pages: ['account', 'edit'],
     keys: ['how many people', 'how many visitors', 'how many views', 'views', 'page views', 'visitors to my page', 'stats', 'statistics', 'analytics', 'traffic', 'clicks', 'insights', 'how many clicks'],
     keysFr: ['combien de personnes', 'combien de visiteurs', 'combien de vues', 'vues', 'statistiques', 'stats', 'clics', 'achalandage', 'trafic'],
     a: '<p>Visit numbers aren\u2019t in the business portal yet. <strong>Message us</strong> and Dayton can tell you roughly how many people have looked at your listing and tapped through to your website or phone.</p>',
     aFr: '<p>Le nombre de visites n\u2019est pas encore dans l\u2019espace entreprises. <strong>Écrivez-nous</strong> et Dayton pourra vous dire à peu près combien de personnes ont consulté votre fiche et touché votre site Web ou votre numéro.</p>' },
+  // French portal (2026-10-18): every signed-in page is in French now; the bot says so and names the French buttons.
+  { id: 'french', q: 'Is the business portal in French?', qFr: 'L\u2019espace entreprises est-il en français?', pages: ['edit', 'account', 'settings', 'login', 'link', 'menu', 'claim'],
+    keys: ['in french', 'french version', 'french page', 'francais', 'language', 'translate', 'translation'],
+    keysFr: ['en francais', 'version francaise', 'anglais', 'en anglais', 'langue', 'traduire', 'traduction', 'traduit'],
+    a: '<p>Yes. Every business portal page has a French version: sign-in, <strong>My listings</strong>, your edit page, <strong>Account settings</strong> and the menu screen. Tap <strong>EN / FR</strong> at the top of the page to switch; this device remembers your choice. Emails you ask for from a French page (a new edit link, a password reset) come in French too.</p>',
+    aFr: '<p>Oui. Toutes les pages de l\u2019espace entreprises sont en français : la connexion, <strong>Mes fiches</strong>, votre page de modification (<strong>Heures d\u2019ouverture</strong>, <strong>Photos</strong>, <strong>Ajouter un événement</strong>, <strong>Enregistrer les modifications</strong>…), les <strong>Paramètres du compte</strong> et l\u2019écran du menu. Touchez <strong>FR / EN</strong> en haut de la page pour changer de langue; cet appareil retient votre choix. Les courriels demandés à partir d\u2019une page en français (nouveau lien, réinitialisation du mot de passe) arrivent aussi en français.</p>' },
   { id: 'cost', q: 'Does this cost anything?', qFr: 'Est-ce que c\u2019est payant?', pages: ['edit', 'account', 'login', 'claim'],
     keys: ['cost', 'costs', 'does it cost', 'how much does', 'pay', 'paid', 'free', 'charge', 'fee', 'fees', 'subscription', 'featured', 'advertise', 'advertising', 'premium', 'sponsored'],
     keysFr: ['gratuit', 'cout', 'coute', 'combien ca coute', 'payer', 'payant', 'frais', 'abonnement', 'publicite', 'en vedette', 'commandite'],
@@ -36343,18 +36370,19 @@ const OWNER_HELP_TOPICS = [
     aFr: '<p>Votre fiche, vos photos, votre menu et vos événements sont entièrement <strong>gratuits</strong>. Vous voulez plus de visibilité? <strong>Écrivez-nous</strong> pour en savoir plus sur les places en vedette.</p>' },
 ];
 // Portal error messages the bot recognises on the page -> the topic that explains them (English and French pages).
+// The French portal's messages (2026-10-18) are matched too.
 const OWNER_HELP_ERROR_RULES = [
-  [/don.t match|wrong password|that password isn.t right|locked|ne correspondent pas|mots de passe erron/i, 'signin'],
-  [/isn.t valid|not valid any more|expired or was already used|link has expired|page has expired/i, 'newlink'],
-  [/too small|at least 800|could not be read|too large|waiting for review|choose up to 5/i, 'photo-small'],
-  [/both times|add the times|time we could not read|same time|at least one open day/i, 'hours'],
-  [/first and last month|two different months/i, 'season'],
-  [/nothing has changed/i, 'nothing-changed'],
-  [/too many|very quick|wait a while|trop de tentatives|très rapide/i, 'too-fast'],
-  [/between 30 and 1200|leave out </i, 'description'],
+  [/don.t match|wrong password|that password isn.t right|locked|ne correspondent pas|mots de passe erron|n.est pas le bon/i, 'signin'],
+  [/isn.t valid|not valid any more|expired or was already used|link has expired|page has expired|n.est plus valide|a expiré|a déjà servi/i, 'newlink'],
+  [/too small|at least 800|could not be read|too large|waiting for review|choose up to 5|trop petite|au moins 800|n.a pas pu être lu|trop grande|attendent notre vérification|jusqu.à 5 photos/i, 'photo-small'],
+  [/both times|add the times|time we could not read|same time|at least one open day|les deux heures|ajoutez les heures|une heure du|à la même heure|au moins un jour d.ouverture/i, 'hours'],
+  [/first and last month|two different months|premier et le dernier mois|deux mois différents/i, 'season'],
+  [/nothing has changed|rien n.a encore changé/i, 'nothing-changed'],
+  [/too many|very quick|wait a while|trop de tentatives|très rapide|trop d.envois|patientez un moment/i, 'too-fast'],
+  [/between 30 and 1200|leave out <|de 30 à 1.200|n.utilisez pas les caractères/i, 'description'],
   [/hard to read|doesn.t look like a menu|didn.t work this time/i, 'menu-blurry'],
   [/couldn.t find a menu|couldn.t reach|can.t open that address/i, 'menu-website'],
-  [/event date has already passed|1 to 3 categories|start time, or tick all day/i, 'event-add'],
+  [/event date has already passed|1 to 3 categories|start time, or tick all day|date de l.événement est déjà passée|de 1 à 3 catégories|heure de début ou cochez/i, 'event-add'],
 ];
 const OWNER_HELP_START = {
   login: ['signin', 'forgot', 'newlink', 'claim', 'login-create'],
@@ -36722,7 +36750,8 @@ async function handleOwnerHelpMessage(req, res) {
   const message = clean(body.message, 1500);
   if (message.length < 5) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please tell us a little about the problem.' });
   if (ownerHelpRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many messages. Please email info@okanaganroam.com instead.' });
-  const path = clean(body.path, 300);
+  // A French portal page (/fr/owner/...) names the same listing as its English address (2026-10-18).
+  const path = clean(body.path, 300).replace(/^\/fr(?=\/owner\/)/, '');
   const account = ownerAccountForRequest(req);
   let venues = [];
   const tokenMatch = /^\/owner\/([A-Za-z0-9_-]+)/.exec(path);
@@ -36784,8 +36813,10 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
 // French entry pages (2026-10-18): lang 'fr' gives the page a French title and description, and (help bot v2) the help
 // bot in French. They also keep a line pointing to info@ in French (see ownerEntryHelpFr).
 // A small footer on every portal page (2026-10-18): privacy, terms and how to reach us.
+// The EN / FR switch script rides with it (French portal, 2026-10-18; see OWNER_LANG_SWITCH_SCRIPT).
 function ownerFooterHtml(fr = false) {
-  return `<footer class="op-footer"><a href="${fr ? '/fr/privacy' : '/privacy'}">${fr ? 'Confidentialité' : 'Privacy'}</a> &middot; <a href="${fr ? '/fr/terms' : '/terms'}">${fr ? 'Conditions' : 'Terms'}</a> &middot; <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a></footer>`;
+  return `<footer class="op-footer"><a href="${fr ? '/fr/privacy' : '/privacy'}">${fr ? 'Confidentialité' : 'Privacy'}</a> &middot; <a href="${fr ? '/fr/terms' : '/terms'}">${fr ? 'Conditions' : 'Terms'}</a> &middot; <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a></footer>
+${OWNER_LANG_SWITCH_SCRIPT}`;
 }
 function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
   const fr = lang === 'fr';
@@ -36844,6 +36875,243 @@ function ownerEntryMessagesScript(fr) {
 function ownerEntryHelpFr() {
   return '<p class="op-hint" style="margin-top:14px">Besoin d’aide? Écrivez-nous à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>; nous répondons en français ou en anglais.</p>';
 }
+// ---------- French business portal (2026-10-18) ----------
+// Before this the portal was French only up to sign-in. Now every signed-in page has a real French address:
+// /fr/owner/account, /fr/owner/account/settings, /fr/owner/account/venue/<id> (and its /menu), /fr/owner/<edit link>
+// (and its /menu) and /fr/owner/reset/<link>. The English route serves each one with res.ownerLang = 'fr', and the
+// pages are written in both languages with an explicit lang flag (L(en, fr)); nothing is regex-translated, and no
+// page script is rewritten. Forms on a French page post to their French address (location.pathname), so:
+//   - the server's JSON messages come back in French (ownerFrMessage, from OWNER_PORTAL_MESSAGES_FR);
+//   - redirects stay French (/owner/login -> /fr/owner/login);
+//   - emails the owner asked for there (reset link, new edit link, password and email changed) go out in French.
+// The header's EN / FR switch links the two addresses and remembers the choice (okanaganLang, as on the rest of the
+// site); an English portal page sends someone who chose French to its French address.
+const OWNER_PORTAL_MESSAGES_FR = {
+  ...OWNER_ENTRY_MESSAGES_FR,
+  'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.': 'Désolés, un problème est survenu. Réessayez ou écrivez-nous à info@okanaganroam.com.',
+  'Sorry, something went wrong. Please try again, or email the photo to info@okanaganroam.com.': 'Désolés, un problème est survenu. Réessayez ou envoyez la photo à info@okanaganroam.com.',
+  'Sorry, something went wrong. Please try again.': 'Désolés, un problème est survenu. Veuillez réessayer.',
+  'Changes are only accepted from the Okanagan Roam website.': 'Les modifications sont acceptées seulement à partir du site Okanagan Roam.',
+  'Events are only accepted from the Okanagan Roam website.': 'Les événements sont acceptés seulement à partir du site Okanagan Roam.',
+  'Photos are only accepted from the Okanagan Roam website.': 'Les photos sont acceptées seulement à partir du site Okanagan Roam.',
+  'Too many submissions. Please try again in an hour.': 'Trop d’envois. Réessayez dans une heure.',
+  'Too many photos at once. Please wait a while and try again.': 'Trop de photos à la fois. Patientez un moment, puis réessayez.',
+  'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.': 'Ce lien de modification n’est plus valide. Demandez-nous-en un nouveau à info@okanaganroam.com.',
+  'This link is not valid any more. Please sign in again or ask us at info@okanaganroam.com.': 'Ce lien n’est plus valide. Reconnectez-vous ou écrivez-nous à info@okanaganroam.com.',
+  'That is too much text in one go. Please shorten it and try again.': 'C’est trop de texte d’un coup. Raccourcissez-le, puis réessayez.',
+  'That was very quick. Please check your changes and send them again.': 'C’était très rapide. Vérifiez vos modifications et envoyez-les de nouveau.',
+  'That was very quick. Please check the event and send it again.': 'C’était très rapide. Vérifiez l’événement et envoyez-le de nouveau.',
+  'That was very quick. Please try again.': 'C’était très rapide. Veuillez réessayer.',
+  'Sorry, your changes could not be saved. Please reload the page and try again.': 'Désolés, vos modifications n’ont pas pu être enregistrées. Rechargez la page et réessayez.',
+  'Nothing was sent. Please try again.': 'Rien n’a été envoyé. Veuillez réessayer.',
+  'Some of the information could not be read. Please reload the page and try again.': 'Une partie de l’information est illisible. Rechargez la page et réessayez.',
+  [OWNER_NOTHING_CHANGED]: 'Rien n’a encore changé. Modifiez un champ, puis envoyez-le.',
+  'Please enter a phone number, like 250-555-0123.': 'Entrez un numéro de téléphone, comme 250-555-0123.',
+  'Please check the web address, for example yourbusiness.com': 'Vérifiez l’adresse Web, par exemple votreentreprise.com',
+  [`Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`]: `Votre description doit compter de ${OWNER_DESCRIPTION_MIN} à ${frNumber(OWNER_DESCRIPTION_MAX.toLocaleString('en-CA'))} caractères.`,
+  'Please leave out < and > characters.': 'N’utilisez pas les caractères < et >.',
+  'Please enter your business name (2 to 100 characters).': 'Entrez le nom de votre entreprise (de 2 à 100 caractères).',
+  'Please enter the full street address, like 1475 Fairview Rd, Penticton.': 'Entrez l’adresse complète, comme 1475 Fairview Rd, Penticton.',
+  'Please enter your Instagram name, like @yourbusiness.': 'Entrez votre nom Instagram, comme @votreentreprise.',
+  'Please enter your Facebook page link, like facebook.com/yourbusiness.': 'Entrez le lien de votre page Facebook, comme facebook.com/votreentreprise.',
+  'Please check the link, for example yourbusiness.com/menu.': 'Vérifiez le lien, par exemple votreentreprise.com/menu.',
+  'Please pick the first and last month you’re open.': 'Choisissez le premier et le dernier mois où vous êtes ouverts.',
+  'The badges could not be read. Please reload the page and try again.': 'Les caractéristiques sont illisibles. Rechargez la page et réessayez.',
+  'Happy hour is only listed for places that serve alcohol.': 'Le happy hour est affiché seulement pour les endroits qui servent de l’alcool.',
+  'Please pick a price range from the list.': 'Choisissez une gamme de prix dans la liste.',
+  'The seasonal hours could not be read. Please reload the page and try again.': 'Les heures saisonnières sont illisibles. Rechargez la page et réessayez.',
+  'Please pick the first and last day of your seasonal hours.': 'Choisissez le premier et le dernier jour de vos heures saisonnières.',
+  'Please pick two different days for your seasonal hours.': 'Choisissez deux jours différents pour vos heures saisonnières.',
+  'Please keep the name of your seasonal hours short (up to 40 characters), without < > or &.': 'Gardez un nom court pour vos heures saisonnières (40 caractères au plus), sans < > ni &.',
+  [`You can list up to ${HOURS_CLOSURE_MAX} closures.`]: `Vous pouvez inscrire jusqu’à ${HOURS_CLOSURE_MAX} fermetures.`,
+  'Please pick a date for each closure.': 'Choisissez une date pour chaque fermeture.',
+  'A closure can’t end before it starts.': 'Une fermeture ne peut pas finir avant de commencer.',
+  'One closure is already over. Remove it, or pick a date from today on.': 'Une fermeture est déjà passée. Retirez-la ou choisissez une date à partir d’aujourd’hui.',
+  'Please add closures for the next two years only.': 'Ajoutez seulement des fermetures pour les deux prochaines années.',
+  'A closure can be up to a year long. For a longer break, use the Season setting.': 'Une fermeture peut durer au plus un an. Pour une pause plus longue, utilisez le réglage Saison.',
+  [`Please keep each note short (up to ${HOURS_EXTRA_NOTE_MAX} characters), without < > & or brackets.`]: `Gardez chaque note courte (${HOURS_EXTRA_NOTE_MAX} caractères au plus), sans < > & ni parenthèses.`,
+  'Please check your email address, or leave it blank.': 'Vérifiez votre adresse courriel ou laissez le champ vide.',
+  'This event can’t be changed any more. Send it as a new event instead.': 'Cet événement ne peut plus être modifié. Envoyez-le plutôt comme un nouvel événement.',
+  'This event was cancelled. Send it as a new event instead.': 'Cet événement a été annulé. Envoyez-le plutôt comme un nouvel événement.',
+  'This page has expired. Please sign in again.': 'Cette page a expiré. Veuillez vous reconnecter.',
+  'This event was already removed.': 'Cet événement a déjà été retiré.',
+  'Your event is too long. Please shorten it and try again.': 'Votre événement est trop long. Raccourcissez-le, puis réessayez.',
+  'Please fix the highlighted fields.': 'Corrigez les champs indiqués.',
+  'You already sent this event. It is waiting for review.': 'Vous avez déjà envoyé cet événement. Il attend notre vérification.',
+  'Please choose at least one category.': 'Choisissez au moins une catégorie.',
+  [`Please choose 1 to ${EVENT_MAX_CATEGORIES} categories from the list.`]: `Choisissez de 1 à ${EVENT_MAX_CATEGORIES} catégories dans la liste.`,
+  'Please enter a valid website or ticket link, like https://example.com/event.': 'Entrez un lien valide vers le site ou la billetterie, comme https://example.com/evenement.',
+  'Please keep the price to 80 characters, like Free or $25 in advance.': 'Gardez le prix à 80 caractères au plus, comme Gratuit ou 25 $ à l’avance.',
+  'Please enter a valid email address, like name@example.com.': 'Entrez une adresse courriel valide, comme nom@example.com.',
+  'Please confirm the statement above so we can review your event.': 'Confirmez la déclaration ci-dessus pour que nous puissions vérifier votre événement.',
+  'Please choose the event date.': 'Choisissez la date de l’événement.',
+  'Please enter a real date.': 'Entrez une date valide.',
+  'The event date has already passed.': 'La date de l’événement est déjà passée.',
+  [`Events can be submitted up to ${EVENT_SUBMISSION_MAX_FUTURE_DAYS} days ahead.`]: `Vous pouvez envoyer un événement jusqu’à ${EVENT_SUBMISSION_MAX_FUTURE_DAYS} jours à l’avance.`,
+  'Please enter a real end date.': 'Entrez une date de fin valide.',
+  'The end date is before the start date.': 'La date de fin est avant la date de début.',
+  [`An event can span at most ${EVENT_SUBMISSION_MAX_SPAN_DAYS} days. Please list longer runs in the schedule notes.`]: `Un événement peut durer au plus ${EVENT_SUBMISSION_MAX_SPAN_DAYS} jours. Indiquez les périodes plus longues sous « Autres dates ».`,
+  'An all-day event has no start or end time.': 'Un événement d’une journée entière n’a pas d’heure de début ni de fin.',
+  'Please enter the start time, or tick All day.': 'Entrez l’heure de début ou cochez « Toute la journée ».',
+  'Please enter a valid start time.': 'Entrez une heure de début valide.',
+  'Please enter a valid end time.': 'Entrez une heure de fin valide.',
+  'The end time is the same as the start time.': 'L’heure de fin est la même que l’heure de début.',
+  'Please enter your name.': 'Entrez votre nom.',
+  'That photo is too large.': 'Cette photo est trop grande.',
+  'Please confirm you took these photos or have permission to share them.': 'Confirmez que vous avez pris ces photos ou que vous avez la permission de les partager.',
+  'Please enter who to credit, e.g. your business or photographer name.': 'Indiquez à qui attribuer les photos, par exemple le nom de votre entreprise ou du photographe.',
+  'That file could not be read as a photo. Please try a JPG or PNG.': 'Ce fichier n’a pas pu être lu comme une photo. Essayez un JPG ou un PNG.',
+  [`That photo is too small. Please use one at least ${OWNER_PHOTO_MIN_EDGE} pixels wide.`]: `Cette photo est trop petite. Utilisez-en une d’au moins ${OWNER_PHOTO_MIN_EDGE} pixels de large.`,
+  'That photo is too large. Please try again.': 'Cette photo est trop grande. Veuillez réessayer.',
+  'That photo isn’t available any more.': 'Cette photo n’est plus disponible.',
+  'The main photo always comes first. Make another photo main to change it.': 'La photo principale vient toujours en premier. Choisissez une autre photo principale pour la changer.',
+  'This photo is still waiting for review.': 'Cette photo attend encore notre vérification.',
+  'Sorry, that didn’t work. Please try again.': 'Désolés, ça n’a pas fonctionné. Veuillez réessayer.',
+  'Please sign in again at okanaganroam.com/owner/login.': 'Veuillez vous reconnecter à okanaganroam.com/fr/owner/login.',
+  'That business isn’t on your login.': 'Cette entreprise n’est pas liée à votre compte.',
+  'That person isn’t on this listing any more.': 'Cette personne n’a plus accès à cette fiche.',
+  'They were added before you, so only Okanagan Roam can remove them. Email info@okanaganroam.com and we’ll check.': 'Cette personne a été ajoutée avant vous : seul Okanagan Roam peut la retirer. Écrivez à info@okanaganroam.com et nous vérifierons.',
+  'Please sign in again, or create a login below.': 'Reconnectez-vous ou créez un compte ci-dessous.',
+  [`Please use at least ${OWNER_PASSWORD_MIN} characters.`]: `Utilisez au moins ${OWNER_PASSWORD_MIN} caractères.`,
+  'That email already has a login. Enter its password, or reset it at okanaganroam.com/owner/forgot.': 'Ce courriel a déjà un compte. Entrez son mot de passe ou réinitialisez-le à okanaganroam.com/fr/owner/forgot.',
+  'Please enter your new email address.': 'Entrez votre nouvelle adresse courriel.',
+  'That password isn’t right.': 'Ce mot de passe n’est pas le bon.',
+  'That’s already your email.': 'C’est déjà votre courriel.',
+  'That email already has its own login.': 'Ce courriel a déjà son propre compte.',
+  'This link has expired or was already used. Please ask for a new one at okanaganroam.com/owner/forgot.': 'Ce lien a expiré ou a déjà servi. Demandez-en un nouveau à okanaganroam.com/fr/owner/forgot.',
+  'Please tell us a little about the problem.': 'Dites-nous-en un peu plus sur le problème.',
+  'Too many messages. Please email info@okanaganroam.com instead.': 'Trop de messages. Écrivez plutôt à info@okanaganroam.com.',
+  'Please add your email so we can reply.': 'Ajoutez votre courriel pour que nous puissions vous répondre.',
+  'Sorry, that didn’t send. Please email info@okanaganroam.com.': 'Désolés, l’envoi n’a pas fonctionné. Écrivez à info@okanaganroam.com.',
+  'Not allowed.': 'Action non permise.',
+  'Not found.': 'Introuvable.',
+  // The menu screen's server messages.
+  'Add a photo of your menu first, or tell us where to find it (like a link to your website).': 'Ajoutez d’abord une photo de votre menu, ou dites-nous où le trouver (par exemple un lien vers votre site Web).',
+  'Lots of pages at once! Please wait a few minutes and try again.': 'Beaucoup de pages d’un coup! Patientez quelques minutes, puis réessayez.',
+  'Lots of tries at once! Please wait a few minutes and try again.': 'Beaucoup d’essais d’un coup! Patientez quelques minutes, puis réessayez.',
+  'Please add a photo of your menu first.': 'Ajoutez d’abord une photo de votre menu.',
+  'Please choose a photo or a PDF of your menu.': 'Choisissez une photo ou un PDF de votre menu.',
+  'Please paste the address of your website or menu, like www.yourplace.com/menu.': 'Collez l’adresse de votre site Web ou de votre menu, comme www.votreendroit.com/menu.',
+  'That PDF is too big. Try a photo of the menu instead.': 'Ce PDF est trop gros. Essayez plutôt une photo du menu.',
+  'That photo is a bit small to read. Try taking it a little closer.': 'Cette photo est un peu petite pour être lue. Essayez de la prendre d’un peu plus près.',
+  'This menu was already sent. Reload the page to see where it is.': 'Ce menu a déjà été envoyé. Rechargez la page pour voir où il en est.',
+  'We couldn’t open that PDF. Try a photo of the menu instead.': 'Nous n’avons pas pu ouvrir ce PDF. Essayez plutôt une photo du menu.',
+  'We couldn’t open that photo. Please try another one.': 'Nous n’avons pas pu ouvrir cette photo. Essayez-en une autre.',
+  'Your menu needs at least one dish before it can go live.': 'Votre menu doit compter au moins un plat avant d’être mis en ligne.',
+  'That file is too big. Try a photo instead.': 'Ce fichier est trop gros. Essayez plutôt une photo.',
+};
+const OWNER_PORTAL_MESSAGES_FR_MAP = new Map(Object.entries(OWNER_PORTAL_MESSAGES_FR).map(([k, v]) => [k.replace(/[’']/g, '’'), v]));
+const OWNER_DAY_LABELS_FR = { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' };
+const OWNER_DAY_NAME_FR = Object.fromEntries(OWNER_DAYS.map((d) => [OWNER_DAY_LABELS[d], OWNER_DAY_LABELS_FR[d]]));
+const OWNER_WEEK_LABEL_FR = { Hours: 'Heures', 'Happy hour': 'Happy hour', 'Seasonal hours': 'Heures saisonnières' };
+const OWNER_EVENT_LABEL_FR = { 'Event name': 'le nom de l’événement', Description: 'la description', 'Venue or location': 'le lieu', Organizer: 'l’organisateur',
+  'Your name': 'votre nom', 'Other dates or schedule notes': 'les autres dates' };
+const OWNER_EVENT_FIELD_FR = { 'Event name': 'Le nom de l’événement', Description: 'La description', 'Venue or location': 'Le lieu', Organizer: 'L’organisateur',
+  'Your name': 'Votre nom', 'Other dates or schedule notes': 'Les autres dates' };
+// Messages with a day, a label or a count in them.
+const OWNER_PORTAL_PATTERNS_FR = [
+  [/^(Hours|Happy hour|Seasonal hours) must list each day\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : indiquez chaque jour.`],
+  [/^(Hours|Happy hour|Seasonal hours): (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) can have at most two time ranges\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : le ${OWNER_DAY_NAME_FR[m[2]]} peut avoir au plus deux plages horaires.`],
+  [/^(Hours|Happy hour|Seasonal hours): (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) has a time we could not read\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : une heure du ${OWNER_DAY_NAME_FR[m[2]]} est illisible.`],
+  [/^(Hours|Happy hour|Seasonal hours): (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) opens and closes at the same time\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : le ${OWNER_DAY_NAME_FR[m[2]]} ouvre et ferme à la même heure.`],
+  [/^(Hours|Happy hour|Seasonal hours): add at least one open day\.$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : ajoutez au moins un jour d’ouverture.`],
+  [/^(Hours|Happy hour|Seasonal hours): (.+)$/, (m) => `${OWNER_WEEK_LABEL_FR[m[1]]} : les heures sont illisibles. Rechargez la page et réessayez.`],
+  [/^You have (\d+) photos waiting for review\. Please wait until we have looked at those\.$/, (m) => `Vous avez ${m[1]} photos qui attendent notre vérification. Attendez que nous les ayons regardées.`],
+  [/^Please enter the (event name|description|venue or location|organizer|other dates or schedule notes)\.$/i, (m) => `Entrez ${OWNER_EVENT_LABEL_FR[Object.keys(OWNER_EVENT_LABEL_FR).find((k) => k.toLowerCase() === m[1].toLowerCase())]}.`],
+  [/^(Event name|Description|Venue or location|Organizer|Your name|Other dates or schedule notes) needs at least (\d+) characters\.$/, (m) => `${OWNER_EVENT_FIELD_FR[m[1]]} doit compter au moins ${m[2]} caractères.`],
+  [/^(Event name|Description|Venue or location|Organizer|Your name|Other dates or schedule notes) can be at most (\d+) characters\.$/, (m) => `${OWNER_EVENT_FIELD_FR[m[1]]} peut compter au plus ${frNumber(Number(m[2]).toLocaleString('en-CA'))} caractères.`],
+  [/^(Event name|Description|Venue or location|Organizer|Your name|Other dates or schedule notes) must be text\.$/, () => 'Une partie de l’information est illisible. Rechargez la page et réessayez.'],
+];
+// One server message -> French (the English stays when nothing matches).
+function ownerFrMessage(text) {
+  if (typeof text !== 'string' || !text) return text;
+  const key = text.replace(/[’']/g, '’');
+  if (OWNER_PORTAL_MESSAGES_FR_MAP.has(key)) return OWNER_PORTAL_MESSAGES_FR_MAP.get(key);
+  for (const [re, fn] of OWNER_PORTAL_PATTERNS_FR) { const m = re.exec(text); if (m) return fn(m); }
+  return text;
+}
+// A JSON reply to a French portal page: its messages in French, and any portal address it hands back French.
+function ownerFrJson(body) {
+  let j; try { j = JSON.parse(body); } catch (e) { return body; }
+  if (!j || typeof j !== 'object' || Array.isArray(j)) return body;
+  if (typeof j.error === 'string') j.error = ownerFrMessage(j.error);
+  if (j.errors && typeof j.errors === 'object') for (const k of Object.keys(j.errors)) j.errors[k] = ownerFrMessage(j.errors[k]);
+  if (typeof j.href === 'string' && /^\/owner\//.test(j.href)) j.href = `/fr${j.href}`;
+  return JSON.stringify(j);
+}
+// Which portal requests are French (or English pages that get the switch). -> { lang, enPath, enUrl } or null.
+// /fr/owner/login, /link and /forgot pages are French twins (FR_TWIN_STATIC); their form posts come here.
+const OWNER_FR_PORTAL_RE = /^\/fr(\/owner\/(?:account(?:\/[^?#]*)?|reset\/[A-Za-z0-9_-]+|help|logout|login|link|forgot|[A-Za-z0-9_-]{32}(?:\/[^?#]*)?))(\?[^#]*)?$/;
+const OWNER_EN_PORTAL_PAGE_RE = /^\/owner\/(?:account(?:\/settings|\/venue\/\d+(?:\/menu)?)?|reset\/[A-Za-z0-9_-]+|[A-Za-z0-9_-]{32}(?:\/menu)?)$/;
+function ownerPortalLangRequest(method, rawUrl) {
+  const getLike = method === 'GET' || method === 'HEAD';
+  const m = OWNER_FR_PORTAL_RE.exec(String(rawUrl || ''));
+  if (m) {
+    if (getLike && /^\/owner\/(?:login|link|forgot)$/.test(m[1])) return null;
+    return { lang: 'fr', enPath: m[1], enUrl: m[1] + (m[2] || '') };
+  }
+  const p = String(rawUrl || '').split('?')[0];
+  if (getLike && OWNER_EN_PORTAL_PAGE_RE.test(p)) return { lang: 'en', enPath: p, enUrl: rawUrl };
+  return null;
+}
+// The header switch remembers the language picked, like app.js does on the rest of the site (the portal pages
+// don't load app.js), so an English portal page doesn't send someone straight back to French.
+const OWNER_LANG_SWITCH_SCRIPT = `<script>
+(function(){
+  var t = document.getElementById('langToggle'); if (!t) return;
+  t.addEventListener('click', function(){ try { localStorage.setItem('okanaganLang', t.getAttribute('hreflang') === 'fr' ? 'fr' : 'en'); } catch (e) {} });
+})();
+</script>`;
+function ownerLangHtml(html, lang, enPath, search) {
+  if (!/^<!DOCTYPE html>/i.test(html)) return html;
+  let out = html;
+  const pageFr = /<html lang="fr/.test(out);
+  if (lang === 'fr') {
+    // The site header in French, as on the French menu screen (ownerSimplePage may already have run frA11yLabels on it).
+    const hdr = renderGolfHeaderHtml();
+    for (const h of [hdr, frA11yLabels(hdr)]) if (h && out.includes(h)) { out = out.split(h).join(frenchHeaderFragment(hdr)); break; }
+    out = frA11yLabels(out).replace(/<html lang="en(?:-CA)?"/, '<html lang="fr"');
+    // The menu screen on its English address follows a French browser unless ?lang=en says otherwise.
+    out = withTwinLangSwitch(out, `${enPath}${/\/menu$/.test(enPath) ? '?lang=en' : search ? search.replace(/&/g, '&amp;') : ''}`, 'fr');
+  } else {
+    // An English address showing French (the menu screen's ?lang=fr) keeps its own switch.
+    if (pageFr) return out;
+    const frPath = frTwinPath(enPath);
+    out = out.replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frPath)}+location.search+location.hash)}catch(e){}</script>\n`);
+    out = withTwinLangSwitch(out, `${frPath}${search ? search.replace(/&/g, '&amp;') : ''}`, 'en');
+  }
+  return out.includes('id="langToggle"') && !out.includes(OWNER_LANG_SWITCH_SCRIPT) ? out.replace(/<\/body>(?![\s\S]*<\/body>)/, `${OWNER_LANG_SWITCH_SCRIPT}\n</body>`) : out;
+}
+function installOwnerLangResponse(req, res, lang, enPath, search = '') {
+  res.ownerLang = lang;
+  const realWriteHead = res.writeHead.bind(res), realEnd = res.end.bind(res);
+  let status = 200, headers = {};
+  res.writeHead = (code, h) => { status = code; headers = { ...(h || {}) }; return res; };
+  res.end = (body) => {
+    const type = String(headers['Content-Type'] || headers['content-type'] || '');
+    if (lang === 'fr' && status >= 300 && status < 400 && typeof headers.Location === 'string' && /^\/owner\//.test(headers.Location)) headers.Location = `/fr${headers.Location}`;
+    if (body != null && /text\/html/.test(type) && (status === 200 || status === 404 || status === 410)) {
+      body = ownerLangHtml(String(body), lang, enPath, search);
+      if (lang === 'fr') headers['Content-Language'] = 'fr-CA';
+      // Signed in from before the French pages: the /fr/owner copy of the cookie is added, so the switch keeps them in.
+      const session = readCookie(req, OWNER_SESSION_COOKIE);
+      if (status === 200 && session && !headers['Set-Cookie'] && ownerAccountForRequest(req)) headers['Set-Cookie'] = ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400);
+      delete headers['Content-Length'];
+    } else if (body != null && lang === 'fr' && /application\/json/.test(type)) {
+      body = ownerFrJson(String(body));
+      delete headers['Content-Length'];
+    }
+    realWriteHead(status, headers);
+    return realEnd(body);
+  };
+}
+// The address of a portal page in the page's language.
+function ownerPath(p, lang) { return lang === 'fr' && /^\/owner\//.test(p) ? `/fr${p}` : p; }
+// Marks a row sent from a French portal page (its lang column, db.js), for the decision email later.
+function ownerMarkFrench(res, table, id) {
+  if (!res || res.ownerLang !== 'fr' || !id) return;
+  try { db.prepare(`UPDATE ${table} SET lang = 'fr' WHERE id = ?`).run(id); } catch (e) { /* an old copy without the column */ }
+}
 function renderOwnerLoginPage({ lang = 'en' } = {}) {
   const fr = lang === 'fr';
   const L = (en, frText) => (fr ? frText : en);
@@ -36860,7 +37128,6 @@ function renderOwnerLoginPage({ lang = 'en' } = {}) {
     </form>
     ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé par courriel et choisissez-y un mot de passe. Vous ne le trouvez pas? <a href="${OWNER_NEW_LINK_PATH}">Recevoir un nouveau lien par courriel</a>.
     <br><strong>Pas encore inscrit?</strong> <a href="/list-your-venue">Inscrivez votre entreprise gratuitement</a>.</p>
-    <p class="op-hint">Après la connexion, la gestion de vos fiches s’affiche en anglais pour l’instant.</p>
     ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><strong>No login yet?</strong> Open the private edit link we emailed you and choose a password there. Can&rsquo;t find it? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.
     <br><strong>Not listed yet?</strong> <a href="/list-your-venue">List your business for free</a>.</p>`}
 ${ownerEntryMessagesJson(fr)}<script>
@@ -36869,34 +37136,38 @@ ${ownerEntryMessagesScript(fr)}
   var f = document.getElementById('olForm'), err = document.getElementById('olError'), btn = document.getElementById('olSubmit');
   f.addEventListener('submit', function(e){
     e.preventDefault(); err.hidden = true; btn.disabled = true;
-    fetch('/owner/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+    fetch('${fr ? '/fr' : ''}/owner/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ email: document.getElementById('olEmail').value, password: document.getElementById('olPassword').value }) })
       .then(function(r){ return r.json(); })
-      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '/owner/account'; return; } err.textContent = oeMsg((j && j.error) || 'Please try again.'); err.hidden = false; })
+      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '${fr ? '/fr' : ''}/owner/account'; return; } err.textContent = oeMsg((j && j.error) || 'Please try again.'); err.hidden = false; })
       .catch(function(){ btn.disabled = false; err.textContent = ${fr ? "'Connexion impossible. Vérifiez votre connexion Internet.'" : "'Could not sign in. Please check your connection.'"}; err.hidden = false; });
   });
 })();
 </script>`, '', { lang, helpKey: 'Business login' });
 }
 
-function renderOwnerAccountPage(account) {
+function renderOwnerAccountPage(account, lang = 'en') {
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
+  const P = (p) => ownerPath(p, lang);
   const venues = ownerAccountVenues(account.id);
-  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><span class="op-summary">${ownerVenueSummary(v.id)}</span><br><a href="${escapeHtml(venueListingUrl(v))}" class="op-hint">View your page</a> &middot; ${(() => { const n = ownerVenueLogins(v.id).length; return `<a href="/owner/account/venue/${v.id}#access" class="op-hint">${n === 1 ? 'Only you have access' : `${n} people have access`}</a>`; })()}${ownerVisitorItemsHtml(v.id)}</span>
-      <a class="op-edit" href="/owner/account/venue/${v.id}">Edit listing, events &amp; photos &rarr;</a></li>`).join('');
-  return ownerSimplePage('My listings', `
-    <div class="op-bar"><span>Signed in as <strong>${escapeHtml(account.email)}</strong></span>
-      <span><a href="/owner/account/settings">Account settings</a> &nbsp;&middot;&nbsp; <button type="button" class="op-linkbtn" id="opLogout">Log out</button></span></div>
-    <h1>My listings</h1>
-    ${venues.length ? `<ul class="op-venues">${items}</ul>` : '<p>No businesses are linked to this login yet.</p>'}
-    <p class="op-hint">Manage another business? Open its private edit link on this device while you&rsquo;re signed in and tap <strong>Add to my login</strong>.</p>
+  const pageUrl = (v) => (fr && venueHasFrench(v) ? `https://okanaganroam.com${venuePagePath(v, 'fr')}` : venueListingUrl(v));
+  const items = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong><br><span class="op-summary">${ownerVenueSummary(v.id, lang)}</span><br><a href="${escapeHtml(pageUrl(v))}" class="op-hint">${L('View your page', 'Voir votre page')}</a> &middot; ${(() => { const n = ownerVenueLogins(v.id).length; return `<a href="${P(`/owner/account/venue/${v.id}`)}#access" class="op-hint">${n === 1 ? L('Only you have access', 'Vous seul y avez accès') : L(`${n} people have access`, `${n} personnes y ont accès`)}</a>`; })()}${ownerVisitorItemsHtml(v.id, lang)}</span>
+      <a class="op-edit" href="${P(`/owner/account/venue/${v.id}`)}">${L('Edit listing, events &amp; photos', 'Modifier la fiche, les événements et les photos')} &rarr;</a></li>`).join('');
+  return ownerSimplePage(L('My listings', 'Mes fiches'), `
+    <div class="op-bar"><span>${L('Signed in as', 'Connecté en tant que')} <strong>${escapeHtml(account.email)}</strong></span>
+      <span><a href="${P('/owner/account/settings')}">${L('Account settings', 'Paramètres du compte')}</a> &nbsp;&middot;&nbsp; <button type="button" class="op-linkbtn" id="opLogout">${L('Log out', 'Se déconnecter')}</button></span></div>
+    <h1>${L('My listings', 'Mes fiches')}</h1>
+    ${venues.length ? `<ul class="op-venues">${items}</ul>` : `<p>${L('No businesses are linked to this login yet.', 'Aucune entreprise n’est encore liée à ce compte.')}</p>`}
+    <p class="op-hint">${L('Manage another business? Open its private edit link on this device while you&rsquo;re signed in and tap <strong>Add to my login</strong>.', 'Vous gérez une autre entreprise? Ouvrez son lien de modification privé sur cet appareil pendant que vous êtes connecté, puis touchez <strong>Ajouter à mon compte</strong>.')}</p>
 <script>
 // This device remembers which listings are yours, so their public pages say "You manage this listing" (2026-10-18).
 try { localStorage.setItem('okrOwnerVenues', JSON.stringify(${JSON.stringify(venues.map((v) => v.id))})); } catch (e) {}
 document.getElementById('opLogout').addEventListener('click', function(){
   try { localStorage.removeItem('okrOwnerVenues'); } catch (e) {}
-  fetch('/owner/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.href = '/owner/login'; });
+  fetch('/owner/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.href = '${P('/owner/login')}'; });
 });
-</script>`);
+</script>`, '', { lang, helpKey: 'My listings' });
 }
 
 // ---------- Owner account settings (2026-10-15) ----------
@@ -36904,40 +37175,44 @@ document.getElementById('opLogout').addEventListener('click', function(){
 // current password), sign out every other device, and take a business off
 // this login. A changed email or password is confirmed by email to the old
 // address when Brevo is set up.
-function renderOwnerSettingsPage(account) {
+function renderOwnerSettingsPage(account, lang = 'en') {
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
+  const P = (p) => ownerPath(p, lang);
+  const J = (t) => JSON.stringify(t).replace(/</g, '\\u003c');
   const venues = ownerAccountVenues(account.id);
   const sessions = db.prepare("SELECT COUNT(*) AS n FROM owner_sessions WHERE account_id = ? AND expires_at > datetime('now')").get(account.id).n;
   const rows = venues.map((v) => `<li><span><strong>${escapeHtml(v.name)}</strong></span>
-      <button type="button" class="op-linkbtn" data-unlink="${v.id}" data-name="${escapeHtml(v.name)}">Remove from my login</button></li>`).join('');
-  return ownerSimplePage('Account settings', `
-    <div class="op-bar"><span>Signed in as <strong id="osEmailNow">${escapeHtml(account.email)}</strong></span><a href="/owner/account">&larr; My listings</a></div>
-    <h1>Account settings</h1>
+      <button type="button" class="op-linkbtn" data-unlink="${v.id}" data-name="${escapeHtml(v.name)}">${L('Remove from my login', 'Retirer de mon compte')}</button></li>`).join('');
+  return ownerSimplePage(L('Account settings', 'Paramètres du compte'), `
+    <div class="op-bar"><span>${L('Signed in as', 'Connecté en tant que')} <strong id="osEmailNow">${escapeHtml(account.email)}</strong></span><a href="${P('/owner/account')}">&larr; ${L('My listings', 'Mes fiches')}</a></div>
+    <h1>${L('Account settings', 'Paramètres du compte')}</h1>
 
-    <h2 class="os-h">Change email</h2>
+    <h2 class="os-h">${L('Change email', 'Changer de courriel')}</h2>
     <form class="venue-form" id="osEmailForm" novalidate>
-      <div class="form-field"><label for="osEmail">New email</label><input type="email" id="osEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="osEmailError" hidden></p></div>
-      <div class="form-field"><label for="osEmailPw">Current password</label><input type="password" id="osEmailPw" autocomplete="current-password" maxlength="200"><p class="lyv-error" id="osEmailPwError" hidden></p></div>
-      <button type="submit" class="venue-form-submit">Change email</button>
-      <p class="op-done" id="osEmailDone" hidden>Done. Sign in with your new email from now on.</p>
+      <div class="form-field"><label for="osEmail">${L('New email', 'Nouveau courriel')}</label><input type="email" id="osEmail" autocomplete="username" maxlength="254"><p class="lyv-error" id="osEmailError" hidden></p></div>
+      <div class="form-field"><label for="osEmailPw">${L('Current password', 'Mot de passe actuel')}</label><input type="password" id="osEmailPw" autocomplete="current-password" maxlength="200"><p class="lyv-error" id="osEmailPwError" hidden></p></div>
+      <button type="submit" class="venue-form-submit">${L('Change email', 'Changer de courriel')}</button>
+      <p class="op-done" id="osEmailDone" hidden>${L('Done. Sign in with your new email from now on.', 'C’est fait. Connectez-vous désormais avec votre nouveau courriel.')}</p>
     </form>
 
-    <h2 class="os-h">Change password</h2>
+    <h2 class="os-h">${L('Change password', 'Changer de mot de passe')}</h2>
     <form class="venue-form" id="osPwForm" novalidate>
       <input type="email" autocomplete="username" value="${escapeHtml(account.email)}" hidden>
-      <div class="form-field"><label for="osPwOld">Current password</label><input type="password" id="osPwOld" autocomplete="current-password" maxlength="200"><p class="lyv-error" id="osPwOldError" hidden></p></div>
-      <div class="form-field"><label for="osPwNew">New password (${OWNER_PASSWORD_MIN}+ characters)</label><input type="password" id="osPwNew" autocomplete="new-password" maxlength="200"><p class="lyv-error" id="osPwNewError" hidden></p></div>
-      <button type="submit" class="venue-form-submit">Change password</button>
-      <p class="op-done" id="osPwDone" hidden>Password changed. Any other devices were signed out.</p>
+      <div class="form-field"><label for="osPwOld">${L('Current password', 'Mot de passe actuel')}</label><input type="password" id="osPwOld" autocomplete="current-password" maxlength="200"><p class="lyv-error" id="osPwOldError" hidden></p></div>
+      <div class="form-field"><label for="osPwNew">${L(`New password (${OWNER_PASSWORD_MIN}+ characters)`, `Nouveau mot de passe (${OWNER_PASSWORD_MIN} caractères ou plus)`)}</label><input type="password" id="osPwNew" autocomplete="new-password" maxlength="200"><p class="lyv-error" id="osPwNewError" hidden></p></div>
+      <button type="submit" class="venue-form-submit">${L('Change password', 'Changer de mot de passe')}</button>
+      <p class="op-done" id="osPwDone" hidden>${L('Password changed. Any other devices were signed out.', 'Mot de passe changé. Vos autres appareils ont été déconnectés.')}</p>
     </form>
 
-    <h2 class="os-h">Devices</h2>
-    <p class="op-hint">You&rsquo;re signed in on ${sessions === 1 ? '1 device (this one)' : `${sessions} devices`}.</p>
-    <button type="button" class="op-linkbtn" id="osSignoutAll">Sign out everywhere else</button>
-    <p class="op-done" id="osSignoutDone" hidden>Signed out everywhere else.</p>
+    <h2 class="os-h">${L('Devices', 'Appareils')}</h2>
+    <p class="op-hint">${sessions === 1 ? L('You&rsquo;re signed in on 1 device (this one).', 'Vous êtes connecté sur 1 appareil (celui-ci).') : L(`You&rsquo;re signed in on ${sessions} devices.`, `Vous êtes connecté sur ${sessions} appareils.`)}</p>
+    <button type="button" class="op-linkbtn" id="osSignoutAll">${L('Sign out everywhere else', 'Me déconnecter partout ailleurs')}</button>
+    <p class="op-done" id="osSignoutDone" hidden>${L('Signed out everywhere else.', 'Déconnecté partout ailleurs.')}</p>
 
-    <h2 class="os-h">Your businesses</h2>
-    ${venues.length ? `<ul class="op-venues" id="osVenues">${rows}</ul><p class="op-hint" id="osVenuesHint">Removing a business only takes it off this login. Its listing stays on Okanagan Roam, and you can add it back with its private edit link.</p>` : ''}
-    <p class="op-done" id="osNoVenues"${venues.length ? ' hidden' : ''}>No businesses are on this login now. To add one, open its private edit link while signed in and tap <strong>Add to my login</strong>. No link? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.</p>
+    <h2 class="os-h">${L('Your businesses', 'Vos entreprises')}</h2>
+    ${venues.length ? `<ul class="op-venues" id="osVenues">${rows}</ul><p class="op-hint" id="osVenuesHint">${L('Removing a business only takes it off this login. Its listing stays on Okanagan Roam, and you can add it back with its private edit link.', 'Retirer une entreprise la retire seulement de ce compte. Sa fiche reste sur Okanagan Roam, et vous pouvez la rajouter avec son lien de modification privé.')}</p>` : ''}
+    <p class="op-done" id="osNoVenues"${venues.length ? ' hidden' : ''}>${L(`No businesses are on this login now. To add one, open its private edit link while signed in and tap <strong>Add to my login</strong>. No link? <a href="${OWNER_NEW_LINK_PATH}">Email me a new link</a>.`, `Aucune entreprise n’est liée à ce compte pour l’instant. Pour en ajouter une, ouvrez son lien de modification privé pendant que vous êtes connecté et touchez <strong>Ajouter à mon compte</strong>. Pas de lien? <a href="/fr${OWNER_NEW_LINK_PATH}">Recevoir un nouveau lien par courriel</a>.`)}</p>
     <p class="lyv-error" id="osError" hidden></p>
 <style>
   body.owner-page .os-h { font-size: 1.15rem; margin: 34px 0 6px; }
@@ -36945,11 +37220,13 @@ function renderOwnerSettingsPage(account) {
 </style>
 <script>
 (function(){
+  var T = ${J({ network: L('Could not reach the site. Please check your connection.', 'Impossible de joindre le site. Vérifiez votre connexion Internet.'), again: L('Please try again.', 'Veuillez réessayer.'), tap: L('Tap again to remove ', 'Touchez encore pour retirer '), click: L('Click again to remove ', 'Cliquez encore pour retirer ') })};
+  var BASE = ${J(fr ? '/fr' : '')};
   function show(id, msg){ var el = document.getElementById(id); el.textContent = msg || ''; el.hidden = !msg; }
   function post(url, body){
-    return fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
+    return fetch(BASE + url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
-      .catch(function(){ return { error: 'Could not reach the site. Please check your connection.' }; });
+      .catch(function(){ return { error: T.network }; });
   }
   document.addEventListener('input', function(e){
     var f = e.target && e.target.closest ? e.target.closest('.form-field') : null;
@@ -36959,24 +37236,24 @@ function renderOwnerSettingsPage(account) {
     e.preventDefault(); show('osEmailError'); show('osEmailPwError'); document.getElementById('osEmailDone').hidden = true;
     post('/owner/account/email', { email: document.getElementById('osEmail').value, password: document.getElementById('osEmailPw').value }).then(function(j){
       if (j.ok) { document.getElementById('osEmailNow').textContent = j.email; document.getElementById('osEmailPw').value = ''; document.getElementById('osEmailDone').hidden = false; return; }
-      var errs = j.errors || {}; show('osEmailError', errs.email); show('osEmailPwError', errs.password || (!errs.email && (j.error || 'Please try again.')));
+      var errs = j.errors || {}; show('osEmailError', errs.email); show('osEmailPwError', errs.password || (!errs.email && (j.error || T.again)));
     });
   });
   document.getElementById('osPwForm').addEventListener('submit', function(e){
     e.preventDefault(); show('osPwOldError'); show('osPwNewError'); document.getElementById('osPwDone').hidden = true;
     post('/owner/account/password', { current: document.getElementById('osPwOld').value, password: document.getElementById('osPwNew').value }).then(function(j){
       if (j.ok) { document.getElementById('osPwOld').value = ''; document.getElementById('osPwNew').value = ''; document.getElementById('osPwDone').hidden = false; return; }
-      var errs = j.errors || {}; show('osPwOldError', errs.current || (!errs.password && (j.error || 'Please try again.'))); show('osPwNewError', errs.password);
+      var errs = j.errors || {}; show('osPwOldError', errs.current || (!errs.password && (j.error || T.again))); show('osPwNewError', errs.password);
     });
   });
   document.getElementById('osSignoutAll').addEventListener('click', function(){
-    post('/owner/account/signout-others', {}).then(function(j){ if (j.ok) document.getElementById('osSignoutDone').hidden = false; else show('osError', j.error || 'Please try again.'); });
+    post('/owner/account/signout-others', {}).then(function(j){ if (j.ok) document.getElementById('osSignoutDone').hidden = false; else show('osError', j.error || T.again); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-unlink]'), function(b){
     b.addEventListener('click', function(){
       // "Tap" on phones and tablets, "Click" with a mouse (2026-10-18).
       var tap = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      if (b.getAttribute('data-sure') !== '1') { b.setAttribute('data-sure', '1'); b.textContent = (tap ? 'Tap' : 'Click') + ' again to remove ' + b.getAttribute('data-name'); return; }
+      if (b.getAttribute('data-sure') !== '1') { b.setAttribute('data-sure', '1'); b.textContent = (tap ? T.tap : T.click) + b.getAttribute('data-name'); return; }
       post('/owner/account/venue/' + b.getAttribute('data-unlink') + '/unlink', {}).then(function(j){
         if (j.ok) {
           var id = Number(b.getAttribute('data-unlink'));
@@ -36986,23 +37263,26 @@ function renderOwnerSettingsPage(account) {
           if (!document.querySelector('#osVenues li')) { ['osVenues', 'osVenuesHint'].forEach(function(x){ var el = document.getElementById(x); if (el) el.hidden = true; }); document.getElementById('osNoVenues').hidden = false; }
           return;
         }
-        show('osError', j.error || 'Please try again.');
+        show('osError', j.error || T.again);
       });
     });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Account settings' });
 }
 
 function ownerAccountRow(id) {
   return db.prepare('SELECT * FROM owner_accounts WHERE id = ?').get(id);
 }
 
-function ownerSettingsNotice(to, subject, line) {
+// French (2026-10-18) when the change was made on a French page.
+function ownerSettingsNotice(to, subject, line, lang = 'en') {
   const direct = ownerDirectEmail();
   if (!direct) return;
-  direct({ to, subject, text: ['Hi,', '', line, '',
-    'If that wasn’t you, reset your password at https://okanaganroam.com/owner/forgot and email info@okanaganroam.com.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
+  const text = lang === 'fr'
+    ? ['Bonjour,', '', line, '', 'Si ce n’était pas vous, réinitialisez votre mot de passe à https://okanaganroam.com/fr/owner/forgot et écrivez à info@okanaganroam.com.', '', 'Okanagan Roam']
+    : ['Hi,', '', line, '', 'If that wasn’t you, reset your password at https://okanaganroam.com/owner/forgot and email info@okanaganroam.com.', '', 'Okanagan Roam'];
+  direct({ to, subject, text: text.join('\n') }).catch(() => {});
 }
 
 async function handleOwnerSettingsAction(req, res, signedIn, action, venueId) {
@@ -37025,7 +37305,8 @@ async function handleOwnerSettingsAction(req, res, signedIn, action, venueId) {
     }
     db.prepare('UPDATE owner_accounts SET email = ?, failed_logins = 0 WHERE id = ?').run(email, account.id);
     db.prepare('UPDATE owner_password_resets SET used_at = CURRENT_TIMESTAMP WHERE account_id = ? AND used_at IS NULL').run(account.id);
-    ownerSettingsNotice(account.email, 'Your Okanagan Roam login email was changed', `The email for your Okanagan Roam business login was changed to ${email}.`);
+    if (res.ownerLang === 'fr') ownerSettingsNotice(account.email, 'Le courriel de votre compte Okanagan Roam a été changé', `Le courriel de votre compte entreprise Okanagan Roam a été changé pour ${email}.`, 'fr');
+    else ownerSettingsNotice(account.email, 'Your Okanagan Roam login email was changed', `The email for your Okanagan Roam business login was changed to ${email}.`);
     return sendSubmissionResponse(res, 200, { ok: true, email });
   }
   if (action === 'password') {
@@ -37039,7 +37320,8 @@ async function handleOwnerSettingsAction(req, res, signedIn, action, venueId) {
     db.prepare('UPDATE owner_accounts SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?').run(hashOwnerPassword(password), account.id);
     db.prepare('UPDATE owner_password_resets SET used_at = CURRENT_TIMESTAMP WHERE account_id = ? AND used_at IS NULL').run(account.id);
     keepThisDevice();
-    ownerSettingsNotice(account.email, 'Your Okanagan Roam password was changed', 'The password for your Okanagan Roam business login was just changed.');
+    if (res.ownerLang === 'fr') ownerSettingsNotice(account.email, 'Le mot de passe de votre compte Okanagan Roam a été changé', 'Le mot de passe de votre compte entreprise Okanagan Roam vient d’être changé.', 'fr');
+    else ownerSettingsNotice(account.email, 'Your Okanagan Roam password was changed', 'The password for your Okanagan Roam business login was just changed.');
     return sendSubmissionResponse(res, 200, { ok: true });
   }
   if (action === 'signout-others') {
@@ -37117,7 +37399,12 @@ function ownerResetAccount(value) {
     WHERE r.token_hash = ? AND r.used_at IS NULL AND r.expires_at > datetime('now')`).get(ownerResetHash(value)) || null;
 }
 
-function ownerResetEmailText(url, hours) {
+function ownerResetEmailText(url, hours, lang = 'en') {
+  if (lang === 'fr') {
+    return ['Bonjour,', '', 'Quelqu’un (vous, nous l’espérons) a demandé à réinitialiser le mot de passe de votre compte entreprise Okanagan Roam.', '',
+      `Choisissez un nouveau mot de passe ici (le lien fonctionne une seule fois, pendant ${hours}) :`, url, '',
+      'Si vous n’avez rien demandé, vous pouvez ignorer ce courriel. Votre mot de passe ne changera pas.', '', 'Okanagan Roam', 'okanaganroam.com/fr'].join('\n');
+  }
   return [
     'Hi,',
     '',
@@ -37143,10 +37430,12 @@ async function handleOwnerForgot(req, res) {
   if (account && ownerResetRecentCount(account.id) < OWNER_RESET_MAX_PER_HOUR) {
     const direct = ownerDirectEmail();
     const minutes = direct ? OWNER_RESET_DIRECT_MINUTES : OWNER_RESET_FORWARD_HOURS * 60;
-    const url = `https://okanaganroam.com${OWNER_RESET_PATH}${createOwnerPasswordReset(account.id, minutes)}`;
+    // From the French page (2026-10-18): the email and the reset page are French.
+    const fr = res.ownerLang === 'fr';
+    const url = `https://okanaganroam.com${fr ? '/fr' : ''}${OWNER_RESET_PATH}${createOwnerPasswordReset(account.id, minutes)}`;
     try {
       if (direct) {
-        await direct({ to: account.email, subject: 'Reset your Okanagan Roam password', text: ownerResetEmailText(url, '1 hour') });
+        await direct({ to: account.email, subject: fr ? 'Réinitialiser votre mot de passe Okanagan Roam' : 'Reset your Okanagan Roam password', text: ownerResetEmailText(url, fr ? '1 heure' : '1 hour', fr ? 'fr' : 'en') });
       } else {
         const names = ownerAccountVenues(account.id).map((v) => v.name).join(', ') || '(none yet)';
         await venueSubmissionTransport({
@@ -37156,7 +37445,8 @@ async function handleOwnerForgot(req, res) {
           'What to do': `Forward the email below to ${account.email} from info@okanaganroam.com. The link works once, for ${OWNER_RESET_FORWARD_HOURS} hours. If you didn't expect this request, ignore it.`,
           'Owner login': account.email,
           'Businesses on this login': names,
-          'Email to forward': ownerResetEmailText(url, `${OWNER_RESET_FORWARD_HOURS} hours`),
+          'Email to forward': ownerResetEmailText(url, fr ? `${OWNER_RESET_FORWARD_HOURS} heures` : `${OWNER_RESET_FORWARD_HOURS} hours`, fr ? 'fr' : 'en'),
+          ...(fr ? { 'Language': 'French (asked from the French page; the email to forward is in French)' } : {}),
         });
       }
     } catch (err) {
@@ -37179,7 +37469,16 @@ async function handleOwnerForgot(req, res) {
 const OWNER_NEW_LINK_PATH = '/owner/link';
 const ownerNewLinkRecent = new Map();
 
-function ownerNewLinkEmailText(items) {
+function ownerNewLinkEmailText(items, lang = 'en') {
+  if (lang === 'fr') {
+    return ['Bonjour,', '', items.length === 1
+      ? `Voici un nouveau lien privé pour mettre à jour ${items[0].name} sur Okanagan Roam :`
+      : 'Voici de nouveaux liens privés pour mettre à jour vos entreprises sur Okanagan Roam :',
+    '', ...items.map((it) => (items.length === 1 ? it.url : `${it.name} : ${it.url}`)), '',
+    'Aucun mot de passe requis. Gardez ce lien privé : toute personne qui l’a peut proposer des modifications. Dès que vous ouvrez ce lien, tout lien plus ancien que nous vous avons envoyé cesse de fonctionner.',
+    '', 'Astuce : sur cette page, vous pouvez créer un compte pour vous connecter la prochaine fois à https://okanaganroam.com/fr/owner/login.',
+    '', 'Si vous n’avez rien demandé, vous pouvez ignorer ce courriel.', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n');
+  }
   return ['Hi,', '', items.length === 1
     ? `Here's a new private link to update ${items[0].name} on Okanagan Roam:`
     : 'Here are new private links to update your businesses on Okanagan Roam:',
@@ -37201,17 +37500,20 @@ async function handleOwnerNewLink(req, res) {
   if (venues.length && recent.length < 3) {
     recent.push(now); ownerNewLinkRecent.set(email, recent);
     const items = [];
+    // From the French page (2026-10-18): French email, French edit links.
+    const fr = res.ownerLang === 'fr';
     for (const v of venues) {
       const r = createOwnerLink(v.id, { reset: true, keepOld: true });
-      if (r.ok) items.push({ name: v.name, url: r.url });
+      if (r.ok) items.push({ name: v.name, url: fr ? r.url.replace('https://okanaganroam.com/owner/', 'https://okanaganroam.com/fr/owner/') : r.url });
     }
     const direct = ownerDirectEmail();
     try {
       if (items.length && direct) {
-        await direct({ to: email, subject: items.length === 1 ? `Your edit link for ${items[0].name}` : 'Your Okanagan Roam edit links', text: ownerNewLinkEmailText(items) });
+        await direct({ to: email, subject: fr ? (items.length === 1 ? `Votre lien de modification pour ${items[0].name}` : 'Vos liens de modification Okanagan Roam') : items.length === 1 ? `Your edit link for ${items[0].name}` : 'Your Okanagan Roam edit links', text: ownerNewLinkEmailText(items, fr ? 'fr' : 'en') });
       } else if (items.length) {
         await venueSubmissionTransport({ _subject: `[ACTION] Edit link request: ${email}`, _template: 'table', _captcha: 'false',
-          'What to do': `Forward the email below to ${email} from info@okanaganroam.com.`, 'Email to forward': ownerNewLinkEmailText(items) });
+          'What to do': `Forward the email below to ${email} from info@okanaganroam.com.`, 'Email to forward': ownerNewLinkEmailText(items, fr ? 'fr' : 'en'),
+          ...(fr ? { 'Language': 'French (asked from the French page; the email to forward is in French)' } : {}) });
       }
     } catch (err) {
       console.error(`[owner-portal] new edit link email failed: ${String((err && err.message) || err).slice(0, 200)}`);
@@ -37235,8 +37537,7 @@ function renderOwnerNewLinkPage({ lang = 'en' } = {}) {
     <p class="op-done" id="onlDone" hidden>${L('If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.', 'Si nous avons ce courriel pour une entreprise, un nouveau lien est en route. Vérifiez votre boîte de réception (et vos courriels indésirables). Votre ancien lien fonctionne jusqu’à ce que vous ouvriez le nouveau.')}</p>
     ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Nous n’avons pas votre courriel, ou il a changé?</strong> Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong>. Nous vérifierons qu’il s’agit bien de vous et vous enverrons un lien.
     <br><strong>Vous ne savez pas quel courriel nous avons?</strong> Écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous réglerons la question.
-    <br><strong>Vous avez déjà un compte?</strong> <a href="/owner/login">Connectez-vous ici</a>.</p>
-    <p class="op-hint">La page de modification de votre fiche s’affiche en anglais pour l’instant.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
+    <br><strong>Vous avez déjà un compte?</strong> <a href="/owner/login">Connectez-vous ici</a>.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
     <br><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
     <br><strong>Already have a login?</strong> <a href="/owner/login">Sign in here</a>.</p>`}
 ${ownerEntryMessagesJson(fr)}<script>
@@ -37246,7 +37547,7 @@ ${ownerEntryMessagesScript(fr)}
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
   f.addEventListener('submit', function(e){
     e.preventDefault(); show('onlEmailError', ''); show('onlError', ''); btn.disabled = true;
-    fetch('${OWNER_NEW_LINK_PATH}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+    fetch('${fr ? '/fr' : ''}${OWNER_NEW_LINK_PATH}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ email: document.getElementById('onlEmail').value }) })
       .then(function(r){ return r.json(); })
       .then(function(j){
@@ -37605,8 +37906,8 @@ function claimApprovalEmail(claim, venue, url) {
     return {
       subject: `Votre lien pour modifier ${venue.name} sur Okanagan Roam`,
       text: [`Bonjour ${first},`, '', `Merci d’avoir revendiqué ${venue.name} sur Okanagan Roam. Nous avons vérifié que c’est bien vous. Voici votre lien privé pour modifier la fiche (aucun mot de passe requis) :`, url, '',
-        `Sur cette page (en anglais), vous pouvez ajouter vos photos, vos heures d’ouverture, ${ownerExtrasFor(venue)} et vos événements, et créer un compte pour vous connecter ensuite à ${OWNER_LOGIN_URL}.`, '',
-        `Gardez ce lien privé : toute personne qui l’a peut proposer des modifications. Vous l’avez perdu ? Demandez-en un nouveau à https://okanaganroam.com${OWNER_NEW_LINK_PATH} avec cette adresse courriel.`, '',
+        `Sur cette page, vous pouvez ajouter vos photos, vos heures d’ouverture, ${ownerExtrasFor(venue, 'fr')} et vos événements, et créer un compte pour vous connecter ensuite à https://okanaganroam.com/fr/owner/login.`, '',
+        `Gardez ce lien privé : toute personne qui l’a peut proposer des modifications. Vous l’avez perdu ? Demandez-en un nouveau à https://okanaganroam.com/fr${OWNER_NEW_LINK_PATH} avec cette adresse courriel.`, '',
         'Merci,', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n'),
     };
   }
@@ -37648,7 +37949,8 @@ async function adminClaimAction(id, action, body, reviewer) {
   const made = createOwnerLink(venue.id, { contact_email: claim.email, reset: true, keepOld: true });
   if (!made.ok) return { status: 409, body: { error: made.reason } };
   db.prepare("UPDATE venue_claims SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ? AND status = 'pending'").run(reviewer, id);
-  const message = claimApprovalEmail(claim, venue, made.url);
+  // A claim from the French page gets the French edit page (2026-10-18).
+  const message = claimApprovalEmail(claim, venue, claim.lang === 'fr' ? made.url.replace('https://okanaganroam.com/owner/', 'https://okanaganroam.com/fr/owner/') : made.url);
   let emailed;
   if (ownerDirectEmail()) {
     emailed = await sendOwnerDecision([claim.email], message);
@@ -37680,7 +37982,12 @@ async function handleOwnerReset(req, res, value) {
   db.prepare('DELETE FROM owner_sessions WHERE account_id = ?').run(account.id); // signs out every other device
   const session = startOwnerSession(account.id);
   const direct = ownerDirectEmail();
-  if (direct) {
+  if (direct && res.ownerLang === 'fr') {
+    direct({ to: account.email, subject: 'Le mot de passe de votre compte Okanagan Roam a été changé', text: [
+      'Bonjour,', '', 'Le mot de passe de votre compte entreprise Okanagan Roam vient d’être changé.', '',
+      'Si ce n’était pas vous, réinitialisez-le tout de suite à https://okanaganroam.com/fr/owner/forgot et écrivez à info@okanaganroam.com.', '', 'Okanagan Roam',
+    ].join('\n') }).catch(() => {});
+  } else if (direct) {
     direct({ to: account.email, subject: 'Your Okanagan Roam password was changed', text: [
       'Hi,', '', 'The password for your Okanagan Roam business login was just changed.', '',
       'If that wasn’t you, reset it now at https://okanaganroam.com/owner/forgot and email info@okanaganroam.com.', '', 'Okanagan Roam',
@@ -37714,7 +38021,7 @@ ${ownerEntryMessagesScript(fr)}
   var show = function(id, text){ var e = document.getElementById(id); e.textContent = text || ''; e.hidden = !text; };
   f.addEventListener('submit', function(e){
     e.preventDefault(); show('ofgEmailError', ''); show('ofgError', ''); btn.disabled = true;
-    fetch('/owner/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
+    fetch('${fr ? '/fr' : ''}/owner/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ email: document.getElementById('ofgEmail').value }) })
       .then(function(r){ return r.json(); })
       .then(function(j){
@@ -37730,45 +38037,49 @@ ${ownerEntryMessagesScript(fr)}
 </script>`, '', { lang, helpKey: 'Reset your password' });
 }
 
-function renderOwnerResetPage(valid) {
+function renderOwnerResetPage(valid, lang = 'en') {
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
+  const J = (t) => JSON.stringify(t).replace(/</g, '\\u003c');
   if (!valid) {
-    return ownerSimplePage('Reset link expired', `
-    <span class="eyebrow">For businesses</span>
-    <h1>This link has expired</h1>
-    <p>Reset links work once and only for a short time. <a href="/owner/forgot">Ask for a new one</a>.</p>`);
+    return ownerSimplePage(L('Reset link expired', 'Lien de réinitialisation expiré'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('This link has expired', 'Ce lien a expiré')}</h1>
+    <p>${L('Reset links work once and only for a short time.', 'Les liens de réinitialisation fonctionnent une seule fois et peu de temps.')} <a href="${ownerPath('/owner/forgot', lang)}">${L('Ask for a new one', 'Demandez-en un nouveau')}</a>.</p>`, '', { lang, helpKey: 'Reset link expired' });
   }
-  return ownerSimplePage('Choose a new password', `
-    <span class="eyebrow">For businesses</span>
-    <h1>Choose a new password</h1>
+  return ownerSimplePage(L('Choose a new password', 'Choisir un nouveau mot de passe'), `
+    <span class="eyebrow">${L('For businesses', 'Pour les entreprises')}</span>
+    <h1>${L('Choose a new password', 'Choisir un nouveau mot de passe')}</h1>
     <form class="venue-form" id="orsForm" novalidate>
-      <div class="form-field"><label for="orsPassword">New password (${OWNER_PASSWORD_MIN}+ characters)</label><input type="password" id="orsPassword" autocomplete="new-password" maxlength="200"></div>
-      <div class="form-field"><label for="orsPassword2">Type it again</label><input type="password" id="orsPassword2" autocomplete="new-password" maxlength="200"></div>
+      <div class="form-field"><label for="orsPassword">${L(`New password (${OWNER_PASSWORD_MIN}+ characters)`, `Nouveau mot de passe (${OWNER_PASSWORD_MIN} caractères ou plus)`)}</label><input type="password" id="orsPassword" autocomplete="new-password" maxlength="200"></div>
+      <div class="form-field"><label for="orsPassword2">${L('Type it again', 'Retapez-le')}</label><input type="password" id="orsPassword2" autocomplete="new-password" maxlength="200"></div>
       <p class="lyv-error" id="orsError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="orsSubmit">Save new password</button>
+      <button type="submit" class="venue-form-submit" id="orsSubmit">${L('Save new password', 'Enregistrer le nouveau mot de passe')}</button>
     </form>
-    <p class="op-hint" style="margin-top:16px">Saving signs you out on every other device.</p>
+    <p class="op-hint" style="margin-top:16px">${L('Saving signs you out on every other device.', 'L’enregistrement vous déconnecte de tous vos autres appareils.')}</p>
 <script>
 (function(){
+  var T = ${J({ short: L(`Please use at least ${OWNER_PASSWORD_MIN} characters.`, `Utilisez au moins ${OWNER_PASSWORD_MIN} caractères.`), match: L('Those two passwords don’t match.', 'Les deux mots de passe ne correspondent pas.'), again: L('Please try again.', 'Veuillez réessayer.'), network: L('Could not connect. Please try again.', 'Connexion impossible. Veuillez réessayer.'), done: ownerPath('/owner/account', lang) })};
   var f = document.getElementById('orsForm'), btn = document.getElementById('orsSubmit'), err = document.getElementById('orsError');
   var fail = function(text){ err.textContent = text; err.hidden = false; };
   f.addEventListener('submit', function(e){
     e.preventDefault(); err.hidden = true;
     var p1 = document.getElementById('orsPassword').value, p2 = document.getElementById('orsPassword2').value;
-    if (p1.length < ${OWNER_PASSWORD_MIN}) return fail('Please use at least ${OWNER_PASSWORD_MIN} characters.');
-    if (p1 !== p2) return fail('Those two passwords don’t match.');
+    if (p1.length < ${OWNER_PASSWORD_MIN}) return fail(T.short);
+    if (p1 !== p2) return fail(T.match);
     btn.disabled = true;
     fetch(location.pathname, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ password: p1 }) })
       .then(function(r){ return r.json(); })
       .then(function(j){
         btn.disabled = false;
-        if (j && j.ok) { location.href = '/owner/account'; return; }
-        fail((j && ((j.errors && j.errors.password) || j.error)) || 'Please try again.');
+        if (j && j.ok) { location.href = T.done; return; }
+        fail((j && ((j.errors && j.errors.password) || j.error)) || T.again);
       })
-      .catch(function(){ btn.disabled = false; fail('Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; fail(T.network); });
   });
 })();
-</script>`);
+</script>`, '', { lang, helpKey: 'Choose a new password' });
 }
 
 // Applies an approved request. `fields` (optional) approves only some of the
@@ -38042,13 +38353,18 @@ function ownerDecisionRecipients(venueId, senderEmail) {
 }
 
 // What else a business can add from its owner page, in its own words.
-function ownerExtrasFor(venue) {
+function ownerExtrasFor(venue, lang = 'en') {
   const kind = menuKind(venue);
+  if (lang === 'fr') {
+    if (!MENU_VENUE_TYPES.has(venue.type)) return 'vos liens de réservation et de réseaux sociaux';
+    return kind === 'menu' ? 'votre menu' : frDecode(PRICE_LIST_WORDS[kind].fr.listHtml);
+  }
   if (!MENU_VENUE_TYPES.has(venue.type)) return 'booking and social links';
   return kind === 'menu' ? 'your menu' : PRICE_LIST_WORDS[kind].en.list;
 }
 
-function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edited }) {
+function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edited, lang }) {
+  if (lang === 'fr') return ownerDecisionEmailFr({ venueName, what, outcome, reason, link, owner, edited });
   const sign = '\n\nThanks,\nOkanagan Roam\ninfo@okanaganroam.com';
   const manage = owner ? `\n\nYou can update your listing, add events or send photos any time: ${OWNER_LOGIN_URL} (no login yet? Get your private edit link at https://okanaganroam.com${OWNER_NEW_LINK_PATH}).` : '';
   if (outcome === 'approved') {
@@ -38070,6 +38386,34 @@ function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edi
   };
 }
 
+// The same in French (2026-10-18), for something sent from a French portal page. `what` is French already.
+function ownerDecisionEmailFr({ venueName, what, outcome, reason, link, owner, edited }) {
+  const sign = '\n\nMerci,\nOkanagan Roam\ninfo@okanaganroam.com';
+  const manage = owner ? `\n\nVous pouvez mettre à jour votre fiche, ajouter des événements ou envoyer des photos en tout temps : https://okanaganroam.com/fr/owner/login (pas encore de compte? Recevez votre lien de modification privé à https://okanaganroam.com/fr${OWNER_NEW_LINK_PATH}).` : '';
+  const why = reason ? `\n\nRaison : ${reason}` : '';
+  if (outcome === 'approved') {
+    return {
+      subject: `Approuvé : ${what} pour ${venueName}`,
+      text: `Bonjour,\n\nBonne nouvelle : nous avons approuvé ${what} pour ${venueName}, et c’est maintenant en ligne sur Okanagan Roam.${edited ? ' Nous avons fait une petite retouche avant la publication; jetez-y un coup d’œil.' : ''}${link ? `\n\nVoyez le résultat ici : ${link}` : ''}${manage}${sign}`,
+    };
+  }
+  if (outcome === 'removed') {
+    return {
+      subject: `Une photo a été retirée de ${venueName}`,
+      text: `Bonjour,\n\nNous avons retiré ${what} de la fiche ${venueName} sur Okanagan Roam.${why}${manage}\n\nDes questions? Écrivez-nous à info@okanaganroam.com.${sign}`,
+    };
+  }
+  return {
+    subject: `Non publié : ${what} pour ${venueName}`,
+    text: `Bonjour,\n\nMerci d’avoir envoyé ${what} pour ${venueName}. Nous n’avons pas pu publier cet envoi cette fois-ci.${why}${owner ? `\n\nVous pouvez envoyer une version corrigée à partir de votre compte entreprise : https://okanaganroam.com/fr/owner/login. Pas encore de compte? Recevez votre lien de modification privé ici : https://okanaganroam.com/fr${OWNER_NEW_LINK_PATH}` : ''}\n\nDes questions? Écrivez-nous à info@okanaganroam.com.${sign}`,
+  };
+}
+// The venue page in French when it has one.
+function ownerListingUrlFr(v) {
+  const row = v ? db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id) : null;
+  return row && venueHasFrench(row) ? `https://okanaganroam.com${venuePagePath(row, 'fr')}` : venueListingUrl(v);
+}
+
 // -> 'sent' | 'failed' | 'no_address' | 'email_off'
 async function sendOwnerDecision(to, message) {
   if (!to.length) return 'no_address';
@@ -38084,9 +38428,10 @@ async function sendOwnerDecision(to, message) {
   }
 }
 
-function ownerFieldList(fields) {
-  const names = fields.map((f) => (OWNER_FIELD_LABELS[f] || f).toLowerCase());
-  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0] || 'listing';
+function ownerFieldList(fields, lang = 'en') {
+  const fr = lang === 'fr';
+  const names = fields.map((f) => ((fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f).toLowerCase());
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')}${fr ? ' et ' : ' and '}${names[names.length - 1]}` : names[0] || (fr ? 'fiche' : 'listing');
 }
 
 // Emails whoever sent item `id` after a successful decision. `extra` carries
@@ -38099,12 +38444,14 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const v = r && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(r.venue_id);
     if (!v) return 'no_address';
     const fields = outcome === 'approved' && Array.isArray(extra.applied) ? extra.applied : Object.keys(r.changes);
+    if (r.lang === 'fr') return sendOwnerDecision(ownerDecisionRecipients(v.id, r.contact_email), ownerDecisionEmail({ venueName: v.name, what: `votre mise à jour (${ownerFieldList(fields, 'fr')})`, outcome, reason, edited: !!extra.edited, link: ownerListingUrlFr(v), owner: true, lang: 'fr' }));
     return sendOwnerDecision(ownerDecisionRecipients(v.id, r.contact_email), ownerDecisionEmail({ venueName: v.name, what: `your ${ownerFieldList(fields)} update`, outcome, reason, edited: !!extra.edited, link: venueListingUrl(v), owner: true }));
   }
   if (kind === 'photo') {
-    const p = db.prepare('SELECT venue_id, contact_email FROM owner_photos WHERE id = ?').get(id);
+    const p = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(id);
     const v = p && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(p.venue_id);
     if (!v) return 'no_address';
+    if (p.lang === 'fr') return sendOwnerDecision(ownerDecisionRecipients(v.id, p.contact_email), ownerDecisionEmail({ venueName: v.name, what: 'votre photo', outcome, reason, edited: !!extra.edited, link: ownerListingUrlFr(v), owner: true, lang: 'fr' }));
     return sendOwnerDecision(ownerDecisionRecipients(v.id, p.contact_email), ownerDecisionEmail({ venueName: v.name, what: 'your photo', outcome, reason, edited: !!extra.edited, link: venueListingUrl(v), owner: true }));
   }
   if (kind === 'event') {
@@ -38113,6 +38460,11 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const venue = s.owner_venue_id ? db.prepare('SELECT name FROM venues WHERE id = ?').get(s.owner_venue_id) : null;
     const ev = s.event_id ? db.prepare('SELECT region, slug FROM events WHERE id = ?').get(s.event_id) : null;
     const to = s.owner_venue_id ? ownerDecisionRecipients(s.owner_venue_id, s.contact_email) : (s.contact_email ? [String(s.contact_email).trim().toLowerCase()] : []);
+    const evLang = s.owner_venue_id ? (db.prepare('SELECT lang FROM event_submissions WHERE id = ?').get(id) || {}).lang : null;
+    if (evLang === 'fr') {
+      return sendOwnerDecision(to, ownerDecisionEmail({ venueName: venue ? venue.name : 'Okanagan Roam', what: `votre événement « ${s.name} »`, outcome, reason,
+        link: ev ? `https://okanaganroam.com/${ev.region}/events/${ev.slug}` : null, owner: true, lang: 'fr' }));
+    }
     return sendOwnerDecision(to, ownerDecisionEmail({ venueName: venue ? venue.name : 'Okanagan Roam', what: `your event "${s.name}"`, outcome, reason,
       link: ev ? `https://okanaganroam.com/${ev.region}/events/${ev.slug}` : null, owner: !!s.owner_venue_id }));
   }
@@ -38121,6 +38473,10 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const v = c && db.prepare('SELECT name FROM venues WHERE id = ?').get(c.venue_id);
     const ev = c && db.prepare('SELECT name, region, slug FROM events WHERE id = ?').get(c.event_id);
     if (!v || !ev) return 'no_address';
+    if (c.lang === 'fr') {
+      return sendOwnerDecision(ownerDecisionRecipients(c.venue_id, c.contact_email), ownerDecisionEmail({ venueName: v.name, what: `la modification de votre événement « ${ev.name} »`,
+        outcome, reason, edited: false, link: `https://okanaganroam.com/${ev.region}/events/${ev.slug}`, owner: true, lang: 'fr' }));
+    }
     return sendOwnerDecision(ownerDecisionRecipients(c.venue_id, c.contact_email), ownerDecisionEmail({ venueName: v.name, what: `the change to your event "${ev.name}"`,
       outcome, reason, edited: false, link: `https://okanaganroam.com/${ev.region}/events/${ev.slug}`, owner: true }));
   }
@@ -38138,9 +38494,14 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     return sendOwnerDecision(s.contact_email ? [String(s.contact_email).trim().toLowerCase()] : [], message);
   }
   if (kind === 'menu') {
-    const m = db.prepare('SELECT venue_id, contact_email FROM venue_menus WHERE id = ?').get(id);
+    const m = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
     const v = m && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(m.venue_id);
     if (!v) return 'no_address';
+    if (m.lang === 'fr') {
+      const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id);
+      const frLink = outcome === 'approved' ? `https://okanaganroam.com${venueHasFrench(row) ? menuPagePath(row, 'fr') : menuPagePath(v)}` : ownerListingUrlFr(v);
+      return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: isPriceList(v) ? frDecode(PRICE_LIST_WORDS[menuKind(v)].fr.listHtml) : 'votre menu', outcome, reason, link: frLink, owner: true, lang: 'fr' }));
+    }
     const link = outcome === 'approved' ? `https://okanaganroam.com${menuPagePath(v)}` : venueListingUrl(v);
     return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: isPriceList(v) ? `your ${PRICE_LIST_WORDS[menuKind(v)].en.list}` : 'your menu', outcome, reason, link, owner: true }));
   }
@@ -38590,10 +38951,11 @@ function renderAdminReviewLoginPage() {
 // Owners see where everything they sent stands (waiting, live, not approved
 // with the reason), and signed-in owners can remove their photos or pick
 // the main one. Dates are shown in Okanagan time.
-function ownerLocalDate(utc) {
+function ownerLocalDate(utc, fr = false) {
   const d = new Date(`${String(utc || '').replace(' ', 'T')}Z`);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'short', day: 'numeric' });
+  // "18 oct." in French (2026-10-18).
+  return d.toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { timeZone: OKANAGAN_TIME_ZONE, month: 'short', day: 'numeric' });
 }
 
 function ownerVenueMainImage(venueId) {
@@ -38602,20 +38964,29 @@ function ownerVenueMainImage(venueId) {
 }
 
 // Everything sent for this venue, newest first.
-function ownerVenueActivity(venueId, limit = 12) {
+// French field names for "Your updates" and the instant-save message (2026-10-18).
+// The badge names as the French site shows them (app.js badge.* keys).
+const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Végane', vegetarian: 'Options végétariennes', patio: 'Terrasse', kid_friendly: 'Adapté aux enfants',
+  gluten_free: 'Options sans gluten', lake_view: 'Vue sur le lac ou le vignoble', nonalcoholic: 'Options sans alcool', sports_tv: 'Sports à la télé', live_music: 'Musique en direct',
+  great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour' };
+const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
+  name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales' };
+function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
+  const fr = lang === 'fr';
   const items = [];
   for (const r of db.prepare("SELECT id, status, changes, submitted_at, reviewed_at, rejection_reason, undone_at FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
     let fields = [];
-    try { fields = Object.keys(JSON.parse(r.changes)).map((f) => OWNER_FIELD_LABELS[f] || f); } catch (e) { /* unreadable */ }
+    try { fields = Object.keys(JSON.parse(r.changes)).map((f) => (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f); } catch (e) { /* unreadable */ }
+    const what = fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
     items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.rejection_reason,
-      title: fields.length ? `Listing update: ${fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}` : 'Listing update' });
+      title: fr ? (fields.length ? `Mise à jour de la fiche : ${what}` : 'Mise à jour de la fiche') : fields.length ? `Listing update: ${what}` : 'Listing update' });
   }
   const today = todayLocal();
   for (const e of db.prepare('SELECT id, name, start_date, end_date, status, submitted_at, reviewed_at, reviewed_by, rejection_reason, event_id FROM event_submissions WHERE owner_venue_id = ? ORDER BY id DESC LIMIT 10').all(venueId)) {
     let status = e.status;
-    let title = `Event: ${e.name}`;
     const ev = e.event_id ? db.prepare('SELECT name, status FROM events WHERE id = ?').get(e.event_id) : null;
-    if (ev) title = `Event: ${ev.name}`;
+    const title = `${fr ? 'Événement : ' : 'Event: '}${ev ? ev.name : e.name}`;
     if (status === 'rejected' && e.reviewed_by === 'owner') status = 'withdrawn';
     else if (status === 'approved' && ev && ev.status === 'cancelled') status = 'cancelled';
     else if (status === 'approved' && ownerEventPendingChange(e.id)) status = 'changewait';
@@ -38626,33 +38997,36 @@ function ownerVenueActivity(venueId, limit = 12) {
   const main = ownerVenueMainImage(venueId);
   for (const ph of db.prepare('SELECT id, file, status, submitted_at, reviewed_at, reviewed_by, rejection_reason FROM owner_photos WHERE venue_id = ? ORDER BY id DESC LIMIT 20').all(venueId)) {
     items.push({ kind: 'photo', at: ph.reviewed_at || ph.submitted_at, sent: ph.submitted_at, status: ph.reviewed_by === 'owner' && ph.status === 'rejected' ? 'removed' : ph.status,
-      reason: ph.rejection_reason, title: main === `/images/owner/${ph.file}` ? 'Photo (main photo)' : 'Photo' });
+      reason: ph.rejection_reason, title: main === `/images/owner/${ph.file}` ? (fr ? 'Photo (photo principale)' : 'Photo (main photo)') : 'Photo' });
   }
   items.sort((a, b) => String(b.sent).localeCompare(String(a.sent)));
   return items.slice(0, limit);
 }
 
-function ownerStatusLabel(item) {
-  if (item.status === 'pending') return { cls: 'wait', text: 'Waiting for review' };
-  if (item.status === 'approved') return { cls: 'live', text: item.kind === 'event' ? 'Approved: on What’s On' : 'Live' };
-  if (item.status === 'removed') return { cls: 'off', text: 'Removed by you' };
-  if (item.status === 'withdrawn') return { cls: 'off', text: 'Withdrawn by you' };
-  if (item.status === 'cancelled') return { cls: 'off', text: 'Cancelled' };
-  if (item.status === 'changewait') return { cls: 'wait', text: 'Change waiting for review' };
-  if (item.status === 'undone') return { cls: 'off', text: 'Changed back by us' };
-  return { cls: 'no', text: 'Not approved' };
+function ownerStatusLabel(item, lang = 'en') {
+  const L = (en, f) => (lang === 'fr' ? f : en);
+  if (item.status === 'pending') return { cls: 'wait', text: L('Waiting for review', 'En attente de vérification') };
+  if (item.status === 'approved') return { cls: 'live', text: item.kind === 'event' ? L('Approved: on What’s On', 'Approuvé : à l’affiche') : L('Live', 'En ligne') };
+  if (item.status === 'removed') return { cls: 'off', text: L('Removed by you', 'Retiré par vous') };
+  if (item.status === 'withdrawn') return { cls: 'off', text: L('Withdrawn by you', 'Retiré par vous') };
+  if (item.status === 'cancelled') return { cls: 'off', text: L('Cancelled', 'Annulé') };
+  if (item.status === 'changewait') return { cls: 'wait', text: L('Change waiting for review', 'Modification en attente de vérification') };
+  if (item.status === 'undone') return { cls: 'off', text: L('Changed back by us', 'Rétabli par nous') };
+  return { cls: 'no', text: L('Not approved', 'Non approuvé') };
 }
 
-function ownerActivityHtml(items) {
+function ownerActivityHtml(items, lang = 'en') {
   if (!items.length) return '';
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
   return `<section class="op-activity" aria-labelledby="opActivityHead">
-      <h2 id="opActivityHead" class="lyv-section-label" style="margin-top:22px">Your updates</h2>
+      <h2 id="opActivityHead" class="lyv-section-label" style="margin-top:22px">${L('Your updates', 'Vos mises à jour')}</h2>
       <ul>${items.map((it) => {
-        const st = ownerStatusLabel(it);
+        const st = ownerStatusLabel(it, lang);
         const why = st.cls === 'no' && it.reason ? `<span class="op-why">${escapeHtml(it.reason)}</span>` : '';
         const live = it.status !== 'pending';
-        const btns = it.kind === 'event' && it.canEdit ? `<span class="op-act-btns"><button type="button" class="op-linkbtn" data-ev-change="${it.id}">Change</button> &middot; <button type="button" class="op-linkbtn" data-ev-cancel="${it.id}" data-ev-live="${live ? 1 : 0}">${live ? 'Cancel event' : 'Withdraw'}</button></span>` : '';
-        return `<li><span class="op-act-main"><strong>${escapeHtml(it.title)}</strong><span class="op-act-date">Sent ${escapeHtml(ownerLocalDate(it.sent))}</span>${why}${btns}</span><span class="op-status op-status-${st.cls}">${st.text}</span></li>`;
+        const btns = it.kind === 'event' && it.canEdit ? `<span class="op-act-btns"><button type="button" class="op-linkbtn" data-ev-change="${it.id}">${L('Change', 'Modifier')}</button> &middot; <button type="button" class="op-linkbtn" data-ev-cancel="${it.id}" data-ev-live="${live ? 1 : 0}">${live ? L('Cancel event', 'Annuler l’événement') : L('Withdraw', 'Retirer')}</button></span>` : '';
+        return `<li><span class="op-act-main"><strong>${escapeHtml(it.title)}</strong><span class="op-act-date">${L('Sent', 'Envoyé le')} ${escapeHtml(ownerLocalDate(it.sent, fr))}</span>${why}${btns}</span><span class="op-status op-status-${st.cls}">${st.text}</span></li>`;
       }).join('')}</ul>
     </section>`;
 }
@@ -38680,14 +39054,16 @@ function ownerUpdatedDate(utc, fr = false) {
   return `${OWNER_UPDATED_MONTHS[m - 1]} ${day}, ${y}`;
 }
 
-function ownerVenueSummary(venueId) {
+function ownerVenueSummary(venueId, lang = 'en') {
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
   const n = (sql) => db.prepare(sql).get(venueId).n;
   const waiting = [
-    [n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0"), 'update', 'updates'],
+    [n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0"), L('update', 'mise à jour'), L('updates', 'mises à jour')],
     // Menus and event changes count too (2026-10-18), so the chip never says "Up to date" while one waits.
     [n("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND status IN ('pending', 'help')"), 'menu', 'menus'],
     [n("SELECT COUNT(*) AS n FROM event_submissions WHERE owner_venue_id = ? AND status = 'pending'")
-      + n("SELECT COUNT(*) AS n FROM owner_event_changes WHERE venue_id = ? AND status = 'pending'"), 'event', 'events'],
+      + n("SELECT COUNT(*) AS n FROM owner_event_changes WHERE venue_id = ? AND status = 'pending'"), L('event', 'événement'), L('events', 'événements')],
     [n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'pending'"), 'photo', 'photos'],
   ].filter(([c]) => c > 0).map(([c, one, many]) => `${c} ${c === 1 ? one : many}`);
   const notApproved = n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'rejected' AND reviewed_at > datetime('now', '-30 days')")
@@ -38695,16 +39071,16 @@ function ownerVenueSummary(venueId) {
     + n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'rejected' AND reviewed_by != 'owner' AND reviewed_at > datetime('now', '-30 days')");
   const live = n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'approved'");
   const parts = [];
-  if (waiting.length) parts.push(`<span class="op-status op-status-wait">Waiting for review: ${waiting.join(', ')}</span>`);
-  if (notApproved) parts.push(`<span class="op-status op-status-no">${notApproved} not approved</span>`);
-  if (live) parts.push(`<span class="op-status op-status-live">${live} photo${live === 1 ? '' : 's'} live</span>`);
+  if (waiting.length) parts.push(`<span class="op-status op-status-wait">${L('Waiting for review', 'En attente de vérification')}${fr ? ' ' : ''}: ${waiting.join(', ')}</span>`);
+  if (notApproved) parts.push(`<span class="op-status op-status-no">${L(`${notApproved} not approved`, `${notApproved} non approuvé${notApproved === 1 ? '' : 's'}`)}</span>`);
+  if (live) parts.push(`<span class="op-status op-status-live">${L(`${live} photo${live === 1 ? '' : 's'} live`, `${live} photo${live === 1 ? '' : 's'} en ligne`)}</span>`);
   if (n("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND status = 'published'")) {
     const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
-    parts.push(`<span class="op-status op-status-live">${v && PRICE_LIST_WORDS[menuKind(v)] ? 'Prices live' : 'Menu live'}</span>`);
+    parts.push(`<span class="op-status op-status-live">${v && PRICE_LIST_WORDS[menuKind(v)] ? L('Prices live', 'Prix en ligne') : L('Menu live', 'Menu en ligne')}</span>`);
   }
   const last = ownerLastUpdatedAt(venueId);
-  const lastHtml = last ? `<br><span class="op-last">Last updated ${ownerUpdatedDate(last)}</span>` : '';
-  return (parts.length ? parts.join(' ') : '<span class="op-status op-status-live">Up to date</span>') + lastHtml;
+  const lastHtml = last ? `<br><span class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</span>` : '';
+  return (parts.length ? parts.join(' ') : `<span class="op-status op-status-live">${L('Up to date', 'À jour')}</span>`) + lastHtml;
 }
 
 // POST /owner/account/venue/<id>/photos/<photoId>/(remove|main|up|down), signed-in owners only.
@@ -38735,20 +39111,22 @@ async function handleOwnerPhotoAction(req, res, account, venueId, photoId, actio
   return sendSubmissionResponse(res, 200, { ok: true, removed: true, new_main: newMain });
 }
 
-function renderOwnerInvalidLinkPage() {
+function renderOwnerInvalidLinkPage(lang = 'en') {
+  const fr = lang === 'fr';
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${fr ? 'fr' : 'en'}">
 <head>
-${pageHead('Edit link not valid | Okanagan Roam', 'This edit link is not valid.', null, [], { golfTheme: true, noindex: true })}
+${pageHead(fr ? 'Lien de modification non valide | Okanagan Roam' : 'Edit link not valid | Okanagan Roam', fr ? 'Ce lien de modification n’est pas valide.' : 'This edit link is not valid.', null, [], { golfTheme: true, noindex: true })}
 </head>
 <body class="golf-page">
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main" style="padding:48px 0;max-width:640px">
-    <h1>This edit link isn&rsquo;t valid</h1>
-    <p>It may have been replaced with a newer link. <a href="${OWNER_NEW_LINK_PATH}"><strong>Email me a new link</strong></a> (it arrives in a minute), or email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
+    ${fr ? `<h1>Ce lien de modification n’est pas valide</h1>
+    <p>Il a peut-être été remplacé par un lien plus récent. <a href="/fr${OWNER_NEW_LINK_PATH}"><strong>Recevoir un nouveau lien par courriel</strong></a> (il arrive en une minute), ou écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>` : `<h1>This edit link isn&rsquo;t valid</h1>
+    <p>It may have been replaced with a newer link. <a href="${OWNER_NEW_LINK_PATH}"><strong>Email me a new link</strong></a> (it arrives in a minute), or email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>`}
   </main>
-${ownerFooterHtml()}
-${ownerHelpWidgetHtml('invalid')}
+${ownerFooterHtml(fr)}
+${ownerHelpWidgetHtml('invalid', { lang: fr ? 'fr' : 'en' })}
 </body>
 </html>`;
 }
@@ -38768,6 +39146,10 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .venue-form-submit:disabled::after { content: 'Sending…'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--paper, #fff); }
   body.owner-page #olSubmit:disabled::after, body.owner-page #olsSubmit:disabled::after { content: 'Signing in…'; }
   body.owner-page #ofSubmit:disabled::after { content: 'Uploading…'; }
+  /* French pages (2026-10-18). */
+  html[lang|="fr"] body.owner-page .venue-form-submit:disabled::after { content: 'Envoi…'; }
+  html[lang|="fr"] body.owner-page #olSubmit:disabled::after, html[lang|="fr"] body.owner-page #olsSubmit:disabled::after { content: 'Connexion…'; }
+  html[lang|="fr"] body.owner-page #ofSubmit:disabled::after { content: 'Téléversement…'; }
   /* Small phones (2026-10-15): nothing wider than the screen, and one box per row below 480px. */
   body.owner-page .form-row > * { min-width: 0; }
   body.owner-page .form-field input, body.owner-page .form-field textarea, body.owner-page .form-field select { max-width: 100%; min-width: 0; box-sizing: border-box; }
@@ -38806,11 +39188,23 @@ function ownerA11y(html) {
 }
 
 // The big "Add your menu" button at the top of the owner page (food, drink and wineries only).
-function ownerMenuCardHtml(venue, href) {
+function ownerMenuCardHtml(venue, href, lang = 'en') {
   if (!MENU_VENUE_TYPES.has(venue.type)) return '';
   const pub = publishedMenu(venue.id);
   const draft = activeMenuDraft(venue.id);
   const w = PRICE_LIST_WORDS[menuKind(venue)];
+  if (lang === 'fr') {
+    // French (2026-10-18): a price list uses its own French words (PRICE_LIST_WORDS).
+    const list = w ? frDecode(w.fr.listHtml) : 'votre menu';
+    const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    const sub = pub ? `${cap(list)} ${w ? 'sont' : 'est'} en ligne (${menuDishCountText(pub.items, 'fr', menuKind(venue))}). Touchez pour ${w ? 'les' : 'le'} modifier ou ${w ? 'les' : 'le'} remplacer.`
+      : draft && ['pending', 'help'].includes(draft.status) ? `Merci! Nous avons ${list} et ${w ? 'les' : 'le'} mettrons en ligne bientôt.`
+        : draft ? `Vous avez commencé à ajouter ${list}. Touchez pour reprendre là où vous étiez.`
+          : w ? `Prenez votre liste de prix en photo ou donnez-nous le lien de votre site Web. Nous en faisons ${frDecode(w.fr.blurb)} sur votre page en environ 2 minutes.`
+            : 'Prenez votre menu en photo ou donnez-nous le lien de votre site Web. Nous le transformons en texte sur votre page en environ 2 minutes.';
+    const big = pub ? `&#128203; ${escapeHtml(cap(list))}` : `&#128247; Ajouter ${escapeHtml(list)}`;
+    return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
+  }
   const what = w ? w.en.list : 'menu';
   const sub = pub ? `Your ${what} ${w ? 'are' : 'is'} live (${menuDishCountText(pub.items, 'en', menuKind(venue))}). Tap to change or replace ${w ? 'them' : 'it'}.`
     : draft && ['pending', 'help'].includes(draft.status) ? `Thanks! We have your ${what} and will put ${w ? 'them' : 'it'} up soon.`
@@ -38826,18 +39220,23 @@ const OWNER_BOOKING_FIRST_TYPES = new Set(['tour', 'golf', 'indoor', 'sport', 'o
 
 // Seasonal hours on the owner page (2026-10-18): one second week of hours for part of every year. `dayRows` is the
 // page's own day-row builder, so the rows look and work like the usual hours.
-function ownerSeasonalHoursHtml(season, dayRows, chip) {
+function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
+  const L = (en, f) => (lang === 'fr' ? f : en);
   const from = season ? season.from : '11-01', to = season ? season.to : '04-30';
-  const monthOpts = (sel) => MONTH_NAMES.en.map((n, i) => `<option value="${String(i + 1).padStart(2, '0')}"${sel === String(i + 1).padStart(2, '0') ? ' selected' : ''}>${n}</option>`).join('');
+  const monthOpts = (sel) => MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'].map((n, i) => `<option value="${String(i + 1).padStart(2, '0')}"${sel === String(i + 1).padStart(2, '0') ? ' selected' : ''}>${n}</option>`).join('');
   const dayOpts = (sel) => Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => `<option value="${d}"${sel === d ? ' selected' : ''}>${Number(d)}</option>`).join('');
+  // French reads day then month ("du 1 novembre au 30 avril").
+  const pair = (mId, dId, sel, mLabel, dLabel) => (lang === 'fr'
+    ? `<select id="${dId}" aria-label="${dLabel}">${dayOpts(sel.slice(3))}</select> <select id="${mId}" aria-label="${mLabel}">${monthOpts(sel.slice(0, 2))}</select>`
+    : `<select id="${mId}" aria-label="${mLabel}">${monthOpts(sel.slice(0, 2))}</select> <select id="${dId}" aria-label="${dLabel}">${dayOpts(sel.slice(3))}</select>`);
   return `<details class="op-fold" id="opSeasonalBox"${season ? ' open' : ''}>
-      <summary><span class="lyv-section-label">Seasonal hours${chip}</span> <span class="op-fold-hint">Different hours part of the year, like winter hours from November to April</span></summary>
-      <label class="op-closed" style="width:auto"><input type="checkbox" id="opSeasonalOn"${season ? ' checked' : ''}> We have different hours part of the year</label>
+      <summary><span class="lyv-section-label">${L('Seasonal hours', 'Heures saisonnières')}${chip}</span> <span class="op-fold-hint">${L('Different hours part of the year, like winter hours from November to April', 'D’autres heures pendant une partie de l’année, comme des heures d’hiver de novembre à avril')}</span></summary>
+      <label class="op-closed" style="width:auto"><input type="checkbox" id="opSeasonalOn"${season ? ' checked' : ''}> ${L('We have different hours part of the year', 'Nous avons d’autres heures pendant une partie de l’année')}</label>
       <div id="opSeasonalFields"${season ? '' : ' hidden'}>
-        <div class="op-season"><label for="opSeasonalLabel"><strong>Name</strong> (optional)</label> <input type="text" id="opSeasonalLabel" maxlength="40" placeholder="Winter hours" value="${escapeHtml(season ? season.label || '' : '')}"></div>
-        <div class="op-season"><strong>From</strong> <select id="opSeasonalFromM" aria-label="Seasonal hours start month">${monthOpts(from.slice(0, 2))}</select> <select id="opSeasonalFromD" aria-label="Seasonal hours start day">${dayOpts(from.slice(3))}</select>
-          <strong>to</strong> <select id="opSeasonalToM" aria-label="Seasonal hours last month">${monthOpts(to.slice(0, 2))}</select> <select id="opSeasonalToD" aria-label="Seasonal hours last day">${dayOpts(to.slice(3))}</select>
-          <p class="op-hint">Every year between these days (both included), your page shows the hours below instead of your usual hours.</p></div>
+        <div class="op-season"><label for="opSeasonalLabel"><strong>${L('Name', 'Nom')}</strong> ${L('(optional)', '(facultatif)')}</label> <input type="text" id="opSeasonalLabel" maxlength="40" placeholder="${L('Winter hours', 'Heures d’hiver')}" value="${escapeHtml(season ? season.label || '' : '')}"></div>
+        <div class="op-season"><strong>${L('From', 'Du')}</strong> ${pair('opSeasonalFromM', 'opSeasonalFromD', from, L('Seasonal hours start month', 'Mois du début des heures saisonnières'), L('Seasonal hours start day', 'Jour du début des heures saisonnières'))}
+          <strong>${L('to', 'au')}</strong> ${pair('opSeasonalToM', 'opSeasonalToD', to, L('Seasonal hours last month', 'Dernier mois des heures saisonnières'), L('Seasonal hours last day', 'Dernier jour des heures saisonnières'))}
+          <p class="op-hint">${L('Every year between these days (both included), your page shows the hours below instead of your usual hours.', 'Chaque année entre ces deux jours (inclusivement), votre page affiche les heures ci-dessous au lieu de vos heures habituelles.')}</p></div>
         <div id="opSeasonHours">${dayRows('season', season ? season.hours : {}, true, !!season)}</div>
       </div>
       <p class="lyv-error" id="opSeasonalError" hidden></p>
@@ -38845,22 +39244,24 @@ function ownerSeasonalHoursHtml(season, dayRows, chip) {
 }
 
 // Special closures on the owner page (2026-10-18): one row per date or date range, with an optional note.
-function ownerClosureRowHtml(c, today) {
+function ownerClosureRowHtml(c, today, lang = 'en') {
+  const L = (en, f) => (lang === 'fr' ? f : en);
   return `<div class="op-closure">
-          <label>First day <input type="date" class="op-cl-from" min="${today}" value="${escapeHtml(c ? c.from : '')}"></label>
-          <label>Last day (optional) <input type="date" class="op-cl-to" min="${today}" value="${escapeHtml(c && c.to !== c.from ? c.to : '')}"></label>
-          <label class="op-cl-note-l">Note (optional) <input type="text" class="op-cl-note" maxlength="${HOURS_EXTRA_NOTE_MAX}" placeholder="Thanksgiving" value="${escapeHtml(c ? c.note || '' : '')}"></label>
-          <button type="button" class="op-cl-remove">Remove</button>
+          <label>${L('First day', 'Premier jour')} <input type="date" class="op-cl-from" min="${today}" value="${escapeHtml(c ? c.from : '')}"></label>
+          <label>${L('Last day (optional)', 'Dernier jour (facultatif)')} <input type="date" class="op-cl-to" min="${today}" value="${escapeHtml(c && c.to !== c.from ? c.to : '')}"></label>
+          <label class="op-cl-note-l">${L('Note (optional)', 'Note (facultatif)')} <input type="text" class="op-cl-note" maxlength="${HOURS_EXTRA_NOTE_MAX}" placeholder="${L('Thanksgiving', 'Action de grâce')}" value="${escapeHtml(c ? c.note || '' : '')}"></label>
+          <button type="button" class="op-cl-remove">${L('Remove', 'Retirer')}</button>
         </div>`;
 }
-function ownerClosuresHtml(closures, chip) {
+function ownerClosuresHtml(closures, chip, lang = 'en') {
+  const L = (en, f) => (lang === 'fr' ? f : en);
   const today = todayLocal();
   return `<details class="op-fold" id="opClosuresBox"${closures.length ? ' open' : ''}>
-      <summary><span class="lyv-section-label">Special closures${chip}</span> <span class="op-fold-hint">Holidays, renovations or private events: days you&rsquo;re closed</span></summary>
-      <div id="opClosures">${closures.map((c) => ownerClosureRowHtml(c, today)).join('')}</div>
-      <template id="opClosureTpl">${ownerClosureRowHtml(null, today)}</template>
-      <button type="button" class="op-cl-add" id="opClosureAdd">+ Add a closed day</button>
-      <p class="op-hint">On these days your page says &ldquo;Closed today&rdquo;, with your note (for example &ldquo;Closed today (Thanksgiving)&rdquo;). Past closures drop off by themselves.</p>
+      <summary><span class="lyv-section-label">${L('Special closures', 'Fermetures spéciales')}${chip}</span> <span class="op-fold-hint">${L('Holidays, renovations or private events: days you&rsquo;re closed', 'Jours fériés, rénovations ou événements privés : les jours où vous êtes fermés')}</span></summary>
+      <div id="opClosures">${closures.map((c) => ownerClosureRowHtml(c, today, lang)).join('')}</div>
+      <template id="opClosureTpl">${ownerClosureRowHtml(null, today, lang)}</template>
+      <button type="button" class="op-cl-add" id="opClosureAdd">${L('+ Add a closed day', '+ Ajouter un jour de fermeture')}</button>
+      <p class="op-hint">${L('On these days your page says &ldquo;Closed today&rdquo;, with your note (for example &ldquo;Closed today (Thanksgiving)&rdquo;). Past closures drop off by themselves.', 'Ces jours-là, votre page indique « Fermé aujourd’hui », avec votre note (par exemple « Fermé aujourd’hui (Action de grâce) »). Les fermetures passées disparaissent d’elles-mêmes.')}</p>
       <p class="lyv-error" id="opClosuresError" hidden></p>
     </details>`;
 }
@@ -38868,7 +39269,8 @@ function ownerClosuresHtml(closures, chip) {
 // The owner's photo grid, in the order the venue page shows them: the main photo, then the rest
 // (2026-10-18). Signed-in owners get Make main, Remove and the earlier/later arrows. The page
 // fetches itself again and swaps this in after an upload or a change, instead of reloading.
-function ownerPhotoGridHtml(venueId, signedIn) {
+function ownerPhotoGridHtml(venueId, signedIn, lang = 'en') {
+  const L = (en, f) => (lang === 'fr' ? f : en);
   const ph = ownerPhotosForVenue(venueId);
   if (!ph.length) return '';
   const main = ownerVenueMainImage(venueId);
@@ -38877,20 +39279,25 @@ function ownerPhotoGridHtml(venueId, signedIn) {
   const movable = ordered.filter((p) => !isMain(p));
   return `<div class="op-photos" id="opPhotoGrid">${ordered.map((p) => {
     const m = isMain(p);
-    const st = p.status === 'approved' ? (m ? '<span class="op-status op-status-live">Main photo</span>' : '<span class="op-status op-status-live">Live</span>') : '<span class="op-status op-status-wait">Waiting for review</span>';
+    const st = p.status === 'approved' ? (m ? `<span class="op-status op-status-live">${L('Main photo', 'Photo principale')}</span>` : `<span class="op-status op-status-live">${L('Live', 'En ligne')}</span>`) : `<span class="op-status op-status-wait">${L('Waiting for review', 'En attente de vérification')}</span>`;
     const k = movable.indexOf(p);
-    const pos = k >= 0 ? `photo ${k + 1} of ${movable.length}` : 'main photo';
-    const arrows = k >= 0 && movable.length > 1 ? `<span class="op-photo-move"><button type="button" class="op-btn op-up" data-photo="${p.id}" data-move="up" aria-label="Move ${pos} earlier"${k === 0 ? ' disabled' : ''}>&uarr;</button><button type="button" class="op-btn op-down" data-photo="${p.id}" data-move="down" aria-label="Move ${pos} later"${k === movable.length - 1 ? ' disabled' : ''}>&darr;</button></span>` : '';
-    const btns = signedIn ? `<span class="op-photo-btns">${p.status === 'approved' && !m ? `<button type="button" class="op-btn op-make-main" data-photo="${p.id}">Make main photo</button>` : ''}<button type="button" class="op-btn op-btn-danger op-remove" data-photo="${p.id}" aria-label="Remove ${pos}">Remove</button>${arrows}</span>` : '';
+    const pos = k >= 0 ? L(`photo ${k + 1} of ${movable.length}`, `la photo ${k + 1} sur ${movable.length}`) : L('main photo', 'la photo principale');
+    const arrows = k >= 0 && movable.length > 1 ? `<span class="op-photo-move"><button type="button" class="op-btn op-up" data-photo="${p.id}" data-move="up" aria-label="${L(`Move ${pos} earlier`, `Avancer ${pos}`)}"${k === 0 ? ' disabled' : ''}>&uarr;</button><button type="button" class="op-btn op-down" data-photo="${p.id}" data-move="down" aria-label="${L(`Move ${pos} later`, `Reculer ${pos}`)}"${k === movable.length - 1 ? ' disabled' : ''}>&darr;</button></span>` : '';
+    const btns = signedIn ? `<span class="op-photo-btns">${p.status === 'approved' && !m ? `<button type="button" class="op-btn op-make-main" data-photo="${p.id}">${L('Make main photo', 'Choisir comme photo principale')}</button>` : ''}<button type="button" class="op-btn op-btn-danger op-remove" data-photo="${p.id}" aria-label="${L(`Remove ${pos}`, `Retirer ${pos}`)}">${L('Remove', 'Retirer')}</button>${arrows}</span>` : '';
     return `<figure><img src="/owner-photos/preview/${p.preview_key}.jpg" alt="" loading="lazy"><figcaption>${st}${btns}</figcaption></figure>`;
   }).join('')}</div>`;
 }
 
-function renderOwnerPage(found, token, pending) {
-  return ownerA11y(renderOwnerPageHtml(found, token, pending));
+function renderOwnerPage(found, token, pending, lang = 'en') {
+  return ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
 }
 
-function renderOwnerPageHtml(found, token, pending) {
+// French (2026-10-18): lang 'fr' writes the whole page in French (L(en, fr)); its links, posts and the help bot stay
+// on the French addresses. The script's words come from one JSON object (T), so the code is the same in both.
+function renderOwnerPageHtml(found, token, pending, lang = 'en') {
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
+  const P = (p) => ownerPath(p, lang);
   const { venue, happyHourTimes } = found;
   const live = ownerVenueSnapshot(venue, happyHourTimes);
   // Pending pre-fill (2026-10-18): what is waiting for review shows in the form, marked "Waiting for review", so an
@@ -38907,9 +39314,11 @@ function renderOwnerPageHtml(found, token, pending) {
       else snap[k] = v == null ? (k === 'hours' || k === 'happy_hour' ? null : Array.isArray(live[k]) ? [] : '') : v;
     }
   }
-  const waitChip = (...fields) => (fields.some((f) => waitingFields.has(f)) ? ' <span class="op-status op-status-wait op-wait-chip">Waiting for review</span>' : '');
+  const waitChip = (...fields) => (fields.some((f) => waitingFields.has(f)) ? ` <span class="op-status op-status-wait op-wait-chip">${L('Waiting for review', 'En attente de vérification')}</span>` : '');
   const instantOn = !!found.account;
-  const listing = venueListingUrl(venue);
+  const listing = fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue);
+  const dayLabel = (d) => (fr ? OWNER_DAY_LABELS_FR[d].charAt(0).toUpperCase() + OWNER_DAY_LABELS_FR[d].slice(1) : OWNER_DAY_LABELS[d]);
+  const menuWord = isPriceList(venue) ? L('prices', 'vos prix') : L('menu', 'votre menu');
   const showHappyHour = OWNER_HAPPY_HOUR_TYPES.has(venue.type);
   const parseWeek = (json) => { try { return json ? (typeof json === 'string' ? JSON.parse(json) : json) : null; } catch (e) { return null; } };
   const hours = parseWeek(snap.hours) || {};
@@ -38923,39 +39332,93 @@ function renderOwnerPageHtml(found, token, pending) {
     const w1 = w[0] || ['', ''];
     const w2 = w[1] || ['', ''];
     return `<div class="op-day" data-day="${d}" data-prefix="${prefix}">
-          <span class="op-day-name">${OWNER_DAY_LABELS[d]}</span>
-          <label class="op-closed"><input type="checkbox" class="op-off"${(emptyMeansClosed ? closed : !w.length) ? ' checked' : ''}> ${emptyMeansClosed ? 'Closed' : 'None'}</label>
+          <span class="op-day-name">${dayLabel(d)}</span>
+          <label class="op-closed"><input type="checkbox" class="op-off"${(emptyMeansClosed ? closed : !w.length) ? ' checked' : ''}> ${emptyMeansClosed ? L('Closed', 'Fermé') : L('None', 'Aucun')}</label>
           <span class="op-times">
-            <input type="time" class="op-t" data-i="0" value="${escapeHtml(w1[0])}" aria-label="${OWNER_DAY_LABELS[d]} from"> to
-            <input type="time" class="op-t" data-i="1" value="${escapeHtml(w1[1])}" aria-label="${OWNER_DAY_LABELS[d]} until">
-            <span class="op-second"${w[1] ? '' : ' hidden'}>and <input type="time" class="op-t" data-i="2" value="${escapeHtml(w2[0])}" aria-label="${OWNER_DAY_LABELS[d]} second range from"> to
-            <input type="time" class="op-t" data-i="3" value="${escapeHtml(w2[1])}" aria-label="${OWNER_DAY_LABELS[d]} second range until"></span>
-            <button type="button" class="op-add"${w[1] ? ' hidden' : ''}>+ second time</button>
+            <input type="time" class="op-t" data-i="0" value="${escapeHtml(w1[0])}" aria-label="${L(`${dayLabel(d)} from`, `${dayLabel(d)}, de`)}"> ${L('to', 'à')}
+            <input type="time" class="op-t" data-i="1" value="${escapeHtml(w1[1])}" aria-label="${L(`${dayLabel(d)} until`, `${dayLabel(d)}, jusqu’à`)}">
+            <span class="op-second"${w[1] ? '' : ' hidden'}>${L('and', 'et')} <input type="time" class="op-t" data-i="2" value="${escapeHtml(w2[0])}" aria-label="${L(`${dayLabel(d)} second range from`, `${dayLabel(d)}, deuxième plage, de`)}"> ${L('to', 'à')}
+            <input type="time" class="op-t" data-i="3" value="${escapeHtml(w2[1])}" aria-label="${L(`${dayLabel(d)} second range until`, `${dayLabel(d)}, deuxième plage, jusqu’à`)}"></span>
+            <button type="button" class="op-add"${w[1] ? ' hidden' : ''}>${L('+ second time', '+ deuxième plage')}</button>
           </span>${d === 'mon' ? `
-          <span class="op-copy">Copy Monday to: <button type="button" data-copy="weekdays">Tue&ndash;Fri</button> <button type="button" data-copy="all">every day</button></span>` : ''}
+          <span class="op-copy">${L('Copy Monday to:', 'Copier le lundi sur :')} <button type="button" data-copy="weekdays">${L('Tue&ndash;Fri', 'mar.&ndash;ven.')}</button> <button type="button" data-copy="all">${L('every day', 'tous les jours')}</button></span>` : ''}
         </div>`;
   }).join('');
   // Food-only badges mean nothing to a tour or an activity: kept (so nothing changes) but not shown.
   const foodOnly = OWNER_BOOKING_FIRST_TYPES.has(venue.type) && venue.type !== 'golf' ? new Set(['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv']) : new Set();
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
-          <label class="amenity-check"${foodOnly.has(f) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(BADGE_LABELS[f].title)}</label>`).join('');
+          <label class="amenity-check"${foodOnly.has(f) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
   const pendingNote = pending
-    ? `<p class="op-pending">You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.</p>`
+    ? `<p class="op-pending">${L(`You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.`, `Vous avez envoyé des modifications le ${escapeHtml(ownerLocalDate(pending.submitted_at, true))}. Elles attendent notre vérification et s’affichent ci-dessous avec la mention « En attente de vérification ». Tout ce que vous envoyez maintenant s’y ajoute.`)}</p>`
     : '';
   const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
   // Events the owner can still change or cancel, with what the Change form starts from.
   const editableEvents = {};
-  for (const it of ownerVenueActivity(venue.id)) {
+  for (const it of ownerVenueActivity(venue.id, 12, lang)) {
     if (it.kind === 'event' && it.canEdit) editableEvents[it.id] = ownerEventFormData(getEventSubmission(it.id));
   }
   const editableEventsJson = JSON.stringify(editableEvents).replace(/</g, '\\u003c');
   // Signed in (2026-10-18): "Your name" starts from the name this login gave last time.
   const accountName = found.account ? ownerAccountName(found.account.email) : found.viewer ? ownerAccountName(found.viewer.email) : '';
   const viewer = found.viewer || null;
+  // The page script's words (2026-10-18), in the page's language.
+  const scriptText = {
+    copied: L(' Copied.', ' Copié.'),
+    seasonBoth: L('Please fill in both times for each day of your seasonal hours.', 'Indiquez les deux heures pour chaque jour de vos heures saisonnières.'),
+    seasonBlank: L('Seasonal hours: add the times for {day}, or tick Closed.', 'Heures saisonnières : ajoutez les heures du {day} ou cochez Fermé.'),
+    seasonSame: L('Please pick two different days for your seasonal hours.', 'Choisissez deux jours différents pour vos heures saisonnières.'),
+    clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
+    clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
+    fields: fr ? { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
+      name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
+      price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales' }
+      : { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
+        name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
+        price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures' },
+    and: L(' and ', ' et '),
+    hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
+    hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),
+    seasonMonths: L('Please pick two different months, or choose Open all year.', 'Choisissez deux mois différents, ou Ouvert toute l’année.'),
+    happyBoth: L('Please fill in both times for each happy hour.', 'Indiquez les deux heures pour chaque happy hour.'),
+    liveNow: L('Live now: {fields}. Your page shows it straight away. ', 'En ligne maintenant : {fields}. Votre page l’affiche tout de suite. '),
+    review: L('We\u2019ll review this within a day: {fields}. ', 'Nous vérifierons ceci d’ici un jour : {fields}. '),
+    saved: L('Saved. ', 'Enregistré. '),
+    fix: L('Please fix the highlighted fields.', 'Corrigez les champs indiqués.'),
+    wrong: L('Sorry, something went wrong. Please try again.', 'Désolés, un problème est survenu. Veuillez réessayer.'),
+    sendNet: L('Could not send. Please check your connection and try again.', 'Envoi impossible. Vérifiez votre connexion Internet et réessayez.'),
+    sendEvent: L('Send event', 'Envoyer l’événement'), addEvent: L('Add an event', 'Ajouter un événement'),
+    yourEvent: L('your event', 'votre événement'), sendChange: L('Send change', 'Envoyer la modification'), changeEvent: L('Change your event', 'Modifier votre événement'),
+    tapCancel: L('Tap again to cancel it on What\u2019s On', 'Touchez encore pour l’annuler dans À l’affiche'), tapWithdraw: L('Tap again to withdraw it', 'Touchez encore pour le retirer'),
+    again: L('Please try again.', 'Veuillez réessayer.'), connect: L('Could not connect. Please try again.', 'Connexion impossible. Veuillez réessayer.'),
+    removePhoto: L('Remove this photo from your page? This can\u2019t be undone.', 'Retirer cette photo de votre page? Cette action est définitive.'),
+    photoRemoved: L('Photo removed.', 'Photo retirée.'), moved: L('Moved. It\u2019s now photo {n} of {total} after the main photo.', 'Déplacée. C’est maintenant la photo {n} sur {total} après la photo principale.'),
+    noMove: L('It can\u2019t move further.', 'Elle ne peut pas aller plus loin.'), mainChanged: L('Main photo changed.', 'Photo principale changée.'),
+    removeMe: L('Take this business off your login? You\u2019ll need its edit link to add it back.', 'Retirer cette entreprise de votre compte? Il vous faudra son lien de modification pour la rajouter.'),
+    removeOther: L('Remove {who}? They won\u2019t be able to update this listing any more, and we\u2019ll email them to say so.', 'Retirer {who}? Cette personne ne pourra plus modifier cette fiche, et nous l’en informerons par courriel.'),
+    removed: L('Removed. We\u2019ve emailed them to say so.', 'Retiré. Nous en avons informé la personne par courriel.'),
+    account: P('/owner/account'),
+    evUpdated: L('Updated. Your event is still waiting for review, usually within a day.', 'Mis à jour. Votre événement attend toujours notre vérification, en général d’ici un jour.'),
+    evChange: L('Thanks! Your change is in for review, usually within a day. The event stays as it is until then, and we\u2019ll email you when it\u2019s updated.', 'Merci! Votre modification est en cours de vérification, en général d’ici un jour. L’événement reste tel quel d’ici là, et nous vous écrirons quand il sera mis à jour.'),
+    pickOne: L('Choose at least one photo.', 'Choisissez au moins une photo.'), max5: L('Please choose up to 5 photos at a time.', 'Choisissez jusqu’à 5 photos à la fois.'),
+    rights: L('Please confirm you took these photos or have permission to share them.', 'Confirmez que vous avez pris ces photos ou que vous avez la permission de les partager.'),
+    uploading: L('Uploading photo {i} of {n}...', 'Téléversement de la photo {i} sur {n}…'),
+    couldNot: L('could not upload', 'téléversement impossible'),
+    tooSmall: L('too small (needs to be at least 800 pixels wide)', 'trop petite (au moins 800 pixels de large)'),
+    unreadable: L('could not be read. Try a JPG or PNG.', 'illisible. Essayez un JPG ou un PNG.'),
+    upLive1: L('1 photo uploaded and live on your page. Thanks!', '1 photo téléversée et en ligne sur votre page. Merci!'),
+    upLiveN: L('{n} photos uploaded and live on your page. Thanks!', '{n} photos téléversées et en ligne sur votre page. Merci!'),
+    upRev1: L('1 photo uploaded. Thanks! We\u2019ll review it, usually within a day', '1 photo téléversée. Merci! Nous la vérifierons, en général d’ici un jour'),
+    upRevN: L('{n} photos uploaded. Thanks! We\u2019ll review them, usually within a day', '{n} photos téléversées. Merci! Nous les vérifierons, en général d’ici un jour'),
+    upMail1: L(', and email you when it\u2019s live.', ', et vous écrirons quand elle sera en ligne.'),
+    upMailN: L(', and email you when they\u2019re live.', ', et vous écrirons quand elles seront en ligne.'),
+    upNet: L('Could not upload. Please check your connection and try again.', 'Téléversement impossible. Vérifiez votre connexion Internet et réessayez.'),
+    dayLc: fr,
+    chars: L('{n} characters', '{n} caractères'), charsMin: L(` (at least ${OWNER_DESCRIPTION_MIN} needed)`, ` (au moins ${OWNER_DESCRIPTION_MIN} requis)`),
+  };
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${fr ? 'fr' : 'en'}">
 <head>
-${pageHead(`Edit ${venue.name} | Okanagan Roam`, `Update the details for ${venue.name} on Okanagan Roam.`, null, [], { golfTheme: true, noindex: true })}
+${pageHead(fr ? `Modifier ${venue.name} | Okanagan Roam` : `Edit ${venue.name} | Okanagan Roam`, fr ? `Mettez à jour les renseignements de ${venue.name} sur Okanagan Roam.` : `Update the details for ${venue.name} on Okanagan Roam.`, null, [], { golfTheme: true, noindex: true })}
 ${golfEngagementHeadHtml('fd', true, 'listing_form')}
 <meta name="referrer" content="no-referrer">
 <style>
@@ -39059,210 +39522,214 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="op-wrap">
     <div class="op-head">
-      <span class="eyebrow">Owner edit page</span>
+      <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
       ${instantOn
-    ? `<p>Update your listing below and press <strong>Save changes</strong>. Your hours, season, phone, description, badges${showHappyHour ? ', happy hour' : ''} and price range go live on <a href="${escapeHtml(listing)}">your page</a> straight away. A new name, address, website or link is checked first, usually within a day.</p>
-      <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`
-    : `<p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
-      <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it. Signed-in owners&rsquo; hours and details go live straight away.</p>`}
-      ${ownerMenuCardHtml(venue, token ? `${OWNER_LINK_PATH}${token}/menu` : `/owner/account/venue/${venue.id}/menu`).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}
+    ? L(`<p>Update your listing below and press <strong>Save changes</strong>. Your hours, season, phone, description, badges${showHappyHour ? ', happy hour' : ''} and price range go live on <a href="${escapeHtml(listing)}">your page</a> straight away. A new name, address, website or link is checked first, usually within a day.</p>
+      <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Enregistrer les modifications</strong>. Vos heures, votre saison, votre téléphone, votre description, vos caractéristiques${showHappyHour ? ', votre happy hour' : ''} et votre gamme de prix sont mis en ligne sur <a href="${escapeHtml(listing)}">votre page</a> tout de suite. Un nouveau nom, une nouvelle adresse, un nouveau site Web ou un nouveau lien sont d’abord vérifiés, en général d’ici un jour.</p>
+      <p class="op-reassure">Gratuit &middot; environ 5 minutes &middot; vous pouvez tout modifier de nouveau en tout temps.</p>`)
+    : L(`<p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
+      <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it. Signed-in owners&rsquo; hours and details go live straight away.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Envoyer les modifications</strong>. Nous vérifions chaque modification, en général d’ici un jour, puis elle est mise en ligne sur <a href="${escapeHtml(listing)}">votre page</a>.<span id="opLinkNote"> Gardez ce lien privé : toute personne qui l’a peut proposer des modifications.</span></p>
+      <p class="op-reassure">Gratuit &middot; environ 5 minutes &middot; rien ne change sur votre page avant notre vérification. Avec un compte, vos heures et vos renseignements sont mis en ligne tout de suite.</p>`)}
+      ${ownerMenuCardHtml(venue, token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`), lang).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}
     </div>
-    <nav class="op-secnav" id="opSecNav" aria-label="Parts of this page"><a href="#hours">Hours</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? 'Prices' : 'Menu'}</a>` : ''}<a href="#events">Events</a></nav>
+    <nav class="op-secnav" id="opSecNav" aria-label="${L('Parts of this page', 'Sections de cette page')}"><a href="#hours">${L('Hours', 'Heures')}</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? L('Prices', 'Prix') : 'Menu'}</a>` : ''}<a href="#events">${L('Events', 'Événements')}</a></nav>
     <div class="op-head">
-      ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">Last updated ${ownerUpdatedDate(last)}</p>` : ''; })()}
+      ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</p>` : ''; })()}
       ${pendingNote}
-      ${ownerActivityHtml(ownerVenueActivity(venue.id))}
-      ${found.account ? `<p class="op-bar-in">Signed in as <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="/owner/account">My listings</a> &middot; <a href="/owner/account/settings">Account settings</a></p>` : viewer && found.viewerManages ? `
-      <p class="op-login">You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.</p>` : viewer ? `
+      ${ownerActivityHtml(ownerVenueActivity(venue.id, 12, lang), lang)}
+      ${found.account ? `<p class="op-bar-in">${L('Signed in as', 'Connecté en tant que')} <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="${P('/owner/account')}">${L('My listings', 'Mes fiches')}</a> &middot; <a href="${P('/owner/account/settings')}">${L('Account settings', 'Paramètres du compte')}</a></p>` : viewer && found.viewerManages ? `
+      <p class="op-login">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>, et cette entreprise est liée à votre compte. <a href="/fr/owner/account/venue/${venue.id}"><strong>Ouvrez-la à partir de Mes fiches</strong></a> pour que vos photos${MENU_VENUE_TYPES.has(venue.type) ? ` et ${menuWord} soient mis` : ' soient mises'} en ligne tout de suite.`)}</p>` : viewer ? `
       <div class="op-login" id="opAddLogin">
-        <p style="margin:0 0 10px">You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>. Add ${escapeHtml(venue.name)} to your login to manage it from <a href="/owner/account">My listings</a>, with photos going live straight away.</p>
-        <button type="button" class="venue-form-submit" id="olsAdd">Add to my login (${escapeHtml(viewer.email)})</button>
+        <p style="margin:0 0 10px">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>. Add ${escapeHtml(venue.name)} to your login to manage it from <a href="/owner/account">My listings</a>, with photos going live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>. Ajoutez ${escapeHtml(venue.name)} à votre compte pour la gérer à partir de <a href="/fr/owner/account">Mes fiches</a>; vos photos seront alors mises en ligne tout de suite.`)}</p>
+        <button type="button" class="venue-form-submit" id="olsAdd">${L('Add to my login', 'Ajouter à mon compte')} (${escapeHtml(viewer.email)})</button>
         <p class="lyv-error" id="olsAddError" hidden></p>
       </div>` : `
       <details class="op-login" id="opLogin">
-        <summary><strong>Create a login</strong> (30 seconds): your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} then go live straight away, and you won&rsquo;t need this link next time</summary>
+        <summary>${L(`<strong>Create a login</strong> (30 seconds): your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} then go live straight away, and you won&rsquo;t need this link next time`, `<strong>Créer un compte</strong> (30 secondes) : vos photos${MENU_VENUE_TYPES.has(venue.type) ? ` et ${menuWord}` : ''} seront mis en ligne tout de suite, et vous n’aurez plus besoin de ce lien`)}</summary>
         <form id="olsForm" novalidate>
-          <p class="op-hint">Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login? Use the same email and password to add this business to it. <a href="/owner/forgot">Forgot your password?</a></p>
+          <p class="op-hint">${L('Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login? Use the same email and password to add this business to it. <a href="/owner/forgot">Forgot your password?</a>', 'Choisissez un mot de passe. La prochaine fois, connectez-vous à <strong>okanaganroam.com/fr/owner/login</strong>. Vous avez déjà un compte? Utilisez le même courriel et le même mot de passe pour y ajouter cette entreprise. <a href="/fr/owner/forgot">Mot de passe oublié?</a>')}</p>
           <div class="form-row">
-            <div class="form-field"><label for="olsEmail">Email</label><input type="email" id="olsEmail" autocomplete="username" maxlength="254" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="olsEmailError" hidden></p></div>
-            <div class="form-field"><label for="olsPassword">Password (${OWNER_PASSWORD_MIN}+ characters)</label><input type="password" id="olsPassword" autocomplete="new-password" maxlength="200"><p class="lyv-error" id="olsPasswordError" hidden></p></div>
+            <div class="form-field"><label for="olsEmail">${L('Email', 'Courriel')}</label><input type="email" id="olsEmail" autocomplete="username" maxlength="254" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="olsEmailError" hidden></p></div>
+            <div class="form-field"><label for="olsPassword">${L(`Password (${OWNER_PASSWORD_MIN}+ characters)`, `Mot de passe (${OWNER_PASSWORD_MIN} caractères ou plus)`)}</label><input type="password" id="olsPassword" autocomplete="new-password" maxlength="200"><p class="lyv-error" id="olsPasswordError" hidden></p></div>
           </div>
           <p class="lyv-error" id="olsError" hidden></p>
-          <button type="submit" class="venue-form-submit" id="olsSubmit">Create login</button>
+          <button type="submit" class="venue-form-submit" id="olsSubmit">${L('Create login', 'Créer mon compte')}</button>
         </form>
-        <p class="op-done" id="olsDone">Done! You&rsquo;re signed in. Next time, go to <a href="/owner/login">okanaganroam.com/owner/login</a>.</p>
+        <p class="op-done" id="olsDone">${L('Done! You&rsquo;re signed in. Next time, go to <a href="/owner/login">okanaganroam.com/owner/login</a>.', 'C’est fait! Vous êtes connecté. La prochaine fois, allez à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.')}</p>
       </details>`}
     </div>
     <form class="venue-form" id="opForm" novalidate>
       <details class="op-fold op-sec" id="hours" open>
-      <summary><span class="lyv-section-label">Opening hours${waitChip('hours')}</span></summary>
-      <p class="op-hint">${hoursKnown ? '' : '<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. '}${hoursKnown ? 'Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ' : ''}Closing after midnight? Just enter the closing time, like 01:00.</p>
+      <summary><span class="lyv-section-label">${L('Opening hours', 'Heures d’ouverture')}${waitChip('hours')}</span></summary>
+      <p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Closing after midnight? Just enter the closing time, like 01:00.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 01:00.')}</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>
       ${(() => {
         // Seasonal businesses (tours, golf, patios): the months they open every year.
         const om = /^(\d{1,2})-(\d{1,2})$/.exec(snap.open_months || '');
-        const opts = (sel) => MONTH_NAMES.en.map((n, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${n}</option>`).join('');
+        const opts = (sel) => MONTH_NAMES[fr ? 'fr' : 'en'].map((n, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${n}</option>`).join('');
         return `<div class="op-season">
-        <label for="opSeasonMode"><strong>Season</strong>${waitChip('open_months')}</label>
-        <select id="opSeasonMode" onchange="document.getElementById('opSeasonMonths').hidden = !this.value"><option value="">Open all year</option><option value="season"${om ? ' selected' : ''}>Open some months only</option></select>
-        <span id="opSeasonMonths"${om ? '' : ' hidden'}>from <select id="opSeasonFrom" aria-label="First month open">${opts(om ? Number(om[1]) : 5)}</select>
-        to <select id="opSeasonTo" aria-label="Last month open">${opts(om ? Number(om[2]) : 10)}</select></span>
+        <label for="opSeasonMode"><strong>${L('Season', 'Saison')}</strong>${waitChip('open_months')}</label>
+        <select id="opSeasonMode" onchange="document.getElementById('opSeasonMonths').hidden = !this.value"><option value="">${L('Open all year', 'Ouvert toute l’année')}</option><option value="season"${om ? ' selected' : ''}>${L('Open some months only', 'Ouvert certains mois seulement')}</option></select>
+        <span id="opSeasonMonths"${om ? '' : ' hidden'}>${L('from', 'de')} <select id="opSeasonFrom" aria-label="${L('First month open', 'Premier mois d’ouverture')}">${opts(om ? Number(om[1]) : 5)}</select>
+        ${L('to', 'à')} <select id="opSeasonTo" aria-label="${L('Last month open', 'Dernier mois d’ouverture')}">${opts(om ? Number(om[2]) : 10)}</select></span>
         <p class="lyv-error" id="opSeasonError" hidden></p>
-        <p class="op-hint">Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.</p>
+        <p class="op-hint">${L('Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.', 'Hors saison, votre page indique « Fermé pour la saison » et la date de réouverture, au lieu de « Ouvert maintenant ».')}</p>
       </div>`;
       })()}
-      ${ownerSeasonalHoursHtml(season0, dayRows, waitChip('hours_seasons'))}
-      ${ownerClosuresHtml(snap.closures || [], waitChip('closures'))}
+      ${ownerSeasonalHoursHtml(season0, dayRows, waitChip('hours_seasons'), lang)}
+      ${ownerClosuresHtml(snap.closures || [], waitChip('closures'), lang)}
       </details>
 
-      <p class="lyv-section-label">Contact</p>
+      <p class="lyv-section-label">${L('Contact', 'Coordonnées')}</p>
       <div class="form-row">
-        <div class="form-field"><label for="opPhone">Phone${waitChip('phone')}</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
-        <div class="form-field"><label for="opWebsite">Website${waitChip('website')}${instantOn ? ' <span class="op-hint">(checked first)</span>' : ''}</label><input type="url" id="opWebsite" maxlength="300" placeholder="yourbusiness.com" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
+        <div class="form-field"><label for="opPhone">${L('Phone', 'Téléphone')}${waitChip('phone')}</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
+        <div class="form-field"><label for="opWebsite">${L('Website', 'Site Web')}${waitChip('website')}${instantOn ? ` <span class="op-hint">${L('(checked first)', '(vérifié d’abord)')}</span>` : ''}</label><input type="url" id="opWebsite" maxlength="300" placeholder="${L('yourbusiness.com', 'votreentreprise.com')}" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
       <details class="op-fold" id="opLinksBox"${OWNER_BOOKING_FIRST_TYPES.has(venue.type) && !snap.booking_url ? ' open' : ''}>
-      <summary><span class="lyv-section-label">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Booking link, name, address &amp; links' : 'Name, address &amp; links'}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? 'Add your booking link so visitors get a &ldquo;Book&rdquo; button' : 'Change your business name, address, menu, booking or social links'}</span></summary>
+      <summary><span class="lyv-section-label">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? L('Booking link, name, address &amp; links', 'Lien de réservation, nom, adresse et liens') : L('Name, address &amp; links', 'Nom, adresse et liens')}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? L('Add your booking link so visitors get a &ldquo;Book&rdquo; button', 'Ajoutez votre lien de réservation pour que les visiteurs aient un bouton « Réserver »') : L('Change your business name, address, menu, booking or social links', 'Changez le nom de votre entreprise, votre adresse ou vos liens de menu, de réservation et de réseaux sociaux')}</span></summary>
       <div class="form-row">
-        ${instantOn ? '<p class="op-hint" style="grid-column:1/-1;margin:0">We check a new name, address or link before it goes live, usually within a day.</p>' : ''}
-        <div class="form-field"><label for="opBizName">Business name${waitChip('name')}</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
-        <div class="form-field"><label for="opAddress">Street address${waitChip('address')}</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
+        ${instantOn ? `<p class="op-hint" style="grid-column:1/-1;margin:0">${L('We check a new name, address or link before it goes live, usually within a day.', 'Nous vérifions un nouveau nom, une nouvelle adresse ou un nouveau lien avant sa mise en ligne, en général d’ici un jour.')}</p>` : ''}
+        <div class="form-field"><label for="opBizName">${L('Business name', 'Nom de l’entreprise')}${waitChip('name')}</label><input type="text" id="opBizName" maxlength="100" value="${escapeHtml(snap.name)}"><p class="lyv-error" id="opBizNameError" hidden></p></div>
+        <div class="form-field"><label for="opAddress">${L('Street address', 'Adresse')}${waitChip('address')}</label><input type="text" id="opAddress" maxlength="200" autocomplete="street-address" value="${escapeHtml(snap.address)}"><p class="lyv-error" id="opAddressError" hidden></p></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label for="opMenu">Menu link (optional)</label><input type="url" id="opMenu" maxlength="300" placeholder="yourbusiness.com/menu" autocapitalize="off" value="${escapeHtml(snap.menu_url)}"><p class="lyv-error" id="opMenuError" hidden></p></div>
-        <div class="form-field"><label for="opBooking">Booking or tickets link (optional)</label><input type="url" id="opBooking" maxlength="300" placeholder="opentable.ca/…" autocapitalize="off" value="${escapeHtml(snap.booking_url)}"><p class="lyv-error" id="opBookingError" hidden></p></div>
+        <div class="form-field"><label for="opMenu">${L('Menu link (optional)', 'Lien du menu (facultatif)')}</label><input type="url" id="opMenu" maxlength="300" placeholder="${L('yourbusiness.com/menu', 'votreentreprise.com/menu')}" autocapitalize="off" value="${escapeHtml(snap.menu_url)}"><p class="lyv-error" id="opMenuError" hidden></p></div>
+        <div class="form-field"><label for="opBooking">${L('Booking or tickets link (optional)', 'Lien de réservation ou de billets (facultatif)')}</label><input type="url" id="opBooking" maxlength="300" placeholder="opentable.ca/…" autocapitalize="off" value="${escapeHtml(snap.booking_url)}"><p class="lyv-error" id="opBookingError" hidden></p></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label for="opInstagram">Instagram (optional)</label><input type="text" id="opInstagram" maxlength="200" placeholder="@yourbusiness" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
-        <div class="form-field"><label for="opFacebook">Facebook page (optional)</label><input type="url" id="opFacebook" maxlength="300" placeholder="facebook.com/yourbusiness" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
+        <div class="form-field"><label for="opInstagram">${L('Instagram (optional)', 'Instagram (facultatif)')}</label><input type="text" id="opInstagram" maxlength="200" placeholder="${L('@yourbusiness', '@votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.instagram_url)}"><p class="lyv-error" id="opInstagramError" hidden></p></div>
+        <div class="form-field"><label for="opFacebook">${L('Facebook page (optional)', 'Page Facebook (facultatif)')}</label><input type="url" id="opFacebook" maxlength="300" placeholder="${L('facebook.com/yourbusiness', 'facebook.com/votreentreprise')}" autocapitalize="off" value="${escapeHtml(snap.facebook_url)}"><p class="lyv-error" id="opFacebookError" hidden></p></div>
       </div>
       </details>
 
       <p class="lyv-section-label" id="opDescriptionLabel">Description${waitChip('description')}</p>
       <div class="form-row full"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}" aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">${escapeHtml(snap.description)}</textarea>
-        <p class="op-hint">A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.</p>
+        <p class="op-hint">${L(`A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui rend votre endroit intéressant. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
       <details class="op-fold op-sec" id="badges">
-      <summary><span class="lyv-section-label">Badges${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? `${n} ticked, like dog friendly or patio` : 'Dog friendly, patio, vegan options and more'; })()}</span></summary>
-      <p class="op-hint">Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.</p>
+      <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? L(`${n} ticked, like dog friendly or patio`, `${n} coché${n === 1 ? '' : 's'}, comme chiens acceptés ou terrasse`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
+      <p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
       ${venue.type === 'golf' ? '' : `
       <details class="op-fold op-sec" id="price"${waitingFields.has('price_range') ? ' open' : ''}>
-      <summary><span class="lyv-section-label" id="opPriceLabel">Price range${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}: ${escapeHtml(OWNER_PRICE_SCALE[Number(snap.price_range)])} per person` : 'Not set: what one person usually spends'}</span></summary>
+      <summary><span class="lyv-section-label" id="opPriceLabel">${L('Price range', 'Gamme de prix')}${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement')}</span></summary>
       <div class="form-row full"><div class="form-field">
         <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
-          <option value="">Not set</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml(OWNER_PRICE_SCALE[n])} per person</option>`).join('')}
+          <option value="">${L('Not set', 'Non indiquée')}</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[n])} ${L('per person', 'par personne')}</option>`).join('')}
         </select>
-        <p class="op-hint" id="opPriceScale">What one person usually spends: $ under $15, $$ $15&ndash;30, $$$ $30&ndash;60, $$$$ over $60 per person.</p>
+        <p class="op-hint" id="opPriceScale">${L('What one person usually spends: $ under $15, $$ $15&ndash;30, $$$ $30&ndash;60, $$$$ over $60 per person.', 'Ce qu’une personne dépense habituellement : $ moins de 15 $, $$ 15 à 30 $, $$$ 30 à 60 $, $$$$ plus de 60 $ par personne.')}</p>
         <p class="lyv-error" id="opPriceError" hidden></p>
       </div></div>
       </details>`}
       ${showHappyHour ? `
       <details class="op-fold op-sec" id="happy">
-      <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? `Set for ${n} day${n === 1 ? '' : 's'}` : 'Not set'; })()}</span></summary>
-      <p class="op-hint">Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.</p>
+      <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? L(`Set for ${n} day${n === 1 ? '' : 's'}`, `Indiqué pour ${n} jour${n === 1 ? '' : 's'}`) : L('Not set', 'Non indiqué'); })()}</span></summary>
+      <p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
       <div id="opHappy">${dayRows('happy', hh, false)}</div>
       <p class="lyv-error" id="opHappyError" hidden></p>
       </details>` : ''}
 
-      <p class="lyv-section-label">Anything else?</p>
+      <p class="lyv-section-label">${L('Anything else?', 'Autre chose?')}</p>
       <div class="form-row">
-        <div class="form-field"><label for="opName">Your name</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
-        ${found.account ? '' : `<div class="form-field"><label for="opEmail">Your email (optional)</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">We&rsquo;ll email you when it&rsquo;s live.</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
+        <div class="form-field"><label for="opName">${L('Your name', 'Votre nom')}</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
+        ${found.account ? '' : `<div class="form-field"><label for="opEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${L('We&rsquo;ll email you when it&rsquo;s live.', 'Nous vous écrirons quand ce sera en ligne.')}</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
       <div class="form-row full"><div class="form-field">
-        <label for="opNote">Note for us (optional)</label>
-        <textarea id="opNote" rows="3" maxlength="1000" placeholder="Seasonal closures, new menu, anything we should know."></textarea>
+        <label for="opNote">${L('Note for us (optional)', 'Note pour nous (facultatif)')}</label>
+        <textarea id="opNote" rows="3" maxlength="1000" placeholder="${L('Seasonal closures, new menu, anything we should know.', 'Fermetures saisonnières, nouveau menu, tout ce que nous devrions savoir.')}"></textarea>
       </div></div>
-      <div class="lyv-hp" aria-hidden="true"><label>Company website <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
+      <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="opFormError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="opSubmit">${instantOn ? 'Save changes' : 'Send changes'}</button>
+      <button type="submit" class="venue-form-submit" id="opSubmit">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
     </form>
-    <div class="op-done" id="opDone" role="status"><span id="opDoneText">Thanks! We&rsquo;ve got your changes and will review them, usually within a day.</span><span id="opDoneMail"${found.account ? '' : ' hidden'}> We&rsquo;ll email you when they&rsquo;re live.</span>
-      <button type="button" class="op-more" id="opMore">Make more changes</button>${found.account || viewer ? '' : `
-      <span class="op-done-login" id="opDoneLogin"><strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.</span>`}</div>
-    <div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t ${instantOn ? 'saved' : 'sent'} yet.</span> <button type="button" id="opUnsentSend">${instantOn ? 'Save changes' : 'Send changes'}</button></div>
+    <div class="op-done" id="opDone" role="status"><span id="opDoneText">${L('Thanks! We&rsquo;ve got your changes and will review them, usually within a day.', 'Merci! Nous avons reçu vos modifications et nous les vérifierons, en général d’ici un jour.')}</span><span id="opDoneMail"${found.account ? '' : ' hidden'}>${L(' We&rsquo;ll email you when they&rsquo;re live.', ' Nous vous écrirons quand elles seront en ligne.')}</span>
+      <button type="button" class="op-more" id="opMore">${L('Make more changes', 'Faire d’autres modifications')}</button>${found.account || viewer ? '' : `
+      <span class="op-done-login" id="opDoneLogin">${L('<strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.', '<strong>Plus besoin du lien la prochaine fois :</strong> <a href="#opLogin">créez un compte</a>. Ça prend 30 secondes.')}</span>`}</div>
+    <div class="op-unsent" id="opUnsent" hidden role="status"><span>${instantOn ? L('Your listing changes aren&rsquo;t saved yet.', 'Les modifications de votre fiche ne sont pas encore enregistrées.') : L('Your listing changes aren&rsquo;t sent yet.', 'Les modifications de votre fiche ne sont pas encore envoyées.')}</span> <button type="button" id="opUnsentSend">${instantOn ? L('Save changes', 'Enregistrer') : L('Send changes', 'Envoyer')}</button></div>
     <details class="op-fold op-sec" id="photos" open>
     <summary><h2 class="lyv-section-label">Photos</h2></summary>
-    <p class="op-hint">Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best. ${found.account ? 'Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.' : 'We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.'}</p>
-    <div id="opPhotoBox">${ownerPhotoGridHtml(venue.id, !!found.account)}</div>
+    <p class="op-hint">${L('Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best.', 'Envoyez jusqu’à 5 photos à la fois : votre espace, vos plats, vos boissons ou ce que vous offrez. Les photos à l’horizontale donnent les meilleurs résultats.')} ${found.account ? L('Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.', 'Comme vous êtes connecté, vos photos sont mises en ligne tout de suite. Si votre page n’a pas encore sa propre photo, la première devient sa photo principale, avec votre nom en crédit.') : L('We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.', 'Nous vérifions chaque photo; la meilleure peut devenir la photo principale de votre page, avec votre nom en crédit. Avec un compte, vos photos sont mises en ligne tout de suite.')}</p>
+    <div id="opPhotoBox">${ownerPhotoGridHtml(venue.id, !!found.account, lang)}</div>
     <p class="lyv-error" id="opPhotoActionError" hidden></p>
     <p class="op-hint" id="opPhotoStatus" role="status"></p>
     <form class="venue-form" id="ofForm" novalidate>
       <div class="form-row full"><div class="form-field">
-        <label for="ofFiles">Choose photos</label>
+        <label for="ofFiles">${L('Choose photos', 'Choisir des photos')}</label>
         <input type="file" id="ofFiles" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
         <p class="lyv-error" id="ofFilesError" hidden></p>
       </div></div>
       <div class="form-row">
-        <div class="form-field"><label for="ofCredit">Credit photos to</label><input type="text" id="ofCredit" maxlength="80" value="${escapeHtml(venue.name)}"><p class="lyv-error" id="ofCreditError" hidden></p></div>
-        ${found.account ? '' : `<div class="form-field"><label for="ofEmail">Your email (optional)</label><input type="email" id="ofEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">We&rsquo;ll tell you when they&rsquo;re reviewed.</p><p class="lyv-error" id="ofEmailError" hidden></p></div>`}
+        <div class="form-field"><label for="ofCredit">${L('Credit photos to', 'Crédit photo')}</label><input type="text" id="ofCredit" maxlength="80" value="${escapeHtml(venue.name)}"><p class="lyv-error" id="ofCreditError" hidden></p></div>
+        ${found.account ? '' : `<div class="form-field"><label for="ofEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="ofEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${L('We&rsquo;ll tell you when they&rsquo;re reviewed.', 'Nous vous écrirons quand elles auront été vérifiées.')}</p><p class="lyv-error" id="ofEmailError" hidden></p></div>`}
       </div>
       <div class="form-row full"><div class="form-field">
-        <label class="op-closed" style="width:auto;align-items:flex-start"><input type="checkbox" id="ofRights" style="margin-top:4px"> <span>I took these photos or have permission to share them, and Okanagan Roam may use them on its website and social media with credit.</span></label>
+        <label class="op-closed" style="width:auto;align-items:flex-start"><input type="checkbox" id="ofRights" style="margin-top:4px"> <span>${L('I took these photos or have permission to share them, and Okanagan Roam may use them on its website and social media with credit.', 'J’ai pris ces photos ou j’ai la permission de les partager, et Okanagan Roam peut les utiliser sur son site Web et ses réseaux sociaux, avec crédit.')}</span></label>
         <p class="lyv-error" id="ofRightsError" hidden></p>
       </div></div>
       <p class="op-hint" id="ofProgress" aria-live="polite"></p>
       <p class="lyv-error" id="ofFormError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="ofSubmit">Upload photos</button>
+      <button type="submit" class="venue-form-submit" id="ofSubmit">${L('Upload photos', 'Téléverser les photos')}</button>
     </form>
     </details>
     <details class="op-fold op-sec" id="events">
-    <summary><h2 class="lyv-section-label" id="oeHead">Add an event</h2> <span class="op-fold-hint">Live music, tastings, markets, classes or specials on What&rsquo;s On</span></summary>
-    <p class="op-hint">Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.</p>
+    <summary><h2 class="lyv-section-label" id="oeHead">${L('Add an event', 'Ajouter un événement')}</h2> <span class="op-fold-hint">${L('Live music, tastings, markets, classes or specials on What&rsquo;s On', 'Musique en direct, dégustations, marchés, cours ou spéciaux dans À l’affiche')}</span></summary>
+    <p class="op-hint">${L('Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.', 'Musique en direct, dégustations, marchés, cours, spéciaux. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.')}</p>
     <form class="venue-form" id="oeForm" novalidate>
-      <p class="op-changing" id="oeChanging" hidden>Changing <strong id="oeChangingName"></strong>. Edit anything below and press <strong>Send change</strong>. <button type="button" class="op-linkbtn" id="oeChangeStop">Add a new event instead</button></p>
-      <div class="form-row full"><div class="form-field"><label for="oeName">Event name *</label><input type="text" id="oeName" maxlength="120"><p class="lyv-error" id="oeNameError" hidden></p></div></div>
+      <p class="op-changing" id="oeChanging" hidden>${L('Changing', 'Modification de')} <strong id="oeChangingName"></strong>. ${L('Edit anything below and press <strong>Send change</strong>.', 'Modifiez ce que vous voulez ci-dessous, puis touchez <strong>Envoyer la modification</strong>.')} <button type="button" class="op-linkbtn" id="oeChangeStop">${L('Add a new event instead', 'Ajouter plutôt un nouvel événement')}</button></p>
+      <div class="form-row full"><div class="form-field"><label for="oeName">${L('Event name', 'Nom de l’événement')} *</label><input type="text" id="oeName" maxlength="120"><p class="lyv-error" id="oeNameError" hidden></p></div></div>
       <div class="form-row full"><div class="form-field">
-        <label id="oeCatLabel">Categories * <span class="op-hint">(choose 1 to 3)</span></label>
+        <label id="oeCatLabel">${L('Categories', 'Catégories')} * <span class="op-hint">${L('(choose 1 to 3)', '(choisissez-en de 1 à 3)')}</span></label>
         <div class="amenity-check-grid" role="group" aria-labelledby="oeCatLabel" id="oeCategories">${WHATSON_CATEGORIES.map((c) => `
-          <label class="amenity-check"><input type="checkbox" value="${c.key}"> ${escapeHtml(c.label)}</label>`).join('')}
+          <label class="amenity-check"><input type="checkbox" value="${c.key}"> ${escapeHtml(fr ? frLookup(c.label) || c.label : c.label)}</label>`).join('')}
         </div>
         <p class="lyv-error" id="oeCategoriesError" hidden></p>
       </div></div>
-      <div class="form-row full"><div class="form-field"><label for="oeDescription">Description *</label><textarea id="oeDescription" rows="4" maxlength="1000" placeholder="What is happening, who is it for, and what should people know?"></textarea><p class="lyv-error" id="oeDescriptionError" hidden></p></div></div>
+      <div class="form-row full"><div class="form-field"><label for="oeDescription">Description *</label><textarea id="oeDescription" rows="4" maxlength="1000" placeholder="${L('What is happening, who is it for, and what should people know?', 'Que se passe-t-il, pour qui, et que faut-il savoir?')}"></textarea><p class="lyv-error" id="oeDescriptionError" hidden></p></div></div>
       <div class="form-row">
         <div class="form-field"><label for="oeStartDate">Date *</label><input type="date" id="oeStartDate" min="${todayLocal()}" max="${addLocalDays(todayLocal(), EVENT_SUBMISSION_MAX_FUTURE_DAYS)}"><p class="lyv-error" id="oeStartDateError" hidden></p></div>
-        <div class="form-field"><label for="oeEndDate">End date (multi-day)</label><input type="date" id="oeEndDate" min="${todayLocal()}"><p class="lyv-error" id="oeEndDateError" hidden></p></div>
+        <div class="form-field"><label for="oeEndDate">${L('End date (multi-day)', 'Date de fin (plusieurs jours)')}</label><input type="date" id="oeEndDate" min="${todayLocal()}"><p class="lyv-error" id="oeEndDateError" hidden></p></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label for="oeStartTime">Start time *</label><input type="time" id="oeStartTime"><p class="lyv-error" id="oeStartTimeError" hidden></p></div>
-        <div class="form-field"><label for="oeEndTime">End time</label><input type="time" id="oeEndTime"><p class="lyv-error" id="oeEndTimeError" hidden></p></div>
+        <div class="form-field"><label for="oeStartTime">${L('Start time', 'Heure de début')} *</label><input type="time" id="oeStartTime"><p class="lyv-error" id="oeStartTimeError" hidden></p></div>
+        <div class="form-field"><label for="oeEndTime">${L('End time', 'Heure de fin')}</label><input type="time" id="oeEndTime"><p class="lyv-error" id="oeEndTimeError" hidden></p></div>
       </div>
-      <div class="form-row full"><div class="form-field"><label class="op-closed" style="width:auto"><input type="checkbox" id="oeAllDay"> All-day event (no set times)</label></div></div>
+      <div class="form-row full"><div class="form-field"><label class="op-closed" style="width:auto"><input type="checkbox" id="oeAllDay"> ${L('All-day event (no set times)', 'Toute la journée (sans heure fixe)')}</label></div></div>
       <div class="form-row">
-        <div class="form-field"><label for="oeUrl">Event or ticket link</label><input type="url" id="oeUrl" maxlength="500" placeholder="https://"><p class="lyv-error" id="oeEventUrlError" hidden></p></div>
-        <div class="form-field"><label for="oePrice">Price</label><input type="text" id="oePrice" maxlength="80" placeholder="e.g. Free, or $25"></div>
+        <div class="form-field"><label for="oeUrl">${L('Event or ticket link', 'Lien de l’événement ou des billets')}</label><input type="url" id="oeUrl" maxlength="500" placeholder="https://"><p class="lyv-error" id="oeEventUrlError" hidden></p></div>
+        <div class="form-field"><label for="oePrice">${L('Price', 'Prix')}</label><input type="text" id="oePrice" maxlength="80" placeholder="${L('e.g. Free, or $25', 'ex. Gratuit ou 25 $')}"></div>
       </div>
-      <div class="form-row full"><div class="form-field"><label for="oeNotes">Repeats or other dates?</label><textarea id="oeNotes" rows="2" maxlength="500" placeholder="e.g. every Friday until December. We'll add the dates."></textarea></div></div>
+      <div class="form-row full"><div class="form-field"><label for="oeNotes">${L('Repeats or other dates?', 'Récurrent ou autres dates?')}</label><textarea id="oeNotes" rows="2" maxlength="500" placeholder="${L("e.g. every Friday until December. We'll add the dates.", 'ex. tous les vendredis jusqu’en décembre. Nous ajouterons les dates.')}"></textarea></div></div>
       <div class="form-row">
-        <div class="form-field"><label for="oeContactName">Your name *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
-        <div class="form-field"><label for="oeContactEmail">Your email *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
+        <div class="form-field"><label for="oeContactName">${L('Your name', 'Votre nom')} *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
+        <div class="form-field"><label for="oeContactEmail">${L('Your email', 'Votre courriel')} *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
       </div>
-      <div class="lyv-hp" aria-hidden="true"><label>Company website <input type="text" id="oeHp" tabindex="-1" autocomplete="off"></label></div>
+      <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="oeHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="oeFormError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="oeSubmit">Send event</button>
+      <button type="submit" class="venue-form-submit" id="oeSubmit">${L('Send event', 'Envoyer l’événement')}</button>
     </form>
-    <div class="op-done" id="oeDone"><span id="oeDoneText">Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.</span> <a href="#events" id="oeAnother">Add another event</a></div>
+    <div class="op-done" id="oeDone"><span id="oeDoneText">${L('Thanks! Your event is in for review, usually within a day. We&rsquo;ll email you when it&rsquo;s on What&rsquo;s On.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Nous vous écrirons quand il sera dans À l’affiche.')}</span> <a href="#events" id="oeAnother">${L('Add another event', 'Ajouter un autre événement')}</a></div>
     </details>
-    ${found.account ? ownerAccessPanelHtml(venue, found.account) : ''}
+    ${found.account ? ownerAccessPanelHtml(venue, found.account, lang) : ''}
 
   </div>
   </main>
-${ownerFooterHtml()}
+${ownerFooterHtml(fr)}
 <script>
 (function(){
   var startedAt = Date.now();
+  var T = ${JSON.stringify(scriptText).replace(/</g, '\\u003c')};
   var initial = ${initial};
+  function dayName(d){ return T.dayLc ? String(d).toLowerCase() : d; }
   var ownerEvents = ${editableEventsJson};
   var form = document.getElementById('opForm');
   function rows(id){ var el = document.getElementById(id); return el ? Array.prototype.slice.call(el.querySelectorAll('.op-day')) : []; }
@@ -39288,7 +39755,7 @@ ${ownerFooterHtml()}
       });
       setListingDirty(true);
       var note = b.parentNode.querySelector('.op-copy-done') || b.parentNode.appendChild(document.createElement('span'));
-      note.className = 'op-copy-done'; note.textContent = ' Copied.';
+      note.className = 'op-copy-done'; note.textContent = T.copied;
     });
   });
   function week(id){
@@ -39327,7 +39794,7 @@ ${ownerFooterHtml()}
   }
   // Live count under the description, so the minimum is clear before sending.
   var dsc = document.getElementById('opDescription'), dscCount = document.getElementById('opDescCount');
-  function countDesc(){ if (!dsc || !dscCount) return; var n = dsc.value.trim().length; dscCount.textContent = n + ' characters' + (n < ${OWNER_DESCRIPTION_MIN} ? ' (at least ${OWNER_DESCRIPTION_MIN} needed)' : ''); dscCount.classList.toggle('op-count-low', n < ${OWNER_DESCRIPTION_MIN}); }
+  function countDesc(){ if (!dsc || !dscCount) return; var n = dsc.value.trim().length; dscCount.textContent = T.chars.replace('{n}', n) + (n < ${OWNER_DESCRIPTION_MIN} ? T.charsMin : ''); dscCount.classList.toggle('op-count-low', n < ${OWNER_DESCRIPTION_MIN}); }
   if (dsc) { dsc.addEventListener('input', countDesc); countDesc(); }
   // A field's error goes away as soon as the owner edits that field.
   document.addEventListener('input', function(e){
@@ -39368,11 +39835,11 @@ ${ownerFooterHtml()}
     var rest = (initial.hours_seasons || []).slice(1);
     if (!seasonalOn.checked) return { list: rest };
     var w = week('opSeasonHours');
-    if (w.bad) return { error: 'Please fill in both times for each day of your seasonal hours.' };
-    if (w.blank) return { error: 'Seasonal hours: add the times for ' + w.blank + ', or tick Closed.' };
+    if (w.bad) return { error: T.seasonBoth };
+    if (w.blank) return { error: T.seasonBlank.replace('{day}', dayName(w.blank)) };
     var val = function(id){ return document.getElementById(id).value; };
     var from = val('opSeasonalFromM') + '-' + val('opSeasonalFromD'), to = val('opSeasonalToM') + '-' + val('opSeasonalToD');
-    if (from === to) return { error: 'Please pick two different days for your seasonal hours.' };
+    if (from === to) return { error: T.seasonSame };
     return { list: [{ label: val('opSeasonalLabel').trim(), from: from, to: to, hours: w.week }].concat(rest) };
   }
   function closuresValue(){
@@ -39381,25 +39848,23 @@ ${ownerFooterHtml()}
     Array.prototype.forEach.call(clBox.querySelectorAll('.op-closure'), function(row){
       var f = row.querySelector('.op-cl-from').value, t = row.querySelector('.op-cl-to').value, n = row.querySelector('.op-cl-note').value.trim();
       if (!f && !t && !n) return;
-      if (!f) { err = 'Please pick the first day of each closure.'; return; }
-      if (t && t < f) { err = 'A closure can\u2019t end before it starts.'; return; }
+      if (!f) { err = T.clFirst; return; }
+      if (t && t < f) { err = T.clOrder; return; }
       out.push({ from: f, to: t || f, note: n });
     });
     if (err) return { error: err };
     out.sort(function(a, b){ return a.from < b.from ? -1 : a.from > b.from ? 1 : (a.to < b.to ? -1 : a.to > b.to ? 1 : 0); });
     return { list: out };
   }
-  var FIELD_NAMES = { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
-    name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures' };
-  function fieldList(list){ var n = (list || []).map(function(f){ return FIELD_NAMES[f] || f; }); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : (n[0] || ''); }
+  var FIELD_NAMES = T.fields;
+  function fieldList(list){ var n = (list || []).map(function(f){ return FIELD_NAMES[f] || f; }); return n.length > 1 ? n.slice(0, -1).join(', ') + T.and + n[n.length - 1] : (n[0] || ''); }
   function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
     ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
-    if (h.bad) { show('opHoursError', 'Please fill in both times for each day you are open.'); jumpToError(form); return; }
-    if (h.blank) { show('opHoursError', 'Add the times for ' + h.blank + ', or tick Closed.'); jumpToError(form); return; }
+    if (h.bad) { show('opHoursError', T.hoursBoth); jumpToError(form); return; }
+    if (h.blank) { show('opHoursError', T.hoursBlank.replace('{day}', dayName(h.blank))); jumpToError(form); return; }
     var changes = {
       hours: h.week,
       phone: document.getElementById('opPhone').value,
@@ -39411,7 +39876,7 @@ ${ownerFooterHtml()}
       open_months: document.getElementById('opSeasonMode').value ? document.getElementById('opSeasonFrom').value + '-' + document.getElementById('opSeasonTo').value : '',
       badges: {}
     };
-    if (changes.open_months && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', 'Please pick two different months, or choose Open all year.'); jumpToError(form); return; }
+    if (changes.open_months && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', T.seasonMonths); jumpToError(form); return; }
     Array.prototype.forEach.call(document.querySelectorAll('#opBadges input'), function(b){ changes.badges[b.value] = b.checked; });
     var sv = seasonalValue();
     if (sv.error) { show('opSeasonalError', sv.error); var sb = document.getElementById('opSeasonalBox'); if (sb) sb.open = true; jumpToError(form); return; }
@@ -39423,7 +39888,7 @@ ${ownerFooterHtml()}
     if (priceEl && priceEl.value !== (initial.price_range || '')) changes.price_range = priceEl.value;
     if (document.getElementById('opHappy')) {
       var hh = week('opHappy');
-      if (hh.bad) { show('opHappyError', 'Please fill in both times for each happy hour.'); jumpToError(form); return; }
+      if (hh.bad) { show('opHappyError', T.happyBoth); jumpToError(form); return; }
       changes.happy_hour = hh.week;
     }
     // Only send what the owner actually touched.
@@ -39448,9 +39913,9 @@ ${ownerFooterHtml()}
           var liveF = r.body.live || [], revF = r.body.review || [];
           if (INSTANT) {
             var msg = '';
-            if (liveF.length) msg += 'Live now: ' + fieldList(liveF) + '. Your page shows it straight away. ';
-            if (revF.length) msg += 'We\u2019ll review this within a day: ' + fieldList(revF) + '. ';
-            if (!liveF.length && !revF.length) msg = 'Saved. ';
+            if (liveF.length) msg += T.liveNow.replace('{fields}', fieldList(liveF));
+            if (revF.length) msg += T.review.replace('{fields}', fieldList(revF));
+            if (!liveF.length && !revF.length) msg = T.saved;
             document.getElementById('opDoneText').textContent = msg.trim();
             document.getElementById('opDoneMail').hidden = !revF.length;
           }
@@ -39463,10 +39928,10 @@ ${ownerFooterHtml()}
         show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
         show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opEmailError', errs.contact_email);
         show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);
-        show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? 'Please fix the highlighted fields.' : 'Sorry, something went wrong. Please try again.'));
+        show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
         jumpToError(form);
       })
-      .catch(function(){ btn.disabled = false; show('opFormError', 'Could not send. Please check your connection and try again.'); });
+      .catch(function(){ btn.disabled = false; show('opFormError', T.sendNet); });
   });
   var ev = document.getElementById('oeForm');
   var evStarted = Date.now();
@@ -39476,7 +39941,7 @@ ${ownerFooterHtml()}
   var changeOf = null;
   function stopChange(){
     changeOf = null; document.getElementById('oeChanging').hidden = true;
-    document.getElementById('oeSubmit').textContent = 'Send event'; document.getElementById('oeHead').textContent = 'Add an event';
+    document.getElementById('oeSubmit').textContent = T.sendEvent; document.getElementById('oeHead').textContent = T.addEvent;
   }
   document.getElementById('oeChangeStop').addEventListener('click', function(){
     var keepName = document.getElementById('oeContactName').value, keepEmail = document.getElementById('oeContactEmail').value;
@@ -39496,9 +39961,9 @@ ${ownerFooterHtml()}
       allDay.checked = !!d.all_day; allDay.dispatchEvent(new Event('change'));
       if (lastEmail && !document.getElementById('oeContactEmail').value) document.getElementById('oeContactEmail').value = lastEmail;
       changeOf = c.getAttribute('data-ev-change');
-      document.getElementById('oeChangingName').textContent = d.name || 'your event';
+      document.getElementById('oeChangingName').textContent = d.name || T.yourEvent;
       document.getElementById('oeChanging').hidden = false;
-      document.getElementById('oeSubmit').textContent = 'Send change'; document.getElementById('oeHead').textContent = 'Change your event';
+      document.getElementById('oeSubmit').textContent = T.sendChange; document.getElementById('oeHead').textContent = T.changeEvent;
       document.getElementById('events').open = true;
       document.getElementById('events').scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
@@ -39506,12 +39971,12 @@ ${ownerFooterHtml()}
     var x = e.target.closest ? e.target.closest('[data-ev-cancel]') : null;
     if (!x) return;
     var live = x.getAttribute('data-ev-live') === '1';
-    if (x.getAttribute('data-sure') !== '1') { x.setAttribute('data-sure', '1'); x.textContent = live ? 'Tap again to cancel it on What\u2019s On' : 'Tap again to withdraw it'; return; }
+    if (x.getAttribute('data-sure') !== '1') { x.setAttribute('data-sure', '1'); x.textContent = live ? T.tapCancel : T.tapWithdraw; return; }
     x.disabled = true;
     fetch(location.pathname + '/events/' + x.getAttribute('data-ev-cancel') + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
       .then(function(r){ return r.json(); })
-      .then(function(j){ if (j && j.ok) { location.hash = 'opActivityHead'; location.reload(); return; } x.disabled = false; x.textContent = (j && j.error) || 'Please try again.'; })
-      .catch(function(){ x.disabled = false; x.textContent = 'Could not connect. Please try again.'; });
+      .then(function(j){ if (j && j.ok) { location.hash = 'opActivityHead'; location.reload(); return; } x.disabled = false; x.textContent = (j && j.error) || T.again; })
+      .catch(function(){ x.disabled = false; x.textContent = T.connect; });
   });
   document.getElementById('oeAnother').addEventListener('click', function(){ stopChange(); ev.reset(); ev.style.display = ''; document.getElementById('oeDone').classList.remove('show'); evStarted = Date.now(); document.getElementById('oeContactName').value = savedName(); if (lastEmail) document.getElementById('oeContactEmail').value = lastEmail; });
   // Photos (2026-10-18): after an upload or a change, fetch this page again and swap in the new
@@ -39534,17 +39999,17 @@ ${ownerFooterHtml()}
     var btn = e.target.closest ? e.target.closest('button[data-photo]') : null;
     if (!btn) return;
     var remove = btn.classList.contains('op-remove'), move = btn.getAttribute('data-move');
-    if (remove && !window.confirm('Remove this photo from your page? This can\u2019t be undone.')) return;
+    if (remove && !window.confirm(T.removePhoto)) return;
     btn.disabled = true; show('opPhotoActionError', '');
     var id = btn.getAttribute('data-photo');
     fetch(location.pathname + '/photos/' + id + (remove ? '/remove' : move ? '/' + move : '/main'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
       .then(function(r){ return r.json(); })
       .then(function(j){
-        if (!j || !j.ok) { btn.disabled = false; show('opPhotoActionError', (j && j.error) || 'Please try again.'); return; }
-        if (photoStatus) photoStatus.textContent = remove ? 'Photo removed.' : move ? (j.position ? 'Moved. It\u2019s now photo ' + j.position + ' of ' + j.total + ' after the main photo.' : 'It can\u2019t move further.') : 'Main photo changed.';
+        if (!j || !j.ok) { btn.disabled = false; show('opPhotoActionError', (j && j.error) || T.again); return; }
+        if (photoStatus) photoStatus.textContent = remove ? T.photoRemoved : move ? (j.position ? T.moved.replace('{n}', j.position).replace('{total}', j.total) : T.noMove) : T.mainChanged;
         return refreshPhotos(move ? 'button.op-' + move + '[data-photo="' + id + '"]' : null);
       })
-      .catch(function(){ btn.disabled = false; show('opPhotoActionError', 'Could not connect. Please try again.'); });
+      .catch(function(){ btn.disabled = false; show('opPhotoActionError', T.connect); });
   });
   // Links to a folded part of the page (the menu at the top, "Add another event", help answers) open it first.
   function openFor(hash){
@@ -39570,20 +40035,19 @@ ${ownerFooterHtml()}
     if (!b) return;
     show('opAccessError', '');
     var me = b.id === 'opRemoveMe';
-    var sure = me ? 'Take this business off your login? You\u2019ll need its edit link to add it back.'
-      : 'Remove ' + b.getAttribute('data-label') + '? They won\u2019t be able to update this listing any more, and we\u2019ll email them to say so.';
+    var sure = me ? T.removeMe : T.removeOther.replace('{who}', b.getAttribute('data-label'));
     if (!window.confirm(sure)) return;
     b.disabled = true;
     var url = me ? location.pathname + '/unlink' : location.pathname + '/logins/' + b.getAttribute('data-login-remove') + '/remove';
     fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
       .then(function(r){ return r.json(); })
       .then(function(j){
-        if (!j || !j.ok) { b.disabled = false; show('opAccessError', (j && j.error) || 'Please try again.'); return; }
-        if (me) { forgetVenue(); location.href = '/owner/account'; return; }
+        if (!j || !j.ok) { b.disabled = false; show('opAccessError', (j && j.error) || T.again); return; }
+        if (me) { forgetVenue(); location.href = T.account; return; }
         var li = b.closest('li'); if (li) li.parentNode.removeChild(li);
-        document.getElementById('opAccessStatus').textContent = 'Removed. We\u2019ve emailed them to say so.';
+        document.getElementById('opAccessStatus').textContent = T.removed;
       })
-      .catch(function(){ b.disabled = false; show('opAccessError', 'Could not connect. Please try again.'); });
+      .catch(function(){ b.disabled = false; show('opAccessError', T.connect); });
   });
   // The venue page swaps "Claim this listing" for "You manage this listing" on this device.
   var VENUES_KEY = 'okrOwnerVenues', thisVenue = ${Number(venue.id)};
@@ -39596,8 +40060,8 @@ ${ownerFooterHtml()}
     addBtn.disabled = true; show('olsAddError', '');
     fetch(location.pathname + '/account', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ add: true }) })
       .then(function(r){ return r.json(); })
-      .then(function(j){ if (j && j.ok && j.href) { location.href = j.href; return; } addBtn.disabled = false; show('olsAddError', (j && j.error) || 'Please try again.'); })
-      .catch(function(){ addBtn.disabled = false; show('olsAddError', 'Could not connect. Please try again.'); });
+      .then(function(j){ if (j && j.ok && j.href) { location.href = j.href; return; } addBtn.disabled = false; show('olsAddError', (j && j.error) || T.again); })
+      .catch(function(){ addBtn.disabled = false; show('olsAddError', T.connect); });
   });
   ev.addEventListener('submit', function(e){
     e.preventDefault();
@@ -39618,8 +40082,8 @@ ${ownerFooterHtml()}
         b.disabled = false;
         if (j && j.ok) {
           rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none';
-          if (j.updated) document.getElementById('oeDoneText').textContent = 'Updated. Your event is still waiting for review, usually within a day.';
-          if (j.change) document.getElementById('oeDoneText').textContent = 'Thanks! Your change is in for review, usually within a day. The event stays as it is until then, and we\u2019ll email you when it\u2019s updated.';
+          if (j.updated) document.getElementById('oeDoneText').textContent = T.evUpdated;
+          if (j.change) document.getElementById('oeDoneText').textContent = T.evChange;
           document.getElementById('oeDone').classList.add('show');
           eventDirty = false;
           if (j.updated || j.change) setTimeout(function(){ location.hash = 'opActivityHead'; location.reload(); }, 3500);
@@ -39627,10 +40091,10 @@ ${ownerFooterHtml()}
         }
         var errs = (j && j.errors) || {};
         Object.keys(errs).forEach(function(k){ if (ids[k]) show(ids[k], errs[k]); });
-        show('oeFormError', (j && j.error) || 'Sorry, something went wrong. Please try again.');
+        show('oeFormError', (j && j.error) || T.wrong);
         jumpToError(ev);
       })
-      .catch(function(){ b.disabled = false; show('oeFormError', 'Could not send. Please check your connection and try again.'); });
+      .catch(function(){ b.disabled = false; show('oeFormError', T.sendNet); });
   });
   // Unsent changes (2026-10-15): while the listing has edits that weren't sent, a bar at the
   // bottom says so (with its own Send button), and leaving the page with anything unsent
@@ -39676,9 +40140,9 @@ ${ownerFooterHtml()}
     e.preventDefault();
     ['ofFilesError','ofCreditError','ofEmailError','ofRightsError','ofFormError'].forEach(function(id){ show(id, ''); });
     var files = Array.prototype.slice.call(document.getElementById('ofFiles').files || []);
-    if (!files.length) return show('ofFilesError', 'Choose at least one photo.');
-    if (files.length > 5) return show('ofFilesError', 'Please choose up to 5 photos at a time.');
-    if (!document.getElementById('ofRights').checked) return show('ofRightsError', 'Please confirm you took these photos or have permission to share them.');
+    if (!files.length) return show('ofFilesError', T.pickOne);
+    if (files.length > 5) return show('ofFilesError', T.max5);
+    if (!document.getElementById('ofRights').checked) return show('ofRightsError', T.rights);
     var credit = document.getElementById('ofCredit').value;
     var btn = document.getElementById('ofSubmit'); btn.disabled = true;
     var progress = document.getElementById('ofProgress');
@@ -39686,7 +40150,7 @@ ${ownerFooterHtml()}
     var chain = Promise.resolve();
     files.forEach(function(file, i){
       chain = chain.then(function(){
-        progress.textContent = 'Uploading photo ' + (i + 1) + ' of ' + files.length + '...';
+        progress.textContent = T.uploading.replace('{i}', i + 1).replace('{n}', files.length);
         return resize(file).then(function(dataUrl){
           return fetch(location.pathname + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ image: dataUrl, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
@@ -39696,17 +40160,18 @@ ${ownerFooterHtml()}
               var errs = (j && j.errors) || {};
               if (errs.credit) show('ofCreditError', errs.credit);
               if (errs.contact_email) show('ofEmailError', errs.contact_email);
-              problems.push(file.name + ': ' + (errs.image || errs.credit || (j && j.error) || 'could not upload'));
+              problems.push(file.name + ': ' + (errs.image || errs.credit || (j && j.error) || T.couldNot));
             });
-        }, function(err){ problems.push(file.name + ': ' + (err.message === 'small' ? 'too small (needs to be at least 800 pixels wide)' : 'could not be read. Try a JPG or PNG.')); });
+        }, function(err){ problems.push(file.name + ': ' + (err.message === 'small' ? T.tooSmall : T.unreadable)); });
       });
     });
     chain.then(function(){
       btn.disabled = false;
-      progress.textContent = !sent ? '' : liveCount ? sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded and live on your page. Thanks!' : sent + ' photo' + (sent === 1 ? '' : 's') + ' uploaded. Thanks! We\u2019ll review ' + (sent === 1 ? 'it' : 'them') + ', usually within a day' + (emailVal('ofEmail').trim() ? ', and email you when ' + (sent === 1 ? 'it\u2019s' : 'they\u2019re') + ' live.' : '.');
+      progress.textContent = !sent ? '' : liveCount ? (sent === 1 ? T.upLive1 : T.upLiveN.replace('{n}', sent))
+        : (sent === 1 ? T.upRev1 : T.upRevN.replace('{n}', sent)) + (emailVal('ofEmail').trim() ? (sent === 1 ? T.upMail1 : T.upMailN) : '.');
       if (problems.length) show('ofFormError', problems.join(' '));
       if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); refreshPhotos(); }
-    }).catch(function(){ btn.disabled = false; show('ofFormError', 'Could not upload. Please check your connection and try again.'); });
+    }).catch(function(){ btn.disabled = false; show('ofFormError', T.upNet); });
   });
   // "create a login" in the thank-you note opens the login box.
   Array.prototype.forEach.call(document.querySelectorAll('a[href="#opLogin"]'), function(a){
@@ -39732,13 +40197,13 @@ ${ownerFooterHtml()}
         }
         var errs = (j && j.errors) || {};
         show('olsEmailError', errs.email); show('olsPasswordError', errs.password);
-        if (!errs.email && !errs.password) show('olsError', (j && j.error) || 'Please try again.');
+        if (!errs.email && !errs.password) show('olsError', (j && j.error) || T.again);
       })
-      .catch(function(){ b.disabled = false; show('olsError', 'Could not connect. Please try again.'); });
+      .catch(function(){ b.disabled = false; show('olsError', T.connect); });
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang })}
 </body>
 </html>`;
 }
@@ -40005,6 +40470,12 @@ const server = http.createServer(async (req, res) => {
     const [p, q] = String(req.url).split('?');
     res.writeHead(301, { Location: p.replace(/\/+$/, '') + (q != null ? `?${q}` : '') });
     return res.end();
+  }
+  // French business portal (2026-10-18): /fr/owner/account, /fr/owner/<edit link> ... are served by the English
+  // routes with res.ownerLang = 'fr' (see ownerPortalLangRequest); English portal pages get the EN / FR switch.
+  {
+    const op = ownerPortalLangRequest(req.method, req.url);
+    if (op) { req.url = op.enUrl; installOwnerLangResponse(req, res, op.lang, op.enPath); }
   }
   // French twins (2026-10-14): /fr + a main or town page renders that page and translates it on the way out; the
   // English page of a pair gets its hreflang and EN / FR switch the same way.
@@ -42526,7 +42997,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/owner/login' || pathname === '/owner/login/') {
       if (method === 'POST') return await handleOwnerLogin(req, res);
       if (method === 'GET' || method === 'HEAD') {
-        if (ownerAccountForRequest(req)) { res.writeHead(302, { Location: '/owner/account', 'Cache-Control': 'no-store' }); return res.end(); }
+        if (ownerAccountForRequest(req)) { res.writeHead(302, { Location: res.twinLang === 'fr' ? '/fr/owner/account' : '/owner/account', 'Cache-Control': 'no-store' }); return res.end(); }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
         return res.end(method === 'HEAD' ? undefined : renderOwnerLoginPage({ lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
       }
@@ -42551,7 +43022,7 @@ const server = http.createServer(async (req, res) => {
       if (method === 'GET' || method === 'HEAD') {
         const valid = !!ownerResetAccount(value);
         res.writeHead(valid ? 200 : 410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
-        return res.end(method === 'HEAD' ? undefined : renderOwnerResetPage(valid));
+        return res.end(method === 'HEAD' ? undefined : renderOwnerResetPage(valid, res.ownerLang));
       }
     }
     if (pathname === '/owner/logout' && method === 'POST') {
@@ -42566,12 +43037,12 @@ const server = http.createServer(async (req, res) => {
       if (pathname === '/owner/account' && method === 'GET') {
         if (!account) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
         res.writeHead(200, headers);
-        return res.end(renderOwnerAccountPage(account));
+        return res.end(renderOwnerAccountPage(account, res.ownerLang));
       }
       if (pathname === '/owner/account/settings' && method === 'GET') {
         if (!account) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
         res.writeHead(200, headers);
-        return res.end(renderOwnerSettingsPage(account));
+        return res.end(renderOwnerSettingsPage(account, res.ownerLang));
       }
       const sa = /^\/owner\/account\/(?:(email|password|signout-others)|venue\/(\d+)\/unlink)$/.exec(pathname);
       if (sa && method === 'POST') return await handleOwnerSettingsAction(req, res, account, sa[1] || 'unlink', sa[2] ? Number(sa[2]) : null);
@@ -42593,7 +43064,7 @@ const server = http.createServer(async (req, res) => {
         const id = Number(mr[1]);
         return await handleMenuRoute(req, res, method, mr[2] || '', {
           found: venueForOwnerAccount(account, id), live: true, mode: 'account', actor: `owner:${account.email}`,
-          base: `/owner/account/venue/${id}/menu`, back: `/owner/account/venue/${id}`,
+          base: ownerPath(`/owner/account/venue/${id}/menu`, res.ownerLang), back: ownerPath(`/owner/account/venue/${id}`, res.ownerLang),
         });
       }
       const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos))?$/.exec(pathname);
@@ -42608,9 +43079,9 @@ const server = http.createServer(async (req, res) => {
         if (!vm[2] && method === 'GET') {
           if (!account) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
           const found = resolve();
-          if (!found) { res.writeHead(404, headers); return res.end(renderOwnerInvalidLinkPage()); }
+          if (!found) { res.writeHead(404, headers); return res.end(renderOwnerInvalidLinkPage(res.ownerLang)); }
           res.writeHead(200, headers);
-          return res.end(renderOwnerPage(found, null, pendingOwnerChange(found.venue.id)));
+          return res.end(renderOwnerPage(found, null, pendingOwnerChange(found.venue.id), res.ownerLang));
         }
       }
     }
@@ -42629,7 +43100,7 @@ const server = http.createServer(async (req, res) => {
       if (menuMatch) {
         return await handleMenuRoute(req, res, method, menuMatch[2] || '', {
           found: venueForOwnerToken(menuMatch[1]), live: false, mode: 'token', actor: 'owner-link',
-          base: `${OWNER_LINK_PATH}${menuMatch[1]}/menu`, back: `${OWNER_LINK_PATH}${menuMatch[1]}`,
+          base: ownerPath(`${OWNER_LINK_PATH}${menuMatch[1]}/menu`, res.ownerLang), back: ownerPath(`${OWNER_LINK_PATH}${menuMatch[1]}`, res.ownerLang),
         });
       }
       const accountMatch = /^([A-Za-z0-9_-]+)\/account$/.exec(rest);
@@ -42637,12 +43108,12 @@ const server = http.createServer(async (req, res) => {
       if (/^[A-Za-z0-9_-]+$/.test(rest) && (method === 'GET' || method === 'HEAD')) {
         const found = venueForOwnerToken(rest);
         const headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' };
-        if (!found) { res.writeHead(404, headers); return res.end(method === 'HEAD' ? undefined : renderOwnerInvalidLinkPage()); }
+        if (!found) { res.writeHead(404, headers); return res.end(method === 'HEAD' ? undefined : renderOwnerInvalidLinkPage(res.ownerLang)); }
         res.writeHead(200, headers);
         // Already signed in (2026-10-18): offer "Add to my login" instead of "Create a login".
         found.viewer = ownerAccountForRequest(req);
         if (found.viewer) found.viewerManages = !!db.prepare('SELECT 1 FROM owner_account_venues WHERE account_id = ? AND venue_id = ?').get(found.viewer.id, found.venue.id);
-        return res.end(method === 'HEAD' ? undefined : renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id)));
+        return res.end(method === 'HEAD' ? undefined : renderOwnerPage(found, rest, pendingOwnerChange(found.venue.id), res.ownerLang));
       }
     }
     if (pathname === '/admin/owner-links' && method === 'POST') {
@@ -44069,6 +44540,8 @@ module.exports = {
   renderSkiSnowPage,
   photoSized,
   ownerHelpWidgetHtml,
+  notifyReviewDecision,
+  ownerFrMessage,
   getIndoorGolfVenues,
   getIndoorAlsoVenues,
   INDOOR_ALSO_COLLECTION_KIND,
