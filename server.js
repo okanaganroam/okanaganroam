@@ -10493,6 +10493,8 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
 #tripTrayPanel h2 { margin: 0 0 10px; font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 700; line-height: inherit; color: inherit; }
 /* Text boxes at 16px or more, so iPhones do not zoom in on them (/browse/classic's wizard search was 14px). */
 @media (max-width: 560px) { .search-box input { font-size: 1rem; } }
+/* Form fields (list your venue, claim, owner pages) were 15.2px in app.css; 16px here, same look otherwise. */
+.form-field input, .form-field select, .form-field textarea { font-size: 1rem; }
 /* Map credits: links underlined, so they are not told apart by colour alone. */
 .leaflet-container .leaflet-control-attribution a { text-decoration: underline; }
 @media (max-width: 940px) {
@@ -10604,6 +10606,11 @@ function withHeaderA11y(headerHtml) {
     .replace('<nav class="nav wrap">', '<nav class="nav wrap" aria-label="Main menu">')
     .replace(/<span class="nav-link-label" tabindex="0" role="button"( aria-haspopup="true" aria-expanded="false">[\s\S]*?<span class="nav-link-caret">[^<]*<\/span>)<\/span>/g, '<button type="button" class="nav-link-label"$1</button>')
     .replace('<button class="nav-hamburger" id="navHamburger"', '<button type="button" class="nav-hamburger" id="navHamburger" aria-controls="navLinks"');
+}
+// The skip link and menu label in French, for French pages that are not served through the French twin (the claim page).
+function frA11yLabels(html) {
+  return String(html).replace('<a class="skip-link" href="#main">Skip to content</a>', '<a class="skip-link" href="#main">Aller au contenu</a>')
+    .replace('<nav class="nav wrap" aria-label="Main menu">', '<nav class="nav wrap" aria-label="Menu principal">');
 }
 function withNavRefresh(headerHtml) {
   if (!headerHtml || headerHtml.includes('<style id="nav-refresh">')) return headerHtml;
@@ -34744,10 +34751,10 @@ const OWNER_HELP_CSS = `
   .ohb-chip { background: #fff; border: 1px solid rgba(31,58,95,0.35); color: #1F3A5F; border-radius: 999px; padding: 7px 11px; font: inherit; font-size: 0.86rem; font-weight: 700; cursor: pointer; text-align: left; }
   .ohb-chip.ohb-human { background: #1F3A5F; color: #fff; border-color: #1F3A5F; }
   .ohb-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid rgba(42,32,25,0.12); background: #fff; }
-  .ohb-form input { flex: 1; min-width: 0; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 10px 12px; font: inherit; }
+  .ohb-form input { flex: 1; min-width: 0; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ }
   .ohb-form button, .ohb-send { background: #1F3A5F; color: #fff; border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 800; cursor: pointer; }
   .ohb-contact label { display: block; font-weight: 700; font-size: 0.86rem; margin: 8px 0 4px; }
-  .ohb-contact textarea, .ohb-contact input { width: 100%; box-sizing: border-box; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 9px 10px; font: inherit; }
+  .ohb-contact textarea, .ohb-contact input { width: 100%; box-sizing: border-box; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 9px 10px; font: inherit; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ }
   .ohb-contact textarea { min-height: 96px; resize: vertical; }
   .ohb-contact .ohb-hp { position: absolute; left: -9999px; }
   .ohb-contact .ohb-send { margin-top: 10px; }
@@ -34975,7 +34982,7 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
 function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
   const fr = lang === 'fr';
   const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
-  return ownerA11y(`<!DOCTYPE html>
+  return (fr ? frA11yLabels : (x) => x)(ownerA11y(`<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead(`${title} | Okanagan Roam`, fr ? 'Espace entreprises des fiches Okanagan Roam.' : 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
@@ -35002,7 +35009,7 @@ ${inner}
   </div></main>
 ${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
 </body>
-</html>`);
+</html>`));
 }
 
 // The server's messages on the French entry pages, in French (the JSON replies stay English for the English pages).

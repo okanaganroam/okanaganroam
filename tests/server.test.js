@@ -23361,6 +23361,21 @@ test('Accessibility: home and /fr home have one main#main, skip link and labelle
   }
 });
 
+test('Accessibility: search, claim and owner pages (EN and FR) have the skip link, main#main and 16px form fields', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const pages = [['/search?q=pizza', 'en'], ['/fr/search?q=pizza', 'fr'], ['/claim/kelowna/restaurants/test-trattoria', 'en'], ['/fr/claim/kelowna/restaurants/test-trattoria', 'fr'],
+    ['/owner/login', 'en'], ['/fr/owner/login', 'fr'], ['/owner/link', 'en'], ['/fr/owner/link', 'fr'], ['/owner/forgot', 'en'], ['/fr/owner/forgot', 'fr']];
+  for (const [p, lang] of pages) {
+    const r = await fetch(base + p);
+    assert.equal(r.status, 200, p);
+    const html = await r.text();
+    assert.match(html, new RegExp(`<a class="skip-link" href="#main">${lang === 'fr' ? 'Aller au contenu' : 'Skip to content'}</a>`), `${p}: skip link`);
+    assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${lang === 'fr' ? 'Menu principal' : 'Main menu'}"`), `${p}: menu label`);
+    assert.equal((html.match(/<main[^>]* id="main"/g) || []).length, 1, `${p}: one main#main`);
+    assert.ok(html.includes('<style id="nav-a11y">'), `${p}: keyboard script and 16px field styles`);
+  }
+  assert.match(app.NAV_A11Y_SNIPPET, /\.form-field input, \.form-field select, \.form-field textarea \{ font-size: 1rem; \}/);
+})));
+
 test('Accessibility: Escape closes the open dropdown, then the My Trip tray, then the phone menu, and returns focus', () => {
   const vm = require('node:vm');
   const code = app.NAV_A11Y_SNIPPET.match(/<script>([\s\S]*?)<\/script>/)[1];
