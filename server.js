@@ -4735,7 +4735,7 @@ ${SEARCH_PAGE_STYLES}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: L.title },
@@ -6042,7 +6042,7 @@ function renderAdvisoryStyles() {
     display: inline-block; margin-top: 6px; font-size: 0.84rem; font-weight: 700;
     color: var(--ref-navy, #1B2B3A); text-decoration: none; border-bottom: 1px solid rgba(27,43,58,0.3);
   }
-  .venue-advisory-source:hover { color: var(--ref-gold, #C9A227); border-bottom-color: currentColor; }
+  .venue-advisory-source:hover { color: var(--ref-gold-ink, #8A6A0F); border-bottom-color: currentColor; }
   .venue-card .venue-advisory { margin: 8px 0 10px; padding: 10px 12px; font-size: 0.86rem; }
   .venue-card .venue-advisory-kicker { font-size: 0.68rem; }
 </style>`;
@@ -8322,7 +8322,7 @@ function renderHomeFooterHTML(fromBrowse) {
       .map((region) => `<li><a href="/${region}">${escapeHtml(REGION_LABELS[region])}</a></li>`)
       .join('\n');
     return `<div class="home-footer-region-group">
-            <h5 data-i18n="${group.labelKey}">${escapeHtml(group.label)}</h5>
+            <h3 data-i18n="${group.labelKey}">${escapeHtml(group.label)}</h3>
             <ul>${links}</ul>
           </div>`;
   };
@@ -8343,7 +8343,7 @@ function renderHomeFooterHTML(fromBrowse) {
     </div>
     <div class="home-footer-cols">
       <details class="home-footer-col home-footer-fold" open>
-        <summary><h4 data-i18n="homeFooter.explore">Explore</h4></summary>
+        <summary><h2 data-i18n="homeFooter.explore">Explore</h2></summary>
         <ul>
           <li><a href="/food-drink" data-i18n="mood.foodDrink.title">Food &amp; Drink</a></li>
           <li><a href="${wineHref}" data-i18n="wizard.wineries">Wineries</a></li>
@@ -8363,7 +8363,7 @@ function renderHomeFooterHTML(fromBrowse) {
         </ul>
       </details>
       <div class="home-footer-col">
-        <h4 data-i18n="footer.about">About</h4>
+        <h2 data-i18n="footer.about">About</h2>
         <ul>
           <li><a href="/about">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
@@ -8373,7 +8373,7 @@ function renderHomeFooterHTML(fromBrowse) {
         </ul>
       </div>
       <details class="home-footer-col home-footer-col-regions home-footer-fold" open>
-        <summary><h4 data-i18n="footer.regions">Regions</h4></summary>
+        <summary><h2 data-i18n="footer.regions">Regions</h2></summary>
         <div class="home-footer-region-groups">
           <div class="home-footer-region-subcol">${regionSubcol1}</div>
           <div class="home-footer-region-subcol">${regionSubcol2}</div>
@@ -8381,7 +8381,7 @@ function renderHomeFooterHTML(fromBrowse) {
         <p class="home-footer-all-regions"><a href="/destinations">See all destinations &rarr;</a></p>
       </details>
       <div class="home-footer-col">
-        <h4 data-i18n="homeFooter.socialMedia">Social Media</h4>
+        <h2 data-i18n="homeFooter.socialMedia">Social Media</h2>
         <div class="home-footer-social-row">
           <a class="home-footer-social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram" data-i18n-aria="homeFooter.instagramAria">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
@@ -8809,8 +8809,9 @@ function renderCanonicalFooterStyles() {
     border-left: 1px solid rgba(245,243,237,0.14);
     padding-left: 20px;
   }
-  .home-footer-col h4 {
-    font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+  /* Accessibility (2026-10-18): the column headings are h2 (were h4, after the page's h2s); same look. */
+  .home-footer-col h2 {
+    font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; line-height: inherit;
     letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 12px; padding-bottom: 8px;
     display: inline-block; border-bottom: 2px solid var(--ref-gold);
   }
@@ -8843,8 +8844,8 @@ function renderCanonicalFooterStyles() {
      low-contrast cream at the same size as the links, which is exactly
      what made them hard to tell apart. Kept smaller than h4 (0.78rem)
      since these are one level down. */
-  .home-footer-region-group h5 {
-    font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 800;
+  .home-footer-region-group h3 {
+    font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 800; line-height: inherit;
     text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--ref-gold); margin: 0 0 8px; padding-bottom: 5px;
     display: inline-block; border-bottom: 1px solid var(--ref-gold);
@@ -8987,11 +8988,11 @@ function renderCanonicalFooterStyles() {
        Media, just without the extra desktop-sized air baked into each
        one. */
     .home-footer-top { padding: 24px 0 20px; gap: 24px; }
-    .home-footer-col h4 { margin-bottom: 10px; }
+    .home-footer-col h2 { margin-bottom: 10px; }
     .home-footer-col ul { gap: 8px; }
     .home-footer-region-groups { gap: 16px; }
     .home-footer-region-subcol { gap: 12px; }
-    .home-footer-region-group h5 { margin-bottom: 6px; }
+    .home-footer-region-group h3 { margin-bottom: 6px; }
     .home-footer-region-group ul { gap: 5px; }
 
     /* Mobile centering pass (2026-09-17): the footer's desktop layout is a
@@ -9047,9 +9048,9 @@ function renderCanonicalFooterStyles() {
     /* Phones: Explore and Regions fold behind their headings, and every
        link is a full-size tap target. */
     .home-footer-fold > summary { pointer-events: auto; cursor: pointer; padding: 6px 0; }
-    .home-footer-fold > summary h4 { margin-bottom: 0; }
-    .home-footer-fold > summary h4::after { content: ' +'; }
-    .home-footer-fold[open] > summary h4::after { content: ' −'; }
+    .home-footer-fold > summary h2 { margin-bottom: 0; }
+    .home-footer-fold > summary h2::after { content: ' +'; }
+    .home-footer-fold[open] > summary h2::after { content: ' −'; }
     .home-footer-fold[open] > summary { margin-bottom: 8px; }
     .home-footer-col ul, .home-footer-region-group ul { gap: 0; }
     .home-footer-col a, .home-footer-region-group a, .home-footer-col .home-footer-link-btn { display: inline-block; padding: 11px 8px; }
@@ -9077,10 +9078,10 @@ function renderHomepageDiscoveryStyles() {
     font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--ref-navy);
     text-decoration: none; white-space: nowrap;
   }
-  .discover-heading-link:hover { color: var(--ref-gold); }
+  .discover-heading-link:hover { color: var(--ref-gold-ink, #8A6A0F); }
   .discover-subtitle {
     font-family: 'Nunito', sans-serif; font-weight: 500; font-size: 0.85rem;
-    color: rgba(42,32,25,0.6); margin-left: 10px; vertical-align: middle;
+    color: rgba(42,32,25,0.72); margin-left: 10px; vertical-align: middle;
   }
   .discover-heading { margin-bottom: 10px; }
   .discover-heading .eyebrow {
@@ -9330,7 +9331,7 @@ function renderHomepageDiscoveryStyles() {
   .hero-search-field { position: relative; flex: 1; min-width: 0; }
   .hero-search-field input {
     width: 100%; border: none; background: transparent; padding: 9px 0;
-    font-size: 0.95rem; color: var(--ink); outline: none; font-family: 'Nunito', sans-serif;
+    font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ color: var(--ink); outline: none; font-family: 'Nunito', sans-serif;
     position: relative; z-index: 1;
   }
   /* Faux two-line placeholder (bold prompt + smaller example line), CSS-
@@ -9578,7 +9579,7 @@ function renderHomepageDiscoveryStyles() {
   .browse-search-heading { margin-bottom: 16px; }
   .browse-search-heading .eyebrow {
     display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.82rem;
-    letter-spacing: 0.09em; text-transform: uppercase; color: var(--ref-gold); margin-bottom: 8px;
+    letter-spacing: 0.09em; text-transform: uppercase; color: var(--ref-gold-ink, #8A6A0F); margin-bottom: 8px;
   }
   .browse-search-heading .eyebrow::before { content: ""; width: 20px; height: 2px; background: var(--ref-gold); display: inline-block; }
   .browse-search-heading h2 {
@@ -9709,12 +9710,15 @@ const SEO_PAGE_CSS = `
   }
   header.top a:not(.brand):hover { text-decoration: underline; }
 
+  /* Accessibility (2026-10-18): the breadcrumb was dimmed with opacity
+     (2.28:1); a solid ink tint keeps the soft look at 4.5:1+, and the
+     links are underlined so they are not told apart by colour alone. */
   nav.breadcrumb {
-    font-size: 0.8rem; color: var(--ink); opacity: 0.62;
+    font-size: 0.8rem; color: rgba(74,52,40,0.8);
     margin-bottom: 22px; letter-spacing: 0.01em;
   }
-  nav.breadcrumb a { color: var(--teal-deep); text-decoration: none; opacity: 1; }
-  nav.breadcrumb a:hover { text-decoration: underline; }
+  nav.breadcrumb a { color: var(--teal-deep); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; opacity: 1; }
+  nav.breadcrumb a:hover { text-decoration-thickness: 2px; }
 
   h1 {
     font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem;
@@ -9877,7 +9881,7 @@ const SEO_PAGE_CSS = `
   }
   .related-card a { font-weight: 700; text-decoration: none; color: var(--ink); }
   .related-card a:hover { color: var(--plum); }
-  .related-card .related-meta { font-size: 0.8rem; color: var(--ink); opacity: 0.62; }
+  .related-card .related-meta { font-size: 0.8rem; color: rgba(74,52,40,0.8); }
 
   .detail-row {
     display: flex; gap: 10px; margin: 0; padding: 9px 0; font-size: 0.95rem;
@@ -9885,7 +9889,7 @@ const SEO_PAGE_CSS = `
   }
   .detail-row:last-of-type { border-bottom: none; }
   .detail-row .label {
-    color: var(--ink); opacity: 0.58; min-width: 100px; font-weight: 700;
+    color: var(--ink); opacity: 0.78; min-width: 100px; font-weight: 700;
     font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px;
   }
   /* A long unbroken website URL wraps inside its row instead of pushing the
@@ -9969,9 +9973,9 @@ const SEO_PAGE_CSS = `
   }
 
   .venue-header { margin-bottom: 18px; }
-  .venue-at-a-glance { color: var(--ink); opacity: 0.7; font-size: 0.98rem; margin: 6px 0 12px; }
-  .venue-at-a-glance a { color: var(--teal-deep); text-decoration: none; }
-  .venue-at-a-glance a:hover { text-decoration: underline; }
+  .venue-at-a-glance { color: rgba(74,52,40,0.8); font-size: 0.98rem; margin: 6px 0 12px; }
+  .venue-at-a-glance a { color: var(--teal-deep); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  .venue-at-a-glance a:hover { text-decoration-thickness: 2px; }
 
   .venue-description { font-size: 1.02rem; line-height: 1.7; margin: 0 0 22px; color: var(--ink); }
 
@@ -10473,9 +10477,147 @@ const NAV_REFRESH_STYLE = `<style id="nav-refresh">
   .nav-links .nav-dropdown-panel a { padding: 12px 0 !important; }
 }
 </style>`;
+// Keyboard and screen-reader fixes for the shared header (2026-10-18, accessibility review): a "Skip to content" link
+// (added to the header by withHeaderA11y) that lands on the page's main element; the phone menu button is a 44px tap target without the
+// red dot that read like a notification; opening the phone menu or My Trip moves focus inside it; one Escape handler
+// closes whichever is open (a Discover-style dropdown, the My Trip tray, then the phone menu) and puts focus back on the
+// button that opened it, instead of letting it fall to the page body. app.js (frozen) still opens and closes them;
+// this only manages focus and Escape around it.
+const NAV_A11Y_SNIPPET = `<style id="nav-a11y">
+#top a.skip-link, #top a.skip-link:hover, #top a.skip-link:visited { position: absolute; left: 12px; top: -60px; z-index: 1000; padding: 10px 16px; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: #fff; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.95rem; text-decoration: none; }
+#top a.skip-link:focus, #top a.skip-link:focus-visible { top: 10px; outline: 2px solid var(--ref-gold, #C9A227); outline-offset: 2px; }
+main:focus { outline: none; }
+/* Gold text on the cream header: the deeper --ref-gold-ink (4.5:1+); the bright gold stays for icons and the navy footer. */
+.logo-wordmark .logo-wordmark-accent { color: var(--ref-gold-ink, #8A6A0F); }
+.nav-links a:hover, .nav-links > li > .nav-link-label:hover { color: var(--ref-gold-ink, #8A6A0F); }
+/* The dropdown triggers are real buttons now (were span role=button), styled exactly like the spans were. */
+button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: inherit; color: inherit; cursor: pointer; }
+/* The My Trip tray title is an h2 (was h4, which came before the page's h1), with the h4's look. */
+#tripTrayPanel h2 { margin: 0 0 10px; font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 700; line-height: inherit; color: inherit; }
+/* Text boxes at 16px or more, so iPhones do not zoom in on them (/browse/classic's wizard search was 14px). */
+@media (max-width: 560px) { .search-box input { font-size: 1rem; } }
+/* Form fields (list your venue, claim, owner pages) were 15.2px in app.css; 16px here, same look otherwise. */
+.form-field input, .form-field select, .form-field textarea { font-size: 1rem; }
+/* Map credits: links underlined, so they are not told apart by colour alone. */
+.leaflet-container .leaflet-control-attribution a { text-decoration: underline; }
+@media (max-width: 940px) {
+  .nav-links > li > .nav-link-label { display: block; padding: 16px 20px; width: 100%; text-align: left; }
+  .nav-hamburger, #navHamburger { min-width: 44px; min-height: 44px; padding: 8px 10px; margin-right: -6px; align-items: center; justify-content: center; }
+  #navHamburger::before { content: none; display: none; animation: none; }
+  #navHamburger .nav-hamburger-count { top: 3px; right: -2px; }
+}
+</style>
+<script>
+(function(){
+  if (window.__navA11y) return;
+  window.__navA11y = true;
+  function visible(el){ return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length)); }
+  function firstFocusable(root){
+    var all = root ? root.querySelectorAll('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])') : [];
+    for (var i = 0; i < all.length; i++) if (visible(all[i])) return all[i];
+    return null;
+  }
+  function focusEl(el){ if (el && visible(el)) { try { el.focus(); } catch (e) {} return true; } return false; }
+  var burger, links, panel, trayOpener = null;
+  function backFromTray(){
+    if (focusEl(trayOpener)) return;
+    if (focusEl(document.querySelector('.nav-mytrip-btn'))) return;
+    focusEl(burger) || focusEl(document.getElementById('tripTrayToggle'));
+  }
+  function init(){
+    burger = document.getElementById('navHamburger'); links = document.getElementById('navLinks'); panel = document.getElementById('tripTrayPanel');
+    // The phone menu: when it opens, focus goes to its first item (the list sits before the button in the page, so the
+    // next Tab would otherwise skip it). Watched, not clicked, so app.js stays the menu's only click handler.
+    if (links && window.MutationObserver) {
+      var menuWasOpen = links.classList.contains('open');
+      new MutationObserver(function(){
+        var open = links.classList.contains('open');
+        if (open && !menuWasOpen) setTimeout(function(){ if (links.classList.contains('open')) focusEl(firstFocusable(links)); }, 0);
+        menuWasOpen = open;
+      }).observe(links, { attributes: true, attributeFilter: ['class'] });
+    }
+    // My Trip: focus moves into the tray when it opens, and back to the button that opened it when it closes.
+    document.addEventListener('click', function(e){
+      var t = e.target && e.target.closest ? e.target.closest('.nav-mytrip-btn, #tripTrayToggle') : null;
+      if (!t || !panel) return;
+      trayOpener = t.id === 'tripTrayToggle' ? null : t;
+      setTimeout(function(){ if (panel.classList.contains('open')) focusEl(panel.querySelector('.trip-tray-close') || firstFocusable(panel)); }, 0);
+    }, true);
+    if (panel && window.MutationObserver) {
+      var wasOpen = panel.classList.contains('open');
+      new MutationObserver(function(){
+        var open = panel.classList.contains('open');
+        if (wasOpen && !open) {
+          var a = document.activeElement;
+          if (!a || a === document.body || panel.contains(a)) backFromTray();
+        }
+        wasOpen = open;
+      }).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    }
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape' && e.key !== 'Esc') return;
+    var dd = document.querySelector('.nav-dropdown.open');
+    if (dd) {
+      var trig = dd.querySelector('.nav-link-label');
+      dd.classList.remove('open');
+      if (trig) { trig.setAttribute('aria-expanded', 'false'); focusEl(trig); }
+      e.preventDefault(); return;
+    }
+    if (panel && panel.classList.contains('open')) {
+      panel.classList.remove('open');
+      e.preventDefault(); return;
+    }
+    if (links && links.classList.contains('open')) {
+      links.classList.remove('open');
+      if (burger) { burger.setAttribute('aria-expanded', 'false'); focusEl(burger); }
+      e.preventDefault();
+    }
+  });
+  // Skip to content: focus the page's main element (#main where it has that id, else the first one).
+  document.addEventListener('click', function(e){
+    var a = e.target && e.target.closest ? e.target.closest('a.skip-link') : null;
+    if (!a) return;
+    var main = document.getElementById('main') || document.querySelector('main');
+    if (!main) return;
+    e.preventDefault();
+    if (!main.hasAttribute('tabindex')) main.setAttribute('tabindex', '-1');
+    try { main.focus({ preventScroll: true }); } catch (err) { main.focus(); }
+    // app.js scrolls to #main itself (below the sticky header) when the page has one; otherwise scroll here.
+    if (main.id !== 'main' && main.scrollIntoView) main.scrollIntoView();
+  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>`;
+// The homepage's <main id="main"> (2026-10-18): from the hero to just before the footer. No-op if either end is missing
+// or the page already has a <main>.
+function wrapHomeMain(html) {
+  if (typeof html !== 'string' || /<main[\s>][\s\S]*<\/main>/.test(html)) return html;
+  const start = html.indexOf('<section class="hero-scenic');
+  const end = html.indexOf('<footer', start);
+  if (start === -1 || end === -1) return html;
+  return `${html.slice(0, start)}<main id="main">\n${html.slice(start, end)}</main>\n${html.slice(end)}`;
+}
+// The header's markup fixes (2026-10-18), applied with the menus refresh to the header from okanagan.html (frozen) on
+// every page: the skip link first, a label for the menu landmark (the breadcrumb has its own), real <button>s for
+// the Discover / Things to Do / Food & Drink triggers, and the phone menu button tied to the list it opens. French
+// pages get "Aller au contenu" / "Menu principal" from FR_STATIC_TEXT / FR_STATIC_ATTRS.
+function withHeaderA11y(headerHtml) {
+  if (!headerHtml || headerHtml.includes('class="skip-link"')) return headerHtml;
+  return String(headerHtml)
+    .replace('<header id="top">', '<header id="top">\n  <a class="skip-link" href="#main">Skip to content</a>')
+    .replace('<nav class="nav wrap">', '<nav class="nav wrap" aria-label="Main menu">')
+    .replace(/<span class="nav-link-label" tabindex="0" role="button"( aria-haspopup="true" aria-expanded="false">[\s\S]*?<span class="nav-link-caret">[^<]*<\/span>)<\/span>/g, '<button type="button" class="nav-link-label"$1</button>')
+    .replace('<button class="nav-hamburger" id="navHamburger"', '<button type="button" class="nav-hamburger" id="navHamburger" aria-controls="navLinks"');
+}
+// The skip link and menu label in French, for French pages that are not served through the French twin (the claim page).
+function frA11yLabels(html) {
+  return String(html).replace('<a class="skip-link" href="#main">Skip to content</a>', '<a class="skip-link" href="#main">Aller au contenu</a>')
+    .replace('<nav class="nav wrap" aria-label="Main menu">', '<nav class="nav wrap" aria-label="Menu principal">');
+}
 function withNavRefresh(headerHtml) {
   if (!headerHtml || headerHtml.includes('<style id="nav-refresh">')) return headerHtml;
-  let out = String(headerHtml);
+  let out = withHeaderA11y(String(headerHtml));
   const panels = [...out.matchAll(/<div class="nav-dropdown-panel">[\s\S]*?<\/div>/g)];
   const discover = panels.find((m) => m[0].includes('href="/destinations"'));
   const things = panels.find((m) => m[0].includes('href="/outdoors"'));
@@ -10487,7 +10629,7 @@ function withNavRefresh(headerHtml) {
   // stays in Discover; only one of the two shows at a time).
   if (!out.includes('class="nav-business-li"')) out = out.replace(/(\n\s*)(<li class="nav-links-(?:favorites|trip)">)/, '$1<li class="nav-business-li"><a href="/owner/login">Business login</a></li>$1$2');
   // After everything else the fragment carries (other header rules sit right after </header>).
-  return `${out}\n${NAV_REFRESH_STYLE}`;
+  return `${out}\n${NAV_REFRESH_STYLE}\n${NAV_A11Y_SNIPPET}`;
 }
 function renderGolfHeaderHtml() {
   if (!fs.existsSync(SITE_PATH)) {
@@ -10897,7 +11039,9 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
 `;
 function withTripNav(html) {
   if (!html || !html.includes('<div id="tripTray">') || html.includes('<style id="trip-nav">')) return html;
-  return html.replace('<div id="tripTray">', `${TRIP_NAV_SNIPPET}<div id="tripTray">`);
+  // Accessibility (2026-10-18): the tray's title is an h2, not an h4 sitting before the page's h1 (same look, see nav-a11y).
+  return html.replace('<div id="tripTray">', `${TRIP_NAV_SNIPPET}<div id="tripTray">`)
+    .replace('<h4 data-i18n="trip.yourTrip">Your trip</h4>', '<h2 data-i18n="trip.yourTrip">Your trip</h2>');
 }
 
 // app.js cache busting (2026-10-05): every page loads /scripts/app.js with
@@ -11103,7 +11247,7 @@ function buildOutdoorThemeStyles() {
      single control. */
   body.outdoor-page .outdoor-activity-card-wrap { display: flex; flex-direction: column; gap: 4px; }
   body.outdoor-page .outdoor-activity-card-link { align-self: flex-end; font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; padding: 2px 4px; border-radius: 4px; }
-  body.outdoor-page .outdoor-activity-card-link:hover { color: var(--ref-gold); text-decoration: underline; }
+  body.outdoor-page .outdoor-activity-card-link:hover { color: var(--ref-gold-ink, #8A6A0F); text-decoration: underline; }
   body.outdoor-page .outdoor-activity-card-link:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoor-activity-card-overlay {
     position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
@@ -11157,7 +11301,7 @@ function buildOutdoorThemeStyles() {
   body.outdoor-page .outdoor-filter-actions .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
   body.outdoor-page .outdoor-filter-actions .cta[hidden] { display: none; }
   body.outdoor-page .outdoor-clear-filters { background: transparent; border: 0; padding: 6px 8px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; align-self: center; }
-  body.outdoor-page .outdoor-clear-filters:hover { color: var(--ref-gold); }
+  body.outdoor-page .outdoor-clear-filters:hover { color: var(--ref-gold-ink, #8A6A0F); }
   body.outdoor-page .outdoor-clear-filters:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoor-clear-filters[hidden] { display: none; }
   body.outdoor-page .outdoor-results-summary { font-size: 0.95rem; color: var(--ink); opacity: 0.75; margin: -6px 0 10px; }
@@ -11220,10 +11364,10 @@ function buildOutdoorThemeStyles() {
     body.outdoor-page .outdoor-region-group-chips, body.outdoor-page .outdoor-region-group-chips[hidden] { display: contents; }
   }
 
-  body.outdoor-page .outdoor-activity-count { display: inline-block; margin-left: 7px; font-size: 0.72rem; font-weight: 700; opacity: 0.6; }
+  body.outdoor-page .outdoor-activity-count { display: inline-block; margin-left: 7px; font-size: 0.72rem; font-weight: 700; opacity: 0.78; }
   body.outdoor-page .outdoor-featured-grid { margin: 0 0 8px; }
   @media (min-width: 900px) { body.outdoor-page .outdoor-featured-grid { grid-template-columns: repeat(3, 1fr); } }
-  body.outdoor-page .related-card .related-meta { font-size: 0.82rem; color: var(--ink); opacity: 0.7; margin-top: 4px; }
+  body.outdoor-page .related-card .related-meta { font-size: 0.82rem; color: rgba(74,52,40,0.8); margin-top: 4px; }
   /* Mobile: four featured cards, not six stacked (the last two are still
      in the markup for larger screens). */
   @media (max-width: 899px) { body.outdoor-page .outdoor-featured-grid .related-card:nth-child(n+5) { display: none; } }
@@ -11267,7 +11411,7 @@ function renderOutdoorsSimplifiedStyles() {
   body.outdoor-page .outdoors-intro { margin-bottom: 14px; }
 
   body.outdoor-page .outdoors-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.outdoor-page .outdoors-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.outdoor-page .outdoors-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.outdoor-page .outdoors-search-input::placeholder { color: rgba(42,32,25,0.55); }
   body.outdoor-page .outdoors-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   /* The page draws its own clear button, so suppress the browser's native one. */
@@ -11351,13 +11495,13 @@ function renderGolfThemeStyles() {
   body.golf-page .home-footer-col a, body.golf-page .home-footer-region-group a { color: rgba(245,243,237,0.78); }
   body.golf-page .home-footer-col a:hover, body.golf-page .home-footer-region-group a:hover { color: var(--ref-gold); }
   body.golf-page a.app-btn, body.golf-page a.app-btn:hover { color: var(--ref-white); text-decoration: none; }
-  body.golf-page nav.breadcrumb { font-size: 0.8rem; color: rgba(42,32,25,0.62); margin-bottom: 18px; }
+  body.golf-page nav.breadcrumb { font-size: 0.8rem; color: rgba(42,32,25,0.76); margin-bottom: 18px; }
   body.golf-page nav.breadcrumb a { color: var(--ref-navy); }
   body.golf-page .category-back-link, body.golf-page .venue-back-link {
     display: inline-block; font-weight: 700; font-size: 0.86rem; color: var(--ref-navy);
     text-decoration: none; margin-bottom: 14px;
   }
-  body.golf-page .category-back-link:hover, body.golf-page .venue-back-link:hover { color: var(--ref-gold); }
+  body.golf-page .category-back-link:hover, body.golf-page .venue-back-link:hover { color: var(--ref-gold-ink, #8A6A0F); }
   body.golf-page h1 {
     font-family: 'Fraunces', serif; font-weight: 600; line-height: 1.15;
     font-size: clamp(1.7rem, 3vw, 2.2rem); margin: 0 0 6px; color: var(--ink);
@@ -11471,13 +11615,13 @@ function renderGolfThemeStyles() {
     font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.8rem; line-height: 1.3; letter-spacing: 0.01em;
     color: var(--ref-navy); white-space: nowrap;
   }
-  body.golf-page .venue-card h2 a.venue-card-link:hover .venue-card-cue { color: var(--ref-gold); }
+  body.golf-page .venue-card h2 a.venue-card-link:hover .venue-card-cue { color: var(--ref-gold-ink, #8A6A0F); }
   body.golf-page .venue-card h2 a.venue-card-link:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
   body.golf-page .venue-card p { font-size: 0.92rem; color: rgba(42,32,25,0.75); line-height: 1.45; opacity: 1; }
   body.golf-page .venue-meta { font-size: 0.85rem; color: rgba(42,32,25,0.68); opacity: 1; }
   body.golf-page .golf-desc.is-clamped p { max-height: calc(4 * 1.45em); }
   body.golf-page .desc-toggle { color: var(--ref-navy); font-size: 0.86rem; align-self: flex-start; }
-  body.golf-page .desc-toggle:hover { color: var(--ref-gold); text-decoration: none; }
+  body.golf-page .desc-toggle:hover { color: var(--ref-gold-ink, #8A6A0F); text-decoration: none; }
   body.golf-page .venue-card[data-venue-category="golf"] .chips:not(:empty),
   body.golf-page .venue-card[data-venue-category="golf"] .card-actions { border-top-color: rgba(27,43,58,0.1); }
   body.golf-page .venue-card[data-venue-category="golf"] .card-actions { margin-top: auto; padding-top: 12px; }
@@ -11632,10 +11776,10 @@ function renderGolfVenuePolishStyles() {
   body.golf-page .venue-header { margin: 0 0 14px; }
   body.golf-page .venue-header .venue-at-a-glance {
     margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; letter-spacing: 0.02em;
-    color: rgba(42,32,25,0.62); opacity: 1;
+    color: rgba(42,32,25,0.76); opacity: 1;
   }
-  body.golf-page .venue-header .venue-at-a-glance a { color: var(--ref-navy); }
-  body.golf-page .venue-header .venue-at-a-glance a:hover { color: var(--ref-gold); text-decoration: none; }
+  body.golf-page .venue-header .venue-at-a-glance a { color: var(--ref-navy); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  body.golf-page .venue-header .venue-at-a-glance a:hover { color: var(--ref-gold-ink, #8A6A0F); }
   body.golf-page .venue-header .chips:empty { display: none; }
   body.golf-page .venue-description { font-size: 1.06rem; line-height: 1.7; max-width: 72ch; margin: 0 0 22px; }
   /* Good to Know: let an unbreakable website URL (e.g. a StoryMaps hash)
@@ -12387,7 +12531,8 @@ function breadcrumbNavHtml(items) {
       ? escapeHtml(item.name)
       : `<a href="${item.href}">${escapeHtml(item.name)}</a>`;
   });
-  return `<nav class="breadcrumb">${parts.join(' &rsaquo; ')}</nav>`;
+  // Accessibility (2026-10-18): its own label, so the two nav landmarks (menu, breadcrumb) are told apart.
+  return `<nav class="breadcrumb" aria-label="Breadcrumb">${parts.join(' &rsaquo; ')}</nav>`;
 }
 
 // The `<span class="chip">` badge row used on venue/category/guide pages —
@@ -12842,7 +12987,7 @@ ${golfEngagementHeadHtml('fd', true, 'region')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel },
@@ -13197,7 +13342,7 @@ ${golfEngagementHeadHtml('fd', true, 'hub')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'Destinations' },
@@ -13421,7 +13566,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-more { margin: 12px auto 4px; display: block; min-height: 42px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
   body.map-page .pm-more[hidden] { display: none; }
   @media (max-width: 899px) { body.map-page .pm-sheet[data-state="peek"] .pm-privacy { display: none; } }
-  body.map-page .pm-privacy { margin: 16px 4px 0; font-size: 0.78rem; line-height: 1.45; opacity: 0.7; max-width: 72ch; }
+  body.map-page .pm-privacy { margin: 16px 4px 0; font-size: 0.78rem; line-height: 1.45; opacity: 0.8; max-width: 72ch; }
   body.map-page .pm-pop a { font-weight: 800; }
   body.map-page .pm-pop small { display: block; opacity: 0.75; margin: 2px 0 4px; }
   body.map-page .pm-pop .pm-st { display: flex; margin: 0 0 6px; }
@@ -14588,7 +14733,7 @@ ${MAP_PAGE_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="pm-app">
+  <main class="pm-app" id="main">
   <h1 class="visually-hidden">Roam Now: map of what’s open near you in the Okanagan</h1>
   <p class="visually-hidden">Find what’s open near you, get directions, and see what’s on.</p>
   <div class="pm-stage" id="pmStage">
@@ -14715,7 +14860,7 @@ ${renderAnalyticsHeadHtml('hub')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'Map' },
@@ -14811,7 +14956,7 @@ ${renderAnalyticsHeadHtml('favorites')}
   body.favorites-page .fav-toolbar button { min-height: 40px; padding: 8px 16px; border-radius: 999px; font: inherit; font-size: 0.85rem; font-weight: 800; cursor: pointer; background: #fff; color: var(--ref-navy, #1B2B3A); border: 1px solid rgba(27,43,58,0.35); }
   body.favorites-page .fav-toolbar button:hover { background: rgba(27,43,58,0.06); }
   body.favorites-page .fav-share-out { flex-basis: 100%; display: flex; gap: 8px; align-items: center; font-size: 0.88rem; }
-  body.favorites-page .fav-share-out input { flex: 1; min-width: 0; min-height: 38px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(27,43,58,0.3); font: inherit; font-size: 0.85rem; }
+  body.favorites-page .fav-share-out input { flex: 1; min-width: 0; min-height: 38px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(27,43,58,0.3); font: inherit; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ }
   body.favorites-page .fav-town { font-size: 0.95rem; margin: 18px 0 8px; }
   body.favorites-page .fav-town span { font-weight: 600; opacity: 0.6; }
   body.favorites-page .fav-shared { padding: 16px; border-radius: 16px; background: rgba(42,107,103,0.08); }
@@ -14823,7 +14968,7 @@ ${renderAnalyticsHeadHtml('favorites')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'Favorites' },
@@ -15218,7 +15363,7 @@ ${CATEGORY_PHOTO_GRID_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'All Categories' },
@@ -15471,7 +15616,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${golfEngagementHeadHtml(type, true, 'category')}
 </head>
 <body${themedBodyClassAttr(type)}>
-  ${usesThemedCategoryLayout(type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+  ${usesThemedCategoryLayout(type) ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${region}` },
@@ -16236,7 +16381,7 @@ ${golfEngagementHeadHtml('outdoor', true, 'category')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'Outdoors', href: '/outdoors' },
@@ -16736,7 +16881,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${golfEngagementHeadHtml(type, hubThemed, 'hub')}${HUB_INTRO_TEXT[type] ? '\n' + HUB_INTRO_STYLE : ''}
 </head>
 <body${themedBodyClassAttr(type, hubThemed)}>
-  ${hubThemed ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+  ${hubThemed ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     ...(activityContent ? [{ name: label.plural, href: `/${catSlug}` }, { name: activityContent.label }] : [{ name: label.plural }]),
@@ -17386,7 +17531,7 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-type-page-link a { color: var(--teal); }
 
   body.fd-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.fd-page .fd-search-input::placeholder { color: rgba(42,32,25,0.55); }
   body.fd-page .fd-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-search-input::-webkit-search-cancel-button, body.fd-page .fd-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
@@ -17458,7 +17603,7 @@ function renderFoodDrinkHubStyles() {
 
   /* Sort (2026-10-14), at the end of the count line. */
   body.fd-page .fd-sort { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
-  body.fd-page .fd-sort-label { opacity: 0.7; }
+  body.fd-page .fd-sort-label { opacity: 0.8; }
   body.fd-page .fd-sort-select { font: inherit; font-weight: 800; color: var(--ref-navy); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 6px 30px 6px 12px; min-height: 40px; cursor: pointer; appearance: none; -webkit-appearance: none;
     background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
   body.fd-page .fd-sort-select:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
@@ -17501,8 +17646,8 @@ ${foodDrinkCardPhotoCss()}
     body.fd-page li.venue-card[data-ph]:not(.whatson-event-card) { padding: 92px 16px 14px !important; }
     body.fd-page li.venue-card[data-ph]::before { height: 78px; }
     body.fd-page .card-grid > li.venue-card[data-ph] .golf-desc p { -webkit-line-clamp: 2; }
-    body.fd-page .card-grid > li.venue-card[data-ph] > .chips { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-right: -16px; padding-right: 16px; }
-    body.fd-page .card-grid > li.venue-card[data-ph] > .chips::-webkit-scrollbar { display: none; }
+    /* Accessibility (2026-10-18): the chips wrap instead of a sideways-scrolling row, which a keyboard could not scroll. */
+    body.fd-page .card-grid > li.venue-card[data-ph] > .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     body.fd-page .card-grid > li.venue-card[data-ph] > .chips > * { flex: 0 0 auto; white-space: nowrap; }
   }
 </style>`;
@@ -18206,7 +18351,7 @@ ${CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE : ''}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     valleyWide ? { name: 'Food & Drink', href: '/food-drink' } : { name: regionLabel, href: `/${region}` },
@@ -18375,7 +18520,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Food & Drink' }])}
   ${categoryHeroHtml(foodDrinkHubBannerHtml(f.types), `<h1 id="fdHeading">${escapeHtml(hubText.heading)}</h1>
   <p class="outdoor-intro fd-intro" id="fdIntro">${escapeHtml(hubText.intro)}</p>
@@ -18511,7 +18656,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Wineries' }])}
   ${categoryHeroHtml(categoryBannerHtml('winery'), `<h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.winery)}</p>
@@ -18729,7 +18874,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Indoor & Rainy Day Spots' }])}
   ${categoryHeroHtml(categoryBannerHtml('indoor'), `<h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.indoor)}</p>
@@ -18920,7 +19065,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Sports & Recreation' }])}
   ${categoryHeroHtml(categoryBannerHtml('sport'), `<h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro fd-intro">${escapeHtml(HUB_INTRO_TEXT.sport)}</p>`)}
@@ -19211,7 +19356,7 @@ function renderDogHubStyles() {
   body.dog-page .fd-intro { margin: 0 0 14px; max-width: 70ch; }
 
   body.dog-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.dog-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.dog-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.dog-page .fd-search-input::placeholder { color: rgba(42,32,25,0.55); }
   body.dog-page .fd-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.dog-page .fd-search-input::-webkit-search-cancel-button, body.dog-page .fd-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
@@ -19639,7 +19784,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Dog Friendly Finds' }])}
   ${categoryHeroHtml(`<div class="category-banner" id="dogBanner"><img src="${dogContent.banner.src}" alt="${escapeHtml(dogContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${dogContent.banner.pos}%" fetchpriority="high"></div>
   <script>
@@ -20174,7 +20319,7 @@ ${golfEngagementHeadHtml('lf', true, 'hub')}${cfg.extraHead ? '\n' + cfg.extraHe
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: heading }])}
   ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${swapContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(heroBanner.credit)}</div>${swapContent ? `
   <script>
@@ -20445,7 +20590,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, ...crumbs, { name: cfg.name }])}
   ${categoryHeroHtml(cfg.noBanner ? '' : `<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(content.banner.credit)}</div>
   <script>
@@ -21494,7 +21639,7 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-intro { margin-bottom: 14px; }
 
   body.whatson-page .whatson-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.whatson-page .whatson-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.95rem; padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.whatson-page .whatson-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.whatson-page .whatson-search-input::placeholder { color: rgba(42,32,25,0.55); }
   /* The page draws its own clear button, so suppress the browser's native one. */
   body.whatson-page .whatson-search-input::-webkit-search-cancel-button, body.whatson-page .whatson-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
@@ -22086,7 +22231,7 @@ ${renderAnalyticsHeadHtml('hub')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     scope ? { name: "What's On", href: '/whats-on' } : { name: "What's On" },
@@ -22244,6 +22389,8 @@ const FR_STATIC_TEXT = {
   'Thank you!': 'Merci!',
   'Okanagan Roam received your message. We will reply by email as soon as we can.': 'Okanagan Roam a bien re\u00e7u votre message. Nous vous r\u00e9pondrons par courriel d\u00e8s que possible.',
   'Close': 'Fermer',
+  // Accessibility (2026-10-18): the header's skip link.
+  'Skip to content': 'Aller au contenu',
   // Footer additions (2026-10-14).
   'Dog Friendly Finds': 'Trouvailles pour chiens',
   'Secret Spots': 'Coins secrets',
@@ -22269,7 +22416,7 @@ const FR_STATIC_TEXT = {
   'Your email': 'Votre courriel',
   'Prefer email?': 'Vous pr\u00e9f\u00e9rez le courriel?',
 };
-const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
+const FR_STATIC_ATTRS = { 'aria-label="Close"': 'aria-label="Fermer"', 'aria-label="Main menu"': 'aria-label="Menu principal"', 'aria-label="Breadcrumb"': 'aria-label="Fil d\u2019Ariane"', 'placeholder="What would you like to tell us?"': 'placeholder="Que souhaitez-vous nous dire?"' };
 // A seasonal notice in French ("Closed for the season. Reopens November 26." -> "Fermé pour la saison. Réouverture le
 // 26 novembre."), from french-text.js's season patterns; null for any other text.
 function frSeasonText(t) {
@@ -22912,7 +23059,7 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .related-card.has-photo { padding: 0 !important; overflow: hidden; display: flex; flex-direction: column; }
   body.golf-page .related-card.has-photo .related-photo { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #2A6B67; }
   body.golf-page .related-card.has-photo .related-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; }
-  body.golf-page .related-card.has-photo .related-type { font-family: 'Nunito', sans-serif; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; }
+  body.golf-page .related-card.has-photo .related-type { font-family: 'Nunito', sans-serif; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; }
   body.golf-page .related-card.has-photo a { font-size: 0.95rem; line-height: 1.3; }
   body.golf-page .related-card.has-photo a::after { content: ""; position: absolute; inset: 0; }
   body.golf-page .related-card.has-photo { position: relative; }
@@ -23251,7 +23398,7 @@ ${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
 ${VENUE_MENU_CSS}` : ''}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
-  ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
+  ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
   ${breadcrumbNavHtml([
     { name: L('Home', 'Accueil'), href: '/' },
     { name: regionLabel, href: `/${venue.region}` },
@@ -23756,7 +23903,7 @@ ${renderAnalyticsHeadHtml('event')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: regionLabel, href: `/${full.region}` },
@@ -23929,9 +24076,9 @@ function renderTripPlannerStyles() {
      header/nav it shares with / and /browse (which style themselves via
      the separate --ref-* token set, unaffected by anything here). */
   .trip-planner-main { padding: 28px 20px 72px; max-width: 900px; margin: 0 auto; }
-  .trip-planner-breadcrumb { font-size: 0.8rem; color: var(--ink); opacity: 0.62; margin-bottom: 18px; }
-  .trip-planner-breadcrumb a { color: var(--teal-deep); text-decoration: none; }
-  .trip-planner-breadcrumb a:hover { text-decoration: underline; }
+  .trip-planner-breadcrumb { font-size: 0.8rem; color: rgba(74,52,40,0.8); margin-bottom: 18px; }
+  .trip-planner-breadcrumb a { color: var(--teal-deep); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  .trip-planner-breadcrumb a:hover { text-decoration-thickness: 2px; }
   .trip-planner-intro h1, .trip-planner-intro h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
   .trip-planner-intro .subtitle { color: var(--ink); opacity: 0.7; font-size: 1.02rem; margin: 0 0 28px; max-width: 640px; }
 
@@ -23955,7 +24102,7 @@ function renderTripPlannerStyles() {
   .trip-conv-submit-btn { font-size: 0.98rem; padding: 13px 28px; }
 
   .trip-conv-examples { margin-bottom: 18px; }
-  .trip-conv-examples-label { display: block; font-size: 0.82rem; font-weight: 700; color: var(--ink); opacity: 0.6; margin-bottom: 8px; }
+  .trip-conv-examples-label { display: block; font-size: 0.82rem; font-weight: 700; color: var(--ink); opacity: 0.8; margin-bottom: 8px; }
   .trip-conv-example-chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .trip-conv-example-chip {
     font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 600; padding: 8px 14px;
@@ -24046,7 +24193,7 @@ function renderTripPlannerStyles() {
     width: 24px; height: 24px; border-radius: 50%; background: var(--teal); color: var(--paper);
     font-size: 0.8rem; font-weight: 800; flex-shrink: 0;
   }
-  .trip-planner-hint { font-size: 0.86rem; color: var(--ink); opacity: 0.62; margin: -6px 0 12px; }
+  .trip-planner-hint { font-size: 0.86rem; color: var(--ink); opacity: 0.8; margin: -6px 0 12px; }
 
   #tripRegionSelect {
     width: 100%; max-width: 360px; padding: 11px 14px; border-radius: 10px;
@@ -24893,7 +25040,7 @@ ${tripTrayHtml}
 ${headerHtml}
 
 <main class="trip-planner-main wrap" id="tripPlannerMain">
-  <nav class="trip-planner-breadcrumb"><a href="/">Home</a> &rsaquo; Build My Trip</nav>
+  <nav class="trip-planner-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a> &rsaquo; Build My Trip</nav>
 
 ${v2 ? renderTripPlannerV2HeroHtml() : TRIP_LEGACY_HERO_HTML}
   <div id="tripWizardSection" style="display:none;">
@@ -25207,7 +25354,7 @@ ${renderAnalyticsHeadHtml('not_found')}
 <body class="golf-page not-found-page">
   ${renderGolfTripTrayHtml()}
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main not-found-main">
+  <main class="wrap-wide golf-main not-found-main" id="main">
     <h1>We couldn\u2019t find that page</h1>
     <p class="nf-lead">The place or page may have moved, or the address has a typo. Search for it, or pick up from one of these.</p>
     <form class="nf-search" action="/browse" method="get" role="search">
@@ -27461,7 +27608,7 @@ ${pageHead(g.title, g.description, canonical, [breadcrumb, article, guideItemLis
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'Ski Season Guide' },
@@ -27605,7 +27752,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'Food & Drink', href: '/food-drink' },
@@ -27798,7 +27945,7 @@ ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: g.parent.name, href: g.parent.href },
@@ -28660,14 +28807,14 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: t
   body.guides-index-page .guides-town-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
   body.guides-index-page .guides-town-links a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); font-weight: 800; font-size: .88rem; text-decoration: none; }
   body.guides-index-page .guides-town-links a:hover { background: rgba(27,43,58,0.06); }
-  body.guides-index-page .guides-town-links span { font-weight: 600; opacity: .65; }
+  body.guides-index-page .guides-town-links span { font-weight: 600; opacity: .8; }
 </style>
 </head>
 <body class="golf-page guides-index-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Guides' }])}
     <div class="guides-index">
       <h1>Okanagan Guides</h1>
@@ -28723,7 +28870,7 @@ ${banner ? CATEGORY_BANNER_STYLE : ''}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name }])}
   ${categoryHeroHtml(banner ? `<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="667" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>` : '', `<h1>${escapeHtml(heading)}</h1>`)}
   <div class="info-body">
@@ -29040,7 +29187,7 @@ ${renderAnalyticsHeadHtml('my_trip')}
 <body class="golf-page my-trip-page">
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: L('My Trip', 'Mon voyage') }])}
   <div class="mt-wrap">
     <div class="mt-head">
@@ -29343,7 +29490,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'List Your Venue' },
@@ -33908,7 +34055,7 @@ ${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}: ${venue.na
 </head>
 <body class="golf-page owner-page">
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main"><div class="mn-wrap">
+  <main class="wrap-wide golf-main" id="main"><div class="mn-wrap">
     ${switcher}
     <div id="mnApp"><p class="mn-lead">${t.adding}</p></div>
     <noscript><p class="mn-card mn-warn">Please turn on JavaScript, or email your menu to <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a>.</p></noscript>
@@ -34124,7 +34271,7 @@ ${pageHead(title, description, canonical, [breadcrumb, business], { noindex: !me
 ${VENUE_MENU_CSS}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
-  ${themedShell ? renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
+  ${themedShell ? renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory →')}
   ${breadcrumbNavHtml([
     { name: L('Home', 'Accueil'), href: '/' },
     { name: regionLabel, href: `/${venue.region}` },
@@ -34611,10 +34758,10 @@ const OWNER_HELP_CSS = `
   .ohb-chip { background: #fff; border: 1px solid rgba(31,58,95,0.35); color: #1F3A5F; border-radius: 999px; padding: 7px 11px; font: inherit; font-size: 0.86rem; font-weight: 700; cursor: pointer; text-align: left; }
   .ohb-chip.ohb-human { background: #1F3A5F; color: #fff; border-color: #1F3A5F; }
   .ohb-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid rgba(42,32,25,0.12); background: #fff; }
-  .ohb-form input { flex: 1; min-width: 0; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 10px 12px; font: inherit; }
+  .ohb-form input { flex: 1; min-width: 0; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ }
   .ohb-form button, .ohb-send { background: #1F3A5F; color: #fff; border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 800; cursor: pointer; }
   .ohb-contact label { display: block; font-weight: 700; font-size: 0.86rem; margin: 8px 0 4px; }
-  .ohb-contact textarea, .ohb-contact input { width: 100%; box-sizing: border-box; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 9px 10px; font: inherit; }
+  .ohb-contact textarea, .ohb-contact input { width: 100%; box-sizing: border-box; border: 1px solid rgba(42,32,25,0.25); border-radius: 10px; padding: 9px 10px; font: inherit; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ }
   .ohb-contact textarea { min-height: 96px; resize: vertical; }
   .ohb-contact .ohb-hp { position: absolute; left: -9999px; }
   .ohb-contact .ohb-send { margin-top: 10px; }
@@ -34842,7 +34989,7 @@ const OWNER_SIMPLE_PAGE_HELP = Object.freeze({
 function ownerSimplePage(title, inner, extraHead = '', { lang = 'en', helpKey = title } = {}) {
   const fr = lang === 'fr';
   const help = OWNER_SIMPLE_PAGE_HELP[helpKey];
-  return ownerA11y(`<!DOCTYPE html>
+  return (fr ? frA11yLabels : (x) => x)(ownerA11y(`<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead(`${title} | Okanagan Roam`, fr ? 'Espace entreprises des fiches Okanagan Roam.' : 'Business login for Okanagan Roam listings.', null, [], { golfTheme: true, noindex: true })}
@@ -34864,12 +35011,12 @@ ${extraHead}
 </head>
 <body class="golf-page owner-page">
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main"><div class="op-wrap">
+  <main class="wrap-wide golf-main" id="main"><div class="op-wrap">
 ${inner}
   </div></main>
 ${help && !fr ? ownerHelpWidgetHtml(help[0], { signedIn: help[1] }) : ''}
 </body>
-</html>`);
+</html>`));
 }
 
 // The server's messages on the French entry pages, in French (the JSON replies stay English for the English pages).
@@ -36198,7 +36345,7 @@ const ADMIN_REVIEW_CSS = `
   .rv-text { white-space: pre-wrap; font-size: 0.88rem; margin: 6px 0 10px; }
   .rv-warn { background: #FFF4D6; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 6px 0 10px; }
   .rv-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-  .rv-actions input[type=text] { flex: 1 1 220px; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.2); font: inherit; font-size: 0.88rem; }
+  .rv-actions input[type=text] { flex: 1 1 220px; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.2); font: inherit; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ }
   .rv-btn { border: 0; border-radius: 10px; padding: 9px 16px; font-weight: 800; cursor: pointer; font: inherit; font-weight: 800; }
   .rv-approve { background: #2E7D4F; color: #fff; }
   .rv-reject { background: #fff; color: #A93226; border: 1px solid #E3B6B0; }
@@ -36605,7 +36752,7 @@ ${pageHead('Edit link not valid | Okanagan Roam', 'This edit link is not valid.'
 </head>
 <body class="golf-page">
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main" style="padding:48px 0;max-width:640px">
+  <main class="wrap-wide golf-main" id="main" style="padding:48px 0;max-width:640px">
     <h1>This edit link isn&rsquo;t valid</h1>
     <p>It may have been replaced with a newer link. <a href="${OWNER_NEW_LINK_PATH}"><strong>Email me a new link</strong></a> (it arrives in a minute), or email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.</p>
   </main>
@@ -36780,7 +36927,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
 </head>
 <body class="golf-page owner-page">
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   <div class="op-wrap">
     <div class="op-head">
       <span class="eyebrow">Owner edit page</span>
@@ -37355,7 +37502,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main">
+  <main class="wrap-wide golf-main" id="main">
   ${breadcrumbNavHtml([
     { name: 'Home', href: '/' },
     { name: 'List an Event' },
@@ -37732,6 +37879,10 @@ const server = http.createServer(async (req, res) => {
           .replace(/href="#directory"/g, 'href="/browse"')
           .replace(/href="#app"/g, 'href="/browse#app"')
           .replace(/href="#list-venue"/g, 'href="/browse#list-venue"');
+
+        // Accessibility (2026-10-18): the homepage's sections, hero to Build My Trip, sit in one <main id="main"> (the skip
+        // link's target), so the page has a main landmark like every other page. English and French (the /fr twin).
+        html = wrapHomeMain(html);
 
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n</body>`)
@@ -41208,6 +41359,8 @@ module.exports = {
   renderPlacesMapPage,
   mapPlaces,
   withNavRefresh,
+  NAV_A11Y_SNIPPET,
+  wrapHomeMain,
   browseRestPayload,
   renderOutdoorsHubPage,
   renderBeachesHubPage,

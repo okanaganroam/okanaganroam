@@ -2041,7 +2041,7 @@ test('render404Page: mobile viewport, themed site shell, landmarks, search box, 
   assert.doesNotMatch(html, /og:url/);
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/, 'the approved homepage stylesheet');
   assert.match(html, /<body class="golf-page not-found-page">/);
-  assert.match(html, /<main class="wrap-wide golf-main not-found-main">/);
+  assert.match(html, /<main class="wrap-wide golf-main not-found-main" id="main">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one H1');
   assert.match(html, /<h1>We couldn\u2019t find that page<\/h1>/);
   // 2026-10-14: a search box to /browse, prefilled from the address.
@@ -2829,7 +2829,7 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
 
 test('Home footer: Explore column lists the site\'s sections, in order, each with a real href (no invented routes)', () => {
   const html = app.renderHomeFooterHTML();
-  const exploreMatch = html.match(/<summary><h4 data-i18n="homeFooter\.explore">Explore<\/h4><\/summary>\s*<ul>([\s\S]*?)<\/ul>/);
+  const exploreMatch = html.match(/<summary><h2 data-i18n="homeFooter\.explore">Explore<\/h2><\/summary>\s*<ul>([\s\S]*?)<\/ul>/);
   assert.ok(exploreMatch, 'expected to find the Explore column');
   const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
     .map((m) => ({ href: m[1], text: m[2] }));
@@ -2855,7 +2855,7 @@ test('Home footer: Regions column lists ALL 20 real regions (none omitted), each
 
 test('Home footer: Regions renders as two explicit subcolumns -- Central+South, then North+Ski resorts -- matching the approved FOOTER.png reference', () => {
   const html = app.renderHomeFooterHTML();
-  const groupLabels = Array.from(html.matchAll(/<h5 data-i18n="(wizard\.[a-zA-Z]+)">([^<]*)<\/h5>/g)).map((m) => m[2]);
+  const groupLabels = Array.from(html.matchAll(/<h3 data-i18n="(wizard\.[a-zA-Z]+)">([^<]*)<\/h3>/g)).map((m) => m[2]);
   assert.deepEqual(groupLabels, ['Central', 'South', 'North', 'Ski resorts']);
   const subcolMatch = html.match(/<div class="home-footer-region-groups">([\s\S]*?)<\/div>\s*<p class="home-footer-all-regions">/);
   assert.ok(subcolMatch, 'expected the region-groups wrapper, then the See all destinations link');
@@ -2873,7 +2873,7 @@ test('Home footer: exactly FOUR columns (Explore, About, Regions, Social Media) 
   const colsMatch = html.match(/<div class="home-footer-cols">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="wrap-wide home-footer-bottom">/);
   assert.ok(colsMatch, 'expected to find the single .home-footer-cols row, immediately followed by the bottom/copyright row (nothing else in between)');
   const colsHtml = colsMatch[1];
-  const headings = Array.from(colsHtml.matchAll(/<h4[^>]*>([^<]*)<\/h4>/g)).map((m) => m[1]);
+  const headings = Array.from(colsHtml.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)).map((m) => m[1]);
   assert.deepEqual(headings, ['Explore', 'About', 'Regions', 'Social Media'], 'expected exactly these 4 column headings, in this order, all inside one row');
   assert.doesNotMatch(html, /class="home-footer-regions"/, 'the old separate full-width Regions band must be gone');
   // Regions' own region-groups grid must be nested inside the 4th column, not a sibling of .home-footer-cols.
@@ -2884,9 +2884,9 @@ test('Home footer: exactly FOUR columns (Explore, About, Regions, Social Media) 
 
 test('Home footer: Social Media heading (renamed from "Follow") uses its own i18n key, distinct from the old footer.followAlong key /browse still uses', () => {
   const html = app.renderHomeFooterHTML();
-  assert.match(html, /<h4 data-i18n="homeFooter\.socialMedia">Social Media<\/h4>/);
+  assert.match(html, /<h2 data-i18n="homeFooter\.socialMedia">Social Media<\/h2>/);
   assert.doesNotMatch(html, /data-i18n="homeFooter\.follow"/, 'the old "Follow" key must no longer be used');
-  assert.doesNotMatch(html, />Follow<\/h4>/, 'the visible heading text must no longer read just "Follow"');
+  assert.doesNotMatch(html, />Follow<\/h2>/, 'the visible heading text must no longer read just "Follow"');
 });
 
 test('Home footer: logo tagline reads exactly "Okanagan Valley, British Columbia" and keeps the gold Roam accent', () => {
@@ -4867,9 +4867,9 @@ test('Batch 4B Events: every event page renders the themed shell around unchange
     assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/, kind);
     assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${kind}: tray precedes the header`);
     assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, `${kind}: old shell header gone`);
-    assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1, `${kind}: one <main>`);
+    assert.equal((html.match(/<main class="wrap-wide golf-main" id="main">/g) || []).length, 1, `${kind}: one <main>`);
     const main = html.slice(html.indexOf('<main '), html.indexOf('</main>'));
-    assert.ok(main.includes('<nav class="breadcrumb">') && main.includes('<h1>') && main.includes('class="venue-cta-row event-actions"') && main.includes('<a class="cta" href="/kelowna">Explore all of Kelowna</a>'), `${kind}: page content inside <main>`);
+    assert.ok(main.includes('<nav class="breadcrumb" aria-label="Breadcrumb">') && main.includes('<h1>') && main.includes('class="venue-cta-row event-actions"') && main.includes('<a class="cta" href="/kelowna">Explore all of Kelowna</a>'), `${kind}: page content inside <main>`);
     assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${kind}: footer after <main>`);
     assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${kind}: exactly one <h1>`);
     assert.match(html, /<p class="subtitle">Event(?: series)? in Kelowna, BC/, kind);
@@ -6836,7 +6836,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.match(html, /<a class="app-btn" id="navTripBtn" href="\/trip">/);
     assert.doesNotMatch(html, /<button class="nav-search-btn"|<button class="lang-toggle"|<header class="top">/);
     assert.match(html, /<li><a href="\/hidden-gems" data-i18n="gems\.heading">Hidden Gems<\/a><\/li>/, 'footer Hidden Gems link');
-    assert.match(html, /<main class="wrap-wide golf-main">[\s\S]*<\/main>/);
+    assert.match(html, /<main class="wrap-wide golf-main" id="main">[\s\S]*<\/main>/);
     // Site-wide floating Trip control: the homepage's own #tripTray fragment,
     // driven by the homepage's app.js (same as /trip) -- not a Golf copy.
     assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">[\s\S]*<span id="tripTrayCount">0<\/span>/);
@@ -7067,7 +7067,7 @@ test('Batch 4A: every Food & Drink venue page renders the themed shell with one 
     assert.ok(html.indexOf('<div id="tripTray">') < html.indexOf('<header id="top">'), `${type}: tray precedes the header`);
     assert.match(html, /<header id="top">/, type);
     assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, `${type}: old shell header gone`);
-    assert.equal((html.match(/<main class="wrap-wide golf-main">/g) || []).length, 1, `${type}: one <main>`);
+    assert.equal((html.match(/<main class="wrap-wide golf-main" id="main">/g) || []).length, 1, `${type}: one <main>`);
     assert.ok(html.indexOf('<main ') < html.indexOf('<nav class="breadcrumb"') && html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${type}: content inside <main>, footer after`);
     assert.equal((html.match(/<script src="\/scripts\/app\.js\?v=[0-9a-f]{12}"><\/script>/g) || []).length, 1, type);
     assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${type}: exactly one <h1>`);
@@ -7129,7 +7129,7 @@ test('Stage 4.1: winery venue pages render the themed shell with one hero <h1> a
   assert.match(html, /id="tripTray"/, 'the site-wide Trip tray is on the page');
   assert.match(html, /<header id="top">/, 'the shared site header and navigation');
   assert.doesNotMatch(html, /<header class="top">|Explore the full directory/, 'the old minimal header is gone');
-  assert.match(html, /<main class="wrap-wide golf-main">/);
+  assert.match(html, /<main class="wrap-wide golf-main" id="main">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1>');
   assert.match(html, /<div class="venue-hero venue-hero-fallback[^"]*">\s*(?:<img class="venue-hero-img"[^>]*>\s*)?<span class="venue-hero-type">Winery<\/span>\s*<h1>Test Winery<\/h1>/, 'the hero carries the <h1>');
   // Favorite / Add to Trip: app.js's labels, and no standalone-page stylesheet.
@@ -10031,7 +10031,7 @@ test('Secret Spots: /secret-spots renders only the Hidden Gem places, with filte
     assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/secret-spots">/);
     assert.match(markup, /<title>Secret Spots in the Okanagan \| Okanagan Roam<\/title>/);
     assert.match(markup, /<h1>Secret Spots in the Okanagan<\/h1>/);
-    assert.match(markup, /<nav class="breadcrumb"><a href="\/">Home<\/a> &rsaquo; Secret Spots<\/nav>/);
+    assert.match(markup, /<nav class="breadcrumb" aria-label="Breadcrumb"><a href="\/">Home<\/a> &rsaquo; Secret Spots<\/nav>/);
     assert.doesNotMatch(markup, /name="robots" content="noindex"/, 'the page is indexable');
     assert.match(html, /"@type":"BreadcrumbList"/);
     assert.match(html, /"@type":"ItemList"/);
@@ -10202,7 +10202,9 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // change must update these deliberately; nothing else may.
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
   assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
-  assert.equal(md5('public/styles/tokens.css'), 'd7ce492fa551ea500eb8868cc47d347f', 'public/styles/tokens.css');
+  // Approved accessibility change (2026-10-18): one added token, --ref-gold-ink, a deeper gold for gold text on the
+  // cream background (the logo's "Roam"); every existing token keeps its value.
+  assert.equal(md5('public/styles/tokens.css'), 'c155b965403a835bfdeba76f9fb58e8f', 'public/styles/tokens.css (+ --ref-gold-ink 2026-10-18)');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
   // fetches the full venue list (/api/venues?limit=5000, ~2 MB) on pages
   // without the /browse #venueGrid -- including the homepage, which never used
@@ -12066,7 +12068,7 @@ test('List Your Venue: the staging table is additive and the old /browse form is
 
 // ---------- List Your Venue footer link (2026-09-25) ----------
 
-const LYV_FOOTER_ABOUT = `<h4 data-i18n="footer.about">About</h4>
+const LYV_FOOTER_ABOUT = `<h2 data-i18n="footer.about">About</h2>
         <ul>
           <li><a href="/about">About Okanagan Roam</a></li>
           <li><a href="/list-your-venue" data-i18n="footer.listVenue">List your venue</a></li>
@@ -12089,7 +12091,7 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     assert.equal((footer[0].match(/>List an Event</g) || []).length, 1, page);
     assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
     // Explore and Regions are <details> that fold on phones (2026-10-14).
-    const cols = footer[0].match(/<(?:div|details) class="home-footer-col(?: home-footer-col-regions)?(?: home-footer-fold)?"(?: open)?>\s*(?:<summary>)?<h4 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
+    const cols = footer[0].match(/<(?:div|details) class="home-footer-col(?: home-footer-col-regions)?(?: home-footer-fold)?"(?: open)?>\s*(?:<summary>)?<h2 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
     assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions', 'homeFooter.socialMedia'], `${page}: same four columns in the same order`);
     // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
     const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
@@ -15551,7 +15553,7 @@ test('Stage 4.4: GET /favorites is a noindex, uncached shell page measured as pa
   assert.doesNotMatch(html, /rel="canonical"/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.match(html, /<h1>My Favorites<\/h1>/);
-  assert.match(html, /<main class="wrap-wide golf-main">/);
+  assert.match(html, /<main class="wrap-wide golf-main" id="main">/);
   assert.match(html, /id="tripTray"/);
   assert.match(html, /page_type: 'favorites'/);
   // The browser runs exactly the tested rules.
@@ -23374,6 +23376,125 @@ test('session replay stays disabled by default and reaches both page renderers w
   }
 });
 
+// ---- Accessibility: skip link, main landmark, menu keyboard (2026-10-18) ----
+test('Accessibility: shared header has a skip link, a labelled main menu and real <button> dropdown triggers', () => {
+  const header = app.renderGolfHeaderHtml();
+  assert.match(header, /^<header id="top">\s*(?:<!--[\s\S]*?-->\s*)?<a class="skip-link" href="#main"[^>]*>Skip to content<\/a>/, 'skip link is the first thing in the header');
+  assert.match(header, /<nav class="nav wrap" aria-label="Main menu"/);
+  assert.doesNotMatch(header, /<span class="nav-link-label"[^>]*role="button"/, 'no span role=button triggers left');
+  assert.equal((header.match(/<button type="button" class="nav-link-label" aria-haspopup="true" aria-expanded="false">/g) || []).length, 3);
+  assert.match(header, /<button type="button" class="nav-hamburger" id="navHamburger"[^>]*aria-controls="navLinks"/);
+  assert.ok(header.includes(app.NAV_A11Y_SNIPPET), 'the keyboard script and styles ride along with the header');
+  assert.match(app.NAV_A11Y_SNIPPET, /min-width: 44px; min-height: 44px/, 'phone menu button is a 44px target');
+  assert.match(app.NAV_A11Y_SNIPPET, /#navHamburger::before \{ content: none/, 'no red notification-like dot on the menu button');
+});
+
+test('Accessibility: wrapHomeMain puts hero-to-footer in one <main id="main">, once', () => {
+  const html = '<header id="top"></header>\n<section class="hero-scenic hero-scenic-home">h</section>\n<section>x</section>\n<footer class="home-footer">f</footer>';
+  const out = app.wrapHomeMain(html);
+  assert.equal(out, '<header id="top"></header>\n<main id="main">\n<section class="hero-scenic hero-scenic-home">h</section>\n<section>x</section>\n</main>\n<footer class="home-footer">f</footer>');
+  assert.equal(app.wrapHomeMain(out), out, 'no second main');
+  assert.equal(app.wrapHomeMain('<p>no hero</p>'), '<p>no hero</p>');
+});
+
+test('Accessibility: home and /fr home have one main#main, skip link and labelled landmarks; pages label the breadcrumb', async () => {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const [p, skip, menu] of [['/', 'Skip to content', 'Main menu'], ['/fr', 'Aller au contenu', 'Menu principal']]) {
+      const html = await (await fetch(base + p)).text();
+      assert.equal((html.match(/<main id="main">/g) || []).length, 1, `${p}: one main#main`);
+      assert.equal((html.match(/<\/main>/g) || []).length, 1, `${p}: one </main>`);
+      const main = html.slice(html.indexOf('<main id="main">'), html.indexOf('</main>'));
+      assert.ok(main.includes('id="heroScenic"'), `${p}: hero inside main`);
+      assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${p}: footer after main`);
+      assert.match(html, new RegExp(`<a class="skip-link" href="#main"[^>]*>${skip}</a>`), `${p}: skip link`);
+      assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${menu}"`), `${p}: menu label`);
+      assert.doesNotMatch(html, /<h4 data-i18n="(?:homeFooter|footer)\./, `${p}: footer headings are not h4`);
+      assert.match(html, /<h2 data-i18n="trip\.yourTrip">/, `${p}: the My Trip tray title is an h2`);
+      assert.doesNotMatch(html, /<h4 data-i18n="trip\.yourTrip">/);
+    }
+    const trip = await (await fetch(base + '/trip')).text();
+    assert.match(trip, /<nav class="trip-planner-breadcrumb" aria-label="Breadcrumb">/);
+    const frTrip = await (await fetch(base + '/fr/trip')).text();
+    assert.match(frTrip, /<nav class="trip-planner-breadcrumb" aria-label="Fil d’Ariane">/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Accessibility: search, claim and owner pages (EN and FR) have the skip link, main#main and 16px form fields', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const pages = [['/search?q=pizza', 'en'], ['/fr/search?q=pizza', 'fr'], ['/claim/kelowna/restaurants/test-trattoria', 'en'], ['/fr/claim/kelowna/restaurants/test-trattoria', 'fr'],
+    ['/owner/login', 'en'], ['/fr/owner/login', 'fr'], ['/owner/link', 'en'], ['/fr/owner/link', 'fr'], ['/owner/forgot', 'en'], ['/fr/owner/forgot', 'fr']];
+  for (const [p, lang] of pages) {
+    const r = await fetch(base + p);
+    assert.equal(r.status, 200, p);
+    const html = await r.text();
+    assert.match(html, new RegExp(`<a class="skip-link" href="#main">${lang === 'fr' ? 'Aller au contenu' : 'Skip to content'}</a>`), `${p}: skip link`);
+    assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${lang === 'fr' ? 'Menu principal' : 'Main menu'}"`), `${p}: menu label`);
+    assert.equal((html.match(/<main[^>]* id="main"/g) || []).length, 1, `${p}: one main#main`);
+    assert.ok(html.includes('<style id="nav-a11y">'), `${p}: keyboard script and 16px field styles`);
+  }
+  assert.match(app.NAV_A11Y_SNIPPET, /\.form-field input, \.form-field select, \.form-field textarea \{ font-size: 1rem; \}/);
+})));
+
+test('Accessibility: Escape closes the open dropdown, then the My Trip tray, then the phone menu, and returns focus', () => {
+  const vm = require('node:vm');
+  const code = app.NAV_A11Y_SNIPPET.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const observers = [];
+  const doc = { activeElement: null, readyState: 'complete', listeners: {} };
+  function el(id) {
+    const classes = new Set(), attrs = {}, kids = [];
+    const node = {
+      id, attrs, kids, offsetWidth: 10, offsetHeight: 10,
+      classList: {
+        contains: (c) => classes.has(c),
+        add: (c) => { classes.add(c); observers.forEach((o) => o.target === node && o.cb()); },
+        remove: (c) => { classes.delete(c); observers.forEach((o) => o.target === node && o.cb()); },
+      },
+      getClientRects: () => [1],
+      setAttribute: (k, v) => { attrs[k] = String(v); },
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      hasAttribute: (k) => k in attrs,
+      focus() { doc.activeElement = node; },
+      addEventListener() {},
+      contains: (x) => x === node || kids.includes(x),
+      querySelector: () => kids[0] || null,
+      querySelectorAll: () => kids,
+    };
+    return node;
+  }
+  const burger = el('navHamburger'), links = el('navLinks'), panel = el('tripTrayPanel');
+  const dd = el('dd'), trigger = el('trigger'), mytrip = el('mytrip'), close = el('close');
+  dd.kids.push(trigger); panel.kids.push(close); links.kids.push(el('firstLink'));
+  doc.body = el('body');
+  doc.getElementById = (id) => ({ navHamburger: burger, navLinks: links, tripTrayPanel: panel }[id] || null);
+  doc.querySelector = (sel) => (sel === '.nav-dropdown.open' ? (dd.classList.contains('open') ? dd : null) : sel === '.nav-mytrip-btn' ? mytrip : null);
+  doc.addEventListener = (type, fn) => { (doc.listeners[type] = doc.listeners[type] || []).push(fn); };
+  const ctx = { document: doc, setTimeout: (fn) => fn(), MutationObserver: function (cb) { this.observe = (target) => observers.push({ target, cb }); } };
+  ctx.window = ctx;
+  vm.runInNewContext(code, ctx);
+  const esc = () => { let prevented = false; doc.listeners.keydown.forEach((fn) => fn({ key: 'Escape', preventDefault() { prevented = true; } })); return prevented; };
+
+  // All three open: Escape peels them off one at a time.
+  links.classList.add('open'); panel.classList.add('open'); dd.classList.add('open'); trigger.setAttribute('aria-expanded', 'true');
+  assert.equal(esc(), true);
+  assert.equal(dd.classList.contains('open'), false, 'dropdown closes first');
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  assert.equal(doc.activeElement, trigger, 'focus back on the dropdown button');
+  close.focus();
+  esc();
+  assert.equal(panel.classList.contains('open'), false, 'then the My Trip tray');
+  assert.equal(doc.activeElement, mytrip, 'focus back on My Trip');
+  assert.equal(links.classList.contains('open'), true, 'menu still open');
+  esc();
+  assert.equal(links.classList.contains('open'), false, 'then the phone menu');
+  assert.equal(burger.getAttribute('aria-expanded'), 'false');
+  assert.equal(doc.activeElement, burger, 'focus back on the menu button');
+  assert.equal(esc(), false, 'nothing open: Escape is left alone');
+});
 // ---------- French gaps (2026-10-18) ----------
 // The review's French leftovers: What's On descriptions and chips, the date form, the business login link, Roam Now,
 // the contact hints, /fr/list-your-venue, /fr/search, the trip address, number formats and the owner entry pages.
