@@ -1,0 +1,323 @@
+{
+ "heading": "A Vernon & SilverStar Weekend",
+ "title": "A Vernon & SilverStar Weekend | Okanagan Roam",
+ "description": "Two days in Vernon and up at SilverStar: Kalamalka Lake, the Rail Trail, Coldstream and dinner downtown, then skiing, tubing or summer trails on the mountain.",
+ "banner": "region-coldstream",
+ "parent": {
+  "name": "Vernon",
+  "href": "/vernon"
+ },
+ "noPlace": true,
+ "intro": [
+  "This weekend splits in two. Day 1 stays low, around Vernon and Coldstream: the colours of Kalamalka Lake, a walk or ride on the Rail Trail, and a good dinner in town. Day 2 climbs about 22 km up Silver Star Road to SilverStar for skiing, tubing and snowshoeing in winter or bike and hiking trails in summer. Then you drive back down to Vernon for dinner.",
+  "It works in any season, but the mountain changes the most. Winter-only places are marked \"(winter, seasonal)\", summer-only ones \"(summer)\". Many patios and some mountain spots cut hours or close between seasons, so check each listing's hours before you set out. If you'd like a plan built around your own dates, our {page:/trip|trip planner} can make one."
+ ],
+ "sections": [
+  {
+   "id": "day-1-morning-coffee-and-kalam",
+   "jump": "Day 1 morning",
+   "heading": "Day 1 morning: coffee and Kalamalka Lake",
+   "lead": "Start downtown, then head south a few minutes to the lake.",
+   "items": [
+    {
+     "ref": "vernon/ratio-coffee-pastry",
+     "name": "Ratio Coffee & Pastry",
+     "text": "coffee roasted in house, served in a converted rail station with a vintage feel. If you're here on a Tuesday, that's the day the eclairs are baked fresh.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "coldstream/kalamalka-lake-lookout-highway-97-rest-area",
+     "name": "Kalamalka Lake Lookout",
+     "text": "the classic drive-up view on the old Highway 97, where the \"lake of many colours\" shifts from turquoise to jade to deep blue. It's a free, wheelchair-accessible rest area with picnic tables facing the water.",
+     "where": "Coldstream"
+    },
+    {
+     "ref": "coldstream/kalamalka-lake-provincial-park-trails-rattlesnake-point",
+     "name": "Kalamalka Lake Provincial Park Trails & Rattlesnake Point",
+     "text": "short grassland and forest trails above the lake. The Crest and Juniper trails lead to the viewing platform at Rattlesnake Point. Watch for rattlesnakes, and note that bikes aren't allowed on these trails.",
+     "where": "Coldstream"
+    }
+   ]
+  },
+  {
+   "id": "day-1-afternoon-the-rail-trail",
+   "jump": "Day 1 afternoon",
+   "heading": "Day 1 afternoon: the Rail Trail and Coldstream",
+   "lead": "Stay on the Kalamalka side, then finish back in downtown Vernon.",
+   "items": [
+    {
+     "ref": "lake-country/okanagan-rail-trail",
+     "name": "Okanagan Rail Trail",
+     "text": "a flat, compact gravel trail on the old CN rail bed that hugs the shore of Kalamalka Lake and passes under a historic trestle. Trailhead parking is on Westkal Road in Coldstream and at Kekuli Bay Provincial Park. Dogs must be on leash.",
+     "where": "Coldstream to Lake Country"
+    },
+    {
+     "ref": "coldstream/rail-trail-cafe-market",
+     "name": "Rail Trail Café & Market",
+     "text": "sits right beside the trail and is a favourite reward stop for cyclists and hikers. Plan your walk or ride to end here and take a seat on the patio.",
+     "where": "Coldstream"
+    },
+    {
+     "ref": "coldstream/kal-beach",
+     "name": "Kal Beach",
+     "text": "swimming and beach volleyball in summer (summer), or a walk out along the Rotary Pier over the water. Dogs aren't on the District's list of parks where they're allowed.",
+     "where": "Coldstream"
+    },
+    {
+     "ref": "vernon/kin-pod-chocolate-ice-cream-and-coffee",
+     "name": "Kin+Pod Chocolate, Ice Cream, and Coffee",
+     "text": "chocolate, ice cream and coffee all made in house. The owner is happy to let you sample before you choose.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "day-1-evening-dinner-in-vernon",
+   "jump": "Day 1 evening",
+   "heading": "Day 1 evening: dinner in Vernon",
+   "lead": "Pick one. For more ideas, see our {page:/guides/best-restaurants-vernon|best restaurants in Vernon guide}.",
+   "items": [
+    {
+     "ref": "vernon/cambium-cider-co",
+     "name": "Cambium Cider Co.",
+     "text": "an orchard cidery with a real restaurant, so a cider stop can turn into dinner. Order beyond a flight, because the kitchen is worth exploring. Go early, as it closes earlier on some nights.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/intermezzo-restaurant-and-wine-cellar",
+     "name": "Intermezzo Restaurant and Wine Cellar",
+     "text": "elegant Italian with a wine cellar, and careful with dietary needs, right down to a gluten-free French onion soup. Live Spanish guitar plays on select nights.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/suda-restaurant",
+     "name": "Suda Restaurant",
+     "text": "widely called the best Korean restaurant in the valley. Order the traditional spicy pork dish and the seafood pancake.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "day-2-morning-up-to-silverstar",
+   "jump": "Day 2 morning",
+   "heading": "Day 2 morning: up to SilverStar",
+   "lead": "Drive up Silver Star Road from Vernon. In winter, carry chains or winter tires and check road conditions before you go.",
+   "items": [
+    {
+     "ref": "silverstar/bugaboos-bakery-cafe",
+     "name": "Bugaboos Bakery Cafe",
+     "text": "the only bakery-cafe in SilverStar Village, with serious plant-based baking such as vegan soy mochas and a vegan banana lava cake. Take in the mountain view with your pastry.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/silverstar-mountain-resort",
+     "name": "SilverStar Mountain Resort",
+     "text": "in winter, 133 runs served by ten lifts, and one My1Pass ticket covers downhill, cross-country, snowshoeing, fat biking, skating and tubing. The alpine season runs November 27, 2026 to April 4, 2027. In summer the slopes become the SilverStar Bike Park, and hikers get a free trail day ticket at the Ticket Office for 16 km of trails, including the Ridge Walk from the top of the gondola. Our {page:/guides/ski-season-big-white-silverstar|ski season guide} has more.",
+     "where": "SilverStar, seasonal"
+    },
+    {
+     "ref": "silverstar/sovereign-lake-nordic-centre",
+     "name": "Sovereign Lake Nordic Centre",
+     "text": "Canada's largest cross-country ski and snowshoe club, 2 km west of the resort. It grooms about 58 km for classic and skate skiing, with rentals and lessons at the lodge. More in our {page:/guides/okanagan-nordic-snowshoe|nordic and snowshoe guide}.",
+     "where": "Silver Star Provincial Park, winter, seasonal"
+    },
+    {
+     "ref": "silverstar/sovereign-lake-mountain-bike-trails-silver-star-provincial-park",
+     "name": "Sovereign Lake Mountain Bike Trails",
+     "text": "in summer the ski trails and singletrack here are a cool, high escape from the valley heat. Expect mostly blue and black, rooty, technical trails, and wet spots early in the season.",
+     "where": "Silver Star Provincial Park, summer"
+    }
+   ]
+  },
+  {
+   "id": "day-2-afternoon-the-village-th",
+   "jump": "Day 2 afternoon",
+   "heading": "Day 2 afternoon: the village, then back down",
+   "lead": "Lunch in the village, one more winter activity, or a waterfall stop on the drive down.",
+   "items": [
+    {
+     "ref": "silverstar/the-red-antler",
+     "name": "The Red Antler",
+     "text": "a village restaurant with both healthy and indulgent options. Order the quinoa avocado power bowl, then the brownie regulars recommend.",
+     "where": "SilverStar"
+    },
+    {
+     "ref": "silverstar/tube-town-silverstar-tube-park",
+     "name": "Tube Town SilverStar Tube Park",
+     "text": "big inner tubes, several lanes and a tube lift back to the top. Kids need to be at least three, and it can close without notice in bad weather.",
+     "where": "SilverStar, winter, seasonal"
+    },
+    {
+     "ref": "silverstar/silverstar-snowshoe-trails",
+     "name": "SilverStar Snowshoe Trails",
+     "text": "16 km of marked singletrack through the forest, with trailheads at the village and by Brewer's Pond. Rentals are in the village, and leashed dogs are welcome on all of it.",
+     "where": "SilverStar, winter, seasonal"
+    },
+    {
+     "ref": "vernon/bx-creek-trail-bx-falls",
+     "name": "BX Creek Trail & BX Falls",
+     "text": "on the way down, a short walk from the Tillicum Road parking lot to the falls, with bridges and steep stairs. Spring runoff can make it unsafe, so pick a dry spell. Dogs on leash.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "day-2-evening-dinner-back-in-v",
+   "jump": "Day 2 evening",
+   "heading": "Day 2 evening: dinner back in Vernon",
+   "items": [
+    {
+     "ref": "vernon/masiero-pizzeria-napoletana",
+     "name": "Masiero Pizzeria Napoletana",
+     "text": "Neapolitan pizza taken toward fine dining, with a strong wine list. The owner tends bar, so let him pick you a cocktail.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/rustlers-table",
+     "name": "Rustlers Table",
+     "text": "farm-to-table dining on a working farm. Before dinner you can walk past the chickens, cows and sheep.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/station-bbq-smokehouse",
+     "name": "Station BBQ Smokehouse",
+     "text": "the owner smokes the brisket and pork ribs personally. Order either one.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "silverstar/paradise-camp-snowcat-dinner-tours-silverstar",
+     "name": "Paradise Camp Snowcat Dinner Tours",
+     "text": "if you'd rather stay up the mountain, a half-hour snowcat ride through the snowy forest to Paradise Camp, then a candlelit multi-course dinner. Select evenings, December to April.",
+     "where": "SilverStar, winter, seasonal"
+    }
+   ]
+  },
+  {
+   "id": "if-the-weather-turns",
+   "jump": "Rainy day",
+   "heading": "If the weather turns",
+   "lead": "All in Vernon, and all indoors.",
+   "items": [
+    {
+     "ref": "vernon/okanagan-science-centre",
+     "name": "Okanagan Science Centre",
+     "text": "hands-on exhibits, planetarium shows and live animals in Polson Park. Drop in and pay at the front desk; planetarium shows need pre-registration.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/vernon-public-art-gallery",
+     "name": "Vernon Public Art Gallery",
+     "text": "the largest public gallery in the North Okanagan, with changing contemporary shows and admission by donation.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/planet-bee-honey-farm-honeymoon-meadery",
+     "name": "Planet Bee Honey Farm & Honeymoon Meadery",
+     "text": "watch live bees build comb in viewing hives, then taste honey for free, and honey wine if you're an adult.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/okanagan-spirits-craft-distillery-vernon",
+     "name": "Okanagan Spirits Craft Distillery",
+     "text": "book a guided tour that mixes history with whisky tastings. There are toys on site to keep kids busy.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/the-boarding-house-cafe",
+     "name": "The Boarding House Cafe",
+     "text": "a board game cafe with more than 300 games. Order a hot chocolate or a plate of Korean comfort food and settle in.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/vernon-towne-theatre",
+     "name": "Vernon Towne Theatre",
+     "text": "a downtown cinema from 1929 showing new releases, classics and indie films, named Canada's top independent theatre in 2023.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "between-seasons-and-where-to-s",
+   "jump": "Where to stay",
+   "heading": "Between seasons and where to stay",
+   "items": [
+    {
+     "lead": "Shoulder seasons:",
+     "tip": "in late fall and spring, SilverStar sits between its summer and winter seasons and many village spots close. Check each listing first. If the mountain is quiet, spend Day 2 on BX Falls and the Kalamalka trails instead, and save the hill for another trip."
+    },
+    {
+     "lead": "Where to stay:",
+     "tip": "pick a base in Vernon to be close to dinner both nights, or stay up in SilverStar Village in winter if skiing is the main event. Either way, the drive between them is short."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "The classic lake view",
+    [
+     "coldstream/kalamalka-lake-lookout-highway-97-rest-area|Kalamalka Lake Lookout"
+    ]
+   ],
+   [
+    "An easy walk or ride by the water",
+    [
+     "lake-country/okanagan-rail-trail|Okanagan Rail Trail"
+    ]
+   ],
+   [
+    "A trailside lunch",
+    [
+     "coldstream/rail-trail-cafe-market|Rail Trail Café & Market"
+    ]
+   ],
+   [
+    "A special dinner",
+    [
+     "vernon/intermezzo-restaurant-and-wine-cellar|Intermezzo Restaurant and Wine Cellar",
+     "vernon/rustlers-table|Rustlers Table"
+    ]
+   ],
+   [
+    "Downhill skiing or summer biking",
+    [
+     "silverstar/silverstar-mountain-resort|SilverStar Mountain Resort"
+    ]
+   ],
+   [
+    "Cross-country skiing",
+    [
+     "silverstar/sovereign-lake-nordic-centre|Sovereign Lake Nordic Centre"
+    ]
+   ],
+   [
+    "Something for the kids in the snow",
+    [
+     "silverstar/tube-town-silverstar-tube-park|Tube Town SilverStar Tube Park"
+    ]
+   ],
+   [
+    "A waterfall walk",
+    [
+     "vernon/bx-creek-trail-bx-falls|BX Creek Trail & BX Falls"
+    ]
+   ],
+   [
+    "A rainy afternoon",
+    [
+     "vernon/okanagan-science-centre|Okanagan Science Centre",
+     "vernon/the-boarding-house-cafe|The Boarding House Cafe"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/vernon\">Vernon</a>, <a href=\"/silverstar\">SilverStar</a>, <a href=\"/guides/best-restaurants-vernon\">Best restaurants in Vernon</a>, <a href=\"/trip\">Trip planner</a>"
+}

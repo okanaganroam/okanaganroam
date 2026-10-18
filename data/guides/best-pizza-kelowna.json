@@ -1,0 +1,272 @@
+{
+ "heading": "Best Pizza in Kelowna",
+ "title": "Best Pizza in Kelowna | Okanagan Roam",
+ "description": "Kelowna pizza by style: wood-fired Neapolitan, slices by the beach, Indian-fusion pies in Rutland, brewery and winery pizza, late-night slices and gluten-free.",
+ "banner": "cafe",
+ "parent": {
+  "name": "Kelowna",
+  "href": "/kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "Kelowna has more good pizza than its size suggests. There are wood-fired Neapolitan rooms downtown, slice shops near the beach, a cluster of Indian-fusion pizzerias in Rutland, and breweries and wineries where a pizza oven is part of the plan. This guide sorts them by the kind of night you want, and every pick is a local shop, not a national chain.",
+  "Patios and winery kitchens often cut their hours from November to April, so check each listing's hours before you head out. For more cheap bites around town, see our {page:/guides/cheap-eats-kelowna|cheap eats guide}."
+ ],
+ "sections": [
+  {
+   "id": "wood-fired-neapolitan",
+   "jump": "Wood-fired & Neapolitan",
+   "heading": "Wood-fired & Neapolitan",
+   "lead": "For a blistered crust and a sit-down meal.",
+   "items": [
+    {
+     "ref": "kelowna/la-vela-pizzeria",
+     "name": "La Vela Pizzeria",
+     "text": "wood-fired Neapolitan pizza made with proper technique, downtown. Reviewers recommend the La Vela and Deliza pies, and the patio is the place to eat them.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/antico-pizza-napoletana",
+     "name": "Antico Pizza Napoletana",
+     "text": "reviewers say it feels like eating pizza in Italy. Expect the char and chew of a proper Neapolitan crust. Staff are patient with families, so bring the kids.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/toncini-modern-italian",
+     "name": "Toncini Modern Italian",
+     "text": "a fast-casual pasta bar with Roman-style pizza by the slice, alongside fresh extruded pasta, ravioli and Italian desserts.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "neighbourhood-slices",
+   "jump": "Neighbourhood slices",
+   "heading": "Neighbourhood slices",
+   "lead": "Small shops where the pizza does the talking. Rutland in particular has a run of Indian-fusion pizzerias worth exploring.",
+   "items": [
+    {
+     "ref": "kelowna/pandosy-pizza",
+     "name": "Pandosy pizza",
+     "text": "a Pandosy-area shop known for its homemade-tasting tomato sauce. The pies are generous and not greasy.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/halfmoon-pizzeria-donair",
+     "name": "Halfmoon Pizzeria + Donair",
+     "text": "pizza and donair under one roof, and neither side feels like an afterthought. Order one of each.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/panjabi-pizzeria",
+     "name": "Panjabi Pizzeria",
+     "text": "a halal Indian-fusion pizza spot in Rutland, with dine-in tables and Punjabi music. Reviewers say the Achari Chicken pizza is worth the wait.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/vancouver-pizza-kitchen",
+     "name": "Vancouver Pizza Kitchen",
+     "text": "a Rutland shop known for Indian-fusion toppings like Tandoori Chaap, with the classics there if you want a more traditional pie.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/fusion-food-lounge",
+     "name": "Fusion Food Lounge",
+     "text": "pizza with Indian flavours in Rutland. Reviewers call the butter chicken quesadilla the sleeper hit, so start there.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/happy-slice-pizza-orchardpark-mall",
+     "name": "Happy Slice Pizza (OrchardPark Mall)",
+     "text": "a food-court counter with butter chicken pizza and tandoori chicken slices. The butter chicken slice is the one to get.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "pizza-with-a-view-or-a-patio",
+   "jump": "Views & patios",
+   "heading": "Pizza with a view or a patio",
+   "lead": "When you want to eat outside.",
+   "items": [
+    {
+     "ref": "kelowna/bless-d-sips-slices",
+     "name": "Bless'd Sips & Slices",
+     "text": "pizza by the slice across the street from Gyro Beach, paired with dirty sodas. Order both and eat within sight of the water.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/dunnenzies-pizza-mission",
+     "name": "DunnEnzies Pizza Mission",
+     "text": "a family-friendly spot with a fire pit at the centre of the patio, popular with neighbours and their dogs. Walk Mission Creek first, then settle in by the fire.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/table-nineteen-kelowna",
+     "name": "Table Nineteen Kelowna",
+     "text": "a newly renovated golf-course restaurant with patio seating overlooking the 19th hole. Order a handmade pizza and time it for happy hour.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "pizza-at-wineries-and-brewerie",
+   "jump": "Wineries & breweries",
+   "heading": "Pizza at wineries and breweries",
+   "lead": "A pint or a tasting flight, with a pizza alongside. Our {page:/guides/okanagan-cideries|cideries guide} and {page:/guides/okanagan-winery-restaurants|winery restaurants guide} have more.",
+   "items": [
+    {
+     "ref": "kelowna/jackknife-brewing",
+     "name": "Jackknife Brewing",
+     "text": "a North End brewery that calls itself \"Weird Beer. Classic Pizza.\" Try The Persuader, with fennel sausage, onions and chili flakes, on the back patio. Leashed dogs are welcome. There's no phone line and no reservations, so just drop in.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/red-bird-brewing",
+     "name": "Red Bird Brewing",
+     "text": "more than 15 house beers on Richter Street, and wood-fired wild-yeast sourdough pizzas. Sit by the outdoor fire pits; ordering is at the counter.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/upside-cidery",
+     "name": "Upside Cidery",
+     "text": "a big cidery with lawn seating and an upstairs patio. Order a wood-fired pizza. There are proper non-alcoholic options too.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "west-kelowna/frind-estate-winery",
+     "name": "Frind Estate Winery",
+     "text": "the only lakefront winery in the area, with a beach picnic spot and a pizza shop on site. Taste, picnic on the beach, and finish with a pizza.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/ciao-bella-winery",
+     "name": "Ciao Bella Winery",
+     "text": "proper Italian pizza with wine tastings. Kids and pets are welcome, so bring the whole crew.",
+     "where": "West Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "late-night-takeout",
+   "jump": "Late-night & takeout",
+   "heading": "Late-night & takeout",
+   "lead": "For a slice after dinner, or a pie at home.",
+   "items": [
+    {
+     "ref": "kelowna/happy-slice-pizza-downtown",
+     "name": "Happy Slice Pizza (Downtown)",
+     "text": "open past 1am on weekends. Late-night regulars order the shahi paneer pizza.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/city-pizza",
+     "name": "City Pizza",
+     "text": "a late-night spot on Pandosy St, open past midnight, with slices on a light sauce and a fluffy crust. It's well loved for giving warm meals to the local homeless community.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/murray-s-pizza-kelowna",
+     "name": "Murray's Pizza Kelowna",
+     "text": "the original flagship of this local chain, takeout and delivery only. Regulars order the Kitchen Sink pie.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "gluten-free-vegan-options",
+   "jump": "Gluten-free & vegan",
+   "heading": "Gluten-free & vegan options",
+   "items": [
+    {
+     "ref": "kelowna/pizza-garden",
+     "name": "Pizza Garden",
+     "text": "a wood-oven shop with a celiac-safe process. One customer called it the best gluten-free pizza she's had.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/red-swan-pizza-kelowna-east",
+     "name": "Red Swan Pizza - Kelowna East",
+     "text": "a family-owned shop with a vegan cheese option. The tandoori chicken pizza special shows off its toppings.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/curious-cafe",
+     "name": "Curious Cafe",
+     "text": "beer-garden energy indoors near Prospera Place, with large communal tables for groups. Order a wood-fired pizza; there's a proper vegan option.",
+     "where": "Kelowna"
+    },
+    {
+     "lead": "Also worth knowing:",
+     "tip": "Red Bird Brewing (above) offers gluten-free crust and vegan cheese, and Jackknife Brewing has vegetarian pies and vegan cheese."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Neapolitan pizza on a downtown patio",
+    [
+     "kelowna/la-vela-pizzeria|La Vela Pizzeria"
+    ]
+   ],
+   [
+    "Pizza that tastes like Italy",
+    [
+     "kelowna/antico-pizza-napoletana|Antico Pizza Napoletana"
+    ]
+   ],
+   [
+    "A slice near the beach",
+    [
+     "kelowna/bless-d-sips-slices|Bless'd Sips & Slices"
+    ]
+   ],
+   [
+    "Indian-fusion pizza",
+    [
+     "kelowna/panjabi-pizzeria|Panjabi Pizzeria"
+    ]
+   ],
+   [
+    "A slice after midnight",
+    [
+     "kelowna/happy-slice-pizza-downtown|Happy Slice Pizza (Downtown)"
+    ]
+   ],
+   [
+    "Beer and pizza with a punk edge",
+    [
+     "kelowna/jackknife-brewing|Jackknife Brewing"
+    ]
+   ],
+   [
+    "Pizza at a lakefront winery",
+    [
+     "west-kelowna/frind-estate-winery|Frind Estate Winery"
+    ]
+   ],
+   [
+    "Celiac-safe pizza",
+    [
+     "kelowna/pizza-garden|Pizza Garden"
+    ]
+   ],
+   [
+    "A pizza night for a big group",
+    [
+     "kelowna/curious-cafe|Curious Cafe"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna/restaurants\">Kelowna restaurants</a> · <a href=\"/kelowna/breweries\">Kelowna breweries</a> · <a href=\"/guides/best-patios-kelowna\">Best patios in Kelowna</a> · <a href=\"/guides/dog-friendly-kelowna\">Dog-friendly Kelowna</a>"
+}

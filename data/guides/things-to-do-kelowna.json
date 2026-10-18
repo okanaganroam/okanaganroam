@@ -1,0 +1,382 @@
+{
+ "heading": "Things to Do in Kelowna, All Year",
+ "title": "Things to Do in Kelowna, All Year | Okanagan Roam",
+ "description": "Things to do in Kelowna in every season: lookouts and rail trails, wineries close to town, summer beaches, museums for rainy days, tours, golf and winter rinks.",
+ "banner": "region-kelowna",
+ "parent": {
+  "name": "Kelowna",
+  "href": "/kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "Kelowna is easy to fill a day in, whatever the month. The lake and the hills sit right at the edge of downtown, the wineries start a short drive out, and there are enough galleries, museums and rinks to carry you through a grey week in January. This guide gathers the places we'd send a friend to, sorted by what kind of day you want.",
+  "Some of these are summer-only and some only work in winter; we've flagged them. Many wineries and golf clubs cut their hours from November to April, so check each listing's hours before you set out. If you only have two days, start with our {page:/guides/weekend-in-kelowna|weekend in Kelowna guide}, and if you'd rather leave the car behind, see {page:/guides/kelowna-without-a-car|Kelowna without a car}."
+ ],
+ "sections": [
+  {
+   "id": "classic-kelowna",
+   "jump": "Classic Kelowna",
+   "heading": "Classic Kelowna",
+   "lead": "The big sights: the views, the rail trail and a bit of history.",
+   "items": [
+    {
+     "ref": "kelowna/knox-mountain-park",
+     "name": "Knox Mountain Park",
+     "text": "the lookouts here are the classic view of the city, just north of downtown. The Apex Trail to the upper lookout is about 5 km round trip, or take the 3 km lakeshore walk to Paul's Tomb. The road to the first lookout closes in winter.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/myra-canyon-myra-bellevue-provincial-park",
+     "name": "Myra Canyon",
+     "text": "the Okanagan's signature rail-trail day, on the old Kettle Valley Railway grade with 18 trestles and bridges. Walk it or ride it; cyclists walk their bikes across the trestles.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kasugai-garden",
+     "name": "Kasugai Garden",
+     "text": "a free, quiet Japanese garden behind a wall off Water Street, with stone lanterns, a waterfall and a koi pond. Open spring to late October.",
+     "where": "Kelowna, seasonal"
+    },
+    {
+     "ref": "kelowna/father-pandosy-mission-heritage-site",
+     "name": "Father Pandosy Mission Heritage Site",
+     "text": "the first permanent non-Indigenous settlement in the Okanagan, founded in 1860, with the restored chapel, root house and barn. Visiting is by donation, and the building interiors open in the warmer months.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/rotary-marsh-park",
+     "name": "Rotary Marsh Park",
+     "text": "a restored wetland at the north end of Waterfront Park, with boardwalks through the cattails, painted turtles and nesting ospreys in summer. It's free, open year-round and a five-minute walk from the downtown cafés.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "wineries-close-to-town",
+   "jump": "Wineries close to town",
+   "heading": "Wineries close to town",
+   "lead": "You don't have to go far for a tasting. New to wine country? Our {page:/guides/okanagan-wineries-first-timers|first-timer's winery guide} explains how visits work. Winery hours shrink in the cooler months, so check each listing first.",
+   "items": [
+    {
+     "ref": "kelowna/summerhill-pyramid-winery",
+     "name": "Summerhill Pyramid Winery",
+     "text": "a certified-organic estate built around an actual pyramid. Stay for a meal on the heated lake-view terrace.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/martin-s-lane-winery",
+     "name": "Martin's Lane Winery",
+     "text": "a gravity-fed winery focused on Riesling and Pinot Noir. Book the guided tour rather than a quick tasting.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/tantalus-vineyards",
+     "name": "Tantalus Vineyards",
+     "text": "one of BC's oldest continuously producing vineyards, planted in 1927. Leashed dogs can join you in the tasting room and on vineyard walks.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/the-vibrant-vine-winery",
+     "name": "The Vibrant Vine Winery",
+     "text": "a winery that doubles as a 3D art gallery. The tasting room feels like a museum.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/st-hubertus-oak-bay-estate-winery",
+     "name": "St Hubertus & Oak Bay Estate Winery",
+     "text": "a small, unpretentious winery with a vineyard sloping to the lake. The tasting fee is waived when you buy a bottle.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "lake-and-beaches-summer",
+   "jump": "Lake & beaches",
+   "heading": "Lake and beaches (summer)",
+   "lead": "These are summer days. The water is tested through the summer, and parking at the smaller beaches can be tight.",
+   "items": [
+    {
+     "ref": "kelowna/city-park-hot-sands-beach",
+     "name": "City Park Hot Sands Beach",
+     "text": "the long sandy beach in City Park, with a floating aqua park beside the swimming area, a children's waterpark from May long weekend to early September, and concession stands.",
+     "where": "Kelowna, summer"
+    },
+    {
+     "ref": "kelowna/waterfront-park-tugboat-bay-beach",
+     "name": "Waterfront Park Tugboat Bay Beach",
+     "text": "a sandy, shallow swimming area you can walk to from downtown, with the boardwalk running all the way to City Park.",
+     "where": "Kelowna, summer"
+    },
+    {
+     "ref": "kelowna/boyce-gyro-beach-park",
+     "name": "Boyce-Gyro Beach Park",
+     "text": "a Lakeshore Road beach with sand volleyball courts and a playground. A beach wheelchair is free to borrow on site.",
+     "where": "Kelowna, summer"
+    },
+    {
+     "ref": "kelowna/sarsons-beach-park",
+     "name": "Sarsons Beach Park",
+     "text": "usually quieter and less crowded than the bigger beaches, with free Parks Alive concerts in summer.",
+     "where": "Kelowna, summer"
+    },
+    {
+     "ref": "kelowna/kelowna-cruises",
+     "name": "Kelowna Cruises",
+     "text": "public afternoon, evening and late-night cruises on Okanagan Lake aboard two 75-foot houseboats, with a licensed bar. An easy way to get a big group onto the water.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "hikes-and-parks",
+   "jump": "Hikes and parks",
+   "heading": "Hikes and parks",
+   "lead": "Most of these work in any season. Regional parks get reduced maintenance from November to spring, so watch for closed gates and icy patches.",
+   "items": [
+    {
+     "ref": "kelowna/mission-creek-greenway-regional-park",
+     "name": "Mission Creek Greenway",
+     "text": "16.5 km of trail along Mission Creek from Okanagan Lake into the hills. It starts flat and wide, then climbs through Scenic Canyon.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/dilworth-mountain-park",
+     "name": "Dilworth Mountain Park",
+     "text": "a short, easy walk to some of the best vantage points in the city, with downtown and the lake spread out below. Parking is free, and it makes an easy sunset stop.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mill-creek-regional-park",
+     "name": "Mill Creek Regional Park",
+     "text": "a flat, shaded trail under cedars to a set of cascading waterfalls, only about 800 metres one way. Good for small children.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/johns-family-nature-conservancy-regional-park",
+     "name": "Johns Family Nature Conservancy Regional Park",
+     "text": "more than 400 hectares in south Kelowna with panoramic views, and Canada's third Nocturnal Preserve, so stay for the stars. The Lakeshore Road entrance closes from November 1 to April 1.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/maude-roxby-wetland-bird-sanctuary",
+     "name": "Maude-Roxby Wetland Bird Sanctuary",
+     "text": "a wheelchair-friendly boardwalk through the marsh to a platform over the lake. Winter brings gulls and waterfowl, with swans possible. Free and open year-round; no dogs.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "indoors-and-rainy-days",
+   "jump": "Indoors",
+   "heading": "Indoors and rainy days",
+   "lead": "For more ideas around the valley, see our {page:/guides/rainy-day-okanagan|rainy day guide}. Travelling with kids? Our {page:/guides/family-friendly-okanagan|family-friendly Okanagan guide} has more.",
+   "items": [
+    {
+     "ref": "kelowna/kelowna-art-gallery",
+     "name": "Kelowna Art Gallery",
+     "text": "the city's public gallery in the downtown Cultural District, with rotating exhibitions. Kids under 12 get in free, and it's half price on Thursdays.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/okanagan-wine-orchard-museum-laurel-packinghouse",
+     "name": "Okanagan Wine & Orchard Museum",
+     "text": "the valley's fruit and wine story, told in the 1918 Laurel Packinghouse. Admission is by donation, and it's a good primer before a winery day.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kf-aerospace-centre-for-excellence",
+     "name": "KF Aerospace Centre for Excellence",
+     "text": "nine vintage aircraft, including a DC-3 and a Mosquito, in a working hangar near the airport, plus a flight simulator. Admission is about $5 a person.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/h2o-adventure-fitness-centre",
+     "name": "H2O Adventure + Fitness Centre",
+     "text": "an indoor waterpark with waterslides, a FlowRider, a wave pool and a lazy river. A go-to for families on a cold or rainy day.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/beyond-the-crux-climbing-gym",
+     "name": "Beyond the Crux Climbing Gym",
+     "text": "over 5,000 sq ft of bouldering plus roped walls. Rentals make it easy for beginners; fill out the online waiver first.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "tours-and-experiences",
+   "jump": "Tours and experiences",
+   "heading": "Tours and experiences",
+   "lead": "Let someone else drive, or try something new.",
+   "items": [
+    {
+     "ref": "kelowna/cheers-okanagan-tours-and-transportation",
+     "name": "Cheers Okanagan Tours and Transportation",
+     "text": "all-inclusive guided wine tours around Kelowna and Vernon, including wheelchair-accessible tours. It also runs winter wine tours from Big White and SilverStar.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/lakeside-eco-sports",
+     "name": "Lakeside Eco Sports",
+     "text": "guided e-bike tours from downtown, including a southeast Kelowna winery ride and Myra Canyon trips. Riders 16+. Season: April to October.",
+     "where": "Kelowna, seasonal"
+    },
+    {
+     "ref": "kelowna/okanagan-adventure-park",
+     "name": "Okanagan Adventure Park",
+     "text": "a treetop obstacle course and ziplines on Highway 33, with a Canyon Swing and a Kid's Course. In the fall shoulder season it opens weekends for drop-ins.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/full-cyrcle-adventures",
+     "name": "Full Cyrcle Adventures",
+     "text": "guided off-road UTV and buggy tours where you drive your own buggy through forested trails and lookouts. Tours are private, so your group has the trail to itself.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "golf-and-sport",
+   "jump": "Golf and sport",
+   "heading": "Golf and sport",
+   "lead": "Outdoor golf is a spring-to-fall thing, and the indoor bays carry on through winter. Our {page:/guides/indoor-golf-okanagan|indoor golf guide} covers more of those.",
+   "items": [
+    {
+     "ref": "kelowna/tower-ranch-golf-country-club",
+     "name": "Tower Ranch Golf & Country Club",
+     "text": "a public course perched above the valley, with views toward Okanagan Lake from nearly every hole. There's no driving range, just hitting nets.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/michaelbrook-golf-course",
+     "name": "Michaelbrook Golf Course",
+     "text": "a flat, walkable course that plays 18 holes in about three hours and ten minutes. Forgiving for beginners and families, with a dog-friendly patio off the Rail Trail.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-driving-range-mini-golf",
+     "name": "Kelowna Driving Range & Mini Golf",
+     "text": "a grass range with 16 covered Toptracer stalls and an 18-hole mini-golf course for the whole family.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/simplex-sportszone",
+     "name": "Simplex Sportszone",
+     "text": "an indoor sports arcade with golf studios, hockey, baseball and soccer simulators, and racing cockpits. Book ahead.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "winter-in-kelowna",
+   "jump": "Winter in Kelowna",
+   "heading": "Winter in Kelowna",
+   "lead": "Skates, snowshoes and a hot sauna. For the ski hills, see our {page:/guides/ski-season-big-white-silverstar|Big White and SilverStar ski guide}, and for more rinks, our {page:/guides/okanagan-skating|skating guide}.",
+   "items": [
+    {
+     "ref": "kelowna/stuart-park-outdoor-rink",
+     "name": "Stuart Park Outdoor Rink",
+     "text": "a free outdoor rink on the downtown waterfront with the lake and the Bennett Bridge behind it. It opens in early December, weather permitting, and there's a rental hut.",
+     "where": "Kelowna, winter"
+    },
+    {
+     "ref": "kelowna/rutland-arena",
+     "name": "Rutland Arena",
+     "text": "two sheets with public skates from October, and the easiest place to skate without gear, since skates and helmets are for rent.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-curling-club",
+     "name": "Kelowna Curling Club",
+     "text": "one-hour Try Curling sessions with an instructor and all equipment supplied, about $25 a person. Book online.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-nordic-ski-snowshoe-club",
+     "name": "Kelowna Nordic Ski & Snowshoe Club",
+     "text": "75 km of groomed cross-country trails in the McCulloch highlands, plus snowshoe trails, warming cabins and trails where dogs are welcome. Check the grooming report before you go.",
+     "where": "Kelowna, winter"
+    },
+    {
+     "ref": "kelowna/loyly-floating-sauna",
+     "name": "Löyly Floating Sauna",
+     "text": "a Finnish-style cedar sauna at the Downtown Marina, with a lake cold plunge and a warm solarium lounge. Book a session online, since walk-ins aren't guaranteed space.",
+     "where": "Kelowna"
+    },
+    {
+     "lead": "Date night:",
+     "tip": "a sauna, a show or dinner after a skate all work. Our {page:/guides/date-night-kelowna|date night in Kelowna guide} has more ideas."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "The classic view of the city",
+    [
+     "kelowna/knox-mountain-park|Knox Mountain Park"
+    ]
+   ],
+   [
+    "A big outdoor day",
+    [
+     "kelowna/myra-canyon-myra-bellevue-provincial-park|Myra Canyon"
+    ]
+   ],
+   [
+    "A winery close to town",
+    [
+     "kelowna/summerhill-pyramid-winery|Summerhill Pyramid Winery",
+     "kelowna/tantalus-vineyards|Tantalus Vineyards"
+    ]
+   ],
+   [
+    "A summer beach day",
+    [
+     "kelowna/city-park-hot-sands-beach|City Park Hot Sands Beach"
+    ]
+   ],
+   [
+    "An easy walk with kids",
+    [
+     "kelowna/mill-creek-regional-park|Mill Creek Regional Park"
+    ]
+   ],
+   [
+    "A rainy afternoon",
+    [
+     "kelowna/kelowna-art-gallery|Kelowna Art Gallery",
+     "kelowna/kf-aerospace-centre-for-excellence|KF Aerospace Centre for Excellence"
+    ]
+   ],
+   [
+    "A family day indoors",
+    [
+     "kelowna/h2o-adventure-fitness-centre|H2O Adventure + Fitness Centre"
+    ]
+   ],
+   [
+    "A round of golf with a view",
+    [
+     "kelowna/tower-ranch-golf-country-club|Tower Ranch Golf & Country Club"
+    ]
+   ],
+   [
+    "A winter skate",
+    [
+     "kelowna/stuart-park-outdoor-rink|Stuart Park Outdoor Rink",
+     "kelowna/rutland-arena|Rutland Arena"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna\">Kelowna</a>, <a href=\"/kelowna/outdoors\">Kelowna outdoors</a>, <a href=\"/kelowna/indoor\">Kelowna indoor</a>, <a href=\"/trip\">Trip planner</a>"
+}

@@ -1,0 +1,391 @@
+{
+ "heading": "Okanagan Craft Breweries: A Valley Beer Trail",
+ "title": "Okanagan Craft Breweries: A Valley Beer Trail | Okanagan Roam",
+ "description": "A north-to-south Okanagan beer trail: 36 craft breweries from Vernon to Osoyoos, with flagship beers, brewpub food, dog-friendly patios and bowling.",
+ "banner": "brewery",
+ "parent": {
+  "name": "Breweries",
+  "href": "/breweries"
+ },
+ "noPlace": true,
+ "intro": [
+  "The Okanagan is known for wine, but the valley pours a lot of good beer too. This guide runs north to south, from Vernon down to Osoyoos, and picks 36 breweries and brewpubs with something specific to go for: a flagship beer, a kitchen worth a meal, a patio for the dog, or a bowling lane while you wait.",
+  "Kelowna has the biggest cluster by far, so it gets two sections. Many patios and backyard spaces scale back from November to April, and some taprooms change their hours with the season, so check each listing's hours before you set out. Prefer apples to hops? See our {page:/guides/okanagan-cideries|cideries guide}, or browse every listing on the {page:/breweries|breweries page}."
+ ],
+ "sections": [
+  {
+   "id": "before-you-go",
+   "jump": "Before you go",
+   "heading": "Before you go",
+   "items": [
+    {
+     "lead": "Order a flight first:",
+     "tip": "most taprooms on this list pour tasting flights. A flight of small pours lets you try several beers without drinking several pints, which matters when you plan to visit more than one brewery in a day."
+    },
+    {
+     "lead": "Pick a designated driver, or skip the car:",
+     "tip": "the stops are spread along the whole valley, and the drive between them is part of the day. Choose a driver before the first pour, book a ride, or stick to breweries within walking distance of each other. Many taprooms pour non-alcoholic options for the driver."
+    },
+    {
+     "lead": "Eat along the way:",
+     "tip": "a lot of these breweries have full kitchens or food trucks. Pair your flight with a meal and pace the day."
+    },
+    {
+     "lead": "Plan by season:",
+     "tip": "patios, backyards and food trucks are a warm-weather thing at many stops. In the cooler months, lean on taprooms with indoor games and kitchens."
+    }
+   ]
+  },
+  {
+   "id": "vernon-the-north-okanagan",
+   "jump": "Vernon",
+   "heading": "Vernon & the North Okanagan",
+   "lead": "Two picks in Vernon. For orchard cider stops nearby, see the {page:/guides/okanagan-cideries|cideries guide}.",
+   "items": [
+    {
+     "ref": "vernon/bna-brewing-vernon-40",
+     "name": "BNA Brewing Vernon",
+     "text": "four 10-pin lanes, three duckpin lanes and arcade games sit right beside the beer list. Lanes start around $35 an hour for duckpin or $45 for 10-pin, and lanes and tables are booked separately. Bowl a round, order a flight and let the kids loose on the arcade.",
+     "where": "Vernon"
+    },
+    {
+     "ref": "vernon/silverstar-brewing",
+     "name": "Silverstar Brewing",
+     "text": "a roomy downtown brewery with a wide beer selection and a well-regarded happy hour. Dishes come large, and the desserts are part of the appeal. Service can be slow, so flag down staff if you need to.",
+     "where": "Vernon"
+    }
+   ]
+  },
+  {
+   "id": "lake-country",
+   "jump": "Lake Country",
+   "heading": "Lake Country",
+   "lead": "Between Vernon and Kelowna, three very different stops.",
+   "items": [
+    {
+     "ref": "lake-country/cutwater-brewing-and-lounge",
+     "name": "Cutwater Brewing and Lounge",
+     "text": "a fun, colourful room with upbeat energy. Regulars call the smash burger the best around, so order it.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "lake-country/britannia-brewing-co",
+     "name": "Britannia Brewing Co",
+     "text": "the outdoor area is designed to welcome both dogs and kids, and a full kitchen makes it a meal stop, not just a beer stop. Bring the whole crew.",
+     "where": "Lake Country"
+    },
+    {
+     "ref": "kelowna/grey-fox-brewing",
+     "name": "Grey Fox Brewing",
+     "text": "the Okanagan's dedicated gluten-free brewery, where no gluten-containing ingredients are allowed in the building. Beers are brewed from millet, rice and buckwheat; look for the Quick Witted witbier, Humble Lager and Buckwild Stout, all Canadian Brewing Awards medal winners in the gluten-free category. It's mainly a production brewery with growler fills and local delivery, so check ahead before stopping by.",
+     "where": "Lake Country"
+    }
+   ]
+  },
+  {
+   "id": "kelowna-the-brewery-district-n",
+   "jump": "Kelowna downtown",
+   "heading": "Kelowna: the Brewery District, North End & downtown",
+   "lead": "All five are in the North End brewery district or downtown, the easiest part of the valley to tour on foot.",
+   "items": [
+    {
+     "ref": "kelowna/the-office-brewery",
+     "name": "The Office Brewery",
+     "text": "a taproom on Clement Avenue in the downtown brewery district that bills itself as \"your best meeting of the week.\" There's weekend brunch, a weekday happy hour, Pickle Flights on Sundays, and dogs are welcome on the patio.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/unleashed-brewing-company",
+     "name": "Unleashed Brewing Company",
+     "text": "a dog-inspired brewery in the Brewery District where pups are welcome inside and on the patio, with no restrictions. Bring yours along.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/rustic-reel-brewing-co",
+     "name": "Rustic Reel Brewing Co",
+     "text": "a brewery, taproom and coffee bar on Vaughan Avenue. Mornings start with coffee, and Wednesday to Sunday the taproom pours house beers with food, happy hour and weekend brunch. Seating is first-come, first-served.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/jackknife-brewing",
+     "name": "Jackknife Brewing",
+     "text": "\"Weird Beer. Classic Pizza.\" Offbeat small-batch beers come with pies like The Persuader (fennel sausage, onions and chili flakes), plus vegetarian pies and vegan cheese. The back patio has art, music and a punk-rock attitude, and leashed dogs are welcome. No reservations, so just drop in.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kelowna-beer-institute",
+     "name": "Kelowna Beer Institute",
+     "text": "a downtown brewpub with live local music on Mondays, a good patio, and TVs that come on early for big games.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "kelowna-more-breweries-around-",
+   "jump": "More Kelowna",
+   "heading": "Kelowna: more breweries around the city",
+   "lead": "Spread across town, from the Mission to the rail trail. Bring a driver or plan a couple of stops at a time.",
+   "items": [
+    {
+     "ref": "kelowna/red-bird-brewing",
+     "name": "Red Bird Brewing",
+     "text": "more than 15 house beers on Richter Street, starting with a crisp Kölsch, the first beer it ever brewed. The kitchen makes wood-fired wild-yeast sourdough pizzas with gluten-free crust and vegan cheese options. Sit by the outdoor fire pits on the dog-friendly patio, and watch for Monday cribbage, bingo and Mario Kart nights.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/copper-brewing-co",
+     "name": "Copper Brewing Co.",
+     "text": "an independently owned brewery and kitchen in the Landmark District, brewing on site since 2019. Monday mac and cheese and Sunday wings are the weekly specials, and there are board games, Nintendo booths and LEGO for the kids.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/shore-line-brewing-co",
+     "name": "Shore Line Brewing Co.",
+     "text": "a bright, beachy taproom on Lakeshore Road in the Mission, right across from Gyro Beach. There's a full kitchen, outdoor patios, trivia on Tuesdays, open mic on Wednesdays and music bingo on Thursdays.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/railside-brewing-ltd",
+     "name": "Railside Brewing Ltd",
+     "text": "a brewery on the rail trail with a fantastic patio and a gluten-free drink menu.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/barn-owl-brewing",
+     "name": "Barn Owl Brewing",
+     "text": "a grassy patio, occasional live music and food from rotating local vendors. It has an unpretentious, backyard-barbecue feel, so grab a pint and find a spot on the grass.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/buffalo-rouge-brewing-co",
+     "name": "Buffalo Rouge Brewing Co.",
+     "text": "a brewpub built around vegan and vegetarian food, with a dedicated gluten-free fryer. Check the schedule for live performance nights.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/vice-virtue-brewing-co",
+     "name": "Vice & Virtue Brewing Co.",
+     "text": "a brewpub with more culinary ambition than typical bar food, and GF buns good enough that people mention them. For a special night, book a chef's-table beer pairing dinner.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/kettle-river-brewing-co",
+     "name": "Kettle River Brewing Co.",
+     "text": "the full kitchen menu goes well beyond typical bar food, so come for a proper meal. The spacious patio makes it easy to stay a while.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/three-lakes-brewing-ltd",
+     "name": "Three Lakes Brewing Ltd",
+     "text": "a community-minded brewery in the warehouse district with live music nights and a friendly crowd of regulars.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bna-brewing-kelowna",
+     "name": "BNA Brewing Kelowna",
+     "text": "a brewery, a six-lane bowling alley and a real cocktail bar in one building. Book lanes up to two months ahead, and note that staff are practised at vegan and gluten-free orders. Happy hour runs 4 to 6 p.m. daily.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/freddys-brewpub",
+     "name": "Freddy's Brewpub",
+     "text": "the pub side of the Bowl and Brew complex on McCurdy Road, next to the 30-lane McCurdy Bowling Centre. It pours more than a dozen in-house craft beers, and there's cosmic bowling, darts, karaoke and Friday live music. Lane reservations are recommended.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "west-kelowna-peachland-summerl",
+   "jump": "West side",
+   "heading": "West Kelowna, Peachland & Summerland",
+   "lead": "Across the bridge and down the west side of the lake. Peachland sits between West Kelowna and Summerland; for cider along this stretch, see the {page:/guides/okanagan-cideries|cideries guide}.",
+   "items": [
+    {
+     "ref": "west-kelowna/lakesider-brewing",
+     "name": "Lakesider Brewing",
+     "text": "right on the lake, with a dog-friendly patio. Order a wood-fired pizza and work through the strong beer list by the water.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/the-hatching-post-brewery-smokery",
+     "name": "The Hatching Post Brewery & Smokery",
+     "text": "a lively BBQ smokehouse with live western music. Order the brisket with something from the big craft beer list.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "summerland/detonate-brewing-company",
+     "name": "Detonate Brewing Company",
+     "text": "leashed dogs are welcome in the taproom as well as on the patio. Bring the dog and order a beer flight and wings.",
+     "where": "Summerland"
+    },
+    {
+     "ref": "summerland/giant-s-head-brewing",
+     "name": "Giant's Head Brewing",
+     "text": "a cozy brewpub with a large street-side patio. The wood-fired pizza holds up, and reviewers single out the fish and chips.",
+     "where": "Summerland"
+    }
+   ]
+  },
+  {
+   "id": "penticton-naramata",
+   "jump": "Penticton",
+   "heading": "Penticton & Naramata",
+   "lead": "Penticton has the second-biggest cluster, and several sit close enough to walk between. Naramata's tasting rooms lean to wine and cider; see the {page:/guides/okanagan-cideries|cideries guide} for those.",
+   "items": [
+    {
+     "ref": "penticton/tin-whistle-brewing",
+     "name": "Tin Whistle Brewing",
+     "text": "calls itself the Okanagan's original microbrewery, in the historic Cannery Trade Centre on Fairview Road. The Peach Cream Ale is always on tap, alongside a honey pilsner, a West Coast IPA and a hazelnut coffee milk stout. In 2021 it announced it had become B.C.'s first carbon-neutral brewery.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/cannery-brewing-co",
+     "name": "Cannery Brewing Co.",
+     "text": "a family-friendly taproom with shareable snacks and a wide range of craft beer. In warmer months the Backyard patio adds food trucks, but it closes for the off-season, and dogs aren't allowed in the taproom.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/highway-97-brewing",
+     "name": "Highway 97 Brewing",
+     "text": "a road-trip-friendly brewery that welcomes travellers with dogs. Order the pulled pork nachos, then walk across the street to Cannery Brewing.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/neighbourhood-brewing",
+     "name": "Neighbourhood Brewing",
+     "text": "a spacious brewery with a Mexican theme. Birria tacos are the specialty, and the kids' menu includes churros.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/abandoned-rail-brewing-co",
+     "name": "Abandoned Rail Brewing Co.",
+     "text": "gluten-free cauliflower-crust pizza and GF beer sit right on the regular menu. The patio looks out toward the mountains, and dogs are welcome.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/yellow-dog-brewing-co",
+     "name": "Yellow Dog Brewing Co",
+     "text": "a well-designed patio and a weekly tradition, with happy hour all day on Thursdays. Try the rotating wing special.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/barley-mill-brew-pub",
+     "name": "Barley Mill Brew Pub",
+     "text": "a family-friendly brewpub with a dedicated kids' menu upstairs, so you can work through a flight while everyone eats well.",
+     "where": "Penticton"
+    },
+    {
+     "ref": "penticton/bna-brewing",
+     "name": "BNA Brewing",
+     "text": "four 10-pin lanes, arcade games and pinball, plus strong happy hour deals and a sunny upstairs patio. Bowl a game, then head upstairs.",
+     "where": "Penticton"
+    }
+   ]
+  },
+  {
+   "id": "oliver-osoyoos-the-south",
+   "jump": "South Okanagan",
+   "heading": "Oliver, Osoyoos & the South",
+   "lead": "Wine country, with three good reasons to order a beer instead.",
+   "items": [
+    {
+     "ref": "oliver/neighbourhood-outpost",
+     "name": "Neighbourhood Outpost",
+     "text": "Penticton's Neighbourhood Brewing runs a small working brewhouse at District Wine Village, used to try out new ideas, so the boards won't always match Penticton. Order a flight or take offsales home. Hours are seasonal, with a February closure.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "oliver/firehall-brewery",
+     "name": "Firehall Brewery",
+     "text": "a dedicated kids' area off to the side lets parents relax. Order the well-loved smoked stout with some pub food.",
+     "where": "Oliver"
+    },
+    {
+     "ref": "osoyoos/backroads-brewing-co",
+     "name": "Backroads Brewing Co",
+     "text": "a sunny downtown patio, a strong flight selection and rotating food trucks. Check which truck is parked out front and claim a patio seat.",
+     "where": "Osoyoos"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A flagship beer with history",
+    [
+     "penticton/tin-whistle-brewing|Tin Whistle Brewing"
+    ]
+   ],
+   [
+    "Gluten-free beer",
+    [
+     "kelowna/grey-fox-brewing|Grey Fox Brewing",
+     "penticton/abandoned-rail-brewing-co|Abandoned Rail Brewing Co."
+    ]
+   ],
+   [
+    "Beer and bowling",
+    [
+     "vernon/bna-brewing-vernon-40|BNA Brewing Vernon",
+     "kelowna/freddys-brewpub|Freddy's Brewpub"
+    ]
+   ],
+   [
+    "Bring the dog inside",
+    [
+     "kelowna/unleashed-brewing-company|Unleashed Brewing Company",
+     "summerland/detonate-brewing-company|Detonate Brewing Company"
+    ]
+   ],
+   [
+    "Pizza with your pint",
+    [
+     "kelowna/jackknife-brewing|Jackknife Brewing",
+     "kelowna/red-bird-brewing|Red Bird Brewing"
+    ]
+   ],
+   [
+    "A meal, not just a pint",
+    [
+     "kelowna/kettle-river-brewing-co|Kettle River Brewing Co.",
+     "summerland/giant-s-head-brewing|Giant's Head Brewing"
+    ]
+   ],
+   [
+    "A beer by the lake",
+    [
+     "west-kelowna/lakesider-brewing|Lakesider Brewing",
+     "kelowna/shore-line-brewing-co|Shore Line Brewing Co."
+    ]
+   ],
+   [
+    "Somewhere for the kids",
+    [
+     "kelowna/copper-brewing-co|Copper Brewing Co.",
+     "oliver/firehall-brewery|Firehall Brewery"
+    ]
+   ],
+   [
+    "A brewery hop on foot",
+    [
+     "penticton/highway-97-brewing|Highway 97 Brewing and Cannery Brewing Co."
+    ]
+   ],
+   [
+    "A beer in wine country",
+    [
+     "oliver/neighbourhood-outpost|Neighbourhood Outpost"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/breweries\">All breweries</a>, <a href=\"/guides/okanagan-cideries\">Okanagan cideries</a>, <a href=\"/guides/dog-friendly-kelowna\">Dog-friendly Kelowna</a>, <a href=\"/trip\">Trip planner</a>"
+}

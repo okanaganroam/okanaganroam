@@ -1,0 +1,254 @@
+{
+ "heading": "Best Sushi in Kelowna",
+ "title": "Best Sushi in Kelowna | Okanagan Roam",
+ "description": "Where to eat sushi in Kelowna: a tiny chef's counter, late-night rolls, all-you-can-eat, sashimi bento lunches, vegan sushi bowls and izakaya plates.",
+ "banner": "food-drink",
+ "parent": {
+  "name": "Kelowna",
+  "href": "/kelowna"
+ },
+ "noPlace": true,
+ "intro": [
+  "Kelowna has more sushi than you might expect for a lake town. This guide sorts it by the kind of meal you want: a seat at a chef's counter, a dependable neighbourhood spot, a cheap pile of rolls, a quick casual bite, or an izakaya night with ramen and skewers.",
+  "Most picks are in Kelowna, from downtown and Pandosy to the Mission, Glenmore and Rutland. A few are across the bridge in West Kelowna and up the highway in Lake Country. For more of the city, see our {page:/kelowna/restaurants|Kelowna restaurants} page."
+ ],
+ "sections": [
+  {
+   "id": "chef-s-counters-a-night-out",
+   "jump": "Night out",
+   "heading": "Chef's counters & a night out",
+   "lead": "For when the meal is the evening's plan.",
+   "items": [
+    {
+     "ref": "kelowna/sushi-hayashi",
+     "name": "SUSHI HAYASHI",
+     "text": "a tiny counter where you watch the chef work up close, which is half the draw. The sushi tower and the katsu both get specific praise.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/wa-skew-r-sushi-bar",
+     "name": "Wa Skew'r Sushi & Bar",
+     "text": "a Japanese izakaya that goes a step past the usual sushi menu. Order skewers and sashimi, then work through the sake list.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/bluetail-sushi-commerce",
+     "name": "Bluetail Sushi - Commerce",
+     "text": "dim lighting, a late-night crowd and experimental rolls for anyone ready to skip the California roll. Start with the beef tataki.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/momo-sushi-mission",
+     "name": "Momo Sushi Mission",
+     "text": "creative special rolls are the reason to come, so order one of those over the usual. Attentive tea service runs through the meal.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "neighbourhood-sushi-bars",
+   "jump": "Neighbourhood sushi bars",
+   "heading": "Neighbourhood sushi bars",
+   "lead": "Smaller, steady places that regulars return to.",
+   "items": [
+    {
+     "ref": "kelowna/aomi-sushi-japanese-restaurant",
+     "name": "Aomi Sushi Japanese Restaurant",
+     "text": "an unassuming Lower Mission spot where the yakiudon and sashimi have always been the strengths. On a first visit, order what the regulars trust.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/yama-kitchen",
+     "name": "Yama Kitchen",
+     "text": "a locally owned sushi spot that regulars praise for consistent quality. Go at lunch for the generous sashimi bento.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mizu-japanese-restaurant",
+     "name": "Mizu Japanese Restaurant",
+     "text": "handmade Japanese food on Pandosy Street since 2000, now under new owners. A casual spot for a family meal, with generous rolls and easy parking.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/mabui-kitchen",
+     "name": "Mabui Kitchen",
+     "text": "a cozy Mission-area spot with a loyal following for its distinctive menu. Order the temaki, and don't skip the cream soda float.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "all-you-can-eat-value",
+   "jump": "All-you-can-eat & value",
+   "heading": "All-you-can-eat & value",
+   "lead": "Rolls that won't stretch the budget.",
+   "items": [
+    {
+     "ref": "kelowna/tokyo-1",
+     "name": "Tokyo 1",
+     "text": "the city's only all-you-can-eat Japanese restaurant. You order on a tablet, and the dining room feels upscale for the price.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/maki-sushi-restaurant",
+     "name": "Maki Sushi Restaurant",
+     "text": "a cozy, homey room on Harvey Ave with reasonable prices and a tofu-friendly menu. The dancing eel and Kelowna maki rolls are the specialties.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/misato-s-kitchen",
+     "name": "Misato's Kitchen",
+     "text": "a wood-panelled spot on Ellis St that stays open late after other kitchens close. The rolls are cheap, and the salmon sashimi comes thick and fatty.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/yuzu-bowl-and-bistro",
+     "name": "Yuzu Bowl and Bistro",
+     "text": "a Japanese bistro that welcomes kids. Time your visit for the happy hour roll deal.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "quick-casual",
+   "jump": "Quick & casual",
+   "heading": "Quick & casual",
+   "lead": "Easy weeknight sushi, and one for plant-based eaters.",
+   "items": [
+    {
+     "ref": "kelowna/dozo-house",
+     "name": "Dozo House",
+     "text": "a casual spot in Glenmore's Kane Road plaza for sushi, ramen, tempura and bento boxes. Reviewers mention quick, friendly service and good value.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/oka-japanese-restaurant",
+     "name": "OKA Japanese Restaurant",
+     "text": "a family-friendly room in Orchard Plaza on Cooper Road, with sushi rolls, tempura and chicken karaage. Reviewers mention quick service.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/naked-cafe",
+     "name": "Naked Cafe",
+     "text": "a dedicated vegan cafe and a longtime favourite for plant-based eating. Its name was made on the sushi bowls and the Japanese curry.",
+     "where": "Kelowna"
+    }
+   ]
+  },
+  {
+   "id": "across-the-bridge-up-the-highw",
+   "jump": "Nearby towns",
+   "heading": "Across the bridge & up the highway",
+   "lead": "Worth the short drive from downtown Kelowna. Our {page:/guides/best-restaurants-west-kelowna|West Kelowna restaurants guide} has more on that side of the lake.",
+   "items": [
+    {
+     "ref": "west-kelowna/asuki-sushi",
+     "name": "Asuki sushi",
+     "text": "a newer spot with creative, generously portioned rolls at reasonable prices. Order something you wouldn't normally try.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "west-kelowna/ginza-sushi-west-kelowna",
+     "name": "Ginza Sushi West Kelowna",
+     "text": "consistent, budget-friendly sushi rather than a special-occasion spot. Reviewers point to the yam roll and miso soup combination.",
+     "where": "West Kelowna"
+    },
+    {
+     "ref": "lake-country/turtle-bay-gogo-sushi",
+     "name": "Turtle Bay GOGO Sushi",
+     "text": "a sushi spot in Winfield that locals say is worth the detour.",
+     "where": "Lake Country"
+    }
+   ]
+  },
+  {
+   "id": "beyond-sushi-ramen-izakaya",
+   "jump": "Ramen & izakaya",
+   "heading": "Beyond sushi: ramen & izakaya",
+   "lead": "For a bowl of broth or a group night out. Our {page:/guides/soup-ramen-pho-okanagan|soup, ramen and pho guide} has more ramen across the valley.",
+   "items": [
+    {
+     "ref": "kelowna/o-zeki-japanese-restaurant",
+     "name": "O-Zeki Japanese Restaurant",
+     "text": "private tatami-style booths suit a group. Book one and order the group platters and the tonkotsu ramen.",
+     "where": "Kelowna"
+    },
+    {
+     "ref": "kelowna/wasabi-ramen-and-izakaya",
+     "name": "Wasabi Ramen and Izakaya",
+     "text": "tucked off Bernard Ave, with a quiet, devoted following. Order the okonomiyaki and one of the rich ramen broths.",
+     "where": "Kelowna"
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "A seat at the chef's counter",
+    [
+     "kelowna/sushi-hayashi|SUSHI HAYASHI"
+    ]
+   ],
+   [
+    "Sashimi and sake",
+    [
+     "kelowna/wa-skew-r-sushi-bar|Wa Skew'r Sushi & Bar"
+    ]
+   ],
+   [
+    "Sushi late at night",
+    [
+     "kelowna/bluetail-sushi-commerce|Bluetail Sushi - Commerce",
+     "kelowna/misato-s-kitchen|Misato's Kitchen"
+    ]
+   ],
+   [
+    "All-you-can-eat",
+    [
+     "kelowna/tokyo-1|Tokyo 1"
+    ]
+   ],
+   [
+    "A sushi lunch",
+    [
+     "kelowna/yama-kitchen|Yama Kitchen"
+    ]
+   ],
+   [
+    "Creative rolls",
+    [
+     "kelowna/momo-sushi-mission|Momo Sushi Mission",
+     "west-kelowna/asuki-sushi|Asuki sushi"
+    ]
+   ],
+   [
+    "Vegan sushi",
+    [
+     "kelowna/naked-cafe|Naked Cafe"
+    ]
+   ],
+   [
+    "Sushi with the kids",
+    [
+     "kelowna/yuzu-bowl-and-bistro|Yuzu Bowl and Bistro",
+     "kelowna/mizu-japanese-restaurant|Mizu Japanese Restaurant"
+    ]
+   ],
+   [
+    "Ramen with a group",
+    [
+     "kelowna/o-zeki-japanese-restaurant|O-Zeki Japanese Restaurant"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>See more:</strong> <a href=\"/kelowna/restaurants\">Kelowna restaurants</a>, <a href=\"/guides/soup-ramen-pho-okanagan\">Soup, ramen &amp; pho</a>, <a href=\"/guides/weekend-in-kelowna\">Weekend in Kelowna</a>"
+}
