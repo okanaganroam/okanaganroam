@@ -24,6 +24,10 @@ const hoursModule = (() => { try { return require('./hours.js'); } catch (e) { r
 // Guarded like hours.js: a copy of the server without share-card.js (isolated tests) runs on, with the brand share image.
 const shareCardModule = (() => { try { return require('./share-card.js'); } catch (e) { return null; } })();
 
+// Session replay is opt-in and disabled until an explicit host variable is set.
+const replayModule = (() => { try { return require('./session-replay'); } catch (e) { return null; } })();
+function replayHead() { return replayModule ? replayModule.renderSessionReplayHead(process.env.CLARITY_PROJECT_ID) : ''; }
+
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
 
@@ -9656,7 +9660,7 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       window.trackEvent('open_my_trip', { trip_size: size, open_source: 'tray_button' });
     } catch (err) { /* analytics must never break the site */ }
   }, true);
-</script>`;
+</script>${replayHead()}`;
 }
 
 // Analytics Cleanup C1: the homepage and /browse (okanagan.html, frozen on
@@ -9693,6 +9697,7 @@ function withFaviconFiles(html) {
   return String(html).replace(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,[^"]*">/g, FAVICON_LINKS);
 }
 function applyHomepageAnalyticsHead(html) {
+  html = html.replace('</head>', () => replayHead() + '</head>');
   const once = (needle) => {
     const i = html.indexOf(needle);
     return i !== -1 && html.indexOf(needle, i + needle.length) === -1;
@@ -28674,6 +28679,9 @@ function renderPrivacyPage() {
     </ul>
     <h2>Analytics</h2>
     <p>We use Google Analytics to understand how the site is used in general &mdash; which pages are popular, roughly where visitors come from and what devices they use. Google Analytics uses cookies to do this. We use the reports to improve the site, not to identify you. You can learn more in <a href="https://policies.google.com/technologies/partner-sites" rel="noopener" target="_blank">how Google uses information from sites that use its services</a>, or install the <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener" target="_blank">Google Analytics opt-out add-on</a>.</p>
+    ${process.env.CLARITY_PROJECT_ID ? `<h2>Optional session recordings</h2>
+    <p>If you choose Allow recordings, Microsoft Clarity records interactions such as clicks, scrolling and navigation on selected public pages to help us improve the site. Text and form fields are masked. Recording does not load before you agree. We exclude private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments. Use Recording preferences on public pages to change your choice; declining reloads the page to stop recording. This choice applies to session recordings and does not change Google Analytics settings.</p>
+    <p>Clarity processes usage, device and network data and may use cookies after you consent. See the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. Your recording preference is stored in your browser.</p>` : ''}
     <h2>Saved in your own browser</h2>
     <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email.</p>
     <h2>Services that help run the site</h2>
