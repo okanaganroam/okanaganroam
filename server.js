@@ -7930,13 +7930,17 @@ const EVENT_PHOTO_RULES = [
   ['halloweenkids', /(hallowe'?en|spook|trick[- ]or[- ]treat|gnome-a-ween).*(famil|kids|children|little|all ages|non-scary)|(famil|kids|children).*(hallowe'?en|trick[- ]or[- ]treat)/],
   ['candlelight', /candlelight/], ['drag', /\bdrag\b/], ['burlesque', /burlesque/],
   ['comedy', /comed(y|ian)|stand-up|stand up|comic strippers|improv/], ['magic', /magician|magic show/],
+  ['swim', /across the lake swim|open[- ]water swim|triathlon|polar (bear )?(dip|plunge|swim)/], ['nordic', /cross[- ]country ski|\bnordic\b|biathlon/],
+  ['snowboard', /snowboard|rail jam|terrain park/], ['chairlift', /(alpine|ski|mountain|big white|silverstar|apex|baldy)[^.]{0,30}opening day|opening day[^.]{0,30}(ski|lifts?)\b/],
+  ['ski', /\bski (race|day|with|challenge|cup|games)|skiing|skiers|snowcross|downhill (race|ski)/],
+  ['rodeo', /rodeo|stampede/], ['ring', /wrestling|\bmma\b|fight night/], ['remembrance', /remembrance|cenotaph|poppies/],
   ['hockey', /\bhockey\b|\bwhl\b|\bbchl\b|\bkijhl\b|puck drop/], ['basketball', /basketball/], ['volleyball', /volleyball/], ['rugby', /\brugby\b/],
   ['pickleball', /pickleball|tennis/], ['golf', /\bgolf\b/], ['skating', /figure skat|skate canada/],
   ['mtbrace', /mountain bike|enduro|downhill race|pedalfest/], ['speedway', /speedway|stock car|race car/],
   ['kickboxing', /kickboxing|muay thai|boxing|martial arts/],
   ['soundbath', /sound (bath|healing|journey)|singing bowls|\bgongs?\b/], ['yoga', /\byoga\b|breathwork|meditation|asana/],
   // Shows and screenings.
-  ['aerial', /aerial|acrobat|circus/], ['carnival', /sideshow|carnival of/], ['ballet', /ballet|contemporary dance|dance work/],
+  ['aerial', /aerial (silks|arts|show|acrobat)|acrobat|circus/], ['carnival', /sideshow|carnival of/], ['ballet', /ballet|contemporary dance|dance work/],
   ['kidstheatre', /puppet|theatre for young|(family|kids|children'?s) (musical|theatre|play)/],
   ['outdoormovie', /movie night|movies in the|outdoor (movie|cinema)|cinema series/], ['cinema', /film festival|film series|\bfilm\b|screening|cinema|\bmovie/],
   // Books, food and drink outings, markets, classes and gatherings.
@@ -7945,14 +7949,14 @@ const EVENT_PHOTO_RULES = [
   ['cookingclass', /cooking class|culinary class/], ['charcuterie', /charcuterie|cheese (class|tasting|pairing)/],
   ['tea', /afternoon tea|high tea/], ['smores', /s'mores|smores/], ['baking', /bake sale|baking|\bbake\b/],
   ['market', /farmers.? market/], ['xmasmarket', /christmas market|holiday market|yuletide|winter (warm-up )?market|christmas at the/],
-  ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage|antique|rummage|retromania|collectibles|flea market/],
-  ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/],
+  ['craftfair', /craft fair|artisan fair|makers.? market/], ['vintage', /vintage (fair|market|fashion|clothing|sale)|antique|rummage|retromania|collectibles|flea market|closet/],
+  ['comiccon', /comic.?con|pop culture|cosplay|anime/], ['mushroom', /mushroom/], ['santa', /\bsanta\b/], ['pumpkinpatch', /pumpkin (patch|picking)/],
   ['storytime', /storytime|story time/], ['games', /video game|mario kart|minecraft|gaming|esports/],
   ['artgallery', /exhibition|art show|art walk|art gallery|artists?'? (show|sale)/],
   ['wreath', /wreath/], ['ceramics', /ceramic|pottery/],
   ['crafts', /craft(ing|s)?\b.*(night|workshop|session|class)|workshop|mosaic|silk scarf|make your own|frankenstuff/],
-  ['techclass', /android|iphone|computer|tablet|tech help|digital literacy/], ['language', /language|nsyilx/],
-  ['moms', /\bmoms?\b|motherhood/], ['gala', /\bgala\b/], ['talk', /tedx|\btalks?\b|lecture|open house|speakers?\b/],
+  ['techclass', /android|iphone|computer|tablet|tech help|digital literacy/], ['language', /language (class|course|lesson)|learning a language|nsyilx/],
+  ['moms', /\bmoms?\b|motherhood/], ['gala', /\bgala\b/], ['talk', /tedx|\btalks?\b|lecture|open house|speaker series/],
   ['coffee', /coffee social|networking|forget-me-not|dementia/], ['pubnight', /bingo|trivia|quiz night/],
   ['dinner', /dinner|long table|feast|friendsgiving|four courses|pasta/], ['wine', /wine (tasting|info)|holiday cheer|barrel|wine club/],
   // Music, by sound; a big-arena show gets the crowd photo.
@@ -7968,9 +7972,24 @@ const EVENT_PHOTO_RULES = [
   ['halloweenparty', /hallowe'?en|spook|howl-?oween|hallowine|haunting|witches/],
   ['theatre', /theatre|musical|\bplay\b|stage thriller/], ['heritage', /heritage house|historic house|guided tours?|house tour/],
 ];
-const EVENT_PHOTO_SPECIAL = Object.freeze({ golf: '/images/golf/golf-courses-800.jpg', pickleball: '/images/sports/activity-courts-800.jpg' });
-let EVENT_PHOTO_BY_ID = {};
-try { EVENT_PHOTO_BY_ID = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'event-photo-themes.json'), 'utf8')).events || {}; } catch (e) { EVENT_PHOTO_BY_ID = {}; }
+// Photos that live elsewhere on the site. `wo-<category>` keys are the What's On category photos, so an event can be
+// pinned to one in data/event-photo-themes.json (2026-10-18 photo review).
+const EVENT_PHOTO_SPECIAL = Object.freeze({
+  golf: '/images/golf/golf-courses-800.jpg', pickleball: '/images/sports/activity-courts-800.jpg', courts: '/images/sports/activity-courts-800.jpg',
+  pumpkins: '/images/guides/halloween-pumpkins-800.jpg', ski: '/images/ski-snow/ski-snow-800.jpg', trail: '/images/outdoors/activity-hiking-800.jpg',
+  ...Object.fromEntries(['arts-culture', 'community-events', 'events-festivals', 'family-kids', 'food-drink-events', 'holiday-seasonal', 'markets-fairs', 'nightlife', 'sports-recreation', 'wineries-wine-events']
+    .map((c) => [`wo-${c}`, `/images/whats-on/${c}-800.jpg`])),
+  'wo-workshops-pottery-wheel': '/images/whats-on/workshops-pottery-wheel-800.jpg', 'wo-whats-on': '/images/whats-on/whats-on-800.jpg',
+});
+let EVENT_PHOTO_BY_ID = {}, EVENT_PHOTO_NAMES = {};
+try {
+  const themes = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'event-photo-themes.json'), 'utf8'));
+  EVENT_PHOTO_BY_ID = themes.events || {};
+  EVENT_PHOTO_NAMES = themes.names || {};
+} catch (e) { EVENT_PHOTO_BY_ID = {}; EVENT_PHOTO_NAMES = {}; }
+// A pinned photo only applies while the event still has the name it was chosen for, so a renamed event (or a test
+// database whose ids overlap) falls back to the keyword rules instead of showing another event's photo.
+const eventPhotoName = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const eventPhotoReady = new Map();
 function eventThemePhoto(key) {
   const src = EVENT_PHOTO_SPECIAL[key] || `/images/events/${key}-2610-800.jpg`;
@@ -7982,7 +8001,8 @@ function eventThemePhoto(key) {
 // band on stage.
 function eventKindPhoto(e) {
   const byId = EVENT_PHOTO_BY_ID[String(e.id)];
-  if (byId) return eventThemePhoto(byId);
+  const pinnedName = EVENT_PHOTO_NAMES[String(e.id)];
+  if (byId && (!e.name || !pinnedName || eventPhotoName(e.name) === eventPhotoName(pinnedName))) return eventThemePhoto(byId);
   for (const field of [e.name, e.description]) {
     const text = String(field || '').toLowerCase().replace(/[’‘]/g, "'");
     for (const [key, re] of EVENT_PHOTO_RULES) if (re.test(text) && eventThemePhoto(key)) return eventThemePhoto(key);
@@ -23607,6 +23627,23 @@ function renderVenuePageLayoutStyles() {
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
+  /* Venue page layout (2026-10-18): on narrower screens the facts (address, phone, hours) come straight after the
+     buttons, and the menu, visitor tips and guide links follow them. */
+  @media (max-width: 959px) {
+    body.golf-page .venue-layout { display: flex; flex-direction: column; }
+    body.golf-page .venue-main { display: contents; }
+    body.golf-page .venue-aside { order: 1; margin-top: 8px; }
+    body.golf-page .venue-extra { order: 2; }
+  }
+  /* The photo leaves room for the name and the open-now line on a laptop screen. */
+  @media (min-width: 641px) {
+    body.golf-page .venue-hero-photo img { max-height: clamp(220px, 42vh, 420px); }
+    body.golf-page .vg-mosaic .venue-hero-photo, body.golf-page .vg-mosaic .venue-hero-photo img { height: clamp(220px, 42vh, 380px); }
+  }
+  /* Gallery pages: the 2x2 thumbnails beside the photo keep the photo's height. */
+  @media (min-width: 900px) { body.golf-page .vg-mosaic .vg-strip { height: clamp(220px, 42vh, 380px); } }
+  body.golf-page .venue-hours-daily { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 4px; font-weight: 800; color: var(--ink); }
+  body.golf-page .venue-hours-days summary { cursor: pointer; font-size: 0.84rem; font-weight: 700; opacity: 0.8; }
   @media (min-width: 960px) {
     body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 40px; align-items: start; }
     body.golf-page .venue-aside { position: sticky; top: 84px; }
@@ -23751,7 +23788,16 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     }).join('');
     hoursHtml = seasonShut
       ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
-      : `<h2>${L('Hours', 'Heures')}</h2><ul class="hours-list" data-today="${today}">${rows}</ul>`;
+      : (() => {
+        // Venue page layout (2026-10-18): seven identical rows read as noise, so a week with the same hours every day
+        // shows one line and keeps the day-by-day list folded under it.
+        const texts = hoursModule.HOURS_WEEKDAYS.map((d) => venueDayHoursText(parsedHours.days[d], fr));
+        const list = `<ul class="hours-list" data-today="${today}">${rows}</ul>`;
+        if (texts.every((t) => t === texts[0])) {
+          return `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${escapeHtml(texts[0])}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
+        }
+        return `<h2>${L('Hours', 'Heures')}</h2>${list}`;
+      })();
     // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
@@ -23790,7 +23836,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // link and the schema keep the stored English.
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
-    venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(venue.website)}</a>`] : null,
+    venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(String(venue.website).replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''))} \u2197</a>`] : null,
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved.
     venueLinkRow.menu_url ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
     venueLinkRow.booking_url ? [L('Book', 'R\u00e9server'), `<a href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book online', 'R\u00e9server en ligne')} \u2197</a>`] : null,
@@ -23821,7 +23867,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const hero960 = photoSized(venue.image_url, 960);
   const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
-  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
+  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;opacity:0.65;text-align:right">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
@@ -24004,9 +24050,11 @@ ${VENUE_MENU_CSS}` : ''}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
+  <div class="venue-extra">
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
+  </div>
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
@@ -28578,7 +28626,7 @@ const DOG_GUIDE = {
   heading: 'Dog-Friendly Kelowna',
   title: 'Dog-Friendly Kelowna: Beaches, Trails & Patios | Okanagan Roam',
   description: 'Off-leash dog beaches, on-leash trails, and breweries, caf\u00e9s and wineries that welcome dogs in Kelowna, BC, with the dog rules for each.',
-  banner: () => DOG_FRIENDLY_BANNER,
+  banner: () => GUIDE_BANNERS['guide-dog-walk-fall'](),
   parent: { name: 'Dog Friendly Finds', href: '/dog-friendly' },
   noPlace: true,
   intro: [
@@ -29252,19 +29300,24 @@ const GUIDE_PHOTOS = {
   'cider-orchard': { alt: 'Apple cider poured into a glass in an orchard at harvest', pos: 45 }, // Adobe Stock 304081257 (2026-10-18)
   'christmas-market-stall': { alt: 'A couple browsing ornaments at a lit-up Christmas market stall', pos: 40 }, // Adobe Stock 289302551 (2026-10-18)
   'outdoor-skating': { alt: 'A family skating together on an outdoor rink in falling snow', pos: 45 }, // Adobe Stock 390067702 (2026-10-18)
-  'okanagan-lake-late-fall': { alt: 'A quiet sandy beach on Okanagan Lake at Summerland out of season', pos: 55 }, // Adobe Stock 401895437 (2026-10-18)
   'frozen-lake-dock': { alt: 'A wooden dock on a frozen lake with snowy mountains behind', pos: 55 }, // Adobe Stock 188154105 (2026-10-18)
   'snowy-lights-park': { alt: 'A snowy park path lit with lamps and holiday lights at night', pos: 50 }, // Adobe Stock 538003727 (2026-10-18)
   'chairlift': { alt: 'Skiers riding a chairlift above snowy slopes on a sunny day', pos: 40 }, // Adobe Stock 472620344 (2026-10-18)
   'mountain-lodge-restaurant': { alt: 'A mountain restaurant with a fireplace and big windows onto the snow', pos: 50 }, // Adobe Stock 470539433 (2026-10-18)
   'cross-country-ski': { alt: 'Two cross-country skiers on a groomed trail below snowy peaks', pos: 50 }, // Adobe Stock 486451203 (2026-10-18)
-  'kelowna-downtown-lake': { alt: 'Downtown Kelowna across Okanagan Lake, with a boat in the foreground', pos: 50 }, // Adobe Stock 490610824 (2026-10-18)
   'street-tacos': { alt: 'Street tacos with guacamole and salsa', pos: 55 }, // Adobe Stock 424429904 (2026-10-18)
   'patio-mountain-view': { alt: 'Wine glasses on a patio table overlooking forested hills', pos: 50 }, // Adobe Stock 593948761 (2026-10-18)
-  'vineyard-dinner': { alt: 'Friends sharing wine at a long table in a vineyard', pos: 40 }, // Adobe Stock 290509701 (2026-10-18)
   'restaurant-dishes': { alt: 'A restaurant table set with plates, bread and glasses of wine', pos: 50 }, // Adobe Stock 300869026 (2026-10-18)
   'dinner-wine-lights': { alt: 'Red and white wine with dinner under warm string lights', pos: 55 }, // Adobe Stock 334732450 (2026-10-18)
   'valentines-dinner': { alt: 'A couple at a candlelit dinner for two', pos: 50 }, // Adobe Stock 473076390 (2026-10-18)
+  'fall-forest-hiker': { alt: 'A hiker walking a road through golden fall forest', pos: 12 }, // Adobe Stock 277081912 (2026-10-18, season check)
+  'vineyard-fall-colour': { alt: 'Vineyard rows in red and gold fall colour', pos: 50 }, // Adobe Stock 408049776 (2026-10-18, season check)
+  'misty-lake-fall': { alt: 'A misty lake at dawn, with fall colour on the far shore', pos: 50 }, // Adobe Stock 360380096 (2026-10-18, season check)
+  'kelowna-dusk-aerial': { alt: 'Kelowna and Okanagan Lake at dusk, with the city lights coming on', pos: 50 }, // Adobe Stock 116567515 (2026-10-18, season check)
+  'kelowna-night': { alt: 'Downtown Kelowna and the bridge lit up at night', pos: 50 }, // Adobe Stock 392530143 (2026-10-18, season check)
+  'kelowna-boardwalk': { alt: 'The lakeside boardwalk in downtown Kelowna', pos: 50 }, // Adobe Stock 511981475 (2026-10-18, season check)
+  'dog-walk-fall': { alt: 'A man walking his dog on a path through fall leaves', pos: 80 }, // Adobe Stock 540450689 (2026-10-18, season check)
+  'family-science-museum': { alt: 'A mother and two kids exploring a science museum', pos: 55 }, // Adobe Stock 705548393 (2026-10-18, season check)
 };
 for (const [name, b] of Object.entries(GUIDE_PHOTOS)) GUIDE_BANNERS[`guide-${name}`] = () => ({ src: `/images/guides/${name}.jpg`, alt: b.alt, pos: b.pos });
 // Town guides (2026-10-18): `region-<town>` uses that town's own photo. Only photos that need no on-page credit.
@@ -31856,7 +31909,7 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-thumb { position: relative; flex: 1 1 0; min-width: 0; max-width: 96px; height: 64px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: #EAE6D9; }
         .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
-        .vg-mosaic + .venue-photo-credit { margin-bottom: 14px !important; }
+        .vg-mosaic + .venue-photo-credit { margin-top: 6px !important; margin-bottom: 14px !important; }
         .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1rem 'Nunito', sans-serif; }
         /* Wide screens: main photo on the left, the other photos as a 2x2
            grid on the right at the same height, so the venue name below is
@@ -32826,8 +32879,8 @@ function isPriceList(venue) { return menuKind(venue) !== 'menu'; }
 // What each kind of price list is called. item/items name one line of it ("3 tours", "5 rates").
 const PRICE_LIST_WORDS = {
   tours: {
-    en: { noun: 'Tours & prices', title: 'Tours & Prices', list: 'tours & prices', item: 'tour', items: 'tours', blurb: 'a list of your tours', seekers: 'people looking for things to do', name: 'Tour name', desc: 'how long, what&rsquo;s included', what: 'your tours' },
-    fr: { noun: 'Activit\u00e9s et tarifs', item: 'activit\u00e9', items: 'activit\u00e9s', name: 'Nom de l&rsquo;activit&eacute;', desc: 'dur&eacute;e, ce qui est inclus', listHtml: 'vos activit&eacute;s et tarifs', blurb: 'la liste de vos activit&eacute;s' },
+    en: { noun: 'Tours & prices', title: 'Tours & Prices', list: 'tours & prices', item: 'tour', items: 'tours', blurb: 'a list of your tours', seekers: 'people looking for things to do', name: 'Tour name', desc: 'what&rsquo;s included, where it starts', what: 'your tours' },
+    fr: { noun: 'Activit\u00e9s et tarifs', item: 'activit\u00e9', items: 'activit\u00e9s', name: 'Nom de l&rsquo;activit&eacute;', desc: 'ce qui est inclus, point de d&eacute;part', listHtml: 'vos activit&eacute;s et tarifs', blurb: 'la liste de vos activit&eacute;s' },
     schema: 'TouristTrip',
   },
   golf: {
@@ -32852,7 +32905,7 @@ const MENU_READS_PER_VENUE_PER_DAY = 8;
 const MENU_READS_PER_DAY = Number(process.env.MENU_DAILY_READ_LIMIT) || 200;
 const MENU_INDEX_MIN_ITEMS = 5; // fewer dishes: the /menu page is noindex and left out of the sitemap
 const TOURS_INDEX_MIN_ITEMS = 3; // price lists are short: a handful of tours or rates, each with a real description
-const MENU_LIMITS = { sections: 40, items: 500, name: 140, description: 500, price: 40, note: 300 };
+const MENU_LIMITS = { sections: 40, items: 500, name: 140, description: 500, price: 40, note: 300, duration: 60 };
 const MENU_DIETARY = ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'spicy'];
 const MENU_DIETARY_LABELS = {
   en: { vegan: 'Vegan', vegetarian: 'Vegetarian', gluten_free: 'Gluten-free', dairy_free: 'Dairy-free', spicy: 'Spicy' },
@@ -32884,6 +32937,9 @@ function normalizeMenuData(raw) {
       if (!name) continue;
       const dietary = Array.isArray(it.dietary) ? [...new Set(it.dietary.filter((d) => MENU_DIETARY.includes(d)))] : [];
       const item = { name, description: text(it.description, MENU_LIMITS.description), price: text(it.price, MENU_LIMITS.price), dietary, check: it.check === true };
+      // How long a tour takes ("3 hours"), typed in on its own line (2026-10-18). Only kept when given.
+      const duration = text(it.duration, MENU_LIMITS.duration);
+      if (duration) item.duration = duration;
       // Where the dish is in the owner's photo (page file id + box), shown under it while checking; never published.
       const src = it.src;
       if (src && Number.isInteger(src.f) && src.f > 0 && Array.isArray(src.b) && src.b.length === 4 && src.b.every((n) => Number.isFinite(n) && n >= 0 && n <= 20000)) {
@@ -32901,6 +32957,8 @@ function normalizeMenuData(raw) {
   return out;
 }
 function menuItemCount(data) { return data && Array.isArray(data.sections) ? data.sections.reduce((n, s) => n + s.items.length, 0) : 0; }
+// Lines still marked "please check" (yellow): an owner can't publish until each is checked or deleted (2026-10-18).
+function menuCheckCount(data) { return data && Array.isArray(data.sections) ? data.sections.reduce((n, s) => n + s.items.filter((it) => it.check).length, 0) : 0; }
 function parseMenuData(json) { try { return normalizeMenuData(JSON.parse(json || 'null')); } catch (e) { return { sections: [] }; } }
 
 // "18" -> 18, "$18.50" -> 18.5, "12 / 16" -> 12 (the first price), "MP" -> null.
@@ -33304,8 +33362,31 @@ function decodeHtmlText(s) {
 // A web page as lines of visible text, roughly as a person reads it: blocks (paragraphs, list items, headings, table
 // rows) on their own lines, table cells side by side. Scripts, styles and the site's header, navigation and footer
 // are left out.
-function htmlToMenuLines(html) {
+// Fix (2026-10-18): elements a page hides from every visitor (style="display:none", the hidden attribute, a page
+// builder's "hidden on desktop, laptop, tablet and mobile") are left out: Quails' Gate's hidden "Begins Monday,
+// December 1" came through as a dish.
+const HIDDEN_OPEN_RE = /<(div|section|article|aside|p|span|h[1-6]|li|ul|ol|table|tr|td|dl|figure)\b(?=[^>]*(?:\shidden(?=[\s>=/])|\saria-hidden=["']true["']|style=["'][^"']*display\s*:\s*none|class=["'][^"']*elementor-hidden-desktop(?=[^"']*elementor-hidden-tablet)(?=[^"']*elementor-hidden-mobile)))[^>]*>/gi;
+function stripHiddenElements(html) {
   let h = String(html || '');
+  for (let guard = 0; guard < 500; guard++) {
+    HIDDEN_OPEN_RE.lastIndex = 0;
+    const m = HIDDEN_OPEN_RE.exec(h);
+    if (!m) break;
+    const tag = m[1].toLowerCase();
+    const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi');
+    re.lastIndex = m.index + m[0].length;
+    let depth = 1, end = -1, t;
+    while ((t = re.exec(h))) {
+      if (t[0].endsWith('/>')) continue;
+      depth += t[1] ? -1 : 1;
+      if (!depth) { end = t.index + t[0].length; break; }
+    }
+    h = h.slice(0, m.index) + ' ' + (end < 0 ? h.slice(m.index + m[0].length) : h.slice(end));
+  }
+  return h;
+}
+function htmlToMenuLines(html) {
+  let h = stripHiddenElements(String(html || '').replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' '));
   h = h.replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(script|style|noscript|svg|template|head|iframe|form|select|button)\b[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<(nav|header|footer)\b[\s\S]*?<\/\1>/gi, ' ');
@@ -33525,6 +33606,12 @@ async function handleMenuApi(req, res, ctx, action, arg) {
     db.prepare("UPDATE venue_menus SET data = ?, status = CASE WHEN status = 'draft' THEN 'ready' ELSE status END, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(JSON.stringify(data), menu.id);
     if (action === 'save') return send(200, { ok: true, saved: true });
     if (!menuItemCount(data)) return send(400, { ok: false, error: 'Your menu needs at least one dish before it can go live.' });
+    // Fix (2026-10-18): a website import once went live with 8 unchecked yellow lines. Owners check (or delete) each
+    // one first; Dayton, finishing a menu from /admin/review, confirms on his screen and may publish anyway.
+    const unchecked = menuCheckCount(data);
+    if (unchecked && !(ctx.menuId && body.allow_unchecked === true)) {
+      return send(409, { ok: false, needs_check: unchecked, error: `${unchecked === 1 ? '1 line still needs' : `${unchecked} lines still need`} checking. Tap each yellow line, fix it if needed and press Done, or delete it.` });
+    }
     const contact = ctx.live ? { email: null } : ownerOptionalEmail(body.contact_email);
     if (contact.error) return send(400, { ok: false, errors: { contact_email: contact.error } });
     const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
@@ -33564,6 +33651,13 @@ async function handleMenuApi(req, res, ctx, action, arg) {
       console.error(`[menus] help request for venue #${venue.id} could not be sent: ${String((err && err.message) || err).slice(0, 300)}`);
     }
     return send(200, { ok: true });
+  }
+  if (action === 'manual') {
+    // "Type it in myself" (2026-10-18): an empty menu, ready to fill in on the checking screen.
+    let m = menu && ['draft', 'ready'].includes(menu.status) ? menu : null;
+    if (m) db.prepare("UPDATE venue_menus SET status = 'ready', read_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(m.id);
+    else db.prepare('INSERT INTO venue_menus (venue_id, status, data, submitted_by, ip_hash) VALUES (?, ?, ?, ?, ?)').run(venue.id, 'ready', JSON.stringify({ sections: [] }), ctx.actor, menuIpHash(ip));
+    return send(200, { ok: true, ...menuStateJson(venue, current()) });
   }
   if (action === 'restart') {
     // "Start over with new photos": the current attempt is closed and a fresh one begins with the next photo.
@@ -33640,6 +33734,13 @@ const MENU_APP_STRINGS = {
     pdfBig: 'That PDF is too big. Try a photo of the menu instead.',
     network: 'No connection right now. Please check your internet and try again.',
     other: 'Fran&ccedil;ais', diet: { vegan: 'Vegan', vegetarian: 'Vegetarian', gluten_free: 'Gluten-free', dairy_free: 'Dairy-free', spicy: 'Spicy' },
+    // Typing a menu in (2026-10-18) and checking every yellow line before it goes live.
+    typeButton: '&#9000;&#65039;&nbsp;Type it in myself', typeTitle: 'Type in your menu',
+    typeIntro: 'Add each dish with its price (the description is optional). Tap a section name to change it, and add sections like Starters, Mains or Drinks.',
+    firstSection: 'Menu', sectionPh: 'Section name, like Starters', namePh: 'like Caesar Salad', pricePh: 'like 14 or 12.50',
+    duration: 'How long (optional)', durationPh: 'like 3 hours',
+    checkHow: 'Tap each yellow line, fix it if needed and press Done, or delete it.',
+    checkFirst: 'Check the {n} yellow lines first', checkFirstOne: 'Check the yellow line first',
   },
   fr: {
     title: 'Ajoutez votre menu', adminTitle: '&Eacute;diteur de menu',
@@ -33690,6 +33791,12 @@ const MENU_APP_STRINGS = {
     pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo du menu.',
     network: 'Pas de connexion pour l&rsquo;instant. V&eacute;rifiez votre internet et r&eacute;essayez.',
     other: 'English', diet: MENU_DIETARY_LABELS.fr,
+    typeButton: '&#9000;&#65039;&nbsp;Je le tape moi-m&ecirc;me', typeTitle: 'Tapez votre menu',
+    typeIntro: 'Ajoutez chaque plat avec son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer, et ajoutez des sections comme Entr&eacute;es, Plats ou Boissons.',
+    firstSection: 'Menu', sectionPh: 'Nom de la section, ex. Entr\u00e9es', namePh: 'ex. Salade C\u00e9sar', pricePh: 'ex. 14 ou 12,50',
+    duration: 'Dur&eacute;e (facultatif)', durationPh: 'ex. 3 heures',
+    checkHow: 'Touchez chaque ligne jaune, corrigez-la au besoin et appuyez sur Termin&eacute;, ou supprimez-la.',
+    checkFirst: 'V&eacute;rifiez d&rsquo;abord les {n} lignes jaunes', checkFirstOne: 'V&eacute;rifiez d&rsquo;abord la ligne jaune',
   },
 };
 
@@ -33724,6 +33831,11 @@ function priceListAppStrings(kind, lang) {
       webIntro: 'Collez le lien de votre site ou de votre page de tarifs. Nous trouverons vos prix et les importerons pour que vous les v&eacute;rifiiez.',
       webGo: 'R&eacute;cup&eacute;rer mes tarifs', webFound: 'Vos tarifs ont &eacute;t&eacute; import&eacute;s depuis votre site. V&eacute;rifiez-les, puis publiez.',
       webNothing: 'Nous avons trouv&eacute; la page, mais pas de prix dessus. Essayez plut&ocirc;t une photo, ou touchez &laquo;&nbsp;Pouvez-vous le faire pour moi&nbsp;?&nbsp;&raquo;',
+      typeTitle: `Tapez ${f.listHtml}`, typeIntro: kind === 'tours'
+        ? 'Ajoutez chaque activit&eacute; avec sa dur&eacute;e et son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer.'
+        : `Ajoutez chaque ${f.item} avec son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer.`,
+      firstSection: kind === 'tours' ? 'Activit\u00e9s' : 'Tarifs', namePh: kind === 'tours' ? 'ex. Visite des vignobles' : kind === 'golf' ? 'ex. 18 trous, semaine' : 'ex. Entr\u00e9e adulte',
+      pricePh: kind === 'tours' ? 'ex. 129 par personne' : 'ex. 75',
     };
   }
   return {
@@ -33751,13 +33863,18 @@ function priceListAppStrings(kind, lang) {
     webIntro: 'Paste the link to your website or the page with your prices. We&rsquo;ll find them and bring them in for you to check.',
     webGo: 'Get my prices', webFound: `We brought ${e.what} in from your website. Please check them, then publish.`,
     webNothing: 'We found the page, but couldn&rsquo;t pick out prices on it. Try a photo instead, or tap &ldquo;Can you do it for me?&rdquo;',
+    typeTitle: `Type in ${e.what}`, typeIntro: kind === 'tours'
+      ? 'Add each tour with how long it takes and its price (the description is optional). Tap a section name to change it.'
+      : `Add each ${e.item} with its price (the description is optional). Tap a section name to change it.`,
+    firstSection: kind === 'tours' ? 'Tours' : kind === 'golf' ? 'Green fees' : 'Prices', namePh: kind === 'tours' ? 'like Wine Tour' : kind === 'golf' ? 'like 18 holes, weekday' : 'like Adult admission',
+    pricePh: kind === 'tours' ? 'like 129 per person' : 'like 75',
   };
 }
 
 // The page's client code (ES5 so older phones run it). Config comes from window.MENU_CFG.
 const MENU_APP_SCRIPT = String.raw`(function(){
   var C = window.MENU_CFG, T = C.t, S = C.state, base = C.base, app = document.getElementById('mnApp');
-  var data = null, openItem = null, saveTimer = null, pollTimer = null, readStart = 0, busyUpload = false;
+  var data = null, openItem = null, saveTimer = null, pollTimer = null, readStart = 0, busyUpload = false, typing = false;
   function h(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function f(s, o){ return String(s).replace(/\{(\w+)\}/g, function(m, k){ return o[k]; }); }
   function api(path, body){
@@ -33797,6 +33914,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   function startScreen(message){
     setScreen('<h1>' + T.title + '</h1><p class="mn-lead">' + T.intro + '</p>' + err(message) + pickers(true)
       + '<button type="button" class="mn-btn mn-plain" data-act="web">' + T.webButton + '</button>'
+      + '<button type="button" class="mn-btn mn-plain" data-act="type">' + T.typeButton + '</button>'
       + '<p class="mn-tip">' + T.tip + '</p>' + helpBtn() + backLink());
   }
   function publishedScreen(){
@@ -33849,8 +33967,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         return '<label class="mn-chip"><input type="checkbox" data-diet="' + d + '"' + (it.dietary.indexOf(d) >= 0 ? ' checked' : '') + '> ' + T.diet[d] + '</label>';
       }).join('');
       return '<div class="mn-item mn-open" data-item="' + key + '">'
-        + '<label>' + T.dishName + '<input type="text" data-f="name" maxlength="140" value="' + h(it.name) + '"></label>'
-        + '<label>' + T.price + '<input type="text" data-f="price" maxlength="40" inputmode="decimal" value="' + h(it.price) + '"></label>'
+        + '<label>' + T.dishName + '<input type="text" data-f="name" maxlength="140" value="' + h(it.name) + '" placeholder="' + h(T.namePh || '') + '"></label>'
+        + '<label>' + T.price + '<input type="text" data-f="price" maxlength="40" inputmode="decimal" value="' + h(it.price) + '" placeholder="' + h(T.pricePh || '') + '"></label>'
+        + (C.kind === 'tours' ? '<label>' + T.duration + '<input type="text" data-f="duration" maxlength="60" value="' + h(it.duration || '') + '" placeholder="' + h(T.durationPh) + '"></label>' : '')
         + '<label>' + T.description + '<textarea data-f="description" maxlength="500" rows="2">' + h(it.description) + '</textarea></label>'
         + '<div class="mn-chips">' + diets + '</div>'
         + '<div class="mn-move"><button type="button" class="mn-link" data-act="up"' + (si === 0 && ii === 0 ? ' disabled' : '') + '>&uarr; ' + T.moveUp + '</button>'
@@ -33861,8 +33980,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     }
     var tags = it.dietary.map(function(d){ return '<span class="mn-tag">' + T.diet[d] + '</span>'; }).join('');
     return '<button type="button" class="mn-item' + (it.check ? ' mn-check' : '') + '" data-item="' + key + '">'
-      + '<span class="mn-line"><span class="mn-name">' + h(it.name) + '</span><span class="mn-price">' + (it.price ? h(priceText(it.price)) : '<em>' + T.noPrice + '</em>') + '</span></span>'
-      + (it.description ? '<span class="mn-desc">' + h(it.description) + '</span>' : '') + (tags ? '<span class="mn-tags">' + tags + '</span>' : '')
+      + '<span class="mn-line"><span class="mn-name">' + (it.name ? h(it.name) : '<em>' + T.dishName + '</em>') + '</span><span class="mn-price">' + (it.price ? h(priceText(it.price)) : '<em>' + T.noPrice + '</em>') + '</span></span>'
+      + (it.duration || it.description ? '<span class="mn-desc">' + h([it.duration, it.description].filter(Boolean).join(' \u00b7 ')) + '</span>' : '') + (tags ? '<span class="mn-tags">' + tags + '</span>' : '')
       + stripHtml(it)
       + (it.check ? '<span class="mn-flag">&#9888;&#65039; ' + T.checkThis + '</span>' : '') + '</button>';
   }
@@ -33885,15 +34004,16 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var n = countChecks(), m = S.menu;
     var head = C.mode === 'admin' ? '<h1>' + T.adminTitle + ': ' + h(C.venueName) + '</h1><p class="mn-sub">#' + m.id + ' &middot; ' + h(m.status) + '</p>'
       + (C.adminNote ? '<div class="mn-card mn-warn"><p>' + h(C.adminNote) + '</p></div>' : '')
+      : typing ? '<h1>' + T.typeTitle + '</h1><p class="mn-lead">' + T.typeIntro + '</p>'
       : '<h1>' + T.reviewTitle + '</h1><p class="mn-lead">' + T.reviewIntro + '</p>';
-    var notes = (notice ? '<div class="mn-card mn-ok"><p>' + notice + '</p></div>' : '') + (data.partial && !notice ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + '</p></div>' : '')
+    var notes = (notice ? '<div class="mn-card mn-ok"><p>' + notice + '</p></div>' : '') + (data.partial && n && !notice ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + ' ' + T.checkHow + '</p></div>' : '')
       + (hasStrips() ? '<p class="mn-sub">' + T.stripHint + '</p>' : '');
     notice = null;
     var secs = data.sections.map(function(s, si){
-      return '<section class="mn-sec" data-sec="' + si + '"><input class="mn-sec-name" type="text" data-sec-name="' + si + '" maxlength="140" value="' + h(s.name) + '" aria-label="' + T.sectionName + '">'
+      return '<section class="mn-sec" data-sec="' + si + '"><input class="mn-sec-name" type="text" data-sec-name="' + si + '" maxlength="140" value="' + h(s.name) + '" aria-label="' + T.sectionName + '" placeholder="' + h(T.sectionPh) + '">'
         + (s.note ? '<p class="mn-note">' + h(s.note) + '</p>' : '')
         + (s.items.length ? s.items.map(function(it, ii){ return itemHtml(it, si, ii); }).join('') : '<p class="mn-sub">' + T.emptySection + '</p>')
-        + '<div class="mn-row"><button type="button" class="mn-link" data-act="add-item" data-s="' + si + '">' + T.addDish + '</button>'
+        + '<div class="mn-row"><button type="button" class="' + (typing ? 'mn-btn mn-plain mn-add' : 'mn-link') + '" data-act="add-item" data-s="' + si + '">' + T.addDish + '</button>'
         + (s.items.length ? '' : '<button type="button" class="mn-link mn-danger" data-act="del-sec" data-s="' + si + '">' + T.deleteSection + '</button>') + '</div></section>';
     }).join('');
     var photos = pages().length ? '<details class="mn-photos"' + (C.mode === 'admin' ? ' open' : '') + '><summary>' + T.yourPhotos + '</summary>' + thumbs(C.mode === 'admin') + '</details>' : '';
@@ -33905,9 +34025,30 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     setScreen(head + photos + admin + notes + err(message) + '<div class="mn-menu">' + secs + '</div>'
       + (C.mode === 'admin' ? '' : '<p class="mn-row"><button type="button" class="mn-link" data-act="add-sec">' + T.addSection + '</button></p>')
       + email + '<p class="mn-saved" id="mnSaved" aria-live="polite"></p>'
-      + '<button type="button" class="mn-btn mn-big mn-go" data-act="publish">' + (C.mode === 'admin' ? 'Publish it (goes live now)' : C.mode === 'token' ? T.send : T.publish) + '</button>'
+      + publishButton(n)
       + (C.mode === 'admin' ? '' : '<p class="mn-help"><button type="button" class="mn-link" data-act="restart">' + T.startOver + '</button></p>') + helpBtn() + backLink());
   }
+  // Fix (2026-10-18): yellow lines can't go live unchecked. While any are left the button says how many and takes
+  // the owner to the next one (fix it or press Done, or delete it); Dayton, finishing a menu, is asked instead.
+  function publishButton(n){
+    var label = C.mode === 'admin' ? 'Publish it (goes live now)' : C.mode === 'token' ? T.send : T.publish;
+    if (n && C.mode !== 'admin') return '<button type="button" class="mn-btn mn-big mn-wait" data-act="next-check">' + (n === 1 ? T.checkFirstOne : f(T.checkFirst, { n: n })) + ' &rarr;</button>';
+    return '<button type="button" class="mn-btn mn-big mn-go" data-act="publish">' + label + '</button>';
+  }
+  function firstCheck(){
+    for (var si = 0; si < data.sections.length; si++) for (var ii = 0; ii < data.sections[si].items.length; ii++) if (data.sections[si].items[ii].check) return si + ':' + ii;
+    return null;
+  }
+  function openAndShow(key){
+    openItem = key; reviewScreen();
+    var box = app.querySelector('.mn-open');
+    if (box) { if (box.scrollIntoView) box.scrollIntoView({ block: 'center' }); var inp = box.querySelector('input'); if (inp) inp.focus(); }
+  }
+  // Removes dishes left with no name (a new line the owner didn't fill in).
+  function pruneBlank(){
+    data.sections.forEach(function(s){ s.items = s.items.filter(function(it){ return String(it.name || '').trim(); }); });
+  }
+  function blankItem(){ return { name: '', description: '', price: '', dietary: [], check: false }; }
   function rerender(){ var y = window.scrollY; reviewScreen(); window.scrollTo(0, y); }
   function save(now){
     clearTimeout(saveTimer);
@@ -33974,7 +34115,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     return loaded[src];
   }
   function scanProgress(frac){ var bar = el('mnBar'); if (bar) bar.style.width = Math.max(4, Math.min(97, Math.round(frac * 100))) + '%'; }
-  function deviceRead(){
+  function deviceRead(fromWeb){
     var list = pages(); if (!list.length) return;
     var secs = 15 + list.length * 15;
     setScreen('<h1 class="mn-center">' + f(T.reading, { s: secs }) + '</h1><div class="mn-bar"><span id="mnBar" style="transition:width .4s linear"></span></div><p class="mn-center mn-sub" id="mnStage">' + T.readingSub + '</p>' + thumbs(false) + helpBtn());
@@ -34103,6 +34244,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     })().then(function(){
       if (worker) worker.terminate();
       var parsed = parseMenuLines(lines);
+      // Menu PDFs from the owner's website get the same tidying as a menu page (2026-10-18).
+      if (fromWeb) parsed = tidyImported(parsed);
       if (!parsed.sections.length) { S.menu.read_error = 'blurry'; return render(); }
       scanProgress(1);
       return api('/save', { data: parsed }).then(function(r){
@@ -34284,10 +34427,43 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   var JUNK_RE = /(\b\d{1,2}(?:[:. ]\d{2})?\s?(?:am|pm)\b|www\.|https?:|@|\.com\b|\.ca\b|\bphone\b|\btel\b|\(\d{3}\)|\d{3}[-. ]\d{3}[-. ]\d{4}|instagram|facebook|gratuity|\bgst\b|\bpst\b|plus tax|prices? (?:are )?subject|allerg|consuming raw)/i;
   var DIET = { V: 'vegetarian', VG: 'vegan', VE: 'vegan', GF: 'gluten_free', DF: 'dairy_free' };
   function words(t){ return t.split(/\s+/).filter(Boolean).length; }
+  var PLATTER_RE = /platter|flight|\bboard\b|sampler|combo|\btrio\b|for two|feast|tasting/i;
+  var MONTH_END_RE = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?,?$/i;
+  var SIZE_NAME_RE = /^(?:for (?:one|two|three|four|five|six|eight|1|2|4)|small|regular|medium|large|half|full|single|double|cup|bowl|glass|bottle|half order|full order)$/i;
+  var TIME_RE = /\b\d{1,2}(?:[:.]\d{2})?\s?(?:am|pm|a\.m\.|p\.m\.)/i;
+  // A heading with the hours it is served ("LUNCH MAINS | 11:00 AM - 2:30 PM", "Breakfast (8am - 11am)",
+  // "HAPPY HOUR | DAILY 2:30 PM - 5:00 PM") -> { name, note }, or null. The heading must look like one (capitals, or a
+  // short title naming a meal or course) and the rest must be hours, not a price, phone or address.
+  function headingWithHours(raw){
+    var s = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!TIME_RE.test(s) || /\$\s?\d/.test(s)) return null;
+    var at = s.search(/\s*(?:\||[\-\u2013\u2014:]\s|\(|\b(?:daily|served|from|until|till|starting|every|weekdays?|weekends?|mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|\d)/i);
+    if (at < 3) return null;
+    var name = s.slice(0, at).replace(/[\s\-\u2013\u2014:|(]+$/, '').trim(), note = s.slice(at).replace(/^[\s|\-\u2013\u2014:(]+|[\s)]+$/g, '').trim();
+    if (!name || !note || !TIME_RE.test(note) || JUNK_RE.test(note.replace(new RegExp(TIME_RE.source, 'gi'), ' '))) return null;
+    if (/\d/.test(name) || words(name) > 5) return null;
+    var title = words(name) <= 3 && name.split(' ').every(function(w){ return /^[A-Z&]/.test(w); }) && name.toLowerCase().split(/[\s&\/]+/).some(function(w){ return MENU_WORDS[w]; });
+    if (!isCapsHeading(name) && !title) return null;
+    if (/^(?:open|opening|hours|closed|seating|early|later|last)\b/i.test(name)) return null;
+    return { name: name, note: note.replace(/\)$/, '') };
+  }
+  // A capitals line of one to three real words, at least one of them a common menu word ("COFFEE", "BREAKFAST").
+  function knownHeading(t){
+    if (!isCapsHeading(t) || words(t) > 3) return false;
+    var toks = t.toLowerCase().replace(/[^a-z\s&]/g, ' ').split(/\s+/).filter(function(w){ return w && w !== '&'; });
+    return toks.length > 0 && toks.every(function(w){ return w.length >= 3 && /[aeiouy]/.test(w); }) && toks.some(function(w){ return MENU_WORDS[fixWord(w)] || MENU_WORDS[w]; });
+  }
   var SIZE_RE = /^\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb|lbs|pc|pcs|pieces?|inch|in|cm)\b/i; // "8 oz striploin", "6 pc"
   function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6 || DURATION_RE.test(t) || DESC_START_RE.test(t) || SIZE_RE.test(t); }
   function isCapsHeading(t){ var l = t.replace(/[^A-Za-z]/g, ''); return l.length >= 3 && l === l.toUpperCase() && words(t) <= 5 && t.length <= 40; }
-  function niceCase(t){ return isCapsHeading(t) ? t.toLowerCase().replace(/(^|[\s\-&\/])([a-z])/g, function(m, a, b){ return a + b.toUpperCase(); }) : t; }
+  // A long name in capitals ("PEPPER & THYME CRUSTED BISON CARPACCIO", "63 ACRES RIBEYE 13oz"): mostly capital letters.
+  function isCapsName(t){ var l = t.replace(/[^A-Za-z]/g, ''), up = l.replace(/[^A-Z]/g, '').length; return l.length >= 6 && up >= l.length * 0.8 && words(t) <= 12; }
+  function niceCase(t){
+    if (isCapsHeading(t)) return t.toLowerCase().replace(/(^|[\s\-&\/])([a-z])/g, function(m, a, b){ return a + b.toUpperCase(); });
+    // (2026-10-18) Longer capitals names too; words with digits or small letters in them ("13oz", "21B") stay as printed.
+    if (isCapsName(t)) return t.split(' ').map(function(w){ return /^[A-Z][A-Z'\u2019&\-]*$/.test(w) && w.length > 1 ? w.charAt(0) + w.slice(1).toLowerCase() : w; }).join(' ');
+    return t;
+  }
   function takeDiet(t, out){
     return t.replace(/\(\s*(VG|VE|V|GF|DF)\s*\)|(?:^|\s)(VG|GF|DF)(?=\s|$|,)/g, function(m, a, b){ var d = DIET[a || b]; if (d && out.indexOf(d) < 0) out.push(d); return ' '; }).replace(/\s+/g, ' ').trim();
   }
@@ -34389,15 +34565,32 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       parts.forEach(function(text){ var c = {}; for (var k in ln) c[k] = ln[k]; c.text = text; split.push(c); });
     });
     split.forEach(function(ln){
-      var t = String(ln.text || '').replace(/[|_]/g, ' ').replace(/(\s?[.·•…]){2,}\s?/g, ' ').replace(/\s+/g, ' ').replace(/[\s.]+$/, '').trim();
+      // Fix (2026-10-18): "For One$14.95" (a web page's price in its own tag) reads as "For One $14.95".
+      var rawT = String(ln.text || '').replace(/([A-Za-z\u00c0-\u00ff)])\$(?=\d)/g, '$1 $');
+      var t = rawT.replace(/[|_]/g, ' ').replace(/(\s?[.·•…]){2,}\s?/g, ' ').replace(/\s+/g, ' ').replace(/[\s.]+$/, '').trim();
       var conf = typeof ln.conf === 'number' ? ln.conf : 100;
+      // Fix (2026-10-18): a heading printed with its hours ("LUNCH MAINS | 11:00 AM - 2:30 PM", "BREAKFAST 8am-11am")
+      // was dropped with the hours, so its dishes ran into the section above. The heading is kept; the hours become
+      // the section's note.
+      var hh = headingWithHours(rawT);
+      if (hh) { flush(); section(hh.name); cur.note = hh.note; return; }
       if (t.length < 2 || JUNK_RE.test(t)) return;
+      // Dietary marks a website prints on their own line under a dish ("Dairy free", "Gluten free").
+      var tag = /^(dairy[- ]free|lactose[- ]free|gluten[- ]free|contains dairy|mild|med|medium)$/i.exec(t);
+      if (tag && last && !pending) {
+        var tk = tag[1].toLowerCase().replace(' ', '-');
+        var dd = tk === 'gluten-free' ? 'gluten_free' : tk === 'dairy-free' || tk === 'lactose-free' ? 'dairy_free' : null;
+        if (dd && last.dietary.indexOf(dd) < 0) last.dietary.push(dd);
+        return;
+      }
       // What the reader "saw" in a menu's pictures and decorations: unsure, and mostly not words. Dropped.
       var sure = typeof ln.wconf === 'number' ? ln.wconf : conf;
       if (sure < 75) {
         var textToks = t.split(' ').filter(function(x){ return !/^[$S]?\d[\d.,\/]*$/.test(x); });
         var wordish = textToks.filter(function(x){ return /^[A-Za-z\u00c0-\u00ff'\u2019&-]{3,}[.,]?$/.test(x) && /[aeiouy]/i.test(x); }).length;
-        if (sure < 35 || (textToks.length && wordish < textToks.length * 0.4)) return;
+        // Fix (2026-10-18): a big decorative heading ("COFFEE", "BREAKFAST") is often read with low confidence; one
+        // that spells a well-known menu word is kept as a heading rather than dropped as decoration.
+        if (!knownHeading(t) && (sure < 35 || (textToks.length && wordish < textToks.length * 0.4))) return;
       }
       // A dish's name printed again right after it (a website's photo caption or hidden label) is a repeat.
       var normName = function(x){ return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
@@ -34406,6 +34599,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       var toks = t.split(' ');
       if (toks.length >= 4 && toks.filter(function(x){ return x.length === 1; }).length >= toks.length * 0.7) return;
       var m = PRICE_RE.exec(t);
+      // Fix (2026-10-18): a number after a month is a date, not a price ("Begins Monday, December 1").
+      if (m && !/\$/.test(m[2]) && MONTH_END_RE.test(t.slice(0, m.index).trim())) m = null;
       if (m) {
         var unit = m[4] ? ' ' + m[4].trim().replace(/\s+/g, ' ').replace(/^\/\s*/, 'per ') : '';
         var price = (m[2] + (m[3] || '')).replace(/[S$\s]/gi, '').replace(/[\/|]/g, ' / ');
@@ -34435,9 +34630,18 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         // The price at the end of a dish's description that ran over several lines ("... house made tortilla chips 12").
         // (Unless it repeats the dish's own name, "PACHOS" ... "Pachos For One 14.95": that's a size of it.)
         var repeatsName = rest.toLowerCase().indexOf(last ? last.name.toLowerCase().split(' ')[0] : '\u0000') === 0;
-        if (!pending && last && !last.price && !repeatsName && (looksDesc(rest) || /^[a-z]/.test(rest) || (last._caps && last.description))) {
+        // (A new name in capitals with its price, "FOOD & WINE FLIGHT | 40", is the next dish, not more description.)
+        if (!pending && last && !last.price && !repeatsName && (looksDesc(rest) || /^[a-z]/.test(rest) || (last._caps && last.description && !isCapsName(rest)))) {
           last.description = (last.description ? last.description + ' ' : '') + fixWords(rest); last.price = price;
           if (conf < 75) last.check = true; grow(last, ln); return;
+        }
+        // Sizes printed under a dish ("Wonton Soup", its description, "For One $14.95", "For Two $21.95") are that
+        // dish in each size, not dishes called "For One" (2026-10-18).
+        if (pending && !pending.caps && SIZE_NAME_RE.test(rest)) { item(pending.text + ' (' + rest + ')', '', price, Math.min(conf, pending.conf), [pending.ln, ln]); last._base = pending.text; pending = null; return; }
+        if (!pending && last && SIZE_NAME_RE.test(rest) && (last._base || !last.price)) {
+          var base = last._base || last.name;
+          if (!last._base) { last.name = base + ' (' + rest + ')'; last.price = price; last._base = base; if (conf < 75) last.check = true; else last.check = false; grow(last, ln); return; }
+          item(base + ' (' + rest + ')', '', price, conf, [ln]); last._base = base; return;
         }
         flush();
         var parts = /^(.{3,60}?)\s+[\-–—:]\s+(.+)$/.exec(rest);
@@ -34460,6 +34664,19 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       pending = { text: t, conf: conf, ln: ln };
     });
     if (pending) item(pending.text, '', '', pending.conf, [pending.ln]);
+    // What comes on a platter, flight or board ("SURF & TURF PLATTER | 38", then its three dishes with no price):
+    // part of it, not dishes (or headings) of their own (2026-10-18).
+    sections.forEach(function(s){
+      var keep = [];
+      for (var k = 0; k < s.items.length; k++) {
+        var it = s.items[k], parts = [];
+        keep.push(it);
+        if (!it.price || !PLATTER_RE.test(it.name)) continue;
+        while (k + 1 < s.items.length && !s.items[k + 1].price && words(s.items[k + 1].name) <= 8) parts.push(s.items[++k].name);
+        if (parts.length) it.description = (it.description ? it.description + ' ' : '') + 'Includes: ' + parts.join(', ') + '.';
+      }
+      s.items = keep;
+    });
     // Short lines with no price right after a dish ("Salt & Pepper", "Korean BBQ", "Buffalo", "Honey Lime") are its
     // choices, not dishes: two or more in a row become part of the dish's description.
     sections.forEach(function(s){
@@ -34488,7 +34705,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       });
     });
     sections = regrouped;
-    sections.forEach(function(s){ s.items.forEach(function(it){ delete it._from; delete it._caps; delete it._maybe; it.description = it.description.replace(/[\s\-–—]+$/, ''); }); });
+    sections.forEach(function(s){ s.items.forEach(function(it){ delete it._from; delete it._caps; delete it._maybe; delete it._base; it.description = it.description.replace(/[\s\-–—]+$/, ''); }); });
     sections = sections.filter(function(s){ return s.items.length; });
     // A menu that prints no prices at all (some dining rooms) isn't flagged dish by dish.
     var total = 0, priced = 0;
@@ -34502,6 +34719,74 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var any = sections.some(function(s){ return s.items.some(function(it){ return it.check; }); });
     return { sections: sections, partial: any };
   }
+  // ----- Tidying a menu brought in from a website (2026-10-18) -----
+  // A restaurant's web page carries more than its menu: welcome blurbs ("Dine With Us"), last year's New Year's Eve
+  // dinner, "Begins Monday, December 1", the same steaks on the lunch and brunch menus. Those are taken out before the
+  // owner sees the menu, so what is left to check is the menu itself:
+  // - a line with no price and a paragraph of prose under it (marketing, not a dish);
+  // - event text: New Year's Eve, "Begins ...", a dated line ("December 31"), a year before this one (not a wine's vintage);
+  // - a "name" that is only a price ("$59 per person (wine included)");
+  // - the same dish at the same price a second time.
+  // Lines with no price right after a platter, flight or board ("Surf & Turf Platter 38") are what comes on it.
+  var EVENT_RE = /new year'?s(?: eve)?|\bnye\b|\bbegins\b|\bstarting (?:on |this )?(?:mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|\b(?:upcoming|past) events?\b/i;
+  var DATED_RE = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}(?:st|nd|rd|th)?\b/i;
+  // "Online menu may differ based on availability", "Prices subject to change".
+  var DISCLAIMER_RE = /\b(?:menu|prices?|items?)\b.{0,60}\b(?:chang\w*|differ|subject to|availability)\b/i;
+  var PROSE_RE = /\b(?:we|we'll|we're|our|us|you|your|join|enjoy|celebrate|discover|unwind|savour|savor|reserv\w*|book(?:ing)?|welcome|experience)\b/i;
+  function pastYear(t){
+    var now = new Date().getFullYear(), m, re = /\b((?:19|20)\d{2})\b/g, s = String(t || '');
+    while ((m = re.exec(s))) {
+      if (+m[1] >= now) continue;
+      // "2022 Merlot", "Quails' Gate Pinot Noir 2022": a wine's vintage, not a date.
+      if (m.index === 0 && /^\s+[A-Za-z]/.test(s.slice(m.index + 4))) continue;
+      return true;
+    }
+    return false;
+  }
+  function eventText(t){ return EVENT_RE.test(t) || DATED_RE.test(t) || /^(?:begins|starts|starting|opens|returns|coming soon|available (?:from|until))\b/i.test(t); }
+  function proseItem(it){
+    if (it.price) return false;
+    var d = it.description || '';
+    return words(it.name) > 10 || words(d) > 22 || (words(d) > 8 && (PROSE_RE.test(d) || /[.!?]\s+[A-Z]/.test(d)));
+  }
+  function tidyImported(menu){
+    var seen = {}, out = [], dropped = 0;
+    var norm = function(x){ return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+    var clean = function(x){ return String(x || '').replace(/\s*\((?:view|see|download)\b[^)]*\)\s*/gi, ' ').replace(/\s+/g, ' ').trim(); };
+    (menu.sections || []).forEach(function(s){
+      s.name = clean(s.name);
+      if (eventText(s.name) || (pastYear(s.name) && !/^\d{4}\s/.test(s.name))) { dropped += s.items.length; return; }
+      s.note = clean(s.note);
+      if (s.note && (eventText(s.note) || pastYear(s.note) || words(s.note) > 30 || DISCLAIMER_RE.test(s.note))) s.note = '';
+      var items = [];
+      for (var k = 0; k < s.items.length; k++) {
+        var it = s.items[k];
+        it.name = clean(it.name);
+        if (!it.name || proseItem(it) || eventText(it.name) || (!it.price && pastYear(it.name))
+          || (!it.price && /^\$?\d+(?:[.,]\d{2})?\s*(?:per\b|pp\b|\/|\+|\()/i.test(it.name))) { dropped++; continue; }
+        // What comes on a platter, flight or board.
+        it.description = String(it.description || '').split(/(?<=[.!?])\s+/).filter(function(x){ return !DISCLAIMER_RE.test(x); }).join(' ').trim();
+        if (it.price && PLATTER_RE.test(it.name)) {
+          var parts = [];
+          while (k + 1 < s.items.length && !s.items[k + 1].price && words(s.items[k + 1].name) <= 8 && !eventText(s.items[k + 1].name)) parts.push(s.items[++k].name);
+          if (parts.length) { it.description = (it.description ? it.description + ' ' : '') + 'Includes: ' + parts.join(', ') + '.'; it.check = false; }
+        }
+        // (A size on its own, "Small 2.50" or "1 Liter, 33oz", is a different drink's each time.)
+        var key = norm(it.name) + '|' + norm(it.price);
+        var generic = SIZE_NAME_RE.test(it.name) || /^[\d\u00bc-\u00be\s\/.,]*(?:liter|litre|l|ml|oz|glass|bottle|carafe|pint|jug)\b/i.test(it.name);
+        if (seen[key] && !generic) { dropped++; continue; }
+        seen[key] = 1;
+        items.push(it);
+      }
+      s.items = items;
+      if (items.length) out.push(s);
+    });
+    menu.sections = out;
+    menu.partial = out.some(function(s){ return s.items.some(function(it){ return it.check; }); });
+    if (dropped) menu.dropped = dropped;
+    return menu;
+  }
+  window.__menuTidy = tidyImported;
   window.__menuParse = parseMenuLines;
   window.__menuOcrLines = ocrLines;
   window.__menuPdfText = pdfTextData;
@@ -34517,8 +34802,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     setScreen('<h1 class="mn-center">' + T.webLooking + '</h1><div class="mn-bar"><span style="width:45%" class="mn-pulse"></span></div>');
     api('/import', { url: url }).then(function(r){
       if (!r || !r.ok) return webScreen(r && r.error ? h(r.error) : T.failed);
-      if (r.from === 'pdf') { S = r; return deviceRead(); }
-      var parsed = parseMenuLines((r.lines || []).map(function(t){ return { text: t, conf: 100 }; }));
+      if (r.from === 'pdf') { S = r; return deviceRead(true); }
+      var parsed = tidyImported(parseMenuLines((r.lines || []).map(function(t){ return { text: t, conf: 100 }; })));
       if (!parsed.sections.length) return webScreen(T.webNothing);
       return api('/save', { data: parsed }).then(function(sv){
         if (!sv || !sv.ok) return webScreen(T.failed);
@@ -34576,7 +34861,17 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     }
     var act = t.getAttribute('data-act');
     if (!act && t.hasAttribute('data-item')) { openItem = t.getAttribute('data-item'); rerender(); var inp = app.querySelector('.mn-open input'); if (inp) inp.focus(); return; }
-    if (act === 'close') { openItem = null; save(); return rerender(); }
+    // Done: the owner has looked at this line, so it is no longer yellow; a line left without a name goes.
+    if (act === 'close') { var ci = currentItem(); if (ci) ci.check = false; openItem = null; pruneBlank(); save(); return rerender(); }
+    if (act === 'next-check') { var nk = firstCheck(); if (nk) { var msgN = countChecks(); openAndShow(nk); var top = app.querySelector('.mn-open'); if (top) top.insertAdjacentHTML('beforebegin', '<p class="mn-error mn-block" role="alert">' + (msgN === 1 ? T.checkOne : f(T.checkCount, { n: msgN })) + ' ' + T.checkHow + '</p>'); } else rerender(); return; }
+    if (act === 'type') {
+      // "Type it in myself" (2026-10-18): an empty menu to fill in, one section to start, its first line open.
+      return api('/manual', {}).then(function(r){
+        if (!r || !r.ok) return startScreen(r && r.error ? h(r.error) : T.failed);
+        S = r; typing = true; data = { sections: [{ name: T.firstSectionText, note: '', items: [blankItem()] }] };
+        openAndShow('0:0');
+      });
+    }
     if (act === 'up' || act === 'down') {
       var q = openItem.split(':'), qs = +q[0], qi = +q[1], list = data.sections[qs].items, moving = list[qi];
       if (act === 'up' && qi > 0) { list.splice(qi, 1); list.splice(qi - 1, 0, moving); openItem = qs + ':' + (qi - 1); }
@@ -34586,8 +34881,12 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       save(); return rerender();
     }
     if (act === 'del-item') { var p = openItem.split(':'); data.sections[+p[0]].items.splice(+p[1], 1); openItem = null; save(); return rerender(); }
-    if (act === 'add-item') { var si = +t.getAttribute('data-s'); data.sections[si].items.push({ name: T.newDishText, description: '', price: '', dietary: [], check: false }); openItem = si + ':' + (data.sections[si].items.length - 1); save(); rerender(); var i2 = app.querySelector('.mn-open input'); if (i2) i2.select(); return; }
-    if (act === 'add-sec') { data.sections.push({ name: T.newSectionText, note: '', items: [{ name: T.newDishText, description: '', price: '', dietary: [], check: false }] }); openItem = (data.sections.length - 1) + ':0'; save(); return rerender(); }
+    if (act === 'add-item') { var si = +t.getAttribute('data-s'); var cur0 = currentItem(); if (cur0) cur0.check = false; pruneBlank(); data.sections[si].items.push(blankItem()); return openAndShow(si + ':' + (data.sections[si].items.length - 1)); }
+    if (act === 'add-sec') {
+      pruneBlank(); data.sections.push({ name: '', note: '', items: [blankItem()] }); openItem = (data.sections.length - 1) + ':0'; reviewScreen();
+      var sn = app.querySelector('[data-sec-name="' + (data.sections.length - 1) + '"]'); if (sn) { if (sn.scrollIntoView) sn.scrollIntoView({ block: 'center' }); sn.focus(); }
+      return;
+    }
     if (act === 'del-sec') { data.sections.splice(+t.getAttribute('data-s'), 1); save(); return rerender(); }
     if (act === 'read' && S.scan === 'device') { if (S.menu) S.menu.read_error = null; return deviceRead(); }
     if (act === 'read') { t.disabled = true; return api('/read', {}).then(function(r){ if (r && r.ok) { S = r; readStart = Date.now(); render(); } else { t.disabled = false; render(r && r.error ? h(r.error) : T.failed); } }); }
@@ -34612,8 +34911,12 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       });
     }
     if (act === 'publish') {
+      pruneBlank();
+      var left = countChecks();
+      if (left && C.mode !== 'admin') return openAndShow(firstCheck());
+      if (left && !window.confirm(left + ' line' + (left === 1 ? '' : 's') + ' still need checking. Publish anyway?')) return;
       openItem = null; clearTimeout(saveTimer); t.disabled = true; t.innerHTML = T.publishing;
-      var pb = { data: data }; if (el('mnEmail')) pb.contact_email = el('mnEmail').value;
+      var pb = { data: data, allow_unchecked: left > 0 }; if (el('mnEmail')) pb.contact_email = el('mnEmail').value;
       return api('/publish', pb).then(function(r){
         if (!r || !r.ok) { t.disabled = false; return reviewScreen(r && r.errors && r.errors.contact_email ? h(r.errors.contact_email) : r && r.error ? h(r.error) : T.failed); }
         if (C.mode === 'admin') return setScreen('<div class="mn-card mn-ok"><p>Published. <a href="' + h(r.url) + '" target="_blank" rel="noopener">See the menu page</a></p></div><p class="mn-back"><a href="/admin/review#menus">Back to review</a></p>');
@@ -34625,6 +34928,12 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   render();
 })();`;
 
+// The site header in French for the French menu screen (2026-10-18): the same translation French twin pages use
+// (data-i18n keys, the shared header words, links to their /fr pages), scripts untouched.
+function frenchHeaderFragment(html) {
+  return localizeStaticFr(localizeHtml(html, 'fr')).split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/)
+    .map((part, i) => (i % 2 ? part : frMarkup(part))).join('');
+}
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
@@ -34635,7 +34944,8 @@ function renderMenuAppPage(found, opts) {
   if (state.published && pub) state.published.date = ownerUpdatedDate(pub.publishedAt, lang === 'fr');
   const cfg = {
     base: opts.base, mode: opts.mode, lang, back: opts.back || null, website: normalizeWebsiteUrl(venue.website) || '', email: found.contactEmail || '', venueName: venue.name, adminNote: opts.adminNote || null,
-    t: { ...t, networkText: t.network, newDishText: plain(t.newDish), newSectionText: plain(t.newSection), takeDownConfirmText: plain(t.takeDownConfirm) },
+    kind: menuKind(venue),
+    t: { ...t, networkText: t.network, newDishText: plain(t.newDish), newSectionText: plain(t.newSection), takeDownConfirmText: plain(t.takeDownConfirm), firstSectionText: plain(t.firstSection) },
     state,
   };
   const other = lang === 'fr' ? 'en' : 'fr';
@@ -34707,10 +35017,25 @@ ${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}: ${venue.na
   body.owner-page .mn-admin { display: grid; gap: 0; }
   body.owner-page .mn-done { text-align: center; padding-top: 24px; }
   body.owner-page .mn-done h1 { font-size: clamp(1.8rem, 8vw, 2.4rem); }
+  /* Phones (2026-10-18): every field at least 16px (no zoom on iPhone), every tap target at least 44px tall. */
+  body.owner-page .mn-link { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 2px; }
+  body.owner-page .mn-thumbs .mn-link { min-height: 44px; }
+  body.owner-page .mn-lang a, body.owner-page .mn-back a, body.owner-page .mn-done a:not(.mn-btn), body.owner-page .mn-card a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }
+  body.owner-page .mn-chip { min-height: 44px; box-sizing: border-box; }
+  body.owner-page .mn-chip input { width: 22px; height: 22px; margin: 0; }
+  body.owner-page .mn-moveto select { font-size: 16px; min-height: 44px; }
+  body.owner-page .mn-sec-name { min-height: 44px; border-bottom: 1px dashed rgba(42,32,25,0.35); }
+  body.owner-page .mn-sec-name::placeholder, body.owner-page .mn-open input::placeholder { color: rgba(42,32,25,0.5); font-weight: 600; }
+  body.owner-page .mn-email input, body.owner-page .mn-open input[type=text], body.owner-page .mn-open textarea { font-size: max(16px, 1.05rem); min-height: 44px; }
+  body.owner-page .mn-name em { font-weight: 600; color: rgba(42,32,25,0.5); }
+  body.owner-page .mn-add { width: auto; min-height: 48px; margin: 4px 0; padding: 8px 18px; font-size: 1rem; }
+  body.owner-page .mn-wait { background: #7A5A00; border-color: #7A5A00; color: #fff; }
+  body.owner-page .mn-block { margin: 8px 0; }
+  body.owner-page .mn-wrap, body.owner-page .mn-menu, body.owner-page .mn-item { min-width: 0; overflow-wrap: anywhere; }
 </style>
 </head>
 <body class="golf-page owner-page">
-${renderGolfHeaderHtml()}
+${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main"><div class="mn-wrap">
     ${switcher}
     <div id="mnApp"><p class="mn-lead">${t.adding}</p></div>
@@ -34741,8 +35066,8 @@ async function handleMenuRoute(req, res, method, sub, ctx) {
   if (method !== 'POST') return sendSubmissionResponse(res, 405, { ok: false, error: 'Not allowed.' });
   const rp = /^\/pages\/(\d+)\/remove$/.exec(sub);
   if (rp) return handleMenuApi(req, res, ctx, 'remove-page', Number(rp[1]));
-  const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit', '/import': 'import' }[sub];
-  if (!action || (ctx.mode === 'admin' && ['help', 'restart', 'unpublish', 'edit'].includes(action))) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
+  const action = { '/pages': 'pages', '/read': 'read', '/save': 'save', '/publish': 'publish', '/help': 'help', '/restart': 'restart', '/unpublish': 'unpublish', '/edit': 'edit', '/import': 'import', '/manual': 'manual' }[sub];
+  if (!action || (ctx.mode === 'admin' && ['help', 'restart', 'unpublish', 'edit', 'manual'].includes(action))) return sendSubmissionResponse(res, 404, { ok: false, error: 'Not found.' });
   return handleMenuApi(req, res, ctx, action);
 }
 
@@ -34795,7 +35120,7 @@ function menuSchema(venue, menu, lang) {
 function menuItemHtml(it, lang) {
   const labels = MENU_DIETARY_LABELS[lang === 'fr' ? 'fr' : 'en'];
   const tags = it.dietary.map((d) => `<span class="vm-tag">${escapeHtml(labels[d])}</span>`).join('');
-  return `<li class="vm-item"><div class="vm-line"><span class="vm-name">${escapeHtml(it.name)}</span>${it.price ? `<span class="vm-price">${escapeHtml(menuPriceLabel(it.price, lang))}</span>` : ''}</div>${it.description ? `<p class="vm-desc">${escapeHtml(it.description)}</p>` : ''}${tags ? `<p class="vm-tags">${tags}</p>` : ''}</li>`;
+  return `<li class="vm-item"><div class="vm-line"><span class="vm-name">${escapeHtml(it.name)}</span>${it.price ? `<span class="vm-price">${escapeHtml(menuPriceLabel(it.price, lang))}</span>` : ''}</div>${it.duration || it.description ? `<p class="vm-desc">${escapeHtml([it.duration, it.description].filter(Boolean).join(' \u00b7 '))}</p>` : ''}${tags ? `<p class="vm-tags">${tags}</p>` : ''}</li>`;
 }
 const VENUE_MENU_CSS = `<style>
   .vm-preview { margin: 22px 0 8px; }
@@ -34833,7 +35158,7 @@ function priceListOfferCatalog(venue, menu, lang) {
         const price = menuPriceNumber(it.price);
         return {
           '@type': 'Offer',
-          itemOffered: { '@type': w.schema, name: it.name, description: it.description || undefined },
+          itemOffered: { '@type': w.schema, name: it.name, description: [it.duration, it.description].filter(Boolean).join(' \u00b7 ') || undefined },
           price: price != null ? price.toFixed(2) : undefined,
           priceCurrency: price != null ? 'CAD' : undefined,
         };
@@ -42142,6 +42467,7 @@ module.exports = {
   readMenuWithClaude,
   setMenuImportNetwork,
   htmlToMenuLines,
+  findMenuOnWebsite,
   isPrivateAddress,
   normalizeMenuData,
   menuPriceLabel,
