@@ -1,0 +1,486 @@
+{
+  "reason": "Restaurant listing photos, second pass: Google Maps (that exact location), the restaurant’s own Facebook/Instagram, Tripadvisor and Castanet; Dayton accepted the suggested 40 from the contact sheets on 2026-10-17.",
+  "batch_id": "venue-photos-restaurants-pass2-2026-10-17",
+  "venues": [
+    {
+      "id": 309,
+      "name": "Jonnie and Lily's Diner",
+      "region": "armstrong",
+      "slug": "jonnie-and-lily-s-diner",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/jonnie-and-lily-s-diner-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 337,
+      "name": "King's Vegetarian Food",
+      "region": "kelowna",
+      "slug": "king-s-vegetarian-food",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/king-s-vegetarian-food-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 898,
+      "name": "Mad Mango Cafe",
+      "region": "kelowna",
+      "slug": "mad-mango-cafe",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/mad-mango-cafe-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 525,
+      "name": "Press'd Sandwich Shop",
+      "region": "kelowna",
+      "slug": "press-d-sandwich-shop",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/press-d-sandwich-shop-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 617,
+      "name": "Streats Harvey Kitchen",
+      "region": "kelowna",
+      "slug": "streats-harvey-kitchen",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/streats-harvey-kitchen-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 640,
+      "name": "TAMM Mexican Restaurant",
+      "region": "kelowna",
+      "slug": "tamm-mexican-restaurant",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tamm-mexican-restaurant-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 652,
+      "name": "Tak-Oh",
+      "region": "kelowna",
+      "slug": "tak-oh",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tak-oh-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 133,
+      "name": "Cherry Bomb Sandwiches",
+      "region": "oliver",
+      "slug": "cherry-bomb-sandwiches",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/cherry-bomb-sandwiches-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 569,
+      "name": "Same Same But Different Thai Food",
+      "region": "oliver",
+      "slug": "same-same-but-different-thai-food",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/same-same-but-different-thai-food-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 118,
+      "name": "Campo Marina",
+      "region": "osoyoos",
+      "slug": "campo-marina",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/campo-marina-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 641,
+      "name": "THE BEAST BBQ AND SMOKE SHACK",
+      "region": "osoyoos",
+      "slug": "the-beast-bbq-and-smoke-shack",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/the-beast-bbq-and-smoke-shack-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 655,
+      "name": "Tantuni Turkish Cuisine",
+      "region": "penticton",
+      "slug": "tantuni-turkish-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tantuni-turkish-cuisine-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 1790,
+      "name": "Red Robin Vernon",
+      "region": "vernon",
+      "slug": "red-robin-vernon",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-robin-vernon-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 423,
+      "name": "Murray's Pizza & Pasta",
+      "region": "west-kelowna",
+      "slug": "murray-s-pizza-pasta",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/murray-s-pizza-pasta-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 231,
+      "name": "Fusion Food Lounge",
+      "region": "kelowna",
+      "slug": "fusion-food-lounge",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/fusion-food-lounge-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 259,
+      "name": "Halfmoon Pizzeria + Donair",
+      "region": "kelowna",
+      "slug": "halfmoon-pizzeria-donair",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/halfmoon-pizzeria-donair-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 279,
+      "name": "Hot Pot Grill Authentic Indian Cuisine",
+      "region": "kelowna",
+      "slug": "hot-pot-grill-authentic-indian-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/hot-pot-grill-authentic-indian-cuisine-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 437,
+      "name": "New York Fries Orchard Park",
+      "region": "kelowna",
+      "slug": "new-york-fries-orchard-park",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/new-york-fries-orchard-park-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 1083,
+      "name": "Pizza 64 (Kelowna)",
+      "region": "kelowna",
+      "slug": "pizza-64-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pizza-64-kelowna-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 906,
+      "name": "PrimeTime Donair & Poutine",
+      "region": "kelowna",
+      "slug": "primetime-donair-poutine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/primetime-donair-poutine-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 541,
+      "name": "Ramen Arashi Kelowna",
+      "region": "kelowna",
+      "slug": "ramen-arashi-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ramen-arashi-kelowna-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 546,
+      "name": "Red Swan Pizza - Kelowna East",
+      "region": "kelowna",
+      "slug": "red-swan-pizza-kelowna-east",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/red-swan-pizza-kelowna-east-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 733,
+      "name": "Tropic Isle Mart",
+      "region": "kelowna",
+      "slug": "tropic-isle-mart",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/tropic-isle-mart-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 782,
+      "name": "White Spot Kelowna Airport",
+      "region": "kelowna",
+      "slug": "white-spot-kelowna-airport",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/white-spot-kelowna-airport-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 102,
+      "name": "Bullies Pizza",
+      "region": "okanagan-falls",
+      "slug": "bullies-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/bullies-pizza-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 195,
+      "name": "Edo Japan",
+      "region": "penticton",
+      "slug": "edo-japan",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/edo-japan-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 494,
+      "name": "Penticton Pizza",
+      "region": "penticton",
+      "slug": "penticton-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/penticton-pizza-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 533,
+      "name": "Quesada Burritos & Tacos",
+      "region": "penticton",
+      "slug": "quesada-burritos-tacos",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/quesada-burritos-tacos-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 999,
+      "name": "Terry's Comfort Food",
+      "region": "penticton",
+      "slug": "terry-s-comfort-food",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/terry-s-comfort-food-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 1059,
+      "name": "Pizza Gratta",
+      "region": "silverstar",
+      "slug": "pizza-gratta",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pizza-gratta-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 625,
+      "name": "Summerland Indian Bistro & Pizza",
+      "region": "summerland",
+      "slug": "summerland-indian-bistro-pizza",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/summerland-indian-bistro-pizza-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 178,
+      "name": "Diner On Six",
+      "region": "vernon",
+      "slug": "diner-on-six",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/diner-on-six-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 453,
+      "name": "Ogopogo Concessions",
+      "region": "vernon",
+      "slug": "ogopogo-concessions",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ogopogo-concessions-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 501,
+      "name": "Pho Fusion",
+      "region": "vernon",
+      "slug": "pho-fusion",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/pho-fusion-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 967,
+      "name": "Rice Box",
+      "region": "vernon",
+      "slug": "rice-box",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/rice-box-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 806,
+      "name": "barBURRITO",
+      "region": "vernon",
+      "slug": "barburrito",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/barburrito-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 915,
+      "name": "Beef Broccoli",
+      "region": "west-kelowna",
+      "slug": "beef-broccoli",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/beef-broccoli-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 242,
+      "name": "Ginza Sushi West Kelowna",
+      "region": "west-kelowna",
+      "slug": "ginza-sushi-west-kelowna",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/ginza-sushi-west-kelowna-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 319,
+      "name": "Kaiso Japanese and Thai Cuisine",
+      "region": "west-kelowna",
+      "slug": "kaiso-japanese-and-thai-cuisine",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/kaiso-japanese-and-thai-cuisine-2610.jpg?v=20261017b"
+      }
+    },
+    {
+      "id": 594,
+      "name": "Smoke Shack Deli",
+      "region": "west-kelowna",
+      "slug": "smoke-shack-deli",
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/venues/smoke-shack-deli-2610.jpg?v=20261017b"
+      }
+    }
+  ]
+}
