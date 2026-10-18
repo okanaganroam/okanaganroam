@@ -21651,7 +21651,7 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
 });
 
 test('Business help bot (2026-10-18): claim, never got the email and staff logins have answers', () => {
-  const topics = Object.fromEntries(JSON.parse(app.ownerHelpWidgetHtml('login').match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]).topics.map((t) => [t.id, t]));
+  const topics = Object.fromEntries(JSON.parse(app.ownerHelpWidgetHtml('login').match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]).topics.map((t) => [t.id, t]));
   for (const id of ['claim', 'noemail', 'staff']) assert.ok(topics[id], id);
   assert.match(topics.claim.a, /Claim this listing/);
   assert.match(topics.noemail.a, /spam/);
@@ -21659,7 +21659,7 @@ test('Business help bot (2026-10-18): claim, never got the email and staff login
   assert.doesNotMatch(topics.newlink.a, /replaces the old one/);
   // The browser's own matcher, run on typed questions from the claim page's widget.
   const html = app.ownerHelpWidgetHtml('claim');
-  const cfg = JSON.parse(html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]);
+  const cfg = JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
   assert.deepEqual(cfg.start, ['claim', 'noemail', 'staff', 'dispute', 'cost']);
   const src = html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'));
   const match = new Function('T', 'cfg', `${src}; return match;`)(cfg.topics, cfg);
@@ -21676,24 +21676,278 @@ test('Business help bot (2026-10-18): claim, never got the email and staff login
 test('Business help bot (2026-10-18): a disputed claim or login gets the "we will check it" answer, not the staff one', () => {
   const pages = ['login', 'link', 'forgot', 'reset', 'account', 'settings', 'edit', 'menu', 'invalid', 'claim'];
   const disputes = ['someone else claimed my business', 'another person has access to my listing', 'who claimed my listing', 'I didn\u2019t give them access',
-    'remove a person', 'someone changed my hours without asking', 'my old manager still has access'];
+    'someone changed my hours without asking'];
+  // Help bot v2 (2026-10-18): a former manager or "remove a person" is the People with access topic (self-serve Remove).
+  const access = ['remove a person', 'my old manager still has access', 'who has access to my listing'];
   const staff = ['how do my staff log in', 'can two people log in', 'add my staff to the listing', 'can another person log in too'];
   for (const page of pages) {
     const html = app.ownerHelpWidgetHtml(page);
-    const cfg = JSON.parse(html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]);
+    const cfg = JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]);
     const src = html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'));
     const match = new Function('T', 'cfg', `${src}; return match;`)(cfg.topics, cfg);
     for (const q of disputes) assert.equal(match(q)[0], 'dispute', `${page}: ${q}`);
     for (const q of staff) assert.equal(match(q)[0], 'staff', `${page}: ${q}`);
+    for (const q of access) assert.equal(match(q)[0], 'access', `${page}: ${q}`);
     assert.notEqual(match('I changed my hours but nothing happened')[0], 'dispute', `${page}: own changes are not a dispute`);
     assert.notEqual(match('my link no longer works')[0], 'dispute', `${page}: a broken link is not a dispute`);
   }
-  const topics = Object.fromEntries(JSON.parse(app.ownerHelpWidgetHtml('account').match(/window\.OHB_CFG = (\{.*?\});<\/script>/s)[1]).topics.map((t) => [t.id, t]));
+  const topics = Object.fromEntries(JSON.parse(app.ownerHelpWidgetHtml('account').match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]).topics.map((t) => [t.id, t]));
   assert.match(topics.dispute.a, /Okanagan Roam will check it/);
   assert.match(topics.dispute.a, /Message us/);
   assert.match(topics.dispute.a, /which listing<\/strong> it is and <strong>who you are/);
   assert.match(topics.dispute.a, /changed without permission<\/strong>, tell us what/);
   assert.match(topics.dispute.a, /Dayton can <strong>take other people\u2019s logins off the listing<\/strong> and <strong>send you a fresh edit link/);
+});
+
+// ---------- Help bot v2 (2026-10-18): new topics, typos, French, "not sure" and signed-in wording ----------
+// The browser's own matcher (everything from "function norm(s)" to "function ask(q)" in the page script), run in a VM
+// with the page's real config.
+function ohbConfig(html) { return JSON.parse(html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/)[1]); }
+function ohbMatcher(page, opts = {}) {
+  const vm = require('node:vm');
+  const html = app.ownerHelpWidgetHtml(page, opts);
+  const cfg = ohbConfig(html);
+  const ctx = { T: cfg.topics, cfg };
+  vm.runInNewContext(`${html.slice(html.indexOf('function norm(s)'), html.indexOf('function ask(q)'))}; this.best = best;`, ctx);
+  return (q) => ctx.best(q);
+}
+// [question, page, topic it should answer (null: "not sure"), language of the answer]
+const OHB_QUESTIONS = [
+  // The portal review's 23 questions (2026-10-18): the 8 it got wrong are the last 8.
+  ['how do i upload pictures', 'edit', 'photo-add'], ['my photo is too small', 'edit', 'photo-small'], ['I can’t log in', 'login', 'signin'],
+  ['forgot password', 'login', 'forgot'], ['the link in my email doesn’t work', 'link', 'newlink'], ['how do I change my hours', 'edit', 'hours'],
+  ['we are closed in winter', 'edit', 'season'], ['I added photos but they’re not showing', 'edit', 'photo-pending'], ['how to add a menu', 'edit', 'menu-add'],
+  ['how do I add an event', 'edit', 'event-add'], ['cancel my event', 'edit', 'event-change'], ['is this free', 'edit', 'cost'],
+  ['can my staff log in too', 'account', 'staff'], ['update my instagram', 'edit', 'links'], ['we sold the business', 'edit', 'remove'],
+  ['can i add a wine tasting every saturday', 'edit', 'event-repeat'], ['how do i change our price range $$', 'edit', 'price-range'],
+  ['how do I get reviews', 'edit', 'reviews'], ['can i reply to a review', 'edit', 'reviews'], ['how do i chnage the adress', 'edit', 'name-address'],
+  ['how do i log out', 'account', 'logout'], ['comment changer mes heures d’ouverture', 'edit', 'hours', 'fr'], ['were closed christmas day', 'edit', 'closures'],
+  // More owner questions, with typos.
+  ['how do i add photoes', 'edit', 'photo-add'], ['my pictre wont uplaod', 'edit', 'photo-small'], ['summer hours are diffrent from winter', 'edit', 'seasonal-hours'],
+  ['closed for thanksgiving monday', 'edit', 'closures'], ['we’re closed new year’s day', 'edit', 'closures'], ['how long until my changes are live', 'edit', 'live-speed'],
+  ['do i need approval for hour changes', 'edit', 'live-speed'], ['remove my old manager from the listing', 'account', 'access'], ['who else can edit our page', 'account', 'access'],
+  ['how do i add our trivia night every thursday', 'edit', 'event-repeat'], ['change the buisness name', 'edit', 'name-address'], ['our phone number is wrong', 'edit', 'links'],
+  ['how do i put my menu on', 'edit', 'menu-add'], ['can i type the menu myself', 'menu', 'menu-add'], ['where is the log out button', 'settings', 'logout'],
+  ['I didnt get the password reset email', 'forgot', 'noemail'], ['can 2 people manage the listing', 'account', 'staff'], ['how much does it cost to be featured', 'edit', 'cost'],
+  ['someone else claimed my busness', 'claim', 'dispute'], ['we have diffrent hours on stat holidays', 'edit', 'seasonal-hours'], ['how do i make a login', 'edit', 'login-create'],
+  ['is the menu scan blury', 'menu', 'menu-blurry'], ['how do i set the hapy hour', 'edit', 'features'], ['i forgot my pasword', 'login', 'forgot'],
+  ['photo upload keeps failing', 'edit', 'photo-small'], ['can i change hours without waiting for approval', 'edit', 'live-speed'], ['what does $$ mean', 'edit', 'price-range'],
+  // French, on French and English pages alike.
+  ['ou est le bouton pour me deconnecter', 'account', 'logout', 'fr'], ['nous sommes fermés le 25 décembre', 'edit', 'closures', 'fr'], ['comment ajouter des photos', 'edit', 'photo-add', 'fr'],
+  ['comment répondre à un avis', 'edit', 'reviews', 'fr'], ['j’ai perdu mon lien', 'link', 'newlink', 'fr'], ['est-ce que c’est gratuit', 'login', 'cost', 'fr'],
+  ['comment ajouter un événement chaque samedi', 'edit', 'event-repeat', 'fr'], ['heures d’été différentes', 'edit', 'seasonal-hours', 'fr'], ['changer notre gamme de prix', 'edit', 'price-range', 'fr'],
+  ['comment changer l’adresse', 'edit', 'name-address', 'fr'], ['je n’ai jamais reçu le courriel', 'link', 'noemail', 'fr'], ['mot de passe oublié', 'login', 'forgot', 'fr'],
+  ['qui a accès à ma fiche', 'account', 'access', 'fr'], ['nous avons déménagé', 'edit', 'name-address', 'fr'],
+  // Not about the portal, or too vague: "not sure", never a confident wrong answer.
+  ['what’s the weather like in kelowna', 'edit', null], ['can you build me a website for my bakery', 'edit', null], ['asdfgh', 'edit', null],
+  ['hello', 'login', null], ['my dog ate my homework', 'edit', null], ['tell me a joke', 'account', null], ['how do I get more customers', 'edit', null], ['pouvez-vous m’aider', 'login', null, 'fr'],
+];
+
+test('Help bot v2 (2026-10-18): the review questions, typos, French and off-topic questions get the right answer or an honest "not sure"', () => {
+  const matchers = {};
+  const misses = [];
+  for (const [q, page, want, lang] of OHB_QUESTIONS) {
+    const m = matchers[page] || (matchers[page] = ohbMatcher(page));
+    const r = m(q);
+    if (r.id !== want || r.lang !== (lang || 'en')) misses.push(`${page}: "${q}" -> ${r.id} (${r.lang}), want ${want} (${lang || 'en'})`);
+  }
+  assert.deepEqual(misses, [], misses.join('\n'));
+  assert.ok(OHB_QUESTIONS.length >= 23 + 20 + 10);
+  // The review's 8 misses: never their old confident wrong answers again.
+  const edit = ohbMatcher('edit'), account = ohbMatcher('account');
+  for (const [q, old, m] of [['can i add a wine tasting every saturday', 'staff', edit], ['how do i change our price range $$', 'cost', edit], ['how do I get reviews', 'login-create', edit],
+    ['can i reply to a review', 'photo-pending', edit], ['how do i chnage the adress', 'login-create', edit], ['how do i log out', 'login-create', account],
+    ['comment changer mes heures d’ouverture', null, edit], ['were closed christmas day', 'hours', edit]]) assert.notEqual(m(q).id, old, q);
+  // Accents, capitals and curly apostrophes do not matter; a French page answers in French unless the question is English.
+  assert.equal(edit('COMMENT CHANGER MES HEURES D\'OUVERTURE').id, 'hours');
+  assert.equal(edit('comment changer mes heures d ouverture').lang, 'fr');
+  const frLogin = ohbMatcher('login', { lang: 'fr' });
+  assert.equal(frLogin('connexion').lang, 'fr');
+  assert.deepEqual([frLogin('how do i log in').id, frLogin('how do i log in').lang], ['signin', 'en']);
+  // "Not sure" still offers the closest topics first.
+  const vague = edit('phto');
+  assert.equal(vague.id, null);
+  assert.equal(vague.hits[0], 'photo-add');
+  assert.equal(edit('adress').id, 'name-address', 'a typo of a word in two keys is enough');
+});
+
+test('Help bot v2 (2026-10-18): every topic has French, the new topics say the right thing, and the wording follows how the owner got in', () => {
+  const ids = ['reviews', 'price-range', 'event-repeat', 'logout', 'closures', 'seasonal-hours', 'name-address', 'live-speed', 'access'];
+  for (const page of ['login', 'link', 'forgot', 'reset', 'account', 'settings', 'edit', 'menu', 'invalid', 'claim']) {
+    for (const [signedIn, lang] of [[false, 'en'], [true, 'en'], [false, 'fr']]) {
+      const cfg = ohbConfig(app.ownerHelpWidgetHtml(page, { signedIn, lang }));
+      assert.equal(cfg.lang, lang);
+      for (const id of ids) assert.ok(cfg.topics.some((t) => t.id === id), `${page}: ${id}`);
+      for (const t of cfg.topics) {
+        for (const k of ['q', 'qFr', 'a', 'aFr']) assert.ok(t[k] && t[k].length > 5, `${t.id}.${k}`);
+        assert.ok(t.keys.length && t.keysFr.length, t.id);
+        assert.doesNotMatch(t.a + t.aFr, /\{(ON|LIVE)\}/, `${t.id}: filled in`);
+        // French answers send owners to the French entry pages.
+        assert.doesNotMatch(t.aFr, /href="\/owner\/(login|link|forgot)"/, `${t.id}: French links`);
+        // Button names on the (English) edit page are quoted in bold, as they appear there.
+        assert.doesNotMatch(t.aFr.replace(/<strong>[^<]*<\/strong>/g, ''), /\b(the|and|you’re|we’ll)\b/, `${t.id}: no English left in the French`);
+      }
+      assert.ok(cfg.start.every((id) => cfg.topics.some((t) => t.id === id)), page);
+      assert.ok(cfg.ui.en.unsure.includes('I’m not sure — tap <strong>Message us</strong> and Dayton will reply.'));
+      assert.ok(cfg.ui.fr.unsure.includes('Dayton vous répondra'));
+    }
+  }
+  const topics = (page, signedIn) => Object.fromEntries(ohbConfig(app.ownerHelpWidgetHtml(page, { signedIn })).topics.map((t) => [t.id, t]));
+  const signedIn = topics('edit', true), link = topics('edit', false), out = topics('login', false);
+  assert.equal(ohbConfig(app.ownerHelpWidgetHtml('edit', { signedIn: true })).mode, 'in');
+  assert.equal(ohbConfig(app.ownerHelpWidgetHtml('edit')).mode, 'link');
+  assert.equal(ohbConfig(app.ownerHelpWidgetHtml('claim')).mode, 'out');
+  // Signed in: "My listings → Edit listing", never "open the edit link we emailed you"; changes are live at once.
+  for (const id of ['hours', 'photo-add', 'closures', 'seasonal-hours', 'price-range', 'access', 'description']) {
+    assert.match(signedIn[id].a, /My listings<\/a> → <strong>Edit listing<\/strong>/, id);
+    assert.doesNotMatch(signedIn[id].a, /edit link we emailed you/, id);
+    assert.match(signedIn[id].aFr, /My listings<\/a> → <strong>Edit listing<\/strong>/, id);
+    if (id !== 'access') assert.match(link[id].a, /the private link we emailed you/, id);
+  }
+  // People with access (PR #358): remove people added after you; anyone added before you goes to Dayton.
+  for (const t of [signedIn.access, link.access, out.access, signedIn.staff]) {
+    assert.match(t.a, /added (<strong>)?after(<\/strong>)? you/i, t.id);
+    assert.match(t.a, /added (<strong>)?before(<\/strong>)? you/i, t.id);
+    assert.match(t.a, /Message us/, t.id);
+  }
+  assert.match(signedIn.dispute.a, /remove anyone added after you/);
+  assert.match(signedIn['more-businesses'].a, /<strong>Add to my login<\/strong>/);
+  assert.match(signedIn['photo-main'].a, /<strong>Make main photo<\/strong>, <strong>Remove<\/strong> and <strong>\u2191 \u2193<\/strong>/);
+  assert.match(out['menu-add'].a, /<strong>Publish<\/strong> works once every yellow line is checked/);
+  assert.match(signedIn.hours.a, /signed in, so it goes live as soon as you save it/);
+  // The button is "Save changes" signed in and "Send changes" on the edit link (#359).
+  assert.match(signedIn.hours.a, /Tap <strong>Save changes<\/strong> at the bottom/);
+  assert.match(link.hours.a, /Tap <strong>Send changes<\/strong> at the bottom/);
+  assert.doesNotMatch(link.hours.a, /Save changes/);
+  assert.match(link.hours.a, /we check changes first/);
+  assert.match(out.hours.a, /Signed in, it goes live as soon as you save it\. From the emailed edit link we check it first/);
+  assert.match(signedIn['live-speed'].a, /as soon as you tap Save changes<\/strong>: hours, open months, seasonal hours, special closures, phone, description, features, happy hour and price range/);
+  assert.match(signedIn['live-speed'].a, /After 30 saves on one listing in a day/);
+  assert.match(signedIn['live-speed'].a, /business name, address, website or link<\/strong> is checked by us first/);
+  assert.match(link['live-speed'].a, /we check every change first/);
+  assert.match(signedIn['name-address'].a, /always checked by us first<\/strong>, usually within a day, even when you’re signed in/);
+  assert.match(signedIn['login-create'].a, /You already have one/);
+  assert.match(signedIn.logout.a, /tap <strong>Log out<\/strong>/);
+  assert.match(link.logout.a, /nothing to log out of/);
+  assert.match(signedIn.access.a, /People with access<\/strong>[\s\S]*<strong>Remove<\/strong>/);
+  assert.match(out.reviews.a, /come from <strong>Google<\/strong>/);
+  assert.match(out.reviews.a, /can’t reply to reviews on Okanagan Roam/);
+  assert.match(out['event-repeat'].a, /Repeats or other dates\?/);
+  assert.match(out['price-range'].a, /<strong>\$\$\$\$<\/strong> over \$60/);
+  assert.match(out['menu-add'].a, /Type it in myself/);
+  assert.match(out.closures.a, /Special closures<\/strong>[\s\S]*<strong>\+ Add a closed day<\/strong>[\s\S]*\u201cClosed today \(Christmas\)\u201d/);
+  assert.match(out['seasonal-hours'].a, /We have different hours part of the year/);
+  assert.match(signedIn['changes-review'].a, /Waiting for review<\/strong> chip/);
+});
+
+test('Help bot v2 (2026-10-18): the page script answers, says "not sure", switches to French and keeps Message us private', async () => {
+  const vm = require('node:vm');
+  // A small stand-in for the page: just enough DOM for the widget.
+  function run(html, pathname) {
+    const els = {};
+    const make = (tag) => {
+      const el = { tag, children: [], className: '', hidden: tag === 'section', textContent: '', value: '', disabled: false, offsetTop: 0, scrollTop: 0, scrollHeight: 0, listeners: {},
+        style: {}, lang: '', set innerHTML(v) { this._html = v; this.children = []; }, get innerHTML() { return this._html || ''; },
+        appendChild(c) { this.children.push(c); return c; }, setAttribute() {}, focus() {}, closest() { return null; },
+        addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
+        querySelector(sel) { return els[`${sel}@${this._id}`] || (els[`${sel}@${this._id}`] = Object.assign(make('x'), { _id: this._id })); } };
+      return el;
+    };
+    ['ohbBtn', 'ohbPanel', 'ohbLog', 'ohbForm', 'ohbInput', 'ohbClose'].forEach((id) => { els[id] = make(id); });
+    els.ohbCfg = { textContent: ohbConfig(html) && html.match(/id="ohbCfg">([\s\S]*?)<\/script>/)[1] };
+    let n = 0;
+    const sent = [];
+    const ctx = {
+      document: { getElementById: (id) => els[id] || null, createElement: (tag) => Object.assign(make(tag), { _id: `m${n++}` }), querySelectorAll: () => [] },
+      window: {}, location: { pathname }, setTimeout: (fn) => fn(), Date, JSON, RegExp, String, Math,
+      fetch: (url, o) => { sent.push({ url, body: JSON.parse(o.body) }); return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) }); },
+    };
+    const src = html.match(/<script>(\n\(function\(\)\{[\s\S]*?)<\/script>/)[1];
+    vm.runInNewContext(src, ctx);
+    const fire = (el, type) => (el.listeners[type] || []).forEach((fn) => fn({ preventDefault() {}, key: '' }));
+    const ask = (q) => { els.ohbInput.value = q; fire(els.ohbForm, 'submit'); };
+    const said = () => els.ohbLog.children.map((c) => c.innerHTML || (c.children || []).map((b) => b.textContent).join(' | '));
+    return { els, fire, ask, said, sent, make };
+  }
+  const html = app.ownerHelpWidgetHtml('edit', { signedIn: true });
+  const page = run(html, '/owner/account/venue/1');
+  page.fire(page.els.ohbBtn, 'click');
+  assert.match(page.said()[0], /Hi! I can help with your listing/);
+  page.ask('can you build me a website for my bakery');
+  const unsure = page.said().slice(-2);
+  assert.match(unsure[0], /I’m not sure — tap <strong>Message us<\/strong> and Dayton will reply/);
+  const chipLabels = unsure[1].split(' | ');
+  assert.ok(chipLabels.length >= 3 && chipLabels.length <= 4, unsure[1]);
+  assert.equal(chipLabels[chipLabels.length - 1], 'Message us');
+  page.ask('how do i chnage the adress');
+  assert.ok(page.said().some((h) => /always checked by us first/.test(h)));
+  // French typed on an English page: answered in French, with French chips.
+  page.ask('comment ajouter des photos');
+  const fr = page.said().slice(-3);
+  assert.match(fr[0], /Touchez <strong>Choose photos<\/strong>/);
+  assert.match(fr[1], /Est-ce que ça vous aide/);
+  assert.match(fr[2], /Écrivez-nous$/);
+  // Message us from a private edit link (in French now): the browser sends the page address to our server only.
+  const token = 'a'.repeat(32);
+  const linkPage = run(app.ownerHelpWidgetHtml('edit'), `/owner/${token}`);
+  linkPage.fire(linkPage.els.ohbBtn, 'click');
+  linkPage.ask('quelle heure est-il sur la lune');
+  const human = linkPage.els.ohbLog.children.slice(-1)[0].children.slice(-1)[0];
+  assert.equal(human.textContent, 'Écrivez-nous');
+  linkPage.fire(human, 'click');
+  const formMsg = linkPage.els.ohbLog.children.slice(-1)[0];
+  assert.match(formMsg.innerHTML, /Avec quoi avez-vous besoin d’aide/);
+  const q = (sel) => formMsg.querySelector(sel);
+  q('#ohbNote').value = 'Mon menu ne se publie pas';
+  q('#ohbEmail').value = 'proprio@example.com';
+  linkPage.fire(q('form'), 'submit');
+  assert.equal(linkPage.sent.length, 1);
+  assert.equal(linkPage.sent[0].url, '/owner/help');
+  assert.equal(linkPage.sent[0].body.lang, 'fr');
+  assert.deepEqual(Object.keys(linkPage.sent[0].body).sort(), ['company_website', 'email', 'lang', 'message', 'page', 'page_error', 'path', 'started_at']);
+});
+
+test('Help bot v2 (2026-10-18): the French entry pages and the French claim form have the help bot in French; Message us in French still keeps the edit link out of the email', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Help Bot FR Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'help-bot-fr-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'help-bot-fr-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const sent = [];
+  app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+  const scriptOf = (html) => html.match(/<script>(\n\(function\(\)\{\n  var cfg = \{\}; try \{ cfg = JSON\.parse\(document\.getElementById\('ohbCfg'\)[\s\S]*?)<\/script>/)[1];
+  try {
+    const enScript = scriptOf(await (await fetch(`${base}/owner/login`)).text());
+    for (const [p, key] of [['/fr/owner/login', 'login'], ['/fr/owner/link', 'link'], ['/fr/owner/forgot', 'forgot'], ['/fr/claim/kelowna/restaurants/help-bot-fr-fixture', 'claim']]) {
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /id="ohbBtn"[^>]*><span class="ohb-q" aria-hidden="true">\?<\/span>Aide<\/button>/, p);
+      assert.match(html, /aria-label="Fermer l’aide"/, p);
+      assert.match(html, /placeholder="Tapez votre question…"/, p);
+      const cfg = ohbConfig(html);
+      assert.equal(cfg.page, key, p);
+      assert.equal(cfg.lang, 'fr', p);
+      // The French twin leaves the bot alone: the same config as rendered directly, and the English page's script.
+      assert.deepEqual(cfg, ohbConfig(app.ownerHelpWidgetHtml(key, { lang: 'fr' })), p);
+      assert.equal(scriptOf(html), enScript, p);
+      assert.doesNotThrow(() => new Function(scriptOf(html)), p);
+    }
+    // Message us in French from the edit link: the listing is found, Dayton sees it was French, the link is not emailed.
+    const r = await fetch(`${base}/owner/help`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.78.0.1' },
+      body: JSON.stringify({ message: 'Mon menu ne se publie pas', email: 'proprio@example.com', path: `/owner/${token}`, page: 'edit', page_error: null, started_at: Date.now(), lang: 'fr', company_website: '' }) });
+    assert.equal(r.status, 200);
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].text, /Language: French/);
+    assert.match(sent[0].text, /Help Bot FR Fixture/);
+    assert.ok(!sent[0].text.includes(token), 'the private edit link is not in the email');
+    assert.ok(!sent[0].subject.includes(token));
+  } finally {
+    app.setOwnerEmailTransport(null);
+    srv.close();
+    db.prepare('DELETE FROM venue_owner_links WHERE venue_id = ?').run(v.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
 });
 
 test('Disputes (2026-10-18): the claim card warns when the listing already has an edit link or logins; admin can list and remove a login', async () => {
@@ -23629,7 +23883,7 @@ test('Owner help bot: on every business portal page (not admin), answers by topi
   const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
   const sent = [];
   app.setOwnerEmailTransport(async (m) => { sent.push(m); });
-  const page = (html) => (html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s) || [])[1];
+  const page = (html) => (html.match(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/) || [])[1];
   try {
     // Present on the portal pages, with the start topics for that page.
     for (const [path, key] of [['/owner/login', 'login'], ['/owner/link', 'link'], ['/owner/forgot', 'forgot'], [`/owner/${token}`, 'edit'], [`/owner/${token}/menu`, 'menu'], ['/owner/' + 'x'.repeat(32), 'invalid']]) {
