@@ -22898,3 +22898,75 @@ test('Owner season (2026-10-17): an owner sets "open May to October"; out of sea
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Owner help bot: on every business portal page (not admin), answers by topic, and "Message us" reaches info@ with the listing', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Help Bot Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'help-bot-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'help-bot-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, extra = {}) => fetch(`${base}${path}`, { method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': extra.ip || `10.77.0.${ip++}`, ...(extra.cookie ? { Cookie: extra.cookie } : {}), ...(extra.headers || {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, cookie: (r.headers.get('set-cookie') || '').split(';')[0], body: await r.json().catch(() => ({})) }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  const sent = [];
+  app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+  const page = (html) => (html.match(/window\.OHB_CFG = (\{.*?\});<\/script>/s) || [])[1];
+  try {
+    // Present on the portal pages, with the start topics for that page.
+    for (const [path, key] of [['/owner/login', 'login'], ['/owner/link', 'link'], ['/owner/forgot', 'forgot'], [`/owner/${token}`, 'edit'], [`/owner/${token}/menu`, 'menu'], ['/owner/' + 'x'.repeat(32), 'invalid']]) {
+      const html = await get(path);
+      assert.match(html, /id="ohbBtn"/, path);
+      assert.equal(JSON.parse(page(html)).page, key, path);
+    }
+    const edit = JSON.parse(page(await get(`/owner/${token}`)));
+    assert.equal(edit.signedIn, false);
+    assert.deepEqual(edit.start.slice(0, 2), ['photo-add', 'hours']);
+    assert.ok(edit.topics.length >= 20 && edit.topics.every((t) => t.id && t.q && t.keys.length && t.a));
+    assert.ok(edit.start.every((id) => edit.topics.some((t) => t.id === id)));
+    // Not on admin pages or visitor pages.
+    assert.doesNotMatch(await get('/admin/review'), /id="ohbBtn"/);
+    assert.doesNotMatch(await get('/kelowna/restaurants/help-bot-fixture'), /id="ohbBtn"/);
+
+    // "Message us" from the edit link: the server works out the listing; the link itself is never emailed.
+    assert.equal((await post('/owner/help', { message: 'My photo will not upload', email: 'pat@example.com', path: `/owner/${token}`, page: 'edit', page_error: 'That photo is too small.', started_at: Date.now() })).status, 200);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, 'info@okanaganroam.com');
+    assert.equal(sent[0].replyTo, 'pat@example.com');
+    assert.match(sent[0].subject, /\[OWNER HELP\] Help Bot Fixture/);
+    assert.match(sent[0].text, /My photo will not upload/);
+    assert.match(sent[0].text, new RegExp(`Help Bot Fixture \\(venue #${v.id}\\)`));
+    assert.match(sent[0].text, /Error on their page: That photo is too small\./);
+    assert.ok(!sent[0].text.includes(token), 'the private edit link is not in the email');
+
+    // Signed out with no email: asked for one. Honeypot: accepted silently, nothing sent.
+    assert.equal((await post('/owner/help', { message: 'Help please', path: '/owner/login', page: 'login' })).status, 400);
+    assert.equal((await post('/owner/help', { message: 'Help please', email: 'x@example.com', path: '/owner/login', company_website: 'spam' })).status, 200);
+    assert.equal(sent.length, 1);
+    // Too short, unknown fields, other sites, and the hourly limit.
+    assert.equal((await post('/owner/help', { message: 'hi', email: 'x@example.com', path: '/owner/login' })).status, 400);
+    assert.equal((await post('/owner/help', { message: 'Help please', email: 'x@example.com', venue_id: 1 })).status, 400);
+    assert.equal((await post('/owner/help', { message: 'Help please', email: 'x@example.com' }, { headers: { Origin: 'https://evil.example' } })).status, 403);
+    const statuses = [];
+    for (let i = 0; i < 6; i++) statuses.push((await post('/owner/help', { message: `Help number ${i}`, email: 'x@example.com', path: '/owner/login' }, { ip: '10.77.9.9' })).status);
+    assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429]);
+
+    // Signed in: replies go to the login email and the listings come from the login.
+    const made = await post(`/owner/${token}/account`, { email: 'help.owner@example.com', password: 'a long enough password' });
+    assert.equal(made.status, 201);
+    const mine = JSON.parse(page(await get('/owner/account', made.cookie)));
+    assert.equal(mine.page, 'account');
+    assert.equal(mine.signedIn, true);
+    sent.length = 0;
+    assert.equal((await post('/owner/help', { message: 'Where are my listings?', path: '/owner/account', page: 'account' }, { cookie: made.cookie })).status, 200);
+    assert.equal(sent[0].replyTo, 'help.owner@example.com');
+    assert.match(sent[0].text, /Signed in: yes, as help\.owner@example\.com/);
+    assert.match(sent[0].text, /Help Bot Fixture/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    srv.close();
+  }
+});
