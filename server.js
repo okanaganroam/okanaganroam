@@ -4321,7 +4321,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       hours: v.hours || null, // the stored JSON; parsed (never modified) by the planner
-      imageUrl: v.image_url || null, // the venue's own photo, shown on its stop card instead of the example photo
+      imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
       // course's published rate windows.
@@ -12086,6 +12086,28 @@ function regionHeading(region) {
   return ski ? ski.heading : `${REGION_LABELS[region]}, BC`;
 }
 // The URL of a card's example photo key ("cafe-1", "noodle", "indoorall-0").
+// Smaller copies of listing photos (2026-10-18): next to each original in these folders sit <name>-w480.jpg
+// (cards, thumbnails) and <name>-w960.jpg (the venue photo on phones), made with the scratchpad thumbs tool. A
+// photo without a copy (owner and visitor uploads, new files) keeps its original, so nothing breaks.
+const PHOTO_SIZE_DIRS = ['venues', 'hiking/venues', 'beaches/venues', 'sports/venues'];
+const PHOTO_SIZE_FILES = (() => {
+  const set = new Set();
+  for (const d of PHOTO_SIZE_DIRS) {
+    try { for (const f of fs.readdirSync(path.join(__dirname, 'public', 'images', d))) if (/-w(480|960)\.jpg$/.test(f)) set.add(`/images/${d}/${f}`); } catch (e) { /* folder missing in test copies */ }
+  }
+  return set;
+})();
+function photoSized(src, width) {
+  const m = /^(\/images\/(?:venues|hiking\/venues|beaches\/venues|sports\/venues)\/[^?#]+?)\.(?:jpe?g|png|webp)(\?[^#]*)?$/i.exec(String(src || ''));
+  if (!m) return src;
+  const sized = `${m[1]}-w${width}.jpg`;
+  return PHOTO_SIZE_FILES.has(sized) ? sized + (m[2] || '') : src;
+}
+// Card photo CSS variables: the 480px copy, plus a 960px copy for sharp large screens (see PHOTO_2X_CSS).
+function cardPhotoVars(name, src) {
+  const small = photoSized(src, 480), big = photoSized(src, 960);
+  return `--${name}:url('${escapeHtml(small)}')${big !== small ? `;--${name}-2x:url('${escapeHtml(big)}')` : ''}`;
+}
 function cardPhotoKeyUrl(key) {
   if (key === 'noodle') return '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg';
   const m = /^([a-z]+)-(\d+|dog)$/.exec(key || '');
@@ -12122,7 +12144,7 @@ function regionPlacesToStartHtml(region) {
       <li class="category-card region-start-card">
         <h3><a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a></h3>
         <p class="venue-meta">${escapeHtml(type)}</p>${src ? `
-        <div class="region-card-photo"><img src="${escapeHtml(src)}" alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
+        <div class="region-card-photo"><img src="${escapeHtml(photoSized(src, 480))}" alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
       </li>`;
   }).join('');
   return `<section class="region-start" aria-labelledby="regionStartHeading">
@@ -14783,12 +14805,13 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     const addPhotos = (html) => html.replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (match, id) => {
       const src = photoById.get(Number(id)) || '';
       return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(src)
-        ? `${match} data-card-ph style="--card-ph:url('${escapeHtml(src)}')"`
+        ? `${match} data-card-ph style="${cardPhotoVars('card-ph', src)}"`
         : match;
     });
     return `<style id="sport-card-photos">
   li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
   li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
+  @media (min-width: 900px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
 </style>
   <ul class="card-grid">
     ${addPhotos(cardHtml(venues))}
@@ -14806,7 +14829,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
     const v = venues.find((x) => x.id === Number(id));
     const own = v ? String(v.image_url || '').trim() : '';
     const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v || { id: Number(id), type: 'golf' }, isIndoorGolfVenue(v || {}) ? null : 'golf')) || '';
-    return src ? `${m} data-card-ph style="--card-ph:url('${escapeHtml(src)}')"` : m;
+    return src ? `${m} data-card-ph style="${cardPhotoVars('card-ph', src)}"` : m;
   });
   const cardHtmlBase = cardHtml;
   cardHtml = (list) => golfPhoto(cardHtmlBase(list));
@@ -14829,6 +14852,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   let html = `<style id="golf-card-photos">
   li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
   li.venue-card[data-card-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--card-ph) center 50% / cover no-repeat; pointer-events: none; }
+  @media (min-width: 900px) and (min-resolution: 1.5dppx) { li.venue-card[data-card-ph]::before { background-image: var(--card-ph-2x, var(--card-ph)); } }
 </style>`;
   if (courses.length) {
     html += `<h2 class="category-subsection-heading">${prefix}Golf Courses</h2>${sortNav}
@@ -16922,6 +16946,7 @@ function renderFoodDrinkHubStyles() {
      Only cards carrying data-ph (the Food & Drink lists) change. */
   body.fd-page li.venue-card[data-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; }
   body.fd-page li.venue-card[data-ph]::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 96px; border-radius: 13px 13px 0 0; background: #2A6B67 var(--fd-ph) center var(--fd-ph-y, 50%) / cover no-repeat; pointer-events: none; }
+  @media (min-width: 900px) and (min-resolution: 1.5dppx) { body.fd-page li.venue-card[data-ph="own"]::before { background-image: var(--fd-ph-2x, var(--fd-ph)); } }
 ${foodDrinkCardPhotoCss()}
   /* The excerpt is already shortened, and the name opens the full page, so
      the list cards drop the inline Read more and keep the text short. */
@@ -17371,7 +17396,7 @@ const ACTIVITY_PHOTO_SWAP_SCRIPT = `<script>
     Array.prototype.forEach.call(document.querySelectorAll('li.venue-card[data-ph-by]'), function(li){
       var m; try { m = JSON.parse(li.getAttribute('data-ph-by')); } catch (e) { return; }
       var u = m[t] || m[''];
-      if (u && li.getAttribute('data-ph-now') !== u) { li.setAttribute('data-ph-now', u); li.style.setProperty('--fd-ph', "url('" + u + "')"); }
+      if (u && li.getAttribute('data-ph-now') !== u) { var p = u.split('|'); li.setAttribute('data-ph-now', u); li.style.setProperty('--fd-ph', "url('" + p[0] + "')"); li.style.setProperty('--fd-ph-2x', "url('" + (p[1] || p[0]) + "')"); }
     });
   };
   try { new MutationObserver(sync).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
@@ -17397,8 +17422,9 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       // data-ph-by lets the page change it as the filter changes ('' = usual photo).
       const alts = extra.altPhotos ? ACTIVITY_PHOTOS[v.id] : null;
       const shown = (alts && extra.photoType && alts[extra.photoType]) || own;
-      const by = alts && extra.altPhotos === 'swap' ? ` data-ph-by="${escapeHtml(JSON.stringify({ ...alts, '': own }))}"` : '';
-      return ` data-ph="own" style="--fd-ph:url('${escapeHtml(shown)}')"${by}`;
+      const pair = (u) => `${photoSized(u, 480)}|${photoSized(u, 960)}`;
+      const by = alts && extra.altPhotos === 'swap' ? ` data-ph-by="${escapeHtml(JSON.stringify(Object.fromEntries(Object.entries({ ...alts, '': own }).map(([k, u]) => [k, pair(u)]))))}"` : '';
+      return ` data-ph="own" style="${cardPhotoVars('fd-ph', shown)}"${by}`;
     }
     return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}"`;
   };
@@ -22207,7 +22233,7 @@ function venueHeroPhoto(venue) {
 // the type's list, so related cards do not repeat one stock picture.
 function venueThumbPhoto(v, used) {
   const own = String(v.image_url || '').trim();
-  if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return own;
+  if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return photoSized(own, 480);
   if (VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]) return FD_CARD_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]][0];
   if (used && FD_CARD_PHOTOS[v.type]) {
     const first = venueThumbPhoto(v);
@@ -22500,7 +22526,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // button and a thumbnail row that open a full-screen viewer.
   const galleryPhotos = venue.image_url ? venueGalleryPhotos(venue, L) : [];
   const galleryHtml = venueGalleryHtml(venue, galleryPhotos, L);
-  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" loading="lazy">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
+  // The venue photo is the biggest thing on the page, so it loads first (not lazily), and phones get the 960px copy.
+  const heroW = Number((/width="(\d+)"/.exec(imgDimsAttr(venue.image_url)) || [])[1]) || 0;
+  const hero960 = photoSized(venue.image_url, 960);
+  const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
+  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:6px 0 0;font-size:0.78rem;opacity:0.7">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
@@ -25494,7 +25524,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     const v = venueById.get(Number(id));
     if (!v) return '';
     const own = String(v.image_url || '').trim();
-    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="--fd-ph:url('${escapeHtml(own)}')"`;
+    if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="${cardPhotoVars('fd-ph', own)}"`;
     return ` data-ph="${spread(curatedPhotoKey(v))}"`;
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true, hideSocial: true })
@@ -28216,7 +28246,7 @@ function tripStopsFor(refs) {
       out.push({
         ref, kind: 'venue', name: v.name, type: CATEGORY_LABELS[v.type].singular, region: v.region, regionLabel: REGION_LABELS[v.region],
         url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v)),
+        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? photoSized(own, 480) : cardPhotoKeyUrl(curatedPhotoKey(v)),
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
@@ -30425,7 +30455,7 @@ function venueGalleryHtml(venue, photos, L) {
   const thumbs = shown.map((p, i) => {
     const hidden = rest.length - shown.length;
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
-    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
+    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
   }).join('');
   const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo', 'Photo')}: ${escapeHtml(p.credit)}</figcaption>` : ''}</figure>`).join('');
   return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
@@ -40441,6 +40471,7 @@ module.exports = {
   getSkiSnowVenues,
   getSkiSnowEatVenues,
   renderSkiSnowPage,
+  photoSized,
   ownerHelpWidgetHtml,
   getIndoorGolfVenues,
   getIndoorAlsoVenues,
