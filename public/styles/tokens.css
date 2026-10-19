@@ -36,5 +36,11 @@
        link hovers) uses this deeper gold (4.56:1 on --ref-cream). The
        bright gold stays for icons, rules and text on the navy footer. */
     --ref-gold-ink: #8A6A0F;
+    /* Contrast (2026-10-19, review pass 5): solid muted text colours for
+       secondary lines (subtitles, hints, counts, table headers), used in
+       place of opacity- or alpha-dimmed text. Both are at least 4.6:1 on
+       --ref-cream, --paper, --sand and --ref-cream-deep. */
+    --ink-muted: #6B5D54;
+    --ref-navy-muted: #56636E;
     --ref-white: #FFFFFF;
 }

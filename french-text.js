@@ -179,6 +179,7 @@ const FR_TEXT = {
   'Sort': 'Trier',
   'Recommended': 'Recommandés',
   'Search places and events': 'Rechercher des lieux et des événements',
+  'Search places, cuisines…': 'Chercher lieux, cuisines…',
   'Search Okanagan Roam': 'Rechercher dans Okanagan Roam',
   '{0} places': '{0} lieux',
   '1 place': '1 lieu',
@@ -1155,6 +1156,7 @@ const FR_SCRIPT_STRINGS = {
   // Open-now empty state on the list pages (2026-10-18).
   "Nothing that matches is open right now.": "Rien de ce qui correspond n’est ouvert en ce moment.",
   "Opening next:": "Prochaines ouvertures :",
+  "Show all (including closed)": "Tout afficher (fermés compris)",
   " selected": " choisi(s)",
   "&copy; OpenStreetMap contributors": "&copy; Contributeurs d’OpenStreetMap",
   "A list shared with you": "Une liste partagée avec vous",
