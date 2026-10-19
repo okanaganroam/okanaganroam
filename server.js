@@ -6318,12 +6318,13 @@ function renderOutdoorBannerSwapScript() {
   for (const a of OUTDOOR_ACTIVITIES) if (OUTDOOR_ACTIVITY_BANNERS[a.slug]) c[a.slug] = { banner: OUTDOOR_ACTIVITY_BANNERS[a.slug], heading: `${a.label} in the Okanagan`, intro: a.blurb };
   return `<script>
   (function(){
-    var c = ${JSON.stringify(c).replace(/</g, '\\u003c')};
+    var c = ${bannerSwapJson(c)};
+    ${BANNER_SWAP_JS}
     var sync = function(){
       var img = document.querySelector('.category-banner img'); if (!img) return;
       var on = {}; Array.prototype.forEach.call(document.querySelectorAll('[data-activity][aria-pressed="true"]'), function(x){ on[x.getAttribute('data-activity')] = 1; });
       var keys = Object.keys(on), t = (keys.length === 1 && c[keys[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
+      swapBanner(img, b);
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.outdoors-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -11967,6 +11968,41 @@ function withRegionHeroFirst(html) {
   }
   return html.replace(/<meta charset="UTF-8">\n?/i, (m) => `${m}${HOME_HERO_FIRST_HEAD}\n`);
 }
+// Speed (2026-10-19, round 7): the list pages with a banner (body.fd-page: /restaurants, /cafes, the town category
+// pages, /food-drink, /wineries, /dog-friendly, the curated hubs...) had a 3.5 s phone LCP. Their banner, the LCP,
+// shared a slow connection with gtag.js (175 KB), the first four card photos and the fonts, it was found only when
+// the parser reached it, and 3x phones took its 1200px copy. They now get what town pages got: the hero-ready
+// signal first in <head> (gtag.js waits for it) and the card photos held until the banner has loaded (8 s at the
+// latest; html.hf is never set without JavaScript, so nothing is held then); a preload right after the viewport
+// meta; and a phone <source> with the 800px copy (an 800px photo is still twice a 375px screen). Runs after
+// withVersionedImages, so the preload repeats the img's own versioned URLs. swapBanner keeps the <source> in step.
+const BANNER_HERO_IMG_RE = /(<div class="category-banner"[^>]*>\s*)(<img src="([^"]+)" srcset="([^"]+)" sizes="([^"]+)"[^>]*\sfetchpriority="high"[^>]*>)/;
+const BANNER_HERO_PHONE_MEDIA = '(max-width: 640px)';
+const BANNER_HERO_HOLD_HEAD = `<style id="hero-first-cards">html.hf li.venue-card::before{background-image:none!important}.category-banner picture.banner-pic{display:contents}</style>
+<script>
+(function(){
+  var d = document.documentElement;
+  if (typeof window.roamAfterHero !== 'function') return;
+  d.className += ' hf';
+  window.roamAfterHero(function(){ d.className = d.className.replace(/(^|\\s)hf(?=\\s|$)/g, ''); });
+})();
+</script>`;
+function withBannerHeroFirst(html) {
+  if (typeof html !== 'string' || html.indexOf('window.roamAfterHero = ') !== -1) return html;
+  const body = /<body class="([^"]*)"/.exec(html);
+  if (!body || !/(^|\s)fd-page(\s|$)/.test(body[1])) return html;
+  const m = BANNER_HERO_IMG_RE.exec(html);
+  if (!m || !/<meta name="viewport"[^>]*>/i.test(html)) return html;
+  const [whole, open, img, , srcset, sizes] = m;
+  const phone = (/(\S+) 800w/.exec(srcset) || [])[1];
+  const pic = phone ? `<picture class="banner-pic"><source media="${BANNER_HERO_PHONE_MEDIA}" srcset="${phone} 800w" sizes="100vw">${img}</picture>` : img;
+  const preload = phone
+    ? `<link rel="preload" as="image" imagesrcset="${phone} 800w" imagesizes="100vw" media="${BANNER_HERO_PHONE_MEDIA}" fetchpriority="high">\n<link rel="preload" as="image" imagesrcset="${srcset}" imagesizes="${sizes}" media="(min-width: 641px)" fetchpriority="high">`
+    : `<link rel="preload" as="image" imagesrcset="${srcset}" imagesizes="${sizes}" fetchpriority="high">`;
+  html = html.slice(0, m.index) + open + pic + html.slice(m.index + whole.length);
+  html = html.replace(/<meta name="viewport"[^>]*>\n?/i, (v) => `${v}${v.endsWith('\n') ? '' : '\n'}${preload}\n`);
+  return html.replace(/<meta charset="UTF-8">\n?/i, (c) => `${c}${HOME_HERO_FIRST_HEAD}\n${BANNER_HERO_HOLD_HEAD}\n`);
+}
 // The homepage's <main id="main"> (2026-10-18): from the hero to just before the footer. No-op if either end is missing
 // or the page already has a <main>.
 function wrapHomeMain(html) {
@@ -12907,6 +12943,7 @@ function installSharedStylesheetResponse(res, req = {}) {
       // Image cache busting (2026-10-19): last, so nothing above sees a query on an image URL, and the waiting cards'
       // hash (withRestCardsDeferred) is of their plain text, as /cards/rest/ computes it.
       try { body = withVersionedImages(body); } catch (e) { /* plain image URLs still work */ }
+      try { body = withBannerHeroFirst(body); } catch (e) { /* the page still works without the preload */ }
     }
     flush();
     return realEnd(body, ...rest);
@@ -14627,7 +14664,7 @@ const PHOTO_SIZE_DIRS = ['venues', 'hiking/venues', 'beaches/venues', 'sports/ve
 const PHOTO_SIZE_FILES = (() => {
   const set = new Set();
   for (const d of PHOTO_SIZE_DIRS) {
-    try { for (const f of fs.readdirSync(path.join(__dirname, 'public', 'images', d))) if (/-w(480|960)\.jpg$/.test(f)) set.add(`/images/${d}/${f}`); } catch (e) { /* folder missing in test copies */ }
+    try { for (const f of fs.readdirSync(path.join(__dirname, 'public', 'images', d))) if (/-w(480|960|1200)\.jpg$/.test(f)) set.add(`/images/${d}/${f}`); } catch (e) { /* folder missing in test copies */ }
   }
   return set;
 })();
@@ -15104,6 +15141,11 @@ function destinationCardPhoto(region) {
   return out;
 }
 // Same card treatment as /categories (Dayton, 2026-10-13): 4 across on desktop, a 3:2 photo above the name.
+// Destination card photos (2026-10-19, round 7): the 800px card photo was the only size, about 1 MB for the page,
+// though phones show it in a 112px column (the box is ~150-170px tall, so the cover-cropped photo is drawn about
+// 240px wide; 160px gives the 480px copy on a 3x phone), two columns from 560px and four from 900px. tileSrcsetAttrs
+// lists the existing -w360 / -w480 copies; a town without them keeps its plain src.
+const DESTINATION_TILE_SIZES = '(max-width: 559px) 160px, (max-width: 899px) calc(50vw - 30px), (max-width: 1359px) calc(25vw - 26px), 320px';
 const DESTINATION_PHOTO_GRID_STYLE = `<style id="destination-photo-grid">
   body.destinations-page .destination-photo-grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 0 0 30px; }
   @media (min-width: 560px) { body.destinations-page .destination-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -15216,7 +15258,7 @@ ${starts.map((x) => `      <li><strong>${escapeHtml(x.label)}</strong><a href="/
         <h2><a href="/${r.region}">${escapeHtml(r.label)}</a></h2>${DESTINATION_TAGLINES[r.region] ? `
         <p class="destination-tagline">${escapeHtml(DESTINATION_TAGLINES[r.region])}</p>` : ''}
         <p class="venue-meta">${r.venues} place${r.venues === 1 ? '' : 's'} to eat, drink and explore</p>${photo ? `
-        <div class="destination-card-photo${photo.map ? ' destination-card-map' : ''}"><img src="${photo.src}" alt="" width="800" height="533" loading="lazy" decoding="async"></div>` : ''}
+        <div class="destination-card-photo${photo.map ? ' destination-card-map' : ''}"><img src="${photo.src}"${tileSrcsetAttrs(photo.src, DESTINATION_TILE_SIZES)} alt="" width="800" height="533" loading="lazy" decoding="async"></div>` : ''}
       </li>`;
     }).join('\n')}
   </ul>`).join('\n  ');
@@ -20402,6 +20444,40 @@ function withSmallBanner(bannerHtml) {
     return `<img src="${src}" srcset="${small} 800w, ${mid ? `${mid} 1200w, ` : ''}${src} 1600w" sizes="(max-width: 860px) 100vw, 1200px"`;
   });
 }
+// Banner swaps (2026-10-19, round 7): the hub scripts that follow the chips (/outdoors, /food-drink, /dog-friendly,
+// /whats-on, the Local Favourites / Hidden Gems / Secret Spots and curated hubs) compared the photo's src with a
+// plain path. Since every server-written image URL got ?v= (speed pass 6) that was always different, so on load
+// they dropped the srcset and fetched the full 1600px unversioned photo (120-500 KB extra on a phone). The banners
+// a script can swap to now carry their versioned URL, the srcset withSmallBanner would give them and the 800px
+// copy for the phone <source> (withBannerHeroFirst); swapBanner compares paths without the query, so the
+// server-rendered responsive photo is kept when it is already the right one.
+function bannerSwapData(value) {
+  if (Array.isArray(value)) return value.map(bannerSwapData);
+  if (!value || typeof value !== 'object') return value;
+  const out = {};
+  for (const [k, v] of Object.entries(value)) out[k] = bannerSwapData(v);
+  if (typeof value.src === 'string' && /^\/images\/[^?#]+$/.test(value.src)) {
+    const small = smallBannerFor(value.src), mid = small ? midBannerFor(value.src) : null;
+    out.src = versionedImageUrl(value.src);
+    if (small) {
+      out.srcset = `${versionedImageUrl(small)} 800w, ${mid ? `${versionedImageUrl(mid)} 1200w, ` : ''}${out.src} 1600w`;
+      out.phone = versionedImageUrl(small);
+    }
+  }
+  return out;
+}
+function bannerSwapJson(value) {
+  return JSON.stringify(bannerSwapData(value)).replace(/</g, '\\u003c');
+}
+const BANNER_SWAP_SIZES = '(max-width: 860px) 100vw, 1200px';
+const BANNER_SWAP_JS = `var swapBanner = function(img, b){
+      var path = function(u){ return String(u || '').split('?')[0]; };
+      if (!img || !b || path(img.getAttribute('src')) === path(b.src)) return;
+      var pic = img.parentNode && img.parentNode.tagName === 'PICTURE' ? img.parentNode : null, ps = pic && pic.querySelector('source');
+      if (ps) { if (b.phone) ps.setAttribute('srcset', b.phone + ' 800w'); else ps.parentNode.removeChild(ps); }
+      if (b.srcset) { img.setAttribute('sizes', '${BANNER_SWAP_SIZES}'); img.setAttribute('srcset', b.srcset); } else img.removeAttribute('srcset');
+      img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%';
+    };`;
 function categoryHeroHtml(bannerHtml, textHtml) {
   if (!bannerHtml) return textHtml;
   return `<div class="category-hero">
@@ -20428,19 +20504,20 @@ const FOOD_DRINK_HUB_BANNER = Object.freeze({ src: '/images/food-drink/food-drin
 // chips: one selected type shows its photo, anything else the hub's own.
 function foodDrinkHubBannerHtml(types) {
   const one = (types.length === 1 && CATEGORY_BANNER_IMAGES[types[0]]) || FOOD_DRINK_HUB_BANNER;
-  const map = JSON.stringify(CATEGORY_BANNER_IMAGES).replace(/</g, '\\u003c');
-  const general = JSON.stringify(FOOD_DRINK_HUB_BANNER).replace(/</g, '\\u003c');
+  const map = bannerSwapJson(CATEGORY_BANNER_IMAGES);
+  const general = bannerSwapJson(FOOD_DRINK_HUB_BANNER);
   const text = JSON.stringify(Object.fromEntries(Object.entries(FD_HUB_HEADINGS).map(([k, x]) => [k, { h: x.heading, i: x.intro }]))).replace(/</g, '\\u003c');
   return `<div class="category-banner" id="fdBanner"><img src="${one.src}" alt="${escapeHtml(one.alt)}" width="1600" height="1067" style="object-position: 50% ${one.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
     var map = ${map}, general = ${general}, text = ${text}, pages = ${JSON.stringify(Object.fromEntries(FOOD_DRINK_TYPES.map((t) => [t, { href: `/${CATEGORY_SLUGS[t]}`, label: CATEGORY_LABELS[t].plural.toLowerCase() }]))).replace(/</g, '\\u003c')};
     var box = document.getElementById('fdBanner'); if (!box) return;
+    ${BANNER_SWAP_JS}
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-fd-type'); });
       var b = (on.length === 1 && map[on[0]]) || general;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
+      swapBanner(img, b);
       var t = (on.length === 1 && text[on[0]]) || text.all;
       var h = document.getElementById('fdHeading'), p = document.getElementById('fdIntro');
       if (h && h.textContent !== t.h) h.textContent = t.h;
@@ -21997,13 +22074,14 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(`<div class="category-banner" id="dogBanner"><img src="${dogContent.banner.src}" alt="${escapeHtml(dogContent.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${dogContent.banner.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
-    var c = ${JSON.stringify(DOG_CATEGORY_CONTENT).replace(/</g, '\\u003c')};
+    var c = ${bannerSwapJson(DOG_CATEGORY_CONTENT)};
     var box = document.getElementById('dogBanner'); if (!box) return;
+    ${BANNER_SWAP_JS}
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-fd-type'); });
       var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
+      swapBanner(img, b);
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -22534,14 +22612,15 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(heroBanner ? `<div class="category-banner"${swapContent ? ' id="lfBanner"' : ''}><img src="${heroBanner.src}" alt="${escapeHtml(heroBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${heroBanner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(heroBanner.credit)}</div>${swapContent ? `
   <script>
   (function(){
-    var c = ${JSON.stringify(cfg.categoryContent || {}).replace(/</g, '\\u003c')}, rc = ${JSON.stringify(cfg.regionContent || {}).replace(/</g, '\\u003c')}, all = ${JSON.stringify({ banner: cfg.banner, heading: h1Text, introHtml: cfg.introHtml }).replace(/</g, '\\u003c')};
+    var c = ${bannerSwapJson(cfg.categoryContent || {})}, rc = ${bannerSwapJson(cfg.regionContent || {})}, all = ${bannerSwapJson({ banner: cfg.banner, heading: h1Text, introHtml: cfg.introHtml })};
     var box = document.getElementById('lfBanner'); if (!box) return;
+    ${BANNER_SWAP_JS}
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-lf-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-lf-type'); });
       var rs = Array.prototype.slice.call(document.querySelectorAll('button.outdoor-filter-chip[data-region][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-region'); });
       var one = (on.length === 1 && c[on[0]]) || (rs.length === 1 && rc[rs[0]]), b = one ? one.banner : all.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
+      swapBanner(img, b);
       var cr = box.querySelector('.region-photo-credit');
       if (cr) cr.remove();
       if (b.credit) {
@@ -22809,13 +22888,14 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(cfg.noBanner ? '' : `<div class="category-banner" id="curatedBanner"><img src="${content.banner.src}" alt="${escapeHtml(content.banner.alt)}" width="1600" height="1067" style="object-position: 50% ${content.banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(content.banner.credit)}</div>
   <script>
   (function(){
-    var c = ${JSON.stringify(cfg.categoryContent).replace(/</g, '\\u003c')};
+    var c = ${bannerSwapJson(cfg.categoryContent)};
     var box = document.getElementById('curatedBanner'); if (!box) return;
+    ${BANNER_SWAP_JS}
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.fd-type-chip[data-fd-type][aria-pressed="true"]')).map(function(x){ return x.getAttribute('data-fd-type'); });
       var t = (on.length === 1 && c[on[0]]) || c.all, b = t.banner;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
+      swapBanner(img, b);
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .fd-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
       if (p && p.textContent !== t.intro) p.textContent = t.intro;
@@ -24722,13 +24802,14 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(`<div class="category-banner" id="whatsOnBanner"><img src="${whatsOnBanner.src}" alt="${escapeHtml(whatsOnBanner.alt)}" width="1600" height="1067" style="object-position: 50% ${whatsOnBanner.pos}%" fetchpriority="high"></div>
   <script>
   (function(){
-    var map = ${JSON.stringify(WHATSON_CATEGORY_BANNERS).replace(/</g, '\\u003c')}, general = ${JSON.stringify(WHATS_ON_BANNER).replace(/</g, '\\u003c')}, text = ${JSON.stringify({ ...WHATSON_CATEGORY_TEXT, all: allText }).replace(/</g, '\\u003c')};
+    var map = ${bannerSwapJson(WHATSON_CATEGORY_BANNERS)}, general = ${bannerSwapJson(WHATS_ON_BANNER)}, text = ${JSON.stringify({ ...WHATSON_CATEGORY_TEXT, all: allText }).replace(/</g, '\\u003c')};
     var box = document.getElementById('whatsOnBanner'); if (!box) return;
+    ${BANNER_SWAP_JS}
     var img = box.querySelector('img');
     var sync = function(){
       var on = Array.prototype.slice.call(document.querySelectorAll('.whatson-cat-chip[data-category][aria-pressed="true"]')).map(function(c){ return c.getAttribute('data-category'); });
       var b = (on.length === 1 && map[on[0]]) || general;
-      if (img.getAttribute('src') !== b.src) { img.removeAttribute('srcset'); img.src = b.src; img.alt = b.alt; img.style.objectPosition = (b.posX == null ? 50 : b.posX) + '% ' + b.pos + '%'; }
+      swapBanner(img, b);
       var t = (on.length === 1 && text[on[0]]) || text.all;
       var h = document.querySelector('.category-hero-text h1'), p = document.querySelector('.category-hero-text .whatson-intro');
       if (h && h.textContent !== t.heading) h.textContent = t.heading;
@@ -25458,11 +25539,12 @@ function venueHeroPhoto(venue) {
   const ex = EXAMPLE_ACTIVITY_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(venue.id) || 0]];
   if (ex) {
     const src = `/images/outdoors/examples/${EXAMPLE_ACTIVITY_FILES[VENUE_EXAMPLE_PHOTOS[Number(venue.id) || 0]]}-2610.jpg`;
-    return { src, small: smallBannerFor(src), alt: ex.alt, pos: ex.pos, example: true };
+    return { src, small: smallBannerFor(src), mid: midBannerFor(src), alt: ex.alt, pos: ex.pos, example: true };
   }
   const b = CATEGORY_BANNER_IMAGES[venue.type];
   if (!b) return null;
-  return { src: b.src, small: smallBannerFor(b.src), alt: b.alt, pos: b.pos, example: true };
+  // The fallback photo lists its 1200px copy too (round 7, 2026-10-19), as the list-page banners do.
+  return { src: b.src, small: smallBannerFor(b.src), mid: midBannerFor(b.src), alt: b.alt, pos: b.pos, example: true };
 }
 // A small photo for a related / nearby card: its own photo, else the same
 // example photo its Food & Drink card uses, else its type's trip photo.
@@ -25884,7 +25966,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // The venue photo is the biggest thing on the page, so it loads first (not lazily), and phones get the 960px copy.
   const heroW = Number((/width="(\d+)"/.exec(imgDimsAttr(venue.image_url)) || [])[1]) || 0;
   const hero960 = photoSized(venue.image_url, 960);
-  const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
+  // Round 7 (2026-10-19): computers (a 976-1312px hero) took the 1800px original (about 450 KB); a <name>-w1200.jpg
+  // copy, where one has been made (scripts/make-photo-w1200.sh), is listed between the two.
+  const hero1200 = heroW > 1200 ? photoSized(venue.image_url, 1200) : venue.image_url;
+  const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${hero1200 !== venue.image_url ? `${escapeHtml(hero1200)} 1200w, ` : ''}${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   // The credit's colour (2026-10-18): a solid #6B5E55 (5.6:1 on the cream page); the old 0.65 opacity was 3.9-4.5:1.
   // French pass 6 (2026-10-19): a credit stored as "Photo: City of Kelowna" read "Photo: Photo: …"; French has its space before the colon.
@@ -25894,7 +25979,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
-        <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''}${imgDimsAttr(heroPhoto.src)} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
+        <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${heroPhoto.mid ? `${heroPhoto.mid} 1200w, ` : ''}${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''}${imgDimsAttr(heroPhoto.src)} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
         <span class="venue-hero-type">${escapeHtml(golfKindLabel)}</span>
         <h1>${escapeHtml(venue.name)}</h1>${heroPhoto && heroPhoto.example ? `
         <span class="venue-hero-example">${L('Example photo', 'Photo d\u2019exemple')}</span>` : ''}
@@ -46882,6 +46967,12 @@ module.exports = {
   withHomeHeroFirst,
   guideCardImage,
   withSmallBanner,
+  // Banner speed (2026-10-19, round 7)
+  bannerSwapData,
+  BANNER_SWAP_JS,
+  withBannerHeroFirst,
+  renderOutdoorBannerSwapScript,
+  DESTINATION_TILE_SIZES,
   eventCardSrcsetAttrs,
   withFilterBarReady,
   withFontFallbacks,

@@ -18099,7 +18099,7 @@ test('Indoor discovery: banner and experience choices stay on the indoor hub', a
   await withWinterServer(async (base) => {
     const hub = await WINTER_GET(base, '/indoor');
     // Photo banner (2026-10-12): the shared category hero replaced the illustrated indoor-hero.
-    assert.match(hub.text, /<div class="category-banner"><img src="\/images\/indoor\/indoor\.jpg"/);
+    assert.match(hub.text, /<div class="category-banner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/indoor\/indoor\.jpg"/);
     assert.doesNotMatch(hub.text, /class="indoor-hero"/);
     assert.match(hub.text, /aria-label="Choose an indoor experience"/);
     for (const label of ['Museums &amp; Galleries', 'Family Fun', 'Games &amp; Escape Rooms', 'Spas', 'Theatre']) assert.ok(hub.text.includes(label), label);
@@ -18323,18 +18323,18 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     await withWinterServer(async (base) => {
       const scoped = (await WINTER_GET(base, '/kelowna/pubs')).text;
       // Photo full width above the heading, cropped at the photo's own focus point.
-      assert.match(scoped, /<div class="category-hero">\s*<div class="category-banner"><img src="\/images\/food-drink\/pubs\.jpg"(?: srcset="[^"]*" sizes="[^"]*")? alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" style="object-position: 50% 65%" fetchpriority="high"><\/div>\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>/);
+      assert.match(scoped, /<div class="category-hero">\s*<div class="category-banner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/food-drink\/pubs\.jpg"(?: srcset="[^"]*" sizes="[^"]*")? alt="A bartender pouring a craft beer from the tap" width="1600" height="1067" style="object-position: 50% 65%" fetchpriority="high">(?:<\/picture>)?<\/div>\s*<div class="category-hero-text"><h1>Pubs in Kelowna, BC<\/h1><\/div>/);
       assert.match(scoped, /@media \(min-width: 900px\) \{[\s\S]*?\.category-banner \{ aspect-ratio: 12 \/ 5;/, 'desktop banner is a 2.4:1 strip');
       assert.doesNotMatch(scoped, /grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.15fr\)/, 'no side-by-side layout');
       assert.match(scoped, /\.category-banner \{[^}]*max-height: min\(44vh, 440px\);/, 'the banner never fills the window, so the heading stays in view');
       assert.deepEqual(Object.keys(app.CATEGORY_LABELS).filter((t) => !app.CATEGORY_BANNER_IMAGES[t]), [], 'every category has a banner photo');
       const hubAll = (await WINTER_GET(base, '/food-drink')).text;
       // No type or several: the hub's own photo with the general heading.
-      assert.match(hubAll, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"(?: srcset="[^"]*" sizes="[^"]*")? alt="Friends toasting drinks over a table of shared dishes"/);
+      assert.match(hubAll, /<div class="category-banner" id="fdBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/food-drink\/food-drink\.jpg"(?: srcset="[^"]*" sizes="[^"]*")? alt="Friends toasting drinks over a table of shared dishes"/);
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.FOOD_DRINK_HUB_BANNER.src)), 'hub image exists');
       assert.match(hubAll, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const hubPub = (await WINTER_GET(base, '/food-drink?types=pub')).text;
-      assert.match(hubPub, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/pubs\.jpg"/);
+      assert.match(hubPub, /<div class="category-banner" id="fdBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/food-drink\/pubs\.jpg"/);
       // One chosen type: the heading and intro are that type's, not the general Food & Drink text.
       assert.match(hubPub, /<h1 id="fdHeading">Pubs &amp; Bars in the Okanagan<\/h1>\s*<p class="outdoor-intro fd-intro" id="fdIntro">Neighbourhood pubs/);
       const hubCocktail = (await WINTER_GET(base, '/food-drink?types=cocktail')).text;
@@ -18342,10 +18342,10 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(hubCocktail, /<title>Food &amp; Drink in the Okanagan \| Okanagan Roam<\/title>/, 'the page title and canonical stay the hub\'s');
       assert.deepEqual(Object.keys(app.FD_HUB_HEADINGS).sort(), ['all', 'brewery', 'cafe', 'cocktail', 'distillery', 'pub', 'restaurant']);
       const hubTwo = (await WINTER_GET(base, '/food-drink?types=pub,brewery')).text;
-      assert.match(hubTwo, /<div class="category-banner" id="fdBanner"><img src="\/images\/food-drink\/food-drink\.jpg"/);
+      assert.match(hubTwo, /<div class="category-banner" id="fdBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/food-drink\/food-drink\.jpg"/);
       assert.match(hubTwo, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/);
       const ski = (await WINTER_GET(base, '/ski-snow')).text;
-      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner" id="curatedBanner"><img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Ski &amp; Snow in the Okanagan<\/h1>/, '/ski-snow opens with its photo above the heading');
+      assert.match(ski, /<div class="category-hero">\s*<div class="category-banner" id="curatedBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/ski-snow\/ski-snow\.jpg"[^>]*>(?:<\/picture>)?<\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Ski &amp; Snow in the Okanagan<\/h1>/, '/ski-snow opens with its photo above the heading');
       const gems = app.renderHiddenGemsPage([{ id: 990008, name: 'Banner Gem', slug: 'banner-gem', region: 'kelowna', type: 'cafe', description: 'Fixture.' }]);
       assert.match(gems, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Hidden Gems in the Okanagan<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
@@ -18353,7 +18353,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner" id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), "What's On thumbnail exists");
       const dogsRes = await WINTER_GET(base, '/dog-friendly');
-      if (dogsRes.status === 200) assert.match(dogsRes.text, /<div class="category-hero">\s*<div class="category-banner" id="dogBanner"><img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
+      if (dogsRes.status === 200) assert.match(dogsRes.text, /<div class="category-hero">\s*<div class="category-banner" id="dogBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*>(?:<\/picture>)?<\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.DOG_FRIENDLY_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'dog-friendly thumbnail exists');
       const favs = app.renderLocalFavouritesPage([{ id: 990007, name: 'Banner Diner', slug: 'banner-diner', region: 'kelowna', type: 'restaurant', description: 'Fixture.' }]);
       assert.match(favs, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Local Favourites in the Okanagan<\/h1>/, '/local-favorites opens with its photo above the heading');
@@ -18367,43 +18367,43 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.deepEqual(Object.keys(app.WHATSON_CATEGORY_BANNERS).sort(), ['arts-culture', 'community-events', 'events-festivals', 'family-kids', 'food-drink-events', 'holiday-seasonal', 'live-music', 'markets-fairs', 'nightlife', 'sports-recreation', 'wineries-wine-events', 'workshops-classes']);
       for (const [k, b] of Object.entries(app.WHATSON_CATEGORY_BANNERS)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${k} photo exists`);
       const woNight = (await WINTER_GET(base, '/whats-on?categories=nightlife')).text;
-      assert.match(woNight, /id="whatsOnBanner"><img src="\/images\/whats-on\/nightlife\.jpg"/);
+      assert.match(woNight, /id="whatsOnBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/whats-on\/nightlife\.jpg"/);
       assert.match(woNight, /<h1>Nightlife in the Okanagan<\/h1>\s*<p class="outdoor-intro whatson-intro">DJ nights/, 'one category: its own heading and intro');
       assert.deepEqual(Object.keys(app.WHATSON_CATEGORY_TEXT).filter((k) => k !== 'all').sort(), Object.keys(app.WHATSON_CATEGORY_BANNERS).sort(), 'every category has text');
       const woTwo = (await WINTER_GET(base, '/whats-on?categories=nightlife,arts-culture')).text;
-      assert.match(woTwo, /id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"/);
+      assert.match(woTwo, /id="whatsOnBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/whats-on\/whats-on\.jpg"/);
       assert.match(woTwo, /<h1>What&#39;s On in the Okanagan<\/h1>/);
       // Dog Friendly Finds: one type chosen shows its own photo, heading and intro.
       assert.deepEqual(Object.keys(app.DOG_CATEGORY_CONTENT).filter((k) => k !== 'all').sort(), ['brewery', 'cafe', 'cocktail', 'distillery', 'dog-beach', 'outdoors', 'pub', 'restaurant', 'winery']);
       for (const [k, c] of Object.entries(app.DOG_CATEGORY_CONTENT)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', c.banner.src)), `${k} dog photo exists`);
       const dogPub = await WINTER_GET(base, '/dog-friendly?types=pub');
       if (dogPub.status === 200) {
-        assert.match(dogPub.text, /id="dogBanner"><img src="\/images\/dog-friendly\/dog-pub\.jpg"/);
+        assert.match(dogPub.text, /id="dogBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/dog-friendly\/dog-pub\.jpg"/);
         assert.match(dogPub.text, /<h1>Dog-Friendly Pubs &amp; Bars in the Okanagan<\/h1>/);
       }
       // Local Favourites: one type chosen shows that category's photo, heading and intro.
       const lfV = [{ id: 990010, name: 'LF Cafe', slug: 'lf-cafe', region: 'kelowna', type: 'cafe', description: 'Fixture.' }, { id: 990011, name: 'LF Golf', slug: 'lf-golf', region: 'kelowna', type: 'golf', description: 'Fixture.' }];
       const lfGolf = app.renderLocalFavouritesPage(lfV, { types: ['golf'], regions: [] });
-      assert.match(lfGolf, /id="lfBanner"><img src="\/images\/golf\/golf-courses\.jpg"/);
+      assert.match(lfGolf, /id="lfBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/golf\/golf-courses\.jpg"/);
       assert.match(lfGolf, /<h1>Local Favourite Golf Courses in the Okanagan<\/h1>/);
-      assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner"><img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites in the Okanagan<\/h1>/);
+      assert.match(app.renderLocalFavouritesPage(lfV), /id="lfBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/local-favourites\/local-favourites\.jpg"[\s\S]*?<h1>Local Favourites in the Okanagan<\/h1>/);
       for (const [k, c] of Object.entries(app.LOCAL_FAVOURITES_CATEGORY_CONTENT)) assert.ok(c.banner && c.heading && c.intro, `${k} has content`);
       assert.doesNotMatch(app.renderHiddenGemsPage(lfV, null, 'dog_friendly'), /lfBanner/, 'badge views unchanged');
       const ssV = [{ id: 990014, name: 'SS Cove', slug: 'ss-cove', region: 'kelowna', type: 'beach', description: 'Fixture.' }, { id: 990015, name: 'SS Falls', slug: 'ss-falls', region: 'kelowna', type: 'outdoor', description: 'Fixture.' }];
       const ssOut = app.renderSecretSpotsPage(ssV, { types: ['outdoor'], regions: [] });
-      assert.match(ssOut, /id="lfBanner"><img src="\/images\/outdoors\/outdoors\.jpg"/);
+      assert.match(ssOut, /id="lfBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/outdoors\/outdoors\.jpg"/);
       assert.match(ssOut, /<h1>Secret Outdoor Spots in the Okanagan<\/h1>/);
       // Hidden Gems: one type chosen shows that category's photo, heading and intro (main page only).
       const hgV = [{ id: 990012, name: 'HG Cafe', slug: 'hg-cafe', region: 'kelowna', type: 'cafe', description: 'Fixture.' }, { id: 990013, name: 'HG Beach', slug: 'hg-beach', region: 'kelowna', type: 'beach', description: 'Fixture.' }];
       const hgBeach = app.renderHiddenGemsPage(hgV, { types: ['beach'], regions: [] });
-      assert.match(hgBeach, /id="lfBanner"><img src="\/images\/beaches\/beaches\.jpg"/);
+      assert.match(hgBeach, /id="lfBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/beaches\/beaches\.jpg"/);
       assert.match(hgBeach, /<h1>Hidden Gem Beaches in the Okanagan<\/h1>/);
       assert.doesNotMatch(app.renderHiddenGemsPage(hgV, { types: ['beach'], regions: [] }, 'dog_friendly'), /Hidden Gem Beaches in the Okanagan/, 'badge views keep their own heading');
       // Ski & Snow: one ski-resort region chosen shows that resort's banner, heading and intro.
       const skiBW = app.renderSkiSnowPage([], [], { types: [], regions: ['big-white'] });
-      assert.match(skiBW, /id="lfBanner"><img src="\/images\/regions\/photos\/big-white-2610\.jpg"/);
+      assert.match(skiBW, /id="lfBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/regions\/photos\/big-white-2610\.jpg"/);
       const skiApex = app.renderSkiSnowPage([], [], { types: [], regions: ['apex'] });
-      assert.match(skiApex, /id="lfBanner"><img src="\/images\/regions\/photos\/apex-2610\.jpg"[^>]*><p class="region-photo-credit">Photo: <a href="https:\/\/www\.flickr\.com\/photos\/mfoubister\/28658736018\/"[^>]*>Murray Foubister<\/a>, CC BY-SA 2\.0<\/p>/, 'a credited photo shows its credit');
+      assert.match(skiApex, /id="lfBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/regions\/photos\/apex-2610\.jpg"[^>]*>(?:<\/picture>)?<p class="region-photo-credit">Photo: <a href="https:\/\/www\.flickr\.com\/photos\/mfoubister\/28658736018\/"[^>]*>Murray Foubister<\/a>, CC BY-SA 2\.0<\/p>/, 'a credited photo shows its credit');
       assert.match(skiBW, /<h1>Big White Ski Resort<\/h1>/);
       assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['apex'] }), /<h1>Apex Mountain Resort<\/h1>/);
       assert.match(app.renderSkiSnowPage([], [], { types: [], regions: ['big-white', 'apex'] }), /<h1>Ski &amp; Snow in the Okanagan<\/h1>/, 'two resorts: general text');
@@ -18424,7 +18424,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(app.renderCategoryAllRegionsPage('tour', toursV, null, { toursAlso: [] }), /<a href="\/tours" aria-current="page">All <span>2<\/span><\/a>/);
       for (const a of app.TOUR_ACTIVITIES) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', a.banner.src)), `${a.slug} photo exists`);
       const wine = (await WINTER_GET(base, '/wineries')).text;
-      assert.match(wine, /<div class="category-banner"><img src="\/images\/food-drink\/wineries\.jpg"/);
+      assert.match(wine, /<div class="category-banner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/food-drink\/wineries\.jpg"/);
     });
   } finally {
     db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(pub.id, pub2.id);
@@ -19216,7 +19216,7 @@ test('Destination photos (2026-10-13): every /destinations card shows its town p
   const cards = Array.from(html.matchAll(/<li class="category-card">\s*<h2><a href="\/([a-z-]+)">[\s\S]*?<\/li>/g));
   assert.ok(cards.length >= 1, 'destination cards render');
   for (const [card, region] of cards) {
-    const m = card.match(/<div class="destination-card-photo( destination-card-map)?"><img src="([^"]+)" alt="" width="800" height="533" loading="lazy"/);
+    const m = card.match(/<div class="destination-card-photo( destination-card-map)?"><img src="([^"]+)"(?: srcset="[^"]*" sizes="[^"]*")? alt="" width="800" height="533" loading="lazy"/);
     assert.ok(m, `${region} has a photo or map`);
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', m[2])), `${m[2]} exists`);
     assert.equal(Boolean(m[1]), m[2].includes('/maps/'), `${region}: map class only on maps`);
@@ -19503,7 +19503,7 @@ test('Venue page: Food & Drink pages offer Favorite / Add to trip; every type ha
 test('Venue page hero: an example photo of the place type, labelled, never in alt text; a venue photo wins and is not labelled', () => {
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const html = app.renderVenuePage(venue, [], [], []);
-  assert.match(html, /<img class="venue-hero-img" src="\/images\/food-drink\/restaurants\.jpg" srcset="\/images\/food-drink\/restaurants-800\.jpg 800w, \/images\/food-drink\/restaurants\.jpg 1600w"[^>]* alt=""/);
+  assert.match(html, /<img class="venue-hero-img" src="\/images\/food-drink\/restaurants\.jpg" srcset="\/images\/food-drink\/restaurants-800\.jpg 800w, \/images\/food-drink\/restaurants-1200\.jpg 1200w, \/images\/food-drink\/restaurants\.jpg 1600w"[^>]* alt=""/);
   assert.match(html, /<span class="venue-hero-example">Example photo<\/span>/);
   for (const type of Object.keys(app.CATEGORY_LABELS)) {
     const p = app.venueHeroPhoto({ ...venue, type });
@@ -28933,3 +28933,133 @@ test('deleteVenue removes a listing that has an owner link, a season and a linke
     db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(id, other);
   }
 });
+
+// ---- Banner speed (2026-10-19, round 7): versioned banner swaps, hero-first list pages, small destination photos ----
+// Every banner object a hub script can swap to, as written into the page.
+function bannerSwapObjects(html) {
+  const out = [];
+  for (const [, js] of String(html).matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+    if (js.indexOf('swapBanner') === -1) continue;
+    for (const [obj] of js.matchAll(/\{"src":"[^"]*"[^{}]*\}/g)) out.push(JSON.parse(obj.replace(/\\u003c/g, '<')));
+  }
+  return out;
+}
+function assertVersionedBannerSwaps(html, label) {
+  assert.doesNotMatch(html, /getAttribute\('src'\) !== b\.src/, `${label}: no plain src comparison`);
+  assert.doesNotMatch(html, /removeAttribute\('srcset'\); img\.src = b\.src/, `${label}: no swap that drops the srcset for the full photo`);
+  const banners = bannerSwapObjects(html);
+  for (const b of banners) {
+    if (!/^\/images\//.test(b.src)) continue;
+    assert.match(b.src, /^\/images\/[^?]+\?v=[0-9a-f]{10}$/, `${label}: ${b.src} is versioned`);
+    const small = b.src.split('?')[0].replace(/\.(jpe?g|webp|png)$/, '-800.jpg');
+    if (fs.existsSync(path.join(__dirname, '..', 'public', small))) {
+      assert.ok(b.srcset, `${label}: ${b.src} carries its srcset`);
+      for (const [, u] of b.srcset.matchAll(/(\S+) \d+w/g)) assert.match(u, /\?v=[0-9a-f]{10}$/, `${label}: ${u} in the srcset is versioned`);
+      assert.match(b.srcset, / 800w, /);
+      assert.match(b.phone, /-800\.jpg\?v=[0-9a-f]{10}$/);
+    }
+  }
+  return banners.length;
+}
+
+test('Banner speed (round 7): no hub page script can produce an unversioned 1600w banner', () => withPass4Server(async (get) => {
+  let pages = 0, banners = 0;
+  const paths = ['/outdoors', '/beaches', '/hidden-gems', '/local-favorites', '/secret-spots', '/dog-friendly', '/food-drink', '/ski-snow', '/tours', '/whats-on',
+    '/food-drink?types=pub', '/fr/food-drink', '/fr/whats-on', '/fr/dog-friendly', '/fr/hidden-gems'];
+  for (const p of paths) {
+    const r = await get(p);
+    if (r.status !== 200) continue;
+    pages++;
+    banners += assertVersionedBannerSwaps(r.text, p);
+  }
+  const fixture = (type) => [{ id: 990101, name: 'Swap Fixture', slug: 'swap-fixture', region: 'kelowna', type, description: 'Fixture.' }];
+  const rendered = {
+    'renderOutdoorBannerSwapScript': app.renderOutdoorBannerSwapScript(),
+    'renderHiddenGemsPage': app.renderHiddenGemsPage(fixture('cafe')),
+    'renderLocalFavouritesPage': app.renderLocalFavouritesPage(fixture('restaurant')),
+    'renderSecretSpotsPage': app.renderSecretSpotsPage(fixture('beach')),
+  };
+  for (const [k, html] of Object.entries(rendered)) { pages++; banners += assertVersionedBannerSwaps(html, k); }
+  assert.ok(pages >= 8, `checked ${pages} pages`);
+  assert.ok(banners >= 25, `checked ${banners} swappable banners`);
+}));
+
+test('Banner speed (round 7): swapBanner keeps the server-rendered responsive photo and swaps to versioned, responsive ones', () => {
+  const vm = require('node:vm');
+  const node = (tag, attrs) => ({ tagName: tag, attrs: { ...attrs }, style: {}, parentNode: null, children: [],
+    getAttribute(k){ return k in this.attrs ? this.attrs[k] : null; }, setAttribute(k, v){ this.attrs[k] = String(v); }, removeAttribute(k){ delete this.attrs[k]; },
+    set src(v){ this.attrs.src = v; }, get src(){ return this.attrs.src; },
+    querySelector(sel){ return this.children.find((c) => c.tagName.toLowerCase() === sel) || null; }, removeChild(c){ this.children = this.children.filter((x) => x !== c); c.parentNode = null; } });
+  const ctx = {};
+  vm.runInNewContext(`${app.BANNER_SWAP_JS} this.swapBanner = swapBanner;`, ctx);
+  const [fd, pubs] = [app.bannerSwapData(app.FOOD_DRINK_HUB_BANNER), app.bannerSwapData(app.CATEGORY_BANNER_IMAGES.pub)];
+  assert.match(fd.src, /^\/images\/food-drink\/food-drink\.jpg\?v=[0-9a-f]{10}$/);
+  // The page's own photo, as the server wrote it (inside the phone <picture>).
+  const pic = node('PICTURE'), source = node('SOURCE', { srcset: fd.phone + ' 800w' });
+  const img = node('IMG', { src: fd.src, srcset: fd.srcset, sizes: '(max-width: 860px) 100vw, 1200px' });
+  pic.children = [source, img]; source.parentNode = pic; img.parentNode = pic;
+  ctx.swapBanner(img, fd);
+  assert.equal(img.getAttribute('srcset'), fd.srcset, 'the right banner keeps its srcset');
+  // A plain (unversioned) path for the same photo still counts as the same banner.
+  ctx.swapBanner(img, { ...fd, src: '/images/food-drink/food-drink.jpg' });
+  assert.equal(img.getAttribute('src'), fd.src);
+  ctx.swapBanner(img, pubs);
+  assert.equal(img.getAttribute('src'), pubs.src);
+  assert.match(img.getAttribute('src'), /\?v=[0-9a-f]{10}$/);
+  assert.equal(img.getAttribute('srcset'), pubs.srcset);
+  assert.equal(source.getAttribute('srcset'), pubs.phone + ' 800w', 'the phone <source> follows');
+  assert.equal(img.alt, pubs.alt);
+  // A banner without small copies drops the srcset and the phone source rather than keeping the old photo's.
+  ctx.swapBanner(img, { src: '/images/no-such/banner.jpg', alt: 'x', pos: 50 });
+  assert.equal(img.getAttribute('srcset'), null);
+  assert.equal(pic.children.includes(source), false);
+});
+
+test('Banner speed (round 7): food list pages preload a phone-sized banner first and hold gtag.js and card photos for it', () => withPass4Server(async (get) => {
+  let checked = 0;
+  for (const p of ['/restaurants', '/fr/restaurants', '/food-drink', '/kelowna/restaurants']) {
+    const r = await get(p);
+    if (r.status !== 200) continue;
+    checked++;
+    const html = r.text;
+    const head = html.slice(0, html.indexOf('</head>'));
+    // Hero-ready signal right after the charset, ahead of the GA4 snippet that waits for it.
+    assert.ok(head.indexOf('window.roamAfterHero = ') !== -1 && head.indexOf('window.roamAfterHero = ') < head.indexOf("gtag('js'"), `${p}: hero-ready signal before GA4`);
+    assert.match(head, /<style id="hero-first-cards">html\.hf li\.venue-card::before\{background-image:none!important\}/);
+    const m = /<div class="category-banner"[^>]*><picture class="banner-pic"><source media="\(max-width: 640px\)" srcset="([^" ]+) 800w" sizes="100vw"><img src="([^"]+)" srcset="([^"]+)" sizes="([^"]+)"[^>]*fetchpriority="high"><\/picture><\/div>/.exec(html);
+    assert.ok(m, `${p}: the banner has a phone <source>`);
+    assert.match(m[1], /-800\.jpg\?v=[0-9a-f]{10}$/);
+    assert.match(m[3], /-800\.jpg\?v=[0-9a-f]{10} 800w, .*-1200\.jpg\?v=[0-9a-f]{10} 1200w, .*\?v=[0-9a-f]{10} 1600w$/);
+    // The preloads sit right after the viewport meta (so their media queries see the phone's width), before the stylesheets.
+    const vp = head.indexOf('<meta name="viewport"');
+    const phonePre = head.indexOf(`<link rel="preload" as="image" imagesrcset="${m[1]} 800w" imagesizes="100vw" media="(max-width: 640px)" fetchpriority="high">`);
+    const deskPre = head.indexOf(`<link rel="preload" as="image" imagesrcset="${m[3]}" imagesizes="${m[4]}" media="(min-width: 641px)" fetchpriority="high">`);
+    assert.ok(vp !== -1 && phonePre > vp && deskPre > phonePre, `${p}: both preloads follow the viewport meta`);
+    assert.ok(deskPre < head.indexOf('<link rel="stylesheet"'), `${p}: before the stylesheets`);
+    assert.equal(html.split('window.roamAfterHero = ').length, 2, `${p}: once`);
+  }
+  assert.ok(checked >= 3, `checked ${checked} list pages`);
+  // Town pages keep their own hero-first, and pages without body.fd-page are left alone.
+  const town = (await get('/kelowna')).text;
+  assert.doesNotMatch(town, /picture class="banner-pic"|id="hero-first-cards"/);
+  const plain = '<!DOCTYPE html><html><head><meta charset="UTF-8">\n<meta name="viewport" content="width=device-width">\n</head><body class="golf-page whatson-page"><div class="category-banner"><img src="/images/a.jpg" srcset="/images/a-800.jpg 800w, /images/a.jpg 1600w" sizes="100vw" alt="" fetchpriority="high"></div></body></html>';
+  assert.equal(app.withBannerHeroFirst(plain), plain);
+  const fd = plain.replace('golf-page whatson-page', 'golf-page fd-page');
+  const once = app.withBannerHeroFirst(fd);
+  assert.notEqual(once, fd);
+  assert.equal(app.withBannerHeroFirst(once), once, 'a second pass changes nothing');
+}));
+
+test('Banner speed (round 7): /destinations card photos list their 360/480px copies for the small phone column', () => withPass4Server(async (get) => {
+  for (const p of ['/destinations', '/fr/destinations']) {
+    const html = (await get(p)).text;
+    const imgs = [...html.matchAll(/<div class="destination-card-photo"><img src="([^"]+)"([^>]*)>/g)];
+    assert.ok(imgs.length >= 1, `${p}: cards render`);
+    for (const [, src, rest] of imgs) {
+      const base = src.split('?')[0].replace(/\.jpg$/, '');
+      if (![360, 480].every((w) => fs.existsSync(path.join(__dirname, '..', 'public', `${base}-w${w}.jpg`)))) continue;
+      assert.match(rest, new RegExp(` srcset="${base}-w360\\.jpg\\?v=[0-9a-f]{10} 360w, ${base}-w480\\.jpg\\?v=[0-9a-f]{10} 480w, ${base}\\.jpg\\?v=[0-9a-f]{10} 800w" sizes="${app.DESTINATION_TILE_SIZES.replace(/[()]/g, '\\$&')}"`), `${p}: ${base}`);
+    }
+  }
+  assert.match(app.DESTINATION_TILE_SIZES, /^\(max-width: 559px\) 160px, /);
+}));
