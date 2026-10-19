@@ -2348,6 +2348,34 @@ const BC_PERMANENT_UTC7_FROM = Date.UTC(2026, 10, 1, 9, 0);
 function isAfterBCPermanentTimeChange(instant) {
   return instant instanceof Date && instant.getTime() >= BC_PERMANENT_UTC7_FROM;
 }
+// UTC instants to Okanagan wall-clock time (2026-10-19, round 7): the one conversion every UTC source goes through
+// (Showpass/Eventbrite feed times via scripts/event-utc-to-local.js). Node's tzdata (2026a) still falls back to PST
+// on Nov 1, so Intl alone put November events an hour early; from BC_PERMANENT_UTC7_FROM it is a fixed UTC-7.
+// Accepts a Date, epoch ms, or an ISO string with Z or an offset ("2026-11-14T03:00:00Z"). Returns
+// { date: 'YYYY-MM-DD', time: 'HH:MM', offset: '-07:00' } or null.
+const okanaganWallClockFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: OKANAGAN_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+function okanaganLocalFromUtc(instant) {
+  let ms;
+  if (instant instanceof Date) ms = instant.getTime();
+  else if (typeof instant === 'number') ms = instant;
+  else if (typeof instant === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i.test(instant.trim())) ms = Date.parse(instant.trim().replace(' ', 'T'));
+  else return null;
+  if (!Number.isFinite(ms)) return null;
+  if (ms >= BC_PERMANENT_UTC7_FROM) {
+    const iso = new Date(ms - 7 * 60 * 60 * 1000).toISOString();
+    return { date: iso.slice(0, 10), time: iso.slice(11, 16), offset: '-07:00' };
+  }
+  const p = Object.fromEntries(okanaganWallClockFormatter.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  const hour = Number(p.hour) % 24;
+  const offMin = Math.round((Date.UTC(+p.year, +p.month - 1, +p.day, hour, +p.minute) - Math.floor(ms / 60000) * 60000) / 60000);
+  const abs = Math.abs(offMin);
+  return {
+    date: `${p.year}-${p.month}-${p.day}`, time: `${String(hour).padStart(2, '0')}:${p.minute}`,
+    offset: `${offMin < 0 ? '-' : '+'}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`,
+  };
+}
 const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_CUSTOM_WINDOW_DAYS = 366; // frozen design: Choose Dates spans at most a year
@@ -2635,6 +2663,35 @@ function validateEventOccurrence(occ, index = 0) {
     if (!isNullish(occ[f]) && typeof occ[f] !== 'string') return eventFail('occurrence_field_invalid', `occurrence[${index}].${f} must be a string`);
   }
   return null;
+}
+
+// UTC feed times (2026-10-19, round 7): an occurrence may give start_utc / end_utc (ISO with Z or an offset, as
+// Showpass and Eventbrite publish them) instead of local start_date/start_time/end_date/end_time. They are turned
+// into Okanagan wall-clock values here, with okanaganLocalFromUtc (fixed UTC-7 from Nov 1, 2026), so no import
+// converts UTC by itself. An end on the next calendar day before the start time becomes ends_next_day.
+function occurrencesFromUtc(occurrences) {
+  if (!Array.isArray(occurrences)) return { list: occurrences };
+  const list = [];
+  for (let i = 0; i < occurrences.length; i++) {
+    const occ = occurrences[i];
+    if (!isPlainObject(occ) || (isNullish(occ.start_utc) && isNullish(occ.end_utc))) { list.push(occ); continue; }
+    const { start_utc: su, end_utc: eu, ...rest } = occ;
+    if (isNullish(su)) return { fail: eventFail('occurrence_utc_invalid', `occurrence[${i}].end_utc needs a start_utc`) };
+    if (['start_date', 'start_time', 'end_date', 'end_time', 'ends_next_day'].some((k) => !isNullish(rest[k]))) {
+      return { fail: eventFail('occurrence_utc_conflict', `occurrence[${i}]: give start_utc/end_utc or local dates and times, not both`) };
+    }
+    const s = okanaganLocalFromUtc(su);
+    if (!s) return { fail: eventFail('occurrence_utc_invalid', `occurrence[${i}].start_utc must be an ISO date-time with Z or an offset`) };
+    const out = { ...rest, start_date: s.date, start_time: s.time };
+    if (!isNullish(eu)) {
+      const e = okanaganLocalFromUtc(eu);
+      if (!e) return { fail: eventFail('occurrence_utc_invalid', `occurrence[${i}].end_utc must be an ISO date-time with Z or an offset`) };
+      if (e.date === addLocalDays(s.date, 1) && e.time < s.time) { out.end_date = s.date; out.ends_next_day = 1; } else out.end_date = e.date;
+      out.end_time = e.time;
+    }
+    list.push(out);
+  }
+  return { list };
 }
 
 function normalizeEventOccurrence(occ) {
@@ -3017,6 +3074,9 @@ function createEvent(data, meta) {
     event_confidence: isNullish(data.event_confidence) ? 'medium' : data.event_confidence,
     valley_wide: isNullish(data.valley_wide) ? 0 : data.valley_wide,
   };
+  const utcOccs = occurrencesFromUtc(input.occurrences);
+  if (utcOccs.fail) return utcOccs.fail;
+  input.occurrences = utcOccs.list;
   const scalarErr = validateEventScalars(input);
   if (scalarErr) return scalarErr;
   const venueErr = validateEventVenue(input);
@@ -3174,6 +3234,9 @@ function upsertEventOccurrences(id, occurrences, meta) {
   if (metaErr) return metaErr;
   const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
   if (!existing) return eventFail('event_not_found', id);
+  const utcOccs = occurrencesFromUtc(occurrences);
+  if (utcOccs.fail) return utcOccs.fail;
+  occurrences = utcOccs.list;
   const setErr = validateEventOccurrenceSet(occurrences, null);
   if (setErr) return setErr;
   const occs = occurrences.map(normalizeEventOccurrence);
@@ -26180,12 +26243,21 @@ function eventSchemaType(event, categories) {
   return WHATSON_CATEGORY_SCHEMA_TYPE[categories[0]] || 'Event';
 }
 function occurrenceIsoStart(o) { return o.all_day === 1 || !o.start_time || (o.start_time === '00:00' && (!o.end_time || o.end_time === '00:00')) ? o.start_date : toVancouverIso(o.start_date, o.start_time); }
+// Default length of a timed event with no stored end time (calendar links and JSON-LD endDate).
+const EVENT_DEFAULT_LENGTH_MINUTES = 120;
 function occurrenceIsoEnd(o) {
   const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date, 1) : o.end_date;
   if (o.all_day !== 1 && o.end_time) return toVancouverIso(endDate, o.end_time);
-  // A timed start with no stored end time, ending the same day: a bare date reads as that day's midnight, before the
-  // start, which Google rejects. No end time is invented; endDate is left out (SEO audit 2, 2026-10-17).
-  if (o.all_day !== 1 && o.start_time && o.start_time !== '00:00' && endDate <= o.start_date) return undefined;
+  // A timed start with no stored end time, ending the same day: a bare date would read as that day's midnight, before
+  // the start, which Google rejects. Always an endDate (2026-10-19, round 7): the start plus the same 2-hour default
+  // the calendar links use (eventCalendarTimes), running into the next day after 10 pm.
+  if (o.all_day !== 1 && o.start_time && o.start_time !== '00:00' && endDate <= o.start_date) {
+    const [h, m] = String(o.start_time).split(':').map(Number);
+    const mins = h * 60 + (m || 0) + EVENT_DEFAULT_LENGTH_MINUTES;
+    const day = mins >= 24 * 60 ? addLocalDays(o.start_date, 1) : o.start_date;
+    const em = mins % (24 * 60);
+    return toVancouverIso(day, `${String(Math.floor(em / 60)).padStart(2, '0')}:${String(em % 60).padStart(2, '0')}`) || undefined;
+  }
   return endDate;
 }
 // JSON-LD for a scheduled event with real occurrences: the next upcoming
@@ -26513,7 +26585,7 @@ function eventHeroImage(full, categories) {
   const big = small.replace(/-800\.jpg$/, '.jpg');
   return { small, big: big !== small && fs.existsSync(path.join(__dirname, 'public', big)) ? big : small };
 }
-// iCalendar for an event's upcoming dates (up to 20), times in America/Vancouver.
+// iCalendar for an event's upcoming dates (up to 20), times in Okanagan local time (fixed UTC-7, round 7).
 function icsEscape(t) { return String(t || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1'); }
 // Calendar times (2026-10-19, site review pass 5): one occurrence as calendar start and end, local Okanagan time.
 // All-day: dates, the end exclusive. Timed: the stored end time, else start + 2 hours (so calendars show a block,
@@ -26530,7 +26602,7 @@ function eventCalendarTimes(o) {
     return { allDay: false, start, end: `${ymd(endDate)}T${hm(o.end_time)}` };
   }
   const [h, m] = String(o.start_time).split(':').map(Number);
-  const mins = h * 60 + (m || 0) + 120;
+  const mins = h * 60 + (m || 0) + EVENT_DEFAULT_LENGTH_MINUTES;
   const endDate = mins >= 24 * 60 ? addLocalDays(o.start_date, 1) : o.start_date;
   const em = mins % (24 * 60);
   return { allDay: false, start, end: `${ymd(endDate)}T${String(Math.floor(em / 60)).padStart(2, '0')}${String(em % 60).padStart(2, '0')}00` };
@@ -26540,8 +26612,10 @@ function eventCalendarTimes(o) {
 function googleCalendarUrl(full, o, location, url, lang = 'en') {
   const t = eventCalendarTimes(o);
   const name = o.label ? `${full.name} \u2013 ${o.label}` : full.name;
-  const params = [['action', 'TEMPLATE'], ['text', name], ['dates', `${t.start}/${t.end}`]];
-  if (!t.allDay) params.push(['ctz', 'America/Vancouver']);
+  // Time zone from Nov 1 (2026-10-19, round 7): timed events go to Google as UTC instants (…Z), worked out with the
+  // site's own offset (B.C. stays on UTC-7 from Nov 1, 2026), so Google never applies an old PST rule; no ctz needed.
+  const dates = t.allDay ? `${t.start}/${t.end}` : `${calendarUtcStamp(t.start)}/${calendarUtcStamp(t.end)}`;
+  const params = [['action', 'TEMPLATE'], ['text', name], ['dates', dates]];
   params.push(['details', `${lang === 'fr' ? 'D\u00e9tails :' : 'Details:'} ${url}`]);
   if (location) params.push(['location', location]);
   return `https://calendar.google.com/calendar/render?${params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')}`;
@@ -26552,23 +26626,51 @@ function eventCalendarLocation(full, hostVenue) {
   const known = !(hostVenue && hostVenue.address) ? eventKnownVenue(hostVenue ? hostVenue.name : full.venue_name_text) : null;
   if (known) return [known.name, known.streetAddress, `${known.locality || REGION_LABELS[known.region]}, BC${known.postalCode ? ` ${known.postalCode}` : ''}`].join(', ');
   return hostVenue ? [hostVenue.name, hostVenue.address].filter(Boolean).join(', ')
-    : (full.venue_name_text ? `${full.venue_name_text}, ${town}, BC` : `${town}, BC`);
+    : withCalendarTown(full.venue_name_text || '', town);
 }
+// Calendar locations (2026-10-19, round 7): the town and "BC" are added only when the place text does not already
+// name them, so "Prospera Place, 1223 Water St, Kelowna" no longer reads "…, Kelowna, Kelowna, BC".
+function withCalendarTown(text, town) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim().replace(/,\s*$/, '');
+  const parts = raw ? raw.split(/\s*,\s*/).filter(Boolean) : [];
+  const key = (x) => eventVenueKey(String(x).replace(/\([^)]*\)/g, ' '));
+  const hasTown = !town || parts.some((x) => key(x) === eventVenueKey(town));
+  const hasBc = parts.some((x) => /^(?:bc|b c|british columbia)(?: [a-z]\d[a-z] ?\d[a-z]\d)?(?: canada)?$/.test(key(x)) || /^bc [a-z]\d[a-z]/.test(key(x)));
+  if (!hasTown) parts.push(town);
+  if (!hasBc && parts.length) parts.push('BC');
+  return parts.join(', ');
+}
+// 'YYYYMMDDTHHMMSS' Okanagan wall-clock time -> 'YYYYMMDDTHHMMSSZ' UTC, with the canonical offset (vancouverOffsetFor).
+function calendarUtcStamp(local) {
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/.exec(String(local));
+  if (!m) return local;
+  const off = vancouverOffsetFor(`${m[1]}-${m[2]}-${m[3]}`, `${m[4]}:${m[5]}`);
+  const ms = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}${off || '-07:00'}`);
+  return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+// The .ics zone (2026-10-19, round 7): B.C. is on a fixed UTC-7 from Nov 1, 2026 (and on PDT, also UTC-7, from
+// Mar 8, 2026), so a fixed-offset zone is right for every upcoming date. A TZID calendar apps cannot map to an old
+// "America/Vancouver" rule set, with no -08:00 STANDARD rule. A time outside that span (only a past winter date)
+// is written in UTC instead.
+const ICS_TZID = 'Etc/GMT+7';
+const ICS_FIXED_FROM = '2026-03-08';
 function eventIcs(full, occurrences, location, url, now = new Date(), lang = 'en') {
   const today = todayLocal(now);
   const stamp = new Date(now).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Okanagan Roam//Events//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
-    // Pacific time (PST/PDT, current North American rules) so every calendar app reads the times as Okanagan local time.
-    'BEGIN:VTIMEZONE', 'TZID:America/Vancouver',
-    'BEGIN:DAYLIGHT', 'TZOFFSETFROM:-0800', 'TZOFFSETTO:-0700', 'TZNAME:PDT', 'DTSTART:19700308T020000', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU', 'END:DAYLIGHT',
-    'BEGIN:STANDARD', 'TZOFFSETFROM:-0700', 'TZOFFSETTO:-0800', 'TZNAME:PST', 'DTSTART:19701101T020000', 'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU', 'END:STANDARD',
+    // Okanagan time as a fixed UTC-7 zone (round 7, see ICS_TZID): one STANDARD rule, no RRULE, no -08:00.
+    'BEGIN:VTIMEZONE', `TZID:${ICS_TZID}`,
+    'BEGIN:STANDARD', 'TZOFFSETFROM:-0700', 'TZOFFSETTO:-0700', 'TZNAME:PT', 'DTSTART:20260308T030000', 'END:STANDARD',
     'END:VTIMEZONE'];
+  const icsTime = (prop, local) => (vancouverOffsetFor(`${local.slice(0, 4)}-${local.slice(4, 6)}-${local.slice(6, 8)}`, `${local.slice(9, 11)}:${local.slice(11, 13)}`) === '-07:00'
+    && `${local.slice(0, 4)}-${local.slice(4, 6)}-${local.slice(6, 8)}` >= ICS_FIXED_FROM
+    ? `${prop};TZID=${ICS_TZID}:${local}` : `${prop}:${calendarUtcStamp(local)}`);
   for (const o of occurrences.filter((x) => x.end_date >= today).slice(0, 20)) {
     lines.push('BEGIN:VEVENT', `UID:okr-event-${full.id}-${o.id}@okanaganroam.com`, `DTSTAMP:${stamp}`);
     // Every event has a DTEND (2026-10-19): the stored end time, else start + 2 hours.
     const t = eventCalendarTimes(o);
     if (t.allDay) lines.push(`DTSTART;VALUE=DATE:${t.start}`, `DTEND;VALUE=DATE:${t.end}`);
-    else lines.push(`DTSTART;TZID=America/Vancouver:${t.start}`, `DTEND;TZID=America/Vancouver:${t.end}`);
+    else lines.push(icsTime('DTSTART', t.start), icsTime('DTEND', t.end));
     lines.push(`SUMMARY:${icsEscape(o.label ? `${full.name} \u2013 ${o.label}` : full.name)}`);
     if (location) lines.push(`LOCATION:${icsEscape(location)}`);
     lines.push(`DESCRIPTION:${icsEscape(`${lang === 'fr' ? 'D\u00e9tails :' : 'Details:'} ${url}`)}`, `URL:${url}`, 'END:VEVENT');
@@ -47143,6 +47245,9 @@ module.exports = {
   localRangesOverlap,
   vancouverOffsetFor,
   toVancouverIso,
+  okanaganLocalFromUtc,
+  occurrencesFromUtc,
+  BC_PERMANENT_UTC7_FROM,
   eventLocalEndDate,
   ACTIVE_EVENT_DATE_SQL,
   // What's On Step 3: event data layer + guarded writers (internal; no route yet)
@@ -47312,6 +47417,8 @@ module.exports = {
   lowercasePageRedirect,
   eventCalendarTimes,
   googleCalendarUrl,
+  eventCalendarLocation,
+  occurrenceIsoEnd,
   eventPlaceSchema,
   eventKnownVenue,
   resetEventVenueCaches,
