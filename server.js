@@ -2916,6 +2916,22 @@ function listUpcomingEventsForRegion(region, { limit = 3, now = new Date() } = {
   }));
 }
 
+// Town pages (What's On pass 6, 2026-10-19): the "Upcoming events" row left today's finished events first at 10 pm.
+// An event whose dates today are all over moves on to its next date, or leaves the row when it has none.
+function regionEventsStillOn(rows, now = new Date()) {
+  const today = todayLocal(now), minutes = okanaganClock(now).minutes;
+  const stmt = db.prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND end_date >= ? ORDER BY start_date, COALESCE(start_time, ''), id");
+  const out = [];
+  for (const r of rows) {
+    if (r.nextDate !== today) { out.push(r); continue; }
+    const occs = stmt.all(r.id, today).map(rowToEventOccurrence);
+    const left = occs.filter((o) => !whatsOnOccurrenceOver(o, today, minutes));
+    if (!occs.length) out.push(r);
+    else if (left.length) out.push(left[0].start_date === today ? r : { ...r, nextDate: left[0].start_date, nextEndDate: left[0].end_date });
+  }
+  return out.map((r, i) => ({ r, i })).sort((a, b) => String(a.r.nextDate || '').localeCompare(String(b.r.nextDate || '')) || a.i - b.i).map((x) => x.r);
+}
+
 // H1 internal linking, Step 3 (2026-09-22): the next few publishable events
 // happening at one venue. Same predicate as listRelatedEventsInRegion(),
 // listUpcomingEventsForRegion() and the sitemap (scheduled event, at least one
@@ -3361,6 +3377,11 @@ function queryWhatsOnEvents({ from, to, regions = [], categories = [] } = {}) {
     // the card's hidden saved-item identity. Non-enumerable, so the public
     // /api/events JSON (built from these objects) is unchanged.
     Object.defineProperty(card, 'firstOccurrence', { value: occs[0], enumerable: false });
+    // What's On pass 6 (2026-10-19): every date in the window, the recurrence text and the venue, also hidden from
+    // the JSON, so a series whose date today is over can move on to its next date (whatsOnPastToday) and an
+    // exhibition can follow its venue's hours.
+    Object.defineProperty(card, 'windowOccurrences', { value: occs, enumerable: false });
+    Object.defineProperty(card, 'recurrenceRule', { value: event.recurrence_rule || null, enumerable: false });
     return card;
   });
 }
@@ -3411,6 +3432,8 @@ function whatsOnPublicEvent(row) {
   // the What's On cards rendered from this shape carry it; /api/events JSON
   // is unchanged.
   if (row.firstOccurrence) Object.defineProperty(card, 'firstOccurrence', { value: row.firstOccurrence, enumerable: false });
+  for (const k of ['windowOccurrences', 'recurrenceRule']) if (row[k] !== undefined) Object.defineProperty(card, k, { value: row[k], enumerable: false });
+  if (row.venueId) Object.defineProperty(card, 'venueId', { value: row.venueId, enumerable: false });
   return card;
 }
 function whatsOnPublicOccurrence(o) {
@@ -4040,7 +4063,7 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
   events = eventsAllowedByExclusions(events, intent.excluded);
   const items = events.slice(0, limit).map((e) => ({
     id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
-    categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '',
+    categories: e.categories || [], dateLabel: e.dateLabel || '', time: whatsOnCardTime(e),
   }));
   return { total: events.length, items, window: { from: win.from, to: win.to, preset: win.preset } };
 }
@@ -4099,7 +4122,7 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() 
   // The full event cards, for the /search page (not part of the JSON).
   if (textEvents) Object.defineProperty(run, 'textEvents', { value: textEvents, enumerable: false });
   if (textEvents && textEvents.total) run.events = { total: textEvents.total, items: textEvents.items.slice(0, limit).map((e) => ({
-    id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide, categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '' })) };
+    id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide, categories: e.categories || [], dateLabel: e.dateLabel || '', time: whatsOnCardTime(e) })) };
   run.presentation = discoveryPresentation(run);
   return run;
 }
@@ -5082,7 +5105,7 @@ function searchEventsHtml(model, lang) {
     <h2 id="searchEventsHead">${esc(head)}</h2>
     <ul class="search-event-list">${items.map((e) => `
       <li data-event-id="${e.id}"><a href="${esc(`/${e.region}/events/${e.slug}`)}">${esc(e.name)}</a>
-        <span class="venue-meta">${esc([whatsOnWhenText(e, today), e.time, e.valleyWide ? (fr ? 'Toute la vallée' : 'Valley-wide') : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</span></li>`).join('')}
+        <span class="venue-meta">${esc([whatsOnWhenText(e, today, model.now || null), whatsOnCardTime(e), e.valleyWide ? (fr ? 'Toute la vallée' : 'Valley-wide') : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</span></li>`).join('')}
     </ul>${more}
   </section>`;
 }
@@ -5263,7 +5286,7 @@ function renderSearchSimplePage(model, lang) {
     resultsHtml = `<p class="search-count">${fr ? `${total} événement${total === 1 ? '' : 's'}${total > items.length ? `, voici les ${items.length} premiers` : ''}` : `${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}`}</p>
   <ul class="card-grid">${items.map((e) => `
     <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
-      <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
+      <p class="venue-meta">${esc([e.dateLabel, whatsOnCardTime(e), e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
   </ul>`;
   } else if (model.events && model.events.items.length) {
     // Search pass 5 (2026-10-19): events that match, when no place does ("cider fest", "free events").
@@ -8761,8 +8784,9 @@ function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
       const span = (Date.parse(`${e.endDate}T12:00:00Z`) - Date.parse(`${e.startDate}T12:00:00Z`)) / 86400000;
       return e.name && !(span > 14); // a months-long exhibition is not "this weekend"
     });
-    events = pick(getWhatsOnEvents(weekend));
-    if (events.length < 4) events = events.concat(pick(getWhatsOnEvents(week)).filter((e) => !events.some((x) => x.id === e.id)));
+    // What's On pass 6 (2026-10-19): events that are over today are left out, and a series shows its next date.
+    events = pick(whatsOnStillOn(getWhatsOnEvents(weekend), now));
+    if (events.length < 4) events = events.concat(pick(whatsOnStillOn(getWhatsOnEvents(week), now)).filter((e) => !events.some((x) => x.id === e.id)));
   } catch (e) { events = []; }
   // Spread across towns and kinds of event.
   const chosen = [];
@@ -8774,12 +8798,13 @@ function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
   for (const e of events) { if (chosen.length >= 4) break; if (!chosen.includes(e)) chosen.push(e); }
   if (chosen.length < 2) return '';
   let total = 0;
-  try { total = getWhatsOnEvents(resolveWhatsOnWindow({}, now)).length; } catch (e) { total = 0; }
+  // The same count as the What's On page's own (events already over today are not counted).
+  try { total = whatsOnStillOn(getWhatsOnEvents(resolveWhatsOnWindow({}, now)), now).length; } catch (e) { total = 0; }
   const usedImages = new Set();
   const cards = chosen.map((e) => { const img = homeEventImage(e, usedImages); return `<a class="home-event-card" href="${escapeHtml(discoveryEventUrl(e))}">
       <span class="home-event-media"><img src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, '(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 260px')} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
       <span class="home-event-body">
-        <span class="home-event-date">${escapeHtml(e.dateLabel || '')}${e.time ? ` · ${escapeHtml(e.time)}` : ''}</span>
+        <span class="home-event-date">${escapeHtml(e.dateLabel || '')}${whatsOnCardTime(e) ? ` · ${escapeHtml(whatsOnCardTime(e))}` : ''}</span>
         <span class="home-event-name">${escapeHtml(e.name)}</span>
         <span class="home-event-place">${escapeHtml(e.valleyWide ? 'Across the Okanagan' : (REGION_LABELS[e.region] || ''))}</span>
       </span>
@@ -12280,24 +12305,31 @@ function restLinkDisplayName(name) {
 const unescapeRestName = (t) => t.replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 function restLinksHtml(kind, inner, lang, shown = '') {
   const seen = new Set(), links = [];
-  for (const m of `${shown}${inner}`.matchAll(REST_LINK_RE)) {
-    if (seen.has(m[1])) continue;
-    seen.add(m[1]);
-    const region = (m[1].match(/^\/(?:fr\/)?([a-z-]+)\//) || [])[1];
-    links.push({ href: m[1], name: restLinkDisplayName(unescapeRestName(m[2].trim())), town: REGION_LABELS[region] || '' });
+  const events = kind === 'whatsOnRest';
+  // What's On pass 6 (2026-10-19): an event card the filters hide (another category on ?categories=live-music) or
+  // one already over today is listed hidden, so the list matches the cards; the filter script keeps it in step.
+  const chunks = events ? `${shown}${inner}`.split(/(?=<li class=")/) : [`${shown}${inner}`];
+  for (const chunk of chunks) {
+    const off = events && /^<li class="venue-card whatson-event-card"(?: hidden| [^>]*data-group="earlier")/.test(chunk.slice(0, chunk.indexOf('>') + 1));
+    for (const m of chunk.matchAll(REST_LINK_RE)) {
+      if (seen.has(m[1])) continue;
+      seen.add(m[1]);
+      const region = (m[1].match(/^\/(?:fr\/)?([a-z-]+)\//) || [])[1];
+      links.push({ href: m[1], name: restLinkDisplayName(unescapeRestName(m[2].trim())), town: REGION_LABELS[region] || '', off });
+    }
   }
   if (!links.length) return '';
-  const fr = lang === 'fr', events = kind === 'whatsOnRest';
+  const fr = lang === 'fr';
   const tally = new Map();
   for (const l of links) { const k = l.name.toLowerCase(); tally.set(k, (tally.get(k) || 0) + 1); }
   for (const l of links) if (!events && l.town && tally.get(l.name.toLowerCase()) > 1) l.name = `${l.name} (${l.town})`;
   // Places A-Z; events keep the page's soonest-first order.
   if (!events) links.sort((a, b) => a.name.localeCompare(b.name, fr ? 'fr' : 'en', { sensitivity: 'base' }));
-  const n = links.length;
+  const n = links.filter((l) => !l.off).length;
   const summary = events
     ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `More upcoming events (${n})`)
     : (fr ? `Toutes les adresses de cette page, de A \u00e0 Z (${n})` : `All places on this page, A\u2013Z (${n})`);
-  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"><summary>${summary}</summary><ul>${links.map((l) => `<li><a href="${l.href}">${escapeHtml(l.name)}</a>`).join('')}</ul></details>`;
+  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"${n ? '' : ' hidden'}><summary>${summary}</summary><ul>${links.map((l) => `<li${l.off ? ' hidden' : ''}><a href="${l.href}">${escapeHtml(l.name)}</a>`).join('')}</ul></details>`;
 }
 // Venue JSON (2026-10-18): the filter data of a list page (#fdVenueData,
 // #bhVenueData) was 0.3-0.5 MB of every page view, mostly search words, and
@@ -14466,7 +14498,7 @@ function renderRegionPage(region, categoryCounts, regionGuidePages) {
   // only; the filtered What's On view is the secondary "see all" link. Reuses
   // the .related-section/.related-grid/.related-card styles this page already
   // loads, so no new CSS. Renders nothing for a region below the threshold.
-  const upcomingEvents = listUpcomingEventsForRegion(region, { limit: 3 });
+  const upcomingEvents = regionEventsStillOn(listUpcomingEventsForRegion(region, { limit: 12 })).slice(0, 3);
   const eventLinks = upcomingEvents.length
     ? `<div class="related-section">
         <h2>Upcoming events in ${escapeHtml(regionLabel)}</h2>
@@ -23239,10 +23271,14 @@ function whatsOnCardSummary(ev) {
   return { text: `${kind} at ${venue.trim()}.${priceText}`, source: `Listed by ${source.trim()} \u00b7 confirm details before you go` };
 }
 // Today / Tomorrow / "On now until ..." wording for a card, from the
-// Okanagan date the page is rendered on.
-function whatsOnWhenText(ev, today) {
+// Okanagan date the page is rendered on. With `now` (What's On pass 6, 2026-10-19), an exhibition or season-long
+// event says "On now" only while it is open (whatsOnOngoingOpen); otherwise "Until Dec 5".
+function whatsOnWhenText(ev, today, now = null) {
   const span = ev.startDate && ev.endDate ? (Date.parse(`${ev.endDate}T12:00:00Z`) - Date.parse(`${ev.startDate}T12:00:00Z`)) / 86400000 : 0;
-  if (ev.occurrenceCount === 1 && span >= 7 && ev.startDate <= today) return `On now \u00b7 until ${formatLocalDateShort(ev.endDate, { weekday: false })}`;
+  if (ev.occurrenceCount === 1 && span >= 7 && ev.startDate <= today) {
+    const until = formatLocalDateShort(ev.endDate, { weekday: false });
+    return now && !whatsOnOngoingOpen(ev, now) ? `Until ${until}` : `On now · until ${until}`;
+  }
   let label = ev.dateLabel || '';
   const word = ev.startDate === today ? 'today' : ev.startDate === addLocalDays(today, 1) ? 'tomorrow' : null;
   if (!word) return label;
@@ -23251,11 +23287,31 @@ function whatsOnWhenText(ev, today) {
   if (label.includes(`next ${d}`)) return label.replace(`next ${d}`, word);
   return label.replace(d, word.charAt(0).toUpperCase() + word.slice(1));
 }
+// What's On pass 6 (2026-10-19): an exhibition is "On now" while its venue is open, when the venue's hours are
+// listed; otherwise in the daytime, 10:00-17:00 (as on /map). A gallery no longer reads "On now" at 10 pm.
+const WHATSON_ONGOING_DAY = [10 * 60, 17 * 60];
+function whatsOnOngoingOpen(ev, now) {
+  if (ev && ev.venueId) {
+    try {
+      const v = getVenue(ev.venueId);
+      const st = v && v.hours ? venueHoursStatusAt(v.hours, now) : null;
+      if (st && st.state === 'open') return true;
+      if (st && st.state === 'closed') return false;
+    } catch (e) { /* the daytime rule below */ }
+  }
+  const m = okanaganClock(now).minutes;
+  return m >= WHATSON_ONGOING_DAY[0] && m < WHATSON_ONGOING_DAY[1];
+}
 // Which heading a card sits under: Today, Tomorrow, This week, On now
-// (exhibitions and season-long events), Next week, then by month.
-function whatsOnGroupOf(ev, today) {
+// (exhibitions and season-long events), Next week, then by month. With `now`, the On now heading reads
+// "Exhibitions & multi-day events" outside the daytime (2026-10-19).
+function whatsOnGroupOf(ev, today, now = null) {
   const span = ev.startDate && ev.endDate ? (Date.parse(`${ev.endDate}T12:00:00Z`) - Date.parse(`${ev.startDate}T12:00:00Z`)) / 86400000 : 0;
-  if (ev.occurrenceCount === 1 && span >= 7 && ev.startDate <= today) return { key: 'ongoing', label: 'On now', rank: 3 };
+  if (ev.occurrenceCount === 1 && span >= 7 && ev.startDate <= today) {
+    const m = now ? okanaganClock(now).minutes : null;
+    const day = m == null || (m >= WHATSON_ONGOING_DAY[0] && m < WHATSON_ONGOING_DAY[1]);
+    return { key: 'ongoing', label: day ? 'On now' : 'Exhibitions & multi-day events', rank: 3 };
+  }
   const next = ev.startDate < today ? today : ev.startDate;
   const days = Math.round((Date.parse(`${next}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86400000);
   if (days <= 0) return { key: 'today', label: 'Today', rank: 0 };
@@ -23268,31 +23324,73 @@ function whatsOnGroupOf(ev, today) {
 }
 // Earlier today (2026-10-19, site review pass 4): a single-day event today whose time is over (its end time, or 3
 // hours after its start when no end is listed) leaves the Today heading for a folded "Earlier today" group after
-// the upcoming and on-now events. All-day, overnight and untimed events stay where they were. `minutes` is the
-// Okanagan wall clock (okanaganClock). A series keeps its place unless the page shows today alone.
+// the upcoming and on-now events. Overnight events stay where they were. `minutes` is the Okanagan wall clock
+// (okanaganClock).
+// What's On pass 6 (2026-10-19): an all-day or untimed (date-only) one-day event counts as over from 18:00, and the
+// rule works on every date the card holds in its window: a card is over when all of them are (any view, not
+// only Today), and a series whose date today is over moves on to its next date (whatsOnPastToday).
 const WHATSON_ASSUMED_EVENT_MINUTES = 180;
+const WHATSON_UNTIMED_OVER_MINUTES = 18 * 60;
 const WHATSON_EARLIER_GROUP = { key: 'earlier', label: 'Earlier today', rank: 3.5 };
-function whatsOnEndedToday(ev, today, minutes, todayOnly = false) {
-  const o = ev && ev.firstOccurrence;
+function whatsOnOccurrenceOver(o, today, minutes) {
   if (!o || o.start_date !== today || o.end_date !== today) return false;
-  if (ev.occurrenceCount > 1 && !todayOnly) return false;
-  if (Number(o.all_day) === 1 || Number(o.ends_next_day) === 1) return false;
+  if (Number(o.ends_next_day) === 1) return false;
   const toMin = (t) => (typeof t === 'string' && LOCAL_TIME_PATTERN.test(t) ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null);
   const start = o.start_time && o.start_time !== '00:00' ? toMin(o.start_time) : null;
   const end = toMin(o.end_time);
+  if (Number(o.all_day) === 1 || (start == null && end == null)) return minutes >= WHATSON_UNTIMED_OVER_MINUTES;
   if (end != null && (start == null || end > start)) return minutes >= end;
   if (end != null) return false; // ends after midnight
   return start != null && minutes >= start + WHATSON_ASSUMED_EVENT_MINUTES;
+}
+function whatsOnEndedToday(ev, today, minutes, todayOnly = false) {
+  const occs = ev && ev.windowOccurrences;
+  if (occs && occs.length) return occs.every((o) => whatsOnOccurrenceOver(o, today, minutes));
+  const o = ev && ev.firstOccurrence;
+  if (ev && ev.occurrenceCount > 1 && !todayOnly) return false;
+  return whatsOnOccurrenceOver(o, today, minutes);
+}
+// A series whose first date in the window is today and over, with dates still to come: the same card from its
+// next date (dates, time and "+ N more dates" worked out again). Anything else comes back unchanged.
+function whatsOnPastToday(ev, today, minutes) {
+  const occs = ev && ev.windowOccurrences;
+  if (!occs || occs.length < 2 || !whatsOnOccurrenceOver(occs[0], today, minutes)) return ev;
+  let k = 0;
+  while (k < occs.length && whatsOnOccurrenceOver(occs[k], today, minutes)) k++;
+  if (k >= occs.length) return ev;
+  const rest = occs.slice(k);
+  const out = { ...ev, startDate: rest[0].start_date, endDate: rest[0].end_date, dateLabel: whatsOnDateLabel({ recurrence_rule: ev.recurrenceRule || null }, rest), time: whatsOnTimeLabel(rest), occurrenceCount: rest.length };
+  Object.defineProperty(out, 'firstOccurrence', { value: rest[0], enumerable: false });
+  Object.defineProperty(out, 'windowOccurrences', { value: rest, enumerable: false });
+  Object.defineProperty(out, 'recurrenceRule', { value: ev.recurrenceRule || null, enumerable: false });
+  if (ev.venueId) Object.defineProperty(out, 'venueId', { value: ev.venueId, enumerable: false });
+  return out;
+}
+// The events of a list as they stand at `now`: series moved on past today's finished dates, and events that are
+// over dropped (the homepage row and the town pages' event rows, 2026-10-19).
+function whatsOnStillOn(events, now = new Date()) {
+  const today = todayLocal(now), minutes = okanaganClock(now).minutes;
+  return events.map((e) => whatsOnPastToday(e, today, minutes)).filter((e) => !whatsOnEndedToday(e, today, minutes));
+}
+// All-day events (2026-10-19): a stored all-day flag, or a start of exactly 00:00 (how imported listings store
+// "no time given"), reads "All day" on cards and in search instead of nothing (or "12 am"). Exhibitions and other
+// long runs keep their "On now · until" line alone.
+function whatsOnCardTime(ev) {
+  if (ev.time) return ev.time;
+  const occs = ev.windowOccurrences || (ev.firstOccurrence ? [ev.firstOccurrence] : []);
+  if (!occs.length || !occs.every((o) => Number(o.all_day) === 1 || o.start_time === '00:00')) return '';
+  const span = ev.startDate && ev.endDate ? (Date.parse(`${ev.endDate}T12:00:00Z`) - Date.parse(`${ev.startDate}T12:00:00Z`)) / 86400000 : 0;
+  return ev.occurrenceCount === 1 && span >= 7 ? '' : 'All day';
 }
 // Event card photos (2026-10-19): the photo is a strip only 96-110px tall across the card, so these sizes ask for
 // the 480px copy on phones and desktop cards alike (about 1.3 photo pixels per screen pixel on a phone); the 800px
 // photo is still listed for wider, sharper screens.
 const WHATSON_CARD_PHOTO_SIZES = '(max-width: 640px) 160px, 240px';
-function whatsOnEventCardHtml(ev, todayArg = null) {
+function whatsOnEventCardHtml(ev, todayArg = null, now = null) {
   // Only a real YYYY-MM-DD turns on the dated card (so .map() indexes never do).
   const today = typeof todayArg === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(todayArg) ? todayArg : null;
   const href = `/${ev.region}/events/${ev.slug}`;
-  const when = [today ? whatsOnWhenText(ev, today) : ev.dateLabel, ev.time].filter(Boolean).join(' · ');
+  const when = [today ? whatsOnWhenText(ev, today, now instanceof Date ? now : null) : ev.dateLabel, whatsOnCardTime(ev)].filter(Boolean).join(' · ');
   const meta = [REGION_LABELS[ev.region] ? escapeHtml(REGION_LABELS[ev.region]) : null, when ? escapeHtml(when) : null].filter(Boolean).join(' &middot; ');
   const chips = (ev.categories || []).filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="badge-chip whatson-category-chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
   const descId = `golf-desc-event-${ev.id}`;
@@ -23470,7 +23568,20 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   var searchClear = document.getElementById('whatsOnSearchClear');
   var regionsCount = document.getElementById('whatsOnRegionsCount');
   var searchTerm = '';
-  var cards = Array.prototype.slice.call(document.querySelectorAll('#whatsOnResults > .venue-card'));
+  // Paged for real (2026-10-19): the events past the first page are kept out of the page (window.__whatsOnItems).
+  var cards = window.__whatsOnItems ? window.__whatsOnItems.filter(function(n){ return n.classList.contains('venue-card'); }) : Array.prototype.slice.call(document.querySelectorAll('#whatsOnResults > .venue-card'));
+  function isEarlier(card){ return card.getAttribute('data-group') === 'earlier'; }
+  // "No more live music tonight. Next: ..." (2026-10-19): one block per category (and one for any event), shown
+  // when the chosen category has nothing left today.
+  var nextUp = document.getElementById('whatsOnNextUp');
+  var nextBlocks = nextUp ? Array.prototype.slice.call(nextUp.querySelectorAll('[data-next-for]')) : [];
+  // The "More upcoming events" list under the cards follows the filters (2026-10-19).
+  var restLinks = document.getElementById('whatsOnRestLinks'), restSummary = restLinks && restLinks.querySelector('summary'), restItems = [];
+  if (restLinks) {
+    var byHref = {};
+    cards.forEach(function(c){ var a = c.querySelector('.venue-card-link'); if (a) byHref[a.getAttribute('href')] = c; });
+    Array.prototype.forEach.call(restLinks.querySelectorAll('li'), function(li){ var a = li.querySelector('a'); restItems.push({ li: li, card: a ? byHref[a.getAttribute('href')] : null }); });
+  }
   var summary = document.getElementById('whatsOnResultsSummary');
   var showBtn = document.getElementById('whatsOnShowResults');
   var clearBtn = document.getElementById('whatsOnClearFilters');
@@ -23523,6 +23634,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     var regionCounts = {}, categoryCounts = {};
     cards.forEach(function(card){
       var d = cardData(card);
+      if (isEarlier(card)) return; // over today: not counted (2026-10-19)
       if (cardMatches(d, [], categories)) { (d.valley ? allRegionKeys : [d.region]).forEach(function(r){ regionCounts[r] = (regionCounts[r] || 0) + 1; }); }
       if (cardMatches(d, regions, [])) d.cats.forEach(function(c){ categoryCounts[c] = (categoryCounts[c] || 0) + 1; });
     });
@@ -23558,9 +23670,10 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   function dateParamsOf(search){ var p = new URLSearchParams(search); return { when: p.get('when') || '', from: p.get('from') || '', to: p.get('to') || '' }; }
   function apply(historyMode){
     var regions = selected('region'), categories = selected('category');
-    var shown = 0;
-    cards.forEach(function(card){ var d = cardData(card); var ok = cardMatches(d, regions, categories) && cardMatchesSearch(card); card.hidden = !ok; if (ok) shown++; });
-    var total = cards.length, filtered = regions.length || categories.length || !!searchTerm;
+    // shown/total leave out the events already over today (folded under Earlier today), as the server's count does.
+    var shown = 0, any = 0, total = 0;
+    cards.forEach(function(card){ var d = cardData(card); var ok = cardMatches(d, regions, categories) && cardMatchesSearch(card); card.hidden = !ok; if (ok) any++; if (!isEarlier(card)) { total++; if (ok) shown++; } });
+    var filtered = regions.length || categories.length || !!searchTerm;
     // "All" is pressed exactly when no category is chosen.
     if (allChip) allChip.setAttribute('aria-pressed', categories.length ? 'false' : 'true');
     if (regionsCount) { regionsCount.textContent = regions.length ? (' \u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
@@ -23573,10 +23686,21 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     if (showBtn) { showBtn.textContent = filtered ? ('Show ' + shown + ' result' + (shown === 1 ? '' : 's')) : 'Show all results'; showBtn.hidden = !INVENTORY; }
     if (clearBtn) clearBtn.hidden = !filtered;
     if (emptyInventory) emptyInventory.hidden = INVENTORY;
-    if (empty) empty.hidden = !(INVENTORY && shown === 0);
+    if (empty) empty.hidden = !(INVENTORY && any === 0);
+    var nextKey = INVENTORY && shown === 0 && !searchTerm && !regions.length && categories.length <= 1 ? (categories[0] || '') : null, nextOn = false;
+    nextBlocks.forEach(function(b){ var on = b.getAttribute('data-next-for') === nextKey; b.hidden = !on; if (on) nextOn = true; });
+    if (nextUp) nextUp.hidden = !nextOn;
+    if (nextOn && empty) empty.hidden = true;
+    if (restSummary) {
+      var nLinks = 0;
+      restItems.forEach(function(x){ var on = !x.card || (!x.card.hidden && !isEarlier(x.card)); x.li.hidden = !on; if (on) nLinks++; });
+      restSummary.textContent = restSummary.textContent.replace(/\\(\\d+\\)/, '(' + nLinks + ')');
+      restLinks.hidden = nLinks === 0;
+    }
     // Date links carry the live region/category selection to the server.
     Array.prototype.forEach.call(document.querySelectorAll('a[data-when]'), function(a){ a.setAttribute('href', window.location.pathname + queryFor(regions, categories, { when: a.getAttribute('data-when') })); });
-    if (results) results.hidden = shown === 0;
+    if (results) results.hidden = any === 0;
+    if (window.__whatsOnLayout) window.__whatsOnLayout();
     var next = window.location.pathname + queryFor(regions, categories) + window.location.hash;
     if (window.history && historyMode !== 'none') {
       if (historyMode === 'push' && window.history.pushState && next !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState({ whatson: true }, '', next);
@@ -23829,14 +23953,26 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
   body.whatson-page .whatson-event-card .golf-desc p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 4px; }
   body.whatson-page .whatson-event-card .desc-toggle { display: none !important; }
   body.whatson-page .whatson-source { margin: 0 0 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.76rem; color: var(--ink); opacity: 0.6; }
+  /* No more <category> tonight (2026-10-19). */
+  body.whatson-page .whatson-next-up { margin: 6px 0 18px; padding: 14px 18px; border: 1px solid var(--line, #d8dee2); border-radius: 12px; background: var(--card, #fff); }
+  body.whatson-page .whatson-next-up[hidden], body.whatson-page .whatson-next-block[hidden] { display: none; }
+  body.whatson-page .whatson-next-title { margin: 0 0 6px; font-weight: 800; color: var(--ink); }
+  body.whatson-page .whatson-next-list { margin: 0; padding: 0 0 0 18px; }
+  body.whatson-page .whatson-next-list li { margin: 4px 0; }
+  body.whatson-page .whatson-next-list a { display: inline-block; min-height: 24px; font-weight: 700; }
+  body.whatson-page .whatson-next-when { color: var(--muted, #4f5b62); font-size: 0.9rem; }
   body.whatson-page .whatson-more-row { display: flex; justify-content: center; margin: 22px 0 8px; }
   body.whatson-page .whatson-show-more { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 12px 26px; min-height: 48px; cursor: pointer; }
   body.whatson-page .whatson-show-more[hidden] { display: none; }
   @media (max-width: 640px) { body.whatson-page .whatson-event-card > .whatson-event-photo { height: 96px; margin: -18px -20px 10px; } }
 </style>`;
-// Lighter pages (2026-10-18): puts the waiting events (whatsOnRest) back at
-// the end of the list, then runs whatever waited on window.__whatsOnReady
-// (the paging script below and the filter script).
+// Lighter pages (2026-10-18): gathers the waiting events (whatsOnRest), then runs whatever waited on
+// window.__whatsOnReady (the paging script below and the filter script).
+// Paged for real (What's On pass 6, 2026-10-19): every event used to be put in the page (554 cards, about 12,000
+// elements) and the ones past "Show more" only hidden. They are now parsed into an inert <template> and kept there,
+// out of the page, as window.__whatsOnItems: every heading and card in page order. The filter script reads and
+// filters all of them, so search, chips and counts still cover every event; the paging script puts in the page only
+// what is shown (the first page, and one more page per Show more) and takes out the rest.
 const WHATSON_REST_BATCH = 40;
 const WHATSON_REST_SCRIPT = `<script>
 (function(){
@@ -23848,63 +23984,68 @@ const WHATSON_REST_SCRIPT = `<script>
   function finish(){ ready = true; var q = queue.concat(late); queue = []; late = []; q.forEach(function(fn){ fn(); }); }
   var hash = el && el.getAttribute('data-rest');
   if (!el || !list) { finish(); return; }
-  var kids = Array.prototype.slice.call(list.children);
-  function place(frag){
+  var kids = Array.prototype.slice.call(list.children), all = [], k = 0;
+  // Each waiting item carries data-wo-at: the number of first-page items before it.
+  function gather(frag){
     Array.prototype.slice.call(frag.children).forEach(function(li){
       var at = Number(li.getAttribute('data-wo-at'));
       li.removeAttribute('data-wo-at');
-      list.insertBefore(li, kids[at] || null);
+      while (k < kids.length && k < at) all.push(kids[k++]);
+      all.push(li);
     });
   }
-  if (!hash || !window.fetch) { place(el.content); finish(); return; }
+  function done(){ while (k < kids.length) all.push(kids[k++]); window.__whatsOnItems = all; }
+  if (!hash || !window.fetch) { gather(el.content); done(); finish(); return; }
   fetch('/cards/rest/' + hash + '.html?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
     .then(function(r){ if (!r.ok) throw new Error('rest ' + r.status); return r.text(); })
     .then(function(html){
-      // Batches (2026-10-19): the waiting events were parsed and put in the list in one go -- about 12,000
-      // elements in one long task on a phone. They now go in BATCH items at a time, yielding between batches.
-      // Every item they hold comes after the first page, so each shown card and heading goes in already paged
-      // (whatson-paged: display none) and costs no layout; the paging script lays out the final list at the end.
+      // Parsed BATCH items at a time, yielding between batches (2026-10-19), into templates that stay out of the page.
       var parts = html.split(/(?=<li class="(?:whatson-group-head|venue-card whatson-event-card)")/), BATCH = ${WHATSON_REST_BATCH}, i = 0;
-      return new Promise(function(done){
+      return new Promise(function(resolve){
         (function step(){
           var t = document.createElement('template');
           t.innerHTML = parts.slice(i, i + BATCH).join('');
           i += BATCH;
-          Array.prototype.forEach.call(t.content.children, function(li){ if (!li.hidden) li.classList.add('whatson-paged'); });
-          place(t.content);
-          if (i < parts.length) setTimeout(step, 0); else done();
+          gather(t.content);
+          if (i < parts.length) setTimeout(step, 0); else resolve();
         })();
-      }).then(function(){
-        // Favorite / Add to trip state for the cards that just arrived.
-        if (window.__syncFavButtons) window.__syncFavButtons();
-        if (window.__syncTripButtons) window.__syncTripButtons();
       });
     })
     .catch(function(){})
-    .then(finish);
+    .then(function(){ done(); finish(); });
 })();
 </script>`;
 const WHATSON_LIST_SCRIPT = `<script>
 (window.__whatsOnReady || function(fn){ fn(); })(function(){
   var list = document.getElementById('whatsOnResults'), more = document.getElementById('whatsOnShowMore');
   if (!list) return;
-  var page = 1, busy = false, PAGE = ${WHATSON_PAGE_SIZE};
+  var items = window.__whatsOnItems || Array.prototype.slice.call(list.children);
+  var page = 1, PAGE = ${WHATSON_PAGE_SIZE};
   function layout(){
-    busy = true;
-    var shown = 0, total = 0, visibleGroups = {}, earlier = 0, folded = list.getAttribute('data-earlier') === 'closed';
-    Array.prototype.forEach.call(list.querySelectorAll('.whatson-event-card'), function(card){
-      if (card.hidden) { card.classList.remove('whatson-paged'); return; }
+    var shown = 0, total = 0, visibleGroups = {}, earlier = 0, folded = list.getAttribute('data-earlier') === 'closed', want = [];
+    items.forEach(function(it){
+      it.__woOn = false;
+      if (!it.classList.contains('whatson-event-card') || it.hidden) return;
       // Earlier today (2026-10-19): folded cards are not counted; their heading shows once the list reaches it.
-      if (card.getAttribute('data-group') === 'earlier') { earlier++; if (folded) { card.classList.remove('whatson-paged'); if (total <= page * PAGE) visibleGroups.earlier = true; return; } }
+      if (it.getAttribute('data-group') === 'earlier') { earlier++; if (folded) { if (total <= page * PAGE) visibleGroups.earlier = true; return; } }
       total++;
-      var over = total > page * PAGE;
-      card.classList.toggle('whatson-paged', over);
-      if (!over) { shown++; visibleGroups[card.getAttribute('data-group')] = true; }
+      if (total <= page * PAGE) { shown++; it.__woOn = true; visibleGroups[it.getAttribute('data-group')] = true; }
     });
-    Array.prototype.forEach.call(list.querySelectorAll('.whatson-group-head'), function(h){ h.classList.toggle('whatson-paged', !visibleGroups[h.getAttribute('data-group')]); });
+    items.forEach(function(it){
+      if (it.classList.contains('whatson-group-head') ? visibleGroups[it.getAttribute('data-group')] : it.__woOn) want.push(it);
+    });
+    // Only what is shown is in the page: put the wanted items in order, take the others out.
+    var cur = list.firstElementChild, added = 0;
+    want.forEach(function(n){
+      if (n === cur) { cur = cur.nextElementSibling; return; }
+      if (n.parentNode !== list) added++;
+      list.insertBefore(n, cur);
+    });
+    while (cur) { var nx = cur.nextElementSibling; list.removeChild(cur); cur = nx; }
     var n = list.querySelector('.whatson-earlier-count'); if (n) n.textContent = '(' + earlier + ')';
     if (more) { more.hidden = shown >= total; more.textContent = 'Show more (' + shown + ' of ' + total + ')'; }
-    busy = false;
+    // Favorite / Add to trip state for the cards that just came in.
+    if (added) { if (window.__syncFavButtons) window.__syncFavButtons(); if (window.__syncTripButtons) window.__syncTripButtons(); }
   }
   if (more) more.addEventListener('click', function(){ page += 1; layout(); });
   list.addEventListener('click', function(e){
@@ -23915,11 +24056,8 @@ const WHATSON_LIST_SCRIPT = `<script>
     b.setAttribute('aria-expanded', open ? 'true' : 'false');
     layout();
   });
-  var pending = false;
-  try {
-    new MutationObserver(function(){ if (busy || pending) return; pending = true; requestAnimationFrame(function(){ pending = false; page = 1; layout(); }); })
-      .observe(list, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
-  } catch (e) {}
+  // The filter script calls this after every change (back to the first page).
+  window.__whatsOnLayout = function(){ page = 1; layout(); };
   layout();
 }, true);
 </script>`;
@@ -23943,15 +24081,25 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // (default: the rolling next 90 days) and selects the events rendered;
   // region/category chips then filter that set exactly as before.
   const window = weekendWindow || (scope && !scope.weekend && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {}, opts.now || new Date()));
-  const allEvents = getWhatsOnEvents(window);
+  // What's On pass 6 (2026-10-19): a series whose date today is over shows its next date (whatsOnPastToday), and
+  // every view, not only Today, folds the events that are over into "Earlier today" (renderNow below).
+  const renderNow = opts.now || new Date();
+  const today = todayLocal(renderNow);
+  const clockMinutes = okanaganClock(renderNow).minutes;
+  const allEvents = getWhatsOnEvents(window).map((e) => whatsOnPastToday(e, today, clockMinutes));
   const events = townScope ? allEvents.filter((e) => e.valleyWide || e.region === townScope) : allEvents;
+  const todayOnly = window.from === today && window.to === today;
+  const endedIds = new Set(events.filter((e) => whatsOnEndedToday(e, today, clockMinutes, todayOnly)).map((e) => e.id));
+  // The counts (the result bar, the chips and Show more) leave out the events that are over, so "554 events" and
+  // "Show more (48 of 554)" agree (2026-10-19).
+  const liveEvents = events.filter((e) => !endedIds.has(e.id));
   const townCounts = townScope ? Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, allEvents.filter((e) => !e.valleyWide && e.region === r).length])) : null;
   const matching = filterWhatsOnEvents(events, selectedRegions, selectedCategories);
   const filtered = selectedRegions.length > 0 || selectedCategories.length > 0;
   const hasInventory = whatsOnInventoryExists();
   const counts = hasInventory ? {
-    regions: Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, filterWhatsOnEvents(events, [], selectedCategories).filter((e) => e.valleyWide || e.region === r).length])),
-    categories: Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, filterWhatsOnEvents(events, selectedRegions, []).filter((e) => (e.categories || []).includes(c.key)).length])),
+    regions: Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, filterWhatsOnEvents(liveEvents, [], selectedCategories).filter((e) => e.valleyWide || e.region === r).length])),
+    categories: Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, filterWhatsOnEvents(liveEvents, selectedRegions, []).filter((e) => (e.categories || []).includes(c.key)).length])),
   } : null;
   // A weekend page's own weekend is its default, so it adds no date parameters to the address.
   const dateState = weekendWindow ? { when: '', from: '', to: '' } : { when: window.preset === 'upcoming' ? '' : (window.preset === 'custom' ? 'custom' : window.preset), from: window.preset === 'custom' ? window.from : '', to: window.preset === 'custom' ? window.to : '' };
@@ -23987,6 +24135,32 @@ function renderWhatsOnPage(filter = null, opts = {}) {
       .filter((e) => (townScope ? !e.valleyWide && e.region === townScope : scope && scope.category ? (e.categories || []).includes(scope.category) : true));
     return later.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate))).slice(0, scope ? 80 : 40);
   })() : [];
+  // "No more live music tonight. Next: ..." (What's On pass 6, 2026-10-19): on a one-day Today view, a block per
+  // category (and one for any event) with its next three events after today, in this page's town; the one for the
+  // chosen category shows when nothing of it is left today (the filter script switches blocks as chips change).
+  const nextUp = hasInventory && todayOnly ? (() => {
+    const later = getWhatsOnEvents({ from: addLocalDays(today, 1), to: addLocalDays(today, 60) })
+      .filter((e) => e.startDate > today && (townScope ? e.valleyWide || e.region === townScope : true));
+    const word = clockMinutes >= 17 * 60 ? 'tonight' : 'today';
+    const liveMatching = matching.filter((e) => !endedIds.has(e.id)).length;
+    const showKey = !liveMatching && !selectedRegions.length && selectedCategories.length <= 1 ? (selectedCategories[0] || '') : null;
+    const blocks = ['', ...WHATSON_CATEGORIES.map((c) => c.key)].map((k) => {
+      const list = (k ? later.filter((e) => (e.categories || []).includes(k)) : later).slice(0, 3);
+      if (!list.length) return '';
+      const what = k ? WHATSON_CATEGORY_BY_KEY[k].label.toLowerCase() : 'events';
+      return `
+    <div class="whatson-next-block" data-next-for="${escapeHtml(k)}"${k === showKey ? '' : ' hidden'}>
+      <p class="whatson-next-title">${escapeHtml(`No more ${what} ${word}. Next:`)}</p>
+      <ul class="whatson-next-list">${list.map((e) => `
+        <li><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a> <span class="whatson-next-when">${escapeHtml([formatLocalDateShort(e.startDate), whatsOnCardTime(e), e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</span></li>`).join('')}
+      </ul>
+    </div>`;
+    }).join('');
+    if (!blocks) return null;
+    const on = showKey !== null && blocks.includes(`data-next-for="${escapeHtml(showKey)}">`);
+    return { on, html: `<div class="whatson-next-up" id="whatsOnNextUp" aria-live="polite"${on ? '' : ' hidden'}>${blocks}
+  </div>` };
+  })() : null;
   const itemList = scope && scopeList.length ? {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -24004,10 +24178,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // week, then by month. A months-long exhibition no longer leads the list
   // ahead of tonight's shows. Headings are list items the filter script never
   // touches; the page script hides a heading whose events are all filtered out.
-  const today = todayLocal(opts.now || new Date());
-  const clockMinutes = okanaganClock(opts.now || new Date()).minutes;
-  const todayOnly = window.from === today && window.to === today;
-  const grouped = events.map((e, i) => ({ e, i, g: whatsOnEndedToday(e, today, clockMinutes, todayOnly) ? WHATSON_EARLIER_GROUP : whatsOnGroupOf(e, today) }))
+  const grouped = events.map((e, i) => ({ e, i, g: endedIds.has(e.id) ? WHATSON_EARLIER_GROUP : whatsOnGroupOf(e, today, renderNow) }))
     .sort((a, b) => a.g.rank - b.g.rank || (a.g.key === 'ongoing' ? String(a.e.endDate).localeCompare(String(b.e.endDate)) : 0) || a.i - b.i);
   let lastGroup = null;
   // Lighter pages (2026-10-18): the HTML carries only what a visitor sees
@@ -24021,7 +24192,8 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const items = [];
   for (const { e, g } of grouped) {
     const shown = matchingIds.has(e.id);
-    const card = shown ? whatsOnEventCardHtml(e, today) : whatsOnEventCardHtml(e, today).replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden');
+    const html = whatsOnEventCardHtml(e, today, renderNow);
+    const card = shown ? html : html.replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden');
     if (g.key !== lastGroup) {
       items.push({ g: g.key, head: true, html: g.key === 'earlier'
         ? `\n      <li class="whatson-group-head whatson-earlier-head" data-group="earlier" aria-hidden="false"><h3><button type="button" class="whatson-earlier-toggle" aria-expanded="false" aria-controls="whatsOnResults">${escapeHtml(g.label)}</button> <span class="whatson-earlier-count"></span></h3></li>`
@@ -24107,12 +24279,13 @@ ${renderGolfHeaderHtml()}
   <span class="visually-hidden" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span>
   <section class="outdoor-step outdoor-step-results whatson-results-step" aria-labelledby="whatsOnResultsTop">
   <h2 class="visually-hidden" id="whatsOnResultsTop">Results</h2>
-  ${whatsOnResultBarHtml(matching.length, events.length, filtered, selectedRegions, selectedCategories)}
+  ${whatsOnResultBarHtml(matching.filter((e) => !endedIds.has(e.id)).length, liveEvents.length, filtered, selectedRegions, selectedCategories)}
   <div class="whatson-empty" id="whatsOnEmptyInventory"${hasInventory ? ' hidden' : ''}>
     <h3>We’re gathering what’s on.</h3>
     <p>Okanagan Roam is building its What’s On listings community by community. Your region and category choices are saved in the address bar, so this page is ready the moment the first events arrive — in the meantime, <a href="/outdoors">explore the outdoors</a> or <a href="/trip">start planning a trip</a>.</p>
   </div>
-  <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 ? '' : ' hidden'}>No events match that combination yet. <a href="${basePath}" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
+  ${nextUp ? nextUp.html : ''}
+  <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 && !(nextUp && nextUp.on) ? '' : ' hidden'}>No events match that combination yet. <a href="${basePath}" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
   ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
@@ -25504,7 +25677,9 @@ function describeEventOccurrence(o) {
     ? formatLocalDateLong(o.start_date)
     : `${formatLocalDateLong(o.start_date, { year: !sameYear })} – ${formatLocalDateLong(o.end_date)}`;
   let timeText = '';
-  if (o.all_day === 1) timeText = 'All day';
+  // All-day events (2026-10-19): a start of exactly 00:00 is how imported listings store "no time given", so it
+  // reads "All day", not "12 am" (or "minuit").
+  if (o.all_day === 1 || (o.start_time === '00:00' && (!o.end_time || o.end_time === '00:00'))) timeText = 'All day';
   else if (o.start_time && o.end_time) timeText = `${formatLocalTime(o.start_time)} – ${formatLocalTime(o.end_time)}${o.ends_next_day === 1 ? ' (next day)' : ''}`;
   else if (o.start_time) timeText = formatLocalTime(o.start_time);
   return { dateText, timeText };
@@ -25515,13 +25690,13 @@ function eventSchemaType(event, categories) {
   if (event.type && EVENT_SCHEMA_TYPE_MAP[event.type]) return EVENT_SCHEMA_TYPE_MAP[event.type];
   return WHATSON_CATEGORY_SCHEMA_TYPE[categories[0]] || 'Event';
 }
-function occurrenceIsoStart(o) { return o.all_day === 1 || !o.start_time ? o.start_date : toVancouverIso(o.start_date, o.start_time); }
+function occurrenceIsoStart(o) { return o.all_day === 1 || !o.start_time || (o.start_time === '00:00' && (!o.end_time || o.end_time === '00:00')) ? o.start_date : toVancouverIso(o.start_date, o.start_time); }
 function occurrenceIsoEnd(o) {
   const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date, 1) : o.end_date;
   if (o.all_day !== 1 && o.end_time) return toVancouverIso(endDate, o.end_time);
   // A timed start with no stored end time, ending the same day: a bare date reads as that day's midnight, before the
   // start, which Google rejects. No end time is invented; endDate is left out (SEO audit 2, 2026-10-17).
-  if (o.all_day !== 1 && o.start_time && endDate <= o.start_date) return undefined;
+  if (o.all_day !== 1 && o.start_time && o.start_time !== '00:00' && endDate <= o.start_date) return undefined;
   return endDate;
 }
 // JSON-LD for a scheduled event with real occurrences: the next upcoming
@@ -46494,6 +46669,14 @@ module.exports = {
   whatsOnWhenText,
   whatsOnGroupOf,
   whatsOnEndedToday,
+  whatsOnOccurrenceOver,
+  whatsOnPastToday,
+  whatsOnStillOn,
+  whatsOnCardTime,
+  whatsOnOngoingOpen,
+  regionEventsStillOn,
+  WHATSON_LIST_SCRIPT,
+  WHATSON_REST_SCRIPT,
   smartNameMatches,
   whatsOnSelectedTagsHtml,
   whatsOnSummaryText,

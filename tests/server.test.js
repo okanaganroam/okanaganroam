@@ -24373,7 +24373,8 @@ test("Lighter pages: What's On ships its first page of events and every other it
       assert.match(html, /<template id="whatsOnRest" data-rest="[0-9a-f]{12}"><\/template>/, `${p}: the response ships it empty`);
       assert.match(html, /\(window\.__whatsOnReady \|\| function\(fn\)\{ fn\(\); \}\)\(function\(\)\{\n  var LABELS/, 'the filter script waits for them');
       // Speed (2026-10-19): they go into the list in batches, already paged; the card photos have 480px copies.
-      assert.ok(html.includes(`BATCH = ${app.WHATSON_REST_BATCH}`) && html.includes("li.classList.add('whatson-paged')") && html.includes('setTimeout(step, 0)'), `${p}: batched`);
+      // What's On pass 6 (2026-10-19): parsed in batches, and kept out of the page until shown.
+      assert.ok(html.includes(`BATCH = ${app.WHATSON_REST_BATCH}`) && html.includes('window.__whatsOnItems = all') && html.includes('setTimeout(step, 0)'), `${p}: batched`);
       if (p === '/whats-on') assert.match(html, /<img class="whatson-event-img whatson-event-photo" src="(\/images\/[^"]+)-800\.jpg" srcset="\1-800-w480\.jpg 480w, \1-800\.jpg 800w" sizes="\(max-width: 640px\) 160px, 240px"/, 'a 480px copy');
     }
   } finally {
@@ -28034,3 +28035,234 @@ test('Season end (2026-10-19): trip facts and /map read the ended season on the 
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
+
+// ---- What's On pass 6 (2026-10-19): ended events in every view, the category fold, "no more tonight", real paging,
+// French leftovers and all-day events ----
+const WO6_DAY = '2031-06-09'; // a Monday
+const WO6_NIGHT = new Date('2031-06-10T05:00:00Z'); // 10 pm in the Okanagan
+const WO6_AFTERNOON = new Date('2031-06-09T21:00:00Z'); // 2 pm
+const wo6AddDays = (d, n) => { const t = new Date(`${d}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+function withWo6Events(fn) {
+  const ids = [];
+  const add = (name, cat, occs, extra = {}) => {
+    const slug = `wo6-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const id = db.prepare('INSERT INTO events (name, slug, region, description, start_datetime, recurrence_rule) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(name, slug, extra.region || 'kelowna', `${name}: a What's On pass 6 fixture.`, `${occs[0].start_date} 09:00:00`, extra.rule || null).lastInsertRowid;
+    for (const o of occs) db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time, all_day) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, o.start_date, o.end_date || o.start_date, o.start_time || null, o.end_time || null, o.all_day || 0);
+    db.prepare('INSERT INTO event_categories (event_id, category_key, position) VALUES (?, ?, 0)').run(id, cat);
+    ids.push(id);
+    return id;
+  };
+  try {
+    add('WO6 Farmers Market', 'markets-fairs', [0, 7, 14].map((k) => ({ start_date: wo6AddDays(WO6_DAY, k), start_time: '10:00', end_time: '13:00' })), { rule: 'Mondays', region: 'vernon' });
+    add('WO6 Morning Tasting', 'wineries-wine-events', [{ start_date: WO6_DAY, start_time: '11:00', end_time: '12:30' }]);
+    add('WO6 Pumpkin Day', 'family-kids', [{ start_date: WO6_DAY }]);
+    add('WO6 Gallery Show', 'arts-culture', [{ start_date: wo6AddDays(WO6_DAY, -20), end_date: wo6AddDays(WO6_DAY, 40), all_day: 1 }]);
+    add('WO6 Late Jazz', 'live-music', [{ start_date: WO6_DAY, start_time: '21:00', end_time: '23:30' }]);
+    add('WO6 Early Jazz', 'live-music', [{ start_date: WO6_DAY, start_time: '12:00', end_time: '14:00' }]);
+    add('WO6 Midnight Party', 'nightlife', [{ start_date: wo6AddDays(WO6_DAY, 3), start_time: '00:00' }]);
+    for (let i = 0; i < 4; i++) add(`WO6 Market Next ${i}`, 'markets-fairs', [{ start_date: wo6AddDays(WO6_DAY, 2 + i), start_time: '09:00', end_time: '12:00' }], { region: 'penticton' });
+    for (let i = 0; i < 70; i++) add(`WO6 Show ${String(i).padStart(2, '0')}`, 'live-music', [{ start_date: wo6AddDays(WO6_DAY, 1 + (i % 30)), start_time: '19:00', end_time: '21:00' }]);
+    return fn();
+  } finally {
+    for (const id of ids) { db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id); db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id); db.prepare('DELETE FROM events WHERE id = ?').run(id); }
+  }
+}
+const wo6Card = (html, name) => (html.split(`data-venue-name="${name}"`)[1] || '').split('</li>')[0];
+const wo6Group = (html, name) => ((html.match(new RegExp(`data-venue-name="${name}"[^>]*data-group="([^"]+)"`)) || [])[1]);
+
+test("What's On pass 6: the default view folds today's finished events at 10 pm; a weekly market moves on to its next date", () => withWo6Events(() => {
+  const ev = (name, win) => app.getWhatsOnEvents(win || { from: WO6_DAY, to: wo6AddDays(WO6_DAY, 89) }).find((e) => e.name === name);
+  const mins = 22 * 60;
+  // Untimed and all-day one-day events are over from 18:00.
+  assert.equal(app.whatsOnOccurrenceOver({ start_date: WO6_DAY, end_date: WO6_DAY }, WO6_DAY, 17 * 60 + 59), false);
+  assert.equal(app.whatsOnOccurrenceOver({ start_date: WO6_DAY, end_date: WO6_DAY }, WO6_DAY, 18 * 60), true);
+  assert.equal(app.whatsOnOccurrenceOver({ start_date: WO6_DAY, end_date: WO6_DAY, all_day: 1 }, WO6_DAY, 18 * 60), true);
+  assert.equal(app.whatsOnOccurrenceOver({ start_date: WO6_DAY, end_date: WO6_DAY, start_time: '00:00' }, WO6_DAY, 19 * 60), true);
+  assert.equal(app.whatsOnEndedToday(ev('WO6 Pumpkin Day'), WO6_DAY, mins), true);
+  assert.equal(app.whatsOnEndedToday(ev('WO6 Pumpkin Day'), WO6_DAY, 14 * 60), false);
+  // The series: its date today is over, so the card is its next Monday.
+  const market = app.whatsOnPastToday(ev('WO6 Farmers Market'), WO6_DAY, mins);
+  assert.equal(market.startDate, wo6AddDays(WO6_DAY, 7));
+  assert.equal(market.occurrenceCount, 2);
+  assert.match(market.dateLabel, /^Mondays · next Mon Jun 16$/);
+  assert.equal(app.whatsOnEndedToday(market, WO6_DAY, mins), false);
+  assert.equal(app.whatsOnPastToday(ev('WO6 Farmers Market'), WO6_DAY, 9 * 60).startDate, WO6_DAY, 'before it ends it stays today');
+  const page = app.renderWhatsOnPage(null, { now: WO6_NIGHT });
+  assert.equal(wo6Group(page, 'WO6 Farmers Market'), 'next-week');
+  assert.match(wo6Card(page, 'WO6 Farmers Market'), /Mondays · next Mon Jun 16 · 10 am/);
+  for (const n of ['WO6 Morning Tasting', 'WO6 Pumpkin Day', 'WO6 Early Jazz']) assert.equal(wo6Group(page, n), 'earlier', n);
+  assert.equal(wo6Group(page, 'WO6 Late Jazz'), 'today');
+  const at = (s) => page.indexOf(s);
+  assert.ok(at('data-venue-name="WO6 Late Jazz"') < at('data-venue-name="WO6 Morning Tasting"'), 'upcoming first');
+  // One count: the summary leaves out what is over, as "Show more (48 of N)" does.
+  const live = (page.match(/<li class="venue-card whatson-event-card"[^>]*data-group="(?!earlier)[^"]+"/g) || []).length;
+  assert.match(page, new RegExp(`id="whatsOnResultsSummary" aria-live="polite">${live} events<`));
+  assert.ok(page.includes("if (!isEarlier(card)) { total++; if (ok) shown++; }"), 'the client counts the same way');
+  // Earlier in the day nothing is folded, and the market is today's.
+  const noon = app.renderWhatsOnPage(null, { now: WO6_AFTERNOON });
+  assert.equal(wo6Group(noon, 'WO6 Pumpkin Day'), 'today');
+  assert.equal(wo6Group(noon, 'WO6 Farmers Market'), 'next-week', 'the market ended at 1 pm');
+  assert.equal(wo6Group(app.renderWhatsOnPage(null, { now: new Date('2031-06-09T18:00:00Z') }), 'WO6 Farmers Market'), 'today', 'at 11 am it is on');
+  assert.notEqual(wo6Group(noon, 'WO6 Late Jazz'), 'earlier');
+  // The homepage row leaves finished events out; its count is the page's.
+  const home = app.renderHomeThisWeekendHTML({ now: WO6_NIGHT });
+  assert.doesNotMatch(home, /WO6 Morning Tasting|WO6 Pumpkin Day|WO6 Early Jazz/);
+  assert.match(home, /WO6 /, 'the row still has events');
+  assert.match(home, /See all (\d+) events/);
+  assert.equal(Number(home.match(/See all (\d+) events/)[1]), app.whatsOnStillOn(app.getWhatsOnEvents(app.resolveWhatsOnWindow({}, WO6_NIGHT)), WO6_NIGHT).length);
+  // The town page's event row: finished today, moved on or left out.
+  const rows = [{ id: db.prepare("SELECT id FROM events WHERE name = 'WO6 Morning Tasting'").get().id, nextDate: WO6_DAY, name: 'a' },
+    { id: db.prepare("SELECT id FROM events WHERE name = 'WO6 Farmers Market'").get().id, nextDate: WO6_DAY, name: 'b' },
+    { id: db.prepare("SELECT id FROM events WHERE name = 'WO6 Late Jazz'").get().id, nextDate: WO6_DAY, name: 'c' }];
+  const still = app.regionEventsStillOn(rows, WO6_NIGHT);
+  assert.deepEqual(still.map((r) => [r.name, r.nextDate]), [['c', WO6_DAY], ['b', wo6AddDays(WO6_DAY, 7)]]);
+}));
+
+test("What's On pass 6: an exhibition says On now only in the daytime (or while its venue is open)", () => withWo6Events(() => {
+  const gallery = app.getWhatsOnEvents({ from: WO6_DAY, to: wo6AddDays(WO6_DAY, 89) }).find((e) => e.name === 'WO6 Gallery Show');
+  assert.equal(app.whatsOnWhenText(gallery, WO6_DAY, WO6_AFTERNOON), `On now · until Jul 19`);
+  assert.equal(app.whatsOnWhenText(gallery, WO6_DAY, WO6_NIGHT), 'Until Jul 19');
+  assert.equal(app.whatsOnWhenText(gallery, WO6_DAY), 'On now · until Jul 19', 'without a clock, as before');
+  assert.equal(app.whatsOnGroupOf(gallery, WO6_DAY, WO6_AFTERNOON).label, 'On now');
+  assert.equal(app.whatsOnGroupOf(gallery, WO6_DAY, WO6_NIGHT).label, 'Exhibitions & multi-day events');
+  assert.equal(app.whatsOnCardTime(gallery), '', 'no "All day" on a long run');
+  // A venue with listed hours decides: open at 10 pm means On now.
+  const open = { ...gallery, venueId: null };
+  const v = app.createVenue({ name: 'WO6 Late Gallery', region: 'kelowna', type: 'indoor', description: 'A late gallery fixture.', slug: 'wo6-late-gallery' });
+  try {
+    db.prepare('UPDATE venues SET hours = ? WHERE id = ?').run(JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['12:00', '23:30']]]))), v.id);
+    Object.defineProperty(open, 'venueId', { value: v.id, enumerable: false });
+    assert.equal(app.whatsOnOngoingOpen(open, WO6_NIGHT), true);
+    assert.equal(app.whatsOnOngoingOpen(open, new Date('2031-06-09T17:00:00Z')), false, 'closed at 10 am');
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+  const page = app.renderWhatsOnPage(null, { now: WO6_NIGHT });
+  assert.match(wo6Card(page, 'WO6 Gallery Show'), /Kelowna &middot; Until Jul 19</);
+  const fr = app.frenchTwinHtml(page, '/whats-on', '');
+  assert.ok(fr.includes('Expositions et événements de plusieurs jours'));
+  assert.ok(fr.includes('Jusqu’au 19 juill.'));
+}));
+
+test("What's On pass 6: Today + one category: the More upcoming list follows it, and nothing left shows the next three", async () => withWo6Events(async () => {
+  const lm = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today', categories: 'live-music' }), { now: WO6_NIGHT });
+  // Only Late Jazz is left today: no "no more" block, it is hidden.
+  assert.match(lm, /id="whatsOnNextUp" aria-live="polite" hidden>/);
+  assert.match(lm, /data-next-for="live-music" hidden>/);
+  // The links list under the cards: other kinds of event and finished ones are listed hidden, and not counted.
+  const links = app.restLinksHtml('whatsOnRest', (lm.match(/<template id="whatsOnRest">([\s\S]*?)<\/template>/) || [])[1] || '', 'en');
+  // Every live-music event left today is on the first page, so all the waiting ones are other kinds or finished.
+  assert.match(links, /<li hidden><a href="[^"]*wo6-pumpkin-day">/, 'a family event is not listed as live music');
+  assert.match(links, /<details class="rest-links" id="whatsOnRestLinks" hidden><summary>More upcoming events \(0\)</);
+  assert.doesNotMatch(links, /<li><a /);
+  const unit = app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>'
+    + '<li class="venue-card whatson-event-card" data-venue-id="event-2" data-group="earlier"><h2><a class="venue-card-link" href="/kelowna/events/b"><span class="venue-card-name">B Show</span></a></h2></li>'
+    + '<li class="venue-card whatson-event-card" data-venue-id="event-3" data-group="today"><h2><a class="venue-card-link" href="/kelowna/events/c"><span class="venue-card-name">C Show</span></a></h2></li>', 'en');
+  assert.match(unit, /More upcoming events \(1\)<\/summary><ul><li hidden><a href="\/kelowna\/events\/a">A Show<\/a><li hidden><a href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
+  assert.match(app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>', 'en'), /<details class="rest-links" id="whatsOnRestLinks" hidden>/, 'an empty list is hidden');
+  // Markets today: all over, so the block says so and lists the next three markets.
+  const mk = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today', categories: 'markets-fairs' }), { now: WO6_NIGHT });
+  const block = (mk.match(/<div class="whatson-next-block" data-next-for="markets-fairs">([\s\S]*?)<\/div>/) || [])[1];
+  assert.ok(block, 'shown');
+  assert.match(mk, /id="whatsOnNextUp" aria-live="polite">/);
+  assert.match(block, /No more markets &amp; fairs tonight\. Next:/);
+  assert.deepEqual([...block.matchAll(/<a href="[^"]+">([^<]+)<\/a>/g)].map((m) => m[1]), ['WO6 Market Next 0', 'WO6 Market Next 1', 'WO6 Market Next 2']);
+  assert.match(block, /Wed Jun 11 · 9 am · Penticton/);
+  assert.match(mk, /id="whatsOnNoResults" hidden>/, 'not also "No events match"');
+  assert.doesNotMatch(block, /WO6 Gallery Show/, 'an exhibition already on is not "next"');
+  // In the afternoon it is "today", and in French.
+  const mkDay = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today', categories: 'markets-fairs' }), { now: new Date('2031-06-09T22:00:00Z') });
+  assert.match(mkDay, /No more markets &amp; fairs today\. Next:/, 'at 3 pm');
+  const fr = app.frenchTwinHtml(mk, '/whats-on', '?when=today&categories=markets-fairs');
+  assert.ok(fr.includes('Plus de marchés et foires ce soir. À venir :'), 'French');
+  assert.ok(fr.includes('Plus de musique en direct ce soir. À venir :'));
+  assert.equal(app.frText('No more events today. Next:'), 'Plus d’événements aujourd’hui. À venir :');
+  assert.equal(app.frText('No more arts & culture tonight. Next:'), 'Plus d’arts et culture ce soir. À venir :');
+  // The client switches blocks with the chips.
+  assert.ok(mk.includes("b.getAttribute('data-next-for') === nextKey"));
+  // A view that is not one day has no such block.
+  assert.doesNotMatch(app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ categories: 'markets-fairs' }), { now: WO6_NIGHT }), /id="whatsOnNextUp"/);
+}));
+
+// A small stand-in for the browser DOM, enough for the paging script.
+function wo6FakeDom() {
+  class El {
+    constructor(cls, attrs = {}) { this.cls = new Set(cls.split(' ').filter(Boolean)); this.attrs = { ...attrs }; this.children = []; this.parentNode = null; this.hidden = false; this.text = ''; this.listeners = {}; }
+    get classList() { const s = this.cls; return { contains: (c) => s.has(c), add: (c) => s.add(c), remove: (c) => s.delete(c), toggle: (c, on) => (on ? s.add(c) : s.delete(c)) }; }
+    getAttribute(n) { return Object.prototype.hasOwnProperty.call(this.attrs, n) ? this.attrs[n] : null; }
+    setAttribute(n, v) { this.attrs[n] = String(v); }
+    get firstElementChild() { return this.children[0] || null; }
+    get nextElementSibling() { if (!this.parentNode) return null; const k = this.parentNode.children.indexOf(this); return this.parentNode.children[k + 1] || null; }
+    insertBefore(n, ref) { if (n.parentNode) n.parentNode.removeChild(n); const k = ref ? this.children.indexOf(ref) : -1; if (k === -1) this.children.push(n); else this.children.splice(k, 0, n); n.parentNode = this; return n; }
+    appendChild(n) { return this.insertBefore(n, null); }
+    removeChild(n) { this.children.splice(this.children.indexOf(n), 1); n.parentNode = null; return n; }
+    querySelector(sel) { const c = sel.replace(/^\./, ''); const walk = (e) => { for (const k of e.children) { if (k.cls.has(c)) return k; const f = walk(k); if (f) return f; } return null; }; return walk(this); }
+    addEventListener(t, fn) { this.listeners[t] = fn; }
+    set textContent(v) { this.text = v; }
+    get textContent() { return this.text; }
+  }
+  return El;
+}
+
+test("What's On pass 6: paged for real: only the shown events are in the page, Show more adds the next page, filters reset it", () => {
+  const El = wo6FakeDom();
+  const list = new El('card-grid', { id: 'whatsOnResults', 'data-earlier': 'closed' }), more = new El('whatson-show-more');
+  const head = (g) => new El('whatson-group-head', { 'data-group': g });
+  const card = (g, i) => new El('venue-card whatson-event-card', { 'data-group': g, 'data-i': String(i) });
+  const items = [head('today')];
+  for (let i = 0; i < 30; i++) items.push(card('today', i));
+  const eh = head('earlier'); eh.appendChild(new El('whatson-earlier-count'));
+  items.push(eh);
+  for (let i = 0; i < 5; i++) items.push(card('earlier', 100 + i));
+  items.push(head('next-week'));
+  for (let i = 0; i < 100; i++) items.push(card('next-week', 200 + i));
+  // The first page as the server sends it (heads and the first 48 shown cards); everything else waits outside.
+  items.slice(0, 32).concat(items.slice(37, 55)).forEach((n) => list.appendChild(n));
+  const window = { __whatsOnItems: items };
+  const document = { getElementById: (id) => (id === 'whatsOnResults' ? list : id === 'whatsOnShowMore' ? more : null) };
+  const js = app.WHATSON_LIST_SCRIPT.replace(/^<script>|<\/script>$/g, '');
+  vm.runInNewContext(js, { window, document });
+  const ids = () => list.children.map((n) => n.getAttribute('data-i') || `h:${n.getAttribute('data-group')}`);
+  assert.equal(list.children.filter((n) => n.cls.has('venue-card')).length, 48, 'one page in the page');
+  assert.deepEqual(ids().slice(0, 2), ['h:today', '0']);
+  assert.ok(ids().includes('h:earlier'), 'the folded heading, once the list reaches it');
+  assert.ok(!ids().includes('100'), 'folded cards stay out');
+  assert.equal(more.textContent, 'Show more (48 of 130)');
+  assert.equal(eh.querySelector('.whatson-earlier-count').textContent, '(5)');
+  more.listeners.click();
+  assert.equal(list.children.filter((n) => n.cls.has('venue-card')).length, 96);
+  assert.equal(more.textContent, 'Show more (96 of 130)');
+  // A filter: the paging starts again over what is left, and hidden cards leave the page.
+  items.forEach((n) => { if (n.cls.has('venue-card') && Number(n.getAttribute('data-i')) % 2) n.hidden = true; });
+  window.__whatsOnLayout();
+  assert.equal(list.children.filter((n) => n.cls.has('venue-card')).length, 48);
+  assert.ok(list.children.every((n) => !n.hidden));
+  assert.equal(more.textContent, 'Show more (48 of 65)');
+  // Opening Earlier today puts its cards in, in place.
+  list.listeners.click({ target: { closest: () => eh } });
+  assert.equal(list.getAttribute('data-earlier'), 'open');
+  assert.ok(ids().indexOf('100') > ids().indexOf('h:earlier') && ids().indexOf('100') < ids().indexOf('h:next-week'));
+  // Order always follows the page.
+  const order = items.filter((n) => n.parentNode === list);
+  assert.deepEqual(list.children, order);
+});
+
+test("What's On pass 6: French month headings, the one-day date line and all-day events", () => withWo6Events(() => {
+  assert.equal(app.frText('Later in December'), 'Plus tard en décembre');
+  assert.equal(app.frText('Later in January'), 'Plus tard en janvier');
+  assert.equal(app.frText('Showing Sun Oct 18'), 'Le dim. 18 oct.');
+  assert.equal(app.frText('Showing Sun Oct 18 – Sat Oct 24'), 'Du dim. 18 oct. au sam. 24 oct.', 'ranges as before');
+  // 00:00 starts are all day: event pages, cards and search.
+  assert.equal(app.describeEventOccurrence({ start_date: WO6_DAY, end_date: WO6_DAY, start_time: '00:00' }).timeText, 'All day');
+  assert.equal(app.describeEventOccurrence({ start_date: WO6_DAY, end_date: WO6_DAY, start_time: '19:30' }).timeText, '7:30 pm');
+  const party = app.getWhatsOnEvents({ from: WO6_DAY, to: wo6AddDays(WO6_DAY, 10) }).find((e) => e.name === 'WO6 Midnight Party');
+  assert.equal(party.time, '', 'the stored label is unchanged (the planner reads it)');
+  assert.equal(app.whatsOnCardTime(party), 'All day');
+  const card = app.whatsOnEventCardHtml(party, WO6_DAY, WO6_NIGHT);
+  assert.match(card, /Kelowna &middot; Thu Jun 12 · All day</);
+  assert.doesNotMatch(card, /12 am/);
+  assert.ok(app.frenchTwinHtml(`<!DOCTYPE html><html lang="en"><head><title>x</title></head><body><ul class="card-grid">${card}</ul></body></html>`, '/whats-on', '').includes('jeu. 12 juin · Toute la journée'));
+  // The rendered page: no "Later in" left in English on the French twin.
+  const fr = app.frenchTwinHtml(app.renderWhatsOnPage(null, { now: WO6_NIGHT }), '/whats-on', '');
+  assert.doesNotMatch(fr, />Later in /);
+}));

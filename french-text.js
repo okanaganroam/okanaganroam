@@ -43,6 +43,8 @@ const FR_CUISINE = {
 };
 
 const FR_TEXT = {
+  // What's On (2026-10-19): the On now heading outside the daytime (the /map wording).
+  'Exhibitions & multi-day events': 'Expositions et événements de plusieurs jours',
   ...FR_CUISINE,
   // ---- Cards, chips and filters ----
   'View details →': 'Voir les détails →',
@@ -1028,6 +1030,18 @@ const MONTHS_LONG = { January: 'janvier', February: 'février', March: 'mars', A
 const SEASON_DATE = '(January|February|March|April|May|June|July|August|September|October|November|December) (\\d{1,2})(?:, (\\d{4}))?';
 const seasonDate = (m, i) => `${m[i + 1] === '1' ? '1er' : m[i + 1]} ${MONTHS_LONG[m[i]]}${m[i + 2] ? ` ${m[i + 2]}` : ''}`;
 const FR_PATTERNS = [
+  // What's On (2026-10-19): the month headings past next week, a one-day "Showing Sun Oct 18" under the dates, and
+  // "No more live music tonight. Next:" above the next three events of that kind.
+  [/^Later in (January|February|March|April|May|June|July|August|September|October|November|December)$/, (m) => `Plus tard en ${MONTHS_LONG[m[1]]}`],
+  [/^Showing ((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2})$/, (m, tr) => { const d = tr(m[1]); return d === m[1] ? null : `Le ${d}`; }],
+  [/^No more (.+) (tonight|today)\. Next:$/, (m) => {
+    const when = m[2] === 'tonight' ? 'ce soir' : 'aujourd’hui';
+    if (m[1] === 'events') return `Plus d’événements ${when}. À venir :`;
+    const key = Object.keys(FR_TEXT).find((k) => k.toLowerCase() === m[1]);
+    if (!key) return null;
+    const what = FR_TEXT[key].charAt(0).toLowerCase() + FR_TEXT[key].slice(1);
+    return `Plus ${/^[aeiouyàâéèêîïôûh]/i.test(what) ? 'd’' : 'de '}${what} ${when}. À venir :`;
+  }],
   [/^Closed for the season\.$/, () => 'Fermé pour la saison.'],
   [/^Closed for the season\. The reopening date has not been announced yet\.$/, () => 'Fermé pour la saison. La date de réouverture n’a pas encore été annoncée.'],
   [new RegExp(`^Closed for the season\\. Reopens ${SEASON_DATE}\\.$`), (m) => `Fermé pour la saison. Réouverture le ${seasonDate(m, 1)}.`],
