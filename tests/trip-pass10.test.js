@@ -270,7 +270,7 @@ test('Timing (round 10): a long empty afternoon moves dinner earlier, or the wai
   tp.pullDinnersForward(p, input, req);
   const stops = p.days[0].stops, k = stops.findIndex(tp.isDinnerStop);
   assert.ok(dinnerRow().startMinutes < 18 * 60, 'dinner moved before 6 PM');
-  assert.ok(dinnerRow().startMinutes >= 17 * 60, 'but not before 5 PM');
+  assert.ok(dinnerRow().startMinutes >= 17 * 60 + 30, 'but not before 5:30 PM');
   assert.ok(dinnerRow().waitMinutes < 90 || (stops[k - 1] && stops[k - 1].freeTime), 'what is left is short, or a Free time card');
 });
 

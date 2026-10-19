@@ -2825,7 +2825,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
           : stop.daypart==='evening'&&beforeEvent ? dinnerFloor
           : ({midday:720,afternoon:780,late:930,evening:1080,night:1080}[stop.daypart]||0);
         // Round 10 (2026-10-19): a dinner after a long empty afternoon is moved earlier (from 5 PM), see pullDinnersForward.
-        const partStart=isDinnerStop(stop)&&Number.isFinite(stop.dinnerFrom)&&!beforeEvent?Math.min(partStart0,stop.dinnerFrom):partStart0;
+        // A dinner kept through a Swap keeps the earlier time it had on screen.
+        const earlyDinner=Math.min(Number.isFinite(stop.dinnerFrom)?stop.dinnerFrom:Infinity,Number.isFinite(stop.keepStart)&&stop.keepStart>=DINNER_EARLIEST?stop.keepStart:Infinity);
+        const partStart=isDinnerStop(stop)&&!beforeEvent&&earlyDinner<partStart0?earlyDinner:partStart0;
         // Round 9: a stop kept through a Swap starts no earlier than it did (keepStart, from the plan on screen).
         const fillStart=Math.max(stop.gapFill&&Number.isFinite(stop.fillStart)?stop.fillStart:0,Number.isFinite(stop.keepStart)?stop.keepStart:0);
         let range=ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
@@ -3154,9 +3156,9 @@ function fillDinnerGaps(result, input, requirements) {
   return changed;
 }
 // Round 10 (2026-10-19): 90 minutes or more of nothing before dinner (a tasting ending at 3:30, dinner at 6) moves
-// dinner earlier, to 5 PM at the soonest (5:30 when the day runs that late); a wait still left after that gets a Free
+// dinner earlier, to 5:30 PM at the soonest; a wait still left after that gets a Free
 // time card, so the gap is on purpose. Days with an evening event, ski days and dinners kept through a Swap are left.
-const DINNER_EARLIEST = 17 * 60;
+const DINNER_EARLIEST = 17 * 60 + 30;
 function dinnerGapStops(result) {
   return (result.days || []).length ? result.days.map((d) => ({ day: d.day, stops: d.stops })) : [{ day: 1, stops: (result.itinerary && result.itinerary.stops) || (result.outing && result.outing.stops) || [] }];
 }
