@@ -128,6 +128,17 @@ const FR_TEXT = {
   'Mentions its restaurant or dining': 'Mentionne son restaurant ou sa salle à manger',
   // Search gaps (2026-10-18): the new /fr/search card notes.
   'Runs wine tours': 'Organise des tournées des vignobles',
+  // Search pass 5 (2026-10-19): /fr/search card notes for names, views, free things and open now.
+  'Name matches': 'Le nom correspond',
+  'A viewpoint or lookout': 'Un point de vue ou un belvédère',
+  'Patio with a lake view': 'Terrasse avec vue sur le lac',
+  'Lake view': 'Vue sur le lac',
+  'Mentions the view': 'Mentionne la vue',
+  'Says entry is free': 'Entrée gratuite indiquée',
+  'Beach': 'Plage',
+  'Park or trail': 'Parc ou sentier',
+  'Viewpoint': 'Point de vue',
+  'Earlier today': 'Plus tôt aujourd’hui',
   'Winery': 'Vignoble',
   'Café': 'Café',
   '$': '$',

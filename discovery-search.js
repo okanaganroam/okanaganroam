@@ -247,4 +247,47 @@ function searchVenues(intent, venues) {
   return { total: scored.length, items: scored.map(({ venue, matchedOn }) => ({ venue, matchedOn })), exclusions: plan };
 }
 
-module.exports = { textHas, termMatch, foodMatch, searchVenues, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_STRAY_WORDS, withoutConceptStrays, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
+// Any-word fallback (2026-10-19): when no venue has EVERY word ("pumpkin cider farm"), the venues that have SOME of
+// them, the most words first, then text relevance, rating, review count, name and id. The same hard filters as
+// searchVenues (region, type, badges, lists, activities, cuisine, exclusions); only the every-word rule is relaxed.
+// Each result still says exactly which words it matched in `matchedOn`.
+function searchVenuesAnyWord(intent, venues) {
+  const empty = { total: 0, items: [], exclusions: { applied: [], notApplied: [] } };
+  const terms = (intent && intent.textTerms) || [];
+  if (!intent || intent.mode === 'events' || intent.mode === 'unknown' || terms.length < 2) return empty;
+  const R = intent.regions || [], T = intent.types || [], F = intent.features || [], C = intent.collections || [], A = intent.activities || [];
+  const cuisines = intent.cuisines || [];
+  const plan = exclusionPlan(intent.excluded);
+  const scored = [];
+  for (const v of venues) {
+    if (R.length && !R.includes(v.region)) continue;
+    if (T.length && !hasType(v, T)) continue;
+    if (!F.every((f) => hasFeature(v, f))) continue;
+    if (!C.every((c) => v.collections.includes(c))) continue;
+    if (A.length && !A.some((a) => v.activities.includes(a))) continue;
+    if (cuisines.length && !cuisines.includes(v.cuisine)) continue;
+    let hits = 0, score = 0;
+    const matchedOn = [];
+    for (const term of terms) {
+      const m = termMatch(v, term);
+      if (!m) continue;
+      hits += 1;
+      score += termWeight(m);
+      matchedOn.push(`${term}:${termWhere(m)}`);
+    }
+    if (!hits) continue;
+    if (plan.applied.length && isExcluded(v, plan)) continue;
+    for (const f of F) matchedOn.push(`feature:${f}`);
+    for (const c of C) matchedOn.push(`collection:${c}`);
+    scored.push({ venue: v, hits, score, matchedOn });
+  }
+  scored.sort((a, b) => b.hits - a.hits
+    || b.score - a.score
+    || (Number(b.venue.rating) || 0) - (Number(a.venue.rating) || 0)
+    || (Number(b.venue.reviews) || 0) - (Number(a.venue.reviews) || 0)
+    || String(a.venue.name).localeCompare(String(b.venue.name))
+    || a.venue.id - b.venue.id);
+  return { total: scored.length, items: scored.map(({ venue, matchedOn, hits }) => ({ venue, matchedOn, hits })), exclusions: plan };
+}
+
+module.exports = { textHas, termMatch, foodMatch, searchVenues, searchVenuesAnyWord, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_STRAY_WORDS, withoutConceptStrays, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
