@@ -344,6 +344,7 @@ test('Events (2026-10-19): lunch before a noon event moves after it, never a "Ti
 });
 
 test('Events (2026-10-19): a drop-in says when it is open, an untimed family event is a daytime visit, and a Halloween trip says which day has no Halloween event', () => {
+  if (!FACTS.some((v) => v.name === 'Penticton Family Diner 1')) for (let i = 0; i < 4; i++) add({ name: `Penticton Family Diner ${i + 1}`, region: 'penticton', type: 'restaurant', rating: 4.7, price: 2, hours: open('11:00', '21:00'), features: { kid_friendly: true }, dLat: 0.003 * i });
   const text = 'Halloween weekend in Penticton with my kids';
   const events = [
     ev({ name: 'Halloween Tricks and Treats aboard the Sternwheeler', region: 'penticton', date: '2026-10-31', time: '11 am - 4 pm', categories: ['family-kids', 'holiday-seasonal'] }),
@@ -365,6 +366,8 @@ test('Events (2026-10-19): a drop-in says when it is open, an untimed family eve
   assert.notEqual(con.daypart, 'night', 'not a night stop after dinner');
   const dinner = day2.stops.findIndex((s) => s.venue && s.daypart === 'evening');
   if (dinner >= 0) assert.ok(day2.stops.indexOf(con) < dinner, 'before dinner');
+  const lunch = day2.stops.find((s) => s.venue && s.daypart === 'midday');
+  assert.ok(lunch && day2.stops.indexOf(lunch) < day2.stops.indexOf(con), 'day 2 keeps its lunch, before the afternoon visit');
   const row = rowOf(p, con);
   assert.equal(row.status, 'provisional', JSON.stringify(row));
   assert.ok(Number.isInteger(row.startMinutes) && row.startMinutes >= 780 && row.startMinutes < 1080, JSON.stringify(row));
