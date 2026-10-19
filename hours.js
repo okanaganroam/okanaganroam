@@ -132,6 +132,14 @@ function shiftDate(date, offset) {
   const t = Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))) + offset * 86400000;
   return new Date(t).toISOString().slice(0, 10);
 }
+// A closure of three days or more (round 8, 2026-10-19): a temporary closure rather than a holiday.
+function isTemporaryClosure(c) {
+  if (!c || !c.from || !c.to || c.to <= c.from) return false;
+  // Written for the browser copy too (HOURS_CLIENT_SRC).
+  var from = Date.UTC(Number(c.from.slice(0, 4)), Number(c.from.slice(5, 7)) - 1, Number(c.from.slice(8, 10)));
+  var to = Date.UTC(Number(c.to.slice(0, 4)), Number(c.to.slice(5, 7)) - 1, Number(c.to.slice(8, 10)));
+  return (to - from) / 86400000 >= 2;
+}
 function closureOn(parsed, date) {
   return (parsed && parsed.closures || []).find((c) => date >= c.from && date <= c.to) || null;
 }
@@ -250,7 +258,9 @@ function statusAt(parsed, clock) {
     closedToday: current.status === 'closed',
   };
   // A special closure today names itself: "Closed today (Thanksgiving)", or "(holiday)" without a note.
-  if (current.closure) out.closedNote = current.closure.note || 'holiday';
+  // Round 8 (2026-10-19): a closure of three days or more without a note is "(temporary closure)", not a holiday
+  // (Christmas and Boxing Day stay a holiday).
+  if (current.closure) out.closedNote = current.closure.note || (isTemporaryClosure(current.closure) ? 'temporary closure' : 'holiday');
   return out;
 }
 
@@ -344,7 +354,7 @@ function openingPeriods(parsed) {
 // server and the browser can never read hours differently.
 const HOURS_CLIENT_SRC = [
   `var WEEKDAYS = ${JSON.stringify(WEEKDAYS)}; var DAY_MINUTES = ${DAY_MINUTES};`,
-  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, seasonOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
+  ...[hoursTimeToMinutes, parseHoursPeriod, unknownHours, parseHours, dateWeekday, shiftDate, closureOn, isTemporaryClosure, seasonOn, dayOnDate, hoursForClock, isOpenAllDay, shiftWeekday,
     validClock, resolveClose, nextOpening, statusAt, formatClockMinutes, hoursStatusLabel].map((fn) => fn.toString()),
 ].join('\n');
 
@@ -356,6 +366,7 @@ module.exports = {
   dateWeekday,
   shiftDate,
   dayOnDate,
+  isTemporaryClosure,
   hoursForClock,
   statusAt,
   formatClockMinutes,
