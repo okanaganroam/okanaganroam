@@ -7488,8 +7488,11 @@ test('Advisories: the collection is bootstrapped, memberships render a "Check be
   assert.doesNotMatch(category.slice(bareIdx, category.indexOf('</li>', bareIdx)), /venue-advisory/, 'only the member venue gets the notice');
 
   const page = app.renderVenuePage(b, [], [], []);
-  assert.match(page, /<\/p>\n  <aside class="venue-advisory" role="note" aria-label="Check before you go">/, 'notice sits between the description and the CTA row');
-  assert.match(page, /<\/aside>\n  <div class="venue-cta-row"/);
+  // Round 10 (2026-10-19): the notice and the CTA row come after the header and before the description in the page
+  // (wide screens show the description first through CSS order).
+  assert.match(page, /-->\n  <aside class="venue-advisory" role="note" aria-label="Check before you go">/, 'notice sits right after the header');
+  assert.match(page, /<\/aside>\n  <div class="venue-cta-row"/, 'and just before the CTA row');
+  assert.ok(page.indexOf('<div class="venue-cta-row"') < page.indexOf('<p class="venue-description"'));
   assert.match(page, /\.venue-advisory \{/);
   // Permanent facts are untouched: the description text is identical.
   assert.match(page, /<p class="venue-description">A fixture public beach with a swim area, playground and washrooms, used only by the automated test suite\.<\/p>/);
@@ -31187,3 +31190,48 @@ test('Round 9 My Trip: a season notice is judged on the stop\'s planned date, no
     db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(hill.id);
   }
 }));
+
+// ---------- Round 10 phone (2026-10-19): venue action row placement and 44px tap targets ----------
+test('Round 10 phone: venue pages put Call / Directions / Favorite / Add to trip right after the header, before the description (EN and FR)', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  for (const opts of [{}, { lang: 'fr' }]) {
+    const html = app.renderVenuePage({ ...venue, description_fr: 'Une trattoria fictive pour les tests.' }, [], [], [], opts);
+    const main = html.slice(html.indexOf('<div class="venue-main">'), html.indexOf('<aside class="venue-aside">'));
+    const at = (s) => main.indexOf(s);
+    assert.ok(at('<div class="venue-header">') >= 0 && at('<div class="venue-cta-row"') > 0 && at('<p class="venue-description"') > 0);
+    assert.ok(at('<div class="venue-header">') < at('<div class="venue-cta-row"'), 'header first');
+    assert.ok(at('<div class="venue-cta-row"') < at('<p class="venue-description"'), 'the buttons come before the description in the page (tab order)');
+    assert.match(main, /<a class="cta secondary" href="tel:/, 'the Call button is in that row');
+    // #402: the contact block (sidebar) still comes before the visitor photos and tips.
+    assert.ok(html.indexOf('<aside class="venue-aside">') < html.indexOf('<div class="venue-extra">'));
+    // Wider screens show the description first again through CSS order, and phones keep the page order.
+    assert.match(html, /@media \(min-width: 641px\) \{\n    body\.golf-page \.venue-main > \.venue-header \{ order: -4; \}\n    body\.golf-page \.venue-main > \.venue-description \{ order: -3; \}\n    body\.golf-page \.venue-main > aside \{ order: -2; \}\n    body\.golf-page \.venue-main > \.venue-editorial \{ order: -1; \}/);
+    assert.match(html, /@media \(min-width: 960px\) \{[\s\S]*?body\.golf-page \.venue-main \{ display: flex; flex-direction: column; \}/);
+  }
+  // Editorial story sections (Elora) follow the description in the page and are marked for the wide-screen order.
+  const elora = app.renderVenuePage(eloraPageFixture(), [], [], []);
+  assert.ok(elora.indexOf('<div class="venue-cta-row"') < elora.indexOf('<p class="venue-description"'));
+  assert.ok(elora.indexOf('<p class="venue-description"') < elora.indexOf('<section class="venue-section venue-editorial"'));
+});
+
+test('Round 10 phone: map, What\'s On, list, homepage, gallery, footer and town-event tap targets are 44px', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const mapAt = src.indexOf('const MAP_PAGE_STYLE = `<style id="near-me-map">');
+  assert.ok(mapAt > 0);
+  const map = src.slice(mapAt, src.indexOf('</style>', mapAt));
+  for (const cls of ['pm-tab', 'pm-route-end', 'pm-mode', 'pm-relax']) assert.match(map, new RegExp(`body\\.map-page \\.${cls} \\{[^}]*min-height: 44px;`), cls);
+  assert.match(map, /body\.map-page \.pm-chip \{ flex: none; min-height: 44px;/);
+  assert.match(map, /body\.map-page \.pm-more \{[^}]*min-height: 44px;/);
+  assert.match(map, /body\.map-page \.pm-filters-btn \{[^}]*width: 44px; height: 44px;/);
+  assert.match(map, /body\.map-page \.pm-mic \{[^}]*width: 44px; height: 44px;/);
+  assert.doesNotMatch(map, /body\.map-page \.pm-(?:chip|tab|more|mode|route-end) \{[^}]*min-height: (?:3\d|4[0-3])px/);
+  // "More upcoming events (N)" (What's On) and "All places on this page, A-Z" (list pages) share one summary rule.
+  const rest = app.restLinksHtml('fdRest', '<li class="venue-card"><a class="venue-card-link" href="/kelowna/restaurants/a-place"><span class="venue-card-name">A Place</span></a></li>', 'en');
+  assert.match(rest, /\.rest-links summary\{[^}]*min-height:44px/);
+  assert.match(app.renderWhatsOnStyles(), /\.whatson-browse-list a, body\.whatson-page \.whatson-browse-list span \{[^}]*min-height: 44px;/);
+  assert.match(app.renderHomepageDiscoveryStyles(), /@media \(max-width: 640px\), \(pointer: coarse\) \{ \.discover-heading-link\.home-see-all \{ min-height: 44px; \} \}/);
+  assert.match(app.renderCanonicalFooterStyles(), /\.home-footer-legal a, \.home-footer-legal \.home-footer-link-btn \{ display: inline-block; padding: 12px 4px; min-height: 44px;/);
+  assert.match(src, /\.vg-close \{[^}]*min-width: 44px; min-height: 44px; \}/, 'lightbox close button');
+  assert.match(src, /@media \(max-width: 640px\), \(pointer: coarse\) \{ \.vg-all \{ min-height: 44px;/, 'See all N photos');
+  assert.match(src, /\.related-card-event > a \{ display: inline-block; padding: 11px 0; margin: -11px 0; \}/, 'town What\'s On strip links');
+});
