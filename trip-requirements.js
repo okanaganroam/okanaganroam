@@ -280,6 +280,8 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     const longerStay=/\b(?:[2-7]|two|three|four|five|six|seven)\s+days?\b|\bweekend\b|\bnights?\b|\bweek\b/.test(normalizedText);
     for(const length of c.matchAll(/\b([1-7]|one|two|three|four|five|six|seven)\s+days?\b/g)) {
       if(longerStay&&/^(?:1|one)$/.test(length[1])&&/^\s*trips?\b/.test(c.slice(length.index+length[0].length)))continue;
+      // Round 8 (2026-10-19): "2 days: West Kelowna wineries one day, Naramata wineries the next" -- "one day" is which day, not a length.
+      if(longerStay&&/^(?:1|one)$/.test(length[1])&&/\b(?:the next|the other|the second|next day|another day|day two|the day after|the following day)\b/.test(normalizedText))continue;
       add('days',Number(length[1])||WORD_DAYS[length[1]],scopeText,{dayIndex:null,weekday:null});
     }
     const dayTrip=/\bday trips? (?:to|into|over to|down to|up to|out to) (.+)/.exec(c);

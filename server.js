@@ -5993,8 +5993,10 @@ function parseTripPlanBody(body) {
   if (body.swap !== undefined) {
     const w = body.swap;
     // id (round 7): the place being swapped out, kept with a note when nothing else fits.
-    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id> }.' };
-    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}) };
+    // locked (round 8): the stops the visitor locked; the other pins only keep the plan steady and may give way.
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
+      || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"] }.' };
+    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}) };
   }
   return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap } };
 }
@@ -6353,6 +6355,33 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       }
     }
   }
+  // Holiday trips (round 8, 2026-10-19): "Halloween weekend in Kelowna" uses What's On's Halloween events on those
+  // dates (one a day where there is one). An undated request is the Halloween weekend itself.
+  let holidayEvents = null;
+  const holiday = !itineraryEvents && !familyEvents && !trip.multi && intent.mode === 'plan' && !requirements?.items.some(i => i.kind === 'event') ? tripPlannerModule().holidayTheme(interpretationText) : null;
+  if (holiday && holiday.key === 'halloween') {
+    const days = Math.max(1, Math.min(7, intent.days || requirements?.items.find(i => i.kind === 'days')?.value || 1));
+    let from = requirements?.startDate || null;
+    if (!from) {
+      const today = todayLocal(now);
+      let year = Number(today.slice(0, 4));
+      if (today > `${year}-11-01`) year += 1;
+      const eve = `${year}-10-31`, wd = localWeekday(eve);
+      from = days > 1 ? (wd === 6 ? eve : wd === 0 ? addLocalDays(eve, -1) : addLocalDays(eve, -((wd + 1) % 7))) : eve;
+      if (from < today) from = today;
+    }
+    const window = resolveWhatsOnWindow({ from, to: addLocalDays(from, days - 1) }, now);
+    const found = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], []), intent.excluded), window.from, window.to), now)
+      .filter(e => holiday.re.test(discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''}`)));
+    if (found.length) {
+      holidayEvents = found;
+      if (!requirements?.startDate) {
+        const dated = requirements || extracted;
+        dated.startDate = from; dated.endDate = days > 1 ? addLocalDays(from, days - 1) : null; dated.dateSource = dated.dateSource || 'Halloween';
+        if (!requirements) requirements = dated;
+      }
+    }
+  }
   if (requirements) {
     const consumed = requirementModule.consumedTerms(requirements);
     intent.foodTerms = (intent.foodTerms || []).filter(f => f.cuisine || !consumed.has(f.term));
@@ -6407,8 +6436,9 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     avoidIds: avoidVenueIds,
     pinned,
     swap,
-    events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || familyEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
+    events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || familyEvents || holidayEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
     familyEvents: !!familyEvents,
+    holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripPlanDate(intent.when, now),
     startWeekday: requirements?.startDate ? ['sun','mon','tue','wed','thu','fri','sat'][new Date(`${requirements.startDate}T12:00:00Z`).getUTCDay()] : tripStartWeekday(intent.when, now),
     clock: okanaganClock(now),
