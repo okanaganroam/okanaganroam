@@ -25702,13 +25702,17 @@ test('Owner portal access (2026-10-18): People with access lists logins, emails 
     const ownerPage = await (await s.get(`/owner/account/venue/${v.id}`, owner.cookie)).text();
     assert.match(ownerPage, /<details class="op-fold" id="access">[\s\S]*2 logins can update this listing/);
     assert.match(ownerPage, /<strong>first\.owner@example\.com<\/strong> \(you\)/);
-    assert.match(ownerPage, /<strong>ne•••@example\.com<\/strong>/, 'others are partly masked');
-    assert.doesNotMatch(ownerPage, /newstaff@example\.com/);
+    // Full emails (2026-10-18): everyone on the panel has access to the same listing, so two staff never look alike.
+    assert.match(ownerPage, /<strong>newstaff@example\.com<\/strong>/, 'colleagues see full emails');
+    assert.doesNotMatch(ownerPage, /•••@/);
+    assert.match(ownerPage, /<span class="op-fold-hint" id="opAccessCount">2 logins can update this listing<\/span>/);
+    assert.match(ownerPage, /id="opResetLink">Reset edit link<\/button>/, 'the first login can reset the link');
     const staffId = db.prepare('SELECT id FROM owner_accounts WHERE email = ?').get('newstaff@example.com').id;
     const ownerId = db.prepare('SELECT id FROM owner_accounts WHERE email = ?').get('first.owner@example.com').id;
     assert.match(ownerPage, new RegExp(`data-login-remove="${staffId}"`), 'the owner can remove the newer login');
     const staffPage = await (await s.get(`/owner/account/venue/${v.id}`, staff.cookie)).text();
-    assert.match(staffPage, /fi•••@example\.com<\/strong><\/span><span class="op-act-date">Added [^<]*&middot; added before you/);
+    assert.match(staffPage, /first\.owner@example\.com<\/strong><\/span><span class="op-act-date">Added [^<]*&middot; added before you/);
+    assert.doesNotMatch(staffPage, /id="opResetLink"/, 'a newer login has no Reset button');
     assert.doesNotMatch(staffPage, new RegExp(`data-login-remove="${ownerId}"`), 'no Remove button for an older login');
     assert.match(await (await s.get('/owner/account', owner.cookie)).text(), new RegExp(`href="/owner/account/venue/${v.id}#access" class="op-hint">2 people have access`));
 
@@ -25724,14 +25728,44 @@ test('Owner portal access (2026-10-18): People with access lists logins, emails 
     mail.length = 0;
     const removed = await s.post(`/owner/account/venue/${v.id}/logins/${staffId}/remove`, {}, owner.cookie);
     assert.equal(removed.status, 200, JSON.stringify(removed.body));
+    assert.equal(removed.body.logins, 1, 'the new count, for the panel header');
+    assert.equal(removed.body.link_reset, true);
+    assert.equal(removed.body.emailed, 'sent');
     assert.deepEqual(app.ownerLoginsForVenue(v.id).map((l) => l.email), ['first.owner@example.com']);
     assert.equal((await s.get(`/owner/account/venue/${v.id}`, staff.cookie)).status, 404);
-    assert.deepEqual(mail.map((m) => m.to), ['newstaff@example.com']);
-    assert.match(mail[0].subject, /Your access to Access Fixture on Okanagan Roam was removed/);
+    assert.deepEqual(mail.map((m) => m.to).sort(), ['first.owner@example.com', 'newstaff@example.com']);
+    const gone = mail.find((m) => m.to === 'newstaff@example.com');
+    assert.match(gone.subject, /Your access to Access Fixture on Okanagan Roam was removed/);
+    assert.match(gone.text, /edit link was reset at the same time, so the old link no longer works/);
     const fyi = dayton[dayton.length - 1];
     assert.match(fyi._subject, /Login removed from Access Fixture/);
     assert.equal(fyi['Removed'], 'newstaff@example.com');
     assert.equal(fyi['Removed by'], 'first.owner@example.com');
+    assert.match(fyi['Edit link'], /^Reset: the old link stopped working at once\. The new one was emailed to first\.owner@example\.com\./);
+    assert.doesNotMatch(fyi['To undo'], /opens the listing’s private edit link/);
+    // Rotate on Remove (2026-10-18): the old link is dead at once (no grace), so the removed person can't re-add themselves.
+    assert.equal((await s.get(`/owner/${token}`)).status, 404, 'old link page');
+    const rejoin = await s.post(`/owner/${token}/account`, { email: 'newstaff@example.com', password: 'staff member password' });
+    assert.equal(rejoin.status, 404, 'old link can\'t add a login');
+    assert.equal(app.ownerLoginsForVenue(v.id).length, 1);
+    const linkMail = mail.find((m) => m.to === 'first.owner@example.com');
+    assert.equal(linkMail.subject, 'New edit link for Access Fixture');
+    const newToken = /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(linkMail.text)[1];
+    assert.notEqual(newToken, token);
+    assert.equal((await s.get(`/owner/${newToken}`)).status, 200, 'the new link works');
+    assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'first.owner@example.com', '"Email me a new link" now goes to the remover');
+    // The page script refreshes the header count and says the link was reset.
+    assert.match(ownerPage, /cnt\.textContent = n <= 1 \? T\.onlyYou : T\.nLogins\.replace\('\{n\}', n\)/);
+    assert.match(ownerPage, /"onlyYou":"Only you can update this listing","nLogins":"\{n\} logins can update this listing"/);
+    const after = await (await s.get(`/owner/account/venue/${v.id}`, owner.cookie)).text();
+    assert.match(after, /id="opAccessCount">Only you can update this listing</);
+    // Add to my login with the new link still works (the owner sends it to the staff member again).
+    const readd = await s.post(`/owner/${newToken}/account`, { add: true }, staff.cookie);
+    assert.equal(readd.status, 201, JSON.stringify(readd.body));
+    assert.equal(app.ownerLoginsForVenue(v.id).length, 2);
+    const again2 = await s.post(`/owner/account/venue/${v.id}/logins/${staffId}/remove`, {}, owner.cookie);
+    assert.equal(again2.status, 200);
+    assert.equal((await s.get(`/owner/${newToken}`)).status, 404, 'each Remove resets the link again');
 
     // Removing yourself keeps working (settings unlink and the panel's Remove me use the same route).
     assert.equal((await s.post(`/owner/account/venue/${v.id}/unlink`, {}, owner.cookie)).status, 200);
@@ -25743,6 +25777,180 @@ test('Owner portal access (2026-10-18): People with access lists logins, emails 
     app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
     await s.close();
   }
+});
+
+test('Pending link changes (2026-10-18): creating a login or adding the listing publishes waiting hours and phone with an audit row and Undo; name and website stay waiting; banner wording', () => withOwnerPortalServer(async ({ post, get }) => {
+  seasonInsert.run({ name: 'Pending Carry Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'pending-carry-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'pending-carry-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const week = (w) => ({ mon: [w], tue: [w], wed: [w], thu: [w], fri: [w], sat: [], sun: [] });
+  // Sent from the edit link: everything waits for review.
+  const sent = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0171', hours: week(['10:00', '18:00']), badges: { patio: true },
+    name: 'Pending Carry Fixture Bistro', website: 'pendingcarry.example' }, contact_name: 'Sam', contact_email: 'sam@pendingcarry.example', started_at: Date.now() - 10000 });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  assert.deepEqual(sent.body.live, []);
+  const linkPage = await get(`/owner/${token}`);
+  assert.match(linkPage, /Anything else you send now is added to them\./, 'signed out, the old line stays');
+  // Creating a login from the link publishes the instant-eligible ones.
+  const made = await post(`/owner/${token}/account`, { email: 'sam@pendingcarry.example', password: 'a long enough password' });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  assert.deepEqual(made.body.published.sort(), ['badges', 'hours', 'phone']);
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id);
+  assert.equal(row.phone, '250-555-0171');
+  assert.equal(row.patio, 1);
+  assert.equal(JSON.parse(row.hours).mon[0][0], '10:00');
+  assert.equal(row.hours_source, 'venue_owner');
+  assert.equal(row.name, 'Pending Carry Fixture', 'the name still waits');
+  const waiting = app.getOwnerChange(app.pendingOwnerChange(v.id).id);
+  assert.deepEqual(Object.keys(waiting.changes).sort(), ['name', 'website'], 'reviewed fields stay pending');
+  assert.equal(waiting.id, sent.body.id, 'the same request, so the email Dayton already has still matches');
+  // The audit row: instant, approved by the login, with Undo on /admin/review.
+  const audit = app.recentInstantOwnerChanges().find((x) => x.venue_id === v.id);
+  assert.equal(audit.reviewed_by, 'owner:sam@pendingcarry.example');
+  assert.equal(audit.contact_email, 'sam@pendingcarry.example');
+  assert.equal(audit.changes.phone, '250-555-0171');
+  assert.equal(audit.previous.phone, '');
+  assert.equal(JSON.parse(audit.undo_meta).from_request, sent.body.id);
+  assert.match(app.renderAdminReviewPage(), new RegExp(`data-kind="change" data-id="${audit.id}"[\\s\\S]*?data-act="undo">Undo<`));
+  // Signed in, the banner no longer says "added to them".
+  const page = await get(`/owner/account/venue/${v.id}`, made.cookie);
+  assert.doesNotMatch(page, /Anything else you send now is added to them/);
+  assert.match(page, /<p class="op-pending">You sent changes on [^.]+\. A new name, address, website or link is checked by us first, usually within a day; it shows below, marked &ldquo;Waiting for review&rdquo;, until then\.<\/p>/);
+  assert.doesNotMatch(page, /Phone <span class="op-status op-status-wait op-wait-chip">/, 'the phone is live, not waiting');
+  // Undo puts the old values back.
+  const u = app.undoOwnerInstantChange(audit.id, 'dayton');
+  assert.equal(u.ok, true, JSON.stringify(u));
+  assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(v.id).phone, null);
+  assert.equal(db.prepare('SELECT hours FROM venues WHERE id = ?').get(v.id).hours, PE_WEEK);
+
+  // Add to my login (already signed in elsewhere) publishes too.
+  seasonInsert.run({ name: 'Pending Add Fixture', type: 'cafe', hours: PE_WEEK, slug: 'pending-add-fixture' });
+  const w = app.findVenueBySlug('kelowna', 'cafe', 'pending-add-fixture');
+  const tokenW = app.createOwnerLink(w.id, {}).url.split('/owner/')[1];
+  await post(`/owner/${tokenW}/changes`, { changes: { description: 'A pending description that is long enough to be accepted by the form.', address: '123 Pending Rd, Kelowna' }, started_at: Date.now() - 10000 });
+  const added = await post(`/owner/${tokenW}/account`, { add: true }, made.cookie);
+  assert.equal(added.status, 201, JSON.stringify(added.body));
+  assert.deepEqual(added.body.published, ['description']);
+  assert.equal(db.prepare('SELECT description FROM venues WHERE id = ?').get(w.id).description, 'A pending description that is long enough to be accepted by the form.');
+  assert.deepEqual(Object.keys(app.getOwnerChange(app.pendingOwnerChange(w.id).id).changes), ['address']);
+  assert.equal(app.recentInstantOwnerChanges().find((x) => x.venue_id === w.id).reviewed_by, 'owner:sam@pendingcarry.example');
+
+  // Link changes on a listing already on the login: opening it doesn't publish them (the waiting request can merge
+  // several people's sends), the banner says Save will, and the next Save includes them though the form didn't send them.
+  await post(`/owner/${tokenW}/changes`, { changes: { phone: '250-555-0172' }, contact_email: 'colleague@pendingcarry.example', started_at: Date.now() - 10000 });
+  const wPage = await get(`/owner/account/venue/${w.id}`, made.cookie);
+  assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(w.id).phone, null, 'not published on opening');
+  assert.match(wPage, /<p class="op-pending" id="opPendingCarry">You sent changes on [^.]+ from the edit link\. They show below, marked &ldquo;Waiting for review&rdquo;\. Tap <strong>Save changes<\/strong> to put the phone live now\./);
+  const saved = await post(`/owner/account/venue/${w.id}/changes`, { changes: { badges: { patio: true } }, started_at: Date.now() - 10000 }, made.cookie);
+  assert.equal(saved.status, 201, JSON.stringify(saved.body));
+  assert.deepEqual(saved.body.live.sort(), ['badges', 'phone']);
+  assert.deepEqual(saved.body.carried, ['phone']);
+  assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(w.id).phone, '250-555-0172');
+  assert.deepEqual(Object.keys(app.getOwnerChange(app.pendingOwnerChange(w.id).id).changes), ['address']);
+  // A Save with nothing else changed still sends the waiting ones.
+  await post(`/owner/${tokenW}/changes`, { changes: { phone: '250-555-0173' }, started_at: Date.now() - 10000 });
+  const onlyCarry = await post(`/owner/account/venue/${w.id}/changes`, { changes: {}, started_at: Date.now() - 10000 }, made.cookie);
+  assert.equal(onlyCarry.status, 201, JSON.stringify(onlyCarry.body));
+  assert.deepEqual(onlyCarry.body.live, ['phone']);
+  // French: the same line in French, and no "added to them".
+  await post(`/owner/${tokenW}/changes`, { changes: { phone: '250-555-0175' }, contact_email: 'sam@pendingcarry.example', started_at: Date.now() - 10000 });
+  const frPage = await get(`/fr/owner/account/venue/${w.id}`, made.cookie);
+  assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(w.id).phone, '250-555-0173', 'opening a listing never publishes');
+  assert.match(frPage, /Touchez <strong>Enregistrer les modifications<\/strong> pour mettre en ligne maintenant : téléphone\./);
+  assert.doesNotMatch(frPage, /Tout ce que vous envoyez maintenant s’y ajoute/);
+  const frSigned = await get(`/fr/owner/account/venue/${v.id}`, made.cookie);
+  assert.match(frSigned, /Un nouveau nom, une nouvelle adresse, un site Web ou un lien est d’abord vérifié par nous, en général d’ici un jour/);
+  // Inline scripts on these pages parse.
+  const vm = require('node:vm');
+  for (const html of [page, wPage, frPage, frSigned]) {
+    for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+      if (/\bsrc=|application\/(ld\+)?json/i.test(m[1] || '') || !m[2].trim()) continue;
+      assert.doesNotThrow(() => new vm.Script(m[2]), m[2].slice(0, 80));
+    }
+  }
+}));
+
+test('Reset edit link (2026-10-18): the longest-standing login resets the link (EN and FR); the old link stops at once; claims still work after', async () => {
+  seasonInsert.run({ name: 'Reset Link Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'reset-link-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'reset-link-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const s = await ownerUiServer();
+  const mail = [];
+  const dayton = [];
+  app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+  app.setVenueSubmissionTransport(async (p) => { dayton.push(p); });
+  try {
+    const owner = await s.post(`/owner/${token}/account`, { email: 'reset.owner@example.com', password: 'reset owner password' });
+    const staff = await s.post(`/owner/${token}/account`, { email: 'reset.staff@example.com', password: 'reset staff password' });
+    assert.equal(staff.status, 201);
+    const page = await (await s.get(`/owner/account/venue/${v.id}`, owner.cookie)).text();
+    assert.match(page, /"resetConfirm":"Reset this listing’s private edit link\? The old link stops working straight away/);
+    assert.match(page, /fetch\(location\.pathname \+ '\/reset-link'/);
+    for (const code of ownerUiInlineScripts(page)) assert.doesNotThrow(() => new (require('node:vm').Script)(code), code.slice(0, 80));
+    // Only the first login can reset; signed out is refused.
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/reset-link`, {}, staff.cookie)).status, 403);
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/reset-link`, {})).status, 401);
+    assert.equal((await s.get(`/owner/${token}`)).status, 200, 'refusals change nothing');
+    mail.length = 0;
+    const r = await s.post(`/owner/account/venue/${v.id}/reset-link`, {}, owner.cookie);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.emailed, 'sent');
+    assert.equal((await s.get(`/owner/${token}`)).status, 404, 'the old link stops at once');
+    assert.equal((await s.post(`/owner/${token}/changes`, { changes: { phone: '250-555-0100' }, started_at: Date.now() - 10000 })).status, 404);
+    assert.deepEqual(mail.map((m) => m.to), ['reset.owner@example.com']);
+    assert.match(mail[0].text, /You reset the private edit link for Reset Link Fixture/);
+    const newToken = /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(mail[0].text)[1];
+    assert.equal((await s.get(`/owner/${newToken}`)).status, 200);
+    assert.match(dayton[dayton.length - 1]._subject, /\[FYI\] Edit link reset for Reset Link Fixture/);
+    // Both logins keep their access.
+    assert.equal((await s.get(`/owner/account/venue/${v.id}`, staff.cookie)).status, 200);
+    // French: the button, the confirm text and the emailed link are French.
+    const fr = await (await s.get(`/fr/owner/account/venue/${v.id}`, owner.cookie)).text();
+    assert.match(fr, /id="opResetLink">Réinitialiser le lien de modification<\/button>/);
+    assert.match(fr, /"resetConfirm":"Réinitialiser le lien de modification privé de cette fiche\?/);
+    assert.match(fr, /"nLogins":"\{n\} comptes peuvent modifier cette fiche"/);
+    mail.length = 0;
+    const rf = await s.post(`/fr/owner/account/venue/${v.id}/reset-link`, {}, owner.cookie);
+    assert.equal(rf.status, 200, JSON.stringify(rf.body));
+    assert.equal(mail[0].subject, 'Nouveau lien de modification pour Reset Link Fixture');
+    assert.match(mail[0].text, /https:\/\/okanaganroam\.com\/fr\/owner\/[A-Za-z0-9_-]{32}/);
+    const frToken = /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(mail[0].text)[1];
+    assert.equal((await s.get(`/owner/${newToken}`)).status, 404);
+    // A claim approved after a reset makes a working link (and the reset link keeps working until it's opened).
+    const claimId = Number(db.prepare(`INSERT INTO venue_claims (venue_id, name, role, email, phone, verify_method) VALUES (?, 'Casey', 'owner', 'casey@example.com', '250 555 0111', 'call')`).run(v.id).lastInsertRowid);
+    const approved = await app.adminClaimAction(claimId, 'approve', {}, 'dayton');
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    const claimToken = approved.body.link.split('/owner/')[1];
+    assert.equal((await s.get(`/owner/${frToken}`)).status, 200, 'the reset link still works until the claim link is opened');
+    assert.equal((await s.get(`/owner/${claimToken}`)).status, 200);
+    const claimed = await s.post(`/owner/${claimToken}/account`, { email: 'casey@example.com', password: 'casey owner password' });
+    assert.equal(claimed.status, 201, JSON.stringify(claimed.body));
+    assert.equal(app.ownerLoginsForVenue(v.id).length, 3);
+    // Admin removal can reset the link too.
+    const adminR = await fetch(`${s.base}/admin/owner-links/logins`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` },
+      body: JSON.stringify({ venue_id: v.id, remove_email: 'casey@example.com', reset_link: true }) }).then((x) => x.json());
+    assert.equal(adminR.removed, true, JSON.stringify(adminR));
+    assert.match(adminR.new_link, /^https:\/\/okanaganroam\.com\/owner\/[A-Za-z0-9_-]{32}$/);
+    assert.equal((await s.get(`/owner/${claimToken}`)).status, 404);
+    assert.equal((await s.get(`/owner/${adminR.new_link.split('/owner/')[1]}`)).status, 200);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await s.close();
+  }
+});
+
+test('Help bot (2026-10-18): the access and dispute answers say Remove resets the edit link, with full emails and Reset edit link, in English and French', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  const access = src.slice(src.indexOf("{ id: 'access'"), src.indexOf("{ id: 'access'") + 6000);
+  assert.match(access, /with each person’s email/);
+  assert.doesNotMatch(access, /partly hidden|en partie masqués/);
+  assert.match(access, /<strong>Reset edit link<\/strong>/);
+  assert.match(access, /<strong>Réinitialiser le lien de modification<\/strong>/);
+  assert.match(access, /resets the private edit link/);
+  const dispute = src.slice(src.indexOf("{ id: 'dispute'"), src.indexOf("{ id: 'access'"));
+  assert.match(dispute, /Removing someone also resets the private edit link/);
+  assert.match(dispute, /Retirer quelqu\\u2019un réinitialise aussi le lien de modification privé/);
 });
 
 test('Owner portal conveniences (2026-10-18): one-tap Add to my login, event name filled in, settings last-business message', async () => {

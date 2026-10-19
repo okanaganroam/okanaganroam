@@ -31403,11 +31403,6 @@ function ownerVenueLogins(venueId) {
   return db.prepare(`SELECT a.id AS account_id, a.email, av.added_at, av.rowid AS seq FROM owner_account_venues av
     JOIN owner_accounts a ON a.id = av.account_id WHERE av.venue_id = ? ORDER BY av.rowid`).all(venueId);
 }
-// "jo•••@joiefarm.com": enough for an owner to recognise their staff, not enough to read off a full address.
-function maskOwnerEmail(email) {
-  const [local, domain] = String(email || '').split('@');
-  return `${local.slice(0, local.length <= 3 ? 1 : 2)}•••@${domain || ''}`;
-}
 function ownerCanRemoveLogin(actor, target) {
   return !!actor && !!target && (actor.account_id === target.account_id || actor.seq < target.seq);
 }
@@ -31421,14 +31416,14 @@ function notifyOwnersOfNewLogin(venue, newAccount) {
       `${newAccount.email} now has a login that can update ${venue.name} on Okanagan Roam.`, '',
       'If you know them, there’s nothing to do. If you don’t, sign in and remove them under People with access:',
       `https://okanaganroam.com/owner/account/venue/${venue.id}#access`, '',
-      'Then email info@okanaganroam.com and we’ll send you a fresh private edit link, so the old one stops working.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
+      'Removing them also resets the listing’s private edit link, so the old one stops working and they can’t use it to get back in. We email the new link to you.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
   }
 }
-async function notifyOwnerLoginRemoved(venue, removed, by) {
+async function notifyOwnerLoginRemoved(venue, removed, by, linkReset = null) {
   const direct = ownerDirectEmail();
   if (direct) {
     direct({ to: removed.email, subject: `Your access to ${venue.name} on Okanagan Roam was removed`, text: ['Hi,', '',
-      `Another person who manages ${venue.name} took your login (${removed.email}) off the listing, so you can’t update it any more. Your login itself still works for any other businesses on it.`, '',
+      `Another person who manages ${venue.name} took your login (${removed.email}) off the listing, so you can’t update it any more. The listing’s private edit link was reset at the same time, so the old link no longer works. Your login itself still works for any other businesses on it.`, '',
       'If that’s a mistake, email info@okanaganroam.com and we’ll sort it out.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
   }
   try {
@@ -31438,7 +31433,8 @@ async function notifyOwnerLoginRemoved(venue, removed, by) {
       'Venue': `${venue.name} (venue #${venue.id})`, 'Listing': venueListingUrl(venue),
       'Removed': removed.email, 'Removed by': by.email,
       'Logins left': ownerVenueLogins(venue.id).map((l) => l.email).join(', ') || 'None',
-      'To undo': 'The removed person opens the listing’s private edit link and signs in with their login there.',
+      'Edit link': linkReset && linkReset.ok ? `Reset: the old link stopped working at once. The new one was ${linkReset.emailed === 'sent' ? `emailed to ${by.email}` : linkReset.emailed === 'forwarded' ? `sent to info@ to forward to ${by.email}` : `not sent (${linkReset.emailed}); make one with POST /admin/owner-links`}.` : 'Not reset (failed); make a new one with POST /admin/owner-links and reset: true.',
+      'To undo': `${by.email} sends the removed person the new edit link, and they sign in with their login there. Or POST /admin/owner-links with reset: true and send it to them.`,
     });
   } catch (err) {
     console.error(`[owner-access] notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
@@ -31453,11 +31449,12 @@ function ownerAccountName(email) {
   ) ORDER BY t DESC LIMIT 1`).get(email, email);
   return row ? row.name : '';
 }
-// The panel's rows for one viewer.
+// The panel's rows for one viewer. Full emails (2026-10-18): everyone on the panel already has access to the same
+// listing, so they're colleagues; cut to two letters ("jo•••@joiefarm.com"), two staff at one business looked the same.
 function ownerAccessRows(venueId, viewerId, lang = 'en') {
   const logins = ownerVenueLogins(venueId);
   const me = logins.find((l) => l.account_id === viewerId);
-  return logins.map((l) => ({ id: l.account_id, you: l.account_id === viewerId, email: l.account_id === viewerId ? l.email : maskOwnerEmail(l.email),
+  return logins.map((l) => ({ id: l.account_id, you: l.account_id === viewerId, email: l.email,
     added: l.added_at ? ownerLocalDate(l.added_at, lang === 'fr') : '', canRemove: l.account_id !== viewerId && ownerCanRemoveLogin(me, l) }));
 }
 function ownerAccessPanelHtml(venue, account, lang = 'en') {
@@ -31467,12 +31464,83 @@ function ownerAccessPanelHtml(venue, account, lang = 'en') {
     r.you ? `<button type="button" class="op-btn" id="opRemoveMe">${L('Remove me', 'Me retirer')}</button>`
       : r.canRemove ? `<button type="button" class="op-btn op-btn-danger" data-login-remove="${r.id}" data-label="${escapeHtml(r.email)}">${L('Remove', 'Retirer')}</button>` : ''}</li>`).join('');
   return `<details class="op-fold" id="access">
-      <summary><span class="lyv-section-label">${L('People with access', 'Personnes ayant accès')}</span> <span class="op-fold-hint">${rows.length === 1 ? L('Only you can update this listing', 'Vous seul pouvez modifier cette fiche') : L(`${rows.length} logins can update this listing`, `${rows.length} comptes peuvent modifier cette fiche`)}</span></summary>
+      <summary><span class="lyv-section-label">${L('People with access', 'Personnes ayant accès')}</span> <span class="op-fold-hint" id="opAccessCount">${ownerAccessCountText(rows.length, lang)}</span></summary>
       <ul class="op-access" id="opAccessList">${items}</ul>
-      <p class="op-hint">${L('Each person signs in with their own login. Anyone with this listing&rsquo;s private edit link can add one, and everyone already here gets an email when that happens. You can remove people added after you; to remove someone added before you, email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.', 'Chaque personne se connecte avec son propre compte. Toute personne qui a le lien de modification privé de cette fiche peut en ajouter un, et tous ceux qui ont déjà accès reçoivent alors un courriel. Vous pouvez retirer les personnes ajoutées après vous; pour retirer quelqu’un ajouté avant vous, écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.')}</p>
+      <p class="op-hint">${L('Each person signs in with their own login. Anyone with this listing&rsquo;s private edit link can add one, and everyone already here gets an email when that happens. You can remove people added after you; removing someone also resets the edit link, so the old one stops working, and we email the new one to you. To remove someone added before you, email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.', 'Chaque personne se connecte avec son propre compte. Toute personne qui a le lien de modification privé de cette fiche peut en ajouter un, et tous ceux qui ont déjà accès reçoivent alors un courriel. Vous pouvez retirer les personnes ajoutées après vous; retirer quelqu’un réinitialise aussi le lien de modification, pour que l’ancien cesse de fonctionner, et nous vous envoyons le nouveau par courriel. Pour retirer quelqu’un ajouté avant vous, écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>.')}</p>
+      ${ownerIsFirstLogin(venue.id, account.id) ? `<p class="op-hint"><button type="button" class="op-btn" id="opResetLink">${L('Reset edit link', 'Réinitialiser le lien de modification')}</button> ${L('Think someone kept an old edit link? Get a new one: the old link stops working straight away, and logins keep their access.', 'Une personne a peut-être gardé un ancien lien? Obtenez-en un nouveau : l’ancien cesse de fonctionner tout de suite, et les comptes gardent leur accès.')}</p>` : ''}
       <p class="lyv-error" id="opAccessError" hidden></p>
       <p class="op-hint" id="opAccessStatus" role="status"></p>
     </details>`;
+}
+// "Only you can update this listing" / "2 logins can update this listing".
+function ownerAccessCountText(n, lang = 'en') {
+  const fr = lang === 'fr';
+  if (n <= 1) return fr ? 'Vous seul pouvez modifier cette fiche' : 'Only you can update this listing';
+  return fr ? `${n} comptes peuvent modifier cette fiche` : `${n} logins can update this listing`;
+}
+// Reset edit link (2026-10-18): after a Remove, or from the panel's "Reset edit link" button, the listing gets a new
+// private edit link and the old one stops working at once (no keepOld grace: the point is to shut someone out). The
+// new link, and the link's contact email, go to the person who did it, so "Email me a new link" can't hand it back
+// to the person removed. Everyone with a login keeps their access through it.
+// -> { ok, emailed: 'sent' | 'forwarded' | 'failed' | 'off' }.
+async function resetOwnerLinkFor(venue, account, lang = 'en', why = 'reset') {
+  const made = createOwnerLink(venue.id, { reset: true, contact_email: account.email });
+  if (!made.ok) return { ok: false, reason: made.reason };
+  const fr = lang === 'fr';
+  const url = fr ? made.url.replace('https://okanaganroam.com/owner/', 'https://okanaganroam.com/fr/owner/') : made.url;
+  const subject = fr ? `Nouveau lien de modification pour ${venue.name}` : `New edit link for ${venue.name}`;
+  const text = (fr ? ['Bonjour,', '',
+    why === 'removed' ? `Vous avez retiré une personne de ${venue.name} sur Okanagan Roam. Pour qu’elle ne puisse pas revenir avec l’ancien lien, nous avons remplacé le lien de modification privé de la fiche.`
+      : `Vous avez réinitialisé le lien de modification privé de ${venue.name} sur Okanagan Roam.`,
+    'L’ancien lien ne fonctionne plus. Voici le nouveau :', '', url, '',
+    'Gardez-le privé. Les personnes qui ont un compte pour cette fiche gardent leur accès; envoyez ce lien seulement à quelqu’un que vous voulez ajouter.', '',
+    'Ce n’était pas vous? Écrivez à info@okanaganroam.com.', '', 'Okanagan Roam']
+    : ['Hi,', '',
+      why === 'removed' ? `You removed someone from ${venue.name} on Okanagan Roam. So they can’t get back in with the old link, we replaced the listing’s private edit link.`
+        : `You reset the private edit link for ${venue.name} on Okanagan Roam.`,
+      'The old link no longer works. Here’s the new one:', '', url, '',
+      'Keep it private. Everyone with a login for this listing keeps their access; only send this link to someone you want to add.', '',
+      'Wasn’t you? Email info@okanaganroam.com.', '', 'Okanagan Roam']).join('\n');
+  const direct = ownerDirectEmail();
+  let emailed = 'off';
+  try {
+    if (direct) { await direct({ to: account.email, subject, text }); emailed = 'sent'; } else {
+      await venueSubmissionTransport({ _subject: `[ACTION] New edit link for ${venue.name}: forward it to ${account.email}`, _template: 'table', _captcha: 'false',
+        'What to do': `Forward the email below to ${account.email} from info@okanaganroam.com.`, 'Subject': subject, 'Email to forward': text });
+      emailed = 'forwarded';
+    }
+  } catch (err) {
+    emailed = 'failed';
+    console.error(`[owner-access] new edit link email for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 200)}`);
+  }
+  return { ok: true, emailed };
+}
+// Only the login that has been on the listing longest can reset its link from the panel.
+function ownerIsFirstLogin(venueId, accountId) {
+  const first = ownerVenueLogins(venueId)[0];
+  return !!first && first.account_id === accountId;
+}
+// POST /owner/account/venue/<id>/reset-link
+async function handleOwnerLinkReset(req, res, account, venueId) {
+  if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
+  const body = await readOwnerJson(req, res, []);
+  if (!body) return;
+  const found = venueForOwnerAccount(account, venueId);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'That business isn’t on your login.' });
+  const fr = res.ownerLang === 'fr';
+  if (!ownerIsFirstLogin(venueId, account.id)) {
+    return sendSubmissionResponse(res, 403, { ok: false, error: fr ? 'Seule la personne ajoutée en premier à cette fiche peut réinitialiser le lien. Écrivez à info@okanaganroam.com.' : 'Only the person who has been on this listing longest can reset its link. Email info@okanaganroam.com and we’ll help.' });
+  }
+  const r = await resetOwnerLinkFor(found.venue, account, fr ? 'fr' : 'en', 'reset');
+  if (!r.ok) return sendSubmissionResponse(res, 500, { ok: false, error: fr ? 'Désolés, le lien n’a pas pu être réinitialisé. Veuillez réessayer.' : 'Sorry, the link could not be reset. Please try again.' });
+  try {
+    await venueSubmissionTransport({ _subject: `[FYI] Edit link reset for ${found.venue.name}`, _template: 'table', _captcha: 'false',
+      'Status': 'FYI. An owner reset their listing’s private edit link from People with access. The old link stopped working at once.',
+      'Venue': `${found.venue.name} (venue #${found.venue.id})`, 'Listing': venueListingUrl(found.venue), 'Reset by': account.email,
+      'New link': r.emailed === 'sent' ? `Emailed to ${account.email}` : `Not emailed directly (${r.emailed})`,
+      'Logins': ownerVenueLogins(venueId).map((l) => l.email).join(', ') || 'None' });
+  } catch (err) { /* the reset itself worked */ }
+  return sendSubmissionResponse(res, 200, { ok: true, emailed: r.emailed });
 }
 // POST /owner/account/venue/<id>/logins/<accountId>/remove
 async function handleOwnerLoginRemoval(req, res, account, venueId, targetId) {
@@ -31490,8 +31558,10 @@ async function handleOwnerLoginRemoval(req, res, account, venueId, targetId) {
   }
   removeOwnerLoginFromVenue(venueId, target.email);
   if (target.account_id === account.id) return sendSubmissionResponse(res, 200, { ok: true, self: true });
-  await notifyOwnerLoginRemoved(found.venue, target, account);
-  return sendSubmissionResponse(res, 200, { ok: true, logins: ownerAccessRows(venueId, account.id).length });
+  // The removed person may still have the edit link: reset it, so they can't add themselves back (2026-10-18).
+  const reset = await resetOwnerLinkFor(found.venue, account, res.ownerLang === 'fr' ? 'fr' : 'en', 'removed');
+  await notifyOwnerLoginRemoved(found.venue, target, account, reset);
+  return sendSubmissionResponse(res, 200, { ok: true, logins: ownerAccessRows(venueId, account.id).length, link_reset: !!reset.ok, emailed: reset.emailed || null });
 }
 
 // The venue behind an edit-link token, or null for a malformed, unknown or
@@ -31760,6 +31830,21 @@ function listOwnerChanges(status = 'pending') {
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
   price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures' };
+// The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
+const OWNER_FIELD_WORDS = {
+  fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
+    name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales' },
+  en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
+    name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures' },
+};
+// "hours, phone and description" / "heures, téléphone et description".
+function ownerFieldNames(list, lang = 'en') {
+  const words = OWNER_FIELD_WORDS[lang === 'fr' ? 'fr' : 'en'];
+  const n = (list || []).map((f) => words[f] || f);
+  return n.length > 1 ? `${n.slice(0, -1).join(', ')}${lang === 'fr' ? ' et ' : ' and '}${n[n.length - 1]}` : (n[0] || '');
+}
 function ownerWeekText(json) {
   if (!json) return '(none)';
   try {
@@ -31849,16 +31934,33 @@ async function handleOwnerChangeSubmission(req, res, token) {
   // A field still waiting for review that the owner set back to what is live (2026-10-18).
   const reverts = checked.same.filter((f) => f in waitingChanges);
   const badgeReverts = waitingChanges.badges ? checked.badgesSame.filter((k) => k in waitingChanges.badges) : [];
-  if (errors.form === OWNER_NOTHING_CHANGED && (reverts.length || badgeReverts.length)) delete errors.form;
+  // Instant (2026-10-18): a signed-in owner's own facts go live now; the rest waits for review as before.
+  const instantOk = !!found.account && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT;
+  // Waiting edit-link changes go out with a signed-in Save (2026-10-18): the form shows them (pending pre-fill) but
+  // only sends fields changed on the page, so the instant-eligible ones still waiting are added to this save, unless
+  // the owner changed or set back that field now. The page says so above the form.
+  const carried = {}, carriedPrev = {};
+  if (instantOk && waiting) {
+    const split = ownerPendingInstantSplit(waiting, ownerVenueSnapshot(venue, happyHourTimes));
+    for (const [k, v] of Object.entries(split.live)) {
+      if (k !== 'badges') { if (!(k in changes) && !reverts.includes(k)) { carried[k] = v; carriedPrev[k] = split.livePrev[k]; } continue; }
+      const b = {};
+      for (const [bk, on] of Object.entries(v)) if (!(changes.badges && bk in changes.badges) && !badgeReverts.includes(bk)) b[bk] = on;
+      if (Object.keys(b).length) { carried.badges = b; carriedPrev.badges = Object.fromEntries(Object.keys(b).map((f) => [f, split.livePrev.badges[f]])); }
+    }
+  }
+  if (errors.form === OWNER_NOTHING_CHANGED && (reverts.length || badgeReverts.length || Object.keys(carried).length)) delete errors.form;
   if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, errors });
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 1000) || null : null;
   const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
   const ipHash = crypto.createHash('sha256').update(`okanagan-roam-owner-change:${requestClientIp(req)}`).digest('hex');
-  // Instant (2026-10-18): a signed-in owner's own facts go live now; the rest waits for review as before.
-  const instantOk = !!found.account && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT;
   const live = {}, livePrev = {}, review = {}, reviewPrev = {};
   for (const k of Object.keys(changes)) {
     if (instantOk && OWNER_INSTANT_FIELDS.has(k)) { live[k] = changes[k]; livePrev[k] = previous[k]; } else { review[k] = changes[k]; reviewPrev[k] = previous[k]; }
+  }
+  for (const k of Object.keys(carried)) {
+    if (k === 'badges') { live.badges = { ...carried.badges, ...(live.badges || {}) }; livePrev.badges = { ...carriedPrev.badges, ...(livePrev.badges || {}) }; }
+    else { live[k] = carried[k]; livePrev[k] = carriedPrev[k]; }
   }
   let id = null, liveId = null;
   db.exec('BEGIN');
@@ -31924,7 +32026,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
   ownerMarkFrench(res, 'owner_change_requests', id);
   ownerMarkFrench(res, 'owner_change_requests', liveId);
   if (id && Object.keys(review).length) await notifyOwnerChange(id);
-  return sendSubmissionResponse(res, 201, { ok: true, id: id || liveId, live_id: liveId, fields: Object.keys(changes), live: Object.keys(live), review: Object.keys(review) });
+  return sendSubmissionResponse(res, 201, { ok: true, id: id || liveId, live_id: liveId, fields: Object.keys(changes), live: Object.keys(live), review: Object.keys(review), ...(Object.keys(carried).length ? { carried: Object.keys(carried) } : {}) });
 }
 
 // An event from the owner edit page: the venue, region and organizer come
@@ -36069,7 +36171,9 @@ async function handleOwnerAccountSetup(req, res, token) {
     if (!signedIn) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again, or create a login below.' });
     const added = db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(signedIn.id, found.venue.id).changes > 0;
     if (added) notifyOwnersOfNewLogin(found.venue, signedIn);
-    return sendSubmissionResponse(res, 201, { ok: true, action: added ? 'venue_added' : 'signed_in', href: `/owner/account/venue/${found.venue.id}` });
+    // Changes sent from this link and still waiting go live now (2026-10-18), as if saved signed in.
+    const published = publishPendingOwnerInstant(found.venue.id, signedIn);
+    return sendSubmissionResponse(res, 201, { ok: true, action: added ? 'venue_added' : 'signed_in', href: `/owner/account/venue/${found.venue.id}`, ...(published ? { published: published.fields } : {}) });
   }
   const email = validOwnerEmail(body.email);
   const password = typeof body.password === 'string' ? body.password : '';
@@ -36095,9 +36199,11 @@ async function handleOwnerAccountSetup(req, res, token) {
   }
   const added = db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(account.id, venueId).changes > 0;
   if (added) notifyOwnersOfNewLogin(found.venue, account);
+  // Changes sent from this link and still waiting go live now (2026-10-18), as if saved signed in.
+  const published = publishPendingOwnerInstant(venueId, account);
   const session = startOwnerSession(account.id);
   res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
-  return res.end(JSON.stringify({ ok: true, action }));
+  return res.end(JSON.stringify({ ok: true, action, ...(published ? { published: published.fields } : {}) }));
 }
 
 // POST /owner/login
@@ -36223,22 +36329,23 @@ const OWNER_HELP_TOPICS = [
       'didnt give', 'didnt authorize', 'didnt authorise', 'not authorized', 'unauthorized', 'unauthorised', 'didnt allow', 'without permission', 'without my permission', 'without asking', 'without telling',
       'someone changed', 'somebody changed', 'changed without', 'wasnt me', 'not one of us', 'old owner', 'former owner', 'previous owner'],
     keysFr: ['quelqu un a revendique', 'deja revendique', 'revendique ma fiche', 'qui a revendique', 'sans permission', 'sans ma permission', 'sans mon accord', 'sans autorisation', 'pas autorise', 'quelqu un a modifie', 'quelqu un a change', 'ce n etait pas moi', 'pirate', 'usurpation', 'litige', 'ancien proprietaire', 'inconnu a acces'],
-    a: '<p>Thanks for telling us. <strong>Okanagan Roam will check it.</strong> Nobody should have access to your listing without your say-so.</p><ol><li>Tap <strong>Message us</strong> below (it goes to info@okanaganroam.com).</li><li>Say <strong>which listing</strong> it is and <strong>who you are</strong>: your name, your role, and a phone number or email we can check against the listing.</li><li>If anything was <strong>changed without permission</strong>, tell us what (hours, photos, description, an event) so we can put it right.</li></ol><p>Once we\u2019ve checked, Dayton can <strong>take other people\u2019s logins off the listing</strong> and <strong>send you a fresh edit link</strong>, so the old link stops working.</p><p>Signed in, you can also see every login under <strong>People with access</strong> on your edit page and remove anyone added after you. Anyone added before you, Dayton handles.</p>',
-    aFr: '<p>Merci de nous le signaler. <strong>Okanagan Roam va vérifier.</strong> Personne ne devrait avoir accès à votre fiche sans votre accord.</p><ol><li>Touchez <strong>Écrivez-nous</strong> ci-dessous (le message va à info@okanaganroam.com).</li><li>Dites-nous <strong>de quelle fiche</strong> il s\u2019agit et <strong>qui vous êtes</strong> : votre nom, votre rôle, et un numéro de téléphone ou un courriel que nous pouvons comparer à la fiche.</li><li>Si quelque chose a été <strong>modifié sans permission</strong>, dites-nous quoi (heures, photos, description, un événement) pour que nous puissions corriger.</li></ol><p>Après vérification, Dayton peut <strong>retirer les comptes des autres personnes</strong> et <strong>vous envoyer un nouveau lien de modification</strong>, pour que l\u2019ancien cesse de fonctionner.</p><p>Avec votre compte, vous voyez aussi tous les comptes sous <strong>Personnes ayant accès</strong>, sur votre page de modification, et pouvez retirer toute personne ajoutée après vous. Pour les personnes ajoutées avant vous, Dayton s\u2019en occupe.</p>' },
+    a: '<p>Thanks for telling us. <strong>Okanagan Roam will check it.</strong> Nobody should have access to your listing without your say-so.</p><ol><li>Tap <strong>Message us</strong> below (it goes to info@okanaganroam.com).</li><li>Say <strong>which listing</strong> it is and <strong>who you are</strong>: your name, your role, and a phone number or email we can check against the listing.</li><li>If anything was <strong>changed without permission</strong>, tell us what (hours, photos, description, an event) so we can put it right.</li></ol><p>Once we\u2019ve checked, Dayton can <strong>take other people\u2019s logins off the listing</strong> and <strong>send you a fresh edit link</strong>, so the old link stops working.</p><p>Signed in, you can also see every login under <strong>People with access</strong> on your edit page and remove anyone added after you. Removing someone also resets the private edit link, so they can\u2019t use it to get back in, and we email you the new one. Anyone added before you, Dayton handles.</p>',
+    aFr: '<p>Merci de nous le signaler. <strong>Okanagan Roam va vérifier.</strong> Personne ne devrait avoir accès à votre fiche sans votre accord.</p><ol><li>Touchez <strong>Écrivez-nous</strong> ci-dessous (le message va à info@okanaganroam.com).</li><li>Dites-nous <strong>de quelle fiche</strong> il s\u2019agit et <strong>qui vous êtes</strong> : votre nom, votre rôle, et un numéro de téléphone ou un courriel que nous pouvons comparer à la fiche.</li><li>Si quelque chose a été <strong>modifié sans permission</strong>, dites-nous quoi (heures, photos, description, un événement) pour que nous puissions corriger.</li></ol><p>Après vérification, Dayton peut <strong>retirer les comptes des autres personnes</strong> et <strong>vous envoyer un nouveau lien de modification</strong>, pour que l\u2019ancien cesse de fonctionner.</p><p>Avec votre compte, vous voyez aussi tous les comptes sous <strong>Personnes ayant accès</strong>, sur votre page de modification, et pouvez retirer toute personne ajoutée après vous. Retirer quelqu\u2019un réinitialise aussi le lien de modification privé, pour qu\u2019il ne puisse pas revenir avec, et nous vous envoyons le nouveau par courriel. Pour les personnes ajoutées avant vous, Dayton s\u2019en occupe.</p>' },
   // Help bot v2 (2026-10-18): People with access lists every login on the listing, with Remove.
   { id: 'access', over: ['staff'], q: 'Who has access to my listing? Remove someone', qFr: 'Qui a accès à ma fiche? Retirer quelqu\u2019un', pages: ['account', 'edit', 'settings'],
     keys: ['who has access', 'who can edit', 'who else can edit', 'people with access', 'who has a login', 'remove a person', 'remove someone', 'remove a login', 'remove their access', 'remove access', 'remove staff', 'remove an employee', 'remove my manager', 'take away access', 'take someone off', 'revoke', 'kick out', 'lock them out',
-      'still has access', 'still have access', 'still has a login', 'old manager', 'former manager', 'ex manager', 'former employee', 'ex employee', 'old employee', 'former staff', 'left the company', 'no longer works here', 'doesnt work here anymore', 'doesnt work here'],
-    keysFr: ['qui a acces', 'qui peut modifier', 'personnes qui ont acces', 'retirer une personne', 'retirer quelqu un', 'retirer l acces', 'enlever l acces', 'supprimer un compte', 'retirer un employe', 'ancien gerant', 'ancienne gerante', 'ancien employe', 'ancienne employee', 'a toujours acces', 'encore acces', 'ne travaille plus ici', 'ne travaille plus pour nous'],
+      'still has access', 'still have access', 'still has a login', 'old manager', 'former manager', 'ex manager', 'former employee', 'ex employee', 'old employee', 'former staff', 'left the company', 'no longer works here', 'doesnt work here anymore', 'doesnt work here',
+      'reset edit link', 'reset the edit link', 'reset our edit link', 'still has the link', 'still has our link', 'kept the link'],
+    keysFr: ['qui a acces', 'qui peut modifier', 'personnes qui ont acces', 'retirer une personne', 'retirer quelqu un', 'retirer l acces', 'enlever l acces', 'supprimer un compte', 'retirer un employe', 'ancien gerant', 'ancienne gerante', 'ancien employe', 'ancienne employee', 'a toujours acces', 'encore acces', 'ne travaille plus ici', 'ne travaille plus pour nous', 'reinitialiser le lien', 'a garde le lien'],
     a: {
-      in: '<p>{ON}, open <strong>People with access</strong>. It lists every login that can update this listing (other people’s emails are partly hidden).</p><ul><li><strong>Added after you</strong>, like a former manager or staff member? Tap <strong>Remove</strong> beside them. They get an email saying so, and so does Dayton.</li><li><strong>Added before you?</strong> You can’t remove them yourself: tap <strong>Message us</strong> and Dayton will check it.</li><li><strong>Remove me</strong> takes your own login off the listing.</li></ul><p>Worried someone kept an old edit link? Ask for a fresh one at <a href="/owner/link">Email me a new link</a> and open it, so the old one stops working. Everyone on the listing gets an email whenever a new login is added.</p>',
-      link: '<p><strong>People with access</strong> is for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open the listing from <strong>My listings</strong> to see every login that can update it.</p><p>You can remove people added after you. A login added <strong>before</strong> yours (a former manager, say) only Dayton can remove: tap <strong>Message us</strong> and say who it is.</p><p>Worried someone kept an old edit link? Ask for a fresh one at <a href="/owner/link">Email me a new link</a> and open it, so the old one stops working.</p>',
-      out: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. <strong>People with access</strong> lists every login that can update it.</p><ul><li>Someone added <strong>after</strong> you? Tap <strong>Remove</strong> beside them. They and Dayton get an email.</li><li>Someone added <strong>before</strong> you? Tap <strong>Message us</strong> and Dayton will check it.</li></ul><p>Worried someone kept an old edit link? Ask for a fresh one at <a href="/owner/link">Email me a new link</a> and open it, so the old one stops working.</p>',
+      in: '<p>{ON}, open <strong>People with access</strong>. It lists every login that can update this listing, with each person’s email.</p><ul><li><strong>Added after you</strong>, like a former manager or staff member? Tap <strong>Remove</strong> beside them. They get an email saying so, and so does Dayton. Removing someone also <strong>resets the private edit link</strong>, so they can’t use the old one to get back in; we email the new link to you.</li><li><strong>Added before you?</strong> You can’t remove them yourself: tap <strong>Message us</strong> and Dayton will check it.</li><li><strong>Remove me</strong> takes your own login off the listing.</li></ul><p>Worried someone kept an old edit link? The person who has been on the listing longest has a <strong>Reset edit link</strong> button there: the old link stops working straight away, and everyone with a login keeps their access. Everyone on the listing gets an email whenever a new login is added.</p>',
+      link: '<p><strong>People with access</strong> is for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open the listing from <strong>My listings</strong> to see every login that can update it.</p><p>You can remove people added after you, which also resets this edit link so they can’t get back in. A login added <strong>before</strong> yours (a former manager, say) only Dayton can remove: tap <strong>Message us</strong> and say who it is.</p><p>Worried someone kept an old edit link? Signed in, the person who has been on the listing longest can tap <strong>Reset edit link</strong> under People with access, so the old one stops working.</p>',
+      out: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. <strong>People with access</strong> lists every login that can update it.</p><ul><li>Someone added <strong>after</strong> you? Tap <strong>Remove</strong> beside them. They and Dayton get an email, and the private edit link is reset so they can’t use it to get back in.</li><li>Someone added <strong>before</strong> you? Tap <strong>Message us</strong> and Dayton will check it.</li></ul><p>Worried someone kept an old edit link? The person who has been on the listing longest can tap <strong>Reset edit link</strong> there, so the old one stops working.</p>',
     },
     aFr: {
-      in: '<p>{ON}, ouvrez <strong>Personnes ayant accès</strong>. On y voit tous les comptes qui peuvent modifier cette fiche (les courriels des autres sont en partie masqués).</p><ul><li><strong>Ajoutée après vous</strong>, comme un ancien gérant ou employé? Touchez <strong>Retirer</strong> à côté de son nom. Elle reçoit un courriel pour l’en informer, et Dayton aussi.</li><li><strong>Ajoutée avant vous?</strong> Vous ne pouvez pas la retirer vous-même : touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li><li><strong>Me retirer</strong> retire votre propre compte de la fiche.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner. Toutes les personnes sur la fiche reçoivent un courriel chaque fois qu’un compte s’ajoute.</p>',
-      link: '<p><strong>Personnes ayant accès</strong> est réservé aux comptes. Utilisez <strong>Créer un compte</strong> en haut de cette page, puis ouvrez la fiche depuis <strong>Mes fiches</strong> pour voir tous les comptes qui peuvent la modifier.</p><p>Vous pouvez retirer les personnes ajoutées après vous. Un compte ajouté <strong>avant</strong> le vôtre (un ancien gérant, par exemple), seul Dayton peut le retirer : touchez <strong>Écrivez-nous</strong> et dites-nous de qui il s’agit.</p><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
-      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>. <strong>Personnes ayant accès</strong> montre tous les comptes qui peuvent la modifier.</p><ul><li>Une personne ajoutée <strong>après</strong> vous? Touchez <strong>Retirer</strong> à côté de son nom. Elle et Dayton reçoivent un courriel.</li><li>Une personne ajoutée <strong>avant</strong> vous? Touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Demandez-en un nouveau à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et ouvrez-le, pour que l’ancien cesse de fonctionner.</p>',
+      in: '<p>{ON}, ouvrez <strong>Personnes ayant accès</strong>. On y voit tous les comptes qui peuvent modifier cette fiche, avec le courriel de chaque personne.</p><ul><li><strong>Ajoutée après vous</strong>, comme un ancien gérant ou employé? Touchez <strong>Retirer</strong> à côté de son nom. Elle reçoit un courriel pour l’en informer, et Dayton aussi. Retirer quelqu’un <strong>réinitialise aussi le lien de modification privé</strong>, pour qu’il ne puisse pas revenir avec l’ancien; nous vous envoyons le nouveau lien par courriel.</li><li><strong>Ajoutée avant vous?</strong> Vous ne pouvez pas la retirer vous-même : touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li><li><strong>Me retirer</strong> retire votre propre compte de la fiche.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? La personne qui est sur la fiche depuis le plus longtemps y a un bouton <strong>Réinitialiser le lien de modification</strong> : l’ancien lien cesse de fonctionner tout de suite, et les comptes gardent leur accès. Toutes les personnes sur la fiche reçoivent un courriel chaque fois qu’un compte s’ajoute.</p>',
+      link: '<p><strong>Personnes ayant accès</strong> est réservé aux comptes. Utilisez <strong>Créer un compte</strong> en haut de cette page, puis ouvrez la fiche depuis <strong>Mes fiches</strong> pour voir tous les comptes qui peuvent la modifier.</p><p>Vous pouvez retirer les personnes ajoutées après vous, ce qui réinitialise aussi ce lien de modification pour qu’elles ne puissent pas revenir. Un compte ajouté <strong>avant</strong> le vôtre (un ancien gérant, par exemple), seul Dayton peut le retirer : touchez <strong>Écrivez-nous</strong> et dites-nous de qui il s’agit.</p><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Avec un compte, la personne qui est sur la fiche depuis le plus longtemps peut toucher <strong>Réinitialiser le lien de modification</strong> sous Personnes ayant accès, pour que l’ancien cesse de fonctionner.</p>',
+      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>. <strong>Personnes ayant accès</strong> montre tous les comptes qui peuvent la modifier.</p><ul><li>Une personne ajoutée <strong>après</strong> vous? Touchez <strong>Retirer</strong> à côté de son nom. Elle et Dayton reçoivent un courriel, et le lien de modification privé est réinitialisé pour qu’elle ne puisse pas revenir avec.</li><li>Une personne ajoutée <strong>avant</strong> vous? Touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? La personne qui est sur la fiche depuis le plus longtemps peut y toucher <strong>Réinitialiser le lien de modification</strong>, pour que l’ancien cesse de fonctionner.</p>',
     } },
   { id: 'login-create', q: 'How do I make a login?', qFr: 'Comment créer un compte?', pages: ['edit', 'login'],
     keys: ['create login', 'create a login', 'make login', 'make a login', 'make an account', 'create an account', 'sign up', 'register', 'why login', 'need a login', 'set up a login', 'set up an account', 'get a login'],
@@ -36342,12 +36449,12 @@ const OWNER_HELP_TOPICS = [
     keys: ['sent changes', 'my changes', 'changes not showing', 'changes not', 'didnt change', 'not changed', 'still old', 'still shows', 'update not', 'saved', 'submitted', 'approve', 'approval', 'hours not updated', 'description not', 'nothing happened', 'didnt save', 'didnt work', 'waiting for review chip', 'review chip', 'what does waiting for review mean'],
     keysFr: ['mes modifications', 'modifications envoyees', 'rien n a change', 'pas change', 'toujours l ancienne', 'pas mis a jour', 'pas a jour', 'enregistre', 'envoye', 'rien ne s est passe'],
     a: {
-      in: '<p>Refresh your page first: a change can take a minute to show everywhere.</p><p>Still the old version? Look in the form: anything still waiting has a <strong>Waiting for review</strong> chip beside it. A new <strong>name, address, website or link</strong> waits for us to check it, usually within a day; the rest go live as soon as you tap <strong>Save changes</strong>. Changes sent from the edit link before you signed in, and anything after 30 saves on one listing in a day, are checked first too.</p>',
+      in: '<p>Refresh your page first: a change can take a minute to show everywhere.</p><p>Still the old version? Look in the form: anything still waiting has a <strong>Waiting for review</strong> chip beside it. A new <strong>name, address, website or link</strong> waits for us to check it, usually within a day; the rest go live as soon as you tap <strong>Save changes</strong>. Hours, phone and the other details you sent from the edit link before you had a login go live when you create the login or add the listing to it (or the next time you tap <strong>Save changes</strong>). After 30 saves on one listing in a day, further changes are checked first too.</p>',
       link: '<p>From the emailed edit link, we check changes before they go live, usually within a day. Anything still waiting shows a <strong>Waiting for review</strong> chip in the form, and <strong>Your updates</strong> at the top of this page lists what’s waiting and what’s live.</p><p>With a login most changes go live straight away: use <strong>Create a login</strong> near the top of this page.</p>',
       out: '<p>Signed in, most changes go live as soon as you save them (refresh the page to see them). A new name, address, website or link, and anything sent from the emailed edit link, is checked first, usually within a day. Anything still waiting shows a <strong>Waiting for review</strong> chip in the form.</p>',
     },
     aFr: {
-      in: '<p>Actualisez d’abord la page : une modification peut prendre une minute à s’afficher partout.</p><p>Toujours l’ancienne version? Regardez le formulaire : ce qui attend encore porte l’étiquette <strong>En attente de vérification</strong>. Un nouveau <strong>nom, adresse, site Web ou lien</strong> attend notre vérification, en général d’ici un jour; le reste est en ligne dès que vous touchez <strong>Enregistrer les modifications</strong>. Ce qui a été envoyé avec le lien de modification avant votre connexion, et ce qui dépasse 30 enregistrements sur une même fiche dans une journée, est aussi vérifié d’abord.</p>',
+      in: '<p>Actualisez d’abord la page : une modification peut prendre une minute à s’afficher partout.</p><p>Toujours l’ancienne version? Regardez le formulaire : ce qui attend encore porte l’étiquette <strong>En attente de vérification</strong>. Un nouveau <strong>nom, adresse, site Web ou lien</strong> attend notre vérification, en général d’ici un jour; le reste est en ligne dès que vous touchez <strong>Enregistrer les modifications</strong>. Les heures, le téléphone et les autres renseignements envoyés avec le lien de modification avant d’avoir un compte sont mis en ligne quand vous créez le compte ou y ajoutez la fiche (ou la prochaine fois que vous touchez <strong>Enregistrer les modifications</strong>). Au-delà de 30 enregistrements sur une même fiche dans une journée, les modifications sont aussi vérifiées d’abord.</p>',
       link: '<p>Avec le lien de modification reçu par courriel, nous vérifions les modifications avant de les mettre en ligne, en général d’ici un jour. Ce qui attend encore porte l’étiquette <strong>En attente de vérification</strong> dans le formulaire, et <strong>Vos mises à jour</strong>, en haut de cette page, montre ce qui est en attente et ce qui est en ligne.</p><p>Avec un compte, la plupart des modifications sont en ligne tout de suite : utilisez <strong>Créer un compte</strong> en haut de cette page.</p>',
       out: '<p>Avec un compte, la plupart des modifications sont en ligne dès l’enregistrement (actualisez la page pour les voir). Un nouveau nom, une nouvelle adresse, un site Web ou un lien, et tout ce qui est envoyé avec le lien de modification reçu par courriel, sont vérifiés d’abord, en général d’ici un jour. Ce qui attend encore porte l’étiquette <strong>En attente de vérification</strong> dans le formulaire.</p>',
     } },
@@ -37988,7 +38095,7 @@ function renderAdminClaimCard(c) {
   }[c.verify_method] || '';
   // Already managed (2026-10-18): a claim on a listing someone already has could be a hijack, so say so up top.
   const held = [f.link ? 'an edit link' : '', f.logins.length ? `${f.logins.length} login${f.logins.length === 1 ? '' : 's'} (${f.logins.join(', ')})` : ''].filter(Boolean);
-  const heldLine = held.length ? `<div class="rv-warn rv-held" role="note"><strong>This listing already has ${esc(held.join(' and '))}. Check before approving.</strong> If the claimant isn’t the same business, contact the people already on it first. Approving doesn’t remove existing logins; take one off with POST /admin/owner-links/logins.</div>` : '';
+  const heldLine = held.length ? `<div class="rv-warn rv-held" role="note"><strong>This listing already has ${esc(held.join(' and '))}. Check before approving.</strong> If the claimant isn’t the same business, contact the people already on it first. Approving doesn’t remove existing logins; take one off with POST /admin/owner-links/logins (add reset_link: true so the old edit link stops working too).</div>` : '';
   const linkLine = f.link ? `An edit link exists${f.link.contact_email ? ` (sent to ${esc(f.link.contact_email)})` : ''}${f.link.last_used_at ? `, last used ${esc(adminReviewTime(f.link.last_used_at))}` : ', never used'}. Approving sends a new one to ${esc(c.email)}; the old one stops working once they open it. Logins already made keep working.` : '';
   return `<article class="rv-card" data-kind="claim" data-id="${c.id}">
       <h3>${esc(c.venue_name)}</h3>
@@ -38364,6 +38471,77 @@ function undoOwnerInstantChange(id, reviewer, now = new Date()) {
   if (!r.ok) return r;
   db.prepare('UPDATE owner_change_requests SET undone_at = CURRENT_TIMESTAMP, undone_by = ? WHERE id = ?').run(reviewer, id);
   return { ok: true, restored: r.applied, skipped };
+}
+// The waiting fields that would go live now for a signed-in owner (2026-10-18): the instant-eligible ones from the
+// edit-link request still waiting for review, minus any that already match the listing. -> { live, livePrev, rest,
+// restPrev } or null. `current` is ownerVenueSnapshot(); closures already over are dropped.
+function ownerPendingInstantSplit(waiting, current) {
+  if (!waiting) return null;
+  const changes = typeof waiting.changes === 'string' ? JSON.parse(waiting.changes) : waiting.changes;
+  const previous = typeof waiting.previous === 'string' ? JSON.parse(waiting.previous) : waiting.previous;
+  const live = {}, livePrev = {}, rest = {}, restPrev = {};
+  for (const [k, val] of Object.entries(changes)) {
+    if (!OWNER_INSTANT_FIELDS.has(k)) { rest[k] = val; if (k in previous) restPrev[k] = previous[k]; continue; }
+    if (k === 'badges') {
+      const b = {};
+      for (const [bk, on] of Object.entries(val || {})) if (!!current.badges[bk] !== !!on) b[bk] = !!on;
+      if (Object.keys(b).length) { live.badges = b; livePrev.badges = Object.fromEntries(Object.keys(b).map((f) => [f, !!current.badges[f]])); }
+      continue;
+    }
+    const v = k === 'closures' && Array.isArray(val) ? val.filter((c) => (c.to || c.from) >= todayLocal()) : val;
+    if (ownerFieldEquals(k, current[k], v)) continue;
+    live[k] = v;
+    livePrev[k] = current[k];
+  }
+  return { live, livePrev, rest, restPrev };
+}
+// Pending link changes go live (2026-10-18): an owner who sent hours or a phone number from the edit link and then
+// creates a login (or adds the listing to one) used to see them stuck on "Waiting for review" under a header saying
+// they go live straight away, because Save only sends the fields changed on the page. Now the instant-eligible ones
+// are published through the same path as an instant save: an instant=1 audit row with Undo, attributed to the
+// login: the person creating it holds the edit link right now, so they could have saved those fields anyway. A new
+// name, address, website or link stays waiting.
+// Not done when a signed-in owner just opens a listing: the waiting request may merge several people's link sends
+// (and their emails), so it can't be pinned on this login. Instead the next signed-in Save carries them (see
+// handleOwnerChangeSubmission) and the banner above the form says so.
+// -> { id, fields } or null when nothing went live.
+function publishPendingOwnerInstant(venueId, account) {
+  if (!account || !account.email) return null;
+  const waiting = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 1").get(venueId);
+  if (!waiting) return null;
+  if (ownerInstantCountToday(venueId) >= OWNER_INSTANT_DAILY_LIMIT) return null;
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+  if (!row || row.redirect_to) return null;
+  const split = ownerPendingInstantSplit(waiting, ownerVenueSnapshot(rowToVenue(row), row.happy_hour_times || null));
+  if (!split || !Object.keys(split.live).length) return null;
+  const { live, livePrev, rest, restPrev } = split;
+  const restLeft = Object.keys(rest).length > 0;
+  const reviewer = `owner:${account.email}`;
+  let liveId;
+  db.exec('BEGIN');
+  try {
+    if (restLeft) db.prepare('UPDATE owner_change_requests SET changes = ?, previous = ? WHERE id = ?').run(JSON.stringify(rest), JSON.stringify(restPrev), waiting.id);
+    else db.prepare("UPDATE owner_change_requests SET status = 'superseded', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, waiting.id);
+    liveId = Number(db.prepare('INSERT INTO owner_change_requests (venue_id, changes, previous, note, contact_name, contact_email, ip_hash, instant, undo_meta) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)')
+      .run(venueId, JSON.stringify(live), JSON.stringify(livePrev), restLeft ? null : waiting.note, waiting.contact_name, account.email, waiting.ip_hash,
+        JSON.stringify({ hours_source: row.hours_source || null, hours_checked_at: row.hours_checked_at || null, from_request: waiting.id })).lastInsertRowid);
+    try { if (waiting.lang) db.prepare('UPDATE owner_change_requests SET lang = ? WHERE id = ?').run(waiting.lang, liveId); } catch (e) { /* an old copy without the column */ }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    console.error(`[owner-portal] publishing waiting changes for venue #${venueId} failed: ${err.message}`);
+    return null;
+  }
+  const r = approveOwnerChange(liveId, reviewer);
+  if (!r.ok) {
+    // Put the waiting request back as it was, so nothing is lost.
+    db.prepare("UPDATE owner_change_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = 'system', rejection_reason = ? WHERE id = ?")
+      .run(`publishing waiting changes failed: ${r.reason}${r.detail ? ` (${String(r.detail).slice(0, 120)})` : ''}`, liveId);
+    db.prepare("UPDATE owner_change_requests SET status = 'pending', reviewed_at = NULL, reviewed_by = NULL, changes = ?, previous = ? WHERE id = ?").run(waiting.changes, waiting.previous, waiting.id);
+    console.error(`[owner-portal] publishing waiting changes #${waiting.id} for venue #${venueId} failed: ${r.reason} ${r.detail || ''}`);
+    return null;
+  }
+  return { id: liveId, fields: Object.keys(live) };
 }
 // Instant changes from the last 14 days, newest first, for /admin/review.
 function recentInstantOwnerChanges() {
@@ -39455,9 +39633,17 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const foodOnly = OWNER_BOOKING_FIRST_TYPES.has(venue.type) && venue.type !== 'golf' ? new Set(['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv']) : new Set();
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
           <label class="amenity-check"${foodOnly.has(f) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
-  const pendingNote = pending
-    ? `<p class="op-pending">${L(`You sent changes on ${escapeHtml(ownerLocalDate(pending.submitted_at))}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.`, `Vous avez envoyé des modifications le ${escapeHtml(ownerLocalDate(pending.submitted_at, true))}. Elles attendent notre vérification et s’affichent ci-dessous avec la mention « En attente de vérification ». Tout ce que vous envoyez maintenant s’y ajoute.`)}</p>`
-    : '';
+  // Signed in (2026-10-18): "Anything else you send now is added to them" isn't true any more (most fields go live on
+  // Save), so the line says what Save does with what is still waiting.
+  const carryOnSave = instantOn && waitingReq && waitingReq.status === 'pending' && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT
+    ? Object.keys((ownerPendingInstantSplit(waitingReq, live) || { live: {} }).live) : [];
+  const sentOn = pending ? escapeHtml(ownerLocalDate(pending.submitted_at, fr)) : '';
+  const pendingNote = !pending ? ''
+    : !instantOn
+      ? `<p class="op-pending">${L(`You sent changes on ${sentOn}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.`, `Vous avez envoyé des modifications le ${sentOn}. Elles attendent notre vérification et s’affichent ci-dessous avec la mention « En attente de vérification ». Tout ce que vous envoyez maintenant s’y ajoute.`)}</p>`
+      : carryOnSave.length
+        ? `<p class="op-pending" id="opPendingCarry">${L(`You sent changes on ${sentOn} from the edit link. They show below, marked &ldquo;Waiting for review&rdquo;. Tap <strong>Save changes</strong> to put the ${escapeHtml(ownerFieldNames(carryOnSave, 'en'))} live now. A new name, address, website or link is still checked by us first.`, `Vous avez envoyé des modifications le ${sentOn} avec le lien de modification. Elles s’affichent ci-dessous avec la mention « En attente de vérification ». Touchez <strong>Enregistrer les modifications</strong> pour mettre en ligne maintenant : ${escapeHtml(ownerFieldNames(carryOnSave, 'fr'))}. Un nouveau nom, une nouvelle adresse, un site Web ou un lien est toujours vérifié par nous d’abord.`)}</p>`
+        : `<p class="op-pending">${L(`You sent changes on ${sentOn}. A new name, address, website or link is checked by us first, usually within a day; it shows below, marked &ldquo;Waiting for review&rdquo;, until then.`, `Vous avez envoyé des modifications le ${sentOn}. Un nouveau nom, une nouvelle adresse, un site Web ou un lien est d’abord vérifié par nous, en général d’ici un jour; d’ici là, il s’affiche ci-dessous avec la mention « En attente de vérification ».`)}</p>`;
   const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
   // Events the owner can still change or cancel, with what the Change form starts from.
   const editableEvents = {};
@@ -39476,12 +39662,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     seasonSame: L('Please pick two different days for your seasonal hours.', 'Choisissez deux jours différents pour vos heures saisonnières.'),
     clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
     clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
-    fields: fr ? { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
-      name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-      price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales' }
-      : { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
-        name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-        price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures' },
+    fields: OWNER_FIELD_WORDS[fr ? 'fr' : 'en'],
     and: L(' and ', ' et '),
     hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
     hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),
@@ -39501,8 +39682,14 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     photoRemoved: L('Photo removed.', 'Photo retirée.'), moved: L('Moved. It\u2019s now photo {n} of {total} after the main photo.', 'Déplacée. C’est maintenant la photo {n} sur {total} après la photo principale.'),
     noMove: L('It can\u2019t move further.', 'Elle ne peut pas aller plus loin.'), mainChanged: L('Main photo changed.', 'Photo principale changée.'),
     removeMe: L('Take this business off your login? You\u2019ll need its edit link to add it back.', 'Retirer cette entreprise de votre compte? Il vous faudra son lien de modification pour la rajouter.'),
-    removeOther: L('Remove {who}? They won\u2019t be able to update this listing any more, and we\u2019ll email them to say so.', 'Retirer {who}? Cette personne ne pourra plus modifier cette fiche, et nous l’en informerons par courriel.'),
+    removeOther: L('Remove {who}? They won\u2019t be able to update this listing any more, and we\u2019ll email them to say so. The private edit link is reset too, so they can\u2019t use it to get back in; we\u2019ll email you the new one.', 'Retirer {who}? Cette personne ne pourra plus modifier cette fiche, et nous l’en informerons par courriel. Le lien de modification privé est aussi réinitialisé, pour qu’elle ne puisse pas revenir avec; nous vous enverrons le nouveau par courriel.'),
     removed: L('Removed. We\u2019ve emailed them to say so.', 'Retiré. Nous en avons informé la personne par courriel.'),
+    removedReset: L('Removed. We\u2019ve emailed them to say so. The edit link was reset too, so the old one no longer works; we\u2019ve emailed you the new one.', 'Retiré. Nous en avons informé la personne par courriel. Le lien de modification a aussi été réinitialisé : l\u2019ancien ne fonctionne plus, et nous vous avons envoyé le nouveau par courriel.'),
+    removedResetNoMail: L('Removed. The edit link was reset too, so the old one no longer works. We\u2019ll send you the new one from info@okanaganroam.com.', 'Retiré. Le lien de modification a aussi été réinitialisé : l\u2019ancien ne fonctionne plus. Nous vous enverrons le nouveau depuis info@okanaganroam.com.'),
+    resetConfirm: L('Reset this listing\u2019s private edit link? The old link stops working straight away, for everyone who has it. We\u2019ll email the new one to you. Everyone with a login keeps their access.', 'Réinitialiser le lien de modification privé de cette fiche? L\u2019ancien lien cesse de fonctionner tout de suite, pour tous ceux qui l\u2019ont. Nous vous enverrons le nouveau par courriel. Les personnes qui ont un compte gardent leur accès.'),
+    resetDone: L('Done. The old edit link no longer works; we\u2019ve emailed you the new one.', 'C\u2019est fait. L\u2019ancien lien ne fonctionne plus; nous vous avons envoyé le nouveau par courriel.'),
+    resetDoneNoMail: L('Done. The old edit link no longer works. We\u2019ll send you the new one from info@okanaganroam.com.', 'C\u2019est fait. L\u2019ancien lien ne fonctionne plus. Nous vous enverrons le nouveau depuis info@okanaganroam.com.'),
+    onlyYou: ownerAccessCountText(1, lang), nLogins: ownerAccessCountText(99, lang).replace('99', '{n}'),
     account: P('/owner/account'),
     evUpdated: L('Updated. Your event is still waiting for review, usually within a day.', 'Mis à jour. Votre événement attend toujours notre vérification, en général d’ici un jour.'),
     evChange: L('Thanks! Your change is in for review, usually within a day. The event stays as it is until then, and we\u2019ll email you when it\u2019s updated.', 'Merci! Votre modification est en cours de vérification, en général d’ici un jour. L’événement reste tel quel d’ici là, et nous vous écrirons quand il sera mis à jour.'),
@@ -40152,9 +40339,27 @@ ${ownerFooterHtml(fr)}
         if (!j || !j.ok) { b.disabled = false; show('opAccessError', (j && j.error) || T.again); return; }
         if (me) { forgetVenue(); location.href = T.account; return; }
         var li = b.closest('li'); if (li) li.parentNode.removeChild(li);
-        document.getElementById('opAccessStatus').textContent = T.removed;
+        // The count in the header follows the list (2026-10-18).
+        var n = typeof j.logins === 'number' ? j.logins : accessList.querySelectorAll('li').length;
+        var cnt = document.getElementById('opAccessCount'); if (cnt) cnt.textContent = n <= 1 ? T.onlyYou : T.nLogins.replace('{n}', n);
+        document.getElementById('opAccessStatus').textContent = j.link_reset ? (j.emailed === 'sent' ? T.removedReset : T.removedResetNoMail) : T.removed;
       })
       .catch(function(){ b.disabled = false; show('opAccessError', T.connect); });
+  });
+  // Reset edit link (2026-10-18): the longest-standing login can replace the listing's private link.
+  var resetBtn = document.getElementById('opResetLink');
+  if (resetBtn) resetBtn.addEventListener('click', function(){
+    show('opAccessError', '');
+    if (!window.confirm(T.resetConfirm)) return;
+    resetBtn.disabled = true;
+    fetch(location.pathname + '/reset-link', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: '{}' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        resetBtn.disabled = false;
+        if (!j || !j.ok) { show('opAccessError', (j && j.error) || T.again); return; }
+        document.getElementById('opAccessStatus').textContent = j.emailed === 'sent' ? T.resetDone : T.resetDoneNoMail;
+      })
+      .catch(function(){ resetBtn.disabled = false; show('opAccessError', T.connect); });
   });
   // The venue page swaps "Claim this listing" for "You manage this listing" on this device.
   var VENUES_KEY = 'okrOwnerVenues', thisVenue = ${Number(venue.id)};
@@ -43160,6 +43365,8 @@ const server = http.createServer(async (req, res) => {
       }
       const lr = /^\/owner\/account\/venue\/(\d+)\/logins\/(\d+)\/remove$/.exec(pathname);
       if (lr && method === 'POST') return await handleOwnerLoginRemoval(req, res, account, Number(lr[1]), Number(lr[2]));
+      const rl = /^\/owner\/account\/venue\/(\d+)\/reset-link$/.exec(pathname);
+      if (rl && method === 'POST') return await handleOwnerLinkReset(req, res, account, Number(rl[1]));
       const pa = /^\/owner\/account\/venue\/(\d+)\/photos\/(\d+)\/(remove|main|up|down)$/.exec(pathname);
       if (pa && method === 'POST') return await handleOwnerPhotoAction(req, res, account, Number(pa[1]), Number(pa[2]), pa[3]);
       const mr = /^\/owner\/account\/venue\/(\d+)\/menu(\/[a-z0-9/]*)?$/.exec(pathname);
@@ -43258,7 +43465,7 @@ const server = http.createServer(async (req, res) => {
       if (!requireAdminToken(req, res)) return;
       let body;
       try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
-      const unexpected = Object.keys(body || {}).filter((k) => !['venue_id', 'remove_email'].includes(k));
+      const unexpected = Object.keys(body || {}).filter((k) => !['venue_id', 'remove_email', 'reset_link'].includes(k));
       if (unexpected.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
       if (!body || !Number.isInteger(body.venue_id) || body.venue_id <= 0) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
       let removed;
@@ -43266,7 +43473,15 @@ const server = http.createServer(async (req, res) => {
         if (typeof body.remove_email !== 'string' || !body.remove_email.trim()) return sendJSON(res, 400, { error: 'remove_email must be an email address.' });
         removed = removeOwnerLoginFromVenue(body.venue_id, body.remove_email);
       }
-      return sendJSON(res, 200, { venue_id: body.venue_id, ...(removed === undefined ? {} : { removed }), logins: ownerLoginsForVenue(body.venue_id) });
+      // reset_link: true (2026-10-18) also replaces the edit link at once (no grace), so a removed person holding the
+      // old link can't add themselves back. The new link comes back here for Dayton to send on.
+      let link;
+      if (body.reset_link === true) {
+        const made = createOwnerLink(body.venue_id, { reset: true });
+        if (!made.ok) return sendJSON(res, { venue_not_found: 404, venue_redirected: 409 }[made.reason] || 400, { error: made.reason });
+        link = made.url;
+      }
+      return sendJSON(res, 200, { venue_id: body.venue_id, ...(removed === undefined ? {} : { removed }), ...(link ? { new_link: link } : {}), logins: ownerLoginsForVenue(body.venue_id) });
     }
     if (pathname === '/admin/owner-links/revoke' && method === 'POST') {
       if (!requireAdminToken(req, res)) return;
@@ -44047,6 +44262,7 @@ module.exports = {
   renderAdminClaimCard,
   removeOwnerLoginFromVenue,
   venueForOwnerToken,
+  adminClaimAction,
   venueForOwnerAccount,
   validateOwnerChanges,
   approveOwnerChange,
@@ -44055,6 +44271,8 @@ module.exports = {
   recentInstantOwnerChanges,
   pendingOwnerChange,
   OWNER_INSTANT_FIELDS,
+  publishPendingOwnerInstant,
+  ownerAccessCountText,
   hoursWithExtras,
   venueHoursExtras,
   clearHoursExtraCache,
