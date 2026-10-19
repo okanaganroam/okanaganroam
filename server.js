@@ -4329,7 +4329,9 @@ const FR_SEARCH_SYNONYMS = [
   ['raquette', 'snowshoeing'], ['raquettes', 'snowshoeing'], ['raquette a neige', 'snowshoeing'], ['raquettes a neige', 'snowshoeing'], ['faire de la raquette', 'snowshoeing'],
   ['ski alpin', 'downhill skiing'], ['ski de fond', 'cross country skiing'], ['station de ski', 'ski resort'], ['stations de ski', 'ski resorts'], ['centre de ski', 'ski resort'],
   ['planche a neige', 'snowboarding'], ['glissade sur tube', 'tubing'], ['glissades sur tube', 'tubing'], ['glissade', 'tubing'], ['luge', 'sledding'],
-  ['traineau a chiens', 'dog sledding'], ['promenade en traineau', 'sleigh ride'], ['traineau', 'sleigh ride'], ['motoneige', 'snowmobiling'],
+  ['traineau a chiens', 'dog sledding'], ['traineaux a chiens', 'dog sledding'], ['promenade en traineau', 'sleigh ride'], ['promenades en traineau', 'sleigh ride'], ['traineau', 'sleigh ride'], ['traineaux', 'sleigh ride'],
+  // Round 7 (2026-10-19): toboggan (the English rewrites below then read sleigh rides, dog sleds and sledding).
+  ['toboggan', 'sledding'], ['glissade en toboggan', 'sledding'], ['faire du toboggan', 'sledding'], ['glisser en toboggan', 'sledding'], ['bonhomme de neige', 'snow'], ['motoneige', 'snowmobiling'],
   ['peche sur glace', 'ice fishing'], ['peche blanche', 'ice fishing'], ['neige', 'snow'],
   // fall and the holidays
   ['citrouille', 'pumpkin'], ['champ de citrouilles', 'pumpkin patch'], ['autocueillette de citrouilles', 'pumpkin patch'], ['labyrinthe de mais', 'corn maze'],
@@ -4351,6 +4353,9 @@ const FR_SEARCH_SYNONYMS = [
   ['frites', 'fries'], ['hambourgeois', 'burger'], ['chocolat', 'chocolate'], ['chocolaterie', 'chocolate'], ['fromage', 'cheese'], ['fromagerie', 'cheese'],
   ['miel', 'honey'], ['lavande', 'lavender'], ['verger', 'orchard'], ['cerise', 'cherries'], ['pomme', 'apples'], ['kiosque fermier', 'farm stand'],
   ['marche fermier', 'farmers market'], ['marche public', 'farmers market'], ['marche des fermiers', 'farmers market'], ['marche', 'market'], ['marche facile', 'easy walk'], ['marches faciles', 'easy walks'], ['marche en nature', 'nature walk'], ['autocueillette', 'u pick'],
+  // Round 7 (2026-10-19): cueillette (picking your own fruit) is a u-pick.
+  ['cueillette', 'u pick'], ['cueillette de fruits', 'u pick'], ['cueillette de pommes', 'u pick'], ['cueillette de cerises', 'u pick'], ['cueillette de petits fruits', 'u pick'],
+  ['cueillette de bleuets', 'u pick'], ['cueillette de fraises', 'u pick'], ['autocueillette de fruits', 'u pick'], ['cueillette de citrouilles', 'pumpkin patch'],
   ['ferme', 'farm'], ['sans gluten', 'gluten free'], ['vegetalien', 'vegan'], ['vegetalienne', 'vegan'], ['vegetarien', 'vegetarian'], ['terrasse', 'patio'],
   // outdoors
   ['randonnee', 'hike'], ['randonnee pedestre', 'hiking'], ['rando', 'hike'], ['sentier', 'trail'], ['plage', 'beach'], ['plage pour chiens', 'dog beach'],
@@ -4411,11 +4416,58 @@ function frSearchSynonyms(text) {
   }
   return changed ? out.join(' ') : raw;
 }
+// Search phrases (2026-10-19, round 7), English and French alike (a French search reaches them through the list
+// above): a phrase whose words mean something else one by one, read as the word the listings use. "haunted house"
+// listed every coffee house, "sleigh ride" and "dog sled" every tour (dog read as the dog-friendly badge), "toboggan
+// hill" every winery on a hill, "u pick" Pick Thai. A place's own name is never rewritten.
+const SEARCH_PHRASE_REWRITES = [
+  ['haunted house', 'haunted'], ['haunted houses', 'haunted'], ['haunted attraction', 'haunted'], ['haunted attractions', 'haunted'],
+  ['toboggan', 'sledding'], ['toboggans', 'sledding'], ['tobogganing', 'sledding'], ['toboggan hill', 'sledding'], ['toboggan hills', 'sledding'],
+  ['sledding hill', 'sledding'], ['sledding hills', 'sledding'], ['sled hill', 'sledding'], ['sleds', 'sledding'],
+  ['sleigh ride', 'sleigh'], ['sleigh rides', 'sleigh'], ['sleigh riding', 'sleigh'], ['horse drawn sleigh', 'sleigh'], ['horse drawn sleigh ride', 'sleigh'],
+  ['horse drawn sleigh rides', 'sleigh'], ['dog sled', 'sled'], ['dog sleds', 'sled'], ['dog sledding', 'sled'], ['dogsled', 'sled'], ['dogsledding', 'sled'],
+  ['dog sled tour', 'sled'], ['dog sled tours', 'sled'], ['dog sled ride', 'sled'], ['dog sled rides', 'sled'], ['mushing', 'sled'],
+  ['u pick', 'u-pick orchard'], ['upick', 'u-pick orchard'], ['u picks', 'u-pick orchard'], ['pick your own', 'u-pick orchard'],
+];
+const SEARCH_PHRASE_REWRITE_MAP = new Map(SEARCH_PHRASE_REWRITES);
+const SEARCH_PHRASE_REWRITE_MAX = Math.max(...SEARCH_PHRASE_REWRITES.map(([k]) => k.split(' ').length));
+function searchPhraseRewrites(text) {
+  const raw = String(text || '');
+  const parts = raw.split(/\s+/).filter(Boolean);
+  // "u-pick" is two words once folded ("u pick"): fold each typed word, then spread it over its folded words.
+  const folded = [], owner = [];
+  parts.forEach((p, i) => { for (const w of frSearchFold(p).split(' ').filter(Boolean)) { folded.push(w); owner.push(i); } });
+  if (!folded.length) return raw;
+  const keep = new Set();
+  for (const name of frSearchVenueNames()) {
+    for (let i = 0; i + name.length <= folded.length; i++) if (name.every((w, k) => folded[i + k] === w)) for (let k = 0; k < name.length; k++) keep.add(i + k);
+  }
+  const out = [];
+  let changed = false, lastOwner = -1;
+  for (let i = 0; i < folded.length;) {
+    let hit = 0;
+    for (let len = Math.min(SEARCH_PHRASE_REWRITE_MAX, folded.length - i); len >= 1 && !hit; len--) {
+      // A phrase starts and ends on whole typed words, and never inside a place's name.
+      if ((i > 0 && owner[i - 1] === owner[i]) || (i + len < folded.length && owner[i + len] === owner[i + len - 1])) continue;
+      if ([...Array(len).keys()].some((k) => keep.has(i + k))) continue;
+      const en = SEARCH_PHRASE_REWRITE_MAP.get(folded.slice(i, i + len).join(' '));
+      if (en != null) { out.push(en); hit = len; }
+    }
+    if (hit) { changed = true; lastOwner = owner[i + hit - 1]; i += hit; continue; }
+    if (owner[i] !== lastOwner) { out.push(parts[owner[i]]); lastOwner = owner[i]; }
+    i += 1;
+  }
+  return changed ? out.join(' ') : raw;
+}
 // French pass 6 (2026-10-19): the French search words first (frSearchSynonyms), then the planner's French list.
+// Round 7 (2026-10-19): then the search phrases above, for English and French searches alike.
 function discoverySearchText(text, lang) {
-  if (lang !== 'fr') return text;
+  if (lang !== 'fr') {
+    try { return searchPhraseRewrites(text); } catch (e) { return text; }
+  }
   let t = text;
   try { t = frSearchSynonyms(text); } catch (e) { t = text; }
+  try { t = searchPhraseRewrites(t); } catch (e) { /* as read so far */ }
   try { return tripPlannerFrModule().tripPlannerText(t, buildDiscoveryTaxonomy(), { frenchPage: true }); } catch (e) { return t; }
 }
 function heroSearchTarget(text, { lang = 'en' } = {}) {
@@ -6916,6 +6968,77 @@ function advisoryNoticeHtml(note, tr = (s) => s) {
 </aside>`;
 }
 
+// ---------- French advisories (2026-10-19, round 7) ----------
+// An advisory added through POST /admin/collection-membership carries its French wording in collection_items.note_fr.
+// English visible text -> French visible text for every advisory that has one (the URL is dropped from both, as on the
+// page). Read fresh each time: there are only a handful of advisories. A database without the column (an old copy)
+// simply has no French notes.
+function getAdvisoryFrenchByEnglish() {
+  const map = new Map();
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT ci.note AS note, ci.note_fr AS note_fr FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id
+      WHERE c.kind = ? AND ci.content_type = 'venue' AND ci.note_fr IS NOT NULL AND trim(ci.note_fr) != ''
+    `).all(ADVISORY_COLLECTION_KIND);
+  } catch (e) { rows = []; }
+  const norm = (t) => String(t || '').replace(/\s+/g, ' ').replace(/[’‘]/g, "'").trim();
+  for (const r of rows) {
+    // The French keeps its space before ":" and ";" (parseAdvisoryNote tightens those for the English).
+    const frRaw = String(r.note_fr).trim(), frUrl = frRaw.match(/https?:\/\/[^\s)>\]]+/);
+    const fr = (frUrl ? frRaw.replace(frUrl[0], '') : frRaw).replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,])/g, '$1').trim();
+    const en = norm(parseAdvisoryNote(r.note).text);
+    if (en && fr) map.set(en, fr);
+  }
+  return map;
+}
+// A French fallback for an advisory with no French yet: its known opening phrasing ("Temporarily closed", "Permanently
+// closed", "Closed for the season" ...) and its "(checked <date>)" in French, then a pointer to the official source.
+// Never the English sentence on a French page.
+const FR_ADVISORY_LEADS = [
+  [/^permanently closed\b/i, 'Fermé définitivement'],
+  [/^temporarily closed\b/i, 'Fermé temporairement'],
+  [/^closed for the season\b/i, 'Fermé pour la saison'],
+  [/\breceivership\b/i, 'L’entreprise est sous séquestre ordonné par le tribunal; vérifiez qu’elle est ouverte'],
+  [/\bno longer listed\b|\bmay be closed\b|\bmay have closed\b/i, 'Cet endroit est peut-être fermé'],
+  [/\b(tasting room|patio|kitchen)\b[^.]*\bclosed\b/i, 'Salle de dégustation ou terrasse fermée en ce moment'],
+  [/\bby appointment\b/i, 'Visites ou achats sur rendez-vous seulement'],
+  [/\bswimming advisory\b/i, 'Avis de baignade en vigueur'],
+  [/\bpartial closure\b|\bpartially closed\b/i, 'Fermeture partielle'],
+  [/\bclosed\b/i, 'Fermeture signalée'],
+];
+function frAdvisoryFallback(text) {
+  const t = String(text || '').trim();
+  const lead = (FR_ADVISORY_LEADS.find(([re]) => re.test(t)) || [null, 'Une condition temporaire touche cet endroit'])[1];
+  let date = '';
+  const m = /\bchecked (January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}),? (\d{4})/.exec(t)
+    || /\bchecked (\d{4})-(\d{2})-(\d{2})\b/.exec(t);
+  if (m && FR_MONTH_LONG[m[1]]) date = ` (vérifié le ${m[2] === '1' ? '1er' : m[2]} ${FR_MONTH_LONG[m[1]]} ${m[3]})`;
+  else if (m) {
+    const mo = Object.values(FR_MONTH_LONG)[Number(m[2]) - 1], d = String(Number(m[3]));
+    if (mo) date = ` (vérifié le ${d === '1' ? '1er' : d} ${mo} ${m[1]})`;
+  }
+  return `${lead}${date}. Vérifiez la source officielle avant d’y aller.`;
+}
+// The French for an advisory's visible text: the French list (data/french) first, then the note's own French
+// (note_fr), also when a season note is in front of it, then the fallback above.
+function frAdvisoryText(text) {
+  const key = String(text || '').replace(/\s+/g, ' ').replace(/[’‘]/g, "'").trim();
+  if (!key) return text;
+  const listed = frText(key);
+  if (listed != null) return listed;
+  const own = getAdvisoryFrenchByEnglish();
+  if (own.has(key)) return own.get(key);
+  for (const [en, fr] of own) {
+    if (key.endsWith(` ${en}`)) {
+      const before = key.slice(0, key.length - en.length).trim(), beforeFr = frText(before);
+      return `${beforeFr != null ? beforeFr : frAdvisoryFallback(before)} ${fr}`;
+    }
+  }
+  return frAdvisoryFallback(key);
+}
+
 // Emitted only on a page that actually contains an advisory notice, so
 // every other page's markup and inline CSS are unchanged. Values come from
 // tokens.css; the kicker mirrors the homepage's .eyebrow treatment.
@@ -6999,8 +7122,14 @@ function guardedCollectionMembershipUpdate(kind, venueId, action, note, meta) {
       const next = db
         .prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM collection_items WHERE collection_id = ?')
         .get(collection.id).p;
-      db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, position) VALUES (?, 'venue', ?, ?, ?)`)
-        .run(collection.id, venueId, note, next);
+      // French advisories (2026-10-19, round 7): meta.note_fr, when given, is stored beside the English note.
+      if (meta && typeof meta.note_fr === 'string' && meta.note_fr.trim()) {
+        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, note_fr, position) VALUES (?, 'venue', ?, ?, ?, ?)`)
+          .run(collection.id, venueId, note, meta.note_fr.trim(), next);
+      } else {
+        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, position) VALUES (?, 'venue', ?, ?, ?)`)
+          .run(collection.id, venueId, note, next);
+      }
     } else {
       db.prepare("DELETE FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
         .run(collection.id, venueId);
@@ -25329,6 +25458,9 @@ function frenchTwinHtml(html, enPath, search = '') {
   const frPath = frTwinPath(enPath);
   const frEvent = frEventForPath(enPath);
   if (frEvent) html = frEventHead(html, frEvent);
+  // French advisories (2026-10-19, round 7): a card's "Check before you go" text in French (its own note_fr, the
+  // French list or the known-phrasing fallback), never the English sentence.
+  html = html.replace(/(<p class="venue-advisory-text">)([^<]*)(<\/p>)/g, (m, a, t, b) => `${a}${escapeHtml(frAdvisoryText(frDecode(t)))}${b}`);
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -25945,7 +26077,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // description and the CTA row; '' for the overwhelming majority of
   // venues, which keeps their page markup byte-identical.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes().get(venue.id);
-  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frTextOr).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
+  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frAdvisoryText).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
   const golfGlanceHtml = fr ? '' : golfAtAGlanceHtml(venue);
@@ -39119,9 +39251,35 @@ const OWNER_HELP_TOPICS = [
     aFr: '<p>Fermé pour de bon, entreprise vendue, ou fiche à retirer? <strong>Écrivez-nous</strong> ci-dessous et nous nous en occupons. Les nouveaux propriétaires pourront ensuite réclamer la fiche.</p><p>Vous avez seulement déménagé ou changé de nom? Modifiez-le dans <strong>Nom, adresse et liens</strong> et touchez {SEND}.</p>' },
   { id: 'features', q: 'What are the features and badges?', qFr: 'À quoi servent les caractéristiques et les badges?', pages: ['edit'],
     keys: ['features', 'badges', 'badge', 'dog friendly', 'dogs', 'patio', 'kid friendly', 'kids', 'wheelchair', 'accessible', 'vegan', 'vegetarian', 'gluten', 'gluten free', 'happy hour', 'amenities', 'lake view', 'live music badge'],
-    keysFr: ['caracteristiques', 'badges', 'badge', 'chiens', 'chien', 'animaux', 'terrasse', 'enfants', 'fauteuil roulant', 'accessible', 'vegetalien', 'vegane', 'vegetarien', 'sans gluten', 'cinq a sept', '5 a 7', 'happy hour', 'commodites', 'vue sur le lac'],
-    a: '<p>{ON}, tick the features that genuinely apply (patio, dog-friendly, kid-friendly and so on). Visitors use them to filter. If you serve alcohol you can also add your <strong>happy hour</strong> days and times. Then tap {SEND}. {LIVE}</p>',
-    aFr: '<p>{ON}, cochez les caractéristiques qui s\u2019appliquent vraiment (terrasse, chiens bienvenus, familles, etc.). Les visiteurs s\u2019en servent pour filtrer. Si vous servez de l\u2019alcool, vous pouvez aussi indiquer les jours et les heures de votre <strong>happy hour</strong> (5 à 7). Touchez ensuite {SEND}. {LIVE}</p>' },
+    // Round 7 (2026-10-19): on the French edit page this section is Caractéristiques, so a French "badge" is the
+    // website badge (site-badge), not this one.
+    keysFr: ['caracteristiques', 'chiens acceptes', 'options veganes', 'chiens', 'chien', 'animaux', 'terrasse', 'enfants', 'fauteuil roulant', 'accessible', 'vegetalien', 'vegane', 'vegetarien', 'sans gluten', 'cinq a sept', '5 a 7', 'happy hour', 'commodites', 'vue sur le lac'],
+    // Round 7 (2026-10-19): the answers name the section as the edit page does (Badges / Caractéristiques) and its
+    // own examples; the free badge for an owner's website is its own topic (site-badge).
+    a: '<p>{ON}, open <strong>Badges</strong> and tick the ones that genuinely apply (dog friendly, patio, vegan options and so on). Visitors use them to filter. If you serve alcohol you can also add your <strong>happy hour</strong> days and times. Then tap {SEND}. {LIVE}</p><p>Looking for the \u201cFeatured on Okanagan Roam\u201d badge for your own website? Ask \u201cwebsite badge\u201d.</p>',
+    aFr: '<p>{ON}, ouvrez <strong>Caractéristiques</strong> et cochez celles qui s\u2019appliquent vraiment (chiens acceptés, terrasse, options véganes, etc.). Les visiteurs s\u2019en servent pour filtrer. Si vous servez de l\u2019alcool, vous pouvez aussi indiquer les jours et les heures de votre <strong>happy hour</strong> (5 à 7). Touchez ensuite {SEND}. {LIVE}</p><p>Vous cherchez le badge « Featured on Okanagan Roam » pour votre propre site Web? Demandez « badge pour mon site ».</p>' },
+  // Round 7 (2026-10-19): the free "Featured on Okanagan Roam" badge (/badges/featured-on-okanagan-roam.svg) that a
+  // listed business can put on its own website, linking to its listing. The French answer used to be the Badges
+  // (features) one.
+  { id: 'site-badge', over: ['features', 'links'], q: 'Get the \u201cFeatured on Okanagan Roam\u201d badge for our website', qFr: 'Obtenir le badge « Featured on Okanagan Roam » pour notre site Web', pages: ['edit', 'account', 'settings'],
+    keys: ['website badge', 'badge for my website', 'badge for our website', 'badge for my site', 'badge for our site', 'badge on my website', 'badge on our website', 'badge on my site', 'site badge', 'web badge',
+      'featured badge', 'featured on okanagan roam', 'featured on', 'okanagan roam badge', 'roam badge', 'badge logo', 'your logo', 'okanagan roam logo', 'embed', 'embed code', 'badge code', 'widget', 'link back', 'link to my listing', 'link to our listing', 'sticker',
+      'logo on my website', 'logo on our website', 'put your logo', 'badge'],
+    keysFr: ['badge pour mon site', 'badge pour notre site', 'badge sur mon site', 'badge sur notre site', 'badge web', 'badge site web', 'badge en vedette', 'en vedette sur okanagan roam', 'featured on okanagan roam',
+      'badge okanagan roam', 'logo okanagan roam', 'votre logo', 'code a integrer', 'integrer', 'code du badge', 'lien vers ma fiche', 'lien vers notre fiche', 'autocollant',
+      'logo sur mon site', 'logo sur notre site', 'badge'],
+    a: '<p>Every listed business can put our free \u201cFeatured on Okanagan Roam\u201d badge on its own website. It links visitors to your listing.</p><ol><li>Open your listing on Okanagan Roam and copy its address from the browser bar.</li><li>Paste this code in your website\u2019s footer or About page, with your listing\u2019s address in place of YOUR-LISTING:<br><code>&lt;a href="YOUR-LISTING"&gt;&lt;img src="https://okanaganroam.com/badges/featured-on-okanagan-roam.svg" alt="Featured on Okanagan Roam" width="240" height="72"&gt;&lt;/a&gt;</code></li></ol><p>A PNG copy is at <a href="/badges/featured-on-okanagan-roam.png" target="_blank" rel="noopener">featured-on-okanagan-roam.png</a> if your site builder needs an image file. Need a hand? Tap <strong>Message us</strong>.</p><p>Looking for the <strong>Badges</strong> on your listing (dog friendly, patio \u2026)? Ask \u201cbadges\u201d.</p>',
+    aFr: '<p>Toute entreprise inscrite peut afficher gratuitement notre badge « Featured on Okanagan Roam » (en vedette sur Okanagan Roam) sur son propre site Web. Il mène les visiteurs à votre fiche. Le badge est en anglais.</p><ol><li>Ouvrez votre fiche sur Okanagan Roam et copiez son adresse dans la barre du navigateur.</li><li>Collez ce code dans le pied de page ou la page À propos de votre site, en remplaçant VOTRE-FICHE par l\u2019adresse de votre fiche :<br><code>&lt;a href="VOTRE-FICHE"&gt;&lt;img src="https://okanaganroam.com/badges/featured-on-okanagan-roam.svg" alt="Featured on Okanagan Roam" width="240" height="72"&gt;&lt;/a&gt;</code></li></ol><p>Une copie PNG se trouve à <a href="/badges/featured-on-okanagan-roam.png" target="_blank" rel="noopener">featured-on-okanagan-roam.png</a> si votre outil de création de site demande un fichier image. Besoin d\u2019aide? Touchez <strong>Écrivez-nous</strong>.</p><p>Vous cherchez les <strong>Caractéristiques</strong> de votre fiche (chiens acceptés, terrasse…)? Demandez « caractéristiques ».</p>' },
+  // Round 7 (2026-10-19): an owner who can't find their business on the site: search first, then claim it, or list it.
+  { id: 'not-found', over: ['claim'], q: 'I can\u2019t find my business on Okanagan Roam', qFr: 'Je ne trouve pas mon entreprise sur Okanagan Roam', pages: ['login', 'link', 'invalid', 'claim', 'account'],
+    keys: ['cant find my business', 'cannot find my business', 'cant find our business', 'cant find my listing', 'cant find our listing', 'cannot find my listing', 'not find my business', 'find my business', 'find our business', 'find my listing',
+      'where is my business', 'where is my listing', 'where is our listing', 'business not listed', 'not listed', 'isnt listed', 'arent listed', 'not on the site', 'not on your site', 'not on okanagan roam', 'missing from the site',
+      'my business is missing', 'listing is missing', 'search for my business', 'add my business', 'add our business', 'list my business', 'list our business', 'new listing', 'get listed'],
+    keysFr: ['trouve pas mon entreprise', 'trouve pas notre entreprise', 'trouve pas ma fiche', 'trouve pas notre fiche', 'trouver mon entreprise', 'trouver ma fiche', 'entreprise introuvable', 'fiche introuvable',
+      'ou est mon entreprise', 'ou est ma fiche', 'pas sur le site', 'pas sur votre site', 'pas sur okanagan roam', 'pas inscrite', 'pas inscrit', 'pas repertoriee', 'pas repertorie', 'pas listee', 'mon entreprise manque',
+      'ajouter mon entreprise', 'ajouter notre entreprise', 'inscrire mon entreprise', 'inscrire notre entreprise', 'nouvelle fiche', 'etre inscrit', 'etre inscrite'],
+    a: '<ol><li><strong>Search for it:</strong> type your business name in the search box at the top of any page, without \u201cLtd\u201d or \u201cInc\u201d. You can also open your town and the right category (Restaurants, Wineries, Outdoors \u2026). It may be listed under an older name.</li><li><strong>Found it?</strong> Open its page and tap <strong>Claim this listing</strong> (beside the opening hours). We check it\u2019s you and email you an edit link.</li><li><strong>Not there?</strong> <a href="/list-your-venue">List your venue</a> for free. We review it, usually within a day or two, and email you when it\u2019s live.</li></ol><p>Think it was removed by mistake? Tap <strong>Message us</strong> below.</p>',
+    aFr: '<ol><li><strong>Cherchez-la :</strong> tapez le nom de votre entreprise dans la boîte de recherche en haut de chaque page, sans « Ltée » ni « Inc. ». Vous pouvez aussi ouvrir votre ville et la bonne catégorie (Restaurants, Vignobles, Plein air…). Elle est peut-être inscrite sous un ancien nom.</li><li><strong>Vous l\u2019avez trouvée?</strong> Ouvrez sa page et touchez <strong>Réclamer cette fiche</strong> (à côté des heures d\u2019ouverture). Nous vérifions que c\u2019est bien vous et vous envoyons un lien de modification par courriel.</li><li><strong>Elle n\u2019y est pas?</strong> <a href="/fr/list-your-venue">Inscrivez votre établissement</a> gratuitement. Nous la vérifions, en général d\u2019ici un jour ou deux, et vous écrivons quand elle est en ligne.</li></ol><p>Vous pensez qu\u2019elle a été retirée par erreur? Touchez <strong>Écrivez-nous</strong> ci-dessous.</p>' },
   // Help bot v2 (2026-10-18): the $ to $$$$ price range on the edit page. "$$" is read as the word 'dollarsign'.
   { id: 'price-range', over: ['cost', 'menu-add'], q: 'Set our price range ($ to $$$$)', qFr: 'Indiquer notre gamme de prix ($ à $$$$)', pages: ['edit'],
     keys: ['price range', 'pricerange', 'price level', 'price point', 'dollarsign', 'dollar sign', 'dollar signs', 'how expensive', 'expensive', 'cheap', 'affordable', 'budget', 'pricey', 'upscale', 'change our price', 'change the price range', 'wrong price range'],
@@ -44774,7 +44932,10 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'Malformed JSON body.' });
       }
 
-      const ALLOWED_MEMBERSHIP_KEYS = ['kind', 'venue_id', 'action', 'note', 'reason', 'batch_id'];
+      // note_fr / french_pending (2026-10-19, round 7): an advisory shows on /fr pages too, so adding one needs its
+      // French wording (note_fr). french_pending: true lets an urgent English-only advisory through, with a warning;
+      // the French page then shows a French fallback built from known phrasings.
+      const ALLOWED_MEMBERSHIP_KEYS = ['kind', 'venue_id', 'action', 'note', 'note_fr', 'french_pending', 'reason', 'batch_id'];
       const unexpectedMembershipKeys = Object.keys(body).filter((k) => !ALLOWED_MEMBERSHIP_KEYS.includes(k));
       if (unexpectedMembershipKeys.length > 0) {
         return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedMembershipKeys.join(', ')}` });
@@ -44791,11 +44952,22 @@ const server = http.createServer(async (req, res) => {
       if (body.note !== undefined && body.note !== null && typeof body.note !== 'string') {
         return sendJSON(res, 400, { error: 'note must be a string when provided.' });
       }
+      if (body.note_fr !== undefined && body.note_fr !== null && typeof body.note_fr !== 'string') {
+        return sendJSON(res, 400, { error: 'note_fr must be a string when provided.' });
+      }
+      if (body.french_pending !== undefined && typeof body.french_pending !== 'boolean') {
+        return sendJSON(res, 400, { error: 'french_pending must be true or false when provided.' });
+      }
       if (typeof body.reason !== 'string' || body.reason.trim() === '') {
         return sendJSON(res, 400, { error: 'reason is required and must be a non-empty string.' });
       }
       if (typeof body.batch_id !== 'string' || body.batch_id.trim() === '') {
         return sendJSON(res, 400, { error: 'batch_id is required and must be a non-empty string.' });
+      }
+      const membershipNoteFr = typeof body.note_fr === 'string' && body.note_fr.trim() !== '' ? body.note_fr.trim() : null;
+      const missingFrench = body.kind === ADVISORY_COLLECTION_KIND && body.action === 'add' && !membershipNoteFr;
+      if (missingFrench && body.french_pending !== true) {
+        return sendJSON(res, 400, { error: 'note_fr is required for an advisory: give the French wording (or send french_pending: true to add it in English only for now).' });
       }
 
       let result;
@@ -44805,7 +44977,7 @@ const server = http.createServer(async (req, res) => {
           body.venue_id,
           body.action,
           typeof body.note === 'string' && body.note.trim() !== '' ? body.note.trim() : null,
-          { reason: body.reason.trim(), batch_id: body.batch_id.trim(), reviewed_by: null }
+          { reason: body.reason.trim(), batch_id: body.batch_id.trim(), reviewed_by: null, note_fr: membershipNoteFr }
         );
       } catch (err) {
         return sendJSON(res, 500, { error: 'Membership change failed and was rolled back.', detail: String(err.message || err) });
@@ -44814,6 +44986,7 @@ const server = http.createServer(async (req, res) => {
         const statusMap = { unknown_kind: 400, venue_not_found: 404, venue_redirected: 409, already_member: 409, not_member: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason });
       }
+      if (missingFrench) result.warning = 'No French text (note_fr): /fr pages show a French fallback until it is added.';
       return sendJSON(res, 200, result);
     }
 
@@ -46855,6 +47028,11 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // French advisories and search phrases (2026-10-19, round 7)
+  frAdvisoryText,
+  frAdvisoryFallback,
+  getAdvisoryFrenchByEnglish,
+  searchPhraseRewrites,
   deleteVenue,
   withChipWidths,
   eventTextPlace,
