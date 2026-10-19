@@ -7219,17 +7219,50 @@ const DAY_SCHEMA_NAMES = {
 // than opens, which schema.org reads as past midnight. A 24-hour day is
 // 00:00-23:59. Only days listed as open produce periods: a closed day and an
 // unknown day (absent key, malformed period) produce none, as before.
-function buildOpeningHoursSpecification(hoursRaw) {
-  if (!hoursRaw || !hoursModule) return undefined;
+// One OpeningHoursSpecification per opening period of an hours JSON; `extra` (2026-10-18) adds validFrom/validThrough
+// for a seasonal set. -> [] when nothing is readable.
+function openingSpecsFor(hoursRaw, extra = {}) {
   const parsed = hoursModule.parseHours(hoursRaw);
-  if (!parsed.known) return undefined;
-  const specs = hoursModule.openingPeriods(parsed).map((p) => ({
+  if (!parsed.known) return [];
+  return hoursModule.openingPeriods(parsed).map((p) => ({
     '@type': 'OpeningHoursSpecification',
     dayOfWeek: DAY_SCHEMA_NAMES[p.day],
     opens: p.opens,
     closes: p.closes,
+    ...extra,
   }));
+}
+function buildOpeningHoursSpecification(hoursRaw) {
+  if (!hoursRaw || !hoursModule) return undefined;
+  const specs = openingSpecsFor(hoursRaw);
   return specs.length > 0 ? specs : undefined;
+}
+
+// The extra OpeningHoursSpecification entries for a venue's seasonal hours and upcoming special closures
+// (2026-10-18). A season ('MM-DD' to 'MM-DD', every year, possibly across New Year) is dated for the run that is on
+// now or comes next. -> [] when there are none.
+function seasonRunDates(from, to, today) {
+  const y = Number(today.slice(0, 4)), md = today.slice(5);
+  const fix = (yr, mmdd) => (mmdd === '02-29' && !(yr % 4 === 0 && (yr % 100 !== 0 || yr % 400 === 0)) ? `${yr}-02-28` : `${yr}-${mmdd}`);
+  if (from <= to) return md <= to ? [fix(y, from), fix(y, to)] : [fix(y + 1, from), fix(y + 1, to)];
+  return md <= to ? [fix(y - 1, from), fix(y, to)] : [fix(y, from), fix(y + 1, to)];
+}
+function hoursExtrasSpecification(venueId, now = new Date()) {
+  if (!hoursModule) return [];
+  const x = hoursExtrasMap().get(venueId);
+  if (!x) return [];
+  const today = todayLocal(now);
+  const out = [];
+  for (const season of x.seasons || []) {
+    if (!season || !/^\d{2}-\d{2}$/.test(season.from) || !/^\d{2}-\d{2}$/.test(season.to) || !season.hours) continue;
+    const [validFrom, validThrough] = seasonRunDates(season.from, season.to, today);
+    out.push(...openingSpecsFor(JSON.stringify(season.hours), { validFrom, validThrough }));
+  }
+  for (const c of x.closures || []) {
+    if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(c.from) || (c.to || c.from) < today) continue;
+    out.push({ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: c.from, validThrough: c.to || c.from });
+  }
+  return out;
 }
 
 function escapeHtml(str) {
@@ -23803,6 +23836,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // still shown to visitors on the page.
     openingHoursSpecification: buildOpeningHoursSpecification(pageHours),
   };
+  // Seasonal hours and special closures in the structured data (2026-10-18), so Google doesn't show summer hours in
+  // winter: each seasonal set's days carry validFrom/validThrough for its current or next run, and each upcoming
+  // closure is a closed spec (opens = closes = 00:00) for its dates. Only for the stored hours, like the page.
+  if (localBusiness.openingHoursSpecification && pageHours === venue.hours && !venue.redirect_to) {
+    localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.concat(hoursExtrasSpecification(venue.id, opts.now || new Date()));
+  }
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
   const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
   if (venueMenu && menuKind(venue) === 'menu') localBusiness.hasMenu = menuMenuUrl(venue, fr ? 'fr' : 'en');
@@ -31406,25 +31445,68 @@ function ownerVenueLogins(venueId) {
 function ownerCanRemoveLogin(actor, target) {
   return !!actor && !!target && (actor.account_id === target.account_id || actor.seq < target.seq);
 }
-// Tells everyone already on a listing that a new login was added to it.
+// The language to email an owner login in (2026-10-18): the one recorded on the login (the portal page they last
+// signed in or made it from), else the page their latest update, photo, menu or event came from. -> 'fr' | 'en' |
+// null when nothing is known (the email is then bilingual).
+function ownerEmailLang(email) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!e) return null;
+  try {
+    const acc = db.prepare('SELECT lang FROM owner_accounts WHERE email = ?').get(e);
+    if (acc && (acc.lang === 'fr' || acc.lang === 'en')) return acc.lang;
+  } catch (err) { /* an old copy without the column */ }
+  try {
+    const row = db.prepare(`SELECT lang FROM (
+      SELECT lang, submitted_at AS t FROM owner_change_requests WHERE contact_email = ? COLLATE NOCASE OR reviewed_by = ?
+      UNION ALL SELECT lang, submitted_at FROM owner_photos WHERE contact_email = ? COLLATE NOCASE
+      UNION ALL SELECT lang, submitted_at FROM venue_menus WHERE contact_email = ? COLLATE NOCASE
+      UNION ALL SELECT lang, submitted_at FROM event_submissions WHERE contact_email = ? COLLATE NOCASE AND owner_venue_id IS NOT NULL
+    ) ORDER BY t DESC LIMIT 1`).get(e, `owner:${e}`, e, e, e);
+    if (row) return row.lang === 'fr' ? 'fr' : 'en';
+  } catch (err) { /* an old copy without the lang columns */ }
+  return null;
+}
+// Records the portal language on a login when it signs in or is made (the French pages set res.ownerLang = 'fr').
+function ownerRememberLang(res, accountId) {
+  try { db.prepare('UPDATE owner_accounts SET lang = ? WHERE id = ?').run(res && res.ownerLang === 'fr' ? 'fr' : 'en', accountId); } catch (e) { /* an old copy without the column */ }
+}
+// An access email in the person's language; bilingual (English first) when it isn't known.
+function ownerLangEmail(lang, en, fr) {
+  if (lang === 'fr') return fr;
+  if (lang === 'en') return en;
+  return { subject: `${en.subject} / ${fr.subject}`, text: `${en.text}\n\n----- Français -----\n\n${fr.text}` };
+}
+// Tells everyone already on a listing that a new login was added to it. In each person's language (2026-10-18).
 function notifyOwnersOfNewLogin(venue, newAccount) {
   const direct = ownerDirectEmail();
   if (!direct) return;
   for (const l of ownerVenueLogins(venue.id)) {
     if (l.account_id === newAccount.id) continue;
-    direct({ to: l.email, subject: `New login added to ${venue.name} on Okanagan Roam`, text: ['Hi,', '',
+    const en = { subject: `New login added to ${venue.name} on Okanagan Roam`, text: ['Hi,', '',
       `${newAccount.email} now has a login that can update ${venue.name} on Okanagan Roam.`, '',
       'If you know them, there’s nothing to do. If you don’t, sign in and remove them under People with access:',
       `https://okanaganroam.com/owner/account/venue/${venue.id}#access`, '',
-      'Removing them also resets the listing’s private edit link, so the old one stops working and they can’t use it to get back in. We email the new link to you.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
+      'Removing them also resets the listing’s private edit link, so the old one stops working and they can’t use it to get back in. We email the new link to you.', '', 'Okanagan Roam'].join('\n') };
+    const fr = { subject: `Nouveau compte ajouté à ${venue.name} sur Okanagan Roam`, text: ['Bonjour,', '',
+      `${newAccount.email} a maintenant un compte qui peut modifier ${venue.name} sur Okanagan Roam.`, '',
+      'Si vous connaissez cette personne, vous n’avez rien à faire. Sinon, connectez-vous et retirez-la sous Personnes ayant accès :',
+      `https://okanaganroam.com/fr/owner/account/venue/${venue.id}#access`, '',
+      'La retirer réinitialise aussi le lien de modification privé de la fiche : l’ancien cesse de fonctionner et elle ne peut pas s’en servir pour revenir. Nous vous envoyons le nouveau lien par courriel.', '', 'Okanagan Roam'].join('\n') };
+    const msg = ownerLangEmail(ownerEmailLang(l.email), en, fr);
+    direct({ to: l.email, subject: msg.subject, text: msg.text }).catch(() => {});
   }
 }
 async function notifyOwnerLoginRemoved(venue, removed, by, linkReset = null) {
   const direct = ownerDirectEmail();
   if (direct) {
-    direct({ to: removed.email, subject: `Your access to ${venue.name} on Okanagan Roam was removed`, text: ['Hi,', '',
+    const en = { subject: `Your access to ${venue.name} on Okanagan Roam was removed`, text: ['Hi,', '',
       `Another person who manages ${venue.name} took your login (${removed.email}) off the listing, so you can’t update it any more. The listing’s private edit link was reset at the same time, so the old link no longer works. Your login itself still works for any other businesses on it.`, '',
-      'If that’s a mistake, email info@okanaganroam.com and we’ll sort it out.', '', 'Okanagan Roam'].join('\n') }).catch(() => {});
+      'If that’s a mistake, email info@okanaganroam.com and we’ll sort it out.', '', 'Okanagan Roam'].join('\n') };
+    const fr = { subject: `Votre accès à ${venue.name} sur Okanagan Roam a été retiré`, text: ['Bonjour,', '',
+      `Une autre personne qui gère ${venue.name} a retiré votre compte (${removed.email}) de la fiche : vous ne pouvez donc plus la modifier. Le lien de modification privé de la fiche a été réinitialisé en même temps, et l’ancien lien ne fonctionne plus. Votre compte fonctionne toujours pour les autres entreprises qui y sont liées.`, '',
+      'C’est une erreur? Écrivez à info@okanaganroam.com et nous réglerons la situation.', '', 'Okanagan Roam'].join('\n') };
+    const msg = ownerLangEmail(ownerEmailLang(removed.email), en, fr);
+    direct({ to: removed.email, subject: msg.subject, text: msg.text }).catch(() => {});
   }
   try {
     await venueSubmissionTransport({
@@ -31920,10 +32002,8 @@ async function handleOwnerChangeSubmission(req, res, token) {
     return sendSubmissionResponse(res, 400, { ok: false, error: generic });
   }
   if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
-  const startedAt = Number(body.started_at);
-  if (!Number.isFinite(startedAt) || Date.now() - startedAt < VENUE_SUBMISSION_MIN_FILL_MS) {
-    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check your changes and send them again.' });
-  }
+  // No fill-time check here (2026-10-18): the edit link or the login already proves who this is, and a quick Save
+  // right after opening the page got "That was very quick". The check stays on the anonymous public forms.
   const { venue, happyHourTimes } = found;
   const checked = validateOwnerChanges(venue, happyHourTimes, body);
   const { changes, previous, errors } = checked;
@@ -32222,10 +32302,8 @@ async function handleOwnerEventSubmission(req, res, token) {
     return sendSubmissionResponse(res, 400, { ok: false, error: generic });
   }
   if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
-  const startedAt = Number(body.started_at);
-  if (!Number.isFinite(startedAt) || Date.now() - startedAt < VENUE_SUBMISSION_MIN_FILL_MS) {
-    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please check the event and send it again.' });
-  }
+  // No fill-time check here (2026-10-18): the edit link or the login already proves who this is, and a quick Save
+  // right after opening the page got "That was very quick". The check stays on the anonymous public forms.
   const { venue } = found;
   const full = { ...body, region: venue.region, venue_name: venue.name, organizer_name: venue.name, consent: true };
   delete full.company_website;
@@ -32489,10 +32567,8 @@ async function handleOwnerPhotoUpload(req, res, token) {
     return sendSubmissionResponse(res, 400, { ok: false, error: generic });
   }
   if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
-  const startedAt = Number(body.started_at);
-  if (!Number.isFinite(startedAt) || Date.now() - startedAt < VENUE_SUBMISSION_MIN_FILL_MS) {
-    return sendSubmissionResponse(res, 400, { ok: false, error: 'That was very quick. Please try again.' });
-  }
+  // No fill-time check here (2026-10-18): the edit link or the login already proves who this is, and a quick Save
+  // right after opening the page got "That was very quick". The check stays on the anonymous public forms.
   if (body.rights !== true) return sendSubmissionResponse(res, 400, { ok: false, errors: { rights: 'Please confirm you took these photos or have permission to share them.' } });
   const contact = typeof token === 'function' ? { email: null } : ownerOptionalEmail(body.contact_email);
   if (contact.error) return sendSubmissionResponse(res, 400, { ok: false, errors: { contact_email: contact.error } });
@@ -33468,9 +33544,27 @@ function menuPriceLabel(price, lang = 'en') {
     const t = p.replace('$', '');
     return lang === 'fr' ? `${t.replace(/,/g, ' ').replace('.', ',')} $` : `$${t}`;
   }
-  if (!/^\$?\d{1,5}(?:[.,]\d{1,2})?$/.test(p)) return p;
+  if (!/^\$?\d{1,5}(?:[.,]\d{1,2})?$/.test(p)) return menuPriceWithWords(p, lang);
   const n = p.replace('$', '');
   return lang === 'fr' ? `${n.replace('.', ',')} $` : `$${n.replace(',', '.')}`;
+}
+
+// Tour prices (2026-10-18): a number with words and no currency sign gets one, so "129 per person" goes live as
+// "$129 per person" (French "129 $ par personne") and "From 89" as "From $89". Left as typed: anything with a "$"
+// (or another currency), more than one number ("75 / 45 child", "2 for 30"), or a number that is a count or a
+// length ("3 hours", "18 holes").
+const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper adult\b/i, 'par adulte'], [/\bper child\b/i, 'par enfant'], [/\bper group\b/i, 'par groupe'], [/^from\b/i, 'À partir de']];
+function menuPriceWithWords(p, lang = 'en') {
+  if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) return p;
+  const m = /^((?:from|starting at|starts at|only|à partir de|a partir de|dès)\s+)?(\d{1,3}(?:,\d{3})+|\d{1,5})((?:[.,]\d{1,2})?)(\s*\D*)$/i.exec(p);
+  if (!m || (!m[1] && !m[4].trim())) return p;
+  if (/^\s*(?:hours?|hrs?|h\b|min|mins|minutes?|days?|nights?|km|kms|miles?|holes?|%|people|persons|guests|pieces?|pcs|oz|ml|l\b|g\b|kg|x\b)/i.test(m[4])) return p;
+  const fr = lang === 'fr';
+  const whole = fr ? m[2].replace(/,/g, ' ') : m[2];
+  const amount = fr ? `${whole}${m[3].replace('.', ',')} $` : `$${whole}${m[3].replace(',', '.')}`;
+  let before = m[1] || '', after = m[4];
+  if (fr) for (const [re, word] of MENU_PRICE_WORDS_FR) { before = before.replace(re, word); after = after.replace(re, word); }
+  return `${before}${amount}${after}`;
 }
 
 // ----- Reading a menu with Claude -----
@@ -34233,7 +34327,7 @@ const MENU_APP_STRINGS = {
     gettingReady: 'Getting the reader ready (first time only, about 10 seconds)&hellip;', checkingPrices: 'Double-checking the prices&hellip;',
     stripHint: 'Under each line you&rsquo;ll see that bit of your photo, so you can check the name and price at a glance.',
     moveUp: 'Move up', moveDown: 'Move down', moveTo: 'Section:',
-    tryAgain: 'Try again', newPhoto: '&#128247;&nbsp;Take a new photo', startOver: 'Start over with new photos',
+    tryAgain: 'Try again', newPhoto: '&#128247;&nbsp;Take a new photo', startOver: 'Start over with new photos', startFresh: 'Start over',
     reviewTitle: 'Here&rsquo;s your menu', reviewIntro: 'This is how customers will see it. Tap any dish or price to fix it.',
     checkCount: 'Please check the {n} in yellow.', checkOne: 'Please check the one in yellow.', checkThis: 'Please check this',
     partial: 'Some parts were hard to read. Please check the yellow ones, and add anything that&rsquo;s missing.',
@@ -34290,7 +34384,7 @@ const MENU_APP_STRINGS = {
     gettingReady: 'Pr&eacute;paration du lecteur (premi&egrave;re fois seulement, environ 10&nbsp;secondes)&hellip;', checkingPrices: 'V&eacute;rification des prix&hellip;',
     stripHint: 'Sous chaque ligne, vous verrez ce morceau de votre photo pour v&eacute;rifier le nom et le prix d&rsquo;un coup d&rsquo;&oelig;il.',
     moveUp: 'Monter', moveDown: 'Descendre', moveTo: 'Section&nbsp;:',
-    tryAgain: 'R&eacute;essayer', newPhoto: '&#128247;&nbsp;Prendre une nouvelle photo', startOver: 'Recommencer avec de nouvelles photos',
+    tryAgain: 'R&eacute;essayer', newPhoto: '&#128247;&nbsp;Prendre une nouvelle photo', startOver: 'Recommencer avec de nouvelles photos', startFresh: 'Recommencer',
     reviewTitle: 'Voici votre menu', reviewIntro: 'Voici ce que verront vos clients. Touchez un plat ou un prix pour le corriger.',
     checkCount: 'V&eacute;rifiez les {n} en jaune.', checkOne: 'V&eacute;rifiez celui en jaune.', checkThis: '&Agrave; v&eacute;rifier',
     partial: 'Certaines parties &eacute;taient difficiles &agrave; lire. V&eacute;rifiez celles en jaune et ajoutez ce qui manque.',
@@ -34363,6 +34457,8 @@ function priceListAppStrings(kind, lang) {
         : `Ajoutez chaque ${f.item} avec son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer.`,
       firstSection: kind === 'tours' ? 'Activit\u00e9s' : 'Tarifs', namePh: kind === 'tours' ? 'ex. Visite des vignobles' : kind === 'golf' ? 'ex. 18 trous, semaine' : 'ex. Entr\u00e9e adulte',
       pricePh: kind === 'tours' ? 'ex. 129 par personne' : 'ex. 75',
+      // Wording for the business type (2026-10-18), not the menu's "Entrées".
+      sectionPh: kind === 'tours' ? 'Nom de la section, ex. Visites d\u2019une journ\u00e9e' : kind === 'golf' ? 'Nom de la section, ex. Tarifs en semaine' : 'Nom de la section, ex. Droits d\u2019entr\u00e9e',
     };
   }
   return {
@@ -34395,6 +34491,8 @@ function priceListAppStrings(kind, lang) {
       : `Add each ${e.item} with its price (the description is optional). Tap a section name to change it.`,
     firstSection: kind === 'tours' ? 'Tours' : kind === 'golf' ? 'Green fees' : 'Prices', namePh: kind === 'tours' ? 'like Wine Tour' : kind === 'golf' ? 'like 18 holes, weekday' : 'like Adult admission',
     pricePh: kind === 'tours' ? 'like 129 per person' : 'like 75',
+    // Wording for the business type (2026-10-18), not the menu's "Starters".
+    sectionPh: kind === 'tours' ? 'Section name, like Day tours' : kind === 'golf' ? 'Section name, like Weekday rates' : 'Section name, like Admission',
   };
 }
 
@@ -34553,7 +34651,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       + (C.mode === 'admin' ? '' : '<p class="mn-row"><button type="button" class="mn-link" data-act="add-sec">' + T.addSection + '</button></p>')
       + email + '<p class="mn-saved" id="mnSaved" aria-live="polite"></p>'
       + publishButton(n)
-      + (C.mode === 'admin' ? '' : '<p class="mn-help"><button type="button" class="mn-link" data-act="restart">' + T.startOver + '</button></p>') + helpBtn() + backLink());
+      + (C.mode === 'admin' ? '' : '<p class="mn-help"><button type="button" class="mn-link" data-act="restart">' + (pages().length ? T.startOver : T.startFresh) + '</button></p>') + helpBtn() + backLink());
   }
   // Fix (2026-10-18): yellow lines can't go live unchecked. While any are left the button says how many and takes
   // the owner to the next one (fix it or press Done, or delete it); Dayton, finishing a menu, is asked instead.
@@ -36169,6 +36267,7 @@ async function handleOwnerAccountSetup(req, res, token) {
   if (body.add === true) {
     const signedIn = ownerAccountForRequest(req);
     if (!signedIn) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again, or create a login below.' });
+    ownerRememberLang(res, signedIn.id);
     const added = db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(signedIn.id, found.venue.id).changes > 0;
     if (added) notifyOwnersOfNewLogin(found.venue, signedIn);
     // Changes sent from this link and still waiting go live now (2026-10-18), as if saved signed in.
@@ -36197,6 +36296,7 @@ async function handleOwnerAccountSetup(req, res, token) {
     }
     action = manages ? 'signed_in' : 'venue_added';
   }
+  ownerRememberLang(res, account.id);
   const added = db.prepare('INSERT OR IGNORE INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(account.id, venueId).changes > 0;
   if (added) notifyOwnersOfNewLogin(found.venue, account);
   // Changes sent from this link and still waiting go live now (2026-10-18), as if saved signed in.
@@ -36219,6 +36319,7 @@ async function handleOwnerLogin(req, res) {
   const attempt = ownerPasswordAttempt(account, password);
   if (attempt === 'locked') return sendSubmissionResponse(res, 429, { ok: false, error: OWNER_LOCKED_MESSAGE });
   if (attempt !== 'ok') return wrong();
+  ownerRememberLang(res, account.id);
   const session = startOwnerSession(account.id);
   res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
   return res.end(JSON.stringify({ ok: true }));
@@ -36512,11 +36613,18 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['difficile a lire', 'flou', 'floue', 'numerisation', 'n a pas fonctionne', 'ne marche pas', 'mauvais prix', 'erreurs', 'jaune'],
     a: '<ul><li>Use good light, hold the phone straight above the page, and fill the screen with the menu.</li><li>One page per photo; avoid glare on glossy menus.</li><li>A PDF of your menu usually reads best.</li><li>Each <strong>yellow</strong> line needs a quick check before you can publish: tap it, fix it if needed and press <strong>Done</strong>, or delete it.</li></ul><p>Short menu? <strong>Type it in myself</strong> can be quicker. Still stuck? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up for you, free.</p>',
     aFr: '<ul><li>Utilisez un bon éclairage, tenez le téléphone bien droit au-dessus de la page et remplissez l\u2019écran avec le menu.</li><li>Une page par photo; évitez les reflets sur les menus glacés.</li><li>Un PDF de votre menu se lit généralement le mieux.</li><li>Chaque ligne en <strong>jaune</strong> doit être vérifiée avant la publication : touchez-la, corrigez-la au besoin et appuyez sur <strong>Terminé</strong>, ou supprimez-la.</li></ul><p>Menu court? <strong>Je le tape moi-même</strong> peut être plus rapide. Toujours bloqué? Touchez <strong>Pouvez-vous le faire pour moi?</strong> et nous le taperons pour vous, gratuitement.</p>' },
-  { id: 'menu-website', over: ['menu-add', 'links'], q: '\u201cWe couldn\u2019t find a menu on that page\u201d', qFr: '« We couldn\u2019t find a menu on that page » (menu introuvable)', pages: ['menu'],
-    keys: ['couldnt find', 'couldnt reach', 'import', 'from my website', 'menu from website', 'menu on my website', 'not found'],
-    keysFr: ['introuvable', 'importer', 'depuis mon site', 'menu sur mon site'],
+  { id: 'menu-website', over: ['menu-add', 'links', 'menu-import'], q: '\u201cWe couldn\u2019t find a menu on that page\u201d', qFr: '« We couldn\u2019t find a menu on that page » (menu introuvable)', pages: ['menu'],
+    keys: ['couldnt find', 'couldnt reach', 'not found', 'cant open that address'],
+    keysFr: ['introuvable', 'impossible d ouvrir'],
     a: '<ul><li>Paste the link to the <strong>menu page itself</strong> (or the menu PDF), not your home page.</li><li>Some menus are built in a way we can\u2019t read (ordering systems, images). Take a photo of the menu instead, or use <strong>Type it in myself</strong>.</li><li>Or tap <strong>Can you do it for me?</strong></li></ul>',
     aFr: '<ul><li>Collez le lien de la <strong>page du menu elle-même</strong> (ou du PDF du menu), pas celui de votre page d\u2019accueil.</li><li>Certains menus sont faits d\u2019une façon que nous ne pouvons pas lire (systèmes de commande, images). Photographiez plutôt le menu, ou utilisez <strong>Je le tape moi-même</strong>.</li><li>Ou touchez <strong>Pouvez-vous le faire pour moi?</strong></li></ul>' },
+  // Portal polish (2026-10-18): "wine list from my website" -- the website import reads wine, drinks and price lists too.
+  { id: 'menu-import', over: ['menu-add', 'links'], q: 'Bring in my menu, wine list or prices from my website', qFr: 'Importer mon menu, ma carte des vins ou mes prix depuis mon site', pages: ['menu', 'edit'],
+    keys: ['import', 'import my menu', 'from my website', 'from our website', 'from the website', 'on my website', 'on our website', 'menu from website', 'menu on my website', 'wine list from', 'wine list on',
+      'drinks list from', 'price list from', 'prices from', 'prices on our website', 'copy from my website', 'copy my menu', 'pull my menu', 'website menu', 'link to my menu'],
+    keysFr: ['importer', 'importer mon menu', 'depuis mon site', 'depuis notre site', 'sur mon site', 'sur notre site', 'menu sur mon site', 'carte des vins sur', 'carte des vins depuis', 'liste de prix sur', 'copier mon menu'],
+    a: '<p>Yes. The website import reads <strong>wine lists, drinks lists and price lists</strong> (tours, green fees, rates) as well as food menus.</p><ol><li>Open <strong>Add your menu</strong> (or prices) from your edit page.</li><li>Choose <strong>My menu is on my website</strong> and paste the link to the <strong>page with the list itself</strong> (or its PDF), not your home page.</li><li>Check each <strong>yellow</strong> line, then <strong>Publish</strong>.</li></ol><p>Got a food menu and a wine list? Import one, then add the other as a new section, or use <strong>Type it in myself</strong>. If we can’t read your page, take a photo of the list instead, or tap <strong>Can you do it for me?</strong> and we’ll type it up, free.</p>',
+    aFr: '<p>Oui. L’importation depuis votre site lit les <strong>cartes des vins, cartes des boissons et listes de prix</strong> (visites, droits de jeu, tarifs) autant que les menus.</p><ol><li>Ouvrez <strong>Ajouter votre menu</strong> (ou vos prix) depuis votre page de modification.</li><li>Choisissez <strong>Mon menu est sur mon site</strong> et collez le lien de la <strong>page de la liste elle-même</strong> (ou de son PDF), pas celui de votre page d’accueil.</li><li>Vérifiez chaque ligne en <strong>jaune</strong>, puis publiez.</li></ol><p>Vous avez un menu et une carte des vins? Importez-en un, puis ajoutez l’autre dans une nouvelle section, ou utilisez <strong>Je le tape moi-même</strong>. Si nous ne pouvons pas lire votre page, photographiez plutôt la liste, ou touchez <strong>Pouvez-vous le faire pour moi?</strong> et nous la taperons pour vous, gratuitement.</p>' },
   { id: 'menu-change', over: ['menu-add'], q: 'Change or remove my menu', qFr: 'Modifier ou retirer mon menu', pages: ['menu', 'edit'],
     keys: ['change menu', 'change my menu', 'update menu', 'update my menu', 'new menu', 'old menu', 'take down', 'remove menu', 'remove my menu', 'edit menu', 'edit my menu', 'change a price', 'change prices', 'menu prices', 'update prices', 'update our menu', 'menu is out of date', 'old prices'],
     keysFr: ['modifier le menu', 'modifier mon menu', 'changer le menu', 'changer mon menu', 'nouveau menu', 'ancien menu', 'retirer le menu', 'retirer mon menu', 'mettre a jour le menu', 'changer un prix'],
@@ -36571,6 +36679,33 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['combien de personnes', 'combien de visiteurs', 'combien de vues', 'vues', 'statistiques', 'stats', 'clics', 'achalandage', 'trafic'],
     a: '<p>Visit numbers aren\u2019t in the business portal yet. <strong>Message us</strong> and Dayton can tell you roughly how many people have looked at your listing and tapped through to your website or phone.</p>',
     aFr: '<p>Le nombre de visites n\u2019est pas encore dans l\u2019espace entreprises. <strong>Écrivez-nous</strong> et Dayton pourra vous dire à peu près combien de personnes ont consulté votre fiche et touché votre site Web ou votre numéro.</p>' },
+  // Portal polish (2026-10-18): the second portal review's missed questions -- posting on social media for them, who
+  // can see a login, a wrong phone number on Google, and a broken website link.
+  { id: 'social-post', over: ['links', 'cost'], q: 'Can you post about us on Instagram or Facebook?', qFr: 'Pouvez-vous publier sur nous sur Instagram ou Facebook?', pages: ['edit', 'account'],
+    keys: ['post on instagram', 'post on facebook', 'post on social', 'post on social media', 'post for us', 'post about us', 'posts for us', 'share on instagram', 'share on facebook', 'share our posts', 'share our event',
+      'repost', 'reshare', 'tag us', 'shout out', 'shoutout', 'instagram post', 'facebook post', 'promote us', 'promote our', 'run our instagram', 'manage our instagram', 'manage our social', 'feature us on instagram', 'story', 'stories', 'reel'],
+    keysFr: ['publier sur instagram', 'publier sur facebook', 'publier pour nous', 'publication instagram', 'partager sur instagram', 'partager sur facebook', 'partager notre', 'identifier', 'mention', 'faire la promotion', 'gerer notre instagram', 'gerer nos reseaux'],
+    a: '<p>No, we don’t post on your accounts or manage your social media, and we can’t promise a post about you.</p><p>What we do share:</p><ul><li>Our own Instagram and Facebook pages sometimes feature places, events and guides from Okanagan Roam.</li><li>Events you add show on <strong>What’s On</strong>, and your listing shows in the guides and search.</li></ul><p>To help visitors find you, add your <strong>Instagram</strong> and <strong>Facebook</strong> in <strong>Name, address &amp; links</strong>, and add your events. Have something you’d like us to share? <strong>Message us</strong>.</p>',
+    aFr: '<p>Non, nous ne publions pas sur vos comptes et ne gérons pas vos réseaux sociaux, et nous ne pouvons pas promettre une publication sur vous.</p><p>Ce que nous partageons :</p><ul><li>Nos propres pages Instagram et Facebook présentent parfois des endroits, des événements et des guides d’Okanagan Roam.</li><li>Les événements que vous ajoutez s’affichent dans <strong>À l’affiche</strong>, et votre fiche paraît dans les guides et la recherche.</li></ul><p>Pour que les visiteurs vous trouvent, ajoutez votre <strong>Instagram</strong> et votre <strong>Facebook</strong> dans <strong>Nom, adresse et liens</strong>, et ajoutez vos événements. Vous aimeriez que nous partagions quelque chose? <strong>Écrivez-nous</strong>.</p>' },
+  { id: 'login-privacy', over: ['access', 'signin', 'staff', 'settings'], q: 'Who can see my login?', qFr: 'Qui peut voir mon compte?', pages: ['account', 'settings', 'edit', 'login'],
+    keys: ['who can see my login', 'who can see my email', 'who sees my email', 'who can see', 'see my login', 'see my email', 'see my password', 'can you see my password', 'is my email public', 'email public', 'email shown', 'email visible',
+      'privacy', 'private', 'is my login private', 'personal information', 'my data', 'my information', 'share my email', 'sell my email'],
+    keysFr: ['qui peut voir mon compte', 'qui peut voir mon courriel', 'qui peut voir', 'voir mon courriel', 'voir mon mot de passe', 'courriel public', 'courriel visible', 'confidentialite', 'vie privee', 'prive', 'renseignements personnels', 'mes donnees'],
+    a: '<p>Your login is private:</p><ul><li><strong>Visitors never see it.</strong> Your login email isn’t shown on your listing, and we don’t share or sell it.</li><li><strong>Your password</strong> is stored scrambled, so nobody can read it, us included.</li><li>The only people who see your login email are the others with a login for the same listing, in <strong>People with access</strong> on your edit page, and Dayton at Okanagan Roam.</li></ul><p>What <em>is</em> public is what you put on the listing itself: phone, website, address and links. Want someone off your listing? Ask me about <strong>who has access</strong>. More in our <a href="/privacy">privacy policy</a>.</p>',
+    aFr: '<p>Votre compte est privé :</p><ul><li><strong>Les visiteurs ne le voient jamais.</strong> Le courriel de votre compte n’est pas affiché sur votre fiche, et nous ne le partageons ni ne le vendons.</li><li><strong>Votre mot de passe</strong> est enregistré sous forme brouillée : personne ne peut le lire, pas même nous.</li><li>Les seules personnes qui voient le courriel de votre compte sont les autres personnes ayant un compte pour la même fiche, dans <strong>Personnes ayant accès</strong> sur votre page de modification, et Dayton chez Okanagan Roam.</li></ul><p>Ce qui <em>est</em> public, c’est ce que vous mettez sur la fiche : téléphone, site Web, adresse et liens. Vous voulez retirer quelqu’un de votre fiche? Demandez-moi <strong>qui a accès</strong>. Plus de détails dans notre <a href="/fr/privacy">politique de confidentialité</a>.</p>' },
+  { id: 'google', over: ['links', 'hours', 'name-address', 'reviews'], q: 'My phone number or hours are wrong on Google', qFr: 'Mon numéro ou mes heures sont erronés sur Google', pages: ['edit', 'account'],
+    keys: ['on google', 'wrong on google', 'google maps', 'google listing', 'google business', 'google business profile', 'google profile', 'google search', 'google shows', 'google says', 'google has', 'in google', 'from google'],
+    keysFr: ['sur google', 'google maps', 'fiche google', 'profil google', 'profil d entreprise google', 'google affiche', 'dans google'],
+    a: { in: '<p>We can’t change Google: Google Maps and Google search show your <strong>Google Business Profile</strong>, which only you (or whoever manages it) can edit.</p><ol><li>Go to <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a> and sign in with the Google account that manages your business.</li><li>Choose your business, tap <strong>Edit profile</strong>, then <strong>Contact</strong> (phone, website) or <strong>Hours</strong>, and save.</li><li>Google may take a few days to check it.</li></ol><p>Not on that Google account? Search for your business on Google Maps and tap <strong>Claim this business</strong> or <strong>Suggest an edit</strong>.</p><p>Then fix it here too: {ON}, change <strong>Phone</strong> (in <strong>Contact</strong>) or your hours, and tap {SEND}. {LIVE}</p>',
+      out: '<p>We can’t change Google: Google Maps and Google search show your <strong>Google Business Profile</strong>, which only you (or whoever manages it) can edit.</p><ol><li>Go to <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a> and sign in with the Google account that manages your business.</li><li>Choose your business, tap <strong>Edit profile</strong>, then <strong>Contact</strong> (phone, website) or <strong>Hours</strong>, and save.</li><li>Google may take a few days to check it.</li></ol><p>Not on that Google account? Search for your business on Google Maps and tap <strong>Claim this business</strong> or <strong>Suggest an edit</strong>.</p><p>Then fix it on your Okanagan Roam listing too: {ON}, change <strong>Phone</strong> (in <strong>Contact</strong>) or your hours, and tap {SEND}. {LIVE}</p>' },
+    aFr: { in: '<p>Nous ne pouvons pas modifier Google : Google Maps et la recherche Google affichent votre <strong>profil d’entreprise Google</strong>, que seule la personne qui le gère peut modifier.</p><ol><li>Allez à <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a> et connectez-vous avec le compte Google qui gère votre entreprise.</li><li>Choisissez votre entreprise, touchez <strong>Modifier le profil</strong>, puis <strong>Coordonnées</strong> (téléphone, site Web) ou <strong>Horaires</strong>, et enregistrez.</li><li>Google peut prendre quelques jours pour vérifier.</li></ol><p>Pas sur ce compte Google? Cherchez votre entreprise dans Google Maps et touchez <strong>Revendiquer cette entreprise</strong> ou <strong>Suggérer une modification</strong>.</p><p>Corrigez-le ici aussi : {ON}, changez le <strong>Téléphone</strong> (dans <strong>Coordonnées</strong>) ou vos heures, puis touchez {SEND}. {LIVE}</p>',
+      out: '<p>Nous ne pouvons pas modifier Google : Google Maps et la recherche Google affichent votre <strong>profil d’entreprise Google</strong>, que seule la personne qui le gère peut modifier.</p><ol><li>Allez à <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a> et connectez-vous avec le compte Google qui gère votre entreprise.</li><li>Choisissez votre entreprise, touchez <strong>Modifier le profil</strong>, puis <strong>Coordonnées</strong> (téléphone, site Web) ou <strong>Horaires</strong>, et enregistrez.</li><li>Google peut prendre quelques jours pour vérifier.</li></ol><p>Pas sur ce compte Google? Cherchez votre entreprise dans Google Maps et touchez <strong>Revendiquer cette entreprise</strong> ou <strong>Suggérer une modification</strong>.</p><p>Corrigez-le aussi sur votre fiche Okanagan Roam : {ON}, changez le <strong>Téléphone</strong> (dans <strong>Coordonnées</strong>) ou vos heures, puis touchez {SEND}. {LIVE}</p>' } },
+  { id: 'website-broken', over: ['links', 'newlink'], q: 'The website link on my listing is broken', qFr: 'Le lien vers mon site Web ne fonctionne pas', pages: ['edit'],
+    keys: ['website link', 'website link is broken', 'broken link', 'link is broken', 'link broken', 'website broken', 'website is broken', 'website doesnt work', 'website not working', 'website link doesnt work', 'dead link',
+      'wrong website', 'website is wrong', 'old website', 'website goes to', 'website error', 'site is down', 'booking link broken', 'menu link broken'],
+    keysFr: ['lien du site', 'lien brise', 'lien casse', 'site ne fonctionne pas', 'site web ne fonctionne pas', 'mauvais site', 'ancien site', 'lien mort', 'site web errone'],
+    a: '<ol><li>{ON}, find <strong>Website</strong> under <strong>Contact</strong>.</li><li>Paste the working address. Copying it from your browser’s address bar, starting with https://, is the surest way.</li><li>Tap {SEND}.</li></ol><p>A new website is <strong>always checked by us first</strong>, usually within a day, even when you’re signed in, so the old link shows until then and the field says <strong>Waiting for review</strong>. A broken booking, menu or social link? Those are in <strong>Name, address &amp; links</strong>, and work the same way.</p>',
+    aFr: '<ol><li>{ON}, trouvez <strong>Site Web</strong> sous <strong>Coordonnées</strong>.</li><li>Collez la bonne adresse. Le plus sûr est de la copier dans la barre d’adresse de votre navigateur, en commençant par https://.</li><li>Touchez {SEND}.</li></ol><p>Un nouveau site Web est <strong>toujours vérifié par nous d’abord</strong>, en général d’ici un jour, même avec un compte : l’ancien lien reste affiché d’ici là et le champ indique <strong>En attente de vérification</strong>. Un lien de réservation, de menu ou de réseau social brisé? Ils sont dans <strong>Nom, adresse et liens</strong>, et fonctionnent de la même façon.</p>' },
   // French portal (2026-10-18): every signed-in page is in French now; the bot says so and names the French buttons.
   { id: 'french', q: 'Is the business portal in French?', qFr: 'L\u2019espace entreprises est-il en français?', pages: ['edit', 'account', 'settings', 'login', 'link', 'menu', 'claim'],
     keys: ['in french', 'french version', 'french page', 'francais', 'language', 'translate', 'translation'],
@@ -38441,8 +38576,9 @@ function ownerFieldEquals(field, a, b) {
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
-// owner set. -> { ok, restored, skipped } or { ok: false, reason }.
-function undoOwnerInstantChange(id, reviewer, now = new Date()) {
+// owner set. -> { ok, restored, skipped } or { ok: false, reason }. `reason` (2026-10-18) is kept for the owner's
+// "Your updates" ("Changed back by us: ...") and their email.
+function undoOwnerInstantChange(id, reviewer, now = new Date(), reason = '') {
   const req = getOwnerChange(id);
   if (!req) return { ok: false, reason: 'not_found' };
   if (!req.instant || req.status !== 'approved') return { ok: false, reason: 'not_instant' };
@@ -38470,6 +38606,8 @@ function undoOwnerInstantChange(id, reviewer, now = new Date()) {
   const r = applyOwnerFields(row, restore, Object.keys(restore), meta, reviewer, now, { undo: true, undoMeta });
   if (!r.ok) return r;
   db.prepare('UPDATE owner_change_requests SET undone_at = CURRENT_TIMESTAMP, undone_by = ? WHERE id = ?').run(reviewer, id);
+  const why = String(reason || '').trim().slice(0, 300);
+  if (why) { try { db.prepare('UPDATE owner_change_requests SET undo_reason = ? WHERE id = ?').run(why, id); } catch (e) { /* an old copy without the column */ } }
   return { ok: true, restored: r.applied, skipped };
 }
 // The waiting fields that would go live now for a signed-in owner (2026-10-18): the instant-eligible ones from the
@@ -38693,6 +38831,32 @@ function ownerDecisionEmailFr({ venueName, what, outcome, reason, link, owner, e
     text: `Bonjour,\n\nMerci d’avoir envoyé ${what} pour ${venueName}. Nous n’avons pas pu publier cet envoi cette fois-ci.${why}${owner ? `\n\nVous pouvez envoyer une version corrigée à partir de votre compte entreprise : https://okanaganroam.com/fr/owner/login. Pas encore de compte? Recevez votre lien de modification privé ici : https://okanaganroam.com/fr${OWNER_NEW_LINK_PATH}` : ''}\n\nDes questions? Écrivez-nous à info@okanaganroam.com.${sign}`,
   };
 }
+// "We changed something back" (2026-10-18): the email after an Undo from /admin/review that came with a reason, in the
+// language the change was saved in, to whoever saved it and the listing's logins.
+function ownerUndoEmail({ venueName, fields, reason, link, lang }) {
+  if (lang === 'fr') {
+    return { subject: `Nous avons rétabli une modification de ${venueName}`,
+      text: `Bonjour,\n\nNous avons remis l’ancienne version de ${ownerFieldList(fields, 'fr')} sur la fiche ${venueName} d’Okanagan Roam.\n\nRaison : ${reason}${link ? `\n\nVotre fiche : ${link}` : ''}\n\nVous pouvez la mettre à jour de nouveau en tout temps : https://okanaganroam.com/fr/owner/login. Des questions? Répondez à ce courriel ou écrivez à info@okanaganroam.com.\n\nMerci,\nOkanagan Roam` };
+  }
+  return { subject: `We changed back an update to ${venueName}`,
+    text: `Hi,\n\nWe put back the earlier ${ownerFieldList(fields)} on the ${venueName} listing on Okanagan Roam.\n\nReason: ${reason}${link ? `\n\nYour listing: ${link}` : ''}\n\nYou can update it again any time: ${OWNER_LOGIN_URL}. Questions? Reply to this email or write to info@okanaganroam.com.\n\nThanks,\nOkanagan Roam` };
+}
+// -> 'sent' | 'failed' | 'no_address' | 'email_off'
+async function notifyOwnerUndo(id, restored, reason) {
+  const r = getOwnerChange(id);
+  const v = r && db.prepare('SELECT id, name, region, type, slug FROM venues WHERE id = ?').get(r.venue_id);
+  if (!v) return 'no_address';
+  const fr = r.lang === 'fr';
+  const fields = Array.isArray(restored) && restored.length ? restored : Object.keys(r.changes);
+  const email = String(r.reviewed_by || '').startsWith('owner:') ? String(r.reviewed_by).slice(6) : r.contact_email;
+  return sendOwnerDecision(ownerDecisionRecipients(v.id, email), ownerUndoEmail({ venueName: v.name, fields, reason: String(reason).trim().slice(0, 300),
+    link: fr ? ownerListingUrlFr(v) : venueListingUrl(v), lang: fr ? 'fr' : 'en' }));
+}
+// An event page in French when it has a French twin (its description is translated), else the English page (2026-10-18).
+function ownerEventUrlFr(ev) {
+  const p = `/${ev.region}/events/${ev.slug}`;
+  return `https://okanaganroam.com${hasFrenchTwin(p) ? `/fr${p}` : p}`;
+}
 // The venue page in French when it has one.
 function ownerListingUrlFr(v) {
   const row = v ? db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id) : null;
@@ -38748,7 +38912,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     const evLang = s.owner_venue_id ? (db.prepare('SELECT lang FROM event_submissions WHERE id = ?').get(id) || {}).lang : null;
     if (evLang === 'fr') {
       return sendOwnerDecision(to, ownerDecisionEmail({ venueName: venue ? venue.name : 'Okanagan Roam', what: `votre événement « ${s.name} »`, outcome, reason,
-        link: ev ? `https://okanaganroam.com/${ev.region}/events/${ev.slug}` : null, owner: true, lang: 'fr' }));
+        link: ev ? ownerEventUrlFr(ev) : null, owner: true, lang: 'fr' }));
     }
     return sendOwnerDecision(to, ownerDecisionEmail({ venueName: venue ? venue.name : 'Okanagan Roam', what: `your event "${s.name}"`, outcome, reason,
       link: ev ? `https://okanaganroam.com/${ev.region}/events/${ev.slug}` : null, owner: !!s.owner_venue_id }));
@@ -38760,7 +38924,7 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     if (!v || !ev) return 'no_address';
     if (c.lang === 'fr') {
       return sendOwnerDecision(ownerDecisionRecipients(c.venue_id, c.contact_email), ownerDecisionEmail({ venueName: v.name, what: `la modification de votre événement « ${ev.name} »`,
-        outcome, reason, edited: false, link: `https://okanaganroam.com/${ev.region}/events/${ev.slug}`, owner: true, lang: 'fr' }));
+        outcome, reason, edited: false, link: ownerEventUrlFr(ev), owner: true, lang: 'fr' }));
     }
     return sendOwnerDecision(ownerDecisionRecipients(c.venue_id, c.contact_email), ownerDecisionEmail({ venueName: v.name, what: `the change to your event "${ev.name}"`,
       outcome, reason, edited: false, link: `https://okanaganroam.com/${ev.region}/events/${ev.slug}`, owner: true }));
@@ -38841,15 +39005,17 @@ async function adminReviewAction(kind, id, action, body) {
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
   let r;
   if (action === 'undo') {
-    // Undo a signed-in owner's instant change (2026-10-18). The owner isn't emailed.
+    // Undo a signed-in owner's instant change (2026-10-18). With a reason (portal polish, 2026-10-18) the owner gets
+    // a short email in their language and sees the reason in "Your updates"; without one nobody is emailed.
     if (kind !== 'change') return { status: 400, body: { error: 'Unknown action.' } };
-    const u = undoOwnerInstantChange(id, ADMIN_REVIEWER);
+    const u = undoOwnerInstantChange(id, ADMIN_REVIEWER, new Date(), reason);
     if (!u.ok) {
       const msg = { not_found: 'This was already removed.', not_instant: 'Only changes that went live straight away can be undone here.', already_undone: 'This was already undone.',
         changed_since: 'Nothing to undo: every field was changed again since.', venue_unavailable: 'The listing no longer exists.' }[u.reason] || ADMIN_REVIEW_ERRORS[u.reason] || u.reason;
       return { status: u.reason === 'not_found' ? 404 : 409, body: { error: msg, detail: u.detail } };
     }
-    return { status: 200, body: { ok: true, restored: u.restored, skipped: u.skipped, emailed: 'not_told' } };
+    const emailed = reason ? await notifyOwnerUndo(id, u.restored, reason) : 'not_told';
+    return { status: 200, body: { ok: true, restored: u.restored, skipped: u.skipped, emailed } };
   }
   if (kind === 'change') {
     if (action === 'remove') return { status: 400, body: { error: 'Unknown action.' } };
@@ -39020,13 +39186,14 @@ function renderAdminInstantCard(r) {
     const before = f === 'badges' ? '' : ownerValueText(f, r.previous[f]);
     return `<tr><th>${adminReviewEsc(OWNER_FIELD_LABELS[f] || f)}</th><td class="rv-old">${adminReviewEsc(before)}</td><td class="rv-new">${adminReviewEsc(ownerValueText(f, r.changes[f]))}</td></tr>`;
   }).join('');
-  const done = r.undone_at ? `<p class="rv-result">Undone ${adminReviewEsc(adminReviewTime(r.undone_at))}.</p>` : '';
+  // adminReviewTime ends in "p.m." already, so no second period (2026-10-18).
+  const done = r.undone_at ? `<p class="rv-result">Undone ${adminReviewEsc(adminReviewTime(r.undone_at).replace(/\.$/, ''))}.${r.undo_reason ? ` Reason: ${adminReviewEsc(r.undo_reason)}` : ''}</p>` : '';
   return `<article class="rv-card${r.undone_at ? ' rv-done' : ''}" data-kind="change" data-id="${r.id}">
       <h3>${adminReviewEsc(r.venue_name)}</h3>
       <p class="rv-meta">Live change #${r.id} · ${adminReviewEsc(adminReviewTime(r.submitted_at))} by ${adminReviewEsc(String(r.reviewed_by || '').replace(/^owner:/, '') || r.contact_email || 'owner')}${r.contact_name ? ` (${adminReviewEsc(r.contact_name)})` : ''} · <a href="${adminReviewEsc(r.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <table class="rv-diff"><tr><th>Change</th><th>Before</th><th>Now</th></tr>${rows}</table>
       ${r.note ? `<p class="rv-text"><strong>Note:</strong> ${adminReviewEsc(r.note)}</p>` : ''}
-      ${done || `<div class="rv-actions"><button type="button" class="rv-btn rv-reject" data-act="undo">Undo</button><span class="rv-meta">Puts back what was there before (fields changed again since are left alone). The owner isn\u2019t emailed.</span></div><p class="rv-result" hidden></p>`}
+      ${done || `<div class="rv-actions"><input type="text" name="reason" maxlength="300" placeholder="Reason (sent to the owner)"><button type="button" class="rv-btn rv-reject" data-act="undo">Undo</button></div><p class="rv-meta">Puts back what was there before (fields changed again since are left alone). With a reason, the owner is emailed it and sees it under Your updates; without one, they aren\u2019t emailed.</p><p class="rv-result" hidden></p>`}
     </article>`;
 }
 
@@ -39260,11 +39427,11 @@ const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
-  for (const r of db.prepare("SELECT id, status, changes, submitted_at, reviewed_at, rejection_reason, undone_at FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
+  for (const r of db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND status != 'superseded' ORDER BY id DESC LIMIT 10").all(venueId)) {
     let fields = [];
     try { fields = Object.keys(JSON.parse(r.changes)).map((f) => (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[f] || f); } catch (e) { /* unreadable */ }
     const what = fields.join(', ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
-    items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.rejection_reason,
+    items.push({ kind: 'change', at: r.reviewed_at || r.submitted_at, sent: r.submitted_at, status: r.undone_at ? 'undone' : r.status, reason: r.undone_at ? r.undo_reason || null : r.rejection_reason,
       title: fr ? (fields.length ? `Mise à jour de la fiche : ${what}` : 'Mise à jour de la fiche') : fields.length ? `Listing update: ${what}` : 'Listing update' });
   }
   const today = todayLocal();
@@ -39300,19 +39467,41 @@ function ownerStatusLabel(item, lang = 'en') {
   return { cls: 'no', text: L('Not approved', 'Non approuvé') };
 }
 
-function ownerActivityHtml(items, lang = 'en') {
+// Folded updates (2026-10-18): every save added a row, which pushed the form down on phones. Anything sent more than a
+// day ago that isn't waiting for review now folds behind "Show all (N)"; waiting items always show, and when
+// everything is old the newest row still shows.
+function ownerActivityIsOld(item, now = new Date()) {
+  if (item.status === 'pending' || item.status === 'changewait') return false;
+  const t = new Date(`${String(item.sent || '').replace(' ', 'T')}Z`).getTime();
+  return !Number.isNaN(t) && now.getTime() - t > 24 * 3600 * 1000;
+}
+function ownerActivityHtml(items, lang = 'en', now = new Date()) {
   if (!items.length) return '';
   const fr = lang === 'fr';
   const L = (en, f) => (fr ? f : en);
+  const old = items.map((it) => ownerActivityIsOld(it, now));
+  if (old.every(Boolean)) old[0] = false;
+  const folded = old.filter(Boolean).length;
   return `<section class="op-activity" aria-labelledby="opActivityHead">
       <h2 id="opActivityHead" class="lyv-section-label" style="margin-top:22px">${L('Your updates', 'Vos mises à jour')}</h2>
-      <ul>${items.map((it) => {
+      <ul id="opActivityList">${items.map((it, i) => {
         const st = ownerStatusLabel(it, lang);
-        const why = st.cls === 'no' && it.reason ? `<span class="op-why">${escapeHtml(it.reason)}</span>` : '';
+        const why = st.cls === 'no' && it.reason ? `<span class="op-why">${escapeHtml(it.reason)}</span>`
+          : it.status === 'undone' && it.reason ? `<span class="op-why">${L('Changed back by us: ', 'Rétabli par nous : ')}${escapeHtml(it.reason)}</span>` : '';
         const live = it.status !== 'pending';
         const btns = it.kind === 'event' && it.canEdit ? `<span class="op-act-btns"><button type="button" class="op-linkbtn" data-ev-change="${it.id}">${L('Change', 'Modifier')}</button> &middot; <button type="button" class="op-linkbtn" data-ev-cancel="${it.id}" data-ev-live="${live ? 1 : 0}">${live ? L('Cancel event', 'Annuler l’événement') : L('Withdraw', 'Retirer')}</button></span>` : '';
-        return `<li><span class="op-act-main"><strong>${escapeHtml(it.title)}</strong><span class="op-act-date">${L('Sent', 'Envoyé le')} ${escapeHtml(ownerLocalDate(it.sent, fr))}</span>${why}${btns}</span><span class="op-status op-status-${st.cls}">${st.text}</span></li>`;
+        return `<li${old[i] ? ' class="op-act-old" hidden' : ''}><span class="op-act-main"><strong>${escapeHtml(it.title)}</strong><span class="op-act-date">${L('Sent', 'Envoyé le')} ${escapeHtml(ownerLocalDate(it.sent, fr))}</span>${why}${btns}</span><span class="op-status op-status-${st.cls}">${st.text}</span></li>`;
       }).join('')}</ul>
+      ${folded ? `<p class="op-hint"><button type="button" class="op-linkbtn" id="opActivityMore">${L(`Show all (${items.length})`, `Tout afficher (${items.length})`)}</button></p>
+      <script>
+(function(){
+  var b = document.getElementById('opActivityMore'); if (!b) return;
+  b.addEventListener('click', function(){
+    Array.prototype.forEach.call(document.querySelectorAll('#opActivityList .op-act-old'), function(li){ li.hidden = false; });
+    b.parentNode.hidden = true;
+  });
+})();
+</script>` : ''}
     </section>`;
 }
 
@@ -39382,7 +39571,16 @@ async function handleOwnerPhotoAction(req, res, account, venueId, photoId, actio
   }
   if (action === 'main') {
     if (photo.status !== 'approved') return sendSubmissionResponse(res, 409, { ok: false, error: 'This photo is still waiting for review.' });
+    // The old main photo stays near the front (2026-10-18): it becomes the first of the other photos, and the rest
+    // keep their order. It used to drop to the end of the gallery (it had no place in the order, being main).
+    const mainBefore = ownerVenueMainImage(venueId);
+    const others = ownerPhotosForVenue(venueId).filter((p) => p.id !== photo.id && mainBefore !== `/images/owner/${p.file}`);
+    const oldMain = ownerPhotosForVenue(venueId).find((p) => p.id !== photo.id && mainBefore === `/images/owner/${p.file}`);
     const r = approveOwnerPhoto(photo.id, 'owner', { main: true });
+    if (r.ok && oldMain) {
+      const set = db.prepare('UPDATE owner_photos SET sort_order = ? WHERE id = ?');
+      [oldMain, ...others].forEach((p, n) => set.run(n + 1, p.id));
+    }
     return sendSubmissionResponse(res, r.ok ? 200 : 409, r.ok ? { ok: true, main: true } : { ok: false, error: 'Sorry, that didn’t work. Please try again.' });
   }
   const r = removeOwnerPhoto(photo.id, 'owner', 'removed by owner');
@@ -39425,6 +39623,7 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-act-btns { display: block; font-size: 0.86rem; margin-top: 4px; }
   body.owner-page .op-act-btns button, body.owner-page .op-changing button { background: none; border: 0; padding: 2px 0; color: var(--ref-navy); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   body.owner-page .op-act-btns button[data-sure="1"] { color: #9C2F22; }
+  body.owner-page #opActivityMore { background: none; border: 0; padding: 0; color: var(--ref-navy); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   body.owner-page .op-count { margin: 4px 0 0; font-size: 0.8rem; }
   /* While a send is in progress the button says so (slow phone connections). */
   body.owner-page .venue-form-submit:disabled { position: relative; color: transparent !important; opacity: 0.85; cursor: wait; }
@@ -39503,6 +39702,22 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
 // Businesses people book (tours, golf, activities): the booking link comes first on the owner page.
 const OWNER_BOOKING_FIRST_TYPES = new Set(['tour', 'golf', 'indoor', 'sport', 'outdoor']);
 
+// What the folded Seasonal hours and Special closures headers say once something is set (2026-10-18), so an owner
+// sees it without opening them: "Winter hours Nov 1–Apr 30", "2 closures (next: Dec 25)".
+function ownerSeasonSummary(season, lang = 'en') {
+  if (!season || !season.from || !season.to) return '';
+  const fr = lang === 'fr';
+  const label = String(season.label || '').trim() || (fr ? 'Heures saisonnières' : 'Seasonal hours');
+  return fr ? `${label} du ${hoursExtraDayText(season.from, true)} au ${hoursExtraDayText(season.to, true)}`
+    : `${label} ${hoursExtraDayText(season.from)}–${hoursExtraDayText(season.to)}`;
+}
+function ownerClosuresSummary(closures, lang = 'en', today = todayLocal()) {
+  const list = (closures || []).filter((c) => c && (c.to || c.from) >= today).sort((a, b) => String(a.from).localeCompare(String(b.from)));
+  if (!list.length) return '';
+  const fr = lang === 'fr', n = list.length, next = list[0].from >= today ? list[0].from : today;
+  const when = hoursExtraDayText(next, fr);
+  return fr ? `${n} fermeture${n === 1 ? '' : 's'} (prochaine : ${when})` : `${n} closure${n === 1 ? '' : 's'} (next: ${when})`;
+}
 // Seasonal hours on the owner page (2026-10-18): one second week of hours for part of every year. `dayRows` is the
 // page's own day-row builder, so the rows look and work like the usual hours.
 function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
@@ -39515,7 +39730,7 @@ function ownerSeasonalHoursHtml(season, dayRows, chip, lang = 'en') {
     ? `<select id="${dId}" aria-label="${dLabel}">${dayOpts(sel.slice(3))}</select> <select id="${mId}" aria-label="${mLabel}">${monthOpts(sel.slice(0, 2))}</select>`
     : `<select id="${mId}" aria-label="${mLabel}">${monthOpts(sel.slice(0, 2))}</select> <select id="${dId}" aria-label="${dLabel}">${dayOpts(sel.slice(3))}</select>`);
   return `<details class="op-fold" id="opSeasonalBox"${season ? ' open' : ''}>
-      <summary><span class="lyv-section-label">${L('Seasonal hours', 'Heures saisonnières')}${chip}</span> <span class="op-fold-hint">${L('Different hours part of the year, like winter hours from November to April', 'D’autres heures pendant une partie de l’année, comme des heures d’hiver de novembre à avril')}</span></summary>
+      <summary><span class="lyv-section-label">${L('Seasonal hours', 'Heures saisonnières')}${chip}</span> <span class="op-fold-hint" id="opSeasonalSummary">${season ? escapeHtml(ownerSeasonSummary(season, lang)) : L('Different hours part of the year, like winter hours from November to April', 'D’autres heures pendant une partie de l’année, comme des heures d’hiver de novembre à avril')}</span></summary>
       <label class="op-closed" style="width:auto"><input type="checkbox" id="opSeasonalOn"${season ? ' checked' : ''}> ${L('We have different hours part of the year', 'Nous avons d’autres heures pendant une partie de l’année')}</label>
       <div id="opSeasonalFields"${season ? '' : ' hidden'}>
         <div class="op-season"><label for="opSeasonalLabel"><strong>${L('Name', 'Nom')}</strong> ${L('(optional)', '(facultatif)')}</label> <input type="text" id="opSeasonalLabel" maxlength="40" placeholder="${L('Winter hours', 'Heures d’hiver')}" value="${escapeHtml(season ? season.label || '' : '')}"></div>
@@ -39542,7 +39757,7 @@ function ownerClosuresHtml(closures, chip, lang = 'en') {
   const L = (en, f) => (lang === 'fr' ? f : en);
   const today = todayLocal();
   return `<details class="op-fold" id="opClosuresBox"${closures.length ? ' open' : ''}>
-      <summary><span class="lyv-section-label">${L('Special closures', 'Fermetures spéciales')}${chip}</span> <span class="op-fold-hint">${L('Holidays, renovations or private events: days you&rsquo;re closed', 'Jours fériés, rénovations ou événements privés : les jours où vous êtes fermés')}</span></summary>
+      <summary><span class="lyv-section-label">${L('Special closures', 'Fermetures spéciales')}${chip}</span> <span class="op-fold-hint" id="opClosuresSummary">${ownerClosuresSummary(closures, lang, today) ? escapeHtml(ownerClosuresSummary(closures, lang, today)) : L('Holidays, renovations or private events: days you&rsquo;re closed', 'Jours fériés, rénovations ou événements privés : les jours où vous êtes fermés')}</span></summary>
       <div id="opClosures">${closures.map((c) => ownerClosureRowHtml(c, today, lang)).join('')}</div>
       <template id="opClosureTpl">${ownerClosureRowHtml(null, today, lang)}</template>
       <button type="button" class="op-cl-add" id="opClosureAdd">${L('+ Add a closed day', '+ Ajouter un jour de fermeture')}</button>
@@ -39637,13 +39852,14 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   // Save), so the line says what Save does with what is still waiting.
   const carryOnSave = instantOn && waitingReq && waitingReq.status === 'pending' && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT
     ? Object.keys((ownerPendingInstantSplit(waitingReq, live) || { live: {} }).live) : [];
+  // "le 15 oct." already ends in a period, so the French sentences drop their own after it (2026-10-18).
   const sentOn = pending ? escapeHtml(ownerLocalDate(pending.submitted_at, fr)) : '';
   const pendingNote = !pending ? ''
     : !instantOn
-      ? `<p class="op-pending">${L(`You sent changes on ${sentOn}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.`, `Vous avez envoyé des modifications le ${sentOn}. Elles attendent notre vérification et s’affichent ci-dessous avec la mention « En attente de vérification ». Tout ce que vous envoyez maintenant s’y ajoute.`)}</p>`
+      ? `<p class="op-pending">${L(`You sent changes on ${sentOn}. They&rsquo;re waiting for review and show below, marked &ldquo;Waiting for review&rdquo;. Anything else you send now is added to them.`, `Vous avez envoyé des modifications le ${sentOn.replace(/\.$/, '')}. Elles attendent notre vérification et s’affichent ci-dessous avec la mention « En attente de vérification ». Tout ce que vous envoyez maintenant s’y ajoute.`)}</p>`
       : carryOnSave.length
         ? `<p class="op-pending" id="opPendingCarry">${L(`You sent changes on ${sentOn} from the edit link. They show below, marked &ldquo;Waiting for review&rdquo;. Tap <strong>Save changes</strong> to put the ${escapeHtml(ownerFieldNames(carryOnSave, 'en'))} live now. A new name, address, website or link is still checked by us first.`, `Vous avez envoyé des modifications le ${sentOn} avec le lien de modification. Elles s’affichent ci-dessous avec la mention « En attente de vérification ». Touchez <strong>Enregistrer les modifications</strong> pour mettre en ligne maintenant : ${escapeHtml(ownerFieldNames(carryOnSave, 'fr'))}. Un nouveau nom, une nouvelle adresse, un site Web ou un lien est toujours vérifié par nous d’abord.`)}</p>`
-        : `<p class="op-pending">${L(`You sent changes on ${sentOn}. A new name, address, website or link is checked by us first, usually within a day; it shows below, marked &ldquo;Waiting for review&rdquo;, until then.`, `Vous avez envoyé des modifications le ${sentOn}. Un nouveau nom, une nouvelle adresse, un site Web ou un lien est d’abord vérifié par nous, en général d’ici un jour; d’ici là, il s’affiche ci-dessous avec la mention « En attente de vérification ».`)}</p>`;
+        : `<p class="op-pending">${L(`You sent changes on ${sentOn}. A new name, address, website or link is checked by us first, usually within a day; it shows below, marked &ldquo;Waiting for review&rdquo;, until then.`, `Vous avez envoyé des modifications le ${sentOn.replace(/\.$/, '')}. Un nouveau nom, une nouvelle adresse, un site Web ou un lien est d’abord vérifié par nous, en général d’ici un jour; d’ici là, il s’affiche ci-dessous avec la mention « En attente de vérification ».`)}</p>`;
   const initial = JSON.stringify(snap).replace(/</g, '\\u003c');
   // Events the owner can still change or cancel, with what the Change form starts from.
   const editableEvents = {};
@@ -39777,6 +39993,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-activity ul { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper); border-radius: 14px; }
   body.owner-page .op-activity li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(42,32,25,0.08); }
   body.owner-page .op-activity li:last-child { border-bottom: 0; }
+  body.owner-page .op-activity li[hidden] { display: none; }
   body.owner-page .op-act-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   body.owner-page .op-act-date { font-size: 0.8rem; color: rgba(42,32,25,0.8); }
   body.owner-page .op-access { list-style: none; padding: 0; margin: 8px 0; background: var(--paper); border-radius: 14px; }
@@ -39921,7 +40138,7 @@ ${renderGolfHeaderHtml()}
         <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
           <option value="">${L('Not set', 'Non indiquée')}</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[n])} ${L('per person', 'par personne')}</option>`).join('')}
         </select>
-        <p class="op-hint" id="opPriceScale">${L('What one person usually spends: $ under $15, $$ $15&ndash;30, $$$ $30&ndash;60, $$$$ over $60 per person.', 'Ce qu’une personne dépense habituellement : $ moins de 15 $, $$ 15 à 30 $, $$$ 30 à 60 $, $$$$ plus de 60 $ par personne.')}</p>
+        <p class="op-hint" id="opPriceScale">${L('Pick what one person usually spends on a visit.', 'Choisissez ce qu’une personne dépense habituellement par visite.')}</p>
         <p class="lyv-error" id="opPriceError" hidden></p>
       </div></div>
       </details>`}
@@ -44137,6 +44354,23 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Portal polish (2026-10-18)
+  ownerActivityHtml,
+  ownerVenueActivity,
+  ownerActivityIsOld,
+  adminReviewAction,
+  ownerUndoEmail,
+  ownerEmailLang,
+  ownerLangEmail,
+  ownerEventUrlFr,
+  ownerListingUrlFr,
+  ownerSeasonSummary,
+  ownerClosuresSummary,
+  hoursExtrasSpecification,
+  seasonRunDates,
+  menuPriceWithWords,
+  priceListAppStrings,
+  MENU_APP_STRINGS,
   // Lazy card photos (2026-10-18)
   withLazyCardPhotos,
   LAZY_CARD_EAGER,

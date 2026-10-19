@@ -1096,4 +1096,14 @@ for (const t of ['owner_change_requests', 'owner_photos', 'event_submissions', '
   if (cols.length && !cols.includes('lang')) db.exec(`ALTER TABLE ${t} ADD COLUMN lang TEXT`);
 }
 
+// Portal polish (2026-10-18): owner_accounts.lang is the language of the portal page the owner last signed in or made
+// their login from ('fr' or 'en'), so the access emails ("new login added", "access removed") reach them in it.
+// owner_change_requests.undo_reason is the reason Dayton gave when undoing an instant change (shown to the owner).
+{
+  const acc = db.prepare('PRAGMA table_info(owner_accounts)').all().map((c) => c.name);
+  if (acc.length && !acc.includes('lang')) db.exec('ALTER TABLE owner_accounts ADD COLUMN lang TEXT');
+  const ocr = db.prepare('PRAGMA table_info(owner_change_requests)').all().map((c) => c.name);
+  if (ocr.length && !ocr.includes('undo_reason')) db.exec('ALTER TABLE owner_change_requests ADD COLUMN undo_reason TEXT');
+}
+
 module.exports = db;

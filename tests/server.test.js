@@ -20354,7 +20354,7 @@ test('Owner portal: edit link, owner page, change request, review and approval',
     // Validation.
     const started = Date.now() - 10000;
     assert.equal((await send(token, { changes: { phone: '123' }, started_at: started })).body.errors.phone !== undefined, true);
-    assert.equal((await send(token, { changes: { phone: '250-555-0123' }, started_at: Date.now() })).status, 400, 'too fast');
+    // Portal polish (2026-10-18): the owner page has no "very quick" fill-time check any more (see the portal polish tests).
     assert.equal((await send(token, { changes: { description: 'short' }, started_at: started })).status, 400);
     assert.equal((await send(token, { changes: { hours: { mon: [['25:00', '10:00']] } }, started_at: started })).status, 400);
     const none = await send(token, { changes: { badges: {} }, started_at: started });
@@ -25375,7 +25375,10 @@ test('Instant owner edits (2026-10-18): signed-in hours, phone, description, bad
   assert.match(page, /go live on <a href="[^"]+">your page<\/a> straight away/);
   assert.match(page, /id="opSubmit">Save changes</);
   assert.match(page, /\$\$ &mdash; \$15–30 per person/, 'price range selector with its scale');
-  assert.match(page, /What one person usually spends: \$ under \$15, \$\$ \$15&ndash;30, \$\$\$ \$30&ndash;60, \$\$\$\$ over \$60 per person\./);
+  // Portal polish (2026-10-18): the scale shows once, in the choices; the hint no longer repeats it.
+  const priceSec = page.slice(page.indexOf('id="price"'), page.indexOf('</details>', page.indexOf('id="price"')));
+  assert.equal((priceSec.match(/\$15(?:–|&ndash;)30/g) || []).length, 1, 'the price scale shows once');
+  assert.match(page, /id="opPriceScale">Pick what one person usually spends on a visit\.</);
   const week = (w) => ({ mon: [w], tue: [w], wed: [w], thu: [w], fri: [w], sat: [], sun: [] });
   const r = await post(`/owner/account/venue/${v.id}/changes`, { changes: {
     phone: '250-555-0181', description: 'A cosy fixture restaurant with a wood oven, a patio and a short local wine list.',
@@ -26370,3 +26373,273 @@ test('French portal (2026-10-18): the help bot answers in French with the French
   assert.equal(topicFor('Rien n’a encore changé. Modifiez un champ, puis envoyez-le.'), 'nothing-changed');
   assert.equal(topicFor('Cette photo est trop petite. Utilisez-en une d’au moins 800 pixels de large.'), 'photo-small');
 });
+
+// ---------- Portal polish (2026-10-18): the second portal review's issues 5-12 ----------
+test('Portal polish (2026-10-18): "Your updates" folds live rows older than a day behind "Show all (N)"; waiting rows always show (EN and FR)', () => {
+  const vm = require('node:vm');
+  const now = new Date('2026-10-18T20:00:00Z');
+  const items = [
+    { kind: 'change', status: 'approved', sent: '2026-10-18 19:00:00', title: 'Listing update: Hours' },
+    { kind: 'change', status: 'approved', sent: '2026-10-16 19:00:00', title: 'Listing update: Phone' },
+    { kind: 'change', status: 'pending', sent: '2026-10-10 19:00:00', title: 'Listing update: Website' },
+    { kind: 'event', id: 9, status: 'changewait', sent: '2026-10-01 19:00:00', title: 'Event: Old Gala', canEdit: true },
+    { kind: 'photo', status: 'approved', sent: '2026-10-12 19:00:00', title: 'Photo' },
+  ];
+  const html = app.ownerActivityHtml(items, 'en', now);
+  const rows = html.match(/<li[^>]*>/g);
+  assert.deepEqual(rows, ['<li>', '<li class="op-act-old" hidden>', '<li>', '<li>', '<li class="op-act-old" hidden>'], 'old live rows fold; waiting rows stay, however old');
+  assert.match(html, /id="opActivityMore">Show all \(5\)<\/button>/);
+  for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => new vm.Script(m[1]));
+  assert.match(app.ownerActivityHtml(items, 'fr', now), /Tout afficher \(5\)/);
+  // Everything new: nothing folds and there's no button. Everything old: the newest row still shows.
+  assert.doesNotMatch(app.ownerActivityHtml([items[0]], 'en', now), /opActivityMore|hidden/);
+  const allOld = app.ownerActivityHtml([items[1], items[4]], 'en', now);
+  assert.deepEqual(allOld.match(/<li[^>]*>/g), ['<li>', '<li class="op-act-old" hidden>']);
+  // The folded rows really hide: li is display:flex, so [hidden] needs its own rule.
+  assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8'), /body\.owner-page \.op-activity li\[hidden\] \{ display: none; \}/);
+});
+
+test('Portal polish (2026-10-18): the help bot answers Instagram posting, login privacy, Google, broken website links and wine lists from a website (EN and FR)', () => {
+  const qs = [
+    ['can you post on Instagram for us', 'edit', 'social-post'], ['will you share our event on instagram', 'edit', 'social-post'], ['can you tag us in a story', 'account', 'social-post'],
+    ['who can see my login', 'account', 'login-privacy'], ['is my email public', 'edit', 'login-privacy'], ['can you see my password', 'settings', 'login-privacy'],
+    ['my phone number is wrong on Google', 'edit', 'google'], ['google maps has our old hours', 'edit', 'google'], ['how do i fix my google business profile', 'account', 'google'],
+    ['the website link is broken', 'edit', 'website-broken'], ['our website link doesnt work', 'edit', 'website-broken'], ['the website on our listing is wrong', 'edit', 'website-broken'],
+    ['wine list from my website', 'menu', 'menu-import'], ['can you import our wine list from our website', 'edit', 'menu-import'], ['our prices are on our website', 'menu', 'menu-import'],
+    ['pouvez-vous publier sur instagram pour nous', 'edit', 'social-post', 'fr'], ['qui peut voir mon compte', 'account', 'login-privacy', 'fr'],
+    ['mon numéro est erroné sur google', 'edit', 'google', 'fr'], ['le lien de mon site ne fonctionne pas', 'edit', 'website-broken', 'fr'],
+    ['importer ma carte des vins depuis mon site', 'menu', 'menu-import', 'fr'],
+    // The near misses keep their old answers.
+    ['our phone number is wrong', 'edit', 'links'], ['update my instagram', 'edit', 'links'], ['the link in my email doesn’t work', 'link', 'newlink'],
+    ['we couldnt find a menu on that page', 'menu', 'menu-website'], ['how to add a menu', 'edit', 'menu-add'], ['how do I get reviews', 'edit', 'reviews'],
+    ['who else can edit our page', 'account', 'access'],
+  ];
+  const matchers = {};
+  const misses = [];
+  for (const [q, page, want, lang] of qs) {
+    const m = matchers[page] || (matchers[page] = ohbMatcher(page));
+    const r = m(q);
+    if (r.id !== want || r.lang !== (lang || 'en')) misses.push(`${page}: "${q}" -> ${r.id} (${r.lang}), want ${want} (${lang || 'en'})`);
+  }
+  assert.deepEqual(misses, [], misses.join('\n'));
+  // The answers say the right thing, in both languages and for each way in.
+  for (const [signedIn, lang] of [[true, 'en'], [false, 'en'], [true, 'fr'], [false, 'fr']]) {
+    const t = Object.fromEntries(ohbConfig(app.ownerHelpWidgetHtml('edit', { signedIn, lang })).topics.map((x) => [x.id, x]));
+    const a = (id) => (lang === 'fr' ? t[id].aFr : t[id].a);
+    assert.match(a('social-post'), lang === 'fr' ? /^<p>Non, nous ne publions pas[\s\S]*Écrivez-nous/ : /^<p>No, we don’t post on your accounts[\s\S]*What we do share[\s\S]*Message us/);
+    assert.match(a('login-privacy'), lang === 'fr' ? /Personnes ayant accès[\s\S]*\/fr\/privacy/ : /People with access[\s\S]*\/privacy/);
+    assert.match(a('google'), lang === 'fr' ? /Nous ne pouvons pas modifier Google[\s\S]*business\.google\.com[\s\S]*Téléphone/ : /We can’t change Google[\s\S]*business\.google\.com[\s\S]*Phone/);
+    assert.doesNotMatch(a('google'), /\{(ON|LIVE|SEND)\}/);
+    assert.match(a('website-broken'), lang === 'fr' ? /Site Web[\s\S]*toujours vérifié par nous d’abord/ : /Website[\s\S]*always checked by us first/);
+    assert.match(a('menu-import'), lang === 'fr' ? /cartes des vins[\s\S]*listes de prix/ : /wine lists, drinks lists and price lists/);
+  }
+});
+
+test('Portal polish (2026-10-18): access emails follow the owner’s language (bilingual when unknown); French approval emails link to French pages', async () => {
+  seasonInsert.run({ name: 'Polish Lang Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'polish-lang-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'polish-lang-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const s = await ownerUiServer();
+  const mail = [];
+  app.setOwnerEmailTransport(async (m) => { mail.push(m); });
+  app.setVenueSubmissionTransport(async () => {});
+  try {
+    const fr = await s.post(`/fr/owner/${token}/account`, { email: 'polish.fr@example.com', password: 'polish french password' });
+    assert.equal(fr.status, 201, JSON.stringify(fr.body));
+    assert.equal(app.ownerEmailLang('polish.fr@example.com'), 'fr', 'the login made on a French page is French');
+    mail.length = 0;
+    const en = await s.post(`/owner/${token}/account`, { email: 'polish.en@example.com', password: 'polish english password' });
+    assert.equal(en.status, 201);
+    assert.equal(app.ownerEmailLang('polish.en@example.com'), 'en');
+    assert.deepEqual(mail.map((m) => m.to), ['polish.fr@example.com']);
+    assert.equal(mail[0].subject, 'Nouveau compte ajouté à Polish Lang Fixture sur Okanagan Roam');
+    assert.match(mail[0].text, /polish\.en@example\.com a maintenant un compte[\s\S]*https:\/\/okanaganroam\.com\/fr\/owner\/account\/venue\/\d+#access/);
+    // The French owner removes the English one: the "access removed" email is English for them.
+    mail.length = 0;
+    const enId = db.prepare('SELECT id FROM owner_accounts WHERE email = ?').get('polish.en@example.com').id;
+    const rm = await s.post(`/fr/owner/account/venue/${v.id}/logins/${enId}/remove`, {}, fr.cookie);
+    assert.equal(rm.status, 200, JSON.stringify(rm.body));
+    const removedMail = mail.find((m) => m.to === 'polish.en@example.com');
+    assert.equal(removedMail.subject, 'Your access to Polish Lang Fixture on Okanagan Roam was removed');
+    // ... and French for a French login.
+    const fr2 = await s.post(`/fr/owner/${(await (async () => { const r = mail.find((m) => /fr\/owner\/[A-Za-z0-9_-]{32}/.test(m.text)); return /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(r.text)[1]; })())}/account`, { email: 'polish.fr2@example.com', password: 'polish french password 2' });
+    assert.equal(fr2.status, 201, JSON.stringify(fr2.body));
+    mail.length = 0;
+    const fr2Id = db.prepare('SELECT id FROM owner_accounts WHERE email = ?').get('polish.fr2@example.com').id;
+    assert.equal((await s.post(`/owner/account/venue/${v.id}/logins/${fr2Id}/remove`, {}, fr.cookie)).status, 200);
+    assert.equal(mail.find((m) => m.to === 'polish.fr2@example.com').subject, 'Votre accès à Polish Lang Fixture sur Okanagan Roam a été retiré');
+  } finally {
+    app.setOwnerEmailTransport(null);
+    app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
+    await s.close();
+  }
+  // Nothing known: a short bilingual email, English first.
+  assert.equal(app.ownerEmailLang('nobody.polish@example.com'), null);
+  const both = app.ownerLangEmail(null, { subject: 'Hi', text: 'Hello' }, { subject: 'Salut', text: 'Bonjour' });
+  assert.equal(both.subject, 'Hi / Salut');
+  assert.match(both.text, /^Hello\n\n----- Français -----\n\nBonjour$/);
+  // The language of a later update counts when the login has none recorded.
+  db.prepare("INSERT INTO owner_change_requests (venue_id, changes, previous, contact_email, lang) VALUES (?, '{}', '{}', 'request.fr@example.com', 'fr')").run(v.id);
+  assert.equal(app.ownerEmailLang('request.fr@example.com'), 'fr');
+  // French approval emails: the French venue page when there is one; an event page's French twin when translated.
+  db.prepare("UPDATE venues SET description_fr = 'Un café fictif pour les tests.' WHERE id = ?").run(v.id);
+  assert.equal(app.ownerListingUrlFr(v), `https://okanaganroam.com/fr/kelowna/cafes/polish-lang-fixture`);
+  assert.equal(app.ownerEventUrlFr({ region: 'kelowna', slug: 'no-such-polish-event' }), 'https://okanaganroam.com/kelowna/events/no-such-polish-event', 'untranslated: the English event page');
+  const changeId = Number(db.prepare("INSERT INTO owner_change_requests (venue_id, changes, previous, contact_email, lang) VALUES (?, '{\"phone\":\"250-555-0142\"}', '{\"phone\":\"\"}', 'polish.fr@example.com', 'fr')").run(v.id).lastInsertRowid);
+  const sent = [];
+  app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+  try {
+    assert.equal(await app.notifyReviewDecision('change', changeId, 'approve', { applied: ['phone'] }), 'sent');
+  } finally { app.setOwnerEmailTransport(null); }
+  assert.match(sent[0].subject, /^Approuvé/);
+  assert.match(sent[0].text, /https:\/\/okanaganroam\.com\/fr\/kelowna\/cafes\/polish-lang-fixture/);
+});
+
+test('Portal polish (2026-10-18): Undo takes a reason; the owner sees "Changed back by us" and gets a short email in their language; no reason, no email; no double period', () => withOwnerPortalServer(async ({ post, get }) => {
+  seasonInsert.run({ name: 'Polish Undo Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'polish-undo-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'polish-undo-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const cookie = (await post(`/fr/owner/${token}/account`, { email: 'polish.undo@example.com', password: 'a long enough password' })).cookie;
+  // A quick Save from the edit page is fine now (no "That was very quick").
+  const r1 = await post(`/fr/owner/account/venue/${v.id}/changes`, { changes: { phone: '250-555-0161' }, started_at: Date.now() }, cookie);
+  assert.equal(r1.status, 201, JSON.stringify(r1.body));
+  const r2 = await post(`/owner/account/venue/${v.id}/changes`, { changes: { description: 'A cosy fixture restaurant with a wood oven, a patio and a short local wine list.' } }, cookie);
+  assert.equal(r2.status, 201, 'no started_at at all is fine too');
+  const viaLink = await post(`/owner/${token}/changes`, { changes: { website: 'polishundo.example' }, started_at: Date.now() });
+  assert.equal(viaLink.status, 201, 'the edit link is not an anonymous form either');
+  const sent = [];
+  app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+  try {
+    // Without a reason: undone, nobody emailed.
+    const quiet = await app.adminReviewAction('change', r2.body.live_id, 'undo', {});
+    assert.equal(quiet.status, 200, JSON.stringify(quiet.body));
+    assert.equal(quiet.body.emailed, 'not_told');
+    assert.equal(sent.length, 0);
+    // With a reason (the change was saved on the French page): a French email, and the reason on the owner's page.
+    const loud = await app.adminReviewAction('change', r1.body.live_id, 'undo', { reason: 'Ce numéro sonne chez un autre commerce.' });
+    assert.equal(loud.status, 200, JSON.stringify(loud.body));
+    assert.equal(loud.body.emailed, 'sent');
+  } finally { app.setOwnerEmailTransport(null); }
+  assert.deepEqual(sent.map((m) => m.to), ['polish.undo@example.com']);
+  assert.equal(sent[0].subject, 'Nous avons rétabli une modification de Polish Undo Fixture');
+  assert.match(sent[0].text, /Raison : Ce numéro sonne chez un autre commerce\./);
+  assert.equal(db.prepare('SELECT phone FROM venues WHERE id = ?').get(v.id).phone, null);
+  const enMail = app.ownerUndoEmail({ venueName: 'X', fields: ['phone'], reason: 'Wrong number', link: 'https://okanaganroam.com/x', lang: 'en' });
+  assert.equal(enMail.subject, 'We changed back an update to X');
+  assert.match(enMail.text, /We put back the earlier phone on the X listing[\s\S]*Reason: Wrong number/);
+  const fr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
+  assert.match(fr, /<span class="op-why">Rétabli par nous : Ce numéro sonne chez un autre commerce\.<\/span>/);
+  const en = await get(`/owner/account/venue/${v.id}`, cookie);
+  assert.match(en, /<span class="op-why">Changed back by us: Ce numéro sonne chez un autre commerce\.<\/span>[\s\S]*?Changed back by us<\/span>/);
+  // The admin card: a reason box before Undo, and after it no "p.m.." double period.
+  assert.equal((await post(`/owner/account/venue/${v.id}/changes`, { changes: { price_range: '2' } }, cookie)).status, 201);
+  const review = app.renderAdminReviewPage();
+  assert.match(review, /<input type="text" name="reason" maxlength="300" placeholder="Reason \(sent to the owner\)"><button type="button" class="rv-btn rv-reject" data-act="undo">Undo<\/button>/);
+  assert.match(review, /Undone [^<]*\. Reason: Ce numéro sonne chez un autre commerce\./);
+  assert.doesNotMatch(review, /Undone [^<]*\.\./);
+}));
+
+test('Portal polish (2026-10-18): tour prices get a "$"; type-it-in wording suits tours, golf and other price lists; menus keep theirs', () => {
+  assert.equal(app.menuPriceLabel('129 per person'), '$129 per person');
+  assert.equal(app.menuPriceLabel('129 per person', 'fr'), '129\u00a0$ par personne');
+  assert.equal(app.menuPriceLabel('129 par personne', 'fr'), '129\u00a0$ par personne');
+  assert.equal(app.menuPriceLabel('From 89'), 'From $89');
+  assert.equal(app.menuPriceLabel('From 89', 'fr'), 'À partir de 89\u00a0$');
+  assert.equal(app.menuPriceLabel('1,299 per group'), '$1,299 per group');
+  assert.equal(app.menuPriceLabel('49.50 pp'), '$49.50 pp');
+  for (const keep of ['$129 per person', '75 / 45 child', '3 hours', '18 holes', 'MP', 'Market price', '12 / 16', '89 CAD', '2 for 30']) assert.equal(app.menuPriceLabel(keep), keep, keep);
+  assert.equal(app.menuPriceLabel('18'), '$18');
+  assert.equal(app.menuPriceLabel('18.50', 'fr'), '18,50\u00a0$');
+  const t = app.priceListAppStrings('tours', 'en');
+  assert.equal(t.sectionPh, 'Section name, like Day tours');
+  assert.equal(app.priceListAppStrings('golf', 'en').sectionPh, 'Section name, like Weekday rates');
+  assert.equal(app.priceListAppStrings('prices', 'en').sectionPh, 'Section name, like Admission');
+  assert.match(app.priceListAppStrings('tours', 'fr').sectionPh, /^Nom de la section, ex\. Visites d’une journée$/);
+  assert.match(app.priceListAppStrings('golf', 'fr').sectionPh, /Tarifs en semaine/);
+  for (const k of ['tours', 'golf', 'prices']) for (const l of ['en', 'fr']) assert.ok(app.priceListAppStrings(k, l).sectionPh && !/Starters|ex\. Entr\u00e9es$/.test(app.priceListAppStrings(k, l).sectionPh), `${k} ${l}`);
+  assert.equal(app.MENU_APP_STRINGS.en.sectionPh, 'Section name, like Starters', 'menus keep their wording');
+  assert.equal(app.MENU_APP_STRINGS.en.startFresh, 'Start over');
+  assert.equal(app.MENU_APP_STRINGS.fr.startFresh, 'Recommencer');
+  // Typed in (or imported from a website), with no photos: "Start over", not "Start over with new photos".
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /data-act="restart">' \+ \(pages\(\)\.length \? T\.startOver : T\.startFresh\) \+ '<\/button>/);
+});
+
+test('Portal polish (2026-10-18): folded seasonal-hours and closures headers say what is set; venue JSON-LD carries seasonal validFrom/validThrough and closed days', () => withOwnerPortalServer(async ({ post, get }) => {
+  assert.equal(app.ownerSeasonSummary({ label: 'Winter hours', from: '11-01', to: '04-30' }), 'Winter hours Nov 1–Apr 30');
+  assert.equal(app.ownerSeasonSummary({ label: '', from: '11-01', to: '04-30' }, 'fr'), 'Heures saisonnières du 1er nov. au 30 avr.');
+  assert.equal(app.ownerClosuresSummary([{ from: '2026-12-25', to: '2026-12-26' }, { from: '2026-11-11', to: '2026-11-11' }, { from: '2026-10-01', to: '2026-10-01' }], 'en', '2026-10-18'), '2 closures (next: Nov 11)');
+  assert.equal(app.ownerClosuresSummary([{ from: '2026-12-25', to: '2026-12-25' }], 'fr', '2026-10-18'), '1 fermeture (prochaine : 25 déc.)');
+  assert.equal(app.ownerClosuresSummary([], 'en', '2026-10-18'), '');
+  // The season's run: on now, or next; across New Year.
+  assert.deepEqual(app.seasonRunDates('11-01', '04-30', '2026-10-18'), ['2026-11-01', '2027-04-30']);
+  assert.deepEqual(app.seasonRunDates('11-01', '04-30', '2027-01-10'), ['2026-11-01', '2027-04-30']);
+  assert.deepEqual(app.seasonRunDates('06-01', '08-31', '2026-10-18'), ['2027-06-01', '2027-08-31']);
+  assert.deepEqual(app.seasonRunDates('06-01', '08-31', '2026-07-04'), ['2026-06-01', '2026-08-31']);
+  // The owner page.
+  seasonInsert.run({ name: 'Polish Season Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'polish-season-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'polish-season-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const cookie = (await post(`/owner/${token}/account`, { email: 'polish.season@example.com', password: 'a long enough password' })).cookie;
+  const before = await get(`/owner/account/venue/${v.id}`, cookie);
+  assert.match(before, /id="opSeasonalSummary">Different hours part of the year/);
+  assert.match(before, /id="opClosuresSummary">Holidays, renovations or private events/);
+  const today = app.todayLocal();
+  const winter = { mon: [['10:00', '16:00']], tue: [['10:00', '16:00']], wed: [['10:00', '16:00']], thu: [['10:00', '16:00']], fri: [['10:00', '16:00']], sat: [], sun: [] };
+  const r = await post(`/owner/account/venue/${v.id}/changes`, { changes: {
+    hours_seasons: [{ from: '11-01', to: '04-30', label: 'Winter hours', hours: winter }],
+    closures: [{ from: app.addLocalDays(today, 20), to: app.addLocalDays(today, 21), note: 'Renovations' }, { from: app.addLocalDays(today, 40), to: '', note: '' }],
+  } }, cookie);
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const after = await get(`/owner/account/venue/${v.id}`, cookie);
+  assert.match(after, /id="opSeasonalSummary">Winter hours Nov 1–Apr 30</);
+  assert.match(after, /id="opClosuresSummary">2 closures \(next: [A-Z][a-z]{2} \d{1,2}\)</);
+  const afterFr = await get(`/fr/owner/account/venue/${v.id}`, cookie);
+  assert.match(afterFr, /id="opSeasonalSummary">Winter hours du 1er nov\. au 30 avr\.</);
+  assert.match(afterFr, /id="opClosuresSummary">2 fermetures \(prochaine : /);
+  // Venue page structured data, on a fixed clock.
+  db.prepare('UPDATE venue_hours_extra SET closures = ? WHERE venue_id = ?').run(JSON.stringify([{ from: '2026-12-25', to: '2026-12-26', note: '' }, { from: '2026-10-12', to: '2026-10-12', note: 'Thanksgiving' }]), v.id);
+  app.clearHoursExtraCache();
+  const ld = (html) => [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1])).find((x) => x.openingHoursSpecification);
+  const fresh = app.findVenueBySlug('kelowna', 'restaurant', 'polish-season-fixture');
+  for (const lang of ['en', 'fr']) {
+    const specs = ld(app.renderVenuePage(fresh, [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang })).openingHoursSpecification;
+    const plain = specs.filter((x) => !x.validFrom);
+    assert.equal(plain.length, 7, 'the usual week stays as it was');
+    const seasonal = specs.filter((x) => x.validFrom && x.opens !== '00:00');
+    assert.equal(seasonal.length, 5);
+    assert.deepEqual(seasonal[0], { '@type': 'OpeningHoursSpecification', dayOfWeek: seasonal[0].dayOfWeek, opens: '10:00', closes: '16:00', validFrom: '2026-11-01', validThrough: '2027-04-30' });
+    const closed = specs.filter((x) => x.opens === '00:00' && x.closes === '00:00');
+    assert.deepEqual(closed, [{ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: '2026-12-25', validThrough: '2026-12-26' }], 'the closure already over is left out');
+  }
+  // A venue with no extras: unchanged.
+  seasonInsert.run({ name: 'Polish Plain Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'polish-plain-fixture' });
+  const plainPage = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'polish-plain-fixture'), [], [], [], { now: new Date('2026-10-18T19:00:00Z') });
+  assert.ok(ld(plainPage).openingHoursSpecification.every((x) => !x.validFrom));
+}));
+
+test('Portal polish (2026-10-18): Make main photo keeps the old main photo near the front, not at the end', () => withOwnerPortalServer(async ({ post }) => {
+  const nodeFs = require('node:fs'), nodePath = require('node:path');
+  seasonInsert.run({ name: 'Polish Photo Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'polish-photo-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'polish-photo-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const cookie = (await post(`/owner/${token}/account`, { email: 'polish.photo@example.com', password: 'a long enough password' })).cookie;
+  const files = ['a', 'b', 'c', 'd'].map((x) => `polishphoto${x.repeat(13)}.jpg`);
+  nodeFs.mkdirSync(app.OWNER_PHOTO_DIR, { recursive: true });
+  try {
+    const ids = files.map((f, i) => {
+      nodeFs.writeFileSync(nodePath.join(app.OWNER_PHOTO_DIR, f), 'x');
+      return Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, rights_confirmed_at, status)
+        VALUES (?, ?, ?, 1600, 1200, 100, 'Polish', CURRENT_TIMESTAMP, 'approved')`).run(v.id, f, `polishpreview${i}`).lastInsertRowid);
+    });
+    db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run(`/images/owner/${files[0]}`, v.id);
+    // The owner moves D up once (so the others get places in the order), then makes C the main photo.
+    assert.equal((await post(`/owner/account/venue/${v.id}/photos/${ids[3]}/up`, {}, cookie)).status, 200);
+    const mk = await post(`/owner/account/venue/${v.id}/photos/${ids[2]}/main`, {}, cookie);
+    assert.equal(mk.status, 200, JSON.stringify(mk.body));
+    const order = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'cafe', 'polish-photo-fixture')).map((p) => p.src.replace('/images/owner/', ''));
+    assert.deepEqual(order.slice(0, 4), [files[2], files[0], files[1], files[3]], 'new main, then the old main, then the rest in their order');
+  } finally {
+    for (const f of files) { try { nodeFs.unlinkSync(nodePath.join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
+  }
+}));
