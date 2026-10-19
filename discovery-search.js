@@ -25,8 +25,9 @@ function textHas(normalized, term) {
 }
 
 // Where a word appears in a venue's name, cuisine and description, or null.
-function termMatch(v, term) {
-  const inName = textHas(v.textName, term), inCui = textHas(v.textCuisine, term), inDesc = textHas(v.textDesc, term);
+// French pass 6 (2026-10-19): a search from a French page (fr) also reads the place's French description.
+function termMatch(v, term, fr = false) {
+  const inName = textHas(v.textName, term), inCui = textHas(v.textCuisine, term), inDesc = textHas(v.textDesc, term) || (fr && textHas(v.textDescFr, term));
   return inName || inCui || inDesc ? { inName, inCui, inDesc } : null;
 }
 const termWeight = (m) => (m.inName ? 3 : 0) + (m.inCui ? 2 : 0) + (m.inDesc ? 1 : 0);
@@ -190,6 +191,7 @@ function searchVenues(intent, venues) {
   const cuisines = intent.cuisines || [], terms = intent.textTerms || [];
   if (!R.length && !T.length && !F.length && !C.length && !A.length && !cuisines.length && !terms.length) return empty;
   const plan = exclusionPlan(intent.excluded);
+  const fr = !!intent.frenchText;
   const dishWords = [];
   if (cuisines.length) {
     for (const ft of intent.foodTerms || []) {
@@ -226,7 +228,7 @@ function searchVenues(intent, venues) {
     const matchedOn = [];
     let ok = true;
     for (const term of terms) {
-      const m = termMatch(v, term);
+      const m = termMatch(v, term, fr);
       if (!m) { ok = false; break; }
       score += termWeight(m);
       matchedOn.push(`${term}:${termWhere(m)}`);
@@ -258,6 +260,7 @@ function searchVenuesAnyWord(intent, venues) {
   const R = intent.regions || [], T = intent.types || [], F = intent.features || [], C = intent.collections || [], A = intent.activities || [];
   const cuisines = intent.cuisines || [];
   const plan = exclusionPlan(intent.excluded);
+  const fr = !!intent.frenchText;
   const scored = [];
   for (const v of venues) {
     if (R.length && !R.includes(v.region)) continue;
@@ -269,7 +272,7 @@ function searchVenuesAnyWord(intent, venues) {
     let hits = 0, score = 0;
     const matchedOn = [];
     for (const term of terms) {
-      const m = termMatch(v, term);
+      const m = termMatch(v, term, fr);
       if (!m) continue;
       hits += 1;
       score += termWeight(m);
