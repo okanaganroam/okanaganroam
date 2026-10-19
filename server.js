@@ -17984,6 +17984,71 @@ ${renderGolfHeaderHtml()}
 function favoritesPageModule() {
   return require('./favorites-page');
 }
+// GET /links (2026-10-19): the Instagram bio link -- the day's post first, then recent posts and the main pages.
+// noindex and briefly cached, since it changes each day. See social-links.js and data/social-links.json.
+let socialLinksData = null;
+function socialLinksPosts() {
+  if (!socialLinksData) {
+    try { socialLinksData = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'social-links.json'), 'utf8')).posts || []; }
+    catch (err) { socialLinksData = []; }
+  }
+  return socialLinksData;
+}
+function renderSocialLinksPage(now = new Date()) {
+  const today = todayLocal(now);
+  const posts = require('./social-links.js').linksForDay(socialLinksPosts(), today);
+  const dayLabel = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).replace(/\./g, '');
+  const card = (p, lead) => `<li><a class="lk-card${lead ? ' lk-lead' : ''}" href="${escapeHtml(p.path)}" data-post-date="${escapeHtml(p.date)}"><span class="lk-date">${lead && p.isToday ? 'Today' : escapeHtml(dayLabel(p.date))}</span><span class="lk-title">${escapeHtml(p.title)}</span></a></li>`;
+  const [first, ...rest] = posts;
+  const main = [
+    { title: 'Build My Trip', path: '/trip', note: 'Type one sentence, get a plan' },
+    { title: "What's On", path: '/whats-on', note: 'Events this week' },
+    { title: 'Guides', path: '/guides', note: 'Local guides by season' },
+    { title: 'Map', path: '/map', note: 'What is near you' },
+  ];
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead('Links | Okanagan Roam', 'Links from Okanagan Roam’s Instagram and Facebook posts: today’s post, recent posts and the main pages.', null, [], { golfTheme: true, noindex: true })}
+${renderAnalyticsHeadHtml('info')}
+<style>
+  body.links-page .lk-wrap { max-width: 560px; margin: 0 auto; }
+  body.links-page .lk-intro { margin: 0 0 18px; opacity: 0.8; }
+  body.links-page .lk-wrap h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.2rem; margin: 26px 0 10px; }
+  body.links-page .lk-wrap ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  body.links-page .lk-card { display: flex; flex-direction: column; gap: 2px; min-height: 44px; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.links-page .lk-card:hover, body.links-page .lk-card:focus-visible { border-color: var(--ref-navy, #1B2B3A); }
+  body.links-page .lk-lead { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: var(--ref-navy, #1B2B3A); padding: 18px; }
+  body.links-page .lk-date { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.75; }
+  body.links-page .lk-title { font-weight: 800; font-size: 1.05rem; overflow-wrap: anywhere; }
+  body.links-page .lk-lead .lk-title { font-size: 1.2rem; }
+  body.links-page .lk-note { font-size: 0.85rem; opacity: 0.75; }
+</style>
+</head>
+<body class="golf-page links-page">
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main" id="main">
+  <div class="lk-wrap">
+  <h1>Okanagan Roam links</h1>
+  <p class="lk-intro">The pages from our Instagram and Facebook posts, newest first.</p>
+  ${first ? `<ul>${card(first, true)}</ul>` : ''}
+  ${rest.length ? `<h2>Recent posts</h2>\n  <ul>${rest.map((p) => card(p, false)).join('')}</ul>` : ''}
+  <h2>Explore</h2>
+  <ul>${main.map((m) => `<li><a class="lk-card" href="${m.path}" data-post-date="main"><span class="lk-title">${escapeHtml(m.title)}</span><span class="lk-note">${escapeHtml(m.note)}</span></a></li>`).join('')}</ul>
+  </div>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script>
+document.addEventListener('click', function(e){
+  var a = e.target.closest && e.target.closest('a[data-post-date]');
+  if (a && window.trackEvent) window.trackEvent('bio_link_click', { post_date: a.getAttribute('data-post-date'), link_url: a.getAttribute('href') });
+});
+</script>
+</body>
+</html>`;
+}
+
 function renderFavoritesPage() {
   const title = 'My Favorites | Okanagan Roam';
   const description = 'The places and events you have saved on Okanagan Roam, in this browser.';
@@ -45863,6 +45928,10 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/favorites' || pathname === '/favorites/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
       return res.end(renderFavoritesPage());
+    }
+    if ((pathname === '/links' || pathname === '/links/') && method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'public, max-age=300' });
+      return res.end(renderSocialLinksPage());
     }
     // The British spelling goes to the same page.
     if ((pathname === '/favourites' || pathname === '/favourites/') && method === 'GET') {
