@@ -11009,6 +11009,11 @@ function renderHomepageDiscoveryStyles() {
     .hero-search-box { max-width: 100%; padding: 5px 5px 5px 16px; }
     .hero-search-field input { padding: 7px 0; }
     .hero-search-box button { height: 38px; padding: 0 20px; }
+    /* Tap targets (2026-10-19, round 9): the field and the button are 44px tall; the box's padding shrinks to match,
+       so the box stays 48px. */
+    .hero-search-box { padding: 2px 2px 2px 16px; }
+    .hero-search-field input { min-height: 44px; padding: 0; }
+    .hero-search-box button { height: 44px; }
     .hero-search-faux-sub { display: none; }
   }
 
@@ -11448,6 +11453,8 @@ const SEO_PAGE_CSS = `
     html body nav.category-region-selector { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 6px; }
     html body nav.category-region-selector::-webkit-scrollbar { display: none; }
     html body nav.category-region-selector a, html body nav.category-region-selector .category-region-selector-active { flex: none; white-space: nowrap; }
+    /* Tap targets (2026-10-19, round 9): the town and category chips are 44px tall on phones (they were 33px). */
+    html body nav.category-region-selector a, html body nav.category-region-selector .category-region-selector-active { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; }
   }
 
   /* Back-link on a category's single-region page (e.g. /kelowna/golf)
@@ -13942,7 +13949,7 @@ function renderOutdoorsSimplifiedStyles() {
 
   body.outdoor-page .outdoors-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.outdoor-page .outdoors-pop { position: relative; }
-  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.outdoor-page .outdoors-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.outdoor-page .outdoors-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoors-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -16125,7 +16132,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-st.is-open { color: #166534; }
   body.map-page .pm-st.is-closed { color: #92400E; }
   body.map-page .pm-acts { display: flex; gap: 8px; padding: 0 14px 12px; }
-  body.map-page .pm-dir, body.map-page .pm-link { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 999px; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
+  body.map-page .pm-dir, body.map-page .pm-link { display: inline-flex; align-items: center; min-height: 44px; /* round 9: 44px tap targets */ padding: 0 16px; border-radius: 999px; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
   body.map-page .pm-dir { background: #1D4ED8; color: #fff; }
   body.map-page .pm-dir:hover { background: #1E40AF; color: #fff; }
   body.map-page .pm-link { border: 1px solid rgba(27,43,58,0.25); color: var(--ink); }
@@ -20375,7 +20382,7 @@ function renderFoodDrinkHubStyles() {
 
   body.fd-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.fd-page .fd-pop { position: relative; }
-  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.fd-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.fd-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -20431,7 +20438,7 @@ function renderFoodDrinkHubStyles() {
   /* Sort (2026-10-14), at the end of the count line. */
   body.fd-page .fd-sort { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.84rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
   body.fd-page .fd-sort-label { opacity: 0.8; }
-  body.fd-page .fd-sort-select { font: inherit; font-weight: 800; color: var(--ref-navy); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 6px 30px 6px 12px; min-height: 40px; cursor: pointer; appearance: none; -webkit-appearance: none;
+  body.fd-page .fd-sort-select { font: inherit; font-weight: 800; color: var(--ref-navy); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 6px 30px 6px 12px; min-height: 44px; /* round 9: 44px tap target */ cursor: pointer; appearance: none; -webkit-appearance: none;
     background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
   body.fd-page .fd-sort-select:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   /* iPhones zoom into a select under 16px (2026-10-18), so the sort menu is 16px. */
@@ -22378,7 +22385,7 @@ function renderDogHubStyles() {
 
   body.dog-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.dog-page .fd-pop { position: relative; }
-  body.dog-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.dog-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.dog-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.dog-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.dog-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -24762,7 +24769,7 @@ function buildWhatsOnStyles() {
 
   body.whatson-page .whatson-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.whatson-page .whatson-pop { position: relative; }
-  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.whatson-page .whatson-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.whatson-page .whatson-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
   body.whatson-page .whatson-pop-count[hidden] { display: none; }
@@ -26433,12 +26440,12 @@ function renderVenuePageLayoutStyles() {
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
   /* Venue page layout (2026-10-18): on narrower screens the facts (address, phone, hours) come straight after the
-     buttons, and the menu, visitor tips and guide links follow them. */
+     buttons, and the menu, visitor tips and guide links follow them. Round 9 (2026-10-19): .venue-extra now follows
+     the sidebar in the page itself, so the tab and reading order match what is on screen (no CSS order). */
   @media (max-width: 959px) {
     body.golf-page .venue-layout { display: flex; flex-direction: column; }
     body.golf-page .venue-main { display: contents; }
-    body.golf-page .venue-aside { order: 1; margin-top: 8px; }
-    body.golf-page .venue-extra { order: 2; }
+    body.golf-page .venue-aside { margin-top: 8px; }
   }
   /* The photo leaves room for the name and the open-now line on a laptop screen. */
   @media (min-width: 641px) {
@@ -26455,9 +26462,23 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .detail-row .map-link { margin-top: -7px; }
   body.golf-page .category-back-link, body.golf-page .venue-back-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: -10px; margin-bottom: 3px; }
   body.golf-page nav.breadcrumb a { display: inline-block; padding: 13px 5px; margin: -13px -5px; }
+  /* Tap targets (2026-10-19, round 9): the English/Français switch, the town link in the at-a-glance line and the
+     names on the "Other … in" and "More to explore near" cards are 44px tall to a finger; negative margins keep every
+     line where it was. Cards without a photo are whole-card links too, like the photo cards. */
+  body.golf-page .venue-lang-switch a, body.golf-page .venue-header .venue-at-a-glance a { display: inline-block; padding: 12px 0; margin: -12px 0; }
+  body.golf-page .related-card > a, body.golf-page .related-card .related-body > a { display: block; padding: 12px 0; margin: -12px 0; }
+  body.golf-page .related-card { position: relative; }
+  body.golf-page .related-card > a::after { content: ""; position: absolute; inset: 0; }
   @media (min-width: 960px) {
-    body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 40px; align-items: start; }
+    body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto 1fr; gap: 0 40px; align-items: start; }
     body.golf-page .venue-aside { position: sticky; top: 84px; }
+    /* Round 9: the extras sit under the story in the left column, with the sidebar beside both, as before. */
+    body.golf-page .venue-main { grid-column: 1; grid-row: 1; }
+    body.golf-page .venue-aside { grid-column: 2; grid-row: 1 / span 2; }
+    body.golf-page .venue-extra { grid-column: 1; grid-row: 2; }
+    /* The story's last bottom margin used to merge with the extras' top margin; now that they are two boxes, it is
+       dropped so the gap stays the same. */
+    body.golf-page .venue-main > :last-child { margin-bottom: 0; }
   }
   body.golf-page .venue-aside .venue-section { margin-top: 0; margin-bottom: 16px; }
   body.golf-page .venue-aside .detail-row { display: flex; gap: 12px; }
@@ -26908,11 +26929,6 @@ ${VENUE_MENU_CSS}` : ''}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
-  <div class="venue-extra">
-  ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
-  ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
-  ${guideLinks}
-  </div>
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
@@ -26939,6 +26955,13 @@ ${VENUE_MENU_CSS}` : ''}
   })();
   </script>`}
   </aside>
+  <!-- Reading order (2026-10-19, round 9): the menu, visitor photos and tips, and guide links come after the facts
+       in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
+  <div class="venue-extra">
+  ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
+  ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
+  ${guideLinks}
+  </div>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
@@ -32966,7 +32989,8 @@ ${banner ? CATEGORY_BANNER_STYLE : ''}
   body.info-page .info-body p, body.info-page .info-body li { font-size: 1rem; line-height: 1.65; }
   body.info-page .info-body ul { padding-left: 1.2em; }
   body.info-page .info-body li { margin: 0 0 6px; }
-  body.info-page .info-updated { font-size: 0.86rem; opacity: 0.7; margin-top: 30px; }
+  /* Contrast (2026-10-19, round 9): 0.7 opacity was 4.45:1 on the paper background; 0.8 is above 4.5:1. */
+  body.info-page .info-updated { font-size: 0.86rem; opacity: 0.8; margin-top: 30px; }
   body.info-page .info-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
   body.info-page .info-cta a, body.info-page .info-cta button { display: inline-block; padding: 10px 18px; border-radius: 999px; font: inherit; font-weight: 800; font-size: 0.95rem; text-decoration: none; border: 0; cursor: pointer; background: var(--ref-navy, #1B2B3A); color: #fff; }
   body.info-page .info-cta a.secondary { background: var(--sand-deep, #ece3d3); color: var(--ink); }
@@ -33247,6 +33271,43 @@ function tripShareCardPng(card) {
   return png;
 }
 
+// My Trip map (2026-10-19, round 9): pins that sit closer than `gap` pixels on screen (not only at the very same spot)
+// are spread in a small ring around their middle, so every number shows and each pin can be tapped. `xy` holds each
+// pin's screen point ({ x, y }); the result is each pin's { dx, dy } shift in pixels. Pins near one another are grouped
+// in chains (A near B, B near C), and neighbours on a ring end up gap + 2 pixels apart. Shipped into the page with
+// .toString(), so it uses nothing from outside itself (and keeps its comments out here). Pins go round the ring in
+// their own directions from the middle (list order for pins at the same spot), so each moves as little as it can; the
+// first starts at the top when they all share one spot.
+function myTripPinSpread(xy, gap) {
+  var n = xy.length, parent = [], out = [], groups = {}, i, j;
+  for (i = 0; i < n; i++) parent[i] = i;
+  function root(k) { while (parent[k] !== k) { parent[k] = parent[parent[k]]; k = parent[k]; } return k; }
+  for (i = 0; i < n; i++) {
+    for (j = i + 1; j < n; j++) {
+      var ddx = xy[i].x - xy[j].x, ddy = xy[i].y - xy[j].y;
+      if (ddx * ddx + ddy * ddy < gap * gap) parent[root(j)] = root(i);
+    }
+  }
+  for (i = 0; i < n; i++) { out.push({ dx: 0, dy: 0 }); var r0 = root(i); (groups[r0] = groups[r0] || []).push(i); }
+  Object.keys(groups).forEach(function(k){
+    var g = groups[k];
+    if (g.length < 2) return;
+    var cx = 0, cy = 0;
+    g.forEach(function(m){ cx += xy[m].x; cy += xy[m].y; });
+    cx /= g.length; cy /= g.length;
+    var ang = function(m){ var ax = xy[m].x - cx, ay = xy[m].y - cy; return ax * ax + ay * ay < 1 ? null : Math.atan2(ay, ax); };
+    var same = g.every(function(m){ return ang(m) === null; });
+    var order = g.slice().sort(function(a, b){ var x = ang(a), y = ang(b); return x === null || y === null || x === y ? a - b : x - y; });
+    var start = same ? -Math.PI / 2 : ang(order[0]);
+    var r = Math.ceil((gap / 2 + 1) / Math.sin(Math.PI / g.length));
+    order.forEach(function(m, q){
+      var a = start + 2 * Math.PI * q / g.length;
+      out[m] = { dx: Math.round(cx + r * Math.cos(a) - xy[m].x), dy: Math.round(cy + r * Math.sin(a) - xy[m].y) };
+    });
+  });
+  return out;
+}
+
 function renderMyTripPage(opts = {}) {
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
   const share = opts.share || null;
@@ -33297,6 +33358,14 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-shared { margin: 0 0 18px; padding: 14px 18px; border-radius: 14px; background: #FFF4DA; }
   body.my-trip-page .mt-status { min-height: 1.2em; margin: 0 0 10px; font-weight: 700; color: var(--teal-deep, #1F5450); }
   body.my-trip-page #mtMap { height: 320px; border-radius: 16px; margin: 0 0 22px; background: #dfe9e6; z-index: 0; }
+  /* Map tap targets (2026-10-19, round 9): each numbered pin takes taps over a 44px circle, as on /map, and the zoom
+     buttons are 44px (Leaflet's are 30px). */
+  body.my-trip-page .leaflet-marker-icon.mt-pin { background: none; border: 0; }
+  body.my-trip-page .leaflet-marker-icon.mt-pin::before { content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px; border-radius: 50%; }
+  body.my-trip-page .leaflet-marker-icon.mt-pin .mt-num { margin: 0; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+  body.my-trip-page .leaflet-marker-icon.mt-pin:focus { outline: none; }
+  body.my-trip-page .leaflet-marker-icon.mt-pin:focus-visible .mt-num { outline: 3px solid #1B2B3A; outline-offset: 2px; }
+  body.my-trip-page .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; }
   body.my-trip-page .mt-day { margin: 0 0 26px; }
   body.my-trip-page .mt-day-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin: 0 0 10px; }
   body.my-trip-page .mt-day-head h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.3rem; margin: 0; }
@@ -33399,7 +33468,8 @@ ${renderGolfHeaderHtml()}
   }
   function timeText(t){ return t && Number.isFinite(t.s) ? clockText(t.s) + (Number.isFinite(t.e) ? (isFr ? '–' : ' – ') + clockText(t.e) : '') : ''; }
   var viewing = shared.length ? 'shared' : 'mine';
-  var info = {}, map = null, layer = null;
+  var info = {}, map = null, layer = null, spreadPins = null;
+  var myTripPinSpread = ${myTripPinSpread.toString()};
   var el = function(id){ return document.getElementById(id); };
   function status(t){ var s = el('mtStatus'); s.textContent = ''; setTimeout(function(){ s.textContent = t; }, 30); }
   function list(){
@@ -33461,7 +33531,7 @@ ${renderGolfHeaderHtml()}
     drawMap(shown);
   }
   function drawMap(stops){
-    var pts = stops.map(function(s, i){ var d = info[s.ref]; return d && d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng, n: i + 1, name: d.name } : null; }).filter(Boolean);
+    var pts = stops.map(function(s, i){ var d = info[s.ref]; return d && d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng, n: i + 1, name: d.name, url: (document.documentElement.lang === 'fr' && d.urlFr) || d.url } : null; }).filter(Boolean);
     var box = el('mtMap');
     if (!window.L || pts.length < 1) { box.hidden = true; return; }
     box.hidden = false;
@@ -33476,20 +33546,31 @@ ${renderGolfHeaderHtml()}
       L.control.zoom(mapFr ? { zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' } : {}).addTo(map);
       if (mapFr && map.attributionControl) map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="Une bibliothèque JavaScript de cartes interactives">Leaflet</a>');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: mapFr ? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map);
+      map.on('zoomend', function(){ if (spreadPins) spreadPins(); });
     }
     if (layer) layer.remove();
-    // Stops at the same spot (2026-10-19, round 8): a winery and its restaurant, or one place saved on two days, used to
-    // sit exactly on top of one another, so only the top number showed. Pins that share a spot are now fanned out in a
-    // small ring around it (a fixed pixel offset, so they stay apart at every zoom).
-    var spots = {};
-    pts.forEach(function(p){ var k = p.lat.toFixed(4) + ',' + p.lng.toFixed(4); (spots[k] = spots[k] || []).push(p); });
-    Object.keys(spots).forEach(function(k){
-      var g = spots[k], r = Math.max(16, Math.ceil(15 * g.length / Math.PI));
-      g.forEach(function(p, j){ p.dx = g.length > 1 ? Math.round(r * Math.cos(2 * Math.PI * j / g.length - Math.PI / 2)) : 0; p.dy = g.length > 1 ? Math.round(r * Math.sin(2 * Math.PI * j / g.length - Math.PI / 2)) : 0; });
+    // Stops close together (2026-10-19, round 8 and 9): a winery and its restaurant, one place saved on two days, or
+    // two stops a few streets apart used to sit on top of one another, so only the top number showed. After each fit
+    // or zoom, pins closer than a pin's width on screen are fanned out in a small ring (myTripPinSpread); zooming in
+    // brings them back to their own spots once there is room. A tap on a pin shows its name, linked to its page.
+    var pinIcon = function(p, dx, dy){ return L.divIcon({ className: 'mt-pin', html: '<span class="mt-num">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12 - dx, 12 - dy], popupAnchor: [dx, dy - 12] }); };
+    var shift = pts.map(function(){ return { dx: 0, dy: 0 }; });
+    var markers = pts.map(function(p){
+      var mk = L.marker([p.lat, p.lng], { icon: pinIcon(p, 0, 0), title: p.n + '. ' + p.name });
+      mk.bindPopup('<strong>' + p.n + '.</strong> ' + (p.url ? '<a ' + hrefAttr(p.url) + '>' + esc(p.name) + '</a>' : esc(p.name)));
+      return mk;
     });
-    layer = L.layerGroup(pts.map(function(p){ return L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: '<span class="mt-num" style="box-shadow:0 2px 6px rgba(0,0,0,.3)">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12 - p.dx, 12 - p.dy] }), title: p.name }); })).addTo(map);
+    layer = L.layerGroup(markers).addTo(map);
+    spreadPins = function(){
+      var off = myTripPinSpread(pts.map(function(p){ return map.latLngToLayerPoint([p.lat, p.lng]); }), 24);
+      markers.forEach(function(mk, i){
+        if (off[i].dx === shift[i].dx && off[i].dy === shift[i].dy) return;
+        shift[i] = off[i];
+        mk.setIcon(pinIcon(pts[i], off[i].dx, off[i].dy));
+      });
+    };
     map.invalidateSize();
-    var fit = function(){ if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [36, 36], maxZoom: 15 }); };
+    var fit = function(){ if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [36, 36], maxZoom: 15 }); spreadPins(); };
     fit();
     // Fonts and the list above can still change the width after the first paint; fit again once settled.
     setTimeout(function(){ map.invalidateSize(); fit(); }, 250);
@@ -48586,6 +48667,7 @@ module.exports = {
   skiKinds,
   outdoorActivitiesByVenue,
   renderMyTripPage,
+  myTripPinSpread,
   tripStopsFor,
   tripShareSummary,
   tripShareSearch,
