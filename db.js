@@ -1113,4 +1113,35 @@ for (const t of ['owner_change_requests', 'owner_photos', 'event_submissions', '
   if (ci.length && !ci.includes('note_fr')) db.exec('ALTER TABLE collection_items ADD COLUMN note_fr TEXT');
 }
 
+// Removed places (2026-10-19, round 8): one row per listing deleted from the site, so its old address answers
+// 410 "This place has closed" with similar places nearby instead of a plain 404. server.js deleteVenue() writes a row
+// in the same transaction as the delete; a place listed again under the same address simply shows again (the venue
+// lookup comes first). Seeded with the listings removed on 2026-10-19, before this table existed.
+db.exec(`
+CREATE TABLE IF NOT EXISTS removed_venues (
+  region TEXT NOT NULL,
+  type TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  name TEXT NOT NULL,
+  latitude REAL,
+  longitude REAL,
+  venue_id INTEGER,
+  removed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (region, type, slug)
+);
+`);
+{
+  const seed = db.prepare('INSERT OR IGNORE INTO removed_venues (region, type, slug, name, latitude, longitude, venue_id, removed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  for (const r of [
+    ['kelowna', 'restaurant', 'the-hot-box', 'The Hot Box', 49.86252, -119.49419, 691],
+    ['kelowna', 'restaurant', 'tori-dori-japanese-chicken-grill', 'TORI DORI Japanese Chicken & Grill', 49.89384, -119.48411, 644],
+    ['okanagan-falls', 'winery', 'ramification-cellars', 'Ramification Cellars', 49.2840843, -119.5231704, 862],
+    ['osoyoos', 'restaurant', 'canco-gas-station-curries-more', 'Canco Gas Station - Curries & More', 49.0367792, -119.4773783, 120],
+    ['penticton', 'cafe', 'south-main-market', 'South Main Market', 49.4629215, -119.5789237, 1626],
+    ['penticton', 'restaurant', 'queen-city-eats', 'Queen City Eats', null, null, 531],
+    ['west-kelowna', 'restaurant', 'beef-broccoli', 'Beef Broccoli', 49.8345156, -119.6186746, 915],
+    ['kelowna', 'restaurant', 'misato-s-kitchen', "Misato's Kitchen", 49.885222, -119.493323, 901],
+  ]) seed.run(...r, '2026-10-19');
+}
+
 module.exports = db;
