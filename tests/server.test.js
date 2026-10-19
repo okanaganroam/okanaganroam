@@ -14825,7 +14825,8 @@ test('Stage 4.0 F07: V2 "View My Trip" opens the tray after the click, and stays
   assert.equal(q.toggle.clicks, 1);
   // View My Trip now opens the full /my-trip page (2026-10-14), after sending open_my_trip.
   const page = app.renderTripPlannerPage(true);
-  assert.match(page, /track\('open_my_trip', \{ trip_size: tripSize\(\), open_source: 'plan_view_trip' \}\);\s*window\.location\.href = '\/my-trip';/);
+  // French pages open /fr/my-trip (round 7).
+  assert.match(page, /track\('open_my_trip', \{ trip_size: tripSize\(\), open_source: 'plan_view_trip' \}\);\s*window\.location\.href = \(location\.pathname === '\/fr' \|\| location\.pathname\.indexOf\('\/fr\/'\) === 0\) \? '\/fr\/my-trip' : '\/my-trip';/);
 });
 
 test('Stage 4.0 F10: on phones the V2 stop links start their own line at the left; desktop and the planner-off page are unchanged', () => {
@@ -20037,7 +20038,7 @@ test('My Trip (2026-10-14): /api/trip-stops describes each stop, /my-trip is a p
   for (const id of ['mtCopy', 'mtSave', 'mtMap', 'mtDays', 'mtEmpty']) assert.match(html, new RegExp(`id="${id}"`));
   assert.ok(html.includes("'okanaganTripDays'"), 'reads the day of each stop');
   const kelowna = await (await fetch(`${base}/kelowna`)).text();
-  assert.ok(kelowna.includes("full.href = '/my-trip'"), 'the tray offers the full trip');
+  assert.ok(kelowna.includes("full.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip'"), 'the tray offers the full trip (French pages: /fr/my-trip, round 7)');
   assert.ok(kelowna.includes("/api/trip-stops?refs="), 'the tray links each stop to its page');
   const planner = app.renderTripPlannerPage(true);
   assert.ok(planner.includes("localStorage.setItem('okanaganTripDays'"), 'Add whole trip remembers the days');
@@ -28933,3 +28934,47 @@ test('deleteVenue removes a listing that has an owner link, a season and a linke
     db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(id, other);
   }
 });
+
+// ---- Build My Trip, round 7 (2026-10-19): trip dates for season checks, Swap ids, the French tray link ----
+test('Round 7 trip planner: a named month is judged on a date in that month, never today', () => {
+  const now = new Date('2026-10-19T17:00:00Z');
+  assert.equal(app.tripRequestedMonthDate({ month: 1, season: 'winter' }, now), '2027-01-15');
+  assert.equal(app.tripRequestedMonthDate({ month: 10, season: 'fall' }, now), '2026-10-19', 'this month is today');
+  assert.equal(app.tripRequestedMonthDate({ season: 'fall' }, now), '2026-10-19');
+  assert.equal(app.tripRequestedMonthDate({ season: 'summer' }, now), '2027-07-15');
+  assert.equal(app.tripRequestedMonthDate({ month: 1, when: { preset: 'this-weekend' } }, now), null, 'a date the visitor gave wins');
+  assert.equal(app.tripRequestedMonthDate({}, now), null);
+});
+
+test('Round 7 trip planner: a January ski trip at SilverStar keeps village dinners that are only closed for the off-season', () => {
+  const ins = db.prepare(`INSERT INTO venues (name, region, type, description, rating, price, latitude, longitude, slug) VALUES (?, 'silverstar', ?, ?, 4.5, 3, 50.359, -119.062, ?)`);
+  const ids = [
+    ins.run('R7 SilverStar Mountain Resort', 'outdoor', 'A fixture ski resort used only by the round 7 test.', 'r7-silverstar-mountain-resort').lastInsertRowid,
+    ins.run('R7 Village Bistro', 'restaurant', 'A fixture restaurant.', 'r7-village-bistro').lastInsertRowid,
+    ins.run('R7 Village Grill', 'restaurant', 'A fixture restaurant.', 'r7-village-grill').lastInsertRowid,
+    ins.run('R7 Village Cafe', 'cafe', 'Coffee and breakfast.', 'r7-village-cafe').lastInsertRowid,
+  ].map(Number);
+  // Closed for the season from Oct 15, reopening not announced (SilverStar, Oct 19 2026).
+  for (const id of ids) db.prepare(`INSERT INTO venue_seasons (venue_id, status, source_url, checked_at) VALUES (?, 'closed', 'https://example-season.ca', '2026-10-15')`).run(id);
+  try {
+    const p = app.runTripPlan({ text: 'ski SilverStar 2 days in January' }, new Date('2026-10-19T17:00:00Z'));
+    assert.equal(p.days.length, 2);
+    for (const day of p.days) {
+      assert.equal(day.stops[0].venue && day.stops[0].venue.id, ids[0], `day ${day.day} skis`);
+      assert.ok(day.stops.some((s) => s.daypart === 'evening' && s.venue && ids.includes(s.venue.id)), `day ${day.day} has dinner at the hill`);
+    }
+    assert.ok(!p.warnings.some((w) => /No dinner spot open that evening/.test(w)), p.warnings.join(' | '));
+  } finally {
+    db.prepare(`DELETE FROM venue_seasons WHERE venue_id IN (${ids.join(',')})`).run();
+    db.prepare(`DELETE FROM venues WHERE id IN (${ids.join(',')})`).run();
+  }
+});
+
+test('Round 7 trip planner: Swap may name the place it replaces; French pages open /fr/my-trip', () => withPass4Server(async (get) => {
+  assert.deepEqual(app.parseTripPlanBody({ text: 'x', swap: { key: '1-afternoon', type: 'outdoor', id: 12 } }).value.swap, { key: '1-afternoon', type: 'outdoor', id: 12 });
+  assert.deepEqual(app.parseTripPlanBody({ text: 'x', swap: { key: '1-afternoon', type: 'outdoor' } }).value.swap, { key: '1-afternoon', type: 'outdoor' });
+  assert.match(app.parseTripPlanBody({ text: 'x', swap: { key: '1-afternoon', type: 'outdoor', id: 'a' } }).error, /^swap must be/);
+  const fr = (await get('/fr/kelowna')).text;
+  assert.ok(fr.includes("full.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip'"), 'the tray link follows the page language');
+  assert.ok(app.renderTripPlannerPage(true).includes("window.location.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip';"));
+}));

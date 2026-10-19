@@ -167,7 +167,9 @@ function t3DriveText(leg, lang) {
   if (!leg || !leg.fromLabel || !leg.toLabel) return '';
   var fr = lang === 'fr', a = leg.minMinutes, b = leg.maxMinutes;
   var mins = a && b && a !== b ? (fr ? a + ' à ' + b : a + '–' + b) : String(b || a);
-  return fr ? 'Trajet de ' + leg.fromLabel + ' à ' + leg.toLabel + ' : environ ' + mins + ' min (estimation)' : 'Drive from ' + leg.fromLabel + ' to ' + leg.toLabel + ': about ' + mins + ' min (estimate)';
+  // Round 7: a drive to the other shore of Okanagan Lake goes around it, and says so.
+  var lake = leg.aroundLake ? (fr ? ' en contournant le lac' : ' around the lake') : '';
+  return fr ? 'Trajet de ' + leg.fromLabel + ' à ' + leg.toLabel + lake + ' : environ ' + mins + ' min (estimation)' : 'Drive from ' + leg.fromLabel + ' to ' + leg.toLabel + lake + ': about ' + mins + ' min (estimate)';
 }
 function t3DroppedRequests(p) {
   var out = [];
@@ -864,6 +866,8 @@ function renderScript(d) {
           return;
         }
         setStatus('');
+        // Swap with nothing else to offer (round 7): the stop is kept, so it is not excluded from later plans.
+        if (res.j && res.j.swapKept) state.exclude = state.exclude.filter(function(x){ return x !== res.j.swapKept.id; });
         state.last = res.j;
         state.lastReq = { seed: body.seed, overrides: body.overrides || {}, exclude: body.excludeVenueIds, pinned: body.pinned || null, avoid: body.avoidVenueIds || [] };
         state.removed = {};
@@ -1203,7 +1207,7 @@ function renderScript(d) {
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
       + '<div class="t3-actions">'
-      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + '>Add to trip</button>'
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + '>Add to trip</button>'
     // The list cards' Favorite button (2026-10-19): named for the place, with its pressed state.
     var favHtml = '<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>';
     var detailsHtml = url ? '<a class="t3-act" href="' + esc(url) + '">' + esc(tx('tripv3.viewDetails')) + '</a>' : '';
@@ -1284,7 +1288,14 @@ function renderScript(d) {
           html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+          return;
+        }
+        // Round 7: a long wait before dinner with nothing nearby that fits is labelled free time, not left blank.
+        if (s.freeTime && s.freeTime.minutes > 0) {
+          var ftFr = lang() === 'fr', ftH = Math.round(s.freeTime.minutes / 30) / 2;
+          var ftLen = ftFr ? String(ftH).replace('.', ',') + ' h' : ftH + (ftH === 1 ? ' hour' : ' hours');
+          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty t3-free"><strong>' + (ftFr ? 'Temps libre' : 'Free time') + '</strong><p>' + esc(ftFr ? 'Environ ' + ftLen + ' avant le souper pour flâner, vous reposer ou revenir à un endroit préféré.' : 'About ' + ftLen + ' before dinner to wander, rest or go back to a favourite spot.') + '</p></div></li>';
           return;
         }
         if ((s.freeEvening || []).length) {
@@ -1298,7 +1309,8 @@ function renderScript(d) {
         return;
       }
       if (prev) {
-        var km = kmText(t3Km(prev.venue, s.venue));
+        // The straight line across the lake says nothing about the drive (round 7), so it is left out then.
+        var km = s.driveFrom && s.driveFrom.aroundLake ? null : kmText(t3Km(prev.venue, s.venue));
         // A stop in another town shows the drive there (2026-10-19), not only the straight-line distance.
         var drive = s.driveFrom ? t3DriveText(s.driveFrom, lang()) : '';
         if (km || drive) html += '<li class="t3-leg' + (drive ? ' t3-leg-drive' : '') + '" aria-label="' + esc(tx('tripv3.distanceLabel')) + '">' + esc(drive ? drive + (km ? ' \u00b7 ' + km : '') : km) + '</li>';
@@ -1705,6 +1717,12 @@ function renderScript(d) {
   // My Trip keeps the plan's days (2026-10-18): each stop's day goes in okanaganTripDays (ref -> day), the same store
   // the older planner used, so /my-trip groups the stops by day with a directions link per day. Saved trips without
   // days still show as one list.
+  // A dated one-day outing (an itinerary: "brewery crawl Penticton afternoon" on Sat, Oct 24) has no day list, so its
+  // stops are Day 1 of My Trip and keep that date (round 7: they were saved with no date at all).
+  function datedOneDay(){
+    var p = state.last;
+    return !!(p && !(p.days || []).length && (p.schedule || []).some(function(r){ return r && r.day === 1 && /^\d{4}-\d{2}-\d{2}$/.test(r.date || ''); }));
+  }
   function readDays(){
     try { var m = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
   }
@@ -1959,12 +1977,21 @@ function renderScript(d) {
       delete state.removed[sk];
       var oldName = ss && ss.venue ? ss.venue.name : null;
       // The kind of place goes with it (2026-10-19), so a winery is swapped for a winery.
-      var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
+      var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type, id: ss.venue.id } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
       // Say what changed and show where: "Swapped Lachi for Poplar Grove", with the new card briefly highlighted.
       if (swapped && swapped.then) swapped.then(function(){
         var ns = stopAt(sk);
-        if (!ns || !ns.venue || ns.venue.name === oldName) return;
         var fr = lang() === 'fr';
+        // Nothing else fits (round 7): the stop stays, and the visitor is told so rather than seeing nothing happen.
+        if (state.last && state.last.swapKept && state.last.swapKept.key === sk) {
+          var keptMsg = fr ? 'Aucune autre option à proximité ne convient à ce moment de la journée : ' + state.last.swapKept.name + ' reste dans votre plan.' : (state.last.swapNote || ('Nothing else nearby fits here, so ' + state.last.swapKept.name + ' stays in your plan.'));
+          announce(keptMsg);
+          var kb = resultEl.querySelector('[data-t3-swap="' + sk + '"]');
+          var kc = kb && kb.closest('.t3-card');
+          if (kc) { var kn = document.createElement('p'); kn.className = 't3-swap-note'; kn.textContent = keptMsg; kc.insertBefore(kn, kc.firstChild); try { kb.focus({ preventScroll: true }); } catch (e) {} }
+          return;
+        }
+        if (!ns || !ns.venue || ns.venue.name === oldName) return;
         announce(oldName ? (fr ? oldName + ' a été remplacé par ' + ns.venue.name + '.' : 'Swapped ' + oldName + ' for ' + ns.venue.name + '.') : (fr ? 'Nouvelle suggestion : ' + ns.venue.name + '.' : 'New suggestion: ' + ns.venue.name + '.'));
         var nb = resultEl.querySelector('[data-t3-swap="' + sk + '"]');
         var card = nb && nb.closest('.t3-card');

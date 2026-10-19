@@ -5557,7 +5557,8 @@ function tripPlannerModule() {
 // secondary Food & Drink categories, the stored coordinates, rating, review
 // count, price level and cuisine, and normalized name/cuisine/description
 // text for whole-word matching. The planner can use nothing else.
-function buildTripPlannerFacts(preparePlannerKinds = true) {
+// onDate (2026-10-19, round 7): the trip's first date, so a venue's seasonal hours are the ones for the trip, not today.
+function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   const normalize = discoveryIntentModule().normalizeDiscoveryText;
   const memberships = new Map();
   const addMember = (id, key) => { if (!memberships.has(id)) memberships.set(id, { collections: [], activities: [], fdTypes: [] }); memberships.get(id)[key.kind].push(key.value); };
@@ -5568,7 +5569,12 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
   const advisories = getAdvisoryNotesWithDates();
   const seasons = getSeasonRows();
   const seasonToday = todayLocal();
+  const hoursDate = parseLocalDate(onDate) ? onDate : seasonToday;
   const seasonStatesNow = getSeasonStates();
+  // An owner's yearly season with no dated closure set by hand, judged by the planner on the trip's date (round 7).
+  const explicitSeasons = new Set(db.prepare('SELECT venue_id FROM venue_seasons').all().map((r) => r.venue_id));
+  const openMonthsById = new Map();
+  try { for (const r of db.prepare('SELECT venue_id, open_months FROM venue_links WHERE open_months IS NOT NULL').all()) if (!explicitSeasons.has(r.venue_id)) openMonthsById.set(r.venue_id, r.open_months); } catch (e) { /* no venue_links table */ }
   const dogNotes = getDogFriendlyNotes();
   const golfWindows = getGolfRateWindows();
   const facts = [];
@@ -5593,7 +5599,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       // The stored JSON, parsed (never modified) by the planner -- or, in an owner's seasonal hours (2026-10-18), that
       // week instead. The owner's special closures are dated, like the season below.
-      hours: weekJsonOn(v, seasonToday) || null,
+      hours: weekJsonOn(v, hoursDate) || null,
+      openMonths: openMonthsById.get(v.id) || undefined,
       ownerClosures: (() => { const c = upcomingClosures(venueHoursExtras(v.id).closures); return c.length ? c.map((x) => ({ from: x.from, to: x.to || x.from })) : undefined; })(),
       imageUrl: v.image_url ? photoSized(v.image_url, 480) : null, // the venue's own photo (small copy), shown on its stop card instead of the example photo
       // Seasonal inputs (read only by the multi-part itinerary planner): the
@@ -5724,8 +5731,9 @@ function parseTripPlanBody(body) {
   let swap = null;
   if (body.swap !== undefined) {
     const w = body.swap;
-    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '')) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>" }.' };
-    swap = { key: w.key, type: w.type };
+    // id (round 7): the place being swapped out, kept with a note when nothing else fits.
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id> }.' };
+    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}) };
   }
   return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap } };
 }
@@ -5760,6 +5768,24 @@ function tripPlanDate(when, now = new Date()) {
   if (when.weekday && names.includes(when.weekday.slice(0, 3))) return addLocalDays(today, (names.indexOf(when.weekday.slice(0, 3)) - wd + 7) % 7);
   if (when.preset === 'this-weekend') return wd === 0 || wd === 6 ? today : addLocalDays(today, 6 - wd);
   return today;
+}
+
+// Season checks (2026-10-19, round 7): a trip for a named month or season ("3 days skiing in January") is judged on a
+// day in that month -- the 15th of its next occurrence, or today when that is now -- never on today's date. A date the
+// visitor gave (or "this weekend", "Saturday") always wins. null when nothing was named.
+const TRIP_SEASON_MONTHS = { winter: [12, 1, 2], spring: [3, 4, 5], summer: [6, 7, 8], fall: [9, 10, 11] };
+const TRIP_SEASON_REP_MONTH = { winter: 1, spring: 4, summer: 7, fall: 10 };
+function tripRequestedMonthDate(intent, now = new Date()) {
+  if (!intent || (intent.when && (intent.when.preset || intent.when.relative || intent.when.weekday))) return null;
+  const today = todayLocal(now), current = Number(today.slice(5, 7));
+  let month = Number.isInteger(intent.month) && intent.month >= 1 && intent.month <= 12 ? intent.month : null;
+  if (!month && TRIP_SEASON_MONTHS[intent.season]) {
+    if (TRIP_SEASON_MONTHS[intent.season].includes(current)) return today;
+    month = TRIP_SEASON_REP_MONTH[intent.season];
+  }
+  if (!month) return null;
+  if (month === current) return today;
+  return `${Number(today.slice(0, 4)) + (month < current ? 1 : 0)}-${String(month).padStart(2, '0')}-15`;
 }
 
 // The Okanagan wall clock at an instant: { weekday: 'thu', minutes: 1266 }
@@ -5948,6 +5974,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   const extracted = requirementModule.extractTripRequirements({ text: requirementsText, intent, trip, taxonomy, referenceDate:todayLocal(now) });
   // "Wine tour" means wineries unless a tour company or shuttle was asked for (2026-10-18); planTrip applies it too.
   tripPlannerModule().applyWineTourMeaning(requirementsText, intent, extracted);
+  // "Vegan food tour" means cafés and restaurants, not a tour company (round 7); planTrip applies it too.
+  tripPlannerModule().applyFoodTourMeaning(requirementsText, intent, extracted);
   if (selectedNamedEvent) {
     const normalizedTitle = discoveryIntentModule().normalizeDiscoveryText(selectedNamedEvent.name || '');
     const filler = new Set('the a an and of return experience tribute show night day live music dinner lunch date plan with in at to'.split(' '));
@@ -6081,14 +6109,14 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     });
     const plan = planner.planTrip({
       intent, trip, tripEvents, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
-      facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity')),
+      facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now)),
       labels: tripPlannerLabels(),
       seed,
       excludeIds: excludeVenueIds,
       avoidIds: avoidVenueIds,
       startWeekday: tripStartWeekday(trip.when, now),
       clock: okanaganClock(now),
-      tripDate: tripPlanDate(trip.when, now),
+      tripDate: (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
     });
     plan.seeAll = null;
     if (eventWindow) plan.eventWindow = eventWindow;
@@ -6111,7 +6139,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, requirements) : null;
   const plan = tripPlannerModule().planTrip({
     intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
-    facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity')),
+    facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now)),
     labels: tripPlannerLabels(),
     seed,
     excludeIds: excludeVenueIds,
@@ -6120,7 +6148,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     swap,
     events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || familyEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
     familyEvents: !!familyEvents,
-    tripDate: requirements?.startDate || tripPlanDate(intent.when, now),
+    tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripPlanDate(intent.when, now),
     startWeekday: requirements?.startDate ? ['sun','mon','tue','wed','thu','fri','sat'][new Date(`${requirements.startDate}T12:00:00Z`).getUTCDay()] : tripStartWeekday(intent.when, now),
     clock: okanaganClock(now),
   });
@@ -12394,7 +12422,8 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
     close.addEventListener('click', function(e){ e.stopPropagation(); panel.classList.remove('open'); });
     panel.insertBefore(close, panel.firstChild);
     var full = document.createElement('a');
-    full.href = '/my-trip'; full.className = 'trip-tray-full'; full.textContent = 'Open full trip: days, map and share link \u2192';
+    // Round 7 (2026-10-19): French pages open the French My Trip.
+    full.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip'; full.className = 'trip-tray-full'; full.textContent = 'Open full trip: days, map and share link \u2192';
     if (clear) panel.insertBefore(full, clear);
     var info = {}, busy = false;
     function stored(){ try { return JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []; } catch (e) { return []; } }
@@ -27767,7 +27796,7 @@ function renderTripPlannerV2Script() {
     if (viewTrip) {
       // The full My Trip page (2026-10-14), grouped by day.
       track('open_my_trip', { trip_size: tripSize(), open_source: 'plan_view_trip' });
-      window.location.href = '/my-trip';
+      window.location.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip';
       return;
     }
     var replace = e.target.closest ? e.target.closest('[data-replace-id]') : null;
@@ -47561,6 +47590,7 @@ module.exports = {
   withoutEndedEvents,
   tripStartWeekday,
   tripPlanDate,
+  tripRequestedMonthDate,
   okanaganClock,
   venueHoursStatusAt,
   openNowEligibility,
