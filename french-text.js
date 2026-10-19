@@ -61,6 +61,7 @@ const FR_TEXT = {
   'Open Late': 'Ouvert tard',
   'Live Music': 'Musique en direct',
   'Happy Hour': 'Happy hour',
+  'Free to Visit': 'Gratuit',
   'Non-Alcoholic Options': 'Options sans alcool',
   'Sports TV': 'Sports à la télé',
   'Sports on TV': 'Sports à la télé',

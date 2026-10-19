@@ -187,6 +187,8 @@ var TRANSLATIONS = {
     'badge.liveMusic': 'Live music',
     'badge.greatGroups': 'Great for groups',
     'badge.happyHour': 'Happy hour',
+    'badge.freeEntry': 'Free to visit',
+    'badge.artsCulture': 'Arts & culture',
     'badge.openEarly': 'Open early',
     'badge.openLate': 'Open late',
 
@@ -658,6 +660,8 @@ var TRANSLATIONS = {
     'badge.liveMusic': 'Musique en direct',
     'badge.greatGroups': 'Id\u00e9al pour les groupes',
     'badge.happyHour': 'Happy hour',
+    'badge.freeEntry': 'Gratuit',
+    'badge.artsCulture': 'Arts et culture',
     'badge.openEarly': 'Ouvert t\u00f4t',
     'badge.openLate': 'Ouvert tard',
 
@@ -1249,6 +1253,8 @@ var CARD_BADGES = [
   { field: 'live_music', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>', label: 'badge.liveMusic' },
   { field: 'great_groups', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M20 20v-1.5a3.2 3.2 0 0 0-2.2-3"/><path d="M15 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>', label: 'badge.greatGroups' },
   { field: 'happy_hour', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', label: 'badge.happyHour' },
+  { field: 'free_entry', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>', label: 'badge.freeEntry' },
+  { field: 'arts_culture', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V10M9.5 21V10M14.5 21V10M19 21V10"/><path d="M2 10l10-6 10 6z"/></svg>', label: 'badge.artsCulture' },
   { field: 'open_early', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17a7 7 0 0 1 14 0"/><path d="M12 5v3"/><path d="M4.9 9.9l1.8 1.3"/><path d="M19.1 9.9l-1.8 1.3"/><path d="M3 20h18"/></svg>', label: 'badge.openEarly' },
   { field: 'open_late', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>', label: 'badge.openLate' }
 ];
@@ -3563,6 +3569,7 @@ window.__scrollToVenueCard = function(name){
     gluten_free: 'badge.glutenFree', patio: 'badge.patio', kid_friendly: 'badge.kidFriendly',
     lake_view: 'badge.lakeView', nonalcoholic: 'badge.nonalcoholic', sports_tv: 'badge.sportsTv',
     live_music: 'badge.liveMusic', great_groups: 'badge.greatGroups', happy_hour: 'badge.happyHour',
+    free_entry: 'badge.freeEntry', arts_culture: 'badge.artsCulture',
     open_early: 'badge.openEarly', open_late: 'badge.openLate'
   };
   var BUDGET_I18N_KEY = { budget: 'trip.conv.budget.budget', moderate: 'trip.conv.budget.moderate', upscale: 'trip.conv.budget.upscale' };

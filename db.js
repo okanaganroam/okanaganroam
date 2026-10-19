@@ -55,6 +55,9 @@ const newColumns = [
   ['great_groups', 'INTEGER DEFAULT 0'],
   ['happy_hour', 'INTEGER DEFAULT 0'],
   ['hours', 'TEXT'],
+  // Free to visit and Arts & Culture (2026-10-19): researched badges for things to do.
+  ['free_entry', 'INTEGER DEFAULT 0'],
+  ['arts_culture', 'INTEGER DEFAULT 0'],
   ['description_fr', 'TEXT'],
   // Derived badges (2026-10-11): computed from `hours` by server.js
   // (deriveHoursBadges), never researched or set by hand. Recomputed at

@@ -379,5 +379,14 @@
  "Remove nature": "Retirer nature",
  "Remove water": "Retirer eau",
  "Remove viewpoints": "Retirer belvédères",
- "Remove fishing": "Retirer pêche"
+ "Remove fishing": "Retirer pêche",
+ "{0} free things to do in {T}, BC. Parks, beaches, trails, galleries and more in {T} that cost nothing to visit. Some ask for a donation or charge for parking; check before you go.": "{0} activités gratuites à {T} (C.-B.). Parcs, plages, sentiers, galeries et plus à {T} qui ne coûtent rien à visiter. Certains demandent un don ou font payer le stationnement; vérifiez avant de partir.",
+ "{0} arts and culture spots in {T}, BC. Museums, galleries, theatres and heritage sites in {T}, for a day of art, history and learning.": "{0} lieux d’arts et de culture à {T} (C.-B.). Musées, galeries, théâtres et sites patrimoniaux à {T}, pour une journée d’art, d’histoire et de découverte.",
+ "Free Things to Do in {T}, BC | Okanagan Roam": "Activités gratuites à {T} (C.-B.) | Okanagan Roam",
+ "Arts & Culture in {T}, BC | Okanagan Roam": "Arts et culture à {T} (C.-B.) | Okanagan Roam",
+ "Free Things to Do in {T}": "Activités gratuites à {T}",
+ "Parks, beaches, trails, galleries and more in {T} that cost nothing to visit. Some ask for a donation or charge for parking; check before you go.": "Parcs, plages, sentiers, galeries et plus à {T} qui ne coûtent rien à visiter. Certains demandent un don ou font payer le stationnement; vérifiez avant de partir.",
+ "Arts & Culture in {T}": "Arts et culture à {T}",
+ "Museums, galleries, theatres and heritage sites in {T}, for a day of art, history and learning.": "Musées, galeries, théâtres et sites patrimoniaux à {T}, pour une journée d’art, d’histoire et de découverte.",
+ "Free to Visit": "Gratuit"
 }

@@ -178,11 +178,16 @@ function safeTokenEquals(provided, expected) {
 
 // The twelve researched amenity badges: verified per venue from real
 // listings and written by hand (PUT/POST, the guarded admin paths).
+// free_entry and arts_culture (2026-10-19, the Alternator Centre asked): "Free to visit" (no admission, or by
+// donation) and "Arts & Culture" (museums, galleries, theatres, heritage sites). Researched for things to do
+// (outdoor, indoor, beach, tour, sport); they mean nothing for a restaurant, so food places never show them.
 const RESEARCHED_BOOL_FIELDS = [
   'dog_friendly', 'vegan', 'vegetarian', 'patio', 'kid_friendly',
   'gluten_free', 'lake_view', 'nonalcoholic', 'sports_tv', 'live_music',
-  'great_groups', 'happy_hour',
+  'great_groups', 'happy_hour', 'free_entry', 'arts_culture',
 ];
+const ACTIVITY_ONLY_BADGES = new Set(['free_entry', 'arts_culture']);
+const ACTIVITY_BADGE_TYPES = new Set(['outdoor', 'indoor', 'beach', 'tour', 'sport']);
 
 // Derived badges (2026-10-11): computed ONLY from the venue's stored hours
 // by deriveHoursBadges() below -- never researched, never set by hand. They
@@ -1167,7 +1172,7 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
 const AMENITY_GUARDED_FIELDS = [
   'dog_friendly', 'vegan', 'vegetarian', 'patio', 'kid_friendly',
   'gluten_free', 'lake_view', 'nonalcoholic', 'sports_tv', 'live_music',
-  'great_groups', 'happy_hour',
+  'great_groups', 'happy_hour', 'free_entry', 'arts_culture',
 ];
 
 // fieldValues: { [fieldName]: { expectedCurrent: boolean, corrected: boolean } }
@@ -1480,6 +1485,8 @@ const BADGE_LABELS = {
   live_music: { title: 'Live Music', noun: 'venues with live music', adj: 'live-music' },
   great_groups: { title: 'Great for Groups', noun: 'venues that are great for groups', adj: 'group-friendly' },
   happy_hour: { title: 'Happy Hour', noun: 'venues with happy hour', adj: 'happy-hour' },
+  free_entry: { title: 'Free to Visit', noun: 'free things to do', adj: 'free' },
+  arts_culture: { title: 'Arts & Culture', noun: 'arts and culture spots', adj: 'arts-and-culture' },
   // Derived from stored hours (deriveHoursBadges), not researched.
   open_early: { title: 'Open Early', noun: 'spots open early for breakfast & brunch', adj: 'early-opening' },
   open_late: { title: 'Open Late', noun: 'late-night spots', adj: 'late-night' },
@@ -5106,11 +5113,12 @@ const SMART_FREE_EVENT_RE = /(?<![-\w])(?<!gluten[- ]|dairy[- ]|alcohol[- ]|suga
 function smartFreePick(region, features) {
   return smartPickVenues((v) => {
     if ((region && v.region !== region) || !features.every((f) => v.features[f])) return false;
+    if (v.row.free_entry) return 'Free to visit';
     if (SMART_FREE_DESC_RE.test(String(v.row.description || ''))) return 'Says entry is free';
     if (v.type === 'beach') return 'Beach';
     if (v.type === 'outdoor' && v.activities.some((a) => SMART_FREE_ACTIVITIES.includes(a))) return v.activities.includes('viewpoints') ? 'Viewpoint' : 'Park or trail';
     return false;
-  }, (v) => (SMART_FREE_DESC_RE.test(String(v.row.description || '')) ? 20 : 0) + (SMART_FREE_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+  }, (v) => (v.row.free_entry ? 30 : 0) + (SMART_FREE_DESC_RE.test(String(v.row.description || '')) ? 20 : 0) + (SMART_FREE_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
 }
 
 // Open now: the places open right now by their listed hours (the same hours engine as the cards), for the rest of
@@ -8653,6 +8661,8 @@ const GUIDE_BADGE_TEXT = {
   live_music: { h: 'Live Music in {T}', i: 'Pubs, wineries, breweries and lounges in {T} that put on live music. Check each place for this week\u2019s line-up.' },
   great_groups: { h: 'Great Spots for Groups in {T}', i: 'Places in {T} with the room and the menu for a crowd: birthdays, team nights and family get-togethers.' },
   happy_hour: { h: 'Happy Hour in {T}', i: 'Pubs, restaurants and lounges in {T} with a happy hour. Times change, so check with the place before you go.' },
+  free_entry: { h: 'Free Things to Do in {T}', i: 'Parks, beaches, trails, galleries and more in {T} that cost nothing to visit. Some ask for a donation or charge for parking; check before you go.' },
+  arts_culture: { h: 'Arts & Culture in {T}', i: 'Museums, galleries, theatres and heritage sites in {T}, for a day of art, history and learning.' },
   open_early: { h: 'Breakfast & Early Spots in {T}', i: 'Caf\u00e9s and restaurants in {T} that open early, for breakfast, brunch or a first coffee.' },
   open_late: { h: 'Late-Night Spots in {T}', i: 'Places in {T} that stay open late, for a last drink or a bite after the show.' },
 };
@@ -8670,6 +8680,7 @@ const GUIDE_BADGE_BANNERS = {
   vegetarian: () => CATEGORY_BANNER_IMAGES.restaurant,
   gluten_free: () => CATEGORY_BANNER_IMAGES.restaurant,
   nonalcoholic: () => CATEGORY_BANNER_IMAGES.cocktail,
+  free_entry: () => CATEGORY_BANNER_IMAGES.outdoor,
 };
 // Our own write-ups for a town and badge, linked from the top of the page.
 const GUIDE_BADGE_PICKS = {
@@ -19751,6 +19762,9 @@ const FD_HUB_FEATURES = [
   { key: 'open_late', label: 'Open Late', icon: '🌙' },
   { key: 'sports_tv', label: 'Sports on TV', icon: '📺' },
   { key: 'nonalcoholic', label: 'Non-Alcoholic Options', icon: '🥤' },
+  // Things-to-do badges (2026-10-19): only offered where a page asks for them (onlyKeys), never on food pages.
+  { key: 'free_entry', label: 'Free to Visit', icon: '🎟️' },
+  { key: 'arts_culture', label: 'Arts & Culture', icon: '🎨' },
 ];
 const FD_HUB_FEATURE_KEYS = new Set(FD_HUB_FEATURES.map((f) => f.key));
 // How many cards are in the render tree at a time. 75 keeps the initial page
@@ -20287,7 +20301,7 @@ function foodDrinkTypeChipsHtml(state = {}) {
 function foodDrinkFeatureChipsHtml(state = {}, onlyKeys = null) {
   const selected = new Set(state.features || []);
   const counts = state.counts && state.counts.features ? state.counts.features : null;
-  const chips = FD_HUB_FEATURES.filter((f) => !onlyKeys || onlyKeys.includes(f.key)).map((f) => {
+  const chips = FD_HUB_FEATURES.filter((f) => (onlyKeys ? onlyKeys.includes(f.key) : !ACTIVITY_ONLY_BADGES.has(f.key))).map((f) => {
     const n = counts ? (counts[f.key] || 0) : null;
     return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-fd-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
@@ -21783,7 +21797,7 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
   const featureTally = {};
   for (const list of featsById.values()) for (const k of list) featureTally[k] = (featureTally[k] || 0) + 1;
   // Only the features that mean something indoors.
-  const featureKeys = ['kid_friendly', 'great_groups', 'dog_friendly'].filter((k) => (featureTally[k] || 0) >= 5);
+  const featureKeys = ['free_entry', 'arts_culture', 'kid_friendly', 'great_groups', 'dog_friendly'].filter((k) => (featureTally[k] || 0) >= 5);
   f.features = f.features.filter((k) => featureKeys.includes(k));
   const advisoryNotes = getAdvisoryNotes();
   const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
@@ -23727,7 +23741,7 @@ function renderSecretSpotsHubPage(venues, filter = null, now = new Date()) {
     cardNotes: getPublicCollectionNotes('hidden_gem'),
     cardNoteLabel: 'Why it\u2019s a gem:',
     cardOpts: { hideHiddenGemBadge: true },
-    features: ['dog_friendly', 'kid_friendly', 'lake_view'],
+    features: ['free_entry', 'dog_friendly', 'kid_friendly', 'lake_view'],
     openNow: false,
     search: { label: 'Search secret spots', placeholder: 'Search by name, town, waterfall or trail...' },
     searchLabels: { falls: 'waterfall canyon falls', wildlife: 'birds wetland wildlife pond', gardens: 'garden heritage history', parks: 'park hike trail viewpoint' },
@@ -23807,7 +23821,7 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
     activityPhotos: 'swap',
     cardNotes: getDogFriendlyNotes(),
     cardNoteLabel: 'Dogs:',
-    features: ['dog_friendly', 'kid_friendly', 'lake_view'],
+    features: ['free_entry', 'arts_culture', 'dog_friendly', 'kid_friendly', 'lake_view'],
     openNow: false,
     search: { label: 'Search outdoor destinations', placeholder: 'Search by name, town, trail or lake...' },
     searchLabels: { hiking: 'hike trail walk', viewpoints: 'lookout view summit', nature: 'wildlife birds park', cycling: 'bike', winter: 'ski snow', water: 'paddle swim boat lake' },
@@ -23888,7 +23902,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
     photoKeyFor: (v) => { const a = tourActivityOf(v); return curatedPhotoKey(v, a ? `tour${a}` : 'tour'); },
     cardNotes: getToursAlsoNotes(),
     cardNoteLabel: 'Experience:',
-    features: ['kid_friendly', 'dog_friendly', 'great_groups'],
+    features: ['arts_culture', 'kid_friendly', 'dog_friendly', 'great_groups'],
     openNow: false,
     search: { label: 'Search tours and experiences', placeholder: 'Search by name, town or activity...' },
     tryLinks: [['/tours?types=wine', 'wine tours'], ['/tours?types=lake', 'boats'], ['/tours?types=bike', 'bike tours']],
@@ -29972,7 +29986,7 @@ function browseTypeChipsHtml(state = {}) {
 function browseFeatureChipsHtml(state = {}) {
   const selected = new Set(state.features || []);
   const counts = state.counts && state.counts.features ? state.counts.features : null;
-  const chips = FD_HUB_FEATURES.map((f) => {
+  const chips = FD_HUB_FEATURES.filter((f) => !ACTIVITY_ONLY_BADGES.has(f.key)).map((f) => {
     const n = counts ? (counts[f.key] || 0) : null;
     return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-bh-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
@@ -43137,7 +43151,7 @@ function venuePhotoPosY(venueId, imageUrl) {
 // The badge names as the French site shows them (app.js badge.* keys).
 const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Végane', vegetarian: 'Options végétariennes', patio: 'Terrasse', kid_friendly: 'Adapté aux enfants',
   gluten_free: 'Options sans gluten', lake_view: 'Vue sur le lac ou le vignoble', nonalcoholic: 'Options sans alcool', sports_tv: 'Sports à la télé', live_music: 'Musique en direct',
-  great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour' };
+  great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
   price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales' };
@@ -43637,8 +43651,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   }).join('');
   // Food-only badges mean nothing to a tour or an activity: kept (so nothing changes) but not shown.
   const foodOnly = OWNER_BOOKING_FIRST_TYPES.has(venue.type) && venue.type !== 'golf' ? new Set(['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'sports_tv']) : new Set();
+  const activityOnly = ACTIVITY_BADGE_TYPES.has(venue.type) ? new Set() : ACTIVITY_ONLY_BADGES;
   const badgeChecks = RESEARCHED_BOOL_FIELDS.filter((f) => f !== 'happy_hour' || showHappyHour).map((f) => `
-          <label class="amenity-check"${foodOnly.has(f) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
+          <label class="amenity-check"${(foodOnly.has(f) || activityOnly.has(f)) && !snap.badges[f] ? ' hidden' : ''}><input type="checkbox" name="badge" value="${f}"${snap.badges[f] ? ' checked' : ''}> ${escapeHtml(fr ? OWNER_BADGE_LABELS_FR[f] || BADGE_LABELS[f].title : BADGE_LABELS[f].title)}</label>`).join('');
   // Signed in (2026-10-18): "Anything else you send now is added to them" isn't true any more (most fields go live on
   // Save), so the line says what Save does with what is still waiting.
   const carryOnSave = instantOn && waitingReq && waitingReq.status === 'pending' && ownerInstantCountToday(venue.id) < OWNER_INSTANT_DAILY_LIMIT
