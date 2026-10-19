@@ -30258,3 +30258,50 @@ test('Trip planner round 8: Swap sends the visitor\'s locks, and only valid ones
   // The dated one-day outing check survives the template (a single backslash became "d").
   assert.ok(html.includes("/^\\d{4}-\\d{2}-\\d{2}$/.test(r.date || '')"));
 });
+
+// ---- Build My Trip, round 9 (2026-10-19): Swap times, notices on the planned date, French plan links ----
+test('Trip planner round 9: Swap sends each shown stop\'s start time, and only valid times are accepted', () => {
+  const ok = app.parseTripPlanBody({ text: 'Naramata wine day', pinned: { '1-morning': 3 }, swap: { key: '1-afternoon', type: 'winery', id: 5, locked: [], times: { '1-morning': 540, '1-evening': 1080 } } });
+  assert.deepEqual(ok.value.swap.times, { '1-morning': 540, '1-evening': 1080 });
+  for (const times of [[540], { 'day-1': 540 }, { '1-morning': 1440 }, { '1-morning': -1 }, { '1-morning': '540' }]) assert.match(app.parseTripPlanBody({ text: 'x', swap: { key: '1-afternoon', type: 'winery', times } }).error, /^swap must be/, JSON.stringify(times));
+  const html = app.renderTripPlannerV3Page({ preview: true });
+  assert.ok(html.includes('times: shownTimes()'), 'the page sends the times');
+  // An undated plan for a month keeps the month in My Trip, and the month test survives the template.
+  assert.ok(html.includes('else if (planMonth()) t.m = planMonth();'));
+  assert.ok(html.includes("if (/^\\d{4}-\\d{2}-\\d{2}$/.test(date || '')) t.d = date;"));
+});
+
+test('Trip planner round 9: plan stops carry their French page (urlFr) for /fr/trip', () => r8Fixtures([
+  { name: 'R9 Plan Link Winery', region: 'naramata', type: 'winery' },
+], async ([v]) => {
+  const plan = app.withTripFrenchUrls({ days: [{ day: 1, stops: [{ daypart: 'afternoon', venue: { id: v.id, name: v.name, url: `/naramata/wineries/${v.slug}` } }] }], rainBackup: [{ id: 1, name: 'Nowhere', url: '/not-a-real-page/x/y' }] });
+  assert.equal(plan.days[0].stops[0].venue.urlFr, `/fr/naramata/wineries/${v.slug}`);
+  assert.equal(plan.rainBackup[0].urlFr, undefined, 'a page with no French twin keeps only url');
+}));
+
+test('Round 9 My Trip: a season notice is judged on the stop\'s planned date, not today', () => r8Fixtures([
+  { name: 'R9 Ski Hill Fixture', region: 'kelowna', type: 'outdoor' },
+], async ([hill]) => {
+  const today = app.todayLocal();
+  const reopens = app.addLocalDays(today, 30);
+  db.prepare('INSERT INTO venue_seasons (venue_id, status, reopens_date, source_url, checked_at) VALUES (?, ?, ?, ?, ?)').run(hill.id, 'closed', reopens, 'https://example.com/season', today);
+  try {
+    const now = app.tripStopsFor([`venue:${hill.id}`]);
+    assert.equal(now[0].notice.kind, 'closed', 'closed for the season today');
+    // A January trip after the reopening: no "Closed for the season. Reopens ..." on that stop.
+    const later = app.tripStopsFor([`venue:${hill.id}`], new Date(), { [`venue:${hill.id}`]: app.addLocalDays(today, 80) });
+    assert.equal(later[0].notice, null);
+    // A planned date inside the closure still says so.
+    const during = app.tripStopsFor([`venue:${hill.id}`], new Date(), { [`venue:${hill.id}`]: app.addLocalDays(today, 10) });
+    assert.equal(during[0].notice.kind, 'closed');
+    await withDiscoveryServer(async (base) => {
+      const api = await (await fetch(`${base}/api/trip-stops?refs=venue:${hill.id}&on=${app.addLocalDays(today, 80)}`)).json();
+      assert.equal(api.stops[0].notice, null);
+      const page = await (await fetch(`${base}/my-trip`)).text();
+      assert.ok(page.includes("'&on=' + encodeURIComponent(on.join(','))"), 'My Trip sends each stop\'s planned date');
+      assert.ok(page.includes('function plannedDate(t){ return t && /^\\d{4}-\\d{2}-\\d{2}$/.test(t.d'), 'the date test survives the template');
+    });
+  } finally {
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(hill.id);
+  }
+}));

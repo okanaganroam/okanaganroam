@@ -5994,9 +5994,11 @@ function parseTripPlanBody(body) {
     const w = body.swap;
     // id (round 7): the place being swapped out, kept with a note when nothing else fits.
     // locked (round 8): the stops the visitor locked; the other pins only keep the plan steady and may give way.
-    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
-      || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"] }.' };
-    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}) };
+    // times (round 9, 2026-10-19): the start of each shown stop, so a Swap keeps every other stop's time of day.
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
+      || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))
+      || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => TRIP_PLAN_PIN_RE.test(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
+    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}) };
   }
   return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap } };
 }
@@ -6204,8 +6206,10 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // Calendar dates are handled by requirements, not mistaken for a day count.
   const requirementModule = require('./trip-requirements');
   const calendar = requirementModule.tripCalendar(planText, todayLocal(now));
-  let interpretationText = requirementModule.sportsVenueInterpretationText(calendar.cleanText, taxonomy);
-  let requirementsText = planText;
+  // Round 9 (2026-10-19): « soirée spectacle » / "a show on Saturday night" is dinner and a show, like "dinner and a show".
+  const showEvening = tripPlannerModule().showEveningText;
+  let interpretationText = requirementModule.sportsVenueInterpretationText(showEvening(calendar.cleanText), taxonomy);
+  let requirementsText = showEvening(planText);
   let namedEventAmbiguity = null;
   const eventChoiceDate = overrides?.startDate || calendar.startDate;
   let namedEventCandidates = [];
@@ -6217,7 +6221,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     interpretationText = detected.text;
     namedEventAmbiguity = detected.ambiguity;
     namedEventCandidates = detected.ambiguity ? listed.filter(e => detected.ambiguity.candidateIds.includes(e.id)) : [];
-    requirementsText = requirementModule.namedEventInterpretationText(planText, listed);
+    requirementsText = requirementModule.namedEventInterpretationText(showEvening(planText), listed);
   }
   let selectedNamedEvent = null;
   if (overrides?.eventId !== undefined) {
@@ -6234,6 +6238,12 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
   let trip = discoveryIntentModule().interpretTripComponents(interpretationText, taxonomy, intent);
+  // Round 9: dinner and a show with no town is planned in Kelowna, where most shows are (it was West Kelowna, or a
+  // haunted corn maze in Vernon); the Where chip can change it.
+  if (!(intent.regions || []).length && trip.multi && !trip.route && trip.components.some((c) => c.kind === 'event' && c.event && ['show', 'performance', 'comedy'].includes(c.event.kind)) && trip.components.some((c) => c.meal)) {
+    intent.regions = ['kelowna'];
+    trip.regions = ['kelowna'];
+  }
   const extracted = requirementModule.extractTripRequirements({ text: requirementsText, intent, trip, taxonomy, referenceDate:todayLocal(now) });
   // "Wine tour" means wineries unless a tour company or shuttle was asked for (2026-10-18); planTrip applies it too.
   tripPlannerModule().applyWineTourMeaning(requirementsText, intent, extracted);
@@ -6461,6 +6471,23 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   return plan;
 }
 
+// French plan links (round 9, 2026-10-19): every place and event in a plan also carries its /fr page (urlFr) when it has
+// one, so /fr/trip links to French pages (it used safeUrl(v.url), the English page). Places without a French page keep
+// only url.
+function withTripFrenchUrls(plan) {
+  const seen = new Set();
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 8 || seen.has(o)) return;
+    seen.add(o);
+    if (Array.isArray(o)) { for (const x of o) walk(x, depth + 1); return; }
+    if (typeof o.url === 'string' && /^\/(?!\/|fr\/)/.test(o.url) && typeof o.name === 'string' && o.urlFr === undefined) {
+      try { const fr = frHref(o.url); if (fr && fr !== o.url) o.urlFr = fr; } catch (e) { /* English page only */ }
+    }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') walk(o[k], depth + 1);
+  };
+  walk(plan, 0);
+  return plan;
+}
 // ---------- Temporary-condition advisories (2026-09-19) ----------
 // A venue's permanent, verified facts live in its description. Temporary
 // conditions -- a swimming advisory, a partial wildfire closure, a
@@ -6913,7 +6940,8 @@ function recurringSeasonRow(venueId, openMonths, today) {
   return { venue_id: venueId, status: 'closed', until_date: null, reopens_date: reopens, source_url: null, checked_at: closedFrom };
 }
 
-function getSeasonRows() {
+// today (round 9): the date a recurring owner season is judged from (a planned stop's date on My Trip).
+function getSeasonRows(today = todayLocal()) {
   const map = new Map();
   for (const r of db.prepare(`
     SELECT s.venue_id, s.status, s.until_date, s.reopens_date, s.source_url, s.checked_at
@@ -6921,7 +6949,6 @@ function getSeasonRows() {
     WHERE v.redirect_to IS NULL
   `).all()) map.set(r.venue_id, r);
   // Owners' yearly seasons, where no dated closure has been set by hand.
-  const today = todayLocal();
   for (const r of db.prepare(`SELECT l.venue_id, l.open_months FROM venue_links l JOIN venues v ON v.id = l.venue_id
     WHERE l.open_months IS NOT NULL AND v.redirect_to IS NULL`).all()) {
     if (map.has(r.venue_id)) continue;
@@ -33051,7 +33078,20 @@ const MY_TRIP_MAX_REFS = 30;
 // My Trip notices (2026-10-19, round 8): a stop with a closure or a "Check before you go" advisory says so on My Trip,
 // as its card does: the dated season or closure tag ("Closed Oct 21–28, reopens Oct 29.") when there is one, else the
 // written advisory. -> null | { kind, text, textFr }
-function tripStopNotice(venueId, seasons, advisories) {
+// Round 9 (2026-10-19): a stop with a planned date (or month) is judged on that date: a January ski trip no longer says
+// "Closed for the season. Reopens Nov 26" because the hill is closed today. A season that says nothing about that
+// date shows nothing; the written advisory (not dated) still shows.
+function tripStopNotice(venueId, seasons, advisories, onDate = null) {
+  if (onDate) {
+    let st = null;
+    try { const rows = getSeasonRows(onDate); st = rows.has(venueId) ? seasonStateOn(rows.get(venueId), onDate) : null; } catch (e) { st = null; }
+    if (st) {
+      let fr = null;
+      try { fr = frText(seasonTagShortText(st)); } catch (e) { fr = null; }
+      return { kind: st.kind, text: seasonTagShortText(st), textFr: fr || seasonTagShortText(st), on: onDate };
+    }
+    seasons = new Map();
+  }
   const st = seasons.get(venueId);
   if (st) {
     const text = seasonTagShortText(st);
@@ -33067,7 +33107,8 @@ function tripStopNotice(venueId, seasons, advisories) {
   try { fr = frAdvisoryText(text); } catch (e) { fr = text; }
   return { kind: 'advisory', text, textFr: fr };
 }
-function tripStopsFor(refs, now = new Date()) {
+// onDates (round 9): ref -> 'YYYY-MM-DD', each stop's planned date, for its notice.
+function tripStopsFor(refs, now = new Date(), onDates = {}) {
   const out = [];
   const venueQ = db.prepare('SELECT * FROM venues WHERE id = ?');
   let seasons = new Map(), advisories = new Map();
@@ -33091,7 +33132,7 @@ function tripStopsFor(refs, now = new Date()) {
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
-        notice: tripStopNotice(v.id, seasons, advisories),
+        notice: tripStopNotice(v.id, seasons, advisories, parseLocalDate(onDates[ref]) && onDates[ref] !== todayLocal(now) ? onDates[ref] : null),
       });
     } else {
       const e = eventQ.get(Number(m[2]));
@@ -33388,6 +33429,11 @@ ${renderGolfHeaderHtml()}
     var mo = isFr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return isFr ? wd[t.getUTCDay()] + ' ' + t.getUTCDate() + ' ' + mo[t.getUTCMonth()] : wd[t.getUTCDay()] + ', ' + mo[t.getUTCMonth()] + ' ' + t.getUTCDate();
   }
+  function monthText(ym){
+    var n = Number(String(ym).slice(5, 7));
+    var mo = isFr ? ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'] : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return n >= 1 && n <= 12 ? mo[n - 1] + ' ' + String(ym).slice(0, 4) : '';
+  }
   function clockText(m){
     var h = Math.floor(m / 60) % 24, mm = m % 60;
     if (isFr) return h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '');
@@ -33406,10 +33452,16 @@ ${renderGolfHeaderHtml()}
     if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: sharedStart && sharedDays[i] ? { d: addDays(sharedStart, sharedDays[i] - 1) } : null }; });
     return trip.map(function(t){ var k = keyOf(t); return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (k && days[k]) || 0, time: k && times[k] || null, raw: t }; });
   }
+  // Round 9 (2026-10-19): each stop's planned date (or the middle of its planned month) goes with it, so a season
+  // notice is the one for that day ("Closed for the season" today is not a January ski trip's problem).
+  function plannedDate(t){ return t && /^\\d{4}-\\d{2}-\\d{2}$/.test(t.d || '') ? t.d : t && /^\\d{4}-\\d{2}$/.test(t.m || '') ? t.m + '-15' : ''; }
   function fetchInfo(refs){
     var need = refs.filter(function(r){ return r && !info[r]; });
     if (!need.length) return Promise.resolve();
-    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(','))).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
+    var when = {};
+    list().forEach(function(s){ var d = plannedDate(s.time); if (d && !when[s.ref]) when[s.ref] = d; });
+    var on = need.map(function(r){ return when[r] || ''; });
+    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(',')) + (on.some(Boolean) ? '&on=' + encodeURIComponent(on.join(',')) : '')).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
   }
   function dirUrl(stops){
     // At most 11 stops: an origin, nine waypoints and a destination, Google's limit for one route link (2026-10-18).
@@ -33444,7 +33496,9 @@ ${renderGolfHeaderHtml()}
     var mine = viewing === 'mine';
     el('mtDays').innerHTML = groups.map(function(g){
       var gDate = g.key ? g.stops.map(function(x){ return x.s.time && x.s.time.d; }).filter(Boolean)[0] : null;
-      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
+      // An undated plan for a month ("skiing in January") keeps its month (round 9).
+      var gMonth = g.key && !gDate ? g.stops.map(function(x){ return x.s.time && x.s.time.m; }).filter(Boolean)[0] : null;
+      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : gMonth ? ' · ' + esc(monthText(gMonth)) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
         '<a class="mt-btn" ' + hrefAttr(dirUrl(g.stops.map(function(x){ return x.s; }))) + ' target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
         '<ol class="mt-list">' + (g.key && mine && drives[g.key] && drives[g.key].f && drives[g.key].t ? '<li class="mt-drive">' + esc(driveText(drives[g.key])) + '</li>' : '') + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
@@ -46991,7 +47045,7 @@ const server = http.createServer(async (req, res) => {
       }
       const parsed = parseTripPlanBody(body);
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
-      try { return sendJSON(res, 200, runTripPlan(parsed.value)); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
+      try { return sendJSON(res, 200, withTripFrenchUrls(runTripPlan(parsed.value))); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
@@ -47202,7 +47256,11 @@ const server = http.createServer(async (req, res) => {
     // page link, photo, map position and directions query for My Trip.
     if (pathname === '/api/trip-stops' && method === 'GET') {
       const refs = String(query.refs || '').split(',').map((x) => x.trim()).filter(Boolean);
-      return sendJSON(res, 200, { stops: tripStopsFor(refs) });
+      // on= (round 9): each ref's planned date, in the same order ("" for none).
+      const on = String(query.on || '').split(',').slice(0, MY_TRIP_MAX_REFS);
+      const onDates = {};
+      refs.forEach((r, i) => { const dt = (on[i] || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(dt) && parseLocalDate(dt) && !onDates[r]) onDates[r] = dt; });
+      return sendJSON(res, 200, { stops: tripStopsFor(refs, new Date(), onDates) });
     }
     if (pathname === '/site.webmanifest' && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
@@ -48587,6 +48645,7 @@ module.exports = {
   outdoorActivitiesByVenue,
   renderMyTripPage,
   tripStopsFor,
+  withTripFrenchUrls,
   tripShareSummary,
   tripShareSearch,
   tripCardPhotoKey,

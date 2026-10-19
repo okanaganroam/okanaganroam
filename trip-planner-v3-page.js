@@ -800,6 +800,8 @@ function renderScript(d) {
   // attribute is joined from parts instead, so the script holds no href="..." text.
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); }
   function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
+  // Round 9 (2026-10-19): a place's or event's own page in the plan's language (/fr page on /fr/trip when it has one).
+  function placeUrl(o){ return o ? safeUrl((lang() === 'fr' && o.urlFr) || o.url) : null; }
   function setStatus(text, mode){ statusEl.textContent = text || ''; statusEl.className = 't3-status' + (mode ? ' is-' + mode : ''); }
   // Interface text in the visitor's language (2026-10-04): the tripv3.* keys
   // of /scripts/app.js, through its t() and getCurrentLang(). In English every
@@ -971,6 +973,15 @@ function renderScript(d) {
     var pins = {};
     days().forEach(function(d){ d.stops.forEach(function(s){ var k = d.day + '-' + s.daypart; if (s.venue && !state.removed[k] && (exceptKeys || []).indexOf(k) === -1) pins[k] = s.venue.id; }); });
     return pins;
+  }
+  // Round 9 (2026-10-19): the start of each shown stop, sent with a Swap so every other stop keeps its time of day.
+  function shownTimes(){
+    var times = {}, rows = (state.last && state.last.schedule) || [];
+    days().forEach(function(d){ d.stops.forEach(function(s){
+      if (!s.venue) return;
+      for (var i = 0; i < rows.length; i++) { var r = rows[i]; if (r.day === d.day && r.venueId === s.venue.id && typeof r.startMinutes === 'number' && r.startMinutes >= 0 && r.startMinutes < 1440) { times[d.day + '-' + s.daypart] = Math.round(r.startMinutes); break; } }
+    }); });
+    return times;
   }
   function shownIds(){
     var ids = [], p = state.last || {};
@@ -1199,13 +1210,13 @@ function renderScript(d) {
     if (items.length > 4) {
       var extra = items.length - 3;
       items = items.slice(0, 3).concat(items.slice(3).map(function(li){ return li.replace('<li', '<li hidden data-t3-badge-extra'); }))
-        .concat('<li class="is-more"><button type="button" class="t3-badge-more" data-t3-badges-more aria-expanded="false">' + esc(lang() === 'fr' ? '+' + extra + ' de plus' : '+' + extra + ' more') + '</button></li>');
+        .concat('<li class="is-more"><button type="button" class="t3-badge-more" data-t3-badges-more aria-expanded="false">' + esc(lang() === 'fr' ? '+' + extra : '+' + extra + ' more') + '</button></li>');
     }
     return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
   }
   function cardHtml(stop, key, opts){
     opts = opts || {};
-    var v = stop.venue, url = safeUrl(v.url), counts = opts.counts || {};
+    var v = stop.venue, url = placeUrl(v), counts = opts.counts || {};
     var cardAnchor = v.id != null && !renderedVenueCardAnchors[v.id] ? ' id="' + esc(t3VenueCardId(v.id)) + '"' : '';
     if (v.id != null) renderedVenueCardAnchors[v.id] = true;
     var kept = key && state.locks[key] === v.id;
@@ -1236,7 +1247,7 @@ function renderScript(d) {
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
       + '<div class="t3-actions">'
-      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + '>Add to trip</button>'
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + '>' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>'
     // The list cards' Favorite button (2026-10-19): named for the place, with its pressed state.
     var favHtml = '<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>';
     var detailsHtml = url ? '<a class="t3-act" ' + hrefAttr(url) + '>' + esc(tx('tripv3.viewDetails')) + '</a>' : '';
@@ -1258,6 +1269,19 @@ function renderScript(d) {
   // The planner's fixed occasion and party labels (trip-planner.js).
   var OCCASION_KEYS = { 'date night': 'tripv3.occasion.date_night', 'romantic outing': 'tripv3.occasion.romantic', 'family trip': 'tripv3.occasion.family', 'rainy day': 'tripv3.occasion.rainy_day', celebration: 'tripv3.occasion.celebration', 'group getaway': 'tripv3.occasion.group_getaway', 'relaxing getaway': 'tripv3.occasion.relaxing', adventure: 'tripv3.occasion.adventure', 'adults-only trip': 'tripv3.occasion.adults' };
   var PARTY_KEYS = { 'with kids': 'tripv3.party.kids', 'with a dog': 'tripv3.party.dog' };
+  // Round 9 (2026-10-19): the planner's relative "when" in French on /fr/trip ("on Saturday evening" -> "Samedi soir",
+  // "this weekend" -> "Cette fin de semaine"). Anything else is shown as it came.
+  function whenLabelFr(w){
+    if (lang() !== 'fr' || typeof w !== 'string') return w;
+    var days = { monday: 'lundi', tuesday: 'mardi', wednesday: 'mercredi', thursday: 'jeudi', friday: 'vendredi', saturday: 'samedi', sunday: 'dimanche' };
+    var parts = { morning: 'matin', afternoon: 'après-midi', evening: 'soir', night: 'soir' };
+    var fixed = { 'right now': 'maintenant', 'tonight': 'ce soir', 'today': 'aujourd’hui', 'tomorrow': 'demain', 'this weekend': 'cette fin de semaine', 'this morning': 'ce matin', 'this afternoon': 'cet après-midi', 'this evening': 'ce soir' };
+    var t = w.trim().toLowerCase(), out = fixed[t];
+    var m;
+    if (!out && (m = /^tomorrow (morning|afternoon|evening)$/.exec(t))) out = 'demain ' + parts[m[1]];
+    if (!out && (m = /^on (monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?: (morning|afternoon|evening|night))?$/.exec(t))) out = days[m[1]] + (m[2] ? ' ' + parts[m[2]] : '');
+    return out ? out.charAt(0).toUpperCase() + out.slice(1) : w;
+  }
   function understoodHtml(p){
     var u = p.understood;
     if (!u) return '';
@@ -1280,7 +1304,7 @@ function renderScript(d) {
       chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.pace')) + '</span><select data-t3-override="pace" aria-label="' + esc(tx('tripv3.pace')) + '">' + paces.map(function(x){ return '<option value="' + x + '"' + (u.pace === x ? ' selected' : '') + '>' + esc(tx('tripv3.pace.' + x)) + '</option>'; }).join('') + '</select></li>');
     }
     if (u.season) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(u.season.label) + '</li>');
-    else if (u.when) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(u.when) + '</li>');
+    else if (u.when) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(whenLabelFr(u.when)) + '</li>');
     if (u.budget) chips.push('<li class="t3-chip">' + esc(lang() === 'fr' ? ({ budget: 'Petit budget', moderate: 'Prix moyens', upscale: 'Haut de gamme' }[u.budget] || u.budget) : ({ budget: 'On a budget', moderate: 'Mid-range prices', upscale: 'Upscale' }[u.budget] || u.budget)) + '</li>');
     if (u.occasion) chips.push('<li class="t3-chip">' + esc(frLabel(OCCASION_KEYS[u.occasion], u.occasion.charAt(0).toUpperCase() + u.occasion.slice(1))) + '</li>');
     (u.party || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(frLabel(PARTY_KEYS[x], x.charAt(0).toUpperCase() + x.slice(1))) + '</li>'); });
@@ -1313,13 +1337,13 @@ function renderScript(d) {
       }
       if (!s.venue) {
         if (s.kind === 'event' && s.event) {
-          var e = s.event, u = safeUrl(e.url);
+          var e = s.event, u = placeUrl(e);
           html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             // Round 8: an event says why it is in the plan, like every other stop.
             + ((s.why || []).length ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + s.why.slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
         }
         // Round 7: a long wait before dinner with nothing nearby that fits is labelled free time, not left blank.
@@ -1332,7 +1356,7 @@ function renderScript(d) {
         if ((s.freeEvening || []).length) {
           // One dinner was asked for: this evening is free on purpose, with a couple of places in case they want to eat out.
           var feFr = lang() === 'fr';
-          var feLinks = s.freeEvening.map(function(x){ var u = safeUrl(x.url); return u ? '<a ' + hrefAttr(u) + '>' + esc(x.name) + '</a>' : esc(x.name); }).join(feFr ? ' ou ' : ' or ');
+          var feLinks = s.freeEvening.map(function(x){ var u = placeUrl(x); return u ? '<a ' + hrefAttr(u) + '>' + esc(x.name) + '</a>' : esc(x.name); }).join(feFr ? ' ou ' : ' or ');
           html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty t3-free"><strong>' + (feFr ? 'Soirée libre' : 'Free evening') + '</strong><p>' + esc(feFr ? 'Vous avez demandé un seul souper, alors cette soirée reste libre. Si vous voulez sortir manger : ' : 'You asked for one dinner, so this evening is yours. If you’d like to eat out: ') + feLinks + '.</p></div></li>';
           return;
         }
@@ -1536,7 +1560,7 @@ function renderScript(d) {
     // The rainy-day backups are shown up front with links, so their note is not repeated under "How this plan was made".
     var rainNote = /^(?:If it rains:|S’il pleut :)/;
     var notes = (p.notes || []).filter(function(n){ return (p.contextNotes || []).indexOf(n) === -1 && !((p.rainBackup || []).length && rainNote.test(n)); });
-    var rainHtml = (p.rainBackup || []).length ? '<p class="t3-expect t3-rain">' + esc(lang() === 'fr' ? 'S’il pleut : ' : 'If it rains: ') + p.rainBackup.map(function(v){ var u = safeUrl(v.url); return u ? '<a ' + hrefAttr(u) + '>' + esc(v.name) + '</a>' : esc(v.name); }).join(lang() === 'fr' ? ' ou ' : ' or ') + esc(lang() === 'fr' ? ' — des options intérieures à proximité pour remplacer une plage ou une sortie en plein air.' : ' — indoor backups nearby, to swap in for a beach or outdoor stop.') + '</p>' : '';
+    var rainHtml = (p.rainBackup || []).length ? '<p class="t3-expect t3-rain">' + esc(lang() === 'fr' ? 'S’il pleut : ' : 'If it rains: ') + p.rainBackup.map(function(v){ var u = placeUrl(v); return u ? '<a ' + hrefAttr(u) + '>' + esc(v.name) + '</a>' : esc(v.name); }).join(lang() === 'fr' ? ' ou ' : ' or ') + esc(lang() === 'fr' ? ' — des options intérieures à proximité pour remplacer une plage ou une sortie en plein air.' : ' — indoor backups nearby, to swap in for a beach or outdoor stop.') + '</p>' : '';
     var html = understoodHtml(p)
       + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
       + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
@@ -1666,7 +1690,7 @@ function renderScript(d) {
       html += '<h3 class="t3-section-title">' + esc(tx('tripv3.placesFit')) + '</h3><div class="t3-grid">' + p.recommendations.map(function(s){ return cardHtml(s, null, { counts: {} }); }).join('') + '</div>';
     } else if (p.kind === 'events') {
       var ev = p.events || [];
-      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.whatsOn')) + '</h3>' + (ev.length ? '<div class="t3-grid">' + ev.map(function(e){ var u = safeUrl(e.url); return '<article class="t3-card"><div class="t3-card-top"><span>' + esc(e.dateLabel) + (e.time ? ' · ' + esc(e.time) : '') + '</span></div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>' + (u ? '<div class="t3-actions"><a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a></div>' : '') + '</article>'; }).join('') + '</div>' : '<p class="t3-empty">' + esc(tx('tripv3.nothingListed')) + '</p>');
+      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.whatsOn')) + '</h3>' + (ev.length ? '<div class="t3-grid">' + ev.map(function(e){ var u = placeUrl(e); return '<article class="t3-card"><div class="t3-card-top"><span>' + esc(e.dateLabel) + (e.time ? ' · ' + esc(e.time) : '') + '</span></div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>' + (u ? '<div class="t3-actions"><a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a></div>' : '') + '</article>'; }).join('') + '</div>' : '<p class="t3-empty">' + esc(tx('tripv3.nothingListed')) + '</p>');
     } else if (p.kind === 'navigate' && p.venue && safeUrl(p.venue.url)) {
       html += '<p class="t3-empty">' + esc(tx('tripv3.placeIs')) + ' <a class="t3-seeall" ' + hrefAttr(p.venue.url) + '>' + esc(tx('tripv3.openPage')) + '</a></p>';
     } else {
@@ -1756,6 +1780,17 @@ function renderScript(d) {
     var p = state.last;
     return !!(p && !(p.days || []).length && (p.schedule || []).some(function(r){ return r && r.day === 1 && /^\\d{4}-\\d{2}-\\d{2}$/.test(r.date || ''); }));
   }
+  // The month an undated plan is for, as YYYY-MM (the next one from today), or ''.
+  function planMonth(){
+    var se = state.last && state.last.understood && state.last.understood.season;
+    if (!se || se.named !== 'month') return '';
+    var names = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    var n = names.indexOf(String(se.label || '').toLowerCase());
+    if (n < 0) return '';
+    var now = new Date(), y = now.getFullYear();
+    if (n < now.getMonth()) y += 1;
+    return y + '-' + (n < 9 ? '0' : '') + (n + 1);
+  }
   function readDays(){
     try { var m = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
   }
@@ -1780,11 +1815,13 @@ function renderScript(d) {
         var m = /^(venue|event):(\\d+)(?:@\\d+)?$/.exec(ref);
         var row = m && rows.filter(function(r){ return r.day === d && (m[1] === 'venue' ? r.venueId : r.eventId) === Number(m[2]); })[0];
         var date = row && row.date || ((state.last && state.last.days) || []).filter(function(x){ return x.day === d; }).map(function(x){ return x.date; })[0];
-        if (!date && !row) return;
+        if (!date && !row && !planMonth()) return;
         var t = {};
         if (/^\\d{4}-\\d{2}-\\d{2}$/.test(date || '')) t.d = date;
+        // Round 9 (2026-10-19): an undated plan for a month ("skiing in January") keeps its month in My Trip.
+        else if (planMonth()) t.m = planMonth();
         if (row && Number.isFinite(row.startMinutes) && row.status !== 'unmet') { t.s = row.startMinutes; if (Number.isFinite(row.endMinutes)) t.e = row.endMinutes; }
-        if (t.d || t.s != null) timeMap[ref] = t;
+        if (t.d || t.m || t.s != null) timeMap[ref] = t;
       });
       localStorage.setItem('okanaganTripTimes', JSON.stringify(timeMap));
       // Drive legs between towns (2026-10-19) go with their day: day -> { f, t, a, b } (from, to, min and max minutes),
@@ -2019,7 +2056,7 @@ function renderScript(d) {
       var oldName = ss && ss.venue ? ss.venue.name : null;
       // The kind of place goes with it (2026-10-19), so a winery is swapped for a winery.
       // Round 8: only the stops the visitor locked must stay; the rest are kept where they fit (no false "locked stop").
-      var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type, id: ss.venue.id, locked: Object.keys(state.locks).filter(function(k){ return k !== sk; }) } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
+      var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type, id: ss.venue.id, locked: Object.keys(state.locks).filter(function(k){ return k !== sk; }), times: shownTimes() } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
       // Say what changed and show where: "Swapped Lachi for Poplar Grove", with the new card briefly highlighted.
       if (swapped && swapped.then) swapped.then(function(){
         var ns = stopAt(sk);
