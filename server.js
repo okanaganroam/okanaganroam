@@ -146,6 +146,36 @@ function sendJSON(res, status, data) {
   res.end(body);
 }
 
+// Public list reads (2026-10-19, round 10): /api/events, /api/venues and /api/stats may be kept for a minute by the
+// browser or a shared cache; the data changes a few times a day at most.
+function sendPublicListJSON(res, data) {
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  return sendJSON(res, 200, data);
+}
+// Round 10 (2026-10-19): an unknown /api/ address answered the HTML not-found page (a route like /:region/:category
+// matched first). Under /api/ any 404 that is not already JSON goes out as {"error":"Not found"}.
+const API_NOT_FOUND_BODY = JSON.stringify({ error: 'Not found' });
+function installApiNotFoundJson(res) {
+  const realWriteHead = res.writeHead.bind(res), realEnd = res.end.bind(res);
+  let swap = false;
+  res.writeHead = (status, ...rest) => {
+    const headers = rest.find((x) => x && typeof x === 'object') || {};
+    const typeKey = Object.keys(headers).find((k) => k.toLowerCase() === 'content-type');
+    const type = String(typeKey ? headers[typeKey] : res.getHeader('content-type') || '');
+    if (status === 404 && !/json/i.test(type)) {
+      swap = true;
+      const kept = {};
+      for (const [k, v] of Object.entries(headers)) if (!/^(content-type|content-length|content-language)$/i.test(k)) kept[k] = v;
+      return realWriteHead(404, { ...kept, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    }
+    return realWriteHead(status, ...rest);
+  };
+  res.end = (...args) => (swap ? realEnd(typeof args[0] === 'function' ? args[0] : (args.length && args[0] == null ? undefined : API_NOT_FOUND_BODY)) : realEnd(...args));
+}
+// Round 10 (2026-10-19): a missing file under /styles/, /scripts/ or /images/ (or any path ending in a file
+// extension) is a plain-text 404, not application/json.
+const STATIC_FILE_PATH_RE = /^\/(?:styles|scripts|images|fonts|icons)\/|\.(?:css|js|mjs|map|png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|txt|xml|webmanifest)$/i;
+
 const API_CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
@@ -7223,13 +7253,26 @@ function advisoryCoversClosure(note, st) {
   const month = m ? new RegExp(`\\b(?:${MONTH_NAMES.en[m - 1]}|${SEASON_TAG_MONTHS[m - 1]})\\b`, 'i') : null;
   return (month && month.test(t)) || /\b(?:temporarily|until)\b/i.test(t);
 }
+// Reopening notices (2026-10-19, round 10): a closed-for-the-season row with no reopening date says "The reopening
+// date has not been announced yet." When the venue's written advisory itself says when (or that) it reopens ("The
+// cafe says it reopens in May 2027", "back in April 2027"), that sentence contradicts it, so only "Closed for the
+// season." goes in front of the advisory.
+const SEASON_NOT_ANNOUNCED = ' The reopening date has not been announced yet.';
+const ADVISORY_REOPENING_RE = /\b(?:re-?open\w*|back (?:in|on|for|by)|returns?\b|returning|resum\w*)/i;
+function seasonTextBeforeAdvisory(st, own) {
+  if (st && st.kind === 'closed' && st.text.endsWith(SEASON_NOT_ANNOUNCED) && ADVISORY_REOPENING_RE.test(parseAdvisoryNote(own).text || own)) {
+    return st.text.slice(0, -SEASON_NOT_ANNOUNCED.length);
+  }
+  return st.text;
+}
 function mergeSeasonNotes(advisories, seasons) {
   if (!seasons.size) return advisories;
   const merged = new Map(advisories);
   for (const [id, st] of seasons) {
     if (!advisories.has(id)) { merged.set(id, st.note); continue; }
     const own = advisories.get(id);
-    merged.set(id, st.kind === 'temp_closed' && advisoryCoversClosure(own, st) ? own : `${st.text} ${own}`.trim());
+    if (st.kind === 'temp_closed' && advisoryCoversClosure(own, st)) { merged.set(id, own); continue; }
+    merged.set(id, `${seasonTextBeforeAdvisory(st, own)} ${own}`.trim());
   }
   return merged;
 }
@@ -13420,7 +13463,8 @@ function withVersionedImages(html) {
     if (i % 2 === 1 || part.indexOf('/images/') === -1) return part;
     return part
       .replace(/(\s(?:src|data-src)=")(\/images\/[^"?#]+)(?:\?v=([\w.-]{1,64}))?"/g, (m, a, url, t) => `${a}${t ? rehashedImageUrl(url, t) : versionedImageUrl(url)}"`)
-      .replace(/(\s(?:srcset|data-srcset)=")([^"]*)"/g, (m, a, list) => `${a}${list.replace(IMAGE_URL_IN_LIST_RE, (u, t) => (t ? rehashedImageUrl(u.slice(0, u.indexOf('?')), t) : versionedImageUrl(u)))}"`)
+      // imagesrcset (round 10): a hero's <link rel="preload"> must ask for the same URLs as its <img>.
+      .replace(/(\s(?:srcset|data-srcset|imagesrcset)=")([^"]*)"/g, (m, a, list) => `${a}${list.replace(IMAGE_URL_IN_LIST_RE, (u, t) => (t ? rehashedImageUrl(u.slice(0, u.indexOf('?')), t) : versionedImageUrl(u)))}"`)
       .replace(/(\sstyle=")([^"]*url\([^"]*)"/g, (m, a, css) => `${a}${css.replace(/url\((['"]?|&#39;|&quot;)(\/images\/[^'"()?#&]+)(?:\?v=([\w.-]{1,64}))?\1\)/g, (mm, q, url, t) => `url(${q}${t ? rehashedImageUrl(url, t) : versionedImageUrl(url)}${q})`)}"`);
   }).join('');
 }
@@ -26476,11 +26520,26 @@ function frScript(src) {
     return t == null ? m : JSON.stringify(t).replace(/</g, '\\u003c');
   });
 }
+// Round 10 (2026-10-19): a French ItemList leaves out events whose French page is noindex (English description only,
+// see frEventPageForPath); the visible cards still link to them. Positions are renumbered.
+function frItemListEntryUntranslated(el) {
+  const raw = el && (typeof el.url === 'string' ? el.url : el.item && (typeof el.item === 'string' ? el.item : el.item.url));
+  if (typeof raw !== 'string') return false;
+  const m = /^(?:https?:\/\/(?:www\.)?okanaganroam\.com)?(\/[^?#]*)/.exec(raw);
+  return !!m && /^\/[^/]+\/events\/[^/]+\/?$/.test(m[1]) && frEventUntranslated(m[1].replace(/\/$/, ''));
+}
 function frJsonLd(json) {
   let data; try { data = JSON.parse(json); } catch (e) { return json; }
   const walk = (o) => {
     if (Array.isArray(o)) return o.map(walk);
     if (o && typeof o === 'object') {
+      if (o['@type'] === 'ItemList' && Array.isArray(o.itemListElement) && o.itemListElement.some(frItemListEntryUntranslated)) {
+        const kept = o.itemListElement.filter((el) => !frItemListEntryUntranslated(el))
+          .map((el, i) => (el && typeof el === 'object' && el.position != null ? { ...el, position: i + 1 } : el));
+        const removed = o.itemListElement.length - kept.length;
+        o = { ...o, itemListElement: kept };
+        if (typeof o.numberOfItems === 'number') o.numberOfItems = Math.max(kept.length, o.numberOfItems - removed);
+      }
       const n = {};
       for (const [k, v] of Object.entries(o)) {
         if (typeof v === 'string' && (k === 'url' || k === 'item' || k === '@id')) n[k] = frHref(v);
@@ -26492,7 +26551,10 @@ function frJsonLd(json) {
     }
     return o;
   };
-  return JSON.stringify(walk(data));
+  const out = walk(data);
+  // A French ItemList left with no entries (every event untranslated) is dropped (round 10).
+  if (out && out['@type'] === 'ItemList' && Array.isArray(out.itemListElement) && !out.itemListElement.length && Array.isArray(data.itemListElement) && data.itemListElement.length) return null;
+  return JSON.stringify(out);
 }
 function twinHeadLinks(enPath, search = '') {
   const q = search.replace(/&/g, '&amp;');
@@ -26549,7 +26611,7 @@ function frenchTwinHtml(html, enPath, search = '') {
     if (part.startsWith('<style')) return part;
     const m = /^(<script[^>]*>)([\s\S]*?)(<\/script>)$/.exec(part);
     if (!m) return part;
-    if (/application\/ld\+json/.test(m[1])) return `${m[1]}\n${frJsonLd(m[2].trim())}\n${m[3]}`;
+    if (/application\/ld\+json/.test(m[1])) { const ld = frJsonLd(m[2].trim()); return ld == null ? '' : `${m[1]}\n${ld}\n${m[3]}`; }
     if (/application\/json/.test(m[1])) return `${m[1]}${frSearchData(m[2])}${m[3]}`;
     return m[1] + frScript(m[2]) + m[3];
   }).join('');
@@ -26777,7 +26839,14 @@ function venueHoursCheckedHtml(venueId, fr, now = new Date()) {
 }
 // Under a venue page's hours (2026-10-18): the owner's seasonal hours (the set in use now, or the other one folded
 // away) and the special closures coming up. French pages use their own words, not the owner's English label.
-function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames) {
+// "Closed Oct 11 – Nov 3, back Nov 4." (fr: « Fermé du 11 oct. au 3 nov., de retour le 4 nov. »), round 10.
+function hoursTempClosureText(from, to, fr = false) {
+  const back = hoursExtraDayText(addLocalDays(to, 1), fr);
+  return fr ? `Fermé du ${hoursExtraDayText(from, true)} au ${hoursExtraDayText(to, true)}, de retour le ${back}${back.endsWith('.') ? '' : '.'}`
+    : `Closed ${hoursExtraRangeText(from, to)}, back ${back}.`;
+}
+// `shown`: the temporary closure already said above the hours (round 10), left out of Special closures.
+function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null) {
   const L = (en, frText) => (fr ? frText : en);
   const out = [];
   const list = (days) => `<ul class="hours-list">${hoursModule.HOURS_WEEKDAYS.map((d) => `<li><span>${dayNames[d]}</span><span>${dayText(days[d])}</span></li>`).join('')}</ul>`;
@@ -26794,9 +26863,10 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames) {
       out.push(`<details class="venue-hours-usual"><summary>${name} (${range})</summary>${list(s.days)}</details>`);
     }
   }
-  const soon = (parsed.closures || []).filter((c) => c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
+  const soon = (parsed.closures || []).filter((c) => c !== shown && c.to >= clock.date && c.from <= hoursModule.shiftDate(clock.date, 120)).slice(0, 6);
   if (soon.length) {
-    out.push(`<p class="venue-hours-closures"><strong>${L('Special closures', 'Fermetures spéciales')}:</strong> ${soon.map((c) => `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${c.note ? ` (${escapeHtml(c.note)})` : ''}`).join(' &middot; ')}</p>`);
+    // Round 10: the owner's (English) note stays off the French page unless the French list has it.
+    out.push(`<p class="venue-hours-closures"><strong>${L('Special closures', 'Fermetures spéciales')}:</strong> ${soon.map((c) => `${escapeHtml(hoursExtraRangeText(c.from, c.to, fr))}${c.note && (!fr || frText(c.note)) ? ` (${escapeHtml(fr ? frText(c.note) : c.note)})` : ''}`).join(' &middot; ')}</p>`);
   }
   return out.join('');
 }
@@ -26879,6 +26949,7 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-hours h2 { margin-bottom: 6px; }
   body.golf-page .hours-list li.is-today { font-weight: 800; color: var(--ink); }
   body.golf-page .venue-hours-note, body.golf-page .venue-hours-closures { margin: 10px 0 0; font-size: 0.9rem; }
+  body.golf-page .venue-hours-temp-closed { margin: 6px 0 8px; font-weight: 700; }
   body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 today"; font-weight: 700; opacity: 0.6; }
   html[lang="fr"] body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 aujourd\u2019hui"; }
   /* Actions: one primary button, then the rest two by two on a phone. */
@@ -27034,14 +27105,26 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     const datedWeek = !!(parsedHours.seasons || parsedHours.closures) && !seasonShut && clockNow.date;
     const dateOf = (d) => hoursModule.shiftDate(clockNow.date, (hoursModule.HOURS_WEEKDAYS.indexOf(d) - hoursModule.HOURS_WEEKDAYS.indexOf(today) + 7) % 7);
     // Round 8 (2026-10-19): a closure of three days or more without a note is a temporary closure, not "(holiday)".
-    const closedWord = (c) => (c.note ? `${L('Closed', 'Fermé')} (${escapeHtml(c.note)})`
+    // Round 10 (2026-10-19): the owner's note is their own words, usually English, so a French page says only « Fermé »
+    // unless the French list has that note.
+    const closedWord = (c) => (c.note ? (fr ? (frText(c.note) ? `Fermé (${escapeHtml(frText(c.note))})` : 'Fermé') : `Closed (${escapeHtml(c.note)})`)
       : hoursModule.isTemporaryClosure && hoursModule.isTemporaryClosure(c) ? L('Temporarily closed', 'Fermeture temporaire') : `${L('Closed', 'Fermé')} (${L('holiday', 'jour férié')})`);
+    // Temporary closures in the hours (2026-10-19, round 10): a closure of three days or more (Sugar Quail, Oct 11 -
+    // Nov 3) is said once above the list, as a range in the page's language ("Closed Oct 11 – Nov 3, back Nov 4."),
+    // and the rows keep the regular hours, not "Closed (Closed Oct 11 - Nov 3)" on all seven days.
+    const isTemp = (c) => !!(c && hoursModule.isTemporaryClosure && hoursModule.isTemporaryClosure(c));
+    const dayOnShown = (date) => {
+      const day = hoursModule.dayOnDate(parsedHours, date);
+      return day && day.closure && isTemp(day.closure) ? hoursModule.dayOnDate({ ...parsedHours, closures: null }, date) : day;
+    };
+    const tempClosure = datedWeek ? (parsedHours.closures || []).find((c) => isTemp(c) && c.to >= clockNow.date && c.from <= hoursModule.shiftDate(clockNow.date, 6)) : null;
+    const tempClosureLine = tempClosure ? `<p class="venue-hours-temp-closed"><span aria-hidden="true">\u{1F4C5}</span> ${escapeHtml(hoursTempClosureText(tempClosure.from, tempClosure.to, fr))}</p>` : '';
     const rowsFor = (dayOf) => hoursModule.HOURS_WEEKDAYS.map((d) => {
       const day = dayOf(d);
       const text = day && day.closure ? closedWord(day.closure) : escapeHtml(venueDayHoursText(day, fr));
       return `<li${d === today && !seasonShut ? ' class="is-today"' : ''}${day && day.closure ? ' data-closed-date="1"' : ''}><span>${dayNames[d]}</span><span>${text}</span></li>`;
     }).join('');
-    const rows = datedWeek ? rowsFor((d) => hoursModule.dayOnDate(parsedHours, dateOf(d))) : rowsFor((d) => parsedHours.days[d]);
+    const rows = datedWeek ? rowsFor((d) => dayOnShown(dateOf(d))) : rowsFor((d) => parsedHours.days[d]);
     hoursHtml = seasonShut
       ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
       : (() => {
@@ -27049,19 +27132,19 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
         // shows one line and keeps the day-by-day list folded under it. With seasonal hours or closures the rows are
         // this coming week's dates, so a closed day breaks the run and the full list shows.
         const texts = hoursModule.HOURS_WEEKDAYS.map((d) => {
-          const day = datedWeek ? hoursModule.dayOnDate(parsedHours, dateOf(d)) : parsedHours.days[d];
+          const day = datedWeek ? dayOnShown(dateOf(d)) : parsedHours.days[d];
           return day && day.closure ? `closed:${day.closure.note}` : venueDayHoursText(day, fr);
         });
         const list = `<ul class="hours-list" data-today="${today}">${rows}</ul>`;
         if (texts.every((t) => t === texts[0])) {
           // A week closed every day (a temporary closure) says so, not "closed:" (round 8).
-          const first = datedWeek ? hoursModule.dayOnDate(parsedHours, dateOf('mon')) : parsedHours.days.mon;
+          const first = datedWeek ? dayOnShown(dateOf('mon')) : parsedHours.days.mon;
           const daily = first && first.closure ? closedWord(first.closure) : escapeHtml(texts[0]);
-          return `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${daily}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
+          return `<h2>${L('Hours', 'Heures')}</h2>${tempClosureLine}<p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${daily}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
         }
-        return `<h2>${L('Hours', 'Heures')}</h2>${list}`;
+        return `<h2>${L('Hours', 'Heures')}</h2>${tempClosureLine}${list}`;
       })();
-    if (datedWeek) hoursHtml += venueHoursExtrasHtml(parsedHours, clockNow, fr, (d) => escapeHtml(venueDayHoursText(d, fr)), dayNames);
+    if (datedWeek) hoursHtml += venueHoursExtrasHtml(parsedHours, clockNow, fr, (d) => escapeHtml(venueDayHoursText(d, fr)), dayNames, tempClosure);
     // Hours checked (2026-10-18): the date the stored hours were last verified (POST /admin/verify-hours), and a
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
@@ -27132,7 +27215,19 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // Round 7 (2026-10-19): computers (a 976-1312px hero) took the 1800px original (about 450 KB); a <name>-w1200.jpg
   // copy, where one has been made (scripts/make-photo-w1200.sh), is listed between the two.
   const hero1200 = heroW > 1200 ? photoSized(venue.image_url, 1200) : venue.image_url;
-  const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${hero1200 !== venue.image_url ? `${escapeHtml(hero1200)} 1200w, ` : ''}${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
+  // Round 10 (2026-10-19): the 480px copy too (made for every owner upload and most stored photos), so a phone that
+  // shows the hero about 320px wide on a low-density screen doesn't take the 960px one.
+  const hero480 = heroW > 480 ? photoSized(venue.image_url, 480) : venue.image_url;
+  const heroSet = hero960 !== venue.image_url && heroW > 960
+    ? `${hero480 !== venue.image_url ? `${escapeHtml(hero480)} 480w, ` : ''}${escapeHtml(hero960)} 960w, ${hero1200 !== venue.image_url ? `${escapeHtml(hero1200)} 1200w, ` : ''}${escapeHtml(venue.image_url)} ${heroW}w`
+    : '';
+  const heroSizes = '(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px';
+  const heroSrcset = heroSet ? ` srcset="${heroSet}" sizes="${heroSizes}"` : '';
+  // Round 10 (2026-10-19): owner-photo venues were 3-3.5 s LCP on a throttled phone. The hero is preloaded from the
+  // <head> (like the guides' banners), so it starts before the CSS and the strip thumbnails.
+  const heroPreload = venue.image_url && !venue.redirect_to
+    ? (heroSet ? `<link rel="preload" as="image" imagesrcset="${heroSet}" imagesizes="${heroSizes}" fetchpriority="high">` : `<link rel="preload" as="image" imagesrcset="${escapeHtml(venue.image_url)}" fetchpriority="high">`)
+    : '';
   // The owner's chosen height for the banner crop (2026-10-19), if they've moved this photo.
   const heroPosY = venue.image_url ? venuePhotoPosY(venue.id, venue.image_url) : null;
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}"${heroPosY === null ? '' : ` style="object-position: 50% ${heroPosY}%"`} fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
@@ -27367,7 +27462,8 @@ ${VENUE_MENU_CSS}` : ''}
   ${golfVenueEngagementScriptHtml(venue)}
 </body>
 </html>`;
-  return fr ? localizeStaticFr(localizeHtml(page, 'fr')) : page;
+  const withPreload = heroPreload ? page.replace(/<meta name="viewport"[^>]*>\n?/i, (v) => `${v}${v.endsWith('\n') ? '' : '\n'}${heroPreload}\n`) : page;
+  return fr ? localizeStaticFr(localizeHtml(withPreload, 'fr')) : withPreload;
 }
 
 // GET /:region/events/:slug — Phase 1 (Events architecture gate).
@@ -27673,13 +27769,29 @@ function eventOfficialUrl(event) {
 // the site is that place's own event, so the place is the organizer (with its website, else its page here); so is a
 // league's own schedule feed. A ticket seller or a theatre that only rents its hall is still never named.
 const EVENT_HOST_ORGANIZER_TYPES = new Set(['winery', 'brewery', 'distillery', 'pub', 'cocktail', 'restaurant', 'cafe']);
+// Round 10 (2026-10-19): 72% of event pages still had no organizer. Any linked place now counts (a ski hill's
+// festival, a gallery's exhibition, a golf club's tournament) except a hall that is mostly rented out (a theatre,
+// arena, events or convention centre, community hall), which is named only when the listing's source is the
+// organizer. A tourism board, a ticket seller or a venue's ticketing page that only re-lists the event is never the
+// organizer, unless the description says that source organizes it.
+const EVENT_RENTED_HALL_RE = /\b(?:theatre|theater|arena|stadium|place|events? cent(?:re|er)|convention|community (?:cent(?:re|er)|hall)|activity cent(?:re|er)|performing arts|centre for the arts|hall|auditorium|cinemas?)\b/i;
+function eventHostIsOrganizer(hostVenue) {
+  if (!hostVenue || typeof hostVenue.name !== 'string' || !hostVenue.name.trim() || hostVenue.redirect_to) return false;
+  return EVENT_HOST_ORGANIZER_TYPES.has(hostVenue.type) || !EVENT_RENTED_HALL_RE.test(hostVenue.name);
+}
+function eventDescriptionNamesOrganizer(description, name) {
+  const n = String(name || '').trim();
+  if (n.length < 3) return false;
+  const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b(?:organi[sz]ed|hosted|presented|put on|run|produced)(?: free)? by (?:the )?${esc}\\b`, 'i').test(String(description || ''));
+}
 function eventOrganizerSchema(event, hostVenue = null) {
   const sourceName = typeof event.source_name === 'string' ? event.source_name.trim() : '';
   if (event.source_type === 'official_organizer' && sourceName) {
     const url = eventOfficialUrl(event);
     return { '@type': 'Organization', name: sourceName, url: url || undefined };
   }
-  if (hostVenue && typeof hostVenue.name === 'string' && hostVenue.name.trim() && EVENT_HOST_ORGANIZER_TYPES.has(hostVenue.type) && !hostVenue.redirect_to) {
+  if (eventHostIsOrganizer(hostVenue)) {
     const site = typeof hostVenue.website === 'string' && /^https?:\/\/\S+$/i.test(hostVenue.website.trim()) ? hostVenue.website.trim() : null;
     const page = CATEGORY_SLUGS[hostVenue.type] && hostVenue.slug && REGION_LABELS[hostVenue.region] ? `https://okanaganroam.com${venuePagePath(hostVenue)}` : null;
     return { '@type': 'Organization', name: hostVenue.name.trim(), url: site || page || undefined };
@@ -27687,6 +27799,12 @@ function eventOrganizerSchema(event, hostVenue = null) {
   if (event.source_type === 'league_feed' && sourceName) {
     const url = eventOfficialUrl(event);
     return { '@type': 'SportsOrganization', name: sourceName, url: url || undefined };
+  }
+  // The listing's source, when the description itself says that source runs it ("organized free by the City of
+  // Enderby", "hosted by Tourism Vernon").
+  if (sourceName && eventDescriptionNamesOrganizer(event.description, sourceName)) {
+    const url = eventOfficialUrl(event);
+    return { '@type': /^(?:city|town|district|village|regional district|municipality) of\b/i.test(sourceName) ? 'GovernmentOrganization' : 'Organization', name: sourceName, url: url || undefined };
   }
   return undefined;
 }
@@ -27696,7 +27814,9 @@ function eventOrganizerSchema(event, hostVenue = null) {
 // counts only in a sentence about tickets, admission or cost, so "$2 oysters" or "a $15 tasting" never become the price.
 // "By donation" and "early-bird tickets cost less" state no price, so no offer.
 const EVENT_PRICE_CONTEXT_RE = /\b(tickets?|admission|entry|entrance|cover|cost|costs|price[sd]?|register|registration|per (person|adult|child|ticket|couple|team)|passes?|seats?|in advance|at the door|early[- ]bird|from \$)/i;
-const EVENT_FREE_RE = /\b(?:(?:admission|entry|entrance)(?: is)? free|free (?:admission|entry|entrance|event|to attend|of charge|for (?:all|everyone)|and open)|(?:a|this|the) free(?:,? [\w'’-]+){0,3}? (?:event|fair|market|show|concert|festival|workshop|walk|tour|talk|screening|night|party|celebration|drop-in|session|class|day|afternoon|evening|parade|light-up|bazaar|program|gathering|exhibit|exhibition|skate|kick-off|open house|film|performance)|admission: free|^free(?:[.!]|$))/i;
+// Round 10 (2026-10-19): also "Enderby's free Halloween afternoon", "A free, all-ages New Year's Eve party", "a free
+// family storytime", "Red Bird Brewing's free Mario Kart tournament", "organized free by the City".
+const EVENT_FREE_RE = /\b(?:(?:admission|entry|entrance)(?: is)? free|free (?:admission|entry|entrance|event|to attend|of charge|for (?:all|everyone)|and open)|(?:organi[sz]ed|hosted|put on|presented) free by|(?:a|this|the|[\w'’-]+['’]s) free(?:,? [\w'’-]+){0,4}? (?:event|tournament|storytime|story time|meetup|meet-up|social|jam|fair|market|show|concert|festival|workshop|walk|tour|talk|screening|night|party|celebration|drop-in|session|class|day|afternoon|evening|parade|light-up|bazaar|program|gathering|exhibit|exhibition|skate|kick-off|open house|film|performance)|admission: free|^free(?:[.!]|$))/i;
 const EVENT_PRICE_PERSON_RE = /\b(?:kids|adults?|children|child|seniors|students|youth|members)\s\$\s?\d|\$\s?\d[\d.]*\s(?:per\s)?(?:adults?|kids|children|child|seniors|students|youth|guest|per guest)\b/i;
 const EVENT_FREE_SENTENCE_RE = /^(?:(?:it['\u2019]s|it is|admission is|entry is|entrance is|the event is|this event is)\s)?free(?:[.;!]?$|[.;!,]\s|\s(?:with|to (?:attend|watch|play|join|enter)|at the|and (?:open|all-ages|aimed|family)|tickets|for (?:all|everyone|the whole family)|admission|entry)\b)|^[^.;]{0,40}, free\.?$/i;
 function parseEventPrice(text) {
@@ -36693,7 +36813,7 @@ function venueGalleryHtml(venue, photos, L) {
   const thumbs = shown.map((p, i) => {
     const hidden = rest.length - shown.length;
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
-    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
+    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy" fetchpriority="low">${more}</button>`;
   }).join('');
   // Round 9 (2026-10-19): the full-screen viewer lists the smaller copies too, so a phone takes the 960px one.
   const slideSrcset = (src) => {
@@ -45701,6 +45821,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/api/') && method === 'GET') {
     for (const [k, v] of Object.entries(API_CORS_HEADERS)) res.setHeader(k, v);
   }
+  if (pathname.startsWith('/api/')) installApiNotFoundJson(res);
   if (method === 'OPTIONS') {
     const wanted = String(req.headers['access-control-request-method'] || 'GET').toUpperCase();
     const grant = pathname.startsWith('/api/') && (wanted === 'GET' || wanted === 'HEAD');
@@ -47707,7 +47828,7 @@ const server = http.createServer(async (req, res) => {
 
       // ---- public reads (no auth) ----
       if (pathname === '/api/events' && method === 'GET') {
-        return sendJSON(res, 200, listWhatsOnEventsPublic(query));
+        return sendPublicListJSON(res, listWhatsOnEventsPublic(query));
       }
       if (eventId !== null && subResource === null && method === 'GET') {
         const event = getEventById(eventId);
@@ -47735,7 +47856,7 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/venues
     if (pathname === '/api/venues' && method === 'GET') {
-      return sendJSON(res, 200, listVenues(query));
+      return sendPublicListJSON(res, listVenues(query));
     }
     // GET /api/venue-lookup?q=&region= (2026-10-14): up to 8 live venues
     // whose name contains q, for the List Your Venue "already listed?" search
@@ -47778,7 +47899,7 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/stats
     if (pathname === '/api/stats' && method === 'GET') {
-      return sendJSON(res, 200, getStats());
+      return sendPublicListJSON(res, getStats());
     }
 
     // /api/venues/:id
@@ -49008,6 +49129,10 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
+    if (STATIC_FILE_PATH_RE.test(pathname) && !pathname.startsWith('/api/')) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('Not found');
+    }
     return sendJSON(res, 404, { error: 'Not found' });
 
   } catch (err) {
@@ -49192,6 +49317,9 @@ module.exports = {
   mapPlaceTags,
   MAP_TAGS,
   mergeSeasonNotes,
+  seasonTextBeforeAdvisory,
+  hoursExtraRangeText,
+  hoursTempClosureText,
   tripStopNotice,
   // French advisories and search phrases (2026-10-19, round 7)
   frAdvisoryText,

@@ -25804,7 +25804,9 @@ test('Seasonal hours and closures (2026-10-18): owners set them; the venue page 
   assert.match(en, /Special closures:<\/strong> Oct 12 \(Thanksgiving\)/);
   const frPage = app.renderVenuePage(fresh, [], [], [], { now, lang: 'fr' });
   assert.match(frPage, /Fermé aujourd’hui \(Thanksgiving\) · ouvre demain à 9 h/);
-  assert.match(frPage, /<span>Fermé \(Thanksgiving\)<\/span>/);
+  // Round 10: the owner's English note stays off the French hours list (no French for it in the list).
+  assert.match(frPage, /<span>Fermé<\/span>/);
+  assert.doesNotMatch(frPage, /<span>Fermé \(Thanksgiving\)<\/span>/);
   assert.match(frPage, /<summary>Heures saisonnières \(1er nov\. – 30 avr\.\)<\/summary>/);
   assert.match(frPage, /Fermetures spéciales:<\/strong>/);
   // In winter the seasonal set is the week shown, and the usual hours fold away.
@@ -30184,12 +30186,16 @@ test('Round 8 temporary closures: "Temporarily closed" in the hours, not "(holid
   const row = app.findVenueBySlug('kelowna', 'cafe', v.slug);
   const en = app.renderVenuePage(row, [], [], []);
   const hours = en.slice(en.indexOf('<ul class="hours-list"'), en.indexOf('</ul>', en.indexOf('<ul class="hours-list"')));
-  assert.match(hours, /Temporarily closed/);
+  // Round 10: a closure of three days or more is said once above the list; the rows keep the regular hours.
+  assert.doesNotMatch(hours, /Temporarily closed/);
+  assert.match(en, /<p class="venue-hours-temp-closed"><span aria-hidden="true">[^<]*<\/span> Closed [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+, back [A-Z][a-z]{2} \d+\.<\/p>/);
   assert.equal((hours.match(/Closed \(holiday\)/g) || []).length, 1, 'a single day without a note is still a holiday');
   await withDiscoveryServer(async (base) => {
     const fr = await (await fetch(`${base}/fr/kelowna/cafes/${v.slug}`)).text();
     const frHours = fr.slice(fr.indexOf('<ul class="hours-list"'), fr.indexOf('</ul>', fr.indexOf('<ul class="hours-list"')));
-    assert.match(frHours, /Fermeture temporaire/);
+    assert.doesNotMatch(frHours, /Fermeture temporaire/);
+    assert.match(fr, /class="venue-hours-temp-closed"><span aria-hidden="true">[^<]*<\/span> Fermé du \d+(?:er)? [a-zéû.]+ au \d+(?:er)? [a-zéû.]+, de retour le \d+(?:er)? [a-zéû]+\.?<\/p>/);
+    assert.doesNotMatch(fr, /\.\.<\/p>/);
     assert.equal((frHours.match(/jour férié/g) || []).length, 1);
   });
   // The status line (hours.js): a closure of two days or more is a temporary closure.
@@ -30471,7 +30477,11 @@ test('R9 tech: event offers read stated and free prices; organizer is the source
 test('R9 tech: /whats-on and /fr/whats-on carry an ItemList of the cards on show', () => withDiscoveryServer(async (base) => {
   const day = app.addLocalDays(app.todayLocal(), 2);
   const ev = s5create({ name: 'R9 ItemList Show', occurrences: [{ start_date: day, start_time: '19:00', end_time: '21:00' }] });
+  // Round 10: a second fixture whose description is in the French list, so it has a real (indexable) French page.
+  const frKey = Object.keys(require('../french-text.js').FR_TEXT).find((k) => k.length > 60 && /^[A-Z][^<>{}]*\.$/.test(k));
+  const evFr = s5create({ name: 'R10 ItemList Translated Show', description: frKey, venue_id: null, venue_name_text: 'R10 Fixture Hall', occurrences: [{ start_date: app.addLocalDays(day, 1), start_time: '12:00', end_time: '13:00' }] });
   try {
+    assert.equal(app.frEventUntranslated(`/kelowna/events/${evFr.slug}`), false);
     for (const [p, prefix] of [['/whats-on', ''], ['/fr/whats-on', '/fr']]) {
       const html = await (await fetch(base + p)).text();
       const lists = s5jsonLd(html).filter((b) => b['@type'] === 'ItemList');
@@ -30479,14 +30489,23 @@ test('R9 tech: /whats-on and /fr/whats-on carry an ItemList of the cards on show
       const urls = lists[0].itemListElement.map((x) => x.url);
       assert.ok(urls.length > 0 && urls.length <= 100);
       assert.equal(lists[0].numberOfItems, urls.length);
-      assert.ok(urls.includes(`https://okanaganroam.com${prefix}/kelowna/events/${ev.slug}`), `${p} lists the fixture`);
+      // Round 10 (2026-10-19): the fixture has no French description, so its /fr page is noindex and the French
+      // ItemList leaves it out; the card still links to it.
+      if (prefix) {
+        assert.ok(!urls.includes(`https://okanaganroam.com${prefix}/kelowna/events/${ev.slug}`), `${p} leaves out the untranslated fixture`);
+        assert.ok(html.includes(`href="${prefix}/kelowna/events/${ev.slug}"`), `${p} still shows its card`);
+      } else assert.ok(urls.includes(`https://okanaganroam.com${prefix}/kelowna/events/${ev.slug}`), `${p} lists the fixture`);
+      assert.ok(urls.includes(`https://okanaganroam.com${prefix}/kelowna/events/${evFr.slug}`), `${p} lists the translated fixture`);
       lists[0].itemListElement.forEach((x, i) => assert.equal(x.position, i + 1));
       // Every listed event is a card in the page's HTML.
       for (const u of urls) assert.ok(html.includes(`href="${u.replace('https://okanaganroam.com', '')}"`), u);
+      if (prefix) for (const u of urls) assert.equal(app.frEventUntranslated(u.replace('https://okanaganroam.com/fr', '')), false, `${u} is translated`);
     }
   } finally {
-    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
-    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+    for (const e of [ev, evFr]) {
+      for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(e.id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
+    }
   }
 }));
 
@@ -30697,7 +30716,8 @@ test('Owner photo copies (round 9): upload with copies, srcset + ?v= + immutable
     const hero = /<div class="venue-hero venue-hero-photo"><img ([^>]+)>/.exec(page);
     assert.ok(hero, 'hero renders');
     assert.match(hero[1], new RegExp(`src="/images/owner/${stem}\\.jpg\\?v=[0-9a-f]{10}"`));
-    assert.match(hero[1], new RegExp(`srcset="/images/owner/${stem}-w960\\.jpg\\?v=[0-9a-f]{10} 960w, /images/owner/${stem}\\.jpg\\?v=[0-9a-f]{10} 1600w"`));
+    // Round 10: the 480px copy is listed too.
+    assert.match(hero[1], new RegExp(`srcset="/images/owner/${stem}-w480\\.jpg\\?v=[0-9a-f]{10} 480w, /images/owner/${stem}-w960\\.jpg\\?v=[0-9a-f]{10} 960w, /images/owner/${stem}\\.jpg\\?v=[0-9a-f]{10} 1600w"`));
     assert.match(hero[1], /width="1600" height="1067"/);
     assert.equal(app.photoSized(`/images/owner/${row.file}`, 480), `/images/owner/${stem}-w480.jpg`);
     assert.equal(app.photoSized(`/images/owner/${row.file}`, 1200), `/images/owner/${row.file}`, 'no 1200px copy yet: the original');
@@ -30719,7 +30739,7 @@ test('Owner photo copies (round 9): upload with copies, srcset + ?v= + immutable
     made.push(row2.file, ...[480, 960, 1200].map((w) => `${stem2}-w${w}.jpg`));
     assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/approve`, { reviewer: 'test', main: false })).status, 200);
     page = await pageOf();
-    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" width="1600" height="1067" alt="" loading="lazy">`), 'the thumbnail falls back to the original');
+    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" width="1600" height="1067" alt="" loading="lazy" fetchpriority="low">`), 'the thumbnail falls back to the original');
     assert.doesNotMatch(page, new RegExp(`${stem2}-w`));
 
     // 3. The admin backfill: listed with what it needs; token required; bad copies refused; good ones stored.
@@ -31187,3 +31207,140 @@ test('Round 9 My Trip: a season notice is judged on the stop\'s planned date, no
     db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(hill.id);
   }
 }));
+
+// ---------- Round 10 tech/notices (2026-10-19) ----------
+test('R10 notices: a written reopening month drops "The reopening date has not been announced yet." (EN and FR)', () => r8Fixtures([
+  { name: 'R10 Reopens May Cafe', region: 'kelowna', type: 'cafe', hours: SEASON_WEEK },
+], async ([v]) => {
+  const closed = { kind: 'closed', text: 'Closed for the season. The reopening date has not been announced yet.' };
+  const crick = 'The café says it reopens in May 2027 (checked October 19, 2026). https://thecrick.ca';
+  assert.equal(app.seasonTextBeforeAdvisory(closed, crick), 'Closed for the season.');
+  assert.equal(app.seasonTextBeforeAdvisory(closed, "The company says it's back in April 2027 (checked October 19, 2026)."), 'Closed for the season.');
+  assert.equal(app.seasonTextBeforeAdvisory(closed, 'The storefront reopens in March 2027; until then, pick up at the Barn Owl.'), 'Closed for the season.');
+  assert.equal(app.seasonTextBeforeAdvisory(closed, 'Wine purchases are by appointment only.'), closed.text, 'an advisory that says nothing about reopening keeps the sentence');
+  const dated = { kind: 'closed', text: 'Closed for the season. Reopens May 1.' };
+  assert.equal(app.seasonTextBeforeAdvisory(dated, crick), dated.text, 'a dated reopening is left alone');
+  assert.equal(app.mergeSeasonNotes(new Map([[1, crick]]), new Map([[1, closed]])).get(1), `Closed for the season. ${crick}`);
+  // French: the season sentence alone has its French.
+  assert.equal(app.frSeasonText('Closed for the season.'), 'Fermé pour la saison.');
+  // On the venue page, in both languages.
+  const today = app.todayLocal();
+  db.prepare("INSERT INTO venue_seasons (venue_id, status, source_url, checked_at) VALUES (?, 'closed', 'https://example.com/r10', ?)").run(v.id, today);
+  const r = app.guardedCollectionMembershipUpdate('advisory', v.id, 'add', 'The café says it reopens in May 2027 (checked October 19, 2026). https://example.com/r10', { reason: 'r10 test', batch_id: 'r10-test' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  try {
+    const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', v.slug), [], [], []);
+    assert.match(en, /Closed for the season\. The café says it reopens in May 2027/);
+    assert.doesNotMatch(en, /not been announced/);
+    const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', v.slug), [], [], [], { lang: 'fr' });
+    assert.doesNotMatch(fr, /n’a pas encore été annoncée/);
+  } finally {
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(v.id);
+  }
+}));
+
+test('R10 notices: a temporary closure keeps the regular hours and is said once, in the page language', () => r8Fixtures([
+  { name: 'R10 Sugar Fixture Bakeshop', region: 'osoyoos', type: 'cafe', hours: JSON.stringify({ mon: [['09:00', '17:00']], tue: [['09:00', '17:00']], wed: [['09:00', '17:00']], thu: [['09:00', '17:00']], fri: [['09:00', '17:00']], sat: [['09:00', '17:00']], sun: [['09:00', '17:00']] }) },
+], async ([v]) => {
+  const today = app.todayLocal();
+  const from = app.addLocalDays(today, -8), to = app.addLocalDays(today, 15);
+  db.prepare('INSERT INTO venue_hours_extra (venue_id, seasons, closures) VALUES (?, ?, ?)').run(v.id, '[]', JSON.stringify([{ from, to, note: 'Closed Oct 11 - Nov 3' }]));
+  app.clearHoursExtraCache();
+  db.prepare("UPDATE venues SET description_fr = 'Une boulangerie pour les tests.' WHERE id = ?").run(v.id);
+  const row = app.findVenueBySlug('osoyoos', 'cafe', v.slug);
+  const hoursOf = (html, h2) => html.slice(html.indexOf(`<h2>${h2}</h2>`), html.indexOf('</details>', html.indexOf(`<h2>${h2}</h2>`)));
+  const en = hoursOf(app.renderVenuePage(row, [], [], []), 'Hours');
+  assert.match(en, /<span>9 AM – 5 PM<\/span>/, 'the regular hours stay visible');
+  assert.doesNotMatch(en, /Closed \(Closed/);
+  assert.equal((en.match(/venue-hours-temp-closed/g) || []).length, 1);
+  assert.ok(en.includes(`Closed ${app.hoursExtraRangeText(from, to)}, back ${app.hoursExtraRangeText(app.addLocalDays(to, 1))}.`), en.slice(0, 300));
+  await withDiscoveryServer(async (base) => {
+    const page = await (await fetch(`${base}/fr/osoyoos/cafes/${v.slug}`)).text();
+    const fr = hoursOf(page, 'Heures');
+    assert.match(fr, /<span>9 h–17 h<\/span>/);
+    assert.match(fr, /Fermé du \d+(?:er)? \S+ au \d+(?:er)? \S+, de retour le \d+(?:er)? [^.<]+\.?<\/p>/);
+    assert.doesNotMatch(page, /Closed Oct 11 - Nov 3/, 'the owner\'s English note is not on the French page');
+    assert.doesNotMatch(page, /Fermetures spéciales/, 'the closure is not repeated under Special closures');
+  });
+}));
+
+test('R10 tech: event offers and organizer backfill (free wording, linked places, a source the description names)', () => {
+  const p = app.parseEventPrice;
+  assert.deepEqual(p("Enderby's free Halloween afternoon and evening: downtown trick-or-treating."), { price: '0' });
+  assert.deepEqual(p("A free, all-ages New Year's Eve party in Stuart Park with live bands."), { price: '0' });
+  assert.deepEqual(p('A free family storytime at the Osoyoos Library.'), { price: '0' });
+  assert.deepEqual(p("Race for prizes at Red Bird Brewing's free Mario Kart tournament."), { price: '0' });
+  assert.deepEqual(p('A parade organized free by the City of Enderby.'), { price: '0' });
+  assert.equal(p('Santa daily from 11 am, with a free photo and elf crafts.'), null, 'a free extra is not a free event');
+  assert.equal(p('An alcohol-free, all-ages Halloween rave.'), null);
+  const ev = { name: 'R10', region: 'kelowna', source_type: 'tourism_org', source_name: 'Tourism Kelowna', description: 'An exhibition.' };
+  const hill = { name: 'R10 Ski Hill', type: 'outdoor', region: 'big-white', slug: 'r10-ski-hill', website: 'https://r10-hill.example/' };
+  const gallery = { name: 'R10 Art Gallery', type: 'indoor', region: 'kelowna', slug: 'r10-art-gallery', website: null };
+  const arena = { name: 'R10 Memorial Arena', type: 'sport', region: 'kelowna', slug: 'r10-memorial-arena', website: 'https://arena.example/' };
+  const pac = { name: 'R10 Performing Arts Centre', type: 'indoor', region: 'vernon', slug: 'r10-pac', website: 'https://pac.example/' };
+  assert.deepEqual(app.eventOrganizerSchema(ev, hill), { '@type': 'Organization', name: 'R10 Ski Hill', url: 'https://r10-hill.example/' });
+  assert.equal(app.eventOrganizerSchema(ev, gallery).name, 'R10 Art Gallery');
+  assert.match(app.eventOrganizerSchema(ev, gallery).url, /^https:\/\/okanaganroam\.com\/kelowna\//);
+  assert.equal(app.eventOrganizerSchema(ev, arena), undefined, 'an arena that rents its ice is not assumed to run the event');
+  assert.equal(app.eventOrganizerSchema(ev, pac), undefined, 'nor a performing arts centre');
+  assert.equal(app.eventOrganizerSchema(ev, null), undefined, 'a tourism listing is still not the organizer');
+  const city = { ...ev, source_type: 'municipal', source_name: 'City of Enderby', source_url: 'https://enderby.example/events', description: 'A parade organized free by the City of Enderby with help from local businesses.' };
+  assert.deepEqual(app.eventOrganizerSchema(city, null), { '@type': 'GovernmentOrganization', name: 'City of Enderby', url: 'https://enderby.example/events' });
+  assert.equal(app.eventOrganizerSchema({ ...city, description: 'A parade downtown.' }, null), undefined, 'a city calendar that only lists it is not the organizer');
+  // The whole block stays valid JSON with no undefined values.
+  const fake = { ...ev, id: 1, status: 'scheduled', slug: 'r10', venue_name_text: null, valley_wide: 0, website: null, image_url: null, description: 'A free family storytime at the gallery.' };
+  const ld = app.eventJsonLd(fake, [{ id: 1, start_date: '2099-01-02', start_time: '10:00', end_date: '2099-01-02', end_time: '11:00', status: 'scheduled' }], ['family-kids'], gallery, 'https://okanaganroam.com/kelowna/events/r10', '2099-01-01');
+  assert.equal(ld.offers.price, '0');
+  assert.equal(ld.organizer.name, 'R10 Art Gallery');
+  assert.doesNotMatch(JSON.stringify(ld), /undefined/);
+});
+
+test('R10 tech: /api 404s are JSON, public lists cache for a minute, a missing stylesheet is a plain 404', () => withDiscoveryServer(async (base) => {
+  for (const p of ['/api/nope', '/api/kelowna/wineries', '/api/events/999999999/nothing']) {
+    const r = await fetch(base + p);
+    assert.equal(r.status, 404, p);
+    assert.match(r.headers.get('content-type'), /^application\/json/, p);
+    assert.deepEqual(await r.json(), { error: 'Not found' }, p);
+  }
+  const head = await fetch(`${base}/api/nope`, { method: 'HEAD' });
+  assert.equal(head.status, 404);
+  assert.match(head.headers.get('content-type'), /application\/json/);
+  for (const p of ['/api/events', '/api/venues?region=kelowna', '/api/stats']) {
+    const r = await fetch(base + p);
+    assert.equal(r.status, 200, p);
+    assert.equal(r.headers.get('cache-control'), 'public, max-age=60', p);
+    await r.arrayBuffer();
+  }
+  const ev = await fetch(`${base}/api/events/999999999`);
+  assert.equal(ev.status, 404);
+  assert.notEqual(ev.headers.get('cache-control'), 'public, max-age=60', 'a single event (token-dependent) is not shared-cached');
+  await ev.arrayBuffer();
+  const css = await fetch(`${base}/styles/missing-r10.css`);
+  assert.equal(css.status, 404);
+  assert.doesNotMatch(css.headers.get('content-type') || '', /json/);
+  await css.arrayBuffer();
+  // A page 404 is still the HTML not-found page.
+  const page = await fetch(`${base}/kelowna/wineries/not-a-venue-r10`);
+  assert.equal(page.status, 404);
+  assert.match(page.headers.get('content-type'), /text\/html/);
+  await page.arrayBuffer();
+}));
+
+test('R10 speed: a venue photo hero lists its 480px copy, is preloaded from the head, and the strip thumbnails are low priority', () => {
+  const v = db.prepare("SELECT * FROM venues WHERE redirect_to IS NULL AND image_url LIKE '/images/venues/%' LIMIT 400").all()
+    .find((x) => app.photoSized(x.image_url, 480) !== x.image_url && app.photoSized(x.image_url, 960) !== x.image_url);
+  if (!v) return; // the local database has no venue with sized copies
+  const html = app.renderVenuePage(v, [], [], []);
+  const hero = html.match(/<div class="venue-hero venue-hero-photo"><img [^>]*>/)[0];
+  assert.ok(hero.includes(`${app.photoSized(v.image_url, 480)} 480w, `), hero);
+  const head = html.split('</head>')[0];
+  const preload = head.match(/<link rel="preload" as="image" imagesrcset="([^"]+)" imagesizes="([^"]+)" fetchpriority="high">/);
+  assert.ok(preload, 'the hero is preloaded');
+  assert.ok(hero.includes(`srcset="${preload[1]}"`), 'the preload asks for the same candidates as the <img>');
+  assert.ok(hero.includes(`sizes="${preload[2]}"`));
+  assert.ok(head.indexOf('rel="preload" as="image"') < head.indexOf('rel="stylesheet"') || head.indexOf('rel="stylesheet"') === -1, 'before the stylesheets');
+  for (const thumb of html.match(/<button type="button" class="vg-thumb"[^>]*><img [^>]*>/g) || []) assert.match(thumb, /loading="lazy" fetchpriority="low"/);
+  // A page with no photo has no image preload.
+  const plain = db.prepare("SELECT * FROM venues WHERE redirect_to IS NULL AND (image_url IS NULL OR image_url = '') AND type = 'restaurant' LIMIT 1").get();
+  if (plain) assert.doesNotMatch(app.renderVenuePage(plain, [], [], []).split('</head>')[0], /rel="preload" as="image"/);
+});
