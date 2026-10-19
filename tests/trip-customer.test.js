@@ -639,7 +639,7 @@ test('Customer event timing: flexible dinner moves earlier to leave an arrival a
 });
 
 test('Customer event dinner: an earlier-opening alternative is selected when it fits before kickoff',()=>{
- const p=eventSchedule('6:05 pm',undefined,false,{lat:49.88,lng:-119.49},{5:[['15:00','23:00']]});
+ const p=eventSchedule('6 pm',undefined,false,{lat:49.88,lng:-119.49},{5:[['15:00','23:00']]});
  const meal=p.schedule.find(s=>s.venueId);
  assert.equal(meal.venueId,5);assert.equal(meal.status,'estimated');
  assert.ok(meal.endMinutes+meal.transferMinutes+30<=p.schedule.find(s=>s.eventId===90).startMinutes);
@@ -647,7 +647,7 @@ test('Customer event dinner: an earlier-opening alternative is selected when it 
 });
 
 test('Customer event dinner: no feasible restaurant is marked unscheduled instead of recommended',()=>{
- const p=eventSchedule('6:05 pm',undefined,false,{lat:49.88,lng:-119.49}),mealStop=p.itinerary.stops.find(s=>/dinner/i.test(s.label));
+ const p=eventSchedule('6 pm',undefined,false,{lat:49.88,lng:-119.49}),mealStop=p.itinerary.stops.find(s=>/dinner/i.test(s.label));
  assert.ok(mealStop?.unscheduledMeal);assert.equal(mealStop.venue,undefined);
  assert.deepEqual(mealStop.alternates,[]);
  assert.ok(p.schedule.some(s=>s.notScheduledMeal&&s.status==='unmet'));
@@ -656,7 +656,7 @@ test('Customer event dinner: no feasible restaurant is marked unscheduled instea
 });
 
 test('Customer event conflict: summary does not recommend dinner before an impossible kickoff',()=>{
- const p=eventSchedule('6:05 pm',undefined,false,{lat:49.88,lng:-119.49});
+ const p=eventSchedule('6 pm',undefined,false,{lat:49.88,lng:-119.49});
  assert.match(p.experience.text,/not scheduled/i);
  assert.match(p.experience.text,/end time is not listed/i);
  assert.doesNotMatch(p.experience.text,/Start with a relaxed dinner/i);
@@ -664,7 +664,7 @@ test('Customer event conflict: summary does not recommend dinner before an impos
 
 test('Customer event travel: linked venue coordinates produce a transfer estimate',()=>{
  const p=eventSchedule('7 pm','21:30',false,{lat:49.88,lng:-119.49,venueId:77});
- const e=p.schedule.find(s=>s.eventId===90);assert.equal(e.status,'estimated');assert.equal(e.transferMinutes,15);
+ const e=p.schedule.find(s=>s.eventId===90);assert.equal(e.status,'estimated');assert.equal(e.transferMinutes,5);
  assert.match(r.selectedStops(p).find(s=>s.event).scheduleNote,/estimated.*travel/i);
 });
 test('Customer event travel: invalid coordinates never become a verified journey',()=>{
@@ -672,12 +672,16 @@ test('Customer event travel: invalid coordinates never become a verified journey
  assert.equal(p.schedule.find(s=>s.eventId===90).status,'unverified');
 });
 test('Customer event travel: travel allowance reduces the available time before kickoff',()=>{
+ // Road model (2026-10-18): a 22 km drive moves dinner earlier than a game next door, and still arrives in time.
+ const near=eventSchedule('7 pm','21:30',false,{lat:49.88,lng:-119.49,venueId:77}).schedule.find(s=>s.venueId);
  const p=eventSchedule('7 pm','21:30',false,{lat:50.08,lng:-119.49,venueId:77});
- const meal=p.schedule.find(s=>s.notScheduledMeal);assert.equal(meal.status,'unmet');
+ const meal=p.schedule.find(s=>s.venueId),game=p.schedule.find(s=>s.eventId===90);
+ assert.ok(meal.startMinutes<near.startMinutes,`${meal.startMinutes} vs ${near.startMinutes}`);
+ assert.ok(meal.endMinutes+game.transferMinutes+30<=game.startMinutes);
 });
 test('Customer event travel: dinner after a timed event uses its end plus travel',()=>{
  const p=eventSchedule('5 pm','20:00',false,{lat:49.88,lng:-119.49,venueId:77});
- const dinner=p.schedule.find(s=>s.venueId);assert.equal(dinner.status,'estimated');assert.equal(dinner.startMinutes,1215);assert.equal(dinner.transferMinutes,15);
+ const dinner=p.schedule.find(s=>s.venueId);assert.equal(dinner.status,'estimated');assert.equal(dinner.startMinutes,1205);assert.equal(dinner.transferMinutes,5);
 });
 test('Customer event travel: missing end time prevents an invented after-event dinner time',()=>{
  const p=eventSchedule('5 pm',undefined,false,{lat:49.88,lng:-119.49,venueId:77});

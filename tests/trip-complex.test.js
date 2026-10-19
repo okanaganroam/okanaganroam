@@ -55,7 +55,9 @@ test('Complex itinerary: known seasonal closure is assessed on each trip day',()
 });
 test('Complex itinerary: a real event anchors its actual date and known evening time',()=>{
  const p=complex('Plan 3 days in Kelowna. Include a museum and a concert.',{events:[{id:50,name:'Autumn Concert',region:'kelowna',url:'/events/autumn-concert',categories:['live-music'],startDate:'2026-10-18',endDate:'2026-10-18',time:'7:00 PM',dateLabel:'October 18'}]});
- const e=p.days.flatMap(d=>d.stops.map(s=>({day:d.day,...s}))).find(s=>s.kind==='event');assert.equal(e?.day,2);assert.equal(e?.event.id,50);assert.equal(e?.daypart,'evening');
+ const e=p.days.flatMap(d=>d.stops.map(s=>({day:d.day,...s}))).find(s=>s.kind==='event');assert.equal(e?.day,2);assert.equal(e?.event.id,50);
+ // 2026-10-18: an evening event keeps dinner; the show takes the 'night' slot after it.
+ assert.equal(e?.daypart,'night');const day2=p.days.find(d=>d.day===2);assert.ok(!day2.stops.some(s=>s.daypart==='evening'&&s.event),'the evening slot stays for dinner');
 });
 test('Complex itinerary: an explicit distance limit never joins far-apart known stops',()=>{
  const f=facts.map(v=>v.id===1?{...v,lat:52,lng:-120}:v);

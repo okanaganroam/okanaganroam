@@ -100,7 +100,15 @@ function t3FrenchText(value){
  ['Avoids pubs, cocktail bars and technical climbing for a family trip','Évite les pubs, les bars à cocktails et l’escalade technique pour un voyage en famille'],
  ['No matching event was scheduled for the requested dates.','Aucun événement correspondant n’a été prévu aux dates demandées.'],['Not met:','Non satisfait :'],['Not verified:','Non vérifié :'],['hockey game','match de hockey'],['live music','musique en direct'],['sports event','événement sportif']
  ];
+ // Planner realism pass (2026-10-18).
+ phrases.push(['Early evening','Début de soirée'],['Night','Soirée'],['Opening hours, visit lengths and drive times are estimates.','Les horaires, les durées de visite et les trajets sont des estimations.'],['Dinner is the last drive of each day, so nothing after it needs a car.','Le souper est le dernier trajet en voiture de chaque jour; rien après ne demande de voiture.']);
  for(const [a,b] of phrases)text=text.split(a).join(b);
+ text=text.replace(/^Day (\d+): Confirm times before you go\. /,'Jour $1 : confirmez les heures avant de partir. ');
+ text=text.replace(/^No driving after ([\d:]+): dinner is each day’s last drive, and anything after it is a short walk away\.$/,'Pas de voiture après $1 : le souper est le dernier trajet de chaque jour, et ce qui suit est à quelques pas.');
+ text=text.replace(/^In (.+), about (\d+) minutes’ drive: nothing in (.+) fits (lunch|dinner) that day$/,(_,t,m,h,meal)=>'À '+t+', à environ '+m+' minutes en voiture : rien à '+h.replace(/ and (?!.* and )/,' et ')+' ne convient pour le '+(meal==='lunch'?'dîner':'souper')+' ce jour-là');
+ text=text.replace(/^In (.+), about (\d+) minutes’ drive from (.+)$/,'À $1, à environ $2 minutes en voiture de $3');
+ text=text.replace(/^Open ([\d:]+)–([\d:]+); plan on about ([\d.]+) hours there\.$/,(_,a,b,h)=>'Ouvert de '+a+' à '+b+'; prévoyez environ '+h.replace('.',',')+' heures sur place.');
+ text=text.replace(/^Something after dinner is more than ([\d.]+) km from it; plan a ride, or skip it to keep the evening on foot\.$/,(_,k)=>'Une activité après le souper est à plus de '+k.replace('.',',')+' km; prévoyez un transport, ou sautez-la pour garder la soirée à pied.');
  text=text.replace(/Day (\d+) has no additional matching activity available\. The optional afternoon meal was left out; dinner remains\. Consider a different activity or a shorter trip\./g,'Le jour $1 ne comporte aucune autre activité correspondante disponible. Le repas facultatif de l’après-midi a été retiré; le souper reste au programme. Envisagez une autre activité ou un voyage plus court.');
  text=text.replace(/\beasy walks?\b/gi,match=>match.toLowerCase().endsWith('s')?'promenades faciles':'promenade facile');
  text=text.replace(/^In (.+), where you asked to go$/, 'À $1, où vous souhaitez aller');

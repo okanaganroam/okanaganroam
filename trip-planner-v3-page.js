@@ -34,6 +34,19 @@ function t3TimelineRows(p,removed={}){
   const row={...item,name:item.notScheduledMeal?(stop?.label||'Dinner'):stop?.venue?.name||stop?.event?.name||'',gapMinutes:gap};previous=item;return row;
  }).filter(Boolean);
 }
+// Times as the site's venue pages show them (2026-10-18): English "12 PM – 6 PM" / "7:30 PM", French "12 h–18 h" /
+// "19 h 30". The planner API keeps 24-hour clock strings; this changes only the page's text.
+function t3LocalTimes(value,language){
+ const fr=language==='fr';
+ const fmt=(h,m)=>{h=Number(h)%24;m=Number(m||0);if(fr)return h+' h'+(m?' '+String(m).padStart(2,'0'):'');return (h%12||12)+(m?':'+String(m).padStart(2,'0'):'')+(h<12?' AM':' PM');};
+ const text=s=>String(s).replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,ap)=>{const n=Number(h);if(n<1||n>12)return raw;return fmt(n%12+(ap.toLowerCase()==='pm'?12:0),m);})
+  .replace(/\b(0\d|1\d|2[0-3]):([0-5]\d)\b(?!\s*(?:AM|PM|h\b))/g,(_,h,m)=>fmt(h,m))
+  .replace(/\b0(\d) h\b/g,'$1 h')
+  .replace(fr?/(\d h(?: \d\d)?) ?[–-] ?(\d)/g:/((?:AM|PM)) ?[–-] ?(\d)/g,fr?'$1–$2':'$1 – $2');
+ const skip={url:1,photo:1,name:1,address:1,slug:1,query:1,id:1,date:1,startDate:1,endDate:1,startTime:1,endTime:1,region:1,regionLabel:1,venueName:1};
+ const walk=(x,key)=>{if(typeof x==='string')return skip[key]?x:text(x);if(Array.isArray(x))return x.map(y=>walk(y,key));if(x&&typeof x==='object'){const o={};for(const k of Object.keys(x))o[k]=walk(x[k],k);return o;}return x;};
+ return typeof value==='string'?text(value):walk(value,'');
+}
 function t3EventPlaceHtml(event,language,esc){
  const venue=String(event?.venueName||'').trim();if(!venue)return '';
  return '<p class="t3-event-place">'+esc(language==='fr'?'Lieu : ':'Venue: ')+esc(venue)+'</p>';
@@ -172,8 +185,8 @@ function t3KmText(km) {
 function t3StateToQuery(s) {
   const p = [];
   const add = (k, v) => p.push(k + '=' + encodeURIComponent(v));
-  const KEY = /^[1-7]-(morning|midday|afternoon|late|evening)$/;
-  const PARTS = ['morning', 'midday', 'afternoon', 'late', 'evening'];
+  const KEY = /^[1-7]-(morning|midday|afternoon|late|evening|night)$/;
+  const PARTS = ['morning', 'midday', 'afternoon', 'late', 'evening', 'night'];
   const byKey = (a, b) => (Number(a[0]) - Number(b[0])) || (PARTS.indexOf(a.slice(2)) - PARTS.indexOf(b.slice(2)));
   const id = (x) => Number.isInteger(x) && x > 0 && x < 1e9;
   const slots = (m) => Object.keys(m || {}).filter((k) => KEY.test(k) && id(m[k])).sort(byKey).map((k) => k + ':' + m[k]);
@@ -219,7 +232,7 @@ function t3QueryToState(search, regions) {
   if (!text) return null;
   let invalid = !!q.__bad;
   const ID = '[1-9]\\d{0,8}';
-  const SLOT = new RegExp('^([1-7]-(?:morning|midday|afternoon|late|evening)):(' + ID + ')$');
+  const SLOT = new RegExp('^([1-7]-(?:morning|midday|afternoon|late|evening|night)):(' + ID + ')$');
   const seedOk = /^\d{1,7}$/.test(q.seed || '') && Number(q.seed) <= 1000000;
   const seed = seedOk ? Number(q.seed) : 0;
   if (q.seed !== undefined && !seedOk) invalid = true;
@@ -256,7 +269,7 @@ function t3QueryToState(search, regions) {
   const pinned = slotMap(q.pin, 28);
   const avoid = idList(q.avoid, 200);
   const removed = [];
-  if (q.rm !== undefined) String(q.rm).split(',').forEach((k) => { if (/^[1-7]-(morning|midday|afternoon|late|evening)$/.test(k)) { if (removed.indexOf(k) === -1) removed.push(k); } else invalid = true; });
+  if (q.rm !== undefined) String(q.rm).split(',').forEach((k) => { if (/^[1-7]-(morning|midday|afternoon|late|evening|night)$/.test(k)) { if (removed.indexOf(k) === -1) removed.push(k); } else invalid = true; });
   return { text, seed, overrides, locks, exclude, pinned: pinned && Object.keys(pinned).length ? pinned : null, avoid, removed, invalid };
 }
 // A Google Maps directions link through the given stops, in order, using
@@ -314,7 +327,7 @@ function t3DayPinLayout(points, assets) {
   const fits = pins.every((q) => Math.abs(q.d.dx) <= LIMIT.desktop.x && Math.abs(q.d.dy) <= LIMIT.desktop.y && Math.abs(q.w.dx) <= LIMIT.narrow.x && Math.abs(q.w.dy) <= LIMIT.narrow.y);
   return { fits, pins };
 }
-const CLIENT_HELPERS_SRC = [t3DayPinLayout, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3LocalTimes, t3DayPinLayout, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
@@ -1076,7 +1089,7 @@ function renderScript(d) {
   // The hours-derived badges have no key in app.js's frozen dictionary, so
   // their French names live here (same approach as DH_TEXT above).
   var BADGE_FR_EXTRA = { open_early: 'Ouvert t\u00f4t', open_late: 'Ouvert tard' };
-  var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', late: 'Late afternoon', evening: 'Evening' };
+  var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', late: 'Late afternoon', evening: 'Evening', night: 'Night' };
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
   function whenLabel(s){ return DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; }
   // Stop photos: each card in a plan gets a different photo where we have more than one for that kind of place, and a
@@ -1404,7 +1417,7 @@ function renderScript(d) {
     }).join('') + '</section>';
   }
   function render(focus){
-    var p = lang()==='fr' ? t3FrenchPlan(state.last) : state.last;
+    var p = t3LocalTimes(lang()==='fr' ? t3FrenchPlan(state.last) : state.last, lang());
     renderedVenueCardAnchors = {};
     renderedPhotos = {};
     var counts = nameCounts();
@@ -1443,8 +1456,10 @@ function renderScript(d) {
     }
     var timeline=t3TimelineRows(p,state.removed);
     if(timeline.length){
-      var french=lang()==='fr',clock=function(m){return String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+(m>=1440?(french?' (+1 jour)':' (+1 day)'):'');};
-      html+='<section class="t3-warnings" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><h3>'+(french?'Votre horaire':'Your timeline')+'</h3><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row){
+      var french=lang()==='fr',clock=function(m){return t3LocalTimes(String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0'),lang())+(m>=1440?(french?' (+1 jour)':' (+1 day)'):'');};
+      // One "Confirm times before you go" line per day (2026-10-18), not "Provisional timing" on every row.
+      var confirmDays={};timeline.forEach(function(row){if(!row.notScheduledMeal&&(row.status==='provisional'||row.status==='unverified'))confirmDays[row.day]=true;});
+      html+='<section class="t3-warnings" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><h3>'+(french?'Votre horaire':'Your timeline')+'</h3><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
         var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
         if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
         var detail=[];
@@ -1459,8 +1474,10 @@ function renderScript(d) {
           if(row.daylight.status!=='estimated')detail.push(row.daylight.status==='conflict'?(french?'Conflit avec la lumière du jour · partez plus tôt':'Daylight conflict · start earlier'):(french?'Lumière du jour à confirmer':'Daylight unverified'));
         }
         if(row.notScheduledMeal)detail.push(french?'Aucun restaurant ne convient avant l’événement.':'No restaurant fits before the event.');
-        else if(row.status!=='estimated')detail.push(row.status==='unmet'?(french?'Conflit d’horaire':'Timing conflict'):row.status==='provisional'?(french?'Horaire provisoire · à confirmer':'Provisional timing · confirm before visiting'):(french?'À confirmer':'Needs confirmation'));
-        return '<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+time)+'</strong><br>'+esc(row.notScheduledMeal?(french?'Souper non planifié':'Dinner not scheduled'):row.name)+(detail.length?'<br><small>'+esc(detail.join(' · '))+'</small>':'')+'</li>';
+        else if(row.status==='unmet')detail.push(french?'Conflit d’horaire':'Timing conflict');
+        var nextRow=timeline[n+1],lastOfDay=!nextRow||nextRow.day!==row.day;
+        return '<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+time)+'</strong><br>'+esc(row.notScheduledMeal?(french?'Souper non planifié':'Dinner not scheduled'):row.name)+(detail.length?'<br><small>'+esc(detail.join(' · '))+'</small>':'')+'</li>'
+          +(lastOfDay&&confirmDays[row.day]?'<li class="t3-confirm-day" style="margin:0 0 1rem;list-style:none"><small>'+esc(french?'Jour '+row.day+' : confirmez les heures avant de partir.':'Day '+row.day+': Confirm times before you go.')+'</small></li>':'');
       }).join('')+'</ol></section>';
     }
     var schedHtml='';
@@ -2034,4 +2051,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3DayPinLayout, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3LocalTimes, t3DayPinLayout, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
