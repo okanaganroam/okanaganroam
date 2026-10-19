@@ -24989,7 +24989,8 @@ test('Smarter search: breakfast, kids and rainy days, date night, dated events a
   assert.equal(app.smartSearchPlan('déjeuner à west kelowna').key, 'breakfast');
   // Kids, family and rainy days -> the Indoor hub's Family Fun in that town.
   assert.equal(go('kids rainy day kelowna'), '/indoor?types=family&regions=kelowna');
-  assert.equal(go('things to do with kids in kelowna'), '/indoor?types=family&regions=kelowna');
+  // Round 10 (2026-10-19): kids without a rainy day are not indoor-only: the town's kid-friendly places, parks and beaches.
+  assert.equal(go('things to do with kids in kelowna'), search('things to do with kids in kelowna'));
   assert.equal(go('enfants jour de pluie kelowna'), '/indoor?types=family&regions=kelowna');
   // A town with no family places: the whole Family Fun list rather than an empty one.
   assert.equal(go('kids rainy day osoyoos'), '/indoor?types=family');
@@ -31135,8 +31136,8 @@ test('Round 9 claim page: « gérant d’Ancient… » before a vowel, and no sp
   assert.equal(app.claimFrDe('Hester Creek'), 'de Hester Creek');
   assert.equal(app.claimFrDe('Quails’ Gate'), 'de Quails’ Gate');
   const fr = app.renderClaimPage(ancient, 'fr');
-  assert.ok(fr.includes('Vous êtes propriétaire ou gérant d’Ancient R9 Test Winery? Dites-nous'), 'elided');
-  assert.ok(app.renderClaimPage(quails, 'fr').includes('propriétaire ou gérant de Quails R9 Test Winery?'));
+  assert.ok(fr.includes('Vous êtes propriétaire, gérant ou gérante d’Ancient R9 Test Winery? Dites-nous'), 'elided');
+  assert.ok(app.renderClaimPage(quails, 'fr').includes('propriétaire, gérant ou gérante de Quails R9 Test Winery?'));
   assert.doesNotMatch(fr.replace(/<script[\s\S]*?<\/script>/g, ''), /[   ]\?/, 'no space before ?');
   assert.ok(app.renderClaimPage(ancient, 'en').includes('Own or manage Ancient R9 Test Winery?'));
 }));
@@ -31187,3 +31188,172 @@ test('Round 9 My Trip: a season notice is judged on the stop\'s planned date, no
     db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(hill.id);
   }
 }));
+
+// ---- Search, map, help bot and French, round 10 (2026-10-19) ----
+test('Round 10 help bot: who else can edit, "says closed", a second location, open all year, a week off, who are you, blurry photos and holiday hours', () => {
+  const frEdit = ohbMatcher('edit', { lang: 'fr' }), enEdit = ohbMatcher('edit'), frAccount = ohbMatcher('account', { lang: 'fr' });
+  const cases = [
+    ['est-ce que d’autres peuvent modifier ma fiche', 'access'], ['quelqu’un peut modifier ma fiche sans moi?', 'access'], ['quelqu’un d’autre peut changer ma page', 'access'],
+    ['ma fiche dit fermé mais on est ouvert', 'shows-closed'], ['my listing says closed but we’re open', 'shows-closed'],
+    ['ajouter un deuxième emplacement', 'more-businesses'], ['how do i add a second location', 'more-businesses'],
+    ['ouvert à l’année maintenant', 'season'], ['we are open year round now', 'season'],
+    ['ferme pour 1 semaine', 'closures'], ['fermé pour une semaine', 'closures'],
+    ['qui êtes-vous', 'about'], ['who are you', 'about'], ['are you a bot', 'about'],
+    ['my photos are blurry', 'photo-blurry'], ['mes photos sont floues', 'photo-blurry'],
+    ['holiday hours', 'closures'], ['how do i change my hours for christmas', 'closures'], ['heures des fêtes', 'closures'], ['horaire de Noël', 'closures'],
+  ];
+  for (const m of [frEdit, enEdit]) for (const [q, id] of cases) assert.equal(m(q).id, id, q);
+  // My listings has the Claim topic first, but these are not claims.
+  for (const [q, id] of [['est-ce que d’autres peuvent modifier ma fiche', 'access'], ['ma fiche dit fermé mais on est ouvert', 'shows-closed']]) assert.equal(frAccount(q).id, id, `account: ${q}`);
+  // Earlier answers stay put.
+  assert.equal(enEdit('how do I change my hours').id, 'hours');
+  assert.equal(enEdit('we have diffrent hours on stat holidays').id, 'seasonal-hours');
+  assert.equal(enEdit('summer hours are diffrent from winter').id, 'seasonal-hours');
+  assert.equal(ohbMatcher('menu')('is the menu scan blury').id, 'menu-blurry');
+  // The new answers, in both languages.
+  const t = Object.fromEntries(ohbConfig(app.ownerHelpWidgetHtml('edit', { signedIn: true, lang: 'fr' })).topics.map((x) => [x.id, x]));
+  assert.match(t.about.a, /not a person or an AI/);
+  assert.match(t.about.aFr, /pas une personne ni une IA/);
+  assert.match(t['shows-closed'].a, /Open all year/);
+  assert.match(t['shows-closed'].aFr, /Ouvert toute l’année/);
+  assert.match(t.season.a, /Open all year/);
+  assert.match(t.season.aFr, /Ouvert toute l’année/);
+  assert.match(t['photo-blurry'].a, /original/);
+  assert.match(t['photo-blurry'].aFr, /originale/);
+  // French typography: no capital right after the colon in the privacy answer.
+  assert.doesNotMatch(t['login-privacy'].aFr, /privé :<\/p><ul><li><strong>L/);
+});
+
+test('Round 10 French: the Free to Visit and Arts & Culture guides have no English chip, breadcrumb or search label; the claim page is inclusive', () => {
+  for (const [badge, label, search] of [['free_entry', 'Activités gratuites', 'Rechercher les activités gratuites à Kelowna'], ['arts_culture', 'Arts et culture', 'Rechercher les lieux d’arts et de culture à Kelowna']]) {
+    const fr = app.frenchTwinHtml(app.renderGuidePage('kelowna', badge, []), `/guide/kelowna/${badge}`);
+    assert.doesNotMatch(fr, /Free Things to Do|Search free things|Search arts/, badge);
+    assert.ok(fr.includes(`› ${label}`), `${badge}: breadcrumb`);
+    assert.ok(fr.includes(`for="fdSearch">${search}</label>`), `${badge}: search label`);
+  }
+  // The chip on the other guides and on /fr/guides.
+  const chip = app.frenchTwinHtml('<!DOCTYPE html><html lang="en"><head><title>x</title></head><body><main><p><a class="guide-more-chip" href="/guide/penticton/free_entry">Free Things to Do</a><a href="/guide/kelowna/free_entry">Free Things to Do <span>56</span></a></p></main></body></html>', '/guides');
+  assert.doesNotMatch(chip, /Free Things to Do/);
+  assert.equal((chip.match(/Activités gratuites/g) || []).length, 2);
+});
+
+test('Round 10 search: dance, drag, magic, musicals, trade and dog shows, art shows, drive-ins, comedy by town, icewine, kids and live music', () => withDiscoveryFlag('on', () => r9Fixtures({
+  venues: [
+    { name: 'R10 Comedy Club', region: 'kelowna', type: 'indoor', description: 'Stand-up every weekend.' },
+    { name: 'R10 Fitness Gym', region: 'kelowna', type: 'sport', description: 'Weights, classes and a trade show of new gear once a year.' },
+    { name: 'R10 Icewine Estate', region: 'kelowna', type: 'winery', description: 'Known for its ice wine, picked on the first frozen night.' },
+    { name: 'R10 Dog Patio', region: 'kelowna', type: 'pub', description: 'Dogs welcome on the patio.', dog_friendly: 1 },
+    { name: 'R10 Kids Beach', region: 'kelowna', type: 'beach', description: 'A shallow beach with a playground.' },
+  ],
+  events: [
+    ['R10 Ballet Gala', 'The ballet company dances three new works.', ['arts-culture'], 'kelowna'],
+    ['R10 Halloween Dance', 'A community dance with a live band.', ['community-events'], 'osoyoos'],
+    ['R10 God Is a Scottish Drag Queen', 'A drag comedy show.', ['arts-culture'], 'vernon'],
+    ['R10 Leif the Magician Magic Show', 'Close-up magic for the family.', ['arts-culture'], 'vernon'],
+    ['R10 Holiday Magic Market', 'Crafts and gifts.', ['markets-fairs'], 'vernon'],
+    ['R10 Frozen the Musical', 'The Broadway musical on stage.', ['arts-culture'], 'kelowna'],
+    ['R10 Years of Musical Memories', 'A concert of old favourites.', ['live-music'], 'kelowna'],
+    ['R10 Okanagan Home Show', 'Builders, renovators and gardeners under one roof.', ['community-events'], 'kelowna'],
+    ['R10 Square One Art Show & Sale', 'Small works by local artists.', ['arts-culture'], 'penticton'],
+    ['R10 Live Music: Dirt Road Opera', 'A country band at the pub.', ['live-music'], 'penticton'],
+    ['R10 Quartet at the Jazz Club', 'A jazz quartet plays standards.', ['live-music'], 'vernon'],
+    ['R10 Okanagan Symphony Concert', 'The Okanagan Symphony Orchestra plays Beethoven.', ['live-music'], 'kelowna'],
+    ['R10 Vernon Comedy Night', 'Stand-up comedians.', ['arts-culture'], 'vernon'],
+    ['R10 Penticton Comedy Night', 'Stand-up comedians.', ['arts-culture'], 'penticton'],
+    ['R10 Fire & Ice Festival', 'Fire dancers and ice carving.', ['events-festivals'], 'kelowna'],
+    ['R10 Icewine Festival Tasting', 'Taste the new icewines.', ['wineries-wine-events'], 'kelowna'],
+    ['R10 Family Pumpkin Day', 'Crafts and games for kids.', ['family-kids'], 'kelowna'],
+  ],
+}, () => {
+  const plan = (q, lang = 'en') => { const p = app.smartSearchPlan(app.discoverySearchText(q, lang)); assert.ok(p, `a plan for ${q}`); return p; };
+  const r10 = (list) => list.map((x) => x.name || (x.row && x.row.name)).filter((n) => /^R10 /.test(n));
+  const evs = (q, lang = 'en') => r10(plan(q, lang).events().items);
+  // Dance, in English and French ("dance" is never "corrected" to « danse »).
+  assert.equal(app.discoverySearchText('dance'), 'dance');
+  for (const [q, lang] of [['dance'], ['ballet'], ['danse', 'fr'], ['spectacle de danse', 'fr']]) {
+    assert.equal(plan(q, lang).key, 'topic_dance', q);
+    assert.deepEqual(evs(q, lang).sort(), ['R10 Ballet Gala', 'R10 Halloween Dance'], q);
+  }
+  assert.equal(plan('danse', 'fr').headingFr, 'Danse');
+  // One kind of show at a time.
+  assert.deepEqual(evs('drag show'), ['R10 God Is a Scottish Drag Queen']);
+  assert.deepEqual(evs('magic show'), ['R10 Leif the Magician Magic Show'], 'not the Holiday Magic Market');
+  assert.deepEqual(evs('spectacle de magie', 'fr'), ['R10 Leif the Magician Magic Show']);
+  assert.deepEqual(evs('musical'), ['R10 Frozen the Musical'], 'not a concert of musical memories');
+  assert.deepEqual(evs('trade show'), ['R10 Okanagan Home Show']);
+  assert.deepEqual(r10(plan('trade show').list()), [], 'no gyms');
+  const dog = plan('dog show');
+  assert.equal(dog.key, 'topic_dog_show');
+  assert.deepEqual(r10(dog.list()), [], 'not every dog-friendly place');
+  assert.match(dog.emptyText, /No dog shows are listed/);
+  assert.deepEqual(evs('art show'), ['R10 Square One Art Show & Sale']);
+  const drive = plan('drive-in');
+  assert.equal(drive.key, 'topic_drive_in');
+  assert.equal(plan('drive-in theatre').key, 'topic_drive_in');
+  assert.match(drive.emptyText, /No drive-in theatre is listed/);
+  assert.match(drive.emptyTextFr, /Aucun ciné-parc/);
+  // Classical music: the symphony, not a band called "Opera" or a jazz night.
+  for (const q of ['classical', 'opera']) {
+    const list = evs(q);
+    assert.ok(list.includes('R10 Okanagan Symphony Concert'), q);
+    assert.ok(!list.includes('R10 Live Music: Dirt Road Opera') && !list.includes('R10 Quartet at the Jazz Club'), `${q}: ${list.join(' | ')}`);
+  }
+  // Comedy in a town keeps to that town; a comedy club lists the club.
+  assert.equal(plan('comedy vernon').key, 'topic_comedy');
+  assert.ok(evs('comedy vernon').includes('R10 Vernon Comedy Night') && !evs('comedy vernon').includes('R10 Penticton Comedy Night'));
+  assert.ok(evs('comedy penticton').includes('R10 Penticton Comedy Night') && !evs('comedy penticton').includes('R10 Vernon Comedy Night'));
+  assert.equal(plan('comedy vernon').heading, 'Comedy in Vernon');
+  assert.equal(plan('humour à vernon', 'fr').headingFr, 'Humour à Vernon');
+  assert.deepEqual(r10(plan('comedy club').list()), ['R10 Comedy Club']);
+  assert.notEqual((app.smartSearchPlan('comedy') || {}).key, 'topic_comedy', 'comedy alone keeps the valley-wide guide');
+  // Icewine: the wineries that make it and its events, never "Fire & Ice".
+  for (const [q, lang] of [['ice wine'], ['vin de glace', 'fr']]) {
+    const p = plan(q, lang);
+    assert.equal(p.key, 'icewine', q);
+    assert.ok(r10(p.list()).includes('R10 Icewine Estate'), q);
+    const list = r10(p.events().items);
+    assert.ok(list.includes('R10 Icewine Festival Tasting') && !list.includes('R10 Fire & Ice Festival'), `${q}: ${list.join(' | ')}`);
+  }
+  // "live" alone is not the Comedy & Live Shows guide; "live music" lists the places and the gigs on /search.
+  assert.notEqual(app.heroSearchTarget('live').url, '/guides/okanagan-comedy-shows');
+  assert.equal(app.heroSearchTarget('live music').url, '/search?q=live%20music');
+  // Kids: the family guide, or a town's kid-friendly places with parks and beaches, and its family events.
+  if (app.liveGuides().some((g) => g.path === '/guides/family-friendly-okanagan')) {
+    assert.equal(app.heroSearchTarget('things to do with kids').url, '/guides/family-friendly-okanagan');
+    assert.equal(app.heroSearchTarget('activités pour enfants', { lang: 'fr' }).url, '/guides/family-friendly-okanagan');
+  }
+  const kids = plan('things to do with kids in kelowna');
+  assert.equal(kids.key, 'family');
+  assert.ok(r10(kids.list()).includes('R10 Kids Beach'), 'a beach counts');
+  assert.ok(r10(kids.events().items).includes('R10 Family Pumpkin Day'));
+  assert.match(app.heroSearchTarget('kids rainy day kelowna').url, /^\/indoor\?types=family/, 'a rainy day stays indoors');
+})));
+
+test('Round 10 map: matches outside the view, show words open this week’s events, and the French typo note names the French word', async () => {
+  await withDiscoveryServer(async (base) => {
+    const en = await (await fetch(`${base}/map`)).text();
+    const fr = await (await fetch(`${base}/fr/map`)).text();
+    // Outside the view: say how many and offer to show them, never "Nothing called ... here".
+    assert.ok(en.includes('var away = me ? 0 : places.filter(matchesPlace).length;'));
+    assert.ok(en.includes("data-relax=\"fit\">' + esc(T.showThem(away))"));
+    assert.ok(en.includes("return n === 1 ? '1 match outside this part of the map.' : n + ' matches outside this part of the map.';"));
+    assert.ok(fr.includes("n + ' résultats hors de cette zone de la carte.'") && fr.includes("'Les afficher'"));
+    // Show words (« spectacle » reads as "shows") open the Events tab instead of "Nothing called « shows »".
+    assert.ok(en.includes("var EVENT_WORDS = ' shows concert concerts"));
+    assert.ok(en.includes("if (wantEvents) { evTerm = [term].concat(evFilt).join(' ').trim();"));
+    assert.ok(fr.includes('Voici les événements de la semaine sur la carte.'));
+    // The French typo note: « brewry » comme « brasserie ».
+    const vm = require('node:vm');
+    const c = JSON.parse(fr.match(/CONF = (\{.*?\});/)[1]);
+    const list = JSON.parse(fr.match(/<script type="application\/json" id="pmFrWords">([\s\S]*?)<\/script>/)[1]);
+    const document = { getElementById: (id) => (id === 'pmFrWords' ? { textContent: JSON.stringify(list) } : null) };
+    const run = (isFr) => {
+      const ctx = { CONF: c, document, FR: isFr, okanaganClock: () => ({ minutes: 600 }), WEEK: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], NEG: ' no not without except avoid never nothing sans pas ni aucun aucune ' };
+      vm.runInNewContext(`${fr.slice(fr.indexOf('  // Plain words become filters'), fr.indexOf('  var wantNear = false;'))}; this.fixTypos = fixTypos;`, ctx);
+      return (q) => JSON.parse(JSON.stringify(ctx.fixTypos(q).fixes));
+    };
+    assert.deepEqual(run(true)('brewry'), [{ from: 'brewry', to: 'brasserie' }]);
+    assert.deepEqual(run(false)('brewry'), [{ from: 'brewry', to: 'brewery' }], 'the English map keeps the English word');
+    assert.equal(app.mapFrWords().danse, 'dance');
+  });
+});
