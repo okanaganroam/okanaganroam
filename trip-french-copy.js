@@ -206,7 +206,13 @@ function t3FrenchText(value){
  text=text.replace(/Used instead of (.+) because its listed hours do not fit the estimated sequence\./g,'Choisi à la place de $1, dont les horaires indiqués ne conviennent pas à la séquence estimée.');
  text=text.replace(/No suitable (morning|afternoon|evening) stop was found for day (\d+)( in (.+))?\./g,(_,part,day,where,town)=>'Aucun arrêt approprié '+({morning:'le matin',afternoon:'l’après-midi',evening:'le soir'}[part])+' du jour '+day+(town?' à '+town:'')+'.');
  text=text.replace(/^Nothing matching (.+) is listed in (.+); the closest is (.+) in (.+)\.$/,(_,w,t,n,c)=>'Aucune option correspondant à '+w+' n’est répertoriée à '+t.replace(/ and (?!.* and )/,' et ')+'; la plus proche est '+n+' à '+c+'.');
- text=text.replace(/Nothing matching (.+) was available( in (.+))?\./g,(_,what,where,town)=>'Aucune option correspondant à '+what+(town?' à '+town.replace(/ and (?!.* and )/,' et '):'')+' n’était disponible.');
+ // Round 10 (2026-10-19): new planner lines.
+ text=text.split('Serves food, so this is the crawl’s meal stop').join('On y mange : c’est l’arrêt repas de la tournée');
+ text=text.split('Tours run at set times: book ahead with the operator and plan the day around the time you get.').join('Les visites ont lieu à heures fixes : réservez auprès de l’organisateur et planifiez la journée selon l’heure obtenue.');
+ // Round 10 (2026-10-19): the kind of event in a "Not met" or "Not verified" line is French too ("Non vérifié : event").
+ text=text.replace(/^(Non vérifié|Non satisfait) : (comedy show|show|event|market|festival) —/,(_,a,k)=>a+' : '+({'comedy show':'spectacle d’humour',show:'spectacle',event:'événement',market:'marché',festival:'festival'}[k])+' —');
+ text=text.replace(/^Not part of this plan: (.+) — Okanagan Roam couldn’t match (that word|those words) to a kind of place it lists\.$/,(_,w,n)=>'Pas pris en compte dans ce plan : '+w.replace(/“/g,'«\u00a0').replace(/”/g,'\u00a0»').replace(/ and (?!.* and )/,' et ')+' — Okanagan Roam n’a pas pu associer '+(n==='that word'?'ce mot':'ces mots')+' à un type de lieu répertorié.');
+ text=text.replace(/Nothing matching (.+) was available( in (.+))?\./g,(_,what,where,town)=>'Aucune option correspondant à '+what.replace(/“/g,'«\u00a0').replace(/”/g,'\u00a0»')+(town?' à '+town.replace(/ and (?!.* and )/,' et '):'')+' n’était disponible.');
  text=text.replace(/(Morning|Afternoon|Evening) on day (\d+) is kept free for the event’s listed duration\./g,(_,part,day)=>({Morning:'Le matin',Afternoon:'L’après-midi',Evening:'Le soir'}[part])+' du jour '+day+' reste libre pour la durée indiquée de l’événement.');
  text=text.replace('Reserved for the listed event time.','Réservé pour l’horaire indiqué de l’événement.');
  text=text.replace(/A later assumed start reduces waiting while keeping the same stops and listed opening hours\. Estimated first visit: ([\d:]+)\. Change your request to specify a start time\./g,'Un départ supposé plus tard réduit l’attente tout en conservant les mêmes arrêts et horaires indiqués. Première visite estimée : $1. Précisez une heure de départ dans votre demande.');
@@ -284,12 +290,12 @@ function t3FrenchEvent(event){
 }
 // "Votre journée commence par une dégustation à Fox & Archer Wines, puis un dîner à The Bistro, et se termine par un
 // souper à Terroir Kitchen." One sentence a day (three days at most, then the names of the rest).
-const FR_STOP_NOUN={winery:'une dégustation',brewery:'une bière artisanale',distillery:'une dégustation',cafe:'un café',outdoor:'une sortie en plein air',beach:'la plage',golf:'une partie de golf',indoor:'une visite',tour:'une visite guidée',sport:'une activité',pub:'un verre',cocktail:'un cocktail',restaurant:'un repas'};
+const FR_STOP_NOUN={winery:'une dégustation',brewery:'une bière artisanale',distillery:'une dégustation',cafe:'un café',outdoor:'une sortie en plein air',beach:'la plage',golf:'une partie de golf',indoor_golf:'une séance de golf intérieur',indoor:'une visite',tour:'une visite guidée',sport:'une activité',pub:'un verre',cocktail:'un cocktail',restaurant:'un repas'};
 function t3FrenchStopText(s){
  const name=s.venue?.name||s.event?.name;
  if(s.event)return 'l’événement « '+name+' »';
  const t=s.venue?.type,part=s.daypart,label=String(s.label||'');
- let noun=FR_STOP_NOUN[t]||'un arrêt';
+ let noun=FR_STOP_NOUN[s.venue?.indoorGolf?'indoor_golf':t]||'un arrêt';
  if(/^(?:Dîner|Lunch)$/i.test(label)||(part==='midday'&&['restaurant','cafe','pub'].includes(t))||s.wineryLunch||s.onHill)noun=s.wineryLunch?'un dîner au vignoble':'un dîner';
  else if(['evening','night'].includes(part)&&['restaurant','pub'].includes(t))noun='un souper';
  else if(part==='morning'&&t==='cafe')noun='un café';
