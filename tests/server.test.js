@@ -23525,7 +23525,7 @@ test('Visitor contributions: photo upload (metadata stripped), make main with cr
     assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, publicUrl);
     assert.equal((await t.get(publicUrl)).status, 200);
     let page = (await t.get(pagePath)).text;
-    assert.match(page, new RegExp(`src="${publicUrl}"`));
+    assert.match(page, new RegExp(`src="${publicUrl}(?:\\?v=[0-9a-f]{10})?"`)); // round 9: uploads get their ?v= hash
     assert.match(page, /Photo: Jo N\. \(visitor\)/);
     assert.match(mail[mail.length - 1].subject, /^Your photo is live/);
 
@@ -29489,9 +29489,9 @@ test('Banner speed (round 7): food list pages preload a phone-sized banner first
   // Town pages keep their own hero-first, and pages without body.fd-page are left alone.
   const town = (await get('/kelowna')).text;
   assert.doesNotMatch(town, /picture class="banner-pic"|id="hero-first-cards"/);
-  const plain = '<!DOCTYPE html><html><head><meta charset="UTF-8">\n<meta name="viewport" content="width=device-width">\n</head><body class="golf-page whatson-page"><div class="category-banner"><img src="/images/a.jpg" srcset="/images/a-800.jpg 800w, /images/a.jpg 1600w" sizes="100vw" alt="" fetchpriority="high"></div></body></html>';
+  const plain = '<!DOCTYPE html><html><head><meta charset="UTF-8">\n<meta name="viewport" content="width=device-width">\n</head><body class="golf-page outdoor-page"><div class="category-banner"><img src="/images/a.jpg" srcset="/images/a-800.jpg 800w, /images/a.jpg 1600w" sizes="100vw" alt="" fetchpriority="high"></div></body></html>';
   assert.equal(app.withBannerHeroFirst(plain), plain);
-  const fd = plain.replace('golf-page whatson-page', 'golf-page fd-page');
+  const fd = plain.replace('golf-page outdoor-page', 'golf-page fd-page');
   const once = app.withBannerHeroFirst(fd);
   assert.notEqual(once, fd);
   assert.equal(app.withBannerHeroFirst(once), once, 'a second pass changes nothing');
@@ -30257,4 +30257,131 @@ test('Trip planner round 8: Swap sends the visitor\'s locks, and only valid ones
   assert.match(html, /var FR_STOP_NOUN = \{"winery":/);
   // The dated one-day outing check survives the template (a single backslash became "d").
   assert.ok(html.includes("/^\\d{4}-\\d{2}-\\d{2}$/.test(r.date || '')"));
+});
+
+// ---------- Round 9 (2026-10-19): smaller copies of owner photos, guide and /whats-on phone banners ----------
+
+test('Owner photo copies (round 9): upload with copies, srcset + ?v= + immutable, fallback without copies, admin backfill, reject deletes copies', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Copies Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-copies-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-copies-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  // A small well-formed JPEG: SOF0 with the size, then a scan, so it survives stripJpegMetadata. `fill` varies the bytes.
+  const jpeg = (w, h, fill = 0) => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xFF, 0xDA, 0x00, 0x08, 1, 1, 0, 0, 0x3F, 0]), Buffer.alloc(64, fill), Buffer.from([0xFF, 0xD9])]);
+  const dataUrl = (buf) => `data:image/jpeg;base64,${buf.toString('base64')}`;
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const up = (body) => fetch(`${base}/owner/${token}/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.9.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const admin = (p, body, auth = true) => fetch(`${base}${p}`, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` } : {}) }, body: body ? JSON.stringify(body) : undefined })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const file = (f) => path.join(app.OWNER_PHOTO_DIR, f);
+  const pageOf = () => fetch(`${base}/kelowna/cafes/owner-copies-fixture`).then((r) => r.text());
+  const made = [];
+  const good = { image: dataUrl(jpeg(1600, 1067, 1)), credit: 'Owner Copies Fixture', rights: true, notify: false, company_website: '', started_at: Date.now() - 10000 };
+  try {
+    // 1. An upload with a good 480px copy, a good 960px copy and a 1200px copy of the wrong shape: the bad one is
+    //    skipped, the photo itself is still accepted.
+    const ok = await up({ ...good, image_w480: dataUrl(jpeg(480, 320, 2)), image_w960: dataUrl(jpeg(960, 640, 3)), image_w1200: dataUrl(jpeg(1200, 1200, 4)) });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    const row = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(ok.body.id);
+    const stem = row.file.replace(/\.jpg$/, '');
+    made.push(row.file, `${stem}-w480.jpg`, `${stem}-w960.jpg`, `${stem}-w1200.jpg`);
+    assert.ok(fs.existsSync(file(`${stem}-w480.jpg`)) && fs.existsSync(file(`${stem}-w960.jpg`)));
+    assert.equal(fs.existsSync(file(`${stem}-w1200.jpg`)), false, 'the wrongly shaped copy is not stored');
+    // Copies are not public before approval either.
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w480.jpg`)).status, 404);
+    assert.equal((await admin(`/admin/owner-photos/${ok.body.id}/approve`, { reviewer: 'test' })).status, 200);
+    let page = await pageOf();
+    const hero = /<div class="venue-hero venue-hero-photo"><img ([^>]+)>/.exec(page);
+    assert.ok(hero, 'hero renders');
+    assert.match(hero[1], new RegExp(`src="/images/owner/${stem}\\.jpg\\?v=[0-9a-f]{10}"`));
+    assert.match(hero[1], new RegExp(`srcset="/images/owner/${stem}-w960\\.jpg\\?v=[0-9a-f]{10} 960w, /images/owner/${stem}\\.jpg\\?v=[0-9a-f]{10} 1600w"`));
+    assert.match(hero[1], /width="1600" height="1067"/);
+    assert.equal(app.photoSized(`/images/owner/${row.file}`, 480), `/images/owner/${stem}-w480.jpg`);
+    assert.equal(app.photoSized(`/images/owner/${row.file}`, 1200), `/images/owner/${row.file}`, 'no 1200px copy yet: the original');
+    // The page's ?v= is the copy's own hash: a year, immutable. A plain or made-up ?v= keeps the day.
+    const v960 = new RegExp(`/images/owner/${stem}-w960\\.jpg\\?v=[0-9a-f]{10}`).exec(page)[0];
+    const r1 = await fetch(base + v960);
+    assert.equal(r1.status, 200);
+    assert.equal(r1.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    assert.equal(Buffer.from(await r1.arrayBuffer()).length, fs.readFileSync(file(`${stem}-w960.jpg`)).length);
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w960.jpg`)).headers.get('cache-control'), 'public, max-age=86400');
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w960.jpg?v=0123456789`)).headers.get('cache-control'), 'public, max-age=86400');
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w1200.jpg`)).status, 404, 'a copy never made is a 404');
+
+    // 2. A photo sent without copies (an old browser, or before this change) keeps its original everywhere.
+    const plain = await up({ ...good, image: dataUrl(jpeg(1600, 1067, 5)) });
+    assert.equal(plain.status, 201);
+    const row2 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(plain.body.id);
+    const stem2 = row2.file.replace(/\.jpg$/, '');
+    made.push(row2.file, ...[480, 960, 1200].map((w) => `${stem2}-w${w}.jpg`));
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/approve`, { reviewer: 'test', main: false })).status, 200);
+    page = await pageOf();
+    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" width="1600" height="1067" alt="" loading="lazy">`), 'the thumbnail falls back to the original');
+    assert.doesNotMatch(page, new RegExp(`${stem2}-w`));
+
+    // 3. The admin backfill: listed with what it needs; token required; bad copies refused; good ones stored.
+    const list = await admin('/admin/owner-photos/sizes');
+    assert.equal(list.status, 200);
+    const item = list.body.photos.find((p) => p.id === plain.body.id);
+    assert.deepEqual(item.needs, [480, 960, 1200]);
+    assert.equal(item.file_present, true);
+    assert.deepEqual(list.body.photos.find((p) => p.id === ok.body.id).needs, [1200]);
+    assert.equal((await admin('/admin/owner-photos/sizes', null, false)).status, 401);
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320)) }, false)).status, 401);
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: 'data:image/png;base64,AAAA' })).status, 400);
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(500, 333)) })).status, 400, 'wrong width');
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { image: 'x' })).status, 400, 'unknown field');
+    const sent = await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320, 6)), w960: dataUrl(jpeg(960, 640, 7)), w1200: dataUrl(jpeg(1200, 800, 8)) });
+    assert.equal(sent.status, 200, JSON.stringify(sent.body));
+    assert.deepEqual(sent.body.written, [480, 960, 1200]);
+    assert.deepEqual(sent.body.has, [480, 960, 1200]);
+    const again = await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320, 9)) });
+    assert.deepEqual(again.body.skipped, [480], 'an existing copy is kept unless replace is set');
+    assert.equal((await admin('/admin/owner-photos/sizes')).body.photos.find((p) => p.id === plain.body.id).needs.length, 0);
+    page = await pageOf();
+    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}-w480\\.jpg\\?v=[0-9a-f]{10}"`), 'the thumbnail now takes the 480px copy');
+    assert.match(page, new RegExp(`<figure class="vg-slide"><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" srcset="/images/owner/${stem2}-w960\\.jpg\\?v=[0-9a-f]{10} 960w, /images/owner/${stem2}-w1200\\.jpg\\?v=[0-9a-f]{10} 1200w, /images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10} 1600w" sizes="100vw"`));
+    // A pending photo cannot be given copies.
+    const pending = await up({ ...good, image: dataUrl(jpeg(1600, 1067, 10)) });
+    const row3 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(pending.body.id);
+    made.push(row3.file);
+    assert.equal((await admin(`/admin/owner-photos/${pending.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320)) })).status, 409);
+
+    // 4. Removing a photo deletes its copies too.
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/remove`, { reviewer: 'test', reason: 'test' })).status, 200);
+    for (const w of [480, 960, 1200]) assert.equal(fs.existsSync(file(`${stem2}-w${w}.jpg`)), false, `${w}px copy deleted`);
+    assert.equal((await fetch(`${base}/images/owner/${stem2}-w480.jpg`)).status, 404);
+  } finally {
+    for (const f of made) { try { fs.unlinkSync(file(f)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner photo copies (round 9): the upload page makes 480/960/1200px copies in the browser and sends them', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Copies Page Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-copies-page-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-copies-page-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  try {
+    const html = await fetch(`http://localhost:${srv.address().port}/owner/${token}`).then((r) => r.text());
+    assert.match(html, /\[480, 960, 1200\]\.forEach\(function\(cw\)\{/);
+    assert.match(html, /image_w480: made\.image_w480, image_w960: made\.image_w960, image_w1200: made\.image_w1200/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Banner speed (round 9): guides and /whats-on get the 800px phone <source> and preloads like the list pages', () => {
+  const page = (cls) => `<!DOCTYPE html><html><head><meta charset="UTF-8">\n<meta name="viewport" content="width=device-width">\n</head><body class="${cls}"><div class="category-banner"><img src="/images/a.jpg?v=1" srcset="/images/a-800.jpg?v=2 800w, /images/a.jpg?v=1 1600w" sizes="(max-width: 860px) 100vw, 1200px" alt="" fetchpriority="high"></div></body></html>`;
+  for (const cls of ['golf-page ski-guide-page', 'golf-page outdoor-page whatson-page']) {
+    const out = app.withBannerHeroFirst(page(cls));
+    assert.match(out, /<picture class="banner-pic"><source media="\(max-width: 640px\)" srcset="\/images\/a-800\.jpg\?v=2 800w" sizes="100vw"><img src="\/images\/a\.jpg\?v=1"/, cls);
+    assert.match(out, /<link rel="preload" as="image" imagesrcset="\/images\/a-800\.jpg\?v=2 800w" imagesizes="100vw" media="\(max-width: 640px\)" fetchpriority="high">/, cls);
+  }
 });
