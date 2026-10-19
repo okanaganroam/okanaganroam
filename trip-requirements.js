@@ -244,7 +244,12 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     }
     const singleDinner=/\b(?:a|an|one)\s+(?:(?:relaxed|casual|romantic|special|easygoing|quiet|nice|great)\s+){0,2}(?:dinner|supper)\b/.exec(c);
     // "A nice dinner each night" is a dinner every night, not one dinner (2026-10-18).
-    if(singleDinner&&!/\b(?:lunch|breakfast|meals?|dinners?|suppers?)\b/.test(c.replace(singleDinner[0],''))&&!/\b(?:each|every|per) (?:night|evening|day)\b|\bnightly\b|\bnights? in a row\b/.test(c))explicitMealCount=1;
+    // Round 9 (2026-10-19): "a romantic weekend ... and a great dinner" wants a good dinner, not one dinner in two days
+    // (Day 2 had none). On a romantic trip of more than one day only "one dinner" counts the meals.
+    const multiDay=(intent.days||0)>1||/\b(?:weekend|getaway|[2-7] days?|two days|three days|four days|five days|[2-7] nights|two nights|three nights)\b/.test(normalizedText);
+    const romanticTrip=intent.occasion==='romantic'||intent.occasion==='date_night'||/\b(?:romantic|romance|honeymoon|anniversary)\b/.test(normalizedText);
+    const looseDinner=!!singleDinner&&/^(?:a|an)\s/.test(singleDinner[0])&&multiDay&&romanticTrip&&!/\b(?:only|just)\s+(?:a|an)\s/.test(c);
+    if(singleDinner&&!looseDinner&&!/\b(?:lunch|breakfast|meals?|dinners?|suppers?)\b/.test(c.replace(singleDinner[0],''))&&!/\b(?:each|every|per) (?:night|evening|day)\b|\bnightly\b|\bnights? in a row\b/.test(c))explicitMealCount=1;
     // 2026-10-14: only a large group is worth a note (seating and bookings); "our two kids" was reported as an
     // unverifiable party size on every family trip.
     if (/\b(?:[89]|[1-9]\d+|eight|nine|ten|eleven|twelve|fifteen|twenty)\s+(?:people|adults|guests|of us|friends|guys|girls|ladies)\b/.test(c)) add('unsupported','party size',scopeText);
@@ -544,7 +549,10 @@ function transferRange(distance,walking=false){
 // about 40. The shore line is a rough centre line of the lake, north to south; places more than ~9 km from the lake
 // (Big White, Rutland) are not on a shore and keep the straight line.
 const LAKE_CENTRE=[[49.49,-119.6],[49.55,-119.625],[49.6,-119.615],[49.65,-119.64],[49.7,-119.66],[49.75,-119.665],[49.8,-119.6],[49.85,-119.53],[49.88,-119.505],[49.95,-119.505],[50.05,-119.47],[50.1,-119.43]];
-const LAKE_SOUTH_END={lat:49.497,lng:-119.593},LAKE_BRIDGE={lat:49.876,lng:-119.505},LAKE_EAST_SPLIT=49.8;
+// Round 9 (2026-10-19): the east shore splits at Okanagan Mountain Park (about 49.72), not at 49.8 -- Kelowna's Lower
+// Mission (CedarCreek, Waldhof, Summerhill) is on Lakeshore Road north of the park, so "WOK STAR to Waldhof" (4 km)
+// was "114 min" around the south end of the lake.
+const LAKE_SOUTH_END={lat:49.497,lng:-119.593},LAKE_BRIDGE={lat:49.876,lng:-119.505},LAKE_EAST_SPLIT=49.72;
 function lakeShore(p){
   if(!p||!(p.lat>LAKE_CENTRE[0][0]&&p.lat<LAKE_CENTRE[LAKE_CENTRE.length-1][0]))return null;
   const i=LAKE_CENTRE.findIndex(([lat])=>lat>=p.lat),[la,lo]=LAKE_CENTRE[i-1],[lb,lob]=LAKE_CENTRE[i];

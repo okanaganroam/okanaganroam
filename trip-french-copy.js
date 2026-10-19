@@ -169,6 +169,21 @@ function t3FrenchText(value){
  text=text.replace(/^The drive to dinner comes after ([\d:]+) on day ([\d, and]+): no listed dinner spot is within walking distance of the day’s last stop\.$/,(_,t,d)=>'Le trajet pour le souper se fait après '+t+' le jour '+d.replace(/ and (?!.* and )/,' et ')+' : aucun restaurant répertorié n’est à distance de marche du dernier arrêt de la journée.');
  text=text.replace(/^(Under 1 km|About ([\d.]+) km) on foot from (.+), so the evening needs no car$/,(_,a,k,n)=>(k?'Environ '+k.replace('.',',')+' km':'Moins de 1 km')+' à pied de '+n+' : pas besoin de voiture le soir');
  text=text.replace(/^Lunch at a winery’s restaurant$/,'Dîner au restaurant d’un vignoble');
+ // Round 9 (2026-10-19): reasons that were still in English on /fr/trip. Constants stay inside the function (it is
+ // shipped to the page with toString()).
+ {
+  const mon={January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'};
+  const act={'Hiking & Trails':'Randonnée et sentiers','Cycling & Biking':'Vélo','Winter':'Hiver','Camping':'Camping','Nature & Wildlife':'Nature et faune','Water Activities':'Activités nautiques','Viewpoints':'Points de vue','Adventure':'Aventure','Fishing':'Pêche'};
+  const enMois=(m)=>mon[m]?(/^[aeiouâéèêîôû]/i.test(mon[m])?'d’':'de ')+mon[m]:'de '+m;
+  text=text.replace(/^Described as an indoor golf \/ simulator venue$/,'Décrit comme un golf intérieur ou un simulateur');
+  text=text.replace(/^An indoor golf \/ simulator venue — suits an? (\w+) round$/,(_,m)=>'Un golf intérieur ou un simulateur, idéal pour une partie '+enMois(m));
+  text=text.replace(/^Listed for (.+?) — in season in (\w+)$/,(raw,a,m)=>act[a]?'Répertorié dans '+act[a]+' — de saison en '+(mon[m]||m):raw);
+  text=text.replace(/^Listed for (.+)$/,(raw,a)=>act[a]?'Répertorié dans '+act[a]:raw);
+  text=text.replace(/^Price level (\$+)$/,'Niveau de prix $1');
+  text=text.replace(/^A sit-down dinner to end the day$/,'Un souper assis pour finir la journée');
+  text=text.replace(/^Fills the free time before dinner$/,'Occupe le temps libre avant le souper');
+  text=text.replace(/^In (.+?), about (\d+) minutes’ drive: nothing in (.+) fits dinner that day$/,(_,t,n,w)=>'À '+t+', à environ '+n+' minutes en voiture : rien à '+w.replace(/ and (?!.* and )/,' et ')+' ne convient pour le souper ce jour-là');
+ }
  text=text.replace(/^No driving after ([\d:]+): dinner is each day’s last drive, and anything after it is a short walk away\.$/,'Pas de voiture après $1 : le souper est le dernier trajet de chaque jour, et ce qui suit est à quelques pas.');
  text=text.replace(/^In (.+), about (\d+) minutes’ drive: nothing in (.+) fits (lunch|dinner) that day$/,(_,t,m,h,meal)=>'À '+t+', à environ '+m+' minutes en voiture : rien à '+h.replace(/ and (?!.* and )/,' et ')+' ne convient pour le '+(meal==='lunch'?'dîner':'souper')+' ce jour-là');
  text=text.replace(/^In (.+), about (\d+) minutes’ drive from (.+)$/,'À $1, à environ $2 minutes en voiture de $3');
