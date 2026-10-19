@@ -1,5 +1,7 @@
 'use strict';
 // Display-only French copy. Stored venue names, URLs, facts and API output stay intact.
+const FR_MONTHS_BY_EN={January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'};
+const FR_SEASON_WORDS={winter:'hiver',spring:'printemps',summer:'été',fall:'automne',autumn:'automne','off-season':'hors saison'};
 function t3FrenchText(value){
  let text=String(value||'');
  const directLabels={market:'marché',festival:'festival',event:'événement',walks:'promenades','easy walk':'promenade facile','easy walks':'promenades faciles','Kid-friendly spots':'Endroits adaptés aux enfants'};
@@ -69,6 +71,8 @@ function t3FrenchText(value){
  ['Visits after the event remain unverified until travel time is confirmed.','Les visites après l’événement restent non vérifiées tant que le trajet n’est pas confirmé.'],
  ['Listed hours vary by day — see the venue page','Les horaires varient selon le jour — consultez la fiche'],
  ['shorter transfers are preferred. Confirm the route.','les trajets plus courts sont privilégiés. Confirmez le parcours.'],
+ // Round 7 (2026-10-19): an event with no listed end time gets an allowance, and the day carries on from it.
+ ['Later visits are timed from the end shown here.','Les visites suivantes partent de la fin indiquée ici.'],
  ['Listed event start ','Début indiqué de l’événement : '],['; listed end ','; fin indiquée : '],['; event duration is not listed','; durée de l’événement non indiquée'],
  ['Estimated visit ','Visite estimée : '],['within listed hours','pendant les heures indiquées'],['; uses an assumed start time','; heure de départ supposée'],
  ['Estimated driving assumed travel','Trajet estimé en voiture (mode supposé)'],['Estimated walking travel','Trajet estimé à pied'],[' travel to the event:',' vers l’événement :'],
@@ -141,9 +145,18 @@ function t3FrenchText(value){
  text=text.replace(/^No winery with its own kitchen fits lunch on day (\d+)( in (.+))?, so lunch is at a restaurant near the wineries\.$/,(_,d,w,t)=>'Aucun vignoble avec sa propre cuisine ne convient pour le dîner du jour '+d+(t?' à '+t.replace(/ and (?!.* and )/,' et '):'')+'; le dîner est donc dans un restaurant près des vignobles.');
  text=text.replace(/^Lunch here could not start until ([\d:]+) on (\S+) under its listed hours, so it does not fit a midday meal\. Choose another lunch spot nearby\.$/,'Selon ses horaires indiqués, le dîner ici ne pourrait pas commencer avant $1 le $2; il ne convient donc pas pour le midi. Choisissez un autre endroit à proximité.');
  text=text.replace(/^(.+): Lunch here could not start until ([\d:]+) on (\S+) under its listed hours, so it does not fit a midday meal\. Choose another lunch spot nearby\.$/,'$1 : selon ses horaires indiqués, le dîner ici ne pourrait pas commencer avant $2 le $3; il ne convient donc pas pour le midi. Choisissez un autre endroit à proximité.');
+ // Round 7 (2026-10-19): the event allowance, skiing out of season, lunch at a winery.
+ text=text.replace(/; its end time isn’t listed, so about ([\d.]+) hours are allowed/,(_,h)=>'; heure de fin non indiquée, environ '+h.replace('.',',')+' h prévues');
+ text=text.replace(/^The Okanagan’s ski hills usually run from December to early April, so skiing isn’t part of this (\w+) plan\.$/,(_,m)=>{const fm=FR_MONTHS_BY_EN[m]||m;return 'Les stations de ski de l’Okanagan sont en général ouvertes de décembre au début avril; le ski ne fait donc pas partie de ce plan '+(/^[aeiouâéèêîôû]/i.test(fm)?'d’':'de ')+fm+'.';});
+ text=text.replace(/^Lunch at (.+), a winery that serves food\.$/,'Dîner à $1, un vignoble qui sert à manger.');
+ text=text.replace(/^Lunch at (.+), a winery’s restaurant\.$/,'Dîner à $1, le restaurant d’un vignoble.');
+ text=text.replace(/^Every place to eat has the (Vegan|Vegetarian|Gluten-Free)-Friendly badge\.$/,(_,b)=>'Chaque endroit où manger possède le badge '+({Vegan:'Options véganes',Vegetarian:'Options végétariennes','Gluten-Free':'Options sans gluten'}[b])+'.');
  // "No driving after 7pm", applied (2026-10-19).
  text=text.replace(/^No driving after ([\d:]+): dinner is a short walk from the day’s last stop( on the other days)?, or the drive to it ends by then\.$/,(_,t,o)=>'Pas de voiture après '+t+' : le souper est à quelques pas du dernier arrêt de la journée'+(o?' les autres jours':'')+', ou le trajet pour s’y rendre se termine avant.');
  text=text.replace(/^No driving after ([\d:]+): we could not keep the evenings car-free with the places listed; see the note above\.$/,'Pas de voiture après $1 : impossible de garder les soirées sans voiture avec les lieux répertoriés; voir la note ci-dessus.');
+ // Round 7 (2026-10-19): said up front, with dinner kept close.
+ text=text.replace(/^No driving after ([\d:]+): we could not keep the evenings car-free with the places listed, so dinner is the closest good spot to the day’s last stop\.$/,'Pas de voiture après $1 : impossible de garder les soirées sans voiture avec les lieux répertoriés; le souper est donc la bonne adresse la plus proche du dernier arrêt de la journée.');
+ text=text.replace(/^A short drive from (.+), so the evening stays close$/,'À quelques minutes en voiture de $1 : la soirée reste tout près');
  text=text.replace(/^The drive to dinner comes after ([\d:]+) on day ([\d, and]+): no listed dinner spot is within walking distance of the day’s last stop\.$/,(_,t,d)=>'Le trajet pour le souper se fait après '+t+' le jour '+d.replace(/ and (?!.* and )/,' et ')+' : aucun restaurant répertorié n’est à distance de marche du dernier arrêt de la journée.');
  text=text.replace(/^(Under 1 km|About ([\d.]+) km) on foot from (.+), so the evening needs no car$/,(_,a,k,n)=>(k?'Environ '+k.replace('.',',')+' km':'Moins de 1 km')+' à pied de '+n+' : pas besoin de voiture le soir');
  text=text.replace(/^Lunch at a winery’s restaurant$/,'Dîner au restaurant d’un vignoble');
@@ -215,7 +228,7 @@ function t3FrenchText(value){
  text=text.replace(/ on (\d{4}-\d{2}-\d{2})/g,' le $1');
  // ISO dates read as dates (2026-10-19): "le 2026-10-24" -> "le 24 octobre 2026".
  text=text.replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g,(raw,y,m,d)=>{const mo=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][Number(m)-1];return mo?(Number(d)===1?'1er':String(Number(d)))+' '+mo+' '+y:raw;});
- const words={'Lakeside walk':'Promenade au bord du lac',Cafes:'Cafés',Wineries:'Vignobles',Breweries:'Microbrasseries',Beaches:'Plages',Dinner:'Souper',Supper:'Souper',Lunch:'Dîner',Breakfast:'Déjeuner','Live-music':'Musique en direct','Live music':'Musique en direct',Morning:'Matin',Afternoon:'Après-midi',Evening:'Soir',cafes:'cafés',wineries:'vignobles',walks:'promenades','kid-friendly spots':'endroits adaptés aux enfants','indoor & rainy day spots':'lieux intérieurs et jours de pluie','outdoor destinations':'lieux de plein air','Hiking & Trails':'Randonnées et sentiers','hiking & trails':'randonnées et sentiers','dog-friendly spots':'endroits qui acceptent les chiens','vegetarian-friendly venues':'lieux avec options végétariennes','vegan-friendly venues':'lieux avec options véganes','lake time':'temps au bord du lac','golf courses':'terrains de golf','cocktail lounges':'bars à cocktails','tours & experiences':'visites et expériences',breweries:'microbrasseries',beaches:'plages',daily:'tous les jours','Mon–Thu':'lun.–jeu.','Fri–Sat':'ven.–sam.',Sun:'dim.'};
+ const words={'Lunch at a winery':'Dîner dans un vignoble','A winery that serves lunch':'Un vignoble qui sert le dîner','Fills the free time before dinner':'Occupe le temps libre avant le souper','Late afternoon':'Fin d’après-midi',Winter:'Hiver','Optional — skip it to keep skiing':'Facultatif — sautez-le pour continuer à skier','Lakeside walk':'Promenade au bord du lac',Cafes:'Cafés',Wineries:'Vignobles',Breweries:'Microbrasseries',Beaches:'Plages',Dinner:'Souper',Supper:'Souper',Lunch:'Dîner',Breakfast:'Déjeuner','Live-music':'Musique en direct','Live music':'Musique en direct',Morning:'Matin',Afternoon:'Après-midi',Evening:'Soir',cafes:'cafés',wineries:'vignobles',walks:'promenades','kid-friendly spots':'endroits adaptés aux enfants','indoor & rainy day spots':'lieux intérieurs et jours de pluie','outdoor destinations':'lieux de plein air','Hiking & Trails':'Randonnées et sentiers','hiking & trails':'randonnées et sentiers','dog-friendly spots':'endroits qui acceptent les chiens','vegetarian-friendly venues':'lieux avec options végétariennes','vegan-friendly venues':'lieux avec options véganes','lake time':'temps au bord du lac','golf courses':'terrains de golf','cocktail lounges':'bars à cocktails','tours & experiences':'visites et expériences',breweries:'microbrasseries',beaches:'plages',daily:'tous les jours','Mon–Thu':'lun.–jeu.','Fri–Sat':'ven.–sam.',Sun:'dim.'};
  for(const [a,b] of Object.entries(words)){if(text===a)text=b;else if(a===a.toLowerCase()||a.includes('–')||a.includes('&'))text=text.replace(new RegExp('\\b'+a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'),b);}
  text=text.replace(/^In (.+), où a lieu l’événement$/, 'À $1, où a lieu l’événement');
  // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
@@ -247,6 +260,8 @@ function t3FrenchPlan(plan){
   if(s.venue?.listedHours)s.venue.listedHours=t3FrenchText(s.venue.listedHours).replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d]));
   for(const a of s.alternates||[])translateStop(a);
  };
+ // Round 7: the When chip ("fall", "January") in French.
+ if(p.understood&&p.understood.season&&p.understood.season.label){const l=String(p.understood.season.label),fr=FR_SEASON_WORDS[l.toLowerCase()]||FR_MONTHS_BY_EN[l]||l;p.understood.season={...p.understood.season,label:fr.charAt(0).toUpperCase()+fr.slice(1)};}
  if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(t3FrenchText);if(typeof p.understood.when==='string')p.understood.when=t3FrenchEvent({dateLabel:p.understood.when}).dateLabel.replace(/,/g,'');}
  const stops=p.days?.length?p.days.flatMap(d=>d.stops||[]):p.itinerary?.stops||p.outing?.stops||p.recommendations||[];
  for(const s of stops)translateStop(s);

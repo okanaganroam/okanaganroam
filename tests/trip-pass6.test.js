@@ -345,7 +345,7 @@ test('Accessibility: Favorite buttons are named and pressed, the Pace select is 
 test('Swap on the page: a failed edit restores the exclusions, and the swap sends the kind of place', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.ok(src.includes("if (['replace','regenerate','regenerate_day'].indexOf(requestType) !== -1 && state.lastReq) state.exclude = (state.lastReq.exclude || []).slice();"));
-  assert.ok(src.includes("swap: { key: sk, type: ss.venue.type }"));
+  assert.ok(src.includes("swap: { key: sk, type: ss.venue.type, id: ss.venue.id }")); // id since round 7: kept when nothing else fits
 });
 
 // ---- My Trip: the tray keeps a repeated place as its own stop ----
