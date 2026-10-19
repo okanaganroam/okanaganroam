@@ -1,5 +1,5 @@
 'use strict';
-const {t3FrenchText,t3FrenchEvent,t3FrenchPlan}=require('./trip-french-copy');
+const {t3FrenchText,t3FrenchEvent,t3FrenchPlan,FR_MONTHS_BY_EN,FR_SEASON_WORDS}=require('./trip-french-copy');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -771,6 +771,9 @@ function renderScript(d) {
   ${t3PlanNextSteps.toString()}
   ${t3TimingChecklist.toString()}
   ${t3TimelineRows.toString()}
+  // Fix (2026-10-19): the French helpers below read these lookups, so ship them with the functions (a season or month crashed /fr/trip).
+  var FR_MONTHS_BY_EN = ${JSON.stringify(FR_MONTHS_BY_EN)};
+  var FR_SEASON_WORDS = ${JSON.stringify(FR_SEASON_WORDS)};
   ${t3FrenchText.toString()}
   ${t3FrenchEvent.toString()}
   ${t3FrenchPlan.toString()}

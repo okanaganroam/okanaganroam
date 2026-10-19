@@ -280,4 +280,4 @@ function t3FrenchPlan(plan){
  }else {p.headline=t3FrenchText(p.headline||p.summary);if(p.experience?.text)p.experience.text=t3FrenchText(p.experience.text);}
  return p;
 }
-module.exports={t3FrenchText,t3FrenchEvent,t3FrenchPlan};
+module.exports={t3FrenchText,t3FrenchEvent,t3FrenchPlan,FR_MONTHS_BY_EN,FR_SEASON_WORDS};
