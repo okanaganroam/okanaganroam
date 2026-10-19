@@ -39105,6 +39105,12 @@ function rejectOwnerPhoto(id, reviewer, reason) {
   return { ok: true };
 }
 
+// Dismiss quietly (2026-10-19): turns down a waiting photo without telling the owner, for photos that were used
+// another way (Suda sent its menu pages as photos; they became its text menu). The file is deleted as on Reject, no
+// email is sent, and the owner's "Your updates" leaves it out instead of showing "Not published".
+const OWNER_PHOTO_DISMISSED_BY = 'review:dismissed';
+function dismissOwnerPhoto(id) { return rejectOwnerPhoto(id, OWNER_PHOTO_DISMISSED_BY, null); }
+
 // Takes a photo off the site (approved or pending): if it is the venue's
 // main photo, the listing goes back to its example photo. The file is deleted.
 function removeOwnerPhoto(id, reviewer, reason) {
@@ -42061,6 +42067,7 @@ const ADMIN_REVIEW_ERRORS = {
 
 // One decision from the review page -> { status, body }.
 async function adminReviewAction(kind, id, action, body) {
+  if (action === 'dismiss' && kind !== 'photo') return { status: 400, body: { error: 'Unknown action.' } };
   if (kind === 'claim') return adminClaimAction(id, action, body, ADMIN_REVIEWER);
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
   let r;
@@ -42093,6 +42100,10 @@ async function adminReviewAction(kind, id, action, body) {
       return { status: r.reason === 'not_found' ? 404 : r.reason === 'no_fields' ? 400 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason, detail: r.detail } };
     }
     r.edited = ed.edited.length > 0;
+  } else if (kind === 'photo' && action === 'dismiss') {
+    r = dismissOwnerPhoto(id);
+    if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason } };
+    return { status: 200, body: { ok: true, emailed: 'not_told' } };
   } else if (kind === 'photo') {
     const credit = pickEdits(body.edits, ['credit']).credit;
     if (action === 'approve' && credit !== undefined) {
@@ -42207,8 +42218,10 @@ function adminReviewTime(utc) {
 function adminReviewActions(kind, id, opts = {}) {
   const approve = opts.remove ? '' : `<button type="button" class="rv-btn rv-approve" data-act="approve">${opts.approveLabel || 'Approve'}</button>`;
   const reject = `<button type="button" class="rv-btn rv-reject" data-act="${opts.remove ? 'remove' : 'reject'}">${opts.remove ? 'Remove from site' : 'Reject'}</button>`;
+  const dismiss = opts.dismiss ? '<button type="button" class="rv-btn rv-reject" data-act="dismiss" title="Takes it off this list without emailing them">Dismiss quietly</button>' : '';
   return `<div class="rv-actions">${opts.options || ''}</div>
-      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.reasonPlaceholder || (opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)')}">${reject}</div>
+      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.reasonPlaceholder || (opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)')}">${reject}${dismiss}</div>
+      ${opts.dismiss ? '<p class="rv-meta">Dismiss quietly: not published and nothing is sent to them (for photos used another way, like menu pages).</p>' : ''}
       <p class="rv-result" hidden></p>`;
 }
 
@@ -42292,7 +42305,7 @@ function renderAdminPhotoCard(p, live) {
       <p class="rv-meta">Photo #${p.id} · ${p.width}×${p.height} · sent ${adminReviewEsc(adminReviewTime(p.submitted_at))} · credit “${adminReviewEsc(p.credit)}”${p.is_main ? ' · <strong>main photo</strong>' : ''} · <a href="${adminReviewEsc(p.listing_url)}" target="_blank" rel="noopener">listing</a></p>
       <img class="rv-photo" src="${adminReviewEsc(preview)}" alt="" loading="lazy">
       ${live ? '' : `<label class="rv-field">Credit ${adminEditBox('credit', p.credit, { max: 80 })}</label>`}
-      ${adminReviewActions('photo', p.id, { remove: live, options: main })}
+      ${adminReviewActions('photo', p.id, { remove: live, options: main, dismiss: !live })}
     </article>`;
 }
 
@@ -42414,6 +42427,8 @@ function renderAdminReviewPage() {
     var nd = card.querySelector('input[name=notdup]'); if (nd && nd.checked) body.reviewed_duplicates = nd.getAttribute('data-ids').split(',').map(Number);
     var ad = card.querySelector('input[name=allowdup]'); if (ad) body.allow_duplicate = ad.checked;
     var am = card.querySelector('input[name=amenities]'); if (am) body.include_amenities = am.checked;
+    // Fix (2026-10-19): Reject acts at once and emails them, so an empty reason now asks first.
+    if (act === 'reject' && !String(body.reason).trim() && !window.confirm('Reject with no reason? They will still be emailed that it was turned down.' + (kind === 'photo' ? ' To turn it down without emailing them, use Dismiss quietly.' : ''))) return;
     if (act === 'approve') {
       var edits = {}, any = false;
       Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ if (el.value !== el.getAttribute('data-orig')) { edits[el.name] = el.value; any = true; } });
@@ -42425,7 +42440,7 @@ function renderAdminReviewPage() {
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(x){
         out.hidden = false;
-        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'undo' ? 'Undone: the old values are back.' + (x.j.skipped && x.j.skipped.length ? ' Left alone (changed again since): ' + x.j.skipped.join(', ') + '.' : '') : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
+        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'undo' ? 'Undone: the old values are back.' + (x.j.skipped && x.j.skipped.length ? ' Left alone (changed again since): ' + x.j.skipped.join(', ') + '.' : '') : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : act === 'dismiss' ? 'Dismissed.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
       })
@@ -42507,7 +42522,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
       canEdit: upcoming && ['pending', 'approved', 'changewait'].includes(status) });
   }
   const main = ownerVenueMainImage(venueId);
-  for (const ph of db.prepare('SELECT id, file, status, submitted_at, reviewed_at, reviewed_by, rejection_reason FROM owner_photos WHERE venue_id = ? ORDER BY id DESC LIMIT 20').all(venueId)) {
+  for (const ph of db.prepare("SELECT id, file, status, submitted_at, reviewed_at, reviewed_by, rejection_reason FROM owner_photos WHERE venue_id = ? AND COALESCE(reviewed_by, '') != ? ORDER BY id DESC LIMIT 20").all(venueId, OWNER_PHOTO_DISMISSED_BY)) {
     items.push({ kind: 'photo', at: ph.reviewed_at || ph.submitted_at, sent: ph.submitted_at, status: ph.reviewed_by === 'owner' && ph.status === 'rejected' ? 'removed' : ph.status,
       reason: ph.rejection_reason, title: main === `/images/owner/${ph.file}` ? (fr ? 'Photo (photo principale)' : 'Photo (main photo)') : 'Photo' });
   }
@@ -42602,7 +42617,7 @@ function ownerVenueSummary(venueId, lang = 'en') {
   ].filter(([c]) => c > 0).map(([c, one, many]) => `${c} ${c === 1 ? one : many}`);
   const notApproved = n("SELECT COUNT(*) AS n FROM owner_change_requests WHERE venue_id = ? AND status = 'rejected' AND reviewed_at > datetime('now', '-30 days')")
     + n("SELECT COUNT(*) AS n FROM event_submissions WHERE owner_venue_id = ? AND status = 'rejected' AND reviewed_at > datetime('now', '-30 days')")
-    + n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'rejected' AND reviewed_by != 'owner' AND reviewed_at > datetime('now', '-30 days')");
+    + n(`SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'rejected' AND reviewed_by NOT IN ('owner', '${OWNER_PHOTO_DISMISSED_BY}') AND reviewed_at > datetime('now', '-30 days')`);
   const live = n("SELECT COUNT(*) AS n FROM owner_photos WHERE venue_id = ? AND status = 'approved'");
   const parts = [];
   if (waiting.length) parts.push(`<span class="op-status op-status-wait">${L('Waiting for review', 'En attente de vérification')}${fr ? ' ' : ''}: ${waiting.join(', ')}</span>`);
@@ -44883,7 +44898,7 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { status, photos: listOwnerPhotos(status) });
     }
     {
-      const m = /^\/admin\/owner-photos\/(\d+)\/(approve|reject|remove)$/.exec(pathname);
+      const m = /^\/admin\/owner-photos\/(\d+)\/(approve|reject|remove|dismiss)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!requireAdminToken(req, res)) return;
         let body;
@@ -44892,9 +44907,9 @@ const server = http.createServer(async (req, res) => {
         if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
         const id = Number(m[1]);
         const r = m[2] === 'approve' ? approveOwnerPhoto(id, reviewer, { main: typeof body.main === 'boolean' ? body.main : undefined })
-          : m[2] === 'remove' ? removeOwnerPhoto(id, reviewer, body.reason) : rejectOwnerPhoto(id, reviewer, body.reason);
+          : m[2] === 'remove' ? removeOwnerPhoto(id, reviewer, body.reason) : m[2] === 'dismiss' ? dismissOwnerPhoto(id) : rejectOwnerPhoto(id, reviewer, body.reason);
         if (!r.ok) return sendJSON(res, { not_found: 404, not_pending: 409, venue_unavailable: 409, file_missing: 410 }[r.reason] || 400, { error: r.reason, status: r.status });
-        const emailed = await notifyReviewDecision('photo', id, m[2], { reason: body.reason });
+        const emailed = m[2] === 'dismiss' ? 'not_told' : await notifyReviewDecision('photo', id, m[2], { reason: body.reason });
         return sendJSON(res, 200, { id, ...r, emailed });
       }
     }
@@ -46905,7 +46920,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
     {
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim)\/(\d+)\/(approve|reject|remove|undo)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });

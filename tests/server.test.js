@@ -20974,6 +20974,21 @@ test('Admin review page (2026-10-15): one sign-in, approve/reject everything in 
     assert.equal(sent[1].subject, 'Not published: your photo for Review Page Fixture');
     assert.match(sent[1].text, /Reason: Too dark/);
 
+    // Dismiss quietly (2026-10-19): off the list, file gone, nothing emailed, left out of the owner's updates.
+    const quietId = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, rights_confirmed_at)
+      VALUES (?, 'reviewfixturequiet000000.jpg', 'reviewfixturequietkey000', 1100, 1400, 100, 'Review Cafe', CURRENT_TIMESTAMP)`).run(v.id).lastInsertRowid);
+    assert.match(await get('/admin/review', cookie), /data-act="dismiss"[^>]*>Dismiss quietly</);
+    const sentBefore = sent.length;
+    const dq = await post(`/admin/review/photo/${quietId}/dismiss`, {}, cookie);
+    assert.equal(dq.status, 200, JSON.stringify(dq.body));
+    assert.equal(dq.body.emailed, 'not_told');
+    assert.equal(sent.length, sentBefore, 'no email for a quiet dismiss');
+    const qrow = db.prepare('SELECT status, reviewed_by, rejection_reason FROM owner_photos WHERE id = ?').get(quietId);
+    assert.deepEqual({ ...qrow }, { status: 'rejected', reviewed_by: 'review:dismissed', rejection_reason: null });
+    assert.equal((await post(`/admin/review/photo/${quietId}/dismiss`, {}, cookie)).status, 409, 'already dismissed');
+    assert.equal((await post(`/admin/review/event/${eventId}/dismiss`, {}, cookie)).status, 400, 'only photos can be dismissed');
+    assert.doesNotMatch(await get('/admin/review', cookie), /reviewfixturequietkey000/);
+
     const ev = await post(`/admin/review/event/${eventId}/reject`, { reason: 'Please add a ticket link' }, cookie);
     assert.equal(ev.status, 200, JSON.stringify(ev.body));
     assert.deepEqual(sent.slice(2, 4).map((m) => m.to), ['sam@example.com', 'review.owner@example.com'], 'the sender and the venue login');
