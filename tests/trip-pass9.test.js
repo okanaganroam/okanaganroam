@@ -342,3 +342,33 @@ test('Events (2026-10-19): lunch before a noon event moves after it, never a "Ti
     assert.ok(checked, `${time}: a day with lunch and the event`);
   }
 });
+
+test('Events (2026-10-19): a drop-in says when it is open, an untimed family event is a daytime visit, and a Halloween trip says which day has no Halloween event', () => {
+  const text = 'Halloween weekend in Penticton with my kids';
+  const events = [
+    ev({ name: 'Halloween Tricks and Treats aboard the Sternwheeler', region: 'penticton', date: '2026-10-31', time: '11 am - 4 pm', categories: ['family-kids', 'holiday-seasonal'] }),
+    ev({ name: 'Pop Culture Convention', region: 'penticton', date: '2026-11-01', time: '', categories: ['family-kids', 'arts-culture'] }),
+  ];
+  const intent = d.interpretDiscoveryQuery(text, TAXONOMY);
+  const trip = d.interpretTripComponents(text, TAXONOMY, intent);
+  const requirements = r.extractTripRequirements({ text, intent, trip, taxonomy: TAXONOMY, referenceDate: '2026-10-19' });
+  requirements.startDate = '2026-10-31'; requirements.endDate = '2026-11-01';
+  const p = tp.planTrip({ intent, trip: null, requirements, facts: FACTS, labels: LABELS, text, tripDate: '2026-10-31', events, familyEvents: true, tripEvents: [] });
+  const [day1, day2] = p.days;
+  const treat = day1.stops.find((s) => s.event);
+  assert.ok(treat && treat.dropIn, 'the treat trail is a drop-in');
+  assert.ok(treat.why.some((w) => /family Halloween event/.test(w)), JSON.stringify(treat.why));
+  assert.match(treat.scheduleNote, /^Open 11:00–16:00 on 2026-10-31; planned arrival about \d{2}:\d{2}/);
+  assert.ok(!/Listed event start/.test(treat.scheduleNote));
+  const con = day2.stops.find((s) => s.event);
+  assert.ok(con, 'the convention is on day 2');
+  assert.notEqual(con.daypart, 'night', 'not a night stop after dinner');
+  const dinner = day2.stops.findIndex((s) => s.venue && s.daypart === 'evening');
+  if (dinner >= 0) assert.ok(day2.stops.indexOf(con) < dinner, 'before dinner');
+  const row = rowOf(p, con);
+  assert.equal(row.status, 'provisional', JSON.stringify(row));
+  assert.ok(Number.isInteger(row.startMinutes) && row.startMinutes >= 780 && row.startMinutes < 1080, JSON.stringify(row));
+  for (const s of day2.stops) { const x = rowOf(p, s); if (x && s !== con) assert.notEqual(x.status, 'unverified', `${s.venue && s.venue.name} is still timed`); }
+  assert.ok(p.notes.some((n) => /^No Halloween events are listed( near Penticton)? on day 2, so it has another family event instead\.$/.test(n)), JSON.stringify(p.notes));
+  assert.ok(!p.notes.some((n) => /on day 1,/.test(n)));
+});

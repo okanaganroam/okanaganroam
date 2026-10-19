@@ -1502,7 +1502,10 @@ function buildDays(facts, ctx, days, pinned) {
     // "Good restaurants" is met by dinner; it does not also turn the afternoon into a second meal (2026-10-14: a wine
     // weekend's first day had lunch and dinner and no winery).
     const dinnerWillMeet = (v, part) => v.type === 'restaurant' && part !== 'evening' && dayDayparts.includes('evening') && !hasExplicitMeals && !anchor;
-    let eventPart = anchor ? (start == null ? 'evening' : start < 12 * 60 ? 'morning' : start < 17 * 60 ? 'afternoon' : 'evening') : null;
+    // 2026-10-19: a family event with no listed time (a pop culture convention) is a daytime visit, not a night stop
+    // after dinner.
+    const untimedFamily = !!(anchor && start == null && familyItem && tripRequirements.eventMatches(anchor, familyItem) && dayDayparts.includes('afternoon'));
+    let eventPart = anchor ? (untimedFamily ? 'afternoon' : start == null ? 'evening' : start < 12 * 60 ? 'morning' : start < 17 * 60 ? 'afternoon' : 'evening') : null;
     if (dropIn) eventPart = start <= 13 * 60 + 30 && end >= 15 * 60 + 30 && dayDayparts.includes('afternoon') ? 'afternoon' : eventPart;
     // An evening event keeps dinner (2026-10-18): it goes in the 'night' slot after dinner, or before dinner when it
     // starts before 7 PM.
@@ -1520,6 +1523,7 @@ function buildDays(facts, ctx, days, pinned) {
       if(anchor && daypart === eventPart) {
         const evStop = { kind:'event', daypart, label: daypart === 'night' && eventFirst ? 'Early evening' : PLAN_DAYPART_LABELS[daypart], event:anchor, timeKnown:start!=null, why: eventWhy(anchor, requestedEvents.find((i) => tripRequirements.eventMatches(anchor, i)) || null, holiday), caveats:[start==null?'Event start time is not listed; confirm before visiting.':dropIn?`Open ${clockText(start)}–${clockText(end)}; plan on about ${DROP_IN_MINUTES / 60} hours there.`:'Confirm the event duration and allow time around its listed start.'] };
         if (dropIn) { evStop.dropIn = true; evStop.visitMinutes = DROP_IN_MINUTES; }
+        if (untimedFamily) { evStop.untimedVisit = true; evStop.visitMinutes = DROP_IN_MINUTES; evStop.caveats = [`Event hours are not listed; this plans about ${DROP_IN_MINUTES / 60} hours in the afternoon. Check the times before you go.`]; }
         if (regionList.length && !regionList.includes(anchor.region) && !anchor.valleyWide) evStop.caveats.push(`In ${regionLabel(ctx, anchor.region)}, about ${regionMinutes(centroids, region, anchor.region)} minutes’ drive from ${regionLabel(ctx, region)}`);
         // Before dinner: the event comes first in the day's order.
         if (eventFirst && stops.length && stops[stops.length - 1].daypart === 'evening') stops.splice(stops.length - 1, 0, evStop); else stops.push(evStop);
@@ -2705,8 +2709,12 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const location=stop.event.location,transfer=previous?tripRequirements.estimateTransfer(previous,location,walking):null;
         const locationKnown=tripRequirements.estimateTransfer(location,location)!=null;
         // A drop-in family event (open 10-4) starts when the day reaches it and lasts about 2.5 hours (2026-10-18).
+        const listedStart=start,listedEnd0=end;
+        // An untimed family event (2026-10-19) gets the afternoon planning window, marked provisional, so the rest of the
+        // day is still timed.
+        if(stop.untimedVisit&&start==null&&cursor!=null){start=Math.max(780,Math.ceil((cursor+(transfer?.maxMinutes||20))/5)*5);end=start+(stop.visitMinutes||150);assumedEnd=true;}
         if(stop.dropIn&&start!=null&&end!=null){const listedEnd=end;start=Math.max(start,cursor!=null?cursor+(transfer?.maxMinutes||0):stop.daypart==='afternoon'?780:start);end=Math.min(listedEnd,start+(stop.visitMinutes||150));if(end-start<60){start=parseEventStart(stop.event.time);end=listedEnd;}}
-        const late=!stop.dropIn&&start!=null&&previous&&cursor!=null&&cursor+(transfer?.maxMinutes||0)+30>start;
+        const late=!stop.dropIn&&!stop.untimedVisit&&start!=null&&previous&&cursor!=null&&cursor+(transfer?.maxMinutes||0)+30>start;
         const verified=start!=null&&end!=null&&!assumedEnd&&locationKnown&&(!previous||transfer)&&cursor!=null&&!provisional;
         // A listed start with an assumed length or an unmapped place is provisional, not "Timing unverified".
         const item={day:group.day,date,eventId:stop.event.id,status:late?'unmet':verified?'estimated':start!=null?'provisional':'unverified',assumedStart:false};
@@ -2714,7 +2722,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         if(end!=null)item.endMinutes=end;
         if(assumedEnd)item.assumedEnd=true;
         if(transfer)Object.assign(item,{transferMinutes:transfer.maxMinutes,arrivalAllowanceMinutes:30});
-        let note=start==null?'Event start time is not listed; confirm it before following this sequence.':`Listed event start ${clock(start)} on ${date}${assumedEnd?`; its end time isn’t listed, so about ${Math.round((end-start)/30)/2} hours are allowed`:end!=null?`; listed end ${clock(end)}`:'; event duration is not listed'}.`;
+        // 2026-10-19: a drop-in says when it is open and when the plan arrives ("Listed event start 13:35" read as if the
+        // event began then).
+        let note=start==null?'Event start time is not listed; confirm it before following this sequence.':stop.untimedVisit&&listedStart==null?`Event hours are not listed; planned visit about ${clock(start)}–${clock(end)} on ${date}. Check the times before you go.`:stop.dropIn&&listedStart!=null&&listedEnd0!=null?`Open ${clock(listedStart)}–${clock(listedEnd0)} on ${date}; planned arrival about ${clock(start)}, staying until about ${clock(end)}.`:`Listed event start ${clock(start)} on ${date}${assumedEnd?`; its end time isn’t listed, so about ${Math.round((end-start)/30)/2} hours are allowed`:end!=null?`; listed end ${clock(end)}`:'; event duration is not listed'}.`;
         if(late)note+=' The preceding visit and arrival allowance cannot fit before the listed start. Choose an earlier meal or move it after the event.';
         if(transfer||verified)note+=` Estimated ${transfer?.mode||'driving assumed'} travel${transfer?`: ${transfer.minMinutes===transfer.maxMinutes?`about ${transfer.maxMinutes}`:`${transfer.minMinutes}–${transfer.maxMinutes}`} minutes`:''}; allow 30 minutes for arrival. This is a planning estimate, not a verified road route.`;
         else if(start!=null&&end!=null)note+=' Event travel time is unverified; confirm the route and allow arrival time before the event. Later visits are timed from the end shown here.';
@@ -3692,6 +3702,16 @@ function planTrip(input) {
   ensureDinners(result, { ...input, intent });
   if (eveningWalk && result.days.length) applyEveningWalk(result, { ...input, intent }, eveningWalk);
   for(const day of result.days)if(day.mealNote)result.notes.push(day.mealNote);
+  // 2026-10-19: a Halloween trip says which day has no Halloween event nearby (Sun Nov 1 near Penticton), rather than
+  // leaving a family event that looks like one.
+  const holidayTrip=(input.familyEvents||input.holidayEvents)&&result.days.length>1?holidayTheme(requirements?.text||input.text||''):null;
+  if(holidayTrip){
+    const themed=day=>day.stops.some(s=>s.event&&holidayTrip.re.test(normWords(s.event.name||'')));
+    if(result.days.some(themed))for(const day of result.days.filter(d=>!themed(d))){
+      const town=input.labels?.regions?.[day.regions?.[0]];
+      result.notes.push(`No ${holidayTrip.label} events are listed${town?` near ${town}`:''} on day ${day.day}, so ${day.stops.some(s=>s.event)?'it has another family event instead':'it is a regular day out'}.`);
+    }
+  }
   scheduleTripByHours(result, input, requirements);
   result = fitTimeBudget(result, input, requirements);
   if(result.timeBudget?.selected)scheduleTripByHours(result,input,requirements);
@@ -4474,7 +4494,7 @@ const EVENT_WHY_NOUNS = { comedy: 'a comedy show', show: 'a show', performance: 
 function eventWhy(e, item, holiday) {
   const out = [];
   if (item && item.id === 'holiday-events' && holiday) out.push(`A ${holiday.label} event on your dates`);
-  else if (item && item.id === 'family-events') out.push('A family event on What’s On that day');
+  else if (item && item.id === 'family-events') out.push(holiday && holiday.re.test(normWords(e.name || '')) ? `A family ${holiday.label} event on your dates` : 'A family event on What’s On that day');
   else if (item) out.push(`Matches your request for ${EVENT_WHY_NOUNS[item.eventKind] || (item.value === 'live-music' ? 'live music' : 'an event')}`);
   else if (holiday && holiday.re.test(normWords(e.name || ''))) out.push(`A ${holiday.label} event on your dates`);
   out.push(e.time ? 'Listed on What’s On, with its start time' : 'Listed on What’s On for that day');
