@@ -1167,7 +1167,7 @@ const FR_SCRIPT = [
   // same French wording as the place pages ("Ouvert · ferme à 17 h").
   ["function hoursStatusLabel(status, clock) {", "function hoursStatusLabel(status, clock) { var __l = hoursStatusLabelEn(status, clock); __l.text = __frStatusText(__l.text); return __l; }\n" +
     "function __frStatusText(text) { var D = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };\n" +
-    "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace(' (holiday)', ' (jour f\\u00e9ri\\u00e9)').replace(') \\u00b7 Opens ', ') \\u00b7 ouvre ').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
+    "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace(' (holiday)', ' (jour f\\u00e9ri\\u00e9)').replace(' (temporary closure)', ' (fermeture temporaire)').replace(') \\u00b7 Opens ', ') \\u00b7 ouvre ').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
     "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
     "function hoursStatusLabelEn(status, clock) {"],
 ];
@@ -1336,5 +1336,8 @@ FR_PATTERNS.unshift(
     return `À l’affiche ${where} cette fin de semaine${dates ? `, ${dates}` : ''} : festivals, musique en direct, marchés, spectacles et événements familiaux. Choisissez un type d’événement pour préciser votre recherche.`;
   }],
 );
+// Round 8 (2026-10-19): a place listed as "The Dream (live music venue)" keeps its name, with the note in French,
+// also where its name runs on ("The Dream (live music venue) · 67 Front St").
+FR_PATTERNS.unshift([/^(.+?) \(live music venue\)(.*)$/, (m) => `${m[1]} (salle de concerts)${m[2]}`]);
 
 module.exports = { FR_TEXT, FR_PATTERNS, FR_SCRIPT, FR_SCRIPT_STRINGS, FR_CUISINE, frTime };

@@ -854,7 +854,8 @@ var TRANSLATIONS = {
     'tripv3.map.marker': 'Jour {day}, arr\u00eat {n}\u00a0: {name}',
     'tripv3.map.showInPlan': 'Voir dans le plan',
     'tripv3.day': 'Jour {n}',
-    'tripv3.from': 'selon',
+    // Round 8 (2026-10-19): the rating reads "4,7 sur 5 (939 avis)" to a screen reader, not "4,7 selon (939 avis)".
+    'tripv3.from': 'sur 5',
     'tripv3.reviews': '({n}\u00a0avis)',
     'tripv3.priceLevel': 'Niveau de prix {n} sur 4',
     'tripv3.verified': 'V\u00e9rifi\u00e9 sur Okanagan Roam',

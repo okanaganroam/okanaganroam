@@ -4404,7 +4404,10 @@ const FR_SEARCH_SYNONYMS = [
   ['patinage sur glace', 'skating'], ['patinoire', 'skating'], ['patinoire exterieure', 'skating'], ['anneau de glace', 'skating'], ['sentier de glace', 'skating'],
   ['raquette', 'snowshoeing'], ['raquettes', 'snowshoeing'], ['raquette a neige', 'snowshoeing'], ['raquettes a neige', 'snowshoeing'], ['faire de la raquette', 'snowshoeing'],
   ['ski alpin', 'downhill skiing'], ['ski de fond', 'cross country skiing'], ['station de ski', 'ski resort'], ['stations de ski', 'ski resorts'], ['centre de ski', 'ski resort'],
-  ['planche a neige', 'snowboarding'], ['glissade sur tube', 'tubing'], ['glissades sur tube', 'tubing'], ['glissade', 'tubing'], ['luge', 'sledding'],
+  ['planche a neige', 'snowboarding'], ['glissade sur tube', 'snow tubing'], ['glissades sur tube', 'snow tubing'], ['glissade', 'sledding'], ['luge', 'sledding'],
+  // Round 8 (2026-10-19): a waterslide is not a snow slide; ski lifts mean the ski resorts.
+  ['glissade d eau', 'waterslide'], ['glissades d eau', 'waterslide'], ['remonte pente', 'ski resort'], ['remonte pentes', 'ski resorts'], ['remontee mecanique', 'ski resort'],
+  ['remontees mecaniques', 'ski resorts'], ['telesiege', 'ski resort'], ['telesieges', 'ski resorts'], ['telecabine', 'ski resort'], ['tapis magique', 'ski resort'],
   ['traineau a chiens', 'dog sledding'], ['traineaux a chiens', 'dog sledding'], ['promenade en traineau', 'sleigh ride'], ['promenades en traineau', 'sleigh ride'], ['traineau', 'sleigh ride'], ['traineaux', 'sleigh ride'],
   // Round 7 (2026-10-19): toboggan (the English rewrites below then read sleigh rides, dog sleds and sledding).
   ['toboggan', 'sledding'], ['glissade en toboggan', 'sledding'], ['faire du toboggan', 'sledding'], ['glisser en toboggan', 'sledding'], ['bonhomme de neige', 'snow'], ['motoneige', 'snowmobiling'],
@@ -4428,7 +4431,10 @@ const FR_SEARCH_SYNONYMS = [
   ['diner', 'lunch'], ['souper', 'dinner'], ['boulangerie', 'bakery'], ['patisserie', 'bakery'], ['fruits de mer', 'seafood'], ['poisson', 'fish'],
   ['frites', 'fries'], ['hambourgeois', 'burger'], ['chocolat', 'chocolate'], ['chocolaterie', 'chocolate'], ['fromage', 'cheese'], ['fromagerie', 'cheese'],
   ['miel', 'honey'], ['lavande', 'lavender'], ['verger', 'orchard'], ['cerise', 'cherries'], ['pomme', 'apples'], ['kiosque fermier', 'farm stand'],
-  ['marche fermier', 'farmers market'], ['marche public', 'farmers market'], ['marche des fermiers', 'farmers market'], ['marche', 'market'], ['marche facile', 'easy walk'], ['marches faciles', 'easy walks'], ['marche en nature', 'nature walk'], ['autocueillette', 'u pick'],
+  ['marche fermier', 'farmers market'], ['marche public', 'farmers market'], ['marche des fermiers', 'farmers market'],
+  // Round 8 (2026-10-19): "marché de producteurs" found nothing.
+  ['marche de producteurs', 'farmers market'], ['marches de producteurs', 'farmers market'], ['marche des producteurs', 'farmers market'], ['marche agricole', 'farmers market'],
+  ['marches agricoles', 'farmers market'], ['marche paysan', 'farmers market'], ['marche de fermiers', 'farmers market'], ['marches fermiers', 'farmers market'], ['marche', 'market'], ['marche facile', 'easy walk'], ['marches faciles', 'easy walks'], ['marche en nature', 'nature walk'], ['autocueillette', 'u pick'],
   // Round 7 (2026-10-19): cueillette (picking your own fruit) is a u-pick.
   ['cueillette', 'u pick'], ['cueillette de fruits', 'u pick'], ['cueillette de pommes', 'u pick'], ['cueillette de cerises', 'u pick'], ['cueillette de petits fruits', 'u pick'],
   ['cueillette de bleuets', 'u pick'], ['cueillette de fraises', 'u pick'], ['autocueillette de fruits', 'u pick'], ['cueillette de citrouilles', 'pumpkin patch'],
@@ -4442,6 +4448,11 @@ const FR_SEARCH_SYNONYMS = [
   ['croisiere', 'cruise'], ['bateau', 'boat'], ['location de bateau', 'boat rental'], ['camping', 'camping'], ['terrain de golf', 'golf course'], ['minigolf', 'mini golf'],
   ['mini putt', 'mini golf'], ['parc aquatique', 'water park'], ['jeux d eau', 'splash park'], ['aire de jeux', 'playground'], ['terrain de jeux', 'playground'],
   ['planchodrome', 'skate park'], ['parc de planche a roulettes', 'skate park'], ['piscine', 'pool'], ['source thermale', 'hot springs'],
+  // Round 8 (2026-10-19): warm soaks.
+  ['sources thermales', 'hot springs'], ['spa nordique', 'nordic spa'], ['spas nordiques', 'nordic spa'], ['bain nordique', 'nordic spa'], ['bains nordiques', 'nordic spa'],
+  ['bain chaud', 'hot pool'], ['bains chauds', 'hot pool'], ['bain thermal', 'thermal spa'], ['bains thermaux', 'thermal spa'],
+  // Round 8 (2026-10-19): the winter words each keep their own meaning (the planner's French list read them all as "winter").
+  ['ski de randonnee nordique', 'cross country skiing'], ['ski nordique', 'nordic skiing'], ['sentiers de ski de fond', 'cross country skiing'], ['pistes de ski de fond', 'cross country skiing'],
   // indoors and events
   ['musee', 'museum'], ['galerie d art', 'art gallery'], ['salle d evasion', 'escape room'], ['jeu d evasion', 'escape room'], ['quilles', 'bowling'], ['salle de quilles', 'bowling'],
   ['karting', 'go karts'], ['spectacle', 'show'], ['musique en direct', 'live music'], ['humour', 'comedy'], ['visite guidee', 'guided tour'], ['atelier', 'workshop'],
@@ -4467,7 +4478,8 @@ function frSearchVenueNames() {
   return frSearchNames;
 }
 // The request with its French search words in English, or the text exactly as typed when none is there.
-function frSearchSynonyms(text) {
+// pairs (round 8, 2026-10-19): when given an array, each rewrite is added to it as { fr: the words typed, en }.
+function frSearchSynonyms(text, pairs = null) {
   const raw = String(text || '');
   // Elided articles ("l'eau", "d'hiver") split off so the word after them is read.
   const parts = raw.replace(/\b(l|d|j|qu|n|m|t|c|s|jusqu|lorsqu)['\u2019](?=[a-z\u00e0-\u00ff])/gi, '$1 ').split(/\s+/).filter(Boolean);
@@ -4485,12 +4497,68 @@ function frSearchSynonyms(text) {
     for (let len = Math.min(FR_SEARCH_SYNONYM_MAX, parts.length - i); len >= 1 && !hit; len--) {
       if ([...Array(len).keys()].some((k) => keep.has(i + k) || !folded[i + k])) continue;
       const en = FR_SEARCH_SYNONYM_MAP.get(folded.slice(i, i + len).join(' '));
-      if (en != null) { out.push(en); hit = len; }
+      if (en != null) { out.push(en); hit = len; if (pairs) pairs.push({ fr: parts.slice(i, i + len).join(' '), en }); }
     }
     // "l'Action de grâce" -> "thanksgiving", not "l thanksgiving".
     if (hit) { if (i > 0 && out.length > 1 && /^(l|d|qu)$/i.test(out[out.length - 2]) && out[out.length - 2] === parts[i - 1]) out.splice(out.length - 2, 1); changed = true; i += hit; } else { out.push(parts[i]); i += 1; }
   }
   return changed ? out.join(' ') : raw;
+}
+// Search typos (2026-10-19, round 8): a misspelled kind of place or activity ("vignobel", "winary", "pumkin") is read as
+// the word meant, so it no longer finds nothing. The words it can become are the category names (English and French),
+// the French search words above, the search's activities and a few seasonal words; a word is corrected only when it
+// is 5 letters or more, appears nowhere in the site's own place names, cuisines or descriptions, starts with the same
+// letter, and is one edit away (two for 8 letters or more) from exactly one such word. -> { text, corrections }.
+const SEARCH_TYPO_EXTRA = ['winery', 'wineries', 'brewery', 'breweries', 'cidery', 'cideries', 'distillery', 'distilleries', 'vineyard', 'vineyards', 'restaurant',
+  'restaurants', 'beach', 'beaches', 'museum', 'museums', 'pumpkin', 'pumpkins', 'skating', 'snowshoe', 'snowshoeing', 'sledding', 'toboggan', 'tobogganing', 'farmers',
+  'market', 'markets', 'hiking', 'trails', 'waterfall', 'waterfalls', 'brunch', 'breakfast', 'patio', 'patios', 'coffee', 'bakery', 'bakeries', 'halloween', 'christmas',
+  'orchard', 'orchards', 'campground', 'campgrounds', 'playground', 'playgrounds', 'skiing', 'snowboarding', 'cider', 'ciders', 'citrouille', 'citrouilles'];
+let searchTypoIndex = null;
+function searchTypoTargets() {
+  const venues = (() => { try { return discoverySearchVenues(); } catch (e) { return []; } })();
+  if (searchTypoIndex && searchTypoIndex.venues === venues) return searchTypoIndex;
+  const targets = new Set();
+  const add = (w) => { const f = frSearchFold(w); if (f && !f.includes(' ') && f.length >= 5) targets.add(f); };
+  for (const labels of [CATEGORY_LABELS, CATEGORY_LABELS_FR]) for (const l of Object.values(labels)) for (const x of [l.plural, l.singular]) frSearchFold(x).split(' ').forEach(add);
+  for (const fr of FR_SEARCH_SYNONYM_MAP.keys()) add(fr);
+  for (const a of SMART_ACTIVITIES) a.words.forEach(add);
+  SEARCH_TYPO_EXTRA.forEach(add);
+  const known = new Set(targets);
+  // Every word of a phrase the search already reads is a real word ("hantées" in "maisons hantées").
+  for (const phrase of [...FR_SEARCH_SYNONYM_MAP.keys(), ...SEARCH_PHRASE_REWRITE_MAP.keys(), ...SMART_ACTIVITIES.flatMap((a) => a.words)]) for (const w of frSearchFold(phrase).split(' ')) if (w) known.add(w);
+  for (const label of Object.values(REGION_LABELS)) frSearchFold(label).split(' ').forEach((w) => known.add(w));
+  for (const v of venues) for (const t of [v.name, v.cuisine, v.textDesc, v.textDescFr]) for (const w of frSearchFold(t).split(' ')) if (w.length >= 5) known.add(w);
+  searchTypoIndex = { venues, targets: [...targets], known };
+  return searchTypoIndex;
+}
+function searchTypoFix(text) {
+  const raw = String(text || '');
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (!parts.length) return { text: raw, corrections: [] };
+  const { targets, known } = searchTypoTargets();
+  const corrections = [];
+  const out = parts.map((p) => {
+    const w = frSearchFold(p);
+    if (w.length < 5 || !/^[a-z]+$/.test(w) || known.has(w)) return p;
+    const max = w.length >= 8 ? 2 : 1;
+    let best = max + 1, hits = [];
+    for (const t of targets) {
+      if (t[0] !== w[0] || Math.abs(t.length - w.length) > max) continue;
+      const d = smartEditDistance(w, t, max);
+      if (d > max) continue;
+      if (d < best) { best = d; hits = [t]; } else if (d === best) hits.push(t);
+    }
+    // Two equally close words: only the same word in the singular and the plural ("pumkins" -> pumpkins over pumpkin).
+    if (hits.length > 1) {
+      const one = (a, b) => a === b || [`${a}s`, `${a}es`, a.replace(/y$/, 'ies')].includes(b) || [`${b}s`, `${b}es`, b.replace(/y$/, 'ies')].includes(a);
+      if (!hits.every((h) => one(h, hits[0]))) return p;
+      hits.sort((a, b) => Math.abs(a.length - w.length) - Math.abs(b.length - w.length) || a.length - b.length);
+    }
+    if (!hits.length) return p;
+    corrections.push({ from: p, to: hits[0] });
+    return hits[0];
+  });
+  return corrections.length ? { text: out.join(' '), corrections } : { text: raw, corrections };
 }
 // Search phrases (2026-10-19, round 7), English and French alike (a French search reaches them through the list
 // above): a phrase whose words mean something else one by one, read as the word the listings use. "haunted house"
@@ -4538,6 +4606,7 @@ function searchPhraseRewrites(text) {
 // French pass 6 (2026-10-19): the French search words first (frSearchSynonyms), then the planner's French list.
 // Round 7 (2026-10-19): then the search phrases above, for English and French searches alike.
 function discoverySearchText(text, lang) {
+  try { text = searchTypoFix(text).text; } catch (e) { /* as typed */ }
   if (lang !== 'fr') {
     try { return searchPhraseRewrites(text); } catch (e) { return text; }
   }
@@ -4826,6 +4895,9 @@ const smartTextHas = (v, re) => re.test(String(v.row.name || '')) || re.test(Str
 // Search ranking (2026-10-18): activity phrases -> /search with the places whose name says it first, then the ones
 // whose description does ("escape room" went to all of /indoor, where Exit Kelowna Escape Games was #24; "bike
 // rental" found 1 place). words: folded phrases a request may use; re: what a name or description must say.
+// The kinds of place where people go to do a winter activity or soak (round 8): a restaurant named Snowshoe Sam's is
+// not a snowshoe trail.
+const SMART_WINTER_ACTIVITY_TYPES = ['outdoor', 'sport', 'tour', 'indoor', 'beach', 'golf'];
 const SMART_ACTIVITIES = [
   { key: 'escape_room', label: 'Escape rooms', labelFr: 'Jeux d’évasion', words: ['escape room', 'escape rooms', 'escape game', 'escape games', 'jeu d evasion', 'jeux d evasion', 'salle d evasion', 'salles d evasion'],
     re: /\bescape (?:rooms?|games?)\b/i },
@@ -4847,6 +4919,29 @@ const SMART_ACTIVITIES = [
     re: /\bla[sz]er[- ]?tag\b|\bplanet lazer\b/i },
   { key: 'bike_rental', label: 'Bike rentals', labelFr: 'Location de vélos', words: ['bike rental', 'bike rentals', 'bicycle rental', 'bicycle rentals', 'rent a bike', 'rent bikes', 'bike hire', 'e bike rental', 'e bike rentals', 'ebike rental', 'ebike rentals', 'rent an e bike', 'rent e bikes', 'location de velo', 'location de velos', 'louer un velo', 'louer des velos'],
     re: /\b(?:e-?)?(?:bike|bicycle)s? (?:rentals?|hire)\b|\brent(?:al|als|s)? (?:an? )?(?:e-?)?(?:bikes?|bicycles?)\b|\b(?:e-?)?bikes? (?:for|to) rent\b/i },
+  // Search dead ends (2026-10-19, round 8): the winter activities each find their own places ("snowshoe", "patin",
+  // "raquette" and "ski de fond" all listed the same 51-place Winter set), "hot springs" finds the spas and warm soaks
+  // (it listed Hot Bread Shoppe), "toboggan" the tube parks and sledding hills, "pumpkin patch" the farms that say
+  // they have one, and "farmers market" the markets. Each can offer its guide beside the places (guide), and its
+  // What's On events (events). A snowmobile area is not a sledding hill (notName).
+  { key: 'snowshoe', label: 'Snowshoeing', labelFr: 'Raquette', words: ['snowshoe', 'snowshoes', 'snowshoeing', 'snow shoe', 'snow shoes', 'snow shoeing', 'snowshoe trail', 'snowshoe trails', 'snowshoeing trails'],
+    re: /\bsnow ?shoe/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-nordic-snowshoe', events: true },
+  { key: 'xc_ski', label: 'Cross-country skiing', labelFr: 'Ski de fond', words: ['cross country skiing', 'cross country ski', 'cross country skis', 'cross country', 'xc skiing', 'xc ski', 'nordic skiing', 'nordic ski',
+    'nordic', 'nordic centre', 'nordic center', 'nordic trails', 'skate skiing', 'classic skiing', 'cross country ski trails', 'cross country trails'],
+    re: /\bcross[- ]country(?: ski\w*| trails?)\b|\bnordic (?:ski\w*|centre|center|club|trails?)\b|\bxc ski|\bskate[- ]skiing\b/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-nordic-snowshoe', events: true },
+  { key: 'skating', label: 'Skating', labelFr: 'Patin', words: ['skating', 'ice skating', 'skating rink', 'skating rinks', 'ice rink', 'ice rinks', 'outdoor skating', 'outdoor rink', 'outdoor rinks',
+    'skating trail', 'skating trails', 'skating loop', 'skating pond', 'skating ponds', 'public skating', 'skate rink', 'skate rinks'],
+    re: /\b(?:ice )?skating\b|\b(?:ice|skating|skate|outdoor) rinks?\b|\bshinny\b/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-skating', events: true },
+  { key: 'sledding', label: 'Sledding & tube parks', labelFr: 'Luge et glissades sur tube', words: ['sledding', 'sledding hill', 'sledding hills', 'tube park', 'tube parks', 'snow tubing', 'tubing park', 'sledding and tubing', 'luge'],
+    re: /\bsledd?ing\b|\btobogg\w*|\btube parks?\b|\bsnow tubing\b|\btubing (?:park|lanes?|hill)s?\b|\btube town\b/i, notName: /snowmobil/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-winter-beyond-skiing', events: true },
+  { key: 'spa', label: 'Spas & warm soaks', labelFr: 'Spas et bains chauds', words: ['hot springs', 'hot spring', 'spa', 'spas', 'nordic spa', 'nordic spas', 'thermal spa', 'thermal spas', 'sauna', 'saunas', 'hot pool', 'hot pools',
+    'day spa', 'warm soak', 'steam room', 'salt cave'],
+    re: /\bspas?\b|\bsaunas?\b|\bthermal (?:spa|pools?|baths?)\b|\bhot springs?\b|\bhot pools?\b|\bnordic (?:spa|baths?)\b|\bsteam (?:room|cave)\b|\bsalt cave\b/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-saunas-spas' },
+  { key: 'pumpkin_patch', label: 'Pumpkin patches', labelFr: 'Champs de citrouilles', words: ['pumpkin patch', 'pumpkin patches', 'pumpkin', 'pumpkins', 'pumpkin farm', 'pumpkin farms', 'pumpkin picking', 'pick a pumpkin',
+    'pick your own pumpkin', 'pick your own pumpkins'],
+    re: /\bpumpkins?\b/i, guide: '/guides/fall-farms-u-pick-okanagan', events: true },
+  { key: 'farmers_market', label: 'Farmers’ markets', labelFr: 'Marchés fermiers', words: ['farmers market', 'farmers markets', 'farmer s market', 'farmer s markets', 'farmers marketplace', 'farm market', 'farm markets'],
+    re: /\bfarmers?['’]?s? ?markets?\b|\bfarm markets?\b/i, nameOnly: true, events: true, whatsOn: 'markets-fairs' },
 ];
 // Words that add nothing to an activity request ("escape rooms near me", "best go karts in kelowna").
 const SMART_ACTIVITY_GENERIC = ['in', 'near', 'me', 'the', 'a', 'an', 'okanagan', 'best', 'top', 'places', 'place', 'spots', 'spot', 'where', 'to', 'go', 'for', 'find', 'fun',
@@ -4855,14 +4950,22 @@ const SMART_ACTIVITY_GENERIC = ['in', 'near', 'me', 'the', 'a', 'an', 'okanagan'
 // Places where people go to do things come before a restaurant or pub that also has it.
 const SMART_ACTIVITY_TYPES = new Set(['indoor', 'outdoor', 'tour', 'sport', 'golf', 'beach']);
 function smartActivityFor(folded) {
-  return SMART_ACTIVITIES.find((a) => smartHas(folded, a.words)) || null;
+  // Round 8 (2026-10-19): the longest phrase wins, so "nordic spa" is a spa, not cross-country skiing ("nordic").
+  let best = null, bestLen = 0;
+  for (const a of SMART_ACTIVITIES) {
+    for (const w of a.words) if (w.length > bestLen && smartHas(folded, [w])) { best = a; bestLen = w.length; }
+  }
+  return best;
 }
 // The places for one activity: name matches first, then description matches; best first within each.
 function smartActivityPick(activity, region, features) {
   const inName = (v) => activity.re.test(String(v.row.name || ''));
   return smartPickVenues((v) => {
     if ((region && v.region !== region) || !features.every((f) => v.features[f])) return false;
+    if (activity.notName && activity.notName.test(String(v.row.name || ''))) return false;
+    if (activity.types && !activity.types.includes(v.type)) return false;
     if (inName(v)) return `Name says ${activity.label.toLowerCase()}`;
+    if (activity.nameOnly) return false;
     return activity.re.test(String(v.row.description || '')) || activity.re.test(String(v.row.cuisine || '')) ? `Mentions ${activity.label.toLowerCase()}` : false;
   }, (v) => (inName(v) ? 100 : 0) + (SMART_ACTIVITY_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
 }
@@ -5046,15 +5149,21 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   if (activity && T.every((t) => SMART_ACTIVITY_TYPES.has(t)) && !intent.cuisines.length && !intent.collections.length
     && !smartTopicWords(folded, intent, [...activity.words, ...SMART_ACTIVITY_GENERIC]).length) {
     const pick = () => smartActivityPick(activity, region, F);
+    // Round 8 (2026-10-19): the activity's guide beside its places, and its events; with no place, the guide itself.
+    const guide = activity.guide ? liveGuides().find((g) => g.path === activity.guide) : null;
     if (pick().length) {
       return {
         key: activity.key,
         heading: `${activity.label}${town ? ` in ${town}` : ''}`,
         headingFr: `${activity.labelFr}${town ? ` à ${town}` : ''}`,
-        guides: [],
+        guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
         list: pick,
+        ...(activity.events ? { events: () => searchEventsFor({ regions: R, test: (e) => activity.re.test(`${e.name || ''} ${e.description || ''}`), now }) } : {}),
       };
     }
+    if (guide && !F.length) return { key: `${activity.key}_guide`, url: guide.path };
+    // No place by that name (farmers' markets are events): What's On's markets for the town.
+    if (activity.whatsOn && !F.length) return { key: activity.key, url: `/whats-on${discoveryQueryString({ regions: R, categories: [activity.whatsOn] })}` };
   }
 
   // Search pass 5 (2026-10-19): "open now" -> what is open right now (Food & Drink types alone keep their own page's
@@ -5218,7 +5327,10 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
     && !smartTopicWords(folded, intent, [...SMART_FAMILY_WORDS, ...SMART_RAINY_WORDS, ...SMART_FAMILY_GENERIC, 'indoor activities', 'kid friendly', 'family friendly']).length) {
     if (!family) {
       // A rainy day alone keeps the routing above (/indoor or the town's Indoor page) when it has one.
+      // Round 8 (2026-10-19): and goes there from /search too. It returned nothing here, so /search?q=pluie (or "rainy
+      // day") stayed on an empty page with "See this on its own page".
       const d = resolveDiscoveryDestination(intent);
+      if (d.url && d.kind !== 'browse') return { key: 'rainy', url: d.url };
       if (d.url) return null;
       return { key: 'rainy', url: `/indoor${discoveryQueryString({ regions: region && smartIndoorCount(region, false) ? [region] : [] })}` };
     }
@@ -5315,14 +5427,31 @@ function frSearchTypePlural(t, labels) {
   return (CATEGORY_LABELS_FR[t] ? CATEGORY_LABELS_FR[t].plural : frSearchLabel(labels.types[t] ? labels.types[t].plural : t)).toLowerCase();
 }
 const FR_SEARCH_COLLECTIONS = { hidden_gem: 'trésors cachés', local_favorite: 'coups de cœur locaux', dog_friendly: 'plages pour chiens' };
-function discoveryInterpretedTextFr(intent, labels) {
+// French search words (2026-10-19, round 8): a word the search read in English ("humour" -> "comedy", "traîneau" ->
+// "sleigh") is shown as the visitor's own French words, never the English the search used inside. A word that is
+// neither typed nor one of those rewrites is left out (null).
+function frSearchTermLabel(term, typed) {
+  const t = frSearchFold(term);
+  if (!t) return null;
+  const typedFold = ` ${frSearchFold(typed)} `;
+  if (typed == null || typedFold.includes(` ${t} `)) return term;
+  const pairs = [];
+  try { frSearchSynonyms(typed, pairs); } catch (e) { return null; }
+  for (const p of pairs) {
+    let after = p.en;
+    try { after = searchPhraseRewrites(p.en); } catch (e) { /* as listed */ }
+    if (` ${frSearchFold(p.en)} ${frSearchFold(after)} `.includes(` ${t} `)) return p.fr.replace(/^(?:l|d|qu)['\u2019]/i, '');
+  }
+  return null;
+}
+function discoveryInterpretedTextFr(intent, labels, typed = null) {
   const foodWords = uniqueList((intent.foodTerms || []).filter((f) => f.cuisine && intent.cuisines.includes(f.cuisine)).map((f) => `« ${f.term} »`));
   const parts = [
     ...intent.collections.map((c) => FR_SEARCH_COLLECTIONS[c] || c),
     ...foodWords,
     ...intent.types.map((t) => frSearchTypePlural(t, labels)),
     ...intent.activities.map((a) => frSearchLabel(labels.activities[a] || a).toLowerCase()),
-    ...intent.textTerms.map((w) => `« ${w} »`),
+    ...uniqueList(intent.textTerms.map((w) => (typed == null ? w : frSearchTermLabel(w, typed))).filter(Boolean)).map((w) => `« ${w} »`),
   ];
   if (!(parts.length + intent.features.length + intent.regions.length)) return null;
   let text = parts.length ? parts.join(', ') : 'lieux';
@@ -5351,6 +5480,9 @@ function discoveryMatchedOnTextFr(m) {
   const where = value.split('+').map((w) => (w === 'name' ? 'son nom' : w === 'cuisine' ? 'sa cuisine indiquée' : 'sa description'));
   return `Mentionne « ${key} » dans ${where.join(' et ')}`;
 }
+// The occasions in French (2026-10-19, round 8): the note said « rainy day » on /fr/search.
+const FR_SEARCH_OCCASIONS = { date_night: 'soirée en amoureux', romantic: 'sortie romantique', rainy_day: 'jour de pluie', family: 'sortie en famille',
+  celebration: 'célébration', group_getaway: 'escapade en groupe', relaxing: 'détente', adventure: 'aventure', adults: 'entre adultes' };
 function discoveryNoteTextFr(n, labels) {
   const what = (f, v) => (f === 'region' ? `pas à ${labels.regions[v] || v}` : f === 'type' ? `sans ${frSearchTypePlural(v, labels)}` : f === 'cuisine' ? `sans ${v}`
     : f === 'collection' ? `sauf ${FR_SEARCH_COLLECTIONS[v] || v}` : f === 'activity' ? `sans ${frSearchLabel(labels.activities[v] || v).toLowerCase()}`
@@ -5363,7 +5495,7 @@ function discoveryNoteTextFr(n, labels) {
   if (n.code === 'exclusion_not_applied') return n.field === 'feature'
     ? `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas exclure de lieux selon un badge; aucun n’a été retiré.`
     : `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas l’appliquer; aucun lieu n’a été retiré pour cette raison.`;
-  if (n.field === 'occasion') return `Les occasions comme « ${String(n.value).replace(/_/g, ' ')} » ne s’appliquent pas à la recherche. Planifier mon voyage peut en tenir compte.`;
+  if (n.field === 'occasion') return `Les occasions comme « ${FR_SEARCH_OCCASIONS[n.value] || String(n.value).replace(/_/g, ' ')} » ne s’appliquent pas à la recherche. Planifier mon voyage peut en tenir compte.`;
   if (n.field === 'budget') return 'Le budget ne s’applique pas à la recherche : tous les lieux n’indiquent pas leurs prix.';
   if (n.field === 'when') return 'Les dates et les heures ne sont pas vérifiées ici. La page À l’affiche présente les événements datés.';
   if (n.field === 'days' || n.field === 'pace') return 'La durée et le rythme du voyage servent à Planifier mon voyage, pas à la recherche.';
@@ -5489,7 +5621,7 @@ function searchSummaryHtml(model, lang) {
   const one = model.venues && model.venues.length === 1;
   const interpreted = plan && plan.heading ? (lang === 'fr' ? plan.headingFr : plan.heading)
     : model.nameOnly ? (lang === 'fr' ? (one ? 'le lieu de ce nom' : 'les lieux de ce nom') : (one ? 'the place by that name' : 'the places by that name'))
-      : (lang === 'fr' ? (p.status === 'ambiguous' ? null : discoveryInterpretedTextFr(run.intent, labels)) : p.interpreted);
+      : (lang === 'fr' ? (p.status === 'ambiguous' ? null : discoveryInterpretedTextFr(run.intent, labels, q)) : p.interpreted);
   const correctionText = !p.corrections.length ? ''
     : lang === 'fr' ? `<p class="search-corrected">Nous avons lu ${p.corrections.map((c) => `« ${esc(c.from)} » comme « ${esc(c.to)} »`).join(', ')}.</p>`
       : `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>`;
@@ -5497,7 +5629,8 @@ function searchSummaryHtml(model, lang) {
   // applies its occasion and dates itself, so their notes are left off.
   // Search gaps (2026-10-18): the cheap-eats list applies the budget itself.
   const notes = p.notes.filter((n) => !(plan && plan.list && (['occasion', 'when'].includes(n.field) || (plan.key === 'budget' && n.field === 'budget'))))
-    .filter((n) => !(model.nameOnly && n.code === 'any_words'))
+    // Round 8 (2026-10-19): a plan's own list ("hot springs" -> spas) is not an any-word match either.
+    .filter((n) => !((model.nameOnly || (plan && plan.list)) && n.code === 'any_words'))
     .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
@@ -6836,11 +6969,24 @@ function tempClosureStateOn(closures, today) {
 }
 
 // The advisory collection's notes with each venue's season note in front.
+// Round 8 (2026-10-19): a temporary closure's own sentence ("Closed Oct 21–28, reopens Oct 29.") is left off when the
+// place's written advisory already says it is closed (Beat Patisserie's notice said it twice).
+const ADVISORY_SAYS_CLOSED_RE = /\b(?:closed|closing|closure|shut)\b/i;
+// The advisory says the place is closed, and when: it names the closure's first month, or says "temporarily" or "until".
+function advisoryCoversClosure(note, st) {
+  const t = String(note || '');
+  if (!ADVISORY_SAYS_CLOSED_RE.test(t)) return false;
+  const m = st && st.from ? Number(String(st.from).slice(5, 7)) : 0;
+  const month = m ? new RegExp(`\\b(?:${MONTH_NAMES.en[m - 1]}|${SEASON_TAG_MONTHS[m - 1]})\\b`, 'i') : null;
+  return (month && month.test(t)) || /\b(?:temporarily|until)\b/i.test(t);
+}
 function mergeSeasonNotes(advisories, seasons) {
   if (!seasons.size) return advisories;
   const merged = new Map(advisories);
   for (const [id, st] of seasons) {
-    merged.set(id, advisories.has(id) ? `${st.text} ${advisories.get(id)}`.trim() : st.note);
+    if (!advisories.has(id)) { merged.set(id, st.note); continue; }
+    const own = advisories.get(id);
+    merged.set(id, st.kind === 'temp_closed' && advisoryCoversClosure(own, st) ? own : `${st.text} ${own}`.trim());
   }
   return merged;
 }
@@ -16803,7 +16949,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   });
   // Plain words become filters: "patio drinks dog" turns on Drinks, Patio and Dogs OK; anything else searches names.
   var WORDS = {
-    drinks: 'drink drinks beer beers pint pints bar bars pub pubs brewery breweries brew cider booze bevvy bevvies biere bière boire verre',
+    drinks: 'drink drinks beer beers pint pints bar bars pub pubs brew booze bevvy bevvies biere bière boire verre',
     food: 'food eat eats dinner supper lunch restaurant restaurants bite hungry manger souper diner dîner resto restos',
     coffee: 'coffee coffees cafe cafes café cafés latte',
     top: 'great best top amazing excellent awesome incredible fantastic highly rated meilleur meilleurs meilleure meilleures excellente',
@@ -16849,7 +16995,46 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (h >= 1 && h <= 11 && !morning) h += 12;
     return Math.min(1439, h * 60 + m);
   }
-  function parseWords(v){
+  // French map search (2026-10-19, round 8): on /fr/map the words the map does not read itself go through the site
+  // search's French list (CONF.fs, folded French -> English), longest phrase first, and the English is read as if
+  // typed: "cidre" finds cideries, "musée" museums, "marché fermier" farmers' markets. Words the map already reads
+  // ("terrasse", "chien", "plage", "vue sur le lac") are never rewritten.
+  // French map search (2026-10-19, round 8): /fr/map carries the list (folded French -> English) as page data (#pmFrWords).
+  var FS = null, FS_MAX = 1;
+  try { var fsEl = document.getElementById('pmFrWords'); if (fsEl) FS = JSON.parse(fsEl.textContent); } catch (e) { FS = null; }
+  if (FS) Object.keys(FS).forEach(function(k){ FS_MAX = Math.max(FS_MAX, k.split(' ').length); });
+  function foldFr(w){ return String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0153/g, 'oe').replace(/[^a-z0-9]+/g, ' ').trim(); }
+  function frWords(toks){
+    var out = [], run = [];
+    function flush(){
+      if (!run.length) return;
+      // Each folded piece remembers its typed word, so a word left alone is kept exactly as typed ("musée" in a name).
+      var sub = [], own = [], used = {};
+      run.forEach(function(w, j){ foldFr(w).split(' ').forEach(function(x){ if (x) { sub.push(x); own.push(j); } }); });
+      var parts = [];
+      for (var i = 0; i < sub.length;) {
+        var hit = 0, en = null;
+        for (var len = Math.min(FS_MAX, sub.length - i); len >= 1 && !hit; len--) {
+          var k = sub.slice(i, i + len).join(' ');
+          if (Object.prototype.hasOwnProperty.call(FS, k)) { hit = len; en = FS[k]; }
+        }
+        if (hit) { for (var u = i; u < i + hit; u++) used[own[u]] = 1; parts.push({ en: en, at: own[i] }); i += hit; } else { parts.push({ w: sub[i], j: own[i] }); i += 1; }
+      }
+      var kept = {};
+      parts.forEach(function(x){
+        if (x.en != null) { out.push.apply(out, parseWords(x.en, true)); return; }
+        if (!used[x.j]) { if (!kept[x.j]) { kept[x.j] = 1; out.push(run[x.j]); } return; }
+        out.push(x.w);
+      });
+      run = [];
+    }
+    toks.forEach(function(w){
+      if (WORD_TO[w] || special(w) || NEG.indexOf(' ' + w + ' ') !== -1) { flush(); out.push(w); } else run.push(w);
+    });
+    flush();
+    return out;
+  }
+  function parseWords(v, english){
     var raw = ' ' + String(v).toLowerCase().replace(/[’]/g, '\\'') + ' ', nowMin = okanaganClock(new Date()).minutes;
     var morning = /breakfast|brunch|coffee|morning|matin|déjeuner|cafe|café/.test(raw);
     // Group size: "for 8 people", "party of 10", "table for 6".
@@ -16879,7 +17064,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     t = ' ' + t.replace(/-/g, ' ').replace(/\\s+/g, ' ') + ' ';
     TAG_RX.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
     TOWN_RX.forEach(function(ph){ t = t.replace(ph[0], ph[1]); });
-    return t.split(/\\s+/).filter(Boolean);
+    var words = t.split(/\\s+/).filter(Boolean);
+    return FS && !english ? frWords(words) : words;
   }
   function special(w){ var c = w.charAt(0); return c === '#' || c === '@' || c === '$' || c === '^' || w.indexOf('~r:') === 0; }
   function hasWords(v){ return parseWords(v).some(function(w){ return WORD_TO[w] || special(w); }); }
@@ -17172,7 +17358,15 @@ const MAP_TAGS = [
   ['smoothie', 'Smoothies & juice', 'Smoothies et jus', '🥤', /\b(smoothie|juice|acai)/, 'smoothie|smoothies|juice|juices|acai|jus', []],
   ['sandwich', 'Sandwiches', 'Sandwichs', '🥪', /\b(sandwich|deli)\b/, 'sandwich|sandwiches|deli', []],
   ['tapas', 'Tapas & small plates', 'Tapas', '🫒', /\b(tapas|small plates|sharing plates|charcuterie)/, 'tapas|small plates|sharing plates|charcuterie', []],
-  ['craftbeer', 'Craft beer', 'Bière artisanale', '🍻', /\b(craft beer|taproom|on tap|ipa)\b/, 'craft beer|craft beers|taproom|ipa|ipas|on tap|microbrasserie', ['brewery']],
+  ['craftbeer', 'Craft beer', 'Bière artisanale', '🍻', /\b(craft beer|taproom|on tap|ipa)\b/, 'craft beer|craft beers|taproom|ipa|ipas|on tap', ['brewery']],
+  // Map search (2026-10-19, round 8): "brewery" and "cider" each find their own places. Both read as Drinks before, so
+  // either one listed the same 300 pubs, wineries and lounges. Cideries are filed as breweries, so a brewery is one
+  // whose name is not a cider maker's (or any place named for brewing); a cidery is one named for cider, or a
+  // brewery, winery or distillery that says it makes cider.
+  ['brewery', 'Breweries', 'Brasseries', '🍺', /\b(brewery|breweries|brewing|brewhouse|brew pub|brewpub|brew co)\b/, 'brewery|breweries|brewpub|brewpubs|brew pub|brew pubs|brasserie|brasseries|microbrasserie|microbrasseries|microbrewery|microbreweries', [],
+    (v, name) => (v.type === 'brewery' && !/\b(cider|cidery|ciderie|cidrerie)\b/.test(name)) || /\b(brewery|brewing|brewhouse|brew ?pub|brew co)\b/.test(name)],
+  ['cider', 'Cideries', 'Cidreries', '🍏', /\b(cider|ciders|cidery|cideries|ciderie|cidrerie)\b/, 'cider|ciders|cidery|cideries|ciderie|cidre|cidres|cidrerie|cidreries|hard cider', [],
+    (v, name, text) => /\b(cider|cidery|ciderie|cidrerie)\b/.test(name) || (['brewery', 'winery', 'distillery'].includes(v.type) && /\b(cider|ciders|cidery)\b/.test(text))],
   ['winebar', 'Wine bar', 'Bar à vin', '🍷', /\b(wine bar|wine list|by the glass)/, 'wine bar|wine list|bar a vin|bar à vin', []],
   ['datenight', 'Date night', 'Soirée en amoureux', '🕯️', /\b(romantic|date night|intimate|candlelit|anniversar)/, 'date night|date|romantic|anniversary|romantique', []],
   ['sunset', 'Sunset views', 'Coucher de soleil', '🌅', /\bsunset/, 'sunset|sunsets|coucher de soleil', []],
@@ -17180,7 +17374,7 @@ const MAP_TAGS = [
   ['salad', 'Salads & bowls', 'Salades et bols', '🥗', /\b(salad|poke|bowls?)\b/, 'salad|salads|poke|bowl|bowls|salade|salades', []],
   ['crepes', 'Crêpes & waffles', 'Crêpes et gaufres', '🧇', /\b(cr[eê]pe|waffle)/, 'crepe|crepes|crêpe|crêpes|waffle|waffles|gaufre|gaufres', []],
   ['specialty', 'Specialty coffee', 'Café de spécialité', '☕', /\b(roaster|pour[ -]over|specialty coffee|espresso)/, 'specialty coffee|pour over|roaster|espresso', []],
-].map(([key, en, fr, icon, find, say, types]) => ({ key, en, fr, icon, find, say, types }));
+].map(([key, en, fr, icon, find, say, types, match]) => ({ key, en, fr, icon, find, say, types, match: match || null }));
 const MAP_DIETARY = [
   { key: 'veg', label: 'Vegetarian', icon: '\u{1F957}' }, { key: 'vegan', label: 'Vegan', icon: '\u{1F331}' }, { key: 'gf', label: 'Gluten-free', icon: '\u{1F33E}' },
 ];
@@ -17188,8 +17382,8 @@ function mapHappyHourTimes(json) {
   try { return compactFoodDrinkHours(JSON.parse(json)) || 0; } catch (e) { return 0; }
 }
 function mapPlaceTags(v) {
-  const text = `${v.name} ${v.cuisine || ''} ${v.description || ''}`.toLowerCase();
-  return MAP_TAGS.reduce((out, t, i) => (t.types.includes(v.type) || t.find.test(text) ? out.concat(i) : out), []);
+  const text = `${v.name} ${v.cuisine || ''} ${v.description || ''}`.toLowerCase(), name = String(v.name || '').toLowerCase();
+  return MAP_TAGS.reduce((out, t, i) => ((t.match ? t.match(v, name, text) : t.types.includes(v.type) || t.find.test(text)) ? out.concat(i) : out), []);
 }
 function mapFrenchNote(note) {
   const en = String(note || '').trim();
@@ -17268,7 +17462,7 @@ function mapLiveData(now = new Date()) {
   mapDataCache = { version, json };
   return mapDataCache;
 }
-function renderPlacesMapPage(placeCount = null, now = new Date()) {
+function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const count = placeCount == null ? mapPlaces().length : placeCount;
   const title = 'Roam Now: Okanagan Map of What’s Open Near You | Okanagan Roam';
   const description = `Find what’s open near you in the Okanagan: ${count.toLocaleString('en-CA')} restaurants, wineries, beaches, trails and more on one map, with directions and what’s on this week.`;
@@ -17385,7 +17579,8 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
-<script>
+${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.stringify(Object.fromEntries(FR_SEARCH_SYNONYM_MAP)).replace(/</g, '\\u003c')}</script>
+` : ''}<script>
 (function(){
   var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(OKANAGAN_CLOCK_FORMAT)});
   ${okanaganClock.toString()}
@@ -25917,6 +26112,9 @@ function frenchTwinHtml(html, enPath, search = '') {
   // French advisories (2026-10-19, round 7): a card's "Check before you go" text in French (its own note_fr, the
   // French list or the known-phrasing fallback), never the English sentence.
   html = html.replace(/(<p class="venue-advisory-text">)([^<]*)(<\/p>)/g, (m, a, t, b) => `${a}${escapeHtml(frAdvisoryText(frDecode(t)))}${b}`);
+  // Round 8 (2026-10-19): the dog-friendly chip's tooltip (the place's dog rule) in French too, from the French list;
+  // Peach Orchard Dog Beach's said "Fenced off-leash dog beach; ..." on /fr.
+  html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml(frTextOr(frDecode(t)))}${b}`);
   let out = localizeStaticFr(localizeHtml(html, 'fr'));
   out = out.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/).map((part, i) => {
     if (i % 2 === 0) return frMarkup(part);
@@ -26122,6 +26320,7 @@ function frStatusText(text) {
     .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
     // A special closure (2026-10-18): "Closed today (holiday) \u00b7 Opens ..." -> "Ferm\u00e9 aujourd\u2019hui (jour f\u00e9ri\u00e9) \u00b7 ouvre ...".
     .replace(' (holiday)', ' (jour f\u00e9ri\u00e9)')
+    .replace(' (temporary closure)', ' (fermeture temporaire)')
     .replace(') \u00b7 Opens ', ') \u00b7 ouvre ')
     .replace('Closed now', 'Ferm\u00e9 en ce moment')
     .replace('Hours not listed for today', 'Heures non indiqu\u00e9es pour aujourd\u2019hui')
@@ -26391,7 +26590,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // a seasonal set shows on its dates and a closed day reads "Closed (Thanksgiving)".
     const datedWeek = !!(parsedHours.seasons || parsedHours.closures) && !seasonShut && clockNow.date;
     const dateOf = (d) => hoursModule.shiftDate(clockNow.date, (hoursModule.HOURS_WEEKDAYS.indexOf(d) - hoursModule.HOURS_WEEKDAYS.indexOf(today) + 7) % 7);
-    const closedWord = (c) => `${L('Closed', 'Fermé')} (${escapeHtml(c.note || L('holiday', 'jour férié'))})`;
+    // Round 8 (2026-10-19): a closure of three days or more without a note is a temporary closure, not "(holiday)".
+    const closedWord = (c) => (c.note ? `${L('Closed', 'Fermé')} (${escapeHtml(c.note)})`
+      : hoursModule.isTemporaryClosure && hoursModule.isTemporaryClosure(c) ? L('Temporarily closed', 'Fermeture temporaire') : `${L('Closed', 'Fermé')} (${L('holiday', 'jour férié')})`);
     const rowsFor = (dayOf) => hoursModule.HOURS_WEEKDAYS.map((d) => {
       const day = dayOf(d);
       const text = day && day.closure ? closedWord(day.closure) : escapeHtml(venueDayHoursText(day, fr));
@@ -26410,7 +26611,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
         });
         const list = `<ul class="hours-list" data-today="${today}">${rows}</ul>`;
         if (texts.every((t) => t === texts[0])) {
-          return `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${escapeHtml(texts[0])}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
+          // A week closed every day (a temporary closure) says so, not "closed:" (round 8).
+          const first = datedWeek ? hoursModule.dayOnDate(parsedHours, dateOf('mon')) : parsedHours.days.mon;
+          const daily = first && first.closure ? closedWord(first.closure) : escapeHtml(texts[0]);
+          return `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-daily"><span>${L('Every day', 'Tous les jours')}</span> <span>${daily}</span></p><details class="venue-hours-days"><summary>${L('Each day', 'Jour par jour')}</summary>${list}</details>`;
         }
         return `<h2>${L('Hours', 'Heures')}</h2>${list}`;
       })();
@@ -32789,9 +32993,30 @@ function renderContactPage() {
 // page has no trip tray, so app.js's in-memory copy of the trip is not
 // running here and this page is the only writer while it is open.
 const MY_TRIP_MAX_REFS = 30;
-function tripStopsFor(refs) {
+// My Trip notices (2026-10-19, round 8): a stop with a closure or a "Check before you go" advisory says so on My Trip,
+// as its card does: the dated season or closure tag ("Closed Oct 21–28, reopens Oct 29.") when there is one, else the
+// written advisory. -> null | { kind, text, textFr }
+function tripStopNotice(venueId, seasons, advisories) {
+  const st = seasons.get(venueId);
+  if (st) {
+    const text = seasonTagShortText(st);
+    let fr = null;
+    try { fr = frText(text); } catch (e) { fr = null; }
+    return { kind: st.kind, text, textFr: fr || text };
+  }
+  const note = advisories.get(venueId);
+  if (!note) return null;
+  const text = parseAdvisoryNote(note).text;
+  if (!text) return null;
+  let fr = text;
+  try { fr = frAdvisoryText(text); } catch (e) { fr = text; }
+  return { kind: 'advisory', text, textFr: fr };
+}
+function tripStopsFor(refs, now = new Date()) {
   const out = [];
   const venueQ = db.prepare('SELECT * FROM venues WHERE id = ?');
+  let seasons = new Map(), advisories = new Map();
+  try { seasons = getSeasonStates(now); advisories = getCollectionNotes(ADVISORY_COLLECTION_KIND); } catch (e) { /* no notices */ }
   const eventQ = db.prepare('SELECT * FROM events WHERE id = ?');
   for (const ref of refs.slice(0, MY_TRIP_MAX_REFS)) {
     const m = /^(venue|event):([1-9][0-9]*)$/.exec(String(ref || ''));
@@ -32811,6 +33036,7 @@ function tripStopsFor(refs) {
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
+        notice: tripStopNotice(v.id, seasons, advisories),
       });
     } else {
       const e = eventQ.get(Number(m[2]));
@@ -32983,6 +33209,7 @@ function renderMyTripPage(opts = {}) {
     // A planned trip's stops without a day (2026-10-18): their link maps only them, so it says so.
     otherStops: L('Other stops', 'Autres arrêts'), dirOther: L('Directions for other stops', 'Itinéraire des autres arrêts'),
     gone: L('No longer listed', 'N’est plus répertorié'),
+    checkFirst: L('Check before you go:', 'À vérifier avant d’y aller :'),
     moveUp: L('Move {name} up', 'Monter {name}'), moveDown: L('Move {name} down', 'Descendre {name}'), remove: L('Remove {name}', 'Retirer {name}'),
     movedUp: L('Moved {name} up.', '{name} déplacé vers le haut.'), movedDown: L('Moved {name} down.', '{name} déplacé vers le bas.'),
     removed: L('Removed {name}.', '{name} retiré.'), theStop: L('the stop', 'l’arrêt'),
@@ -33020,6 +33247,7 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-day-head h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.3rem; margin: 0; }
   body.my-trip-page .mt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
   body.my-trip-page .mt-drive { list-style: none; margin: 0 0 8px; padding: 8px 12px; border-left: 3px solid var(--teal, #1F5C5C); font-weight: 700; font-size: 0.92rem; }
+  body.my-trip-page .mt-notice { margin: 6px 0 0; padding: 6px 10px; border-radius: 10px; background: #FFF4E0; color: #6B3F00; font-size: 0.86rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   body.my-trip-page .mt-stop { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px; border-radius: 14px; background: var(--paper, #fffaf2); box-shadow: 0 8px 20px -16px rgba(74,52,40,0.45); }
   body.my-trip-page .mt-photo { width: 120px; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; background: #2A6B67; }
   body.my-trip-page .mt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -33169,7 +33397,10 @@ ${renderGolfHeaderHtml()}
           var fr = document.documentElement.lang === 'fr';
           var meta = d.missing ? T.gone : [timeText(x.s.time), (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
-          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p></div>' + tools + '</li>';
+          // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
+          var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
+          var notice = nt ? '<p class="mt-notice mt-notice-' + esc(d.notice.kind) + '"><span aria-hidden="true">' + (d.notice.kind === 'advisory' ? '⚠️' : d.notice.kind === 'open_until' ? '⏳' : d.notice.kind === 'reopening' ? '🌱' : '📅') + '</span> ' + (d.notice.kind === 'advisory' ? '<strong>' + esc(T.checkFirst) + '</strong> ' : '') + esc(nt) + '</p>' : '';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + notice + '</div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
     drawMap(shown);
@@ -39668,8 +39899,10 @@ const OWNER_HELP_TOPICS = [
     aFr: '<p>Allez à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et entrez le courriel de l\u2019entreprise que nous avons au dossier. Un nouveau lien arrive en une minute ou deux.</p><p>Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau; ensuite, utilisez le courriel le plus récent. Aucun courriel? Nous n\u2019avons peut-être pas votre courriel, ou nous en avons un autre. Ouvrez la page de votre entreprise et touchez <strong>Réclamer cette fiche</strong>, ou utilisez <strong>Écrivez-nous</strong> ci-dessous.</p>' },
   // Claim this listing (2026-10-18): owners with no edit link, no email on file, or a changed email.
   { id: 'claim', q: 'How do I claim my listing?', qFr: 'Comment réclamer ma fiche?', pages: ['login', 'link', 'invalid', 'account', 'claim'],
-    keys: ['claim', 'claim my listing', 'claim this listing', 'claim my business', 'take over', 'takeover', 'my business is listed', 'business is on your site', 'ownership', 'prove', 'verify', 'own this business', 'get access', 'access my listing', 'no edit link', 'never had a link', 'manage my listing', 'control my listing'],
-    keysFr: ['revendiquer', 'revendiquer ma fiche', 'revendiquer cette fiche', 'reclamer', 'reclamer ma fiche', 'reclamer cette fiche', 'mon entreprise est sur votre site', 'mon entreprise est affichee', 'prouver', 'verifier', 'je suis le proprietaire', 'je suis la proprietaire', 'acceder a ma fiche', 'gerer ma fiche', 'pas de lien', 'jamais eu de lien'],
+    keys: ['claim', 'claim my listing', 'claim this listing', 'claim my business', 'take over', 'takeover', 'my business is listed', 'business is on your site', 'ownership', 'prove', 'verify', 'own this business', 'get access', 'access my listing', 'no edit link', 'never had a link', 'manage my listing', 'control my listing',
+      // Round 8 (2026-10-19): the word alone ("my busness") is about getting at the listing.
+      'business'],
+    keysFr: ['revendiquer', 'revendiquer ma fiche', 'revendiquer cette fiche', 'reclamer', 'reclamer ma fiche', 'reclamer cette fiche', 'mon entreprise est sur votre site', 'mon entreprise est affichee', 'prouver', 'verifier', 'je suis le proprietaire', 'je suis la proprietaire', 'acceder a ma fiche', 'gerer ma fiche', 'pas de lien', 'jamais eu de lien', 'fiche'],
     a: '<ol><li>Open your business\u2019s page on Okanagan Roam and tap <strong>Claim this listing</strong> (beside the opening hours).</li><li>Tell us your name, your role and your business email, and how we can check it\u2019s you, for example by calling the number on your listing.</li><li>Once we\u2019ve checked, usually within a day or two, we email you a private edit link. On that page you can also create a login.</li></ol><p>It\u2019s free. Already got an email from us before? <a href="/owner/link">Email me a new link</a> is faster. Not listed at all? <a href="/list-your-venue">List your business</a>.</p>',
     aFr: '<ol><li>Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Réclamer cette fiche</strong> (à côté des heures d\u2019ouverture).</li><li>Indiquez votre nom, votre rôle et le courriel de l\u2019entreprise, et comment nous pouvons vérifier que c\u2019est bien vous, par exemple en appelant le numéro de votre fiche.</li><li>Après vérification, en général d\u2019ici un jour ou deux, nous vous envoyons par courriel un lien de modification privé. Sur cette page, vous pouvez aussi créer un compte.</li></ol><p>C\u2019est gratuit. Vous avez déjà reçu un courriel de nous? <a href="/fr/owner/link">Recevoir un nouveau lien</a> est plus rapide. Pas encore inscrit? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>.</p>' },
   { id: 'noemail', over: ['forgot', 'newlink'], q: 'I never got the email', qFr: 'Je n\u2019ai jamais reçu le courriel', pages: ['login', 'link', 'forgot', 'invalid'],
@@ -39950,10 +40183,10 @@ const OWNER_HELP_TOPICS = [
   { id: 'site-badge', over: ['features', 'links'], q: 'Get the \u201cFeatured on Okanagan Roam\u201d badge for our website', qFr: 'Obtenir le badge « Featured on Okanagan Roam » pour notre site Web', pages: ['edit', 'account', 'settings'],
     keys: ['website badge', 'badge for my website', 'badge for our website', 'badge for my site', 'badge for our site', 'badge on my website', 'badge on our website', 'badge on my site', 'site badge', 'web badge',
       'featured badge', 'featured on okanagan roam', 'featured on', 'okanagan roam badge', 'roam badge', 'badge logo', 'your logo', 'okanagan roam logo', 'embed', 'embed code', 'badge code', 'widget', 'link back', 'link to my listing', 'link to our listing', 'sticker',
-      'logo on my website', 'logo on our website', 'put your logo', 'badge'],
+      'logo on my website', 'logo on our website', 'put your logo', 'badge', 'logo', 'logo for my website', 'logo for our website', 'logo for my site'],
     keysFr: ['badge pour mon site', 'badge pour notre site', 'badge sur mon site', 'badge sur notre site', 'badge web', 'badge site web', 'badge en vedette', 'en vedette sur okanagan roam', 'featured on okanagan roam',
       'badge okanagan roam', 'logo okanagan roam', 'votre logo', 'code a integrer', 'integrer', 'code du badge', 'lien vers ma fiche', 'lien vers notre fiche', 'autocollant',
-      'logo sur mon site', 'logo sur notre site', 'badge'],
+      'logo sur mon site', 'logo sur notre site', 'badge', 'logo', 'logo pour mon site', 'logo pour notre site', 'logo pour mon site web', 'logo pour notre site web'],
     a: '<p>Every listed business can put our free \u201cFeatured on Okanagan Roam\u201d badge on its own website. It links visitors to your listing.</p><ol><li>Open your listing on Okanagan Roam and copy its address from the browser bar.</li><li>Paste this code in your website\u2019s footer or About page, with your listing\u2019s address in place of YOUR-LISTING:<br><code>&lt;a href="YOUR-LISTING"&gt;&lt;img src="https://okanaganroam.com/badges/featured-on-okanagan-roam.svg" alt="Featured on Okanagan Roam" width="240" height="72"&gt;&lt;/a&gt;</code></li></ol><p>A PNG copy is at <a href="/badges/featured-on-okanagan-roam.png" target="_blank" rel="noopener">featured-on-okanagan-roam.png</a> if your site builder needs an image file. Need a hand? Tap <strong>Message us</strong>.</p><p>Looking for the <strong>Badges</strong> on your listing (dog friendly, patio \u2026)? Ask \u201cbadges\u201d.</p>',
     aFr: '<p>Toute entreprise inscrite peut afficher gratuitement notre badge « Featured on Okanagan Roam » (en vedette sur Okanagan Roam) sur son propre site Web. Il mène les visiteurs à votre fiche. Le badge est en anglais.</p><ol><li>Ouvrez votre fiche sur Okanagan Roam et copiez son adresse dans la barre du navigateur.</li><li>Collez ce code dans le pied de page ou la page À propos de votre site, en remplaçant VOTRE-FICHE par l\u2019adresse de votre fiche :<br><code>&lt;a href="VOTRE-FICHE"&gt;&lt;img src="https://okanaganroam.com/badges/featured-on-okanagan-roam.svg" alt="Featured on Okanagan Roam" width="240" height="72"&gt;&lt;/a&gt;</code></li></ol><p>Une copie PNG se trouve à <a href="/badges/featured-on-okanagan-roam.png" target="_blank" rel="noopener">featured-on-okanagan-roam.png</a> si votre outil de création de site demande un fichier image. Besoin d\u2019aide? Touchez <strong>Écrivez-nous</strong>.</p><p>Vous cherchez les <strong>Caractéristiques</strong> de votre fiche (chiens acceptés, terrasse…)? Demandez « caractéristiques ».</p>' },
   // Round 7 (2026-10-19): an owner who can't find their business on the site: search first, then claim it, or list it.
@@ -40163,7 +40396,9 @@ const OWNER_HELP_SCRIPT = String.raw`
     x = x.replace(/\u0153/g, 'oe').replace(/\u00e6/g, 'ae');
     // French elisions keep their word (d'ouverture -> d ouverture); English contractions join (can't -> cant).
     x = x.replace(/\b(qu|l|d|j|n|s|c|m|t)['\u2019](?=[a-z])/g, '$1 ').replace(/['\u2019]/g, '');
-    return x.replace(/\$+/g, ' dollarsign ').replace(/[^a-z0-9]+/g, ' ').trim();
+    x = x.replace(/\$+/g, ' dollarsign ').replace(/[^a-z0-9]+/g, ' ').trim();
+    // Round 8 (2026-10-19): "business" as owners mistype it ("busness" was too far from any key to be read).
+    return x.replace(/\b(?:busness|buisness|bussiness|busines|bizness|buissness|businness)\b/g, 'business');
   }
   function toks(s){ var n = norm(s); return n ? n.split(' ') : []; }
   var STOP = {};
@@ -40224,8 +40459,9 @@ const OWNER_HELP_SCRIPT = String.raw`
     return -s * 2;
   }
   var FR_WORDS = 'comment je j nous vous mes mon ma nos notre votre vos est les des une pour avec dans pas puis peux peut quand pourquoi quoi ou au aux du le la et qui que mettre changer modifier ajouter enlever retirer supprimer heures heure horaire horaires ferme fermes fermee ouvert ouverts courriel mot passe lien fiche entreprise bonjour merci aide svp connexion connecter deconnecter avis prix evenement evenements semaine chaque samedi dimanche noel ete hiver adresse nom ai sommes sont personnel'.split(' ');
-  var EN_WORDS = 'the my how do i can is our we to what where why change add hours password link login closed open are it you your me and of for with not dont cant im were get set edit remove photo photos event events menu'.split(' ');
-  // Which language a question is in; the page's language when it could be either.
+  var EN_WORDS = 'the my how do i can is our we to what where why change add hours password link login closed open are it you your me and of for with not dont cant im were get set edit remove event events'.split(' ');
+  // Which language a question is in; the page's language when it could be either. Round 8 (2026-10-19): words that
+  // are the same in both ("photos", "menu", "logo") never count as English, so "photos" on /fr is answered in French.
   function langOf(q){
     var w = toks(q), fr = /[\u00e0\u00e2\u00e7\u00e8\u00e9\u00ea\u00eb\u00ee\u00ef\u00f4\u00f9\u00fb\u00fc\u0153]/i.test(q) ? 2 : 0, en = 0;
     w.forEach(function(x){ if (FR_WORDS.indexOf(x) >= 0) fr++; if (EN_WORDS.indexOf(x) >= 0) en++; });
@@ -44564,6 +44800,11 @@ const server = http.createServer(async (req, res) => {
       }
       const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS, lang: res.twinLang === 'fr' ? 'fr' : 'en' });
       run.query = q; run.searchText = searchText;
+      // Search typos (round 8): "We read “winary” as “winery”."
+      try {
+        const typo = searchTypoFix(q).corrections;
+        if (typo.length && run.presentation) run.presentation.corrections = [...typo, ...(run.presentation.corrections || []).filter((c) => !typo.some((t) => t.from === c.from))];
+      } catch (e) { /* no correction line */ }
       const html = renderSearchPage(run, { lang: res.twinLang });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
       return res.end(html);
@@ -44573,7 +44814,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/map' || pathname === '/map/') && method === 'GET') {
       // A real map of every place (2026-10-14), so it is indexable now.
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(renderPlacesMapPage());
+      return res.end(renderPlacesMapPage(null, new Date(), { lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
     }
     // GET /map/data.json -- the places, their hours and this week's events for /map, versioned by ?v=.
     if (pathname === '/map/data.json' && method === 'GET') {
@@ -47799,6 +48040,15 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // French and tools (2026-10-19, round 8)
+  searchTypoFix,
+  frSearchTermLabel,
+  discoveryInterpretedTextFr,
+  discoveryNoteTextFr,
+  mapPlaceTags,
+  MAP_TAGS,
+  mergeSeasonNotes,
+  tripStopNotice,
   // French advisories and search phrases (2026-10-19, round 7)
   frAdvisoryText,
   frAdvisoryFallback,

@@ -29978,3 +29978,254 @@ test('Round 8 tech: one duplicate guard for POST /api/venues and List Your Venue
     db.prepare("DELETE FROM removed_venues WHERE name LIKE 'R8 %' OR name LIKE 'The R8 %'").run();
   }
 });
+
+// ---------- Round 8 (2026-10-19): French and tools ----------
+function r8Fixtures(rows, fn) {
+  const cols = ['name', 'region', 'type', 'slug', 'description', 'rating', 'reviews', 'hours'];
+  const made = [];
+  for (const row of rows) {
+    const r = { description: 'Round 8 fixture.', rating: 4.3, reviews: 40, hours: null, ...row };
+    r.slug = r.slug || app.slugify(r.name);
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c]));
+    made.push(db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(r.slug, r.region));
+  }
+  return Promise.resolve().then(() => fn(made)).finally(() => {
+    for (const v of made) {
+      db.prepare('DELETE FROM venue_hours_extra WHERE venue_id = ?').run(v.id);
+      db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id = ?").run(v.id);
+      db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+    }
+    app.clearHoursExtraCache();
+  });
+}
+
+test('Round 8 map: "brewery" and "cider" each find their own places, and /fr/map reads the search\'s French words', async () => {
+  const tagsOf = (v) => app.mapPlaceTags({ cuisine: '', description: '', ...v }).map((i) => app.MAP_TAGS[i].key);
+  assert.ok(tagsOf({ name: 'Cannery Brewing', type: 'brewery' }).includes('brewery'));
+  assert.ok(!tagsOf({ name: 'Cannery Brewing', type: 'brewery' }).includes('cider'));
+  assert.ok(tagsOf({ name: 'Folktale Cider', type: 'brewery' }).includes('cider'));
+  assert.ok(!tagsOf({ name: 'Folktale Cider', type: 'brewery' }).includes('brewery'), 'a cidery filed as a brewery is not a brewery');
+  assert.ok(tagsOf({ name: 'Orchard Winery', type: 'winery', description: 'Wines and a hard cider.' }).includes('cider'));
+  for (const t of ['brewery', 'cider']) assert.ok(!tagsOf({ name: 'Corner Pub', type: 'pub', description: 'Beer and cider on tap.' }).includes(t), `a pub is not a ${t}`);
+  await withDiscoveryServer(async (base) => {
+    const en = await (await fetch(`${base}/map`)).text();
+    const fr = await (await fetch(`${base}/fr/map`)).text();
+    const conf = (html) => JSON.parse(html.match(/CONF = (\{.*?\});/)[1]);
+    const words = (html) => { const m = html.match(/<script type="application\/json" id="pmFrWords">([\s\S]*?)<\/script>/); return m ? JSON.parse(m[1]) : null; };
+    assert.equal(words(en), null, 'the English map carries no French list');
+    assert.equal(words(fr).cidre, 'cider');
+    assert.equal(words(fr).musee, 'museum');
+    // The map's own reading of a search, run as the page runs it.
+    const vm = require('node:vm');
+    const reader = (html) => {
+      const c = conf(html);
+      const list = words(html);
+      const document = { getElementById: (id) => (id === 'pmFrWords' && list ? { textContent: JSON.stringify(list) } : null) };
+      const ctx = { CONF: c, document, okanaganClock: () => ({ minutes: 600 }), WEEK: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], NEG: ' no not without except avoid never nothing sans pas ni aucun aucune ' };
+      vm.runInNewContext(`${html.slice(html.indexOf('  // Plain words become filters'), html.indexOf('  var wantNear = false;'))}; this.parseWords = parseWords; this.WORD_TO = WORD_TO;`, ctx);
+      return (q) => ctx.parseWords(q).map((w) => (w[0] === '#' ? `#${c.tg[Number(w.slice(1))].k}` : ctx.WORD_TO[w] || w)).join(' ');
+    };
+    const rEn = reader(en), rFr = reader(fr);
+    assert.equal(rEn('cider'), '#cider');
+    assert.equal(rEn('brewery'), '#brewery');
+    assert.equal(rEn('breweries'), '#brewery');
+    assert.equal(rEn('craft beer'), '#craftbeer');
+    assert.equal(rEn('beer'), 'drinks', 'a plain drink word is still Drinks');
+    assert.equal(rFr('cidre'), '#cider');
+    assert.equal(rFr('cidrerie'), '#cider');
+    assert.equal(rFr('brasserie à Kelowna'), '#brewery @kelowna');
+    assert.equal(rFr('musée'), 'museum');
+    assert.equal(rFr('marché de Noël'), 'christmas market');
+    assert.equal(rFr('vue sur le lac'), 'lake', 'a phrase the map reads itself is left alone');
+    assert.equal(rFr('terrasse avec mon chien'), 'patio avec mon dogs');
+    assert.equal(rEn('musée'), 'musée', 'the English map has no French list');
+  });
+});
+
+test('Round 8 /fr/search: French labels, the occasion in French, and the visitor\'s own words instead of the English the search used', () => {
+  assert.equal(app.frSearchTermLabel('comedy', 'humour'), 'humour');
+  assert.equal(app.frSearchTermLabel('haunted', 'maison hantée'), 'maison hantée');
+  assert.equal(app.frSearchTermLabel('sleigh', 'promenade en traîneau'), 'promenade en traîneau');
+  assert.equal(app.frSearchTermLabel('cider', 'cidre'), 'cidre');
+  assert.equal(app.frSearchTermLabel('snow', 'neige'), 'neige');
+  assert.equal(app.frSearchTermLabel('sledding', 'toboggan'), 'toboggan');
+  assert.equal(app.frSearchTermLabel('cider', 'cider fest'), 'cider', 'a word typed as is stays');
+  assert.equal(app.frSearchTermLabel('winter', 'xyz'), null, 'an English word the visitor never typed is left out');
+  const labels = app.tripPlannerLabels();
+  const intent = { collections: [], foodTerms: [], types: [], activities: [], textTerms: ['comedy'], features: [], regions: ['kelowna'], cuisines: [],
+    excluded: { types: [], regions: [], cuisines: [], collections: [], activities: [], budget: null } };
+  const text = app.discoveryInterpretedTextFr(intent, labels, 'humour à Kelowna');
+  assert.ok(text.includes('« humour »') && !text.includes('comedy'), text);
+  assert.match(app.discoveryNoteTextFr({ code: 'not_applied', field: 'occasion', value: 'rainy_day' }, labels), /« jour de pluie »/);
+  for (const en of ['See this on its own page', 'Plan it with Build My Trip', 'Open now on Food & Drink', 'What’s On for those dates']) {
+    const fr = app.frText(en);
+    assert.ok(fr && fr !== en, en);
+  }
+});
+
+test('Round 8 search dead ends: rain, farmers\' markets, ski lifts, typos, hot springs, sledding, each winter activity and pumpkin patches', () => withDiscoveryFlag('on', () => r8Fixtures([
+  { name: 'R8 Snowshoe Loops', region: 'vernon', type: 'outdoor', description: 'Groomed snowshoe loops in the trees.' },
+  { name: 'R8 Nordic Centre', region: 'penticton', type: 'outdoor', description: 'Cross-country ski trails, classic and skate.' },
+  { name: 'R8 Lake Rink', region: 'kelowna', type: 'outdoor', description: 'An outdoor skating rink by the lake.' },
+  { name: 'R8 Tube Park', region: 'kelowna', type: 'outdoor', description: 'Snow tubing lanes and a magic carpet.' },
+  { name: 'R8 Snowmobile Area', region: 'kelowna', type: 'outdoor', description: 'Sledding trails for snowmobiles.' },
+  { name: 'R8 Thermal Spa', region: 'penticton', type: 'indoor', description: 'Saunas, cold plunges and a steam room.' },
+  { name: 'R8 Hot Bread Bakery', region: 'penticton', type: 'cafe', description: 'Bread hot from the oven.' },
+  { name: 'R8 Snowshoe Grill', region: 'kelowna', type: 'restaurant', description: 'Burgers after a day on the hill.' },
+  { name: 'R8 Fruit Stand', region: 'oliver', type: 'tour', description: 'Apples, a corn maze and a pumpkin patch in October.' },
+  { name: 'R8 Rainy Museum', region: 'kelowna', type: 'indoor', description: 'Local history.' },
+], () => {
+  const plan = (q, lang = 'en') => app.smartSearchPlan(app.discoverySearchText(q, lang));
+  // Only this test's places (the shared test database has a few others).
+  const names = (q, lang) => { const p = plan(q, lang); return p && p.list ? p.list().map((x) => x.row.name).filter((n) => n.startsWith('R8 ')) : []; };
+  const hero = (q, lang = 'en') => app.heroSearchTarget(q, { lang }).url;
+  // Rain: the Indoor pages, from /search as from the search box.
+  assert.equal(hero('pluie', 'fr'), '/indoor');
+  assert.equal(hero('rainy day'), '/indoor');
+  assert.equal(plan('pluie', 'fr').url, '/indoor');
+  // Farmers' markets: What's On's markets (no place is named one).
+  assert.equal(app.discoverySearchText('marché de producteurs', 'fr'), 'farmers market');
+  assert.equal(hero('marché de producteurs', 'fr'), '/whats-on?categories=markets-fairs');
+  assert.equal(hero('farmers market in kelowna'), '/whats-on?regions=kelowna&categories=markets-fairs');
+  // Ski lifts: the ski resorts, like "station de ski".
+  assert.equal(app.discoverySearchText('remonte-pente', 'fr'), 'ski resort');
+  assert.equal(app.discoverySearchText('station de ski', 'fr'), 'ski resort');
+  // Typos onto the names of kinds of place and activities.
+  assert.equal(app.searchTypoFix('winary').text, 'winery');
+  assert.equal(app.searchTypoFix('pumkin patch').text, 'pumpkin patch');
+  assert.equal(app.searchTypoFix('vignobel').text, 'vignoble');
+  assert.deepEqual(app.searchTypoFix('winary').corrections, [{ from: 'winary', to: 'winery' }]);
+  assert.equal(app.searchTypoFix('wineries in kelowna').corrections.length, 0, 'a real word is never touched');
+  assert.equal(app.searchTypoFix('snowshoe grill').text, 'snowshoe grill', 'a word in a place\'s name is never touched');
+  assert.equal(app.discoverySearchText('vignobel', 'fr'), 'winery');
+  assert.equal(hero('winary'), '/wineries');
+  // Hot springs: the spa, never the hot bread.
+  assert.deepEqual(names('hot springs'), ['R8 Thermal Spa']);
+  assert.deepEqual(names('source thermale', 'fr'), ['R8 Thermal Spa']);
+  assert.deepEqual(names('bain nordique', 'fr'), ['R8 Thermal Spa'], 'a nordic spa is a spa, not cross-country skiing');
+  // Each winter activity has its own places.
+  assert.deepEqual(names('snowshoe'), ['R8 Snowshoe Loops'], 'a restaurant named Snowshoe is not a trail');
+  assert.deepEqual(names('raquette', 'fr'), ['R8 Snowshoe Loops']);
+  assert.deepEqual(names('ski de fond', 'fr'), ['R8 Nordic Centre']);
+  assert.deepEqual(names('patin', 'fr'), ['R8 Lake Rink']);
+  assert.deepEqual(['snowshoe', 'xc_ski', 'skating'], [plan('raquette', 'fr').key, plan('ski de fond', 'fr').key, plan('patin', 'fr').key]);
+  assert.equal(plan('patin', 'fr').headingFr, 'Patin');
+  // Toboggan and sledding: tube parks, not the snowmobile area.
+  for (const [q, lang] of [['toboggan'], ['sledding'], ['luge', 'fr']]) assert.deepEqual(names(q, lang), ['R8 Tube Park'], q);
+  // Pumpkin patches: the farm that says it has one, and the fall farms guide when it is live.
+  assert.deepEqual(names('pumpkin patch'), ['R8 Fruit Stand']);
+  assert.deepEqual(names('citrouilles', 'fr'), ['R8 Fruit Stand']);
+  assert.deepEqual(names('pumkin'), ['R8 Fruit Stand']);
+  const guide = app.liveGuides().find((g) => g.path === '/guides/fall-farms-u-pick-okanagan');
+  if (guide) assert.deepEqual(plan('pumpkin patch').guides.map((g) => g.path), [guide.path]);
+})));
+
+test('Round 8 /search pages: "pluie" leaves for Indoor, a typo is named, and the French page shows French', () => withDiscoveryFlag('on', () => r8Fixtures([
+  { name: 'R8 Rainy Museum', region: 'kelowna', type: 'indoor', description: 'Local history.' },
+  { name: 'R8 Wine House', region: 'kelowna', type: 'winery', description: 'Wine tastings.' },
+], () => withDiscoveryServer(async (base) => {
+  const pluie = await fetch(`${base}/fr/search?q=pluie`, { redirect: 'manual' });
+  assert.equal(pluie.status, 302);
+  assert.equal(pluie.headers.get('location'), '/fr/indoor');
+  const typo = await (await fetch(`${base}/search?q=${encodeURIComponent('winary tasting')}`)).text();
+  assert.match(typo, /We read “winary” as “winery”/);
+  const frTypo = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('vignobel dégustation')}`)).text();
+  assert.match(frTypo, /Nous avons lu « vignobel » comme « vignoble »/);
+  for (const english of ['See this on its own page', 'Plan it with Build My Trip']) assert.ok(!frTypo.includes(english), english);
+}))));
+
+test('Round 8 help bot: words the same in both languages answer in the page\'s language, and the new keywords', () => {
+  const frEdit = ohbMatcher('edit', { lang: 'fr' }), enEdit = ohbMatcher('edit'), frAccount = ohbMatcher('account', { lang: 'fr' });
+  for (const [q, id] of [['photos', 'photo-add'], ['photo', 'photo-add'], ['menu', 'menu-add']]) {
+    assert.deepEqual([frEdit(q).id, frEdit(q).lang], [id, 'fr'], `/fr: ${q}`);
+    assert.deepEqual([enEdit(q).id, enEdit(q).lang], [id, 'en'], `English page: ${q}`);
+  }
+  assert.equal(enEdit('how do i add photos').lang, 'en', 'an English question stays English on /fr');
+  assert.equal(frEdit('how do i add photos').lang, 'en');
+  assert.equal(enEdit('busness').id, 'claim');
+  assert.equal(enEdit('my busness').id, 'claim');
+  assert.equal(ohbMatcher('claim')('someone else claimed my busness').id, 'dispute', 'a narrower topic still wins');
+  assert.deepEqual([frAccount('fiche').id, frAccount('fiche').lang], ['claim', 'fr']);
+  assert.equal(frAccount('supprimer ma fiche').id, 'remove');
+  assert.equal(frAccount('qui a accès à ma fiche').id, 'access');
+  for (const q of ['logo', 'logo pour mon site', 'logo pour notre site web']) assert.deepEqual([frEdit(q).id, frEdit(q).lang], ['site-badge', 'fr'], q);
+  assert.equal(enEdit('logo').id, 'site-badge');
+});
+
+test('Round 8 temporary closures: "Temporarily closed" in the hours, not "(holiday)", and the notice says it once', () => r8Fixtures([
+  { name: 'R8 Closed Week Cafe', region: 'kelowna', type: 'cafe', hours: SEASON_WEEK },
+], async ([v]) => {
+  const today = app.todayLocal();
+  const from = app.addLocalDays(today, -1), to = app.addLocalDays(today, 3), single = app.addLocalDays(today, 5);
+  db.prepare('INSERT INTO venue_hours_extra (venue_id, seasons, closures) VALUES (?, ?, ?)').run(v.id, '[]', JSON.stringify([{ from, to }, { from: single, to: single }]));
+  app.clearHoursExtraCache();
+  db.prepare("UPDATE venues SET description_fr = 'Un café pour les tests.' WHERE id = ?").run(v.id);
+  const row = app.findVenueBySlug('kelowna', 'cafe', v.slug);
+  const en = app.renderVenuePage(row, [], [], []);
+  const hours = en.slice(en.indexOf('<ul class="hours-list"'), en.indexOf('</ul>', en.indexOf('<ul class="hours-list"')));
+  assert.match(hours, /Temporarily closed/);
+  assert.equal((hours.match(/Closed \(holiday\)/g) || []).length, 1, 'a single day without a note is still a holiday');
+  await withDiscoveryServer(async (base) => {
+    const fr = await (await fetch(`${base}/fr/kelowna/cafes/${v.slug}`)).text();
+    const frHours = fr.slice(fr.indexOf('<ul class="hours-list"'), fr.indexOf('</ul>', fr.indexOf('<ul class="hours-list"')));
+    assert.match(frHours, /Fermeture temporaire/);
+    assert.equal((frHours.match(/jour férié/g) || []).length, 1);
+  });
+  // The status line (hours.js): a closure of two days or more is a temporary closure.
+  const hoursModule = require('../hours.js');
+  const parsed = hoursModule.parseHours(JSON.stringify({ ...JSON.parse(SEASON_WEEK), _closures: [{ from: '2026-10-21', to: '2026-10-28' }] }));
+  const st = hoursModule.statusAt(parsed, { weekday: 'thu', minutes: 600, date: '2026-10-22' });
+  assert.equal(st.closedNote, 'temporary closure');
+  // A written advisory that already says it is closed is not repeated by the closure's own sentence.
+  const season = new Map([[1, { kind: 'temp_closed', text: 'Closed Oct 21–28, reopens Oct 29.', note: 'Closed Oct 21–28, reopens Oct 29.', from: '2026-10-21', to: '2026-10-28' }]]);
+  const said = 'Closed from Wednesday, October 21 to Wednesday, October 28, 2026 (wedding week); back Thursday, October 29. https://example.com';
+  assert.equal(app.mergeSeasonNotes(new Map([[1, said]]), season).get(1), said);
+  assert.equal(app.mergeSeasonNotes(new Map([[1, 'Cash only this month.']]), season).get(1), 'Closed Oct 21–28, reopens Oct 29. Cash only this month.');
+  assert.equal(app.mergeSeasonNotes(new Map([[1, 'The patio is closed for winter.']]), season).get(1), 'Closed Oct 21–28, reopens Oct 29. The patio is closed for winter.', 'a closed patio is not the closure');
+  assert.equal(app.mergeSeasonNotes(new Map(), season).get(1), 'Closed Oct 21–28, reopens Oct 29.');
+}));
+
+test('Round 8 leftover English on /fr: awards, access, the dog-beach chip, The Dream, "selon" and the badge note', async () => {
+  for (const en of ['Voted Best Cake Shop, Best of Penticton 2026', 'Voted Best Campground around Penticton (2026)', 'Voted Best Seafood in Penticton (2026)',
+    'Voted Best Distillery around Penticton (2026)', 'Voted Best Cheap Eats in Penticton (2026)',
+    'Recreation Sites and Trails BC parking lot about 3.8 km up Gillard Forest Service Road from Chute Lake Road (via Lakeshore Road), Kelowna, BC',
+    'Hydraulic Lake Road off Highway 33, about 35 km southeast of Kelowna, BC']) {
+    const fr = app.frText(en);
+    assert.ok(fr && fr !== en && !/\bVoted\b|\bparking lot\b|\boff Highway\b/.test(fr), en);
+  }
+  assert.equal(app.frText('The Dream (live music venue)'), 'The Dream (salle de concerts)');
+  assert.equal(app.frText('The Dream (live music venue) · 67 Front St'), 'The Dream (salle de concerts) · 67 Front St');
+  // The dog-friendly chip's tooltip.
+  const html = '<!DOCTYPE html><html lang="en"><head><title>x</title></head><body><span class="chip dog-friendly-badge" title="Fenced off-leash dog beach; main Peach Orchard Beach is no-dogs in season (off-leash approx. Oct–Apr)">🐾 Dog Friendly</span></body></html>';
+  const fr = app.frenchTwinHtml(html, '/summerland/beaches/peach-orchard-dog-beach');
+  assert.match(fr, /title="Plage clôturée pour chiens sans laisse;/);
+  // The planner's rating, read aloud: "4,7 sur 5 (939 avis)".
+  const appJs = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.ok(appJs.includes("'tripv3.from': 'sur 5',") && !appJs.includes("'tripv3.from': 'selon'"));
+  // List Your Venue (FR) says the badge itself is in English, as the help bot does.
+  await withDiscoveryServer(async (base) => {
+    const lyv = await (await fetch(`${base}/fr/list-your-venue`)).text();
+    assert.match(lyv, /Le badge est en anglais\./);
+  });
+});
+
+test('Round 8 My Trip: a stop with a closure or an advisory shows it', () => r8Fixtures([
+  { name: 'R8 Trip Closure Cafe', region: 'kelowna', type: 'cafe', hours: SEASON_WEEK },
+  { name: 'R8 Trip Advisory Beach', region: 'kelowna', type: 'beach' },
+  { name: 'R8 Trip Plain Cafe', region: 'kelowna', type: 'cafe' },
+], async ([closed, beach, plain]) => {
+  const today = app.todayLocal();
+  db.prepare('INSERT INTO venue_hours_extra (venue_id, seasons, closures) VALUES (?, ?, ?)').run(closed.id, '[]', JSON.stringify([{ from: today, to: app.addLocalDays(today, 4) }]));
+  app.clearHoursExtraCache();
+  const r = app.guardedCollectionMembershipUpdate('advisory', beach.id, 'add', 'Swimming advisory in effect. https://www.kelowna.ca/beaches (checked 2026-10-19)', { reason: 'r8 test', batch_id: 'r8' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const stops = app.tripStopsFor([`venue:${closed.id}`, `venue:${beach.id}`, `venue:${plain.id}`]);
+  assert.equal(stops[0].notice.kind, 'temp_closed');
+  assert.equal(stops[0].notice.text, app.tempClosureText(today, app.addLocalDays(today, 4), today));
+  assert.match(stops[0].notice.textFr, /^Fermé du /);
+  assert.deepEqual([stops[1].notice.kind, stops[1].notice.text], ['advisory', 'Swimming advisory in effect. (checked 2026-10-19)']);
+  assert.equal(stops[2].notice, null);
+  const fr = app.renderMyTripPage({ lang: 'fr' });
+  assert.ok(fr.includes('mt-notice') && fr.includes('À vérifier avant d’y aller :'));
+  app.guardedCollectionMembershipUpdate('advisory', beach.id, 'remove', null, { reason: 'r8 test', batch_id: 'r8' });
+}));
