@@ -252,6 +252,8 @@ var TRANSLATIONS = {
     'trip.otherStops': 'Other stops',
     'trip.dayRoute': 'Route for day {n}',
     'trip.routeCapped': 'Google Maps takes up to {n} stops in one route, so this route has the first {n}. Each day in My Trip has its own route.',
+    'trip.toastAdded': 'Added to My Trip.',
+    'trip.toastView': 'View My Trip',
 
     'trip.planner.title': 'Build My Trip',
     'trip.planner.subtitle': 'Answer a few questions and we\u2019ll put together a real, day-by-day Okanagan itinerary from actual venues \u2014 no invented places, no AI guesswork.',
@@ -721,6 +723,8 @@ var TRANSLATIONS = {
     'trip.otherStops': 'Autres arr\u00eats',
     'trip.dayRoute': 'Itin\u00e9raire du jour {n}',
     'trip.routeCapped': 'Google Maps accepte jusqu\u2019\u00e0 {n} arr\u00eats par itin\u00e9raire; celui-ci comprend donc les {n} premiers. Chaque jour de Mon voyage a son propre itin\u00e9raire.',
+    'trip.toastAdded': 'Ajout\u00e9 \u00e0 Mon voyage.',
+    'trip.toastView': 'Voir Mon voyage',
 
     'trip.planner.title': 'Planifiez mon voyage',
     'trip.planner.subtitle': 'R\u00e9pondez \u00e0 quelques questions et nous cr\u00e9erons un itin\u00e9raire r\u00e9el, jour par jour, dans l\u2019Okanagan \u00e0 partir de vrais \u00e9tablissements \u2014 aucun lieu invent\u00e9, aucune supposition par IA.',
@@ -2923,6 +2927,50 @@ window.__scrollToVenueCard = function(name){
     render();
   }
 
+  // Venue pages (2026-10-19, round 8): after "Add to trip" on a venue (or event) page, a short message at the foot of
+  // the screen says it was added, with a "View My Trip" link (/fr/my-trip on French pages). It is a polite status
+  // message, so screen readers announce it without moving focus; it stays while hovered or focused and goes after
+  // about 6 seconds, or when Esc is pressed.
+  var addedToastTimer = null;
+  function showAddedToast(){
+    var box = document.getElementById('tripAddedToast');
+    if (!box) {
+      if (!document.getElementById('tripAddedToastStyle')) {
+        var st = document.createElement('style');
+        st.id = 'tripAddedToastStyle';
+        st.textContent = '.trip-added-toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:1200;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:6px 8px 6px 18px;border-radius:14px;background:#1B2B3A;color:#fff;font:700 0.95rem/1.3 Nunito,"Nunito Fallback",sans-serif;box-shadow:0 10px 28px -10px rgba(0,0,0,.55)}'
+          + '.trip-added-toast:empty,.trip-added-toast[hidden]{display:none}'
+          + '.trip-added-toast a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:999px;background:#fff;color:#1B2B3A;text-decoration:none;font-weight:800}'
+          + '.trip-added-toast a:focus-visible{outline:3px solid #E8C468;outline-offset:2px}';
+        document.head.appendChild(st);
+      }
+      box = document.createElement('div');
+      box.id = 'tripAddedToast';
+      box.className = 'trip-added-toast';
+      box.setAttribute('role', 'status');
+      box.setAttribute('aria-live', 'polite');
+      document.body.appendChild(box);
+      var hold = function(){ clearTimeout(addedToastTimer); };
+      var later = function(){ clearTimeout(addedToastTimer); addedToastTimer = setTimeout(hideAddedToast, 6000); };
+      box.addEventListener('mouseenter', hold); box.addEventListener('focusin', hold);
+      box.addEventListener('mouseleave', later); box.addEventListener('focusout', later);
+      document.addEventListener('keydown', function(e){ if ((e.key === 'Escape' || e.key === 'Esc') && box.firstChild) hideAddedToast(); });
+    }
+    clearTimeout(addedToastTimer);
+    box.textContent = '';
+    // Filled a moment after the (empty) live region exists, so it is announced the first time too.
+    setTimeout(function(){
+      var msg = document.createElement('span');
+      msg.textContent = t('trip.toastAdded');
+      var link = document.createElement('a');
+      link.href = frPathPrefix() + '/my-trip';
+      link.textContent = t('trip.toastView');
+      box.appendChild(msg); box.appendChild(link);
+      addedToastTimer = setTimeout(hideAddedToast, 6000);
+    }, 60);
+  }
+  function hideAddedToast(){ clearTimeout(addedToastTimer); var box = document.getElementById('tripAddedToast'); if (box) box.textContent = ''; }
+
   // keep(t) decides which stops stay: a card's button removes its matching
   // stop(s); the tray's ✕ removes exactly the one it belongs to.
   function removeFromTrip(name, keep){
@@ -2943,6 +2991,7 @@ window.__scrollToVenueCard = function(name){
         removeFromTrip(s.name, function(t){ return !sameStop(t, s); });
       } else {
         addToTrip(s);
+        if (trip.some(function(t){ return sameStop(t, s); }) && tripBtn.closest('[data-surface="venue_page"], body.event-page')) showAddedToast();
       }
       return;
     }
