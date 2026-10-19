@@ -28911,3 +28911,25 @@ test('A11y pass 5: the /browse search placeholder is short, in English and Frenc
   assert.match((await get('/browse')).text, /id="bhSearch" class="fd-search-input" placeholder="Search places, cuisines…"/);
   assert.match((await get('/fr/browse')).text, /id="bhSearch" class="fd-search-input" placeholder="Chercher lieux, cuisines…"/);
 }));
+
+// ---- Deleting a listing with linked rows (2026-10-19: Misato's Kitchen failed with "FOREIGN KEY constraint failed") ----
+test('deleteVenue removes a listing that has an owner link, a season and a linked event, and keeps the event', () => {
+  const v = db.prepare(`INSERT INTO venues (name, region, type, description, slug) VALUES ('Delete FK Fixture', 'kelowna', 'restaurant', 'A fixture used only by the delete test.', 'delete-fk-fixture')`).run();
+  const id = Number(v.lastInsertRowid);
+  const other = Number(db.prepare(`INSERT INTO venues (name, region, type, description, slug, redirect_to) VALUES ('Delete FK Redirect', 'kelowna', 'restaurant', 'Redirects to the fixture.', 'delete-fk-redirect', ?)`).run(id).lastInsertRowid);
+  db.prepare(`INSERT INTO venue_owner_links (venue_id, token_hash, contact_email) VALUES (?, ?, NULL)`).run(id, 'delete-fk-fixture-hash');
+  db.prepare(`INSERT INTO venue_seasons (venue_id, status, source_url, checked_at) VALUES (?, 'closed', 'https://example.com', '2026-10-19')`).run(id);
+  const ev = Number(db.prepare(`INSERT INTO events (name, region, slug, start_datetime, venue_id) VALUES ('Delete FK Event', 'kelowna', 'delete-fk-event', '2026-11-01T19:00', ?)`).run(id).lastInsertRowid);
+  try {
+    assert.equal(app.deleteVenue(id), true);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venues WHERE id = ?').get(id).n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_owner_links WHERE venue_id = ?').get(id).n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_seasons WHERE venue_id = ?').get(id).n, 0);
+    assert.equal(db.prepare('SELECT venue_id FROM events WHERE id = ?').get(ev).venue_id, null, 'the event stays, unlinked');
+    assert.equal(db.prepare('SELECT redirect_to FROM venues WHERE id = ?').get(other).redirect_to, null, 'a redirect to it is cleared');
+    assert.equal(app.deleteVenue(id), false, 'a second delete finds nothing');
+  } finally {
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev);
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(id, other);
+  }
+});
