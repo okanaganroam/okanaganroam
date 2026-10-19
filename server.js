@@ -33778,18 +33778,48 @@ function stripHiddenElements(html) {
   }
   return h;
 }
-function htmlToMenuLines(html) {
-  let h = stripHiddenElements(String(html || '').replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' '));
+// Fix (2026-10-18): each line also says how the page set it, so the menu reader can tell a heading from a dish:
+// mark 1-6 is an <h1>-<h6>, 7 a line that is all bold, 9 the page's or site's own name (the <title>, og:site_name),
+// which is never a section. Lines: [{ text, mark }].
+const MENU_TITLE_SPLIT_RE = /\s+[|\u2013\u2014\u00b7:\-]\s+|\s*[|\u00b7]\s*/;
+const MENU_COURSE_WORD_RE = /\b(?:menus?|breakfast|brunch|lunch|dinner|drinks?|wines?|beers?|cocktails?|desserts?|happy hour|food|carte|d[e\u00e9]jeuner|d[i\u00ee]ner|boissons?|vins?)\b/i;
+function htmlToMenuLineData(html) {
+  const src = String(html || '');
+  // The page's and site's own names.
+  const titles = new Set();
+  const norm = (x) => decodeHtmlText(String(x || '')).toLowerCase().replace(/[^a-z0-9\u00c0-\u00ff]+/g, ' ').trim();
+  const tm = /<title\b[^>]*>([\s\S]{0,300}?)<\/title>/i.exec(src);
+  if (tm) for (const piece of decodeHtmlText(tm[1].replace(/<[^>]+>/g, ' ')).split(MENU_TITLE_SPLIT_RE)) {
+    if (piece.trim() && !MENU_COURSE_WORD_RE.test(piece)) titles.add(norm(piece));
+  }
+  for (const m of src.matchAll(/<meta\b[^>]*(?:property|name)=["'](?:og:site_name|application-name)["'][^>]*>/gi)) {
+    const c = /content=["']([^"']{1,120})["']/i.exec(m[0]);
+    if (c) titles.add(norm(c[1]));
+  }
+  titles.delete('');
+  let h = stripHiddenElements(src.replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' '));
   h = h.replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style|noscript|svg|template|head|iframe|form|select|button)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<(script|style|noscript|svg|template|head|title|iframe|form|select|button)\b[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<(nav|header|footer)\b[\s\S]*?<\/\1>/gi, ' ');
-  h = h.replace(/<br\s*\/?>/gi, '\n')
+  h = h.replace(/[\u0001\u0002]/g, ' ').replace(/<h([1-6])\b[^>]*>/gi, '\n\u0001$1\u0002').replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/?(p|div|li|ul|ol|h[1-6]|tr|table|section|article|aside|main|dd|dt|dl|blockquote|figure|figcaption|hr)\b[^>]*>/gi, '\n')
-    .replace(/<\/?(td|th)\b[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '');
-  return decodeHtmlText(h).split('\n').map((l) => l.replace(/[\s\u00a0]+/g, ' ').trim())
-    .filter((l) => l && l.length <= 400 && !WEB_BUTTON_RE.test(l)).slice(0, 3000);
+    .replace(/<\/?(td|th)\b[^>]*>/gi, ' ');
+  // A line that is all bold ("<p><strong>Breakfast</strong></p>").
+  h = h.split('\n').map((l) => {
+    const b = /^\s*<(strong|b)\b[^>]*>([\s\S]*)<\/\1>\s*$/i.exec(l);
+    return b && !new RegExp('</' + b[1] + '>', 'i').test(b[2]) && b[2].replace(/<[^>]+>/g, '').trim() ? '\u00017\u0002' + b[2] : l;
+  }).join('\n').replace(/<[^>]+>/g, '');
+  const out = [];
+  for (const raw of decodeHtmlText(h).split('\n')) {
+    const mk = /^\s*\u0001([1-7])\u0002/.exec(raw);
+    const text = raw.replace(/\u0001[1-7]?\u0002?|\u0002/g, ' ').replace(/[\s\u00a0]+/g, ' ').trim();
+    if (!text || text.length > 400 || WEB_BUTTON_RE.test(text)) continue;
+    out.push({ text, mark: titles.has(norm(text)) ? 9 : mk ? Number(mk[1]) : 0 });
+    if (out.length >= 3000) break;
+  }
+  return out;
 }
+function htmlToMenuLines(html) { return htmlToMenuLineData(html).map((l) => l.text); }
 // Website buttons and links that aren't part of a menu.
 const WEB_BUTTON_RE = /^(?:view (?:more|menu|details)|learn more|read more|see more|more info|book(?: now| online| a table)?|reserve(?: now)?|order(?: now| online| takeout| delivery)?|skip to (?:main )?content|your cart|cart|add to cart|shop(?: now)?|subscribe|sign up|log ?in|close|home|contact(?: us)?|gift cards?|apply now|careers|follow us|back to top|download(?: the)? (?:app|pdf)|apple ios app.*|android app.*|view full menu.*|menu|\W*)$/i;
 function htmlLinks(baseUrl, html) {
@@ -33836,17 +33866,19 @@ async function findMenuOnWebsite(rawUrl, kind = 'menu') {
   const pages = links.filter((l) => !/\.(pdf|jpe?g|png|gif|webp)(\?|$)/i.test(l.url) && new URL(l.url).hostname.replace(/^www\./, '').endsWith(host))
     .filter((l) => !seen.has(l.url) && seen.add(l.url)).sort((a, b) => pagePriority(a) - pagePriority(b)).slice(0, 6);
   const found = [];
-  const firstLines = htmlToMenuLines(html);
-  if (pricedLineCount(firstLines) >= 5) found.push({ url: first.url, label: '', lines: firstLines, priced: pricedLineCount(firstLines) });
+  const firstData = htmlToMenuLineData(html);
+  const firstLines = firstData.map((l) => l.text);
+  if (pricedLineCount(firstLines) >= 5) found.push({ url: first.url, label: '', lines: firstLines, marks: firstData.map((l) => l.mark), priced: pricedLineCount(firstLines) });
   for (const p of pages) {
     let got;
     try { got = await menuImportGet(p.url); } catch (e) { continue; }
     if (got.type === 'pdf') { if (menuPdf({ url: got.url, text: p.text })) pdfs.unshift({ url: got.url, got }); continue; }
     if (got.type !== 'html') continue;
     const pageHtml = got.buf.toString('utf8');
-    const pl = htmlToMenuLines(pageHtml);
+    const pd = htmlToMenuLineData(pageHtml);
+    const pl = pd.map((l) => l.text);
     const priced = pricedLineCount(pl);
-    if (priced >= 5) found.push({ url: got.url, label: (p.url + ' ' + p.text).toLowerCase(), lines: pl, priced });
+    if (priced >= 5) found.push({ url: got.url, label: (p.url + ' ' + p.text).toLowerCase(), lines: pl, marks: pd.map((l) => l.mark), priced });
     for (const l of htmlLinks(got.url, pageHtml)) {
       if (menuPdf(l) && !seen.has(l.url)) { seen.add(l.url); pdfs.push(l); }
     }
@@ -33865,7 +33897,7 @@ async function findMenuOnWebsite(rawUrl, kind = 'menu') {
     const main = found[0];
     const extra = !drinks(main) ? found.find((f) => f !== main && drinks(f) && f.url !== first.url) : null;
     const keep = extra ? [main, extra] : [main];
-    return { type: 'text', lines: keep.flatMap((f) => f.lines), source: main.url };
+    return { type: 'text', lines: keep.flatMap((f) => f.lines), marks: keep.flatMap((f) => f.marks), source: main.url };
   }
   const files = [];
   for (const p of pdfs.slice(0, 3)) {
@@ -33959,7 +33991,7 @@ async function handleMenuApi(req, res, ctx, action, arg) {
       if (!draft || !['draft', 'ready'].includes(draft.status)) {
         db.prepare('INSERT INTO venue_menus (venue_id, status, submitted_by, ip_hash) VALUES (?, ?, ?, ?)').run(venue.id, 'draft', ctx.actor, menuIpHash(ip));
       }
-      return send(200, { ok: true, from: 'text', source: found.source, lines: found.lines });
+      return send(200, { ok: true, from: 'text', source: found.source, lines: found.lines, marks: found.marks });
     }
     for (const f of found.files) {
       const stored = storePage('pdf', f.buf, null);
@@ -34848,6 +34880,45 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   var SIZE_RE = /^\d+(?:\.\d+)?\s*(?:oz|g|kg|ml|lb|lbs|pc|pcs|pieces?|inch|in|cm)\b/i; // "8 oz striploin", "6 pc"
   function looksDesc(t){ return /^[a-z(]/.test(t) || t.indexOf(',') >= 0 || words(t) > 6 || DURATION_RE.test(t) || DESC_START_RE.test(t) || SIZE_RE.test(t); }
+  // ----- Headings vs dishes (2026-10-18) -----
+  // A website's "Our Menu" title over an h2 "Breakfast" came in as a section "Our Menu" with a $9.50 dish called
+  // "Breakfast", and the real first dish ("Egg, Bacon & Cheddar Sandwich") as its description. A heading is now told
+  // apart by how the page set it (h1-h4 or a bold line), by being a common course word, or by capitals naming a course.
+  function headKey(t){
+    var s = String(t || '').toLowerCase();
+    try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) { /* old browser */ }
+    return s.replace(/\u0153/g, 'oe').replace(/['\u2019]/g, '').replace(/[^a-z]+/g, ' ').trim()
+      .replace(/^(?:our|nos|notre)\s+/, '').replace(/\s+menus?$/, '').replace(/^menus?\s+/, '');
+  }
+  // Course names that are a heading, never a dish, when they stand alone (English and French).
+  var HEAD_NAMES = {};
+  ('breakfast|all day breakfast|brunch|lunch|dinner|supper|appetizers|appetizer|apps|starters|starter|mains|main|main courses|entrees|entree|desserts|dessert|sweets'
+    + '|drinks|drink|beverages|beverage|hot drinks|cold drinks|coffee|coffees|coffee tea|kids|kid|childrens|sides|side|side dishes|salads|salad|soups|soup|soups salads|soup salad'
+    + '|sandwiches|sandwich|burgers|burger|pizza|pizzas|wine|wines|beer|beers|cocktails|cocktail|happy hour|shareables|small plates'
+    + '|dejeuner|petit dejeuner|petits dejeuners|diner|souper|entrees|plats|plats principaux|plat principal|desserts|boissons|boisson|boissons chaudes|cafe|cafes'
+    + '|enfants|pour enfants|accompagnements|accompagnement|salades|salade|soupes|soupe|potages|potage|sandwichs|sandwiches|burgers|pizzas|vin|vins|biere|bieres'
+    + '|cocktails|hors d oeuvre|hors d oeuvres|bouchees|a partager').split('|').forEach(function(w){ HEAD_NAMES[w] = 1; });
+  function headWord(t){ return !!HEAD_NAMES[headKey(t)]; }
+  // Words a section heading is made of ("FROM THE GRILL", "HOT DRINKS", "LUNCH FEATURES").
+  var HEAD_VOCAB = {};
+  ('breakfast brunch lunch dinner supper appetizers starters mains entrees desserts sweets treats drinks beverages coffee tea teas kids sides salads soups '
+    + 'sandwiches burgers pizzas pizza pasta pastas wines beers cocktails mocktails spirits bar happy hour shareables sharing share plates small large big '
+    + 'handhelds bowls greens grill kitchen oven garden sea land specials features favourites favorites classics hot cold light all day late night morning '
+    + 'evening afternoon little menu house signature extras add ons tacos bakery baked goods pastries fresh daily weekend weekday by glass bottle '
+    + 'sparkling red white rose non alcoholic local craft draft draught on tap wood fired').split(' ').forEach(function(w){ if (w) HEAD_VOCAB[w] = 1; });
+  var HEAD_STOP = { the: 1, from: 1, of: 1, and: 1, to: 1, our: 1, for: 1, a: 1 };
+  function headingPhrase(t){
+    var toks = headKey(t).split(' ').filter(Boolean);
+    return toks.length > 0 && toks.length <= 5 && toks.every(function(w){ return HEAD_VOCAB[w] || HEAD_STOP[w]; }) && toks.some(function(w){ return HEAD_VOCAB[w]; });
+  }
+  // The page's own title ("Our Menu", "Menus", "Notre carte"): never a section.
+  var PAGE_TITLE_RE = /^(?:(?:our|the|view our|see our|full|all)\s+)?menus?$|^(?:notre|nos|la|le|les)\s+(?:menus?|cartes?)$/i;
+  // A dish's name in title case ("Egg, Bacon & Cheddar Sandwich"), as opposed to a description ("two eggs, toast").
+  function titleName(t){
+    if (!/^[A-Z0-9\u00c0-\u00de]/.test(t) || /[.!?]$/.test(t) || words(t) > 8 || SIZE_NAME_RE.test(t)) return false;
+    var big = t.split(' ').filter(function(w){ return w.replace(/[^A-Za-z\u00c0-\u00ff]/g, '').length >= 4; });
+    return big.length > 0 && big.filter(function(w){ return /^[^A-Za-z\u00c0-\u00ff]*[A-Z\u00c0-\u00de]/.test(w); }).length >= big.length * 0.75;
+  }
   function isCapsHeading(t){ var l = t.replace(/[^A-Za-z]/g, ''); return l.length >= 3 && l === l.toUpperCase() && words(t) <= 5 && t.length <= 40; }
   // A long name in capitals ("PEPPER & THYME CRUSTED BISON CARPACCIO", "63 ACRES RIBEYE 13oz"): mostly capital letters.
   function isCapsName(t){ var l = t.replace(/[^A-Za-z]/g, ''), up = l.replace(/[^A-Z]/g, '').length; return l.length >= 6 && up >= l.length * 0.8 && words(t) <= 12; }
@@ -34957,6 +35028,19 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       if (parts.length < 2) { split.push(ln); return; }
       parts.forEach(function(text){ var c = {}; for (var k in ln) c[k] = ln[k]; c.text = text; split.push(c); });
     });
+    // Heading levels a website uses for dish names (Kiki Gardens' h4 "Wonton Soup", Quails' Gate's h5 "SEARED LING
+    // COD | 33"): a level whose lines carry a price, or are followed by just a price, a size or a sentence. Other
+    // levels (and bold lines) are section headings.
+    var dishLevel = {};
+    var plain = function(x){ return String(x || '').replace(/([A-Za-z\u00c0-\u00ff)])\$(?=\d)/g, '$1 $').replace(/[|_]/g, ' ').replace(/\s+/g, ' ').replace(/[\s.]+$/, '').trim(); };
+    split.forEach(function(ln, k){
+      var mk = ln.mark || 0;
+      if (!(mk >= 1 && mk <= 7)) return;
+      var t0 = plain(ln.text), nl = split[k + 1], nraw = nl ? String(nl.text || '').trim() : '', nx = plain(nraw);
+      var own = PRICE_RE.exec(t0), np = PRICE_RE.exec(nx), nRest = np ? nx.slice(0, np.index).trim() : '';
+      if ((own && /[A-Za-z]{2}/.test(t0.slice(0, own.index))) || (np && (!/[A-Za-z]{2}/.test(nRest) || SIZE_NAME_RE.test(nRest)))
+        || (nl && !(nl.mark >= 1 && nl.mark <= 7) && !np && (/^[a-z(]/.test(nraw) || /[.!?]$/.test(nraw)))) dishLevel[mk] = 1;
+    });
     split.forEach(function(ln){
       // Fix (2026-10-18): "For One$14.95" (a web page's price in its own tag) reads as "For One $14.95".
       var rawT = String(ln.text || '').replace(/([A-Za-z\u00c0-\u00ff)])\$(?=\d)/g, '$1 $');
@@ -34991,6 +35075,18 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       // Spaced-out decorative lettering ("B U F F A L O") is design, not a dish.
       var toks = t.split(' ');
       if (toks.length >= 4 && toks.filter(function(x){ return x.length === 1; }).length >= toks.length * 0.7) return;
+      var mk = ln.mark || 0;
+      // (2026-10-18) A held heading followed by a deeper heading, or by a dish with its price, heads that dish: it is a
+      // section, never a dish whose description is the next dish's name.
+      if (pending && pending.hd) {
+        var pk = PRICE_RE.exec(t), pRest = pk ? t.slice(0, pk.index).trim() : t;
+        var nextHead = mk >= 1 && mk <= 7, deeper = nextHead && pending.mk >= 1 && mk > pending.mk;
+        var promote = deeper;
+        if (!promote && !nextHead && pRest.replace(/[^A-Za-z\u00c0-\u00ff]/g, '').length >= 2 && !SIZE_NAME_RE.test(pRest) && !NOTE_START_RE.test(pRest) && !JUNK_RE.test(pRest)) {
+          promote = pk ? !/^[a-z(]/.test(pRest) && (titleName(pRest) || !looksDesc(pRest)) : titleName(pRest) && looksDesc(pRest);
+        }
+        if (promote) { section(pending.text); pending = null; }
+      }
       var m = PRICE_RE.exec(t);
       // Fix (2026-10-18): a number after a month is a date, not a price ("Begins Monday, December 1").
       if (m && !/\$/.test(m[2]) && MONTH_END_RE.test(t.slice(0, m.index).trim())) m = null;
@@ -35042,14 +35138,22 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         return;
       }
       if (t.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 2) return;
+      // (2026-10-18) The page's or site's own name ("Our Menu", "Sunny Side Cafe" from the page title) is not a section.
+      if (mk === 9 || PAGE_TITLE_RE.test(t.replace(/['\u2019]/g, '').trim())) { flush(); return; }
+      // A heading the page set as one (h1-h4, a bold line) or a course word ("Breakfast"): held as a heading.
+      var setAsHead = mk >= 1 && mk <= 7 && !dishLevel[mk] && words(t) <= 6;
+      if (setAsHead || headWord(t)) { flush(true); pending = { text: t, conf: conf, ln: ln, caps: isCapsHeading(t), hd: true, mk: mk }; return; }
       // A line in capitals is a heading ("MAINS") or a dish name ("STUFFED MUSHROOMS"): what follows decides.
-      if (isCapsHeading(t)) { flush(); pending = { text: t, conf: conf, ln: ln, caps: true }; return; }
+      if (isCapsHeading(t)) { flush(); pending = { text: t, conf: conf, ln: ln, caps: true, hd: headingPhrase(t), mk: mk }; return; }
       // A dish named in capitals runs on with description lines until its price (or the next capitals name).
       if (!pending && last && last._caps && last.description && !last.price) { last.description += ' ' + fixWords(t); grow(last, ln); return; }
       if (NOTE_START_RE.test(t) && last && !pending) { last.description = (last.description ? last.description + ' ' : '') + fixWords(t); grow(last, ln); return; }
       if (looksDesc(t)) {
         if (pending) { item(pending.text, t, '', Math.min(conf, pending.conf), [pending.ln, ln]); if (pending.caps) last._caps = true; pending = null; return; }
         if (last) { last.description = (last.description ? last.description + ' ' : '') + fixWords(t); grow(last, ln); return; }
+        // (2026-10-18) The first line under a heading in title case is a dish's name ("Egg, Bacon & Cheddar Sandwich"),
+        // not the section's note: held until its price or description.
+        if (!last && titleName(t)) { pending = { text: t, conf: conf, ln: ln }; return; }
         if (cur && !cur.items.length) { cur.note = (cur.note ? cur.note + ' ' : '') + t; }
         return;
       }
@@ -35100,6 +35204,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     sections = regrouped;
     sections.forEach(function(s){ s.items.forEach(function(it){ delete it._from; delete it._caps; delete it._maybe; delete it._base; it.description = it.description.replace(/[\s\-–—]+$/, ''); }); });
     sections = sections.filter(function(s){ return s.items.length; });
+    // (2026-10-18) A dish named like a heading ("Breakfast", "Desserts", "Boissons") is shown yellow to check, so it
+    // never goes live unchecked.
+    sections.forEach(function(s){ s.items.forEach(function(it){ if (headWord(it.name)) it.check = true; }); });
     // A menu that prints no prices at all (some dining rooms) isn't flagged dish by dish.
     var total = 0, priced = 0;
     sections.forEach(function(s){ s.items.forEach(function(it){ total++; if (it.price) priced++; }); });
@@ -35196,7 +35303,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     api('/import', { url: url }).then(function(r){
       if (!r || !r.ok) return webScreen(r && r.error ? h(r.error) : T.failed);
       if (r.from === 'pdf') { S = r; return deviceRead(true); }
-      var parsed = tidyImported(parseMenuLines((r.lines || []).map(function(t){ return { text: t, conf: 100 }; })));
+      var parsed = tidyImported(parseMenuLines((r.lines || []).map(function(t, i){ return { text: t, conf: 100, mark: (r.marks || [])[i] || 0 }; })));
       if (!parsed.sections.length) return webScreen(T.webNothing);
       return api('/save', { data: parsed }).then(function(sv){
         if (!sv || !sv.ok) return webScreen(T.failed);
@@ -43841,6 +43948,7 @@ module.exports = {
   readMenuWithClaude,
   setMenuImportNetwork,
   htmlToMenuLines,
+  htmlToMenuLineData,
   findMenuOnWebsite,
   isPrivateAddress,
   normalizeMenuData,

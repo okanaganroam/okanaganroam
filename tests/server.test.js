@@ -23589,6 +23589,10 @@ test('Menus: "My menu is on my website" finds the menu (page or PDF) and never f
     assert.equal(fromSite.from, 'text');
     assert.equal(fromSite.source, 'https://webmenu.example/menu');
     assert.ok(fromSite.lines.includes('Poutine 14') && fromSite.lines.includes('Fish & Chips 22'));
+    // (2026-10-18) Each line says how the page set it: the h2 headings are marked, so the reader keeps them as sections.
+    assert.equal(fromSite.marks.length, fromSite.lines.length);
+    assert.equal(fromSite.marks[fromSite.lines.indexOf('Starters')], 2);
+    assert.equal(fromSite.marks[fromSite.lines.indexOf('Poutine 14')], 0);
     // A menu PDF linked from the page becomes a page of the menu, to be scanned like an upload.
     const fromPdf = await imp('pdfonly.example');
     assert.equal(fromPdf.from, 'pdf', JSON.stringify(fromPdf));
@@ -23665,6 +23669,48 @@ test('Menus (2026-10-18): a website import leaves out blurbs, past events, dates
   // A wine list's vintages stay.
   const wines = win.__menuTidy(win.__menuParse('WINES BY THE GLASS\n2022 Merlot 14\n2021 Pinot Noir 16\nRiesling 2023 12'.split('\n').map((text) => ({ text, conf: 100 }))));
   assert.equal(wines.sections[0].items.length, 3);
+});
+
+test('Menus (2026-10-18): a website heading is a section, never a dish; the page title is never a section; heading-named dishes are yellow', () => {
+  const win = loadMenuAppScript();
+  const fromPage = (file) => win.__menuTidy(win.__menuParse(app.htmlToMenuLineData(menuFixturePage(file)).map((l) => ({ text: l.text, conf: 100, mark: l.mark }))));
+  const flat = (r) => r.sections.flatMap((s) => s.items.map((i) => `${s.name} | ${i.name} | ${i.price} | ${i.description}${i.check ? ' | CHECK' : ''}`));
+
+  // How the page set each line: h-tags by level, an all-bold line 7, the page's or site's own name 9.
+  const marks = Object.fromEntries(app.htmlToMenuLineData(menuFixturePage('heading-title-h2.html')).map((l) => [l.text, l.mark]));
+  assert.equal(marks.Breakfast, 2);
+  assert.equal(marks['Our Menu'], 1);
+  assert.equal(marks['Egg, Bacon & Cheddar Sandwich'], 0);
+  assert.ok(!('Our Menu | Sunny Side Cafe' in marks), 'the <title> itself is not a line');
+  assert.equal(app.htmlToMenuLineData(menuFixturePage('heading-bold.html'))[0].mark, 9, 'the site name from the page title');
+  assert.equal(app.htmlToMenuLineData('<p><strong>Mains</strong></p><p><strong>Hi</strong> there</p>').map((l) => l.mark).join(','), '7,0');
+
+  // The review's bug: "Our Menu" title, h2 "Breakfast", then a sandwich with a comma in its name and its price below.
+  const h2 = fromPage('heading-title-h2.html');
+  assert.deepEqual(h2.sections.map((s) => s.name), ['Breakfast', 'Lunch']);
+  assert.deepEqual(flat(h2), ['Breakfast | Egg, Bacon & Cheddar Sandwich | 9.50 | on a toasted brioche bun', 'Breakfast | Avocado Toast | 12 | sourdough, chili flakes, lemon',
+    'Lunch | Turkey, Brie & Apple Panini | 15.50 | ', 'Lunch | Soup of the Day | 8 | ask your server']);
+
+  // Bold headings, with the site's name as the h1.
+  assert.deepEqual(flat(fromPage('heading-bold.html')), ['Breakfast | Ham, Egg & Swiss Croissant | 11 | flaky butter croissant, dijon', 'Breakfast | Granola Bowl | 9 | yogurt, berries, honey',
+    'Handhelds | Chicken, Bacon & Avocado Club | 17 | ', 'Handhelds | Smash Burger | 18 | ']);
+
+  // Headings in capitals on plain lines; a dish named in capitals with its description is still a dish.
+  assert.deepEqual(flat(fromPage('heading-caps.html')), ['Breakfast | Bacon, Egg & Cheese Bagel | 9.50 | ', 'Breakfast | Breakfast Burrito | 13 | eggs, chorizo, potato, salsa',
+    'From The Grill | Steak, Egg & Frites | 26 | ', 'From The Grill | Stuffed Mushrooms | 15 | crab, cream cheese, garlic butter']);
+
+  // The price on the line after the name, the description after the price.
+  assert.deepEqual(flat(fromPage('heading-price-next-line.html')), ['Breakfast | Eggs, Toast & Hash Browns | 10.50 | two eggs any style',
+    'Breakfast | Buttermilk Pancakes | 12 | maple syrup, whipped butter', 'Desserts | Apple Pie | 7 | ']);
+
+  // No heading at all: the dishes go under "Menu".
+  const bare = win.__menuParse(['Our Menu', 'Smash Burger 18', 'Caesar Salad 14'].map((text) => ({ text, conf: 100 })));
+  assert.deepEqual(flat(bare), ['Menu | Smash Burger | 18 | ', 'Menu | Caesar Salad | 14 | ']);
+
+  // The safety net: a dish named like a heading (English or French) is yellow, so publishing waits for a check.
+  const odd = win.__menuParse('Breakfast 9.50\nDesserts 8\nBoissons 4\nPetit-déjeuner 12\nDrip Coffee 3'.split('\n').map((text) => ({ text, conf: 100 })));
+  assert.deepEqual(odd.sections[0].items.map((i) => `${i.name}:${i.check}`), ['Breakfast:true', 'Desserts:true', 'Boissons:true', 'Petit-déjeuner:true', 'Drip Coffee:false']);
+  assert.equal(odd.partial, true);
 });
 
 test('Menus (2026-10-18): the photo scanner keeps section headings (COFFEE / BREAKFAST), even with hours or read faintly', () => {
