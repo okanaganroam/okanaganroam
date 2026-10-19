@@ -1175,7 +1175,7 @@ function renderScript(d) {
     return parts.length ? '<p class="t3-facts">' + parts.join(' · ') + '</p>' : '';
   }
   // The site's own badge names (the same keys as /browse).
-  var BADGE_KEYS = { dog_friendly: 'badge.dogFriendly', vegan: 'badge.vegan', vegetarian: 'badge.vegetarian', gluten_free: 'badge.glutenFree', patio: 'badge.patio', kid_friendly: 'badge.kidFriendly', lake_view: 'badge.lakeView', nonalcoholic: 'badge.nonalcoholic', sports_tv: 'badge.sportsTv', live_music: 'badge.liveMusic', great_groups: 'badge.greatGroups', happy_hour: 'badge.happyHour' };
+  var BADGE_KEYS = { dog_friendly: 'badge.dogFriendly', vegan: 'badge.vegan', vegetarian: 'badge.vegetarian', gluten_free: 'badge.glutenFree', patio: 'badge.patio', kid_friendly: 'badge.kidFriendly', lake_view: 'badge.lakeView', nonalcoholic: 'badge.nonalcoholic', sports_tv: 'badge.sportsTv', live_music: 'badge.liveMusic', great_groups: 'badge.greatGroups', happy_hour: 'badge.happyHour', free_entry: 'badge.freeEntry', arts_culture: 'badge.artsCulture' };
   // The hours-derived badges have no key in app.js's frozen dictionary, so
   // their French names live here (same approach as DH_TEXT above).
   var BADGE_FR_EXTRA = { open_early: 'Ouvert t\u00f4t', open_late: 'Ouvert tard' };

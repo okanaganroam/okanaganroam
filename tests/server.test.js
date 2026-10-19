@@ -9038,9 +9038,10 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.ok(venues.every((v) => v.type !== 'winery'), 'the hub universe excludes wineries entirely');
 
   // Features: every chip is a real BOOL_FIELDS column, never an invented one.
-  assert.equal(app.FD_HUB_FEATURES.length, 14, 'the twelve researched badges plus Open Early / Open Late');
+  assert.equal(app.FD_HUB_FEATURES.length, 16, 'the fourteen researched badges plus Open Early / Open Late');
+  assert.doesNotMatch(markup, /data-fd-feature="free_entry"|data-fd-feature="arts_culture"/, 'the things-to-do badges are not Food & Drink filters');
   for (const f of app.FD_HUB_FEATURES) assert.ok(app.BOOL_FIELDS.includes(f.key), `${f.key} is a real venue column`);
-  assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key));
+  assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key).filter((k) => k !== 'free_entry' && k !== 'arts_culture'));
 
   // Regions: the canonical list, from the SAME renderer the other directories use.
   for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`data-region="${r}"`), `canonical region chip for ${r}`);
@@ -30379,6 +30380,48 @@ test('Event partners (2026-10-19): an owner tags other listed businesses; once a
     // Deleting a partner venue clears its rows.
     app.deleteVenue(second.id);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_partner_venues WHERE venue_id = ?').get(second.id).n, 0);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Free to Visit and Arts & Culture badges (2026-10-19): things-to-do badges with guide pages, filters and owner checkboxes, never on food pages', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Free Arts Gallery Fixture', type: 'indoor', hours: SEASON_WEEK, slug: 'free-arts-gallery-fixture' });
+  seasonInsert.run({ name: 'Free Arts Cafe Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'free-arts-cafe-fixture' });
+  const gallery = app.findVenueBySlug('kelowna', 'indoor', 'free-arts-gallery-fixture');
+  const cafe = app.findVenueBySlug('kelowna', 'cafe', 'free-arts-cafe-fixture');
+  assert.ok(app.RESEARCHED_BOOL_FIELDS.includes('free_entry') && app.RESEARCHED_BOOL_FIELDS.includes('arts_culture'));
+  assert.ok(app.AMENITY_GUARDED_FIELDS.includes('free_entry') && app.AMENITY_GUARDED_FIELDS.includes('arts_culture'));
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    // Set through the guarded amenity route, like the research script does.
+    const res = await fetch(`${base}/admin/correct-amenities`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` },
+      body: JSON.stringify({ id: gallery.id, fields: { free_entry: { expected_current: false, corrected: true }, arts_culture: { expected_current: false, corrected: true } }, reason: 'test', batch_id: 'test-free-arts' }) });
+    assert.equal(res.status, 200, await res.clone().text());
+    const api = await fetch(`${base}/api/venues/${gallery.id}`).then((r) => r.json());
+    assert.equal(api.free_entry, true);
+    assert.equal(api.arts_culture, true);
+    const page = await fetch(`${base}/kelowna/indoor/free-arts-gallery-fixture`).then((r) => r.text());
+    assert.match(page, /<span class="chip">Free to Visit<\/span>/);
+    assert.match(page, /<span class="chip"[^>]*>Arts &amp; Culture<\/span>/);
+    // Guide pages read the badge like any other.
+    const guide = app.renderGuidePage('kelowna', 'free_entry', [app.findVenueBySlug('kelowna', 'indoor', 'free-arts-gallery-fixture')]);
+    assert.match(guide, /Free Things to Do in Kelowna/);
+    assert.match(app.renderGuidePage('kelowna', 'arts_culture', [app.findVenueBySlug('kelowna', 'indoor', 'free-arts-gallery-fixture')]), /Arts &amp; Culture in Kelowna/);
+    // Food pages never offer the things-to-do chips; a page that asks for them does.
+    assert.doesNotMatch(app.foodDrinkFeatureChipsHtml({}), /data-fd-feature="free_entry"|data-fd-feature="arts_culture"/);
+    assert.match(app.foodDrinkFeatureChipsHtml({}, ['free_entry', 'arts_culture']), /data-fd-feature="free_entry"[\s\S]*Free to Visit[\s\S]*data-fd-feature="arts_culture"/);
+    // Owners: the checkboxes show for things to do, stay hidden for a café.
+    const gTok = app.createOwnerLink(gallery.id, {}).url.split('/owner/')[1];
+    const cTok = app.createOwnerLink(cafe.id, {}).url.split('/owner/')[1];
+    const gPage = await fetch(`${base}/owner/${gTok}`).then((r) => r.text());
+    const cPage = await fetch(`${base}/owner/${cTok}`).then((r) => r.text());
+    assert.match(gPage, /<label class="amenity-check"><input type="checkbox" name="badge" value="free_entry" checked> Free to Visit<\/label>/);
+    assert.match(cPage, /<label class="amenity-check" hidden><input type="checkbox" name="badge" value="free_entry"> Free to Visit<\/label>/);
+    assert.match(cPage, /<label class="amenity-check" hidden><input type="checkbox" name="badge" value="arts_culture"> Arts &amp; Culture<\/label>/);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
