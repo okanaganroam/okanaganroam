@@ -21542,7 +21542,7 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
     const en = await fetch(`${base}/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
     assert.match(en, /<a class="venue-claim-btn" href="\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Claim this listing<\/a>/);
     const frPage = await fetch(`${base}/fr/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
-    assert.match(frPage, /<a class="venue-claim-btn" href="\/fr\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Revendiquer cette fiche<\/a>/);
+    assert.match(frPage, /<a class="venue-claim-btn" href="\/fr\/claim\/kelowna\/cafes\/claim-fixture-cafe" rel="nofollow"[^>]*>Réclamer cette fiche<\/a>/);
     assert.match(frPage, /<a href="\/fr\/owner\/login" rel="nofollow">Connectez-vous pour modifier cette fiche<\/a>/, 'French gaps (2026-10-18): the sign-in link stays French');
     // The form, in each language; unknown listings 404.
     const form = await fetch(`${base}/claim/kelowna/cafes/claim-fixture-cafe`);
@@ -21554,7 +21554,7 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
     assert.match(formHtml, /name="company_website"/);
     const frForm = await fetch(`${base}/fr/claim/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
     assert.match(frForm, /<html lang="fr-CA">/);
-    assert.match(frForm, /<h1>Revendiquer cette fiche<\/h1>/);
+    assert.match(frForm, /<h1>Réclamer cette fiche<\/h1>/);
     assert.match(frForm, /Envoyer ma demande/);
     assert.equal((await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`)).status, 404);
 
@@ -27158,6 +27158,104 @@ test('French gaps (2026-10-18): the comedy and Christmas market guides have Fren
   const html = app.frenchTwinHtml(`<!DOCTYPE html><html lang="en"><head><title>Okanagan Comedy &amp; Live Shows 2026–27 | Okanagan Roam</title></head><body><main><h1>${'Comedy &amp; Live Shows in the Okanagan, Fall &amp; Winter 2026–27'}</h1></main></body></html>`, '/guides/okanagan-comedy-shows');
   assert.match(html, /<title>Humour et spectacles dans l’Okanagan 2026–27 \| Okanagan Roam<\/title>/);
   assert.match(html, /<h1>Humour et spectacles dans l’Okanagan, automne et hiver 2026–27<\/h1>/);
+});
+
+// French pass 5 (2026-10-18): the eight guides that were still English on /fr, and the list-page leftovers.
+const FR5_GUIDES = ['winter-in-kelowna', 'okanagan-ski-season-2026-27', 'big-white-restaurants-apres', 'silverstar-restaurants-apres',
+  'dog-friendly-vernon', 'dog-friendly-penticton', 'best-brunch-vernon', 'best-brunch-penticton'];
+// Every line a guide page can show, keyed the way the French twin looks it up: an item reads "(Town): text" (or, when
+// its text links another place, "{a0} (Town): ... {a1} ..."), a tip "{a0} tip", the footer a {aN} template.
+function fr5GuideKeys(g) {
+  const LINK = /\{(?:page:\/[a-z0-9\/_-]*|(?:event:)?[a-z-]+\/[a-z0-9-]+)\|([^}]+)\}/g;
+  const keys = [];
+  const withLinks = (t, prefix) => {
+    let i = prefix ? 1 : 0;
+    const tpl = (prefix ? `{a0} ${prefix}` : '') + t.replace(LINK, () => `{a${i++}}`);
+    if (i > (prefix ? 1 : 0)) { keys.push(tpl); keys.push({ link: true, labels: [...t.matchAll(LINK)].map((m) => m[1]) }); } else keys.push((prefix || '') + t);
+  };
+  keys.push(g.title, g.description, g.heading);
+  g.intro.forEach((p) => withLinks(p, ''));
+  for (const s of g.sections) {
+    keys.push(s.heading, s.jump);
+    if (s.lead) withLinks(s.lead, '');
+    for (const it of s.items) {
+      if (it.tip) { keys.push(it.lead); withLinks(it.tip, ''); continue; }
+      withLinks(it.text, it.where ? `(${it.where}): ` : ': ');
+    }
+  }
+  keys.push(g.table.heading, g.table.jump, ...(g.table.head || []), ...g.table.rows.map((r) => r[0]));
+  // The footer: one {aN} template when it has words between the links, and each link's own label.
+  let n = 0;
+  const foot = g.footerHtml.replace(/<(a|strong)\b[^>]*>([^<]*)<\/\1>/g, () => `{a${n++}}`).replace(/&amp;/g, '&');
+  if (/[A-Za-z]{2}/.test(foot.replace(/\{a\d+\}/g, ''))) keys.push(foot);
+  keys.push({ link: true, labels: [...g.footerHtml.matchAll(/<(?:a|strong)\b[^>]*>([^<]*)<\/(?:a|strong)>/g)].map((m) => m[1].replace(/&amp;/g, '&')) });
+  return keys;
+}
+test('French pass 5 (2026-10-18): the eight guides still English on /fr have French for every line, title, description and jump link', () => {
+  const missing = [];
+  for (const slug of FR5_GUIDES) {
+    const g = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'guides', `${slug}.json`), 'utf8'));
+    for (const k of fr5GuideKeys(g)) {
+      if (k && typeof k === 'object') { for (const l of k.labels) if (!app.frText(l) && !/^[A-Z][\w'’&.+ -]*$/.test(l)) missing.push(`${slug}: link "${l}"`); continue; }
+      const t = app.frText(k);
+      if (t == null) { missing.push(`${slug}: ${k}`); continue; }
+      // A real sentence must read differently in French (a place name or "Après-ski" may not).
+      if (k.split(/\s+/).length >= 4) assert.notEqual(t, k, `${slug}: still English: ${k}`);
+    }
+  }
+  assert.deepEqual(missing, [], 'every line of the eight guides has French');
+  // The table's own link labels that are not place names.
+  assert.equal(app.frText("Rosalinda's (Filipino breakfast)"), 'Rosalinda’s (déjeuner philippin)');
+  // Spot checks: titles, a dated item and the footer template.
+  assert.equal(app.frText('Things to Do in Kelowna in Winter 2026–27 | Okanagan Roam'), 'Que faire à Kelowna en hiver 2026–27 | Okanagan Roam');
+  assert.equal(app.frText('Okanagan Ski Season 2026–27: Opening Days & Events'), 'Saison de ski 2026–27 dans l’Okanagan : ouvertures et événements');
+  assert.match(app.frText('(Big White, Thu Nov 26): Big White\'s 2026/27 winter season opens on November 26. Opening depends on snow conditions, so check bigwhite.com for the latest before you book.'), /^\(Big White, jeu\. 26 nov\.\) : /);
+  assert.equal(app.frText('Old-school diners'), 'Casse-croûte à l’ancienne');
+});
+
+test('French pass 5 (2026-10-18): a French guide page translates its jump links, JSON-LD headline and a linked item whole', () => {
+  const en = `<!DOCTYPE html><html lang="en"><head><title>SilverStar Restaurants, Cafés &amp; Après | Okanagan Roam</title>
+<script type="application/ld+json">{"@type":"Article","headline":"Where to Eat & Après at SilverStar","description":"Where to eat and après at SilverStar: pubs, a cocktail bar, Italian and village dinners, a bakery-café, pizza by the slice and snowcat dinners."}</script></head><body><main>
+<nav class="ski-guide-jump" aria-label="Jump to a section"><a href="#apres">Après-ski &amp; pubs</a><a href="#dinner">Sit-down dinners</a><a href="#cafes">Cafés &amp; quick bites</a></nav>
+<ul class="ski-guide-list">
+<li><strong><a href="/silverstar/tours/paradise-camp-snowcat-dinner">Paradise Camp Snowcat Dinner Tours</a></strong> (SilverStar): an evening snowcat ride from the village to <a href="/silverstar/restaurants/paradise-camp">Paradise Camp</a> on the back side of the mountain, followed by a candlelit multi-course dinner. The half-hour ride climbs about 8 km through the snowy forest; a night out for couples and groups. Season: Dec–Apr, select evenings.</li>
+<li><strong><a href="/silverstar/pubs/the-bulldog">The Bulldog</a></strong> (SilverStar): a quaint pub with a large split patio and four gas fireplaces. Warm up by the fire between runs and catch a game on the TVs; kids are welcome.</li>
+</ul></main></body></html>`;
+  const fr = app.frenchTwinHtml(en, '/guides/silverstar-restaurants-apres');
+  assert.match(fr, /<title>Restos, cafés et après-ski à SilverStar \| Okanagan Roam<\/title>/);
+  assert.match(fr, /"headline":"Où manger et faire l’après-ski à SilverStar"/);
+  assert.match(fr, />Après-ski et pubs<\/a><a href="#dinner">Soupers au resto<\/a><a href="#cafes">Cafés et bouchées rapides<\/a>/);
+  // The item's own place link and the place it mentions stay as they are; the sentence around them is one French line.
+  assert.match(fr, /<li><strong><a href="\/fr\/silverstar\/tours\/paradise-camp-snowcat-dinner">Paradise Camp Snowcat Dinner Tours<\/a><\/strong> \(SilverStar\) : une montée en dameuse en soirée du village jusqu’au <a href="\/fr\/silverstar\/restaurants\/paradise-camp">Paradise Camp<\/a>, sur l’autre versant/);
+  assert.match(fr, /\(SilverStar\) : un pub pittoresque avec une grande terrasse/);
+  assert.doesNotMatch(fr, /Sit-down dinners|quick bites|snowcat ride/);
+});
+
+test('French pass 5 (2026-10-18): no doubled town in event titles, no "oct..", list-page leftovers and one word for the claim button', () => {
+  const ev = { region: 'kelowna' };
+  // The event's own name already ends with its town.
+  assert.equal(app.frEventTitle('Electric Elton: The Music of Elton John (Kelowna) — Kelowna', ev), 'Electric Elton: The Music of Elton John (Kelowna, C.-B.)');
+  assert.equal(app.frEventTitle('Ben Thompson as Elvis: Birthday Tour 2027 (Kelowna)', ev), 'Ben Thompson as Elvis: Birthday Tour 2027 (Kelowna, C.-B.)');
+  assert.equal(app.frEventTitle('Skillful — Kelowna', ev), 'Skillful (Kelowna, C.-B.)');
+  assert.equal(app.eventPageTitle({ id: -1, region: 'kelowna', name: 'FR5 Tribute Night: Music of Someone (Kelowna)', start_datetime: '2032-01-01' }, 'Kelowna', null),
+    'FR5 Tribute Night: Music of Someone (Kelowna)');
+  // A short French month that ends a sentence keeps one period; an ellipsis is left alone.
+  const dots = app.frenchTwinHtml('<!DOCTYPE html><html lang="en"><head></head><body><p>Fermé jusqu’au 31 oct..</p><p>Et nov...</p></body></html>', '/');
+  assert.match(dots, /<p>Fermé jusqu’au 31 oct\.<\/p>/);
+  assert.match(dots, /<p>Et nov\.\.\.<\/p>/);
+  // A list card's "Check before you go" box.
+  const box = app.frenchTwinHtml(`<!DOCTYPE html><html lang="en"><head></head><body>${app.advisoryNoticeHtml('Closed for renovations. https://example.com/news')}</body></html>`, '/wineries');
+  assert.match(box, /aria-label="À vérifier avant d’y aller"/);
+  assert.match(box, /<p class="venue-advisory-kicker">À vérifier avant d’y aller<\/p>/);
+  assert.match(box, />Source officielle : example\.com ↗</);
+  assert.doesNotMatch(box, /Check before you go|Official source/);
+  // /wineries counts its own noun, and /food-drink's one-type link reads French on /fr.
+  assert.equal(app.frScript('var noun = total === 1 ? "winery" : "wineries";'), 'var noun = total === 1 ? "vignoble" : "vignobles";');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /\? 'Voir la page des ' \+ pg\.label\.toLowerCase\(\) : 'See the ' \+ pg\.label \+ ' page'\)/);
+  // "Réclamer" everywhere on our own pages (Google's own button keeps Google's wording).
+  const ours = src.split('\n').filter((l) => /Revendiquer/.test(l) && !/Revendiquer cette entreprise/.test(l));
+  assert.deepEqual(ours, []);
 });
 
 test('list-your-venue lookup (2026-10-18): French labels and /fr links on the French page, and a Claim this listing button in EN and FR', async () => {

@@ -1025,6 +1025,8 @@ const FR_PATTERNS = [
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
   [/^Open until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
+  // The "Check before you go" box on list cards (2026-10-18): its source link ("Official source: example.com ↗").
+  [/^Official source(?:: (.+?))? ↗$/, (m) => `Source officielle${m[1] ? ` : ${m[1]}` : ''} ↗`],
   [/^Places to start in (.+)$/, (m) => `Par où commencer à ${m[1]}`],
   [/^Read more about (.+)$/, (m) => `En savoir plus sur ${m[1]}`],
   [/^Upcoming events in (.+)$/, (m) => `Événements à venir à ${m[1]}`],
@@ -1080,6 +1082,9 @@ const FR_SCRIPT = [
   ["'Show ' + shown + ' result' + (shown === 1 ? '' : 's')", "'Voir ' + shown + ' résultat' + (shown === 1 ? '' : 's')"],
   ["'Show all results'", "'Voir tous les résultats'"],
   ["var noun = total === 1 ? 'place' : 'places';", "var noun = total === 1 ? 'lieu' : 'lieux';"],
+  // List pages (2026-10-18): /wineries and /sports pass their own noun ("199 wineries" stayed English on /fr/wineries).
+  ['var noun = total === 1 ? "winery" : "wineries";', 'var noun = total === 1 ? "vignoble" : "vignobles";'],
+  ['var noun = total === 1 ? "place to play" : "places to play";', 'var noun = total === 1 ? "lieu pour jouer" : "lieux pour jouer";'],
   ["(shown + ' of ' + total + ' ' + noun)", "(shown + ' sur ' + total + ' ' + noun)"],
   ["(total + ' dog-friendly ' + noun)", "(total + ' ' + noun + ' qui acceptent les chiens')"],
   ["(total + ' local favourite ' + noun)", "(total + ' coups de cœur locaux')"],

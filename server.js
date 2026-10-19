@@ -19386,7 +19386,7 @@ function foodDrinkHubBannerHtml(types) {
       if (h && h.textContent !== t.h) h.textContent = t.h;
       if (p && p.textContent !== t.i) p.textContent = t.i;
       var lk = document.getElementById('fdTypePageLink');
-      if (lk) { var pg = on.length === 1 && pages[on[0]]; lk.hidden = !pg; if (pg) { var a = lk.querySelector('a'); a.href = pg.href; a.textContent = 'See the ' + pg.label + ' page \u2192'; } }
+      if (lk) { var pg = on.length === 1 && pages[on[0]]; lk.hidden = !pg; if (pg) { var a = lk.querySelector('a'); a.href = pg.href; a.textContent = (/^fr/.test(document.documentElement.lang) ? 'Voir la page des ' + pg.label.toLowerCase() : 'See the ' + pg.label + ' page') + ' \u2192'; } }
     };
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
     sync();
@@ -23754,6 +23754,8 @@ function frEventTitle(enTitle, ev) {
   // so two showings of a film series, two dates of one concert or one tour in two towns never share a title.
   const core = t.replace(/ \u2014 \u00c9v\u00e9nement \u00e0 .+? \(C\.-B\.\)( \| Okanagan Roam)?$/, '')
     .replace(new RegExp(` \u2014 ${town.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '');
+  // An event already named with its town ("Electric Elton (Kelowna)") is not given the town twice (2026-10-18).
+  if (core.endsWith(`(${town})`)) return fitTitle([`${core.slice(0, -1)}, C.-B.)`, core, shortTitleName(core)]);
   return fitTitle([`${core} (${town}, C.-B.)`, `${core} (${town})`, `${core} (C.-B.)`, `${shortTitleName(core, TITLE_MAX - 8)} (C.-B.)`]);
 }
 function frEventHead(html, ev) {
@@ -23801,7 +23803,11 @@ function frDecode(s) {
 const frNorm = (s) => frDecode(String(s)).replace(/\s+/g, ' ').replace(/[\u2019\u2018]/g, "'").trim();
 const FR_TEXT_MAP = new Map(Object.entries(frenchText.FR_TEXT).map(([k, v]) => [frNorm(k), v]));
 function frLookup(key) { const k = frNorm(key); return FR_TEXT_MAP.has(k) ? FR_TEXT_MAP.get(k) : null; }
-function frText(plain) {
+// A French short month that ends a sentence keeps one period: "jusqu’au 31 oct." not "oct.." (2026-10-18).
+const FR_MONTH_DOUBLE_DOT = /(\b(?:janv|f\u00e9vr|avr|juil|juill|sept|oct|nov|d\u00e9c))\.\.(?!\.)/g;
+function frTidyDots(s) { return typeof s === 'string' ? s.replace(FR_MONTH_DOUBLE_DOT, '$1.') : s; }
+function frText(plain) { return frTidyDots(frTextRaw(plain)); }
+function frTextRaw(plain) {
   const key = String(plain).replace(/\s+/g, ' ').trim();
   if (!key) return null;
   const hit = frLookup(key);
@@ -23847,14 +23853,16 @@ function frNumber(n) {
 // inline pieces as {a0}, {a1} ... is looked up whole, so the French sentence can put them in its own order.
 function frParagraph(inner) {
   const pieces = [];
-  const tpl = inner.replace(/<(a|strong|em|b|span)\b([^>]*)>([^<]*)<\/\1>/g, (m) => { pieces.push(m); return `{a${pieces.length - 1}}`; });
+  // French guides (2026-10-18): a guide item's bold place link (<strong><a>Name</a></strong>) is one piece too, so an
+  // item whose text links another place ("... at {a1}: ...") is looked up whole, not in broken fragments.
+  const tpl = inner.replace(/<strong><a\b[^>]*>[^<]*<\/a><\/strong>|<(a|strong|em|b|span)\b([^>]*)>([^<]*)<\/\1>/g, (m) => { pieces.push(m); return `{a${pieces.length - 1}}`; });
   if (!pieces.length || /<(?!br\b)/.test(tpl)) return null;
   const key = frDecode(tpl).replace(/\s+/g, ' ').trim();
   const t = frLookup(key) != null ? frLookup(key) : frTemplated(key, frLookup);
   if (t == null) return null;
   const lead = /^\s*/.exec(inner)[0], trail = /\s*$/.exec(inner)[0];
   return lead + escapeHtml(t)
-    .replace(/\{a(\d+)\}/g, (m, i) => pieces[Number(i)].replace(/>([^<]*)</, (mm, txt) => (frIsVenueName(frDecode(txt)) ? mm : `>${escapeHtml(frTextOr(frDecode(txt)))}<`))) + trail;
+    .replace(/\{a(\d+)\}/g, (m, i) => (pieces[Number(i)].startsWith('<strong><a') ? pieces[Number(i)] : pieces[Number(i)].replace(/>([^<]*)</, (mm, txt) => (frIsVenueName(frDecode(txt)) ? mm : `>${escapeHtml(frTextOr(frDecode(txt)))}<`)))) + trail;
 }
 function frTextOr(s) { const t = frText(s); return t == null ? s : t; }
 // app.js's own French (its TRANSLATIONS.en text -> TRANSLATIONS.fr), so a label reads the same as on the home page.
@@ -23922,7 +23930,8 @@ function frPageLinks(html) {
   return html.replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)));
 }
 // Text and attributes of the markup outside <script>/<style>.
-function frMarkup(part) {
+function frMarkup(part) { return frTidyDots(frMarkupRaw(part)); }
+function frMarkupRaw(part) {
   return part
     .replace(/(<(p|li|h[1-6]|figcaption)\b[^>]*>)((?:(?!<\/?(?:p|li|div|ul|ol|section|h[1-6])\b)[\s\S])*?)(<\/\2>)/g, (m, open, tag, inner, close) => {
       const t = frParagraph(inner);
@@ -23995,7 +24004,7 @@ function frJsonLd(json) {
       const n = {};
       for (const [k, v] of Object.entries(o)) {
         if (typeof v === 'string' && (k === 'url' || k === 'item' || k === '@id')) n[k] = frHref(v);
-        else if (typeof v === 'string' && (k === 'name' || k === 'description')) n[k] = frTextOr(v);
+        else if (typeof v === 'string' && (k === 'name' || k === 'description' || k === 'headline')) n[k] = frTextOr(v); // headline: a guide's Article (2026-10-18)
         else n[k] = walk(v);
       }
       if (o['@type'] === 'ItemList' || o['@type'] === 'CollectionPage' || o['@type'] === 'WebPage') n.inLanguage = 'fr-CA';
@@ -24781,7 +24790,7 @@ ${VENUE_MENU_CSS}` : ''}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
   ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
     <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
-    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Revendiquer cette fiche')}</a>
+    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Réclamer cette fiche')}</a>
     <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
   </div>
   <script>
@@ -25068,7 +25077,9 @@ function fitTitle(candidates) {
   return candidates.find((t) => t.length <= TITLE_MAX) || candidates[candidates.length - 1];
 }
 function eventPageTitle(full, regionLabel, mainOccurrence) {
-  const plain = fitTitle([`${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — Event in ${regionLabel}, BC`, `${full.name} — ${regionLabel}`, full.name, shortTitleName(full.name)]);
+  // A name that already ends "(Kelowna)" skips the "— Kelowna" fallback, so the town never shows twice (2026-10-18).
+  const namedTown = String(full.name).trim().endsWith(`(${regionLabel})`);
+  const plain = fitTitle([`${full.name} — Event in ${regionLabel}, BC | Okanagan Roam`, `${full.name} — Event in ${regionLabel}, BC`, ...(namedTown ? [] : [`${full.name} — ${regionLabel}`]), full.name, shortTitleName(full.name)]);
   const twin = db.prepare('SELECT 1 FROM events WHERE region = ? AND name = ? AND id <> ? LIMIT 1').get(full.region, full.name, full.id);
   if (!twin) return plain;
   const dateStr = mainOccurrence ? mainOccurrence.start_date : String(full.start_datetime || '').slice(0, 10);
@@ -37115,23 +37126,23 @@ const OWNER_HELP_TOPICS = [
     keys: ['link', 'edit link', 'lost link', 'lost my link', 'link not valid', 'isnt valid', 'expired', 'old link', 'new link', 'email link', 'link doesnt work', 'link no longer works'],
     keysFr: ['lien', 'lien de modification', 'perdu mon lien', 'lien perdu', 'lien expire', 'lien ne fonctionne pas', 'lien ne marche pas', 'ancien lien', 'nouveau lien', 'lien invalide'],
     a: '<p>Go to <a href="/owner/link">Email me a new link</a> and enter the business email we have on file. A fresh link arrives in a minute or two.</p><p>Your old link keeps working until you open the new one; after that, use the newest email. If no email comes, we may not have your email, or have a different one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, or use <strong>Message us</strong> below.</p>',
-    aFr: '<p>Allez à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et entrez le courriel de l\u2019entreprise que nous avons au dossier. Un nouveau lien arrive en une minute ou deux.</p><p>Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau; ensuite, utilisez le courriel le plus récent. Aucun courriel? Nous n\u2019avons peut-être pas votre courriel, ou nous en avons un autre. Ouvrez la page de votre entreprise et touchez <strong>Revendiquer cette fiche</strong>, ou utilisez <strong>Écrivez-nous</strong> ci-dessous.</p>' },
+    aFr: '<p>Allez à <a href="/fr/owner/link">Recevoir un nouveau lien</a> et entrez le courriel de l\u2019entreprise que nous avons au dossier. Un nouveau lien arrive en une minute ou deux.</p><p>Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau; ensuite, utilisez le courriel le plus récent. Aucun courriel? Nous n\u2019avons peut-être pas votre courriel, ou nous en avons un autre. Ouvrez la page de votre entreprise et touchez <strong>Réclamer cette fiche</strong>, ou utilisez <strong>Écrivez-nous</strong> ci-dessous.</p>' },
   // Claim this listing (2026-10-18): owners with no edit link, no email on file, or a changed email.
-  { id: 'claim', q: 'How do I claim my listing?', qFr: 'Comment revendiquer ma fiche?', pages: ['login', 'link', 'invalid', 'account', 'claim'],
+  { id: 'claim', q: 'How do I claim my listing?', qFr: 'Comment réclamer ma fiche?', pages: ['login', 'link', 'invalid', 'account', 'claim'],
     keys: ['claim', 'claim my listing', 'claim this listing', 'claim my business', 'take over', 'takeover', 'my business is listed', 'business is on your site', 'ownership', 'prove', 'verify', 'own this business', 'get access', 'access my listing', 'no edit link', 'never had a link', 'manage my listing', 'control my listing'],
-    keysFr: ['revendiquer', 'revendiquer ma fiche', 'revendiquer cette fiche', 'reclamer', 'reclamer ma fiche', 'mon entreprise est sur votre site', 'mon entreprise est affichee', 'prouver', 'verifier', 'je suis le proprietaire', 'je suis la proprietaire', 'acceder a ma fiche', 'gerer ma fiche', 'pas de lien', 'jamais eu de lien'],
+    keysFr: ['revendiquer', 'revendiquer ma fiche', 'revendiquer cette fiche', 'reclamer', 'reclamer ma fiche', 'reclamer cette fiche', 'mon entreprise est sur votre site', 'mon entreprise est affichee', 'prouver', 'verifier', 'je suis le proprietaire', 'je suis la proprietaire', 'acceder a ma fiche', 'gerer ma fiche', 'pas de lien', 'jamais eu de lien'],
     a: '<ol><li>Open your business\u2019s page on Okanagan Roam and tap <strong>Claim this listing</strong> (beside the opening hours).</li><li>Tell us your name, your role and your business email, and how we can check it\u2019s you, for example by calling the number on your listing.</li><li>Once we\u2019ve checked, usually within a day or two, we email you a private edit link. On that page you can also create a login.</li></ol><p>It\u2019s free. Already got an email from us before? <a href="/owner/link">Email me a new link</a> is faster. Not listed at all? <a href="/list-your-venue">List your business</a>.</p>',
-    aFr: '<ol><li>Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong> (à côté des heures d\u2019ouverture).</li><li>Indiquez votre nom, votre rôle et le courriel de l\u2019entreprise, et comment nous pouvons vérifier que c\u2019est bien vous, par exemple en appelant le numéro de votre fiche.</li><li>Après vérification, en général d\u2019ici un jour ou deux, nous vous envoyons par courriel un lien de modification privé. Sur cette page, vous pouvez aussi créer un compte.</li></ol><p>C\u2019est gratuit. Vous avez déjà reçu un courriel de nous? <a href="/fr/owner/link">Recevoir un nouveau lien</a> est plus rapide. Pas encore inscrit? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>.</p>' },
+    aFr: '<ol><li>Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Réclamer cette fiche</strong> (à côté des heures d\u2019ouverture).</li><li>Indiquez votre nom, votre rôle et le courriel de l\u2019entreprise, et comment nous pouvons vérifier que c\u2019est bien vous, par exemple en appelant le numéro de votre fiche.</li><li>Après vérification, en général d\u2019ici un jour ou deux, nous vous envoyons par courriel un lien de modification privé. Sur cette page, vous pouvez aussi créer un compte.</li></ol><p>C\u2019est gratuit. Vous avez déjà reçu un courriel de nous? <a href="/fr/owner/link">Recevoir un nouveau lien</a> est plus rapide. Pas encore inscrit? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>.</p>' },
   { id: 'noemail', over: ['forgot', 'newlink'], q: 'I never got the email', qFr: 'Je n\u2019ai jamais reçu le courriel', pages: ['login', 'link', 'forgot', 'invalid'],
     keys: ['never got', 'didnt get', 'did not get', 'didnt receive', 'not received', 'never received', 'havent received', 'havent got', 'no email', 'didnt arrive', 'hasnt arrived', 'not arrived', 'where is the email', 'spam', 'junk', 'promotions', 'never came', 'didnt come', 'didnt get the email', 'reset email', 'no reset email'],
     keysFr: ['jamais recu', 'pas recu', 'rien recu', 'aucun courriel', 'pas de courriel', 'courriel pas arrive', 'pas arrive', 'indesirables', 'courriels indesirables', 'pourriel', 'spam', 'toujours rien'],
     a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>',
-    aFr: '<ul><li><strong>Vérifiez les courriels indésirables et l\u2019onglet Promotions</strong>, et cherchez « Okanagan Roam » dans votre boîte de réception. Ça peut prendre quelques minutes.</li><li><strong>Redemandez-le :</strong> <a href="/fr/owner/link">Recevoir un nouveau lien</a> avec le courriel de l\u2019entreprise que nous avons au dossier. Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau.</li><li><strong>Toujours rien?</strong> Nous n\u2019avons peut-être pas votre courriel, ou un ancien. Ouvrez la page de votre entreprise et touchez <strong>Revendiquer cette fiche</strong> : nous vérifierons que c\u2019est bien vous et enverrons un lien au courriel que vous nous donnerez.</li></ul><p>Les courriels de réinitialisation du mot de passe fonctionnent de la même façon : vérifiez d\u2019abord les indésirables, puis <a href="/fr/owner/forgot">redemandez-le</a>.</p>' },
+    aFr: '<ul><li><strong>Vérifiez les courriels indésirables et l\u2019onglet Promotions</strong>, et cherchez « Okanagan Roam » dans votre boîte de réception. Ça peut prendre quelques minutes.</li><li><strong>Redemandez-le :</strong> <a href="/fr/owner/link">Recevoir un nouveau lien</a> avec le courriel de l\u2019entreprise que nous avons au dossier. Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau.</li><li><strong>Toujours rien?</strong> Nous n\u2019avons peut-être pas votre courriel, ou un ancien. Ouvrez la page de votre entreprise et touchez <strong>Réclamer cette fiche</strong> : nous vérifierons que c\u2019est bien vous et enverrons un lien au courriel que vous nous donnerez.</li></ul><p>Les courriels de réinitialisation du mot de passe fonctionnent de la même façon : vérifiez d\u2019abord les indésirables, puis <a href="/fr/owner/forgot">redemandez-le</a>.</p>' },
   { id: 'staff', over: ['signin', 'login-create'], q: 'Can my staff or a partner log in too?', qFr: 'Mon personnel ou un associé peut-il se connecter aussi?', pages: ['account', 'edit', 'login', 'settings'],
     keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', '2 people', '2 logins', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'add a person', 'add someone', 'same login'],
     keysFr: ['employe', 'employes', 'mon personnel', 'personnel', 'mon equipe', 'equipe', 'gerant', 'gerante', 'associe', 'associee', 'partenaire', 'deux personnes', 'une autre personne', 'quelqu un d autre', 'collegue', 'partager l acces', 'deuxieme compte', 'ajouter un utilisateur', 'ajouter une personne', 'plusieurs personnes', 'meme compte'],
     a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password (already signed in? they tap <strong>Add to my login</strong>).</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don’t share one password between people. Everyone already on the listing gets an email when a new login is added. Signed in, <strong>People with access</strong> on your edit page shows who can update it: you can remove anyone added after you; for someone added before you, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>',
-    aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Elle l’ouvre et utilise <strong>Créer un compte</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Ajouter à mon compte</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>Mes fiches</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>Personnes ayant accès</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Revendiquer cette fiche</strong> sur votre page.</p>' },
+    aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Elle l’ouvre et utilise <strong>Créer un compte</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Ajouter à mon compte</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>Mes fiches</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>Personnes ayant accès</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Réclamer cette fiche</strong> sur votre page.</p>' },
   // Dispute (2026-10-18): "someone else claimed my business" used to match the staff topic ("Yes. Each person can
   // have their own login…"), which read like approval of a possible hijack. Its keys are longer phrases than the
   // staff ones ('someone else', 'another person', 'my manager') so it wins whenever access or a change is disputed.
@@ -37141,7 +37152,7 @@ const OWNER_HELP_TOPICS = [
       'another person has access', 'someone else has access', 'someone has access', 'stranger has access', 'dont know who',
       'didnt give', 'didnt authorize', 'didnt authorise', 'not authorized', 'unauthorized', 'unauthorised', 'didnt allow', 'without permission', 'without my permission', 'without asking', 'without telling',
       'someone changed', 'somebody changed', 'changed without', 'wasnt me', 'not one of us', 'old owner', 'former owner', 'previous owner'],
-    keysFr: ['quelqu un a revendique', 'deja revendique', 'revendique ma fiche', 'qui a revendique', 'sans permission', 'sans ma permission', 'sans mon accord', 'sans autorisation', 'pas autorise', 'quelqu un a modifie', 'quelqu un a change', 'ce n etait pas moi', 'pirate', 'usurpation', 'litige', 'ancien proprietaire', 'inconnu a acces'],
+    keysFr: ['quelqu un a revendique', 'quelqu un a reclame', 'deja revendique', 'deja reclame', 'revendique ma fiche', 'qui a revendique', 'sans permission', 'sans ma permission', 'sans mon accord', 'sans autorisation', 'pas autorise', 'quelqu un a modifie', 'quelqu un a change', 'ce n etait pas moi', 'pirate', 'usurpation', 'litige', 'ancien proprietaire', 'inconnu a acces'],
     a: '<p>Thanks for telling us. <strong>Okanagan Roam will check it.</strong> Nobody should have access to your listing without your say-so.</p><ol><li>Tap <strong>Message us</strong> below (it goes to info@okanaganroam.com).</li><li>Say <strong>which listing</strong> it is and <strong>who you are</strong>: your name, your role, and a phone number or email we can check against the listing.</li><li>If anything was <strong>changed without permission</strong>, tell us what (hours, photos, description, an event) so we can put it right.</li></ol><p>Once we\u2019ve checked, Dayton can <strong>take other people\u2019s logins off the listing</strong> and <strong>send you a fresh edit link</strong>, so the old link stops working.</p><p>Signed in, you can also see every login under <strong>People with access</strong> on your edit page and remove anyone added after you. Removing someone also resets the private edit link, so they can\u2019t use it to get back in, and we email you the new one. Anyone added before you, Dayton handles.</p>',
     aFr: '<p>Merci de nous le signaler. <strong>Okanagan Roam va vérifier.</strong> Personne ne devrait avoir accès à votre fiche sans votre accord.</p><ol><li>Touchez <strong>Écrivez-nous</strong> ci-dessous (le message va à info@okanaganroam.com).</li><li>Dites-nous <strong>de quelle fiche</strong> il s\u2019agit et <strong>qui vous êtes</strong> : votre nom, votre rôle, et un numéro de téléphone ou un courriel que nous pouvons comparer à la fiche.</li><li>Si quelque chose a été <strong>modifié sans permission</strong>, dites-nous quoi (heures, photos, description, un événement) pour que nous puissions corriger.</li></ol><p>Après vérification, Dayton peut <strong>retirer les comptes des autres personnes</strong> et <strong>vous envoyer un nouveau lien de modification</strong>, pour que l\u2019ancien cesse de fonctionner.</p><p>Avec votre compte, vous voyez aussi tous les comptes sous <strong>Personnes ayant accès</strong>, sur votre page de modification, et pouvez retirer toute personne ajoutée après vous. Retirer quelqu\u2019un réinitialise aussi le lien de modification privé, pour qu\u2019il ne puisse pas revenir avec, et nous vous envoyons le nouveau par courriel. Pour les personnes ajoutées avant vous, Dayton s\u2019en occupe.</p>' },
   // Help bot v2 (2026-10-18): People with access lists every login on the listing, with Remove.
@@ -37361,14 +37372,14 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Sign in first, then open the other business’s private edit link on the same device and tap <strong>Add to my login</strong>. (No login yet? Use <strong>Create a login</strong> on the first one, then do this for the others.) <a href="/owner/account">My listings</a> shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
     },
     aFr: {
-      in: '<p>Ouvrez le lien de modification privé de l’autre entreprise sur cet appareil, avec votre compte ouvert, et touchez <strong>Ajouter à mon compte</strong>. <a href="/fr/owner/account">Mes fiches</a> les montre ensuite toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
-      out: '<p>Connectez-vous d’abord, puis ouvrez le lien de modification privé de l’autre entreprise sur le même appareil et touchez <strong>Ajouter à mon compte</strong>. (Pas encore de compte? Utilisez <strong>Créer un compte</strong> sur la première, puis faites de même pour les autres.) <a href="/fr/owner/account">Mes fiches</a> les montre toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Revendiquer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
+      in: '<p>Ouvrez le lien de modification privé de l’autre entreprise sur cet appareil, avec votre compte ouvert, et touchez <strong>Ajouter à mon compte</strong>. <a href="/fr/owner/account">Mes fiches</a> les montre ensuite toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Réclamer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
+      out: '<p>Connectez-vous d’abord, puis ouvrez le lien de modification privé de l’autre entreprise sur le même appareil et touchez <strong>Ajouter à mon compte</strong>. (Pas encore de compte? Utilisez <strong>Créer un compte</strong> sur la première, puis faites de même pour les autres.) <a href="/fr/owner/account">Mes fiches</a> les montre toutes.</p><p>Pas de lien pour celle-là? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou touchez <strong>Réclamer cette fiche</strong> sur sa page. Pas encore inscrite? <a href="/fr/list-your-venue">Inscrivez votre entreprise</a>, gratuitement.</p>',
     } },
   { id: 'remove', q: 'We closed for good or sold the business', qFr: 'Nous avons fermé pour de bon ou vendu l\u2019entreprise', pages: ['edit', 'account'],
     keys: ['closed for good', 'closed down', 'closed permanently', 'permanently closed', 'closing down', 'closing for good', 'new owner', 'new owners', 'sold', 'sold the business', 'remove listing', 'remove my listing', 'delete listing', 'delete my listing', 'out of business', 'no longer in business', 'shut down', 'went out of business'],
     keysFr: ['ferme pour de bon', 'fermes pour de bon', 'ferme definitivement', 'fermeture definitive', 'nouveau proprietaire', 'nouveaux proprietaires', 'vendu', 'vendu l entreprise', 'supprimer ma fiche', 'retirer ma fiche', 'supprimer la fiche'],
     a: '<p>Closed for good, sold, or need the listing removed? <strong>Message us</strong> below and we\u2019ll take care of it. New owners can then claim the listing for themselves.</p><p>Just moved or renamed? Change it in <strong>Name, address &amp; links</strong> and tap {SEND}.</p>',
-    aFr: '<p>Fermé pour de bon, entreprise vendue, ou fiche à retirer? <strong>Écrivez-nous</strong> ci-dessous et nous nous en occupons. Les nouveaux propriétaires pourront ensuite revendiquer la fiche.</p><p>Vous avez seulement déménagé ou changé de nom? Modifiez-le dans <strong>Nom, adresse et liens</strong> et touchez {SEND}.</p>' },
+    aFr: '<p>Fermé pour de bon, entreprise vendue, ou fiche à retirer? <strong>Écrivez-nous</strong> ci-dessous et nous nous en occupons. Les nouveaux propriétaires pourront ensuite réclamer la fiche.</p><p>Vous avez seulement déménagé ou changé de nom? Modifiez-le dans <strong>Nom, adresse et liens</strong> et touchez {SEND}.</p>' },
   { id: 'features', q: 'What are the features and badges?', qFr: 'À quoi servent les caractéristiques et les badges?', pages: ['edit'],
     keys: ['features', 'badges', 'badge', 'dog friendly', 'dogs', 'patio', 'kid friendly', 'kids', 'wheelchair', 'accessible', 'vegan', 'vegetarian', 'gluten', 'gluten free', 'happy hour', 'amenities', 'lake view', 'live music badge'],
     keysFr: ['caracteristiques', 'badges', 'badge', 'chiens', 'chien', 'animaux', 'terrasse', 'enfants', 'fauteuil roulant', 'accessible', 'vegetalien', 'vegane', 'vegetarien', 'sans gluten', 'cinq a sept', '5 a 7', 'happy hour', 'commodites', 'vue sur le lac'],
@@ -38596,7 +38607,7 @@ function renderOwnerNewLinkPage({ lang = 'en' } = {}) {
       <button type="submit" class="venue-form-submit" id="onlSubmit">${L('Email me my link', 'M’envoyer mon lien')}</button>
     </form>
     <p class="op-done" id="onlDone" hidden>${L('If we have that email for a business, a new link is on its way. Check your inbox (and spam folder). Your old link keeps working until you open the new one.', 'Si nous avons ce courriel pour une entreprise, un nouveau lien est en route. Vérifiez votre boîte de réception (et vos courriels indésirables). Votre ancien lien fonctionne jusqu’à ce que vous ouvriez le nouveau.')}</p>
-    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Nous n’avons pas votre courriel, ou il a changé?</strong> Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Revendiquer cette fiche</strong>. Nous vérifierons qu’il s’agit bien de vous et vous enverrons un lien.
+    ${fr ? `<p class="op-hint" style="margin-top:20px"><strong>Nous n’avons pas votre courriel, ou il a changé?</strong> Ouvrez la page de votre entreprise sur Okanagan Roam et touchez <strong>Réclamer cette fiche</strong>. Nous vérifierons qu’il s’agit bien de vous et vous enverrons un lien.
     <br><strong>Vous ne savez pas quel courriel nous avons?</strong> Écrivez à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous réglerons la question.
     <br><strong>Vous avez déjà un compte?</strong> <a href="/owner/login">Connectez-vous ici</a>.</p>` : `<p class="op-hint" style="margin-top:20px"><strong>We don&rsquo;t have your email, or it changed?</strong> Open your business&rsquo;s page on Okanagan Roam and tap <strong>Claim this listing</strong>. We&rsquo;ll check it&rsquo;s you and send you a link.
     <br><strong>Not sure which email we have?</strong> Email <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we&rsquo;ll sort it out.
@@ -38666,7 +38677,7 @@ const CLAIM_TEXT = {
     errVenue: 'We couldn’t find that listing.', errConnect: 'Could not connect. Please try again.',
   },
   fr: {
-    title: 'Revendiquer cette fiche', eyebrow: 'Pour les entreprises',
+    title: 'Réclamer cette fiche', eyebrow: 'Pour les entreprises',
     intro: 'Vous êtes propriétaire ou gérant de {name} ? Dites-nous qui vous êtes et comment vérifier que c’est bien vous. Ensuite, nous vous enverrons par courriel un lien privé pour modifier la fiche : photos, heures, menu ou tarifs, et événements. C’est gratuit.',
     name: 'Votre nom', role: 'Votre rôle', choose: 'Choisissez', email: 'Courriel de l’entreprise', emailHint: 'Nous enverrons le lien de modification à cette adresse.',
     phone: 'Numéro de téléphone', verify: 'Comment vérifier que c’est bien vous ?', detailSocial: 'Quel compte ? (par exemple @votreentreprise)', detailOther: 'Expliquez-nous',
@@ -38966,7 +38977,7 @@ function claimApprovalEmail(claim, venue, url) {
   if (claim.lang === 'fr') {
     return {
       subject: `Votre lien pour modifier ${venue.name} sur Okanagan Roam`,
-      text: [`Bonjour ${first},`, '', `Merci d’avoir revendiqué ${venue.name} sur Okanagan Roam. Nous avons vérifié que c’est bien vous. Voici votre lien privé pour modifier la fiche (aucun mot de passe requis) :`, url, '',
+      text: [`Bonjour ${first},`, '', `Merci d’avoir réclamé ${venue.name} sur Okanagan Roam. Nous avons vérifié que c’est bien vous. Voici votre lien privé pour modifier la fiche (aucun mot de passe requis) :`, url, '',
         `Sur cette page, vous pouvez ajouter vos photos, vos heures d’ouverture, ${ownerExtrasFor(venue, 'fr')} et vos événements, et créer un compte pour vous connecter ensuite à https://okanaganroam.com/fr/owner/login.`, '',
         `Gardez ce lien privé : toute personne qui l’a peut proposer des modifications. Vous l’avez perdu ? Demandez-en un nouveau à https://okanaganroam.com/fr${OWNER_NEW_LINK_PATH} avec cette adresse courriel.`, '',
         'Merci,', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n'),
