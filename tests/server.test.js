@@ -29609,3 +29609,17 @@ test('Round 7 trip planner: Swap may name the place it replaces; French pages op
   assert.ok(fr.includes("full.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip'"), 'the tray link follows the page language');
   assert.ok(app.renderTripPlannerPage(true).includes("window.location.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip';"));
 }));
+
+// ---- Build My Trip, round 8 (2026-10-19): Swap locks and the /trip page's French helpers ----
+test('Trip planner round 8: Swap sends the visitor\'s locks, and only valid ones are accepted', () => {
+  const ok = app.parseTripPlanBody({ text: 'Naramata wine day', pinned: { '1-morning': 3 }, swap: { key: '1-afternoon', type: 'winery', id: 5, locked: ['1-morning'] } });
+  assert.deepEqual(ok.value.swap, { key: '1-afternoon', type: 'winery', id: 5, locked: ['1-morning'] });
+  assert.deepEqual(app.parseTripPlanBody({ text: 'x', swap: { key: '1-afternoon', type: 'winery' } }).value.swap, { key: '1-afternoon', type: 'winery' }, 'older pages still work');
+  for (const locked of ['1-morning', ['day-1'], [1], new Array(29).fill('1-morning')]) assert.match(app.parseTripPlanBody({ text: 'x', swap: { key: '1-afternoon', type: 'winery', locked } }).error, /^swap must be/);
+  const html = app.renderTripPlannerV3Page({ preview: true });
+  assert.ok(html.includes('locked: Object.keys(state.locks).filter(function(k){ return k !== sk; })'), 'the page sends what the visitor locked');
+  assert.match(html, /function t3FrenchStory\(/);
+  assert.match(html, /var FR_STOP_NOUN = \{"winery":/);
+  // The dated one-day outing check survives the template (a single backslash became "d").
+  assert.ok(html.includes("/^\\d{4}-\\d{2}-\\d{2}$/.test(r.date || '')"));
+});

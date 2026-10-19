@@ -194,7 +194,9 @@ const PHRASES = [
   ['terrasse', 'patio'], ['terrasses', 'patios'],
   // events
   ['musique live', 'live music'], ['musique en direct', 'live music'], ['musique sur scene', 'live music'],
-  ['spectacle', 'live show'], ['spectacles', 'live shows'], ['evenement', 'event'], ['evenements', 'events'],
+  // Round 8 (2026-10-19): « spectacle » is any show (theatre, comedy, a concert), not only a concert.
+  ['spectacle musical', 'concert'], ['spectacle de musique', 'concert'], ['le spectacle', 'the show'], ['du spectacle', 'the show'], ['des spectacles', 'shows'],
+  ['spectacle', 'a show'], ['spectacles', 'shows'], ['evenement', 'event'], ['evenements', 'events'],
   ['marche fermier', 'farmers market'], ['marche des fermiers', 'farmers market'], ['marche public', 'farmers market'],
   ['marches publics', 'farmers markets'], ['marche de producteurs', 'farmers market'], ['marches fermiers', 'farmers markets'],
   ['partie de hockey', 'hockey game'], ['match de hockey', 'hockey game'], ['galerie', 'gallery'], ['galeries', 'galleries'],

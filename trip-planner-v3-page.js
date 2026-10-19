@@ -1,5 +1,5 @@
 'use strict';
-const {t3FrenchText,t3FrenchEvent,t3FrenchPlan,FR_MONTHS_BY_EN,FR_SEASON_WORDS}=require('./trip-french-copy');
+const {t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN}=require('./trip-french-copy');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -776,6 +776,10 @@ function renderScript(d) {
   var FR_SEASON_WORDS = ${JSON.stringify(FR_SEASON_WORDS)};
   ${t3FrenchText.toString()}
   ${t3FrenchEvent.toString()}
+  // Round 8: the written French summary and its lookup ship with t3FrenchPlan, which calls them.
+  var FR_STOP_NOUN = ${JSON.stringify(FR_STOP_NOUN)};
+  ${t3FrenchStopText.toString()}
+  ${t3FrenchStory.toString()}
   ${t3FrenchPlan.toString()}
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
   var renderedVenueCardAnchors = {};
@@ -1293,6 +1297,8 @@ function renderScript(d) {
         if (s.kind === 'event' && s.event) {
           var e = s.event, u = safeUrl(e.url);
           html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+            // Round 8: an event says why it is in the plan, like every other stop.
+            + ((s.why || []).length ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + s.why.slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
             + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
@@ -1726,9 +1732,11 @@ function renderScript(d) {
   // days still show as one list.
   // A dated one-day outing (an itinerary: "brewery crawl Penticton afternoon" on Sat, Oct 24) has no day list, so its
   // stops are Day 1 of My Trip and keep that date (round 7: they were saved with no date at all).
+  // Round 8 (2026-10-19): the date test needs a doubled backslash inside this template; a single one became "d" and
+  // never matched, so a dated one-day outing still lost its date and times in My Trip.
   function datedOneDay(){
     var p = state.last;
-    return !!(p && !(p.days || []).length && (p.schedule || []).some(function(r){ return r && r.day === 1 && /^\d{4}-\d{2}-\d{2}$/.test(r.date || ''); }));
+    return !!(p && !(p.days || []).length && (p.schedule || []).some(function(r){ return r && r.day === 1 && /^\\d{4}-\\d{2}-\\d{2}$/.test(r.date || ''); }));
   }
   function readDays(){
     try { var m = JSON.parse(localStorage.getItem('okanaganTripDays') || '{}') || {}; return typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
@@ -1882,7 +1890,7 @@ function renderScript(d) {
     }
     if ((b=t.closest('[data-t3-event-date]'))) {
       var eventDate=b.getAttribute('data-t3-event-date');
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate || '')) return;
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(eventDate || '')) return;
       state.overrides.startDate=eventDate;
       delete state.overrides.eventId;
       if (!(state.last && state.last.requirementResults)) state.locks={};
@@ -1992,7 +2000,8 @@ function renderScript(d) {
       delete state.removed[sk];
       var oldName = ss && ss.venue ? ss.venue.name : null;
       // The kind of place goes with it (2026-10-19), so a winery is swapped for a winery.
-      var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type, id: ss.venue.id } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
+      // Round 8: only the stops the visitor locked must stay; the rest are kept where they fit (no false "locked stop").
+      var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type, id: ss.venue.id, locked: Object.keys(state.locks).filter(function(k){ return k !== sk; }) } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
       // Say what changed and show where: "Swapped Lachi for Poplar Grove", with the new card briefly highlighted.
       if (swapped && swapped.then) swapped.then(function(){
         var ns = stopAt(sk);

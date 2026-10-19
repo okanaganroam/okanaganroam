@@ -77,6 +77,10 @@ function t3FrenchText(value){
  ['Estimated visit ','Visite estimée : '],['within listed hours','pendant les heures indiquées'],['; uses an assumed start time','; heure de départ supposée'],
  ['Estimated driving assumed travel','Trajet estimé en voiture (mode supposé)'],['Estimated walking travel','Trajet estimé à pied'],[' travel to the event:',' vers l’événement :'],
  ['; allow 30 minutes for arrival','; prévoyez 30 minutes pour l’arrivée'],['Listed hours:','Horaires indiqués :'],
+ ['Matches your request for a comedy show','Correspond à votre demande de spectacle d’humour'],['Matches your request for a show','Correspond à votre demande de spectacle'],
+ ['Matches your request for a concert','Correspond à votre demande de concert'],['Matches your request for live music','Correspond à votre demande de musique en direct'],
+ ['Matches your request for a hockey game','Correspond à votre demande de match de hockey'],['Matches your request for a festival','Correspond à votre demande de festival'],
+ ['Matches your request for a market','Correspond à votre demande de marché'],['Matches your request for an event','Correspond à votre demande d’événement'],['A sit-down dinner to end the day','Un souper au restaurant pour finir la journée'],['Optional: something different after the lifts close','Facultatif : autre chose après la fermeture des remontées'],['Optional — skip it to keep skiing','Facultatif — sautez-le pour continuer à skier'],
  ['Matches your request for ','Correspond à votre demande : '],[', where the event is',', où a lieu l’événement'],
  ['Its description mentions','Sa description mentionne'],['Listed on Okanagan Roam for','Répertorié sur Okanagan Roam pour'],['Has the verified','Possède le badge vérifié'],
  ['Event start time is not listed; confirm before visiting.','L’heure de début n’est pas indiquée; confirmez avant de partir.'],
@@ -88,7 +92,12 @@ function t3FrenchText(value){
  ['No indoor backup could be fitted into this plan.','Aucune option intérieure n’a pu être intégrée à ce plan en cas de pluie.'],
  ['You asked for one dinner, so it is planned once and the other evenings are left free.','Vous avez demandé un seul souper : il est prévu une fois et les autres soirées restent libres.'],
  ['First tasting of the day','Première dégustation de la journée'],['Second tasting of the day','Deuxième dégustation de la journée'],['Lunch between the wineries','Dîner entre les vignobles'],['Lunch at the hill','Dîner à la station'],['A lunch stop for the day','Un arrêt pour le dîner'],['A lunch stop between the morning and afternoon','Un arrêt pour le dîner entre le matin et l’après-midi'],
- ['Après-ski and dinner at the hill','Après-ski et souper à la station'],['A sit-down dinner to end the day','Un souper au restaurant pour finir la journée'],['Optional: something different after the lifts close','Facultatif : autre chose après la fermeture des remontées'],['Optional — skip it to keep skiing','Facultatif — sautez-le pour continuer à skier'],
+ ['Après-ski and dinner at the hill','Après-ski et souper à la station'],
+ // Round 8 (2026-10-19): new reasons and event "why" lines.
+ ['Lunch on the hill, between runs','Dîner sur la montagne, entre deux descentes'],['Lunch at a winery that serves food, so it is a tasting too','Dîner dans un vignoble qui sert à manger : c’est aussi une dégustation'],
+ ['A lunch stop, so the day doesn’t skip a meal','Un arrêt pour dîner, pour ne pas sauter de repas'],['Fills the free time in the afternoon','Occupe le temps libre de l’après-midi'],
+ ['A Halloween event on your dates','Un événement d’Halloween à vos dates'],['A family event on What’s On that day','Un événement familial à l’affiche ce jour-là'],
+ ['Listed on What’s On, with its start time','À l’affiche sur Okanagan Roam, avec son heure de début'],['Listed on What’s On for that day','À l’affiche sur Okanagan Roam ce jour-là'],
  ['A viewpoint or walk before the tastings','Un point de vue ou une promenade avant les dégustations'],['Also planned on an earlier evening — few dinner spots at the hill are listed on Okanagan Roam','Déjà prévu un autre soir — peu de restaurants de la station sont répertoriés sur Okanagan Roam'],
  // Build My Trip gaps (2026-10-18): counted wine days, the late-afternoon tasting, special dinners, empty results.
  // French gaps (2026-10-18): the occasion notes still in English.
@@ -194,6 +203,9 @@ function t3FrenchText(value){
  text=text.replace(/^Okanagan Roam only covers the Okanagan Valley, so (.+) (?:isn’t|aren’t) included\. Here are ideas in the Okanagan instead; name a town such as Kelowna, Penticton or Vernon to choose where\.$/,(_,p)=>'Okanagan Roam couvre seulement la vallée de l’Okanagan, alors '+p.replace(/ and (?!.* and )/,' et ')+' n’est pas inclus. Voici des idées dans l’Okanagan; nommez une ville comme Kelowna, Penticton ou Vernon pour choisir l’endroit.');
  text=text.replace(/^Based in (.+), with day (\d+) as your day trip to (.+)\.$/,'Basé à $1, avec le jour $2 consacré à votre excursion à $3.');
  text=text.replace(/^Planned as a road trip from (.+) to (.+), one stretch of the valley each day\.$/,'Planifié comme un road trip de $1 à $2, une portion de la vallée chaque jour.');
+ text=text.replace(/: about (\d+) minutes\b/g,' : environ $1 minutes');
+ text=text.replace(/^Planned as a road trip from (.+) to (.+), one stretch of the valley each day, with a stop on the way\.$/,'Planifié comme un road trip de $1 à $2, une portion de la vallée chaque jour, avec un arrêt en chemin.');
+ text=text.replace(/^No other winery that serves lunch nearby fits this part of the day, so (.+) stays in your plan\.$/,'Aucun autre vignoble qui sert le dîner ne convient à ce moment de la journée : $1 reste dans votre plan.');
  // Wine and ski trips (2026-10-18).
  const frMonth=m=>({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'}[m]||m);
  const frDate=x=>x.replace(/^(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2})$/,(_,m,d)=>(d==='1'?'1er':d)+' '+frMonth(m));
@@ -228,7 +240,7 @@ function t3FrenchText(value){
  text=text.replace(/ on (\d{4}-\d{2}-\d{2})/g,' le $1');
  // ISO dates read as dates (2026-10-19): "le 2026-10-24" -> "le 24 octobre 2026".
  text=text.replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g,(raw,y,m,d)=>{const mo=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][Number(m)-1];return mo?(Number(d)===1?'1er':String(Number(d)))+' '+mo+' '+y:raw;});
- const words={'Lunch at a winery':'Dîner dans un vignoble','A winery that serves lunch':'Un vignoble qui sert le dîner','Fills the free time before dinner':'Occupe le temps libre avant le souper','Late afternoon':'Fin d’après-midi',Winter:'Hiver','Optional — skip it to keep skiing':'Facultatif — sautez-le pour continuer à skier','Lakeside walk':'Promenade au bord du lac',Cafes:'Cafés',Wineries:'Vignobles',Breweries:'Microbrasseries',Beaches:'Plages',Dinner:'Souper',Supper:'Souper',Lunch:'Dîner',Breakfast:'Déjeuner','Live-music':'Musique en direct','Live music':'Musique en direct',Morning:'Matin',Afternoon:'Après-midi',Evening:'Soir',cafes:'cafés',wineries:'vignobles',walks:'promenades','kid-friendly spots':'endroits adaptés aux enfants','indoor & rainy day spots':'lieux intérieurs et jours de pluie','outdoor destinations':'lieux de plein air','Hiking & Trails':'Randonnées et sentiers','hiking & trails':'randonnées et sentiers','dog-friendly spots':'endroits qui acceptent les chiens','vegetarian-friendly venues':'lieux avec options végétariennes','vegan-friendly venues':'lieux avec options véganes','lake time':'temps au bord du lac','golf courses':'terrains de golf','cocktail lounges':'bars à cocktails','tours & experiences':'visites et expériences',breweries:'microbrasseries',beaches:'plages',daily:'tous les jours','Mon–Thu':'lun.–jeu.','Fri–Sat':'ven.–sam.',Sun:'dim.'};
+ const words={'Lunch at a winery':'Dîner dans un vignoble','A winery that serves lunch':'Un vignoble qui sert le dîner','Fills the free time before dinner':'Occupe le temps libre avant le souper','Late afternoon':'Fin d’après-midi',Winter:'Hiver','Optional — skip it to keep skiing':'Facultatif — sautez-le pour continuer à skier','Lakeside walk':'Promenade au bord du lac',Cafes:'Cafés',Wineries:'Vignobles',Breweries:'Microbrasseries',Beaches:'Plages',Dinner:'Souper',Supper:'Souper',Lunch:'Dîner',Breakfast:'Déjeuner','Live-music':'Musique en direct','Live music':'Musique en direct',Morning:'Matin',Midday:'Midi',Afternoon:'Après-midi',Evening:'Soir','Free time':'Temps libre','Comedy show':'Spectacle d’humour','Comedy':'Humour',comedy:'humour','Show':'Spectacle',cafes:'cafés',wineries:'vignobles',walks:'promenades','kid-friendly spots':'endroits adaptés aux enfants','indoor & rainy day spots':'lieux intérieurs et jours de pluie','outdoor destinations':'lieux de plein air','Hiking & Trails':'Randonnées et sentiers','hiking & trails':'randonnées et sentiers','dog-friendly spots':'endroits qui acceptent les chiens','vegetarian-friendly venues':'lieux avec options végétariennes','vegan-friendly venues':'lieux avec options véganes','lake time':'temps au bord du lac','golf courses':'terrains de golf','cocktail lounges':'bars à cocktails','tours & experiences':'visites et expériences',breweries:'microbrasseries',beaches:'plages',daily:'tous les jours','Mon–Thu':'lun.–jeu.','Fri–Sat':'ven.–sam.',Sun:'dim.'};
  for(const [a,b] of Object.entries(words)){if(text===a)text=b;else if(a===a.toLowerCase()||a.includes('–')||a.includes('&'))text=text.replace(new RegExp('\\b'+a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'),b);}
  text=text.replace(/^In (.+), où a lieu l’événement$/, 'À $1, où a lieu l’événement');
  // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
@@ -241,13 +253,42 @@ function t3FrenchEvent(event){
  const e={...event};
  const days={Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'};
  const months={Jan:'janv.',Feb:'févr.',Mar:'mars',Apr:'avr.',May:'mai',Jun:'juin',Jul:'juill.',Aug:'août',Sep:'sept.',Oct:'oct.',Nov:'nov.',Dec:'déc.'};
- e.dateLabel=String(e.dateLabel||'').replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>days[d]).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}(?:[–-]\d{1,2})?)/g,(_,m,d)=>d+' '+months[m]);
+ e.dateLabel=String(e.dateLabel||'').replace(/\+\s*(\d+) more dates?\b/g,(_,n)=>'+ '+n+' '+(n==='1'?'autre date':'autres dates')).replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>days[d]).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}(?:[–-]\d{1,2})?)/g,(_,m,d)=>d+' '+months[m]);
  e.time=String(e.time||'').replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,part)=>{
   if(Number(h)<1||Number(h)>12||Number(m||0)>59)return raw;
   const hour=Number(h)%12+(part.toLowerCase()==='pm'?12:0);
   return String(hour).padStart(2,'0')+' h'+(m&&m!=='00'?' '+m:'');
  });
  return e;
+}
+// "Votre journée commence par une dégustation à Fox & Archer Wines, puis un dîner à The Bistro, et se termine par un
+// souper à Terroir Kitchen." One sentence a day (three days at most, then the names of the rest).
+const FR_STOP_NOUN={winery:'une dégustation',brewery:'une bière artisanale',distillery:'une dégustation',cafe:'un café',outdoor:'une sortie en plein air',beach:'la plage',golf:'une partie de golf',indoor:'une visite',tour:'une visite guidée',sport:'une activité',pub:'un verre',cocktail:'un cocktail',restaurant:'un repas'};
+function t3FrenchStopText(s){
+ const name=s.venue?.name||s.event?.name;
+ if(s.event)return 'l’événement « '+name+' »';
+ const t=s.venue?.type,part=s.daypart,label=String(s.label||'');
+ let noun=FR_STOP_NOUN[t]||'un arrêt';
+ if(/^(?:Dîner|Lunch)$/i.test(label)||(part==='midday'&&['restaurant','cafe','pub'].includes(t))||s.wineryLunch||s.onHill)noun=s.wineryLunch?'un dîner au vignoble':'un dîner';
+ else if(['evening','night'].includes(part)&&['restaurant','pub'].includes(t))noun='un souper';
+ else if(part==='morning'&&t==='cafe')noun='un café';
+ else if(s.skiDay)noun='une journée de ski';
+ return noun+' à '+name;
+}
+function t3FrenchStory(p){
+ const days=p.days?.length?p.days.map(d=>({day:d.day,town:d.regionLabel,stops:(d.stops||[]).filter(s=>s.venue||s.event)})):[{day:1,town:null,stops:(p.itinerary?.stops||p.outing?.stops||[]).filter(s=>s.venue||s.event)}];
+ const one=days.length===1;
+ const out=[];
+ for(const d of days.slice(0,3)){
+  const parts=d.stops.map(t3FrenchStopText);
+  if(!parts.length)continue;
+  const lead=one?'Votre journée'+(d.town?' à '+d.town:''):'Le jour '+d.day+(d.town?', à '+d.town+',':'');
+  if(parts.length===1){out.push(lead.replace(/,$/,'')+' : '+parts[0]+'.');continue;}
+  const first=parts[0],last=parts[parts.length-1],mid=parts.slice(1,-1);
+  out.push(lead+' commence par '+first+(mid.length?', puis '+mid.join(', '):'')+', et se termine par '+last+'.');
+ }
+ if(days.length>3){const rest=days.slice(3).flatMap(d=>d.stops.map(s=>s.venue?.name||s.event?.name));if(rest.length)out.push('Ensuite : '+rest.join(', ')+'.');}
+ return out.join(' ').replace(/\bà (le|les) /g,(m,a)=>a==='le'?'au ':'aux ');
 }
 function t3FrenchPlan(plan){
  const p=JSON.parse(JSON.stringify(plan));
@@ -262,7 +303,7 @@ function t3FrenchPlan(plan){
  };
  // Round 7: the When chip ("fall", "January") in French.
  if(p.understood&&p.understood.season&&p.understood.season.label){const l=String(p.understood.season.label),fr=FR_SEASON_WORDS[l.toLowerCase()]||FR_MONTHS_BY_EN[l]||l;p.understood.season={...p.understood.season,label:fr.charAt(0).toUpperCase()+fr.slice(1)};}
- if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(t3FrenchText);if(typeof p.understood.when==='string')p.understood.when=t3FrenchEvent({dateLabel:p.understood.when}).dateLabel.replace(/,/g,'');}
+ if(p.understood){for(const key of ['interests','themes'])if(p.understood[key])p.understood[key]=p.understood[key].map(x=>{const q=/^“(.+)”$/.exec(String(x));if(!q)return t3FrenchText(x);const fr=t3FrenchText(q[1]);return fr!==q[1]?fr:'« '+q[1]+' »';});if(typeof p.understood.when==='string')p.understood.when=t3FrenchEvent({dateLabel:p.understood.when}).dateLabel.replace(/,/g,'');}
  const stops=p.days?.length?p.days.flatMap(d=>d.stops||[]):p.itinerary?.stops||p.outing?.stops||p.recommendations||[];
  for(const s of stops)translateStop(s);
  if(p.events)p.events=p.events.map(t3FrenchEvent);
@@ -276,8 +317,9 @@ function t3FrenchPlan(plan){
   const translatedSummary=p.summary?t3FrenchText(p.summary):'';
   const towns=[...new Set(stops.map(s=>s.venue?.regionLabel).filter(Boolean))],at=towns.length===1?' à '+towns[0]:towns.length===2?' à '+towns[0]+' et '+towns[1]:' dans l’Okanagan';
   p.headline=p.days?.length?(p.days.length===1?'Votre journée'+at:'Votre voyage de '+p.days.length+' jours'+at):translatedSummary&&translatedSummary!==p.summary&&!/\b(?:and|in|with|the|of|for|near)\b/.test(translatedSummary)?translatedSummary:'Votre itinéraire'+at;
-  if(p.experience)p.experience.text=p.experience.text?.startsWith('Timing conflict:')?t3FrenchText(p.experience.text):'Arrêts proposés, dans l’ordre : '+names.join(' → ')+'. Les horaires et les trajets restent à confirmer; consultez les détails de chaque arrêt.';
+  // Round 8 (2026-10-19): a written French summary of the day (it was a plain list of names with arrows).
+  if(p.experience)p.experience.text=p.experience.text?.startsWith('Timing conflict:')?t3FrenchText(p.experience.text):t3FrenchStory(p)+' Les horaires et les trajets restent à confirmer; consultez les détails de chaque arrêt.';
  }else {p.headline=t3FrenchText(p.headline||p.summary);if(p.experience?.text)p.experience.text=t3FrenchText(p.experience.text);}
  return p;
 }
-module.exports={t3FrenchText,t3FrenchEvent,t3FrenchPlan,FR_MONTHS_BY_EN,FR_SEASON_WORDS};
+module.exports={t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN};
