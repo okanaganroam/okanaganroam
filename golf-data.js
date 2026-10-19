@@ -587,7 +587,7 @@ function golfValueSectionHtml(detail, today = todayIso()) {
 const GOLF_DATA_CSS = `<style>
   /* Golf data (2026-09-26): green fees, price sort, course-map link. */
   body.golf-page .golf-fee { margin: 2px 0 0; font-size: 0.92rem; color: var(--ink); }
-  body.golf-page .golf-fee .golf-fee-price { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.05rem; color: var(--ref-navy); }
+  body.golf-page .golf-fee .golf-fee-price { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.05rem; color: var(--ref-navy); }
   body.golf-page .golf-fee .golf-fee-detail { color: rgba(42,32,25,0.72); }
   body.golf-page .golf-fee-none { color: rgba(42,32,25,0.62); font-style: italic; }
   body.golf-page .golf-fee-note { margin: 0 0 6px; font-size: 0.78rem; color: rgba(42,32,25,0.6); }
@@ -609,7 +609,7 @@ const GOLF_DATA_CSS = `<style>
   body.golf-page .golf-map-callout .golf-map-cta:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
   body.golf-page .golf-map-credit { grid-column: 1 / -1; font-size: 0.8rem; color: rgba(42,32,25,0.6); }
   body.golf-page .golf-fees-headline { margin: 0 0 12px; }
-  body.golf-page .golf-fees-headline .golf-fee-price { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.6rem; color: var(--ref-navy); }
+  body.golf-page .golf-fees-headline .golf-fee-price { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.6rem; color: var(--ref-navy); }
   body.golf-page .golf-fees-headline .golf-fee-detail { color: rgba(42,32,25,0.75); }
   body.golf-page .golf-fees-headline-note { display: block; font-size: 0.85rem; color: rgba(42,32,25,0.65); }
   body.golf-page .golf-fees-table-wrap { overflow-x: auto; }
@@ -622,7 +622,7 @@ const GOLF_DATA_CSS = `<style>
   body.golf-page .golf-fees-meta, body.golf-page .golf-fees-source, body.golf-page .golf-fees-none { font-size: 0.85rem; color: rgba(42,32,25,0.7); margin: 10px 0 0; }
   body.golf-page .golf-value { margin: 0 0 6px; font-size: 0.84rem; font-weight: 700; color: var(--ref-navy); }
   body.golf-page .golf-value.golf-value-none { font-weight: 400; font-style: italic; color: rgba(42,32,25,0.6); }
-  body.golf-page .golf-value-headline { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.2rem; color: var(--ref-navy); margin: 0 0 14px; }
+  body.golf-page .golf-value-headline { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.2rem; color: var(--ref-navy); margin: 0 0 14px; }
   body.golf-page .golf-value-rows { display: grid; gap: 14px; }
   body.golf-page .golf-value-row-head { display: flex; justify-content: space-between; gap: 12px; font-size: 0.92rem; }
   body.golf-page .golf-value-name { font-weight: 700; color: var(--ink); }

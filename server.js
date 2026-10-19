@@ -4889,7 +4889,7 @@ function searchFormHtml(q, L) {
 const SEARCH_PAGE_STYLES = `<style id="search-page">
   body.search-page .search-form { display: flex; gap: 10px; max-width: 640px; margin: 8px 0 18px; }
   body.search-page .search-form input { flex: 1; min-width: 0; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); font: inherit; font-size: 16px; background: var(--ref-white, #fff); }
-  body.search-page .search-form button { padding: 12px 22px; border-radius: 999px; border: 0; cursor: pointer; font-weight: 800; background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); font-family: 'Nunito', sans-serif; }
+  body.search-page .search-form button { padding: 12px 22px; border-radius: 999px; border: 0; cursor: pointer; font-weight: 800; background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); font-family: 'Nunito', 'Nunito Fallback', sans-serif; }
   body.search-page .search-interpreted { font-size: 1.05rem; margin: 0 0 6px; }
   body.search-page .search-corrected, body.search-page .search-count { color: rgba(42,32,25,0.72); margin: 0 0 8px; }
   body.search-page .search-notes { margin: 6px 0 16px; padding-left: 18px; color: rgba(42,32,25,0.72); font-size: 0.92rem; }
@@ -7722,7 +7722,7 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
   body.guide-page .guide-picks a { color: var(--teal-deep, #1F5450); }
   body.guide-page .guide-more { margin: 32px 0 8px; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
-  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
 </style>`,
     afterHtml,
@@ -7920,7 +7920,7 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
   body.guide-page .guide-facts li { margin: 2px 0; }
   body.guide-page .guide-more { margin: 32px 0 8px; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
-  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
 </style>`,
     afterHtml,
@@ -9133,7 +9133,7 @@ function renderCanonicalFooterStyles() {
      links; the dialog reuses the teaser's navy/gold look. */
   .home-footer-link-btn {
     background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: left;
-    font-family: 'Nunito', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78); transition: color 0.15s;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78); transition: color 0.15s;
   }
   .home-footer-link-btn:hover, .home-footer-link-btn:focus-visible { color: var(--ref-gold, #E0A94E); }
   .app-teaser-dialog {
@@ -9141,9 +9141,9 @@ function renderCanonicalFooterStyles() {
     background: var(--ref-navy-deep, #16233a); color: var(--ref-cream, #F5F3ED); box-shadow: 0 24px 60px -20px rgba(0,0,0,0.55);
   }
   .app-teaser-dialog::backdrop { background: rgba(10,16,28,0.55); }
-  .app-teaser-dialog-inner { position: relative; padding: 34px 30px 28px; font-family: 'Nunito', sans-serif; }
+  .app-teaser-dialog-inner { position: relative; padding: 34px 30px 28px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; }
   .app-teaser-dialog-eyebrow { display: inline-block; color: var(--ref-gold, #E0A94E); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
-  .app-teaser-dialog h2 { font-family: 'Fraunces', serif; color: inherit; font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.15; margin: 10px 0 12px; }
+  .app-teaser-dialog h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; color: inherit; font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.15; margin: 10px 0 12px; }
   .app-teaser-dialog p { color: rgba(245,243,237,0.78); margin: 0 0 18px; line-height: 1.5; }
   .app-teaser-dialog-stores { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .app-teaser-dialog-store {
@@ -9164,7 +9164,7 @@ function renderCanonicalFooterStyles() {
   .contact-field { margin: 0 0 14px; }
   .contact-field label { display: block; font-size: 0.88rem; font-weight: 700; margin: 0 0 6px; color: var(--ref-cream, #F5F3ED); }
   .contact-dialog input[type="text"], .contact-dialog input[type="email"], .contact-dialog textarea {
-    display: block; width: 100%; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; line-height: 1.4;
+    display: block; width: 100%; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; line-height: 1.4;
     color: var(--ref-cream, #F5F3ED); background: rgba(255,252,246,0.08); border: 1px solid rgba(255,252,246,0.3); border-radius: 12px;
   }
   .contact-dialog textarea { min-height: 120px; resize: vertical; }
@@ -9178,7 +9178,7 @@ function renderCanonicalFooterStyles() {
   .contact-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
   .contact-submit {
     display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 26px; border: 0; border-radius: 999px; cursor: pointer;
-    background: var(--ref-gold, #E0A94E); color: var(--ref-navy-deep, #16233a); font-family: 'Nunito', sans-serif; font-size: 1rem; font-weight: 800;
+    background: var(--ref-gold, #E0A94E); color: var(--ref-navy-deep, #16233a); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; font-weight: 800;
   }
   .contact-submit:hover { filter: brightness(1.06); }
   .contact-submit:focus-visible { outline: 2px solid var(--ref-cream, #F5F3ED); outline-offset: 3px; }
@@ -9186,7 +9186,7 @@ function renderCanonicalFooterStyles() {
   @media (max-width: 480px) { .contact-dialog .app-teaser-dialog-inner { padding: 30px 20px 22px; } .contact-submit { width: 100%; } }
   /* Contact topic and app launch sign-up (2026-10-14). */
   .contact-dialog select {
-    display: block; width: 100%; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem;
+    display: block; width: 100%; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem;
     color: var(--ref-cream, #F5F3ED); background: rgba(255,252,246,0.08); border: 1px solid rgba(255,252,246,0.3); border-radius: 12px;
   }
   .contact-dialog select option { color: #16233a; }
@@ -9196,7 +9196,7 @@ function renderCanonicalFooterStyles() {
   .app-teaser-signup { margin: 14px 0 6px; }
   .app-teaser-signup label { display: block; font-size: 0.88rem; font-weight: 700; margin: 0 0 6px; color: var(--ref-cream, #F5F3ED); }
   .app-teaser-signup-row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .app-teaser-signup-row input { flex: 1 1 200px; min-width: 0; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; color: var(--ref-cream, #F5F3ED); background: rgba(255,252,246,0.08); border: 1px solid rgba(255,252,246,0.3); border-radius: 12px; }
+  .app-teaser-signup-row input { flex: 1 1 200px; min-width: 0; min-height: 46px; padding: 11px 14px; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; color: var(--ref-cream, #F5F3ED); background: rgba(255,252,246,0.08); border: 1px solid rgba(255,252,246,0.3); border-radius: 12px; }
   .app-teaser-signup-row input::placeholder { color: rgba(245,243,237,0.5); }
   .app-teaser-signup .app-teaser-dialog-note { margin-top: 8px; }
   .app-teaser-thanks { margin: 14px 0; font-weight: 800; color: var(--ref-gold, #E0A94E); }
@@ -9263,11 +9263,11 @@ function renderCanonicalFooterStyles() {
   .home-footer-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 14px; flex-shrink: 0; color: var(--ref-cream); }
   .home-footer-icon svg { width: 100%; height: 100%; }
   .home-footer-wordmark {
-    font-family: 'Fraunces', serif; font-weight: 400; font-size: 1.3rem;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 400; font-size: 1.3rem;
     letter-spacing: 0.02em; text-transform: uppercase; color: var(--ref-cream);
   }
   .home-footer-wordmark-accent { color: var(--ref-gold); }
-  .home-footer-tagline { font-family: 'Nunito', sans-serif; font-size: 0.85rem; color: rgba(245,243,237,0.6); margin: 0; }
+  .home-footer-tagline { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.85rem; color: rgba(245,243,237,0.6); margin: 0; }
   /* Explicit request (2026-09-17 revision): Regions folded back INTO this
      row as its own 4th column rather than a separate full-width band
      below. Layout correction (same day, follow-up): a strict equal
@@ -9303,13 +9303,13 @@ function renderCanonicalFooterStyles() {
   }
   /* Accessibility (2026-10-18): the column headings are h2 (were h4, after the page's h2s); same look. */
   .home-footer-col h2 {
-    font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; line-height: inherit;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; line-height: inherit;
     letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 12px; padding-bottom: 8px;
     display: inline-block; border-bottom: 2px solid var(--ref-gold);
   }
   .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
   .home-footer-col a, .home-footer-region-group a {
-    font-family: 'Nunito', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78);
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78);
     text-decoration: none; transition: color 0.15s;
   }
   .home-footer-col a:hover, .home-footer-region-group a:hover { color: var(--ref-gold); }
@@ -9337,7 +9337,7 @@ function renderCanonicalFooterStyles() {
      what made them hard to tell apart. Kept smaller than h4 (0.78rem)
      since these are one level down. */
   .home-footer-region-group h3 {
-    font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 800; line-height: inherit;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.7rem; font-weight: 800; line-height: inherit;
     text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--ref-gold); margin: 0 0 8px; padding-bottom: 5px;
     display: inline-block; border-bottom: 1px solid var(--ref-gold);
@@ -9364,7 +9364,7 @@ function renderCanonicalFooterStyles() {
     position: absolute; bottom: calc(100% + 8px); left: 50%;
     transform: translateX(-50%) translateY(4px);
     background: var(--ref-navy-deep); color: var(--ref-cream);
-    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 700;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 700;
     white-space: nowrap; padding: 5px 10px; border-radius: 8px;
     opacity: 0; pointer-events: none; z-index: 20;
     transition: opacity 0.12s, transform 0.12s;
@@ -9374,7 +9374,7 @@ function renderCanonicalFooterStyles() {
   /* Footer refresh (2026-10-14): Privacy, Terms and the app teaser in a
      bottom row; Explore and Regions are <details> that stay open (and
      unclickable) on desktop and fold on phones. */
-  .home-footer-legal { font-family: 'Nunito', sans-serif; font-size: 0.84rem; text-align: center; margin: 0 0 8px; color: rgba(245,243,237,0.55); }
+  .home-footer-legal { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.84rem; text-align: center; margin: 0 0 8px; color: rgba(245,243,237,0.55); }
   .home-footer-legal a, .home-footer-legal .home-footer-link-btn { color: rgba(245,243,237,0.78); text-decoration: none; font-size: 0.84rem; }
   .home-footer-legal a:hover, .home-footer-legal .home-footer-link-btn:hover { color: var(--ref-gold); }
   /* Fix (2026-10-18): body.golf-page a (navy) out-ranks the rule above on list
@@ -9385,7 +9385,7 @@ function renderCanonicalFooterStyles() {
   .home-footer-fold > summary::-webkit-details-marker { display: none; }
   .home-footer-all-regions { margin: 14px 0 0; }
   .home-footer-all-regions a { font-weight: 700; }
-  .home-footer-copyright { font-family: 'Nunito', sans-serif; font-size: 0.8rem; color: rgba(245,243,237,0.55); text-align: center; margin: 0; }
+  .home-footer-copyright { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.8rem; color: rgba(245,243,237,0.55); text-align: center; margin: 0; }
 
   /* Trip 0 button redesign, homepage-only (2026-09-17): #tripTray/
      #tripTrayToggle/#tripTrayCount are shared, site-wide rules defined in
@@ -9418,7 +9418,7 @@ function renderCanonicalFooterStyles() {
     background: var(--ref-navy); color: var(--ref-cream);
     border: 1px solid var(--ref-gold);
     border-radius: 999px; padding: 9px 16px; gap: 8px;
-    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.78rem;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.78rem;
     box-shadow: 0 4px 14px -6px rgba(16,27,36,0.45);
   }
   #tripTrayToggle:hover { background: var(--ref-navy-deep); }
@@ -9571,12 +9571,12 @@ function renderHomepageDiscoveryStyles() {
   .discover-section { padding: 6px 0 16px; }
   .discover-heading-split { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .discover-heading-link {
-    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--ref-navy);
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.85rem; color: var(--ref-navy);
     text-decoration: none; white-space: nowrap;
   }
   .discover-heading-link:hover { color: var(--ref-gold-ink, #8A6A0F); }
   .discover-subtitle {
-    font-family: 'Nunito', sans-serif; font-weight: 500; font-size: 0.85rem;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 500; font-size: 0.85rem;
     color: rgba(42,32,25,0.72); margin-left: 10px; vertical-align: middle;
   }
   .discover-heading { margin-bottom: 10px; }
@@ -9585,7 +9585,7 @@ function renderHomepageDiscoveryStyles() {
     letter-spacing:0.09em; text-transform:uppercase; color: var(--teal); margin-bottom:8px;
   }
   .discover-heading .eyebrow::before { content:""; width:20px; height:2px; background: var(--teal); display:inline-block; }
-  .discover-heading h2 { font-family:'Fraunces',serif; font-size: clamp(1.2rem, 1.8vw, 1.45rem); margin:0; }
+  .discover-heading h2 { font-family:'Fraunces','Fraunces Fallback',serif; font-size: clamp(1.2rem, 1.8vw, 1.45rem); margin:0; }
 
   .discover-strip, .discover-grid {
     display:flex; gap:16px; overflow-x:auto; padding-bottom:8px; list-style:none; margin:0;
@@ -9600,7 +9600,7 @@ function renderHomepageDiscoveryStyles() {
   .discover-card-media img { width:100%; height:120px; object-fit:cover; display:block; }
   .discover-card-body { padding:14px 16px; }
   .discover-card-date { font-size:0.78rem; font-weight:700; color: var(--teal-deep); margin-bottom:4px; }
-  .discover-card-body h3 { font-family:'Fraunces',serif; font-size:1.02rem; margin:0 0 6px; line-height:1.25; }
+  .discover-card-body h3 { font-family:'Fraunces','Fraunces Fallback',serif; font-size:1.02rem; margin:0 0 6px; line-height:1.25; }
 
   .discover-grid.card-grid { flex-wrap: nowrap; }
 
@@ -9651,7 +9651,7 @@ function renderHomepageDiscoveryStyles() {
   }
   .hidden-gem-card-body h3 {
     display: flex; align-items: center; gap: 6px;
-    font-family:'Fraunces',serif; font-size:1.05rem; margin:0 0 3px; line-height:1.2; color:#fff;
+    font-family:'Fraunces','Fraunces Fallback',serif; font-size:1.05rem; margin:0 0 3px; line-height:1.2; color:#fff;
   }
   .hidden-gem-card-pin { flex-shrink: 0; }
   .hidden-gem-card-body p {
@@ -9666,7 +9666,7 @@ function renderHomepageDiscoveryStyles() {
 
   .tile-label { display:block; }
   .tile-tagline {
-    display:block; font-family:'Nunito',sans-serif; font-weight:500; font-size:0.76rem;
+    display:block; font-family:'Nunito','Nunito Fallback',sans-serif; font-weight:500; font-size:0.76rem;
     color: rgba(42,32,25,0.62); margin-top:4px; line-height:1.35;
   }
 
@@ -9677,7 +9677,7 @@ function renderHomepageDiscoveryStyles() {
     display:flex; flex-direction: column; align-items:center; justify-content:center; text-align:center;
     background: var(--paper); border: 1.5px solid rgba(74,52,40,0.12); border-radius:12px;
     padding:18px 14px; font-weight:700; color: var(--ink); text-decoration:none;
-    font-family:'Fraunces',serif; font-size:1.02rem;
+    font-family:'Fraunces','Fraunces Fallback',serif; font-size:1.02rem;
     transition: border-color .15s ease, transform .15s ease;
   }
   .category-tile:hover, .region-tile:hover { border-color: var(--plum); transform: translateY(-2px); }
@@ -9711,9 +9711,9 @@ function renderHomepageDiscoveryStyles() {
     position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between;
     padding: 10px 12px; gap: 8px;
   }
-  .region-card-label { font-family: 'Fraunces', serif; font-size: 0.95rem; font-weight: 700; display: block; }
+  .region-card-label { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 0.95rem; font-weight: 700; display: block; }
   .region-card-tagline {
-    display: block; font-family: 'Nunito', sans-serif; font-size: 0.82rem;
+    display: block; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.82rem;
     margin-top: 4px; color: rgba(255,255,255,0.9); line-height: 1.4;
   }
   /* Reference redesign: the arrow is a plain white glyph with a soft drop
@@ -9783,7 +9783,7 @@ function renderHomepageDiscoveryStyles() {
   }
   .hero-inner { position: relative; z-index: 1; padding: 28px 0; max-width: 760px; }
   .hero-title {
-    font-family: 'Fraunces', serif; font-size: clamp(1.9rem, 3.6vw, 2.7rem);
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: clamp(1.9rem, 3.6vw, 2.7rem);
     font-weight: 400; line-height: 1.1; margin: 0 0 10px; max-width: 22ch;
     text-transform: uppercase; letter-spacing: 0.01em;
     color: #fff; /* app.css's global h1,h2,h3,.display rule sets color:
@@ -9809,7 +9809,7 @@ function renderHomepageDiscoveryStyles() {
      stretches edge-to-edge). Font, size, line-height, and color
      untouched. */
   .hero-lead {
-    font-family: 'Nunito', sans-serif; font-size: 1.05rem;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1.05rem;
     line-height: 1.4; margin: 0 auto 16px; max-width: 54ch; color: rgba(255,255,255,0.92);
     text-align: center;
   }
@@ -9827,7 +9827,7 @@ function renderHomepageDiscoveryStyles() {
   .hero-search-field { position: relative; flex: 1; min-width: 0; }
   .hero-search-field input {
     width: 100%; border: none; background: transparent; padding: 9px 0;
-    font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ color: var(--ink); outline: none; font-family: 'Nunito', sans-serif;
+    font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ color: var(--ink); outline: none; font-family: 'Nunito', 'Nunito Fallback', sans-serif;
     position: relative; z-index: 1;
     -webkit-appearance: none; appearance: none; /* type="search" (2026-10-18) keeps the plain look */
   }
@@ -9853,7 +9853,7 @@ function renderHomepageDiscoveryStyles() {
   .hero-search-box button {
     border: none; background: var(--ref-navy); color: #fff; border-radius: 999px;
     height: 42px; flex-shrink: 0; display: flex; align-items: center;
-    padding: 0 24px; font-weight: 700; font-size: 0.9rem; font-family: 'Nunito', sans-serif;
+    padding: 0 24px; font-weight: 700; font-size: 0.9rem; font-family: 'Nunito', 'Nunito Fallback', sans-serif;
     justify-content: center; cursor: pointer; transition: background-color .15s ease;
   }
   .hero-search-box button:hover { background: var(--ref-navy-deep); }
@@ -9940,7 +9940,7 @@ function renderHomepageDiscoveryStyles() {
   }
   .mood-card-icon { color: #fff; opacity: 0.95; margin-bottom: 4px; }
   .mood-card-icon svg { display: block; width: 18px; height: 18px; }
-  .mood-card-title { font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 700; display: block; line-height: 1.15; text-wrap: balance; }
+  .mood-card-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 0.92rem; font-weight: 700; display: block; line-height: 1.15; text-wrap: balance; }
   /* The longest tile title (Indoor & Rainy Day / Intérieur et pluie, 2026-10-13) is a step smaller and wraps as two even lines,
      so it covers less of the photo. */
   .mood-card-indoor .mood-card-title, .mood-card-sports .mood-card-title { font-size: 0.84rem; }
@@ -9969,7 +9969,7 @@ function renderHomepageDiscoveryStyles() {
     }
     .mood-card-grid::-webkit-scrollbar { display: none; }
     .mood-card { flex: 0 0 calc((100% + var(--mood-pad) - 2 * var(--mood-gap)) / 2.25); scroll-snap-align: start; aspect-ratio: 1.59 / 1; }
-    .mood-swipe-cue { display: inline-block; margin-left: auto; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.02em; color: rgba(42,32,25,0.62); white-space: nowrap; }
+    .mood-swipe-cue { display: inline-block; margin-left: auto; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.02em; color: rgba(42,32,25,0.62); white-space: nowrap; }
     /* The seasonal guide link (2026-10-13) stacked the heading into three rows on phones; it shows from 641px up only. */
     .mood-season-link { display: none; }
   }
@@ -10021,22 +10021,22 @@ function renderHomepageDiscoveryStyles() {
   .trip-cta-content { position: relative; z-index: 2; max-width: 460px; padding: 40px 24px 40px 44px; color: #fff; }
   .trip-cta-icon { display: inline-flex; color: var(--ref-gold); margin-bottom: 14px; }
   .trip-cta-title {
-    font-family: 'Fraunces', serif; font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: clamp(1.4rem, 2.2vw, 1.8rem);
     line-height: 1.2; margin: 0 0 10px; color: #fff;
   }
   .trip-cta-lead {
-    font-family: 'Nunito', sans-serif; font-size: 0.95rem; line-height: 1.5;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; line-height: 1.5;
     margin: 0 0 14px; color: rgba(255,255,255,0.9); max-width: 38ch;
   }
   .trip-cta-example {
-    font-family: 'Nunito', sans-serif; font-style: italic; font-size: 0.86rem; line-height: 1.5;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-style: italic; font-size: 0.86rem; line-height: 1.5;
     margin: 0 0 22px; padding-left: 14px; border-left: 2px solid var(--ref-gold);
     color: rgba(255,255,255,0.72); max-width: 40ch;
   }
   .trip-cta-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
   .trip-cta-btn {
     border: none; background: var(--ref-white); color: var(--ref-navy-deep); font-weight: 700;
-    font-family: 'Nunito', sans-serif; font-size: 0.9rem; padding: 13px 24px;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; padding: 13px 24px;
     border-radius: 999px; cursor: pointer; transition: background-color .15s ease;
     display: inline-flex; align-items: center; gap: 8px;
   }
@@ -10081,17 +10081,17 @@ function renderHomepageDiscoveryStyles() {
   }
   .browse-search-heading .eyebrow::before { content: ""; width: 20px; height: 2px; background: var(--ref-gold); display: inline-block; }
   .browse-search-heading h2 {
-    font-family: 'Fraunces', serif; font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin: 6px 0 8px; color: var(--ref-navy);
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: clamp(1.4rem, 2.4vw, 1.8rem); margin: 6px 0 8px; color: var(--ref-navy);
   }
   .browse-search-lead {
-    font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: rgba(27,43,58,0.72); margin: 0;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; color: rgba(27,43,58,0.72); margin: 0;
   }
 ${renderCanonicalFooterStyles()}
   /* ---- Homepage polish (2026-10-14) ---- */
   /* Counts strip under the hero. */
   .home-stats-wrap { padding-top: 14px; padding-bottom: 2px; }
-  .home-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; list-style: none; margin: 0; padding: 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; color: rgba(42,32,25,0.72); }
-  .home-stats strong { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.02rem; color: var(--ref-navy); margin-right: 2px; }
+  .home-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; list-style: none; margin: 0; padding: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; color: rgba(42,32,25,0.72); }
+  .home-stats strong { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 700; font-size: 1.02rem; color: var(--ref-navy); margin-right: 2px; }
   .home-stats a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s ease, color 0.15s ease; }
   .home-stats a:hover, .home-stats a:focus-visible { color: var(--ref-navy); border-bottom-color: currentColor; }
   /* This Weekend + Top Picks: a row of four cards on desktop, a swipe row on phones (like the mood tiles). */
@@ -10101,9 +10101,9 @@ ${renderCanonicalFooterStyles()}
   .home-event-media { display: block; aspect-ratio: 16 / 9; background: #E8E3D3; overflow: hidden; }
   .home-event-media img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .home-event-body { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px 13px; }
-  .home-event-date { font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #8A5A1F; }
-  .home-event-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .home-event-place { font-family: 'Nunito', sans-serif; font-size: 0.82rem; color: rgba(42,32,25,0.68); }
+  .home-event-date { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #8A5A1F; }
+  .home-event-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .home-event-place { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.82rem; color: rgba(42,32,25,0.68); }
   .home-pick-star { color: var(--ref-gold, #C9A227); }
   /* "See all" links look like small buttons that open a page; the row-end card shows on phone swipe rows only. */
   .discover-heading-link.home-see-all { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; background: #fff; font-size: 0.82rem; font-weight: 800; color: var(--ref-navy); text-decoration: none; white-space: nowrap; box-sizing: border-box; }
@@ -10131,7 +10131,7 @@ ${renderCanonicalFooterStyles()}
     }
     .home-row .home-scroll-row::-webkit-scrollbar, .region-card-grid::-webkit-scrollbar { display: none; }
     .home-event-card, .home-pick-card { flex: 0 0 72%; scroll-snap-align: start; }
-    .home-row-end { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 0 0 44%; scroll-snap-align: start; min-height: 120px; padding: 12px; border-radius: 12px; background: var(--ref-navy, #1B2B3A); color: #fff; text-decoration: none; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.9rem; text-align: center; box-sizing: border-box; }
+    .home-row-end { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 0 0 44%; scroll-snap-align: start; min-height: 120px; padding: 12px; border-radius: 12px; background: var(--ref-navy, #1B2B3A); color: #fff; text-decoration: none; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.9rem; text-align: center; box-sizing: border-box; }
     .mood-card-grid > .home-row-end { flex: 0 0 calc((100% + var(--mood-pad) - 2 * var(--mood-gap)) / 2.25); aspect-ratio: 1.59 / 1; min-height: 0; }
     .region-card-grid > .home-row-end { flex: 0 0 44%; min-height: 0; }
     /* Destinations: a swipe row of six instead of six tall stacked cards. */
@@ -10187,7 +10187,7 @@ const SEO_PAGE_CSS = `
   :root { color-scheme: light; }
   *, *::before, *::after { box-sizing: border-box; }
   body {
-    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Nunito', 'Nunito Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     max-width: 900px; margin: 0 auto; padding: 28px 20px 72px;
     color: var(--ink); background: var(--sand); line-height: 1.65;
   }
@@ -10200,7 +10200,7 @@ const SEO_PAGE_CSS = `
     border-bottom: 1px solid rgba(74,52,40,0.14);
   }
   header.top a.brand {
-    font-family: 'Fraunces', serif; font-weight: 700; letter-spacing: -0.01em;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 700; letter-spacing: -0.01em;
     text-decoration: none; color: var(--ink); font-size: 1.2rem;
   }
   header.top a:not(.brand) {
@@ -10219,7 +10219,7 @@ const SEO_PAGE_CSS = `
   nav.breadcrumb a:hover { text-decoration-thickness: 2px; }
 
   h1 {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 2rem;
     line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 6px;
   }
   .subtitle { color: var(--ink); opacity: 0.66; font-size: 1.02rem; margin: 0 0 26px; }
@@ -10247,7 +10247,7 @@ const SEO_PAGE_CSS = `
   }
   li.venue-card:not(.whatson-event-card) > .venue-top { padding-top: 0 !important; }
   .venue-card h2, .category-card h2 {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px;
   }
   .venue-card h2 a, .category-card h2 a { color: var(--ink); text-decoration: none; }
   .venue-card h2 a:hover, .category-card h2 a:hover { color: var(--plum); text-decoration: underline; }
@@ -10287,7 +10287,7 @@ const SEO_PAGE_CSS = `
   }
   .venue-card[data-venue-category="golf"] .card-action {
     display: inline-flex; align-items: center; gap: 5px; margin: 0;
-    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', 'Nunito Fallback', sans-serif; line-height: 1.4;
     color: var(--ink); background: var(--sand-deep); border: none; text-decoration: none;
     border-radius: 999px; padding: 5px 12px; cursor: pointer; width: fit-content;
     transition: background 0.15s;
@@ -10362,14 +10362,14 @@ const SEO_PAGE_CSS = `
      groups (e.g. Golf Courses vs. Indoor Golf & Simulators) -- reuses
      the same treatment as .related-section h2 for visual consistency. */
   .category-subsection-heading {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.3rem;
     margin: 30px 0 14px;
   }
   .category-subsection-heading:first-of-type { margin-top: 6px; }
 
   .related-section { margin-top: 40px; }
   .related-section h2 {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.25rem; margin-bottom: 14px;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.25rem; margin-bottom: 14px;
   }
   .related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
   .related-card {
@@ -10444,7 +10444,7 @@ const SEO_PAGE_CSS = `
     opacity: 0.85; margin-bottom: 6px;
   }
   .venue-hero-fallback .venue-hero-name {
-    font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.9rem; line-height: 1.15;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 700; font-size: 1.9rem; line-height: 1.15;
     text-shadow: 0 2px 12px rgba(12,29,34,0.45);
   }
   /* Per-type gradient — the exact hue family already used for each type's
@@ -10487,7 +10487,7 @@ const SEO_PAGE_CSS = `
   .venue-cta-row .cta { margin: 0; }
 
   .venue-section { margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(74,52,40,0.12); }
-  .venue-section h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.2rem; margin: 0 0 12px; }
+  .venue-section h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.2rem; margin: 0 0 12px; }
   .venue-address { margin: 0 0 8px; font-size: 0.96rem; }
   .map-link { display: inline-block; font-weight: 700; font-size: 0.88rem; color: var(--teal-deep); text-decoration: none; }
   .map-link:hover { text-decoration: underline; }
@@ -10988,7 +10988,7 @@ const NAV_REFRESH_STYLE = `<style id="nav-refresh">
 // button that opened it, instead of letting it fall to the page body. app.js (frozen) still opens and closes them;
 // this only manages focus and Escape around it.
 const NAV_A11Y_SNIPPET = `<style id="nav-a11y">
-#top a.skip-link, #top a.skip-link:hover, #top a.skip-link:visited { position: absolute; left: 12px; top: -60px; z-index: 1000; padding: 10px 16px; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: #fff; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.95rem; text-decoration: none; }
+#top a.skip-link, #top a.skip-link:hover, #top a.skip-link:visited { position: absolute; left: 12px; top: -60px; z-index: 1000; padding: 10px 16px; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: #fff; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.95rem; text-decoration: none; }
 #top a.skip-link:focus, #top a.skip-link:focus-visible { top: 10px; outline: 2px solid var(--ref-gold, #C9A227); outline-offset: 2px; }
 main:focus { outline: none; }
 /* Gold text on the cream header: the deeper --ref-gold-ink (4.5:1+); the bright gold stays for icons and the navy footer. */
@@ -10997,7 +10997,7 @@ main:focus { outline: none; }
 /* The dropdown triggers are real buttons now (were span role=button), styled exactly like the spans were. */
 button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: inherit; color: inherit; cursor: pointer; }
 /* The My Trip tray title is an h2 (was h4, which came before the page's h1), with the h4's look. */
-#tripTrayPanel h2 { margin: 0 0 10px; font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 700; line-height: inherit; color: inherit; }
+#tripTrayPanel h2 { margin: 0 0 10px; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.05rem; font-weight: 700; line-height: inherit; color: inherit; }
 /* Text boxes at 16px or more, so iPhones do not zoom in on them (/browse/classic's wizard search was 14px). */
 @media (max-width: 560px) { .search-box input { font-size: 1rem; } }
 /* Form fields (list your venue, claim, owner pages) were 15.2px in app.css; 16px here, same look otherwise. */
@@ -11163,6 +11163,78 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>`;
+// Homepage weight (2026-10-18): on a slow phone the 18 "lazy" card photos (640-800px, 1.45 MB, shown at about
+// 150-330px) all loaded at once, because the page is short and the mood and town rows scroll sideways, and they
+// competed with the hero. Each mood / Hidden Gems / town card photo that has 320px and 480px copies next to it
+// (<name>-w320.jpg, <name>-w480.jpg, made with the scratchpad thumbs tool) gets a srcset with sizes that match the
+// layout. In the two sideways rows, the cards past the first phone screen (HOME_ROW_EAGER) wait for a small script:
+// they load once they are on screen (desktop, where the rows do not scroll) or when the visitor swipes that row.
+// <noscript> keeps the plain image for visitors without JavaScript. Done on the way out, so the render functions
+// (and the tests that read them) are unchanged, and the result never depends on listing data.
+const HOME_CARD_SIZE_DIRS = ['mood', 'hidden-gems', 'regions/photos'];
+const HOME_CARD_SIZE_FILES = (() => {
+  const set = new Set();
+  for (const d of HOME_CARD_SIZE_DIRS) {
+    try { for (const f of fs.readdirSync(path.join(__dirname, 'public', 'images', d))) if (/-w(320|480)\.jpg$/.test(f)) set.add(`/images/${d}/${f}`); } catch (e) { /* folder missing in test copies */ }
+  }
+  return set;
+})();
+const HOME_CARD_SIZES = {
+  'mood-card-img': '(max-width: 640px) 42vw, (max-width: 899px) 30vw, (max-width: 1099px) 15vw, 216px',
+  'hidden-gem-card-img': '(max-width: 640px) calc(100vw - 48px), (max-width: 1099px) 47vw, 444px',
+  'region-card-img': '(max-width: 640px) 57vw, (max-width: 899px) 30vw, (max-width: 1099px) 15vw, 214px',
+};
+// How many cards of each sideways row are (at least partly) on a 375px phone screen; they load as usual.
+const HOME_ROW_EAGER = { 'mood-card-img': 3, 'region-card-img': 2 };
+const HOME_CARD_LAZY_SCRIPT = `<style id="home-card-lz">img[data-home-lz]{background:rgba(27,43,58,0.14)}</style>
+<script>
+(function(){
+  var imgs = document.querySelectorAll('img[data-home-lz]');
+  function load(img){
+    if (!img || !img.hasAttribute('data-home-lz')) return;
+    img.removeAttribute('data-home-lz');
+    var s = img.getAttribute('data-srcset');
+    if (s) img.setAttribute('srcset', s);
+    img.setAttribute('src', img.getAttribute('data-src'));
+  }
+  if (!window.IntersectionObserver) { for (var i = 0; i < imgs.length; i++) load(imgs[i]); return; }
+  var io = new IntersectionObserver(function(es){
+    for (var i = 0; i < es.length; i++) if (es[i].isIntersecting) { io.unobserve(es[i].target); load(es[i].target); }
+  }, { rootMargin: '300px 0px' });
+  var rows = [];
+  for (var j = 0; j < imgs.length; j++) {
+    io.observe(imgs[j]);
+    var row = imgs[j].parentNode && imgs[j].parentNode.parentNode;
+    if (row && rows.indexOf(row) === -1) rows.push(row);
+  }
+  // A swipe loads the rest of that row: its cards are clipped sideways, so they never intersect the screen.
+  rows.forEach(function(row){
+    var go = function(){ row.removeEventListener('scroll', go); var l = row.querySelectorAll('img[data-home-lz]'); for (var k = 0; k < l.length; k++) load(l[k]); };
+    row.addEventListener('scroll', go, { passive: true });
+  });
+})();
+</script>`;
+function withHomeCardPhotos(html) {
+  if (typeof html !== 'string') return html;
+  const seen = {};
+  let lazy = 0;
+  html = html.replace(/<img class="(mood-card-img|hidden-gem-card-img|region-card-img)" src="(\/images\/[^"?#]+)\.(jpe?g|webp|png)" width="(\d+)" height="(\d+)" alt="" loading="lazy">/g, (m, cls, base, ext, w, h) => {
+    const small = `${base}-w320.jpg`, mid = `${base}-w480.jpg`;
+    if (!HOME_CARD_SIZE_FILES.has(small) || !HOME_CARD_SIZE_FILES.has(mid)) return m;
+    const src = `${base}.${ext}`;
+    const srcset = `${small} 320w, ${mid} 480w, ${src} ${w}w`;
+    const sizes = HOME_CARD_SIZES[cls];
+    seen[cls] = (seen[cls] || 0) + 1;
+    if (!(cls in HOME_ROW_EAGER) || seen[cls] <= HOME_ROW_EAGER[cls]) {
+      return `<img class="${cls}" src="${src}" srcset="${srcset}" sizes="${sizes}" width="${w}" height="${h}" alt="" loading="lazy">`;
+    }
+    lazy++;
+    return `<img class="${cls}" data-src="${src}" data-srcset="${srcset}" sizes="${sizes}" width="${w}" height="${h}" alt="" loading="lazy" data-home-lz><noscript><img class="${cls}" src="${src}" width="${w}" height="${h}" alt=""></noscript>`;
+  });
+  if (!lazy) return html;
+  const at = html.indexOf('</main>');
+  return at === -1 ? html.replace('</body>', `${HOME_CARD_LAZY_SCRIPT}\n</body>`) : `${html.slice(0, at)}${HOME_CARD_LAZY_SCRIPT}\n${html.slice(at)}`;
+}
 // The homepage's <main id="main"> (2026-10-18): from the hero to just before the footer. No-op if either end is missing
 // or the page already has a <main>.
 function wrapHomeMain(html) {
@@ -11466,7 +11538,7 @@ function renderEngagementControlStyles() {
   ${cardSel} .card-action,
   .venue-cta-row .card-action {
     display: inline-flex; align-items: center; gap: 5px; margin: 0;
-    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', 'Nunito Fallback', sans-serif; line-height: 1.4;
     color: var(--ink); background: var(--sand-deep); border: none; text-decoration: none;
     border-radius: 999px; padding: 5px 12px; cursor: pointer; width: fit-content;
     transition: background 0.15s;
@@ -11852,6 +11924,78 @@ function withLazyCardPhotos(html) {
   const head = html.indexOf('</head>');
   return head === -1 ? html : html.slice(0, head) + LAZY_CARD_PHOTO_HEAD + '\n' + html.slice(head);
 }
+// Font swap shift (2026-10-18): Nunito and Fraunces come from Google Fonts with display=swap, so a slow page first
+// lays out in the fallback font and moves when they arrive (a 2-3 row category bar became 2 rows, the results
+// jumped 41px: CLS 0.19 on /kelowna/restaurants). Every font stack now names a fallback face between the web font
+// and the generic family -- a local Arial / Georgia scaled to the web font's width and line height, measured in
+// Chrome against the loaded fonts -- so text wraps (nearly) the same before and after. A device without those
+// fonts (Android) skips the face and falls back exactly as before. Added to every page that loads the fonts.
+const FONT_FALLBACK_CSS = [
+  "@font-face{font-family:'Nunito Fallback';src:local('Arial'),local('ArialMT');font-weight:100 549;size-adjust:101.2%;ascent-override:99.8%;descent-override:34.6%;line-gap-override:0%}",
+  "@font-face{font-family:'Nunito Fallback';src:local('Arial Bold'),local('Arial-BoldMT');font-weight:550 1000;size-adjust:97.8%;ascent-override:103.3%;descent-override:35.8%;line-gap-override:0%}",
+  "@font-face{font-family:'Fraunces Fallback';src:local('Georgia');font-weight:100 549;size-adjust:107.4%;ascent-override:91.2%;descent-override:24.2%;line-gap-override:0%}",
+  "@font-face{font-family:'Fraunces Fallback';src:local('Georgia Bold'),local('Georgia-Bold');font-weight:550 1000;size-adjust:93.6%;ascent-override:104.7%;descent-override:27.8%;line-gap-override:0%}",
+].join('');
+const GOOGLE_FONTS_LINK = '<link href="https://fonts.googleapis.com/css2?';
+function withFontFallbacks(html) {
+  if (typeof html !== 'string' || html.indexOf('id="font-fallbacks"') !== -1) return html;
+  const at = html.indexOf(GOOGLE_FONTS_LINK);
+  return at === -1 ? html : `${html.slice(0, at)}<style id="font-fallbacks">${FONT_FALLBACK_CSS}</style>\n${html.slice(at)}`;
+}
+// Filter bar, final from the first paint (2026-10-18): a list page's Filters / Regions popovers (.fd-controls,
+// .outdoors-controls) showed every chip inline until the page script added the "js" class, which on the lighter
+// pages waits for /cards/rest/ or /browse/cards.json. When it collapsed, the results jumped up 100-1200px (CLS
+// 0.08-0.3). A page whose script does add that class now gets it in the HTML, so the bar is already in its final
+// shape; <noscript> CSS keeps the inline panels for visitors without JavaScript, and until the page script is
+// ready a tiny click handler opens and closes the panels (the page's own button handlers stop the click from
+// reaching it once they are bound).
+const FILTER_BAR_PREFIXES = ['fd', 'outdoors'];
+const FILTER_BAR_READY_HEAD = `<noscript><style id="filter-bar-nojs">${FILTER_BAR_PREFIXES.map((p) => `.${p}-controls.js .${p}-pop-panel,.${p}-controls.js .${p}-pop-panel[hidden]{position:static!important;display:block!important;max-width:none!important;max-height:none!important;box-shadow:none!important;border:0!important;padding:10px 0 0!important}.${p}-controls.js .${p}-pop-btn{display:none!important}`).join('')}</style></noscript>
+<script>
+(function(){
+  if (!document.addEventListener || !Element.prototype.closest) return;
+  var P = ${JSON.stringify(FILTER_BAR_PREFIXES)};
+  document.addEventListener('click', function(e){
+    var t = e.target && e.target.closest ? e.target : null;
+    if (!t) return;
+    for (var i = 0; i < P.length; i++) {
+      var p = P[i], btn = t.closest('.' + p + '-pop-btn'), inPanel = t.closest('.' + p + '-pop-panel');
+      if (inPanel) return;
+      var pops = document.querySelectorAll('.' + p + '-controls.js .' + p + '-pop');
+      for (var j = 0; j < pops.length; j++) {
+        var b = pops[j].querySelector('.' + p + '-pop-btn'), pnl = pops[j].querySelector('.' + p + '-pop-panel');
+        if (!b || !pnl) continue;
+        var open = b === btn && b.getAttribute('aria-expanded') !== 'true';
+        b.setAttribute('aria-expanded', open ? 'true' : 'false');
+        pnl.hidden = !open;
+      }
+    }
+  });
+  // Escape closes them too; the shared Escape handler then puts focus back on the button.
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape' && e.key !== 'Esc') return;
+    for (var i = 0; i < P.length; i++) {
+      var pops = document.querySelectorAll('.' + P[i] + '-controls.js .' + P[i] + '-pop');
+      for (var j = 0; j < pops.length; j++) {
+        var b = pops[j].querySelector('.' + P[i] + '-pop-btn'), pnl = pops[j].querySelector('.' + P[i] + '-pop-panel');
+        if (b && pnl && b.getAttribute('aria-expanded') === 'true') { b.setAttribute('aria-expanded', 'false'); pnl.hidden = true; }
+      }
+    }
+  });
+})();
+</script>`;
+function withFilterBarReady(html) {
+  if (typeof html !== 'string' || html.indexOf('-controls">') === -1) return html;
+  let hit = false;
+  for (const p of FILTER_BAR_PREFIXES) {
+    const tag = `<div class="${p}-controls">`;
+    if (html.indexOf(tag) === -1 || html.indexOf(`var popsRoot = document.querySelector('.${p}-controls');`) === -1) continue;
+    html = html.split(tag).join(`<div class="${p}-controls js">`);
+    hit = true;
+  }
+  const head = html.indexOf('</head>');
+  return !hit || head === -1 ? html : html.slice(0, head) + FILTER_BAR_READY_HEAD + '\n' + html.slice(head);
+}
 // GET /cards/rest/<hash>.html?u=<page path and query>: see above. Returns
 // true once answered (a memory hit, or a refused ?u=); on a miss it points
 // the request at the page itself and returns false so it renders as usual.
@@ -11917,14 +12061,18 @@ function installSharedStylesheetResponse(res, req = {}) {
     const h = rest.length === 1 && rest[0] && typeof rest[0] === 'object' ? rest[0] : null;
     const type = h ? String(h['Content-Type'] || h['content-type'] || '') : '';
     if (code === 200 && h && /text\/html/.test(type) && !h['Content-Length'] && !h['content-length']) { held = [code, h]; return res; }
+    // Caching (2026-10-18): a /cards/rest/<hash>.json miss whose page is not a 200 (a 404, a redirect) answers {}
+    // below, not the page's own 131 KB 404 HTML.
+    if (req.restCardsJson) { held = [code, h || {}]; return res; }
     flush();
     return realWriteHead(code, ...rest);
   };
-  res.write = (...a) => { flush(); return realWrite(...a); };
+  res.write = (...a) => { if (req.restCardsJson) return true; flush(); return realWrite(...a); };
   res.end = (body, ...rest) => {
     if (req.restCardsHash) {
       // Only the waiting cards, or nothing for a page without them. A
       // redirect or error already went out as it was.
+      if (req.restCardsJson && (!held || held[0] !== 200) && !res.headersSent) { held = null; realWriteHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return realEnd('{}'); }
       if (!held) return realEnd(body, ...rest);
       const m = body != null && typeof body !== 'function' ? (req.restCardsJson ? REST_DATA_RE : REST_TEMPLATE_RE).exec(String(body)) : null;
       held = null;
@@ -11935,7 +12083,7 @@ function installSharedStylesheetResponse(res, req = {}) {
       return realEnd(m[2]);
     }
     if (held && body != null && typeof body !== 'function') {
-      try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(withLazyCardPhotos(String(body))))); } catch (e) { /* the inline page is still correct */ }
+      try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(withFontFallbacks(withFilterBarReady(withLazyCardPhotos(String(body))))))); } catch (e) { /* the inline page is still correct */ }
     }
     flush();
     return realEnd(body, ...rest);
@@ -12026,7 +12174,7 @@ function buildIndoorThemeStyles() {
      so one long arena description doesn't stretch its whole row. */
   body.golf-page.indoor-page .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
   /* "Also good on a rainy day": why a non-indoor venue is listed. */
-  body.indoor-page .card-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+  body.indoor-page .card-note { margin: 8px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
   body.indoor-page .card-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
 </style>`;
 }
@@ -12050,7 +12198,7 @@ function buildTourThemeStyles() {
   /* Cards on /tours clamp to 3 lines (Read more expands), like /indoor. */
   body.golf-page.tour-page .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
   /* "More experiences to book": what an other-type operator offers. */
-  body.tour-page .card-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+  body.tour-page .card-note { margin: 8px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
   body.tour-page .card-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
 </style>`;
 }
@@ -12074,7 +12222,7 @@ function buildSportThemeStyles() {
   /* Cards on /sports clamp to 3 lines (Read more expands), like /tours. */
   body.golf-page.sport-page .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
   /* "More places to play": what an other-type venue offers. */
-  body.sport-page .card-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+  body.sport-page .card-note { margin: 8px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
   body.sport-page .card-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
 </style>`;
 }
@@ -12112,7 +12260,7 @@ function buildOutdoorThemeStyles() {
   body.outdoor-page .outdoor-activity-toggle[aria-pressed="true"] .outdoor-activity-card-overlay { background: linear-gradient(180deg, rgba(42,107,103,0.35) 0%, rgba(30,79,76,0.9) 100%); }
   body.outdoor-page .outdoor-activity-card-check {
     display: none; position: absolute; top: 8px; left: 8px; z-index: 1; padding: 4px 9px; border-radius: 999px;
-    background: var(--teal); color: #fff; font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em;
+    background: var(--teal); color: #fff; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em;
   }
   body.outdoor-page .outdoor-activity-toggle[aria-pressed="true"] .outdoor-activity-card-check { display: inline-block; }
   /* The card's count reuses the region-chip count hook; undo the pill
@@ -12122,7 +12270,7 @@ function buildOutdoorThemeStyles() {
      /outdoors/<activity> page, kept out of the button so the card stays a
      single control. */
   body.outdoor-page .outdoor-activity-card-wrap { display: flex; flex-direction: column; gap: 4px; }
-  body.outdoor-page .outdoor-activity-card-link { align-self: flex-end; font-family: 'Nunito', sans-serif; font-size: 0.78rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; padding: 2px 4px; border-radius: 4px; }
+  body.outdoor-page .outdoor-activity-card-link { align-self: flex-end; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.78rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; padding: 2px 4px; border-radius: 4px; }
   body.outdoor-page .outdoor-activity-card-link:hover { color: var(--ref-gold-ink, #8A6A0F); text-decoration: underline; }
   body.outdoor-page .outdoor-activity-card-link:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoor-activity-card-overlay {
@@ -12131,7 +12279,7 @@ function buildOutdoorThemeStyles() {
   }
   body.outdoor-page .outdoor-activity-card-icon { color: #fff; opacity: 0.95; margin-bottom: 4px; }
   body.outdoor-page .outdoor-activity-card-icon svg { display: block; width: 18px; height: 18px; }
-  body.outdoor-page .outdoor-activity-card-title { font-family: 'Fraunces', serif; font-size: 0.98rem; font-weight: 700; display: block; line-height: 1.2; }
+  body.outdoor-page .outdoor-activity-card-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 0.98rem; font-weight: 700; display: block; line-height: 1.2; }
   body.outdoor-page .outdoor-activity-card-count, body.outdoor-page .outdoor-activity-card-soon { display: block; font-size: 0.74rem; font-weight: 700; opacity: 0.85; margin-top: 2px; letter-spacing: 0.01em; }
   body.outdoor-page .outdoor-activity-card-pending { cursor: default; }
   body.outdoor-page .outdoor-activity-card-pending .outdoor-activity-card-overlay { background: linear-gradient(180deg, rgba(27,43,58,0.15) 0%, rgba(20,14,10,0.82) 100%); }
@@ -12146,7 +12294,7 @@ function buildOutdoorThemeStyles() {
   body.outdoor-page .outdoor-step-results { margin-bottom: 0; padding-top: 4px; }
   body.outdoor-page .outdoor-step-head { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; }
   body.outdoor-page .outdoor-step-head .category-subsection-heading { margin-bottom: 0; }
-  body.outdoor-page .outdoor-step-status { font-family: 'Nunito', sans-serif; font-size: 0.8rem; font-weight: 800; color: var(--teal); padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(42,107,103,0.35); background: rgba(42,107,103,0.08); margin-bottom: 4px; }
+  body.outdoor-page .outdoor-step-status { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.8rem; font-weight: 800; color: var(--teal); padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(42,107,103,0.35); background: rgba(42,107,103,0.08); margin-bottom: 4px; }
   body.outdoor-page .outdoor-step-status[hidden] { display: none; }
   body.outdoor-page .outdoor-activity-selector { margin-bottom: 8px; }
   /* Step 1 (Choose a Region): the primary choice, so its pills are a
@@ -12172,11 +12320,11 @@ function buildOutdoorThemeStyles() {
     margin: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
     background: var(--ref-navy); color: var(--ref-white); border: 1px solid var(--ref-navy);
     padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 0.86rem; letter-spacing: 0.01em;
-    font-family: 'Nunito', sans-serif; text-decoration: none; transition: background .15s ease;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; text-decoration: none; transition: background .15s ease;
   }
   body.outdoor-page .outdoor-filter-actions .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
   body.outdoor-page .outdoor-filter-actions .cta[hidden] { display: none; }
-  body.outdoor-page .outdoor-clear-filters { background: transparent; border: 0; padding: 6px 8px; font: inherit; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; align-self: center; }
+  body.outdoor-page .outdoor-clear-filters { background: transparent; border: 0; padding: 6px 8px; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; align-self: center; }
   body.outdoor-page .outdoor-clear-filters:hover { color: var(--ref-gold-ink, #8A6A0F); }
   body.outdoor-page .outdoor-clear-filters:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoor-clear-filters[hidden] { display: none; }
@@ -12251,7 +12399,7 @@ function buildOutdoorThemeStyles() {
      cards under a community heading; no description, no actions. */
   body.outdoor-page .outdoor-region-group { margin: 0 0 22px; }
   body.outdoor-page .outdoor-region-heading {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem; color: var(--ink); opacity: 0.8; margin: 0 0 10px;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.02rem; color: var(--ink); opacity: 0.8; margin: 0 0 10px;
   }
   body.outdoor-page .outdoor-region-count { display: inline-block; margin-left: 8px; font-family: inherit; font-size: 0.78rem; font-weight: 700; opacity: 0.55; vertical-align: 2px; }
   body.outdoor-page .outdoor-index-card { padding: 11px 14px 10px; }
@@ -12287,7 +12435,7 @@ function renderOutdoorsSimplifiedStyles() {
   body.outdoor-page .outdoors-intro { margin-bottom: 14px; }
 
   body.outdoor-page .outdoors-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.outdoor-page .outdoors-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.outdoor-page .outdoors-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.outdoor-page .outdoors-search-input::placeholder { color: rgba(42,32,25,0.55); }
   body.outdoor-page .outdoors-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   /* The page draws its own clear button, so suppress the browser's native one. */
@@ -12306,7 +12454,7 @@ function renderOutdoorsSimplifiedStyles() {
 
   body.outdoor-page .outdoors-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.outdoor-page .outdoors-pop { position: relative; }
-  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.outdoor-page .outdoors-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.outdoor-page .outdoors-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoors-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -12338,11 +12486,11 @@ function renderOutdoorsSimplifiedStyles() {
      confirmation affordance -- the primary action in the panel, in the
      homepage's navy/gold system, with the live count as its label. */
   body.outdoor-page .outdoors-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
-  body.outdoor-page .outdoors-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.outdoor-page .outdoors-pop-apply { display: block; width: 100%; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.outdoor-page .outdoors-pop-apply:hover { background: var(--ref-navy-deep); }
   body.outdoor-page .outdoors-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoors-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
-  body.outdoor-page .outdoors-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+  body.outdoor-page .outdoors-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.outdoor-page .outdoors-results-step { margin-top: 4px; }</style>`;
 }
 
@@ -12352,7 +12500,7 @@ function renderGolfThemeStyles() {
   body.golf-page {
     max-width: none; margin: 0; padding: 0;
     background: var(--ref-cream); color: var(--ink);
-    font-family: 'Nunito', sans-serif; font-size: 17px; line-height: 1.65;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 17px; line-height: 1.65;
   }
   body.golf-page .golf-main { max-width: 1360px; margin: 0 auto; padding: 26px 24px 72px; }
   /* app.js's initBlock11 appends a .card-links row (directions / menu /
@@ -12379,7 +12527,7 @@ function renderGolfThemeStyles() {
   }
   body.golf-page .category-back-link:hover, body.golf-page .venue-back-link:hover { color: var(--ref-gold-ink, #8A6A0F); }
   body.golf-page h1 {
-    font-family: 'Fraunces', serif; font-weight: 600; line-height: 1.15;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; line-height: 1.15;
     font-size: clamp(1.7rem, 3vw, 2.2rem); margin: 0 0 6px; color: var(--ink);
   }
   body.golf-page .subtitle { font-size: 0.95rem; color: rgba(42,32,25,0.65); margin: 0 0 22px; }
@@ -12398,7 +12546,7 @@ function renderGolfThemeStyles() {
 
   /* Section headings: the homepage's .discover-heading h2 + eyebrow bar. */
   body.golf-page .category-subsection-heading {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(1.2rem, 1.8vw, 1.45rem);
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: clamp(1.2rem, 1.8vw, 1.45rem);
     color: var(--ink); margin: 26px 0 12px; padding: 0; border: 0;
   }
   body.golf-page .category-subsection-heading::before {
@@ -12470,7 +12618,7 @@ function renderGolfThemeStyles() {
     transition: transform .15s ease, box-shadow .15s ease; display: flex; flex-direction: column;
   }
   body.golf-page .venue-card:hover { transform: translateY(-3px); box-shadow: 0 16px 28px -16px rgba(74,52,40,0.4); }
-  body.golf-page .venue-card h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px; line-height: 1.25; }
+  body.golf-page .venue-card h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.12rem; margin: 0 0 5px; line-height: 1.25; }
   /* Venue name = the one link to the detail page. Rendered navy (the
      redesign's link colour, as the header nav / .discover-heading-link),
      underlined on hover/focus, with a small "View details" cue inside the
@@ -12488,7 +12636,7 @@ function renderGolfThemeStyles() {
   body.golf-page .venue-card h2 a.venue-card-link:hover { color: var(--ref-navy-deep); }
   body.golf-page .venue-card h2 a.venue-card-link .venue-card-cue {
     display: block; margin-top: 3px;
-    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.8rem; line-height: 1.3; letter-spacing: 0.01em;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.8rem; line-height: 1.3; letter-spacing: 0.01em;
     color: var(--ref-navy); white-space: nowrap;
   }
   body.golf-page .venue-card h2 a.venue-card-link:hover .venue-card-cue { color: var(--ref-gold-ink, #8A6A0F); }
@@ -12548,7 +12696,7 @@ function renderGolfThemeStyles() {
   body.golf-page .venue-card > .chips:not(:empty) + .card-actions { margin-top: auto; }
   body.golf-page .venue-card .card-actions .card-action {
     display: inline-flex; align-items: center; gap: 5px; margin: 0;
-    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    font-size: 0.82rem; font-weight: 700; font-family: 'Nunito', 'Nunito Fallback', sans-serif; line-height: 1.4;
     background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); text-decoration: none;
     border-radius: 999px; padding: 5px 12px; cursor: pointer; width: fit-content;
     transition: background 0.15s;
@@ -12574,14 +12722,14 @@ function renderGolfThemeStyles() {
     margin: 0; display: inline-flex; align-items: center; gap: 6px;
     background: var(--ref-navy); color: var(--ref-white); border: 1px solid var(--ref-navy);
     padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 0.86rem; letter-spacing: 0.01em;
-    font-family: 'Nunito', sans-serif; text-decoration: none; transition: background .15s ease;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; text-decoration: none; transition: background .15s ease;
   }
   body.golf-page .venue-cta-row .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
   body.golf-page .venue-cta-row .cta.secondary { background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); }
   body.golf-page .venue-cta-row .cta.secondary:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.golf-page .venue-cta-row .card-action {
     display: inline-flex; align-items: center; gap: 5px; margin: 0;
-    font-size: 0.86rem; font-weight: 700; font-family: 'Nunito', sans-serif; line-height: 1.4;
+    font-size: 0.86rem; font-weight: 700; font-family: 'Nunito', 'Nunito Fallback', sans-serif; line-height: 1.4;
     text-decoration: none; border-radius: 999px; padding: 10px 16px; cursor: pointer; transition: background 0.15s;
   }
   body.golf-page .trip-notice { margin: 8px 0 0; font-size: 0.85rem; color: var(--ref-navy); }
@@ -12592,7 +12740,7 @@ function renderGolfThemeStyles() {
   }
   body.golf-page .venue-section { padding: 18px 20px; margin-bottom: 18px; }
   body.golf-page .venue-section h2, body.golf-page .related-section h2 {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(1.1rem, 1.6vw, 1.3rem); margin: 0 0 10px; color: var(--ink);
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: clamp(1.1rem, 1.6vw, 1.3rem); margin: 0 0 10px; color: var(--ink);
   }
   body.golf-page .related-card a:hover { color: var(--ref-navy); }
   body.golf-page .golf-main > a.cta {
@@ -12639,11 +12787,11 @@ function renderGolfVenuePolishStyles() {
   body.golf-page .venue-hero-fallback .venue-hero-type,
   body.golf-page .venue-hero-fallback h1 { position: relative; z-index: 1; }
   body.golf-page .venue-hero-fallback .venue-hero-type {
-    font-family: 'Nunito', sans-serif; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.12em;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.12em;
     text-transform: uppercase; color: rgba(255,255,255,0.82); margin-bottom: 10px;
   }
   body.golf-page .venue-hero-fallback h1 {
-    font-family: 'Fraunces', serif; font-weight: 600; line-height: 1.1;
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; line-height: 1.1;
     font-size: clamp(1.9rem, 3.6vw, 2.75rem); margin: 0; color: var(--ref-white); max-width: 22ch;
     text-shadow: 0 1px 2px rgba(16,32,22,0.25);
   }
@@ -12674,7 +12822,7 @@ function renderGolfVenuePolishStyles() {
     padding: 10px 0 12px; border-top: 1px solid rgba(27,43,58,0.1);
   }
   body.golf-page .golf-glance dt {
-    font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em;
     text-transform: uppercase; color: rgba(42,32,25,0.55); margin: 0 0 3px;
   }
   body.golf-page .golf-glance dd { margin: 0; font-size: 0.95rem; line-height: 1.45; color: var(--ink); }
@@ -13762,7 +13910,7 @@ const REGION_PAGE_STYLE = `<style id="region-page">
   body.region-page .region-photo-grid .region-card-photo { order: -1; aspect-ratio: 3 / 2; overflow: hidden; background: #2A6B67; margin-bottom: 10px; }
   body.region-page .region-photo-grid .region-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.35s ease; }
   body.region-page .region-photo-grid .category-card:hover .region-card-photo img { transform: scale(1.04); }
-  body.region-page .region-photo-grid h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; margin: 0 12px 3px; }
+  body.region-page .region-photo-grid h3 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; margin: 0 12px 3px; }
   body.region-page .region-photo-grid h3 a { color: var(--ink); text-decoration: none; }
   body.region-page .region-photo-grid h3 a::after { content: ''; position: absolute; inset: 0; }
   body.region-page .region-photo-grid h3 a:focus-visible { outline: none; }
@@ -14175,7 +14323,7 @@ const DESTINATION_PAGE_EXTRA_STYLE = `<style id="destinations-extra">
   body.destinations-page .destination-photo-grid .destination-tagline { margin: 0 18px 6px; font-size: 0.92rem; line-height: 1.45; color: var(--ink); }
   body.destinations-page .destination-photo-grid .venue-meta { font-size: 0.82rem; opacity: 0.75; }
   body.destinations-page .destination-starts { margin: 4px 0 30px; padding: 18px 20px; border-radius: 16px; background: var(--paper, #fffaf2); box-shadow: 0 10px 24px -20px rgba(74,52,40,0.5); }
-  body.destinations-page .destination-starts h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.destinations-page .destination-starts h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
   body.destinations-page .destination-starts ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 8px 22px; }
   @media (min-width: 760px) { body.destinations-page .destination-starts ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 1100px) { body.destinations-page .destination-starts ul { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -14374,10 +14522,10 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-handle { flex: none; display: flex; justify-content: center; align-items: center; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; }
   body.map-page .pm-handle span { width: 44px; height: 5px; border-radius: 999px; background: rgba(27,43,58,0.28); }
   body.map-page .pm-sheet-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px 10px; touch-action: none; }
-  body.map-page .pm-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
+  body.map-page .pm-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
   body.map-page .pm-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 16px; }
   body.map-page .pm-tabs { flex: none; display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(27,43,58,0.08); }
-  body.map-page .pm-tab { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
+  body.map-page .pm-tab { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
   body.map-page .pm-tab[aria-selected="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
   /* Filters: one panel with everything else. */
   body.map-page .pm-panel { position: absolute; z-index: 700; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 24px; background: var(--bg, #F7F5F0); }
@@ -15784,7 +15932,7 @@ ${renderAnalyticsHeadHtml('hub')}
   body.map-page .map-page-head h1 { margin: 0; }
   body.map-page a.map-page-close {
     display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; font-weight: 800;
-    background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); text-decoration: none; font-family: 'Nunito', sans-serif;
+    background: var(--ref-navy-deep, #16233a); color: var(--ref-white, #fff); text-decoration: none; font-family: 'Nunito', 'Nunito Fallback', sans-serif;
   }
   body.map-page a.map-page-close:hover, body.map-page a.map-page-close:focus-visible { background: var(--ref-gold, #E0A94E); color: var(--ref-navy-deep, #16233a); }
   body.map-page .map-panel.open { margin: 18px 0 34px; }
@@ -15863,7 +16011,7 @@ ${renderAnalyticsHeadHtml('favorites')}
   body.favorites-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   body.favorites-page .fav-intro { margin: 0 0 22px; color: var(--ink); opacity: 0.8; }
   body.favorites-page .fav-section { margin: 0 0 30px; }
-  body.favorites-page .fav-section h2 { font-family: 'Fraunces', serif; font-size: 1.35rem; margin: 0 0 12px; }
+  body.favorites-page .fav-section h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.35rem; margin: 0 0 12px; }
   body.favorites-page .fav-section h3 { font-size: 0.95rem; margin: 18px 0 8px; }
   body.favorites-page .fav-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
   body.favorites-page .fav-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 14px 16px; border-radius: 14px; background: var(--ref-white, #fff); border: 1px solid rgba(27,43,58,0.12); }
@@ -16192,14 +16340,14 @@ function categoryDirectoryEntries() {
 // name's link stretches over the whole card.
 const CATEGORY_PHOTO_GRID_STYLE = `<style id="category-photo-grid">
   /* 2026-10-14: count line, site search, Browse by town. */
-  body.categories-page .category-photo-grid .category-count { margin: 0 18px 4px; font-family: 'Nunito', sans-serif; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; color: var(--teal, #2A6B67); }
+  body.categories-page .category-photo-grid .category-count { margin: 0 18px 4px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; color: var(--teal, #2A6B67); }
   body.categories-page .categories-search .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   body.categories-page .categories-search { display: flex; gap: 8px; max-width: 620px; margin: 4px 0 26px; }
-  body.categories-page .categories-search input { flex: 1; min-width: 0; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; padding: 12px 16px; min-height: 48px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: var(--paper); color: var(--ink); }
+  body.categories-page .categories-search input { flex: 1; min-width: 0; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; padding: 12px 16px; min-height: 48px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: var(--paper); color: var(--ink); }
   body.categories-page .categories-search input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
-  body.categories-page .categories-search button { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 0 22px; min-height: 48px; cursor: pointer; }
+  body.categories-page .categories-search button { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.95rem; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 0 22px; min-height: 48px; cursor: pointer; }
   body.categories-page .categories-towns { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 34px; }
-  body.categories-page .categories-towns a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; min-height: 42px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.9rem; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.categories-page .categories-towns a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; min-height: 42px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.9rem; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
   body.categories-page .categories-towns a:hover { background: rgba(27,43,58,0.06); }
   body.categories-page .categories-towns a span { font-size: 0.76rem; opacity: 0.6; }
   @media (max-width: 559px) {
@@ -18364,7 +18512,7 @@ function renderFoodDrinkOpenNowStyles() {
   body.fd-page .fd-open-toggle[aria-pressed="true"]:hover { background: var(--ref-navy-deep, #101B24); border-color: var(--ref-navy-deep, #101B24); }
   body.fd-page .fd-open-toggle .outdoor-activity-count { margin-left: 2px; }
   body.fd-page .fd-open-toggle[aria-pressed="true"] .outdoor-activity-count { opacity: 0.8; }
-  body.fd-page .fd-open-note { margin: -2px 0 14px; font-family: 'Nunito', sans-serif; font-size: 0.8rem; line-height: 1.45; color: var(--ink); opacity: 0.7; max-width: 64ch; text-wrap: pretty; }
+  body.fd-page .fd-open-note { margin: -2px 0 14px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.8rem; line-height: 1.45; color: var(--ink); opacity: 0.7; max-width: 64ch; text-wrap: pretty; }
   /* Open-now footnote (2026-10-14): under the list always; above it only while Open now is on. */
   body.fd-page .fd-controls + .fd-open-note { display: none; }
   body.fd-page .fd-controls:has(.fd-open-toggle[aria-pressed="true"]) + .fd-open-note { display: block; }
@@ -18375,7 +18523,7 @@ function renderFoodDrinkOpenNowStyles() {
      open, hollow dot = closed, no dot when today's hours are not listed. */
   /* Two-up card rows (2026-10-12): the open-now line has its own row under the meta (see the golf theme's card rows). */
   @supports (grid-template-rows: subgrid) { @media (min-width: 900px) { body.golf-page .card-grid > .venue-card > .fd-open-status { grid-row: 3; } } }
-  body.fd-page .venue-card .fd-open-status { display: flex; align-items: center; gap: 7px; margin: -6px 0 10px; font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; line-height: 1.3; color: var(--ink); opacity: 1; }
+  body.fd-page .venue-card .fd-open-status { display: flex; align-items: center; gap: 7px; margin: -6px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.84rem; font-weight: 700; line-height: 1.3; color: var(--ink); opacity: 1; }
   body.fd-page .venue-card .fd-open-status::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="closed"] { opacity: 0.78; }
@@ -18482,7 +18630,7 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-type-page-link a { color: var(--teal); }
 
   body.fd-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.fd-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.fd-page .fd-search-input::placeholder { color: rgba(42,32,25,0.55); }
   body.fd-page .fd-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-search-input::-webkit-search-cancel-button, body.fd-page .fd-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
@@ -18499,7 +18647,7 @@ function renderFoodDrinkHubStyles() {
 
   body.fd-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.fd-page .fd-pop { position: relative; }
-  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.fd-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.fd-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -18528,32 +18676,32 @@ function renderFoodDrinkHubStyles() {
      confirmation affordance -- the primary action in the panel, in the
      homepage's navy/gold system, with the live count as its label. */
   body.fd-page .fd-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
-  body.fd-page .fd-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.fd-page .fd-pop-apply { display: block; width: 100%; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.fd-page .fd-pop-apply:hover { background: var(--ref-navy-deep); }
   body.fd-page .fd-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   /* "Show more" reveals the next batch. Centered, comfortable target, and the
      homepage's navy/gold button system -- same language as the popovers'
      "Show results". It removes itself once every match is on screen. */
   body.fd-page .fd-more-row { display: flex; justify-content: center; margin: 22px 0 8px; }
-  body.fd-page .fd-show-more { font-family: 'Nunito', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 12px 26px; min-height: 48px; cursor: pointer; transition: background .12s ease; }
+  body.fd-page .fd-show-more { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 12px 26px; min-height: 48px; cursor: pointer; transition: background .12s ease; }
   body.fd-page .fd-show-more:hover { background: var(--ref-navy-deep); }
   body.fd-page .fd-show-more:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-show-more[hidden] { display: none; }
 
   body.fd-page .fd-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
-  body.fd-page .fd-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+  body.fd-page .fd-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.fd-page .fd-results-step { margin-top: 4px; }
   body.fd-page #fdResults > .venue-card[hidden] { display: none; }
-  body.fd-page .fd-no-results { margin: 14px 0 0; font-family: 'Nunito', sans-serif; font-weight: 700; }
+  body.fd-page .fd-no-results { margin: 14px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; }
   body.fd-page .fd-no-results[hidden] { display: none; }
   body.fd-page .fd-no-results p { margin: 0 0 6px; }
   body.fd-page .fd-no-results a { color: var(--teal); }
   body.fd-page .fd-no-results .fd-no-results-try { font-weight: 600; opacity: 0.8; }
-  body.fd-page .fd-search-note { margin: 0 0 10px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--teal); }
+  body.fd-page .fd-search-note { margin: 0 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--teal); }
   body.fd-page .fd-search-note[hidden] { display: none; }
 
   /* Sort (2026-10-14), at the end of the count line. */
-  body.fd-page .fd-sort { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  body.fd-page .fd-sort { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.84rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
   body.fd-page .fd-sort-label { opacity: 0.8; }
   body.fd-page .fd-sort-select { font: inherit; font-weight: 800; color: var(--ref-navy); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 6px 30px 6px 12px; min-height: 40px; cursor: pointer; appearance: none; -webkit-appearance: none;
     background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
@@ -19638,9 +19786,9 @@ ${golfEngagementHeadHtml('winery', true, 'hub')}
   body.wine-hub-page .wine-guide-link { margin: 0 0 14px; font-weight: 700; }
   body.wine-hub-page .wine-guide-link a { color: var(--teal); }
   body.wine-hub-page .wine-towns { margin: 26px 0 8px; }
-  body.wine-hub-page .wine-towns h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.wine-hub-page .wine-towns h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
   body.wine-hub-page .wine-towns nav { display: flex; flex-wrap: wrap; gap: 8px; }
-  body.wine-hub-page .wine-towns a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.wine-hub-page .wine-towns a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
   body.wine-hub-page .wine-towns a:hover { background: rgba(27,43,58,0.06); }
   body.wine-hub-page .wine-towns a span { font-size: 0.74rem; opacity: 0.6; }
 </style>
@@ -19857,9 +20005,9 @@ ${golfEngagementHeadHtml('indoor', true, 'hub')}
   body.indoor-hub-page .rainy-guide-link { margin: 0 0 14px; font-weight: 700; }
   body.indoor-hub-page .rainy-guide-link a { color: var(--teal); }
   body.indoor-hub-page .hub-links { margin: 26px 0 8px; }
-  body.indoor-hub-page .hub-links h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.indoor-hub-page .hub-links h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
   body.indoor-hub-page .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
-  body.indoor-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.indoor-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
   body.indoor-hub-page .hub-links a:hover { background: rgba(27,43,58,0.06); }
   body.indoor-hub-page .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
   body.indoor-hub-page .card-note-label { font-weight: 800; }
@@ -20050,9 +20198,9 @@ ${renderFoodDrinkHubStyles()}
 ${golfEngagementHeadHtml('sport', true, 'hub')}
 <style id="sports-hub">
   body.sports-hub-page .hub-links { margin: 26px 0 8px; }
-  body.sports-hub-page .hub-links h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.sports-hub-page .hub-links h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
   body.sports-hub-page .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
-  body.sports-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
+  body.sports-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
   body.sports-hub-page .hub-links a:hover { background: rgba(27,43,58,0.06); }
   body.sports-hub-page .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
   body.sports-hub-page .card-note-label { font-weight: 800; }
@@ -20354,7 +20502,7 @@ function renderDogHubStyles() {
   body.dog-page .fd-intro { margin: 0 0 14px; max-width: 70ch; }
 
   body.dog-page .fd-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.dog-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.dog-page .fd-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.dog-page .fd-search-input::placeholder { color: rgba(42,32,25,0.55); }
   body.dog-page .fd-search-input:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.dog-page .fd-search-input::-webkit-search-cancel-button, body.dog-page .fd-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
@@ -20371,7 +20519,7 @@ function renderDogHubStyles() {
 
   body.dog-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.dog-page .fd-pop { position: relative; }
-  body.dog-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.dog-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.dog-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.dog-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.dog-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -20395,20 +20543,20 @@ function renderDogHubStyles() {
   body.dog-page .fd-feature-icon { font-size: 0.95em; }
 
   body.dog-page .fd-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
-  body.dog-page .fd-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.dog-page .fd-pop-apply { display: block; width: 100%; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.dog-page .fd-pop-apply:hover { background: var(--ref-navy-deep); }
   body.dog-page .fd-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 
   body.dog-page .fd-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
-  body.dog-page .fd-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+  body.dog-page .fd-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.dog-page .fd-results-step { margin-top: 4px; }
   body.dog-page #dogResults > .venue-card[hidden] { display: none; }
-  body.dog-page .fd-no-results { margin: 14px 0 0; font-family: 'Nunito', sans-serif; font-weight: 700; }
+  body.dog-page .fd-no-results { margin: 14px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; }
 
   /* The dog-beach restriction, on the card where it is actually read. Teal
      rather than the advisory's amber: this is standing official information,
      not a temporary warning, and the two must not look alike. */
-  body.dog-page .dog-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+  body.dog-page .dog-note { margin: 8px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
   body.dog-page .dog-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
   body.dog-page .dog-guides { margin-top: 28px; }
 </style>`;
@@ -20776,7 +20924,7 @@ ${golfEngagementHeadHtml('dog', true, 'hub')}
   body.dog-hub-page .dog-note-label, body.dog-hub-page .card-note-label { font-weight: 800; }
   body.dog-hub-page .dog-rule-intro { margin: 0 0 14px; font-size: 0.9rem; opacity: 0.75; }
   body.dog-hub-page .dog-guides { margin: 26px 0 8px; }
-  body.dog-hub-page .dog-guides h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.dog-hub-page .dog-guides h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
 </style>
 </head>
 <body class="golf-page outdoor-page fd-page dog-page dog-hub-page">
@@ -21028,7 +21176,7 @@ function renderLocalFavouritesStyles() {
     .replace(/#dogResults/g, '#lfResults')
     // Collection notes on the curated pages' cards ("Local pick: …",
     // "Why it's a gem: …"), styled like the /indoor and /tours note line.
-    .replace(/<\/style>\s*$/, `  body.lf-page .card-note { margin: 8px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
+    .replace(/<\/style>\s*$/, `  body.lf-page .card-note { margin: 8px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; line-height: 1.45; color: var(--ink); background: rgba(42,107,103,0.08); border-left: 3px solid var(--teal, #2A6B67); border-radius: 0 8px 8px 0; padding: 8px 10px; }
   body.lf-page .card-note-label { font-weight: 800; color: var(--teal-deep, #1E4F4C); }
 </style>`);
 }
@@ -21974,7 +22122,7 @@ function renderSkiSnowStyles() {
     background: linear-gradient(135deg, var(--ref-navy), var(--ref-navy-deep));
     box-shadow: 0 10px 22px -16px rgba(16,27,36,0.6);
   }
-  body.lf-page .ski-snow-link-title { display: block; font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.08rem; }
+  body.lf-page .ski-snow-link-title { display: block; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 700; font-size: 1.08rem; }
   body.lf-page .ski-snow-link-text { display: block; margin-top: 4px; font-size: 0.92rem; opacity: 0.88; }
   body.lf-page .ski-snow-link:hover .ski-snow-link-title, body.lf-page .ski-snow-link:focus-visible .ski-snow-link-title { text-decoration: underline; }
   body.lf-page .ski-snow-eats { margin-top: 28px; }
@@ -22621,7 +22769,7 @@ function buildWhatsOnStyles() {
   body.whatson-page #whatsOnResults .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
   body.whatson-page #whatsOnResults > .venue-card[hidden] { display: none; }
   body.whatson-page .whatson-empty { background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px; padding: 18px 20px; margin: 0 0 26px; max-width: 68ch; }
-  body.whatson-page .whatson-empty h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 6px; color: var(--ink); }
+  body.whatson-page .whatson-empty h3 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 6px; color: var(--ink); }
   body.whatson-page .whatson-empty p { margin: 0; color: var(--ink); opacity: 0.8; line-height: 1.55; }
   body.whatson-page .whatson-empty a { color: var(--ref-navy); font-weight: 700; }
   /* Step 6: the "When are you visiting?" step -- preset chips reuse the region-chip rules; the custom-range form and the "Showing" line are page-scoped. */
@@ -22629,11 +22777,11 @@ function buildWhatsOnStyles() {
   body.whatson-page a.whatson-date-chip { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
   body.whatson-page .whatson-custom-dates { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0 4px; }
   body.whatson-page .whatson-custom-dates[hidden] { display: none; }
-  body.whatson-page .whatson-custom-dates label { display: flex; flex-direction: column; gap: 4px; font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 800; color: var(--ink); }
+  body.whatson-page .whatson-custom-dates label { display: flex; flex-direction: column; gap: 4px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.85rem; font-weight: 800; color: var(--ink); }
   body.whatson-page .whatson-custom-dates input[type="date"] { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); min-height: 40px; }
   body.whatson-page .whatson-custom-dates .cta.whatson-custom-go { margin: 0; }
-  body.whatson-page .whatson-date-showing { margin: 10px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--ink); opacity: 0.8; }
-  body.whatson-page .whatson-date-note { margin: 6px 0 0; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--plum, #6B2C40); font-weight: 700; }
+  body.whatson-page .whatson-date-showing { margin: 10px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; color: var(--ink); opacity: 0.8; }
+  body.whatson-page .whatson-date-note { margin: 6px 0 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; color: var(--plum, #6B2C40); font-weight: 700; }
 
   /* ---- Simplified filter surface (2026-09-24) -----------------------------
      Compact search + one horizontal category chip row + Regions/Date
@@ -22645,7 +22793,7 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-intro { margin-bottom: 14px; }
 
   body.whatson-page .whatson-search { position: relative; margin: 0 0 12px; max-width: 520px; }
-  body.whatson-page .whatson-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
+  body.whatson-page .whatson-search-input { width: 100%; box-sizing: border-box; font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ padding: 10px 36px 10px 14px; min-height: 42px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: var(--paper); color: var(--ink); }
   body.whatson-page .whatson-search-input::placeholder { color: rgba(42,32,25,0.55); }
   /* The page draws its own clear button, so suppress the browser's native one. */
   body.whatson-page .whatson-search-input::-webkit-search-cancel-button, body.whatson-page .whatson-search-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
@@ -22661,7 +22809,7 @@ function buildWhatsOnStyles() {
 
   body.whatson-page .whatson-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.whatson-page .whatson-pop { position: relative; }
-  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.whatson-page .whatson-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.whatson-page .whatson-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
   body.whatson-page .whatson-pop-count[hidden] { display: none; }
@@ -22681,7 +22829,7 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-town-links a:hover, body.whatson-page .whatson-town-links a:focus-visible { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.whatson-page .whatson-town-count { color: var(--muted, #5b6b78); font-weight: 600; }
   body.whatson-page .whatson-quick-dates { display: flex; gap: 8px; overflow-x: auto; margin: 10px 0 4px; padding-bottom: 2px; scrollbar-width: none; }
-  body.whatson-page .whatson-quick-date { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.whatson-page .whatson-quick-date { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.whatson-page .whatson-quick-date:hover { background: rgba(27,43,58,0.06); }
   body.whatson-page .whatson-quick-date[aria-current="page"] { background: var(--ref-navy, #1B2B3A); border-color: var(--ref-navy, #1B2B3A); color: var(--paper); }
   body.whatson-page .whatson-date-compact { margin: 0; }
@@ -22692,7 +22840,7 @@ function buildWhatsOnStyles() {
      confirmation affordance -- the primary action in the panel, in the
      homepage's navy/gold system, with the live count as its label. */
   body.whatson-page .whatson-pop-actions { position: sticky; bottom: -14px; margin: 12px -14px -14px; padding: 10px 14px; background: var(--paper); border-top: 1px solid rgba(27,43,58,0.12); border-radius: 0 0 14px 14px; }
-  body.whatson-page .whatson-pop-apply { display: block; width: 100%; font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
+  body.whatson-page .whatson-pop-apply { display: block; width: 100%; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 10px 16px; min-height: 44px; cursor: pointer; transition: background .12s ease; }
   body.whatson-page .whatson-pop-apply:hover { background: var(--ref-navy-deep); }
   body.whatson-page .whatson-pop-apply:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.whatson-page .whatson-coming-up { margin: 32px 0 0; }
@@ -22703,7 +22851,7 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-browse-list a, body.whatson-page .whatson-browse-list span { display: inline-block; background: var(--paper); border-radius: 999px; padding: 7px 14px; font-weight: 700; text-decoration: none; }
   body.whatson-page .whatson-browse-list span { opacity: .6; }
   body.whatson-page .whatson-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
-  body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+  body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.whatson-page .whatson-results-step { margin-top: 4px; }
 </style>`;
 }
@@ -23074,7 +23222,7 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
   /* Group headings span the whole grid. */
   body.whatson-page #whatsOnResults > .whatson-group-head { grid-column: 1 / -1; list-style: none; margin: 18px 0 2px; padding: 0; border: 0; background: none; box-shadow: none; }
   body.whatson-page #whatsOnResults > .whatson-group-head:first-child { margin-top: 0; }
-  body.whatson-page #whatsOnResults > .whatson-group-head h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.2rem; margin: 0; color: var(--ink); }
+  body.whatson-page #whatsOnResults > .whatson-group-head h3 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.2rem; margin: 0; color: var(--ink); }
   body.whatson-page #whatsOnResults > .whatson-group-head h3::before { content: ""; display: block; width: 20px; height: 2px; background: var(--teal); margin-bottom: 6px; }
   body.whatson-page #whatsOnResults > .whatson-paged { display: none !important; }
   /* A photo across the top of each card, edge to edge. */
@@ -23086,9 +23234,9 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
   body.whatson-page .card-grid > .venue-card.whatson-event-card .golf-desc { min-height: 0; }
   body.whatson-page .whatson-event-card .golf-desc p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 4px; }
   body.whatson-page .whatson-event-card .desc-toggle { display: none !important; }
-  body.whatson-page .whatson-source { margin: 0 0 6px; font-family: 'Nunito', sans-serif; font-size: 0.76rem; color: var(--ink); opacity: 0.6; }
+  body.whatson-page .whatson-source { margin: 0 0 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.76rem; color: var(--ink); opacity: 0.6; }
   body.whatson-page .whatson-more-row { display: flex; justify-content: center; margin: 22px 0 8px; }
-  body.whatson-page .whatson-show-more { font-family: 'Nunito', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 12px 26px; min-height: 48px; cursor: pointer; }
+  body.whatson-page .whatson-show-more { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 800; color: var(--ref-cream); background: var(--ref-navy); border: 1px solid var(--ref-gold); border-radius: 999px; padding: 12px 26px; min-height: 48px; cursor: pointer; }
   body.whatson-page .whatson-show-more[hidden] { display: none; }
   @media (max-width: 640px) { body.whatson-page .whatson-event-card > .whatson-event-photo { height: 96px; margin: -18px -20px 10px; } }
 </style>`;
@@ -24160,9 +24308,9 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-hero-fallback.venue-hero-has-photo::before { z-index: 1; background: linear-gradient(100deg, rgba(12,22,28,0.82) 0%, rgba(12,22,28,0.5) 50%, rgba(12,22,28,0.08) 100%); }
   body.golf-page .venue-hero-fallback.venue-hero-has-photo::after { z-index: 1; }
   body.golf-page .venue-hero-has-photo h1, body.golf-page .venue-hero-has-photo .venue-hero-type { z-index: 2; text-shadow: 0 2px 14px rgba(0,0,0,0.55); }
-  body.golf-page .venue-hero-has-photo .venue-hero-example { position: absolute; right: 18px; bottom: 16px; z-index: 2; font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.85); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
+  body.golf-page .venue-hero-has-photo .venue-hero-example { position: absolute; right: 18px; bottom: 16px; z-index: 2; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.85); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
   /* Open-now line under the name. */
-  body.golf-page .venue-open-status { display: flex; align-items: center; gap: 7px; margin: -2px 0 10px; font-family: 'Nunito', sans-serif; font-size: 0.92rem; font-weight: 800; color: var(--ink); }
+  body.golf-page .venue-open-status { display: flex; align-items: center; gap: 7px; margin: -2px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.92rem; font-weight: 800; color: var(--ink); }
   body.golf-page .venue-open-status::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor; flex: 0 0 auto; }
   body.golf-page .venue-open-status[data-open="open"] { color: var(--teal, #2A6B67); }
   body.golf-page .venue-open-status[data-open="closed"] { color: rgba(42,32,25,0.72); }
@@ -24220,7 +24368,7 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .related-card.has-photo { padding: 0 !important; overflow: hidden; display: flex; flex-direction: column; }
   body.golf-page .related-card.has-photo .related-photo { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #2A6B67; }
   body.golf-page .related-card.has-photo .related-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; }
-  body.golf-page .related-card.has-photo .related-type { font-family: 'Nunito', sans-serif; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; }
+  body.golf-page .related-card.has-photo .related-type { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.8; }
   body.golf-page .related-card.has-photo a { font-size: 0.95rem; line-height: 1.3; }
   body.golf-page .related-card.has-photo a::after { content: ""; position: absolute; inset: 0; }
   body.golf-page .related-card.has-photo { position: relative; }
@@ -25167,8 +25315,8 @@ ${renderAnalyticsHeadHtml('event')}
   /* 2026-10-14: photo, status line, buttons and a details sidebar. */
   .event-hero { position: relative; width: 100%; height: clamp(170px, 26vw, 340px); margin: 0 0 18px; border-radius: 16px; overflow: hidden; background: #2A6B67; }
   .event-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .event-hero-example { position: absolute; right: 14px; bottom: 12px; font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.88); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
-  .event-status { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 12px; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.98rem; color: var(--teal, #2A6B67); }
+  .event-hero-example { position: absolute; right: 14px; bottom: 12px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.88); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
+  .event-status { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 12px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.98rem; color: var(--teal, #2A6B67); }
   .event-status::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor; }
   .event-body { font-size: 1.06rem; line-height: 1.65; max-width: 68ch; }
   .event-cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 12px; }
@@ -25370,7 +25518,7 @@ function renderTripPlannerStyles() {
   .trip-planner-breadcrumb { font-size: 0.8rem; color: rgba(74,52,40,0.8); margin-bottom: 18px; }
   .trip-planner-breadcrumb a { color: var(--teal-deep); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .trip-planner-breadcrumb a:hover { text-decoration-thickness: 2px; }
-  .trip-planner-intro h1, .trip-planner-intro h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
+  .trip-planner-intro h1, .trip-planner-intro h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
   .trip-planner-intro .subtitle { color: var(--ink); opacity: 0.7; font-size: 1.02rem; margin: 0 0 28px; max-width: 640px; }
 
   /* Conversational hero (primary /trip experience) -- same design tokens
@@ -25380,13 +25528,13 @@ function renderTripPlannerStyles() {
     background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 20px;
     padding: 32px 28px; margin-bottom: 28px; box-shadow: 0 10px 28px -18px rgba(74,52,40,0.4);
   }
-  .trip-conv-hero h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 2.1rem; margin: 0 0 8px; color: var(--ink); }
+  .trip-conv-hero h1 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 2.1rem; margin: 0 0 8px; color: var(--ink); }
   .trip-conv-subtitle { color: var(--ink); opacity: 0.72; font-size: 1.05rem; margin: 0 0 22px; max-width: 620px; }
 
   .trip-conv-input-wrap { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; align-items: flex-start; }
   .trip-conv-textarea {
     width: 100%; min-height: 100px; padding: 16px 18px; border-radius: 14px; box-sizing: border-box;
-    border: 1.5px solid rgba(42,32,25,0.22); font-family: 'Nunito', sans-serif; font-size: 1.02rem;
+    border: 1.5px solid rgba(42,32,25,0.22); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1.02rem;
     background: var(--sand); color: var(--ink); resize: vertical; line-height: 1.5;
   }
   .trip-conv-textarea:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(31,92,92,0.15); }
@@ -25396,7 +25544,7 @@ function renderTripPlannerStyles() {
   .trip-conv-examples-label { display: block; font-size: 0.82rem; font-weight: 700; color: var(--ink); opacity: 0.8; margin-bottom: 8px; }
   .trip-conv-example-chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .trip-conv-example-chip {
-    font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 600; padding: 8px 14px;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.85rem; font-weight: 600; padding: 8px 14px;
     border-radius: 999px; border: 1.5px solid rgba(42,32,25,0.18); background: var(--paper);
     color: var(--teal-deep); cursor: pointer; text-align: left;
   }
@@ -25411,20 +25559,20 @@ function renderTripPlannerStyles() {
   }
 
   .trip-conv-understood { margin-top: 22px; padding-top: 22px; border-top: 1.5px dashed rgba(74,52,40,0.16); }
-  .trip-conv-understood h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.25rem; color: var(--ink); margin: 0 0 16px; }
+  .trip-conv-understood h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.25rem; color: var(--ink); margin: 0 0 16px; }
 
   .trip-conv-chips { display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; }
   .trip-conv-field { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .trip-conv-field label, .trip-conv-field-label { font-size: 0.82rem; font-weight: 800; color: var(--teal-deep); min-width: 80px; }
   .trip-conv-field select, .trip-conv-field input[type="number"] {
     padding: 8px 12px; border-radius: 8px; border: 1.5px solid rgba(42,32,25,0.22);
-    font-family: 'Nunito', sans-serif; font-size: 0.92rem; background: var(--sand); color: var(--ink);
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.92rem; background: var(--sand); color: var(--ink);
   }
   .trip-conv-field input[type="number"] { width: 70px; }
 
   .trip-conv-pace-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
   .trip-conv-pace-btn {
-    font-family: 'Nunito', sans-serif; font-size: 0.84rem; font-weight: 700; padding: 7px 14px;
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.84rem; font-weight: 700; padding: 7px 14px;
     border-radius: 999px; border: 1.5px solid rgba(42,32,25,0.22); background: var(--sand);
     color: var(--ink); cursor: pointer;
   }
@@ -25457,7 +25605,7 @@ function renderTripPlannerStyles() {
 
   .trip-conv-wizard-toggle {
     display: block; margin-top: 20px; background: none; border: none; padding: 0;
-    font-family: 'Nunito', sans-serif; font-size: 0.88rem; font-weight: 700; color: var(--teal-deep);
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.88rem; font-weight: 700; color: var(--teal-deep);
     cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
   }
   .trip-conv-wizard-toggle:hover { color: var(--teal); }
@@ -25476,7 +25624,7 @@ function renderTripPlannerStyles() {
   .trip-planner-step { margin-bottom: 24px; }
   .trip-planner-step:last-of-type { margin-bottom: 20px; }
   .trip-planner-step h2 {
-    font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 1rem; color: var(--ink);
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 1rem; color: var(--ink);
     display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
   }
   .trip-planner-step-num {
@@ -25488,13 +25636,13 @@ function renderTripPlannerStyles() {
 
   #tripRegionSelect {
     width: 100%; max-width: 360px; padding: 11px 14px; border-radius: 10px;
-    border: 1.5px solid rgba(42,32,25,0.25); font-family: 'Nunito', sans-serif; font-size: 0.98rem;
+    border: 1.5px solid rgba(42,32,25,0.25); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.98rem;
     background: var(--sand); color: var(--ink);
   }
   .trip-planner-days-row { display: flex; align-items: center; gap: 10px; }
   #tripDaysInput {
     width: 84px; padding: 11px 14px; border-radius: 10px; border: 1.5px solid rgba(42,32,25,0.25);
-    font-family: 'Nunito', sans-serif; font-size: 0.98rem; background: var(--sand); color: var(--ink);
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.98rem; background: var(--sand); color: var(--ink);
   }
 
   .trip-interest-chips { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -25529,7 +25677,7 @@ function renderTripPlannerStyles() {
   @keyframes tripSpin { to { transform: rotate(360deg); } }
 
   .trip-planner-result-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-  .trip-planner-result-header h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.4rem; color: var(--ink); margin: 0; }
+  .trip-planner-result-header h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.4rem; color: var(--ink); margin: 0; }
   .trip-planner-regen-btn { background: var(--teal); font-size: 0.82rem; padding: 9px 16px; }
   .trip-planner-regen-btn:hover { background: var(--teal-deep); }
   /* Regenerate loading state -- own visible indicator at the button
@@ -25557,7 +25705,7 @@ function renderTripPlannerStyles() {
 
   .trip-day { margin-bottom: 28px; }
   .trip-day h3 {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.2rem; color: var(--ink);
+    font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.2rem; color: var(--ink);
     margin: 0 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--amber);
   }
   .trip-day-slots { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); }
@@ -25568,7 +25716,7 @@ function renderTripPlannerStyles() {
     display: flex; flex-direction: column; gap: 6px;
   }
   .trip-slot-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--teal-deep); }
-  .trip-slot-card h4 { font-family: 'Fraunces', serif; font-size: 1.02rem; font-weight: 600; color: var(--ink); margin: 0; }
+  .trip-slot-card h4 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.02rem; font-weight: 600; color: var(--ink); margin: 0; }
   .trip-slot-card h4 a { color: inherit; text-decoration: none; }
   .trip-slot-card h4 a:hover { text-decoration: underline; }
   .trip-slot-meta { font-size: 0.84rem; color: var(--ink); opacity: 0.75; }
@@ -25690,12 +25838,12 @@ function renderTripPlannerV2Styles() {
     padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 8px 20px -16px rgba(74,52,40,0.35);
   }
   .trip-plan-eyebrow { margin: 0 0 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-deep); }
-  .trip-plan-summary h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.35rem; color: var(--ink); margin: 0 0 10px; }
+  .trip-plan-summary h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.35rem; color: var(--ink); margin: 0 0 10px; }
   .trip-plan-overview { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
   .trip-plan-overview li { background: var(--sand-deep); color: var(--plum); font-weight: 700; font-size: 0.76rem; padding: 4px 11px; border-radius: 999px; }
   .trip-plan-notes { margin: 12px 0 0; padding: 0; list-style: none; font-size: 0.8rem; color: var(--ink); opacity: 0.72; }
   .trip-plan-notes li + li { margin-top: 4px; }
-  .trip-plan-section-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; color: var(--ink); margin: 22px 0 12px; }
+  .trip-plan-section-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; color: var(--ink); margin: 22px 0 12px; }
   .trip-plan-days .trip-day-slots, .trip-plan-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
   .trip-slot-why { margin: 4px 0 0; padding-left: 18px; font-size: 0.8rem; color: var(--ink); opacity: 0.82; }
   .trip-slot-why li + li { margin-top: 2px; }
@@ -26629,7 +26777,7 @@ ${renderAnalyticsHeadHtml('not_found')}
   body.not-found-page .nf-search { display: flex; gap: 8px; max-width: 520px; margin: 0 auto 28px; }
   body.not-found-page .nf-search input { flex: 1; min-width: 0; min-height: 46px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line, #cfd8df); font: inherit; font-size: 1rem; background: #fff; color: var(--ink); }
   body.not-found-page .nf-search input:focus-visible { outline: 3px solid var(--teal, #2A6B67); outline-offset: 2px; }
-  body.not-found-page .nf-search button { min-height: 46px; padding: 10px 20px; border: 0; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: #fff; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; }
+  body.not-found-page .nf-search button { min-height: 46px; padding: 10px 20px; border: 0; border-radius: 999px; background: var(--ref-navy, #1B2B3A); color: #fff; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; }
   body.not-found-page .nf-block { text-align: left; margin: 0 auto 26px; }
   body.not-found-page .nf-block h2 { font-size: 1.05rem; margin: 0 0 10px; text-align: center; }
   body.not-found-page .nf-suggest { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -26637,7 +26785,7 @@ ${renderAnalyticsHeadHtml('not_found')}
   body.not-found-page .nf-suggest a:hover { text-decoration: underline; }
   body.not-found-page .nf-suggest .nf-meta { font-weight: 600; font-size: 0.86rem; opacity: .7; white-space: nowrap; }
   body.not-found-page .nf-popular { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-  body.not-found-page .nf-popular a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
+  body.not-found-page .nf-popular a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
   body.not-found-page .nf-popular a:hover { background: rgba(27,43,58,0.06); }
   @media (max-width: 520px) { body.not-found-page .nf-suggest a { flex-direction: column; gap: 2px; } body.not-found-page .nf-search button { padding: 10px 16px; } }
 </style>
@@ -27476,12 +27624,12 @@ function browseResultBarHtml(summary, state) {
 // renderFoodDrinkOpenNowStyles() (scoped to body.fd-page), unchanged.
 function renderBrowseHubStyles() {
   return `<style>
-  body.browse-page .bh-select { font-family: 'Nunito', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; max-width: 100%; }
+  body.browse-page .bh-select { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; max-width: 100%; }
   body.browse-page .bh-select:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.browse-page .bh-cuisine-price { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-  body.browse-page .bh-field-label { font-family: 'Nunito', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ref-navy, #1B2B3A); }
+  body.browse-page .bh-field-label { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ref-navy, #1B2B3A); }
   body.browse-page .bh-near-me { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
-  body.browse-page .bh-near-me-status { font-family: 'Nunito', sans-serif; font-size: 0.82rem; opacity: 0.8; }
+  body.browse-page .bh-near-me-status { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.82rem; opacity: 0.8; }
   body.browse-page .bh-near-me-status[hidden] { display: none; }
   body.browse-page .region-distance { font-weight: 600; opacity: 0.7; margin-left: 4px; }
   body.browse-page .bh-fav-toggle[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--teal, #2A6B67); }
@@ -27506,7 +27654,7 @@ function renderBrowseHubStyles() {
   body.browse-page .bh-list-venue h2 { margin: 0 0 6px; }
   body.browse-page .bh-list-venue p { margin: 0 0 12px; max-width: 64ch; }
   body.browse-page .bh-list-venue-links { display: flex; flex-wrap: wrap; gap: 10px; }
-  body.browse-page .bh-list-venue-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 18px; border-radius: 999px; font-family: 'Nunito', sans-serif; font-weight: 800; text-decoration: none; background: var(--ref-navy, #1B2B3A); color: var(--paper); }
+  body.browse-page .bh-list-venue-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 18px; border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; text-decoration: none; background: var(--ref-navy, #1B2B3A); color: var(--paper); }
   body.browse-page .bh-list-venue-links a:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 </style>`;
 }
@@ -27982,7 +28130,9 @@ function browseRestPayload(venues, now = new Date()) {
   const orderById = new Map(recommended.map((v, i) => [v.id, i]));
   const advisoryNotes = getAdvisoryNotes();
   const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
-  const html = browseBatchedCardsHtml(recommended, new Set(), 0, advisoryNotes, openInfo.byId, orderById, { restOnly: true });
+  // Trimmed (2026-10-18): the hidden "Read more" button never shows on these photo cards (see the fd-page CSS).
+  const html = browseBatchedCardsHtml(recommended, new Set(), 0, advisoryNotes, openInfo.byId, orderById, { restOnly: true })
+    .replace(/\s*<button type="button" class="desc-toggle"[^>]*\shidden>[^<]*<\/button>/g, '');
   const k = {};
   for (const v of venues) { const w = descSearchWords(v.description || ''); if (w) k[String(v.id)] = w; }
   return { html, k };
@@ -27990,6 +28140,20 @@ function browseRestPayload(venues, now = new Date()) {
 function browseRestVersion(venues, now = new Date()) {
   const sig = venues.map((v) => `${v.id}:${v.updated_at || ''}`).join(',') + `|${todayLocal(now)}`;
   return crypto.createHash('md5').update(sig).digest('hex').slice(0, 12);
+}
+// Caching (2026-10-18): /browse/cards.json was cached for 10 minutes only. The page now names it by the hash of
+// its content (?h=), and that URL is cached for a year as immutable, like /cards/rest/. The text is built once per
+// listing version and at most every BROWSE_REST_TTL_MS (so advisories still show up as before); any other ?h=
+// (an old page, another instance) gets the current text with a short cache, never an error.
+const BROWSE_REST_TTL_MS = 10 * 60 * 1000;
+let browseRestMemo = null;
+function browseRestJson(venues, now = new Date(), fresh = false) {
+  const version = browseRestVersion(venues, now);
+  const m = browseRestMemo;
+  if (!fresh && m && m.version === version && Date.now() - m.at < BROWSE_REST_TTL_MS) return m;
+  const json = JSON.stringify(browseRestPayload(venues, now));
+  const hash = crypto.createHash('md5').update(json).digest('hex').slice(0, 12);
+  return (browseRestMemo = { version, json, hash, at: Date.now() });
 }
 function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   const cuisines = browseCuisines(venues);
@@ -28042,7 +28206,7 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   if (f.sort === 'rating') listVenues = recommended.slice().sort((a, b) => ((Number(b.rating) || -1) - (Number(a.rating) || -1)));
   if (f.sort === 'name') listVenues = venues;
   const orderById = new Map(recommended.map((v, i) => [v.id, i]));
-  const cardsHtml = browseBatchedCardsHtml(listVenues, matchIds, matching.length, advisoryNotes, openInfo.byId, orderById, { restSrc: `/browse/cards.json?v=${browseRestVersion(venues, now)}` });
+  const cardsHtml = browseBatchedCardsHtml(listVenues, matchIds, matching.length, advisoryNotes, openInfo.byId, orderById, { restSrc: `/browse/cards.json?h=${browseRestJson(venues, now).hash}` });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -28124,7 +28288,7 @@ body.page-browse #directory .wizard-continue-btn { border-radius: 999px; padding
 body.page-browse #directory #clearFilters { min-height: 24px; }
 body.page-browse .results-head { align-items: center; padding-bottom: 14px; margin-bottom: 24px; border-bottom: 1px solid rgba(27,43,58,0.12); }
 body.page-browse #resultsCount { font-size: 0.84rem; font-weight: 800; color: var(--ref-navy); background: rgba(27,43,58,0.06); border-radius: 999px; padding: 6px 12px; }
-body.page-browse #sortSelect { -webkit-appearance: none; appearance: none; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.84rem !important; color: var(--ref-navy); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231B2B3A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; padding: 8px 36px 8px 14px !important; }
+body.page-browse #sortSelect { -webkit-appearance: none; appearance: none; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.84rem !important; color: var(--ref-navy); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231B2B3A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; padding: 8px 36px 8px 14px !important; }
 body.page-browse #noResults.show { max-width: 560px; margin: 8px auto 48px; padding: 28px 24px; background: var(--paper); border: 1px dashed rgba(27,43,58,0.25); border-radius: 16px; color: rgba(27,43,58,0.78); font-size: 0.98rem; }
 
 /* ---- Cards ---- */
@@ -30182,7 +30346,7 @@ ${banner ? CATEGORY_BANNER_STYLE : ''}
 <style>
   body.info-page .info-body { max-width: 72ch; padding: 0 0 48px; }
   body.info-page .info-lead { font-size: 1.12rem; line-height: 1.6; margin: 0 0 22px; }
-  body.info-page .info-body h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem; margin: 30px 0 8px; }
+  body.info-page .info-body h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.3rem; margin: 30px 0 8px; }
   body.info-page .info-body p, body.info-page .info-body li { font-size: 1rem; line-height: 1.65; }
   body.info-page .info-body ul { padding-left: 1.2em; }
   body.info-page .info-body li { margin: 0 0 6px; }
@@ -30496,12 +30660,12 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page #mtMap { height: 320px; border-radius: 16px; margin: 0 0 22px; background: #dfe9e6; z-index: 0; }
   body.my-trip-page .mt-day { margin: 0 0 26px; }
   body.my-trip-page .mt-day-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin: 0 0 10px; }
-  body.my-trip-page .mt-day-head h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem; margin: 0; }
+  body.my-trip-page .mt-day-head h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.3rem; margin: 0; }
   body.my-trip-page .mt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
   body.my-trip-page .mt-stop { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px; border-radius: 14px; background: var(--paper, #fffaf2); box-shadow: 0 8px 20px -16px rgba(74,52,40,0.45); }
   body.my-trip-page .mt-photo { width: 120px; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; background: #2A6B67; }
   body.my-trip-page .mt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  body.my-trip-page .mt-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.05rem; color: var(--ink); text-decoration: none; }
+  body.my-trip-page .mt-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.05rem; color: var(--ink); text-decoration: none; }
   body.my-trip-page .mt-name:hover { text-decoration: underline; }
   body.my-trip-page .mt-meta { margin: 2px 0 0; font-size: 0.86rem; opacity: 0.75; }
   body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
@@ -30821,7 +30985,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
 </head>
 <style id="listing-forms-extra">
   body.list-venue-page .lyv-panel, body.list-event-page .lyv-panel { max-width: 908px; margin: 0 auto 22px; padding: 18px 22px; border-radius: 16px; background: var(--paper, #fffaf2); box-shadow: 0 10px 24px -20px rgba(74,52,40,0.5); }
-  body.list-venue-page .lyv-panel h2, body.list-event-page .lyv-panel h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 6px; }
+  body.list-venue-page .lyv-panel h2, body.list-event-page .lyv-panel h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 6px; }
   body.list-venue-page .lyv-includes ul { margin: 6px 0 0; padding-left: 1.2em; }
   body.list-venue-page .lyv-includes li { margin: 0 0 4px; line-height: 1.5; }
   body.list-venue-page .lyv-lookup-input { width: 100%; font: inherit; font-size: 1rem; padding: 12px 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; margin-top: 8px; }
@@ -33022,14 +33186,14 @@ function venueGalleryHtml(venue, photos, L) {
       </dialog>
       <style>
         .venue-hero-photo { position: relative; }
-        .vg-all { position: absolute; right: 12px; bottom: 12px; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(27,43,58,0.85); color: #fff; font: 700 0.85rem/1.2 'Nunito', sans-serif; cursor: pointer; }
+        .vg-all { position: absolute; right: 12px; bottom: 12px; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(27,43,58,0.85); color: #fff; font: 700 0.85rem/1.2 'Nunito', 'Nunito Fallback', sans-serif; cursor: pointer; }
         .vg-all:hover, .vg-all:focus-visible { background: rgba(27,43,58,1); }
         .vg-strip { display: flex; gap: 6px; margin: 6px 0 0; }
         .vg-thumb { position: relative; flex: 1 1 0; min-width: 0; max-width: 96px; height: 64px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: #EAE6D9; }
         .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
         .vg-mosaic + .venue-photo-credit { margin-top: 6px !important; margin-bottom: 14px !important; }
-        .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1rem 'Nunito', sans-serif; }
+        .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1rem 'Nunito', 'Nunito Fallback', sans-serif; }
         /* Wide screens: main photo on the left, the other photos as a 2x2
            grid on the right at the same height, so the venue name below is
            on the first screen. */
@@ -33045,7 +33209,7 @@ function venueGalleryHtml(venue, photos, L) {
         }
         .vg-dialog { width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #101B24; color: #fff; }
         .vg-dialog::backdrop { background: rgba(0,0,0,0.85); }
-        .vg-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; z-index: 2; font: 700 0.95rem 'Nunito', sans-serif; }
+        .vg-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; z-index: 2; font: 700 0.95rem 'Nunito', 'Nunito Fallback', sans-serif; }
         .vg-close { border: 0; background: none; color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; padding: 4px 8px; }
         .vg-track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
         .vg-track::-webkit-scrollbar { display: none; }
@@ -41709,10 +41873,11 @@ const server = http.createServer(async (req, res) => {
         // Homepage hero (2026-10-06): the panoramic sunset photo, with its own
         // crop, height and type. Everything is scoped to .hero-scenic-home, a
         // class only this route adds, so /browse/classic (which shares the hero
-        // CSS and keeps hero.webp) is unchanged.
+        // CSS and keeps hero.webp) is unchanged. Homepage weight (2026-10-18): phones up to 470px wide get a single
+        // 800px copy (121 KB) -- a 3x phone picked the 1159px one (303 KB) and its LCP waited for it.
         html = html
           .replace('<section class="hero-scenic" id="heroScenic">', '<section class="hero-scenic hero-scenic-home" id="heroScenic">')
-          .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
+          .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 470px)" srcset="/images/okanagan-valley-sunset-hero-mobile-w800.jpg" width="800" height="937"><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
           .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`)
           // The near-me map, one tap from the home page (2026-10-14).
           // The hero search box is a search field (2026-10-18): a Search key on phones, and no spell-check, autocorrect
@@ -41737,6 +41902,8 @@ const server = http.createServer(async (req, res) => {
         // Accessibility (2026-10-18): the homepage's sections, hero to Build My Trip, sit in one <main id="main"> (the skip
         // link's target), so the page has a main landmark like every other page. English and French (the /fr twin).
         html = wrapHomeMain(html);
+        // Homepage weight (2026-10-18): smaller card photos, and the sideways rows' off-screen cards wait (see withHomeCardPhotos).
+        html = withHomeCardPhotos(html);
 
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n</body>`)
@@ -41812,8 +41979,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/browse/cards.json' && method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=600' });
-      return res.end(JSON.stringify(browseRestPayload(getBrowseHubVenues())));
+      // See browseRestJson: the page's own ?h= is immutable; anything else is the current text, briefly cached.
+      const venues = getBrowseHubVenues();
+      let rest = browseRestJson(venues);
+      if (rest.hash !== query.h) rest = browseRestJson(venues, new Date(), true);
+      const same = typeof query.h === 'string' && rest.hash === query.h;
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'public, max-age=600' });
+      return res.end(rest.json);
     }
     // /browse (2026-10-05) is the hub-style all-venue directory
     // (renderBrowseHubPage). The previous wizard page -- okanagan.html with the
@@ -42363,7 +42535,10 @@ const server = http.createServer(async (req, res) => {
         || requestedPath.startsWith(imagesRoot + path.sep);
       if (contentType && isWithinImagesRoot && fs.existsSync(requestedPath) && fs.statSync(requestedPath).isFile()) {
         const body = fs.readFileSync(requestedPath);
-        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400' });
+        // Caching (2026-10-18): a versioned URL (?v=, changed whenever the file changes) is kept for a year; a
+        // plain one stays at a day, since the same name may get a new photo.
+        const versioned = typeof query.v === 'string' && /^[\w.-]{1,64}$/.test(query.v);
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': versioned ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' });
         return res.end(body);
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -44926,6 +45101,10 @@ module.exports = {
   MENU_APP_STRINGS,
   // Lazy card photos (2026-10-18)
   withLazyCardPhotos,
+  withHomeCardPhotos,
+  withFilterBarReady,
+  withFontFallbacks,
+  HOME_CARD_SIZE_FILES,
   LAZY_CARD_EAGER,
   // Lighter pages (2026-10-18)
   capItemListSchema,

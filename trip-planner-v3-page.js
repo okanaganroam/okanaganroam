@@ -342,7 +342,7 @@ function renderStyles() {
   return `<style>
   /* Build My Trip V3 -- scoped to .t3; homepage reference tokens only. */
   body.page-trip-v3 { background: var(--ref-cream, #F5F3ED); }
-  .t3 { color: var(--ref-navy); font-family: 'Nunito', sans-serif; }
+  .t3 { color: var(--ref-navy); font-family: 'Nunito', 'Nunito Fallback', sans-serif; }
   .t3 .t3-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .t3 .t3-eyebrow { margin: 0 0 6px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ref-gold); }
   .t3 .t3-wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
@@ -357,10 +357,10 @@ function renderStyles() {
   .t3-hero-inner { position: relative; z-index: 1; padding-top: 34px; padding-bottom: 44px; }
   .t3-crumb { font-size: 0.8rem; color: rgba(255,255,255,0.75); margin-bottom: 26px; }
   .t3-crumb a { color: #fff; text-decoration: none; } .t3-crumb a:hover { text-decoration: underline; }
-  .t3-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(1.9rem, 4.2vw, 3rem); line-height: 1.08; letter-spacing: 0.01em; margin: 0 0 12px; color: #fff; max-width: 18ch; }
+  .t3-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: clamp(1.9rem, 4.2vw, 3rem); line-height: 1.08; letter-spacing: 0.01em; margin: 0 0 12px; color: #fff; max-width: 18ch; }
   .t3-lead { font-size: 1.02rem; line-height: 1.55; color: rgba(255,255,255,0.88); max-width: 60ch; margin: 0 0 24px; }
   .t3-composer { background: #fff; border-radius: 18px; padding: 16px 16px 12px 20px; box-shadow: 0 18px 40px -22px rgba(0,0,0,0.6); max-width: 820px; }
-  .t3-composer textarea { width: 100%; border: 0; resize: vertical; min-height: 78px; font: 500 1.05rem/1.5 'Nunito', sans-serif; color: var(--ref-navy); background: transparent; padding: 4px 0; }
+  .t3-composer textarea { width: 100%; border: 0; resize: vertical; min-height: 78px; font: 500 1.05rem/1.5 'Nunito', 'Nunito Fallback', sans-serif; color: var(--ref-navy); background: transparent; padding: 4px 0; }
   .t3-composer textarea::placeholder { color: rgba(27,43,58,0.5); }
   .t3-composer textarea:focus { outline: none; }
   .t3-composer:focus-within { box-shadow: 0 0 0 3px var(--ref-gold), 0 18px 40px -22px rgba(0,0,0,0.6); }
@@ -395,10 +395,10 @@ function renderStyles() {
 
   /* How it works (before the first plan). */
   .t3-how { padding: 34px 0 56px; }
-  .t3-how h2 { font-family: 'Fraunces', serif; font-size: clamp(1.25rem, 2vw, 1.5rem); color: var(--ref-navy); margin: 0 0 16px; }
+  .t3-how h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: clamp(1.25rem, 2vw, 1.5rem); color: var(--ref-navy); margin: 0 0 16px; }
   .t3-how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 0; padding: 0; list-style: none; }
   .t3-how-grid li { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 10px 22px -18px rgba(27,43,58,0.45); font-size: 0.92rem; line-height: 1.5; }
-  .t3-how-grid strong { display: block; font-family: 'Fraunces', serif; font-size: 1.02rem; margin-bottom: 4px; }
+  .t3-how-grid strong { display: block; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.02rem; margin-bottom: 4px; }
   .t3-how-num { display: inline-flex; width: 26px; height: 26px; border-radius: 999px; background: var(--ref-navy); color: #fff; font-weight: 800; font-size: 0.8rem; align-items: center; justify-content: center; margin-bottom: 8px; }
 
   /* Result */
@@ -417,7 +417,7 @@ function renderStyles() {
   .t3-plan-head { background: var(--ref-navy); color: #fff; border-radius: 18px; padding: 24px 26px 20px; margin-bottom: 18px; position: relative; z-index: 0; overflow: hidden; }
   .t3-plan-head .t3-eyebrow { color: var(--ref-gold); }
   .t3-request { margin: 0 0 6px; font-size: 0.86rem; color: rgba(255,255,255,0.7); overflow-wrap: anywhere; }
-  .t3-headline { font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(1.45rem, 3vw, 2.1rem); line-height: 1.15; margin: 0 0 10px; color: #fff; }
+  .t3-headline { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: clamp(1.45rem, 3vw, 2.1rem); line-height: 1.15; margin: 0 0 10px; color: #fff; }
   .t3-headline:focus { outline: none; } .t3-headline:focus-visible { outline: 2px solid rgba(201,162,39,0.8); outline-offset: 6px; border-radius: 4px; }
   .t3-expect { margin: 0 0 16px; font-size: 1rem; line-height: 1.6; color: rgba(255,255,255,0.9); max-width: 70ch; }
   .t3-plan-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -499,7 +499,7 @@ function renderStyles() {
   .t3-day .t3-day-head--map.t3-dh-nomap { grid-template-columns: minmax(0, 1fr); grid-template-areas: "info" "actions"; }
   .t3-dh-nomap .t3-dh-map { display: none; }
   .t3-day-headin { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; width: 100%; padding: 18px 20px; }
-  .t3-day-title { font-family: 'Fraunces', serif; font-size: clamp(1.3rem, 2.4vw, 1.7rem); margin: 0; color: #fff; }
+  .t3-day-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: clamp(1.3rem, 2.4vw, 1.7rem); margin: 0; color: #fff; }
   .t3-day-theme { margin: 4px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-gold); }
   .t3-day-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .t3-day-actions .t3-btn { background: rgba(255,255,255,0.95); color: var(--ref-navy-deep); padding: 8px 14px; min-height: 40px; font-size: 0.82rem; }
@@ -515,7 +515,7 @@ function renderStyles() {
   .t3-card { background: #fff; border-radius: 14px; padding: 16px 18px 14px; box-shadow: 0 12px 26px -20px rgba(27,43,58,0.5); border: 1px solid rgba(27,43,58,0.06); }
   .t3-card.is-kept { border-color: var(--ref-gold); box-shadow: 0 0 0 1px var(--ref-gold), 0 12px 26px -20px rgba(27,43,58,0.5); }
   .t3-card-top { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(27,43,58,0.6); }
-  .t3-card h4 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.22rem; margin: 4px 0 4px; line-height: 1.25; }
+  .t3-card h4 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.22rem; margin: 4px 0 4px; line-height: 1.25; }
   .t3-card h4 a { color: var(--ref-navy); text-decoration: none; } .t3-card h4 a:hover { text-decoration: underline; }
   .t3-event-place { margin: 0 0 8px; color: rgba(27,43,58,0.78); font-size: 0.92rem; font-weight: 700; }
   .t3-address { margin: 0 0 6px; font-size: 0.84rem; color: rgba(27,43,58,0.72); }
@@ -529,7 +529,7 @@ function renderStyles() {
   .t3-tools .t3-map { background: none; box-shadow: none; padding: 0; min-height: 0; }
   .t3-tools .t3-sched { background: none; border: none; box-shadow: none; min-height: 0; }
   .t3-tools .t3-sched > summary { background: #fff; border: 1px solid rgba(27,43,58,0.2); border-radius: 999px; min-height: 44px; padding: 6px 16px; justify-content: center; }
-  .t3-tools .t3-sched > summary h3 { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); }
+  .t3-tools .t3-sched > summary h3 { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); }
   .t3-tools .t3-sched[open] { background: #fff; border: 1px solid rgba(27,43,58,0.08); border-radius: 14px; }
   .t3-tools .t3-sched[open] > summary { border: none; justify-content: flex-start; }
   /* Both tools stretch to the same height, so they match even when a label wraps (French). */
@@ -575,7 +575,7 @@ function renderStyles() {
   .t3-removed { background: transparent; border: 1px dashed rgba(27,43,58,0.3); border-radius: 14px; padding: 14px 18px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   .t3-empty { background: #fff; border-radius: 14px; padding: 16px 18px; font-size: 0.92rem; }
   .t3-free p { margin: 6px 0 0; } .t3-free a { color: var(--ref-navy); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
-  .t3-section-title { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 22px 0 12px; color: var(--ref-navy); }
+  .t3-section-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.25rem; margin: 22px 0 12px; color: var(--ref-navy); }
   .t3-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   /* Cards in a grid row line up: badges, details and buttons start at the same
      height whatever the title length or badge count. Without subgrid support
@@ -619,10 +619,10 @@ function renderStyles() {
   .t3-map-status { margin: 8px 0 0; font-size: 0.84rem; font-weight: 700; color: var(--ref-navy); }
   .t3-map-status:empty { display: none; }
   .t3-pin { background: transparent; border: 0; }
-  .t3-pin span { display: flex; box-sizing: border-box; width: 28px; height: 28px; border-radius: 999px; align-items: center; justify-content: center; color: #fff; font: 800 0.8rem/1 'Nunito', sans-serif; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
-  .t3-map-pop { font-family: 'Nunito', sans-serif; color: var(--ref-navy); }
+  .t3-pin span { display: flex; box-sizing: border-box; width: 28px; height: 28px; border-radius: 999px; align-items: center; justify-content: center; color: #fff; font: 800 0.8rem/1 'Nunito', 'Nunito Fallback', sans-serif; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+  .t3-map-pop { font-family: 'Nunito', 'Nunito Fallback', sans-serif; color: var(--ref-navy); }
   .t3-map-pop-when { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(27,43,58,0.62); }
-  .t3-map-pop strong { display: block; font-family: 'Fraunces', serif; font-size: 1rem; margin: 2px 0 8px; }
+  .t3-map-pop strong { display: block; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1rem; margin: 2px 0 8px; }
 
   @media (max-width: 900px) {
     .t3-how-grid { grid-template-columns: 1fr; }

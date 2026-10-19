@@ -10201,7 +10201,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
-  assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25)');
+  assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25; font fallback faces in every stack, speed/CLS PR approved 2026-10-18)');
   // Approved accessibility change (2026-10-18): one added token, --ref-gold-ink, a deeper gold for gold text on the
   // cream background (the logo's "Roam"); every existing token keeps its value.
   assert.equal(md5('public/styles/tokens.css'), 'c155b965403a835bfdeba76f9fb58e8f', 'public/styles/tokens.css (+ --ref-gold-ink 2026-10-18)');
@@ -12121,7 +12121,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
   assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
-  assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
+  assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
   // Listed since the 2026-10-17 SEO audit (with its French twin).
@@ -15796,7 +15796,7 @@ test('homepage hero uses the 3:1 sunset panorama with its own crop and type, sco
   assert.ok(!home.includes('src="/images/hero.webp"'), 'the old hero image is gone from the homepage');
   // Phones get their own near-square crop of the same scene; everything wider keeps the panorama.
   const MOBILE = '/images/okanagan-valley-sunset-hero-mobile.webp';
-  assert.ok(home.includes(`<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, ${MOBILE} 1159w" sizes="100vw" width="1159" height="1358"><img class="hero-media-img" src="${NEW}"`), 'the mobile image is a <source> for 640px and below only, with an 800px copy for phones (2026-10-13)');
+  assert.ok(home.includes(`<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, ${MOBILE} 1159w" sizes="100vw" width="1159" height="1358"><img class="hero-media-img" src="${NEW}"`.replace('<picture>', '<picture><source media="(max-width: 470px)" srcset="/images/okanagan-valley-sunset-hero-mobile-w800.jpg" width="800" height="937">')), 'the mobile image is a <source> for 640px and below only, with an 800px copy for phones (2026-10-13)');
   assert.equal(home.split(MOBILE).length - 1, 1);
   assert.equal(home.split('id="home-hero"').length - 1, 1, 'one scoped hero style');
   const css = home.slice(home.indexOf('id="home-hero"'), home.indexOf('</style>', home.indexOf('id="home-hero"')));
@@ -16371,7 +16371,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
   assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
-  assert.equal(md5('public/styles/app.css'), '7eaf0cbf89832411941c8dadb6891b16');
+  assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
 
 // ---- /browse/classic Open Now status from the canonical hours engine (2026-10) -----------
@@ -20027,7 +20027,7 @@ test('Sections on the shared engine (2026-10-14): Outdoors, Beaches, Tours, Ski 
 
 test('Browse (2026-10-14): only the first page of cards ships with /browse; the rest and the search words come from /browse/cards.json', () => withDiscoveryServer(async (base) => {
   const html = await (await fetch(`${base}/browse`)).text();
-  const m = html.match(/<template id="bhRest" data-src="(\/browse\/cards\.json\?v=[0-9a-f]{12})"><\/template>/);
+  const m = html.match(/<template id="bhRest" data-src="(\/browse\/cards\.json\?h=[0-9a-f]{12})"><\/template>/);
   assert.ok(m, 'the template points at the rest of the cards');
   assert.doesNotMatch(html.match(/<script type="application\/json" id="bhVenueData">([\s\S]*?)<\/script>/)[1], /"k":/, 'search words are not in the page');
   const grid = (html.match(/<ul class="card-grid" id="bhResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
@@ -27215,3 +27215,64 @@ test('Seasons everywhere: /map lists an untimed one-day event as "On now" only f
   assert.equal(eventGroup({ ...fair, sd: '2026-10-19', ed: '2026-10-19' }, today, at(2)), 'tomorrow');
   assert.equal(eventGroup({ ...fair, st: '19:00', et: '21:00' }, today, at(2)), 'later', 'a timed one keeps its time');
 });
+
+// ---- Speed and layout shift (2026-10-18) ----
+test('Speed/CLS (2026-10-18): filter bar final from the first paint, font fallbacks, homepage card srcset and lazy rows', () => withDiscoveryServer(async (base) => {
+  // The filter bar comes with its "js" class (reserved, final shape), a no-JS fallback and an early click handler.
+  for (const p of ['/food-drink', '/restaurants', '/browse']) {
+    const html = await (await fetch(base + p)).text();
+    assert.match(html, /<div class="fd-controls js">/, `${p}: the bar is in its final shape in the HTML`);
+    assert.doesNotMatch(html, /<div class="fd-controls">/, `${p}: no pre-script bar left`);
+    assert.match(html, /<noscript><style id="filter-bar-nojs">[^<]*\.fd-controls\.js \.fd-pop-panel[^<]*display:block!important/, `${p}: no-JS visitors keep the inline panels`);
+    assert.match(html, /<style id="font-fallbacks">@font-face\{font-family:'Nunito Fallback';src:local\('Arial'\)/, `${p}: metric-matched fallback faces`);
+    assert.ok(html.indexOf('id="font-fallbacks"') < html.indexOf('<link href="https://fonts.googleapis.com/css2?'), `${p}: before the web fonts`);
+  }
+  // A page whose script never adds the class is left alone.
+  assert.equal(app.withFilterBarReady('<head></head><div class="fd-controls"></div>'), '<head></head><div class="fd-controls"></div>');
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'styles', 'app.css'), 'utf8'), /font-family:'Nunito', 'Nunito Fallback', sans-serif/);
+  // Homepage: 320/480 copies with sizes; the sideways rows' off-screen cards wait for the script.
+  const home = await (await fetch(base + '/')).text();
+  const imgs = [...home.matchAll(/<img class="(mood-card-img|hidden-gem-card-img|region-card-img)"[^>]*>/g)].map((m) => m[0]).filter((t) => / loading="lazy"/.test(t)); // not the <noscript> copies
+  assert.ok(imgs.length >= 12);
+  for (const tag of imgs) {
+    const set = (tag.match(/ (?:data-)?srcset="([^"]+)"/) || [])[1];
+    assert.ok(set, `srcset on ${tag}`);
+    const [w320, w480] = set.split(', ').map((x) => x.split(' ')[0]);
+    assert.match(set, /-w320\.jpg 320w, \/images\/[^ ]+-w480\.jpg 480w, \/images\/[^ ]+ (640|800)w$/);
+    for (const f of [w320, w480]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', f)), `${f} exists`);
+    assert.match(tag, / sizes="\(max-width: 640px\) [^"]+"/);
+  }
+  const lazy = imgs.filter((t) => / data-home-lz/.test(t));
+  assert.equal(lazy.length, 3 + 4, 'mood cards 4-6 and town cards 3-6 wait');
+  assert.ok(lazy.every((t) => !/ src="/.test(t) && / data-src="/.test(t)), 'no src until on screen');
+  assert.equal((home.match(/<noscript><img class="(mood|region)-card-img" src="/g) || []).length, lazy.length, 'a no-JS copy of each');
+  assert.match(home, /new IntersectionObserver/);
+  assert.match(home, /<source media="\(max-width: 470px\)" srcset="\/images\/okanagan-valley-sunset-hero-mobile-w800\.jpg" width="800" height="937">/);
+  const heroSize = fs.statSync(path.join(__dirname, '..', 'public', 'images', 'okanagan-valley-sunset-hero-mobile-w800.jpg')).size;
+  assert.ok(heroSize <= 150 * 1024, `the phone hero is ${heroSize} bytes`);
+}));
+
+test('Caching (2026-10-18): versioned images are immutable, /browse/cards.json has a content-hash URL, a /cards/rest/ JSON miss on a non-200 page is {}', () => withDiscoveryServer(async (base) => {
+  const img = '/images/mood/indoor.jpg';
+  assert.equal((await fetch(`${base}${img}?v=abc123`)).headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.equal((await fetch(`${base}${img}`)).headers.get('cache-control'), 'public, max-age=86400', 'unversioned stays a day');
+  const html = await (await fetch(`${base}/browse`)).text();
+  const src = (html.match(/data-src="(\/browse\/cards\.json\?h=[0-9a-f]{12})"/) || [])[1];
+  assert.ok(src);
+  const r = await fetch(base + src);
+  assert.equal(r.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  const text = await r.text();
+  assert.equal(src.slice(-12), require('crypto').createHash('md5').update(text).digest('hex').slice(0, 12), 'the hash is of the content');
+  assert.doesNotMatch(text, /class=\\"desc-toggle\\"/, 'the never-shown Read more button is trimmed');
+  const stale = await fetch(`${base}/browse/cards.json?h=000000000000`);
+  assert.equal(stale.status, 200);
+  assert.equal(stale.headers.get('cache-control'), 'public, max-age=600', 'an unknown hash gets the current text, briefly cached');
+  assert.equal(await stale.text(), text);
+  assert.equal((await fetch(`${base}/browse/cards.json?v=abc`)).headers.get('cache-control'), 'public, max-age=600', 'old pages still work');
+  for (const u of ['/no-such-page-at-all', '/kelowna/']) {
+    const miss = await fetch(`${base}/cards/rest/abcdef123456.json?u=${encodeURIComponent(u)}`, { redirect: 'manual' });
+    assert.equal(miss.status, 200, u);
+    assert.equal(miss.headers.get('cache-control'), 'no-store', u);
+    assert.equal(await miss.text(), '{}', u);
+  }
+}));
