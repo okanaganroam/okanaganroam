@@ -352,7 +352,7 @@ function renderStyles() {
   .t3-composer textarea:focus { outline: none; }
   .t3-composer:focus-within { box-shadow: 0 0 0 3px var(--ref-gold), 0 18px 40px -22px rgba(0,0,0,0.6); }
   .t3-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid rgba(27,43,58,0.1); padding-top: 10px; margin-top: 6px; }
-  .t3-hint { font-size: 0.78rem; color: rgba(27,43,58,0.62); }
+  .t3-hint { font-size: 0.78rem; color: rgba(27,43,58,0.72); } /* 0.72 (2026-10-18): 0.62 was 4.25:1 on white. */
   .t3-submit, .t3-btn { background: var(--ref-navy); color: #fff; border: 0; border-radius: 999px; padding: 11px 22px; min-height: 44px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
   .t3-submit:hover, .t3-btn:hover { background: var(--ref-navy-deep); }
   .t3-submit[disabled], .t3-btn[disabled], .t3-btn[aria-disabled="true"] { opacity: 0.55; cursor: default; }
@@ -375,6 +375,10 @@ function renderStyles() {
   .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples { display: none; }
   .t3.is-compact .t3-crumb { margin-bottom: 10px; }
   .t3.is-compact .t3-status:empty { display: none; }
+  /* What we understood (the editable chips) belongs to the request, so it folds away with it until "Edit request"
+     (2026-10-18): the plan then starts right under the bar instead of about 400px further down. */
+  .t3.is-compact .t3-understood { display: none; }
+  .t3.is-compact .t3-result { padding-top: 14px; }
 
   /* How it works (before the first plan). */
   .t3-how { padding: 34px 0 56px; }
@@ -395,7 +399,9 @@ function renderStyles() {
   .t3-chip-label { font-weight: 600; opacity: 0.7; }
   .t3-notused { margin: 10px 0 0; font-size: 0.84rem; color: #7A4A2A; }
 
-  .t3-plan-head { background: var(--ref-navy); color: #fff; border-radius: 18px; padding: 24px 26px 20px; margin-bottom: 18px; position: relative; overflow: hidden; }
+  /* z-index 0 (2026-10-18): app.css's header rule (sticky, z-index 60) also matches this <header>, so on phones the
+     plan card was drawn over the sticky site header. */
+  .t3-plan-head { background: var(--ref-navy); color: #fff; border-radius: 18px; padding: 24px 26px 20px; margin-bottom: 18px; position: relative; z-index: 0; overflow: hidden; }
   .t3-plan-head .t3-eyebrow { color: var(--ref-gold); }
   .t3-request { margin: 0 0 6px; font-size: 0.86rem; color: rgba(255,255,255,0.7); overflow-wrap: anywhere; }
   .t3-headline { font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(1.45rem, 3vw, 2.1rem); line-height: 1.15; margin: 0 0 10px; color: #fff; }
@@ -416,7 +422,8 @@ function renderStyles() {
   .t3-event-choices { display: flex; flex-wrap: wrap; gap: 8px; }
   .t3-warnings ul { margin: 0; padding-left: 18px; }
 
-  .t3-daynav { position: sticky; top: 0; z-index: 20; display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; margin: 0 0 8px; background: var(--ref-cream); scrollbar-width: none; }
+  /* Sticks just under the sticky site header (2026-10-18; at top: 0 it slid under it). --t3-head-h is set below. */
+  .t3-daynav { position: sticky; top: var(--t3-head-h, 0px); z-index: 20; display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; margin: 0 0 8px; background: var(--ref-cream); scrollbar-width: none; }
   .t3-daynav::-webkit-scrollbar { display: none; }
   .t3-daynav a { flex: 0 0 auto; text-decoration: none; background: #fff; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.14); border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: 0.84rem; min-height: 40px; display: inline-flex; align-items: center; }
   .t3-daynav a:hover { border-color: var(--ref-navy); }
@@ -1548,9 +1555,16 @@ function renderScript(d) {
     refreshAddAll();
     if (focus) {
       // On a phone the plan itself comes into view (what we understood stays just above it).
+      var compact = !!(mainEl && mainEl.classList.contains('is-compact'));
       var scrollTarget = (window.matchMedia && window.matchMedia('(max-width: 640px)').matches && resultEl.querySelector('.t3-plan')) || resultEl;
+      // A plan link on a phone (2026-10-18): the "Edit request" bar stays on screen just above the plan, and nothing
+      // lands under the sticky site header.
+      if (compact && editBar && !editBar.hidden) scrollTarget = editBar;
+      var siteHead = document.querySelector('header#top');
+      var headH = siteHead && getComputedStyle(siteHead).position === 'sticky' ? siteHead.getBoundingClientRect().height : 0;
+      var top = scrollTarget.getBoundingClientRect().top + (window.pageYOffset || 0) - headH - 8;
       // A compact (plan link) page jumps straight there; a smooth scroll can be cut short while photos load.
-      scrollTarget.scrollIntoView({ behavior: mainEl && mainEl.classList.contains('is-compact') ? 'auto' : 'smooth', block: 'start' });
+      try { window.scrollTo({ top: Math.max(0, top), behavior: compact ? 'auto' : 'smooth' }); } catch (e) { window.scrollTo(0, Math.max(0, top)); }
       var t = document.getElementById('t3Headline');
       if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
     }
@@ -1920,6 +1934,14 @@ function renderScript(d) {
   // Phones (2026-10-18): a plan link shows the plan first; the request becomes an "Edit request" bar.
   var EDIT_TEXT = { en: { label: 'Your request', edit: 'Edit request' }, fr: { label: 'Votre demande', edit: 'Modifier la demande' } };
   var mainEl = document.getElementById('tripV3'), editBar = document.getElementById('t3EditBar');
+  // The day bar's sticky offset: the site header's height (it is sticky too), kept up to date on resize.
+  function syncHeadH(){
+    var h = document.querySelector('header#top');
+    var px = h && getComputedStyle(h).position === 'sticky' ? Math.round(h.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty('--t3-head-h', px + 'px');
+  }
+  syncHeadH();
+  window.addEventListener('resize', syncHeadH);
   function editText(k){ return (EDIT_TEXT[lang()] || EDIT_TEXT.en)[k]; }
   function setCompact(on){
     if (!mainEl || !editBar) return;

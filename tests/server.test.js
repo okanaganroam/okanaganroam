@@ -10584,7 +10584,7 @@ test('Phase 3: the planner flag is off by default and /trip is unchanged without
   const page = await (await fetch(`${base}/trip`)).text();
   // French twins (2026-10-14): only the EN / FR switch and hreflang are added on the way out
   // (and the shared CSS is linked, 2026-10-18).
-  assert.equal(page, app.withSharedStylesheets(app.tidySeoHead(app.englishTwinHtml(legacy, '/trip'))), 'GET /trip serves the unchanged page');
+  assert.equal(page, app.withMainSkipTarget(app.withSharedStylesheets(app.tidySeoHead(app.englishTwinHtml(legacy, '/trip')))), 'GET /trip serves the unchanged page');
   const api = await fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Plan 3 days in Kelowna' }) });
   assert.equal(api.status, 404, 'the route does not exist when the flag is off');
 })));
@@ -24512,15 +24512,15 @@ test('Accessibility: home and /fr home have one main#main, skip link and labelle
   try {
     for (const [p, skip, menu] of [['/', 'Skip to content', 'Main menu'], ['/fr', 'Aller au contenu', 'Menu principal']]) {
       const html = await (await fetch(base + p)).text();
-      assert.equal((html.match(/<main id="main">/g) || []).length, 1, `${p}: one main#main`);
+      assert.equal((html.match(/<main id="main" tabindex="-1">/g) || []).length, 1, `${p}: one main#main`);
       assert.equal((html.match(/<\/main>/g) || []).length, 1, `${p}: one </main>`);
-      const main = html.slice(html.indexOf('<main id="main">'), html.indexOf('</main>'));
+      const main = html.slice(html.indexOf('<main id="main" tabindex="-1">'), html.indexOf('</main>'));
       assert.ok(main.includes('id="heroScenic"'), `${p}: hero inside main`);
       assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${p}: footer after main`);
       assert.match(html, new RegExp(`<a class="skip-link" href="#main"[^>]*>${skip}</a>`), `${p}: skip link`);
       assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${menu}"`), `${p}: menu label`);
       assert.doesNotMatch(html, /<h4 data-i18n="(?:homeFooter|footer)\./, `${p}: footer headings are not h4`);
-      assert.match(html, /<h2 data-i18n="trip\.yourTrip">/, `${p}: the My Trip tray title is an h2`);
+      assert.match(html, /<h2 id="tripTrayTitle" data-i18n="trip\.yourTrip">/, `${p}: the My Trip tray title is an h2`);
       assert.doesNotMatch(html, /<h4 data-i18n="trip\.yourTrip">/);
     }
     const trip = await (await fetch(base + '/trip')).text();
@@ -24560,6 +24560,7 @@ test('Accessibility: Escape closes the open dropdown, then the My Trip tray, the
         contains: (c) => classes.has(c),
         add: (c) => { classes.add(c); observers.forEach((o) => o.target === node && o.cb()); },
         remove: (c) => { classes.delete(c); observers.forEach((o) => o.target === node && o.cb()); },
+        toggle: (c, on) => { if (on === undefined ? !classes.has(c) : on) classes.add(c); else classes.delete(c); return classes.has(c); },
       },
       getClientRects: () => [1],
       setAttribute: (k, v) => { attrs[k] = String(v); },
@@ -24576,9 +24577,9 @@ test('Accessibility: Escape closes the open dropdown, then the My Trip tray, the
   const burger = el('navHamburger'), links = el('navLinks'), panel = el('tripTrayPanel');
   const dd = el('dd'), trigger = el('trigger'), mytrip = el('mytrip'), close = el('close');
   dd.kids.push(trigger); panel.kids.push(close); links.kids.push(el('firstLink'));
-  doc.body = el('body');
+  doc.body = el('body'); doc.body.children = []; doc.documentElement = { lang: 'en' }; doc.querySelectorAll = () => [];
   doc.getElementById = (id) => ({ navHamburger: burger, navLinks: links, tripTrayPanel: panel }[id] || null);
-  doc.querySelector = (sel) => (sel === '.nav-dropdown.open' ? (dd.classList.contains('open') ? dd : null) : sel === '.nav-mytrip-btn' ? mytrip : null);
+  doc.querySelector = (sel) => (sel === '.nav-dropdown.open' ? (dd.classList.contains('open') ? dd : null) : sel === '.nav-mytrip-btn' ? mytrip : /app\.js/.test(sel) ? {} : null);
   doc.addEventListener = (type, fn) => { (doc.listeners[type] = doc.listeners[type] || []).push(fn); };
   const ctx = { document: doc, setTimeout: (fn) => fn(), MutationObserver: function (cb) { this.observe = (target) => observers.push({ target, cb }); } };
   ctx.window = ctx;
@@ -24601,6 +24602,150 @@ test('Accessibility: Escape closes the open dropdown, then the My Trip tray, the
   assert.equal(burger.getAttribute('aria-expanded'), 'false');
   assert.equal(doc.activeElement, burger, 'focus back on the menu button');
   assert.equal(esc(), false, 'nothing open: Escape is left alone');
+});
+// ---- Accessibility pass 3 (2026-10-18): skip-link targets, phone menu, tray, filter panels ----
+test('Accessibility pass 3: withMainSkipTarget gives main tabindex=-1 and points the skip link at the real main id', () => {
+  const head = '<header id="top">\n  <a class="skip-link" href="#main">Skip to content</a></header>';
+  assert.equal(app.withMainSkipTarget(`${head}<main class="t3" id="tripV3">x</main>`), '<header id="top">\n  <a class="skip-link" href="#tripV3">Skip to content</a></header><main class="t3" id="tripV3" tabindex="-1">x</main>');
+  assert.equal(app.withMainSkipTarget(`${head}<main class="a" id="main">x</main>`), `${head}<main class="a" id="main" tabindex="-1">x</main>`);
+  assert.equal(app.withMainSkipTarget(`${head}<main>x</main>`), `${head}<main tabindex="-1" id="main">x</main>`, 'a main without an id becomes #main');
+  const done = `${head}<main id="main" tabindex="-1">x</main>`;
+  assert.equal(app.withMainSkipTarget(done), done, 'already done: unchanged');
+  assert.equal(app.withMainSkipTarget('<p>no main</p>'), '<p>no main</p>');
+});
+
+test('Accessibility pass 3: every main page template has a focusable main that the skip link targets', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const pages = ['/', '/fr', '/browse', '/fr/browse', '/restaurants', '/kelowna/restaurants', '/kelowna/restaurants/test-trattoria', '/whats-on', '/trip', '/fr/trip', '/map', '/guides', '/search?q=pizza', '/claim/kelowna/restaurants/test-trattoria', '/fr/claim/kelowna/restaurants/test-trattoria', '/owner/login', '/my-trip', '/list-your-venue', '/no-such-page-at-all'];
+  for (const p of pages) {
+    const html = await (await fetch(base + p)).text();
+    const mains = html.match(/<main\b[^>]*>/g) || [];
+    assert.equal(mains.length, 1, `${p}: one <main>`);
+    assert.match(mains[0], /\stabindex="-1"/, `${p}: main takes focus`);
+    const id = (/\sid="([^"]+)"/.exec(mains[0]) || [])[1];
+    assert.ok(id, `${p}: main has an id`);
+    const skip = /<a class="skip-link" href="#([^"]+)"/.exec(html);
+    assert.ok(skip, `${p}: skip link`);
+    assert.equal(skip[1], id, `${p}: skip link targets the main element`);
+  }
+  const browse = await (await fetch(base + '/browse')).text();
+  assert.match(browse, /<a class="skip-link" href="#directory">/, '/browse keeps #directory (app.js scrolls to it)');
+})));
+
+test('Accessibility pass 3: the My Trip tray is a dialog named by its title', async () => {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const p of ['/', '/fr', '/browse', '/restaurants', '/whats-on']) {
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /<div id="tripTrayPanel" role="dialog" aria-labelledby="tripTrayTitle">/, `${p}: tray role`);
+      assert.match(html, /<h2 id="tripTrayTitle" data-i18n="trip\.yourTrip">/, `${p}: the tray title names it`);
+    }
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Accessibility pass 3: the open phone menu makes the page behind it inert, says "Close menu" and locks scrolling', () => {
+  const vm = require('node:vm');
+  const code = app.NAV_A11Y_SNIPPET.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const observers = [];
+  const doc = { activeElement: null, readyState: 'complete', listeners: {}, captures: {} };
+  function el(tag, id) {
+    const classes = new Set(), attrs = {}, kids = [];
+    const node = {
+      tagName: tag, id, attrs, kids, offsetWidth: 10, offsetHeight: 10, inert: false,
+      classList: {
+        contains: (c) => classes.has(c),
+        add: (c) => { classes.add(c); observers.forEach((o) => o.target === node && o.cb()); },
+        remove: (c) => { classes.delete(c); observers.forEach((o) => o.target === node && o.cb()); },
+        toggle: (c, on) => { if (on === undefined ? !classes.has(c) : on) classes.add(c); else classes.delete(c); return classes.has(c); },
+      },
+      getClientRects: () => [1],
+      setAttribute: (k, v) => { attrs[k] = String(v); if (k === 'aria-expanded') {} },
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      removeAttribute: (k) => { delete attrs[k]; },
+      hasAttribute: (k) => k in attrs,
+      focus() { doc.activeElement = node; },
+      addEventListener() {},
+      closest: (sel) => (sel === '#top' && node.inHeader ? {} : null),
+      contains: (x) => x === node || kids.some((k) => k === x || (k.contains && k.contains(x))),
+      querySelector: () => kids[0] || null,
+      querySelectorAll: () => kids,
+    };
+    return node;
+  }
+  const header = el('HEADER', 'top'), burger = el('BUTTON', 'navHamburger'), links = el('UL', 'navLinks');
+  const main = el('MAIN', 'main'), footer = el('FOOTER'), tray = el('DIV', 'tripTray'), script = el('SCRIPT');
+  const fbtn = el('BUTTON', 'fdFeaturesBtn'), fpanel = el('DIV', 'fdFeaturesPanel'), chip = el('BUTTON', 'chip');
+  header.kids.push(links, burger); links.kids.push(el('A', 'firstLink')); fpanel.kids.push(chip); main.kids.push(fbtn, fpanel);
+  burger.inHeader = true; links.inHeader = true;
+  doc.body = el('BODY'); doc.body.children = [tray, header, main, footer, script];
+  doc.documentElement = { lang: 'en' };
+  doc.getElementById = (id) => ({ navHamburger: burger, navLinks: links, fdFeaturesPanel: fpanel }[id] || null);
+  doc.querySelector = (sel) => (/app\.js/.test(sel) ? {} : null);
+  doc.querySelectorAll = (sel) => (/aria-expanded="true"/.test(sel) ? [burger, fbtn].filter((b) => b.getAttribute('aria-expanded') === 'true') : []);
+  doc.addEventListener = (type, fn, capture) => { const bag = capture ? doc.captures : doc.listeners; (bag[type] = bag[type] || []).push(fn); };
+  const timers = [];
+  const ctx = { document: doc, setTimeout: (fn) => { timers.push(fn); }, MutationObserver: function (cb) { this.observe = (target) => observers.push({ target, cb }); } };
+  ctx.window = ctx;
+  burger.setAttribute('aria-label', 'Open menu');
+  vm.runInNewContext(code, ctx);
+  const flush = () => { while (timers.length) timers.shift()(); };
+  const esc = () => { (doc.captures.keydown || []).concat(doc.listeners.keydown || []).forEach((fn) => fn({ key: 'Escape', preventDefault() {} })); flush(); };
+
+  assert.equal(burger.getAttribute('aria-label'), 'Open menu');
+  links.classList.add('open'); burger.setAttribute('aria-expanded', 'true'); flush();
+  assert.equal(doc.activeElement && doc.activeElement.id, 'firstLink', 'focus moves into the menu');
+  assert.equal(burger.getAttribute('aria-label'), 'Close menu', 'label while open');
+  assert.equal(main.inert, true, 'main is inert'); assert.equal(main.getAttribute('inert'), '');
+  assert.equal(footer.inert, true, 'footer is inert');
+  assert.equal(tray.inert, true, 'the tray is inert');
+  assert.equal(header.inert, false, 'the header holding the menu stays live');
+  assert.equal(script.inert, false, 'scripts are left alone');
+  assert.equal(doc.body.classList.contains('nav-menu-open'), true, 'body scroll locked');
+  doc.documentElement.lang = 'fr-CA';
+  observers.filter((o) => o.target === doc.documentElement).forEach((o) => o.cb());
+  assert.equal(burger.getAttribute('aria-label'), 'Fermer le menu', 'French label while open');
+  esc();
+  assert.equal(links.classList.contains('open'), false, 'Escape closes the menu');
+  assert.equal(burger.getAttribute('aria-label'), 'Ouvrir le menu');
+  assert.equal(main.inert, false); assert.equal(main.hasAttribute('inert'), false); assert.equal(footer.inert, false);
+  assert.equal(doc.body.classList.contains('nav-menu-open'), false, 'scrolling back');
+  assert.equal(doc.activeElement, burger, 'focus back on the menu button');
+  assert.match(app.NAV_A11Y_SNIPPET, /#navHamburger\[aria-expanded="true"\] span:nth-child\(1\) \{ transform: translateY\(7\.5px\) rotate\(45deg\)/, 'the bars become an X');
+
+  // A list page's Filters panel: the page closes it on Escape, focus goes back to its button.
+  fbtn.setAttribute('aria-expanded', 'true'); fbtn.setAttribute('aria-controls', 'fdFeaturesPanel'); chip.focus();
+  doc.listeners.keydown.push(() => fbtn.setAttribute('aria-expanded', 'false'));
+  esc();
+  assert.equal(doc.activeElement, fbtn, 'focus back on Filters');
+});
+
+test('Accessibility pass 3: contrast, target-size and small markup fixes', async () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /iconSize: \[24, 24\], iconAnchor: \[12, 12\]/, 'map pins are 24px targets');
+  assert.match(src, /\.rest-links summary:focus-visible\{outline:3px solid/, 'A-Z summary focus ring');
+  assert.doesNotMatch(src, /venue-photo-credit" style="[^"]*opacity/, 'photo credit is solid');
+  assert.doesNotMatch(src, /\.venue-open-status a \{[^}]*opacity/, 'See hours link is solid');
+  assert.match(src, /a\.whatson-date-chip \{ text-decoration: none; display: inline-flex; align-items: center;/);
+  const t3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(t3, /\.t3-hint \{ font-size: 0\.78rem; color: rgba\(27,43,58,0\.72\); \}/);
+  assert.match(t3, /\.t3-plan-head \{[^}]*position: relative; z-index: 0;/, 'plan card below the sticky header');
+  assert.match(t3, /\.t3\.is-compact \.t3-understood \{ display: none; \}/);
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const p of ['/', '/fr']) {
+      const html = await (await fetch(base + p)).text();
+      assert.match(html, /<input type="search" id="heroSearchInput" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocomplete="off"/, `${p}: hero search field`);
+    }
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
 });
 // ---------- French gaps (2026-10-18) ----------
 // The review's French leftovers: What's On descriptions and chips, the date form, the business login link, Roam Now,
