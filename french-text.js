@@ -1136,6 +1136,9 @@ const FR_SCRIPT = [
 // ' selected', 'Price ' and 'Correction for '). Only these whole single-quoted strings are turned French, exactly
 // as written here, with their spaces kept. Code is never rewritten except by the FR_SCRIPT fragments above.
 const FR_SCRIPT_STRINGS = {
+  // Open-now empty state on the list pages (2026-10-18).
+  "Nothing that matches is open right now.": "Rien de ce qui correspond n’est ouvert en ce moment.",
+  "Opening next:": "Prochaines ouvertures :",
   " selected": " choisi(s)",
   "&copy; OpenStreetMap contributors": "&copy; Contributeurs d’OpenStreetMap",
   "A list shared with you": "Une liste partagée avec vous",

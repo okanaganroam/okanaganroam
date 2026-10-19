@@ -67,6 +67,9 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 //   Tesseract on jsdelivr with its language data, OSM tiles, GA4, Clarity, Google Fonts, FormSubmit, Open-Meteo,
 //   Cloudflare's own scripts) and sends violations to /csp-report, which only logs.
 // - Inline scripts and styles are everywhere, so 'unsafe-inline' stays until pages carry nonces.
+// - connect-src lists fonts.googleapis.com too (2026-10-18, review pass 4): a script that fetches the font stylesheet
+//   (a session recorder such as Clarity can re-read a page's stylesheets) is governed by connect-src, not style-src,
+//   and would otherwise be reported as a violation.
 const CSP_REPORT_PATH = '/csp-report';
 const CSP_REPORT_ONLY = [
   "default-src 'self'",
@@ -74,7 +77,7 @@ const CSP_REPORT_ONLY = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://stats.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com",
+  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://stats.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com https://fonts.googleapis.com",
   "worker-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
   "frame-src 'self'",
   "media-src 'self' blob: data:",
@@ -9370,7 +9373,10 @@ function renderCanonicalFooterStyles() {
     transition: opacity 0.12s, transform 0.12s;
   }
   .home-footer-social-icon:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 16px 0 24px; }
+  /* Footer gutter (2026-10-18, review pass 4): "padding: 16px 0" took away .wrap-wide's side padding, so on a phone
+     the copyright line ran to 3px from the screen edges. It keeps a 24px gutter (16px on phones). */
+  .home-footer-bottom { border-top: 1px solid rgba(245,243,237,0.14); padding: 16px 24px 24px; }
+  @media (max-width: 640px) { .home-footer-bottom { padding-left: 16px; padding-right: 16px; } }
   /* Footer refresh (2026-10-14): Privacy, Terms and the app teaser in a
      bottom row; Explore and Regions are <details> that stay open (and
      unclickable) on desktop and fold on phones. */
@@ -11053,9 +11059,19 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
     }
     if (document.body) document.body.classList.toggle('nav-menu-open', open);
     if (open && !inerted.length && document.body) {
-      Array.prototype.forEach.call(document.body.children, function(el){
-        if (el.contains(links) || el.inert || /^(SCRIPT|STYLE|LINK|NOSCRIPT|TEMPLATE)$/.test(el.tagName)) return;
+      // Phone layout (2026-10-18, review pass 4): the header around the menu is made inert too (the logo, the skip
+      // link, Build My Trip), not only the page's other top-level blocks: every sibling along the way from the menu
+      // and its button up to the body that holds neither of them.
+      var keep = function(el){ return el.contains(links) || (burger && el.contains(burger)); };
+      var add = function(el){
+        if (keep(el) || el.inert || /^(SCRIPT|STYLE|LINK|NOSCRIPT|TEMPLATE)$/.test(el.tagName)) return;
         el.inert = true; el.setAttribute('inert', ''); inerted.push(el);
+      };
+      Array.prototype.forEach.call(document.body.children, add);
+      [links, burger].forEach(function(start){
+        for (var node = start; node && node.parentElement && node.parentElement !== document.body; node = node.parentElement) {
+          Array.prototype.forEach.call(node.parentElement.children, add);
+        }
       });
     } else if (!open && inerted.length) {
       inerted.forEach(function(el){ el.inert = false; el.removeAttribute('inert'); });
@@ -11063,6 +11079,24 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
     }
   }
   window.__navMenuSync = syncMenu;
+  // Tab and Shift+Tab go round the open phone menu: its links, then the Close menu button, then back to the first
+  // link (2026-10-18, review pass 4). Without it Tab left the menu for the browser's address bar and came back in at
+  // the skip link. Focus that is somehow outside the menu is brought back to its first item.
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Tab' || !links || !links.classList.contains('open') || (phoneMq && !phoneMq.matches)) return;
+    var all = links.querySelectorAll('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    var ring = [];
+    for (var i = 0; i < all.length; i++) if (visible(all[i]) && !all[i].closest('[inert]')) ring.push(all[i]);
+    if (burger && visible(burger)) ring.push(burger);
+    if (!ring.length) return;
+    var at = ring.indexOf(document.activeElement), next = null;
+    if (at === -1) next = e.shiftKey ? ring[ring.length - 1] : ring[0];
+    else if (!e.shiftKey && at === ring.length - 1) next = ring[0];
+    else if (e.shiftKey && at === 0) next = ring[ring.length - 1];
+    else next = ring[at + (e.shiftKey ? -1 : 1)];
+    e.preventDefault();
+    focusEl(next);
+  }, true);
   function init(){
     burger = document.getElementById('navHamburger'); links = document.getElementById('navLinks'); panel = document.getElementById('tripTrayPanel');
     // Pages without app.js (the claim and business login pages, 2026-10-18): the phone menu button and the menu's
@@ -11942,6 +11976,39 @@ function withFontFallbacks(html) {
   const at = html.indexOf(GOOGLE_FONTS_LINK);
   return at === -1 ? html : `${html.slice(0, at)}<style id="font-fallbacks">${FONT_FALLBACK_CSS}</style>\n${html.slice(at)}`;
 }
+// Badge chips, same size in either font (2026-10-18): a row of chips is laid out first in the fallback face and again
+// when Nunito arrives. The fallback is within ~2% of Nunito, but a row that fits to the pixel in one font wraps in the
+// other (Wildling's three chips are 343px in Arial and 344px in Nunito, so the row grew a line and the page jumped
+// 34px: CLS 0.1). Each known badge label now reserves its text width: the wider of the two faces at the chip's weight
+// (700, letter-spacing 0.01em), plus 0.04em, in em so it follows the chip's font size, measured in Chrome. The chip
+// keeps its padding (content-box) and centres its text; a longer text (another platform's font) still grows the chip.
+// Labels not in the table are left as they were.
+const CHIP_TEXT_EM = {
+  "Dog-Friendly": 6.3, "Vegan-Friendly": 7.3, "Vegetarian-Friendly": 9.5, "Patio": 2.5, "Kid-Friendly": 5.9,
+  "Gluten-Free-Friendly": 10.05, "Lake View": 5, "Non-Alcoholic Options": 10.85, "Sports TV": 4.85, "Live Music": 5.15,
+  "Great for Groups": 8.1, "Happy Hour": 5.8, "Open Early": 5.35, "Open Late": 4.95, "\ud83d\udc3e Dog Friendly": 7.45,
+  "\ud83d\udc8e Hidden Gem": 7.25, "\u2665 Local Favourite": 8.55, "\ud83d\udc3e Chiens bienvenus": 9.9,
+  "\ud83d\udc8e Tr\u00e9sor cach\u00e9": 7.5, "\u2665 Coup de c\u0153ur local": 10.45, "Dog-friendly": 6.15,
+  "Vegan-friendly": 7.15, "Vegetarian options": 9.05, "Gluten-free options": 9.4, "Kid-friendly": 5.75,
+  "Lake/vineyard view": 9.15, "Non-alcoholic options": 10.55, "Sports on TV": 6.35, "Live music": 5.2,
+  "Great for groups": 7.95, "Happy hour": 5.6, "Open early": 5.25, "Open late": 4.7, "Accepte les chiens": 9.05,
+  "V\u00e9gane": 3.6, "Options v\u00e9g\u00e9tariennes": 10.8, "Options sans gluten": 9.65, "Terrasse": 4.15,
+  "Adapt\u00e9 aux enfants": 9.35, "Vue sur le lac ou le vignoble": 13.45, "Options sans alcool": 9.55,
+  "Sports \u00e0 la t\u00e9l\u00e9": 7.35, "Musique en direct": 8.55, "Id\u00e9al pour les groupes": 10.7,
+  "Ouvert t\u00f4t": 5, "Ouvert tard": 5.6, "Events & Festivals": 8.9, "Sports & Recreation": 9.65,
+  "Arts & Culture": 6.95, "Food & Drink Events": 9.85, "Markets & Fairs": 7.5, "Family & Kids": 6.65, "Nightlife": 4.2,
+  "Wineries & Wine Events": 11.7, "Holiday & Seasonal Events": 12.85, "Workshops & Classes": 10.5,
+  "Community Events": 9.1, "Options v\u00e9ganes": 8.1, "Vue sur le lac": 6.45,
+};
+const CHIP_RE = /<span class="chip([^"]*)"([^>]*)>([^<]{1,60})<\/span>/g;
+function withChipWidths(html) {
+  if (typeof html !== 'string' || html.indexOf('<span class="chip') === -1) return html;
+  return html.replace(CHIP_RE, (m, cls, attrs, text) => {
+    if (/\sstyle=/.test(attrs)) return m;
+    const em = CHIP_TEXT_EM[text.trim().replace(/&amp;/g, '&').replace(/&#39;/g, "'")];
+    return em ? `<span class="chip${cls}"${attrs} style="box-sizing:content-box;min-width:${em}em;text-align:center">${text}</span>` : m;
+  });
+}
 // Filter bar, final from the first paint (2026-10-18): a list page's Filters / Regions popovers (.fd-controls,
 // .outdoors-controls) showed every chip inline until the page script added the "js" class, which on the lighter
 // pages waits for /cards/rest/ or /browse/cards.json. When it collapsed, the results jumped up 100-1200px (CLS
@@ -12074,7 +12141,8 @@ function installSharedStylesheetResponse(res, req = {}) {
       // redirect or error already went out as it was.
       if (req.restCardsJson && (!held || held[0] !== 200) && !res.headersSent) { held = null; realWriteHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return realEnd('{}'); }
       if (!held) return realEnd(body, ...rest);
-      const m = body != null && typeof body !== 'function' ? (req.restCardsJson ? REST_DATA_RE : REST_TEMPLATE_RE).exec(String(body)) : null;
+      // The waiting cards get the same chip widths as the page they were cut from, so their hash matches (2026-10-18).
+      const m = body != null && typeof body !== 'function' ? (req.restCardsJson ? REST_DATA_RE : REST_TEMPLATE_RE).exec(withChipWidths(String(body))) : null;
       held = null;
       if (!m && req.restCardsJson) { realWriteHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return realEnd('{}'); }
       if (!m) { realWriteHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return realEnd('Not found'); }
@@ -12083,7 +12151,7 @@ function installSharedStylesheetResponse(res, req = {}) {
       return realEnd(m[2]);
     }
     if (held && body != null && typeof body !== 'function') {
-      try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(withFontFallbacks(withFilterBarReady(withLazyCardPhotos(String(body))))))); } catch (e) { /* the inline page is still correct */ }
+      try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(withFontFallbacks(withFilterBarReady(withLazyCardPhotos(withChipWidths(String(body)))))))); } catch (e) { /* the inline page is still correct */ }
     }
     flush();
     return realEnd(body, ...rest);
@@ -12388,7 +12456,9 @@ function buildOutdoorThemeStyles() {
     body.outdoor-page .outdoor-region-group-chips, body.outdoor-page .outdoor-region-group-chips[hidden] { display: contents; }
   }
 
-  body.outdoor-page .outdoor-activity-count { display: inline-block; margin-left: 7px; font-size: 0.72rem; font-weight: 700; opacity: 0.78; }
+  /* Chip counts (2026-10-18, review pass 4): every count now follows a real space ("Patio 234", which read and copied
+     as "Patio234"), so its margin is 4px smaller to keep the same look. */
+  body.outdoor-page .outdoor-activity-count { display: inline-block; margin-left: 3px; font-size: 0.72rem; font-weight: 700; opacity: 0.78; }
   body.outdoor-page .outdoor-featured-grid { margin: 0 0 8px; }
   @media (min-width: 900px) { body.outdoor-page .outdoor-featured-grid { grid-template-columns: repeat(3, 1fr); } }
   body.outdoor-page .related-card .related-meta { font-size: 0.82rem; color: rgba(74,52,40,0.8); margin-top: 4px; }
@@ -14213,7 +14283,7 @@ function regionCategoryTabsHtml(region, categoryCounts, currentType, categories 
   const cats = categories || destinationCategories(region, categoryCounts);
   const pills = cats.map((c) => {
     const label = escapeHtml(c.label);
-    const count = `<span class="outdoor-activity-count">${c.count}</span>`;
+    const count = ` <span class="outdoor-activity-count">${c.count}</span>`;
     if (c.type && c.type === currentType) return `<span class="category-region-selector-active" aria-current="page">${label}${count}</span>`;
     if (!c.href) return `<span class="category-region-selector-empty" aria-disabled="true" title="None listed in ${escapeHtml(REGION_LABELS[region])} yet">${label}${count}</span>`;
     return `<a href="${escapeHtml(c.href)}">${label}${count}</a>`;
@@ -14737,7 +14807,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   map.setMaxBounds(OK_BOUNDS.pad(0.04)); map.options.maxBoundsViscosity = 1;
   function okLimits(){ map.setMinZoom(Math.max(6, map.getBoundsZoom(OK_BOUNDS))); }
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
-  var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 15 ? 18 : z >= 13 ? 32 : 48; }, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
+  // Overlapping pins (2026-10-18, review pass 4): clustering used to switch off at zoom 17, so places and events at the
+  // very same spot (a winery and its restaurant, every event at one hall) sat on one another and only the top pin could
+  // be tapped. From zoom 17 only pins within a pixel of each other still group; tapping that group fans them out.
+  var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 17 ? 1 : z >= 15 ? 18 : z >= 13 ? 32 : 48; }, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
   var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
@@ -16760,7 +16833,7 @@ function renderOutdoorActivitySelector(currentSlug = null) {
   const showCounts = currentSlug === null;
   const chips = live.map((a) => (a.slug === currentSlug
     ? `<span class="category-region-selector-active">${escapeHtml(a.label)}</span>`
-    : `<a href="/outdoors/${a.slug}">${escapeHtml(a.label)}${showCounts ? `<span class="outdoor-activity-count">${a.count}</span>` : ''}</a>`)).join('\n      ');
+    : `<a href="/outdoors/${a.slug}">${escapeHtml(a.label)}${showCounts ? ` <span class="outdoor-activity-count">${a.count}</span>` : ''}</a>`)).join('\n      ');
   const allLink = currentSlug ? `<a href="/outdoors">All Outdoors</a>\n      ` : '';
   return `<nav class="category-region-selector outdoor-activity-selector" aria-label="Choose an activity">
       ${allLink}${chips}
@@ -16778,7 +16851,7 @@ function renderOutdoorRegionChoice(venues) {
   for (const v of venues) if (REGION_LABELS[v.region]) counts.set(v.region, (counts.get(v.region) || 0) + 1);
   const regions = [...counts.keys()].sort((a, b) => REGION_LABELS[a].localeCompare(REGION_LABELS[b]));
   if (!regions.length) return '';
-  const links = regions.map((r) => `<a href="/${r}/${CATEGORY_SLUGS.outdoor}">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${counts.get(r)}</span></a>`).join('\n      ');
+  const links = regions.map((r) => `<a href="/${r}/${CATEGORY_SLUGS.outdoor}">${escapeHtml(REGION_LABELS[r])} <span class="outdoor-activity-count">${counts.get(r)}</span></a>`).join('\n      ');
   return `<nav class="category-region-selector outdoor-region-choice" aria-label="Choose a region">
       ${links}
     </nav>`;
@@ -16916,7 +16989,7 @@ function renderOutdoorRegionFilterChips(venues, state = {}) {
   // and contextual counts; without it the chips are the plain totals.
   const selected = new Set(state.selectedRegions || []);
   const count = (r) => (state.counts && state.counts.regions ? (state.counts.regions[r] || 0) : (counts.get(r) || 0));
-  const chip = (r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="${selected.has(r) ? 'true' : 'false'}">${escapeHtml(REGION_LABELS[r])}<span class="outdoor-activity-count">${count(r)}</span></button>`;
+  const chip = (r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="${selected.has(r) ? 'true' : 'false'}">${escapeHtml(REGION_LABELS[r])} <span class="outdoor-activity-count">${count(r)}</span></button>`;
   const placed = new Set();
   const groups = FOOTER_REGION_GROUPS.map((g) => ({ label: g.label, slug: outdoorRegionGroupSlug(g.label), regions: g.regions.filter((r) => REGION_LABELS[r]) }));
   groups.forEach((g) => g.regions.forEach((r) => placed.add(r)));
@@ -16951,7 +17024,7 @@ function renderOutdoorActivityFilterChips(state = {}) {
   if (!live.length) return '';
   const selected = new Set(state.selectedActivities || []);
   const count = (a) => (state.counts && state.counts.activities ? (state.counts.activities[a.slug] || 0) : a.count);
-  const chips = live.map((a) => `<button type="button" class="outdoor-filter-chip" data-activity="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)}<span class="outdoor-activity-count">${count(a)}</span></button>`).join('\n      ');
+  const chips = live.map((a) => `<button type="button" class="outdoor-filter-chip" data-activity="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)} <span class="outdoor-activity-count">${count(a)}</span></button>`).join('\n      ');
   return `<div class="category-region-selector outdoor-filter-group" role="group" aria-label="Choose activities" data-filter="activity">
       ${chips}
     </div>`;
@@ -18510,13 +18583,19 @@ function renderFoodDrinkOpenNowStyles() {
      navy-deep like the selected tags. */
   body.fd-page .fd-open-toggle[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--teal, #2A6B67); }
   body.fd-page .fd-open-toggle[aria-pressed="true"]:hover { background: var(--ref-navy-deep, #101B24); border-color: var(--ref-navy-deep, #101B24); }
-  body.fd-page .fd-open-toggle .outdoor-activity-count { margin-left: 2px; }
+  body.fd-page .fd-open-toggle .outdoor-activity-count { margin-left: 0; }
   body.fd-page .fd-open-toggle[aria-pressed="true"] .outdoor-activity-count { opacity: 0.8; }
   body.fd-page .fd-open-note { margin: -2px 0 14px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.8rem; line-height: 1.45; color: var(--ink); opacity: 0.7; max-width: 64ch; text-wrap: pretty; }
   /* Open-now footnote (2026-10-14): under the list always; above it only while Open now is on. */
   body.fd-page .fd-controls + .fd-open-note { display: none; }
   body.fd-page .fd-controls:has(.fd-open-toggle[aria-pressed="true"]) + .fd-open-note { display: block; }
   body.fd-page .fd-open-note-end { margin: 6px auto 0; text-align: center; }
+  /* Open-now empty state (2026-10-18): the next places to open, under the no-results line. */
+  body.fd-page .fd-open-next { margin: 10px 0 0; font-weight: 400; }
+  body.fd-page .fd-open-next-title { margin: 0 0 4px; font-weight: 700; }
+  body.fd-page .fd-open-next ul { margin: 0; padding-left: 18px; }
+  body.fd-page .fd-open-next li { margin: 2px 0; }
+  body.fd-page .fd-open-next-when { white-space: nowrap; }
   /* Card status line: one cluster with the meta line (4px under it), then
      the meta line's own 10px before the description. The .venue-card
      selector outranks the golf theme's ".venue-card p" sizing. Filled dot =
@@ -18549,7 +18628,7 @@ function foodDrinkTypeChipsHtml(state = {}) {
   const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
   const chips = FD_HUB_TYPES.map((t) => {
     const n = counts ? (counts[t.type] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="fd-type">${all}${chips}</div>`;
 }
@@ -18560,7 +18639,7 @@ function foodDrinkFeatureChipsHtml(state = {}, onlyKeys = null) {
   const counts = state.counts && state.counts.features ? state.counts.features : null;
   const chips = FD_HUB_FEATURES.filter((f) => !onlyKeys || onlyKeys.includes(f.key)).map((f) => {
     const n = counts ? (counts[f.key] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-fd-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-fd-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="fd-feature-grid" role="group" aria-label="Choose what you are looking for" data-filter="fd-feature">${chips}</div>`;
 }
@@ -18739,7 +18818,9 @@ ${foodDrinkCardPhotoCss()}
     body.fd-page .fd-type-row { scrollbar-width: none; padding-bottom: 2px; }
     body.fd-page .fd-type-row::-webkit-scrollbar { display: none; }
     body.fd-page .card-grid > li.venue-card[data-ph] > .chips:not(:empty) { margin-top: 8px; }
-    body.fd-page .fd-controls { flex-wrap: nowrap; gap: 6px; }
+    /* Phone layout (2026-10-18): the controls wrap to a second row when they don't fit (/browse has six, and French
+       labels are longer); nowrap pushed the page 450px sideways at 375px. The popovers stay anchored to the bar. */
+    body.fd-page .fd-controls { flex-wrap: wrap; gap: 6px; }
     body.fd-page .fd-pop-btn { padding: 8px 11px; font-size: 0.82rem; white-space: nowrap; }
     body.fd-page .fd-pop-long { display: none; }
     body.fd-page .fd-pop-short { display: inline; }
@@ -18754,6 +18835,42 @@ ${foodDrinkCardPhotoCss()}
 </style>`;
 }
 
+// Open-now empty state (2026-10-18, review pass 4), shared by the list pages and /browse: when Open now leaves nothing,
+// the no-results box names the next five matching places to open, soonest first, each with its "Opens ..." time from
+// hoursStatusLabel() (so the French pages get its French wording). openNextOf() turns a closed status into the minutes
+// until it opens; paintOpenNextList() fills (or empties) the list inside the no-results box.
+const OPEN_NEXT_CLIENT_SRC = `var OPEN_NEXT_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  function openNextOf(status, label, clock){
+    if (!status || label.state !== 'closed' || !status.opensAt) return null;
+    var mins = ((OPEN_NEXT_WEEK.indexOf(status.opensAt.weekday) - OPEN_NEXT_WEEK.indexOf(clock.weekday) + 7) % 7) * 1440 + status.opensAt.minutes - clock.minutes;
+    if (mins <= 0) mins += 7 * 1440;
+    var parts = String(label.text).split(' \\u00b7 ');
+    return { mins: mins, text: parts[parts.length - 1] };
+  }
+  function paintOpenNextList(empty, textEl, candidates, next){
+    var box = document.getElementById('openNextList');
+    if (!box && empty) { box = document.createElement('div'); box.id = 'openNextList'; box.className = 'fd-open-next'; box.hidden = true; empty.appendChild(box); }
+    if (!box) return;
+    var list = candidates.slice().sort(function(a, b){ return next[a.getAttribute('data-venue-id')].mins - next[b.getAttribute('data-venue-id')].mins; }).slice(0, 5);
+    box.hidden = !list.length;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    if (!list.length) return;
+    if (textEl) textEl.textContent = 'Nothing that matches is open right now.';
+    var h = document.createElement('p'); h.className = 'fd-open-next-title'; h.textContent = 'Opening next:'; box.appendChild(h);
+    var ul = document.createElement('ul');
+    list.forEach(function(card){
+      var n = next[card.getAttribute('data-venue-id')];
+      var link = card.querySelector('h2 a, h3 a') || card.querySelector('a[href]');
+      var li = document.createElement('li'), a = document.createElement('a'), when = document.createElement('span');
+      a.href = link ? link.getAttribute('href') : '#';
+      a.textContent = card.getAttribute('data-venue-name') || (link ? link.textContent.trim() : '');
+      when.className = 'fd-open-next-when';
+      when.textContent = n.text.charAt(0).toUpperCase() + n.text.slice(1);
+      li.appendChild(a); li.appendChild(document.createTextNode(' \\u2014 ')); li.appendChild(when);
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  }`;
 // The inline script: the same interaction contract as the Outdoors explorer
 // (toggle chips, filter the already-rendered cards, keep the selection in the
 // URL, pushState/popstate, Clear all) with this page's three groups and its
@@ -18831,14 +18948,21 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   var openCountEl = document.getElementById('fdOpenNowCount');
   var openOn = false;
   var OPEN_IDS = {};
+  // Open-now empty state (2026-10-18, review pass 4): for each closed place with a listed next opening, the minutes
+  // until it opens and its "Opens ..." wording, so an empty Open now list can name the next places to open.
+  var NEXT_OPEN = {};
+  ${OPEN_NEXT_CLIENT_SRC}
   function refreshOpen(){
     var clock = okanaganClock(new Date());
-    OPEN_IDS = {};
+    OPEN_IDS = {}; NEXT_OPEN = {};
     cards.forEach(function(card){
       var id = card.getAttribute('data-venue-id'), d = DATA[id];
       if (!d || !d.h) return;
-      var label = hoursStatusLabel(statusAt(parseHours(expandFoodDrinkHours(d.h)), clock), clock);
+      var status = statusAt(parseHours(expandFoodDrinkHours(d.h)), clock);
+      var label = hoursStatusLabel(status, clock);
       if (label.state === 'open') OPEN_IDS[id] = true;
+      var nx = openNextOf(status, label, clock);
+      if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
       if (el) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
     });
@@ -18851,6 +18975,12 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       if (OPEN_IDS[id] && fdMatches(types, features, regions, d.c, d.f, d.r)) n++;
     });
     openCountEl.textContent = String(n);
+  }
+  function paintOpenNext(types, features, regions, shown){
+    paintOpenNextList(empty, noResultsText, openOn && shown === 0 ? cards.filter(function(card){
+      var id = card.getAttribute('data-venue-id'), d = DATA[id] || { c: [], f: [], r: '' };
+      return NEXT_OPEN[id] && fdMatches(types, features, regions, d.c, d.f, d.r) && (!searchTerm || fdSearchHit(card));
+    }) : [], NEXT_OPEN);
   }
   ${FD_HOURS_CLIENT_SRC}
   refreshOpen();
@@ -19032,7 +19162,8 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     updateGroupHeaders(); updateCounts(types, features, regions); renderSelected(types, features, regions);${O(`
     if (openToggle) openToggle.setAttribute('aria-pressed', openOn ? 'true' : 'false');
     paintOpenCount(types, features, regions);`)}
-    if (empty) empty.hidden = shown !== 0;
+    if (empty) empty.hidden = shown !== 0;${O(`
+    paintOpenNext(types, features, regions, shown);`)}
     if (results) results.hidden = shown === 0;
     var next = window.location.pathname + queryFor(types, features, regions) + window.location.hash;
     if (window.history && historyMode !== 'none') {
@@ -19973,7 +20104,7 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, openInfo.byId, { cardNotes, cardNoteLabel: 'Rainy day:', photoKeyFor });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an indoor experience" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${INDOOR_HUB_EXPERIENCES.map((e) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${e.slug}" aria-pressed="${selected.has(e.slug) ? 'true' : 'false'}">${escapeHtml(e.label)}<span class="outdoor-activity-count">${counts.types[e.slug] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an indoor experience" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${INDOOR_HUB_EXPERIENCES.map((e) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${e.slug}" aria-pressed="${selected.has(e.slug) ? 'true' : 'false'}">${escapeHtml(e.label)} <span class="outdoor-activity-count">${counts.types[e.slug] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
@@ -20169,7 +20300,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
   const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, null, { cardNotes, cardNoteLabel: 'Play:', photoKeyFor });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)}<span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
@@ -20431,7 +20562,7 @@ function dogTypeChipsHtml(state = {}) {
   const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-dog-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
   const chips = DOG_HUB_TYPES.map((t) => {
     const n = counts ? (counts[t.type] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-dog-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-dog-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="dog-type">${all}${chips}</div>`;
 }
@@ -20440,7 +20571,7 @@ function dogFeatureChipsHtml(state = {}) {
   const counts = state.counts && state.counts.features ? state.counts.features : null;
   const chips = DOG_HUB_FEATURES.map((f) => {
     const n = counts ? (counts[f.key] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-dog-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-dog-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="fd-feature-grid" role="group" aria-label="Choose what you are looking for" data-filter="dog-feature">${chips}</div>`;
 }
@@ -20896,7 +21027,7 @@ function renderDogHubPage(venues, filter = null, now = new Date()) {
     cardOpts: { dogNoteInline: true, hideDogBadges: true },
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${DOG_HUB_TYPES.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${DOG_HUB_TYPES.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
@@ -21145,7 +21276,7 @@ function localFavouritesTypeChipsHtml(types, state = {}) {
   const selected = new Set(state.types || []);
   const counts = state.counts && state.counts.types ? state.counts.types : {};
   const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-lf-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
-  const chips = types.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-lf-type="${t}" aria-pressed="${selected.has(t) ? 'true' : 'false'}">${escapeHtml(CATEGORY_LABELS[t].plural)}<span class="outdoor-activity-count">${counts[t] || 0}</span></button>`).join('');
+  const chips = types.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-lf-type="${t}" aria-pressed="${selected.has(t) ? 'true' : 'false'}">${escapeHtml(CATEGORY_LABELS[t].plural)} <span class="outdoor-activity-count">${counts[t] || 0}</span></button>`).join('');
   return `<div class="fd-type-row" role="group" aria-label="Choose categories" data-filter="lf-type">${all}${chips}</div>`;
 }
 function localFavouritesFilterBarHtml(venues, state = {}) {
@@ -21705,7 +21836,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${escapeHtml(t.label)}<span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
@@ -22489,7 +22620,7 @@ function parseWhatsOnPageQuery(query) {
 function whatsOnRegionChipsHtml(state = {}) {
   const selected = new Set(state.selectedRegions || []);
   const counts = state.counts || null;
-  const chip = (r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="${selected.has(r) ? 'true' : 'false'}">${escapeHtml(REGION_LABELS[r])}${counts ? `<span class="outdoor-activity-count">${counts[r] || 0}</span>` : ''}</button>`;
+  const chip = (r) => `<button type="button" class="outdoor-filter-chip" data-region="${escapeHtml(r)}" aria-pressed="${selected.has(r) ? 'true' : 'false'}">${escapeHtml(REGION_LABELS[r])}${counts ? ` <span class="outdoor-activity-count">${counts[r] || 0}</span>` : ''}</button>`;
   const placed = new Set();
   const groups = FOOTER_REGION_GROUPS.map((g) => ({ label: g.label, slug: outdoorRegionGroupSlug(g.label), regions: g.regions.filter((r) => REGION_LABELS[r]) }));
   groups.forEach((g) => g.regions.forEach((r) => placed.add(r)));
@@ -22565,7 +22696,7 @@ function whatsOnCategoryChipsHtml(state = {}) {
   const allChip = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-cat-all" data-category-all="1" aria-pressed="${selected.size === 0 ? 'true' : 'false'}">All</button>`;
   const chips = WHATSON_CATEGORIES.map((c) => {
     const n = counts ? (counts[c.key] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="${escapeHtml(c.key)}" aria-pressed="${selected.has(c.key) ? 'true' : 'false'}">${escapeHtml(c.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="${escapeHtml(c.key)}" aria-pressed="${selected.has(c.key) ? 'true' : 'false'}">${escapeHtml(c.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">${allChip}${chips}</div>`;
 }
@@ -24456,6 +24587,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // closure is a closed spec (opens = closes = 00:00) for its dates. Only for the stored hours, like the page.
   if (localBusiness.openingHoursSpecification && pageHours === venue.hours && !venue.redirect_to) {
     localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.concat(hoursExtrasSpecification(venue.id, opts.now || new Date()));
+    // Open for the season until a date (2026-10-18, review pass 4): the weekly hours stop on the last open day, so
+    // they carry validThrough that day (a seasonal set or closure that already has its own dates is left alone).
+    const season = getSeasonStates(opts.now || new Date()).get(venue.id);
+    if (season && season.kind === 'open_until' && season.until) {
+      localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.map((spec) => (spec.validThrough ? spec : { ...spec, validThrough: season.until }));
+    }
   }
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
   const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
@@ -24917,6 +25054,21 @@ function absoluteSiteUrl(u) {
   if (v.startsWith('//')) return `https:${v}`;
   return `https://okanaganroam.com${v.startsWith('/') ? '' : '/'}${v}`;
 }
+// An event's free-text place ("Prospera Place, 1223 Water St, Kelowna") as a Place with a split address (2026-10-18,
+// review pass 4: 458 event pages carried the street inside the place name and a town-only address). The first part
+// that starts with a street number ("1223 Water St", "106-1641 Dartmouth Rd") is the streetAddress, the parts before it
+// are the name, and the town after it is the locality; anything else keeps the old town-level address.
+function eventTextPlace(text, event) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  const fallback = eventLocationAddress(event, null);
+  const parts = raw.split(/\s*,\s*/).filter(Boolean);
+  const at = parts.findIndex((p) => /^\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?\s+\S+/.test(p) && /[A-Za-z]{2,}/.test(p));
+  if (at === -1) return { '@type': 'Place', name: raw, address: fallback };
+  const after = parts.slice(at + 1).map((p) => p.replace(/\s+(?:BC|B\.C\.)$/i, '')).filter((p) => p && !/^(?:BC|B\.C\.|Canada)$/i.test(p));
+  const town = after.find((p) => Object.values(REGION_LABELS).includes(p)) || (after.length && !/\d/.test(after[0]) && after[0].length <= 30 ? after[0] : null);
+  const address = { '@type': 'PostalAddress', streetAddress: parts[at], addressLocality: town || fallback.addressLocality, addressRegion: 'BC', addressCountry: 'CA' };
+  return { '@type': 'Place', name: at > 0 ? parts.slice(0, at).join(', ') : raw, address };
+}
 function eventLocationAddress(event, hostVenue) {
   // A host venue's address is split like the venue page's (2026-10-18).
   if (hostVenue && hostVenue.address) return venuePostalAddress(hostVenue.address, REGION_LABELS[hostVenue.region]);
@@ -24947,7 +25099,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
   const schemaType = eventSchemaType(event, categories);
   const location = hostVenue
     ? { '@type': 'Place', name: hostVenue.name, address: eventLocationAddress(event, hostVenue) }
-    : { '@type': 'Place', name: event.venue_name_text || (event.valley_wide === 1 ? 'Okanagan Valley, BC' : REGION_LABELS[event.region]), address: eventLocationAddress(event, null) };
+    : event.venue_name_text ? eventTextPlace(event.venue_name_text, event)
+      : { '@type': 'Place', name: event.valley_wide === 1 ? 'Okanagan Valley, BC' : REGION_LABELS[event.region], address: eventLocationAddress(event, null) };
   const sub = (o) => ({
     '@type': schemaType,
     name: o.label ? `${event.name} – ${o.label}` : event.name,
@@ -27555,7 +27708,7 @@ function browseTypeChipsHtml(state = {}) {
   const all = `<button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-bh-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>`;
   const chips = BROWSE_HUB_TYPE_ORDER.map((t) => {
     const n = counts ? (counts[t] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-bh-type="${t}" aria-pressed="${selected.has(t) ? 'true' : 'false'}">${escapeHtml(browseTypeLabel(t))}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip fd-type-chip" data-bh-type="${t}" aria-pressed="${selected.has(t) ? 'true' : 'false'}">${escapeHtml(browseTypeLabel(t))}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="fd-type-row" role="group" aria-label="Choose venue types" data-filter="bh-type">${all}${chips}</div>`;
 }
@@ -27564,7 +27717,7 @@ function browseFeatureChipsHtml(state = {}) {
   const counts = state.counts && state.counts.features ? state.counts.features : null;
   const chips = FD_HUB_FEATURES.map((f) => {
     const n = counts ? (counts[f.key] || 0) : null;
-    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-bh-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : `<span class="outdoor-activity-count">${n}</span>`}</button>`;
+    return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-bh-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
   return `<div class="fd-feature-grid" role="group" aria-label="Choose what matters to you" data-filter="bh-feature">${chips}</div>`;
 }
@@ -27766,16 +27919,20 @@ function bhStart(){
   var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(OKANAGAN_CLOCK_FORMAT)});
   ${okanaganClock.toString()}
   ${hoursModule ? hoursModule.HOURS_CLIENT_SRC : ''}
-  var OPEN_IDS = {};
+  var OPEN_IDS = {}, NEXT_OPEN = {};
+  ${OPEN_NEXT_CLIENT_SRC}
   function refreshOpen(){
     if (!${hoursModule ? 'true' : 'false'}) return;
     var clock = okanaganClock(new Date());
-    OPEN_IDS = {};
+    OPEN_IDS = {}; NEXT_OPEN = {};
     cards.forEach(function(card){
       var id = card.getAttribute('data-venue-id'), d = DATA[id];
       if (!d || !d.h) return;
-      var label = hoursStatusLabel(statusAt(parseHours(d.h), clock), clock);
+      var status = statusAt(parseHours(d.h), clock);
+      var label = hoursStatusLabel(status, clock);
       if (label.state === 'open') OPEN_IDS[id] = true;
+      var nx = openNextOf(status, label, clock);
+      if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
       if (el) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
     });
@@ -27912,6 +28069,10 @@ function bhStart(){
     if (openToggle) openToggle.setAttribute('aria-pressed', openOn ? 'true' : 'false');
     if (favToggle) favToggle.setAttribute('aria-pressed', favOn ? 'true' : 'false');
     if (empty) empty.hidden = shown !== 0;
+    paintOpenNextList(empty, null, openOn && shown === 0 ? ordered.filter(function(card){
+      var id = card.getAttribute('data-venue-id');
+      return NEXT_OPEN[id] && bhMatches(types, features, regions, cuisine, price, dataOf(card)) && (!favs || !!favs[id]) && (!searchTerm || (card.__bh || '').indexOf(searchTerm) !== -1);
+    }) : [], NEXT_OPEN);
     if (results) results.hidden = shown === 0;
     var next = window.location.pathname + queryFor(types, features, regions) + window.location.hash;
     if (window.history && historyMode !== 'none') {
@@ -45082,6 +45243,9 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  withChipWidths,
+  eventTextPlace,
+  CHIP_TEXT_EM,
   // Portal polish (2026-10-18)
   ownerActivityHtml,
   ownerVenueActivity,

@@ -3982,7 +3982,7 @@ test('S5 #7/#10/#12/#13/#15: a timed single-date event renders its occurrence, c
   assert.match(text, /<span class="label">When<\/span><span>Saturday, May 15, 2032 &middot; 7:30 pm &ndash; 9:30 pm<\/span>/.source ? /Saturday, May 15, 2032 &middot; 7:30 pm – 9:30 pm/ : /x/, 'stored local date + time range');
   assert.match(text, /<p class="subtitle">Event in Kelowna, BC<\/p>/, 'single-date events are "Event", not "Event series"');
   assert.doesNotMatch(text, /All dates/, 'no series list for a single date');
-  assert.match(text, /<span class="chip">Arts &amp; Culture<\/span> <span class="chip">Nightlife<\/span>/, 'category chips in position order');
+  assert.match(text, /<span class="chip"[^>]*>Arts &amp; Culture<\/span> <span class="chip"[^>]*>Nightlife<\/span>/, 'category chips in position order (each reserves its width, 2026-10-18)');
   assert.match(text, /<img src="https:\/\/example\.com\/gallery\.jpg" alt="S5 Gallery Night"/);
   assert.match(text, /href="\/kelowna\/restaurants\/test-trattoria">Test Trattoria<\/a>/, 'venue row link');
   assert.doesNotMatch(text, /Listed by/, 'official_venue source -> no attribution line');
@@ -4626,7 +4626,7 @@ test('S6 #9-#11/#21: region/category multi-select and no-match state over the re
   assert.match(both, /id="whatsOnSelectedClear">Clear all</, 'Clear all now lives with the removable filter chips');
   const regionOnly = s6markup((await s6get('/whats-on?regions=peachland')).text);
   assert.match(regionOnly, /aria-live="polite">1 of 4 events<\/p>/, 'valley-wide festival matches a region with nothing else');
-  assert.match(regionOnly, /data-region="peachland" aria-pressed="true">Peachland<span class="outdoor-activity-count">1<\/span>/, 'region chip counts include valley-wide rows');
+  assert.match(regionOnly, /data-region="peachland" aria-pressed="true">Peachland <span class="outdoor-activity-count">1<\/span>/, 'region chip counts include valley-wide rows');
   const noMatch = s6markup((await s6get('/whats-on?regions=vernon&categories=nightlife')).text);
   assert.match(noMatch, /aria-live="polite">0 of 4 events<\/p>/);
   assert.match(noMatch, /<p class="outdoor-no-results" id="whatsOnNoResults">No events match that combination yet\./, 'no-match state, not the empty-inventory state');
@@ -5606,7 +5606,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     assert.ok(app.getCollectionVenueIds('local_favorite').has(cmGolf.id), 'membership visible through getCollectionVenueIds');
 
     const vernonGolfHttp = await (await fetch(`${base}/vernon/golf`)).text();
-    assert.match(vernonGolfHttp, /<span class="chip local-favourite-badge">\u2665 Local Favourite<\/span>/, 'badge must render on the live /vernon/golf page');
+    assert.match(vernonGolfHttp, /<span class="chip local-favourite-badge"[^>]*>\u2665 Local Favourite<\/span>/, 'badge must render on the live /vernon/golf page');
     const venuePageHttp = await (await fetch(`${base}/vernon/golf/test-vernon-golf-course`)).text();
     assert.match(venuePageHttp, /local-favourite-badge/, 'badge must render on the live venue page');
 
@@ -7654,9 +7654,9 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     const wideBody = await wide.text();
     assert.match(wideBody, /Homepage Beach One/);
     // Beaches runs on the shared engine (2026-10-14): towns are Regions chips with counts.
-    assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">[1-9]/);
-    assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon<span class="outdoor-activity-count">[1-9]/);
-    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/);
+    assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna <span class="outdoor-activity-count">[1-9]/);
+    assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon <span class="outdoor-activity-count">[1-9]/);
+    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos <span class="outdoor-activity-count">0<\/span>/);
     assert.match(wideBody, /venue-advisory/, 'advisory notice renders on the listing card');
     assert.match(wideBody, /<p class="dog-note"><span class="dog-note-label">Dogs:<\/span> Off-leash dog beach<\/p>/, 'the dog rule shows as a Dogs: line on the card (2026-10-14)');
     assert.match(wideBody, /hidden-gem-badge/); assert.match(wideBody, /local-favourite-badge/);
@@ -8020,9 +8020,9 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.equal(wide.status, 200);
     const wideBody = await wide.text();
     assert.match(wideBody, /Fixture Canyon Park/); assert.match(wideBody, /Fixture Nordic Centre/);
-    assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">1<\/span>/);
+    assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna <span class="outdoor-activity-count">1<\/span>/);
     assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon/);
-    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/, 'a canonical region with no outdoor venues still gets a chip, showing 0');
+    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos <span class="outdoor-activity-count">0<\/span>/, 'a canonical region with no outdoor venues still gets a chip, showing 0');
     assert.equal((wideBody.match(/<h1[\s>]/g) || []).length, 1);
     assert.equal(footerOf(wideBody), footerOf(withFooterOutdoors(beachesBefore)), 'the shared footer on /outdoors is byte-identical to the /beaches footer (with its Outdoors link now /outdoors)');
     const outdoorGrid = (wideBody.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
@@ -8163,7 +8163,7 @@ test('Activity page + landing sections render once an activity reaches the thres
     const order = ['<p class="outdoor-intro outdoors-intro">', 'id="outdoorsSearch"', 'data-filter="activity"', 'id="outdoorRegionsBtn"', 'data-filter="region"', 'id="outdoorResultsSummary"', '<ul class="card-grid" id="outdoorResults">'];
     const landingMarkup = outdoorMarkupOnly(landing);
     let pos = -1; for (const marker of order) { const i = landingMarkup.indexOf(marker); assert.ok(i > pos, `landing section order: ${marker}`); pos = i; }
-    assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-activity="hiking" aria-pressed="false">Hiking &amp; Trails<span class="outdoor-activity-count">4<\/span><\/button>/, 'the live activity is a compact filter chip carrying its count');
+    assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-activity="hiking" aria-pressed="false">Hiking &amp; Trails <span class="outdoor-activity-count">4<\/span><\/button>/, 'the live activity is a compact filter chip carrying its count');
     assert.doesNotMatch(landing, /outdoors-guide-link|outdoors-guides/, 'the landing carries no Activity guides row');
     assert.match(app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking)), /<h1>Hiking &amp; Trails in the Okanagan<\/h1>/, 'the activity page itself is untouched and still renders');
     assert.doesNotMatch(withoutSiteHeader(landing), /data-activity="viewpoints"|data-activity="camping"|href="\/outdoors\/(viewpoints|camping)"/, 'sub-threshold activities get no toggle and no link');
@@ -8317,7 +8317,7 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
       assert.equal((await fetch(`${base}/${r}/outdoors`)).status, 200, `/${r}/outdoors is valid`);
     }
     assert.equal((await fetch(`${base}/outdoors/camping`)).status, 404); assert.equal((await fetch(`${base}/outdoors/water`)).status, 404);
-    assert.match(landing, /data-fd-type="hiking" aria-pressed="false">Hiking &amp; Trails<span class="outdoor-activity-count">3<\/span><\/button>/);
+    assert.match(landing, /data-fd-type="hiking" aria-pressed="false">Hiking &amp; Trails <span class="outdoor-activity-count">3<\/span><\/button>/);
     assert.doesNotMatch(landing, /outdoors-guide-link/);
     assert.equal((lm.match(/<li class="venue-card" /g) || []).length, 3, 'results list has each venue once');
     assert.match(landing, /id="fdResults"/);
@@ -8392,8 +8392,8 @@ test('filterOutdoorVenues over real memberships: region-only, activity-only, com
     assert.deepEqual(names(app.filterOutdoorVenues(venues, ['osoyoos'], ['hiking'], map)), [], 'a venue with no activity never satisfies an activity filter');
     assert.equal(app.filterOutdoorVenues(venues, [], [], map).length, 5, 'reset = everything again');
     const chips = app.renderOutdoorRegionFilterChips(venues);
-    assert.match(chips, /data-region="apex" aria-pressed="false">Apex<span class="outdoor-activity-count">1<\/span>/);
-    assert.match(chips, /data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">2<\/span>/);
+    assert.match(chips, /data-region="apex" aria-pressed="false">Apex <span class="outdoor-activity-count">1<\/span>/);
+    assert.match(chips, /data-region="kelowna" aria-pressed="false">Kelowna <span class="outdoor-activity-count">2<\/span>/);
     const script = app.renderOutdoorFilterScriptHtml();
     for (const needle of ['data-venue-region', 'aria-pressed', 'outdoorSelectedClear', 'outdoorNoResults', 'replaceState', 'outdoorNoResultsClear', '"kelowna":"Kelowna"', '"hiking":"Hiking & Trails"']) assert.ok(script.includes(needle), needle);
   } finally {
@@ -8481,7 +8481,7 @@ test('/outdoors with a filter query renders pre-filtered: pressed chips, context
     assert.match(markup, /data-region-group="north">\s*<button[^>]*aria-expanded="true"[^>]*><span class="outdoor-region-group-name">North<\/span><span class="outdoor-region-group-meta">\d+ regions<\/span><span class="outdoor-region-group-selected">· 1 selected<\/span>/);
     assert.match(markup, /data-region-group="ski-resorts">\s*<button[^>]*aria-expanded="false"/);
     // Contextual counts are what the region chips carry in the filtered render.
-    assert.match(markup, new RegExp(`data-region="kelowna" aria-pressed="true">Kelowna<span class="outdoor-activity-count">${app.outdoorChipCounts(all, map, ['kelowna', 'vernon'], ['hiking', 'winter']).regions.kelowna}</span>`));
+    assert.match(markup, new RegExp(`data-region="kelowna" aria-pressed="true">Kelowna <span class="outdoor-activity-count">${app.outdoorChipCounts(all, map, ['kelowna', 'vernon'], ['hiking', 'winter']).regions.kelowna}</span>`));
     // Canonical stays the bare landing; the filter never becomes a route.
     assert.match(filtered, /rel="canonical" href="https:\/\/okanaganroam\.com\/outdoors"/);
 
@@ -8622,7 +8622,7 @@ test('Outdoor activity cards (2026-09-22 explorer): nine data-model activities i
     const iIntro = landing.indexOf('<p class="outdoor-intro outdoors-intro">'), iSearch = landing.indexOf('id="outdoorsSearch"'), iActs = landing.indexOf('outdoors-act-row'), iRegion = landing.indexOf('id="outdoorRegionsBtn"'), iRes = landing.indexOf('id="outdoorResults"');
     assert.ok(iIntro > 0 && iSearch > iIntro && iActs > iSearch && iRegion > iActs && iRes > iRegion, 'intro -> search -> activity chips -> Regions -> results');
     assert.doesNotMatch(landing, /outdoor-activity-showcase|outdoor-activity-card-img|Choose Activity\(s\)|Choose Region\(s\)/, 'no image tiles and no step headings on the landing');
-    assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">\d+<\/span>/, 'region chip and label untouched');
+    assert.match(landing, /<button type="button" class="outdoor-filter-chip" data-region="kelowna" aria-pressed="false">Kelowna <span class="outdoor-activity-count">\d+<\/span>/, 'region chip and label untouched');
     // Activity pages and region pages do not carry the activity cards.
     // (markup only -- the shared outdoor <style> block legitimately carries the card class names on every outdoor page)
     assert.doesNotMatch(outdoorMarkupOnly(app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking))), /outdoor-activity-showcase|outdoor-activity-toggle/);
@@ -8672,7 +8672,7 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     // Compact activity chips, live activities only (hiking, camping), no image tiles.
     assert.equal((pm.match(/outdoor-activity-card-img/g) || []).length, 0, 'no image tiles on the landing');
     assert.deepEqual([...pm.matchAll(/data-activity="([a-z]+)" aria-pressed="false"/g)].map((m) => m[1]), ['hiking', 'camping']);
-    assert.match(pm, /data-activity="hiking"[^>]*>[\s\S]*?<span class="outdoor-activity-count">4<\/span>/); assert.match(pm, /data-activity="camping"[^>]*>[\s\S]*?<span class="outdoor-activity-count">3<\/span>/);
+    assert.match(pm, /data-activity="hiking"[^>]*>[\s\S]*? <span class="outdoor-activity-count">4<\/span>/); assert.match(pm, /data-activity="camping"[^>]*>[\s\S]*? <span class="outdoor-activity-count">3<\/span>/);
 
     // 2. One region.
     const kel = app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['kelowna'], activities: [] });
@@ -8685,8 +8685,8 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     assert.doesNotMatch(km, /outdoor-selected-label">Activities/);
     assert.match(km, /id="outdoorSelectedClear">Clear all</); assert.match(km, /data-activity-all="1" aria-pressed="true"/, 'All stays pressed while only a region is chosen');
     // Activity card counts are contextual to the region selection: hiking in Kelowna = kelA (1), camping in Kelowna = kelB (1).
-    assert.match(km, /data-activity="hiking"[^>]*>[^<]*<span class="outdoor-activity-count">1<\/span>/);
-    assert.match(km, /data-activity="camping"[^>]*>[^<]*<span class="outdoor-activity-count">1<\/span>/);
+    assert.match(km, /data-activity="hiking"[^>]*>[^<]* <span class="outdoor-activity-count">1<\/span>/);
+    assert.match(km, /data-activity="camping"[^>]*>[^<]* <span class="outdoor-activity-count">1<\/span>/);
 
     // 3. Multiple regions = OR.
     const kp = app.renderCategoryAllRegionsPage('outdoor', all, { regions: ['kelowna', 'penticton'], activities: [] });
@@ -8707,8 +8707,8 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     assert.match(cm, /<div class="outdoor-selected-row"><span class="outdoor-selected-label">Activities<\/span> <button type="button" class="outdoor-selected-tag" data-remove-activity="camping" aria-label="Remove Camping">Camping<span/);
     assert.doesNotMatch(cm, /outdoor-selected-label">Regions/);
     // Region pill counts are contextual to the activity selection: Kelowna camping = 1, Osoyoos camping = 0.
-    assert.match(cm, /data-region="kelowna" aria-pressed="false">Kelowna<span class="outdoor-activity-count">1<\/span>/);
-    assert.match(cm, /data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0<\/span>/);
+    assert.match(cm, /data-region="kelowna" aria-pressed="false">Kelowna <span class="outdoor-activity-count">1<\/span>/);
+    assert.match(cm, /data-region="osoyoos" aria-pressed="false">Osoyoos <span class="outdoor-activity-count">0<\/span>/);
 
     // 5. Multiple activities = OR.
     const hc = app.renderCategoryAllRegionsPage('outdoor', all, { regions: [], activities: ['hiking', 'camping'] });
@@ -8725,8 +8725,8 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     assert.match(bm, /data-activity-all="1" aria-pressed="false"/, 'All releases once an activity is chosen');
     assert.match(bm, /<div class="outdoor-selected" id="outdoorSelected"><div class="outdoor-selected-row"><span class="outdoor-selected-label">Regions<\/span> [\s\S]*?data-remove-region="kelowna"[\s\S]*?data-remove-region="penticton"[\s\S]*?<\/div><div class="outdoor-selected-row"><span class="outdoor-selected-label">Activities<\/span> [\s\S]*?data-remove-activity="hiking"[\s\S]*?data-remove-activity="camping"[\s\S]*?<\/div><button type="button" class="outdoor-selected-clear" id="outdoorSelectedClear">Clear all<\/button><\/div>/);
     // Contextual counts in the combined state: Kelowna = Kelowna venues with hiking OR camping (kelA, kelB) = 2; hiking = hiking venues in Kelowna OR Penticton (kelA, penA) = 2.
-    assert.match(bm, /data-region="kelowna" aria-pressed="true">Kelowna<span class="outdoor-activity-count">2<\/span>/);
-    assert.match(bm, /data-activity="hiking" aria-pressed="true"[^>]*>[\s\S]*?<span class="outdoor-activity-count">2<\/span>/);
+    assert.match(bm, /data-region="kelowna" aria-pressed="true">Kelowna <span class="outdoor-activity-count">2<\/span>/);
+    assert.match(bm, /data-activity="hiking" aria-pressed="true"[^>]*>[\s\S]*? <span class="outdoor-activity-count">2<\/span>/);
     // Same result from the shipped client predicate.
     const clientMatches = new Function(`${app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}; return matches;`)();
     assert.deepEqual(all.filter((v) => clientMatches(['kelowna', 'penticton'], ['hiking', 'camping'], v.region, map.get(v.id) || [])).map((v) => v.id).sort((x, y) => x - y), [kelA, kelB, penA].sort((x, y) => x - y));
@@ -8764,7 +8764,7 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     assert.equal(app.getOutdoorActivityCounts().hiking, 5);
     const landing = app.renderCategoryAllRegionsPage('outdoor', universe);
     const lm = outdoorMarkupOnly(landing);
-    assert.match(lm, /data-activity="hiking"[^>]*>[\s\S]*?<span class="outdoor-activity-count">5<\/span>/, 'the Hiking card shows the activity count (same number as /outdoors/hiking)');
+    assert.match(lm, /data-activity="hiking"[^>]*>[\s\S]*? <span class="outdoor-activity-count">5<\/span>/, 'the Hiking card shows the activity count (same number as /outdoors/hiking)');
     assert.equal(app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking).length, 5);
     assert.equal(summary(landing), `${all.length + 1} outdoor destinations`);
     assert.match(lm, new RegExp(`<li class="venue-card" data-venue-id="${beach.id}" data-venue-region="kelowna" data-venue-category="beach" data-venue-name="Test Beach Park"`));
@@ -8820,7 +8820,7 @@ test('I.3: the landing filter chips and the activity-page chips present the six 
     // Landing chips (multi-select buttons with counts), in order.
     const chips = app.renderOutdoorActivityFilterChips();
     assert.deepEqual([...chips.matchAll(/data-activity="([a-z]+)"/g)].map((m) => m[1]), expectedSlugs);
-    assert.deepEqual([...chips.matchAll(/aria-pressed="false">([^<]+)<span class="outdoor-activity-count">(\d+)<\/span>/g)].map((m) => m[1].replace(/&amp;/g, '&')), expectedLabels);
+    assert.deepEqual([...chips.matchAll(/aria-pressed="false">([^<]+) <span class="outdoor-activity-count">(\d+)<\/span>/g)].map((m) => m[1].replace(/&amp;/g, '&')), expectedLabels);
     assert.ok(!chips.includes('data-activity="camping"') && !chips.includes('data-activity="water"'));
     // Activity-page selector (links + active pill), same order, no counts.
     const nav = app.renderOutdoorActivitySelector('nature');
@@ -9408,7 +9408,7 @@ test('Outdoor region chips use the complete canonical region list (REGION_LABELS
   assert.deepEqual(canonical.slice(-4), ['silverstar', 'big-white', 'apex', 'baldy']);
   const rows = app.getVenuesByCategory('outdoor');
   const chips = app.renderOutdoorRegionFilterChips(rows);
-  const rendered = [...chips.matchAll(/data-region="([a-z-]+)" aria-pressed="false">([^<]+)<span class="outdoor-activity-count">(\d+)<\/span>/g)].map((m) => [m[1], m[2], Number(m[3])]);
+  const rendered = [...chips.matchAll(/data-region="([a-z-]+)" aria-pressed="false">([^<]+) <span class="outdoor-activity-count">(\d+)<\/span>/g)].map((m) => [m[1], m[2], Number(m[3])]);
   assert.deepEqual(rendered.map((r) => r[0]), canonical, 'chips rendered for every canonical region in site order');
   for (const [slug, label, count] of rendered) {
     assert.equal(label, app.REGION_LABELS[slug].replace(/&/g, '&amp;'), `label for ${slug} comes from REGION_LABELS`);
@@ -9458,9 +9458,9 @@ test('Grouped region selector: four FOOTER_REGION_GROUPS blocks in order, all 20
   // Chips themselves unchanged: same toggle buttons, counts (0 shown) intact.
   for (const r of app.canonicalOutdoorRegionOrder()) {
     const count = rows.filter((v) => v.region === r).length;
-    assert.match(html, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">${app.REGION_LABELS[r].replace(/&/g, '&amp;')}<span class="outdoor-activity-count">${count}</span></button>`));
+    assert.match(html, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">${app.REGION_LABELS[r].replace(/&/g, '&amp;')} <span class="outdoor-activity-count">${count}</span></button>`));
   }
-  assert.ok(html.includes('data-region="osoyoos" aria-pressed="false">Osoyoos<span class="outdoor-activity-count">0</span>'), 'zero-count region present and selectable');
+  assert.ok(html.includes('data-region="osoyoos" aria-pressed="false">Osoyoos <span class="outdoor-activity-count">0</span>'), 'zero-count region present and selectable');
   // CSS: desktop shows every chip without expansion (headers hidden, blocks flow), no-JS shows every chip.
   const css = app.renderOutdoorThemeStyles();
   assert.match(css, /@media \(min-width: 900px\) \{\s*body\.outdoor-page \.outdoor-region-groups \{ display: flex;[\s\S]*?\.outdoor-region-group-toggle \{ display: none !important; \}[\s\S]*?\.outdoor-region-group-chips\[hidden\] \{ display: contents; \}/);
@@ -9527,7 +9527,7 @@ test("What's On shell: twelve categories in the approved order, tiles are multi-
   assert.match(markup, /data-category-all="1" aria-pressed="true">All</, 'All is pressed when no category is chosen');
   assert.doesNotMatch(markup, /whatson-category-card/, 'the image tiles are no longer rendered on this page');
   // Region chips: the complete canonical list, grouped like Outdoors; counts (all 0 in the empty default window) are shown because inventory exists.
-  for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">${app.REGION_LABELS[r].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<span class="outdoor-activity-count">0</span></button>`));
+  for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">${app.REGION_LABELS[r].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} <span class="outdoor-activity-count">0</span></button>`));
   assert.equal((markup.match(/class="outdoor-filter-chip" data-region="/g) || []).length, 20);
   assert.match(markup, /data-region-group="central">[\s\S]*?aria-expanded="true"/);
   // Inventory exists but the default window (next 30 days) holds none of the 2099 fixtures: no-match state, empty-inventory copy hidden, no fake cards.
@@ -10089,7 +10089,7 @@ test('Destination pages: every linked category tab has an active venue, and food
     const region = s6markup(app.renderRegionPage('apex', counts, []));
     assert.match(region, /class="golf-page outdoor-page region-page"/, 'themed shell');
     assert.match(region, /id="tripTray"/);
-    const tabs = [...region.matchAll(/<a href="\/apex\/([a-z-]+)">[^<]*<span class="outdoor-activity-count">(\d+)<\/span>/g)];
+    const tabs = [...region.matchAll(/<a href="\/apex\/([a-z-]+)">[^<]* <span class="outdoor-activity-count">(\d+)<\/span>/g)];
     assert.ok(tabs.length > 0);
     for (const [, slug, n] of tabs) assert.ok(Number(n) >= 1, `${slug} tab has an active venue`);
     assert.match(region, /href="\/apex\/cafes">/);
@@ -11377,7 +11377,7 @@ test('Hidden Gems page: Build My Trip "See everything" links follow the same rul
 const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'Tours & Experiences', 'Sports & Recreation', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
 function destTabs(html) {
   const nav = (html.match(/<nav class="category-region-selector region-category-tabs"[\s\S]*?<\/nav>/) || [''])[0];
-  return [...nav.matchAll(/<(a|span)( href="([^"]+)")?([^>]*)>([^<]+)<span class="outdoor-activity-count">(\d+)<\/span><\/\1>/g)]
+  return [...nav.matchAll(/<(a|span)( href="([^"]+)")?([^>]*)>([^<]+) <span class="outdoor-activity-count">(\d+)<\/span><\/\1>/g)]
     .map((m) => ({ tag: m[1], href: m[3] ? m[3].replace(/&amp;/g, '&') : null, attrs: m[4], label: m[5].replace(/&rsquo;/g, '\u2019').replace(/&amp;/g, '&'), count: Number(m[6]) }));
 }
 function destRegions() {
@@ -17366,7 +17366,7 @@ test('Derived hours badges: PUT/POST /api/venues cannot set them, and PUT re-der
     const json = await (await fetch(`${base}/api/venues/${c.id}`)).json();
     assert.equal(json.open_late, true);
     const page = await (await fetch(`${base}/summerland/restaurants/hb-posted-bistro`)).text();
-    assert.match(page, /<span class="chip">Open Late<\/span>/);
+    assert.match(page, /<span class="chip"[^>]*>Open Late<\/span>/);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
@@ -17535,7 +17535,7 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       assert.match(empty.text, /<h1>Indoor &amp; Rainy Day in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="indoor-coming-soon">More indoor spots are coming soon/);
       // One list since 2026-10-14: the simulators sit in it, under the Indoor Golf chip.
-      assert.match(empty.text, /data-fd-type="golf" aria-pressed="false">Indoor Golf<span class="outdoor-activity-count">[1-9]\d*<\/span>/);
+      assert.match(empty.text, /data-fd-type="golf" aria-pressed="false">Indoor Golf <span class="outdoor-activity-count">[1-9]\d*<\/span>/);
       assert.match(empty.text, /href="\/vernon\/golf\/winter-test-sim-lounge"/, 'the simulator links to its existing golf page');
       assert.match(empty.text, /<body class="golf-page outdoor-page fd-page indoor-page indoor-hub-page">/);
       assert.doesNotMatch(empty.text, /noindex/);
@@ -19602,7 +19602,7 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   assert.match(html, /data-venue-id="9002"[^>]*data-ph="bike-\d"/);
   assert.match(html, /data-venue-id="9001"[^>]*data-ph="skate-0"/);
   for (const k of ['skate', 'bike', 'disc', 'courts']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
-  assert.match(html, /data-fd-type="skate" aria-pressed="false">Skate Parks &amp; BMX<span class="outdoor-activity-count">1<\/span>/);
+  assert.match(html, /data-fd-type="skate" aria-pressed="false">Skate Parks &amp; BMX <span class="outdoor-activity-count">1<\/span>/);
   assert.match(html, /<option value="recommended" selected>Biggest first<\/option><option value="town">By town<\/option>/);
   assert.match(html, /if \(key === 'town'\)/, 'the page can sort by town');
   assert.match(html, /<a href="\/sports\/bike">Mountain Biking <span>1<\/span><\/a>/, 'activity pages stay linked');
@@ -19626,7 +19626,7 @@ test('Indoor hub: one list, experience chips incl. Indoor Golf, a real Family Fu
   const notes = new Map([[9106, 'Bowling lanes and arcade']]);
   const html = app.renderIndoorHubPage(indoor, golf, also, notes, { types: [], features: [], regions: [] });
   assert.match(html, /id="fdResultsSummary" aria-live="polite">6 places</);
-  assert.match(html, /data-fd-type="golf" aria-pressed="false">Indoor Golf<span class="outdoor-activity-count">1<\/span>/);
+  assert.match(html, /data-fd-type="golf" aria-pressed="false">Indoor Golf <span class="outdoor-activity-count">1<\/span>/);
   // Family Fun is the hands-on places, not every kid-friendly listing; never the brewery.
   assert.deepEqual(app.indoorExperiencesOf(indoor[2], null), ['family']);
   assert.ok(!app.indoorExperiencesOf(indoor[1], null).includes('family'), 'a kid-friendly gallery is not Family Fun');
@@ -27276,3 +27276,106 @@ test('Caching (2026-10-18): versioned images are immutable, /browse/cards.json h
     assert.equal(await miss.text(), '{}', u);
   }
 }));
+
+// ---- Phone layout and tech polish (2026-10-18, review pass 4) ----------------------------------------------------
+async function withPass4Server(fn) {
+  const http = require("node:http");
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try { return await fn(async (p) => { const r = await fetch(base + p); return { status: r.status, headers: r.headers, text: await r.text() }; }); }
+  finally { await new Promise((resolve) => srv.close(resolve)); }
+}
+
+test('Pass 4 phone layout: list-page controls wrap, badge chips reserve their width, counts get a space, footer keeps a gutter', () => withPass4Server(async (get) => {
+  // The page plus its own shared stylesheets (inline styles are moved out into /styles/ files).
+  const withCss = async (p) => {
+    const html = (await get(p)).text;
+    const hrefs = [...html.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
+    return html + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
+  };
+  const browse = await withCss('/browse');
+  assert.match(browse, /@media \(max-width: 640px\) \{[\s\S]*?body\.fd-page \.fd-controls \{ flex-wrap: wrap; gap: 6px; \}/, 'the phone filter bar wraps instead of pushing the page sideways');
+  assert.doesNotMatch(browse, /body\.fd-page \.fd-controls \{ flex-wrap: nowrap/);
+  // Chip counts: "Restaurants 433", never "Restaurants433".
+  assert.doesNotMatch(browse, /[^\s>]<span class="outdoor-activity-count">/);
+  assert.match(browse, / <span class="outdoor-activity-count">\d+<\/span>/);
+  // Footer: the bottom row has side padding.
+  assert.match(browse, /\.home-footer-bottom \{ border-top: [^}]*padding: 16px 24px 24px; \}/);
+  // Badge chips: a known label reserves its width in em; an unknown one and a styled one are left alone.
+  assert.ok(app.CHIP_TEXT_EM['Vegetarian-Friendly'] >= 9.43, 'at least Nunito\'s width of the label');
+  assert.equal(app.withChipWidths('<span class="chip">Patio</span>'), `<span class="chip" style="box-sizing:content-box;min-width:${app.CHIP_TEXT_EM.Patio}em;text-align:center">Patio</span>`);
+  assert.match(app.withChipWidths('<span class="chip whatson">Events &amp; Festivals</span>'), /min-width:8\.9em/, 'entities are read as text');
+  assert.equal(app.withChipWidths('<span class="chip">Some new badge</span>'), '<span class="chip">Some new badge</span>');
+  assert.equal(app.withChipWidths('<span class="chip" style="color:red">Patio</span>'), '<span class="chip" style="color:red">Patio</span>');
+  for (const label of ['Dog-Friendly', 'Vegan-Friendly', 'Patio', 'Kid-Friendly', 'Gluten-Free-Friendly', 'Lake View', 'Non-Alcoholic Options', 'Sports TV', 'Live Music', 'Great for Groups', 'Happy Hour', 'Open Early', 'Open Late']) {
+    assert.ok(app.CHIP_TEXT_EM[label], `${label} has a reserved width`);
+  }
+}));
+
+test('Pass 4 phone menu: Tab and Shift+Tab go round the open menu, and the header around it is inert', () => withPass4Server(async (get) => {
+  const home = (await get('/')).text;
+  assert.match(home, /document\.addEventListener\('keydown', function\(e\)\{\n    if \(e\.key !== 'Tab' \|\| !links \|\| !links\.classList\.contains\('open'\)/);
+  assert.match(home, /if \(burger && visible\(burger\)\) ring\.push\(burger\);/);
+  assert.match(home, /\[links, burger\]\.forEach\(function\(start\)\{/, 'siblings all the way up from the menu and its button are made inert');
+}));
+
+test('Pass 4 open-now empty state: list pages and /browse name the next places to open, in English and French', () => withPass4Server(async (get) => {
+  for (const p of ['/wineries', '/browse', '/kelowna/restaurants']) {
+    const html = (await get(p)).text;
+    assert.match(html, /function openNextOf\(status, label, clock\)\{/, p);
+    assert.match(html, /paintOpenNextList\(empty, /, p);
+    assert.match(html, /'Opening next:'/, p);
+  }
+  const fr = (await get('/fr/wineries')).text;
+  assert.match(fr, /'Prochaines ouvertures :'/);
+  assert.match(fr, /'Rien de ce qui correspond n’est ouvert en ce moment\.'/);
+  // The helper itself: a place opening tomorrow at 9 sorts after one opening tonight at 17:00.
+  const src = /(var OPEN_NEXT_WEEK[\s\S]*?\n  function paintOpenNextList)/.exec(fr)[1].replace(/\n  function paintOpenNextList$/, '');
+  const openNextOf = new Function(`${src}; return openNextOf;`)();
+  const clock = { weekday: 'sun', minutes: 21 * 60 };
+  const a = openNextOf({ opensAt: { weekday: 'mon', minutes: 9 * 60 } }, { state: 'closed', text: 'Closed · Opens tomorrow 9 AM' }, clock);
+  const b = openNextOf({ opensAt: { weekday: 'sun', minutes: 22 * 60 } }, { state: 'closed', text: 'Closed · Opens 10 PM' }, clock);
+  const c = openNextOf({ opensAt: { weekday: 'sun', minutes: 20 * 60 } }, { state: 'closed', text: 'Closed · Opens Sun 8 PM' }, clock);
+  assert.deepEqual(a, { mins: 12 * 60, text: 'Opens tomorrow 9 AM' });
+  assert.deepEqual(b, { mins: 60, text: 'Opens 10 PM' });
+  assert.equal(c.mins, 7 * 1440 - 60, 'earlier today means next week');
+  assert.equal(openNextOf({ opensAt: null }, { state: 'closed', text: 'Closed now' }, clock), null);
+  assert.equal(openNextOf({ opensAt: { weekday: 'mon', minutes: 0 } }, { state: 'open', text: 'Open now' }, clock), null);
+}));
+
+test('Pass 4 tech polish: event places with a street split it out; CSP connect-src allows Google Fonts; /map groups pins on one spot', () => withPass4Server(async (get) => {
+  const ev = { region: 'vernon', valley_wide: 0 };
+  assert.deepEqual(app.eventTextPlace('Prospera Place, 1223 Water St, Kelowna', ev), { '@type': 'Place', name: 'Prospera Place', address: { '@type': 'PostalAddress', streetAddress: '1223 Water St', addressLocality: 'Kelowna', addressRegion: 'BC', addressCountry: 'CA' } });
+  assert.deepEqual(app.eventTextPlace('Steady Effort Yoga, 106-1641 Dartmouth Rd, Penticton BC', ev).address.streetAddress, '106-1641 Dartmouth Rd');
+  assert.equal(app.eventTextPlace('Steady Effort Yoga, 106-1641 Dartmouth Rd, Penticton BC', ev).address.addressLocality, 'Penticton');
+  assert.equal(app.eventTextPlace('Simply Baskets, 1206 Hwy 6, Cherryville', ev).address.addressLocality, 'Cherryville');
+  assert.equal(app.eventTextPlace('Ottercrest Farms, 4387 MacDonald Rd', ev).address.addressLocality, 'Vernon', 'no town given: the event\'s own town');
+  assert.equal(app.eventTextPlace('1091 Coronation Ave, Kelowna', ev).name, '1091 Coronation Ave, Kelowna', 'an address alone stays the name');
+  assert.deepEqual(app.eventTextPlace('IPE Fairgrounds, Armstrong', ev), { '@type': 'Place', name: 'IPE Fairgrounds, Armstrong', address: { '@type': 'PostalAddress', addressLocality: 'Vernon', addressRegion: 'BC', addressCountry: 'CA' } }, 'no street: as before');
+  assert.match(app.CSP_REPORT_ONLY, /connect-src [^;]*https:\/\/fonts\.googleapis\.com/);
+  const map = (await get('/map')).text;
+  assert.match(map, /maxClusterRadius: function\(z\)\{ return z >= 17 \? 1 : /);
+  assert.doesNotMatch(map, /disableClusteringAtZoom/);
+}));
+
+test('Pass 4 tech polish: an open-until venue\'s weekly hours carry validThrough its last open day', () => {
+  seasonInsert.run({ name: 'Pass4 Open Until Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'pass4-open-until-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'pass4-open-until-fixture');
+  const meta = { reason: 'test', batch_id: 'pass4-valid-through' };
+  const specs = () => {
+    const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'pass4-open-until-fixture'), [], [], [], { now: SEASON_NOW });
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1])).find((o) => o.openingHoursSpecification);
+    return ld.openingHoursSpecification;
+  };
+  try {
+    assert.ok(specs().every((s) => !s.validThrough), 'no season: no validThrough');
+    assert.equal(app.guardedSeasonUpdate(v.id, { status: 'open_until', until_date: '2026-10-26', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
+    const s = specs();
+    assert.ok(s.length >= 7);
+    assert.ok(s.every((x) => x.validThrough === '2026-10-26'), JSON.stringify(s[0]));
+  } finally {
+    app.guardedSeasonUpdate(v.id, null, meta, SEASON_NOW);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
