@@ -1,6 +1,6 @@
 {
  "updated": "2026-10-19",
- "note": "Street addresses of the busiest event venues, for event JSON-LD and calendar files (site review pass 5). Each was checked against the venue's own site, its city's site or the Kelowna community directory on 2026-10-19; a postal code is left out where it could not be confirmed. aliases are other spellings seen in event listings.",
+ "note": "Street addresses of the busiest event venues, for event JSON-LD and calendar files (site review pass 5). Each was checked against the venue's own site, its city's site or the Kelowna community directory on 2026-10-19; a postal code is left out where it could not be confirmed. aliases are other spellings seen in event listings. Round 7 (2026-10-19): 15 more places, each taken from the listing's own address on the live site (/api/venues), and regionAliases, names that only count for an event in that town.",
  "venues": [
   {
    "name": "Creekside Theatre",
@@ -185,7 +185,17 @@
   {
    "name": "Landmark Cinemas Penticton",
    "region": "penticton",
-   "streetAddress": "250 Winnipeg St"
+   "streetAddress": "250 Winnipeg St",
+   "aliases": [
+    "Landmark Cinemas 7 Penticton",
+    "Landmark 7 Penticton"
+   ],
+   "postalCode": "V2A 5M3",
+   "regionAliases": [
+    "Landmark Cinemas",
+    "Landmark Cinema",
+    "The Landmark"
+   ]
   },
   {
    "name": "IPE Fairgrounds",
@@ -256,7 +266,10 @@
   {
    "name": "Metro Hub",
    "region": "kelowna",
-   "streetAddress": "1265 Ellis St"
+   "streetAddress": "1265 Ellis St",
+   "aliases": [
+    "Metro Hub Kelowna"
+   ]
   },
   {
    "name": "The Balsam School",
@@ -351,6 +364,164 @@
    "region": "vernon",
    "streetAddress": "3228 31 Ave",
    "postalCode": "V1T 2H3"
+  },
+  {
+   "name": "Ex Nihilo Vineyards",
+   "region": "lake-country",
+   "streetAddress": "1525 Camp Rd",
+   "postalCode": "V4V 1K1",
+   "aliases": [
+    "Ex Nihilo Vineyards & Tasting Room",
+    "Ex Nihilo"
+   ]
+  },
+  {
+   "name": "Sociale",
+   "region": "penticton",
+   "streetAddress": "950 Lakeshore Dr W",
+   "postalCode": "V2A 1C1",
+   "aliases": [
+    "Socialē on Lakeshore",
+    "Sociale on Lakeshore",
+    "Socialē"
+   ]
+  },
+  {
+   "name": "Sonora Room Restaurant",
+   "region": "oliver",
+   "streetAddress": "500 Burrowing Owl Pl",
+   "postalCode": "V0H 1T1",
+   "aliases": [
+    "Sonora Room Restaurant at Burrowing Owl Estate Winery",
+    "Sonora Room at Burrowing Owl",
+    "The Sonora Room"
+   ]
+  },
+  {
+   "name": "Burrowing Owl Estate Winery",
+   "region": "oliver",
+   "streetAddress": "500 Burrowing Owl Pl",
+   "postalCode": "V0H 1T1",
+   "aliases": [
+    "Burrowing Owl Winery",
+    "Burrowing Owl"
+   ]
+  },
+  {
+   "name": "The Sage Pub",
+   "region": "osoyoos",
+   "streetAddress": "6403 Cottonwood Dr",
+   "postalCode": "V0H 1V3",
+   "aliases": [
+    "The Sage Pub & Liquor Store",
+    "Sage Pub"
+   ]
+  },
+  {
+   "name": "SS Sicamous",
+   "region": "penticton",
+   "streetAddress": "1099 Lakeshore Dr W",
+   "postalCode": "V2A 1B7",
+   "aliases": [
+    "SS Sicamous Museum & Heritage Park",
+    "SS Sicamous Museum",
+    "S.S. Sicamous"
+   ]
+  },
+  {
+   "name": "Cannery Brewing",
+   "region": "penticton",
+   "streetAddress": "198 Ellis St",
+   "postalCode": "V2A 4L5",
+   "aliases": [
+    "Cannery Brewing Co.",
+    "Cannery Brewing Company"
+   ]
+  },
+  {
+   "name": "Kettle Valley Steam Railway",
+   "region": "summerland",
+   "streetAddress": "18404 Bathville Rd",
+   "postalCode": "V0H 1Z8",
+   "aliases": [
+    "Kettle Valley Steam Railway, Prairie Valley Station",
+    "Prairie Valley Station"
+   ]
+  },
+  {
+   "name": "Mission Hill Family Estate",
+   "region": "west-kelowna",
+   "streetAddress": "1730 Mission Hill Rd",
+   "postalCode": "V4T 2E4",
+   "aliases": [
+    "Mission Hill Family Estate Winery",
+    "Mission Hill Winery",
+    "Mission Hill"
+   ]
+  },
+  {
+   "name": "Crown & Thieves",
+   "region": "west-kelowna",
+   "streetAddress": "3887 Brown Rd",
+   "postalCode": "V4T 2J9",
+   "aliases": [
+    "The Broken Hearts Club @ Crown & Thieves",
+    "The Broken Hearts Club at Crown & Thieves",
+    "The Broken Hearts Club"
+   ]
+  },
+  {
+   "name": "River Stone Estate Winery",
+   "region": "oliver",
+   "streetAddress": "143 Buchanan Dr",
+   "postalCode": "V0H 1T2",
+   "aliases": [
+    "River Stone Winery",
+    "River Stone Estate"
+   ]
+  },
+  {
+   "name": "The Cannery Trade Centre",
+   "region": "penticton",
+   "streetAddress": "1475 Fairview Rd",
+   "postalCode": "V2A 7W5",
+   "aliases": [
+    "Cannery Trade Centre",
+    "Cannery Stage",
+    "Many Hats Theatre Company (Cannery Stage)"
+   ]
+  },
+  {
+   "name": "DunnEnzies Pizza Downtown",
+   "region": "kelowna",
+   "streetAddress": "1559 Ellis St",
+   "postalCode": "V1Y 2A7",
+   "aliases": [
+    "DunnEnzies Downtown"
+   ]
+  },
+  {
+   "name": "Tugboat Bay Beach, Waterfront Park",
+   "region": "kelowna",
+   "streetAddress": "1200 Water St",
+   "aliases": [
+    "Tugboat Beach, Waterfront Park",
+    "Tugboat Beach",
+    "Tugboat Bay",
+    "Waterfront Park – Tugboat Bay Beach"
+   ]
+  },
+  {
+   "name": "Mount Boucherie Community Centre",
+   "region": "west-kelowna",
+   "streetAddress": "2760 Cameron Rd",
+   "aliases": [
+    "Mount Boucherie Recreation Centre",
+    "Mount Boucherie Arenas",
+    "Mt. Boucherie Community Centre",
+    "Royal LePage Place",
+    "Jim Lind Arena"
+   ]
   }
  ]
 }

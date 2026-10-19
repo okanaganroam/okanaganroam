@@ -4244,6 +4244,8 @@ module.exports = {
   eligible,
   advisoryFit,
   advisoryNotOperating,
+  // Round 7 (2026-10-19): server.js's legacy /api/trip/generate uses the same rule.
+  advisoryUnavailable,
   ADVISORY_NOT_OPERATING_RE,
   seasonClosedOnTrip,
   scoreVenue,
