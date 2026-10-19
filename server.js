@@ -6117,6 +6117,17 @@ function tripPlannerLabels() {
 const TRIP_PLAN_MAX_IDS = 200;
 const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|late|evening|night)$/; // late: a wine day's late-afternoon tasting; night: an event on an evening with dinner (2026-10-18)
 // Validates the POST /api/trip/plan body; returns { error } or { value }.
+// The first day of an undated Halloween trip: Oct 31 itself, or the weekend around it for a longer trip (never a
+// day already past).
+function halloweenTripStart(days, now) {
+  const today = todayLocal(now);
+  let year = Number(today.slice(0, 4));
+  if (today > `${year}-11-01`) year += 1;
+  const eve = `${year}-10-31`, wd = localWeekday(eve);
+  const from = days > 1 ? (wd === 6 ? eve : wd === 0 ? addLocalDays(eve, -1) : addLocalDays(eve, -((wd + 1) % 7))) : eve;
+  return from < today ? today : from;
+}
+
 function parseTripPlanBody(body) {
   const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap'];
   const unexpected = Object.keys(body || {}).filter((k) => !allowed.includes(k));
@@ -6523,6 +6534,9 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   if (!itineraryEvents && !trip.multi && intent.mode === 'plan' && (intent.party?.kids || intent.occasion === 'family') && !requirements?.items.some(i => i.kind === 'event') && !/\b(?:ski|skiing|snowboard\w*)\b/i.test(interpretationText)) {
     const days = Math.max(1, Math.min(7, intent.days || requirements?.items.find(i => i.kind === 'days')?.value || 1));
     let from = requirements?.startDate || null;
+    // 2026-10-19: an undated "Halloween weekend ... with my kids" is the Halloween weekend, not the coming one.
+    const halloween = tripPlannerModule().holidayTheme(interpretationText)?.key === 'halloween';
+    if (!from && halloween && !intent.when) from = halloweenTripStart(days, now);
     if (!from && /\bweekends?\b/i.test(interpretationText) && !intent.when) {
       const today = todayLocal(now), wd = localWeekday(today);
       from = wd === 6 ? today : addLocalDays(today, (6 - wd + 7) % 7 || 7);
@@ -6551,14 +6565,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   if (holiday && holiday.key === 'halloween') {
     const days = Math.max(1, Math.min(7, intent.days || requirements?.items.find(i => i.kind === 'days')?.value || 1));
     let from = requirements?.startDate || null;
-    if (!from) {
-      const today = todayLocal(now);
-      let year = Number(today.slice(0, 4));
-      if (today > `${year}-11-01`) year += 1;
-      const eve = `${year}-10-31`, wd = localWeekday(eve);
-      from = days > 1 ? (wd === 6 ? eve : wd === 0 ? addLocalDays(eve, -1) : addLocalDays(eve, -((wd + 1) % 7))) : eve;
-      if (from < today) from = today;
-    }
+    if (!from) from = halloweenTripStart(days, now);
     const window = resolveWhatsOnWindow({ from, to: addLocalDays(from, days - 1) }, now);
     const found = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], []), intent.excluded), window.from, window.to), now)
       .filter(e => holiday.re.test(discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''}`)));

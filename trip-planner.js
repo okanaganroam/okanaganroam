@@ -2682,6 +2682,17 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
       const anchor=group.stops.find(s=>s.event),start=anchor&&parseEventStart(anchor.event.time);
       if(start!=null&&start>=1020)cursor=Math.min(cursor,900);
     }
+    // 2026-10-19: lunch right before an event that starts at lunchtime (a noon Halloween trail) cannot fit before it
+    // with travel and the arrival allowance, so it was a "Timing conflict"; lunch moves to after the event instead.
+    for(let i=0;i<group.stops.length-1;i++){
+      const lunch=group.stops[i],next=group.stops.slice(i+1).find(s=>s.venue||s.event);
+      if(!isLunchStop(lunch)||!next?.event||next.dropIn)continue;
+      const start=parseEventStart(next.event.time);
+      if(start==null||start<660||start>780)continue;
+      const j=group.stops.indexOf(next);
+      if(/^(?:midday|afternoon)$/i.test(lunch.label||'')&&/^(?:midday|afternoon)$/i.test(next.label||''))[lunch.label,next.label]=[next.label,lunch.label];
+      group.stops.splice(j,1);group.stops.splice(i,0,next);i++;
+    }
     for(const stop of group.stops){
       if(!stop.venue&&!stop.event)continue;
       // Listed event times are fixed anchors, never estimated visit lengths.

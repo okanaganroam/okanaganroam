@@ -318,3 +318,27 @@ test('Brewery crawl (round 9): something to eat between the breweries', () => {
   const stops = (p.itinerary && p.itinerary.stops) || p.days.flatMap((x) => x.stops);
   if (stops.filter((s) => s.venue && s.venue.type === 'brewery').length >= 2) assert.ok(stops.some((s) => s.venue && ['restaurant', 'pub'].includes(s.venue.type)), stops.map((s) => s.venue && s.venue.name).join(', '));
 });
+
+test('Events (2026-10-19): lunch before a noon event moves after it, never a "Timing conflict"', () => {
+  // The real request: "Halloween weekend in Penticton with my kids" put lunch before a noon Halloween trail in Summerland.
+  // Family-friendly places to eat (added last, so the tests above keep their fixture valley).
+  if (!FACTS.some((v) => v.name === 'Penticton Family Diner 1')) for (let i = 0; i < 4; i++) add({ name: `Penticton Family Diner ${i + 1}`, region: 'penticton', type: 'restaurant', rating: 4.7, price: 2, hours: open('11:00', '21:00'), features: { kid_friendly: true }, dLat: 0.003 * i });
+  for (const time of ['12 pm', '11:30 am', '1 pm']) {
+    const text = 'Halloween weekend in Penticton with my kids';
+    const events = ['2026-10-31', '2026-11-01'].map((date) => ev({ name: 'Haunted Halloween Trail', region: 'summerland', date, time, categories: ['family-kids', 'holiday-seasonal'] }));
+    const intent = d.interpretDiscoveryQuery(text, TAXONOMY);
+    const trip = d.interpretTripComponents(text, TAXONOMY, intent);
+    const requirements = r.extractTripRequirements({ text, intent, trip, taxonomy: TAXONOMY, referenceDate: '2026-10-19' });
+    requirements.startDate = '2026-10-31'; requirements.endDate = '2026-11-01';
+    const p = tp.planTrip({ intent, trip: null, requirements, facts: FACTS, labels: LABELS, text, tripDate: '2026-10-31', events, familyEvents: true, tripEvents: [] });
+    let checked = 0;
+    for (const day of p.days) {
+      const event = day.stops.find((s) => s.event);
+      if (!event) continue;
+      for (const s of day.stops) { const row = rowOf(p, s); if (row) assert.notEqual(row.status, 'unmet', `${time} ${s.venue ? s.venue.name : s.event.name}: ${JSON.stringify(row)}`); }
+      const lunch = day.stops.find((s) => s.venue && s.daypart === 'midday');
+      if (lunch) { assert.ok(day.stops.indexOf(lunch) > day.stops.indexOf(event), `${time}: lunch comes after the event`); checked++; }
+    }
+    assert.ok(checked, `${time}: a day with lunch and the event`);
+  }
+});
