@@ -25895,7 +25895,7 @@ test('Owner portal photos (2026-10-18): the grid refreshes in place and owners m
     const gridOrder = async () => [...(await (await s.get(`/owner/account/venue/${v.id}`, me.cookie)).text()).matchAll(/<button type="button" class="op-btn op-btn-danger op-remove" data-photo="(\d+)"/g)].map((m) => Number(m[1]));
     assert.deepEqual(await gridOrder(), [main, a, b, c], 'main first, then oldest first');
     const page = await (await s.get(`/owner/account/venue/${v.id}`, me.cookie)).text();
-    assert.match(page, /<div id="opPhotoBox"><div class="op-photos" id="opPhotoGrid">/, 'one box the page swaps after an upload');
+    assert.match(page, /<div id="opPhotoBox">(?:<div class="op-pos" id="opPos">[\s\S]*?<\/figure>\s*<\/div>[\s\S]*?<\/div>\s*<\/div>)?<div class="op-photos" id="opPhotoGrid">/, 'one box the page swaps after an upload (the main photo position block first)');
     assert.match(page, new RegExp(`data-photo="${a}" data-move="up" aria-label="Move photo 1 of 3 earlier" disabled>`));
     assert.match(page, new RegExp(`data-photo="${c}" data-move="down" aria-label="Move photo 3 of 3 later" disabled>`));
     assert.match(page, /refreshPhotos\(\); \}/, 'the upload refreshes the grid');
@@ -30257,4 +30257,124 @@ test('Trip planner round 8: Swap sends the visitor\'s locks, and only valid ones
   assert.match(html, /var FR_STOP_NOUN = \{"winery":/);
   // The dated one-day outing check survives the template (a single backslash became "d").
   assert.ok(html.includes("/^\\d{4}-\\d{2}-\\d{2}$/.test(r.date || '')"));
+});
+
+test('Main photo position (2026-10-19): a signed-in owner slides the banner photo up or down; it applies only to that photo', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Photo Position Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'photo-position-fixture' });
+  seasonInsert.run({ name: 'Photo Position Other', type: 'winery', hours: SEASON_WEEK, slug: 'photo-position-other' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'photo-position-fixture');
+  const other = app.findVenueBySlug('kelowna', 'winery', 'photo-position-other');
+  db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run('/images/venues/15-park-bistro-2610.jpg?v=1', v.id);
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body, cookie, origin = base) => fetch(`${base}${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin, 'X-Real-IP': `10.9.0.${ip++}`, ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})), cookie: (r.headers.get('set-cookie') || '').split(';')[0] }));
+  const get = (path, cookie) => fetch(`${base}${path}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} }).then((r) => r.text());
+  const heroImg = (html) => (/<div class="venue-hero venue-hero-photo"><img[^>]*>/.exec(html) || [''])[0];
+  try {
+    const linkPage = await get(`/owner/${token}`);
+    assert.match(linkPage, /Main photo on your page/);
+    assert.match(linkPage, /We chose this photo for you/, 'our photo is explained');
+    assert.doesNotMatch(linkPage, /id="opPosY"/, 'the slider is for signed-in owners');
+    assert.match(linkPage, /create a login<\/a> \(it takes 30 seconds\)/);
+    const cookie = (await post(`/owner/${token}/account`, { email: 'position@example.com', password: 'a long enough password' })).cookie;
+    const page = await get(`/owner/account/venue/${v.id}`, cookie);
+    assert.match(page, /id="opPosY" min="0" max="100" step="1" value="50"/);
+    const path = `/owner/account/venue/${v.id}/photo-position`;
+    assert.equal((await post(path, { y: 20 })).status, 401);
+    assert.equal((await post(path, { y: 20 }, cookie, 'https://evil.example')).status, 403);
+    assert.equal((await post(`/owner/account/venue/${other.id}/photo-position`, { y: 20 }, cookie)).status, 404);
+    assert.equal((await post(path, { y: 140 }, cookie)).status, 400);
+    assert.equal((await post(path, { y: 'top' }, cookie)).status, 400);
+    const saved = await post(path, { y: 22.4 }, cookie);
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.y, 22);
+    const venuePage = await get('/kelowna/wineries/photo-position-fixture');
+    assert.match(heroImg(venuePage), /style="object-position: 50% 22%"/);
+    assert.match(await get(`/owner/account/venue/${v.id}`, cookie), /id="opPosY" min="0" max="100" step="1" value="22"/);
+    assert.ok(db.prepare("SELECT 1 FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'image_position' AND new_value = '22'").get(v.id), 'logged');
+    // Another main photo starts centred; the first one's position comes back with it.
+    db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run('/images/venues/19-bistro-fitz-2610.jpg', v.id);
+    assert.doesNotMatch(heroImg(await get('/kelowna/wineries/photo-position-fixture')), /object-position/);
+    db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run('/images/venues/15-park-bistro-2610.jpg?v=2', v.id);
+    assert.match(heroImg(await get('/kelowna/wineries/photo-position-fixture')), /object-position: 50% 22%/);
+    // Centring removes the row.
+    assert.equal((await post(path, { y: 50 }, cookie)).body.y, 50);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_photo_positions WHERE venue_id = ?').get(v.id).n, 0);
+    assert.doesNotMatch(heroImg(await get('/kelowna/wineries/photo-position-fixture')), /object-position/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Event partners (2026-10-19): an owner tags other listed businesses; once approved the event shows on their pages and names them', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Partner Host Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'partner-host-fixture' });
+  seasonInsert.run({ name: 'Partner Guest Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'partner-guest-fixture' });
+  seasonInsert.run({ name: 'Partner Second Fixture', type: 'brewery', hours: SEASON_WEEK, slug: 'partner-second-fixture' });
+  const host = app.findVenueBySlug('kelowna', 'winery', 'partner-host-fixture');
+  const guest = app.findVenueBySlug('kelowna', 'restaurant', 'partner-guest-fixture');
+  const second = app.findVenueBySlug('kelowna', 'brewery', 'partner-second-fixture');
+  const token = app.createOwnerLink(host.id, { contact_email: 'host@example.com' }).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const send = (body) => fetch(`${base}/owner/${token}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.10.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const admin = (path, body) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const day = app.todayLocal();
+  const later = new Date(Date.parse(`${day}T12:00:00Z`) + 12 * 86400000).toISOString().slice(0, 10);
+  const good = { name: 'Harvest Long Table', categories: ['food-drink-events'], description: 'A long-table harvest dinner in the vineyard with our neighbours cooking.',
+    start_date: later, end_date: '', start_time: '17:00', end_time: '21:00', all_day: false, event_url: '', price_text: '$95', schedule_notes: '',
+    contact_name: 'Host Person', contact_email: 'host@example.com', company_website: '', started_at: Date.now() - 10000 };
+  try {
+    const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
+    assert.match(page, /Partner businesses \(optional\)/);
+    assert.match(page, /ownVenueId = \d+;/);
+    const lookup = await fetch(`${base}/api/venue-lookup?q=Partner%20Guest`).then((r) => r.json());
+    assert.equal(lookup.venues[0].id, guest.id, 'the lookup gives the id the picker needs');
+    for (const bad of [[999999999], ['x'], [guest.id, second.id, 3, 4, 5, 6], 'nope']) {
+      const r = await send({ ...good, name: `Bad ${JSON.stringify(bad)}`, partner_venue_ids: bad });
+      assert.equal(r.status, 400, JSON.stringify(bad));
+      assert.ok(r.body.errors.partner_venue_ids);
+    }
+    const ok = await send({ ...good, partner_venue_ids: [guest.id, host.id, guest.id] });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal(db.prepare('SELECT partner_venue_ids FROM event_submissions WHERE id = ?').get(ok.body.id).partner_venue_ids, JSON.stringify([guest.id]), 'own venue and repeats dropped');
+    const login = await fetch(`${base}/admin/review/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ token: LYV_TOKEN }) });
+    const reviewCookie = (login.headers.get('set-cookie') || '').split(';')[0];
+    const review = await fetch(`${base}/admin/review`, { headers: { Cookie: reviewCookie } }).then((r) => r.text());
+    assert.match(review, new RegExp(`Partner venues \\(the event also shows on their pages\\): Partner Guest Fixture \\(#${guest.id}\\)`));
+    const approved = await admin(`/admin/event-submissions/${ok.body.id}/approve`, { reviewer: 'test' });
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    const ev = approved.body.event;
+    assert.equal(ev.venue_id, host.id);
+    assert.deepEqual(db.prepare('SELECT venue_id FROM event_partner_venues WHERE event_id = ?').all(ev.id).map((r) => r.venue_id), [guest.id]);
+    const evPage = await fetch(`${base}/${ev.region}/events/${ev.slug}`).then((r) => r.text());
+    assert.match(evPage, /<span class="label">With<\/span><span><a href="\/kelowna\/restaurants\/partner-guest-fixture">Partner Guest Fixture<\/a><\/span>/);
+    const guestPage = await fetch(`${base}/kelowna/restaurants/partner-guest-fixture`).then((r) => r.text());
+    assert.ok(guestPage.includes(`/events/${ev.slug}`), 'a partner event shows on the partner page, even as its only event');
+    // A change to the live event can swap the partners; approving it applies the new list.
+    const sub = db.prepare('SELECT id FROM event_submissions WHERE id = ?').get(ok.body.id);
+    const change = await send({ ...good, change_of: sub.id, partner_venue_ids: [second.id] });
+    assert.equal(change.status, 200, JSON.stringify(change.body));
+    const review2 = await fetch(`${base}/admin/review`, { headers: { Cookie: reviewCookie } }).then((r) => r.text());
+    assert.match(review2, new RegExp(`<th>Partners</th><td class="rv-old">Partner Guest Fixture \\(#${guest.id}\\)</td><td class="rv-new">Partner Second Fixture \\(#${second.id}\\)</td>`));
+    const ch = await fetch(`${base}/admin/review/eventchange/${change.body.change}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, Cookie: reviewCookie }, body: '{}' });
+    assert.equal(ch.status, 200, await ch.text());
+    assert.deepEqual(db.prepare('SELECT venue_id FROM event_partner_venues WHERE event_id = ?').all(ev.id).map((r) => r.venue_id), [second.id]);
+    assert.ok(!(await fetch(`${base}/kelowna/restaurants/partner-guest-fixture`).then((r) => r.text())).includes(`/events/${ev.slug}`), 'the old partner no longer lists it');
+    // Deleting a partner venue clears its rows.
+    app.deleteVenue(second.id);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_partner_venues WHERE venue_id = ?').get(second.id).n, 0);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
 });
