@@ -10910,7 +10910,8 @@ function renderCanonicalFooterStyles() {
     .home-footer-fold[open] > summary { margin-bottom: 8px; }
     .home-footer-col ul, .home-footer-region-group ul { gap: 0; }
     .home-footer-col a, .home-footer-region-group a, .home-footer-col .home-footer-link-btn { display: inline-block; padding: 11px 8px; }
-    .home-footer-legal a, .home-footer-legal .home-footer-link-btn { display: inline-block; padding: 9px 4px; }
+    /* Round 10: 44px tall (the App coming soon button was 37px). */
+    .home-footer-legal a, .home-footer-legal .home-footer-link-btn { display: inline-block; padding: 12px 4px; min-height: 44px; box-sizing: border-box; }
   }`;
 }
 
@@ -11472,6 +11473,8 @@ ${renderCanonicalFooterStyles()}
   .home-pick-star { color: var(--ref-gold, #C9A227); }
   /* "See all" links look like small buttons that open a page; the row-end card shows on phone swipe rows only. */
   .discover-heading-link.home-see-all { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; background: #fff; font-size: 0.82rem; font-weight: 800; color: var(--ref-navy); text-decoration: none; white-space: nowrap; box-sizing: border-box; }
+  /* Tap targets (2026-10-19, round 10): on a phone or touch screen the See all links are 44px tall. */
+  @media (max-width: 640px), (pointer: coarse) { .discover-heading-link.home-see-all { min-height: 44px; } }
   .discover-heading-link.home-see-all:hover { border-color: var(--ref-navy); color: var(--ref-navy); }
   .mood-season-link { margin-left: auto; margin-right: 6px; }
   .home-row-end { display: none; }
@@ -11752,6 +11755,8 @@ const SEO_PAGE_CSS = `
      is stretched over it by its own ::after (as the Browse cards), so there is still one link per card. */
   .related-card-event { position: relative; }
   .related-card-event > a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+  /* Round 10 (2026-10-19): the name link itself is 44px tall too (negative margins keep the card's lines in place). */
+  .related-card-event > a { display: inline-block; padding: 11px 0; margin: -11px 0; }
   .related-card-event > a:focus-visible { outline: none; }
   .related-card-event > a:focus-visible::after { outline: 3px solid var(--teal, #2A6B67); outline-offset: 2px; }
   .related-card-event:hover { border-color: rgba(74,52,40,0.22); }
@@ -13503,7 +13508,7 @@ const REST_TEMPLATE_RE = /<template id="(fdRest|whatsOnRest)">([\s\S]*?)<\/templ
 // from anybody and it never duplicates the cards visibly.
 const REST_LINK_RE = /<a class="venue-card-link" href="([^"]+)"><span class="venue-card-name">([^<]*)<\/span>/g;
 // The A-Z summary gets the site's 3px focus ring (2026-10-18; summaries are not in app.css's focus rule).
-const REST_LINKS_CSS = '<style id="rest-links-css">.rest-links{margin:18px 0 6px;font-size:.88rem}.rest-links summary{cursor:pointer;font-weight:700;padding:8px 0}.rest-links summary:focus-visible{outline:3px solid var(--teal,#1F5C5C);outline-offset:3px;border-radius:4px}.rest-links ul{columns:15em;column-gap:24px;margin:6px 0 0;padding:0;list-style:none}.rest-links li{break-inside:avoid;padding:2px 0}</style>';
+const REST_LINKS_CSS = '<style id="rest-links-css">.rest-links{margin:18px 0 6px;font-size:.88rem}.rest-links summary{cursor:pointer;font-weight:700;padding:10px 0;min-height:44px;box-sizing:border-box}.rest-links summary:focus-visible{outline:3px solid var(--teal,#1F5C5C);outline-offset:3px;border-radius:4px}.rest-links ul{columns:15em;column-gap:24px;margin:6px 0 0;padding:0;list-style:none}.rest-links li{break-inside:avoid;padding:2px 0}</style>';
 // A-Z lists (2026-10-18): the list is every place on the page (shown cards too), labelled "All places on this
 // page" since its count never changes with the filters; a name that repeats in the list carries its town
 // ("Earls (Penticton)"), and an ALL-CAPS name reads in Title Case here (the listing itself is unchanged).
@@ -16268,8 +16273,10 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-search-icon { flex: none; display: inline-flex; color: #64748B; }
   body.map-page .pm-search { flex: 1 1 auto; min-width: 0; height: 100%; padding: 0 8px; border: 0; background: transparent; font: inherit; font-size: 1rem; color: var(--ink); outline: none; }
   body.map-page .pm-search::-webkit-search-cancel-button { cursor: pointer; }
-  body.map-page .pm-filters-btn { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border: 0; border-radius: 50%; background: rgba(27,43,58,0.07); color: var(--ref-navy, #1B2B3A); cursor: pointer; }
-  body.map-page .pm-mic { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border: 0; border-radius: 50%; background: transparent; color: #1D4ED8; cursor: pointer; }
+  /* Tap targets (2026-10-19, round 10): every button on the map (Filters, voice, the quick-filter chips, the Places /
+     Events tabs, Show more and the route buttons) is at least 44px tall to a finger. */
+  body.map-page .pm-filters-btn { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(27,43,58,0.07); color: var(--ref-navy, #1B2B3A); cursor: pointer; }
+  body.map-page .pm-mic { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: #1D4ED8; cursor: pointer; }
   body.map-page .pm-mic[hidden] { display: none; }
   body.map-page .pm-mic.is-listening { background: #E11D48; color: #fff; animation: pm-mic 1.4s ease-in-out infinite; }
   @keyframes pm-mic { 0%, 100% { box-shadow: 0 0 0 0 rgba(225,29,72,0.45); } 50% { box-shadow: 0 0 0 8px rgba(225,29,72,0); } }
@@ -16322,7 +16329,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
   body.map-page .pm-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 16px; }
   body.map-page .pm-tabs { flex: none; display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(27,43,58,0.08); }
-  body.map-page .pm-tab { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
+  body.map-page .pm-tab { min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
   body.map-page .pm-tab[aria-selected="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
   /* Filters: one panel with everything else. */
   body.map-page .pm-panel { position: absolute; z-index: 700; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px 24px; background: var(--bg, #F7F5F0); }
@@ -16350,7 +16357,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
     body.map-page .pm-panel-head { border-radius: 18px 18px 0 0; }
   }
   body.map-page .pm-chips, body.map-page .pm-quick { align-items: center; }
-  body.map-page .pm-chip { flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  body.map-page .pm-chip { flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   body.map-page .pm-chip[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: transparent; }
   body.map-page .pm-select { min-height: 42px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; font: inherit; font-size: 0.92rem; }
   body.map-page .pm-radius { width: 110px; }
@@ -16372,9 +16379,9 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-route { background: #fff; border-radius: 16px; box-shadow: 0 1px 4px rgba(27,43,58,0.15); padding: 14px 16px; margin-bottom: 12px; }
   body.map-page .pm-route-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
   body.map-page .pm-route-head h2 { margin: 0; font-size: 1.1rem; line-height: 1.3; }
-  body.map-page .pm-route-end { flex: none; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
+  body.map-page .pm-route-end { flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; font-size: 0.85rem; cursor: pointer; }
   body.map-page .pm-modes { display: inline-flex; gap: 4px; padding: 4px; margin: 10px 0 6px; border-radius: 999px; background: rgba(27,43,58,0.07); }
-  body.map-page .pm-mode { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer; color: var(--ink); }
+  body.map-page .pm-mode { min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer; color: var(--ink); }
   body.map-page .pm-mode[aria-pressed="true"] { background: #1D4ED8; color: #fff; }
   body.map-page .pm-route-sum { margin: 6px 0 8px; font-size: 1rem; }
   body.map-page .pm-route-sum strong { font-size: 1.25rem; color: #1D4ED8; }
@@ -16406,9 +16413,9 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-dir { background: #1D4ED8; color: #fff; }
   body.map-page .pm-dir:hover { background: #1E40AF; color: #fff; }
   body.map-page .pm-link { border: 1px solid rgba(27,43,58,0.25); color: var(--ink); }
-  body.map-page .pm-relax { margin-left: 4px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: #1D4ED8; color: #fff; font: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer; }
+  body.map-page .pm-relax { margin-left: 4px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: #1D4ED8; color: #fff; font: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer; }
   body.map-page .pm-empty { padding: 14px; border-radius: 12px; background: rgba(27,43,58,0.05); font-size: 0.92rem; }
-  body.map-page .pm-more { margin: 12px auto 4px; display: block; min-height: 42px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+  body.map-page .pm-more { margin: 12px auto 4px; display: block; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
   body.map-page .pm-more[hidden] { display: none; }
   @media (max-width: 899px) { body.map-page .pm-sheet[data-state="peek"] .pm-privacy { display: none; } }
   body.map-page .pm-privacy { margin: 16px 4px 0; font-size: 0.78rem; line-height: 1.45; opacity: 0.8; max-width: 72ch; }
@@ -25139,7 +25146,7 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-guides + .whatson-browse { margin-top: 12px; }
   body.whatson-page .whatson-browse { margin: 40px 0 8px; }
   body.whatson-page .whatson-browse-list { list-style: none; padding: 0; margin: 8px 0 20px; display: flex; flex-wrap: wrap; gap: 8px 10px; }
-  body.whatson-page .whatson-browse-list a, body.whatson-page .whatson-browse-list span { display: inline-block; background: var(--paper); border-radius: 999px; padding: 7px 14px; font-weight: 700; text-decoration: none; }
+  body.whatson-page .whatson-browse-list a, body.whatson-page .whatson-browse-list span { display: inline-block; background: var(--paper); border-radius: 999px; padding: 8px 14px; min-height: 44px; box-sizing: border-box; font-weight: 700; text-decoration: none; }
   body.whatson-page .whatson-browse-list span { opacity: .6; }
   body.whatson-page .whatson-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
@@ -26875,7 +26882,30 @@ function renderVenuePageLayoutStyles() {
     body.golf-page .venue-extra { grid-column: 1; grid-row: 2; }
     /* The story's last bottom margin used to merge with the extras' top margin; now that they are two boxes, it is
        dropped so the gap stays the same. */
-    body.golf-page .venue-main > :last-child { margin-bottom: 0; }
+    /* Round 10: the buttons now come before the description in the page itself (see below), so the story column is
+       a flex column that puts them back in place. Flex items' margins don't merge, so these rules give each gap the
+       size the merged margins had (the item shown last, not the page's last one, drops its margin). */
+    body.golf-page .venue-main { display: flex; flex-direction: column; }
+    body.golf-page .venue-main > :last-child:not(.venue-description, .venue-editorial),
+    body.golf-page .venue-main:not(:has(> .venue-cta-row)) > :last-child,
+    body.golf-page .venue-main > .venue-cta-row:not(:has(~ :not(.venue-description, .venue-editorial))) { margin-bottom: 0; }
+    body.golf-page .venue-main > .venue-header:has(> .chips:last-child:not(:empty)) { margin-bottom: 0; }
+    body.golf-page .venue-main > .venue-header > :nth-last-child(2):has(+ .chips:empty) { margin-bottom: 0; }
+    body.golf-page .venue-main > .venue-cta-row { margin-top: 0; }
+    body.golf-page .venue-main:not(:has(> aside)) > .venue-description:has(+ .venue-section),
+    body.golf-page .venue-main:has(> .venue-editorial) > aside,
+    body.golf-page .venue-main > .venue-section:has(+ .venue-section),
+    body.golf-page .venue-main > .venue-cta-row:has(+ .venue-section) { margin-bottom: 0; }
+  }
+  /* Phone layout (2026-10-19, round 10): Call, Directions, Favorite and Add to trip follow the name, hours and badges
+     in the page itself (renderVenuePage), so on a phone they are on the first screen and first in the tab order.
+     From 641px wide the description, any notice (the only aside in .venue-main) and the story sections show above the
+     buttons again, as before. */
+  @media (min-width: 641px) {
+    body.golf-page .venue-main > .venue-header { order: -4; }
+    body.golf-page .venue-main > .venue-description { order: -3; }
+    body.golf-page .venue-main > aside { order: -2; }
+    body.golf-page .venue-main > .venue-editorial { order: -1; }
   }
   body.golf-page .venue-aside .venue-section { margin-top: 0; margin-bottom: 16px; }
   body.golf-page .venue-aside .detail-row { display: flex; gap: 12px; }
@@ -26949,7 +26979,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const description = editorial ? editorial.metaDescription
     : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
   const editorialHtml = editorial ? editorial.sections.map((section) => `
-  <section class="venue-section" style="max-width:72ch">
+  <section class="venue-section venue-editorial" style="max-width:72ch">
     <h2>${escapeHtml(section.heading)}</h2>
     <p>${escapeHtml(section.text)}</p>
     ${section.links.length ? `<ul>${section.links.map((link) => `<li><a href="${escapeHtml(link.href)}"${link.href.startsWith('https://') ? ' rel="nofollow noopener" target="_blank" data-track="website"' : ''}>${escapeHtml(link.label)}</a></li>`).join('')}</ul>` : ''}
@@ -27221,8 +27251,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const ctaRowAttrs = venuePageUsesEngagement(venue.type)
     ? ` data-venue-id="${venue.id}" data-venue-region="${escapeHtml(venue.region)}" data-venue-category="${escapeHtml(venue.type)}" data-venue-name="${escapeHtml(venue.name)}" data-surface="venue_page"`
     : '';
-  // Temporary condition (advisory collection), rendered between the
-  // description and the CTA row; '' for the overwhelming majority of
+  // Temporary condition (advisory collection), rendered just before the
+  // CTA row (round 10: after the header, ahead of the description on a phone; wide screens still show it after
+  // the description); '' for the overwhelming majority of
   // venues, which keeps their page markup byte-identical.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes().get(venue.id);
   const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frAdvisoryText).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
@@ -27351,8 +27382,11 @@ ${VENUE_MENU_CSS}` : ''}
       return last ? `\n    <p class="venue-owner-updated" style="font-size:.84rem;margin:6px 0 0;color:#1E6B3A;font-weight:700"><span aria-hidden="true">&#10003;</span> ${L('Updated by the business', 'Mis \u00e0 jour par l\u2019entreprise')} &middot; ${escapeHtml(ownerUpdatedDate(last, fr))}</p>` : '';
     })()}
   </div>
-  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
-  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
+  <!-- Phone layout (2026-10-19, round 10): Call, Directions, Favorite and Add to trip come straight after the name,
+       hours and badges (and any check-before-you-go notice), before the description, so they are on the first screen of
+       a phone and come first in the tab order. Wider screens keep the description first (renderVenuePageLayoutStyles). -->${venueAdvisoryHtml}
+  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}
+  <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${editorialHtml}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
@@ -36790,7 +36824,9 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-dialog { width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #101B24; color: #fff; }
         .vg-dialog::backdrop { background: rgba(0,0,0,0.85); }
         .vg-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; z-index: 2; font: 700 0.95rem 'Nunito', 'Nunito Fallback', sans-serif; }
-        .vg-close { border: 0; background: none; color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; padding: 4px 8px; }
+        .vg-close { border: 0; background: none; color: #fff; font-size: 2rem; line-height: 1; cursor: pointer; padding: 4px 8px; min-width: 44px; min-height: 44px; }
+        /* Tap targets (2026-10-19, round 10): See all photos is 44px tall on a phone or touch screen, the close button everywhere. */
+        @media (max-width: 640px), (pointer: coarse) { .vg-all { min-height: 44px; display: inline-flex; align-items: center; } }
         .vg-track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
         .vg-track::-webkit-scrollbar { display: none; }
         .vg-slide { flex: 0 0 100%; height: 100%; margin: 0; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 52px 12px 16px; box-sizing: border-box; }
