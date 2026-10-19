@@ -12893,7 +12893,11 @@ function sharedStyles() {
     try { block = render(); } catch (e) { continue; }
     const m = /^<style>([\s\S]*)<\/style>$/.exec(block || '');
     if (!m || m[1].length < 2000) continue;
-    const css = m[1];
+    // Placeholder photos (2026-10-19, round 8): the served file's /images/ URLs get the same ?v=<file hash> as the
+    // page's own images, so a card placeholder that is also the page's banner (restaurant-3 = restaurants-800.jpg on
+    // /restaurants) is the very URL the hero already fetched, and every placeholder gets the year-long cache. The
+    // hash in the file's own URL covers the rewritten text, so a recompressed photo is a new stylesheet URL too.
+    const css = withVersionedCssImages(m[1]);
     const hash = crypto.createHash('md5').update(css).digest('hex').slice(0, 12);
     byName.set(name, { name, block, css, hash, href: `/styles/shared/${name}.css?v=${hash}` });
   }
@@ -12974,7 +12978,13 @@ function rehashedImageUrl(url, token) {
   const h = imageVersion(url);
   return h ? `${url}?v=${h}` : `${url}?v=${token}`;
 }
-const IMAGE_URL_IN_LIST_RE = /\/images\/[\w\/.-]+\.(?:jpe?g|png|webp)(?:\?v=([\w.-]{1,64}))?(?=[\s,]|$)/gi;
+// url('/images/...') in a stylesheet's text (round 8, 2026-10-19): a plain local image URL gets its ?v=<hash>;
+// anything else (a URL with a query, a missing file, another host) is left alone.
+function withVersionedCssImages(css) {
+  if (typeof css !== 'string' || css.indexOf('/images/') === -1) return css;
+  return css.replace(/url\((['"]?)(\/images\/[^'"()?#\s]+)\1\)/g, (m, q, url) => `url(${q}${versionedImageUrl(url)}${q})`);
+}
+const IMAGE_URL_IN_LIST_RE =/\/images\/[\w\/.-]+\.(?:jpe?g|png|webp)(?:\?v=([\w.-]{1,64}))?(?=[\s,]|$)/gi;
 function withVersionedImages(html) {
   if (typeof html !== 'string' || html.indexOf('/images/') === -1) return html;
   // <style> blocks (the shared stylesheets match them by their exact text) and scripts stay as they are.
@@ -13133,6 +13143,32 @@ function withLazyCardPhotos(html) {
   });
   const head = html.indexOf('</head>');
   return head === -1 ? html : html.slice(0, head) + LAZY_CARD_PHOTO_HEAD + '\n' + html.slice(head);
+}
+// /browse's first card photo, found at once (2026-10-19, round 8): /browse has no banner, so its largest paint is the
+// first card, whose photo is a CSS background (li::before) the browser only finds once every stylesheet is in and the
+// card is laid out, behind app.js and the fonts on a slow phone (LCP 2.6-2.8 s against FCP 1.1 s). The page's first
+// card photo is now preloaded from the <head> at high priority: the 480px copy, and the 960px one for the wide,
+// sharp screens that show it (the --fd-ph-2x rule in the Food & Drink styles). The card itself is unchanged. Runs
+// after withVersionedImages, so the URLs are the versioned ones the card uses.
+const FIRST_CARD_GRID_RE = /<ul class="card-grid" id="bhResults"[^>]*>\s*<li class="venue-card"([^>]*)>/;
+function withFirstCardPhotoPreload(html) {
+  if (typeof html !== 'string' || html.indexOf('id="bhResults"') === -1 || html.indexOf('rel="preload" as="image"') !== -1) return html;
+  const m = FIRST_CARD_GRID_RE.exec(html);
+  if (!m) return html;
+  const attrs = m[1];
+  let small = null, big = null;
+  const own = /\sstyle="--fd-ph:url\('([^']+)'\)(?:;--fd-ph-2x:url\('([^']+)'\))?/.exec(attrs);
+  if (own) { small = own[1]; big = own[2] || null; } else {
+    const key = (/\sdata-ph="([^"]+)"/.exec(attrs) || [])[1];
+    const u = key && key !== 'own' ? cardPhotoKeyUrl(key) : null;
+    if (u) small = versionedImageUrl(u);
+  }
+  if (!small || !/^(?:\/images\/|https:\/\/)[^"'<>\s]+$/.test(small) || (big && !/^(?:\/images\/|https:\/\/)[^"'<>\s]+$/.test(big))) return html;
+  const sharp = '(min-width: 900px) and (min-resolution: 1.5dppx)';
+  const tags = big
+    ? `<link rel="preload" as="image" href="${small}" media="not all and ${sharp}" fetchpriority="high">\n<link rel="preload" as="image" href="${big}" media="${sharp}" fetchpriority="high">`
+    : `<link rel="preload" as="image" href="${small}" fetchpriority="high">`;
+  return html.replace(/<meta name="viewport"[^>]*>\n?/i, (v) => `${v}${v.endsWith('\n') ? '' : '\n'}${tags}\n`);
 }
 // Font swap shift (2026-10-18): Nunito and Fraunces come from Google Fonts with display=swap, so a slow page first
 // lays out in the fallback font and moves when they arrive (a 2-3 row category bar became 2 rows, the results
@@ -13332,6 +13368,7 @@ function installSharedStylesheetResponse(res, req = {}) {
       // hash (withRestCardsDeferred) is of their plain text, as /cards/rest/ computes it.
       try { body = withVersionedImages(body); } catch (e) { /* plain image URLs still work */ }
       try { body = withBannerHeroFirst(body); } catch (e) { /* the page still works without the preload */ }
+      try { body = withFirstCardPhotoPreload(body); } catch (e) { /* the page still works without the preload */ }
     }
     flush();
     return realEnd(body, ...rest);
@@ -47973,6 +48010,10 @@ module.exports = {
   browseRestPayload,
   browseRestJson,
   withVersionedImages,
+  // Speed (2026-10-19, round 8)
+  withVersionedCssImages,
+  withFirstCardPhotoPreload,
+  cardPhotoKeyUrl,
   imageVersion,
   tileSrcsetAttrs,
   withRegionHeroFirst,
