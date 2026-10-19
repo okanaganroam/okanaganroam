@@ -39,7 +39,9 @@ function t3TimelineRows(p,removed={}){
 function t3LocalTimes(value,language){
  const fr=language==='fr';
  const fmt=(h,m)=>{h=Number(h)%24;m=Number(m||0);if(fr)return h+' h'+(m?' '+String(m).padStart(2,'0'):'');return (h%12||12)+(m?':'+String(m).padStart(2,'0'):'')+(h<12?' AM':' PM');};
- const text=s=>String(s).replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,ap)=>{const n=Number(h);if(n<1||n>12)return raw;return fmt(n%12+(ap.toLowerCase()==='pm'?12:0),m);})
+ // English ISO dates read as dates (2026-10-19): "Trip starts on 2026-10-24" -> "Trip starts on Sat, Oct 24, 2026".
+ const iso=s=>fr?s:s.replace(/\b(20\d\d)-(\d\d)-(\d\d)\b/g,(raw,y,m,d)=>{const t=new Date(Date.UTC(+y,+m-1,+d,12));if(t.getUTCMonth()!==+m-1)return raw;return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][t.getUTCDay()]+', '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]+' '+(+d)+', '+y;});
+ const text=s=>iso(String(s)).replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,ap)=>{const n=Number(h);if(n<1||n>12)return raw;return fmt(n%12+(ap.toLowerCase()==='pm'?12:0),m);})
   .replace(/\b(0\d|1\d|2[0-3]):([0-5]\d)\b(?!\s*(?:AM|PM|h\b))/g,(_,h,m)=>fmt(h,m))
   .replace(/\b0(\d) h\b/g,'$1 h')
   .replace(fr?/(\d h(?: \d\d)?) ?[–-] ?(\d)/g:/((?:AM|PM)) ?[–-] ?(\d)/g,fr?'$1–$2':'$1 – $2');
@@ -96,9 +98,12 @@ function t3PlanNextSteps(p) {
   (p.requirementResults||[]).forEach(function(i){
     if(i.status!=='unmet'||['type','type_count','venue_kind','venue','activity','event','rainy','feature'].indexOf(i.kind)===-1)return;
     var key=i.kind+':'+i.value;if(seen[key])return;seen[key]=true;
-    var eventLabels={hockey:'hockey game','live-music':'live music',festival:'festival',market:'market'};
+    var eventLabels={hockey:'hockey game','live-music':'live music',festival:'festival',market:'market',comedy:'comedy show',show:'show',concert:'concert'};
     var requestLabels={pottery:'pottery class'};
-    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' '),labelFr:i.value==='pottery'?'atelier de poterie':null,url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode};}):[]});
+    // The category word in French too (2026-10-19: "event — Non inclus").
+    var labelsFr={'hockey game':'match de hockey','live music':'musique en direct',festival:'festival',market:'marché','comedy show':'spectacle d’humour',show:'spectacle',concert:'concert',event:'événement','sports event':'événement sportif','pottery class':'atelier de poterie',restaurant:'restaurant',cafe:'café',winery:'vignoble',brewery:'microbrasserie',pub:'pub',cocktail:'bar à cocktails',distillery:'distillerie',beach:'plage',golf:'golf',indoor:'lieu intérieur',outdoor:'lieu de plein air',tour:'visite guidée',sport:'sport','dog friendly':'lieu qui accepte les chiens','kid friendly':'lieu adapté aux enfants',hiking:'randonnée',rainy:'activité par temps de pluie'};
+    var label=i.kind==='event'?(eventLabels[i.eventKind]||(i.value==='sports-recreation'?'sports event':'event')):i.kind==='venue'?(i.sourceText||String(i.value)):requestLabels[i.value]||String(i.value).replace(/_/g,' ');
+    steps.push({kind:i.kind==='event'?'missing_event':'missing',label:label,labelFr:i.kind==='venue'?null:(labelsFr[label]||null),url:browseUrl(i),alternatives:Array.isArray(i.optionalAlternatives)?i.optionalAlternatives.filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);}).map(function(a){return {id:a.id,name:a.name,url:a.url,region:a.region,reasonCode:a.reasonCode};}):[]});
   });
   var stops=p.days&&p.days.length?p.days.reduce(function(a,d){return a.concat(d.stops||[]);},[]):((p.itinerary&&p.itinerary.stops)||(p.outing&&p.outing.stops)||[]);
   (p.schedule||[]).forEach(function(i){
@@ -389,6 +394,12 @@ function renderStyles() {
   .t3-examples-label { width: 100%; font-size: 0.8rem; color: rgba(255,255,255,0.72); margin-bottom: 2px; }
   .t3-example { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.28); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 0.84rem; font-weight: 600; cursor: pointer; text-align: left; }
   .t3-example:hover { background: rgba(255,255,255,0.22); }
+  /* 2026-10-19: the example chips' height is reserved (measured with the final fonts), so the hero does not grow when the
+     web font replaces the fallback and a chip wraps onto another line. */
+  .t3-examples { min-height: 216px; }
+  html[lang="fr"] .t3-examples { min-height: 264px; }
+  @media (max-width: 1023px) { .t3-examples { min-height: 264px; } html[lang="fr"] .t3-examples { min-height: 312px; } }
+  @media (max-width: 640px) { .t3-examples { min-height: 396px; } html[lang="fr"] .t3-examples { min-height: 446px; } }
   .t3-status { min-height: 1.4em; margin: 14px 0 0; font-weight: 700; font-size: 0.92rem; color: #fff; }
   .t3-status.is-error { color: #FFD7A8; }
   /* Phones opening a plan link (2026-10-18): the request shrinks to one "Edit request" bar so the plan is on screen
@@ -422,7 +433,9 @@ function renderStyles() {
   .t3-understood .t3-eyebrow { color: var(--teal-deep, #1E4F4C); }
   .t3-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; align-items: center; }
   .t3-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--ref-cream); border: 1px solid rgba(27,43,58,0.12); color: var(--ref-navy); border-radius: 999px; padding: 6px 12px; font-size: 0.84rem; font-weight: 700; }
-  .t3-chip select { font: inherit; font-weight: 800; color: var(--ref-navy); background: transparent; border: 0; padding: 2px 0; cursor: pointer; }
+  .t3-chip select { font: inherit; font-weight: 800; color: var(--ref-navy); background: transparent; border: 0; padding: 2px 0; cursor: pointer; min-height: 32px; } /* 2026-10-19: a 32px target */
+  .t3-length-ask { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
+  .t3-length-ask select { font: inherit; min-height: 32px; margin-left: 6px; }
   .t3-chip-label { font-weight: 600; opacity: 0.7; }
   .t3-notused { margin: 10px 0 0; font-size: 0.84rem; color: #7A4A2A; }
 
@@ -784,7 +797,7 @@ function renderScript(d) {
   function frLabel(key, english){ if (lang() !== 'fr') return english; var s = tx(key); return s === key ? english : s; }
   function num(n){ return lang() === 'fr' ? String(n).replace('.', ',') : String(n); }
   // Strings for the map day header (new; kept here so the shared dictionary in app.js stays untouched).
-  var DH_TEXT = { en: { stop1: '1 stop', stopN: '{n} stops', osm: '\u00a9 OpenStreetMap contributors', geo: 'Powered by Geoapify' }, fr: { stop1: '1 arr\u00eat', stopN: '{n} arr\u00eats', osm: '\u00a9 contributeurs OpenStreetMap', geo: 'Powered by Geoapify' } };
+  var DH_TEXT = { en: { stop1: '1 stop', stopN: '{n} stops', osm: '\u00a9 OpenStreetMap contributors', geo: 'Powered by Geoapify' }, fr: { stop1: '1 arr\u00eat', stopN: '{n} arr\u00eats', osm: '\u00a9 contributeurs OpenStreetMap', geo: 'Fourni par Geoapify' } };
   function dh(key, vars){
     var s = (DH_TEXT[lang()] || DH_TEXT.en)[key] || DH_TEXT.en[key] || key;
     if (vars) Object.keys(vars).forEach(function(k){ s = s.split('{' + k + '}').join(String(vars[k])); });
@@ -811,6 +824,12 @@ function renderScript(d) {
   }
 
   // ---- request ----
+  // The planner's conflict messages, in French on /fr/trip (2026-10-19).
+  function errorText(msg){
+    if (lang() !== 'fr') return msg;
+    var m = /^A locked stop cannot be kept: (.+) on day ([0-9]+) no longer fits this plan[.] Unlock it, or change the request[.]$/.exec(msg || '');
+    return m ? 'Un arrêt conservé ne peut pas être gardé : ' + m[1] + ' (jour ' + m[2] + ') ne convient plus à ce plan. Libérez-le ou modifiez la demande.' : msg;
+  }
   function request(extra, opts){
     opts = opts || {};
     var body = { text: state.text, seed: state.seed, excludeVenueIds: state.exclude.slice(-200) };
@@ -836,7 +855,10 @@ function renderScript(d) {
           res={ok:false,status:res.status,incomplete:true,j:{error:message}};
         }
         if (!res.ok) {
-          setStatus(res.j && res.j.error ? res.j.error : tx('tripv3.error'), 'error');
+          // A failed edit leaves the plan as it was (2026-10-19): the stop it tried to swap out is not excluded from
+          // the next Swap, which would otherwise fail on the same kept stop, and so on for every other Swap.
+          if (['replace','regenerate','regenerate_day'].indexOf(requestType) !== -1 && state.lastReq) state.exclude = (state.lastReq.exclude || []).slice();
+          setStatus(res.j && res.j.error ? errorText(res.j.error) : tx('tripv3.error'), 'error');
           showEditError(trigger, statusEl.textContent);
           track('trip_plan_error', { request_type: requestType, error_type: res.incomplete ? 'incomplete_edit' : 'response', http_status: res.status });
           return;
@@ -902,6 +924,10 @@ function renderScript(d) {
 
   // ---- plan helpers ----
   function days(){ return (state.last && state.last.days) || []; }
+  // The same place on an earlier day of this plan (2026-10-19: a ski trip's resort every day). That copy goes into
+  // My Trip as its own stop for this day (data-trip-slot), instead of being dropped as a duplicate.
+  function repeatDay(id, day){ return days().some(function(d){ return d.day < day && d.stops.some(function(s){ return s.venue && s.venue.id === id; }); }); }
+  function tripKey(b){ var r = b.getAttribute('data-trip-ref'), sl = b.getAttribute('data-trip-slot'); return r ? r + (sl ? '@' + sl : '') : null; }
   function stopAt(key){
     var parts = key.split('-'), d = Number(parts[0]), dp = parts[1];
     var day = days().filter(function(x){ return x.day === d; })[0];
@@ -1177,13 +1203,14 @@ function renderScript(d) {
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
       + '<div class="t3-actions">'
-      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + '>Add to trip</button>'
-    var favHtml = '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>';
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + '>Add to trip</button>'
+    // The list cards' Favorite button (2026-10-19): named for the place, with its pressed state.
+    var favHtml = '<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>';
     var detailsHtml = url ? '<a class="t3-act" href="' + esc(url) + '">' + esc(tx('tripv3.viewDetails')) + '</a>' : '';
     if (key) {
       // A plan stop: the everyday actions show; Keep, Favorite and View details sit under "More" (2026-10-14).
       var keepHtml = '<button type="button" class="t3-act" data-t3-keep="' + esc(key) + '" aria-pressed="' + (kept ? 'true' : 'false') + '" aria-label="' + esc(tx('tripv3.keepLabel', { name: v.name })) + '">' + esc(kept ? tx('tripv3.kept') : tx('tripv3.keep')) + '</button>';
-      html += '<button type="button" class="t3-act" data-t3-swap="' + esc(key) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>'
+      html += (stop.noSwap ? '' : '<button type="button" class="t3-act" data-t3-swap="' + esc(key) + '" aria-label="' + esc(tx('tripv3.swapLabel', { name: v.name })) + '">' + esc(tx('tripv3.swap')) + '</button>')
         + '<button type="button" class="t3-act" data-t3-remove="' + esc(key) + '" aria-label="' + esc(tx('tripv3.removeLabel', { name: v.name })) + '">' + esc(tx('tripv3.remove')) + '</button>'
         + (kept ? keepHtml : '')
         + '<details class="t3-more"><summary class="t3-act" aria-label="' + esc(lang() === 'fr' ? 'Plus d’options pour ' + v.name : 'More options for ' + v.name) + '">' + esc(lang() === 'fr' ? 'Plus' : 'More') + '</summary><div class="t3-more-menu">'
@@ -1227,8 +1254,16 @@ function renderScript(d) {
     // A word the visitor typed (“pizza”) shows as a plain chip, “Pizza”, like the others.
     (u.interests || []).forEach(function(x){ var w = String(x).replace(/^[“"«]\s*|\s*[”"»]$/g, ''); chips.push('<li class="t3-chip">' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + '</li>'); });
     (u.themes || []).forEach(function(x){ chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.oneDay')) + '</span>' + esc(x) + '</li>'); });
+    // No length given (2026-10-19): ask for one, with the same Length control.
+    var lengthAsk = '';
+    if (u.lengthAsked === false && ['recommendations', 'discover', 'day_plan', 'multi_day'].indexOf(p.kind) !== -1) {
+      var lfr = lang() === 'fr', lOpts = '<option value="">' + esc(lfr ? 'Choisir une durée' : 'Choose a length') + '</option>';
+      for (var ln = 1; ln <= 7; ln++) lOpts += '<option value="' + ln + '">' + esc(tx(ln === 1 ? 'tripv3.dayOne' : 'tripv3.dayMany', { n: ln })) + '</option>';
+      lengthAsk = '<p class="t3-length-ask">' + esc(planKinds ? (lfr ? 'Vous n’avez pas indiqué de durée : voici un plan de ' + (p.days || []).length + ' jour' + ((p.days || []).length > 1 ? 's' : '') + '. Changez la durée ci-dessus.' : 'You didn’t say how long, so this is a ' + (p.days || []).length + '-day plan. Change the length above.') : (lfr ? 'Combien de temps dure votre voyage? Choisissez une durée pour un plan jour par jour.' : 'How long is your trip? Choose a length for a day-by-day plan.'))
+        + (planKinds ? '' : ' <select data-t3-override="days" aria-label="' + esc(tx('tripv3.lengthLabel')) + '">' + lOpts + '</select>') + '</p>';
+    }
     var notUsed = (u.notUsed || []).length ? '<p class="t3-notused">' + esc(tx('tripv3.notUsed', { list: '\u0001' })).split('\u0001').join(u.notUsed.map(function(w){ return (lang() === 'fr' ? '«\u00a0' : '“') + esc(w) + (lang() === 'fr' ? '\u00a0»' : '”'); }).join(', ')) + '</p>' : '';
-    return '<div class="t3-understood"><p class="t3-eyebrow">' + esc(tx('tripv3.understood')) + '</p><ul class="t3-chips">' + chips.join('') + '</ul>' + notUsed + '</div>';
+    return '<div class="t3-understood"><p class="t3-eyebrow">' + esc(tx('tripv3.understood')) + '</p><ul class="t3-chips">' + chips.join('') + '</ul>' + lengthAsk + notUsed + '</div>';
   }
   function stopsListHtml(stops, keyFor, counts){
     var html = '<ol class="t3-stops">', prev = null;
@@ -1308,7 +1343,7 @@ function renderScript(d) {
     var meta = dayMeta(d);
     var group = mh.group ? (lang() === 'fr' ? tx(mh.group.key) : mh.group.label) : '';
     return '<div class="t3-day-head t3-day-head--map" data-t3-map-header>'
-      + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
       + (group ? '<p class="t3-dh-sub">' + esc(group) + '</p>' : '')
       + '<p class="t3-dh-meta">' + meta.map(esc).join(' \u00b7 ') + '</p>'
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
@@ -1377,13 +1412,14 @@ function renderScript(d) {
     // town used to show the town photo with neither. A region without a map keeps the photo header, with the same line.
     var meta = dayMeta(d);
     var head = MAP_HEADERS[d.region] && MAP_HEADERS[d.region].assets ? mapHeadHtml(d, MAP_HEADERS[d.region], maps) : ('<div class="t3-day-head">' + imgHtml + '<div class="t3-day-scrim"></div>'
-      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '">' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
+      + '<div class="t3-day-headin"><div><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
       + (meta.length ? '<p class="t3-dh-meta">' + meta.map(esc).join(' \u00b7 ') + '</p>' : '')
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
       + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>');
-    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-labelledby="t3-day-title-' + d.day + '">'
+    // A label of its own for each day (2026-10-19): "Day 1 · Kelowna", not "Kelowna" twice.
+    return '<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \u00b7 ' + (d.regionLabel || tx('tripv3.theOkanagan'))) + '">'
       + head
       + (d.driveIn ? '<p class="t3-leg t3-leg-drive t3-drive-in">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
@@ -1424,7 +1460,7 @@ function renderScript(d) {
     var fr = lang() === 'fr';
     var h3End = html.indexOf('</' + 'h3>');
     var inner = html.slice(h3End + 5, html.length - ('</' + 'section>').length);
-    return '<details class="t3-checks"><summary>' + esc(fr ? '✓ Vos ' + checks.length + ' demandes correspondent à des fiches' : '✓ All ' + checks.length + ' of your requests matched a listing') + '</summary>' + inner + '</details>';
+    return '<details class="t3-checks"><summary>' + esc(checks.length === 1 ? (fr ? '✓ Votre demande correspond à une fiche' : '✓ Your request matched a listing') : (fr ? '✓ Vos ' + checks.length + ' demandes correspondent à des fiches' : '✓ All ' + checks.length + ' of your requests matched a listing')) + '</summary>' + inner + '</details>';
   }
   function requirementSummaryHtml(p){
     var checks = p.requirementResults || [];
@@ -1537,9 +1573,11 @@ function renderScript(d) {
       var ld=p.laterDeparture,ldFr=lang()==='fr',ldTime=String(Math.floor(ld.startMinutes/60)).padStart(2,'0')+':'+String(ld.startMinutes%60).padStart(2,'0');
       html+='<section class="t3-warnings" aria-label="'+(ldFr?'Moins d’attente':'Less waiting')+'"><h3>'+(ldFr?'Évitez une longue pause':'Avoid a long gap')+'</h3><p>'+(ldFr?'Les mêmes arrêts avec environ '+ld.savedMinutes+' minutes d’attente en moins.':'The same stops with about '+ld.savedMinutes+' fewer minutes waiting.')+' '+(ld.provisional?(ldFr?'Suggestion provisoire : confirmez les horaires et durées.':'Provisional suggestion: confirm hours and durations.'):(ldFr?'Horaires indiqués vérifiés; durées et trajets estimés.':'Checked against listed hours; durations and travel are estimates.'))+'</p><button type="button" data-t3-later-start="'+ld.startMinutes+'">'+(ldFr?'Essayer un départ à ':'Try departing at ')+ldTime+'</button></section>';
     }
+    // Dates read as dates (2026-10-19), never 2026-10-21.
+    var niceIso=function(iso){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(iso||'') ? new Date(iso+'T12:00:00Z').toLocaleDateString(lang()==='fr'?'fr-CA':'en-CA',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'}) : String(iso||''); };
     if(p.eventAlternatives && p.eventAlternatives.length){
       var eaFr=lang()==='fr';
-      html+='<section class="t3-warnings" aria-label="'+(eaFr?'Événements à d’autres dates':'Events on nearby dates')+'"><h3>'+(eaFr?'Si vos dates sont flexibles':'If your dates are flexible')+'</h3><p>'+(eaFr?'Ces événements du même type sont en dehors des dates du voyage. Ils ne sont pas ajoutés au programme. Consultez la fiche, puis choisissez une date pour refaire le programme en gardant votre demande.':'These events of the requested type fall outside your trip dates. They are not added to your itinerary. Check the listing, then choose a date to replan while keeping your request.')+'</p><ul>'+p.eventAlternatives.map(function(e){var eventDate=String(e.startDate||''),planDate=String(e.suggestedDate||eventDate),eventUrl=typeof e.url==='string'&&e.url.charAt(0)==='/'&&e.url.charAt(1)!=='/'?e.url:null,planDateLabel=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?new Date(planDate+'T12:00:00Z').toLocaleDateString(eaFr?'fr-CA':'en-CA',{month:'short',day:'numeric'}):'',choose=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?'<button type="button" class="t3-act" data-t3-event-date="'+esc(planDate)+'">'+(eaFr?'Planifier le ':'Plan for ')+esc(planDateLabel)+'</button>':'';return '<li>'+(eventUrl?'<a href="'+esc(eventUrl)+'">'+esc(e.name)+'</a>':esc(e.name))+(eventDate?' — '+esc(eventDate+(e.endDate&&e.endDate!==eventDate?' – '+e.endDate:'')):'')+(e.time?' · '+esc(e.time):'')+' '+choose+'</li>';}).join('')+'</ul></section>';
+      html+='<section class="t3-warnings" aria-label="'+(eaFr?'Événements à d’autres dates':'Events on nearby dates')+'"><h3>'+(eaFr?'Si vos dates sont flexibles':'If your dates are flexible')+'</h3><p>'+(eaFr?'Ces événements du même type sont en dehors des dates du voyage. Ils ne sont pas ajoutés au programme. Consultez la fiche, puis choisissez une date pour refaire le programme en gardant votre demande.':'These events of the requested type fall outside your trip dates. They are not added to your itinerary. Check the listing, then choose a date to replan while keeping your request.')+'</p><ul>'+p.eventAlternatives.map(function(e){var eventDate=String(e.startDate||''),planDate=String(e.suggestedDate||eventDate),eventUrl=typeof e.url==='string'&&e.url.charAt(0)==='/'&&e.url.charAt(1)!=='/'?e.url:null,planDateLabel=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?new Date(planDate+'T12:00:00Z').toLocaleDateString(eaFr?'fr-CA':'en-CA',{month:'short',day:'numeric'}):'',choose=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?'<button type="button" class="t3-act" data-t3-event-date="'+esc(planDate)+'">'+(eaFr?'Planifier le ':'Plan for ')+esc(planDateLabel)+'</button>':'';return '<li>'+(eventUrl?'<a href="'+esc(eventUrl)+'">'+esc(e.name)+'</a>':esc(e.name))+(eventDate?' — '+esc(niceIso(eventDate)+(e.endDate&&e.endDate!==eventDate?' – '+niceIso(e.endDate):'')):'')+(e.time?' · '+esc(e.time):'')+' '+choose+'</li>';}).join('')+'</ul></section>';
     }
     if(p.accessConflicts && p.accessConflicts.length){
       var acFr=lang()==='fr';
@@ -1632,7 +1670,7 @@ function renderScript(d) {
     Array.prototype.forEach.call(resultEl.querySelectorAll('.trip-btn[data-plan-stop]'), function(b){
       if (day && b.getAttribute('data-plan-day') !== String(day)) return;
       // Stage 5C: one stop per ref -- two same-name places are two stops.
-      var n = b.getAttribute('data-trip-ref') || b.getAttribute('data-trip-name');
+      var n = tripKey(b) || b.getAttribute('data-trip-name');
       if (!n || seen[n]) return;
       seen[n] = true; out.push(b);
     });
@@ -1675,7 +1713,7 @@ function renderScript(d) {
     try {
       var dayMap = readDays();
       buttons.forEach(function(b){
-        var ref = b.getAttribute('data-trip-ref'), d = parseInt(b.getAttribute('data-plan-day'), 10);
+        var ref = tripKey(b), d = parseInt(b.getAttribute('data-plan-day'), 10);
         if (ref && d > 0 && b.classList.contains('in-trip') && !(offset && dayMap[ref] > 0)) dayMap[ref] = d + (offset || 0);
       });
       localStorage.setItem('okanaganTripDays', JSON.stringify(dayMap));
@@ -1686,9 +1724,9 @@ function renderScript(d) {
       if (typeof timeMap !== 'object' || Array.isArray(timeMap)) timeMap = {};
       var rows = (state.last && state.last.schedule) || [];
       buttons.forEach(function(b){
-        var ref = b.getAttribute('data-trip-ref'), d = parseInt(b.getAttribute('data-plan-day'), 10);
+        var ref = tripKey(b), d = parseInt(b.getAttribute('data-plan-day'), 10);
         if (!ref || !(d > 0) || !b.classList.contains('in-trip') || (offset && timeMap[ref])) return;
-        var m = /^(venue|event):(\\d+)$/.exec(ref);
+        var m = /^(venue|event):(\\d+)(?:@\\d+)?$/.exec(ref);
         var row = m && rows.filter(function(r){ return r.day === d && (m[1] === 'venue' ? r.venueId : r.eventId) === Number(m[2]); })[0];
         var date = row && row.date || ((state.last && state.last.days) || []).filter(function(x){ return x.day === d; }).map(function(x){ return x.date; })[0];
         if (!date && !row) return;
@@ -1698,15 +1736,27 @@ function renderScript(d) {
         if (t.d || t.s != null) timeMap[ref] = t;
       });
       localStorage.setItem('okanaganTripTimes', JSON.stringify(timeMap));
+      // Drive legs between towns (2026-10-19) go with their day: day -> { f, t, a, b } (from, to, min and max minutes),
+      // shown on /my-trip as a row of their own, never as a stop or a map pin.
+      var driveMap = {};
+      try { driveMap = JSON.parse(localStorage.getItem('okanaganTripDrives') || '{}') || {}; } catch (e3) { driveMap = {}; }
+      if (typeof driveMap !== 'object' || Array.isArray(driveMap)) driveMap = {};
+      var planDays = {};
+      buttons.forEach(function(b){ var d = parseInt(b.getAttribute('data-plan-day'), 10); if (d > 0 && b.classList.contains('in-trip')) planDays[d] = true; });
+      days().forEach(function(x){
+        var leg = x.driveIn, at = x.day + (offset || 0);
+        if (planDays[x.day] && leg && leg.fromLabel && leg.toLabel && !(offset && driveMap[at])) driveMap[at] = { f: String(leg.fromLabel), t: String(leg.toLabel), a: leg.minMinutes || null, b: leg.maxMinutes || null };
+      });
+      localStorage.setItem('okanaganTripDrives', JSON.stringify(driveMap));
     } catch (e) {}
     if (window.__roamTripRender) window.__roamTripRender();
   }
   // The last day already used by stops in My Trip that are not in this plan (0 when none has a day).
   function tripDayOffset(){
     var days = readDays(), plan = {}, max = 0;
-    planStopButtons().forEach(function(b){ var r = b.getAttribute('data-trip-ref'); if (r) plan[r] = true; });
+    planStopButtons().forEach(function(b){ var r = tripKey(b); if (r) plan[r] = true; });
     try {
-      (JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []).forEach(function(x){ if (x && x.ref && !plan[x.ref] && days[x.ref] > max) max = Number(days[x.ref]); });
+      (JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []).forEach(function(x){ var k = x && (x.key || x.ref); if (k && !plan[k] && days[k] > max) max = Number(days[k]); });
     } catch (e) {}
     return max;
   }
@@ -1908,7 +1958,8 @@ function renderScript(d) {
       delete state.locks[sk];
       delete state.removed[sk];
       var oldName = ss && ss.venue ? ss.venue.name : null;
-      var swapped = request({ pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
+      // The kind of place goes with it (2026-10-19), so a winery is swapped for a winery.
+      var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
       // Say what changed and show where: "Swapped Lachi for Poplar Grove", with the new card briefly highlighted.
       if (swapped && swapped.then) swapped.then(function(){
         var ns = stopAt(sk);
@@ -1963,7 +2014,7 @@ function renderScript(d) {
     var k = sel.getAttribute('data-t3-override'), v = sel.value;
     if(k==='startDate'){if(!v)return;state.overrides.startDate=v;delete state.overrides.eventId;}
     else if(k==='startMinutes'){if(!/^\\d{2}:\\d{2}$/.test(v))return;state.overrides.startMinutes=Number(v.slice(0,2))*60+Number(v.slice(3));}
-    else if (k === 'days') state.overrides.days = Number(v);
+    else if (k === 'days') { if (!v) return; state.overrides.days = Number(v); }
     else if (k === 'pace') state.overrides.pace = v;
     else if (k === 'baseRegion') { if (v) state.overrides.baseRegion = v; else delete state.overrides.baseRegion; delete state.overrides.eventId; }
     // Complex plans keep locks through settings edits. The server reports
@@ -2023,6 +2074,8 @@ function renderScript(d) {
     }
   }
   var editBtn = document.getElementById('t3EditBtn');
+  // The bar's words in the page's language from the start (2026-10-19: "Edit request" on /fr/trip).
+  if (editBtn) { editBtn.textContent = editText('edit'); var editLabelEl = document.getElementById('t3EditLabel'); if (editLabelEl) editLabelEl.textContent = editText('label'); }
   if (editBtn) editBtn.addEventListener('click', function(){
     setCompact(false);
     try { form.scrollIntoView({ block: 'center' }); } catch (e) {}

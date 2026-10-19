@@ -220,7 +220,7 @@ test('"No driving after 6pm" is an evening rule, not a car-free trip: a full win
   assert.equal(p.days.length, 1);
   assert.ok(stopsOf(p.days[0]).filter((x) => x.fact.type === 'winery').length >= 3, stopsOf(p.days[0]).map((x) => x.fact.name).join(', '));
   assert.ok(!(p.unsupported || []).some((u) => /driv/.test(u)), JSON.stringify(p.unsupported));
-  assert.ok(p.notes.some((n) => /^No driving after 18:00: dinner is each day’s last drive/.test(n)));
+  assert.ok(p.notes.some((n) => /^No driving after 18:00: dinner is a short walk from the day’s last stop/.test(n))); // applied since 2026-10-19
   assert.equal(p.requirementResults.find((i) => i.kind === 'evening_walk').status, 'satisfied');
   const weekend = plan('Kelowna wine weekend, no driving after 6pm').p;
   assert.ok(weekend.days.every((day) => stopsOf(day).filter((x) => x.fact.type === 'winery').length >= 2));
