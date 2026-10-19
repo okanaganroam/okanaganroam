@@ -3765,6 +3765,9 @@ function scheduleNotes(result, ctx) {
 
 module.exports = {
   tripTheme,
+  // Search ranking (2026-10-18): /search ranks date-night and special-dinner requests with the planner's own occasion
+  // scoring (server.js smartRomanceScore), so the two never disagree.
+  occasionScore,
   specialDinner,
   casualDinner,
   requestsSpecialDinner,

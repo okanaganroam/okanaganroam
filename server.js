@@ -59,6 +59,74 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
 // ---------- helpers ----------
 
+// Security headers (2026-10-18): set on every response before any route runs. A route that writes its own value
+// (the owner portal's 'Referrer-Policy: no-referrer') wins, since writeHead overrides setHeader.
+// - The enforced CSP carries frame-ancestors only (report-only can't enforce it), so the site, and above all
+//   /owner/*, can't be framed elsewhere. X-Frame-Options says the same to older browsers.
+// - The full policy is report-only for now: it lists the real outside sources (Leaflet and pdf.js on cdnjs,
+//   Tesseract on jsdelivr with its language data, OSM tiles, GA4, Clarity, Google Fonts, FormSubmit, Open-Meteo,
+//   Cloudflare's own scripts) and sends violations to /csp-report, which only logs.
+// - Inline scripts and styles are everywhere, so 'unsafe-inline' stays until pages carry nonces.
+const CSP_REPORT_PATH = '/csp-report';
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms https://static.cloudflareinsights.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://stats.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com",
+  "worker-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+  "frame-src 'self'",
+  "media-src 'self' blob: data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  `report-uri ${CSP_REPORT_PATH}`,
+].join('; ');
+const SECURITY_HEADERS = {
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Content-Security-Policy': "frame-ancestors 'self'",
+  // /map uses location, the microphone (voice search), the motion sensors (the compass arrow), a screen wake lock
+  // (directions) and the clipboard (Share); the menu scanner takes photos (a file input with capture; camera=(self)
+  // keeps a live-camera scan possible). Web Share (trip and favourites) is left at its default, self: Chrome warns
+  // that web-share is an unrecognized feature. The rest is off.
+  'Permissions-Policy': 'geolocation=(self), camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self), screen-wake-lock=(self), clipboard-write=(self), fullscreen=(self), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=(), display-capture=(), browsing-topics=()',
+  'Content-Security-Policy-Report-Only': CSP_REPORT_ONLY,
+};
+function applySecurityHeaders(res) {
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
+}
+// POST /csp-report: browsers send report-only violations here. Logged (deduplicated, at most 100 distinct per hour)
+// so Railway's logs show what an enforced policy would block; nothing is stored.
+const cspReportSeen = new Set();
+let cspReportHour = 0;
+function handleCspReport(req, res) {
+  let size = 0, body = '';
+  req.on('data', (c) => { size += c.length; if (size <= 16384) body += c; });
+  req.on('end', () => {
+    try {
+      const j = JSON.parse(body || '{}');
+      const list = Array.isArray(j) ? j.map((x) => x && x.body).filter(Boolean) : [j['csp-report'] || j];
+      const hour = Math.floor(Date.now() / 3600000);
+      if (hour !== cspReportHour) { cspReportHour = hour; cspReportSeen.clear(); }
+      for (const r of list) {
+        const dir = r['effective-directive'] || r.effectiveDirective || r['violated-directive'] || '';
+        const blocked = String(r['blocked-uri'] || r.blockedURL || '').slice(0, 200);
+        const page = String(r['document-uri'] || r.documentURL || '').replace(/[?#].*$/, '').slice(0, 200);
+        const key = `${dir} ${blocked.replace(/^(https?:\/\/[^/]+).*$/, '$1')}`;
+        if (cspReportSeen.has(key) || cspReportSeen.size >= 100) continue;
+        cspReportSeen.add(key);
+        console.log(`[csp-report] ${dir} blocked=${blocked} page=${page}`);
+      }
+    } catch (e) { /* a malformed report is ignored */ }
+    res.writeHead(204, { 'Cache-Control': 'no-store' });
+    res.end();
+  });
+}
+
 function sendJSON(res, status, data) {
   const body = JSON.stringify(data);
   res.writeHead(status, {
@@ -4383,6 +4451,86 @@ function smartPickVenues(test, rank) {
 }
 const smartTextHas = (v, re) => re.test(String(v.row.name || '')) || re.test(String(v.row.description || ''));
 
+// Search ranking (2026-10-18): activity phrases -> /search with the places whose name says it first, then the ones
+// whose description does ("escape room" went to all of /indoor, where Exit Kelowna Escape Games was #24; "bike
+// rental" found 1 place). words: folded phrases a request may use; re: what a name or description must say.
+const SMART_ACTIVITIES = [
+  { key: 'escape_room', label: 'Escape rooms', labelFr: 'Jeux d’évasion', words: ['escape room', 'escape rooms', 'escape game', 'escape games', 'jeu d evasion', 'jeux d evasion', 'salle d evasion', 'salles d evasion'],
+    re: /\bescape (?:rooms?|games?)\b/i },
+  { key: 'bowling', label: 'Bowling', labelFr: 'Quilles', words: ['bowling', 'bowling alley', 'bowling alleys', 'ten pin bowling', 'five pin bowling', '5 pin bowling', '10 pin bowling', 'quilles', 'salle de quilles'],
+    re: /\bbowling\b(?! green)|\b(?:5|10|five|ten)[- ]pin\b/i },
+  { key: 'axe_throwing', label: 'Axe throwing', labelFr: 'Lancer de hache', words: ['axe throwing', 'axe throw', 'hatchet throwing', 'lancer de hache', 'lancer de haches'],
+    re: /\baxe[- ]?throw\w*|\bhatchet[- ]?throw\w*/i },
+  { key: 'mini_golf', label: 'Mini golf', labelFr: 'Minigolf', words: ['mini golf', 'minigolf', 'mini putt', 'miniature golf', 'putt putt', 'crazy golf', 'mini golfs'],
+    re: /\bmini[- ]?golf\b|\bminiature golf\b|\bputt[- ]?putt\b|\bmini[- ]?putt\b|\bcrazy golf\b/i },
+  { key: 'go_karts', label: 'Go-karts', labelFr: 'Karting', words: ['go kart', 'go karts', 'go karting', 'gokart', 'gokarts', 'go cart', 'go carts', 'karting', 'kart', 'karts'],
+    re: /\bgo[- ]?karts?\b|\bgo[- ]?karting\b|\bkarting\b|\bkartplex\b/i },
+  { key: 'trampoline', label: 'Trampoline parks', labelFr: 'Parcs de trampolines', words: ['trampoline', 'trampolines', 'trampoline park', 'trampoline parks', 'parc de trampolines', 'trampoline centre'],
+    re: /\btrampolines?\b/i },
+  { key: 'climbing_gym', label: 'Climbing gyms', labelFr: 'Centres d’escalade', words: ['climbing gym', 'climbing gyms', 'bouldering', 'bouldering gym', 'bouldering gyms', 'indoor climbing', 'climbing wall', 'climbing walls', 'escalade', 'escalade interieure'],
+    re: /\bclimbing (?:gyms?|walls?|centres?|centers?)\b|\bboulder(?:ing)?\b|\bindoor climbing\b/i },
+  { key: 'arcade', label: 'Arcades', labelFr: 'Arcades', words: ['arcade', 'arcades', 'video arcade', 'arcade games', 'salle d arcade', 'salles d arcade'],
+    re: /\b(?:arcades?|rcades)\b/i },
+  { key: 'laser_tag', label: 'Laser tag', labelFr: 'Laser tag', words: ['laser tag', 'lazer tag', 'lasertag'],
+    re: /\bla[sz]er[- ]?tag\b|\bplanet lazer\b/i },
+  { key: 'bike_rental', label: 'Bike rentals', labelFr: 'Location de vélos', words: ['bike rental', 'bike rentals', 'bicycle rental', 'bicycle rentals', 'rent a bike', 'rent bikes', 'bike hire', 'e bike rental', 'e bike rentals', 'ebike rental', 'ebike rentals', 'rent an e bike', 'rent e bikes', 'location de velo', 'location de velos', 'louer un velo', 'louer des velos'],
+    re: /\b(?:e-?)?(?:bike|bicycle)s? (?:rentals?|hire)\b|\brent(?:al|als|s)? (?:an? )?(?:e-?)?(?:bikes?|bicycles?)\b|\b(?:e-?)?bikes? (?:for|to) rent\b/i },
+];
+// Words that add nothing to an activity request ("escape rooms near me", "best go karts in kelowna").
+const SMART_ACTIVITY_GENERIC = ['in', 'near', 'me', 'the', 'a', 'an', 'okanagan', 'best', 'top', 'places', 'place', 'spots', 'spot', 'where', 'to', 'go', 'for', 'find', 'fun',
+  'indoor', 'indoors', 'outdoor', 'centre', 'center', 'park', 'parks', 'lanes', 'alley', 'alleys', 'game', 'games', 'rentals', 'rental', 'shop', 'shops', 'can', 'i', 'we',
+  'ou', 'du', 'de', 'des', 'la', 'le', 'les', 'au', 'aux', 'dans', 'pres', 'un', 'une', 'meilleur', 'meilleurs'];
+// Places where people go to do things come before a restaurant or pub that also has it.
+const SMART_ACTIVITY_TYPES = new Set(['indoor', 'outdoor', 'tour', 'sport', 'golf', 'beach']);
+function smartActivityFor(folded) {
+  return SMART_ACTIVITIES.find((a) => smartHas(folded, a.words)) || null;
+}
+// The places for one activity: name matches first, then description matches; best first within each.
+function smartActivityPick(activity, region, features) {
+  const inName = (v) => activity.re.test(String(v.row.name || ''));
+  return smartPickVenues((v) => {
+    if ((region && v.region !== region) || !features.every((f) => v.features[f])) return false;
+    if (inName(v)) return `Name says ${activity.label.toLowerCase()}`;
+    return activity.re.test(String(v.row.description || '')) || activity.re.test(String(v.row.cuisine || '')) ? `Mentions ${activity.label.toLowerCase()}` : false;
+  }, (v) => (inName(v) ? 100 : 0) + (SMART_ACTIVITY_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+}
+
+// Search ranking (2026-10-18): date night, romantic and special dinners rank by the planner's own romance scoring
+// (trip-planner.js occasionScore: lake views, $$$ and up, "romantic" or "intimate" in the description, the kinds of
+// place that suit a date) and its special-dinner rule (specialDinner: $$$ and up, fine dining, tasting menus, winery
+// restaurants), then the rating. They used to be the generic /food-drink list led by JOEY, Frankie and Smitty's.
+// Pubs and the pizza, burger and fast-casual places the planner never picks for a nice dinner are left out.
+const SMART_SPECIAL_DINNER_WORDS = ['thanksgiving', 'thanksgiving dinner', 'thanksgiving dinners', 'special dinner', 'special occasion', 'special occasion dinner', 'fancy dinner', 'nice dinner',
+  'birthday dinner', 'holiday dinner', 'celebration dinner', 'action de grace', 'souper de l action de grace', 'diner de l action de grace', 'souper special', 'diner special'];
+const SMART_CHEF_RE = /\bchef[’']?s (?:table|menu|tasting|counter|choice)\b|\bchef[- ]driven\b|\bchef[- ]owned\b|\btasting[- ]menus?\b/i;
+let smartRomanceCtx = null;
+function smartRomanceScore(v, extraRe = null) {
+  const tp = tripPlannerModule();
+  if (!smartRomanceCtx) smartRomanceCtx = tp.buildContext({ occasion: 'romantic', regions: [], types: [], features: [], foodTerms: [], excluded: {} }, tripPlannerLabels());
+  const reasons = [];
+  let score = 0;
+  tp.occasionScore(v, smartRomanceCtx, (code, weight, text) => { score += weight; if (text) reasons.push({ weight, text }); });
+  if ((v.type === 'restaurant' || v.fdTypes.includes('restaurant')) && tp.specialDinner(v)) { score += 20; reasons.push({ weight: 20, text: 'Fine dining or a special-occasion menu' }); }
+  if (SMART_CHEF_RE.test(String(v.row.description || ''))) { score += 6; reasons.push({ weight: 6, text: 'A tasting or chef’s menu' }); }
+  if (extraRe && (extraRe.test(String(v.row.description || '')) || extraRe.test(String(v.row.name || '')))) { score += 15; reasons.push({ weight: 15, text: 'Mentions it in its description' }); }
+  // The rating, on the planner's scale: a high rating from many reviews counts most.
+  score += (foodDrinkRecommendedScore(v.row) - 4) * 10;
+  return { score, why: reasons.sort((a, b) => b.weight - a.weight).slice(0, 2).map((r) => r.text).join(' · ') };
+}
+// Restaurants, cocktail lounges and wine bars, and wineries with a restaurant, for a date or a special dinner.
+function smartRomancePick(types, region, features, extraRe = null) {
+  const tp = tripPlannerModule();
+  const fits = (v) => types.includes(v.type) || v.fdTypes.some((t) => types.includes(t)) || (v.type === 'winery' && v.fdTypes.includes('restaurant'));
+  const scores = new Map();
+  return smartPickVenues((v) => {
+    if ((region && v.region !== region) || !fits(v) || !features.every((f) => v.features[f])) return false;
+    if (v.type === 'pub' || ((v.type === 'restaurant' || v.type === 'cafe') && tp.casualDinner(v))) return false;
+    const s = smartRomanceScore(v, extraRe);
+    scores.set(v.id, s.score);
+    return s.why || true;
+  }, (v) => scores.get(v.id));
+}
+
 // The plan for a request, or null to keep the routing above:
 //   { key, url } -> send the visitor straight to that page
 //   { key, list() } -> /search shows exactly that list (heading, headingFr)
@@ -4398,6 +4546,23 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   // interpreter reads "brunch" as a cuisine too; that must not count as some
   // other request and block the breakfast/brunch routing below.
   const others = intent.cuisines.filter((c) => !/^(breakfast|brunch)/i.test(c)).length || intent.collections.length || intent.activities.length;
+
+  // Search ranking (2026-10-18): an activity ("escape room", "go karts in kelowna") -> the places that have it,
+  // name matches first. Only when nothing else is asked for, and only when a place in that town has it.
+  const activity = smartActivityFor(folded);
+  if (activity && T.every((t) => SMART_ACTIVITY_TYPES.has(t)) && !intent.cuisines.length && !intent.collections.length
+    && !smartTopicWords(folded, intent, [...activity.words, ...SMART_ACTIVITY_GENERIC]).length) {
+    const pick = () => smartActivityPick(activity, region, F);
+    if (pick().length) {
+      return {
+        key: activity.key,
+        heading: `${activity.label}${town ? ` in ${town}` : ''}`,
+        headingFr: `${activity.labelFr}${town ? ` à ${town}` : ''}`,
+        guides: [],
+        list: pick,
+      };
+    }
+  }
 
   // Breakfast and brunch.
   if (smartHas(folded, SMART_BREAKFAST_WORDS) && T.every((t) => t === 'cafe' || t === 'restaurant') && !others) {
@@ -4425,11 +4590,26 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
     };
   }
 
-  // Date night: restaurants and cocktail lounges, best rated first.
-  if ((smartHas(folded, SMART_DATE_WORDS) || intent.occasion === 'date_night') && T.every((t) => t === 'restaurant' || t === 'cocktail') && !others
-    && getFoodDrinkHubVenues().length >= MIN_CATEGORY_VENUES) {
-    const types = T.length ? T : ['restaurant', 'cocktail'];
-    return { key: 'date_night', url: `/food-drink${discoveryQueryString({ types, features: F.filter((f) => FD_HUB_FEATURE_KEYS.has(f)), regions: R })}` };
+  // Date night: restaurants and cocktail lounges (and winery restaurants), ranked by the planner's romance scoring
+  // (search ranking, 2026-10-18: it was /food-drink's generic list, led by JOEY, Frankie and Smitty's).
+  const dateWords = smartHas(folded, SMART_DATE_WORDS) || intent.occasion === 'date_night' || intent.occasion === 'romantic';
+  const specialWords = smartHas(folded, SMART_SPECIAL_DINNER_WORDS);
+  if ((dateWords || specialWords) && T.every((t) => t === 'restaurant' || t === 'cocktail') && !others) {
+    const types = T.length ? T : dateWords ? ['restaurant', 'cocktail'] : ['restaurant'];
+    // Thanksgiving: a place that says it serves a Thanksgiving dinner comes first.
+    const extraRe = smartHas(folded, ['thanksgiving', 'thanksgiving dinner', 'thanksgiving dinners', 'action de grace']) ? /\bthanksgiving\b/i : null;
+    const pick = () => smartRomancePick(types, region, F, extraRe);
+    if (pick().length) {
+      const what = dateWords ? 'Date night' : extraRe ? 'Thanksgiving dinner' : 'Special dinners';
+      const whatFr = dateWords ? 'Soirée en amoureux' : extraRe ? 'Souper de l’Action de grâce' : 'Soupers spéciaux';
+      return {
+        key: dateWords ? 'date_night' : 'special_dinner',
+        heading: `${what}${town ? ` in ${town}` : ''}`,
+        headingFr: `${whatFr}${town ? ` à ${town}` : ''}`,
+        guides: [],
+        list: pick,
+      };
+    }
   }
 
   // Search gaps (2026-10-18): a wine tour -> the town's wineries, plus the tour operators that run wine tours there
@@ -7371,6 +7551,76 @@ const GUIDE_BADGE_PICKS = {
   'kelowna/dog_friendly': () => [DOG_GUIDE_PATH, 'Our guide: dog beaches, trails and patios in Kelowna'],
 };
 const GUIDE_FEATURES = ['patio', 'dog_friendly', 'kid_friendly', 'lake_view', 'great_groups', 'live_music', 'happy_hour', 'vegetarian', 'open_late'];
+// Search ranking (2026-10-18): dietary guides rank by how strongly a place fits. A fully vegan (vegetarian,
+// gluten-free) kitchen comes first -- its listed cuisine, its name, or a description that says "vegan restaurant",
+// "100% vegan", "plant-based cafe" -- then places that mention it most, then the rest by rating. The vegan guide
+// in Kelowna (146 places) opened with Boston Pizza, JOEY and an ice cream shop; Frankie We Salute You! and Zen's
+// Plant-Based Cuisine now lead. Facts from stored fields only.
+const DIET_PLACE = '(?:restaurant|caf[eé]|bakery|kitchen|eatery|bistro|diner|brewery|facility|food truck|deli|bar)';
+const DIET_FULL = '(?:100\\s?%|100 per ?cent|entirely|fully|completely|totally|exclusively|strictly)[- ]';
+const dietFullRe = (words) => new RegExp(`\\b${DIET_FULL}${words}\\b|\\b${words} (?:brunch |breakfast )?${DIET_PLACE}\\b`, 'i');
+const DIET_STRENGTH = {
+  vegan: {
+    cuisine: /\b(?:vegan|plant[- ]based)\b/i,
+    name: /\b(?:vegan|plant[- ]based)\b/i,
+    full: dietFullRe('(?:vegan|plant[- ]based)'),
+    word: /\b(?:vegan|plant[- ]based)\b/gi,
+  },
+  vegetarian: {
+    cuisine: /\b(?:vegetarian|vegan|plant[- ]based)\b/i,
+    name: /\b(?:vegetarian|vegan|plant[- ]based|veggie)\b/i,
+    full: dietFullRe('(?:vegetarian|vegan|plant[- ]based|meat[- ]free)'),
+    word: /\b(?:vegetarian|vegan|veggie|plant[- ]based|meat[- ]free)\b/gi,
+  },
+  gluten_free: {
+    cuisine: /\bgluten[- ]free\b/i,
+    name: /\bgluten[- ]free\b/i,
+    full: dietFullRe('(?:gluten[- ]free|celiac[- ]safe)'),
+    word: /\b(?:gluten[- ]free|celiac|coeliac)\b/gi,
+  },
+};
+// 0 = a fully vegan (vegetarian, gluten-free) place, 1 = mentions it, 2 = has the badge only; mentions = how often.
+function dietMatchStrength(v, badge) {
+  const d = DIET_STRENGTH[badge];
+  if (!d) return { tier: 2, mentions: 0 };
+  const name = String(v.name || ''), cuisine = String(v.cuisine || ''), desc = String(v.description || '');
+  const mentions = (`${name} ${cuisine} ${desc}`.match(d.word) || []).length;
+  // "can be made fully vegan on request" or "to make it fully vegan" is an option, not a vegan kitchen.
+  const fullDesc = [...desc.matchAll(new RegExp(d.full.source, 'gi'))].some((m) => !/\b(?:made|make|makes|making|be|go|went|it|them|dish|dishes|order)\s*$/i.test(desc.slice(Math.max(0, m.index - 12), m.index))
+    && !/^\s*(?:on request|upon request|options?|choices?|versions?|if asked)\b/i.test(desc.slice(m.index + m[0].length)));
+  if (d.cuisine.test(cuisine) || d.name.test(name) || fullDesc) return { tier: 0, mentions };
+  return { tier: mentions ? 1 : 2, mentions };
+}
+// A ranked dietary guide's first order is a ranking, so it is called Best match rather than Mixed.
+const GUIDE_DIET_SORTS = [{ key: 'recommended', label: 'Best match' }, { key: 'town', label: 'By town' }, { key: 'az', label: 'A\u2013Z' }];
+function sortByDietStrength(venues, badge) {
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
+  const m = new Map(venues.map((v) => [v.id, { ...dietMatchStrength(v, badge), score: foodDrinkRecommendedScore(v) }]));
+  return venues.slice().sort((a, b) => {
+    const x = m.get(a.id), y = m.get(b.id);
+    return x.tier - y.tier || (x.tier === 1 ? y.mentions - x.mentions : 0) || y.score - x.score || byName(a, b);
+  });
+}
+// Guide pages open first (2026-10-18): from 7 am to 11 pm Okanagan time, a guide's default order puts the places
+// open right now first (the food lists' openNowFirst split, #336), each part keeping its order; tierOf keeps a
+// ranked guide's tiers (fully vegan first) and splits each one. Places closed for the season stay last. At night
+// the order is left alone, so a 2 am visitor isn't shown only the few late-night places.
+function guideOpenFirstHours(now = new Date()) {
+  const m = okanaganClock(now).minutes;
+  return m >= 7 * 60 && m < 23 * 60;
+}
+function guideOpenFirst(list, now = new Date(), tierOf = null) {
+  if (!hoursModule || list.length < 2 || !guideOpenFirstHours(now)) return list;
+  const info = foodDrinkOpenNowInfo(list, getAdvisoryNotes(now), now, { requireVerified: false });
+  const seasons = getSeasonStates(now);
+  const key = (v) => {
+    const st = seasons.get(v.id);
+    if (st && st.kind === 'closed') return 1e9;
+    return (tierOf ? tierOf(v) : 0) * 2 + (info.openIds.has(v.id) ? 0 : 1);
+  };
+  const keys = new Map(list.map((v, i) => [v.id, [key(v), i]]));
+  return list.slice().sort((a, b) => keys.get(a.id)[0] - keys.get(b.id)[0] || keys.get(a.id)[1] - keys.get(b.id)[1]);
+}
 function guideBadgeHeading(region, badge) {
   const t = GUIDE_BADGE_TEXT[badge] || { h: `${BADGE_LABELS[badge].title} Places in {T}`, i: `${BADGE_LABELS[badge].title} places in {T}.` };
   const town = REGION_LABELS[region];
@@ -7378,6 +7628,9 @@ function guideBadgeHeading(region, badge) {
 }
 function renderGuidePage(region, badge, venues, filter = null, now = new Date()) {
   const regionLabel = REGION_LABELS[region];
+  // Search ranking (2026-10-18): a dietary guide ranks fully vegan (vegetarian, gluten-free) places first.
+  const diet = DIET_STRENGTH[badge] ? badge : null;
+  if (diet) venues = sortByDietStrength(venues, diet);
   const { heading, intro } = guideBadgeHeading(region, badge);
   const tally = {};
   for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
@@ -7412,6 +7665,10 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
     photoKeyFor: (v) => curatedPhotoKey(v),
     features: GUIDE_FEATURES.filter((k) => k !== badge),
     openNow: true,
+    openFirst: true,
+    keepOrder: !!diet,
+    tierOf: diet ? (v) => dietMatchStrength(v, diet).tier : null,
+    sorts: diet ? GUIDE_DIET_SORTS : undefined,
     search: { label: `Search ${heading.toLowerCase()}`, placeholder: 'Search by name or what you feel like...' },
     categoryContent: { all: { banner, heading, intro } },
     heroExtraHtml: picks ? `\n  <p class="guide-picks"><a href="${picks[0]}">${escapeHtml(picks[1])} &rarr;</a></p>` : '',
@@ -7556,6 +7813,8 @@ function comboGuideFactsHtml(combo, venues) {
 }
 function renderComboGuidePage(region, combo, venues, filter = null, now = new Date()) {
   const regionLabel = REGION_LABELS[region];
+  const diet = combo.badges.find((b) => DIET_STRENGTH[b]) || null;
+  if (diet) venues = sortByDietStrength(venues, diet);
   const { heading, intro } = comboGuideHeading(region, combo);
   const tally = {};
   for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
@@ -7600,6 +7859,10 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
     photoKeyFor: (v) => curatedPhotoKey(v),
     features: GUIDE_FEATURES.filter((k) => !combo.badges.includes(k)),
     openNow: true,
+    openFirst: true,
+    keepOrder: !!diet,
+    tierOf: diet ? (v) => dietMatchStrength(v, diet).tier : null,
+    sorts: diet ? GUIDE_DIET_SORTS : undefined,
     search: { label: 'Search these places', placeholder: 'Search by name or what you feel like...' },
     categoryContent: { all: { banner, heading, intro } },
     heroExtraHtml: comboGuidePopularHtml(venues) + comboGuideFactsHtml(combo, venues),
@@ -11439,22 +11702,42 @@ const REST_TEMPLATE_RE = /<template id="(fdRest|whatsOnRest)">([\s\S]*?)<\/templ
 const REST_LINK_RE = /<a class="venue-card-link" href="([^"]+)"><span class="venue-card-name">([^<]*)<\/span>/g;
 // The A-Z summary gets the site's 3px focus ring (2026-10-18; summaries are not in app.css's focus rule).
 const REST_LINKS_CSS = '<style id="rest-links-css">.rest-links{margin:18px 0 6px;font-size:.88rem}.rest-links summary{cursor:pointer;font-weight:700;padding:8px 0}.rest-links summary:focus-visible{outline:3px solid var(--teal,#1F5C5C);outline-offset:3px;border-radius:4px}.rest-links ul{columns:15em;column-gap:24px;margin:6px 0 0;padding:0;list-style:none}.rest-links li{break-inside:avoid;padding:2px 0}</style>';
-function restLinksHtml(kind, inner, lang) {
+// A-Z lists (2026-10-18): the list is every place on the page (shown cards too), labelled "All places on this
+// page" since its count never changes with the filters; a name that repeats in the list carries its town
+// ("Earls (Penticton)"), and an ALL-CAPS name reads in Title Case here (the listing itself is unchanged).
+const REST_LINK_ACRONYMS = new Set(['BBQ', 'BC', 'BNA', 'YMCA', 'KVR', 'RV', 'VR', 'USA', 'II', 'III', 'IV', 'OK', 'UBC', 'BMX', 'DJ', 'CO', 'KGH', 'SPCA']);
+const REST_LINK_SMALL = new Set(['of', 'at', 'the', 'and', 'in', 'on', 'by', 'a', 'an', 'for', 'to', 'de', 'du', 'la', 'le', 'et']);
+function restLinkDisplayName(name) {
+  const letters = name.replace(/[^A-Za-z\u00c0-\u024f]/g, '');
+  if (letters.length < 4 || letters !== letters.toUpperCase()) return name;
+  return name.replace(/[A-Za-z\u00c0-\u024f][A-Za-z\u00c0-\u024f'\u2019]*/g, (w, i) => {
+    if (REST_LINK_ACRONYMS.has(w)) return w;
+    const lower = w.toLowerCase();
+    if (i > 0 && REST_LINK_SMALL.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  });
+}
+const unescapeRestName = (t) => t.replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+function restLinksHtml(kind, inner, lang, shown = '') {
   const seen = new Set(), links = [];
-  for (const m of inner.matchAll(REST_LINK_RE)) {
+  for (const m of `${shown}${inner}`.matchAll(REST_LINK_RE)) {
     if (seen.has(m[1])) continue;
     seen.add(m[1]);
-    links.push({ href: m[1], name: m[2].trim() });
+    const region = (m[1].match(/^\/(?:fr\/)?([a-z-]+)\//) || [])[1];
+    links.push({ href: m[1], name: restLinkDisplayName(unescapeRestName(m[2].trim())), town: REGION_LABELS[region] || '' });
   }
   if (!links.length) return '';
   const fr = lang === 'fr', events = kind === 'whatsOnRest';
+  const tally = new Map();
+  for (const l of links) { const k = l.name.toLowerCase(); tally.set(k, (tally.get(k) || 0) + 1); }
+  for (const l of links) if (!events && l.town && tally.get(l.name.toLowerCase()) > 1) l.name = `${l.name} (${l.town})`;
   // Places A-Z; events keep the page's soonest-first order.
   if (!events) links.sort((a, b) => a.name.localeCompare(b.name, fr ? 'fr' : 'en', { sensitivity: 'base' }));
   const n = links.length;
   const summary = events
     ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `More upcoming events (${n})`)
-    : (fr ? `Toutes les autres adresses, de A \u00e0 Z (${n})` : `All the other places here, A\u2013Z (${n})`);
-  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"><summary>${summary}</summary><ul>${links.map((l) => `<li><a href="${l.href}">${l.name}</a>`).join('')}</ul></details>`;
+    : (fr ? `Toutes les adresses de cette page, de A \u00e0 Z (${n})` : `All places on this page, A\u2013Z (${n})`);
+  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"><summary>${summary}</summary><ul>${links.map((l) => `<li><a href="${l.href}">${escapeHtml(l.name)}</a>`).join('')}</ul></details>`;
 }
 // Venue JSON (2026-10-18): the filter data of a list page (#fdVenueData,
 // #bhVenueData) was 0.3-0.5 MB of every page view, mostly search words, and
@@ -11471,7 +11754,10 @@ function withRestCardsDeferred(html) {
   if (m && m[2].length >= REST_CARDS_MIN) {
     const hash = rememberRestCards(m[2]);
     const lang = /^<!DOCTYPE html>\s*<html lang="fr"/i.test(html) ? 'fr' : 'en';
-    html = html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + restLinksHtml(m[1], m[2], lang) + html.slice(m.index + m[0].length);
+    // The shown cards of a place list (fdResults) are in the A-Z list too (2026-10-18).
+    const ul = m[1] === 'fdRest' ? html.lastIndexOf('<ul class="card-grid" id="fdResults"', m.index) : -1;
+    const shown = ul !== -1 ? html.slice(ul, m.index) : '';
+    html = html.slice(0, m.index) + `<template id="${m[1]}" data-rest="${hash}"></template>` + restLinksHtml(m[1], m[2], lang, shown) + html.slice(m.index + m[0].length);
   }
   const d = REST_DATA_RE.exec(html);
   if (d && d[2].length >= REST_DATA_MIN && html.indexOf(REST_DATA_LOADER) !== -1) {
@@ -12933,7 +13219,19 @@ function golfCardEngagementScriptHtml(type, themed = usesThemedCategoryLayout(ty
       setup(card);
       ${opts.impressionCards ? `if (typeof io !== 'undefined' && io && card.matches(${JSON.stringify(opts.impressionCards)})) io.observe(card);` : `if (typeof io !== 'undefined' && io) io.observe(card);`}
     });
-    if (typeof syncAll === 'function') syncAll();
+    // Card buttons (2026-10-18): with app.js on the page its own sync paints the labels and states (French on
+    // French pages), as on the first cards; this module's syncAll() wrote its older plus-sign label and a
+    // plain-text heart over every Show more card. Only a page without app.js uses syncAll().
+    if (window.__syncTripButtons || window.__syncFavButtons) {
+      if (window.__syncTripButtons) window.__syncTripButtons();
+      if (window.__syncFavButtons) window.__syncFavButtons();
+      (list || []).forEach(function(card){
+        if (!card || !card.querySelectorAll) return;
+        Array.prototype.forEach.call(card.querySelectorAll('.fav-btn, .trip-btn'), function(btn){
+          btn.setAttribute('aria-pressed', btn.classList.contains('is-fav') || btn.classList.contains('in-trip') ? 'true' : 'false');
+        });
+      });
+    } else if (typeof syncAll === 'function') syncAll();
   };
 ${golfFavTripScriptBody(type)}
 })();
@@ -14151,7 +14449,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
 // runs from its start time (for a multi-day run, its daily start), so an evening event is "later today" in the
 // afternoon, and one that has finished for the day moves to tomorrow if it runs on. Untimed multi-day runs
 // (exhibitions, season-long events; 2026-10-18) are "On now" only in the daytime, 10:00-17:00; outside those hours
-// they are listed as running until their last day, never "On now" at 2 am.
+// they are listed as running until their last day, never "On now" at 2 am. An untimed one-day event (2026-10-18)
+// follows the same 10:00-17:00 day: "Later today" before 10, "On now" from 10 to 17, gone after 17:00.
 const MAP_EVENT_GROUP_SRC = `function eventGroup(e, today, nowMin){
     if (e.sd > today) return e.sd === addDays(today, 1) ? 'tomorrow' : 'week';
     if (e.ed < today) return null;
@@ -14160,10 +14459,27 @@ const MAP_EVENT_GROUP_SRC = `function eventGroup(e, today, nowMin){
       if (nowMin >= 600 && nowMin < 1020) return 'now';
       return e.ed === today && nowMin >= 1020 ? null : 'running';
     }
+    if (sm == null) {
+      if (nowMin >= 600 && nowMin < 1020) return 'now';
+      return nowMin < 600 ? 'later' : null;
+    }
     if (sm != null && nowMin < sm) return 'later';
     if (sm != null && em != null && em > sm && nowMin >= em) return next;
     if (sm != null && em == null && nowMin >= sm + 180) return next;
     return 'now';
+  }`;
+// Desktop map list (2026-10-18): which places the side list shows, and in what order. Near me: open first, then
+// the closest. A town: open first, then A-Z. Otherwise the places inside the map view -- on a desktop always
+// (it showed only "Tap the locate button..."), open first, then the best rated, redrawn on every pan and zoom;
+// on a phone once zoomed in or filtered, open first, then A-Z. Any filter counts, so Open now over the clusters
+// lists them (it said "0 places in this part of the map").
+const MAP_PLACE_LIST_SRC = `function mapPlaceList(onMap, o){
+    var rank = function(p){ return p.st && p.st.state === 'open' ? 0 : p.st && p.st.season ? 2 : 1; };
+    if (o.me) return onMap.slice().sort(function(a, b){ return rank(a) - rank(b) || a.d - b.d; });
+    var az = function(a, b){ return rank(a) - rank(b) || a.name.localeCompare(b.name); };
+    if (o.town) return onMap.slice().sort(az);
+    if (!(o.wide || o.zoom >= 12 || o.filtering)) return [];
+    return onMap.filter(o.inView).sort(o.wide ? function(a, b){ return rank(a) - rank(b) || (b.r || 0) - (a.r || 0) || a.name.localeCompare(b.name); } : az);
   }`;
 const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FR = document.documentElement.lang === 'fr';
@@ -14313,6 +14629,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function timeText(t){ var m = mins(t); if (m == null) return ''; var h = Math.floor(m / 60), mm = m % 60, pad = (mm < 10 ? '0' : '') + mm; if (FR) return h + ' h' + (mm ? ' ' + pad : ''); return (h % 12 || 12) + (mm ? ':' + pad : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
   function dayText(d){ return new Date(d + 'T12:00:00Z').toLocaleDateString(FR ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); }
   ${MAP_EVENT_GROUP_SRC}
+  ${MAP_PLACE_LIST_SRC}
+  var listOn = false;
   function whenText(e, g){
     var times = e.st ? timeText(e.st) + (e.et ? '–' + timeText(e.et) : '') : '';
     if (g === 'now') return e.ed > e.sd && !e.st ? T.onNow + ' · ' + T.until + ' ' + dayText(e.ed) : T.onNow + (times ? ' · ' + times : '') + (e.ed > e.sd ? ' · ' + T.until + ' ' + dayText(e.ed) : '');
@@ -14400,13 +14718,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (tab === 'places') {
       onMap = places.filter(function(p){ return matchesPlace(p) && (!me || !radiusKm || town || p.d <= radiusKm); });
       // Open places first, then the closest.
-      if (me) items = onMap.slice().sort(function(a, b){ return isOpen(a) - isOpen(b) || a.d - b.d; });
-      else {
-        var b = map.getBounds();
-        items = town ? onMap.slice().sort(function(a, c){ return isOpen(a) - isOpen(c) || a.name.localeCompare(c.name); }) : map.getZoom() >= 12 || term || anyOn(kinds) || anyOn(feats) ? onMap.filter(function(p){ return b.contains([p.lat, p.lng]); }).sort(function(a, c){ return isOpen(a) - isOpen(c) || a.name.localeCompare(c.name); }) : [];
-      }
-      var filtering = anyOn(kinds) || anyOn(feats) || openOnly || term;
-      countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (items.length || map.getZoom() >= 12 || filtering ? T.placesHere(items.length) : T.zoomHint);
+      // Desktop map list (2026-10-18): see mapPlaceList.
+      var filtering = !!(anyOn(kinds) || anyOn(feats) || openOnly || term || onTags().length || topOnly || price || atMin != null || atDay);
+      var b = me ? null : map.getBounds();
+      listOn = !!(me || town || WIDE.matches || map.getZoom() >= 12 || filtering);
+      items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); } });
+      countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4 };
@@ -14453,7 +14770,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
           + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
       }
     });
-    if (!listItems.length && (me || tab === 'events' || map.getZoom() >= 12 || term)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(T.noEvents)) + '</li>';
+    if (!listItems.length && (me || tab === 'events' || listOn)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(T.noEvents)) + '</li>';
     listEl.innerHTML = html;
     if (typeof route !== 'undefined' && route) drawRoute();
     moreBtn.hidden = listItems.length <= limit;
@@ -18427,20 +18744,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   // The Favorite / Add to trip row of a card that waited in the template:
   // the same markup golfFavTripButtonsHtml() renders, built with DOM calls.
   var HEART_USE = ${JSON.stringify(FD_HEART_USE)};
-  function fdFillActions(card){
-    var box = card.querySelector('.card-actions[data-fd-lazy]'); if (!box) return;
-    var name = card.getAttribute('data-venue-name') || '', region = card.getAttribute('data-venue-region') || '', id = card.getAttribute('data-venue-id');
-    var fav = document.createElement('button');
-    fav.type = 'button'; fav.className = 'card-action fav-btn';
-    fav.setAttribute('data-fav-name', name); fav.setAttribute('aria-pressed', 'false'); fav.setAttribute('aria-label', 'Favorite ' + name);
-    fav.innerHTML = HEART_USE + ' Favorite';
-    var trip = document.createElement('button');
-    trip.type = 'button'; trip.className = 'card-action trip-btn';
-    trip.setAttribute('data-trip-name', name); trip.setAttribute('data-trip-query', name + ', ' + (LABELS.regions[region] || region) + ', Okanagan Valley, BC');
-    trip.setAttribute('data-trip-region', region); trip.setAttribute('data-trip-ref', 'venue:' + id); trip.setAttribute('aria-pressed', 'false'); trip.setAttribute('aria-label', 'Add ' + name + ' to trip');
-    trip.textContent = '\u{1F9F3} Add to trip';
-    box.appendChild(fav); box.appendChild(trip); box.removeAttribute('data-fd-lazy');
-  }
+  ${cardFillActionsJs('fdFillActions')}
   function fdSearchHit(card){
     if (!searchPlan.groups.length) return true;
     var text = card.__fd || '';
@@ -18695,6 +18999,26 @@ const ACTIVITY_PHOTO_SWAP_SCRIPT = `<script>
   sync();
 })();
 </script>`;
+// Card buttons (2026-10-18): the one template for the Favorite / Add to trip row of a card that waited in the
+// template, used by every list page script (/food-drink style hubs, guides, /search: fdFillActions; /browse:
+// bhFillActions). It builds the same markup golfFavTripButtonsHtml() renders for the first 48 cards, with the
+// same labels (French pages translate these lines with the rest of the script).
+function cardFillActionsJs(fnName) {
+  return `  function ${fnName}(card){
+    var box = card.querySelector('.card-actions[data-fd-lazy]'); if (!box) return;
+    var name = card.getAttribute('data-venue-name') || '', region = card.getAttribute('data-venue-region') || '', id = card.getAttribute('data-venue-id');
+    var fav = document.createElement('button');
+    fav.type = 'button'; fav.className = 'card-action fav-btn';
+    fav.setAttribute('data-fav-name', name); fav.setAttribute('aria-pressed', 'false'); fav.setAttribute('aria-label', 'Favorite ' + name);
+    fav.innerHTML = HEART_USE + ' Favorite';
+    var trip = document.createElement('button');
+    trip.type = 'button'; trip.className = 'card-action trip-btn';
+    trip.setAttribute('data-trip-name', name); trip.setAttribute('data-trip-query', name + ', ' + (LABELS.regions[region] || region) + ', Okanagan Valley, BC');
+    trip.setAttribute('data-trip-region', region); trip.setAttribute('data-trip-ref', 'venue:' + id); trip.setAttribute('aria-pressed', 'false'); trip.setAttribute('aria-label', 'Add ' + name + ' to trip');
+    trip.textContent = '${APP_TRIP_LABEL_HTML}';
+    box.appendChild(fav); box.appendChild(trip); box.removeAttribute('data-fd-lazy');
+  }`;
+}
 const FD_HEART_SYMBOL = '<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="fdHeart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></symbol></svg>';
 const FD_HEART_USE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#fdHeart"/></svg>';
 function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, showRegion, openStatusById = null, extra = {}) {
@@ -21130,7 +21454,9 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const pinnedIds = new Set(pinned.map((v) => v.id));
   // cfg.keepOrder (2026-10-18): the list is already ranked (search results), so its first order is the given one.
   // Seasons everywhere (2026-10-18): places closed for the season go last in this first order (pinned places stay first).
-  const mixed = cfg.keepOrder ? seasonClosedLast(venues, now) : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), now)];
+  let mixed = cfg.keepOrder ? seasonClosedLast(venues, now) : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), now)];
+  // cfg.openFirst (2026-10-18): guide pages lead with places open now, 7 am to 11 pm (guideOpenFirst).
+  if (cfg.openFirst) mixed = guideOpenFirst(mixed, now, cfg.tierOf || null);
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -23919,9 +24245,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     description: editorial ? editorial.intro : ((fr ? venue.description_fr : venue.description) || undefined),
     url: canonical,
     telephone: venue.phone || undefined,
-    address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
+    address: venuePostalAddress(venue.address, regionLabel),
     geo: (venue.latitude && venue.longitude) ? { '@type': 'GeoCoordinates', latitude: venue.latitude, longitude: venue.longitude } : undefined,
-    image: venue.image_url || undefined,
+    image: absoluteSiteUrl(venue.image_url),
     sameAs: normalizeWebsiteUrl(venue.website) || undefined,
     // Golf (2026-09-26): the legacy price level is not a green fee, so it is
     // never shown on golf pages; verified green fees are shown instead.
@@ -24369,8 +24695,38 @@ function occurrenceIsoEnd(o) {
 // results. A host venue's stored street address is used exactly as before;
 // any other event gets its region as a locality-level PostalAddress -- never
 // a guessed street address. Valley-wide events are "Okanagan Valley".
+// Venue JSON-LD (2026-10-18): Google reads a split PostalAddress far better than one string. A stored address
+// "262 Bernard Ave, Kelowna, BC V1Y 6N4" becomes streetAddress "262 Bernard Ave", addressLocality "Kelowna",
+// postalCode "V1Y 6N4"; a descriptive one ("Westlake Road, West Kelowna, BC (parking lot near ...)") drops the
+// trailing note. An address that doesn't end in a town and BC stays whole, with the listing's town as the locality.
+function venuePostalAddress(address, fallbackLocality) {
+  const raw = String(address || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return undefined;
+  const out = { '@type': 'PostalAddress', streetAddress: raw, addressLocality: fallbackLocality || undefined, addressRegion: 'BC', postalCode: undefined, addressCountry: 'CA' };
+  const core = raw.replace(/\s*[;(].*$/, '').replace(/,?\s*Canada\s*$/i, '').trim();
+  const m = /^(.+?),\s*([^,]+?),\s*(?:BC|B\.C\.|British Columbia)\.?(?:,?\s*([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d))?$/.exec(core);
+  if (m) {
+    out.streetAddress = m[1].trim();
+    if (m[2].length <= 30 && !/\d/.test(m[2])) out.addressLocality = m[2].trim();
+    if (m[3]) out.postalCode = `${m[3]} ${m[4]}`.toUpperCase();
+  } else {
+    const pc = /\b([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d)\b/.exec(core);
+    if (pc) out.postalCode = `${pc[1]} ${pc[2]}`.toUpperCase();
+  }
+  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
+  return out;
+}
+// A site path ("/images/venues/x.jpg") as a full URL; an http(s) URL is kept; nothing stays nothing.
+function absoluteSiteUrl(u) {
+  const v = String(u || '').trim();
+  if (!v) return undefined;
+  if (/^https?:\/\//i.test(v)) return v;
+  if (v.startsWith('//')) return `https:${v}`;
+  return `https://okanaganroam.com${v.startsWith('/') ? '' : '/'}${v}`;
+}
 function eventLocationAddress(event, hostVenue) {
-  if (hostVenue && hostVenue.address) return hostVenue.address;
+  // A host venue's address is split like the venue page's (2026-10-18).
+  if (hostVenue && hostVenue.address) return venuePostalAddress(hostVenue.address, REGION_LABELS[hostVenue.region]);
   const region = hostVenue && hostVenue.region ? hostVenue.region : event.region;
   const locality = !hostVenue && event.valley_wide === 1 ? 'Okanagan Valley' : (REGION_LABELS[region] || 'Okanagan Valley');
   return { '@type': 'PostalAddress', addressLocality: locality, addressRegion: 'BC', addressCountry: 'CA' };
@@ -24427,8 +24783,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
 }
 // Organizer and offers (2026-10-13), Google's recommended Event fields, from
 // stored data only: the organizer is named only when the listing's source IS
-// the organizer; the offer is just the official event/ticket link (no price
-// or availability is stored, so none is claimed). Both are omitted otherwise.
+// the organizer; the offer carries the official event/ticket link when there is
+// one. Both are omitted otherwise (the offer also needs a stated price, below).
 function eventOfficialUrl(event) {
   const ok = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
   if (ok(event.website)) return event.website.trim();
@@ -24440,9 +24796,58 @@ function eventOrganizerSchema(event) {
   const url = eventOfficialUrl(event);
   return { '@type': 'Organization', name: event.source_name.trim(), url: url || undefined };
 }
+// Event prices (2026-10-18): Google flags an Offer with no price, so an offer is emitted only when the listing states
+// one: a stored price field when there is one, else the description. "Tickets are about $68–79" -> lowPrice 68,
+// highPrice 79; "Admission is $10" -> price 10; "free admission" or "a free holiday market" -> price 0. A dollar amount
+// counts only in a sentence about tickets, admission or cost, so "$2 oysters" or "a $15 tasting" never become the price.
+// "By donation" and "early-bird tickets cost less" state no price, so no offer.
+const EVENT_PRICE_CONTEXT_RE = /\b(tickets?|admission|entry|entrance|cover|cost|costs|price[sd]?|register|registration|per (person|adult|child|ticket|couple|team)|passes?|seats?|in advance|at the door|early[- ]bird|from \$)/i;
+const EVENT_FREE_RE = /\b(?:(?:admission|entry|entrance)(?: is)? free|free (?:admission|entry|entrance|event|to attend|of charge|for (?:all|everyone)|and open)|(?:a|this|the) free(?:,? [\w'’-]+){0,3}? (?:event|fair|market|show|concert|festival|workshop|walk|tour|talk|screening|night|party|celebration|drop-in|session|class|day|afternoon|evening|parade|light-up|bazaar|program|gathering|exhibit|exhibition|skate|kick-off|open house|film|performance)|admission: free|^free(?:[.!]|$))/i;
+function parseEventPrice(text) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  const amounts = [];
+  for (const sentence of t.split(/(?<=[.!?;])\s+/)) {
+    if (!EVENT_PRICE_CONTEXT_RE.test(sentence) && !/^\s*\$\d/.test(t)) continue;
+    // "$68–79", "$49–$59", "$68 to $79", "$25 - 35"
+    const re = /\$\s?(\d{1,4}(?:\.\d{2})?)(?:\s?(?:–|—|-|to)\s?\$?\s?(\d{1,4}(?:\.\d{2})?)(?![\d,]))?/g;
+    let m;
+    while ((m = re.exec(sentence))) {
+      amounts.push(Number(m[1]));
+      if (m[2] && Number(m[2]) > Number(m[1])) amounts.push(Number(m[2]));
+    }
+  }
+  const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  if (amounts.length) {
+    const lo = Math.min(...amounts), hi = Math.max(...amounts);
+    return lo === hi ? { price: fmt(lo) } : { lowPrice: fmt(lo), highPrice: fmt(hi) };
+  }
+  // "Free" counts unless it's hedged ("in past years it has been free") or names one part ("opens with a free parade").
+  const free = EVENT_FREE_RE.exec(t);
+  if (free && !/\b(past years|usually|typically|has been free|was free)\b/i.test(t)) {
+    const before = t.slice(0, free.index).split(/[.!?;]\s/).pop();
+    if (!/\b(opens|starts|begins|kicks off|ends|closes|wraps up) with\s*$|\b(plus|includes|including)\s*$/i.test(before)) return { price: '0' };
+  }
+  return null;
+}
+function eventPriceInfo(event) {
+  for (const f of ['price_text', 'price']) {
+    const v = event && event[f];
+    if (v == null || v === '') continue;
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return { price: String(v) };
+    const p = parseEventPrice(/^\s*\d/.test(String(v)) ? `$${String(v).trim()}` : v);
+    if (p) return p;
+  }
+  return parseEventPrice(event && event.description);
+}
 function eventOffersSchema(event) {
-  const url = eventOfficialUrl(event);
-  return url ? { '@type': 'Offer', url } : undefined;
+  const info = eventPriceInfo(event);
+  if (!info) return undefined;
+  const url = eventOfficialUrl(event) || undefined;
+  const common = { priceCurrency: 'CAD', availability: 'https://schema.org/InStock', url };
+  return info.price != null
+    ? { '@type': 'Offer', price: info.price, ...common }
+    : { '@type': 'AggregateOffer', lowPrice: info.lowPrice, highPrice: info.highPrice, ...common };
 }
 // SEO-1 E (2026-10-02): when another event has exactly the same name in the
 // same region, both pages would carry an identical <title>; such pages add
@@ -27213,20 +27618,7 @@ function bhStart(){
   function dataOf(card){ return DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '', cu: '', p: 0, rt: 0 }; }
   // The Favorite / Add to trip row of a card that waited in the template (2026-10-14).
   var HEART_USE = ${JSON.stringify(FD_HEART_USE)};
-  function bhFillActions(card){
-    var box = card.querySelector('.card-actions[data-fd-lazy]'); if (!box) return;
-    var name = card.getAttribute('data-venue-name') || '', region = card.getAttribute('data-venue-region') || '', id = card.getAttribute('data-venue-id');
-    var fav = document.createElement('button');
-    fav.type = 'button'; fav.className = 'card-action fav-btn';
-    fav.setAttribute('data-fav-name', name); fav.setAttribute('aria-pressed', 'false'); fav.setAttribute('aria-label', 'Favorite ' + name);
-    fav.innerHTML = HEART_USE + ' Favorite';
-    var trip = document.createElement('button');
-    trip.type = 'button'; trip.className = 'card-action trip-btn';
-    trip.setAttribute('data-trip-name', name); trip.setAttribute('data-trip-query', name + ', ' + (LABELS.regions[region] || region) + ', Okanagan Valley, BC');
-    trip.setAttribute('data-trip-region', region); trip.setAttribute('data-trip-ref', 'venue:' + id); trip.setAttribute('aria-pressed', 'false'); trip.setAttribute('aria-label', 'Add ' + name + ' to trip');
-    trip.textContent = '\u{1F9F3} Add to trip';
-    box.appendChild(fav); box.appendChild(trip); box.removeAttribute('data-fd-lazy');
-  }
+  ${cardFillActionsJs('bhFillActions')}
   function sortCards(){
     ordered = cards.slice();
     if (sortKey === 'rating') ordered.sort(function(a, b){ var x = dataOf(a).rt || -1, y = dataOf(b).rt || -1; return y - x || Number(a.getAttribute('data-bh-i')) - Number(b.getAttribute('data-bh-i')); });
@@ -30324,9 +30716,14 @@ function venueLookup(q, region) {
   const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
     .all(...[like, ...(r ? [r] : []), `${term}%`]);
+  // French lookup (2026-10-18): the French type label, the French page and both claim links ride along, so
+  // /fr/list-your-venue shows French results and every result can be claimed.
   return rows.filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]).map((v) => ({
     name: v.name, region: REGION_LABELS[v.region], type: CATEGORY_LABELS[v.type].singular,
+    typeFr: (CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular,
     url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+    urlFr: `/fr/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+    claim: claimPagePath(v, 'en'), claimFr: claimPagePath(v, 'fr'),
   }));
 }
 function renderListYourVenuePage() {
@@ -30386,7 +30783,9 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.list-venue-page .lyv-lookup-results { list-style: none; margin: 10px 0 0; padding: 0; }
   body.list-venue-page .lyv-lookup-results li { padding: 8px 0; border-top: 1px solid rgba(74,52,40,0.1); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
   body.list-venue-page .lyv-lookup-results a { font-weight: 800; }
-  body.list-venue-page .lyv-correct { margin-left: auto; font: inherit; font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; background: var(--sand-deep, #ece3d3); color: var(--ink); }
+  body.list-venue-page .lyv-actions { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  body.list-venue-page .lyv-lookup-results a.lyv-claim { font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; text-decoration: none; background: var(--ink, #1b2b3a); color: #fff; }
+  body.list-venue-page .lyv-correct { font: inherit; font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; background: var(--sand-deep, #ece3d3); color: var(--ink); }
   body.list-venue-page .lyv-photos-note { margin: -4px 0 18px; }
 </style>
 <body class="golf-page list-venue-page">
@@ -30522,6 +30921,12 @@ ${renderGolfHeaderHtml()}
     var input = document.getElementById('lyvLookup'), list = document.getElementById('lyvLookupResults');
     if (!input || !list) return;
     var timer = null, seq = 0;
+    // French lookup (2026-10-18): /fr/list-your-venue (html lang="fr") shows French labels and links to the French
+    // pages; each result also gets a "Claim this listing" link to its claim page.
+    var FR = String(document.documentElement.getAttribute('lang') || '').slice(0, 2) === 'fr';
+    var TX = FR
+      ? { correct: 'Demander une correction', claim: 'R\\u00e9clamer cette fiche', none: 'Aucun r\\u00e9sultat pour l\\u2019instant. Si votre entreprise est nouvelle pour nous, utilisez le formulaire ci-dessous.', note: 'Correction pour ' }
+      : { correct: 'Request a correction', claim: 'Claim this listing', none: 'No match yet. If your venue is new to us, use the form below.', note: 'Correction for ' };
     function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     input.addEventListener('input', function(){
       clearTimeout(timer);
@@ -30533,8 +30938,9 @@ ${renderGolfHeaderHtml()}
           if (mine !== seq) return;
           var v = (d && d.venues) || [];
           list.innerHTML = v.length ? v.map(function(x){
-            return '<li><a href="' + esc(x.url) + '">' + esc(x.name) + '</a> <span class="lyv-hint">' + esc(x.type) + ' &middot; ' + esc(x.region) + '</span> <button type="button" class="lyv-correct" data-name="' + esc(x.name) + '" data-url="https://okanaganroam.com' + esc(x.url) + '">Request a correction</button></li>';
-          }).join('') : '<li class="lyv-hint">No match yet. If your venue is new to us, use the form below.</li>';
+            var href = FR && x.urlFr ? x.urlFr : x.url, claim = FR ? x.claimFr : x.claim;
+            return '<li><a href="' + esc(href) + '">' + esc(x.name) + '</a> <span class="lyv-hint">' + esc(FR && x.typeFr ? x.typeFr : x.type) + ' &middot; ' + esc(x.region) + '</span> <span class="lyv-actions">' + (claim ? '<a class="lyv-claim" href="' + esc(claim) + '">' + esc(TX.claim) + '</a> ' : '') + '<button type="button" class="lyv-correct" data-name="' + esc(x.name) + '" data-url="https://okanaganroam.com' + esc(href) + '">' + esc(TX.correct) + '</button></span></li>';
+          }).join('') : '<li class="lyv-hint">' + esc(TX.none) + '</li>';
         }).catch(function(){});
       }, 250);
     });
@@ -30542,7 +30948,7 @@ ${renderGolfHeaderHtml()}
       var b = e.target.closest && e.target.closest('.lyv-correct');
       if (!b) return;
       var msg = document.getElementById('contactMessage');
-      if (msg) msg.value = 'Correction for ' + b.getAttribute('data-name') + ' (' + b.getAttribute('data-url') + '):\\n';
+      if (msg) msg.value = TX.note + b.getAttribute('data-name') + ' (' + b.getAttribute('data-url') + '):\\n';
       var opener = document.querySelector('[data-contact-open]');
       var tp = document.getElementById('contactTopic'); if (tp) tp.value = 'correction';
       if (opener) opener.click();
@@ -36041,7 +36447,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     name: venue.name,
     url: venueUrl,
     telephone: venue.phone || undefined,
-    address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressLocality: regionLabel, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
+    address: venuePostalAddress(venue.address, regionLabel),
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
     hasMenu: tours ? undefined : menuSchema(venue, menu, lang),
     hasOfferCatalog: tours ? priceListOfferCatalog(venue, menu, lang) : undefined,
@@ -41085,6 +41491,8 @@ ${renderGolfHeaderHtml()}
 }
 
 const server = http.createServer(async (req, res) => {
+  applySecurityHeaders(res);
+  if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
   // Lighter pages (2026-10-18): shared CSS goes out as cached files, and a
   // hub's waiting cards load after the page (see withRestCardsDeferred).
   if (req.method === 'GET' || req.method === 'HEAD') {
@@ -44666,6 +45074,9 @@ module.exports = {
   WHATSON_SCOPE_MIN_EVENTS,
   eventOrganizerSchema,
   eventOffersSchema,
+  parseEventPrice,
+  venuePostalAddress,
+  absoluteSiteUrl,
   guideItemListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,
@@ -44934,6 +45345,11 @@ module.exports = {
   openNowFirst,
   venueHoursCheckedHtml,
   MAP_EVENT_GROUP_SRC,
+  MAP_PLACE_LIST_SRC,
+  restLinksHtml,
+  cardFillActionsJs,
+  APP_TRIP_LABEL_HTML,
+  CSP_REPORT_ONLY,
   seasonOnlyStates,
   parseAdvisoryNote,
   renderAdvisoryStyles,
@@ -45147,6 +45563,13 @@ module.exports = {
   selectDiscoveryVenues,
   heroSearchTarget,
   smartSearchPlan,
+  // Search ranking (2026-10-18)
+  SMART_ACTIVITIES,
+  smartRomanceScore,
+  dietMatchStrength,
+  sortByDietStrength,
+  guideOpenFirst,
+  guideOpenFirstHours,
   withSmartSearchPlan,
   discoverySearchText,
   SEARCH_PAGE_MAX_RESULTS,

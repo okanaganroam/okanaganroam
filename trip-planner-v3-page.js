@@ -422,7 +422,8 @@ function renderStyles() {
   .t3-event-choices { display: flex; flex-wrap: wrap; gap: 8px; }
   .t3-warnings ul { margin: 0; padding-left: 18px; }
 
-  .t3-daynav { position: sticky; top: 0; z-index: 20; display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; margin: 0 0 8px; background: var(--ref-cream); scrollbar-width: none; }
+  /* Sticks just under the sticky site header (2026-10-18; at top: 0 it slid under it). --t3-head-h is set below. */
+  .t3-daynav { position: sticky; top: var(--t3-head-h, 0px); z-index: 20; display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; margin: 0 0 8px; background: var(--ref-cream); scrollbar-width: none; }
   .t3-daynav::-webkit-scrollbar { display: none; }
   .t3-daynav a { flex: 0 0 auto; text-decoration: none; background: #fff; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.14); border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: 0.84rem; min-height: 40px; display: inline-flex; align-items: center; }
   .t3-daynav a:hover { border-color: var(--ref-navy); }
@@ -1933,6 +1934,14 @@ function renderScript(d) {
   // Phones (2026-10-18): a plan link shows the plan first; the request becomes an "Edit request" bar.
   var EDIT_TEXT = { en: { label: 'Your request', edit: 'Edit request' }, fr: { label: 'Votre demande', edit: 'Modifier la demande' } };
   var mainEl = document.getElementById('tripV3'), editBar = document.getElementById('t3EditBar');
+  // The day bar's sticky offset: the site header's height (it is sticky too), kept up to date on resize.
+  function syncHeadH(){
+    var h = document.querySelector('header#top');
+    var px = h && getComputedStyle(h).position === 'sticky' ? Math.round(h.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty('--t3-head-h', px + 'px');
+  }
+  syncHeadH();
+  window.addEventListener('resize', syncHeadH);
   function editText(k){ return (EDIT_TEXT[lang()] || EDIT_TEXT.en)[k]; }
   function setCompact(on){
     if (!mainEl || !editBar) return;
