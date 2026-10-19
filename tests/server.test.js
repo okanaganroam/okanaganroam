@@ -38,6 +38,9 @@ process.env.ENRICHMENT_ADMIN_TOKEN = 'test-fixture-admin-token';
 // read OKR_TODAY_OVERRIDE; unit tests pass SUMMER_NOW explicitly.
 process.env.OKR_TODAY_OVERRIDE = '2026-07-15';
 const SUMMER_NOW = new Date('2026-07-15T19:00:00Z');
+// Image cache busting (2026-10-19): served pages add ?v=<10 hex of the file's md5> to local image URLs. Tests that
+// pin exact image markup compare against the page without those versions.
+const noImgV = (html) => String(html).replace(/(\/images\/[\w\/.-]+\.(?:jpe?g|png|webp))\?v=[0-9a-f]{10}/gi, '$1');
 
 const app = require('../server.js');
 const db = require('../db.js');
@@ -4488,7 +4491,7 @@ async function s6get(urlPath) {
     });
   });
 }
-const s6markup = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '');
+const s6markup = (html) => noImgV(html.replace(/<script[\s\S]*?<\/script>/g, ''));
 // The shared site header (2026-09-25 navigation redesign) links every Things
 // to Do / Food & Drink page, so page-content assertions exclude it.
 const withoutSiteHeader = (html) => html.replace(/<header id="top">[\s\S]*?<\/header>/, '');
@@ -11501,7 +11504,7 @@ test('/destinations: 200, every destination exactly once, each linking to its ca
 test('/categories: 200, each visitor-facing category once, linking to its own existing page (never /browse)', () => withDiscoveryServer(async (base) => {
   const res = await fetch(`${base}/categories`);
   assert.equal(res.status, 200);
-  const html = await res.text();
+  const html = noImgV(await res.text());
   assert.match(html, /<h1>Explore All Categories<\/h1>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/categories">/);
   const links = [...html.matchAll(/<li class="category-card">\s*<h2><a href="([^"]+)">([^<]+)<\/a><\/h2>/g)].map((m) => m[1].replace(/&amp;/g, '&'));
@@ -15791,7 +15794,7 @@ test('Build My Trip is a permanent header button (no strip under the header), fi
 test('homepage hero uses the 3:1 sunset panorama with its own crop and type, scoped so /browse/classic keeps hero.webp', () => withDiscoveryFlag('on', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
   const page = async (p) => (await fetch(`${base}${p}`)).text();
   const NEW = '/images/okanagan-valley-sunset-hero.webp';
-  const home = await page('/');
+  const home = noImgV(await page('/'));
   assert.match(home, /<section class="hero-scenic hero-scenic-home" id="heroScenic">/);
   assert.ok(home.includes(`src="${NEW}" width="2000" height="667"`), 'the homepage hero image is the panorama, at its real size');
   assert.ok(!home.includes('src="/images/hero.webp"'), 'the old hero image is gone from the homepage');
@@ -15812,7 +15815,7 @@ test('homepage hero uses the 3:1 sunset panorama with its own crop and type, sco
     const html = await page(p);
     assert.ok(!html.includes('hero-scenic-home') && !html.includes('id="home-hero"') && !html.includes(NEW) && !html.includes(MOBILE), `${p}: unchanged`);
   }
-  assert.ok((await page('/browse/classic')).includes('src="/images/hero.webp"'), '/browse/classic (the other page that uses this hero) keeps hero.webp');
+  assert.ok(noImgV(await page('/browse/classic')).includes('src="/images/hero.webp"'), '/browse/classic (the other page that uses this hero) keeps hero.webp');
   // The image is served, is a real 2000x667 WebP and stays a sensible download.
   const res = await fetch(`${base}${NEW}`);
   assert.equal(res.status, 200);
@@ -17422,7 +17425,7 @@ async function withWinterServer(fn) {
   }
 }
 // Lighter pages (2026-10-18): shared CSS is linked, not inline; read it back in place.
-const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); return { status: r.status, text: app.inlineSharedStylesheets(await r.text()) }; };
+const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); return { status: r.status, text: noImgV(app.inlineSharedStylesheets(await r.text())) }; };
 const winterMood = (iso) => app.renderMoodCardsHTML({ now: new Date(`${iso}T19:00:00Z`) });
 const moodKeys = (html) => Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
 
@@ -24374,7 +24377,7 @@ test("Lighter pages: What's On ships its first page of events and every other it
       assert.match(html, /\(window\.__whatsOnReady \|\| function\(fn\)\{ fn\(\); \}\)\(function\(\)\{\n  var LABELS/, 'the filter script waits for them');
       // Speed (2026-10-19): they go into the list in batches, already paged; the card photos have 480px copies.
       assert.ok(html.includes(`BATCH = ${app.WHATSON_REST_BATCH}`) && html.includes("li.classList.add('whatson-paged')") && html.includes('setTimeout(step, 0)'), `${p}: batched`);
-      if (p === '/whats-on') assert.match(html, /<img class="whatson-event-img whatson-event-photo" src="(\/images\/[^"]+)-800\.jpg" srcset="\1-800-w480\.jpg 480w, \1-800\.jpg 800w" sizes="\(max-width: 640px\) 160px, 240px"/, 'a 480px copy');
+      if (p === '/whats-on') assert.match(noImgV(html), /<img class="whatson-event-img whatson-event-photo" src="(\/images\/[^"]+)-800\.jpg" srcset="\1-800-w480\.jpg 480w, \1-800\.jpg 800w" sizes="\(max-width: 640px\) 160px, 240px"/, 'a 480px copy');
     }
   } finally {
     srv.close();
@@ -27359,7 +27362,7 @@ test('Speed/CLS (2026-10-18): filter bar final from the first paint, font fallba
   assert.equal(app.withFilterBarReady('<head></head><div class="fd-controls"></div>'), '<head></head><div class="fd-controls"></div>');
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'public', 'styles', 'app.css'), 'utf8'), /font-family:'Nunito', 'Nunito Fallback', sans-serif/);
   // Homepage: 320/480 copies with sizes; the sideways rows' off-screen cards wait for the script.
-  const home = await (await fetch(base + '/')).text();
+  const home = noImgV(await (await fetch(base + '/')).text());
   const imgs = [...home.matchAll(/<img class="(mood-card-img|hidden-gem-card-img|region-card-img)"[^>]*>/g)].map((m) => m[0]).filter((t) => / loading="lazy"/.test(t)); // not the <noscript> copies
   assert.ok(imgs.length >= 12);
   for (const tag of imgs) {
@@ -27395,7 +27398,12 @@ test('Caching (2026-10-18): versioned images are immutable, /browse/cards.json h
   const r = await fetch(base + src);
   assert.equal(r.headers.get('cache-control'), 'public, max-age=31536000, immutable');
   const text = await r.text();
-  assert.equal(src.slice(-12), require('crypto').createHash('md5').update(text).digest('hex').slice(0, 12), 'the hash is of the content');
+  // Speed pass 6 (2026-10-19): English readers get the text without the French blurbs; the hash is of the full
+  // (bilingual) text the French twin is made from, so it changes whenever either language does.
+  const rest = app.browseRestJson(app.getBrowseHubVenues());
+  assert.equal(src.slice(-12), require('crypto').createHash('md5').update(rest.json).digest('hex').slice(0, 12), 'the hash is of the content');
+  assert.equal(text, rest.jsonEn, 'English gets the English-only text');
+  assert.doesNotMatch(text, /class=\\"desc-fr\\"/, 'no French blurbs for English readers');
   assert.doesNotMatch(text, /class=\\"desc-toggle\\"/, 'the never-shown Read more button is trimmed');
   const stale = await fetch(`${base}/browse/cards.json?h=000000000000`);
   assert.equal(stale.status, 200);
@@ -27700,7 +27708,8 @@ test('Speed (2026-10-19): the homepage hero loads first -- no Leaflet, card and 
   // The event row (local data may have no events this week): its photos wait for the hero too.
   const row = '<main><span class="home-event-media"><img src="/images/events/cider-2610-800.jpg" srcset="/images/events/cider-2610-800-w480.jpg 480w, /images/events/cider-2610-800.jpg 800w" sizes="(max-width: 640px) 72vw, 260px" alt="" width="800" height="533" loading="lazy" decoding="async"></span></main>';
   const out = app.withHomeCardPhotos(row);
-  assert.match(out, /<img data-src="\/images\/events\/cider-2610-800\.jpg" data-srcset="\/images\/events\/cider-2610-800-w480\.jpg 480w, [^"]+" sizes="[^"]+" alt="" width="800" height="533" loading="lazy" decoding="async" data-home-hero><noscript><img src="\/images\/events\/cider-2610-800\.jpg"/);
+  // Speed pass 6 (2026-10-19): phones (up to 640px) are offered the 480px copy only.
+  assert.match(out, /<picture class="home-pic"><source media="\(max-width: 640px\)" data-srcset="\/images\/events\/cider-2610-800-w480\.jpg"><img data-src="\/images\/events\/cider-2610-800\.jpg" data-srcset="\/images\/events\/cider-2610-800-w480\.jpg 480w, [^"]+" sizes="[^"]+" alt="" width="800" height="533" loading="lazy" decoding="async" data-home-hero><\/picture><noscript><img src="\/images\/events\/cider-2610-800\.jpg"/);
   assert.ok(out.includes("window.roamAfterHero(start)"), 'the loader waits for the hero');
   const page = '<!DOCTYPE html>\n<html><head>\n<meta charset="UTF-8">\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>\n<!-- Google Analytics (GA4) --></head><body><img class="hero-media-img" src="/h.jpg"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>\n<script src="/scripts/app.js"></script></body></html>';
   const home = app.withHomeHeroFirst(page);
@@ -27743,13 +27752,49 @@ test('Speed (2026-10-19): the homepage hero loads first -- no Leaflet, card and 
   });
 });
 
-test('Speed (2026-10-19): /browse fetches cards.json after the load event or the first tap, and replays an early filter tap', () => withDiscoveryServer(async (base) => {
+test('Speed pass 6 (2026-10-19): /browse loads cards.json only when needed, and early taps show at once and are replayed', () => withDiscoveryServer(async (base) => {
   const html = await (await fetch(`${base}/browse`)).text();
   const script = html.slice(html.lastIndexOf('<script>\n(function(){\nfunction bhStart(){\n  var LABELS'), html.lastIndexOf('</script>'));
-  assert.ok(script.includes("window.addEventListener('load', idle)") && script.includes('requestIdleCallback(getCards'), 'after load, on idle');
-  assert.ok(script.includes("['pointerdown', 'keydown', 'focusin'].forEach(function(ev){ document.addEventListener(ev, getCards, true); });"), 'or at the first tap, key or focus');
-  assert.ok(script.includes("if (t && t.tagName !== 'A') { pending = t;") && script.includes('p.click();'), 'an early filter tap is replayed, links are never held');
+  assert.ok(script.includes('E.wake = getCards;'), 'an early tap asks for the cards');
+  assert.ok(script.includes("document.addEventListener(ev, onTouch, true)") && script.includes("var ZONE = '.fd-search,.fd-type-row,.fd-controls,.fd-resultbar,.outdoor-selected,.fd-more-row';"), 'or a tap, key or focus in the search box, chips or bars');
+  assert.ok(script.includes("new IntersectionObserver(") && script.includes("rootMargin: '0px 0px 1500px 0px'"), 'or a scroll near Show more');
+  assert.match(script, /if \(\/\[\?&\]\(types\|features\|regions\|cuisine\|price\|q\|open\|fav\|sort\)=\/\.test\(window\.location\.search\) \|\| !more \|\| !window\.IntersectionObserver\) \{\n\s+var idle = /, 'after the load event only for an address with filters');
+  assert.ok(script.includes('function replay(){ E.ready = true; var q = (E.q || []).splice(0); q.forEach(function(t){ t.click(); }); }'), 'queued taps are replayed in order');
   assert.ok(script.indexOf("fetch('/cards/rest/'") < script.indexOf('function getCards'), 'the small filter data still loads at once');
+  // The early-tap script is inline right after the chips and the filter bar, long before the cards and the page script.
+  const at = html.indexOf('window.__bhEarly = { q: [], ready: false, wake: null };');
+  assert.ok(at > html.indexOf('id="bhOpenNow"') && at < html.indexOf('id="bhResultsSummary"') && at < html.indexOf('id="bhResults"'), 'right after the filter bar');
+  const early = html.slice(html.lastIndexOf('<script>', at) + 8, html.indexOf('</script>', at));
+  // Run it against a small stand-in DOM.
+  const vm = require('node:vm');
+  const mk = (attrs, className = 'outdoor-filter-chip') => ({ tagName: 'BUTTON', className, attrs: { ...attrs },
+    hasAttribute(k) { return k in this.attrs; }, getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }, setAttribute(k, v) { this.attrs[k] = String(v); },
+    closest() { return this; }, click() { this.clicked = (this.clicked || 0) + 1; } });
+  const chip = mk({ 'data-bh-type': 'winery', 'aria-pressed': 'false' }), all = mk({ 'data-bh-type-all': '1', 'aria-pressed': 'true' });
+  const pop = mk({ 'aria-expanded': 'false', 'aria-controls': 'bhFeaturesPanel' }, 'fd-pop-btn'), panel = { hidden: true };
+  const summary = { textContent: '812 places', querySelector() { return this.note || null; }, appendChild(n) { this.note = n; this.textContent += n.textContent; } };
+  const lists = { '[data-bh-type]': [chip], '[data-bh-type-all]': [all], '.fd-pop-btn[aria-controls]': [pop], '[data-bh-price]': [] };
+  let onClick = null, woke = 0;
+  const ctx = { document: { addEventListener: (t, fn, cap) => { if (t === 'click' && cap) onClick = fn; }, querySelectorAll: (q) => lists[q] || [], getElementById: (id) => ({ bhResultsSummary: summary, bhFeaturesPanel: panel })[id] || null, createElement: () => ({}) } };
+  ctx.window = ctx;
+  vm.createContext(ctx); vm.runInContext(early, ctx);
+  ctx.__bhEarly.wake = () => { woke++; };
+  const ev = (target) => ({ target, prevented: false, preventDefault() { this.prevented = true; }, stopPropagation() {} });
+  const e1 = ev(chip); onClick(e1);
+  assert.equal(chip.attrs['aria-pressed'], 'true', 'the chip is pressed at once');
+  assert.equal(all.attrs['aria-pressed'], 'false', '"All" lets go');
+  assert.ok(e1.prevented && ctx.__bhEarly.q.length === 1 && ctx.__bhEarly.q[0] === chip && woke === 1, 'queued, and the cards are asked for');
+  assert.match(summary.textContent, /^812 places · Loading all places…$/, 'the note by the count');
+  onClick(ev(pop));
+  assert.equal(panel.hidden, false, 'a filter panel opens at once');
+  assert.equal(pop.attrs['aria-expanded'], 'true');
+  assert.equal(ctx.__bhEarly.q.length, 1, 'opening a panel is not replayed');
+  ctx.__bhEarly.ready = true;
+  const late = ev(chip); onClick(late);
+  assert.ok(!late.prevented && chip.attrs['aria-pressed'] === 'true', 'once the filters are ready it steps aside');
+  // French: the note is translated.
+  const fr = await (await fetch(`${base}/fr/browse`)).text();
+  assert.ok(fr.includes('Chargement de tous les lieux') && !fr.includes('Loading all places'), 'French note');
 }));
 
 test('Speed (2026-10-19): guide cards use the 3:2 thumbnail or a town photo\'s card copy, never the 1600px photo', () => {
@@ -27761,6 +27806,124 @@ test('Speed (2026-10-19): guide cards use the 3:2 thumbnail or a town photo\'s c
     assert.ok(fs.statSync(speedPublic(`images/guides/thumbs/${f}`)).size <= 140 * 1024, `${f} is recompressed`);
   }
 });
+// ---- Speed pass 6 (2026-10-19): smaller tiles, hero-first town pages, versioned images --------------------------
+const jpegWidth = (file) => {
+  const b = fs.readFileSync(file);
+  for (let i = 2; i < b.length - 9;) {
+    if (b[i] !== 0xFF) { i++; continue; }
+    const m = b[i + 1];
+    if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) return b.readUInt16BE(i + 7);
+    i += 2 + b.readUInt16BE(i + 2);
+  }
+  return null;
+};
+test('Speed pass 6 (2026-10-19): every 800px tile has 360px and 480px copies, and the guide tiles are recompressed', () => {
+  const root = speedPublic('images');
+  const tiles = [];
+  for (const d of fs.readdirSync(root)) {
+    const t = path.join(root, d, 'thumbs');
+    if (fs.existsSync(t)) for (const f of fs.readdirSync(t)) if (/^[\w-]+\.jpg$/.test(f) && !/-w(360|480)\.jpg$/.test(f)) tiles.push(`/images/${d}/thumbs/${f}`);
+  }
+  for (const f of fs.readdirSync(path.join(root, 'regions', 'photos'))) if (/-card\.jpg$/.test(f)) tiles.push(`/images/regions/photos/${f}`);
+  assert.ok(tiles.length >= 100, `${tiles.length} tiles`);
+  for (const t of tiles) {
+    for (const w of [360, 480]) {
+      const copy = speedPublic(t.slice(1).replace(/\.jpg$/, `-w${w}.jpg`));
+      assert.ok(fs.existsSync(copy), `${t}: ${w}px copy`);
+      assert.equal(jpegWidth(copy), w, `${t}: the ${w}px copy is ${w}px wide`);
+    }
+    assert.match(app.tileSrcsetAttrs(t, 'S'), new RegExp(` srcset="${t.slice(0, -4)}-w360\\.jpg 360w, ${t.slice(0, -4)}-w480\\.jpg 480w, ${t} 800w" sizes="S"`));
+  }
+  assert.equal(app.tileSrcsetAttrs('/images/food-drink/restaurants-800.jpg', 'S'), '', 'not a tile: no srcset');
+  assert.equal(app.tileSrcsetAttrs('/images/nope/thumbs/none.jpg', 'S'), '', 'no copies: no srcset');
+  const guide = tiles.filter((t) => /\/guides\/thumbs\/|-card\.jpg$/.test(t)).map((t) => fs.statSync(speedPublic(t.slice(1))).size);
+  const avg = guide.reduce((a, b) => a + b, 0) / guide.length;
+  assert.ok(avg <= 62 * 1024, `the guide tiles average ${Math.round(avg / 1024)} KB`);
+});
+
+test('Speed pass 6 (2026-10-19): town pages load the banner first; tiles carry 360/480px copies and wait for it', () => withDiscoveryServer(async (base) => {
+  const raw = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || { restaurant: 3, winery: 2 }, []);
+  assert.ok(raw.indexOf('window.roamAfterHero = function') > raw.indexOf('<meta charset="UTF-8">'), 'the hero signal is in <head>');
+  assert.ok(raw.indexOf('window.roamAfterHero = function') < raw.indexOf("googletagmanager.com/gtag/js"), 'before the GA4 snippet (gtag.js waits for it)');
+  assert.doesNotMatch(raw, /<div class="region-card-photo"><img src=/, 'no tile photo loads before the banner');
+  const tiles = raw.match(/<div class="region-card-photo"><img data-src="[^"]+"[^>]* data-home-hero><noscript><img src="[^"]+" alt="" width="\d+" height="\d+"><\/noscript><\/div>/g) || [];
+  assert.ok(tiles.length >= 2, `${tiles.length} tiles wait for the banner, each with a no-JS copy`);
+  assert.ok(tiles.some((t) => /data-srcset="\/images\/[\w-]+\/thumbs\/[\w-]+-w360\.jpg 360w, [^"]+-w480\.jpg 480w, [^"]+ 800w" sizes="\(max-width: 899px\) calc\(50vw - 31px\)/.test(t)), 'category tiles offer the small copies');
+  assert.ok(raw.includes("window.roamAfterHero(start)") && raw.indexOf('id="home-card-lz"') < raw.indexOf('</main>'), 'the loader is on the page');
+  // The banner (fetchpriority="high") is what releases them.
+  const js = raw.match(/<script>\n\(function\(\)\{\n  var q = \[\], done = false;[\s\S]*?<\/script>/)[0].replace(/^<script>|<\/script>$/g, '');
+  const vm = require('node:vm');
+  const docL = {}; const ctx = { document: { addEventListener: (t, fn) => { docL[t] = fn; } }, addEventListener() {}, setTimeout() {} };
+  ctx.window = ctx; vm.createContext(ctx); vm.runInContext(js, ctx);
+  const ran = []; ctx.roamAfterHero(() => ran.push(1));
+  docL.load({ target: { tagName: 'IMG', className: '', getAttribute: () => null } });
+  assert.deepEqual(ran, [], 'another image does not count');
+  docL.load({ target: { tagName: 'IMG', className: '', getAttribute: (k) => (k === 'fetchpriority' ? 'high' : null) } });
+  assert.deepEqual(ran, [1], 'the banner does');
+  // Served, English and French.
+  for (const p of ['/kelowna', '/fr/kelowna']) {
+    const html = await (await fetch(base + p)).text();
+    if (!/region-card-photo/.test(html)) continue;
+    assert.ok(html.includes('window.roamAfterHero = function') && !/<div class="region-card-photo"><img src=/.test(html), `${p}: hero first`);
+  }
+}));
+
+test('Speed pass 6 (2026-10-19): /guides makes only the first photo eager and offers 360/480px copies (phones: those only)', () => withDiscoveryServer(async (base) => {
+  const html = noImgV(await (await fetch(`${base}/guides`)).text());
+  const imgs = html.match(/<span class="guide-card-img">[\s\S]*?<\/span>/g) || [];
+  assert.ok(imgs.length >= 3, `${imgs.length} guide cards`);
+  assert.equal(imgs.filter((t) => /fetchpriority="high"/.test(t)).length, 1, 'one high-priority photo');
+  assert.ok(/fetchpriority="high"/.test(imgs[0]), 'the first');
+  assert.ok(!html.includes('loading="eager"'), 'no other eager photos');
+  assert.ok(imgs.slice(1).every((t) => / loading="lazy"/.test(t)), 'the rest are lazy');
+  const sized = imgs.filter((t) => /-w480\.jpg 480w/.test(t));
+  assert.ok(sized.length >= imgs.length - 2, 'nearly every card has the small copies');
+  for (const t of sized) assert.match(t, /<picture><source media="\(max-width: 559px\)" srcset="(\/images\/[^ "]+)-w360\.jpg 360w, \1-w480\.jpg 480w" sizes="calc\(100vw - 48px\)"><img src="\1\.jpg" srcset="\1-w360\.jpg 360w, \1-w480\.jpg 480w, \1\.jpg 800w" sizes="/);
+  assert.match(html, /\.guide-card-img picture \{ display: contents; \}/);
+}));
+
+test('Speed pass 6 (2026-10-19): the /trip hero has 800/1200px copies; the homepage town and Hidden Gems cards cap phones at 480px', () => withDiscoveryServer(async (base) => {
+  const v3 = require('../trip-planner-v3-page');
+  const trip = v3.renderTripPlannerV3Page({ esc: (x) => String(x), title: 't', description: 'd', canonical: 'https://okanaganroam.com/trip', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', analyticsHead: '', regions: [], regionImages: {}, preview: false });
+  assert.ok(trip.includes('<picture><source media="(max-width: 640px)" srcset="/images/trip-v3/hero-w800.webp"><img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656" srcset="/images/trip-v3/hero-w1200.webp 1200w, /images/trip-v3/hero.webp 1600w" sizes="100vw" alt="" fetchpriority="high"></picture>'));
+  for (const [f, max] of [['hero-w800.webp', 40], ['hero-w1200.webp', 70]]) {
+    const st = fs.statSync(speedPublic(`images/trip-v3/${f}`));
+    assert.ok(st.size < max * 1024, `${f}: ${st.size} bytes`);
+  }
+  const home = noImgV(await (await fetch(base + '/')).text());
+  for (const cls of ['region-card-img', 'hidden-gem-card-img']) {
+    const m = home.match(new RegExp(`<picture class="home-pic"><source media="\\(max-width: 640px\\)" data-srcset="(/images/[^ "]+)-w320\\.jpg 320w, \\1-w480\\.jpg 480w" sizes="[^"]+"><img class="${cls}" data-src=`, 'g')) || [];
+    assert.ok(m.length >= 3, `${cls}: ${m.length} cards capped at 480px on phones`);
+  }
+  assert.doesNotMatch(home, /<picture class="home-pic">[^]*?<img class="mood-card-img"[^>]*><\/picture>/, 'the mood cards already pick the 480px copy');
+  assert.ok(home.includes('picture.home-pic{display:contents}'));
+  // The loader moves a <source>'s data-srcset over too, and finds a sideways row through the <picture>.
+  assert.ok(home.includes("if (pic && pic.tagName === 'PICTURE') {") && home.includes("if (card && card.tagName === 'PICTURE') card = card.parentNode;"));
+}));
+
+test('Speed pass 6 (2026-10-19): server-rendered image URLs carry a content hash; versioned requests are immutable', () => withDiscoveryServer(async (base) => {
+  const crypto = require('node:crypto');
+  const file = '/images/mood/indoor.jpg';
+  const h = crypto.createHash('md5').update(fs.readFileSync(speedPublic(file.slice(1)))).digest('hex').slice(0, 10);
+  assert.equal(app.imageVersion(file), h);
+  assert.equal(app.imageVersion('/images/nope/missing.jpg'), null);
+  assert.equal(app.imageVersion('/images/../server.js'), null);
+  const v = app.withVersionedImages;
+  assert.equal(v(`<img src="${file}" alt="">`), `<img src="${file}?v=${h}" alt="">`);
+  assert.equal(v(`<img data-src="${file}" data-srcset="${file} 640w, /images/mood/indoor-w480.jpg 480w">`), `<img data-src="${file}?v=${h}" data-srcset="${file}?v=${h} 640w, /images/mood/indoor-w480.jpg?v=${app.imageVersion('/images/mood/indoor-w480.jpg')} 480w">`);
+  assert.equal(v(`<li style="--a:url('${file}')">`), `<li style="--a:url('${file}?v=${h}')">`);
+  for (const same of [`<img src="${file}?v=old">`, '<img src="/images/nope/missing.jpg">', `<style>.x{background:url('${file}')}</style>`, `<script>var s = ' src="${file}"';</script>`, `<a href="${file}">`]) assert.equal(v(same), same, `unchanged: ${same}`);
+  // Served pages.
+  const home = await (await fetch(base + '/')).text();
+  assert.match(home, /src="\/images\/[\w\/.-]+\.(?:jpe?g|webp|png)\?v=[0-9a-f]{10}"/);
+  assert.doesNotMatch(home.replace(/<(style|script)[\s\S]*?<\/\1>/g, ''), /\s(?:src|data-src)="\/images\/[^"?]+"/, 'no plain local image URL in an attribute');
+  const url = home.match(/src="(\/images\/[^"]+\?v=[0-9a-f]{10})"/)[1];
+  const r = await fetch(base + url);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.equal((await fetch(base + url.split('?')[0])).headers.get('cache-control'), 'public, max-age=86400', 'the plain URL still works, for a day');
+}));
+
 // ---- Phone layout and tech polish (2026-10-18, review pass 4) ----------------------------------------------------
 async function withPass4Server(fn) {
   const http = require("node:http");

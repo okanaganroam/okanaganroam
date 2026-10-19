@@ -688,9 +688,11 @@ function renderBody(d) {
   // data-i18n: /scripts/app.js shows these in the visitor's language (the
   // tripv3.* keys); the English below is the same text it shows in English.
   const chips = T3_EXAMPLES.map((e, i) => `<button type="button" class="t3-example" data-t3-example data-i18n="tripv3.example${i + 1}">${esc(e)}</button>`).join('\n          ');
+  // Speed pass 6 (2026-10-19): the hero is a dimmed backdrop (opacity 0.55) behind the composer, yet every phone
+  // took the 1600px file (127 KB). Phones get an 800px copy, wider screens a 1200px one where it is enough.
   return `<main class="t3" id="tripV3">
   <section class="t3-hero" aria-labelledby="t3Title">
-    <img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656" alt="" fetchpriority="high">
+    <picture><source media="(max-width: 640px)" srcset="/images/trip-v3/hero-w800.webp"><img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656" srcset="/images/trip-v3/hero-w1200.webp 1200w, /images/trip-v3/hero.webp 1600w" sizes="100vw" alt="" fetchpriority="high"></picture>
     <div class="t3-hero-scrim"></div>
     <div class="t3-wrap t3-hero-inner">
       <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/" data-i18n="tripv3.crumbHome">Home</a> &rsaquo; <span data-i18n="tripv3.name">Build My Trip</span></nav>
