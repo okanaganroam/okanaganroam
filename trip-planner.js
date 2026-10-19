@@ -1514,7 +1514,7 @@ function buildDays(facts, ctx, days, pinned) {
     // Round 7: a daytime event costs the day its lunch only when it runs over lunchtime (a 10 AM musical ends by noon;
     // a family day had a morning show, a park and no lunch).
     const eventEnds = end != null ? end : start != null && anchor ? start + eventAllowanceMinutes(anchor) : null;
-    const eventAtLunch = anchor && !dropIn && ['morning', 'midday', 'afternoon'].includes(eventPart) && (start == null || (start < 13 * 60 && eventEnds > 13 * 60 + 30));
+    const eventAtLunch = anchor && !dropIn && !untimedFamily && ['morning', 'midday', 'afternoon'].includes(eventPart) && (start == null || (start < 13 * 60 && eventEnds > 13 * 60 + 30));
     const fullDayLunch = fullDayLunchBase && !eventAtLunch;
     for (const daypart of dayDayparts) {
       const pin = pinned && pinned[`${d}-${daypart}`];
