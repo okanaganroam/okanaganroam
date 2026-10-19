@@ -338,6 +338,9 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'if then than else only one ones all more most much many few little lot lots kind sort type types option options idea ideas '
   + 'around tonight today tomorrow while during after before next last then take takes taking bring bringing stay staying '
   + 'whats wanna gonna ive id nearby close near '
+  // French search (2026-10-19, round 7): French articles and joiners left in a French request after its words are read
+  // in English ("bonhomme de neige" listed 1,650 places, every one with "de" somewhere). "a" (à) is above.
+  + 'de du des la le les l d et au aux en '
   // 2026-10-19: times of day are when, not something a listing should mention ("live music in the evenings").
   + 'evening evenings mornings afternoons nightly daily mostly mainly '
   // Step 1 (2026-09-29): verbs, pronouns and filler that were reaching the
@@ -733,7 +736,10 @@ function matchExactVenue(normalized, t, index) {
   const pick = (list, phrase) => (list.length === 1
     ? { venue: { id: list[0].id, region: list[0].region, type: list[0].type, slug: list[0].slug }, ambiguity: null }
     : { venue: null, ambiguity: { phrase, field: 'exactVenue', options: list.map((v) => v.id) } });
-  if (byName.has(q)) return pick(byName.get(q), q);
+  // French search (2026-10-19, round 7): one everyday word ("market", "marché" read as market) never jumps straight
+  // to the one place named with it (The Market at Big White); it is searched like any other word, that place first.
+  // A distinctive one-word name ("Wildling") and every longer full name still go to the place.
+  if (byName.has(q) && !genericOneWordName(q, index)) return pick(byName.get(q), q);
   // name + region (either order) narrows a chain / repeated park name.
   for (const slug of t.regions) {
     const labels = uniq([slug.replace(/-/g, ' '), normalizeDiscoveryText(t.regionLabels[slug] || '')].filter(Boolean));
@@ -807,6 +813,21 @@ const NEVER_CORRECT = new Set([
 const NAME_CORE_GENERIC = new Set(['winery', 'wineries', 'wines', 'wine', 'estate', 'estates', 'vineyard', 'vineyards', 'cellars', 'cellar',
   'restaurant', 'cafe', 'coffee', 'brewing', 'brewery', 'company', 'co', 'distillery', 'distilling', 'distillers', 'pub', 'bar', 'grill',
   'kitchen', 'and', 'the', 'ltd', 'inc', 'bistro', 'eatery', 'lounge', 'taproom', 'tasting', 'room', 'family', 'farm', 'farms']);
+
+// French search (2026-10-19, round 7): one-word names that are also everyday words. A request that is only one of
+// these words (with or without "the") is a search, not the name of one place.
+const GENERIC_ONE_WORD_NAMES = new Set(['market', 'markets', 'marketplace', 'kitchen', 'bistro', 'cafe', 'coffee', 'bakery', 'deli', 'diner', 'eatery',
+  'grill', 'pub', 'tavern', 'lounge', 'bar', 'saloon', 'cantina', 'taproom', 'brewery', 'winery', 'cidery', 'distillery', 'vineyard', 'cellar', 'cellars',
+  'estate', 'farm', 'farmstead', 'orchard', 'garden', 'gardens', 'ranch', 'lodge', 'inn', 'hotel', 'resort', 'spa', 'beach', 'park', 'trail', 'trails',
+  'lake', 'creek', 'falls', 'canyon', 'mountain', 'forest', 'lookout', 'marina', 'pier', 'wharf', 'dock', 'pizza', 'pizzeria', 'sushi', 'taco', 'tacos',
+  'noodle', 'noodles', 'burger', 'burgers', 'ramen', 'pho', 'bbq', 'steakhouse', 'smokehouse', 'creamery', 'gelato', 'juice', 'tea', 'wine', 'beer',
+  'cider', 'patio', 'terrace', 'rooftop', 'local', 'commons', 'social', 'station', 'hub', 'junction', 'corner', 'table', 'pantry', 'provisions',
+  'harvest', 'golf', 'arena', 'museum', 'gallery', 'theatre', 'theater', 'library', 'zoo', 'pool', 'rink', 'tour', 'tours', 'bowling', 'brunch',
+  'breakfast', 'lunch', 'dinner', 'restaurant', 'food', 'snacks', 'dessert', 'desserts', 'pastry', 'bread', 'chocolate', 'cheese', 'icecream']);
+function genericOneWordName(q, index) {
+  if (!q || q.includes(' ')) return false;
+  return GENERIC_ONE_WORD_NAMES.has(q) || NAME_CORE_GENERIC.has(q) || !!(index && index.phrases && index.phrases.has(q));
+}
 
 // Edit distance with adjacent transpositions; a substitution costs 1 only
 // between two vowels when allowed, otherwise it is not an option. Stops as
@@ -928,7 +949,7 @@ function buildDiscoveryIndex(taxonomy, t, venues) {
     if ((byWord.get(c.split(' ')[0]) || []).some((x) => x !== list[0] && ` ${x.name} `.includes(padded))) continue;
     cores.set(c, list[0].v.id);
   }
-  return { targets, known, cores };
+  return { targets, known, cores, phrases };
 }
 
 // Corrects each word it can; returns the words (corrected in place) and

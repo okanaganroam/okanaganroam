@@ -1106,4 +1106,11 @@ for (const t of ['owner_change_requests', 'owner_photos', 'event_submissions', '
   if (ocr.length && !ocr.includes('undo_reason')) db.exec('ALTER TABLE owner_change_requests ADD COLUMN undo_reason TEXT');
 }
 
+// French advisories (2026-10-19, round 7): collection_items.note_fr is the French wording of a note (today only shown
+// for 'advisory' notes, on /fr pages). NULL means no French yet; the French page then uses a known-phrasing fallback.
+{
+  const ci = db.prepare('PRAGMA table_info(collection_items)').all().map((c) => c.name);
+  if (ci.length && !ci.includes('note_fr')) db.exec('ALTER TABLE collection_items ADD COLUMN note_fr TEXT');
+}
+
 module.exports = db;

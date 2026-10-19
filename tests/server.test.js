@@ -7637,7 +7637,7 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.equal(homeBefore, homeNoBeaches.replace('class="mood-card mood-card-beaches" href="#exploreRegions">', 'class="mood-card mood-card-beaches" href="/beaches">'), 'beach data changes exactly one attribute on "/": the Beaches mood-card href');
     const b2 = await fetch(`${base}/api/venues`, { method: 'POST', headers: authed, body: JSON.stringify({ name: 'Homepage Beach Two', region: 'vernon', type: 'beach', description: 'fixture beach two', slug: 'homepage-beach-two' }) });
     assert.equal(b2.status, 201);
-    const adv = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'advisory', venue_id: beachOne.id, action: 'add', note: 'Partial closure (rdco.com, 2026-09-19).', reason: 'test', batch_id: 'homepage-test' }) });
+    const adv = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind: 'advisory', venue_id: beachOne.id, action: 'add', note: 'Partial closure (rdco.com, 2026-09-19).', note_fr: 'Fermeture partielle (rdco.com, 2026-09-19).', reason: 'test', batch_id: 'homepage-test' }) });
     assert.equal(adv.status, 200, await adv.text());
     for (const kind of ['hidden_gem', 'local_favorite', 'dog_friendly']) {
       const r = await fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: authed, body: JSON.stringify({ kind, venue_id: beachOne.id, action: 'add', note: kind === 'dog_friendly' ? 'Off-leash dog beach' : null, reason: 'test', batch_id: 'homepage-test' }) });
@@ -29008,4 +29008,134 @@ test('Round 7 accessibility: .t3-leg uses the solid muted navy, and Favorite in 
   assert.ok((lum('#F5F3ED') + 0.05) / (lum('#56636E') + 0.05) >= 4.5);
   assert.match(page, /if \(d\.contains\(e\.target\) && \(!item \|\| item\.classList\.contains\('fav-btn'\)\)\) return;/);
   assert.match(page, /if \(item && had\) \{ var sm = d\.querySelector\('summary'\);/);
+});
+
+// ---- French advisories, search words and help bot topics (2026-10-19, round 7) ----
+test('Round 7 French: an advisory shows its own French (note_fr) on the French place page and cards, with a French fallback for one that has none', async () => {
+  const mk = (name, slug) => Number(db.prepare(`INSERT INTO venues (name, region, type, description, description_fr, slug) VALUES (?, 'kelowna', 'restaurant', 'A fixture.', 'Un lieu d’essai.', ?)`).run(name, slug).lastInsertRowid);
+  const withFr = mk('R7 Advisory French Fixture', 'r7-advisory-french-fixture');
+  const noFr = mk('R7 Advisory English Fixture', 'r7-advisory-english-fixture');
+  const meta = { reason: 'r7 test', batch_id: 'r7-advisory-fr' };
+  const en = 'Permanently closed: the fixture closed its Laurel Avenue café in July 2025 (checked October 19, 2026). https://example.com/locations';
+  const fr = 'Fermé définitivement : le lieu d’essai a fermé son café de l’avenue Laurel en juillet 2025 (vérifié le 19 octobre 2026). https://example.com/locations';
+  try {
+    assert.equal(app.guardedCollectionMembershipUpdate('advisory', withFr, 'add', en, { ...meta, note_fr: fr }).ok, true);
+    assert.equal(app.guardedCollectionMembershipUpdate('advisory', noFr, 'add', 'Temporarily closed, per the restaurant\'s own website (checked October 19, 2026). https://example.com/', meta).ok, true);
+    assert.equal(db.prepare("SELECT note_fr FROM collection_items WHERE content_type = 'venue' AND content_id = ?").get(withFr).note_fr, fr);
+    const enText = 'Permanently closed: the fixture closed its Laurel Avenue café in July 2025 (checked October 19, 2026).';
+    const frText = 'Fermé définitivement : le lieu d’essai a fermé son café de l’avenue Laurel en juillet 2025 (vérifié le 19 octobre 2026).';
+    assert.equal(app.frAdvisoryText(enText), frText, 'its own French, with the French space before the colon');
+    assert.equal(app.frAdvisoryText(enText.replace(/'/g, '’')), frText, 'curly apostrophes read the same');
+    assert.match(app.frAdvisoryText(`Closed for the season. ${enText}`), new RegExp(`${frText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), 'a season note in front keeps the advisory’s own French');
+    assert.equal(app.frAdvisoryText('Temporarily closed, per the restaurant\'s own website (checked October 19, 2026).'),
+      'Fermé temporairement (vérifié le 19 octobre 2026). Vérifiez la source officielle avant d’y aller.', 'no French yet: the known phrasing in French');
+    assert.equal(app.frAdvisoryFallback('Something unusual is going on (checked 2026-09-01)'), 'Une condition temporaire touche cet endroit (vérifié le 1er septembre 2026). Vérifiez la source officielle avant d’y aller.');
+    assert.match(app.frAdvisoryFallback('The winery is in court-ordered receivership; check it is open.'), /^L’entreprise est sous séquestre/);
+    await withDiscoveryServer(async (base) => {
+      const frPage = await (await fetch(`${base}/fr/kelowna/restaurants/r7-advisory-french-fixture`)).text();
+      assert.ok(frPage.includes(`<p class="venue-advisory-text">${frText}</p>`), 'French place page: the French note');
+      assert.match(frPage, /À vérifier avant d’y aller/);
+      assert.match(frPage, /Source officielle : example\.com/);
+      const enPage = await (await fetch(`${base}/kelowna/restaurants/r7-advisory-french-fixture`)).text();
+      assert.ok(enPage.includes(`<p class="venue-advisory-text">${enText}</p>`), 'the English page is unchanged');
+      const frOther = await (await fetch(`${base}/fr/kelowna/restaurants/r7-advisory-english-fixture`)).text();
+      assert.match(frOther, /<p class="venue-advisory-text">Fermé temporairement \(vérifié le 19 octobre 2026\)\. Vérifiez la source officielle avant d’y aller\.<\/p>/);
+      assert.doesNotMatch(frOther, /per the restaurant/);
+    });
+    // A card on a French list page (the English HTML turned French on the way out).
+    const card = `<!DOCTYPE html><html lang="en"><head><title>x</title></head><body><aside class="venue-advisory"><p class="venue-advisory-kicker">Check before you go</p><p class="venue-advisory-text">${enText.replace(/'/g, '&#39;')}</p></aside></body></html>`;
+    const twin = app.frenchTwinHtml(card, '/kelowna/restaurants');
+    assert.ok(twin.includes(`<p class="venue-advisory-text">${frText}</p>`), twin.slice(0, 400));
+  } finally {
+    db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id IN (?, ?)").run(withFr, noFr);
+    db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id IN (?, ?)').run(withFr, noFr);
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(withFr, noFr);
+  }
+});
+
+test('Round 7 French: POST /admin/collection-membership asks for the French of an advisory (note_fr), or french_pending with a warning', async () => {
+  const id = Number(db.prepare(`INSERT INTO venues (name, region, type, description, slug) VALUES ('R7 Membership Fixture', 'kelowna', 'restaurant', 'A fixture.', 'r7-membership-fixture')`).run().lastInsertRowid);
+  const post = (base, body) => fetch(`${base}/admin/collection-membership`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` }, body: JSON.stringify(body) });
+  const good = { kind: 'advisory', venue_id: id, action: 'add', note: 'Temporarily closed (checked October 19, 2026).', reason: 'r7 test', batch_id: 'r7-membership' };
+  try {
+    await withDiscoveryServer(async (base) => {
+      const missing = await post(base, good);
+      assert.equal(missing.status, 400);
+      assert.match((await missing.json()).error, /^note_fr is required for an advisory/);
+      assert.equal((await post(base, { ...good, note_fr: 12 })).status, 400, 'note_fr must be a string');
+      assert.equal((await post(base, { ...good, french_pending: 'yes' })).status, 400, 'french_pending must be a boolean');
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM collection_items WHERE content_type = 'venue' AND content_id = ?").get(id).n, 0, 'nothing saved');
+      const pending = await post(base, { ...good, french_pending: true });
+      assert.equal(pending.status, 200);
+      assert.match((await pending.json()).warning, /No French text/);
+      assert.equal((await post(base, { ...good, action: 'remove' })).status, 200);
+      const ok = await post(base, { ...good, note_fr: 'Fermé temporairement (vérifié le 19 octobre 2026).' });
+      assert.equal(ok.status, 200);
+      assert.equal((await ok.json()).warning, undefined);
+      assert.equal(db.prepare("SELECT ci.note_fr FROM collection_items ci JOIN collections c ON c.id = ci.collection_id WHERE c.kind = 'advisory' AND ci.content_id = ?").get(id).note_fr, 'Fermé temporairement (vérifié le 19 octobre 2026).');
+      // Other kinds and removes need no French.
+      assert.equal((await post(base, { ...good, action: 'remove' })).status, 200);
+      assert.equal((await post(base, { ...good, kind: 'local_favorite', note: null })).status, 200);
+    });
+  } finally {
+    db.prepare("DELETE FROM collection_items WHERE content_type = 'venue' AND content_id = ?").run(id);
+    db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('Round 7 French: one everyday word never jumps to the one place named with it; a distinctive name still does', () => {
+  const t = app.buildDiscoveryTaxonomy();
+  const venues = [...t.venues, { id: 990001, name: 'The Market', region: 'big-white', type: 'cafe', slug: 'the-market' }, { id: 990002, name: 'Zorblaxian', region: 'kelowna', type: 'restaurant', slug: 'zorblaxian' },
+    { id: 990003, name: 'Kitchen', region: 'kelowna', type: 'restaurant', slug: 'kitchen' }];
+  const i = (q) => discovery.interpretDiscoveryQuery(q, { ...t, venues });
+  for (const q of ['market', 'Market', 'the market', 'The Market', 'kitchen']) assert.equal(i(q).exactVenue, null, q);
+  assert.equal(i('zorblaxian').exactVenue.id, 990002, 'a distinctive one-word name still goes to the place');
+  assert.equal(i('the market big white').exactVenue.id, 990001, 'name and town together still go to the place');
+});
+
+test('Round 7 French: French articles are not search words, and phrase searches read as the listings word them', () => withDiscoveryFlag('on', () => {
+  const read = (q, lang) => app.interpretDiscoveryText(app.discoverySearchText(q, lang));
+  for (const w of ['de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'et', 'au', 'aux', 'en']) {
+    assert.ok(!read(`fromagerie ${w} zorbla`, 'fr').textTerms.includes(w), w);
+  }
+  assert.deepEqual(read('bonhomme de neige', 'fr').textTerms, ['snow']);
+  assert.deepEqual(read('cabane de la ferme', 'fr').textTerms.filter((w) => ['de', 'la'].includes(w)), []);
+  const cases = [['maison hantée', 'fr', 'haunted'], ['maisons hantées', 'fr', 'haunted'], ['toboggan', 'fr', 'sledding'], ['glissade en toboggan', 'fr', 'sledding'],
+    ['cueillette', 'fr', 'u-pick orchard'], ['cueillette de pommes', 'fr', 'u-pick orchard'], ['traîneau', 'fr', 'sleigh'], ['promenade en traîneau', 'fr', 'sleigh'], ['traîneau à chiens', 'fr', 'sled'],
+    ['haunted house', 'en', 'haunted'], ['tobogganing', 'en', 'sledding'], ['toboggan hill', 'en', 'sledding'], ['sleigh rides', 'en', 'sleigh'], ['horse-drawn sleigh rides', 'en', 'sleigh'],
+    ['dog sledding', 'en', 'sled'], ['u-pick', 'en', 'u-pick orchard'], ['pick your own', 'en', 'u-pick orchard']];
+  for (const [q, lang, want] of cases) assert.equal(app.discoverySearchText(q, lang).toLowerCase(), want, `${lang}: ${q}`);
+  assert.equal(app.searchPhraseRewrites('haunted house tours in Vernon'), 'haunted tours in Vernon', 'the rest of the request is kept as typed');
+  assert.equal(app.searchPhraseRewrites('wineries in Kelowna'), 'wineries in Kelowna', 'nothing to rewrite: exactly as typed');
+  assert.equal(app.searchPhraseRewrites('u-pickers'), 'u-pickers', 'a phrase never starts or ends inside a typed word');
+  // "marché" is the word market, so it searches markets instead of opening The Market.
+  assert.doesNotMatch(app.heroSearchTarget('marché', { lang: 'fr' }).url || '', /\/(cafes|restaurants)\//);
+}));
+
+test('Round 7 French: the help bot answers "can’t find my business" and the website badge in English and French', () => {
+  const cases = [['i can’t find my business', 'login', 'not-found'], ['my business isn’t listed', 'claim', 'not-found'], ['where is my listing', 'account', 'not-found'],
+    ['je ne trouve pas mon entreprise', 'login', 'not-found', 'fr'], ['mon entreprise n’est pas sur le site', 'claim', 'not-found', 'fr'],
+    ['how do i get the badge for my website', 'edit', 'site-badge'], ['featured on okanagan roam badge', 'edit', 'site-badge'], ['can i put your logo on my website', 'account', 'site-badge'],
+    ['badge pour mon site web', 'edit', 'site-badge', 'fr'], ['comment obtenir le badge', 'edit', 'site-badge', 'fr'], ['badge', 'edit', 'site-badge', 'fr'],
+    ['what are the badges', 'edit', 'features'], ['dog friendly badge', 'edit', 'features'], ['caractéristiques', 'edit', 'features', 'fr'], ['how do i claim my business', 'login', 'claim']];
+  const misses = [];
+  for (const [q, page, want, lang] of cases) {
+    const r = ohbMatcher(page, lang ? { lang } : {})(q);
+    if (r.id !== want || r.lang !== (lang || 'en')) misses.push(`${page}: "${q}" -> ${r.id} (${r.lang}), want ${want}`);
+  }
+  assert.deepEqual(misses, [], misses.join('\n'));
+  for (const [signedIn, lang] of [[false, 'en'], [true, 'fr']]) {
+    const t = Object.fromEntries(ohbConfig(app.ownerHelpWidgetHtml('edit', { signedIn, lang })).topics.map((x) => [x.id, x]));
+    assert.match(t['site-badge'].a, /https:\/\/okanaganroam\.com\/badges\/featured-on-okanagan-roam\.svg/);
+    assert.match(t['site-badge'].aFr, /https:\/\/okanaganroam\.com\/badges\/featured-on-okanagan-roam\.svg/);
+    assert.match(t['not-found'].a, /href="\/list-your-venue"/);
+    assert.match(t['not-found'].aFr, /href="\/fr\/list-your-venue"/);
+    assert.match(t['not-found'].aFr, /Réclamer cette fiche/);
+    // The French Badges answer names the section as the French edit page does.
+    assert.match(t.features.aFr, /<strong>Caractéristiques<\/strong>/);
+    assert.match(t.features.aFr, /chiens acceptés/);
+    assert.doesNotMatch(t.features.aFr, /chiens bienvenus/);
+    assert.match(t.features.a, /<strong>Badges<\/strong>/);
+  }
 });
