@@ -96,12 +96,6 @@
      "where": "Kelowna"
     },
     {
-     "ref": "kelowna/misato-s-kitchen",
-     "name": "Misato's Kitchen",
-     "text": "a wood-panelled spot on Ellis St that stays open late after other kitchens close. The rolls are cheap, and the salmon sashimi comes thick and fatty.",
-     "where": "Kelowna"
-    },
-    {
      "ref": "kelowna/yuzu-bowl-and-bistro",
      "name": "Yuzu Bowl and Bistro",
      "text": "a Japanese bistro that welcomes kids. Time your visit for the happy hour roll deal.",
@@ -206,8 +200,7 @@
    [
     "Sushi late at night",
     [
-     "kelowna/bluetail-sushi-commerce|Bluetail Sushi - Commerce",
-     "kelowna/misato-s-kitchen|Misato's Kitchen"
+     "kelowna/bluetail-sushi-commerce|Bluetail Sushi - Commerce"
     ]
    ],
    [
