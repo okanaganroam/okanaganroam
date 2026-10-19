@@ -28759,3 +28759,122 @@ test('French pass 6: /fr/owner/forgot says "Ça peut prendre quelques heures"', 
   assert.match(html, /Ça peut prendre quelques heures\./);
   assert.ok(!/Il peut prendre quelques heures/.test(html));
 }));
+
+// Phone and accessibility, review pass 5 (2026-10-19).
+async function withPass5Css(get, p) {
+  const html = (await get(p)).text;
+  const hrefs = [...html.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
+  return html + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
+}
+
+test('A11y pass 5: muted text is one solid token at 4.6:1 or better, never opacity-dimmed', () => withPass4Server(async (get) => {
+  const tokens = fs.readFileSync(path.join(__dirname, '..', 'public', 'styles', 'tokens.css'), 'utf8');
+  const hex = (name) => new RegExp(`--${name}: (#[0-9A-Fa-f]{6});`).exec(tokens)[1];
+  const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  for (const t of ['ink-muted', 'ref-navy-muted']) {
+    for (const bg of ['ref-cream', 'paper', 'sand', 'ref-cream-deep']) assert.ok(ratio(hex(t), hex(bg)) >= 4.6, `${t} on ${bg}`);
+  }
+  const region = await withPass5Css(get, '/kelowna');
+  assert.match(region, /\.subtitle \{ color: var\(--ink-muted, #6B5D54\); font-size: 1\.02rem;/);
+  assert.doesNotMatch(region, /\.subtitle \{ color: var\(--ink\); opacity/);
+  const wine = await withPass5Css(get, '/wineries');
+  assert.match(wine, /\.wine-towns a span \{ font-size: 0\.74rem; color: var\(--ref-navy-muted, #56636E\); \}/);
+  assert.match(wine, /\.fd-open-note \{[^}]*color: var\(--ink-muted, #6B5D54\);/);
+  assert.doesNotMatch(wine, /\.fd-open-note \{[^}]*opacity/);
+  const guide = await withPass5Css(get, '/guides/best-brunch-vernon');
+  assert.match(guide, /\.patio-picks thead th \{[^}]*color: var\(--ink-muted, #6B5D54\); \}/);
+  const lyv = await withPass5Css(get, '/list-your-venue');
+  assert.match(lyv, /\.form-field \.lyv-hint \{ font-size: 0\.78rem; color: var\(--ink-muted, #6B5D54\);/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8'), /\.t3-card-top \{[^}]*color: var\(--ref-navy-muted, #56636E\); \}/);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /\.venue-hours-checked \{ margin: 8px 0 0; font-size: 0\.8rem; color: var\(--ink-muted, #6B5D54\); \}/);
+  assert.match(src, /\.whatson-earlier-count \{[^}]*color: var\(--ink-muted, #6B5D54\); \}/);
+}));
+
+test('A11y pass 5: region intro checkbox leaves the tab order on desktop; /kelowna columns in em, not ch', () => withPass4Server(async (get) => {
+  const region = await withPass5Css(get, '/kelowna');
+  assert.match(region, /@media \(min-width: 641px\) \{\s*body\.region-page \.region-intro-toggle \{ display: none; \}/);
+  assert.match(region, /\.region-lead-split \{ display: grid; grid-template-columns: minmax\(0, 38\.4em\) minmax\(0, 1fr\);/);
+  assert.match(region, /body\.region-page \.region-intro \{ max-width: 40\.8em;/);
+  assert.doesNotMatch(region, /minmax\(0, 64ch\)/);
+  assert.match(region, /@media \(min-width: 941px\) \{ \.nav \.logo-wordmark \{ display: inline-block; min-width: 9\.95em; \} \}/);
+}));
+
+test('A11y pass 5: phone menu follows the visual order and has a backdrop; phone filter panels fit the screen', () => withPass4Server(async (get) => {
+  const html = await withPass5Css(get, '/restaurants');
+  assert.match(html, /function menuRing\(\)\{/);
+  assert.match(html, /pos\.sort\(function\(a, b\)\{ return Math\.abs\(a\.top - b\.top\) > 4 \? a\.top - b\.top : /);
+  assert.match(html, /var ring = \(!phoneMq \|\| phoneMq\.matches\) \? menuRing\(\)\.filter\(function\(el\)\{ return el !== burger; \}\) : \[\];/, 'opening focuses the first item on screen');
+  assert.match(html, /body\.nav-menu-open::after \{ content: ''; position: fixed; inset: 0; z-index: 59; background: rgba\(16,27,36,0\.45\); \}/);
+  assert.match(html, /function fitPopPanel\(btn\)\{/);
+  assert.match(html, /pnl\.style\.maxHeight = Math\.max\(200, room\) \+ 'px';/);
+  assert.match(html, /button\[aria-controls\]\[class\*="pop-btn"\]/);
+}));
+
+test('A11y pass 5: 44px targets on venue pages, the footer icons and the header Build My Trip', () => withPass4Server(async (get) => {
+  // The venue page's own rules, read from the source (the test database's venues vary).
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /\.venue-hours-days summary \{[^}]*padding: 12px 0; line-height: 20px; \}/);
+  assert.match(src, /body\.golf-page \.detail-row a, body\.golf-page \.venue-aside \.map-link \{ display: inline-block; max-width: 100%; padding: 11px 0; margin: -11px 0; \}/);
+  assert.match(src, /body\.golf-page \.category-back-link, body\.golf-page \.venue-back-link \{ display: inline-flex; align-items: center; min-height: 44px;/);
+  assert.match(src, /body\.golf-page nav\.breadcrumb a \{ display: inline-block; padding: 13px 5px; margin: -13px -5px; \}/);
+  const css = await withPass5Css(get, '/restaurants');
+  assert.match(css, /\.home-footer-social-icon \{[^}]*width: 44px; height: 44px; border: 5px solid transparent;/);
+  assert.match(css, /\.nav #navTripBtn \{ min-height: 44px; \}/);
+  assert.match(css, /\.fd-open-next li a \{ display: inline-flex; align-items: center; min-height: 44px; \}/);
+}));
+
+test('A11y pass 5: Open-now empty state says so and offers "Show all (including closed)", in English and French', () => withPass4Server(async (get) => {
+  const en = (await get('/restaurants')).text;
+  const fr = (await get('/fr/restaurants')).text;
+  assert.match(en, /'Show all \(including closed\)'/);
+  assert.match(en, /NEXT_OPEN, openOn && shown === 0, openToggle\);/);
+  assert.match(fr, /'Tout afficher \(fermés compris\)'/);
+  assert.match((await get('/browse')).text, /NEXT_OPEN, openOn && shown === 0, openToggle\);/);
+  // The helper on a tiny DOM: the box's first line changes, the button turns off Open now only, and the line comes back.
+  const src = /(var OPEN_NEXT_WEEK[\s\S]*?\n    box\.appendChild\(ul\);\n  \})/.exec(en)[1];
+  const paint = new Function(`var document = this; ${src}; return paintOpenNextList;`);
+  const node = (tag) => ({
+    tagName: tag, children: [], attrs: {}, listeners: {}, textContent: '', nodeType: 1,
+    get firstChild(){ return this.children[0] || null; },
+    appendChild(c){ c.parentNode = this; this.children.push(c); const i = this.children.length - 1; c.nextSibling = null; if (i) this.children[i - 1].nextSibling = c; return c; },
+    removeChild(c){ this.children.splice(this.children.indexOf(c), 1); return c; },
+    setAttribute(k, v){ this.attrs[k] = String(v); }, getAttribute(k){ return k in this.attrs ? this.attrs[k] : null; }, hasAttribute(k){ return k in this.attrs; },
+    addEventListener(t, f){ this.listeners[t] = f; }, click(){ if (this.listeners.click) this.listeners.click(); },
+  });
+  const byId = {};
+  const doc = { getElementById: (id) => byId[id] || null, createElement: (t) => { const n = node(t); Object.defineProperty(n, 'id', { set(v){ byId[v] = n; }, get(){ return ''; } }); return n; }, createTextNode: (t) => ({ nodeType: 3, nodeValue: t }) };
+  const fn = paint.call(doc);
+  const empty = node('p'); const line = { nodeType: 3, nodeValue: 'No restaurants here match that combination yet. ' }; empty.appendChild(line);
+  let toggled = 0; const toggle = node('button'); toggle.setAttribute('aria-pressed', 'true'); toggle.addEventListener('click', () => { toggled++; });
+  fn(empty, null, [], {}, true, toggle);
+  assert.equal(line.nodeValue, 'Nothing that matches is open right now. ');
+  const box = byId.openNextList;
+  assert.equal(box.hidden, false);
+  assert.equal(box.children[0].textContent, 'Show all (including closed)');
+  box.children[0].click();
+  assert.equal(toggled, 1, 'the button presses the Open now toggle');
+  toggle.setAttribute('aria-pressed', 'false'); box.children[0].click();
+  assert.equal(toggled, 1, 'and never turns Open now back on');
+  fn(empty, null, [], {}, false, toggle);
+  assert.equal(line.nodeValue, 'No restaurants here match that combination yet. ', 'the usual line comes back');
+  assert.equal(box.hidden, true);
+}));
+
+test('A11y pass 5: /map pins hand focus to their card and back, clusters are named, hidden pins leave the tab order', () => withPass4Server(async (get) => {
+  const en = (await get('/map')).text;
+  const fr = (await get('/fr/map')).text;
+  assert.match(en, /clusterPlaces: function\(n\)\{ return n \+ ' places here, zoom in'; \}/);
+  assert.match(fr, /clusterPlaces: function\(n\)\{ return n \+ ' lieux ici, zoomez pour les voir'; \}/);
+  assert.match(en, /map\.on\('popupopen', function\(e\)\{/);
+  assert.match(en, /map\.on\('popupclose', function\(e\)\{/);
+  assert.match(en, /t\.closest\('\.leaflet-popup'\)\) \{ e\.preventDefault\(\); map\.closePopup\(\); \}/);
+  assert.match(en, /if \(layerKey !== lastLayerKey\) \{/, 'pins are rebuilt only when the set changes');
+  assert.match(en, /el\.setAttribute\('tabindex', want\)/);
+}));
+
+test('A11y pass 5: the /browse search placeholder is short, in English and French', () => withPass4Server(async (get) => {
+  assert.match((await get('/browse')).text, /id="bhSearch" class="fd-search-input" placeholder="Search places, cuisines…"/);
+  assert.match((await get('/fr/browse')).text, /id="bhSearch" class="fd-search-input" placeholder="Chercher lieux, cuisines…"/);
+}));
