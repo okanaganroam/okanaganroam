@@ -186,7 +186,7 @@ test('Swap: a replacement already in the plan is replaced by another place of th
   assert.equal(gone.days[0].stops[1].venue.type, 'indoor');
   // The page sends the place's id and keeps a kept stop out of the exclusions.
   const page = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.ok(page.includes('swap: { key: sk, type: ss.venue.type, id: ss.venue.id }'));
+  assert.ok(page.includes('swap: { key: sk, type: ss.venue.type, id: ss.venue.id, locked: '));
   assert.ok(page.includes('if (res.j && res.j.swapKept) state.exclude = state.exclude.filter(function(x){ return x !== res.j.swapKept.id; });'));
   assert.ok(page.includes("Aucune autre option à proximité ne convient à ce moment de la journée : "));
 });
@@ -337,7 +337,8 @@ test('Road trips: "Osoyoos to Vernon" runs south to north, and a day with a long
 test('My Trip: a dated one-day itinerary saves its stops as Day 1 with the date', () => {
   const page = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.ok(page.includes("(key ? ' data-plan-day=\"' + esc(key.split('-')[0]) + '\"' : datedOneDay() ? ' data-plan-day=\"1\"' : '')"));
-  const fn = /function datedOneDay\(\)\{[\s\S]*?\n {2}\}/.exec(page)[0];
+  // Round 8: the function lives inside a template literal, so its doubled backslashes are single ones on the page.
+  const fn = /function datedOneDay\(\)\{[\s\S]*?\n {2}\}/.exec(page)[0].replace(/\\\\/g, '\\');
   const datedOneDay = (last) => new Function('state', `${fn}; return datedOneDay();`)({ last });
   assert.equal(datedOneDay({ days: [], schedule: [{ day: 1, date: '2026-10-24', venueId: 1 }] }), true);
   assert.equal(datedOneDay({ days: [{ day: 1 }], schedule: [{ day: 1, date: '2026-10-24' }] }), false, 'day plans already carry their day');
