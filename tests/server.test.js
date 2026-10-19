@@ -4034,7 +4034,8 @@ test('S5 #8/#14/#16/#17: a sports series lists its games chronologically with Sp
   assert.equal(ld.startDate, '2032-10-04T18:05:00-07:00');
   assert.equal(ld.eventStatus, 'https://schema.org/EventScheduled');
   // SEO-1 A: no host venue -> the region as a locality-level PostalAddress (never a guessed street).
-  assert.deepEqual(ld.location, { '@type': 'Place', name: 'Prospera Place', address: { '@type': 'PostalAddress', addressLocality: 'Kelowna', addressRegion: 'BC', addressCountry: 'CA' } });
+  // Pass 6 (2026-10-19): a known event venue carries its street address and postal code.
+  assert.deepEqual(ld.location, { '@type': 'Place', name: 'Prospera Place', address: { '@type': 'PostalAddress', streetAddress: '1223 Water St', addressLocality: 'Kelowna', addressRegion: 'BC', postalCode: 'V1Y 9V1', addressCountry: 'CA' } });
   assert.deepEqual(ld.subEvent.map((s) => [s['@type'], s.name, s.startDate.slice(0, 16)]), [
     ['SportsEvent', 'S5 Rockets Home Games 2032-33 \u2013 vs Kamloops Blazers', '2032-11-01T19:05'],
     ['SportsEvent', 'S5 Rockets Home Games 2032-33 \u2013 vs Victoria Royals', '2032-12-19T18:05'],
@@ -4082,7 +4083,8 @@ test('SEO-1: Event location always has an address; same-name same-region events 
       occurrences: [{ start_date: '2032-07-03' }, { start_date: '2032-07-10' }, { start_date: '2032-07-17' }] });
     const page = (await s5get(`/kelowna/events/${series.slug}`)).text;
     const ld = s5jsonLd(page).find((b) => b['@type'] !== 'BreadcrumbList');
-    assert.deepEqual(ld.location, { '@type': 'Place', name: 'Laurel Packinghouse', address: locality('Kelowna') });
+    // Pass 6 (2026-10-19): a known event venue carries its street address and postal code.
+    assert.deepEqual(ld.location, { '@type': 'Place', name: 'Laurel Packinghouse', address: { ...locality('Kelowna'), streetAddress: '1304 Ellis St', postalCode: 'V1Y 1Z8' } });
     assert.equal(ld.subEvent.length, 2);
     for (const s of ld.subEvent) assert.deepEqual(s.location, ld.location);
     // Host-venue event: the venue's stored address when present, else its region.
@@ -13644,7 +13646,8 @@ test('Analytics Cleanup C2: chip hubs -- URL prefill, page load, popstate and se
     ];
     assert.deepEqual(s.r.fc(), expected, slug);
     assert.deepEqual(s.r.other(), [], `${slug}: no other events from the filter script`);
-    for (const p of s.r.history.pushes) assert.match(p, /^\/x(\?(types|features|regions|open)=[^&]+(&(types|features|regions|open)=[^&]+)*)?$/, `${slug}: pushed URL ${p}`);
+    // The typed search rides along as ?q= (2026-10-19), like /browse.
+    for (const p of s.r.history.pushes) assert.match(p, /^\/x(\?(q|types|features|regions|open)=[^&]+(&(types|features|regions|open)=[^&]+)*)?$/, `${slug}: pushed URL ${p}`);
   }
 });
 
@@ -28033,4 +28036,191 @@ test('Season end (2026-10-19): trip facts and /map read the ended season on the 
     app.guardedSeasonUpdate(v.id, null, meta);
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
+});
+
+// ---------- Site review pass 5, tools (2026-10-19) ----------
+function withLookupPass6Fixtures(fn) {
+  const cols = ['name', 'region', 'type', 'slug', 'description', 'rating', 'reviews'];
+  const made = [];
+  const add = (name, region, type, slug) => {
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(name, region, type, slug, 'Lookup fixture.', 4.5, 100);
+    made.push(db.prepare('SELECT id FROM venues WHERE slug = ? AND region = ?').get(slug, region).id);
+  };
+  add('Gray Monk Estate Winery', 'lake-country', 'winery', 'lk6-gray-monk-estate-winery');
+  add('Mission Hill Family Estate Winery', 'west-kelowna', 'winery', 'lk6-mission-hill');
+  add('Tinhorn Creek Vineyards', 'oliver', 'winery', 'lk6-tinhorn-creek');
+  add('Frind Estate Winery', 'west-kelowna', 'winery', 'lk6-frind');
+  add('Friends Test Lounge', 'kelowna', 'cocktail', 'lk6-friends-lounge');
+  add('Earls Kitchen + Bar', 'kelowna', 'restaurant', 'lk6-earls-kelowna');
+  add('Earls Kitchen + Bar', 'penticton', 'restaurant', 'lk6-earls-penticton');
+  add('The Hatching Post Brewery & Smokery', 'west-kelowna', 'brewery', 'lk6-hatching-post');
+  add('The Office Brewery', 'oliver', 'brewery', 'lk6-office-brewery');
+  try { return fn(); } finally { for (const id of made) db.prepare('DELETE FROM venues WHERE id = ?').run(id); }
+}
+
+test('List Your Venue lookup pass 6: words in any order, generic and town words dropped, French articles, one typo, grey/gray', () => withLookupPass6Fixtures(() => {
+  const first = (q) => (app.venueLookup(q)[0] || {});
+  for (const [q, name] of [
+    ['gray monk winery', 'Gray Monk Estate Winery'], ['grey monk', 'Gray Monk Estate Winery'], ['gray monk estates', 'Gray Monk Estate Winery'],
+    ['mission hill winery', 'Mission Hill Family Estate Winery'], ['mission hill estate', 'Mission Hill Family Estate Winery'],
+    ['tinhorn creek winery', 'Tinhorn Creek Vineyards'], ['frind winery', 'Frind Estate Winery'],
+    ['hatchng post', 'The Hatching Post Brewery & Smokery'], ["l'hatching post", 'The Hatching Post Brewery & Smokery'], ['la hatching post', 'The Hatching Post Brewery & Smokery'],
+    ['office brewing', 'The Office Brewery'], ['monk lake country', 'Gray Monk Estate Winery'],
+  ]) assert.equal(first(q).name, name, q);
+  // A town in the query ranks that town's listing first.
+  assert.equal(first('earls kelowna').region, 'Kelowna');
+  assert.equal(first('earls penticton').region, 'Penticton');
+  // "frind" is a real name, so the one-typo "Friends" is not offered beside it.
+  assert.ok(!app.venueLookup('frind winery').some((v) => v.name === 'Friends Test Lounge'));
+  // Only generic or town words: nothing to match on.
+  assert.deepEqual(app.venueLookup('winery kelowna').filter((v) => /^Lookup/.test(v.name)), []);
+  assert.equal(app.venueLookup('zzzz qqqq').length, 0);
+  assert.ok(app.venueLookup('earls').length <= 8);
+}));
+
+test('List Your Venue lookup pass 6: a miss suggests checking the spelling and adding the town, in English and French', async () => {
+  const get = (p) => new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => { try { resolve(await (await fetch(`http://127.0.0.1:${tmp.address().port}${p}`)).text()); } catch (e) { reject(e); } finally { tmp.close(); } });
+  });
+  const en = await get('/list-your-venue');
+  assert.match(en, /none: 'No match\. Check the spelling, or try one word of the name with your town/);
+  assert.doesNotMatch(en, /No match yet\. If your venue is new to us/);
+  const fr = await get('/fr/list-your-venue');
+  assert.match(fr, /V\\u00e9rifiez l\\u2019orthographe, ou essayez un seul mot du nom suivi de votre ville/);
+});
+
+test('Map search pass 6: a new search drops the last search\'s filters, keeps hand-tapped chips, and keeps the words in the box', async () => {
+  const vm = require('node:vm');
+  const html = (await s5get('/map')).text;
+  const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
+  const chunk = src.slice(src.indexOf('  function snapshot(){'), src.indexOf('  function readSearch('));
+  const ctx = {};
+  vm.runInNewContext(`var kinds = {}, feats = {}, tags = {}, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, openOnly = false, topOnly = false, town = '', price = '', atMin = null, atDay = '', atUntil = false, tagOr = false, radiusKm = 0, radiusFixed = false;\n${chunk}`, ctx);
+  // Search 1 ("patio with my dog in kelowna") turns on Patio, Dogs OK and the town.
+  const before = ctx.snapshot();
+  vm.runInContext("feats.patio = true; feats.dogs = true; town = 'kelowna';", vm.createContext(ctx));
+  ctx.lastSearchSet = ctx.searchDiff(before, ctx.snapshot());
+  // Then the visitor taps Cafés by hand.
+  vm.runInContext('kinds.cafe = true;', ctx);
+  // Search 2 starts by undoing search 1.
+  ctx.undoLastSearch();
+  assert.deepEqual(Object.keys(vm.runInContext('feats', ctx)), []);
+  assert.equal(vm.runInContext('town', ctx), '');
+  assert.equal(vm.runInContext('kinds.cafe', ctx), true, 'a hand-tapped chip stays');
+  assert.equal(ctx.lastSearchSet, null);
+  // A setting the visitor changed after the search is left alone.
+  const b2 = ctx.snapshot();
+  vm.runInContext("town = 'kelowna';", ctx);
+  ctx.lastSearchSet = ctx.searchDiff(b2, ctx.snapshot());
+  vm.runInContext("town = 'vernon';", ctx);
+  ctx.undoLastSearch();
+  assert.equal(vm.runInContext('town', ctx), 'vernon');
+  // Wiring: every search (typed, Enter, voice, ?q=) undoes the last one; the words stay in the box.
+  assert.match(src, /if \(typing\) \{ if \(!liveBase\) \{ undoLastSearch\(\); liveBase = snapshot\(\); \}/);
+  assert.match(src, /else \{ if \(liveBase\) \{ restore\(JSON\.parse\(JSON\.stringify\(liveBase\)\)\); liveBase = null; \} undoLastSearch\(\); \}/);
+  assert.match(src, /lastSearchSet = searchDiff\(before, snapshot\(\)\);/);
+  assert.match(src, /readSearch\(v, false\); searchEl\.value = String\(v \|\| ''\)\.trim\(\);/);
+  assert.match(src, /if \(qs\.get\('q'\)\) \{ readSearch\(qs\.get\('q'\)\); searchEl\.value = qs\.get\('q'\); \}/);
+  assert.match(src, /lastSearchSet = null; radiusFixed = false; searchEl\.value = '';/, 'Clear forgets the last search');
+  // With the location known and something within 1 km, the map shows the 1 km around the visitor.
+  assert.match(src, /if \(within1\) fitTo\(L\.latLng\(me\.lat, me\.lng\)\.toBounds\(2000\), 17\);/);
+});
+
+test('Calendar pass 6: a DTEND on every event, Add to Google Calendar, and the French .ics', async () => {
+  // Start + 2 hours when no end time is stored, running into the next day after 10 pm.
+  assert.deepEqual(app.eventCalendarTimes({ start_date: '2099-06-01', end_date: '2099-06-01', start_time: '19:30', all_day: 0 }), { allDay: false, start: '20990601T193000', end: '20990601T213000' });
+  assert.deepEqual(app.eventCalendarTimes({ start_date: '2099-06-01', end_date: '2099-06-01', start_time: '23:00', all_day: 0 }), { allDay: false, start: '20990601T230000', end: '20990602T010000' });
+  assert.deepEqual(app.eventCalendarTimes({ start_date: '2099-06-01', end_date: '2099-06-01', start_time: '21:00', end_time: '01:00', ends_next_day: 1, all_day: 0 }).end, '20990602T010000');
+  assert.deepEqual(app.eventCalendarTimes({ start_date: '2099-06-01', end_date: '2099-06-02', all_day: 1 }), { allDay: true, start: '20990601', end: '20990603' });
+  const ics = app.eventIcs({ id: 9, name: 'Gala' }, [{ id: 1, start_date: '2099-06-01', end_date: '2099-06-01', start_time: '19:00', all_day: 0 }], 'Hall', 'https://okanaganroam.com/fr/kelowna/events/gala', new Date('2026-10-14T12:00:00Z'), 'fr');
+  assert.match(ics, /DTSTART;TZID=America\/Vancouver:20990601T190000\r\nDTEND;TZID=America\/Vancouver:20990601T210000/);
+  assert.match(ics, /DESCRIPTION:Détails : https:\/\/okanaganroam\.com\/fr\/kelowna\/events\/gala/);
+  const g = new URL(app.googleCalendarUrl({ name: 'Gala' }, { start_date: '2099-06-01', end_date: '2099-06-01', start_time: '19:00', all_day: 0 }, 'Hall, 1 Main St', 'https://okanaganroam.com/kelowna/events/gala'));
+  assert.equal(g.hostname, 'calendar.google.com');
+  assert.equal(g.searchParams.get('action'), 'TEMPLATE');
+  assert.equal(g.searchParams.get('dates'), '20990601T190000/20990601T210000');
+  assert.equal(g.searchParams.get('ctz'), 'America/Vancouver');
+  assert.equal(g.searchParams.get('details'), 'Details: https://okanaganroam.com/kelowna/events/gala');
+  assert.equal(g.searchParams.get('location'), 'Hall, 1 Main St');
+  const ev = s5create({ name: 'Pass6 Calendar Night', occurrences: [{ start_date: '2032-05-15', start_time: '19:30' }] });
+  try {
+    const page = (await s5get(`/kelowna/events/${ev.slug}`)).text;
+    assert.match(page, /<a class="cta secondary" data-gcal href="https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE&amp;text=Pass6%20Calendar%20Night&amp;dates=20320515T193000%2F20320515T213000&amp;ctz=America%2FVancouver&amp;details=Details%3A%20https%3A%2F%2Fokanaganroam\.com%2Fkelowna%2Fevents%2F/);
+    assert.match(page, />Add to Google Calendar<\/a>/);
+    const frIcs = await s5get(`/fr/kelowna/events/${ev.slug}/calendar.ics`);
+    assert.equal(frIcs.status, 200);
+    assert.match(frIcs.text.replace(/\r\n /g, ''), new RegExp(`DESCRIPTION:Détails : https://okanaganroam\\.com/fr/kelowna/events/${ev.slug}`));
+    assert.match(frIcs.text, /DTEND;TZID=America\/Vancouver:20320515T213000/);
+    // The French page links the French .ics and gives Google Calendar the French details and address.
+    const fr = app.frenchTwinHtml(page, `/kelowna/events/${ev.slug}`);
+    assert.match(fr, new RegExp(`href="/fr/kelowna/events/${ev.slug}/calendar\\.ics"`));
+    assert.match(fr, /details=D%C3%A9tails%20%3A%20https%3A%2F%2Fokanaganroam\.com%2Ffr%2Fkelowna%2Fevents%2F/);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_submissions', 'owner_event_changes', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+});
+
+test('Event venue addresses pass 6: the busiest event venues get a street address and postal code; a listing name gets its address', () => {
+  app.resetEventVenueCaches();
+  const data = require('../data/event-venue-addresses.json');
+  assert.ok(data.venues.length >= 35);
+  for (const v of data.venues) {
+    assert.ok(v.name && v.streetAddress && app.REGION_LABELS[v.region], v.name);
+    if (v.postalCode) assert.match(v.postalCode, /^V\d[A-Z] \d[A-Z]\d$/, v.name);
+  }
+  const place = (text, region = 'vernon') => app.eventPlaceSchema({ region, venue_name_text: text }, null);
+  // The three spellings of the Vernon arts centre are one place.
+  const vdpac = ['Vernon & District Performing Arts Centre', 'Vernon and District Performing Arts Centre', 'Vernon District & Performing Arts Centre'].map((t) => place(t));
+  assert.ok(vdpac[0].address.streetAddress);
+  for (const p of vdpac) assert.deepEqual(p, vdpac[0]);
+  assert.equal(vdpac[0].name, 'Vernon & District Performing Arts Centre');
+  for (const t of ['Creekside Theatre', 'Kelowna Community Theatre', 'Prospera Place, Kelowna', 'Rotary Centre for the Arts, Kelowna', 'RCA Atrium, Rotary Centre for the Arts', 'Penticton Trade & Convention Centre', 'South Okanagan Events Centre', 'Kal Tire Place', 'Venables Theatre, Oliver']) {
+    const p = place(t);
+    assert.ok(p.address.streetAddress, t);
+    assert.equal(p.address.addressRegion, 'BC');
+  }
+  // A linked listing with an address keeps it.
+  const host = { name: 'Test Hall', address: '262 Bernard Ave, Kelowna, BC V1Y 6N4', region: 'kelowna' };
+  assert.equal(app.eventPlaceSchema({ region: 'kelowna', venue_name_text: 'Prospera Place' }, host).address.streetAddress, '262 Bernard Ave');
+  // A place that is a listing's name ("<listing>, Kelowna") gets the listing's address.
+  db.prepare("INSERT INTO venues (name, region, type, slug, address, description) VALUES ('Pass6 Test Wines', 'kelowna', 'winery', 'pass6-test-wines', '4870 Chute Lake Rd, Kelowna, BC V1W 4M3', 'x')").run();
+  try {
+    app.resetEventVenueCaches();
+    const p = place('Pass6 Test Wines, Kelowna', 'kelowna');
+    assert.equal(p.name, 'Pass6 Test Wines');
+    assert.equal(p.address.streetAddress, '4870 Chute Lake Rd');
+    assert.equal(p.address.postalCode, 'V1W 4M3');
+    // Unknown places keep the town-only address.
+    assert.equal(place('Somewhere New', 'kelowna').address.streetAddress, undefined);
+  } finally {
+    db.prepare("DELETE FROM venues WHERE slug = 'pass6-test-wines'").run();
+    app.resetEventVenueCaches();
+  }
+});
+
+test('Uppercase page paths 301 to lower case and /index.html to /; token, file and API paths keep their case', async () => {
+  assert.equal(app.lowercasePageRedirect('/Kelowna'), '/kelowna');
+  assert.equal(app.lowercasePageRedirect('/Kelowna/Restaurants/Some-Place'), '/kelowna/restaurants/some-place');
+  assert.equal(app.lowercasePageRedirect('/fr/Whats-On'), '/fr/whats-on');
+  assert.equal(app.lowercasePageRedirect('/index.html'), '/');
+  assert.equal(app.lowercasePageRedirect('/fr/index.html'), '/fr');
+  for (const p of ['/kelowna', '/owner/AbC123_x', '/fr/owner/AbC', '/contribute/confirm/AbC', '/api/Venues', '/images/Foo.jpg', '/claim/AbC', '/admin/Review', '/x/Y.png', '/caf%C3%A9']) assert.equal(app.lowercasePageRedirect(p), null, p);
+  const get = (p) => new Promise((resolve, reject) => {
+    const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+    tmp.listen(0, '127.0.0.1', async () => { try { resolve(await fetch(`http://127.0.0.1:${tmp.address().port}${p}`, { redirect: 'manual' })); } catch (e) { reject(e); } finally { tmp.close(); } });
+  });
+  const r = await get('/Food-Drink?q=Pizza');
+  assert.equal(r.status, 301);
+  assert.equal(r.headers.get('location'), '/food-drink?q=Pizza', 'the query keeps its case');
+  assert.equal((await get('/index.html')).headers.get('location'), '/');
+});
+
+test('/food-drink keeps the typed search in the URL (?q=) and reads it back on load, like /browse', () => {
+  const js = app.renderFoodDrinkHubScriptHtml({ openNow: true });
+  assert.match(js, /var typed = searchInput \? searchInput\.value\.trim\(\) : '';/);
+  assert.match(js, /else if \(typed\) q\.push\('q=' \+ encodeURIComponent\(typed\)\);/);
+  assert.match(js, /searchPlan = searchTerm \? fdPlan\(searchTerm\) : \{ groups: \[\], corrected: null \}; page = 1; apply\('replace'\); \}, 120\);/);
+  assert.match(js, /if \(!KEEP_Q && searchInput\) \{\n\s+var uq = \(params\.get\('q'\) \|\| ''\)\.slice\(0, 80\);/);
 });

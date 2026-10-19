@@ -1232,6 +1232,7 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'Example photo': 'Photo d’exemple',
   'Get directions': 'Itinéraire',
   'Add to calendar': 'Ajouter au calendrier',
+  'Add to Google Calendar': 'Ajouter à Google Agenda',
   'Tickets & info ↗': 'Billets et infos ↗',
   'Tickets & info': 'Billets et infos',
   'Website': 'Site web',

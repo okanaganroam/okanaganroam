@@ -1,0 +1,356 @@
+{
+ "updated": "2026-10-19",
+ "note": "Street addresses of the busiest event venues, for event JSON-LD and calendar files (site review pass 5). Each was checked against the venue's own site, its city's site or the Kelowna community directory on 2026-10-19; a postal code is left out where it could not be confirmed. aliases are other spellings seen in event listings.",
+ "venues": [
+  {
+   "name": "Creekside Theatre",
+   "region": "lake-country",
+   "streetAddress": "10241 Bottom Wood Lake Rd",
+   "postalCode": "V4V 1Y7"
+  },
+  {
+   "name": "Kelowna Community Theatre",
+   "region": "kelowna",
+   "streetAddress": "1375 Water St"
+  },
+  {
+   "name": "Vernon & District Performing Arts Centre",
+   "region": "vernon",
+   "streetAddress": "3800 33 St",
+   "postalCode": "V1T 5T6",
+   "aliases": [
+    "Vernon and District Performing Arts Centre",
+    "Vernon District & Performing Arts Centre",
+    "Vernon District and Performing Arts Centre",
+    "Vernon Performing Arts Centre",
+    "VDPAC"
+   ]
+  },
+  {
+   "name": "Venables Theatre",
+   "region": "oliver",
+   "streetAddress": "6100 Gala St",
+   "aliases": [
+    "Frank Venables Theatre"
+   ]
+  },
+  {
+   "name": "Osoyoos Activity Centre",
+   "region": "osoyoos",
+   "streetAddress": "17 Park Pl",
+   "postalCode": "V0H 1V0",
+   "aliases": [
+    "OSCA Osoyoos Activity Centre",
+    "OSCA",
+    "Osoyoos Seniors Centre"
+   ]
+  },
+  {
+   "name": "Rotary Centre for the Arts",
+   "region": "kelowna",
+   "streetAddress": "421 Cawston Ave",
+   "postalCode": "V1Y 6Z1",
+   "aliases": [
+    "RCA",
+    "Mary Irwin Theatre",
+    "RCA Atrium",
+    "Rotary Centre for the Arts Kelowna"
+   ]
+  },
+  {
+   "name": "Rutland Arena",
+   "region": "kelowna",
+   "streetAddress": "645 Dodd Rd",
+   "postalCode": "V1X 5H1",
+   "aliases": [
+    "Rutland Twin Arena"
+   ]
+  },
+  {
+   "name": "Prospera Place",
+   "region": "kelowna",
+   "streetAddress": "1223 Water St",
+   "postalCode": "V1Y 9V1"
+  },
+  {
+   "name": "Penticton Trade and Convention Centre",
+   "region": "penticton",
+   "streetAddress": "273 Power St",
+   "postalCode": "V2A 7K9",
+   "aliases": [
+    "Penticton Trade & Convention Centre",
+    "PTCC"
+   ]
+  },
+  {
+   "name": "South Okanagan Events Centre",
+   "region": "penticton",
+   "streetAddress": "853 Eckhardt Ave W",
+   "postalCode": "V2A 9C4",
+   "aliases": [
+    "SOEC"
+   ]
+  },
+  {
+   "name": "Kal Tire Place",
+   "region": "vernon",
+   "streetAddress": "3445 43 Ave",
+   "postalCode": "V1T 8P5"
+  },
+  {
+   "name": "Cleland Theatre",
+   "region": "penticton",
+   "streetAddress": "325 Power St",
+   "postalCode": "V2A 7K9",
+   "aliases": [
+    "Cleland Community Theatre"
+   ]
+  },
+  {
+   "name": "Laurel Packinghouse",
+   "region": "kelowna",
+   "streetAddress": "1304 Ellis St",
+   "postalCode": "V1Y 1Z8"
+  },
+  {
+   "name": "Kelowna Actors Studio",
+   "region": "kelowna",
+   "streetAddress": "1379 Ellis St",
+   "postalCode": "V1Y 1Z9",
+   "aliases": [
+    "Actors Studio and Dinner Theatre",
+    "Actors Studio & Dinner Theatre",
+    "Kelowna Actors Studio Dinner Theatre"
+   ]
+  },
+  {
+   "name": "Caravan Farm Theatre",
+   "region": "armstrong",
+   "streetAddress": "4886 Salmon River Rd",
+   "postalCode": "V0E 1B4"
+  },
+  {
+   "name": "Kelowna Art Gallery",
+   "region": "kelowna",
+   "streetAddress": "1315 Water St",
+   "postalCode": "V1Y 9R3"
+  },
+  {
+   "name": "Vernon Jazz Club",
+   "region": "vernon",
+   "streetAddress": "3000 31 St",
+   "postalCode": "V1T 5H7"
+  },
+  {
+   "name": "UBC Okanagan",
+   "region": "kelowna",
+   "streetAddress": "3333 University Way",
+   "postalCode": "V1V 1V7",
+   "aliases": [
+    "UBCO",
+    "UBCO Gymnasium",
+    "UBC Okanagan Gymnasium"
+   ]
+  },
+  {
+   "name": "Okanagan Regional Library - Kelowna Branch",
+   "region": "kelowna",
+   "streetAddress": "1380 Ellis St",
+   "postalCode": "V1Y 2A2",
+   "aliases": [
+    "Kelowna Library",
+    "Okanagan Regional Library Kelowna"
+   ]
+  },
+  {
+   "name": "Revelry Food and Music Hub",
+   "region": "kelowna",
+   "streetAddress": "1383 Ellis St",
+   "postalCode": "V1Y 1Z9",
+   "aliases": [
+    "Revelry",
+    "Revelry Food + Music Hub",
+    "Revelry Food & Music Hub"
+   ]
+  },
+  {
+   "name": "Okanagan Regional Library - Osoyoos Branch",
+   "region": "osoyoos",
+   "streetAddress": "8505 68 Ave",
+   "aliases": [
+    "Osoyoos Regional Library",
+    "Osoyoos Library"
+   ]
+  },
+  {
+   "name": "Landmark Cinemas Penticton",
+   "region": "penticton",
+   "streetAddress": "250 Winnipeg St"
+  },
+  {
+   "name": "IPE Fairgrounds",
+   "region": "armstrong",
+   "streetAddress": "3371 Pleasant Valley Rd",
+   "aliases": [
+    "IPE Grounds",
+    "Armstrong IPE Fairgrounds"
+   ]
+  },
+  {
+   "name": "Bennett House",
+   "region": "kelowna",
+   "streetAddress": "1988 Bowes St",
+   "aliases": [
+    "Bennett Heritage House",
+    "W.A.C. Bennett House"
+   ]
+  },
+  {
+   "name": "Delta Hotels by Marriott Grand Okanagan Resort",
+   "region": "kelowna",
+   "streetAddress": "1310 Water St",
+   "postalCode": "V1Y 9P3",
+   "aliases": [
+    "Delta Grand Okanagan",
+    "Delta Hotels Grand Okanagan",
+    "Grand Okanagan Resort"
+   ]
+  },
+  {
+   "name": "Okanagan Golf Club",
+   "region": "kelowna",
+   "streetAddress": "3200 Via Centrale",
+   "postalCode": "V1V 2A4",
+   "aliases": [
+    "The Okanagan Golf Club"
+   ]
+  },
+  {
+   "name": "Evangel Church",
+   "region": "kelowna",
+   "streetAddress": "3261 Gordon Dr",
+   "postalCode": "V1W 3N4"
+  },
+  {
+   "name": "St. Michael and All Angels' Cathedral",
+   "region": "kelowna",
+   "streetAddress": "608 Sutherland Ave",
+   "postalCode": "V1Y 5X1",
+   "aliases": [
+    "St. Michael's Cathedral",
+    "St Michaels Cathedral",
+    "Cathedral Church of St. Michael & All Angels",
+    "St. Michael & All Angels Cathedral"
+   ]
+  },
+  {
+   "name": "Unitarian Hall",
+   "region": "kelowna",
+   "streetAddress": "1310 Bertram St",
+   "postalCode": "V1Y 2E8",
+   "aliases": [
+    "Kelowna Unitarians",
+    "Unitarian Fellowship of Kelowna"
+   ]
+  },
+  {
+   "name": "Metro Hub",
+   "region": "kelowna",
+   "streetAddress": "1265 Ellis St"
+  },
+  {
+   "name": "The Balsam School",
+   "region": "kelowna",
+   "streetAddress": "301-604 Cawston Ave",
+   "postalCode": "V1Y 6Z4"
+  },
+  {
+   "name": "Kelowna Beer Institute",
+   "region": "kelowna",
+   "streetAddress": "1346 Water St",
+   "postalCode": "V1Y 9P4"
+  },
+  {
+   "name": "Vernon Recreation Centre",
+   "region": "vernon",
+   "streetAddress": "3310 37 Ave",
+   "postalCode": "V1T 2Y5",
+   "aliases": [
+    "Vernon Recreation Complex",
+    "Vernon Rec Centre"
+   ]
+  },
+  {
+   "name": "Penticton Community Centre",
+   "region": "penticton",
+   "streetAddress": "325 Power St",
+   "postalCode": "V2A 7K9"
+  },
+  {
+   "name": "Shatford Centre",
+   "region": "penticton",
+   "streetAddress": "760 Main St"
+  },
+  {
+   "name": "Kelowna Curling Club",
+   "region": "kelowna",
+   "streetAddress": "551 Recreation Ave",
+   "postalCode": "V1Y 7V5"
+  },
+  {
+   "name": "Okanagan Heritage Museum",
+   "region": "kelowna",
+   "streetAddress": "470 Queensway",
+   "postalCode": "V1Y 6S7",
+   "aliases": [
+    "Kelowna Museum",
+    "Kelowna Museums"
+   ]
+  },
+  {
+   "name": "Oliver Community Centre",
+   "region": "oliver",
+   "streetAddress": "6359 Park Dr",
+   "postalCode": "V0H 1T0",
+   "aliases": [
+    "Oliver Community Hall"
+   ]
+  },
+  {
+   "name": "Oliver & District Arena",
+   "region": "oliver",
+   "streetAddress": "665 McKinney Rd",
+   "aliases": [
+    "Oliver Arena",
+    "Oliver and District Arena"
+   ]
+  },
+  {
+   "name": "Peachland Community Centre",
+   "region": "peachland",
+   "streetAddress": "4450 6th St",
+   "postalCode": "V0H 1X6"
+  },
+  {
+   "name": "Lake Country Art Gallery",
+   "region": "lake-country",
+   "streetAddress": "10356A Bottom Wood Lake Rd",
+   "postalCode": "V4V 1T9"
+  },
+  {
+   "name": "Okanagan College Kelowna Campus",
+   "region": "kelowna",
+   "streetAddress": "1000 KLO Rd",
+   "postalCode": "V1Y 4X8",
+   "aliases": [
+    "Okanagan College"
+   ]
+  },
+  {
+   "name": "Vernon Public Art Gallery",
+   "region": "vernon",
+   "streetAddress": "3228 31 Ave",
+   "postalCode": "V1T 2H3"
+  }
+ ]
+}

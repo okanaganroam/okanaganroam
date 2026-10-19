@@ -91,3 +91,17 @@ test('private links keep new-tab, modified-click and download behavior',()=>{
     assert.equal(prevented,false);assert.equal(v.location.assigned,undefined);
   }
 });
+// Fix (2026-10-19): an early tap locks the global before the vendor tag runs; the tag's strict-mode write must not throw.
+test('a strict-mode vendor write after an early halt is ignored without an error',()=>{
+  const v=visit();
+  v.window.history.replaceState({},'', '/outdoors?types=hiking');
+  assert.doesNotThrow(()=>vm.runInNewContext('"use strict"; window.clarity = function(){ window.started = true; }; window.clarity.q = [["start"]]; window.clarity("start");',{window:v.window}));
+  assert.equal(v.window.started,undefined);
+  assert.equal(v.window.clarity.q,undefined);
+});
+test('the loader initialises only once when its tag is included twice',()=>{
+  const v=visit();
+  const js=v.html.replace(/^<script[^>]*>/,'').replace(/<\/script>$/,'');
+  vm.runInNewContext(js,{window:v.window,document:v.window.document,location:v.location,URL});
+  assert.equal(v.scripts.length,1);
+});

@@ -2,6 +2,8 @@
 // Automatic cookieless replay: never grant cookie storage on a visitor's behalf.
 function replayClient(projectId) {
   var w = window, d = document, key = 'roam_replay_v1', loaded = false, halted = false;
+  // Fix (2026-10-19): the loader runs once per page, even if its tag is included twice.
+  try { if (w.__roamReplayInit) return; w.__roamReplayInit = true; } catch (err) { return; }
   function allowed(u) {
     var p = u.pathname.replace(/^\/fr(?=\/|$)/, '') || '/';
     return u.protocol === 'https:' && u.hostname === 'okanaganroam.com' && !u.search && !u.hash &&
@@ -40,8 +42,13 @@ function replayClient(projectId) {
     // later "start" from the vendor tag, so the global is replaced with a
     // locked no-op and any queued commands are dropped. Fails closed.
     try { if (typeof w.clarity === 'function') w.clarity('stop'); } catch (err) {}
-    var off = function(){};
-    try { Object.freeze(off); Object.defineProperty(w, 'clarity', { value: off, writable: false, configurable: false }); }
+    // Fix (2026-10-19): the lock is a getter with a setter that ignores writes, not a read-only value. A vendor tag
+    // still downloading after an early tap (a filter chip on /browse) assigns window.clarity in strict mode, which
+    // threw "Cannot assign to read only property 'clarity'"; now its write is dropped quietly and the global stays
+    // the no-op. The no-op's queue (q) is locked the same way, so no queued "start" can be replayed.
+    var off = function(){}, ignore = function(){};
+    try { Object.defineProperty(off, 'q', { get: function(){ return undefined; }, set: ignore, configurable: false }); } catch (err) {}
+    try { Object.defineProperty(w, 'clarity', { get: function(){ return off; }, set: ignore, configurable: false }); }
     catch (err) { try { w.clarity = off; } catch (e) {} }
   }
   function samePath(next) {
