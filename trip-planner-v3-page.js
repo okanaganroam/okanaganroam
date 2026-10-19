@@ -434,8 +434,11 @@ function renderStyles() {
   .t3-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; align-items: center; }
   .t3-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--ref-cream); border: 1px solid rgba(27,43,58,0.12); color: var(--ref-navy); border-radius: 999px; padding: 6px 12px; font-size: 0.84rem; font-weight: 700; }
   .t3-chip select { font: inherit; font-weight: 800; color: var(--ref-navy); background: transparent; border: 0; padding: 2px 0; cursor: pointer; min-height: 32px; } /* 2026-10-19: a 32px target */
+  /* Tap targets (2026-10-19, round 7): the plan's selects are 44px tall with 16px text (smaller text makes iPhone
+     Safari zoom the page when one is tapped). The negative margin keeps the chip itself about 44px tall. */
+  .t3-chip select { font-size: 16px; min-height: 44px; margin: -6px 0; }
   .t3-length-ask { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
-  .t3-length-ask select { font: inherit; min-height: 32px; margin-left: 6px; }
+  .t3-length-ask select { font: inherit; font-size: 16px; min-height: 44px; margin-left: 6px; }
   .t3-chip-label { font-weight: 600; opacity: 0.7; }
   .t3-notused { margin: 10px 0 0; font-size: 0.84rem; color: #7A4A2A; }
 
@@ -537,7 +540,8 @@ function renderStyles() {
   .t3-when { padding-top: 16px; font-weight: 800; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--teal-deep, #1E4F4C); position: relative; }
   .t3-when::after { content: ""; position: absolute; left: 6px; top: 40px; bottom: -16px; width: 2px; background: rgba(27,43,58,0.12); }
   .t3-stop:last-child .t3-when::after { display: none; }
-  .t3-leg { list-style: none; margin-left: 126px; font-size: 0.8rem; font-weight: 700; color: rgba(27,43,58,0.62); padding: 8px 0 8px 4px; }
+  /* Contrast (2026-10-19, round 7): the see-through navy measured 4.11:1 on the cream page; the solid muted navy passes 4.5:1. */
+  .t3-leg { list-style: none; margin-left: 126px; font-size: 0.8rem; font-weight: 700; color: var(--ref-navy-muted, #56636E); padding: 8px 0 8px 4px; }
   .t3-leg::before { content: "\\2193  "; }
   .t3-leg-drive { color: rgba(27,43,58,0.78); }
   p.t3-drive-in { margin: 12px 0 0 126px; padding: 0 0 0 4px; }
@@ -1830,8 +1834,16 @@ function renderScript(d) {
 
   // ---- interactions ----
   // An open "More" menu closes when you click elsewhere or press Escape.
+  // Keyboard (2026-10-19, round 7): Favorite is a toggle, so the menu stays open after it and focus stays on it (it used
+  // to close the menu and drop focus to the page). Any other item that closes the menu hands focus back to "More".
   document.addEventListener('click', function(e){
-    Array.prototype.forEach.call(document.querySelectorAll('details.t3-more[open]'), function(d){ if (!d.contains(e.target) || (e.target.closest && e.target.closest('.t3-more-menu > *'))) d.removeAttribute('open'); });
+    Array.prototype.forEach.call(document.querySelectorAll('details.t3-more[open]'), function(d){
+      var item = d.contains(e.target) && e.target.closest ? e.target.closest('.t3-more-menu > *') : null;
+      if (d.contains(e.target) && (!item || item.classList.contains('fav-btn'))) return;
+      var had = d.contains(document.activeElement);
+      d.removeAttribute('open');
+      if (item && had) { var sm = d.querySelector('summary'); if (sm) { try { sm.focus({ preventScroll: true }); } catch (err) { sm.focus(); } } }
+    });
   });
   document.addEventListener('keydown', function(e){
     if (e.key !== 'Escape') return;
