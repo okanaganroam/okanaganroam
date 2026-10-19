@@ -1282,6 +1282,12 @@ function deleteVenue(id) {
     for (const [table, col] of VENUE_DELETE_UNLINK) {
       if (tables.has(table)) db.prepare(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ?`).run(id);
     }
+    // Removed places (2026-10-19, round 8): the old address answers 410 "This place has closed" (see findRemovedVenue).
+    const gone = db.prepare('SELECT region, type, slug, name, latitude, longitude FROM venues WHERE id = ?').get(id);
+    if (gone && gone.slug && tables.has('removed_venues')) {
+      db.prepare('INSERT OR REPLACE INTO removed_venues (region, type, slug, name, latitude, longitude, venue_id, removed_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)')
+        .run(gone.region, gone.type, gone.slug, gone.name, gone.latitude ?? null, gone.longitude ?? null, id);
+    }
     const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
     db.exec('COMMIT');
     return info.changes > 0;
@@ -8372,6 +8378,16 @@ function hoursExtrasSpecification(venueId, now = new Date()) {
     const [validFrom, validThrough] = seasonRunDates(season.from, season.to, today);
     out.push(...openingSpecsFor(JSON.stringify(season.hours), { validFrom, validThrough }));
   }
+  return out;
+}
+// Temporary closures in the structured data (2026-10-19, round 8): each upcoming or current special closure is a
+// closed spec (opens = closes = 00:00) for its dates in specialOpeningHoursSpecification, the property schema.org
+// and Google use for holiday and temporary hours, instead of mixed into the regular week.
+function closureSpecialHoursSpecification(venueId, now = new Date()) {
+  const x = hoursExtrasMap().get(venueId);
+  if (!x) return [];
+  const today = todayLocal(now);
+  const out = [];
   for (const c of x.closures || []) {
     if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(c.from) || (c.to || c.from) < today) continue;
     out.push({ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: c.from, validThrough: c.to || c.from });
@@ -11499,7 +11515,8 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // Stage 5A (F12, 2026-10-01): 'trip_v3' labels the Build My Trip V3 view, so
 // V3 page views and its trip_plan_* events are told apart from V2's ('trip').
 // Same URL (/trip), served only while TRIP_PLANNER_V3 allows it.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip']);
+// Analytics (2026-10-19, round 8): 'info' is /about, /contact, /privacy and /terms (EN+FR); /guides itself is a 'hub'.
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip', 'info']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -12800,6 +12817,7 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
     var info = {}, busy = false;
     function stored(){ try { return JSON.parse(localStorage.getItem('okanaganTrip') || '[]') || []; } catch (e) { return []; } }
     function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
     // Each row is matched to its stop by the stored index on its remove button, and keeps the number app.js gave it:
     // when the tray is grouped by plan day the rows are not in stored order (2026-10-18: matching by row position
     // put the wrong names under each day, so the list contradicted its own "Route for day" links).
@@ -12815,7 +12833,7 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
         if (!d || !span || item.getAttribute('data-linked') === t.ref) return;
         var num = /^\\s*(\\d+)\\./.exec(span.textContent);
         item.setAttribute('data-linked', t.ref);
-        span.innerHTML = (num ? num[1] : at + 1) + '. <a href="' + esc((fr && d.urlFr) || d.url) + '">' + esc(d.name) + '</a><br><small class="trip-distance">' + esc([(fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</small>';
+        span.innerHTML = (num ? num[1] : at + 1) + '. <a ' + hrefAttr((fr && d.urlFr) || d.url) + '>' + esc(d.name) + '</a><br><small class="trip-distance">' + esc([(fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</small>';
       });
     }
     function refresh(){
@@ -16093,6 +16111,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
   var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-open]')), topBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-top]')), tagHolder = document.getElementById('pmTagChips'), activeEl = $('pmActive'), searchEl = $('pmSearch');
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
   // The map fills the screen below the header.
   function fitStage(){ var top = stage.getBoundingClientRect().top + (window.scrollY || 0); document.documentElement.style.setProperty('--pm-top', Math.max(0, Math.round(top)) + 'px'); }
@@ -16198,8 +16217,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return out;
   }
   function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
-  function popupFor(p){ return '<div class="pm-pop"><a href="' + esc(p.url) + '">' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" data-k="p' + p.ix + '" href="' + esc(dirUrl(p.lat, p.lng, p.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
-  function popupForEvent(e){ return '<div class="pm-pop"><a href="' + esc(e.url) + '">' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" data-k="e' + e.ix + '" href="' + esc(dirUrl(e.lat, e.lng, e.venue || e.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  function popupFor(p){ return '<div class="pm-pop"><a ' + hrefAttr(p.url) + '>' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" data-k="p' + p.ix + '" ' + hrefAttr(dirUrl(p.lat, p.lng, p.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  function popupForEvent(e){ return '<div class="pm-pop"><a ' + hrefAttr(e.url) + '>' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" data-k="e' + e.ix + '" ' + hrefAttr(dirUrl(e.lat, e.lng, e.venue || e.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
   // Messages show briefly over the map; tap one to hide it.
   var statusTimer = null;
   function setStatus(text, ms){ clearTimeout(statusTimer); statusEl.textContent = text || ''; statusEl.hidden = !text; if (text) statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
@@ -16333,12 +16352,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
         html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
-          + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" href="' + esc(dirUrl(x.lat, x.lng, x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
+          + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
         var where = [x.venue, CONF.r[x.region], x.d != null && me ? T.km(x.d) : ''].filter(Boolean).join(' · ');
         html += '<li class="pm-item pm-event"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span><span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></button>'
-          + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" href="' + esc(x.url) + '">' + esc(T.details) + '</a></div></li>';
+          + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" ' + hrefAttr(x.url) + '>' + esc(T.details) + '</a></div></li>';
       }
     });
     if (!listItems.length && (me || tab === 'events' || listOn)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(T.noEvents)) + '</li>';
@@ -16416,7 +16435,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       html += '<p class="pm-route-sum"><strong>' + esc(durText(r.data.duration)) + '</strong> · ' + esc(T.km(r.data.distance / 1000)) + '</p>';
       html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
     }
-    html += '<p class="pm-route-alt"><a href="' + esc(dirUrl(x.lat, x.lng, x.venue || x.name)) + '" target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
+    html += '<p class="pm-route-alt"><a ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
     routeEl.innerHTML = html;
     drawNav();
   }
@@ -17534,6 +17553,7 @@ ${renderGolfHeaderHtml()}
   var root = document.getElementById('favRoot'), statusEl = document.getElementById('favStatus');
   var LEGACY = 'okanaganFavorites', SAVED = 'okanaganSaved';
   function esc(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   function get(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
   function put(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function stores(){ return { legacy: core.readLegacy(get(LEGACY)), saved: core.readSaved(get(SAVED)) }; }
@@ -17551,14 +17571,14 @@ ${renderGolfHeaderHtml()}
   // Photos and trip details come from /api/trip-stops (2026-10-14), keyed by the item's ref without its date.
   var STOPS = {};
   function baseRef(r){ return String(r || '').split('@')[0]; }
-  function photoHtml(ref, url){ var st = STOPS[baseRef(ref)]; return st && st.photo ? '<a class="fav-photo" href="' + esc(url) + '" tabindex="-1" aria-hidden="true"><img src="' + esc(st.photo) + '" alt="" width="96" height="96" loading="lazy" decoding="async"></a>' : ''; }
+  function photoHtml(ref, url){ var st = STOPS[baseRef(ref)]; return st && st.photo ? '<a class="fav-photo" ' + hrefAttr(url) + ' tabindex="-1" aria-hidden="true"><img src="' + esc(st.photo) + '" alt="" width="96" height="96" loading="lazy" decoding="async"></a>' : ''; }
   function tripBtnHtml(ref, name, region){
     var st = STOPS[baseRef(ref)] || {};
     return '<button type="button" class="trip-btn" data-trip-ref="' + esc(baseRef(ref)) + '" data-trip-name="' + esc(name) + '" data-trip-region="' + esc(region || '') + '" data-trip-query="' + esc(st.query || (name + ', ' + (REGIONS[region] || region || '') + ', Okanagan Valley, BC')) + '">Add to Trip</button>';
   }
   function itemOpen(ref, url){ var ph = photoHtml(ref, url); return '<li class="fav-item' + (ph ? ' has-photo' : '') + '">' + ph; }
   function placeHtml(p){
-    return itemOpen(p.ref, p.url) + '<div class="fav-main"><a class="fav-name" href="' + esc(p.url) + '">' + esc(p.name) + '</a><span class="fav-meta">' + esc(where(p.region, p.type)) + '</span></div>'
+    return itemOpen(p.ref, p.url) + '<div class="fav-main"><a class="fav-name" ' + hrefAttr(p.url) + '>' + esc(p.name) + '</a><span class="fav-meta">' + esc(where(p.region, p.type)) + '</span></div>'
       + '<div class="fav-actions">' + tripBtnHtml(p.ref, p.name, p.region) + removeBtn('data-ref="' + esc(p.ref) + '"', p.name) + '</div></li>';
   }
   function eventHtml(e, canTrip){
@@ -17570,13 +17590,13 @@ ${renderGolfHeaderHtml()}
     }
     var flag = e.status === 'cancelled' ? '<span class="fav-flag">Cancelled</span>' : e.status === 'postponed' ? '<span class="fav-flag">Postponed</span>' : '';
     var trip = canTrip === true && e.status !== 'cancelled' ? tripBtnHtml(e.ref, e.name, e.region) : '';
-    return itemOpen(e.ref, e.url) + '<div class="fav-main"><a class="fav-name" href="' + esc(e.url) + '">' + esc(e.name) + '</a>' + flag + '<span class="fav-meta">' + esc(when) + (REGIONS[e.region] ? ' · ' + esc(REGIONS[e.region]) : '') + '</span></div>'
+    return itemOpen(e.ref, e.url) + '<div class="fav-main"><a class="fav-name" ' + hrefAttr(e.url) + '>' + esc(e.name) + '</a>' + flag + '<span class="fav-meta">' + esc(when) + (REGIONS[e.region] ? ' · ' + esc(REGIONS[e.region]) : '') + '</span></div>'
       + '<div class="fav-actions">' + trip + removeBtn('data-ref="' + esc(e.ref) + '"', e.name) + '</div></li>';
   }
   function upcomingEventHtml(e){ return eventHtml(e, true); }
   function chooseHtml(c){
     var opts = c.candidates.map(function(o){
-      return '<li class="fav-item"><div class="fav-main"><a class="fav-name" href="' + esc(o.url) + '">' + esc(o.name) + '</a><span class="fav-meta">' + esc(o.kind === 'event' ? 'Event · ' + (REGIONS[o.region] || o.region) : where(o.region, o.type)) + '</span></div>'
+      return '<li class="fav-item"><div class="fav-main"><a class="fav-name" ' + hrefAttr(o.url) + '>' + esc(o.name) + '</a><span class="fav-meta">' + esc(o.kind === 'event' ? 'Event · ' + (REGIONS[o.region] || o.region) : where(o.region, o.type)) + '</span></div>'
         + '<div class="fav-actions"><button type="button" class="fav-pick" data-name="' + esc(c.name) + '" data-ref="' + esc(o.ref) + '">This one</button></div></li>';
     }).join('');
     return '<div class="fav-choice"><p>You saved “' + esc(c.name) + '”, and more than one listing has that name. Which one did you mean?</p><ul class="fav-list">' + opts + '</ul>'
@@ -17627,7 +17647,7 @@ ${renderGolfHeaderHtml()}
     var unsaved = SHARED.filter(function(x){ return !isSaved(x.ref); }).length;
     return section('favShared', 'A list shared with you', '<div class="fav-shared"><div class="fav-toolbar">' + (unsaved ? '<button type="button" class="fav-save-all">Save all ' + unsaved + ' to my favorites</button>' : '') + '<button type="button" class="fav-add-all" data-scope="favShared">Add all to My Trip</button></div><ul class="fav-list">' + SHARED.map(function(x){
       var saved = isSaved(x.ref);
-      return itemOpen(x.ref, x.url) + '<div class="fav-main"><a class="fav-name" href="' + esc(x.url) + '">' + esc(x.name) + '</a><span class="fav-meta">' + esc([x.type, x.regionLabel].filter(Boolean).join(' · ')) + '</span></div>'
+      return itemOpen(x.ref, x.url) + '<div class="fav-main"><a class="fav-name" ' + hrefAttr(x.url) + '>' + esc(x.name) + '</a><span class="fav-meta">' + esc([x.type, x.regionLabel].filter(Boolean).join(' · ')) + '</span></div>'
         + '<div class="fav-actions">' + tripBtnHtml(x.ref, x.name, x.region) + '<button type="button" class="fav-save" data-ref="' + esc(x.ref) + '" data-name="' + esc(x.name) + '"' + (saved ? ' disabled' : '') + '>' + (saved ? '♥ Saved' : '♡ Save') + '</button></div></li>';
     }).join('') + '</ul></div>');
   }
@@ -26321,8 +26341,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     openingHoursSpecification: buildOpeningHoursSpecification(pageHours),
   };
   // Seasonal hours and special closures in the structured data (2026-10-18), so Google doesn't show summer hours in
-  // winter: each seasonal set's days carry validFrom/validThrough for its current or next run, and each upcoming
-  // closure is a closed spec (opens = closes = 00:00) for its dates. Only for the stored hours, like the page.
+  // winter: each seasonal set's days carry validFrom/validThrough for its current or next run (closures: see below).
+  // Only for the stored hours, like the page.
   if (localBusiness.openingHoursSpecification && pageHours === venue.hours && !venue.redirect_to) {
     localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.concat(hoursExtrasSpecification(venue.id, opts.now || new Date()));
     // Open for the season until a date (2026-10-18, review pass 4): the weekly hours stop on the last open day, so
@@ -26332,6 +26352,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     if (season && season.until && season.kind !== 'reopening') {
       localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.map((spec) => (spec.validThrough ? spec : { ...spec, validThrough: season.until }));
     }
+  }
+  // Temporary closures (2026-10-19, round 8): closed dates go in specialOpeningHoursSpecification, also for a place
+  // with no weekly hours stored.
+  if (!venue.redirect_to) {
+    const closedDays = closureSpecialHoursSpecification(venue.id, opts.now || new Date());
+    if (closedDays.length) localBusiness.specialOpeningHoursSpecification = closedDays;
   }
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
   const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
@@ -26673,7 +26699,9 @@ ${VENUE_MENU_CSS}` : ''}
     var box = document.getElementById('venueOwnerCta'), mine = [];
     try { mine = JSON.parse(localStorage.getItem('okrOwnerVenues') || '[]') || []; } catch (e) { return; }
     if (!box || mine.indexOf(Number(box.getAttribute('data-venue-id'))) < 0) return;
-    box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" href="/owner/account/venue/' + box.getAttribute('data-venue-id') + '" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
+    box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
+    // Round 8: the address is set as a property, so the page's HTML holds no glued href text for crawlers.
+    var edit = box.querySelector('a.venue-claim-btn'); if (edit) edit.href = '/owner/account/venue/' + box.getAttribute('data-venue-id');
   })();
   </script>`}
   </aside>
@@ -28040,6 +28068,7 @@ function renderTripPlannerV2Script() {
   var state = { text: '', seed: 0, exclude: [], last: null };
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
   function setStatus(text, mode){ statusEl.textContent = text || ''; statusEl.className = 'trip-conv-status' + (mode ? ' is-' + mode : ''); }
 
@@ -28125,7 +28154,7 @@ function renderTripPlannerV2Script() {
       return '<div class="trip-slot-card"><div class="trip-slot-label">' + esc(label) + '</div><p class="trip-slot-empty">No suitable stop found for this part of the day.</p></div>';
     }
     var v = stop.venue, url = safeUrl(v.url);
-    var name = url ? '<a href="' + esc(url) + '">' + esc(v.name) + '</a>' : esc(v.name);
+    var name = url ? '<a ' + hrefAttr(url) + '>' + esc(v.name) + '</a>' : esc(v.name);
     // Phase 2: two reasons up front; any others stay one tap away.
     var reasons = (stop.why || []).map(function(w){ return '<li>' + esc(w) + '</li>'; });
     var why = reasons.slice(0, 2).join('');
@@ -28142,7 +28171,7 @@ function renderTripPlannerV2Script() {
       + '<button type="button" class="fav-btn" data-fav-name="' + esc(v.name) + '">Favorite</button>'
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (planStop ? ' data-plan-stop' : '') + '>Add to trip</button>'
       + '<span class="trip-slot-secondary">'
-      + (url ? '<a class="trip-slot-view-link" href="' + esc(url) + '">View details</a>' : '')
+      + (url ? '<a class="trip-slot-view-link" ' + hrefAttr(url) + '>View details</a>' : '')
       + '<button type="button" class="trip-slot-remove-btn" data-replace-id="' + esc(v.id) + '"' + (key ? ' data-replace-key="' + esc(key) + '"' : '') + ' aria-label="Replace ' + esc(v.name) + ' with another suggestion" title="Remove this stop and suggest another">Replace</button>'
       + '</span></div></div>';
   }
@@ -28216,12 +28245,12 @@ function renderTripPlannerV2Script() {
         html += '<div class="trip-plan-grid">' + it.stops.map(function(s){
           if (s.kind !== 'event') { hasVenues = true; return card(s, s.label, null, true); }
           var e = s.event || {}, u = safeUrl(e.url);
-          return '<div class="trip-slot-card trip-slot-card-event"><div class="trip-slot-label">' + esc(s.label) + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+          return '<div class="trip-slot-card trip-slot-card-event"><div class="trip-slot-label">' + esc(s.label) + '</div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + '<div class="trip-slot-meta">' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' \u00b7 ')) + '</div>'
             + ((s.caveats || []).length ? '<ul class="trip-slot-caveats" aria-label="Good to know">' + s.caveats.map(li).join('') + '</ul>' : '')
             + '<div class="trip-slot-actions">'
             + (e.name ? '<button type="button" class="trip-btn" data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' data-plan-stop>Add to trip</button>' : '')
-            + (u ? '<span class="trip-slot-secondary"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></span>' : '') + '</div></div>';
+            + (u ? '<span class="trip-slot-secondary"><a class="trip-slot-view-link" ' + hrefAttr(u) + '>View event</a></span>' : '') + '</div></div>';
         }).join('') + '</div>';
       } else {
         html += '<p class="trip-plan-empty">Nothing on Okanagan Roam matches those parts yet.</p>';
@@ -28242,15 +28271,15 @@ function renderTripPlannerV2Script() {
       html += '<h3 class="trip-plan-section-title">What\\u2019s on</h3>';
       html += ev.length ? '<div class="trip-plan-grid">' + ev.map(function(e){
           var u = safeUrl(e.url);
-          return '<div class="trip-slot-card trip-slot-card-event"><div class="trip-slot-label">' + esc(e.dateLabel) + (e.time ? ' \\u00b7 ' + esc(e.time) : '') + '</div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
-            + (u ? '<div class="trip-slot-actions"><span class="trip-slot-secondary"><a class="trip-slot-view-link" href="' + esc(u) + '">View event</a></span></div>' : '') + '</div>';
+          return '<div class="trip-slot-card trip-slot-card-event"><div class="trip-slot-label">' + esc(e.dateLabel) + (e.time ? ' \\u00b7 ' + esc(e.time) : '') + '</div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+            + (u ? '<div class="trip-slot-actions"><span class="trip-slot-secondary"><a class="trip-slot-view-link" ' + hrefAttr(u) + '>View event</a></span></div>' : '') + '</div>';
         }).join('') + '</div>' : '<p class="trip-plan-empty">Nothing is listed for that yet.</p>';
     } else if (p.kind === 'navigate' && p.venue && safeUrl(p.venue.url)) {
-      html += '<p class="trip-plan-empty">That\\u2019s a place on Okanagan Roam: <a class="trip-plan-see-all" href="' + esc(p.venue.url) + '">open its page \\u2192</a></p>';
+      html += '<p class="trip-plan-empty">That\\u2019s a place on Okanagan Roam: <a class="trip-plan-see-all" ' + hrefAttr(p.venue.url) + '>open its page \\u2192</a></p>';
     } else {
       html += '<p class="trip-plan-empty">Try naming a place and what you\\u2019d like to do \\u2014 for example \\u201cthree days in Kelowna with wineries and beaches\\u201d.</p>';
     }
-    if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="trip-plan-see-all" href="' + esc(p.seeAll.url) + '">See everything that matches on Okanagan Roam \\u2192</a>';
+    if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="trip-plan-see-all" ' + hrefAttr(p.seeAll.url) + '>See everything that matches on Okanagan Roam \\u2192</a>';
     resultEl.innerHTML = html;
     resultEl.hidden = false;
     if (window.__syncFavButtons) window.__syncFavButtons();
@@ -28886,6 +28915,77 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
 </body>
 </html>`;
+}
+
+// Removed places (2026-10-19, round 8): a listing deleted from the site (removed_venues, written by deleteVenue) answers
+// 410 with "This place has closed" and similar places nearby -- the same category in the same town, closest first
+// when the old listing had coordinates -- instead of a 404 that reads like a broken link. -> row | null
+function findRemovedVenue(region, type, slug) {
+  try {
+    return db.prepare('SELECT region, type, slug, name, latitude, longitude, removed_at FROM removed_venues WHERE region = ? AND type = ? AND slug = ?').get(region, type, slug) || null;
+  } catch (e) { return null; } // table missing in an old copy
+}
+function removedVenueAlternatives(gone, limit = 6) {
+  const at = { id: -1, region: gone.region, type: gone.type, latitude: gone.latitude, longitude: gone.longitude };
+  const same = getRelatedVenues(at, 200).filter((v) => v.slug && CATEGORY_SLUGS[v.type]);
+  if (gone.latitude != null && gone.longitude != null) {
+    const d = new Map(same.map((v) => [v.id, venueDistanceKm(at, v)]));
+    same.sort((a, b) => (d.get(a.id) ?? Infinity) - (d.get(b.id) ?? Infinity));
+    return same.slice(0, limit).map((v) => (d.get(v.id) == null ? v : { ...v, distance_km: d.get(v.id) }));
+  }
+  return same.slice(0, limit);
+}
+function renderRemovedVenuePage(gone, lang = 'en') {
+  const fr = lang === 'fr';
+  const L = (en, frText) => (fr ? frText : en);
+  const labels = (t) => (fr ? (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]) : CATEGORY_LABELS[t]) || { singular: t, plural: t };
+  const town = REGION_LABELS[gone.region] || gone.region;
+  const cat = CATEGORY_SLUGS[gone.type];
+  const alts = removedVenueAlternatives(gone);
+  const km = (x) => (x < 1 ? `${Math.round(x * 1000)} m` : `${x.toFixed(1).replace('.', fr ? ',' : '.')} km`);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(L(`${gone.name} has closed | Okanagan Roam`, `${gone.name} a fermé | Okanagan Roam`), L(`${gone.name} in ${town} has closed and is no longer listed on Okanagan Roam. Here are similar places nearby.`, `${gone.name} à ${town} a fermé et n’est plus répertorié sur Okanagan Roam. Voici des lieux semblables à proximité.`), null, [], { noindex: true, golfTheme: true })}
+${renderAnalyticsHeadHtml('not_found')}
+<style>
+  body.golf-page .not-found-main { max-width: 680px; margin: 0 auto; text-align: center; padding-top: 48px; padding-bottom: 72px; }
+  body.golf-page .not-found-main a.app-btn { min-height: 44px; padding: 10px 24px; text-decoration: none; }
+  body.not-found-page .nf-lead { font-size: 1.05rem; line-height: 1.55; margin: 8px auto 22px; max-width: 46ch; }
+  body.not-found-page .nf-block { text-align: left; margin: 0 auto 26px; }
+  body.not-found-page .nf-block h2 { font-size: 1.05rem; margin: 0 0 10px; text-align: center; }
+  body.not-found-page .nf-suggest { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  body.not-found-page .nf-suggest a { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 12px 16px; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(27,43,58,0.12); color: var(--ink); font-weight: 700; text-decoration: none; }
+  body.not-found-page .nf-suggest a:hover { text-decoration: underline; }
+  body.not-found-page .nf-suggest .nf-meta { font-weight: 600; font-size: 0.86rem; opacity: .7; white-space: nowrap; }
+  body.not-found-page .nf-popular { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  body.not-found-page .nf-popular a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); text-decoration: none; font-weight: 700; }
+  @media (max-width: 520px) { body.not-found-page .nf-suggest a { flex-direction: column; gap: 2px; } }
+</style>
+</head>
+<body class="golf-page not-found-page removed-venue-page">
+  ${renderGolfTripTrayHtml()}
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main not-found-main" id="main" tabindex="-1">
+    <h1>${escapeHtml(L(`${gone.name} has closed`, `${gone.name} a fermé`))}</h1>
+    <p class="nf-lead">${escapeHtml(L(`This place in ${town} is no longer open, so it has been taken off Okanagan Roam.`, `Ce lieu de ${town} n’est plus ouvert, il a donc été retiré d’Okanagan Roam.`))}</p>
+    ${alts.length ? `<section class="nf-block" aria-labelledby="goneAltHeading">
+      <h2 id="goneAltHeading">${escapeHtml(L(`Similar places nearby`, `Lieux semblables à proximité`))}</h2>
+      <ul class="nf-suggest">${alts.map((v) => `
+        <li><a href="${escapeHtml(venuePagePath(v))}"><span>${escapeHtml(v.name)}</span><span class="nf-meta">${escapeHtml([labels(v.type).singular, REGION_LABELS[v.region] || v.region, v.distance_km != null ? km(v.distance_km) : ''].filter(Boolean).join(' · '))}</span></a></li>`).join('')}
+      </ul>
+    </section>` : ''}
+    <section class="nf-block" aria-labelledby="goneMoreHeading">
+      <h2 id="goneMoreHeading">${escapeHtml(L('Keep exploring', 'Continuer à explorer'))}</h2>
+      <p class="nf-popular">${cat ? `<a href="/${gone.region}/${cat}">${escapeHtml(L(`${labels(gone.type).plural} in ${town}`, `${labels(gone.type).plural} à ${town}`))}</a>` : ''}<a href="/${gone.region}">${escapeHtml(L(`Everything in ${town}`, `Tout à ${town}`))}</a><a href="/map">${escapeHtml(L('Map', 'Carte'))}</a></p>
+    </section>
+    <a class="app-btn" href="/">${escapeHtml(L('Back to the home page', 'Retour à l’accueil'))}</a>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+  return fr ? frenchTwinHtml(html, venuePagePath(gone)) : html;
 }
 
 // /browse/classic Open Now status (2026-10): the classic cards' badge and tooltip
@@ -30784,31 +30884,74 @@ function getVenueSubmission(id) {
   return rowToVenueSubmission(db.prepare('SELECT * FROM venue_submissions WHERE id = ?').get(id));
 }
 
-// Live venues in the same region whose name matches, so the reviewer sees
-// a likely duplicate before approving. Name match only, case-insensitive.
-function findExistingVenuesForSubmission(name, region) {
-  return db.prepare(
-    'SELECT id, name, type, region, slug FROM venues WHERE region = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?)) AND redirect_to IS NULL'
-  ).all(region, name);
+// Duplicates (round 7, tightened 2026-10-19 round 8): live venues a new one would duplicate. One check for both ways a
+// venue is created -- POST /api/venues and approving a List Your Venue submission -- so neither can add a place the
+// other would have caught. Each match says why (`match`) and whether it stops the create (`blocking`):
+//  - name: the same name once "the", "&"/"and" and words like "restaurant", "cafe" or "winery" are set aside, so
+//    "The Hot Box" = "Hot Box Restaurant" and "Beef & Broccoli" = "Beef Broccoli", in the town or a nearby one
+//    (Kelowna / West Kelowna / Lake Country). Blocking for the same kind of place, or the exact same name in the same
+//    town (as in round 7); otherwise a warning (a winery and "<its name> Restaurant").
+//  - address: the same street number and street (Street = St, Avenue = Ave ...), unless both give different unit
+//    numbers. Blocking for the same kind of place; a warning for a different one (a winery and its restaurant).
+//  - phone: the same number (last 10 digits). Blocking for the same kind of place; a warning for a different one,
+//    since a town office's number is shared by its parks and beaches.
+// allow_duplicate: true (a real second location) creates it anyway.
+const DUPLICATE_NEARBY_TOWNS = [['kelowna', 'west-kelowna', 'lake-country']];
+const DUPLICATE_NAME_GENERIC = new Set(['the', 'and', 'restaurant', 'restaurants', 'cafe', 'bistro', 'eatery', 'grill', 'kitchen',
+  'bar', 'pub', 'diner', 'winery', 'wines', 'vineyard', 'vineyards', 'estate', 'cellars', 'brewery', 'brewing', 'company', 'co',
+  'inc', 'ltd', 'coffee', 'house', 'okanagan', 'bc']);
+function duplicateNameKey(name) {
+  const words = slugify(String(name || '').replace(/&/g, ' and ').replace(/['\u2019]s\b/gi, 's')).split('-').filter(Boolean);
+  const core = words.filter((w) => !DUPLICATE_NAME_GENERIC.has(w));
+  // Nothing or one short word left ("Thai Kitchen" -> "thai"): compare the whole name instead, so "Thai Kitchen"
+  // never matches "Thai Restaurant", nor "The Bistro" "Bistro Bar".
+  return core.length >= 2 || (core.length === 1 && core[0].length >= 6) ? core.join('-') : words.join('-');
 }
-
-// Round 7 (2026-10-19): live venues a new one would duplicate, for POST /api/venues: the same name in the same town
-// (compared as slugs, so "Sushi Sai" = "SUSHI SAI" = "Sushi-Sai"), or the same phone number (last 10 digits) for the
-// same type of place in that town. Different types may share a phone (a town's parks all list the town office), so
-// only the same type counts there.
+const DUPLICATE_STREET_WORDS = { street: 'st', avenue: 'ave', av: 'ave', road: 'rd', drive: 'dr', boulevard: 'blvd', highway: 'hwy',
+  crescent: 'cres', place: 'pl', court: 'ct', lane: 'ln', way: 'way', north: 'n', south: 's', east: 'e', west: 'w', bc: '' };
+// "#101-1234 Main Street, Kelowna" -> { unit: '101', key: '1234 main st' }; null when there is no street number.
+function duplicateAddressKey(address) {
+  let first = String(address || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim();
+  let unit = null;
+  const u = /^(?:(?:unit|suite|ste)\s*|#)?\s*([0-9]+[a-z]?)\s*-\s*(?=\d)/.exec(first) || /^(?:unit|suite|ste|#)\s*([0-9a-z]+)[\s,]+(?=\d)/.exec(first);
+  if (u) { unit = u[1]; first = first.slice(u[0].length); }
+  first = first.split(',')[0].trim();
+  const m = /^(\d+[a-z]?)\s+(.+)$/.exec(first);
+  if (!m) return null;
+  const street = m[2].replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean)
+    .map((w) => (Object.prototype.hasOwnProperty.call(DUPLICATE_STREET_WORDS, w) ? DUPLICATE_STREET_WORDS[w] : w)).filter(Boolean)
+    .filter((w, i, a) => !(w === 'unit' || w === 'suite' || (i > 0 && (a[i - 1] === 'unit' || a[i - 1] === 'suite'))));
+  return street.length ? { unit, key: `${m[1]} ${street.join(' ')}` } : null;
+}
 function findLikelyDuplicateVenues(data) {
-  const name = slugify(String((data && data.name) || ''));
   const region = data && data.region;
-  if (!name || !region) return [];
+  const nameKey = duplicateNameKey(data && data.name);
+  if (!nameKey || !region) return [];
+  const towns = (DUPLICATE_NEARBY_TOWNS.find((g) => g.includes(region)) || [region]);
   const digits = (p) => String(p || '').replace(/\D/g, '').slice(-10);
   const phone = digits(data.phone);
+  const addr = duplicateAddressKey(data.address);
+  const exactName = slugify(String(data.name || ''));
   const out = [];
-  for (const v of db.prepare('SELECT id, name, type, region, slug, phone FROM venues WHERE region = ? AND redirect_to IS NULL').all(region)) {
-    const sameName = slugify(v.name) === name;
-    const samePhone = phone.length === 10 && v.type === data.type && digits(v.phone) === phone;
-    if (sameName || samePhone) out.push({ id: v.id, name: v.name, type: v.type, region: v.region, slug: v.slug, match: sameName ? 'name' : 'phone' });
+  const rows = db.prepare(`SELECT id, name, type, region, slug, phone, address FROM venues WHERE region IN (${towns.map(() => '?').join(',')}) AND redirect_to IS NULL`).all(...towns);
+  for (const v of rows) {
+    const sameTown = v.region === region, sameType = v.type === data.type;
+    const exact = sameTown && slugify(v.name) === exactName;
+    const sameName = exact || duplicateNameKey(v.name) === nameKey;
+    const va = addr && duplicateAddressKey(v.address);
+    const sameAddress = !!(sameTown && va && va.key === addr.key && !(va.unit && addr.unit && va.unit !== addr.unit));
+    const samePhone = phone.length === 10 && digits(v.phone) === phone;
+    let match = null, blocking = false;
+    if (exact || (sameName && sameType)) { match = 'name'; blocking = true; }
+    else if (sameAddress && sameType) { match = 'address'; blocking = true; }
+    else if (samePhone && sameType && sameTown) { match = 'phone'; blocking = true; }
+    else if (sameName) match = 'name';
+    else if (sameAddress) match = 'address';
+    else if (samePhone) match = 'phone';
+    if (match) out.push({ id: v.id, name: v.name, type: v.type, region: v.region, slug: v.slug, match, blocking });
   }
-  return out;
+  // Blocking matches first, then the same town, then by name.
+  return out.sort((a, b) => (b.blocking - a.blocking) || ((b.region === region) - (a.region === region)) || String(a.name).localeCompare(String(b.name)));
 }
 
 function formatSubmissionTimestamp(sqliteUtc) {
@@ -30848,8 +30991,8 @@ function buildVenueSubmissionEmail(sub) {
   if (sub.happy_hour_text) payload['Happy hour (as given)'] = sub.happy_hour_text;
   if (sub.social_url) payload['Instagram / Facebook'] = sub.social_url;
   if (sub.submitter_role) payload['Submitter role'] = VENUE_SUBMISSION_ROLES[sub.submitter_role] || sub.submitter_role;
-  const existing = findExistingVenuesForSubmission(sub.name, sub.region);
-  if (existing.length) payload['Possible existing listing'] = existing.map((v) => `${v.name} (venue #${v.id}, ${v.type})`).join('; ');
+  const existing = findLikelyDuplicateVenues(sub);
+  if (existing.length) payload['Possible existing listing'] = existing.map((v) => `${v.name} (venue #${v.id}, ${v.type}, ${v.region}, same ${v.match})`).join('; ');
   payload['How to review'] = `Open ${ADMIN_REVIEW_URL} and approve or reject venue submission #${sub.id}.`;
   return payload;
 }
@@ -31024,9 +31167,11 @@ function approveVenueSubmission(id, body) {
   }
 
   const final = { ...sub, ...overrides };
-  const existing = findExistingVenuesForSubmission(final.name, final.region);
+  // Duplicates (2026-10-19, round 8): the same check as POST /api/venues (findLikelyDuplicateVenues).
+  const likely = findLikelyDuplicateVenues(final);
+  const existing = likely.filter((d) => d.blocking);
   if (existing.length && body.allow_duplicate !== true) {
-    return fail(409, 'A live venue with this name already exists in this region. Pass allow_duplicate: true to create it anyway.', { existing });
+    return fail(409, 'A live venue that looks like this one already exists. Pass allow_duplicate: true to create it anyway.', { existing, warnings: likely.filter((d) => !d.blocking) });
   }
 
   const venueData = {
@@ -31091,7 +31236,7 @@ function listVenueSubmissions(status) {
     : db.prepare('SELECT * FROM venue_submissions WHERE status = ? ORDER BY id DESC').all(status);
   return rows.map(rowToVenueSubmission).map((s) => ({
     ...s,
-    possible_existing_venues: s.status === 'pending' ? findExistingVenuesForSubmission(s.name, s.region) : [],
+    possible_existing_venues: s.status === 'pending' ? findLikelyDuplicateVenues(s) : [],
   }));
 }
 
@@ -31234,6 +31379,7 @@ function renderSkiGuidePage() {
 <html lang="en">
 <head>
 ${pageHead(g.title, g.description, canonical, [breadcrumb, article, guideItemListSchema(g.heading, canonical, listed)].filter(Boolean), { golfTheme: true, shareImage: g.shareImage })}
+${renderAnalyticsHeadHtml('guide')}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
   body.ski-guide-page .ski-guide h1 { margin-bottom: 16px; }
@@ -31376,6 +31522,7 @@ function renderPatioGuidePage() {
 <html lang="en">
 <head>
 ${pageHead(g.title, g.description, canonical, [breadcrumb, article, guideItemListSchema(g.heading, canonical, listed)].filter(Boolean), { golfTheme: true, shareImage: banner.src })}
+${renderAnalyticsHeadHtml('guide')}
 ${CATEGORY_BANNER_STYLE}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
@@ -31568,6 +31715,7 @@ function renderEditorialGuidePage(g, path) {
 <html lang="en">
 <head>
 ${pageHead(g.title, g.description, canonical, [breadcrumb, article, guideItemListSchema(g.heading, canonical, listed)].filter(Boolean), { golfTheme: true, shareImage: banner.src, noindex: thin })}
+${renderAnalyticsHeadHtml('guide')}
 ${CATEGORY_BANNER_STYLE}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
@@ -32486,6 +32634,7 @@ function renderGuidesIndexPage(now = new Date()) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: true, shareImage: OUTDOOR_ACTIVITY_BANNERS.hiking.src })}
+${renderAnalyticsHeadHtml('hub')}
 <style>
   body.guides-index-page .guides-index { max-width: 1100px; margin: 0 auto; padding: 8px 0 48px; }
   body.guides-index-page .guides-index-intro { font-size: 1.05rem; line-height: 1.6; max-width: 70ch; }
@@ -32549,6 +32698,7 @@ function renderInfoPage({ path, name, title, description, heading, lead, bodyHtm
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, ...(banner ? { shareImage: banner.src } : {}) })}
+${renderAnalyticsHeadHtml('info')}
 ${banner ? CATEGORY_BANNER_STYLE : ''}
 <style>
   body.info-page .info-body { max-width: 72ch; padding: 0 0 48px; }
@@ -32929,6 +33079,7 @@ ${renderGolfHeaderHtml()}
   function load(k, d){ try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
   function store(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   var trip = (load(KEY, []) || []).filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
   var days = load(DAYS, {}) || {};
   // The planner's dates and times (2026-10-19): ref -> { d: 'YYYY-MM-DD', s: start minutes, e: end minutes }.
@@ -33011,10 +33162,10 @@ ${renderGolfHeaderHtml()}
     el('mtDays').innerHTML = groups.map(function(g){
       var gDate = g.key ? g.stops.map(function(x){ return x.s.time && x.s.time.d; }).filter(Boolean)[0] : null;
       return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
-        '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
+        '<a class="mt-btn" ' + hrefAttr(dirUrl(g.stops.map(function(x){ return x.s; }))) + ' target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
         '<ol class="mt-list">' + (g.key && mine && drives[g.key] && drives[g.key].f && drives[g.key].t ? '<li class="mt-drive">' + esc(driveText(drives[g.key])) + '</li>' : '') + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
-          var name = d.url ? '<a class="mt-name" href="' + esc((document.documentElement.lang === 'fr' && d.urlFr) || d.url) + '">' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
+          var name = d.url ? '<a class="mt-name" ' + hrefAttr((document.documentElement.lang === 'fr' && d.urlFr) || d.url) + '>' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
           var fr = document.documentElement.lang === 'fr';
           var meta = d.missing ? T.gone : [timeText(x.s.time), (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
@@ -33534,6 +33685,7 @@ ${renderGolfHeaderHtml()}
       ? { correct: 'Demander une correction', claim: 'R\\u00e9clamer cette fiche', none: 'Aucun r\\u00e9sultat. V\\u00e9rifiez l\\u2019orthographe, ou essayez un seul mot du nom suivi de votre ville (par exemple \\u00ab monk lake country \\u00bb). Si votre entreprise n\\u2019est vraiment pas encore list\\u00e9e, utilisez le formulaire ci-dessous.', note: 'Correction pour ' }
       : { correct: 'Request a correction', claim: 'Claim this listing', none: 'No match. Check the spelling, or try one word of the name with your town (for example \\u201cmonk lake country\\u201d). If your venue really isn\\u2019t listed yet, use the form below.', note: 'Correction for ' };
     function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
     input.addEventListener('input', function(){
       clearTimeout(timer);
       var q = input.value.trim();
@@ -33545,7 +33697,7 @@ ${renderGolfHeaderHtml()}
           var v = (d && d.venues) || [];
           list.innerHTML = v.length ? v.map(function(x){
             var href = FR && x.urlFr ? x.urlFr : x.url, claim = FR ? x.claimFr : x.claim;
-            return '<li><a href="' + esc(href) + '">' + esc(x.name) + '</a> <span class="lyv-hint">' + esc(FR && x.typeFr ? x.typeFr : x.type) + ' &middot; ' + esc(x.region) + '</span> <span class="lyv-actions">' + (claim ? '<a class="lyv-claim" href="' + esc(claim) + '">' + esc(TX.claim) + '</a> ' : '') + '<button type="button" class="lyv-correct" data-name="' + esc(x.name) + '" data-url="https://okanaganroam.com' + esc(href) + '">' + esc(TX.correct) + '</button></span></li>';
+            return '<li><a ' + hrefAttr(href) + '>' + esc(x.name) + '</a> <span class="lyv-hint">' + esc(FR && x.typeFr ? x.typeFr : x.type) + ' &middot; ' + esc(x.region) + '</span> <span class="lyv-actions">' + (claim ? '<a class="lyv-claim" ' + hrefAttr(claim) + '>' + esc(TX.claim) + '</a> ' : '') + '<button type="button" class="lyv-correct" data-name="' + esc(x.name) + '" data-url="https://okanaganroam.com' + esc(href) + '">' + esc(TX.correct) + '</button></span></li>';
           }).join('') : '<li class="lyv-hint">' + esc(TX.none) + '</li>';
         }).catch(function(){});
       }, 250);
@@ -39069,6 +39221,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
 <html lang="${lang}"${hasFrench ? ` data-page-lang="${lang}"` : ''}>
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, business], { noindex: !menuIndexable(menu, venue), alternates: hasFrench ? [{ hreflang: 'en-CA', href: menuMenuUrl(venue) }, { hreflang: 'fr-CA', href: menuMenuUrl(venue, 'fr') }, { hreflang: 'x-default', href: menuMenuUrl(venue) }] : null, locale: hasFrench && fr ? 'fr_CA' : null, shareImage: venueShareCardUrl(venue, lang), golfTheme: themedShell })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}
+${renderAnalyticsHeadHtml('venue')}
 ${VENUE_MENU_CSS}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
@@ -42444,7 +42597,7 @@ function renderAdminEventChangeCard(c) {
 function renderAdminVenueCard(s) {
   const dups = s.possible_existing_venues || [];
   const amen = (s.amenities || []).map((a) => (BADGE_LABELS[a] ? BADGE_LABELS[a].title : a));
-  const opts = `${amen.length ? `<label class="rv-opt"><input type="checkbox" name="amenities">Publish their badges (${adminReviewEsc(amen.join(', '))})</label>` : ''}${dups.length ? '<label class="rv-opt"><input type="checkbox" name="allowdup">Not a duplicate</label>' : ''}`;
+  const opts = `${amen.length ? `<label class="rv-opt"><input type="checkbox" name="amenities">Publish their badges (${adminReviewEsc(amen.join(', '))})</label>` : ''}${dups.some((d) => d.blocking !== false) ? '<label class="rv-opt"><input type="checkbox" name="allowdup">Not a duplicate</label>' : ''}`;
   return `<article class="rv-card" data-kind="venue" data-id="${s.id}">
       <h3>${adminReviewEsc(s.name)}</h3>
       <p class="rv-meta">New venue #${s.id} · ${adminReviewEsc(s.type)} · ${adminReviewEsc(REGION_LABELS[s.region] || s.region)} · from ${adminReviewEsc(s.contact_name)} (${adminReviewEsc(s.contact_email)})</p>
@@ -42452,7 +42605,7 @@ function renderAdminVenueCard(s) {
       <div class="rv-row"><label class="rv-field">Address ${adminEditBox('address', s.address)}</label><label class="rv-field">Phone ${adminEditBox('phone', s.phone, { max: 40 })}</label></div>
       <label class="rv-field">Website ${adminEditBox('website', s.website)}</label>
       <label class="rv-field">Description ${adminEditBox('description', s.description, { multiline: true, rows: 5, max: 2000 })}</label>
-      ${dups.length ? `<div class="rv-warn">Already listed with this name: ${dups.map((d) => adminReviewEsc(d.name)).join(', ')}</div>` : ''}
+      ${dups.length ? `<div class="rv-warn">May already be listed: ${dups.map((d) => `${adminReviewEsc(d.name)} (same ${adminReviewEsc(d.match || 'name')}, ${adminReviewEsc(REGION_LABELS[d.region] || d.region)}${d.blocking === false ? ', check only' : ''})`).join(', ')}</div>` : ''}
       ${adminReviewActions('venue', s.id, { options: opts })}
     </article>`;
 }
@@ -46335,9 +46488,17 @@ const server = http.createServer(async (req, res) => {
       if (body && typeof body === 'object' && !Array.isArray(body)) {
         const allowDuplicate = body.allow_duplicate === true;
         delete body.allow_duplicate;
-        const existing = allowDuplicate ? [] : findLikelyDuplicateVenues(body);
+        const likely = findLikelyDuplicateVenues(body);
+        const existing = allowDuplicate ? [] : likely.filter((d) => d.blocking);
         if (existing.length) {
-          return sendJSON(res, 409, { error: 'A live venue that looks like this one already exists. Pass allow_duplicate: true to create it anyway.', existing });
+          return sendJSON(res, 409, { error: 'A live venue that looks like this one already exists. Pass allow_duplicate: true to create it anyway.', existing, warnings: likely.filter((d) => !d.blocking) });
+        }
+        // Round 8: matches that don't block (a shared office phone, a different kind of place at the same address)
+        // come back with the new venue so the caller can check them.
+        const warnings = likely.filter((d) => !d.blocking);
+        if (warnings.length) {
+          const createdVenue = createVenue(body);
+          return sendJSON(res, 201, createdVenue && typeof createdVenue === 'object' ? { ...createdVenue, duplicate_warnings: warnings } : createdVenue);
         }
       }
       const created = createVenue(body);
@@ -46804,6 +46965,12 @@ const server = http.createServer(async (req, res) => {
     // and handleEventSubmission above.
     // Owner logins (2026-10-15): checked before the /owner/<token> routes.
     if (pathname === '/owner/help' && method === 'POST') return await handleOwnerHelpMessage(req, res);
+    // Portal root (2026-10-19, round 8): /owner and /fr/owner were 404s; they go to the business login page, which
+    // itself sends a signed-in owner on to their account.
+    if (/^(?:\/fr)?\/owner\/?$/.test(pathname) && (method === 'GET' || method === 'HEAD')) {
+      res.writeHead(302, { Location: withCampaignParams(pathname.startsWith('/fr/') ? '/fr/owner/login' : '/owner/login', parsed.search), 'Cache-Control': 'no-store' });
+      return res.end();
+    }
     if (pathname === '/owner/login' || pathname === '/owner/login/') {
       if (method === 'POST') return await handleOwnerLogin(req, res);
       if (method === 'GET' || method === 'HEAD') {
@@ -47221,6 +47388,12 @@ const server = http.createServer(async (req, res) => {
           return res.end();
         }
       }
+      // Removed places (2026-10-19, round 8): the French "has closed" page.
+      const gone = !venue && REGION_LABELS[region] && type ? findRemovedVenue(region, type, slug) : null;
+      if (gone) {
+        res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': 'fr-CA', 'X-Robots-Tag': 'noindex' });
+        return res.end(renderRemovedVenuePage(gone, 'fr'));
+      }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
     }
@@ -47277,6 +47450,12 @@ const server = http.createServer(async (req, res) => {
         if (relocated && relocated.region !== region) {
           res.writeHead(301, { Location: `/${relocated.region}/${categorySlug}/${slug}${parsed.search || ''}` });
           return res.end();
+        }
+        // Removed places (2026-10-19, round 8): 410 "This place has closed", with similar places nearby.
+        const gone = findRemovedVenue(region, type, slug);
+        if (gone) {
+          res.writeHead(410, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' });
+          return res.end(renderRemovedVenuePage(gone));
         }
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -47657,6 +47836,9 @@ module.exports = {
   ownerSeasonSummary,
   ownerClosuresSummary,
   hoursExtrasSpecification,
+  closureSpecialHoursSpecification,
+  findRemovedVenue,
+  renderRemovedVenuePage,
   seasonRunDates,
   menuPriceWithWords,
   priceListAppStrings,
@@ -48169,6 +48351,8 @@ module.exports = {
   legacyTripAdvisoryUnavailable,
   guardedClosureUpdate,
   findLikelyDuplicateVenues,
+  duplicateNameKey,
+  duplicateAddressKey,
   tempClosureStateOn,
   tempClosureText,
   imageVersionMatches,
