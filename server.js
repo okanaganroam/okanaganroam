@@ -15424,7 +15424,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (fit && me) {
       var close = (tab === 'places' ? items : onMap).filter(function(x){ return x.lat != null; }).slice(0, 12).map(function(x){ return [x.lat, x.lng]; });
       map.stop();
-      if (close.length) fitTo(L.latLngBounds(close.concat([[me.lat, me.lng]])), 17);
+      // Map search pass 5 (2026-10-19): with the location known and something within 1 km, the map shows the 1 km
+      // around the visitor (walking distance) rather than zooming far in on the closest few.
+      var within1 = (tab === 'places' ? items : onMap).some(function(x){ return x.lat != null && distKm(me.lat, me.lng, x.lat, x.lng) <= 1; });
+      if (within1) fitTo(L.latLng(me.lat, me.lng).toBounds(2000), 17);
+      else if (close.length) fitTo(L.latLngBounds(close.concat([[me.lat, me.lng]])), 17);
       else map.setView([me.lat, me.lng], 13);
     }
     else if (fit && term && tab === 'places' && onMap.length && onMap.length <= 25) fitTo(L.latLngBounds(onMap.map(function(p){ return [p.lat, p.lng]; })), 16);
@@ -15797,7 +15801,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (town !== lastTown) { lastTown = town; if (town && CONF.c[town]) map.setView(CONF.c[town], 13); }
     tagAny = false;
     if (onTags().length > 1 && !places.some(matchesPlace)) { tagAny = true; setStatus(T.anyOf); }
-    if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || town || price || atMin != null || atDay) && !places.some(matchesPlace)) { setStatus(T.ignored(term)); term = ''; searchEl.value = ''; }
+    if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || town || price || atMin != null || atDay) && !places.some(matchesPlace)) { setStatus(T.ignored(term)); term = ''; }
     syncChips(); limit = 25;
     if (me && !radiusFixed && !town) {
       var filtering = anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || price || atMin != null || atDay || term;
@@ -15825,7 +15829,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (part[0] === 'notf') delete notFeats[part[1]];
     liveBase = null; changed();
   });
-  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; liveBase = null; radiusFixed = false; searchEl.value = ''; changed(); }
+  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
   function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
   // When nothing matches: the first filter worth dropping that gives results at some distance ("Try without Open at
   // 3 AM"), with a button that drops it (the distance then chooses itself). Tried one at a time on a copy of the filters.
@@ -15983,9 +15987,29 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var NEG = ' no not without except avoid never nothing sans pas ni aucun aucune ';
   // After "no", these leave out one kind of place, not the whole group ("drinks, no pubs").
   var NEG_TYPE = { pub: 'pub', pubs: 'pub', brewery: 'brewery', breweries: 'brewery', brew: 'brewery', winery: 'winery', wineries: 'winery', cafe: 'cafe', cafes: 'cafe', 'café': 'cafe', restaurant: 'restaurant', restaurants: 'restaurant', distillery: 'distillery', distilleries: 'distillery', lounge: 'cocktail', lounges: 'cocktail' };
+  // Map search pass 5 (2026-10-19): a new search replaces the filters the previous search turned on ("patio with my
+  // dog" then "ice cream" no longer keeps Patio and Dogs OK and finds 0), and keeps the chips the visitor tapped.
+  // lastSearchSet holds what the last search changed: the keys it turned on, and each setting's before and after.
+  var lastSearchSet = null;
+  var SET_GROUPS = ['kinds', 'feats', 'tags', 'notTags', 'notKinds', 'notFeats', 'notTypes'], SET_FIELDS = ['openOnly', 'topOnly', 'town', 'price', 'atMin', 'atDay', 'atUntil', 'tagOr'];
+  function searchDiff(a, b){
+    var d = { g: {}, f: {} };
+    SET_GROUPS.forEach(function(g){ d.g[g] = Object.keys(b[g]).filter(function(k){ return b[g][k] && !a[g][k]; }); });
+    SET_FIELDS.forEach(function(f){ if (a[f] !== b[f]) d.f[f] = [a[f], b[f]]; });
+    return d;
+  }
+  function undoLastSearch(){
+    if (!lastSearchSet) return;
+    var d = lastSearchSet, s = snapshot(); lastSearchSet = null;
+    SET_GROUPS.forEach(function(g){ d.g[g].forEach(function(k){ delete s[g][k]; }); });
+    // A setting goes back only if the visitor has not changed it since.
+    SET_FIELDS.forEach(function(f){ if (d.f[f] && s[f] === d.f[f][1]) s[f] = d.f[f][0]; });
+    restore(s);
+  }
   function readSearch(v, typing){
-    if (typing) { if (!liveBase) liveBase = snapshot(); restore(JSON.parse(JSON.stringify(liveBase))); }
-    else if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; }
+    if (typing) { if (!liveBase) { undoLastSearch(); liveBase = snapshot(); } restore(JSON.parse(JSON.stringify(liveBase))); }
+    else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); }
+    var before = snapshot();
     var left = [], neg = false, toks = parseWords(v), ors = toks.indexOf('or') !== -1 || toks.indexOf('ou') !== -1;
     toks.forEach(function(w){
       if (NEG.indexOf(' ' + w + ' ') !== -1) { neg = true; return; }
@@ -16011,14 +16035,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // "Open on Saturday" or "open at 9" is about then, not now (unless "now" is said too).
     if ((atMin != null || atDay) && toks.indexOf('now') === -1 && toks.indexOf('maintenant') === -1 && !(liveBase && liveBase.openOnly)) openOnly = false;
     term = left.join(' ');
+    lastSearchSet = searchDiff(before, snapshot());
   }
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } term = v.trim().toLowerCase(); changed(); } }, 450); });
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); changed(); } }, 450); });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
-    clearTimeout(timer); wantNear = false; radiusFixed = false; readSearch(v, false); searchEl.value = term; searchEl.blur();
-    track('map_search', { words: searchEl.value ? 1 : 0, how: how || 'typed' }); changed();
+    // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
+    clearTimeout(timer); wantNear = false; radiusFixed = false; readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
+    track('map_search', { words: term ? 1 : 0, how: how || 'typed' }); changed();
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
   }
@@ -16087,7 +16113,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k === 'or') tagOr = true;
         else if (k.indexOf('in.') === 0 && CONF.r[k.slice(3)]) town = k.slice(3); else if (/^p\\.(cheap|afford|fancy)$/.test(k)) price = k.slice(2); else if (/^at\\.\\d+u?$/.test(k)) { atMin = parseInt(k.slice(3), 10); atUntil = /u$/.test(k); } else if (/^on\\.(\\+1|mon|tue|wed|thu|fri|sat|sun)$/.test(k)) atDay = k.slice(3); else if (k.indexOf('x.y.') === 0 && TYPES[k.slice(4)]) notTypes[k.slice(4)] = true;
         else if (k.indexOf('x.t.') === 0 && TAGIX[k.slice(4)] != null) notTags[k.slice(4)] = true; else if (k.indexOf('x.k.') === 0 && CONF.k[k.slice(4)]) notKinds[k.slice(4)] = true; else if (k.indexOf('x.f.') === 0 && CONF.f[k.slice(4)]) notFeats[k.slice(4)] = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
-      if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = term; }
+      if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = qs.get('q'); }
     } catch (e) {}
     syncChips();
     if (location.hash === '#events') setTab('events'); else render(false);
@@ -19540,7 +19566,11 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   var KEEP_Q = (location.pathname === '/search' || location.pathname === '/fr/search') ? (new URLSearchParams(location.search).get('q') || '') : '';
   function queryFor(types, features, regions){
     var q = [];
+    // Fix (2026-10-19): /food-drink and the other hubs keep the typed search in the URL too (?q=), like /browse, so
+    // reload, Back and a shared link keep it.
+    var typed = searchInput ? searchInput.value.trim() : '';
     if (KEEP_Q) q.push('q=' + encodeURIComponent(KEEP_Q));
+    else if (typed) q.push('q=' + encodeURIComponent(typed));
     if (types.length) q.push('types=' + types.join(','));
     if (features.length) q.push('features=' + features.join(','));
     if (regions.length) q.push('regions=' + regions.join(','));${O(`
@@ -19609,9 +19639,9 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   if (allChip) allChip.addEventListener('click', function(){ var had = pressed(typeChips, 'data-fd-type').length; typeChips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); page = 1; apply('push'); if (had) trackFilterChange('type', 'all', 'clear_all'); });
   if (searchInput) {
     var timer = null;
-    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); searchPlan = searchTerm ? fdPlan(searchTerm) : { groups: [], corrected: null }; page = 1; apply('none'); }, 120); });
+    searchInput.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){ searchTerm = searchInput.value.trim().toLowerCase(); searchPlan = searchTerm ? fdPlan(searchTerm) : { groups: [], corrected: null }; page = 1; apply('replace'); }, 120); });
   }
-  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; searchPlan = { groups: [], corrected: null }; if (searchInput) { searchInput.value = ''; searchInput.focus(); } page = 1; apply('none'); });
+  if (searchClear) searchClear.addEventListener('click', function(){ searchTerm = ''; searchPlan = { groups: [], corrected: null }; if (searchInput) { searchInput.value = ''; searchInput.focus(); } page = 1; apply('replace'); });
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
     if (t.id === 'fdSelectedClear') { clearAllByVisitor(); return; }${O(`
@@ -19664,6 +19694,11 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-fd-type')) !== -1 ? 'true' : 'false'); });
       featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-fd-feature')) !== -1 ? 'true' : 'false'); });
       regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
+      if (!KEEP_Q && searchInput) {
+        var uq = (params.get('q') || '').slice(0, 80);
+        searchInput.value = uq; searchTerm = uq.trim().toLowerCase();
+        searchPlan = searchTerm ? fdPlan(searchTerm) : { groups: [], corrected: null };
+      }
       if (sortSel) { var sk = params.get('sort') || 'recommended'; if (sk !== sortKey && sortSel.querySelector('option[value="' + sk + '"]')) { sortSel.value = sk; sortKey = sk; sortCards(sk); } }${O(`
       openOn = params.get('open') === 'now';`)}
     } catch (e) {}
@@ -24698,6 +24733,10 @@ function frenchTwinHtml(html, enPath, search = '') {
     .replace(/(<meta property="og:url" content=")https:\/\/okanaganroam\.com[^"?]*(\?[^"]*)?"/, (m, a, q) => `${a}https://okanaganroam.com${frPath}${q || ''}"`)
     .replace(/(<meta property="og:type"[^>]*>\n)/, '$1<meta property="og:locale" content="fr_CA">\n');
   out = withTwinLangSwitch(out, enPath + search.replace(/&/g, '&amp;'), 'fr');
+  // Calendar links (2026-10-19): the .ics download is the French one, and Google Calendar gets the French details
+  // line and the /fr page address.
+  out = out.replace(/href="(\/[a-z-]+\/events\/[a-z0-9-]+\/calendar\.ics)"/g, 'href="/fr$1"')
+    .replace(/(<a [^>]*data-gcal href="[^"]*?details=)Details%3A%20https%3A%2F%2Fokanaganroam\.com%2F/g, '$1D%C3%A9tails%20%3A%20https%3A%2F%2Fokanaganroam.com%2Ffr%2F');
   // Deferred card batches and the rest of /browse load from their French addresses.
   return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
 }
@@ -25598,16 +25637,98 @@ function eventImageUrl(event, categories) {
   const p = eventImagePath(event, categories);
   return /^https?:\/\//.test(p) ? p : `https://okanaganroam.com${p}`;
 }
+// Event venue addresses (2026-10-19, site review pass 5): 634 event pages named their place ("Creekside Theatre",
+// "Vernon and District Performing Arts Centre") with only a town, so Google saw no street address. The busiest
+// event venues are in data/event-venue-addresses.json (each with its other spellings); an event whose place matches
+// one gets its street address and postal code. An event linked to a listing keeps the listing's address, and an
+// unknown place that is a listing's name ("Sandhill Wines, Kelowna") gets that listing's address.
+function eventVenueKey(text) {
+  return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ')
+    .replace(/['\u2018\u2019`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/^the /, '');
+}
+let eventVenueTable = null;
+function eventVenueAddressTable() {
+  if (eventVenueTable) return eventVenueTable;
+  let rows = [];
+  try { rows = require('./data/event-venue-addresses.json').venues || []; } catch (e) { rows = []; }
+  const map = new Map();
+  for (const v of rows) {
+    if (!v || !v.name || !v.streetAddress || !REGION_LABELS[v.region]) continue;
+    for (const n of [v.name, ...(v.aliases || [])]) map.set(eventVenueKey(n), v);
+  }
+  eventVenueTable = map;
+  return map;
+}
+// The place text without a trailing town ("Venables Theatre, Oliver" -> "Venables Theatre") and as written.
+function eventVenueTextKeys(text) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return [];
+  const towns = new Set(Object.values(REGION_LABELS).map(eventVenueKey));
+  const parts = raw.split(/\s*,\s*/).filter(Boolean);
+  const keys = [eventVenueKey(raw)];
+  while (parts.length > 1 && (towns.has(eventVenueKey(parts[parts.length - 1])) || /^(?:bc|b c|canada)$/.test(eventVenueKey(parts[parts.length - 1])))) {
+    parts.pop();
+    keys.push(eventVenueKey(parts.join(', ')));
+  }
+  // "RCA Atrium, Rotary Centre for the Arts": a room, then the building.
+  if (parts.length > 1) keys.push(eventVenueKey(parts[parts.length - 1]));
+  return uniqueList(keys.filter(Boolean));
+}
+function eventKnownVenue(text) {
+  const table = eventVenueAddressTable();
+  for (const k of eventVenueTextKeys(text)) if (table.has(k)) return table.get(k);
+  return null;
+}
+// Listings by name, for a place that is a listing but not linked to it. Refreshed every ten minutes.
+let eventListingNames = null, eventListingNamesAt = 0;
+function eventListingByName(text, region) {
+  if (!eventListingNames || Date.now() - eventListingNamesAt > 10 * 60 * 1000) {
+    eventListingNames = new Map();
+    try {
+      for (const v of db.prepare("SELECT name, region, address FROM venues WHERE redirect_to IS NULL AND address IS NOT NULL AND address != ''").all()) {
+        const k = eventVenueKey(v.name);
+        if (!eventListingNames.has(k)) eventListingNames.set(k, []);
+        eventListingNames.get(k).push(v);
+      }
+    } catch (e) { /* no listing fallback */ }
+    eventListingNamesAt = Date.now();
+  }
+  for (const k of eventVenueTextKeys(text)) {
+    const hits = eventListingNames.get(k);
+    if (!hits) continue;
+    // A chain's name only counts when one of its listings is in the event's town.
+    const here = hits.filter((v) => v.region === region);
+    if (here.length === 1) return here[0];
+    if (hits.length === 1 && !here.length) return hits[0];
+  }
+  return null;
+}
+function resetEventVenueCaches() { eventVenueTable = null; eventListingNames = null; }
+function knownVenuePlace(v) {
+  return {
+    '@type': 'Place', name: v.name,
+    address: { '@type': 'PostalAddress', streetAddress: v.streetAddress, addressLocality: v.locality || REGION_LABELS[v.region], addressRegion: 'BC', postalCode: v.postalCode || undefined, addressCountry: 'CA' },
+  };
+}
+function eventPlaceSchema(event, hostVenue) {
+  if (hostVenue && hostVenue.address) return { '@type': 'Place', name: hostVenue.name, address: eventLocationAddress(event, hostVenue) };
+  const known = eventKnownVenue(hostVenue ? hostVenue.name : event.venue_name_text);
+  if (known) return knownVenuePlace(known);
+  if (hostVenue) return { '@type': 'Place', name: hostVenue.name, address: eventLocationAddress(event, hostVenue) };
+  if (event.venue_name_text) {
+    const listing = eventListingByName(event.venue_name_text, event.region);
+    if (listing) return { '@type': 'Place', name: listing.name, address: venuePostalAddress(listing.address, REGION_LABELS[listing.region]) };
+    return eventTextPlace(event.venue_name_text, event);
+  }
+  return { '@type': 'Place', name: event.valley_wide === 1 ? 'Okanagan Valley, BC' : REGION_LABELS[event.region], address: eventLocationAddress(event, null) };
+}
 function eventJsonLd(event, occurrences, categories, hostVenue, canonical, todayStr) {
   if (event.status !== 'scheduled' || !occurrences.length) return null;
   const upcoming = occurrences.filter((o) => o.end_date >= todayStr);
   const main = upcoming[0] || occurrences[0];
   const others = occurrences.filter((o) => o.id !== main.id && o.end_date >= todayStr).slice(0, 10);
   const schemaType = eventSchemaType(event, categories);
-  const location = hostVenue
-    ? { '@type': 'Place', name: hostVenue.name, address: eventLocationAddress(event, hostVenue) }
-    : event.venue_name_text ? eventTextPlace(event.venue_name_text, event)
-      : { '@type': 'Place', name: event.valley_wide === 1 ? 'Okanagan Valley, BC' : REGION_LABELS[event.region], address: eventLocationAddress(event, null) };
+  const location = eventPlaceSchema(event, hostVenue);
   const sub = (o) => ({
     '@type': schemaType,
     name: o.label ? `${event.name} – ${o.label}` : event.name,
@@ -25769,10 +25890,47 @@ function eventHeroImage(full, categories) {
 }
 // iCalendar for an event's upcoming dates (up to 20), times in America/Vancouver.
 function icsEscape(t) { return String(t || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1'); }
-function eventIcs(full, occurrences, location, url, now = new Date()) {
+// Calendar times (2026-10-19, site review pass 5): one occurrence as calendar start and end, local Okanagan time.
+// All-day: dates, the end exclusive. Timed: the stored end time, else start + 2 hours (so calendars show a block,
+// not a zero-length event), an end before the start running into the next day.
+function eventCalendarTimes(o) {
+  const ymd = (d) => String(d).replace(/-/g, '');
+  const hm = (t) => String(t).slice(0, 5).replace(':', '') + '00';
+  if (o.all_day === 1 || !o.start_time || o.start_time === '00:00') {
+    return { allDay: true, start: ymd(o.start_date), end: ymd(addLocalDays(o.end_date || o.start_date, 1)) };
+  }
+  const start = `${ymd(o.start_date)}T${hm(o.start_time)}`;
+  if (o.end_time) {
+    const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date || o.start_date, 1) : (o.end_date || o.start_date);
+    return { allDay: false, start, end: `${ymd(endDate)}T${hm(o.end_time)}` };
+  }
+  const [h, m] = String(o.start_time).split(':').map(Number);
+  const mins = h * 60 + (m || 0) + 120;
+  const endDate = mins >= 24 * 60 ? addLocalDays(o.start_date, 1) : o.start_date;
+  const em = mins % (24 * 60);
+  return { allDay: false, start, end: `${ymd(endDate)}T${String(Math.floor(em / 60)).padStart(2, '0')}${String(em % 60).padStart(2, '0')}00` };
+}
+// "Add to Google Calendar" (2026-10-19): Google's own event template link, no API or key. French pages get the
+// French details line and the /fr page address.
+function googleCalendarUrl(full, o, location, url, lang = 'en') {
+  const t = eventCalendarTimes(o);
+  const name = o.label ? `${full.name} \u2013 ${o.label}` : full.name;
+  const params = [['action', 'TEMPLATE'], ['text', name], ['dates', `${t.start}/${t.end}`]];
+  if (!t.allDay) params.push(['ctz', 'America/Vancouver']);
+  params.push(['details', `${lang === 'fr' ? 'D\u00e9tails :' : 'Details:'} ${url}`]);
+  if (location) params.push(['location', location]);
+  return `https://calendar.google.com/calendar/render?${params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')}`;
+}
+// Where an event is, as one line for calendars: the linked listing's name and address, else the stored place name.
+function eventCalendarLocation(full, hostVenue) {
+  const town = REGION_LABELS[full.region] || '';
+  const known = !(hostVenue && hostVenue.address) ? eventKnownVenue(hostVenue ? hostVenue.name : full.venue_name_text) : null;
+  if (known) return [known.name, known.streetAddress, `${known.locality || REGION_LABELS[known.region]}, BC${known.postalCode ? ` ${known.postalCode}` : ''}`].join(', ');
+  return hostVenue ? [hostVenue.name, hostVenue.address].filter(Boolean).join(', ')
+    : (full.venue_name_text ? `${full.venue_name_text}, ${town}, BC` : `${town}, BC`);
+}
+function eventIcs(full, occurrences, location, url, now = new Date(), lang = 'en') {
   const today = todayLocal(now);
-  const ymd = (d) => d.replace(/-/g, '');
-  const hm = (t) => t.replace(':', '') + '00';
   const stamp = new Date(now).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Okanagan Roam//Events//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     // Pacific time (PST/PDT, current North American rules) so every calendar app reads the times as Okanagan local time.
@@ -25782,16 +25940,13 @@ function eventIcs(full, occurrences, location, url, now = new Date()) {
     'END:VTIMEZONE'];
   for (const o of occurrences.filter((x) => x.end_date >= today).slice(0, 20)) {
     lines.push('BEGIN:VEVENT', `UID:okr-event-${full.id}-${o.id}@okanaganroam.com`, `DTSTAMP:${stamp}`);
-    if (o.all_day === 1 || !o.start_time || o.start_time === '00:00') {
-      lines.push(`DTSTART;VALUE=DATE:${ymd(o.start_date)}`, `DTEND;VALUE=DATE:${ymd(addLocalDays(o.end_date, 1))}`);
-    } else {
-      const endDate = o.ends_next_day === 1 ? addLocalDays(o.end_date, 1) : o.end_date;
-      lines.push(`DTSTART;TZID=America/Vancouver:${ymd(o.start_date)}T${hm(o.start_time)}`);
-      if (o.end_time) lines.push(`DTEND;TZID=America/Vancouver:${ymd(endDate)}T${hm(o.end_time)}`);
-    }
+    // Every event has a DTEND (2026-10-19): the stored end time, else start + 2 hours.
+    const t = eventCalendarTimes(o);
+    if (t.allDay) lines.push(`DTSTART;VALUE=DATE:${t.start}`, `DTEND;VALUE=DATE:${t.end}`);
+    else lines.push(`DTSTART;TZID=America/Vancouver:${t.start}`, `DTEND;TZID=America/Vancouver:${t.end}`);
     lines.push(`SUMMARY:${icsEscape(o.label ? `${full.name} \u2013 ${o.label}` : full.name)}`);
     if (location) lines.push(`LOCATION:${icsEscape(location)}`);
-    lines.push(`DESCRIPTION:${icsEscape(`Details: ${url}`)}`, `URL:${url}`, 'END:VEVENT');
+    lines.push(`DESCRIPTION:${icsEscape(`${lang === 'fr' ? 'D\u00e9tails :' : 'Details:'} ${url}`)}`, `URL:${url}`, 'END:VEVENT');
   }
   lines.push('END:VCALENDAR');
   // Lines are folded at 75 octets per RFC 5545.
@@ -25902,6 +26057,7 @@ ${pastOccs.map(dateItem).join('\n')}
     ${full.website ? `<a class="cta event-cta-primary" href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">Tickets &amp; info &#8599;</a>` : ''}
     ${directionsUrl ? `<a class="cta secondary" href="${escapeHtml(directionsUrl)}" rel="nofollow noopener" target="_blank">Get directions</a>` : ''}
     ${next ? `<a class="cta secondary" href="/${full.region}/events/${full.slug}/calendar.ics" download>Add to calendar</a>` : ''}
+    ${next ? `<a class="cta secondary" data-gcal href="${escapeHtml(googleCalendarUrl(full, next, eventCalendarLocation(full, hostVenue), canonical))}" rel="nofollow noopener" target="_blank">Add to Google Calendar</a>` : ''}
   </div>`;
   const tripQuery = `${full.name}, ${regionLabel}, Okanagan Valley, BC`;
   const actionsHtml = `
@@ -31664,6 +31820,93 @@ function venueLookupKeys(text) {
   if (words.length > 1 && words[0] === 'the') words.shift();
   return uniqueList([words.map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join(''), words.join('')]);
 }
+// Word lookup (2026-10-19, site review pass 5): "gray monk winery", "earls kelowna", "hatchng post", "grey monk",
+// "office brewing" and "l'hatching post" find the listing. The query is split into words; French articles, generic
+// words (winery, brewing, cafe...) and town names are dropped, and every word left must match a word of the name:
+// the same word, a plural, the start of a longer word (the last word only, while typing), "grey" for "gray", or
+// one typo (one letter added, dropped or changed) in words of 4+ letters. A town in the query ranks that town first.
+const VENUE_LOOKUP_GENERIC = new Set(['the', 'and', 'of', 'winery', 'wineries', 'vineyard', 'vineyards', 'estate', 'estates',
+  'brewing', 'brewery', 'breweries', 'restaurant', 'restaurants', 'cafe', 'cafes', 'bar', 'bars', 'grill', 'co', 'company',
+  'le', 'la', 'les', 'l', 'de', 'du', 'des', 'cave', 'vignoble', 'brasserie']);
+const VENUE_LOOKUP_SYNONYMS = { grey: 'gray', colour: 'color', centre: 'center', theatre: 'theater' };
+function venueLookupWords(text) {
+  return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ')
+    .replace(/\b[ld]['\u2018\u2019`]/g, ' ').replace(/['\u2018\u2019`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean)
+    .map((w) => VENUE_LOOKUP_SYNONYMS[w] || w);
+}
+// Town names as word strings ("kelowna", "west kelowna", "big white") -> the regions they name. "kelowna" also covers
+// West Kelowna; "silver star" is SilverStar.
+function venueLookupTownWords() {
+  if (!venueLookupTownWords.cache) {
+    const towns = new Map();
+    const add = (k, r) => { if (!towns.has(k)) towns.set(k, new Set()); towns.get(k).add(r); };
+    for (const [key, label] of Object.entries(REGION_LABELS)) add(venueLookupWords(label).join(' '), key);
+    add('kelowna', 'west-kelowna'); add('silver star', 'silverstar'); add('ok falls', 'okanagan-falls');
+    venueLookupTownWords.cache = towns;
+  }
+  return venueLookupTownWords.cache;
+}
+function venueLookupSingular(w) { return w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w; }
+// True when a and b are at most one edit apart (one letter added, dropped or changed).
+function venueLookupOneEdit(a, b) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+// 0 = exact or plural, 1 = prefix while typing, 2 = one typo, -1 = no match.
+function venueLookupWordScore(q, nameWords, last) {
+  const qs = venueLookupSingular(q);
+  let best = -1;
+  for (const w of nameWords) {
+    const ws = venueLookupSingular(w);
+    let s = -1;
+    if (q === w || qs === ws) s = 0;
+    else if (last && q.length >= 3 && w.startsWith(q)) s = 1;
+    else if (q.length >= 4 && ws.length >= 4 && (venueLookupOneEdit(qs, ws) || venueLookupOneEdit(q, w))) s = 2;
+    if (s !== -1 && (best === -1 || s < best)) best = s;
+    if (best === 0) break;
+  }
+  return best;
+}
+function venueLookupByWords(term, candidates) {
+  const words = venueLookupWords(term);
+  const towns = venueLookupTownWords();
+  const wantRegions = new Set();
+  const sig = [];
+  for (let i = 0; i < words.length; i++) {
+    const pair = i + 1 < words.length ? `${words[i]} ${words[i + 1]}` : '';
+    if (pair && towns.has(pair)) { for (const r of towns.get(pair)) wantRegions.add(r); i++; continue; }
+    if (towns.has(words[i])) { for (const r of towns.get(words[i])) wantRegions.add(r); continue; }
+    if (VENUE_LOOKUP_GENERIC.has(words[i])) continue;
+    sig.push(words[i]);
+  }
+  if (!sig.length || sig.join('').length < 3) return [];
+  const lastWord = words[words.length - 1];
+  let out = [];
+  for (const v of candidates) {
+    const nameWords = venueLookupWords(v.name);
+    let cost = 0;
+    let ok = true;
+    for (let i = 0; i < sig.length; i++) {
+      const s = venueLookupWordScore(sig[i], nameWords, sig[i] === lastWord);
+      if (s === -1) { ok = false; break; }
+      cost += s;
+    }
+    if (!ok) continue;
+    const startsWith = venueLookupWordScore(sig[0], nameWords.filter((w) => !VENUE_LOOKUP_GENERIC.has(w)).slice(0, 1), true) !== -1;
+    out.push({ v, typo: cost >= 2, rank: (wantRegions.size && !wantRegions.has(v.region) ? 10 : 0) + cost * 2 + (startsWith ? 0 : 1) });
+  }
+  // A typo match only shows when no name matches the words as typed ("frind" finds Frind, not Friends).
+  if (out.some((x) => !x.typo)) out = out.filter((x) => !x.typo);
+  out.sort((a, b) => a.rank - b.rank || String(a.v.name).localeCompare(String(b.v.name)));
+  return out.map((x) => x.v);
+}
 function venueLookup(q, region) {
   const term = String(q || '').normalize('NFC').trim().slice(0, 60);
   if (term.length < 2) return [];
@@ -31688,6 +31931,12 @@ function venueLookup(q, region) {
       more.sort((a, b) => (a.at === 0 ? 0 : 1) - (b.at === 0 ? 0 : 1) || String(a.v.name).localeCompare(String(b.v.name)));
       rows = [...rows, ...more.slice(0, 8 - rows.length).map((x) => x.v)];
     }
+  }
+  if (rows.length < 8) {
+    const seen = new Set(rows.map((v) => `${v.region}/${v.slug}`));
+    const all = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []));
+    const byWords = venueLookupByWords(term, all).filter((v) => !seen.has(`${v.region}/${v.slug}`));
+    rows = [...rows, ...byWords.slice(0, 8 - rows.length)];
   }
   // French lookup (2026-10-18): the French type label, the French page and both claim links ride along, so
   // /fr/list-your-venue shows French results and every result can be claimed.
@@ -31898,8 +32147,8 @@ ${renderGolfHeaderHtml()}
     // pages; each result also gets a "Claim this listing" link to its claim page.
     var FR = String(document.documentElement.getAttribute('lang') || '').slice(0, 2) === 'fr';
     var TX = FR
-      ? { correct: 'Demander une correction', claim: 'R\\u00e9clamer cette fiche', none: 'Aucun r\\u00e9sultat pour l\\u2019instant. Si votre entreprise est nouvelle pour nous, utilisez le formulaire ci-dessous.', note: 'Correction pour ' }
-      : { correct: 'Request a correction', claim: 'Claim this listing', none: 'No match yet. If your venue is new to us, use the form below.', note: 'Correction for ' };
+      ? { correct: 'Demander une correction', claim: 'R\\u00e9clamer cette fiche', none: 'Aucun r\\u00e9sultat. V\\u00e9rifiez l\\u2019orthographe, ou essayez un seul mot du nom suivi de votre ville (par exemple \\u00ab monk lake country \\u00bb). Si votre entreprise n\\u2019est vraiment pas encore list\\u00e9e, utilisez le formulaire ci-dessous.', note: 'Correction pour ' }
+      : { correct: 'Request a correction', claim: 'Claim this listing', none: 'No match. Check the spelling, or try one word of the name with your town (for example \\u201cmonk lake country\\u201d). If your venue really isn\\u2019t listed yet, use the form below.', note: 'Correction for ' };
     function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     input.addEventListener('input', function(){
       clearTimeout(timer);
@@ -42463,6 +42712,14 @@ ${renderGolfHeaderHtml()}
 </html>`;
 }
 
+function lowercasePageRedirect(p) {
+  const path = String(p || '');
+  const idx = /^(\/fr)?\/index\.html?$/i.exec(path);
+  if (idx) return idx[1] ? '/fr' : '/';
+  if (!/[A-Z]/.test(path) || !/^\/[A-Za-z0-9/_-]*$/.test(path)) return null;
+  if (/^\/(?:fr\/)?(?:api|images|styles|scripts|fonts|owner|contribute|claim|admin|share|menu-scan|r)(?:\/|$)/i.test(path)) return null;
+  return path.toLowerCase();
+}
 const server = http.createServer(async (req, res) => {
   applySecurityHeaders(res);
   if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
@@ -42477,6 +42734,17 @@ const server = http.createServer(async (req, res) => {
     const [p, q] = String(req.url).split('?');
     res.writeHead(301, { Location: p.replace(/\/+$/, '') + (q != null ? `?${q}` : '') });
     return res.end();
+  }
+  // One address per page, pass 5 (2026-10-19): /Kelowna or /Whats-On 301 to the lower-case address, and /index.html
+  // to /. Paths that carry a token or a file name (/owner/..., /contribute/confirm/..., /api/, /images/ ...) keep
+  // their case; only plain page paths (letters, digits, - _ /) are touched.
+  if ((req.method === 'GET' || req.method === 'HEAD')) {
+    const [p, q] = String(req.url).split('?');
+    const target = lowercasePageRedirect(p);
+    if (target) {
+      res.writeHead(301, { Location: target + (q != null ? `?${q}` : '') });
+      return res.end();
+    }
   }
   // French business portal (2026-10-18): /fr/owner/account, /fr/owner/<edit link> ... are served by the English
   // routes with res.ownerLang = 'fr' (see ownerPortalLangRequest); English portal pages get the EN / FR switch.
@@ -44814,15 +45082,16 @@ const server = http.createServer(async (req, res) => {
     // never 404'd purely for having ended.
     // GET /:region/events/:slug/calendar.ics (2026-10-14): the event's upcoming
     // dates as an iCalendar file, for the page's "Add to calendar" button.
-    const eventIcsMatch = pathname.match(/^\/([a-z-]+)\/events\/([a-z0-9-]+)\/calendar\.ics$/);
+    // /fr/<town>/events/<slug>/calendar.ics (2026-10-19): the French details line and the French page address.
+    const eventIcsMatch = pathname.match(/^(\/fr)?\/([a-z-]+)\/events\/([a-z0-9-]+)\/calendar\.ics$/);
     if (eventIcsMatch && method === 'GET') {
-      const [, region, slug] = eventIcsMatch;
+      const [, frPrefix, region, slug] = eventIcsMatch;
       const event = REGION_LABELS[region] ? findEventBySlug(region, slug) : null;
       const full = event ? getEventById(event.id) : null;
       if (full && full.status === 'scheduled') {
         const hostVenue = full.venue_id ? getVenue(full.venue_id) : null;
-        const location = hostVenue ? [hostVenue.name, hostVenue.address].filter(Boolean).join(', ') : (full.venue_name_text ? `${full.venue_name_text}, ${REGION_LABELS[region]}, BC` : `${REGION_LABELS[region]}, BC`);
-        const ics = eventIcs(full, listEventOccurrences(full.id, { includeCancelled: false }), location, `https://okanaganroam.com/${region}/events/${slug}`);
+        const location = eventCalendarLocation(full, hostVenue);
+        const ics = eventIcs(full, listEventOccurrences(full.id, { includeCancelled: false }), location, `https://okanaganroam.com${frPrefix ? '/fr' : ''}/${region}/events/${slug}`, new Date(), frPrefix ? 'fr' : 'en');
         // A download, not a page: keep it out of search results (SEO audit, 2026-10-17).
         res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="${slug}.ics"`, 'Cache-Control': 'no-cache', 'X-Robots-Tag': 'noindex' });
         return res.end(ics);
@@ -46295,6 +46564,13 @@ module.exports = {
   renderContactPage,
   CONTACT_TOPICS,
   venueLookup,
+  venueLookupByWords,
+  lowercasePageRedirect,
+  eventCalendarTimes,
+  googleCalendarUrl,
+  eventPlaceSchema,
+  eventKnownVenue,
+  resetEventVenueCaches,
   renderAboutPage,
   renderPrivacyPage,
   renderTermsPage,
