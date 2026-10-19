@@ -442,6 +442,14 @@ function renderStyles() {
   .t3-length-ask { margin: 10px 0 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
   .t3-length-ask select { font: inherit; font-size: 16px; min-height: 44px; margin-left: 6px; }
   .t3-chip-label { font-weight: 600; opacity: 0.7; }
+  /* Phone (2026-10-19, round 8): at 320px the "Where" chip's select ("Anywhere in the Okanagan") pushed the page 12px
+     sideways. A chip now never grows past its row: long text wraps, and on narrow screens a chip's select shrinks to
+     the space left beside its label. The plan's date and time inputs get 16px text and a 44px height, so tapping
+     them doesn't make iPhone Safari zoom the page. */
+  .t3-chip { min-width: 0; max-width: 100%; box-sizing: border-box; flex-wrap: wrap; }
+  .t3-chip select { min-width: 0; max-width: 100%; }
+  @media (max-width: 400px) { .t3-chip:has(> select) { flex-wrap: nowrap; } .t3-chip > select { flex: 1 1 0; width: 100%; } }
+  .t3-sched input[type="date"], .t3-sched input[type="time"] { font: inherit; font-size: 16px; min-height: 44px; box-sizing: border-box; padding: 6px 10px; }
   .t3-notused { margin: 10px 0 0; font-size: 0.84rem; color: #7A4A2A; }
 
   /* z-index 0 (2026-10-18): app.css's header rule (sticky, z-index 60) also matches this <header>, so on phones the

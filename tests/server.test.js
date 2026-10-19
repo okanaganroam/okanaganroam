@@ -11524,7 +11524,7 @@ test('/destinations: 200, every destination exactly once, each linking to its ca
   const html = await res.text();
   assert.match(html, /<h1>Choose Your Okanagan Destination<\/h1>/);
   assert.match(html, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/destinations">/);
-  const links = [...html.matchAll(/<li class="category-card">\s*<h2><a href="\/([a-z-]+)">([^<]+)<\/a><\/h2>/g)].map((m) => [m[1], m[2]]);
+  const links = [...html.matchAll(/<li class="category-card">\s*<h3 class="destination-card-title"><a href="\/([a-z-]+)">([^<]+)<\/a><\/h3>/g)].map((m) => [m[1], m[2]]);
   const regions = destRegions();
   assert.deepEqual(links.map((l) => l[0]).sort(), regions.slice().sort(), 'every destination with a page, once');
   assert.equal(new Set(links.map((l) => l[0])).size, links.length, 'no duplicates');
@@ -19214,7 +19214,7 @@ test('One photo per destination (2026-10-15): every town has one photo, the same
 
 test('Destination photos (2026-10-13): every /destinations card shows its town photo (3:2, like /categories) or, until one exists, its street map', () => {
   const html = app.renderDestinationsPage();
-  const cards = Array.from(html.matchAll(/<li class="category-card">\s*<h2><a href="\/([a-z-]+)">[\s\S]*?<\/li>/g));
+  const cards = Array.from(html.matchAll(/<li class="category-card">\s*<h3 class="destination-card-title"><a href="\/([a-z-]+)">[\s\S]*?<\/li>/g));
   assert.ok(cards.length >= 1, 'destination cards render');
   for (const [card, region] of cards) {
     const m = card.match(/<div class="destination-card-photo( destination-card-map)?"><img src="([^"]+)"(?: srcset="[^"]*" sizes="[^"]*")? alt="" width="800" height="533" loading="lazy"/);
@@ -19877,7 +19877,7 @@ test('Curated hubs (2026-10-14): /local-favorites and /secret-spots run on the s
 
 test('/destinations (2026-10-14): a line on each place, north-to-south order, a "Not sure where to start?" box and an ItemList', () => {
   const html = app.renderDestinationsPage();
-  const order = [...html.matchAll(/<li class="category-card">\s*<h2><a href="\/([a-z-]+)">/g)].map((m) => m[1]);
+  const order = [...html.matchAll(/<li class="category-card">\s*<h3 class="destination-card-title"><a href="\/([a-z-]+)">/g)].map((m) => m[1]);
   assert.ok(order.length > 0);
   for (const r of order) assert.ok(app.DESTINATION_TAGLINES[r], `${r} has a tagline`);
   assert.equal((html.match(/class="destination-tagline"/g) || []).length, order.length);
@@ -29681,4 +29681,110 @@ test('Round 8 speed: /browse preloads its first card photo; a banner page keeps 
   assert.ok(own.includes(`<link rel="preload" as="image" href="/images/venues/a-w480.jpg?v=1" media="not all and (min-width: 900px) and (min-resolution: 1.5dppx)" fetchpriority="high">\n<link rel="preload" as="image" href="/images/venues/a-w960.jpg?v=2" media="(min-width: 900px) and (min-resolution: 1.5dppx)" fetchpriority="high">`), own);
   // Pure: a page without the card grid is unchanged.
   assert.equal(app.withFirstCardPhotoPreload('<html><head><meta name="viewport" content="x"></head><body></body></html>'), '<html><head><meta name="viewport" content="x"></head><body></body></html>');
+}));
+
+// ---- Phone and accessibility, round 8 (2026-10-19): whole-card What's On links, /trip at 320px, iPhone zoom, the
+// /map popup and pins, My Trip's French map and same-spot pins, the "View My Trip" toast, the phone menu, small
+// links, /destinations contrast and headings ----
+async function r8PageWithCss(get, p) {
+  const html = (await get(p)).text;
+  const hrefs = [...html.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
+  return html + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
+}
+
+test('Round 8 phone: a What\'s On card is tappable anywhere through its one link; Favorite and Add to trip stay on top', () => withPass4Server(async (get) => {
+  const css = await r8PageWithCss(get, '/whats-on');
+  assert.match(await r8PageWithCss(get, '/fr/whats-on'), /body\.whatson-page \.whatson-event-card > h2 a\.venue-card-link::after/);
+  assert.match(css, /body\.whatson-page \.whatson-event-card > h2 a\.venue-card-link::after \{ content: ""; position: absolute; inset: 0;/);
+  assert.match(css, /body\.whatson-page \.whatson-event-card > \.card-actions \{ position: relative; z-index: 1; \}/);
+  assert.match(css, /body\.whatson-page \.whatson-event-card > h2 a\.venue-card-link:focus-visible::after \{ outline: 3px solid/);
+  assert.match(css, /body\.whatson-page \.whatson-event-card \{ position: relative; \}/, 'the card is the box the link stretches over');
+  const card = app.whatsOnEventCardHtml({ id: 9, name: 'R8 Card', slug: 'r8-card', region: 'kelowna', categories: [], dateLabel: 'Oct 20' });
+  assert.equal((card.match(/<a /g) || []).length, 1, 'still one link per card');
+  assert.match(card, /<h2><a class="venue-card-link" href="\/kelowna\/events\/r8-card">/);
+}));
+
+test('Round 8 phone: /trip chips never push a 320px page sideways; date, time and Sort inputs are 16px and 44px tall', () => withPass4Server(async (get) => {
+  const v3 = require('../trip-planner-v3-page.js');
+  const page = v3.renderTripPlannerV3Page({ esc: (s) => String(s), title: '', description: '', canonical: '', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '' });
+  assert.match(page, /\.t3-chip \{ min-width: 0; max-width: 100%; box-sizing: border-box; flex-wrap: wrap; \}/);
+  assert.match(page, /\.t3-chip select \{ min-width: 0; max-width: 100%; \}/);
+  assert.match(page, /@media \(max-width: 400px\) \{ \.t3-chip:has\(> select\) \{ flex-wrap: nowrap; \} \.t3-chip > select \{ flex: 1 1 0; width: 100%; \} \}/);
+  assert.match(page, /\.t3-sched input\[type="date"\], \.t3-sched input\[type="time"\] \{ font: inherit; font-size: 16px; min-height: 44px;/);
+  const browse = await r8PageWithCss(get, '/browse');
+  assert.match(browse, /<select id="bhSort" class="bh-select bh-sort">/);
+  assert.match(browse, /body\.browse-page select\.bh-select\.bh-sort \{ font-size: 16px; min-height: 44px; box-sizing: border-box; \}/);
+}));
+
+test('Round 8 phone: /map popup close and name are 44px, pins take 44px taps with a 3px focus ring, the map starts at its first fit, no privacy-note shift', () => {
+  const html = app.renderPlacesMapPage(10);
+  assert.match(html, /body\.map-page \.leaflet-container a\.leaflet-popup-close-button \{ width: 44px; height: 44px;/);
+  assert.match(html, /body\.map-page \.pm-pop > a:not\(\.pm-pop-dir\) \{ display: flex; align-items: center; min-height: 44px; \}/);
+  assert.match(html, /\.leaflet-marker-icon\.pm-pin::before \{ content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px;/);
+  assert.match(html, /body\.map-page \.leaflet-marker-icon\.pm-pin:focus-visible \{ outline: 3px solid #1B2B3A;/);
+  assert.match(html, /@media \(min-width: 900px\) \{ body\.map-page \.pm-list:empty ~ \.pm-privacy \{ display: none; \} \}/);
+  // No zoom-9 start view: the first view the map gets is the Kelowna fit.
+  assert.match(html, /var map = L\.map\(mapEl, \{ zoomControl: false \}\);/);
+  assert.doesNotMatch(html, /setView\(\[49\.75, -119\.5\], 9\)/);
+  const created = html.indexOf('var map = L.map(mapEl');
+  const firstView = html.slice(created).search(/fitTo\(|setView\(|fitBounds\(/);
+  const firstFit = html.slice(created).indexOf('if (WIDE.matches) fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);');
+  assert.ok(firstFit > 0);
+  // The function definitions of fitTo come later in the script; the first call made is the Kelowna fit.
+  assert.ok(html.slice(created, created + firstFit).match(/map\.(setView|fitBounds)\(/g) === null, 'nothing sets a view before the Kelowna fit');
+  assert.ok(firstView >= 0);
+  // The privacy notes come after the list in the markup, so the :empty ~ rule reaches them.
+  assert.ok(html.indexOf('id="pmList"') < html.indexOf('class="pm-privacy"'));
+});
+
+test('Round 8 phone: My Trip\'s map has French Leaflet labels on /fr/my-trip and fans out stops at the same spot', () => {
+  const html = app.renderMyTripPage({ lang: 'fr' });
+  assert.match(html, /L\.control\.zoom\(mapFr \? \{ zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' \} : \{\}\)\.addTo\(map\);/);
+  assert.match(html, /mapFr \? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors'/);
+  assert.match(html, /Une bibliothèque JavaScript de cartes interactives/);
+  assert.match(html, /iconAnchor: \[12 - p\.dx, 12 - p\.dy\]/);
+  // The fan-out itself: run the same arithmetic on three stops at one spot and one elsewhere.
+  const m = html.match(/var spots = \{\};[\s\S]*?\n    \}\);\n/);
+  assert.ok(m, 'the same-spot code is in the page');
+  const pts = [{ lat: 49.8929, lng: -119.4751 }, { lat: 49.89291, lng: -119.47512 }, { lat: 49.8929, lng: -119.4751 }, { lat: 49.88, lng: -119.49 }];
+  new Function('pts', m[0])(pts);
+  assert.deepEqual([pts[3].dx, pts[3].dy], [0, 0], 'a stop on its own stays put');
+  const ring = pts.slice(0, 3);
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) {
+    assert.ok(Math.hypot(ring[i].dx - ring[j].dx, ring[i].dy - ring[j].dy) >= 26, 'pins at one spot no longer cover each other (24px pins)');
+  }
+});
+
+test('Round 8 phone: "Add to trip" on a venue or event page shows a "View My Trip" status message in the page language', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(js, /if \(trip\.some\(function\(t\)\{ return sameStop\(t, s\); \}\) && tripBtn\.closest\('\[data-surface="venue_page"\], body\.event-page'\)\) showAddedToast\(\);/);
+  assert.match(js, /box\.setAttribute\('role', 'status'\);/);
+  assert.match(js, /link\.href = frPathPrefix\(\) \+ '\/my-trip';/);
+  assert.match(js, /'trip\.toastView': 'View My Trip'/);
+  assert.match(js, /'trip\.toastView': 'Voir Mon voyage'/);
+  assert.match(js, /\.trip-added-toast a\{display:inline-flex;align-items:center;min-height:44px;/);
+});
+
+test('Round 8 phone: the phone menu leaves a 44px strip, and See hours, Official source and Claim this listing are 44px targets', () => withPass4Server(async (get) => {
+  assert.match(app.NAV_A11Y_SNIPPET, /@media \(max-width: 940px\) \{[\s\S]*?\.nav-links \{ left: auto; right: 0; width: min\(100%, calc\(100vw - 44px\)\); box-sizing: border-box; \}\n\}/);
+  assert.match(app.advisoryNoticeHtml('Closed until spring. https://example.com/notice'), /class="venue-advisory-source"/);
+  seasonInsert.run({ name: 'R8 Small Links Winery', type: 'winery', hours: SEASON_WEEK, slug: 'r8-small-links-winery' });
+  const page = await r8PageWithCss(get, '/kelowna/wineries/r8-small-links-winery');
+  assert.match(page, /class="venue-claim-btn"[^>]*style="display:inline-flex;align-items:center;min-height:44px;/);
+  assert.match(page, /body\.golf-page \.venue-open-status a \{ display: inline-block; padding: 12px 6px; margin: -12px -6px -12px -2px; \}/);
+  assert.match(page, /<a href="#venueHours">See hours<\/a>/);
+  const advisoryCss = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(advisoryCss, /\.venue-advisory-source \{ padding: 12px 0; margin: -6px 0 -12px; border-bottom: 0; text-decoration: underline;/);
+}));
+
+test('Round 8 accessibility: /destinations card names are h3 under their group h2, and the place count is solid 4.5:1+ text', () => withPass4Server(async (get) => {
+  const html = await r8PageWithCss(get, '/destinations');
+  const grid = html.slice(html.indexOf('<ul class="card-grid destination-photo-grid">'));
+  assert.match(grid, /<li class="category-card">\s*<h3 class="destination-card-title"><a href="\/[a-z-]+">/);
+  assert.doesNotMatch(grid.slice(0, grid.indexOf('</ul>')), /<h2/, 'no h2 inside the cards');
+  assert.match(html, /body\.destinations-page \.destination-photo-grid \.venue-meta \{ font-size: 0\.82rem; opacity: 1; color: #5E5048; \}/);
+  // #5E5048 on the card's #FFFCF6.
+  const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  assert.ok((lum('#FFFCF6') + 0.05) / (lum('#5E5048') + 0.05) >= 4.5);
+  assert.match(html, /\.category-card \.destination-card-title \{ font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600;/);
 }));
