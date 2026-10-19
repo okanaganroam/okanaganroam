@@ -20118,12 +20118,16 @@ test('French twins: which addresses have one, and how a /fr request maps to its 
   for (const p of ['/whats-on', '/whats-on/live-music', '/kelowna/events', '/kelowna/events/this-weekend', '/kelowna/restaurants', '/outdoors/hiking',
     '/guides', '/guides/best-patios-kelowna', '/guide/kelowna/patio', '/about', '/privacy', '/terms', '/contact', '/map', '/trip', '/my-trip', '/favorites',
     '/list-your-venue', '/list-an-event']) assert.equal(app.hasFrenchTwin(p), true, p);
-  for (const p of ['/nowhere', '/kelowna/events/test-future-festival', '/admin/x', '/api/venues', '/kelowna/nowhere/x/y']) assert.equal(app.hasFrenchTwin(p), false, p);
+  for (const p of ['/nowhere', '/kelowna/events/no-such-event', '/admin/x', '/api/venues', '/kelowna/nowhere/x/y']) assert.equal(app.hasFrenchTwin(p), false, p);
+  // Round 9 (2026-10-19): an event with no French description still has a French page (English text, noindex).
+  assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), true);
   assert.deepEqual(app.frenchTwinRequest('/fr'), { enPath: '/', enUrl: '/' });
   assert.deepEqual(app.frenchTwinRequest('/fr/food-drink?types=cafe'), { enPath: '/food-drink', enUrl: '/food-drink?types=cafe' });
   assert.deepEqual(app.frenchTwinRequest('/fr/kelowna/'), { enPath: '/kelowna', enUrl: '/kelowna' });
   assert.deepEqual(app.frenchTwinRequest('/fr/whats-on'), { enPath: '/whats-on', enUrl: '/whats-on' });
-  assert.equal(app.frenchTwinRequest('/fr/kelowna/events/test-future-festival'), null, 'event pages stay English');
+  // Round 9 (2026-10-19): every event has a French page, translated or not; a missing one has none.
+  assert.deepEqual(app.frenchTwinRequest('/fr/kelowna/events/test-future-festival'), { enPath: '/kelowna/events/test-future-festival', enUrl: '/kelowna/events/test-future-festival' });
+  assert.equal(app.frenchTwinRequest('/fr/kelowna/events/no-such-event'), null, 'no event, no French page');
   assert.equal(app.frenchTwinRequest('/fr/kelowna/restaurants/test-trattoria'), null, 'place pages keep their own route');
 });
 
@@ -20196,8 +20200,8 @@ test('French twins: /fr/food-drink is the Food & Drink page in French, paired wi
   assert.match(en, /<a class="lang-toggle" id="langToggle" href="\/fr\/food-drink" hreflang="fr"/);
   assert.match(en, /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink"/);
   assert.match(en, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/, 'the English page is unchanged');
-  const nf = await fetch(`${base}/fr/kelowna/events/test-future-festival`);
-  assert.equal(nf.status, 404, 'event pages have no French twin');
+  const nf = await fetch(`${base}/fr/kelowna/events/no-such-event`);
+  assert.equal(nf.status, 404, 'a missing event has no French page (round 9: every real one does)');
   assert.match(await nf.text(), /<html lang="fr" data-page-lang="fr">/, 'the /fr 404 page is French');
 }));
 
@@ -22655,8 +22659,10 @@ test('SEO round 3: photos declare their size, long names shorten in titles, Fren
     app.frEventTitle('PAG Film Series: The Christophs at Landmark Cinema — Penticton', { region: 'penticton' }));
   assert.notEqual(app.frEventTitle('Freya & Friends: Okanagan Symphony Holiday Concert — Penticton', { region: 'penticton' }),
     app.frEventTitle('Freya & Friends: Okanagan Symphony Holiday Concert — Vernon', { region: 'vernon' }));
-  // A fixture event has no French description, so it stays English-only.
-  assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), false);
+  // A fixture event has no French description: since round 9 (2026-10-19) it has a French page with its English
+  // description, kept out of search until translated.
+  assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), true);
+  assert.equal(app.frEventUntranslated('/kelowna/events/test-future-festival'), true);
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const title = (html) => html.match(/<title>([^<]*)<\/title>/)[1];
   const longVenue = { ...venue, name: 'Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink', description_fr: 'Un aréna.' };
@@ -28574,13 +28580,14 @@ test("What's On pass 6: Today + one category: the More upcoming list follows it,
   // The links list under the cards: other kinds of event and finished ones are listed hidden, and not counted.
   const links = app.restLinksHtml('whatsOnRest', (lm.match(/<template id="whatsOnRest">([\s\S]*?)<\/template>/) || [])[1] || '', 'en');
   // Every live-music event left today is on the first page, so all the waiting ones are other kinds or finished.
-  assert.match(links, /<li hidden><a href="[^"]*wo6-pumpkin-day">/, 'a family event is not listed as live music');
+  // Round 9 (2026-10-19): a hidden link keeps its address in data-href, so crawlers don't follow it.
+  assert.match(links, /<li hidden><a data-href="[^"]*wo6-pumpkin-day">/, 'a family event is not listed as live music');
   assert.match(links, /<details class="rest-links" id="whatsOnRestLinks" hidden><summary>More upcoming events \(0\)</);
   assert.doesNotMatch(links, /<li><a /);
   const unit = app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-2" data-group="earlier"><h2><a class="venue-card-link" href="/kelowna/events/b"><span class="venue-card-name">B Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-3" data-group="today"><h2><a class="venue-card-link" href="/kelowna/events/c"><span class="venue-card-name">C Show</span></a></h2></li>', 'en');
-  assert.match(unit, /More upcoming events \(1\)<\/summary><ul><li hidden><a href="\/kelowna\/events\/a">A Show<\/a><li hidden><a href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
+  assert.match(unit, /More upcoming events \(1\)<\/summary><ul><li hidden><a data-href="\/kelowna\/events\/a">A Show<\/a><li hidden><a data-href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
   assert.match(app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>', 'en'), /<details class="rest-links" id="whatsOnRestLinks" hidden>/, 'an empty list is hidden');
   // Markets today: all over, so the block says so and lists the next three markets.
   const mk = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today', categories: 'markets-fairs' }), { now: WO6_NIGHT });
@@ -30378,3 +30385,234 @@ test('Event partners (2026-10-19): an owner tags other listed businesses; once a
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+// ---- Tech fixes, round 9 (2026-10-19): event schema, What's On ItemList, French event pages, occurrence times,
+// event dateLabel, API CORS and one-hop redirects ----
+test('R9 tech: event offers read stated and free prices; organizer is the source, a food & drink host or a league; every date carries both', () => {
+  const p = (t) => app.parseEventPrice(t);
+  assert.deepEqual(p('A jazz jam. 5–7 pm, free. Listeners welcome.'), { price: '0' });
+  assert.deepEqual(p('Pumpkin painting. Free.'), { price: '0' });
+  assert.deepEqual(p("A gaming night. It's free, and players may bring controllers."), { price: '0' });
+  assert.deepEqual(p('A gallery talk. Free with RSVP; the show stays up.'), { price: '0' });
+  assert.deepEqual(p('A pasta class. $55.'), { price: '55' });
+  assert.deepEqual(p('A haunted farm. Kids $5, adults $10, with a VIP option.'), { lowPrice: '5', highPrice: '10' });
+  assert.equal(p('Free-with-admission guided tours of the museum.'), null, 'free with admission is not free');
+  assert.equal(p('A swap. Free puzzles are set aside for families.'), null);
+  assert.equal(p('A concert. $20 suggested donation.'), null, 'a donation is no price');
+  assert.equal(p('A crawl. In past years it has been free to attend.'), null, 'hedged');
+  assert.equal(p('A market with a $15 five-wine tasting and $2 oysters.'), null, 'a side purchase is not the price');
+
+  const winery = { name: 'R9 Test Winery', type: 'winery', region: 'oliver', slug: 'r9-test-winery', website: 'https://r9-winery.example/' };
+  const theatre = { name: 'R9 Test Theatre', type: 'indoor', region: 'kelowna', slug: 'r9-test-theatre', website: 'https://r9-theatre.example/' };
+  const ev = { name: 'R9', region: 'oliver', source_type: 'tourism_org', source_name: 'Tourism Board', description: 'A tasting. Free.' };
+  assert.deepEqual(app.eventOrganizerSchema(ev, winery), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://r9-winery.example/' });
+  assert.deepEqual(app.eventOrganizerSchema(ev, { ...winery, website: null }), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://okanaganroam.com/oliver/wineries/r9-test-winery' });
+  assert.equal(app.eventOrganizerSchema(ev, theatre), undefined, 'a hall is not assumed to run the show');
+  assert.equal(app.eventOrganizerSchema(ev, null), undefined, 'a tourism listing is not the organizer');
+  assert.deepEqual(app.eventOrganizerSchema({ ...ev, source_type: 'league_feed', source_name: 'Okanagan Hockey League', source_url: 'https://ohl.example/s' }, null),
+    { '@type': 'SportsOrganization', name: 'Okanagan Hockey League', url: 'https://ohl.example/s' });
+  assert.equal(app.eventOrganizerSchema({ ...ev, source_type: 'official_organizer', source_name: 'R9 Society' }, winery).name, 'R9 Society', 'the stated organizer wins');
+
+  const fake = { ...ev, id: 1, status: 'scheduled', slug: 'r9', venue_name_text: 'R9 Test Winery', valley_wide: 0, website: null, image_url: null };
+  const occs = ['2099-07-01', '2099-07-08', '2099-07-15'].map((d, i) => ({ id: i + 1, start_date: d, end_date: d, start_time: '18:00', end_time: '20:00', all_day: 0, ends_next_day: 0 }));
+  const ld = app.eventJsonLd(fake, occs, ['wineries-wine-events'], winery, 'https://okanaganroam.com/oliver/events/r9', '2099-01-01');
+  assert.equal(ld.offers.price, '0');
+  assert.equal(ld.organizer.name, 'R9 Test Winery');
+  assert.equal(ld.subEvent.length, 2);
+  for (const sub of ld.subEvent) {
+    assert.equal(sub.offers.price, '0', 'each date has the offer');
+    assert.equal(sub.organizer.name, 'R9 Test Winery', 'each date has the organizer');
+  }
+  // Valid JSON with no undefined left in it.
+  assert.doesNotMatch(JSON.stringify(ld), /undefined|null,"url"/);
+});
+
+test('R9 tech: /whats-on and /fr/whats-on carry an ItemList of the cards on show', () => withDiscoveryServer(async (base) => {
+  const day = app.addLocalDays(app.todayLocal(), 2);
+  const ev = s5create({ name: 'R9 ItemList Show', occurrences: [{ start_date: day, start_time: '19:00', end_time: '21:00' }] });
+  try {
+    for (const [p, prefix] of [['/whats-on', ''], ['/fr/whats-on', '/fr']]) {
+      const html = await (await fetch(base + p)).text();
+      const lists = s5jsonLd(html).filter((b) => b['@type'] === 'ItemList');
+      assert.equal(lists.length, 1, `${p}: one ItemList`);
+      const urls = lists[0].itemListElement.map((x) => x.url);
+      assert.ok(urls.length > 0 && urls.length <= 100);
+      assert.equal(lists[0].numberOfItems, urls.length);
+      assert.ok(urls.includes(`https://okanaganroam.com${prefix}/kelowna/events/${ev.slug}`), `${p} lists the fixture`);
+      lists[0].itemListElement.forEach((x, i) => assert.equal(x.position, i + 1));
+      // Every listed event is a card in the page's HTML.
+      for (const u of urls) assert.ok(html.includes(`href="${u.replace('https://okanaganroam.com', '')}"`), u);
+    }
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+}));
+
+test('R9 tech: every event in a /fr list has a French page; an untranslated one is English text, noindex, no hreflang', () => withDiscoveryServer(async (base) => {
+  const day = app.addLocalDays(app.todayLocal(), 3);
+  const ev = s5create({ name: 'R9 English Only Show', description: 'R9 fixture text with no French translation at all.', occurrences: [{ start_date: day, start_time: '19:00' }] });
+  try {
+    const enPath = `/kelowna/events/${ev.slug}`;
+    assert.equal(app.hasFrenchTwin(enPath), true);
+    assert.equal(app.frEventUntranslated(enPath), true);
+    const fr = await fetch(`${base}/fr${enPath}`);
+    assert.equal(fr.status, 200);
+    const frHtml = await fr.text();
+    assert.match(frHtml, /<html lang="fr"/);
+    assert.match(frHtml, /<meta name="robots" content="noindex, follow">/);
+    assert.doesNotMatch(frHtml, /hreflang="fr-CA"/);
+    assert.match(frHtml, /<p class="event-body" lang="en">R9 fixture text/);
+    assert.match(frHtml, /Description offerte en anglais seulement/);
+    assert.match(frHtml, /<title>R9 English Only Show — Événement à Kelowna/);
+    const enHtml = await (await fetch(base + enPath)).text();
+    assert.doesNotMatch(enHtml, /hreflang="fr-CA"/, 'the English page names no noindex twin');
+    assert.match(enHtml, new RegExp(`id="langToggle" href="/fr${enPath}"`), 'but its EN / FR switch goes there');
+    const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+    assert.ok(!sitemap.includes(`<loc>https://okanaganroam.com/fr${enPath}</loc>`), 'not in the sitemap');
+
+    // The French lists link only to French event pages, and each of them is there.
+    const seen = new Set();
+    for (const list of ['/fr/whats-on', '/fr/whats-on/live-music', '/fr/kelowna/events']) {
+      const html = await (await fetch(base + list)).text();
+      for (const m of html.matchAll(/(?:href|data-href)="((?:\/fr)?\/[a-z-]+\/events\/[a-z0-9-]+)"/g)) {
+        if (/\/this-weekend$/.test(m[1])) continue;
+        assert.ok(m[1].startsWith('/fr/'), `${list} links ${m[1]}`);
+        seen.add(m[1]);
+      }
+    }
+    assert.ok(seen.has(`/fr${enPath}`), 'the fixture is listed');
+    for (const p of [...seen].slice(0, 80)) assert.equal((await fetch(base + p, { redirect: 'manual' })).status, 200, p);
+
+    // Bunnicula's description has French now.
+    const bunnicula = 'A colourful family musical at The Balsam School: when a mysterious bunny arrives and the veggies start losing their colour, the household pets take the case. Is Bunnicula a vampire, or just a misunderstood bunny? The show runs about 60 minutes and suits all ages. Tickets are $25 adult, $12.50 child, or $35 for a one-adult, one-child Dynamic Duo. Each day has three shows, at 10 am, 1 pm and 4 pm.';
+    assert.match(app.frText(bunnicula), /^Une comédie musicale colorée/);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+}));
+
+test('R9 tech: a type page lists other types\' events without crawlable links; the filter script restores them', () => {
+  const html = app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/other-kind"><span class="venue-card-name">Other Kind</span></a></h2></li>'
+    + '<li class="venue-card whatson-event-card" data-venue-id="event-2"><h2><a class="venue-card-link" href="/kelowna/events/this-kind"><span class="venue-card-name">This Kind</span></a></h2></li>', 'en');
+  assert.doesNotMatch(html, /\shref="\/kelowna\/events\/other-kind"/);
+  assert.ok(html.includes('data-href="/kelowna/events/other-kind"'));
+  assert.ok(html.includes('<li><a href="/kelowna/events/this-kind">'));
+  const page = app.renderWhatsOnPage(null);
+  assert.ok(page.includes("a.getAttribute('href') || a.getAttribute('data-href')"));
+  assert.ok(page.includes("x.a.setAttribute('href', x.a.getAttribute('data-href'))"));
+  // On a French page the hidden address is French too.
+  const real = html.replace(/\/kelowna\/events\/(?:this|other)-kind/g, '/kelowna/events/test-future-festival');
+  const fr = app.frenchTwinHtml(`<!DOCTYPE html><html lang="en"><head>\n<link rel="canonical" href="https://okanaganroam.com/whats-on">\n</head><body>${real}</body></html>`, '/whats-on');
+  assert.ok(fr.includes(' href="/fr/kelowna/events/test-future-festival"'));
+  assert.ok(fr.includes('data-href="/fr/kelowna/events/test-future-festival"'), 'a hidden link on a French page is French');
+});
+
+test('R9 tech: PATCH an occurrence\'s times (token-guarded, validated, logged) and the set-occurrence-times script', () => withDiscoveryServer(async (base) => {
+  const ev = s5create({ name: 'R9 Morning Show', occurrences: [
+    { start_date: '2032-10-31', start_time: '10:00', end_time: '17:00' }, { start_date: '2032-10-31', start_time: '13:00', end_time: '14:00' },
+  ] });
+  const occs = app.listEventOccurrences(ev.id);
+  const morning = occs.find((o) => o.start_time === '10:00');
+  const url = `${base}/api/events/${ev.id}/occurrences/${morning.id}`;
+  const patch = (body, token = process.env.ENRICHMENT_ADMIN_TOKEN) => fetch(url, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body),
+  }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  const meta = { reason: 'r9 fixture: 60-minute show', batch_id: 'r9-times' };
+  try {
+    assert.equal((await patch({ end_time: '11:00', ...meta }, null)).status, 401);
+    assert.equal((await patch({ end_time: '11:00', ...meta }, 'wrong')).status, 401);
+    assert.equal((await patch({ end_time: '11:00' })).status, 400, 'reason and batch are required');
+    assert.equal((await patch({ end_time: '25:00', ...meta })).status, 400);
+    assert.equal((await patch({ end_time: '09:00', ...meta })).status, 400, 'ends before it starts');
+    assert.equal((await patch({ end_time: '11:00', status: 'cancelled', ...meta })).status, 400, 'times or status, not both');
+    assert.equal((await patch({ start_time: '13:00', ...meta })).status, 409, 'clashes with the 1 pm show');
+    const ok = await patch({ end_time: '11:00', ...meta });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.changed, true);
+    assert.deepEqual([ok.body.occurrence.start_date, ok.body.occurrence.start_time, ok.body.occurrence.end_time], ['2032-10-31', '10:00', '11:00']);
+    const log = db.prepare('SELECT field_name, old_value, new_value, batch_id FROM event_enrichment_log WHERE event_id = ? AND occurrence_id = ? AND batch_id = ?').all(ev.id, morning.id, 'r9-times');
+    assert.deepEqual(log.map((r) => ({ ...r })), [{ field_name: 'end_time', old_value: '17:00', new_value: '11:00', batch_id: 'r9-times' }]);
+    assert.equal((await patch({ end_time: '11:00', ...meta })).body.changed, false, 'a re-run changes nothing');
+    assert.equal(app.getEventById(ev.id).end_datetime, '2032-10-31T14:00:00-07:00', 'the span is recomputed');
+    // The status PATCH still works.
+    assert.equal((await patch({ status: 'scheduled', ...meta })).status, 200);
+    // CORS: the write answer grants nothing to other sites.
+    const r = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    assert.equal(r.headers.get('access-control-allow-origin'), null);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+  const script = require('../scripts/set-occurrence-times.js');
+  assert.deepEqual(script.plan(script.parseArgs(['--event', '505', '--occurrences', '814,815', '--end', '11:00'])), { eventId: 505, occIds: [814, 815], times: { end_time: '11:00' } });
+  assert.deepEqual(script.parseArgs(['--event=5', '--apply']), { event: '5', apply: true });
+  assert.throws(() => script.plan(script.parseArgs(['--event', '505', '--occurrences', '814'])), /--start and\/or --end/);
+  assert.throws(() => script.plan(script.parseArgs(['--event', '505', '--occurrences', '814', '--end', '5pm'])), /HH:MM/);
+}));
+
+test('R9 tech: /api/events/:id dates describe what is still to come', () => {
+  const ev = s5create({ name: 'R9 Weekly Market', recurrence_rule: 'Thursdays', occurrences: ['2032-09-23', '2032-09-30', '2032-10-21', '2032-10-28'].map((d) => ({ start_date: d, start_time: '08:00', end_time: '13:00' })) });
+  try {
+    const detail = app.whatsOnPublicEventDetail(app.getEventById(ev.id), new Date('2032-10-15T18:00:00Z'));
+    assert.match(detail.dateLabel, /next Thu Oct 21$/, detail.dateLabel);
+    assert.equal(detail.occurrences.length, 4, 'every date is still listed');
+    const over = app.whatsOnPublicEventDetail(app.getEventById(ev.id), new Date('2033-01-15T18:00:00Z'));
+    assert.match(over.dateLabel, /next Thu Sep 23$/, 'all over: as before');
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+});
+
+test('R9 tech: API CORS covers public reads only (GET/HEAD/OPTIONS)', () => withDiscoveryServer(async (base) => {
+  const get = await fetch(`${base}/api/venues`);
+  assert.equal(get.headers.get('access-control-allow-origin'), '*');
+  assert.equal(get.headers.get('access-control-allow-methods'), 'GET, HEAD, OPTIONS');
+  const pre = (method, p = '/api/events') => fetch(base + p, { method: 'OPTIONS', headers: { Origin: 'https://elsewhere.example', 'Access-Control-Request-Method': method } });
+  const okPre = await pre('GET');
+  assert.equal(okPre.status, 204);
+  assert.equal(okPre.headers.get('access-control-allow-origin'), '*');
+  assert.doesNotMatch(okPre.headers.get('access-control-allow-methods'), /PUT|POST|DELETE|PATCH/);
+  for (const m of ['PUT', 'POST', 'DELETE', 'PATCH']) assert.equal((await pre(m)).headers.get('access-control-allow-origin'), null, m);
+  assert.equal((await pre('GET', '/owner/login')).headers.get('access-control-allow-origin'), null, 'not outside /api/');
+  const post = await fetch(`${base}/api/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(post.status, 401);
+  assert.equal(post.headers.get('access-control-allow-origin'), null);
+  assert.equal((await fetch(`${base}/about`)).headers.get('access-control-allow-origin'), null);
+}));
+
+test('R9 tech: a trailing slash or capital letters on a redirecting address take one hop', () => withDiscoveryServer(async (base) => {
+  const go = (p) => fetch(base + p, { redirect: 'manual' });
+  for (const [from, to, status] of [['/owner/', '/owner/login', 302], ['/fr/owner/', '/fr/owner/login', 302], ['/owner/?utm_source=x', '/owner/login?utm_source=x', 302], ['/kelowna/', '/kelowna', 301]]) {
+    const r = await go(from);
+    assert.equal(r.status, status, from);
+    assert.equal(r.headers.get('location'), to, from);
+  }
+  const old = app.createVenue({ name: 'R9 Old Copy Cafe', region: 'kelowna', type: 'cafe', description: 'fixture', slug: 'r9-old-copy-cafe' });
+  const keep = app.createVenue({ name: 'R9 Kept Cafe', region: 'kelowna', type: 'cafe', description: 'fixture', slug: 'r9-kept-cafe' });
+  try {
+    db.prepare('UPDATE venues SET redirect_to = ? WHERE id = ?').run(keep.id, old.id);
+    for (const p of ['/kelowna/cafes/r9-old-copy-cafe/', '/Kelowna/Cafes/r9-old-copy-cafe', '/kelowna/cafes/r9-old-copy-cafe']) {
+      const r = await go(p);
+      assert.equal(r.status, 301, p);
+      assert.equal(r.headers.get('location'), '/kelowna/cafes/r9-kept-cafe', p);
+    }
+    // A category correction: /kelowna/restaurants/<cafe slug>/ goes straight to the cafe page.
+    const moved = await go('/kelowna/restaurants/r9-kept-cafe/');
+    assert.equal(moved.status, 301);
+    assert.equal(moved.headers.get('location'), '/kelowna/cafes/r9-kept-cafe');
+    // A French address of a place with no French page: one 302 to the English page.
+    const fr = await go('/fr/kelowna/cafes/r9-kept-cafe/');
+    assert.equal(fr.status, 302);
+    assert.equal(fr.headers.get('location'), '/kelowna/cafes/r9-kept-cafe');
+    // A live page just loses the slash.
+    const live = await go('/kelowna/cafes/r9-kept-cafe/?a=1');
+    assert.equal(live.status, 301);
+    assert.equal(live.headers.get('location'), '/kelowna/cafes/r9-kept-cafe?a=1');
+  } finally {
+    db.prepare('UPDATE venues SET redirect_to = NULL WHERE id = ?').run(old.id);
+    for (const v of [old, keep]) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+}));
