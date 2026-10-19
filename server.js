@@ -4059,8 +4059,19 @@ function discoveryNotApplied(intent) {
 function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() } = {}) {
   const intent = interpretDiscoveryText(text);
   const destination = resolveDiscoveryDestination(intent);
-  const venues = selectDiscoveryVenues(intent, limit);
+  let venues = selectDiscoveryVenues(intent, limit);
   const events = selectDiscoveryEvents(intent, limit, now);
+  // Search pass 5 (2026-10-19): no place has every word -> the places that have some of them, most words first,
+  // unless the words nearly spell a place's name ("mision hill" still offers Mission Hill under "Did you mean").
+  let anyWord = false;
+  if (!venues.total && intent.mode !== 'events' && intent.mode !== 'unknown' && (intent.textTerms || []).length >= 2
+    && !smartFuzzyVenues(text, intent).length) {
+    const found = discoverySearchModule().searchVenuesAnyWord(intent, discoverySearchVenues());
+    if (found.total) {
+      anyWord = true;
+      venues = { total: found.total, items: found.items.slice(0, limit).map((x) => discoveryVenueItem(x.venue.row, x.matchedOn)), exclusions: found.exclusions };
+    }
+  }
   const run = {
     query: text,
     intent,
@@ -4070,13 +4081,22 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() 
       // Stage 3.3, additive: which of the request's exclusions ("not in
       // Kelowna", "no breweries", "nothing fancy") the venue results apply,
       // and which they do not (still listed in notApplied as before).
-      : { kind: venues.total ? 'venues' : 'none', total: venues.total, items: venues.items, exclusions: venues.exclusions },
+      : { kind: venues.total ? 'venues' : 'none', total: venues.total, items: venues.items, exclusions: venues.exclusions, ...(anyWord ? { match: 'any' } : {}) },
+    // Search pass 5 (2026-10-19), additive: What's On events whose name or description has the words ("cider fest",
+    // "corn maze"), for a place search that has free-text words.
     notApplied: discoveryNotApplied(intent),
     // Stage 3.4, additive: how to present this request to a visitor (the
     // /search page): their own words, the interpretation, corrections,
     // what was and was not applied, and closed-source suggestions.
     presentation: null,
   };
+  // Search pass 5 (2026-10-19), additive: What's On events whose name or description has the words ("cider fest",
+  // "corn maze"), for a place search with free-text words. Only present when some event matches.
+  const textEvents = intent.mode === 'events' ? null : searchTextEvents(intent, now);
+  // The full event cards, for the /search page (not part of the JSON).
+  if (textEvents) Object.defineProperty(run, 'textEvents', { value: textEvents, enumerable: false });
+  if (textEvents && textEvents.total) run.events = { total: textEvents.total, items: textEvents.items.slice(0, limit).map((e) => ({
+    id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide, categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '' })) };
   run.presentation = discoveryPresentation(run);
   return run;
 }
@@ -4168,6 +4188,7 @@ function discoveryPresentation(run) {
   else status = 'no_results';
 
   const notes = [];
+  if (run.results.match === 'any') notes.push({ code: 'any_words', field: 'text', value: intent.textTerms.join(' ') });
   const plan = discoverySearchModule().exclusionPlan(intent.excluded);
   for (const a of plan.applied) notes.push({ code: status === 'results' ? 'exclusion_applied' : 'exclusion_understood', field: a.field, value: a.value });
   for (const a of plan.notApplied) notes.push({ code: 'exclusion_not_applied', field: a.field, value: a.value });
@@ -4229,6 +4250,8 @@ function heroSearchTarget(text, { lang = 'en' } = {}) {
   const plan = smartSearchPlan(text, intent);
   if (plan && plan.url) return { url: plan.url, reason: `intent_${plan.key}` };
   if (plan && plan.list) return { url: search, reason: `intent_${plan.key}` };
+  // Search pass 5 (2026-10-19): a place whose name holds the words typed ("19 bistro") -> /search, that place first.
+  if (intent.mode !== 'events' && smartNameMatches(text, intent).length) return { url: search, reason: 'name_match' };
   if (intent.cuisines.length) return { url: search, reason: 'cuisine' };
   // A plain one-word text search (/browse?q=<word>, nothing else) is not a
   // page of its own: the one-word rule below decides, so "Poutine" is never
@@ -4275,6 +4298,7 @@ function discoveryNoteText(n, labels) {
   if (n.code === 'exclusion_applied') return n.field === 'budget'
     ? 'Nothing upscale: places at the highest price level ($$) are left out. Places without a listed price are kept.'
     : `Understood “${what(n.field, n.value)}” and left those out.`;
+  if (n.code === 'any_words') return 'No place has every one of those words, so these have some of them, the most words first.';
   if (n.code === 'exclusion_understood') return `Understood “${what(n.field, n.value)}”.`;
   if (n.code === 'exclusion_not_applied') return n.field === 'feature'
     ? `Understood “${what(n.field, n.value)}”, but search can’t leave places out by a badge, so none were removed.`
@@ -4363,6 +4387,17 @@ function smartRegionWords() {
   const words = [];
   for (const [slug, label] of Object.entries(REGION_LABELS)) { words.push(smartFold(label), smartFold(slug.replace(/-/g, ' '))); }
   return uniqueList(words.filter(Boolean));
+}
+// Search pass 5 (2026-10-19): the words that name a kind of place ("wineries", "restaurant", "vignobles"), which the
+// interpreter has already read as a type.
+let smartTypeWordsCache = null;
+function smartTypeWords() {
+  if (!smartTypeWordsCache) {
+    const words = [];
+    for (const labels of [CATEGORY_LABELS, CATEGORY_LABELS_FR]) for (const l of Object.values(labels)) words.push(smartFold(l.plural), smartFold(l.singular));
+    smartTypeWordsCache = uniqueList([...words, 'winery', 'wineries', 'restaurant', 'restaurants', 'cafe', 'cafes', 'pub', 'pubs', 'brewery', 'breweries', 'bar', 'bars', 'lounge', 'lounges'].filter(Boolean));
+  }
+  return smartTypeWordsCache;
 }
 // Ski requests (2026-10-18) and the words that add nothing to one.
 const SMART_SKI_WORDS = ['ski', 'skiing', 'skis', 'ski hill', 'ski hills', 'ski resort', 'ski resorts', 'downhill skiing', 'ski area', 'ski areas'];
@@ -4560,6 +4595,127 @@ function smartRomancePick(types, region, features, extraRe = null) {
   }, (v) => scores.get(v.id));
 }
 
+// ---------- Search pass 5 (2026-10-19): events, exact names, views, free things and open now ----------
+// Site review pass 4: "cider fest" and "corn maze" found no events, "best views" and "open now" found nothing,
+// "free things to do" listed coffee shops, and "19 bistro" listed every restaurant without 19 Bistro @ Fitz.
+
+// One word matches itself, its singular or its plural ("fests" finds "Fest", "maze" finds "Mazes").
+function searchWordIn(folded, word) {
+  const w = smartFold(word);
+  if (!w) return false;
+  const forms = uniqueList([w, smartStem(w), `${w}s`, `${smartStem(w)}s`]);
+  return smartHas(folded, forms);
+}
+// What's On events (the next WHATSON_DEFAULT_WINDOW_DAYS) whose name or description has every word, best first: the
+// most words in the name, then the soonest. With three or more words and no event that has them all, the events
+// that miss only one. `test` (optional) is a plan's own rule (free events) and replaces the words.
+function searchEventsFor({ terms = [], regions = [], test = null, now = new Date() } = {}) {
+  const words = uniqueList((terms || []).map(smartFold).filter(Boolean));
+  if (!words.length && !test) return { total: 0, items: [] };
+  const win = resolveWhatsOnWindow({}, now);
+  const events = filterWhatsOnEvents(getWhatsOnEvents(win), regions || [], []);
+  const rows = [];
+  for (const e of events) {
+    const name = smartFold(e.name), text = `${name} ${smartFold(e.description || '')}`;
+    if (test) { if (test(e, text)) rows.push({ e, hits: 1, inName: 0 }); continue; }
+    const hits = words.filter((w) => searchWordIn(text, w)).length;
+    rows.push({ e, hits, inName: words.filter((w) => searchWordIn(name, w)).length });
+  }
+  let picked = rows.filter((r) => r.hits === Math.max(1, words.length));
+  if (!picked.length && words.length >= 3) picked = rows.filter((r) => r.hits === words.length - 1);
+  picked.sort((a, b) => b.inName - a.inName || String(a.e.startDate).localeCompare(String(b.e.startDate)) || a.e.id - b.e.id);
+  return { total: picked.length, items: picked.map((r) => r.e) };
+}
+// The events for a place search's own words (runDiscovery): only when the request has free-text words.
+function searchTextEvents(intent, now = new Date()) {
+  if (!intent || intent.mode === 'navigate' || intent.mode === 'events' || !(intent.textTerms || []).length) return { total: 0, items: [] };
+  return searchEventsFor({ terms: intent.textTerms, regions: intent.regions, now });
+}
+
+// Exact names first: places whose name is, starts with, or holds the words typed as a whole phrase ("19 bistro" ->
+// 19 Bistro @ Fitz). Only for words the structured reading ignores (a number like "19", or free-text words), so
+// "wineries in Oliver" never turns into a name search. Best first: the same name, then names starting with it, then
+// names holding it.
+function smartNameMatches(text, intent) {
+  if (!intent || intent.mode === 'events') return [];
+  const raw = smartFold(text);
+  const terms = new Set((intent.textTerms || []).map(smartFold));
+  const distinctive = raw.split(' ').some((w) => /\d/.test(w) || terms.has(w));
+  if (!distinctive) return [];
+  const phrases = uniqueList([raw, smartTopicWords(raw, intent).join(' ')]).filter((q) => q.replace(/ /g, '').length >= 3 && !SMART_NAME_GENERIC.has(q));
+  if (!phrases.length) return [];
+  const found = [];
+  for (const v of discoverySearchVenues()) {
+    if (intent.regions.length && !intent.regions.includes(v.region)) continue;
+    const name = smartFold(v.row.name);
+    let tier = 9;
+    for (const q of phrases) {
+      if (name === q) tier = Math.min(tier, 0);
+      else if (name.startsWith(`${q} `)) tier = Math.min(tier, 1);
+      else if (` ${name} `.includes(` ${q} `)) tier = Math.min(tier, 2);
+    }
+    if (tier < 9) found.push({ row: v.row, tier });
+  }
+  return found.sort((a, b) => a.tier - b.tier || foodDrinkRecommendedScore(b.row) - foodDrinkRecommendedScore(a.row) || String(a.row.name).localeCompare(String(b.row.name)));
+}
+
+// Views: viewpoints and lookouts, then places with a lake view (a patio with one first), then places whose own
+// description talks about the view. "patios with a view" keeps the Patio badge; a town keeps the town.
+const SMART_VIEW_WORDS = ['view', 'views', 'best view', 'best views', 'great views', 'great view', 'good views', 'scenic', 'scenic view', 'scenic views', 'with a view', 'with views',
+  'viewpoint', 'viewpoints', 'view point', 'view points', 'lookout', 'lookouts', 'look out', 'panorama', 'panoramas', 'panoramic', 'overlook', 'overlooks', 'sunset', 'sunsets', 'sunset views',
+  'vue', 'vues', 'belle vue', 'belles vues', 'meilleure vue', 'meilleures vues', 'best vues', 'avec vue', 'point de vue', 'points de vue', 'belvedere', 'belvederes', 'panoramique'];
+const SMART_VIEW_GENERIC = [...SMART_ACTIVITY_GENERIC, 'with', 'a', 'and', 'of', 'over', 'lake', 'the lake', 'patio', 'patios', 'deck', 'terrace', 'terrasse', 'terrasses', 'great', 'good', 'nice', 'amazing',
+  'beautiful', 'stunning', 'see', 'watch', 'avec', 'sur', 'le', 'lac', 'sur le lac', 'belle', 'belles', 'meilleure', 'meilleures', 'plus', 'beaux', 'beau'];
+const SMART_VIEW_TYPES = new Set(['outdoor', 'beach', 'winery', 'restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'golf']);
+const SMART_VIEW_NAME_RE = /\b(?:look ?outs?|view ?points?|overlooks?|summit|lookout|bluffs?|panorama)\b/i;
+const SMART_VIEW_DESC_RE = /\b(?:views?|vistas?|panoram\w*|overlook\w*|lookouts?|viewpoints?)\b/i;
+function smartViewsPick(types, region, features) {
+  return smartPickVenues((v) => {
+    if ((region && v.region !== region) || !features.every((f) => v.features[f])) return false;
+    if (types.length ? !(types.includes(v.type) || v.fdTypes.some((t) => types.includes(t))) : !SMART_VIEW_TYPES.has(v.type)) return false;
+    if (v.activities.includes('viewpoints') || SMART_VIEW_NAME_RE.test(String(v.row.name || ''))) return 'A viewpoint or lookout';
+    if (v.features.lake_view) return v.features.patio ? 'Patio with a lake view' : 'Lake view';
+    return SMART_VIEW_DESC_RE.test(String(v.row.description || '')) ? 'Mentions the view' : false;
+  }, (v) => (v.activities.includes('viewpoints') || SMART_VIEW_NAME_RE.test(String(v.row.name || '')) ? 100 : 0)
+    + (v.features.lake_view ? (v.features.patio ? 60 : 40) : 0) + (SMART_VIEW_DESC_RE.test(String(v.row.description || '')) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+}
+
+// Free things to do: beaches, parks, trails and viewpoints, and places whose description says entry is free, plus
+// What's On events listed as free. Never "gluten free" or "alcohol free".
+const SMART_FREE_WORDS = ['free', 'for free', 'free things', 'free things to do', 'free stuff', 'free activities', 'free activity', 'free fun', 'free events', 'free event', 'no cost', 'no charge',
+  'gratuit', 'gratuits', 'gratuite', 'gratuites', 'gratuitement', 'sans frais'];
+const SMART_FREE_NOT = ['gluten free', 'dairy free', 'alcohol free', 'sugar free', 'nut free', 'free range', 'scent free', 'smoke free', 'sans gluten', 'sans alcool'];
+const SMART_FREE_GENERIC = [...SMART_FAMILY_GENERIC, 'parks', 'park', 'beach', 'beaches', 'attraction', 'attractions', 'outdoors', 'outside', 'trail', 'trails', 'hike', 'hikes', 'choses', 'chose',
+  'plages', 'plage', 'parcs', 'parc', 'sorties', 'sortie', 'at', 'cheap', 'budget', 'kid', 'dogs', 'dog'];
+const SMART_FREE_TYPES = new Set(['beach', 'outdoor']);
+const SMART_FREE_ACTIVITIES = ['hiking', 'nature', 'viewpoints'];
+const SMART_FREE_DESC_RE = /\bfree (?:admission|entry|entrance|to (?:visit|enter|explore|use|attend|the public))\b|\badmission is free\b|\bno (?:admission|entry|entrance) (?:fee|charge)\b|\bby donation\b|\bfree of charge\b|\bentr[ée]e (?:libre|gratuite)\b/i;
+const SMART_FREE_EVENT_RE = /(?<![-\w])(?<!gluten[- ]|dairy[- ]|alcohol[- ]|sugar[- ]|nut[- ]|scent[- ])free\b(?![- ](?:range|parking|shuttle|wi-?fi|samples?|gift|refills?|delivery))|\bby donation\b|\bno (?:cover|charge)\b|\bgratuit/i;
+function smartFreePick(region, features) {
+  return smartPickVenues((v) => {
+    if ((region && v.region !== region) || !features.every((f) => v.features[f])) return false;
+    if (SMART_FREE_DESC_RE.test(String(v.row.description || ''))) return 'Says entry is free';
+    if (v.type === 'beach') return 'Beach';
+    if (v.type === 'outdoor' && v.activities.some((a) => SMART_FREE_ACTIVITIES.includes(a))) return v.activities.includes('viewpoints') ? 'Viewpoint' : 'Park or trail';
+    return false;
+  }, (v) => (SMART_FREE_DESC_RE.test(String(v.row.description || '')) ? 20 : 0) + (SMART_FREE_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+}
+
+// Open now: the places open right now by their listed hours (the same hours engine as the cards), for the rest of
+// the request ("wineries open now", "sushi open now in Penticton"), or every kind of place for "open now" alone.
+const SMART_OPEN_WORDS = ['open now', 'opened now', 'open right now', 'right now open', 'currently open', 'open at the moment', 'whats open', 'what s open', 'whats open now', 'what is open', 'what is open now',
+  'ouvert maintenant', 'ouverts maintenant', 'ouverte maintenant', 'ouvertes maintenant', 'ouvert en ce moment', 'ouverts en ce moment', 'ouverts right now', 'ouvert right now', 'ouvertes right now',
+  'ouvert actuellement', 'ouverts actuellement'];
+const SMART_OPEN_TOKENS = new Set(['open', 'opened', 'now', 'right', 'currently', 'moment', 'whats', 'what', 'is', 'ouvert', 'ouverts', 'ouverte', 'ouvertes', 'maintenant', 'actuellement', 'en', 'ce']);
+function smartOpenNowPick(intent, now = new Date()) {
+  const base = { ...intent, textTerms: (intent.textTerms || []).filter((t) => !SMART_OPEN_TOKENS.has(t)), unsupported: [] };
+  const hasFilter = base.regions.length || base.types.length || base.features.length || base.collections.length || base.activities.length || base.cuisines.length || base.textTerms.length;
+  const rows = hasFilter ? discoverySearchModule().searchVenues(base, discoverySearchVenues()).items.map((x) => x.venue.row)
+    : discoverySearchVenues().map((v) => v.row).sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || String(a.name).localeCompare(String(b.name)));
+  const info = foodDrinkOpenNowInfo(rows, getAdvisoryNotes(now), now, { requireVerified: false });
+  return rows.filter((r) => info.openIds.has(r.id)).map((r) => ({ row: r, why: (info.byId.get(r.id) || {}).text || 'Open now', rank: 0 }));
+}
+
 // The plan for a request, or null to keep the routing above:
 //   { key, url } -> send the visitor straight to that page
 //   { key, list() } -> /search shows exactly that list (heading, headingFr)
@@ -4591,6 +4747,54 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
         list: pick,
       };
     }
+  }
+
+  // Search pass 5 (2026-10-19): "open now" -> what is open right now (Food & Drink types alone keep their own page's
+  // Open now filter); "best views" -> viewpoints and lake views; "free things to do" -> free places and free events.
+  if (intent.mode !== 'events' && (smartHas(folded, SMART_OPEN_WORDS) || intent.unsupported.includes('open now'))) {
+    const fd = discoveryOpenNowDestination(intent);
+    if (fd) return { key: 'open_now', url: fd };
+    const one = T.length === 1 ? T[0] : null;
+    return {
+      key: 'open_now',
+      heading: `${one ? `${CATEGORY_LABELS[one].plural} open now` : 'Open now'}${town ? ` in ${town}` : ''}`,
+      headingFr: `Ouvert maintenant${one ? ` : ${CATEGORY_LABELS_FR[one].plural.toLowerCase()}` : ''}${town ? ` à ${town}` : ''}`,
+      emptyText: 'Nothing that fits is open right now by its listed hours. Try again later, or search without “open now”.',
+      emptyTextFr: 'Rien de ce qui correspond n’est ouvert en ce moment selon les heures indiquées. Réessayez plus tard, ou cherchez sans « ouvert maintenant ».',
+      guides: [],
+      list: () => smartOpenNowPick(intent, now),
+    };
+  }
+  const typeWords = smartTypeWords();
+  const viewText = smartStrip(folded, ['lake view', 'lake views', 'lakeview', 'lakeviews', 'vue sur le lac', 'vues sur le lac']).join(' ');
+  const viewpointsOnly = intent.activities.length === 1 && intent.activities[0] === 'viewpoints';
+  if (smartHas(viewText, SMART_VIEW_WORDS) && T.every((t) => SMART_VIEW_TYPES.has(t)) && !intent.cuisines.length && !intent.collections.length
+    && (!intent.activities.length || (viewpointsOnly && (T.length || F.length || smartHas(folded, ['view', 'views', 'best view', 'best views', 'vue', 'vues']))))
+    && !smartTopicWords(folded, intent, [...SMART_VIEW_WORDS, ...SMART_VIEW_GENERIC, ...typeWords]).length) {
+    const feats = F.filter((f) => f !== 'lake_view');
+    const pick = () => smartViewsPick(T, region, feats);
+    if (pick().length) {
+      return {
+        key: 'views',
+        heading: `${feats.includes('patio') ? 'Patios with a view' : 'Best views'}${town ? ` in ${town}` : ''}`,
+        headingFr: `${feats.includes('patio') ? 'Terrasses avec vue' : 'Les plus belles vues'}${town ? ` à ${town}` : ''}`,
+        guides: [],
+        list: pick,
+      };
+    }
+  }
+  if (smartHas(folded, SMART_FREE_WORDS) && !smartHas(folded, SMART_FREE_NOT) && !F.includes('gluten_free') && T.every((t) => SMART_FREE_TYPES.has(t))
+    && !intent.cuisines.length && !intent.collections.length
+    && !smartTopicWords(folded, intent, [...SMART_FREE_WORDS, ...SMART_FREE_GENERIC, ...typeWords]).length) {
+    const eventsOnly = intent.mode === 'events' || smartHas(folded, ['event', 'events', 'evenement', 'evenements']);
+    return {
+      key: 'free',
+      heading: `${eventsOnly ? 'Free events' : 'Free things to do'}${town ? ` in ${town}` : ''}`,
+      headingFr: `${eventsOnly ? 'Événements gratuits' : 'Activités gratuites'}${town ? ` à ${town}` : ''}`,
+      guides: [],
+      list: () => (eventsOnly ? [] : smartFreePick(region, F).filter((x) => !T.length || T.includes(x.row.type))),
+      events: () => searchEventsFor({ regions: R, test: (e) => SMART_FREE_EVENT_RE.test(`${e.name || ''} ${e.description || ''}`), now }),
+    };
   }
 
   // Breakfast and brunch.
@@ -4846,6 +5050,7 @@ function discoveryNoteTextFr(n, labels) {
   if (n.code === 'exclusion_applied') return n.field === 'budget'
     ? 'Rien de haut de gamme : les lieux au niveau de prix le plus élevé ($$) sont exclus. Les lieux sans prix indiqué sont conservés.'
     : `Compris : « ${what(n.field, n.value)} ». Ces lieux ont été exclus.`;
+  if (n.code === 'any_words') return 'Aucun lieu n’a tous ces mots : voici ceux qui en ont certains, les plus proches d’abord.';
   if (n.code === 'exclusion_understood') return `Compris : « ${what(n.field, n.value)} ».`;
   if (n.code === 'exclusion_not_applied') return n.field === 'feature'
     ? `Compris : « ${what(n.field, n.value)} », mais la recherche ne peut pas exclure de lieux selon un badge; aucun n’a été retiré.`
@@ -4862,6 +5067,22 @@ function discoveryNoteTextFr(n, labels) {
 // Search gaps (2026-10-18): every match is on the page (the cards past the first 48 wait in a template and load their
 // photos lazily), so nothing is left out unexplained; past this cap the count says "Showing the top N of M".
 const SEARCH_PAGE_MAX_RESULTS = 3000;
+const SEARCH_PAGE_EVENT_LIMIT = 12;
+// Search pass 5 (2026-10-19): the What's On events that match, as a short list above the places.
+function searchEventsHtml(model, lang) {
+  const { total, items } = model.events || { total: 0, items: [] };
+  if (!items.length) return '';
+  const fr = lang === 'fr', esc = escapeHtml, today = todayLocal(model.now);
+  const head = fr ? `Événements (${total})` : `Events (${total})`;
+  const more = total > items.length ? `<p class="search-events-more"><a href="/whats-on">${esc(fr ? `Voici les ${items.length} premiers. Tout ce qui se passe` : `Showing the first ${items.length}. See everything on What’s On`)} &rarr;</a></p>` : '';
+  return `<section class="search-events" aria-labelledby="searchEventsHead">
+    <h2 id="searchEventsHead">${esc(head)}</h2>
+    <ul class="search-event-list">${items.map((e) => `
+      <li data-event-id="${e.id}"><a href="${esc(`/${e.region}/events/${e.slug}`)}">${esc(e.name)}</a>
+        <span class="venue-meta">${esc([whatsOnWhenText(e, today), e.time, e.valleyWide ? (fr ? 'Toute la vallée' : 'Valley-wide') : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</span></li>`).join('')}
+    </ul>${more}
+  </section>`;
+}
 function searchPageModel(run, now = new Date(), lang = 'en') {
   // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
   // from (a French search goes through the planner's French words first, see discoverySearchText).
@@ -4875,6 +5096,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
   } else if (run.results.kind === 'venues' && run.results.items.length) {
     // Name matches first (2026-10-18): the whole request in the name, then
     // every word in the name, then the rest in the retrieval's own order.
+    // Search pass 5 (2026-10-19): an any-word list keeps its own order (the most words first).
     const byId = new Map(discoverySearchVenues().map((v) => [v.id, v]));
     const phrase = smartTopicWords(smartFold(sq), run.intent).join(' ');
     const tier = (item) => {
@@ -4884,7 +5106,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
       const terms = (item.matchedOn || []).filter((m) => !/^(feature|collection|cuisine):/.test(m));
       return terms.length && terms.every((m) => /:name/.test(m)) ? 1 : 2;
     };
-    const ranked = run.results.items.map((item, i) => ({ item, i, t: tier(item) })).sort((a, b) => a.t - b.t || a.i - b.i);
+    const ranked = run.results.items.map((item, i) => ({ item, i, t: run.results.match === 'any' ? 0 : tier(item) })).sort((a, b) => a.t - b.t || a.i - b.i);
     for (const { item } of ranked) {
       const v = byId.get(item.id);
       if (!v) continue;
@@ -4893,9 +5115,21 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
       if (text) why.set(v.id, text);
     }
   }
+  // Search pass 5 (2026-10-19): a place whose name holds the words typed comes first ("19 bistro" -> 19 Bistro @ Fitz).
+  if (!(plan && plan.list) && run.results.kind !== 'events') {
+    const named = smartNameMatches(sq, run.intent);
+    if (named.length) {
+      const ids = new Set(named.map((x) => x.row.id));
+      venues = [...named.map((x) => x.row), ...venues.filter((v) => !ids.has(v.id))];
+      for (const x of named) why.set(x.row.id, 'Name matches');
+    }
+  }
+  // What's On events for the words ("cider fest") or the plan's own (free events), soonest best match first.
+  const found = plan && plan.events ? plan.events() : run.results.kind === 'events' ? { total: 0, items: [] } : (run.textEvents || searchTextEvents(run.intent, now));
+  const events = { total: found.total, items: found.items.slice(0, SEARCH_PAGE_EVENT_LIMIT) };
   const guides = plan && plan.guides ? plan.guides : smartGuideMatches(sq, run.intent).slice(0, 3);
   const fuzzy = !venues.length && run.results.kind !== 'events' ? smartFuzzyVenues(sq, run.intent).slice(0, 5).map((m) => m.venue) : [];
-  return { run, q, plan, venues, why, guides, fuzzy, now };
+  return { run, q, plan, venues, why, guides, fuzzy, events, now };
 }
 // French words for the page's own text (the cards and filters are translated with every French page).
 const SEARCH_PAGE_TEXT = {
@@ -4928,6 +5162,12 @@ const SEARCH_PAGE_STYLES = `<style id="search-page">
   body.search-page .search-suggestions a { display: inline-block; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.18); text-decoration: none; font-weight: 700; background: var(--ref-white, #fff); color: var(--ink, #2a2019); }
   body.search-page .search-guides { margin: 4px 0 14px; font-weight: 800; }
   body.search-page .search-guides a { color: var(--teal-deep, #1F5450); }
+  body.search-page .search-events { margin: 6px 0 22px; }
+  body.search-page .search-events h2 { font-size: 1.15rem; margin: 0 0 8px; }
+  body.search-page .search-event-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  body.search-page .search-event-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 10px 14px; border-radius: 12px; background: var(--ref-white, #fff); border: 1px solid rgba(42,32,25,0.12); }
+  body.search-page .search-event-list a { font-weight: 800; color: var(--teal-deep, #1F5450); }
+  body.search-page .search-events-more { margin: 8px 0 0; font-weight: 700; }
 </style>`;
 // The visitor's words, the interpretation, corrections and notes.
 function searchSummaryHtml(model, lang) {
@@ -4989,6 +5229,7 @@ function renderSearchResultsHubPage(model, lang) {
     extraHead: SEARCH_PAGE_STYLES,
     leadHtml: `${searchFormHtml(q, L)}
   ${searchSummaryHtml(model, lang)}
+  ${searchEventsHtml(model, lang)}
   <p class="search-count">${escapeHtml(total > venues.length ? L.topOf(venues.length, total) : L.places(total))}</p>
   ${searchGuidesHtml(model, lang)}`,
   }, venues, null, model.now);
@@ -5001,14 +5242,21 @@ function renderSearchSimplePage(model, lang) {
   const total = run.results.total || 0;
   const items = run.results.items || [];
   let resultsHtml = '';
-  if (run.results.kind === 'events' && items.length) {
+  if (model.plan && model.plan.events && model.events.items.length) {
+    // Search pass 5 (2026-10-19): a plan's own events ("free events").
+    resultsHtml = searchEventsHtml(model, lang);
+  } else if (run.results.kind === 'events' && items.length) {
     resultsHtml = `<p class="search-count">${fr ? `${total} événement${total === 1 ? '' : 's'}${total > items.length ? `, voici les ${items.length} premiers` : ''}` : `${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}`}</p>
   <ul class="card-grid">${items.map((e) => `
     <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
       <p class="venue-meta">${esc([e.dateLabel, e.time, e.valleyWide ? 'Valley-wide' : REGION_LABELS[e.region]].filter(Boolean).join(' · '))}</p></li>`).join('')}
   </ul>`;
+  } else if (model.events && model.events.items.length) {
+    // Search pass 5 (2026-10-19): events that match, when no place does ("cider fest", "free events").
+    resultsHtml = searchEventsHtml(model, lang);
   } else {
-    const text = lang === 'fr' ? (SEARCH_EMPTY_TEXT_FR[p.status] || SEARCH_EMPTY_TEXT_FR.no_results) : (SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results);
+    const planEmpty = model.plan && (fr ? model.plan.emptyTextFr : model.plan.emptyText);
+    const text = planEmpty || (lang === 'fr' ? (SEARCH_EMPTY_TEXT_FR[p.status] || SEARCH_EMPTY_TEXT_FR.no_results) : (SEARCH_EMPTY_TEXT[p.status] || SEARCH_EMPTY_TEXT.no_results));
     resultsHtml = `<p class="search-empty">${esc(text)}</p>`;
   }
   const blocks = [];
@@ -22730,6 +22978,24 @@ function whatsOnGroupOf(ev, today) {
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return { key: `m-${y}-${mo}`, label: `Later in ${MONTHS[mo - 1]}`, rank: 5 + (y * 12 + mo) / 100000 };
 }
+// Earlier today (2026-10-19, site review pass 4): a single-day event today whose time is over (its end time, or 3
+// hours after its start when no end is listed) leaves the Today heading for a folded "Earlier today" group after
+// the upcoming and on-now events. All-day, overnight and untimed events stay where they were. `minutes` is the
+// Okanagan wall clock (okanaganClock). A series keeps its place unless the page shows today alone.
+const WHATSON_ASSUMED_EVENT_MINUTES = 180;
+const WHATSON_EARLIER_GROUP = { key: 'earlier', label: 'Earlier today', rank: 3.5 };
+function whatsOnEndedToday(ev, today, minutes, todayOnly = false) {
+  const o = ev && ev.firstOccurrence;
+  if (!o || o.start_date !== today || o.end_date !== today) return false;
+  if (ev.occurrenceCount > 1 && !todayOnly) return false;
+  if (Number(o.all_day) === 1 || Number(o.ends_next_day) === 1) return false;
+  const toMin = (t) => (typeof t === 'string' && LOCAL_TIME_PATTERN.test(t) ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null);
+  const start = o.start_time && o.start_time !== '00:00' ? toMin(o.start_time) : null;
+  const end = toMin(o.end_time);
+  if (end != null && (start == null || end > start)) return minutes >= end;
+  if (end != null) return false; // ends after midnight
+  return start != null && minutes >= start + WHATSON_ASSUMED_EVENT_MINUTES;
+}
 function whatsOnEventCardHtml(ev, todayArg = null) {
   // Only a real YYYY-MM-DD turns on the dated card (so .map() indexes never do).
   const today = typeof todayArg === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(todayArg) ? todayArg : null;
@@ -23254,6 +23520,13 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
   body.whatson-page #whatsOnResults > .whatson-group-head h3 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.2rem; margin: 0; color: var(--ink); }
   body.whatson-page #whatsOnResults > .whatson-group-head h3::before { content: ""; display: block; width: 20px; height: 2px; background: var(--teal); margin-bottom: 6px; }
   body.whatson-page #whatsOnResults > .whatson-paged { display: none !important; }
+  /* Earlier today (2026-10-19): folded until its heading is pressed. */
+  body.whatson-page #whatsOnResults[data-earlier="closed"] > .whatson-event-card[data-group="earlier"] { display: none !important; }
+  body.whatson-page .whatson-earlier-toggle { font: inherit; color: inherit; background: none; border: 0; padding: 0 0 0 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  body.whatson-page .whatson-earlier-toggle::after { content: " \\25B8"; display: inline-block; }
+  body.whatson-page .whatson-earlier-toggle[aria-expanded="true"]::after { content: " \\25BE"; }
+  body.whatson-page .whatson-earlier-toggle:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; border-radius: 4px; }
+  body.whatson-page .whatson-earlier-count { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.85rem; opacity: 0.7; }
   /* A photo across the top of each card, edge to edge. */
   body.whatson-page .whatson-event-card { position: relative; }
   body.whatson-page .whatson-event-card > .whatson-event-photo { display: block; width: calc(100% + 40px); max-width: none; height: 110px; aspect-ratio: auto; object-fit: cover; margin: -18px -20px 12px; border-radius: 13px 13px 0 0; background: #2A6B67; }
@@ -23310,19 +23583,30 @@ const WHATSON_LIST_SCRIPT = `<script>
   var page = 1, busy = false, PAGE = ${WHATSON_PAGE_SIZE};
   function layout(){
     busy = true;
-    var shown = 0, total = 0, visibleGroups = {};
+    var shown = 0, total = 0, visibleGroups = {}, earlier = 0, folded = list.getAttribute('data-earlier') === 'closed';
     Array.prototype.forEach.call(list.querySelectorAll('.whatson-event-card'), function(card){
       if (card.hidden) { card.classList.remove('whatson-paged'); return; }
+      // Earlier today (2026-10-19): folded cards are not counted; their heading shows once the list reaches it.
+      if (card.getAttribute('data-group') === 'earlier') { earlier++; if (folded) { card.classList.remove('whatson-paged'); if (total <= page * PAGE) visibleGroups.earlier = true; return; } }
       total++;
       var over = total > page * PAGE;
       card.classList.toggle('whatson-paged', over);
       if (!over) { shown++; visibleGroups[card.getAttribute('data-group')] = true; }
     });
     Array.prototype.forEach.call(list.querySelectorAll('.whatson-group-head'), function(h){ h.classList.toggle('whatson-paged', !visibleGroups[h.getAttribute('data-group')]); });
+    var n = list.querySelector('.whatson-earlier-count'); if (n) n.textContent = '(' + earlier + ')';
     if (more) { more.hidden = shown >= total; more.textContent = 'Show more (' + shown + ' of ' + total + ')'; }
     busy = false;
   }
   if (more) more.addEventListener('click', function(){ page += 1; layout(); });
+  list.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.whatson-earlier-toggle') : null;
+    if (!b) return;
+    var open = list.getAttribute('data-earlier') !== 'open';
+    list.setAttribute('data-earlier', open ? 'open' : 'closed');
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    layout();
+  });
   var pending = false;
   try {
     new MutationObserver(function(){ if (busy || pending) return; pending = true; requestAnimationFrame(function(){ pending = false; page = 1; layout(); }); })
@@ -23350,7 +23634,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // Step 6: the date window is resolved server-side from ?when= / ?from=&to=
   // (default: the rolling next 90 days) and selects the events rendered;
   // region/category chips then filter that set exactly as before.
-  const window = weekendWindow || (scope && !scope.weekend && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {}));
+  const window = weekendWindow || (scope && !scope.weekend && !queryDates ? whatsOnScopeWindow() : resolveWhatsOnWindow(filter || {}, opts.now || new Date()));
   const allEvents = getWhatsOnEvents(window);
   const events = townScope ? allEvents.filter((e) => e.valleyWide || e.region === townScope) : allEvents;
   const townCounts = townScope ? Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, allEvents.filter((e) => !e.valleyWide && e.region === r).length])) : null;
@@ -23413,7 +23697,9 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   // ahead of tonight's shows. Headings are list items the filter script never
   // touches; the page script hides a heading whose events are all filtered out.
   const today = todayLocal(opts.now || new Date());
-  const grouped = events.map((e, i) => ({ e, i, g: whatsOnGroupOf(e, today) }))
+  const clockMinutes = okanaganClock(opts.now || new Date()).minutes;
+  const todayOnly = window.from === today && window.to === today;
+  const grouped = events.map((e, i) => ({ e, i, g: whatsOnEndedToday(e, today, clockMinutes, todayOnly) ? WHATSON_EARLIER_GROUP : whatsOnGroupOf(e, today) }))
     .sort((a, b) => a.g.rank - b.g.rank || (a.g.key === 'ongoing' ? String(a.e.endDate).localeCompare(String(b.e.endDate)) : 0) || a.i - b.i);
   let lastGroup = null;
   // Lighter pages (2026-10-18): the HTML carries only what a visitor sees
@@ -23428,13 +23714,18 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   for (const { e, g } of grouped) {
     const shown = matchingIds.has(e.id);
     const card = shown ? whatsOnEventCardHtml(e, today) : whatsOnEventCardHtml(e, today).replace('<li class="venue-card whatson-event-card"', '<li class="venue-card whatson-event-card" hidden');
-    if (g.key !== lastGroup) items.push({ g: g.key, head: true, html: `\n      <li class="whatson-group-head" data-group="${g.key}" aria-hidden="false"><h3>${escapeHtml(g.label)}</h3></li>` });
+    if (g.key !== lastGroup) {
+      items.push({ g: g.key, head: true, html: g.key === 'earlier'
+        ? `\n      <li class="whatson-group-head whatson-earlier-head" data-group="earlier" aria-hidden="false"><h3><button type="button" class="whatson-earlier-toggle" aria-expanded="false" aria-controls="whatsOnResults">${escapeHtml(g.label)}</button> <span class="whatson-earlier-count"></span></h3></li>`
+        : `\n      <li class="whatson-group-head" data-group="${g.key}" aria-hidden="false"><h3>${escapeHtml(g.label)}</h3></li>` });
+    }
     lastGroup = g.key;
     items.push({ g: g.key, shown, html: card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`) });
   }
   let firstShown = 0;
   const groupsInFirst = new Set();
-  for (const it of items) if (!it.head && it.shown && firstShown < WHATSON_PAGE_SIZE) { it.first = true; firstShown++; groupsInFirst.add(it.g); }
+  // Folded Earlier today cards take no place in the first page.
+  for (const it of items) if (!it.head && it.shown && it.g !== 'earlier' && firstShown < WHATSON_PAGE_SIZE) { it.first = true; firstShown++; groupsInFirst.add(it.g); }
   let lastFirst = -1;
   items.forEach((it, i) => { if (it.first) lastFirst = i; });
   items.forEach((it, i) => { if (it.head && i < lastFirst && groupsInFirst.has(it.g)) it.first = true; });
@@ -23442,12 +23733,12 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const firstHtml = [], restParts = [];
   for (const it of items) {
     if (it.first) { firstHtml.push(it.html); before++; continue; }
-    restParts.push(it.html.replace(/(<li class="(?:whatson-group-head|venue-card whatson-event-card)"[^>]*)>/, `$1 data-wo-at="${before}">`));
+    restParts.push(it.html.replace(/(<li class="(?:whatson-group-head(?: whatson-earlier-head)?|venue-card whatson-event-card)"[^>]*)>/, `$1 data-wo-at="${before}">`));
   }
   const listHtml = firstHtml.join('');
   const restHtml = restParts.join('');
   const cardsHtml = events.length
-    ? `<ul class="card-grid" id="whatsOnResults"${matching.length ? '' : ' hidden'}>${listHtml}
+    ? `<ul class="card-grid" id="whatsOnResults"${grouped.some((x) => x.g.key === 'earlier') ? ' data-earlier="closed"' : ''}${matching.length ? '' : ' hidden'}>${listHtml}
   </ul>${restHtml ? `\n  <template id="whatsOnRest">${restHtml}</template>` : ''}
   <div class="whatson-more-row"><button type="button" class="whatson-show-more" id="whatsOnShowMore" hidden>Show more</button></div>
   ${WHATSON_REST_SCRIPT}
@@ -30978,13 +31269,40 @@ function renderTermsPage() {
   });
 }
 
+// The lookup's comparison keys: lower case, no accents, "&" as "and", no leading "the", each word's plural "s"
+// dropped, and no spaces or punctuation ("The Quails' Gates" -> "quailgate").
+// Two keys, with and without the plurals, so "joestestdiner" (no spaces) still finds "Joe's Test Diner".
+function venueLookupKeys(text) {
+  const words = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ')
+    .replace(/['\u2018\u2019`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+  if (words.length > 1 && words[0] === 'the') words.shift();
+  return uniqueList([words.map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join(''), words.join('')]);
+}
 function venueLookup(q, region) {
   const term = String(q || '').normalize('NFC').trim().slice(0, 60);
   if (term.length < 2) return [];
   const r = typeof region === 'string' && REGION_LABELS[region] ? region : null;
   const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
+  let rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
     .all(...[like, ...(r ? [r] : []), `${term}%`]);
+  // Forgiving lookup (2026-10-19, site review pass 4): "quails gate", "Quail's Gate", "the hatching post", "sandhill"
+  // and "mission hills" find the listing too: names compared without spaces, apostrophes, accents, a leading "the"
+  // or a plural "s". A name starting with the words comes first.
+  if (rows.length < 8) {
+    const keys = venueLookupKeys(term);
+    if (keys[0].length >= 3) {
+      const seen = new Set(rows.map((v) => `${v.region}/${v.slug}`));
+      const more = [];
+      for (const v of db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []))) {
+        if (seen.has(`${v.region}/${v.slug}`)) continue;
+        let at = -1;
+        for (const nk of venueLookupKeys(v.name)) for (const k of keys) { const i = nk.indexOf(k); if (i !== -1 && (at === -1 || i < at)) at = i; }
+        if (at !== -1) more.push({ v, at });
+      }
+      more.sort((a, b) => (a.at === 0 ? 0 : 1) - (b.at === 0 ? 0 : 1) || String(a.v.name).localeCompare(String(b.v.name)));
+      rows = [...rows, ...more.slice(0, 8 - rows.length).map((x) => x.v)];
+    }
+  }
   // French lookup (2026-10-18): the French type label, the French page and both claim links ride along, so
   // /fr/list-your-venue shows French results and every result can be claimed.
   return rows.filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]).map((v) => ({
@@ -45772,6 +46090,8 @@ module.exports = {
   whatsOnCardSummary,
   whatsOnWhenText,
   whatsOnGroupOf,
+  whatsOnEndedToday,
+  smartNameMatches,
   whatsOnSelectedTagsHtml,
   whatsOnSummaryText,
   renderWhatsOnStyles,
