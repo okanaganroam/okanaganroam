@@ -460,6 +460,7 @@ function requirementScore(v,requirements,day,date,covered=new Set()){
 }
 // Resolve distinctive phrases against supplied, date/region-filtered listings only.
 // Two meaningful words and one unique title are required; never infer from one word.
+const NAMED_EVENT_GENERIC = new Set(['tour', 'tours', 'one', 'two', 'day', 'days', 'weekend', 'weekends', 'night', 'nights', 'trip', 'food', 'okanagan', 'bc']);
 function namedEventInterpretationText(text, events = [], details = false) {
   const normalized = norm(text), tokens = normalized.split(' ');
   if (/\b(?:concerts?|events?|live music|festivals?|hockey|markets?)\b/.test(normalized) || tokens.length > 100) return details ? {text, ambiguity:null} : text;
@@ -475,6 +476,10 @@ function namedEventInterpretationText(text, events = [], details = false) {
         const words = tokens.slice(start, end).filter(w => !['the','a','an','and','of'].includes(w));
         const eventRegion = norm(event.region || '').replace(/-/g, ' ');
         if (words.length < 2 || words.join(' ') === eventRegion || !(` ${title.join(' ')} `).includes(` ${words.join(' ')} `)) continue;
+        // Round 7 (2026-10-19): a town and a generic word are not an event's name ("food tour Kelowna" is not "Hungry for
+        // Laughs Comedy Tour (Kelowna)").
+        const regionWords = new Set(eventRegion.split(' '));
+        if (words.filter(w => !regionWords.has(w) && !NAMED_EVENT_GENERIC.has(w)).length < 2) continue;
         if (/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include)\b).)*$/.test(tokens.slice(0,start).join(' '))) continue;
         matches.push({start,end,phrase:words.join(' '),title:norm(event.name),music:(event.categories || []).includes('live-music')});
       }
@@ -531,9 +536,44 @@ function transferRange(distance,walking=false){
   const max=driveMinutes(distance);
   return {minMinutes:Math.max(MIN_DRIVE_MINUTES,Math.floor(max*0.85)),maxMinutes:max};
 }
+// Okanagan Lake (2026-10-19, round 7): the only ways across are the bridge at Kelowna and around the south end at
+// Penticton, and there is no road along the east shore between Naramata and Kelowna (Okanagan Mountain Park). A pair
+// of places on opposite shores is measured around the lake, not across it: Naramata to Summerland went from "7 min" to
+// about 40. The shore line is a rough centre line of the lake, north to south; places more than ~9 km from the lake
+// (Big White, Rutland) are not on a shore and keep the straight line.
+const LAKE_CENTRE=[[49.49,-119.6],[49.55,-119.625],[49.6,-119.615],[49.65,-119.64],[49.7,-119.66],[49.75,-119.665],[49.8,-119.6],[49.85,-119.53],[49.88,-119.505],[49.95,-119.505],[50.05,-119.47],[50.1,-119.43]];
+const LAKE_SOUTH_END={lat:49.497,lng:-119.593},LAKE_BRIDGE={lat:49.876,lng:-119.505},LAKE_EAST_SPLIT=49.8;
+function lakeShore(p){
+  if(!p||!(p.lat>LAKE_CENTRE[0][0]&&p.lat<LAKE_CENTRE[LAKE_CENTRE.length-1][0]))return null;
+  const i=LAKE_CENTRE.findIndex(([lat])=>lat>=p.lat),[la,lo]=LAKE_CENTRE[i-1],[lb,lob]=LAKE_CENTRE[i];
+  const centre=lo+(lob-lo)*(p.lat-la)/(lb-la),off=p.lng-centre;
+  if(Math.abs(off)>0.12)return null;
+  return off<0?'west':p.lat<LAKE_EAST_SPLIT?'east-south':'east-north';
+}
+// -> { km, via } for a pair on opposite shores (km along the way round, before the road factor), else null.
+// side: the km on winding shore roads (Naramata Road, Lakeshore Road); the rest is highway. Only a real detour counts
+// (the way round at least 1.3 times the straight line): Penticton to Kelowna already drives round the south end.
+function lakeDetour(a,b){
+  const sa=lakeShore(a),sb=lakeShore(b);
+  if(!sa||!sb||sa===sb)return null;
+  const pair=[sa,sb].sort().join('/');
+  let d;
+  if(pair==='east-south/west')d={side:km(a,LAKE_SOUTH_END)+km(LAKE_SOUTH_END,b),highway:0,via:'Penticton'};
+  else if(pair==='east-north/west')d={side:km(a,LAKE_BRIDGE)+km(LAKE_BRIDGE,b),highway:0,via:'the bridge'};
+  else{const [s,n]=sa==='east-south'?[a,b]:[b,a];d={side:km(s,LAKE_SOUTH_END)+km(LAKE_BRIDGE,n),highway:km(LAKE_SOUTH_END,LAKE_BRIDGE)*1.1,via:'Penticton'};}
+  d.km=d.side+d.highway;
+  return d.km>=km(a,b)*1.3?d:null;
+}
+// Kilometres to travel between two places: the straight line, or the way around the lake.
+function travelKm(a,b){const d=lakeDetour(a,b);return d?d.km:km(a,b);}
 function estimateTransfer(a,b,walking=false){
   if(!a||!b||![a.lat,a.lng,b.lat,b.lng].every(Number.isFinite)||Math.abs(a.lat)>90||Math.abs(b.lat)>90||Math.abs(a.lng)>180||Math.abs(b.lng)>180)return null;
-  return {...transferRange(km(a,b),walking),mode:walking?'walking':'driving assumed'};
+  const detour=lakeDetour(a,b);
+  if(!detour)return {...transferRange(km(a,b),walking),mode:walking?'walking':'driving assumed'};
+  // Around the lake: winding shore roads (x1.5 rather than x1.3) and through Penticton or over the bridge (+8 min).
+  if(walking)return {...transferRange(detour.km,true),mode:'walking',aroundLake:detour.via};
+  const max=driveMinutes((detour.side*1.5+detour.highway*ROAD_FACTOR)/ROAD_FACTOR)+8;
+  return {minMinutes:Math.max(MIN_DRIVE_MINUTES,Math.floor(max*0.85)),maxMinutes:max,mode:'driving assumed',aroundLake:detour.via};
 }
 // Approximate NOAA general solar equations; no terrain or weather model.
 // https://gml.noaa.gov/grad/solcalc/solareqns.PDF
@@ -731,4 +771,4 @@ function sparseDayRecovery(plan,requirements){
  const safe=last>0&&last<days.length&&!requirements?.endDate&&!(requirements?.items||[]).some(i=>i.kind==='event'||requirementDay(i,requirements.startDate)>last||i.kind==='venue'&&i.strength==='must'&&!retained.has(i.value));
  return {days:gaps.map(d=>d.day),shorterDays:safe?last:null,region:gaps.every(d=>d.region===gaps[0].region)?gaps[0].region:null};
 }
-module.exports={onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

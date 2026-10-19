@@ -608,13 +608,16 @@ function eventSchedule(time='7 pm',endTime,explicitStart=false,location,mealHour
  return tp.planTrip({...x,trip:x.trip.multi?x.trip:null,facts:known,labels,tripDate:'2026-10-18',events:[event],tripEvents:x.trip.components.map(c=>c.kind==='event'?[event]:null)});
 }
 test('Customer event timing: a listed game start stays fixed with unknown end explicit',()=>{
+ // Round 7 (2026-10-19): an unlisted end gets an allowance by kind (a game: 2.5 hours), marked as assumed and provisional.
  const p=eventSchedule(),item=p.schedule.find(s=>s.eventId===90);
- assert.ok(item);assert.equal(item.startMinutes,1140);assert.equal(item.endMinutes,undefined);
- assert.match(r.selectedStops(p).find(s=>s.event)?.scheduleNote,/duration.*not listed/i);
+ assert.ok(item);assert.equal(item.startMinutes,1140);assert.equal(item.endMinutes,1290);assert.equal(item.assumedEnd,true);assert.equal(item.status,'provisional');
+ assert.match(r.selectedStops(p).find(s=>s.event)?.scheduleNote,/end time isn’t listed, so about 2\.5 hours are allowed/i);
 });
 test('Customer event timing: dinner ending after kickoff is flagged instead of claiming a fit',()=>{
- const p=eventSchedule('7 pm',undefined,true);assert.equal(p.schedule.find(s=>s.eventId===90)?.status,'unmet');
- assert.match(p.scheduleWarnings.join(' '),/preceding visit.*listed start/i);
+ // Round 7: with a 6 pm start, dinner is never booked on top of the 7 pm game; the plan says it cannot fit before it.
+ const p=eventSchedule('7 pm',undefined,true);
+ assert.ok(!p.schedule.some(s=>s.venueId&&Number.isFinite(s.endMinutes)&&s.endMinutes>1110),JSON.stringify(p.schedule));
+ assert.match(p.scheduleWarnings.join(' '),/Dinner is not scheduled because no listed restaurant can fit before Kelowna Rockets Hockey/i);
 });
 test('Customer event timing: missing start stays unknown rather than becoming an estimated evening',()=>{
  const p=eventSchedule('');assert.equal(p.schedule.find(s=>s.eventId===90)?.status,'unverified');
@@ -669,7 +672,8 @@ test('Customer event travel: linked venue coordinates produce a transfer estimat
 });
 test('Customer event travel: invalid coordinates never become a verified journey',()=>{
  const p=eventSchedule('7 pm','21:30',false,{lat:999,lng:-119.49,venueId:77});
- assert.equal(p.schedule.find(s=>s.eventId===90).status,'unverified');
+ assert.notEqual(p.schedule.find(s=>s.eventId===90).status,'estimated'); // provisional since round 7, never estimated
+ assert.equal(p.schedule.find(s=>s.eventId===90).transferMinutes,undefined);
 });
 test('Customer event travel: travel allowance reduces the available time before kickoff',()=>{
  // Road model (2026-10-18): a 22 km drive moves dinner earlier than a game next door, and still arrives in time.
@@ -683,9 +687,11 @@ test('Customer event travel: dinner after a timed event uses its end plus travel
  const p=eventSchedule('5 pm','20:00',false,{lat:49.88,lng:-119.49,venueId:77});
  const dinner=p.schedule.find(s=>s.venueId);assert.equal(dinner.status,'estimated');assert.equal(dinner.startMinutes,1205);assert.equal(dinner.transferMinutes,5);
 });
-test('Customer event travel: missing end time prevents an invented after-event dinner time',()=>{
+test('Customer event travel: missing end time gives an allowance, and dinner after it is provisional',()=>{
+ // Round 7 (2026-10-19): it used to leave dinner "Timing unverified".
  const p=eventSchedule('5 pm',undefined,false,{lat:49.88,lng:-119.49,venueId:77});
- assert.equal(p.schedule.find(s=>s.venueId).status,'unverified');
+ const dinner=p.schedule.find(s=>s.venueId);
+ assert.equal(dinner.status,'provisional');assert.ok(dinner.startMinutes>=1020+150,String(dinner.startMinutes));
 });
 test('Customer event travel: walking and coordinate bounds remain explicit',()=>{
  assert.equal(r.estimateTransfer({lat:49.88,lng:-119.49},{lat:49.88,lng:-119.49},true).mode,'walking');
@@ -1135,14 +1141,12 @@ test('Customer timing uncertainty distinguishes missing own hours from preceding
  assert.deepEqual(p.schedule.find(s=>s.venueId===1).confirmationReasons,['hours','visit_duration','travel']);
 });
 
-test('After-event dinner offers a conditional hours window without inventing transfer or visit times',()=>{
+test('After-event dinner is timed from the event end, provisional, when the event place is not mapped',()=>{
+ // Round 7 (2026-10-19): the day carries on from the listed (or allowed) end instead of an untimed dinner window.
  const p=eventSchedule('5 pm','20:00'),meal=p.schedule.find(s=>s.venueId);
- assert.equal(meal.status,'unverified');assert.equal(meal.startMinutes,undefined);assert.equal(meal.transferMinutes,undefined);
- assert.deepEqual(meal.mealWindow,{earliestStartMinutes:1200,latestStartMinutes:1290,visitMinutes:90});
- assert.match(r.selectedStops(p).find(s=>s.venue).scheduleNote,/if travel permits/);
- assert.equal(eventSchedule('5 pm').schedule.find(s=>s.venueId).mealWindow,undefined);
- assert.equal(eventSchedule('5 pm','22:00').schedule.find(s=>s.venueId).mealWindow,undefined);
- assert.equal(eventSchedule('5 pm','20:00',false,{lat:49.88,lng:-119.49}).schedule.find(s=>s.venueId).mealWindow,undefined);
+ assert.equal(meal.status,'provisional');assert.ok(meal.startMinutes>=1200,String(meal.startMinutes));
+ assert.equal(meal.mealWindow,undefined);
+ assert.equal(eventSchedule('5 pm').schedule.find(s=>s.venueId).status,'provisional');
 });
 
 test('Concert eligibility trusts live-music tags with additional categories while retaining exclusions',()=>{

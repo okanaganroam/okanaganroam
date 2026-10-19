@@ -134,7 +134,8 @@ const TYPE_ALIASES = {
 
 const FEATURE_ALIASES = {
   dog_friendly: ['dog friendly', 'dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pet friendly', 'pets', 'dogs allowed', 'dog welcome', 'dogs welcome', 'pup', 'puppy', 'dog beach', 'dog beaches'],
-  kid_friendly: ['kid friendly', 'kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers', 'family friendly'],
+  // 'young kids', 'little ones' (2026-10-19, round 7): "young" was searched for as a food word.
+  kid_friendly: ['kid friendly', 'kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers', 'family friendly', 'young kids', 'young children', 'little kids', 'little ones', 'small kids', 'young family'],
   vegan: ['vegan', 'vegan friendly', 'vegan options', 'plant based'],
   vegetarian: ['vegetarian', 'vegetarian friendly', 'vegetarian options', 'veggie'],
   gluten_free: ['gluten free', 'gf', 'celiac', 'coeliac'],
@@ -1620,7 +1621,7 @@ const TRIP_DAYPARTS = {
   evening: ['at night', 'in the evening', 'this evening', 'evening', 'night', 'tonight'],
 };
 const TRIP_DOG_PARTY = ['dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pup', 'puppy', 'pets'];
-const TRIP_KID_PARTY = ['kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers'];
+const TRIP_KID_PARTY = ['kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers', 'young kids', 'young children', 'little kids', 'little ones', 'small kids'];
 const TRIP_LIST_JOINERS = new Set(['and', 'or']);
 const TRIP_DETERMINERS = new Set(['a', 'an', 'the', 'some', 'one']);
 const TRIP_CLAUSE_BREAKS = new Set(['then', 'after', 'afterwards', 'before', 'later', 'also', 'plus', 'followed']);
