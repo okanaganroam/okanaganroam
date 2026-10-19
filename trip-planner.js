@@ -522,7 +522,7 @@ function eligible(v, ctx, strict) {
   // already did this; day plans, outings and recommendations now do too).
   // Multi-part itineraries keep their own handling, which also names the
   // place that was left out.
-  if (!ctx.itinerary && v.advisory && v.advisory.note && ADVISORY_CLOSED_RE.test(v.advisory.note)) return false;
+  if (!ctx.itinerary && v.advisory && advisoryUnavailable(v.advisory.note)) return false;
   // A venue closed for the season today is left out the same way (dated
   // itineraries check the trip's own date in advisoryFit instead).
   if (!ctx.itinerary && !ctx.requirements && v.seasonClosedToday) return false;
@@ -2873,7 +2873,7 @@ function rainBackups(result, input, intent) {
   const noDrink = (intent.excluded?.concepts || []).includes('alcohol') || (intent.excluded?.types || []).some((t) => RAIN_BACKUP_DRINK_TYPES.includes(t)) || /\b(?:don t drink|dont drink|no alcohol|alcohol free|sober|non drinkers?)\b/.test(input.requirements?.text || '');
   const text = (v) => `${v.textName || ''} ${v.textDesc || ''}`;
   const scored = (input.facts || []).filter((v) => regions.has(v.region) && !used.has(v.id) && tripRequirements.matches(v, { kind: 'rainy' }) && !['restaurant', 'cafe'].includes(v.type)
-    && !(v.advisory && v.advisory.note && ADVISORY_CLOSED_RE.test(v.advisory.note))
+    && !(v.advisory && advisoryUnavailable(v.advisory.note))
     && !(party.kids && (KIDS_EXCLUDED_TYPES.includes(v.type) || /\bcasino\b/.test(text(v))))
     && !(noDrink && RAIN_BACKUP_DRINK_TYPES.includes(v.type))
     && !(party.dog && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))))
@@ -3520,6 +3520,17 @@ const SWIM_PHRASES = ['swim', 'swimming', 'swimming spot', 'swimming spots', 'sw
 // An advisory note that clearly says a place is unavailable.
 const ADVISORY_UNCERTAIN_RE = /\b(?:receivership|for sale|check (?:that )?it is open|may be closed|may not be open|ownership change|uncertain)\b/i;
 const ADVISORY_CLOSED_RE = /\b(evacuation order|temporarily closed|closed until|closed for the season|is closed|are closed)\b/i;
+// Advisory venues (2026-10-19): a written advisory that says the place is not operating, or may not be (court-ordered
+// receivership, for sale, "the tasting room is closed", "Closed for wildfire recovery"), takes it out of every plan;
+// before, a receivership note only cost -30 and "Closed for ..." was missed. A partial closure ("the northern portion
+// remains closed") is not this. server.js keeps the same rule (ADVISORY_NOT_OPERATING_RE) to list these places last.
+const ADVISORY_NOT_OPERATING_RE = /\b(?:receivership|for sale|not operating|no longer operating|temporarily closed|permanently closed|closed until|(?:is|are) (?:now |currently |temporarily |permanently )?closed|check (?:that )?it is open|may be closed|may not be open|ownership change|uncertain)\b|\bclosed for (?!the season\b)/i;
+function advisoryNotOperating(note) {
+  const t = String(note || '');
+  return !!t && !/\bpartial(?:ly)?\b/i.test(t) && ADVISORY_NOT_OPERATING_RE.test(t);
+}
+// The advisory takes the place out of a plan: an evacuation order or a closure, or a place that is not operating.
+function advisoryUnavailable(note) { return !!note && (ADVISORY_CLOSED_RE.test(note) || advisoryNotOperating(note)); }
 const ADVISORY_MAX_AGE_DAYS = 365;
 const DOG_NOTE_SEASONAL_RE = /\b(season|seasonal|seasonally|summer|winter|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i;
 
@@ -3659,7 +3670,7 @@ function advisoryFit(v, c, season) {
   if (seasonClosedOnTrip(v, season)) return { skip: true };
   const a = v.advisory;
   if (!a || !a.note) return null;
-  if (ADVISORY_CLOSED_RE.test(a.note)) return { skip: true };
+  if (advisoryUnavailable(a.note)) return { skip: true };
   let stale = false;
   if (season && /^\d{4}-\d{2}-\d{2}/.test(a.addedAt || '')) {
     const age = (Date.parse(season.date) - Date.parse(a.addedAt.slice(0, 10))) / 86400000;
@@ -4070,6 +4081,8 @@ module.exports = {
   classifyPlanRequest,
   eligible,
   advisoryFit,
+  advisoryNotOperating,
+  ADVISORY_NOT_OPERATING_RE,
   seasonClosedOnTrip,
   scoreVenue,
   buildContext,
