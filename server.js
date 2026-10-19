@@ -7278,6 +7278,10 @@ function renderAdvisoryStyles() {
     color: var(--ref-navy, #1B2B3A); text-decoration: none; border-bottom: 1px solid rgba(27,43,58,0.3);
   }
   .venue-advisory-source:hover { color: var(--ref-gold-ink, #8A6A0F); border-bottom-color: currentColor; }
+  /* Phone (2026-10-19, round 8): "Official source" takes taps over a 44px-tall area. Its underline is now a text
+     underline (a bottom border would sit below the padding), and the negative margins keep the layout as it was. */
+  .venue-advisory-source { padding: 12px 0; margin: -6px 0 -12px; border-bottom: 0; text-decoration: underline; text-decoration-color: rgba(27,43,58,0.3); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .venue-advisory-source:hover { text-decoration-color: currentColor; }
   .venue-card .venue-advisory { margin: 8px 0 10px; padding: 10px 12px; font-size: 0.86rem; }
   .venue-card .venue-advisory-kicker { font-size: 0.68rem; }
 </style>`;
@@ -11941,6 +11945,9 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
   /* Phone menu (2026-10-19, round 7): on a small phone the menu filled the screen and left only a sliver of the dimmed
      page to tap. It now stops at least 88px above the bottom (scrolling inside itself), leaving a real strip to close it. */
   .nav-links.open { max-height: calc(100vh - 160px); max-height: calc(100dvh - 160px); }
+  /* Phone menu (2026-10-19, round 8): the panel ran to 8px from the screen's left edge, so the dimmed strip beside it
+     was too narrow to tap. It now stops 44px or more from the left edge, which leaves a full-height strip to close it. */
+  .nav-links { left: auto; right: 0; width: min(100%, calc(100vw - 44px)); box-sizing: border-box; }
 }
 @media (prefers-reduced-motion: reduce) { #navHamburger span { transition: none; } }
 </style>
@@ -15582,11 +15589,14 @@ const DESTINATION_PHOTO_GRID_STYLE = `<style id="destination-photo-grid">
   body.destinations-page .destination-photo-grid .destination-card-photo { order: -1; aspect-ratio: 3 / 2; overflow: hidden; background: #2A6B67; }
   body.destinations-page .destination-photo-grid .destination-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.35s ease; }
   body.destinations-page .destination-photo-grid .category-card:hover .destination-card-photo img { transform: scale(1.04); }
-  body.destinations-page .destination-photo-grid .category-card h2 { margin: 16px 18px 4px; font-size: 1.15rem; }
-  body.destinations-page .destination-photo-grid .category-card h2 a::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
-  body.destinations-page .destination-photo-grid .category-card h2 a:hover { text-decoration: none; }
+  /* Headings (2026-10-19, round 8): each card's name is an h3 under its group's h2 (it was an h2 inside the h2's
+     section), drawn exactly as before. */
+  body.destinations-page .destination-photo-grid .category-card .destination-card-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; line-height: 1.15; color: var(--ref-navy, #1B2B3A); text-transform: none; letter-spacing: normal; }
+  body.destinations-page .destination-photo-grid .category-card .destination-card-title { margin: 16px 18px 4px; font-size: 1.15rem; }
+  body.destinations-page .destination-photo-grid .category-card .destination-card-title a::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+  body.destinations-page .destination-photo-grid .category-card .destination-card-title a:hover { text-decoration: none; }
   body.destinations-page .destination-photo-grid .category-card:hover h2 a { color: var(--plum); }
-  body.destinations-page .destination-photo-grid .category-card h2 a:focus-visible { outline: none; }
+  body.destinations-page .destination-photo-grid .category-card .destination-card-title a:focus-visible { outline: none; }
   body.destinations-page .destination-photo-grid .category-card:has(a:focus-visible) { outline: 3px solid var(--plum); outline-offset: 2px; }
   body.destinations-page .destination-photo-grid .venue-meta { margin: 0 18px 18px; line-height: 1.45; }
   /* Phones: a compact row -- small photo on the left, name and tagline beside it. */
@@ -15594,7 +15604,7 @@ const DESTINATION_PHOTO_GRID_STYLE = `<style id="destination-photo-grid">
     body.destinations-page .destination-photo-grid { gap: 12px; }
     body.destinations-page .destination-photo-grid .category-card { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto 1fr; border-radius: 14px; }
     body.destinations-page .destination-photo-grid .destination-card-photo { grid-column: 1; grid-row: 1 / 3; aspect-ratio: auto; min-height: 96px; }
-    body.destinations-page .destination-photo-grid .category-card h2 { grid-column: 2; margin: 14px 14px 2px; font-size: 1.05rem; }
+    body.destinations-page .destination-photo-grid .category-card .destination-card-title { grid-column: 2; margin: 14px 14px 2px; font-size: 1.05rem; }
     body.destinations-page .destination-photo-grid .venue-meta { grid-column: 2; margin: 0 14px 14px; font-size: 0.84rem; }
   }
   @media (prefers-reduced-motion: reduce) { body.destinations-page .destination-photo-grid .category-card, body.destinations-page .destination-photo-grid .destination-card-photo img { transition: none; transform: none !important; } }
@@ -15635,7 +15645,9 @@ const DESTINATION_STARTS = [
 ];
 const DESTINATION_PAGE_EXTRA_STYLE = `<style id="destinations-extra">
   body.destinations-page .destination-photo-grid .destination-tagline { margin: 0 18px 6px; font-size: 0.92rem; line-height: 1.45; color: var(--ink); }
-  body.destinations-page .destination-photo-grid .venue-meta { font-size: 0.82rem; opacity: 0.75; }
+  /* Contrast (2026-10-19, round 8): the place count was 3.25:1 (a faded colour at 0.75 opacity). A solid muted brown
+     with no opacity is 7:1 on the card. */
+  body.destinations-page .destination-photo-grid .venue-meta { font-size: 0.82rem; opacity: 1; color: #5E5048; }
   body.destinations-page .destination-starts { margin: 4px 0 30px; padding: 18px 20px; border-radius: 16px; background: var(--paper, #fffaf2); box-shadow: 0 10px 24px -20px rgba(74,52,40,0.5); }
   body.destinations-page .destination-starts h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
   body.destinations-page .destination-starts ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 8px 22px; }
@@ -15682,7 +15694,7 @@ ${starts.map((x) => `      <li><strong>${escapeHtml(x.label)}</strong><a href="/
       const photo = destinationCardPhoto(r.region);
       return `
       <li class="category-card">
-        <h2><a href="/${r.region}">${escapeHtml(r.label)}</a></h2>${DESTINATION_TAGLINES[r.region] ? `
+        <h3 class="destination-card-title"><a href="/${r.region}">${escapeHtml(r.label)}</a></h3>${DESTINATION_TAGLINES[r.region] ? `
         <p class="destination-tagline">${escapeHtml(DESTINATION_TAGLINES[r.region])}</p>` : ''}
         <p class="venue-meta">${r.venues} place${r.venues === 1 ? '' : 's'} to eat, drink and explore</p>${photo ? `
         <div class="destination-card-photo${photo.map ? ' destination-card-map' : ''}"><img src="${photo.src}"${tileSrcsetAttrs(photo.src, DESTINATION_TILE_SIZES)} alt="" width="800" height="533" loading="lazy" decoding="async"></div>` : ''}
@@ -15944,6 +15956,20 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   .pm-pin-golf span { background: #65A30D; }
   .pm-pin-do span { background: #6D28D9; }
   .pm-pin-event span { background: #DB2777; border-radius: 4px; transform: rotate(45deg); }
+  /* Phone map (2026-10-19, round 8): each pin keeps its 16px dot but takes taps over a 44px circle (an invisible
+     ring around the 24px icon), and a keyboard-focused pin shows a 3px ring, as the popup's links do. */
+  .leaflet-marker-icon.pm-pin::before { content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px; border-radius: 50%; }
+  body.map-page .leaflet-marker-icon.pm-pin:focus { outline: none; }
+  body.map-page .leaflet-marker-icon.pm-pin:focus-visible { outline: 3px solid #1B2B3A; outline-offset: 0; border-radius: 50%; box-shadow: 0 0 0 5px #fff; }
+  body.map-page .leaflet-marker-icon.marker-cluster:focus-visible { outline: 3px solid #1B2B3A; outline-offset: 2px; border-radius: 50%; }
+  /* The popup: a 44px close button, and the place's name as a 44px-tall block link (with room beside the button). */
+  body.map-page .leaflet-container a.leaflet-popup-close-button { width: 44px; height: 44px; font-size: 26px; line-height: 44px; text-align: center; }
+  body.map-page .pm-pop { padding-right: 18px; }
+  body.map-page .pm-pop > a:not(.pm-pop-dir) { display: flex; align-items: center; min-height: 44px; }
+  body.map-page .pm-pop a.pm-pop-dir { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 0 16px; }
+  /* Desktop CLS (2026-10-19, round 8): the privacy notes sat just under the empty list and were pushed down when the
+     list filled in (a 0.072 layout shift). On wide screens they wait until the list has its first rows. */
+  @media (min-width: 900px) { body.map-page .pm-list:empty ~ .pm-privacy { display: none; } }
   .pm-me { background: none; border: 0; }
   .pm-me .pm-me-arrow { position: absolute; left: -19px; top: -19px; width: 60px; height: 60px; display: none; pointer-events: none; }
   .pm-me.has-heading .pm-me-arrow { display: block; }
@@ -16046,7 +16072,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var TYPES = CONF.t[FR ? 'fr' : 'en'];
   var mapEl = document.getElementById('okMap');
   var WIDE = window.matchMedia ? window.matchMedia('(min-width: 900px)') : { matches: false };
-  var map = L.map(mapEl, { zoomControl: false }).setView([49.75, -119.5], 9);
+  // Map start (2026-10-19, round 8): no view yet. The first view is the Kelowna fit below, so the zoom-9 valley tiles
+  // are no longer requested and then thrown away when that fit moves the map in.
+  var map = L.map(mapEl, { zoomControl: false });
   // French map (2026-10-19, round 7): Leaflet's zoom buttons, credits link and map credits in French on /fr/map.
   if (WIDE.matches) L.control.zoom(FR ? { position: 'bottomright', zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' } : { position: 'bottomright' }).addTo(map);
   if (FR && map.attributionControl) map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="Une bibliothèque JavaScript de cartes interactives">Leaflet</a>');
@@ -24940,6 +24968,13 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
   body.whatson-page .whatson-earlier-count { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.85rem; color: var(--ink-muted, #6B5D54); }
   /* A photo across the top of each card, edge to edge. */
   body.whatson-page .whatson-event-card { position: relative; }
+  /* Phone (2026-10-19, round 8): the whole card opens the event, not just its title. The card's one link is
+     stretched over it by its own ::after (as the town event cards and Browse cards), so there is still one link
+     per card; Favorite and Add to trip sit above it and keep their own taps. */
+  body.whatson-page .whatson-event-card > h2 a.venue-card-link::after { content: ""; position: absolute; inset: 0; border-radius: 14px; z-index: 0; }
+  body.whatson-page .whatson-event-card > .card-actions { position: relative; z-index: 1; }
+  body.whatson-page .whatson-event-card > h2 a.venue-card-link:focus-visible { outline: none; }
+  body.whatson-page .whatson-event-card > h2 a.venue-card-link:focus-visible::after { outline: 3px solid var(--teal, #2A6B67); outline-offset: -3px; }
   body.whatson-page .whatson-event-card > .whatson-event-photo { display: block; width: calc(100% + 40px); max-width: none; height: 110px; aspect-ratio: auto; object-fit: cover; margin: -18px -20px 12px; border-radius: 13px 13px 0 0; background: #2A6B67; }
   @supports (grid-template-rows: subgrid) { @media (min-width: 900px) { body.whatson-page .card-grid > .whatson-event-card { grid-row: span 11; } body.whatson-page .card-grid > .whatson-event-card > .whatson-event-photo { grid-row: 1; } body.whatson-page .card-grid > .whatson-event-card > h2 { grid-row: 2; } body.whatson-page .card-grid > .whatson-event-card > .venue-meta { grid-row: 3; } body.whatson-page .card-grid > .whatson-event-card > .golf-desc { grid-row: 5; } body.whatson-page .card-grid > .whatson-event-card > .whatson-source { grid-row: 6; } body.whatson-page .card-grid > .whatson-event-card > .chips { grid-row: 9; } body.whatson-page .card-grid > .whatson-event-card > .card-actions { grid-row: 10; } } }
   @media (min-width: 1180px) { body.whatson-page .card-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -26142,6 +26177,9 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-open-status[data-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
   /* Full strength (2026-10-18): at 0.85 opacity the "See hours" link was 4.27:1 next to a closed status. */
   body.golf-page .venue-open-status a { font-weight: 700; color: inherit; margin-left: 4px; }
+  /* Phone (2026-10-19, round 8): "See hours" takes taps over a 44px-tall area; the padding is cancelled by negative
+     margins, so the line itself doesn't move. */
+  body.golf-page .venue-open-status a { display: inline-block; padding: 12px 6px; margin: -12px -6px -12px -2px; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
@@ -26625,7 +26663,7 @@ ${VENUE_MENU_CSS}` : ''}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
   ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
     <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
-    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Réclamer cette fiche')}</a>
+    <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Réclamer cette fiche')}</a>
     <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
   </div>
   <script>
@@ -26635,7 +26673,7 @@ ${VENUE_MENU_CSS}` : ''}
     var box = document.getElementById('venueOwnerCta'), mine = [];
     try { mine = JSON.parse(localStorage.getItem('okrOwnerVenues') || '[]') || []; } catch (e) { return; }
     if (!box || mine.indexOf(Number(box.getAttribute('data-venue-id'))) < 0) return;
-    box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" href="/owner/account/venue/' + box.getAttribute('data-venue-id') + '" rel="nofollow" style="display:inline-block;padding:7px 16px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
+    box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" href="/owner/account/venue/' + box.getAttribute('data-venue-id') + '" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
   })();
   </script>`}
   </aside>
@@ -29667,6 +29705,8 @@ function renderBrowseHubStyles() {
   body.browse-page a.bh-map-link { text-decoration: none; }
   body.browse-page .fd-resultbar { flex-wrap: wrap; }
   body.browse-page .bh-sort { margin-left: auto; }
+  /* Phone (2026-10-19, round 8): 16px text and a 44px height, so tapping Sort doesn't make iPhone Safari zoom in. */
+  body.browse-page select.bh-select.bh-sort { font-size: 16px; min-height: 44px; box-sizing: border-box; }
   /* Whole-card link. The card's one link -- the venue name, already pointing at the
      venue page -- is stretched over the card by its own ::after, so there is no
      wrapping <a>, no nested interactive markup and no script, middle-click and
@@ -32991,9 +33031,26 @@ ${renderGolfHeaderHtml()}
     // Fit every stop (2026-10-19): a finer zoom step and a taller map for a trip down the valley, sized before fitting.
     var latSpan = Math.max.apply(null, pts.map(function(p){ return p.lat; })) - Math.min.apply(null, pts.map(function(p){ return p.lat; }));
     box.style.height = latSpan > 0.4 && window.innerWidth >= 700 ? '460px' : '';
-    if (!map) { map = L.map(box, { scrollWheelZoom: false, zoomSnap: 0.25 }); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map); }
+    // French map (2026-10-19, round 8): on /fr/my-trip Leaflet's zoom buttons, its credits link and the map credits are
+    // in French, as on /fr/map.
+    var mapFr = document.documentElement.lang === 'fr';
+    if (!map) {
+      map = L.map(box, { scrollWheelZoom: false, zoomSnap: 0.25, zoomControl: false });
+      L.control.zoom(mapFr ? { zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' } : {}).addTo(map);
+      if (mapFr && map.attributionControl) map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="Une bibliothèque JavaScript de cartes interactives">Leaflet</a>');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: mapFr ? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map);
+    }
     if (layer) layer.remove();
-    layer = L.layerGroup(pts.map(function(p){ return L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: '<span class="mt-num" style="box-shadow:0 2px 6px rgba(0,0,0,.3)">' + p.n + '</span>', iconSize: [24, 24] }), title: p.name }); })).addTo(map);
+    // Stops at the same spot (2026-10-19, round 8): a winery and its restaurant, or one place saved on two days, used to
+    // sit exactly on top of one another, so only the top number showed. Pins that share a spot are now fanned out in a
+    // small ring around it (a fixed pixel offset, so they stay apart at every zoom).
+    var spots = {};
+    pts.forEach(function(p){ var k = p.lat.toFixed(4) + ',' + p.lng.toFixed(4); (spots[k] = spots[k] || []).push(p); });
+    Object.keys(spots).forEach(function(k){
+      var g = spots[k], r = Math.max(16, Math.ceil(15 * g.length / Math.PI));
+      g.forEach(function(p, j){ p.dx = g.length > 1 ? Math.round(r * Math.cos(2 * Math.PI * j / g.length - Math.PI / 2)) : 0; p.dy = g.length > 1 ? Math.round(r * Math.sin(2 * Math.PI * j / g.length - Math.PI / 2)) : 0; });
+    });
+    layer = L.layerGroup(pts.map(function(p){ return L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: '<span class="mt-num" style="box-shadow:0 2px 6px rgba(0,0,0,.3)">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12 - p.dx, 12 - p.dy] }), title: p.name }); })).addTo(map);
     map.invalidateSize();
     var fit = function(){ if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [36, 36], maxZoom: 15 }); };
     fit();
