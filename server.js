@@ -3928,7 +3928,7 @@ function buildDiscoverySearchVenues() {
     venues.push({
       id: row.id, name: row.name, region: row.region, type: row.type,
       cuisine: String(row.cuisine || '').toLowerCase().trim(),
-      textName: normalize(row.name || ''), textCuisine: normalize(row.cuisine || ''), textDesc: normalize(row.description || ''),
+      textName: normalize(row.name || ''), textCuisine: normalize(row.cuisine || ''), textDesc: normalize(row.description || ''), textDescFr: normalize(row.description_fr || ''),
       features, collections: m.collections, activities: m.activities, fdTypes: m.fdTypes,
       rating: row.rating, reviews: row.reviews, price: row.price, row,
     });
@@ -4039,7 +4039,15 @@ function withoutEndedOccurrenceItems(items, now = new Date()) {
   const clock = okanaganClock(now);
   return (items || []).filter((e) => !tripOccurrenceEnded(e, clock));
 }
-function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null) {
+// French pass 6 (2026-10-19): search (runDiscovery) passes { text }: a named holiday narrows the list as the planner's
+// does, and the events whose name, then description, has the words typed come first ("christmas market" listed 212
+// events with Field of Screams first).
+const SEARCH_EVENT_RANK_SKIP = new Set(['event', 'events', 'in', 'at', 'the', 'a', 'an', 'and', 'of', 'on', 'for', 'to', 'near', 'this', 'next', 'what', 'whats', 's', 'things', 'do', 'okanagan', 'bc']);
+function searchEventRankWords(text) {
+  const towns = new Set(Object.values(REGION_LABELS).flatMap((t) => smartFold(t).split(' ')));
+  return uniqueList(smartFold(text).split(' ').filter((w) => w.length > 1 && !SEARCH_EVENT_RANK_SKIP.has(w) && !towns.has(w)));
+}
+function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null, opts = {}) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(intent.when, now), now);
   let events = withoutEndedEvents(filterWhatsOnEvents(getWhatsOnEvents(win), intent.regions, intent.eventCategories), now, win.to);
@@ -4051,7 +4059,8 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
   }
   // A named holiday ("Halloween events", "Christmas markets") narrows the Holiday & Seasonal category to that holiday
   // (2026-10-14: "Christmas events in Vernon" listed haunted houses).
-  const theme = intent.eventTheme && HOLIDAY_EVENT_WORDS[intent.eventTheme];
+  const themeKey = intent.eventTheme || (opts.text ? holidayEventTheme(opts.text) : null);
+  const theme = themeKey && HOLIDAY_EVENT_WORDS[themeKey];
   if (theme) {
     events = events.filter((e) => {
       const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
@@ -4061,6 +4070,14 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
   // With kids, bar nights and winery events are left out unless they are also listed for families.
   if (intent.eventKids || (intent.party && intent.party.kids)) events = events.filter((e) => (e.categories || []).includes('family-kids') || !(e.categories || []).some((c) => c === 'nightlife' || c === 'wineries-wine-events'));
   events = eventsAllowedByExclusions(events, intent.excluded);
+  const rankWords = opts.text ? searchEventRankWords(opts.text) : [];
+  if (rankWords.length) {
+    const score = (e) => {
+      const name = smartFold(e.name), desc = smartFold(e.description || '');
+      return rankWords.reduce((n, w) => n + (searchWordIn(name, w) ? 3 : 0) + (searchWordIn(desc, w) ? 1 : 0), 0);
+    };
+    events = events.map((e, i) => ({ e, i, s: score(e) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.e);
+  }
   const items = events.slice(0, limit).map((e) => ({
     id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
     categories: e.categories || [], dateLabel: e.dateLabel || '', time: whatsOnCardTime(e),
@@ -4082,11 +4099,13 @@ function discoveryNotApplied(intent) {
   return out;
 }
 
-function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date() } = {}) {
+function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), lang = 'en' } = {}) {
   const intent = interpretDiscoveryText(text);
+  // French pass 6 (2026-10-19): a French search also matches words in the places' French descriptions (not in the JSON).
+  if (lang === 'fr') Object.defineProperty(intent, 'frenchText', { value: true });
   const destination = resolveDiscoveryDestination(intent);
   let venues = selectDiscoveryVenues(intent, limit);
-  const events = selectDiscoveryEvents(intent, limit, now);
+  const events = selectDiscoveryEvents(intent, limit, now, null, { text });
   // Search pass 5 (2026-10-19): no place has every word -> the places that have some of them, most words first,
   // unless the words nearly spell a place's name ("mision hill" still offers Mission Hill under "Did you mean").
   let anyWord = false;
@@ -4260,9 +4279,106 @@ function discoveryPresentation(run) {
 // Returns { url, reason }; url null = serve /browse as typed.
 // French (2026-10-18): from a French page (lang 'fr') the words are read through the planner's French vocabulary
 // ("terrasse" -> "patio"), and the /search link keeps the visitor's own words.
+// French pass 6 (2026-10-19): everyday French search words -> the English the search reads, applied before anything
+// else on a French page. "patin", "cidre", "citrouilles", "marché de Noël" and "labyrinthe de maïs" found nothing
+// (or nonsense) because the planner's French list only rewrites a request it already knows is French. Keys are folded
+// (lower case, no accents, apostrophes as spaces); the longest phrase wins at each word, a plural "s" is optional on
+// one-word entries, and a place's own name is never rewritten. Meals are Canadian: déjeuner, dîner, souper.
+const FR_SEARCH_SYNONYMS = [
+  // winter
+  ['patin', 'skating'], ['patins', 'skating'], ['patinage', 'skating'], ['patiner', 'skating'], ['patin a glace', 'skating'], ['patins a glace', 'skating'],
+  ['patinage sur glace', 'skating'], ['patinoire', 'skating'], ['patinoire exterieure', 'skating'], ['anneau de glace', 'skating'], ['sentier de glace', 'skating'],
+  ['raquette', 'snowshoeing'], ['raquettes', 'snowshoeing'], ['raquette a neige', 'snowshoeing'], ['raquettes a neige', 'snowshoeing'], ['faire de la raquette', 'snowshoeing'],
+  ['ski alpin', 'downhill skiing'], ['ski de fond', 'cross country skiing'], ['station de ski', 'ski resort'], ['stations de ski', 'ski resorts'], ['centre de ski', 'ski resort'],
+  ['planche a neige', 'snowboarding'], ['glissade sur tube', 'tubing'], ['glissades sur tube', 'tubing'], ['glissade', 'tubing'], ['luge', 'sledding'],
+  ['traineau a chiens', 'dog sledding'], ['promenade en traineau', 'sleigh ride'], ['traineau', 'sleigh ride'], ['motoneige', 'snowmobiling'],
+  ['peche sur glace', 'ice fishing'], ['peche blanche', 'ice fishing'], ['neige', 'snow'],
+  // fall and the holidays
+  ['citrouille', 'pumpkin'], ['champ de citrouilles', 'pumpkin patch'], ['autocueillette de citrouilles', 'pumpkin patch'], ['labyrinthe de mais', 'corn maze'],
+  ['labyrinthe dans le mais', 'corn maze'], ['labyrinthe', 'maze'], ['maison hantee', 'haunted house'], ['maisons hantees', 'haunted house'], ['hantee', 'haunted'], ['hante', 'haunted'],
+  ['marche de noel', 'christmas market'], ['marches de noel', 'christmas market'], ['marche des fetes', 'christmas market'], ['marches des fetes', 'christmas market'],
+  ['marche de fetes', 'christmas market'], ['noel', 'christmas'], ['sapin de noel', 'christmas tree'], ['sapins de noel', 'christmas tree'], ['pere noel', 'santa'],
+  ['lumieres de noel', 'christmas lights'], ['illuminations de noel', 'christmas lights'], ['casse noisette', 'nutcracker'], ['temps des fetes', 'holiday'],
+  ['jour de l an', 'new years'], ['nouvel an', 'new years'], ['veille du jour de l an', 'new years eve'], ['reveillon', 'new years eve'], ['action de grace', 'thanksgiving'],
+  ['vendanges', 'harvest'], ['recolte', 'harvest'], ['feux d artifice', 'fireworks'], ['paques', 'easter'], ['chasse aux oeufs', 'egg hunt'], ['saint valentin', 'valentines'],
+  // drinks
+  ['cidre', 'cider'], ['cidrerie', 'cidery'], ['cidreries', 'cideries'], ['vignoble', 'winery'], ['vignobles', 'wineries'], ['vinerie', 'winery'], ['vineries', 'wineries'],
+  ['cave a vin', 'winery'], ['caves a vin', 'wineries'], ['domaine viticole', 'winery'], ['domaines viticoles', 'wineries'], ['vin de glace', 'ice wine'], ['vins de glace', 'ice wine'],
+  ['brasserie', 'brewery'], ['brasseries', 'breweries'], ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['biere', 'beer'], ['biere artisanale', 'craft beer'],
+  ['distillerie', 'distillery'], ['distilleries', 'distilleries'], ['vin', 'wine'], ['vins', 'wine'], ['degustation', 'tasting'], ['degustation de vin', 'wine tasting'],
+  ['bar a cocktails', 'cocktail bar'], ['bar a vin', 'wine bar'], ['bar a vins', 'wine bar'], ['cinq a sept', 'happy hour'], ['5 a 7', 'happy hour'],
+  // food (Canadian meals: déjeuner is breakfast, dîner lunch, souper dinner)
+  ['creme glacee', 'ice cream'], ['cremes glacees', 'ice cream'], ['bar laitier', 'ice cream'], ['petit dejeuner', 'breakfast'], ['dejeuner', 'breakfast'],
+  ['diner', 'lunch'], ['souper', 'dinner'], ['boulangerie', 'bakery'], ['patisserie', 'bakery'], ['fruits de mer', 'seafood'], ['poisson', 'fish'],
+  ['frites', 'fries'], ['hambourgeois', 'burger'], ['chocolat', 'chocolate'], ['chocolaterie', 'chocolate'], ['fromage', 'cheese'], ['fromagerie', 'cheese'],
+  ['miel', 'honey'], ['lavande', 'lavender'], ['verger', 'orchard'], ['cerise', 'cherries'], ['pomme', 'apples'], ['kiosque fermier', 'farm stand'],
+  ['marche fermier', 'farmers market'], ['marche public', 'farmers market'], ['marche des fermiers', 'farmers market'], ['marche', 'market'], ['marche facile', 'easy walk'], ['marches faciles', 'easy walks'], ['marche en nature', 'nature walk'], ['autocueillette', 'u pick'],
+  ['ferme', 'farm'], ['sans gluten', 'gluten free'], ['vegetalien', 'vegan'], ['vegetalienne', 'vegan'], ['vegetarien', 'vegetarian'], ['terrasse', 'patio'],
+  // outdoors
+  ['randonnee', 'hike'], ['randonnee pedestre', 'hiking'], ['rando', 'hike'], ['sentier', 'trail'], ['plage', 'beach'], ['plage pour chiens', 'dog beach'],
+  ['plage canine', 'dog beach'], ['parc a chiens', 'dog park'], ['parc canin', 'dog park'], ['chien', 'dog'], ['lac', 'lake'], ['chute', 'waterfall'], ['chutes okanagan', 'okanagan falls'],
+  ['cascade', 'waterfall'], ['belvedere', 'lookout'], ['point de vue', 'viewpoint'], ['points de vue', 'viewpoints'], ['velo', 'bike'], ['velo de montagne', 'mountain biking'],
+  ['vtt', 'mountain biking'], ['canot', 'canoe'], ['planche a pagaie', 'paddleboard'], ['baignade', 'swimming'], ['tyrolienne', 'zipline'], ['escalade', 'climbing'],
+  ['equitation', 'horseback riding'], ['balade a cheval', 'horseback riding'], ['peche', 'fishing'], ['peches', 'peaches'], ['cueillette de peches', 'peaches'], ['observation des oiseaux', 'birdwatching'], ['jardin', 'garden'],
+  ['croisiere', 'cruise'], ['bateau', 'boat'], ['location de bateau', 'boat rental'], ['camping', 'camping'], ['terrain de golf', 'golf course'], ['minigolf', 'mini golf'],
+  ['mini putt', 'mini golf'], ['parc aquatique', 'water park'], ['jeux d eau', 'splash park'], ['aire de jeux', 'playground'], ['terrain de jeux', 'playground'],
+  ['planchodrome', 'skate park'], ['parc de planche a roulettes', 'skate park'], ['piscine', 'pool'], ['source thermale', 'hot springs'],
+  // indoors and events
+  ['musee', 'museum'], ['galerie d art', 'art gallery'], ['salle d evasion', 'escape room'], ['jeu d evasion', 'escape room'], ['quilles', 'bowling'], ['salle de quilles', 'bowling'],
+  ['karting', 'go karts'], ['spectacle', 'show'], ['musique en direct', 'live music'], ['humour', 'comedy'], ['visite guidee', 'guided tour'], ['atelier', 'workshop'],
+];
+const FR_SEARCH_SYNONYM_MAP = (() => {
+  const m = new Map();
+  for (const [fr, en] of FR_SEARCH_SYNONYMS) if (!m.has(fr)) m.set(fr, en);
+  // One-word entries also take their plural ("citrouilles", "plages", "vignobles" already listed win).
+  for (const [fr, en] of FR_SEARCH_SYNONYMS) if (!fr.includes(' ') && !fr.endsWith('s') && !m.has(`${fr}s`)) m.set(`${fr}s`, en);
+  return m;
+})();
+const FR_SEARCH_SYNONYM_MAX = Math.max(...FR_SEARCH_SYNONYMS.map(([fr]) => fr.split(' ').length));
+const frSearchFold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\u0153/g, 'oe').replace(/[^a-z0-9]+/g, ' ').trim();
+// The folded names of the places, longest first, cached with the search index.
+let frSearchNamesFor = null, frSearchNames = [];
+function frSearchVenueNames() {
+  let venues = [];
+  try { venues = discoverySearchVenues(); } catch (e) { return []; }
+  if (frSearchNamesFor !== venues) {
+    frSearchNamesFor = venues;
+    frSearchNames = uniqueList(venues.map((v) => frSearchFold(v.name)).filter((n) => n.length >= 4)).map((n) => n.split(' ')).sort((a, b) => b.length - a.length);
+  }
+  return frSearchNames;
+}
+// The request with its French search words in English, or the text exactly as typed when none is there.
+function frSearchSynonyms(text) {
+  const raw = String(text || '');
+  // Elided articles ("l'eau", "d'hiver") split off so the word after them is read.
+  const parts = raw.replace(/\b(l|d|j|qu|n|m|t|c|s|jusqu|lorsqu)['\u2019](?=[a-z\u00e0-\u00ff])/gi, '$1 ').split(/\s+/).filter(Boolean);
+  const folded = parts.map(frSearchFold);
+  const keep = new Set();
+  for (const name of frSearchVenueNames()) {
+    for (let i = 0; i + name.length <= folded.length; i++) {
+      if (name.every((w, k) => folded[i + k] === w)) for (let k = 0; k < name.length; k++) keep.add(i + k);
+    }
+  }
+  const out = [];
+  let changed = false;
+  for (let i = 0; i < parts.length;) {
+    let hit = 0;
+    for (let len = Math.min(FR_SEARCH_SYNONYM_MAX, parts.length - i); len >= 1 && !hit; len--) {
+      if ([...Array(len).keys()].some((k) => keep.has(i + k) || !folded[i + k])) continue;
+      const en = FR_SEARCH_SYNONYM_MAP.get(folded.slice(i, i + len).join(' '));
+      if (en != null) { out.push(en); hit = len; }
+    }
+    // "l'Action de grâce" -> "thanksgiving", not "l thanksgiving".
+    if (hit) { if (i > 0 && out.length > 1 && /^(l|d|qu)$/i.test(out[out.length - 2]) && out[out.length - 2] === parts[i - 1]) out.splice(out.length - 2, 1); changed = true; i += hit; } else { out.push(parts[i]); i += 1; }
+  }
+  return changed ? out.join(' ') : raw;
+}
+// French pass 6 (2026-10-19): the French search words first (frSearchSynonyms), then the planner's French list.
 function discoverySearchText(text, lang) {
   if (lang !== 'fr') return text;
-  try { return tripPlannerFrModule().tripPlannerText(text, buildDiscoveryTaxonomy(), { frenchPage: true }); } catch (e) { return text; }
+  let t = text;
+  try { t = frSearchSynonyms(text); } catch (e) { t = text; }
+  try { return tripPlannerFrModule().tripPlannerText(t, buildDiscoveryTaxonomy(), { frenchPage: true }); } catch (e) { return t; }
 }
 function heroSearchTarget(text, { lang = 'en' } = {}) {
   const typed = text;
@@ -11881,7 +11997,7 @@ const BMT_HEADER_STYLE = `<style id="bmt-header">
 .nav #navTripBtn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 .nav #navTripBtn::after { content: ""; position: absolute; inset: -2px; }
 .nav .logo-wordmark, .nav .lang-toggle { white-space: nowrap; }
-/* Venue descriptions ship in both languages (2026-10-12); app.js sets <html lang> from the EN / FR toggle, so CSS shows the chosen one. */
+/* Venue descriptions ship in both languages (2026-10-12); app.js sets the page's lang attribute from the EN / FR toggle, so CSS shows the chosen one. */
 .desc-fr { display: none; }
 html[lang="fr"] .desc-fr { display: inline; }
 html[lang="fr"] .desc-en { display: none; }
@@ -16226,7 +16342,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
       places.push(p);
     });
@@ -16356,6 +16472,12 @@ function mapPlaceTags(v) {
   const text = `${v.name} ${v.cuisine || ''} ${v.description || ''}`.toLowerCase();
   return MAP_TAGS.reduce((out, t, i) => (t.types.includes(v.type) || t.find.test(text) ? out.concat(i) : out), []);
 }
+function mapFrenchNote(note) {
+  const en = String(note || '').trim();
+  let fr = null;
+  try { fr = en ? frText(en) : null; } catch (e) { fr = null; }
+  return fr && fr !== en ? String(fr).slice(0, 160) : 0;
+}
 function mapPlacesData(now = new Date()) {
   const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description, happy_hour_times, price FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
@@ -16374,7 +16496,9 @@ function mapPlacesData(now = new Date()) {
       // [12] price level 1-4 ($ to $$$$), or 0 when not listed.
       Number(v.price) >= 1 && Number(v.price) <= 4 ? Number(v.price) : 0,
       // [13] 1 when the place is closed for the season today (2026-10-18), else 0.
-      seasons.has(v.id) && seasons.get(v.id).kind === 'closed' ? 1 : 0];
+      seasons.has(v.id) && seasons.get(v.id).kind === 'closed' ? 1 : 0,
+      // [14] the dog note in French when it has a translation (French pass 6, 2026-10-19), else 0.
+      (bits & 2) && dogNotes.has(v.id) ? mapFrenchNote(dogNotes.get(v.id)) : 0];
   });
 }
 // Events in the next week, one entry each (its next date):
@@ -24540,6 +24664,10 @@ const FR_STATIC_TEXT = {
   'Message sent': 'Message envoy\u00e9',
   'Thank you!': 'Merci!',
   'Okanagan Roam received your message. We will reply by email as soon as we can.': 'Okanagan Roam a bien re\u00e7u votre message. Nous vous r\u00e9pondrons par courriel d\u00e8s que possible.',
+  // French pass 6 (2026-10-19): the dialog's current wording (CONTACT_REPLY_NOTE), in the home page's own French
+  // (french-text.js); French place pages showed it in English.
+  'Okanagan Roam received your message. We usually reply within a couple of days.': 'Okanagan Roam a bien re\u00e7u votre message. Nous r\u00e9pondons habituellement en quelques jours.',
+  '. We usually reply within a couple of days.': '. Nous r\u00e9pondons habituellement en quelques jours.',
   'Close': 'Fermer',
   // Accessibility (2026-10-18): the header's skip link.
   'Skip to content': 'Aller au contenu',
@@ -24690,7 +24818,12 @@ function frEventTitle(enTitle, ev) {
   const core = t.replace(/ \u2014 \u00c9v\u00e9nement \u00e0 .+? \(C\.-B\.\)( \| Okanagan Roam)?$/, '')
     .replace(new RegExp(` \u2014 ${town.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '');
   // An event already named with its town ("Electric Elton (Kelowna)") is not given the town twice (2026-10-18).
-  if (core.endsWith(`(${town})`)) return fitTitle([`${core.slice(0, -1)}, C.-B.)`, core, shortTitleName(core)]);
+  // French pass 6 (2026-10-19): too long with "C.-B." it fell back to the name alone, the English page's own title
+  // (two Sweet Caroline and Scottish Drag Queen pages): the name is shortened instead, so the two titles differ.
+  if (core.endsWith(`(${town})`)) {
+    const base = core.slice(0, -(town.length + 2)).trim();
+    return fitTitle([`${base} (${town}, C.-B.)`, `${shortTitleName(base, TITLE_MAX - town.length - 10)} (${town}, C.-B.)`]);
+  }
   return fitTitle([`${core} (${town}, C.-B.)`, `${core} (${town})`, `${core} (C.-B.)`, `${shortTitleName(core, TITLE_MAX - 8)} (C.-B.)`]);
 }
 function frEventHead(html, ev) {
@@ -25009,6 +25142,8 @@ function frenchTwinHtml(html, enPath, search = '') {
   // line and the /fr page address.
   out = out.replace(/href="(\/[a-z-]+\/events\/[a-z0-9-]+\/calendar\.ics)"/g, 'href="/fr$1"')
     .replace(/(<a [^>]*data-gcal href="[^"]*?details=)Details%3A%20https%3A%2F%2Fokanaganroam\.com%2F/g, '$1D%C3%A9tails%20%3A%20https%3A%2F%2Fokanaganroam.com%2Ffr%2F');
+  // French pass 6 (2026-10-19): the photo credit under a town or hub banner has the French space before its colon.
+  out = out.replace(/(<p class="region-photo-credit">)Photo: /g, '$1Photo : ');
   // Deferred card batches and the rest of /browse load from their French addresses.
   return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
 }
@@ -25538,7 +25673,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   // The credit's colour (2026-10-18): a solid #6B5E55 (5.6:1 on the cream page); the old 0.65 opacity was 3.9-4.5:1.
-  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;color:#6B5E55;text-align:right">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
+  // French pass 6 (2026-10-19): a credit stored as "Photo: City of Kelowna" read "Photo: Photo: …"; French has its space before the colon.
+  const creditText = photoCredit ? String(photoCredit).replace(/^\s*photos?\s*:\s*/i, '') : '';
+  const creditHtml = creditText ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;color:#6B5E55;text-align:right">${L('Photo: ', 'Photo : ')}${escapeHtml(creditText)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
@@ -25594,7 +25731,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // description and the CTA row; '' for the overwhelming majority of
   // venues, which keeps their page markup byte-identical.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes().get(venue.id);
-  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frTextOr).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
+  const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frTextOr).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
   const golfGlanceHtml = fr ? '' : golfAtAGlanceHtml(venue);
@@ -34536,7 +34673,7 @@ function venueGalleryHtml(venue, photos, L) {
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
     return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
   }).join('');
-  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo', 'Photo')}: ${escapeHtml(p.credit)}</figcaption>` : ''}</figure>`).join('');
+  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(String(p.credit).replace(/^\s*photos?\s*:\s*/i, ''))}</figcaption>` : ''}</figure>`).join('');
   return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
       <dialog class="vg-dialog" id="venueGallery" aria-label="${L(`Photos of ${name}`, `Photos de ${name}`)}">
         <div class="vg-bar"><span class="vg-count" aria-live="polite">1 / ${n}</span><button type="button" class="vg-close" aria-label="${L('Close photos', 'Fermer les photos')}">&times;</button></div>
@@ -38583,8 +38720,12 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Ça dépend de la façon dont vous avez ouvert votre fiche :</p><ul><li><strong>Avec le lien de modification reçu par courriel :</strong> les nouvelles photos et les menus attendent notre vérification, en général d\u2019ici un jour.</li><li><strong>Avec votre compte, depuis Mes fiches :</strong> les photos et les menus sont en ligne tout de suite.</li></ul><p>C\u2019est en ligne, mais vous voyez encore l\u2019ancienne version? Actualisez la page. L\u2019affichage peut prendre une minute.</p>',
     } },
   { id: 'photo-main', over: ['photo-add'], q: 'Change my main photo or remove one', qFr: 'Changer ma photo principale ou en retirer une', pages: ['edit'],
-    keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'remove a photo', 'delete photo', 'delete a photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo', 'reorder photos', 'photo order', 'change the picture', 'change the photo', 'picture at the top', 'photo at the top', 'top photo', 'header photo', 'big photo'],
-    keysFr: ['photo principale', 'photo de couverture', 'banniere', 'retirer une photo', 'supprimer une photo', 'enlever une photo', 'changer la photo', 'mauvaise photo', 'remplacer la photo', 'premiere photo'],
+    keys: ['main photo', 'main one', 'make main', 'cover photo', 'banner', 'remove photo', 'remove a photo', 'delete photo', 'delete a photo', 'change photo', 'wrong photo', 'replace photo', 'bad photo', 'first photo', 'reorder photos', 'photo order', 'change the picture', 'change the photo', 'picture at the top', 'photo at the top', 'top photo', 'header photo', 'big photo',
+      // French pass 6 (2026-10-19): "ma photo est laide" got the add-photos answer.
+      'ugly photo', 'photo is ugly', 'ugly picture', 'picture is ugly', 'hate the photo', 'hate my photo', 'dont like the photo', 'dont like my photo', 'photo looks bad', 'better photo', 'blurry photo', 'photo is blurry', 'old photo', 'replace my photo', 'change my photo'],
+    keysFr: ['photo principale', 'photo de couverture', 'banniere', 'retirer une photo', 'supprimer une photo', 'enlever une photo', 'changer la photo', 'mauvaise photo', 'remplacer la photo', 'premiere photo',
+      'photo laide', 'photo est laide', 'laide', 'photo moche', 'moche', 'je n aime pas la photo', 'je n aime pas ma photo', 'photo floue', 'photo est floue', 'meilleure photo', 'vieille photo',
+      'remplacer ma photo', 'changer ma photo', 'changer de photo', 'changer notre photo', 'photo affichee'],
     a: {
       in: '<p>{ON}, in <strong>Photos</strong>, each live photo has <strong>Make main photo</strong>, <strong>Remove</strong> and <strong>↑ ↓</strong> arrows to change the order.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main photo</strong> once it’s live. If it isn’t yours to change, <strong>Message us</strong> and we’ll swap it.</p>',
       link: '<p><strong>Make main photo</strong>, <strong>Remove</strong> and the <strong>↑ ↓</strong> order arrows are for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open your listing from <strong>My listings</strong>: they’re on each live photo in <strong>Photos</strong>.</p><p>Want the photo we chose for you replaced? Upload your own, then tap <strong>Make main photo</strong> once it’s live. If it isn’t yours to change, <strong>Message us</strong> and we’ll swap it.</p>',
@@ -38647,10 +38788,18 @@ const OWNER_HELP_TOPICS = [
     a: '<p>{ON}, write 30 to 1,200 characters in <strong>Description</strong>. Say what you serve or offer, what makes you special, and who you suit. Leave out &lt; and &gt; characters. Then tap {SEND}. {LIVE}</p>',
     aFr: '<p>{ON}, écrivez de 30 à 1 200 caractères dans <strong>Description</strong>. Dites ce que vous servez ou offrez, ce qui vous distingue et à qui vous convenez. La description s\u2019affiche en anglais et en français; écrivez-la dans la langue de votre choix. Évitez les caractères &lt; et &gt;. Touchez ensuite {SEND}. {LIVE}</p>' },
   { id: 'links', q: 'Add a booking, menu or social link', qFr: 'Ajouter un lien de réservation, de menu ou de réseau social', pages: ['edit'],
-    keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'phone', 'phone number', 'change website', 'change our website', 'new website', 'tiktok'],
-    keysFr: ['reservation', 'reservations', 'reserver', 'billets', 'lien', 'site web', 'site internet', 'instagram', 'facebook', 'reseaux sociaux', 'telephone', 'numero de telephone', 'nouveau site'],
+    keys: ['booking', 'book', 'book button', 'reservation', 'reservations', 'tickets', 'link', 'website', 'instagram', 'facebook', 'social', 'social media', 'menu link', 'url', 'change website', 'change our website', 'new website', 'tiktok'],
+    keysFr: ['reservation', 'reservations', 'reserver', 'billets', 'lien', 'site web', 'site internet', 'instagram', 'facebook', 'reseaux sociaux', 'nouveau site'],
     a: '<p>{ON}, open <strong>Name, address &amp; links</strong>. There you can add:</p><ul><li>a <strong>booking or tickets link</strong> (visitors get a Book button)</li><li>a <strong>menu link</strong></li><li>your <strong>Instagram</strong> and <strong>Facebook</strong></li></ul><p>Phone and website are just above. Then tap {SEND}. A new <strong>website or link</strong> is always checked first, usually within a day, and shows <strong>Waiting for review</strong> until then. A new phone number goes live as soon as you save it when you’re signed in.</p>',
     aFr: '<p>{ON}, ouvrez <strong>Nom, adresse et liens</strong>. Vous pouvez y ajouter :</p><ul><li>un <strong>lien de réservation ou de billets</strong> (les visiteurs voient un bouton Réserver)</li><li>un <strong>lien vers votre menu</strong></li><li>votre <strong>Instagram</strong> et votre <strong>Facebook</strong></li></ul><p>Le téléphone et le site Web sont juste au-dessus. Touchez ensuite {SEND}. Un nouveau <strong>site Web ou lien</strong> est toujours vérifié d’abord, en général d’ici un jour, et affiche <strong>En attente de vérification</strong> d’ici là. Avec un compte, un nouveau numéro de téléphone est en ligne dès l’enregistrement.</p>' },
+  // French pass 6 (2026-10-19): a phone number of its own ("changer mon numéro de téléphone" got the links answer).
+  { id: 'phone', over: ['links'], q: 'Change our phone number', qFr: 'Changer notre numéro de téléphone', pages: ['edit'],
+    keys: ['phone', 'phone number', 'telephone', 'change phone', 'change my phone', 'change our phone', 'change the phone', 'change my phone number', 'change our phone number',
+      'new phone', 'new phone number', 'new number', 'cell number'],
+    keysFr: ['telephone', 'numero de telephone', 'numero', 'changer mon numero', 'changer le numero', 'changer notre numero', 'modifier le numero', 'modifier mon numero', 'nouveau numero',
+      'numero de cellulaire', 'cellulaire'],
+    a: '<ol><li>{ON}, find <strong>Contact</strong>, just under the hours.</li><li>Type the new number in <strong>Phone</strong>, area code first (for example 250-555-0123).</li><li>Tap {SEND}.</li></ol><p>{LIVE}</p><p>The number is the <strong>Call</strong> button on your page. Wrong on Google too? Google Maps shows your Google Business Profile, which you change at <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a>.</p>',
+    aFr: '<ol><li>{ON}, repérez <strong>Coordonnées</strong>, juste sous les heures.</li><li>Entrez le nouveau numéro dans <strong>Téléphone</strong>, avec l’indicatif régional (par exemple 250-555-0123).</li><li>Touchez {SEND}.</li></ol><p>{LIVE}</p><p>Ce numéro est le bouton <strong>Appeler</strong> de votre page. Il est aussi erroné sur Google? Google Maps affiche votre profil d’entreprise Google, que vous modifiez à <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a>.</p>' },
   // Help bot v2 (2026-10-18): name and address changes are always reviewed, even for signed-in owners.
   { id: 'name-address', over: ['links'], q: 'Change our business name or address', qFr: 'Changer le nom ou l\u2019adresse de l\u2019entreprise', pages: ['edit'],
     keys: ['address', 'change address', 'change the address', 'change our address', 'change my address', 'update address', 'new address', 'wrong address', 'street address', 'moved', 'we moved', 'new location', 'relocated', 'moving',
@@ -38714,8 +38863,12 @@ const OWNER_HELP_TOPICS = [
       out: '<p>Connectez-vous à l\u2019<a href="/fr/owner/login">Espace entreprises</a>, puis ouvrez <strong>Paramètres du compte</strong> en haut de Mes fiches. Vous pouvez y changer votre courriel ou votre mot de passe (il faut votre mot de passe actuel) et fermer la session sur vos autres appareils. Mot de passe oublié? <a href="/fr/owner/forgot">Réinitialisez-le</a>.</p>',
     } },
   { id: 'more-businesses', q: 'I manage more than one business', qFr: 'Je gère plus d\u2019une entreprise', pages: ['account', 'edit', 'settings'],
-    keys: ['another business', 'two businesses', 'two restaurants', 'two locations', 'second location', 'second business', 'more than one business', 'more than one location', 'other listing', 'add listing', 'add another listing', 'multiple businesses', 'multiple locations', 'several businesses', 'locations', 'businesses'],
-    keysFr: ['autre entreprise', 'deux entreprises', 'deux restaurants', 'deux succursales', 'deuxieme succursale', 'plusieurs entreprises', 'plusieurs succursales', 'autre fiche', 'ajouter une fiche'],
+    keys: ['another business', 'two businesses', 'two restaurants', 'two locations', 'second location', 'second business', 'more than one business', 'more than one location', 'other listing', 'add listing', 'add another listing', 'multiple businesses', 'multiple locations', 'several businesses', 'locations', 'businesses',
+      'second venue', 'another venue', 'another location', 'second restaurant', 'another restaurant', 'add a second', 'add another business'],
+    keysFr: ['autre entreprise', 'deux entreprises', 'deux restaurants', 'deux succursales', 'deuxieme succursale', 'plusieurs entreprises', 'plusieurs succursales', 'autre fiche', 'ajouter une fiche',
+      // French pass 6 (2026-10-19): "deuxième établissement" found nothing.
+      'deuxieme etablissement', 'second etablissement', 'autre etablissement', 'un autre etablissement', 'deux etablissements', 'plusieurs etablissements',
+      'deuxieme entreprise', 'deuxieme commerce', 'autre commerce', 'deux commerces', 'deuxieme restaurant', 'autre restaurant', 'deuxieme fiche', 'etablissements'],
     a: {
       in: '<p>Open the other business’s private edit link on this device while you’re signed in, and tap <strong>Add to my login</strong>. <a href="/owner/account">My listings</a> then shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
       out: '<p>Sign in first, then open the other business’s private edit link on the same device and tap <strong>Add to my login</strong>. (No login yet? Use <strong>Create a login</strong> on the first one, then do this for the others.) <a href="/owner/account">My listings</a> shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
@@ -38765,7 +38918,7 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['qui peut voir mon compte', 'qui peut voir mon courriel', 'qui peut voir', 'voir mon courriel', 'voir mon mot de passe', 'courriel public', 'courriel visible', 'confidentialite', 'vie privee', 'prive', 'renseignements personnels', 'mes donnees'],
     a: '<p>Your login is private:</p><ul><li><strong>Visitors never see it.</strong> Your login email isn’t shown on your listing, and we don’t share or sell it.</li><li><strong>Your password</strong> is stored scrambled, so nobody can read it, us included.</li><li>The only people who see your login email are the others with a login for the same listing, in <strong>People with access</strong> on your edit page, and Dayton at Okanagan Roam.</li></ul><p>What <em>is</em> public is what you put on the listing itself: phone, website, address and links. Want someone off your listing? Ask me about <strong>who has access</strong>. More in our <a href="/privacy">privacy policy</a>.</p>',
     aFr: '<p>Votre compte est privé :</p><ul><li><strong>Les visiteurs ne le voient jamais.</strong> Le courriel de votre compte n’est pas affiché sur votre fiche, et nous ne le partageons ni ne le vendons.</li><li><strong>Votre mot de passe</strong> est enregistré sous forme brouillée : personne ne peut le lire, pas même nous.</li><li>Les seules personnes qui voient le courriel de votre compte sont les autres personnes ayant un compte pour la même fiche, dans <strong>Personnes ayant accès</strong> sur votre page de modification, et Dayton chez Okanagan Roam.</li></ul><p>Ce qui <em>est</em> public, c’est ce que vous mettez sur la fiche : téléphone, site Web, adresse et liens. Vous voulez retirer quelqu’un de votre fiche? Demandez-moi <strong>qui a accès</strong>. Plus de détails dans notre <a href="/fr/privacy">politique de confidentialité</a>.</p>' },
-  { id: 'google', over: ['links', 'hours', 'name-address', 'reviews'], q: 'My phone number or hours are wrong on Google', qFr: 'Mon numéro ou mes heures sont erronés sur Google', pages: ['edit', 'account'],
+  { id: 'google', over: ['links', 'phone', 'hours', 'name-address', 'reviews'], q: 'My phone number or hours are wrong on Google', qFr: 'Mon numéro ou mes heures sont erronés sur Google', pages: ['edit', 'account'],
     keys: ['on google', 'wrong on google', 'google maps', 'google listing', 'google business', 'google business profile', 'google profile', 'google search', 'google shows', 'google says', 'google has', 'in google', 'from google'],
     keysFr: ['sur google', 'google maps', 'fiche google', 'profil google', 'profil d entreprise google', 'google affiche', 'dans google'],
     a: { in: '<p>We can’t change Google: Google Maps and Google search show your <strong>Google Business Profile</strong>, which only you (or whoever manages it) can edit.</p><ol><li>Go to <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a> and sign in with the Google account that manages your business.</li><li>Choose your business, tap <strong>Edit profile</strong>, then <strong>Contact</strong> (phone, website) or <strong>Hours</strong>, and save.</li><li>Google may take a few days to check it.</li></ol><p>Not on that Google account? Search for your business on Google Maps and tap <strong>Claim this business</strong> or <strong>Suggest an edit</strong>.</p><p>Then fix it here too: {ON}, change <strong>Phone</strong> (in <strong>Contact</strong>) or your hours, and tap {SEND}. {LIVE}</p>',
@@ -40200,7 +40353,7 @@ function renderClaimPage(venue, lang) {
     <p><strong>${escapeHtml(venue.name)}</strong> &middot; ${escapeHtml(REGION_LABELS[venue.region] || venue.region)}</p>
     <p>${T('intro', { name: venue.name })}</p>
     <form class="venue-form" id="clForm" novalidate>
-      <div class="lyv-hp" aria-hidden="true"><label>Leave this empty <input type="text" id="clCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off"></label></div>
+      <div class="lyv-hp" aria-hidden="true"><label>${fr ? 'Laissez ce champ vide' : 'Leave this empty'} <input type="text" id="clCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off"></label></div>
       ${field('clName', 'name', T('name'), '<input type="text" id="clName" autocomplete="name" maxlength="100" required>')}
       ${field('clRole', 'role', T('role'), `<select id="clRole" required><option value="">${T('choose')}</option>${roles}</select>`)}
       ${field('clEmail', 'email', T('email'), '<input type="email" id="clEmail" autocomplete="email" maxlength="254" required>', T('emailHint'))}
@@ -40277,7 +40430,10 @@ function renderClaimPage(venue, lang) {
   body.owner-page .cl-radio span { flex: 1 1 auto; min-width: 0; }
   body.owner-page [hidden] { display: none !important; }
 </style>`, { lang, helpKey: 'Claim this listing' });
-  return fr ? page.replace('<html lang="en">', '<html lang="fr-CA">') : page;
+  // French pass 6 (2026-10-19): both pages carry the site header in their own language and the EN / FR switch (the
+  // French one had the English menu and <html lang="fr-CA">, which the French-only styles did not match).
+  const enPath = claimPagePath(venue);
+  try { return fr ? frenchTwinHtml(page, enPath) : englishTwinHtml(page, enPath); } catch (e) { return fr ? page.replace('<html lang="en">', '<html lang="fr" data-page-lang="fr">') : page; }
 }
 
 // --- admin side ---
@@ -40430,7 +40586,7 @@ function renderOwnerForgotPage({ lang = 'en' } = {}) {
       <p class="lyv-error" id="ofgError" hidden></p>
       <button type="submit" class="venue-form-submit" id="ofgSubmit">${L('Send reset link', 'Envoyer le lien de réinitialisation')}</button>
     </form>
-    <p class="op-done" id="ofgDone" hidden>${L('If that email has a login, a reset link is on its way. Check your inbox (and spam folder).', 'Si ce courriel est associé à un compte, un lien de réinitialisation est en route. Vérifiez votre boîte de réception (et vos courriels indésirables).')} <span id="ofgSlow" hidden>${L('It can take a few hours to arrive.', 'Il peut prendre quelques heures à arriver.')}</span></p>
+    <p class="op-done" id="ofgDone" hidden>${L('If that email has a login, a reset link is on its way. Check your inbox (and spam folder).', 'Si ce courriel est associé à un compte, un lien de réinitialisation est en route. Vérifiez votre boîte de réception (et vos courriels indésirables).')} <span id="ofgSlow" hidden>${L('It can take a few hours to arrive.', 'Ça peut prendre quelques heures.')}</span></p>
     ${fr ? `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Retour à la connexion</a>
     <br><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé et choisissez-y un mot de passe, ou <a href="${OWNER_NEW_LINK_PATH}">recevez un nouveau lien</a>.</p>
     ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>
@@ -43327,7 +43483,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: direct.url, 'Cache-Control': 'no-store' });
         return res.end();
       }
-      const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS });
+      const run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS, lang: res.twinLang === 'fr' ? 'fr' : 'en' });
       run.query = q; run.searchText = searchText;
       const html = renderSearchPage(run, { lang: res.twinLang });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
@@ -47217,6 +47373,11 @@ module.exports = {
   guideOpenFirstHours,
   withSmartSearchPlan,
   discoverySearchText,
+  // French pass 6 (2026-10-19)
+  FR_SEARCH_SYNONYMS,
+  frSearchSynonyms,
+  renderClaimPage,
+  mapFrenchNote,
   SEARCH_PAGE_MAX_RESULTS,
   smartFuzzyVenues,
   smartGuideMatches,
