@@ -10854,7 +10854,8 @@ test('hours.js scope: guarded load; one reading for the venue page, structured d
   assert.equal((src.match(/hoursModule\.statusAt/g) || []).length, 2, 'status is computed only in venueHoursStatusAt and foodDrinkOpenNowInfo');
   assert.equal((src.match(/renderFoodDrinkHubScriptHtml\(\{ openNow: true \}\)/g) || []).length, 1, 'the browser status runs on the /food-drink hub only');
   // Since 2026-10-14 the venue page's open-now line reads it (venueOpenStatus).
-  assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 3, 'defined, exported, and read by the venue page status line');
+  // Season end (2026-10-19): and by seasonLastOpeningPassed (is the venue open right now, on its last season day).
+  assert.equal((src.match(/venueHoursStatusAt/g) || []).length, 4, 'defined, exported, and read by the venue page status line and the season end');
   assert.equal((src.match(/hoursModule\.openingPeriods\(/g) || []).length, 1, 'structured data periods come from hours.js');
   assert.equal((src.match(/hoursModule\.dayHoursText\(/g) || []).length, 1, 'the venue page list comes from hours.js');
   const planner = fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8');
@@ -27859,6 +27860,177 @@ test('Pass 4 tech polish: an open-until venue\'s weekly hours carry validThrough
     assert.ok(s.every((x) => x.validThrough === '2026-10-26'), JSON.stringify(s[0]));
   } finally {
     app.guardedSeasonUpdate(v.id, null, meta, SEASON_NOW);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+// ---- Advisory venues last, season end (2026-10-19) ---------------------------
+// A written advisory that says a place is not operating (receivership, "the tasting room is closed") sorts it to the
+// end of every Recommended order and the ItemList, and keeps it out of trip plans; an "open for the season until"
+// venue whose last opening has passed reads closed for the season everywhere.
+const ADVISORY_LIVE_NOTES = {
+  notOperating: [
+    'The Vibrant Vine is in court-ordered receivership and its tasting room is closed until further notice.',
+    'The winery is in court-ordered receivership and the property is for sale (July 2026); check it is open before visiting.',
+    'The tasting room is closed; the winery is selling its remaining wines by email or phone.',
+    'Temporarily closed since a fire on February 24, 2026. The brewery said it was working to reopen, but no reopening date has been announced.',
+    'Closed for wildfire recovery after the 2023 Grouse Complex fire.',
+    'The trail down to the waterfalls is closed for slope stability issues.',
+  ],
+  operating: [
+    'Open on Kelowna Rockets game and concert nights only; you need an event ticket to dine here.',
+    'Partial closure after the June 2026 wildfire: the southern portion of the park, including Bowser Beach, has reopened via Collens Hill Road; the northern portion remains closed. Check the official source before visiting. (checked 2026-09-19)',
+    'Off-leash dog park trial at Wharf Park, March 1 – December 31, 2026: dogs must be leashed outside the designated leash-optional area (signed at the park entrances). Check the official source before visiting. (checked 2026-09-20)',
+    'Swimming advisory currently in effect for Rotary Beach. Check the official source for the latest update before swimming. (checked 2026-09-19)',
+    'Closed for the season. Reopens May 1, 2027.',
+  ],
+};
+
+test('Advisory venues (2026-10-19): the not-operating rule matches the live notes; server and planner agree', () => {
+  const planner = require('../trip-planner.js');
+  assert.equal(app.ADVISORY_NOT_OPERATING_RE.source, planner.ADVISORY_NOT_OPERATING_RE.source, 'server.js and trip-planner.js keep the same rule');
+  for (const n of ADVISORY_LIVE_NOTES.notOperating) {
+    assert.equal(app.advisoryNotOperating(n), true, n);
+    assert.equal(planner.advisoryNotOperating(n), true, n);
+  }
+  for (const n of ADVISORY_LIVE_NOTES.operating) {
+    assert.equal(app.advisoryNotOperating(n), false, n);
+    assert.equal(planner.advisoryNotOperating(n), false, n);
+  }
+  assert.equal(app.advisoryNotOperating(''), false);
+  assert.equal(app.advisoryNotOperating(null), false);
+});
+
+test('Advisory venues (2026-10-19): listed last on town, hub, /wineries, /browse and ItemList orders; out of trip plans', async () => {
+  const meta = { reason: 'test', batch_id: 'advisory-last' };
+  const slugs = ['advisory-last-receivership', 'advisory-last-closed', 'advisory-last-open', 'advisory-last-informational'];
+  for (const slug of slugs) seasonInsert.run({ name: `Advisory Last ${slug}`, type: 'winery', hours: SEASON_WEEK, slug });
+  const [rec, shut, open, info] = slugs.map((s) => app.findVenueBySlug('kelowna', 'winery', s));
+  const ids = [rec.id, shut.id, open.id, info.id];
+  // The advisory venues rank best on every score, so only the advisory rule can move them down.
+  for (const v of [rec, shut, info]) db.prepare('UPDATE venues SET rating = 5, reviews = 9000, latitude = 49.88, longitude = -119.49 WHERE id = ?').run(v.id);
+  db.prepare('UPDATE venues SET rating = 3.9, reviews = 5, latitude = 49.88, longitude = -119.49 WHERE id = ?').run(open.id);
+  app.guardedCollectionMembershipUpdate('advisory', rec.id, 'add', ADVISORY_LIVE_NOTES.notOperating[0], meta);
+  app.guardedCollectionMembershipUpdate('advisory', shut.id, 'add', ADVISORY_LIVE_NOTES.notOperating[2], meta);
+  app.guardedCollectionMembershipUpdate('advisory', info.id, 'add', ADVISORY_LIVE_NOTES.operating[0], meta);
+  const ldUrls = (html) => {
+    const out = [];
+    for (const m of html.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)) {
+      try { const o = JSON.parse(m[1]); if (o['@type'] === 'ItemList') out.push(...o.itemListElement.map((e) => e.url)); } catch (e) { /* not JSON */ }
+    }
+    return out;
+  };
+  const cardOrder = (html) => [...html.matchAll(/data-venue-id="(\d+)"/g)].map((m) => Number(m[1])).filter((id, i, a) => ids.includes(id) && a.indexOf(id) === i);
+  try {
+    assert.deepEqual([...app.advisoryNotOperatingIds()].filter((id) => ids.includes(id)).sort(), [rec.id, shut.id].sort());
+    await withDiscoveryServer(async (base) => {
+      for (const path of ['/kelowna/wineries', '/wineries']) {
+        const html = await (await fetch(base + path)).text();
+        const order = cardOrder(html);
+        assert.deepEqual(order.slice(-2).sort(), [rec.id, shut.id].sort(), `${path}: not-operating places are the last cards`);
+        assert.ok(order.indexOf(info.id) < order.indexOf(rec.id) && order.indexOf(info.id) < order.indexOf(shut.id), `${path}: an informational advisory is not moved last`);
+        assert.ok(html.includes(`data-venue-id="${rec.id}"`), `${path}: still listed`);
+        const urls = ldUrls(html).filter((u) => slugs.some((s) => u.endsWith('/' + s)));
+        assert.deepEqual(urls.slice(-2).map((u) => u.split('/').pop()).sort(), ['advisory-last-closed', 'advisory-last-receivership'], `${path}: ItemList too`);
+      }
+    });
+    const browse = app.browseRecommendedOrder([rec, shut, open, info].map((v) => app.findVenueBySlug('kelowna', 'winery', v.slug))).map((v) => v.id);
+    assert.deepEqual(browse.slice(-2).sort(), [rec.id, shut.id].sort(), '/browse Recommended order');
+    // A town category page (renderCategoryPage): cards and ItemList.
+    const fresh = [rec, shut, open, info].map((v) => app.findVenueBySlug('kelowna', 'winery', v.slug)).map((v) => ({ ...v, type: 'outdoor' }));
+    const page = app.renderCategoryPage('kelowna', 'outdoor', fresh, []);
+    const pageUrls = ldUrls(page).map((u) => u.split('/').pop());
+    assert.deepEqual(pageUrls.slice(-2).sort(), ['advisory-last-closed', 'advisory-last-receivership'], 'renderCategoryPage ItemList');
+    assert.deepEqual(app.seasonClosedLast(fresh).slice(-2).map((v) => v.id).sort(), [rec.id, shut.id].sort());
+    // Trip planner: left out of every plan, not just marked down.
+    const planner = require('../trip-planner.js');
+    const facts = app.buildTripPlannerFacts();
+    const fRec = facts.find((f) => f.id === rec.id);
+    const fInfo = facts.find((f) => f.id === info.id);
+    assert.deepEqual(planner.advisoryFit(fRec, {}, { date: app.todayLocal(), month: 10 }), { skip: true });
+    assert.equal(planner.advisoryFit(fInfo, {}, { date: app.todayLocal(), month: 10 }).skip, false, 'an informational advisory stays in plans');
+    const ctx = planner.buildContext({ text: 'wineries in kelowna', regions: ['kelowna'], types: ['winery'] });
+    assert.equal(planner.eligible(fRec, ctx, true), false, 'out of day plans and recommendations');
+  } finally {
+    for (const v of [rec, shut, info]) app.guardedCollectionMembershipUpdate('advisory', v.id, 'remove', null, meta);
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('Season end (2026-10-19): open-until venue whose last opening has passed is closed for the season (Pacific time)', () => {
+  // Weekends only, 11 AM - 5 PM. 2026-10-11 is a Sunday; the season ends Tuesday 2026-10-13.
+  const weekends = JSON.stringify({ mon: [], tue: [], wed: [], thu: [], fri: [], sat: [['11:00', '17:00']], sun: [['11:00', '17:00']] });
+  seasonInsert.run({ name: 'Season End Weekend Fixture', type: 'winery', hours: weekends, slug: 'season-end-weekend-fixture' });
+  seasonInsert.run({ name: 'Season End Monday Fixture', type: 'winery', hours: JSON.stringify({ mon: [['11:00', '17:00']], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [['11:00', '17:00']] }), slug: 'season-end-monday-fixture' });
+  seasonInsert.run({ name: 'Season End No Hours Fixture', type: 'winery', hours: null, slug: 'season-end-no-hours-fixture' });
+  const wk = app.findVenueBySlug('kelowna', 'winery', 'season-end-weekend-fixture');
+  const mon = app.findVenueBySlug('kelowna', 'winery', 'season-end-monday-fixture');
+  const none = app.findVenueBySlug('kelowna', 'winery', 'season-end-no-hours-fixture');
+  const meta = { reason: 'test', batch_id: 'season-end' };
+  const row = { status: 'open_until', until_date: '2026-10-13', source_url: SEASON_SRC, checked_at: '2026-10-11' };
+  for (const v of [wk, mon, none]) assert.equal(app.guardedSeasonUpdate(v.id, v === wk ? { ...row, reopens_date: '2027-05-01' } : row, meta, SEASON_NOW).ok, true);
+  const sunNoon = new Date('2026-10-11T19:00:00Z'); // 12:00 PDT, open
+  const sunMorning = new Date('2026-10-11T17:00:00Z'); // 10:00 PDT, opens at 11 today
+  const sunEvening = new Date('2026-10-12T01:00:00Z'); // 18:00 PDT Sunday (already Monday in UTC)
+  try {
+    assert.equal(app.seasonLastOpeningPassed(wk, '2026-10-13', sunNoon), false, 'open right now');
+    assert.equal(app.seasonLastOpeningPassed(wk, '2026-10-13', sunMorning), false, 'opens later today');
+    assert.equal(app.seasonLastOpeningPassed(wk, '2026-10-13', sunEvening), true, 'next opening (Sat) is after the last day');
+    assert.equal(app.seasonLastOpeningPassed(mon, '2026-10-13', sunEvening), false, 'opens Monday, before the last day');
+    assert.equal(app.seasonLastOpeningPassed(none, '2026-10-13', sunEvening), false, 'no hours: no claim');
+    assert.equal(app.seasonLastOpeningPassed(wk, '2026-10-13', new Date('2026-10-14T19:00:00Z')), true, 'after the date');
+
+    let st = app.getSeasonStates(sunNoon);
+    assert.equal(st.get(wk.id).kind, 'open_until');
+    st = app.getSeasonStates(sunEvening);
+    assert.equal(st.get(wk.id).kind, 'closed');
+    assert.equal(st.get(wk.id).text, 'Closed for the season. Reopens May 1, 2027.', 'with the reopening date when known');
+    assert.equal(st.get(wk.id).until, '2026-10-13');
+    assert.equal(st.get(mon.id).kind, 'open_until');
+    assert.equal(st.get(none.id).kind, 'open_until');
+    // Open Now: no "Closed · Opens Sat" claim; the season note is what shows.
+    const notes = app.getAdvisoryNotes(sunEvening);
+    assert.equal(notes.get(wk.id), `Closed for the season. Reopens May 1, 2027. ${SEASON_SRC}`);
+    const info = app.foodDrinkOpenNowInfo([wk, mon], notes, sunEvening, { requireVerified: false });
+    assert.equal(info.byId.get(wk.id).eligible, false);
+    assert.equal(info.byId.get(mon.id).eligible, true);
+    // Card tag, season-closed last, venue page hours.
+    assert.equal(app.seasonClosedLast([wk, mon], sunEvening).map((v) => v.id).join(), [mon.id, wk.id].join());
+    const page = app.renderVenuePage(wk, [], [], [], { now: sunEvening });
+    assert.match(page, /<p class="venue-hours-season">[^<]*<span aria-hidden="true">[^<]*<\/span> Closed for the season/);
+    assert.doesNotMatch(app.renderVenuePage(wk, [], [], [], { now: sunNoon }), /<p class="venue-hours-season">/);
+    const ld = [...page.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1])).find((o) => o.openingHoursSpecification);
+    assert.ok(ld && ld.openingHoursSpecification.every((s) => s.validThrough), 'JSON-LD weekly hours end on the last day');
+  } finally {
+    for (const v of [wk, mon, none]) { app.guardedSeasonUpdate(v.id, null, meta, SEASON_NOW); db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+  }
+});
+
+test('Season end (2026-10-19): trip facts and /map read the ended season on the real clock', () => {
+  // Closed every day but today's weekday is never listed: open on the other six days, the season ends today.
+  const today = app.todayLocal();
+  const wd = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${today}T12:00:00Z`).getUTCDay()];
+  const week = {};
+  for (const d of ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']) week[d] = d === wd ? [] : [['11:00', '17:00']];
+  seasonInsert.run({ name: 'Season End Today Fixture', type: 'winery', hours: JSON.stringify(week), slug: 'season-end-today-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'winery', 'season-end-today-fixture');
+  db.prepare('UPDATE venues SET latitude = 49.88, longitude = -119.49 WHERE id = ?').run(v.id);
+  const meta = { reason: 'test', batch_id: 'season-end-today' };
+  assert.equal(app.guardedSeasonUpdate(v.id, { status: 'open_until', until_date: today, source_url: SEASON_SRC, checked_at: today }, meta).ok, true);
+  try {
+    assert.equal(app.getSeasonStates().get(v.id).kind, 'closed');
+    const f = app.buildTripPlannerFacts().find((x) => x.id === v.id);
+    assert.equal(f.seasonClosedToday, true, 'left out of undated plans');
+    assert.equal(f.seasonClosed.from, today, 'dated plans for today too');
+    assert.equal(require('../trip-planner.js').seasonClosedOnTrip(f, { date: today }), true);
+    const row = app.mapPlacesData().find((p) => p[5].endsWith('/season-end-today-fixture'));
+    assert.equal(row[13], 1, '/map marks it closed for the season');
+    const hub = app.renderWineriesHubPage(app.getVenuesByCategory('winery'));
+    const card = (hub.split(`data-venue-id="${v.id}"`)[1] || '').split('</li>')[0];
+    assert.match(card, /Closed for the season/, 'the card says closed for the season');
+    assert.doesNotMatch(card, /Opens (?:tomorrow|Mon|Tue|Wed|Thu|Fri|Sat|Sun)/, 'never "Opens tomorrow"');
+  } finally {
+    app.guardedSeasonUpdate(v.id, null, meta);
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });

@@ -5391,6 +5391,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
   const advisories = getAdvisoryNotesWithDates();
   const seasons = getSeasonRows();
   const seasonToday = todayLocal();
+  const seasonStatesNow = getSeasonStates();
   const dogNotes = getDogFriendlyNotes();
   const golfWindows = getGolfRateWindows();
   const facts = [];
@@ -5425,8 +5426,14 @@ function buildTripPlannerFacts(preparePlannerKinds = true) {
       // Seasonal closure (venue_seasons): the dated range the venue says it is
       // closed, so a plan for a later date is judged on that date, plus
       // whether that covers today for plans with no date of their own.
-      seasonClosed: seasons.has(v.id) ? seasonClosedRange(seasons.get(v.id)) : null,
-      seasonClosedToday: seasons.has(v.id) ? (seasonStateOn(seasons.get(v.id), seasonToday) || {}).kind === 'closed' : false,
+      seasonClosed: seasons.has(v.id) ? (() => {
+        const r = seasonClosedRange(seasons.get(v.id));
+        // Season end (2026-10-19): closed from today once the last opening has passed.
+        const st = seasonStatesNow.get(v.id);
+        return st && st.ended && r ? { from: seasonToday, to: r.to } : r;
+      })() : null,
+      // Season end (2026-10-19): getSeasonStates also knows when an open-until season's last opening has passed.
+      seasonClosedToday: seasons.has(v.id) ? (seasonStatesNow.get(v.id) || {}).kind === 'closed' : false,
       seasonReopens: seasons.has(v.id) ? (seasons.get(v.id).reopens_date || null) : undefined, // the listed reopening date; null = not announced (2026-10-18)
       dogNote: dogNotes.get(v.id) || null,
       golfSeasons: v.type === 'golf' ? (golfWindows.get(`${v.region}/${v.slug}`) || []) : [],
@@ -6332,7 +6339,36 @@ function seasonStateOn(s, today) {
     text = `Reopening for the season ${seasonDateText(s.reopens_date, today)}. Check current hours with the venue before you go.`;
   }
   if (!kind) return null;
-  return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text, until: kind === 'open_until' ? s.until_date : null };
+  return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text, until: kind !== 'reopening' && s.status === 'open_until' ? s.until_date : null };
+}
+
+// Season end (2026-10-19): an "open for the season until" venue whose listed hours have no opening left on or before
+// that day (its last opening has passed, or the next one is after it) is closed for the season from now on, not
+// "Closed \u00b7 Opens Fri 11 AM". On the Okanagan clock (America/Vancouver). No hours, or an unknown day before
+// the end, makes no claim and keeps "Open for the season until ...".
+// -> true when there is no opening from `now` through untilDate.
+function seasonLastOpeningPassed(venue, untilDate, now = new Date()) {
+  if (!hoursModule || !venue || !venue.hours || !parseLocalDate(untilDate)) return false;
+  const clock = okanaganClock(now);
+  if (clock.date > untilDate) return true;
+  const parse = (date) => { try { return hoursModule.parseHours(weekJsonOn(venue, date)); } catch (e) { return null; } };
+  const nowStatus = venueHoursStatusAt(weekJsonOn(venue, clock.date), now);
+  if (!nowStatus || nowStatus.state === 'unknown') return false;
+  if (nowStatus.state === 'open') return false;
+  for (let date = clock.date; date <= untilDate; date = addLocalDays(date, 1)) {
+    const parsed = parse(date);
+    if (!parsed || !parsed.days) return false;
+    const day = hoursModule.dayOnDate(parsed, date);
+    if (!day || day.status === 'unknown') return false;
+    if (day.status !== 'open') continue;
+    if (date !== clock.date || (day.ranges || []).some(([a]) => a > clock.minutes)) return false;
+  }
+  return true;
+}
+// The closed-for-the-season state for a row whose open_until season has ended (the text the day after would show).
+function seasonEndedState(s) {
+  const st = seasonStateOn(s, addLocalDays(s.until_date, 1));
+  return st && st.kind === 'closed' ? { ...st, ended: true } : null;
 }
 
 // "5-10" -> "May \u2013 October" (fr: "mai \u2013 octobre").
@@ -6387,9 +6423,20 @@ function getSeasonRows() {
 function getSeasonStates(now = new Date()) {
   const today = todayLocal(now);
   const map = new Map();
+  const ending = [];
   for (const [id, s] of getSeasonRows()) {
     const st = seasonStateOn(s, today);
     if (st) map.set(id, st);
+    if (st && st.kind === 'open_until') ending.push([id, s]);
+  }
+  // Season end (2026-10-19): the last opening has passed -> closed for the season now.
+  if (ending.length && hoursModule) {
+    const byId = new Map(db.prepare(`SELECT id, hours FROM venues WHERE id IN (${ending.map(() => '?').join(',')})`).all(...ending.map(([id]) => id)).map((v) => [v.id, v]));
+    for (const [id, s] of ending) {
+      if (!seasonLastOpeningPassed(byId.get(id), s.until_date, now)) continue;
+      const st = seasonEndedState(s);
+      if (st) map.set(id, st);
+    }
   }
   return map;
 }
@@ -6424,11 +6471,28 @@ function seasonOnlyStates(now = new Date()) {
 }
 // Seasons everywhere (2026-10-18): places closed for the season move to the end of a list, every other place keeping
 // its order. Used by the default (Recommended) order of every list page, not by A-Z, Top rated or a price sort.
+// Advisory venues last (2026-10-19): a place whose written advisory says it is not operating, or may not be, goes
+// after those (receivership, "the tasting room is closed", "Temporarily closed", "Closed for wildfire recovery"). It
+// stays listed and visible, just last. Same rule as trip-planner.js ADVISORY_NOT_OPERATING_RE, which also keeps these
+// places out of trip plans; a partial closure or a season note is not this.
 function seasonClosedLast(list, now = new Date(), states = null) {
   const seasons = states || getSeasonStates(now);
-  if (!seasons.size) return list.slice();
-  const away = (v) => { const st = seasons.get(v.id); return !!(st && st.kind === 'closed'); };
-  return [...list.filter((v) => !away(v)), ...list.filter(away)];
+  const notOperating = advisoryNotOperatingIds();
+  if (!seasons.size && !notOperating.size) return list.slice();
+  const gone = (v) => notOperating.has(v.id);
+  const away = (v) => { const st = seasons.get(v.id); return !gone(v) && !!(st && st.kind === 'closed'); };
+  return [...list.filter((v) => !away(v) && !gone(v)), ...list.filter(away), ...list.filter(gone)];
+}
+const ADVISORY_NOT_OPERATING_RE = /\b(?:receivership|for sale|not operating|no longer operating|temporarily closed|permanently closed|closed until|(?:is|are) (?:now |currently |temporarily |permanently )?closed|check (?:that )?it is open|may be closed|may not be open|ownership change|uncertain)\b|\bclosed for (?!the season\b)/i;
+function advisoryNotOperating(note) {
+  const t = String(note || '');
+  return !!t && !/\bpartial(?:ly)?\b/i.test(t) && ADVISORY_NOT_OPERATING_RE.test(t);
+}
+// Ids of live venues whose written advisory (not a season note) says they are not operating.
+function advisoryNotOperatingIds() {
+  const ids = new Set();
+  for (const [id, note] of getCollectionNotes(ADVISORY_COLLECTION_KIND)) if (advisoryNotOperating(note)) ids.add(id);
+  return ids;
 }
 const SEASON_TAG_ICON = { closed: '\u{1F342}', open_until: '\u23F3', reopening: '\u{1F331}' };
 // "Open until Oct 31" (2026-10-18): the card tag's short form of "Open for the season until October 31."; the venue
@@ -17054,6 +17118,9 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   // sports_also (a park with a skate park, a resort's bike park), listed
   // under "More places to play" as on /sports. Empty for every other type.
   const sportsAlso = type === 'sport' ? (opts.sportsAlso || []) : [];
+  // Advisory venues last (2026-10-19): the ItemList follows the cards' order, so places closed for the season and
+  // places whose advisory says they are not operating come last in it too (golf ranks its own subsections).
+  if (type !== 'golf') venues = seasonClosedLast(venues);
   const description = venues.length === 0 && sportsAlso.length
     ? `Places to play in ${regionLabel}, BC: skate parks, bike parks and trails, disc golf and courts, listed by Okanagan Roam.`
     : venues.length === 0
@@ -17850,6 +17917,8 @@ function renderOutdoorRegionIndexHtml(venues) {
 // shell, same cards (with the community line), its own H1/canonical/
 // JSON-LD, plus the activity selector with this activity active.
 function renderOutdoorActivityPage(activity, venues) {
+  // Advisory venues last (2026-10-19): the ItemList follows the cards' order (closed for the season or not operating last).
+  venues = seasonClosedLast(venues);
   const label = CATEGORY_LABELS.outdoor;
   const title = `${activity.label} in the Okanagan | Okanagan Roam`;
   // Kept under ~158 characters (SEO, 2026-10-13): the blurb plus the count when
@@ -18187,6 +18256,8 @@ function liveActivityPagePaths() {
 }
 
 function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
+  // Advisory venues last (2026-10-19): the ItemList follows the cards' order (closed for the season or not operating last).
+  if (type !== 'golf') venues = seasonClosedLast(venues);
   const indoorActivity = type === 'indoor' && INDOOR_EXPERIENCES.some((c) => c.slug === opts.indoorActivity) ? opts.indoorActivity : '';
   const indoorUniverse = type === 'indoor' ? [...venues, ...(opts.indoorGolf || []), ...(opts.indoorAlso || []).filter((v) => !(opts.indoorGolf || []).some((g) => g.id === v.id))] : [];
   const tourActivity = type === 'tour' && TOUR_ACTIVITIES.some((a) => a.slug === opts.tourActivity) ? opts.tourActivity : '';
@@ -18493,8 +18564,10 @@ function sortFoodDrinkVenues(venues, sort = 'recommended', now = new Date()) {
   const score = new Map(list.map((v) => [v.id, foodDrinkRecommendedScore(v)]));
   // Closed for the season (2026-10-18): kept on the list but moved to the end, so a visitor this week sees places
   // they can actually go to first. Only the Recommended order; Top rated and A-Z stay as named.
+  // Advisory venues last (2026-10-19): a place whose advisory says it is not operating comes after those.
   const seasons = getSeasonStates(now);
-  const away = (v) => { const st = seasons.get(v.id); return st && st.kind === 'closed' ? 1 : 0; };
+  const notOperating = advisoryNotOperatingIds();
+  const away = (v) => { if (notOperating.has(v.id)) return 2; const st = seasons.get(v.id); return st && st.kind === 'closed' ? 1 : 0; };
   return openNowFirst(list.sort((a, b) => away(a) - away(b) || score.get(b.id) - score.get(a.id) || byName(a, b)), now);
 }
 // Open now first (2026-10-18): the Recommended order is a stable three-way split -- places open right now, then every
@@ -21899,6 +21972,8 @@ function renderLocalFavouritesPage(venues, filter = null) {
 // cardNotes / cardNoteLabel (2026-10-11): each member's collection note shown
 // on its card ("Local pick: Voted Best Breakfast…", "Why it's a gem: …").
 function renderCuratedCollectionPage(cfg, venues, filter = null) {
+  // Advisory venues last (2026-10-19): the ItemList follows the cards' order (closed for the season or not operating last).
+  venues = seasonClosedLast(venues);
   const f = filter || { types: [], regions: [] };
   const types = localFavouriteTypesPresent(venues);
   const matching = venues.filter((v) => localFavouriteFilterMatches(f.types, f.regions, v.type, v.region));
@@ -25021,7 +25096,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // Open for the season until a date (2026-10-18, review pass 4): the weekly hours stop on the last open day, so
     // they carry validThrough that day (a seasonal set or closure that already has its own dates is left alone).
     const season = getSeasonStates(opts.now || new Date()).get(venue.id);
-    if (season && season.kind === 'open_until' && season.until) {
+    // Season end (2026-10-19): a season that has just ended keeps its last day too.
+    if (season && season.until && season.kind !== 'reopening') {
       localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.map((spec) => (spec.validThrough ? spec : { ...spec, validThrough: season.until }));
     }
   }
@@ -45917,6 +45993,7 @@ module.exports = {
   guardedWebsiteEnrichUpdate,
   seasonStateOn,
   seasonClosedRange,
+  seasonLastOpeningPassed,
   validateSeason,
   guardedSeasonUpdate,
   guardedHappyHourUpdate,
@@ -46266,6 +46343,10 @@ module.exports = {
   seasonTagHtml,
   seasonTagShortText,
   seasonClosedLast,
+  browseRecommendedOrder,
+  advisoryNotOperating,
+  advisoryNotOperatingIds,
+  ADVISORY_NOT_OPERATING_RE,
   openNowFirst,
   venueHoursCheckedHtml,
   MAP_EVENT_GROUP_SRC,
