@@ -3984,10 +3984,39 @@ function holidayEventTheme(text) {
   if (/\bnew years?\b|\bnye\b/.test(t)) return 'new year';
   return null;
 }
+// Ended events (2026-10-19): "tonight" at 9 PM, or "this weekend" asked on Sunday evening, must not suggest a show that is
+// already over (Okanagan time). An occurrence has ended when its end date is past, or it ends today and its end time
+// (or, with no end time, two hours after its start) has gone by. All-day and overnight ones last the whole day.
+const TRIP_EVENT_ASSUMED_MINUTES = 120;
+function tripOccurrenceEnded(o, clock) {
+  if (!o || !clock || !clock.date) return false;
+  const endDate = o.end_date || o.endDate, startDate = o.start_date || o.startDate;
+  if (endDate && endDate < clock.date) return true;
+  if (!endDate || endDate > clock.date || o.ends_next_day || o.endsNextDay || o.all_day || o.allDay) return false;
+  const toMin = (t) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(t || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const end = toMin(o.end_time !== undefined ? o.end_time : o.endTime);
+  if (end != null) return end <= clock.minutes;
+  const start = toMin(o.start_time !== undefined ? o.start_time : o.startTime);
+  return start != null && startDate === clock.date && start + TRIP_EVENT_ASSUMED_MINUTES <= clock.minutes;
+}
+// What's On cards: kept while any of their occurrences up to `to` is still to come or under way.
+function withoutEndedEvents(events, now = new Date(), to = null) {
+  const clock = okanaganClock(now);
+  const stmt = db.prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND end_date >= ?" + (to ? ' AND start_date <= ?' : '') + ' ORDER BY start_date, COALESCE(start_time, \'\'), id');
+  return (events || []).filter((e) => {
+    const occs = to ? stmt.all(e.id, clock.date, to) : stmt.all(e.id, clock.date);
+    return !occs.length || occs.some((o) => !tripOccurrenceEnded(o, clock));
+  });
+}
+// Planner event items (one per occurrence, tripEventOccurrenceItems): the ones that have not ended.
+function withoutEndedOccurrenceItems(items, now = new Date()) {
+  const clock = okanaganClock(now);
+  return (items || []).filter((e) => !tripOccurrenceEnded(e, clock));
+}
 function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(intent.when, now), now);
-  let events = filterWhatsOnEvents(getWhatsOnEvents(win), intent.regions, intent.eventCategories);
+  let events = withoutEndedEvents(filterWhatsOnEvents(getWhatsOnEvents(win), intent.regions, intent.eventCategories), now, win.to);
   if (intent.textTerms.length) {
     events = events.filter((e) => {
       const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
@@ -5345,7 +5374,7 @@ function selectTripEvents(component, regions, when, now = new Date(), excluded =
   const requirementModule = require('./trip-requirements');
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(when, now), now);
   const ev = component.event || {};
-  let events = filterWhatsOnEvents(getWhatsOnEvents(win), regions || [], ev.category ? [ev.category] : []);
+  let events = withoutEndedEvents(filterWhatsOnEvents(getWhatsOnEvents(win), regions || [], ev.category ? [ev.category] : []), now, win.to);
   if (ev.terms && ev.terms.length) {
     events = events.filter((e) => {
       const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
@@ -5546,7 +5575,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     // 2026-10-18: every town's events, one per dated occurrence; the planner keeps those in each day's town or one
     // about 30 minutes away. (Only the named towns were read: a Vernon-to-Osoyoos road trip never saw Kelowna's or
     // Penticton's live music, and a weekend event was only ever on its first day.)
-    itineraryEvents = tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], categories), intent.excluded), window.from, window.to);
+    itineraryEvents = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], categories), intent.excluded), window.from, window.to), now);
   }
   // Family trips (2026-10-18): the family events on What's On in the trip's dates (O'Keefe Ranch's fall weekends, a
   // corn maze, a kids' haunted house), offered as one stop a day. An undated "family weekend" is the coming weekend.
@@ -5565,7 +5594,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   if (familyEventsFrom) {
     const from = familyEventsFrom.from, days = familyEventsFrom.days;
     const window = resolveWhatsOnWindow({ from, to: addLocalDays(from, days - 1) }, now);
-    const found = tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], ['family-kids']), intent.excluded), window.from, window.to);
+    const found = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], ['family-kids']), intent.excluded), window.from, window.to), now);
     if (found.length) {
       familyEvents = found;
       if (!requirements?.startDate) {
@@ -30715,23 +30744,43 @@ ${renderGolfHeaderHtml()}
 <script>
 (function(){
   var T = ${JSON.stringify(T).replace(/</g, '\\u003c')};
-  var KEY = 'okanaganTrip', DAYS = 'okanaganTripDays', REF = /^(venue|event):[1-9][0-9]*$/;
+  var KEY = 'okanaganTrip', DAYS = 'okanaganTripDays', TIMES = 'okanaganTripTimes', REF = /^(venue|event):[1-9][0-9]*$/;
   function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params || {}); } catch (e) {} }
   function load(k, d){ try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
   function store(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   var trip = (load(KEY, []) || []).filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
   var days = load(DAYS, {}) || {};
+  // The planner's dates and times (2026-10-19): ref -> { d: 'YYYY-MM-DD', s: start minutes, e: end minutes }.
+  var times = load(TIMES, {}) || {};
+  if (typeof times !== 'object' || Array.isArray(times)) times = {};
   var params = new URLSearchParams(location.search);
   var shared = (params.get('stops') || '').split(',').filter(function(r){ return REF.test(r); }).slice(0, ${MY_TRIP_MAX_REFS});
   var sharedDays = (params.get('days') || '').split(',').map(function(n){ return parseInt(n, 10) || 0; });
+  // A shared plan carries its first day's date (start=YYYY-MM-DD), so the days keep their dates.
+  var sharedStart = /^\\d{4}-\\d{2}-\\d{2}$/.test(params.get('start') || '') ? params.get('start') : null;
+  var isFr = document.documentElement.lang === 'fr';
+  function addDays(iso, n){ var t = new Date(iso + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+  function dateText(iso){
+    var t = new Date(iso + 'T12:00:00Z');
+    if (isNaN(t.getTime())) return '';
+    var wd = isFr ? ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var mo = isFr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return isFr ? wd[t.getUTCDay()] + ' ' + t.getUTCDate() + ' ' + mo[t.getUTCMonth()] : wd[t.getUTCDay()] + ', ' + mo[t.getUTCMonth()] + ' ' + t.getUTCDate();
+  }
+  function clockText(m){
+    var h = Math.floor(m / 60) % 24, mm = m % 60;
+    if (isFr) return h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '');
+    return (h % 12 || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + (h < 12 ? ' AM' : ' PM');
+  }
+  function timeText(t){ return t && Number.isFinite(t.s) ? clockText(t.s) + (Number.isFinite(t.e) ? (isFr ? '–' : ' – ') + clockText(t.e) : '') : ''; }
   var viewing = shared.length ? 'shared' : 'mine';
   var info = {}, map = null, layer = null;
   var el = function(id){ return document.getElementById(id); };
   function status(t){ var s = el('mtStatus'); s.textContent = ''; setTimeout(function(){ s.textContent = t; }, 30); }
   function list(){
-    if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0 }; });
-    return trip.map(function(t){ return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (t.ref && days[t.ref]) || 0, raw: t }; });
+    if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: sharedStart && sharedDays[i] ? { d: addDays(sharedStart, sharedDays[i] - 1) } : null }; });
+    return trip.map(function(t){ return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (t.ref && days[t.ref]) || 0, time: t.ref && times[t.ref] || null, raw: t }; });
   }
   function fetchInfo(refs){
     var need = refs.filter(function(r){ return r && !info[r]; });
@@ -30770,13 +30819,14 @@ ${renderGolfHeaderHtml()}
     groups.forEach(function(g){ g.stops.forEach(function(x){ shown.push(x.s); x.n = shown.length; }); });
     var mine = viewing === 'mine';
     el('mtDays').innerHTML = groups.map(function(g){
-      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
+      var gDate = g.key ? g.stops.map(function(x){ return x.s.time && x.s.time.d; }).filter(Boolean)[0] : null;
+      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
         '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
         '<ol class="mt-list">' + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
           var name = d.url ? '<a class="mt-name" href="' + esc((document.documentElement.lang === 'fr' && d.urlFr) || d.url) + '">' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
           var fr = document.documentElement.lang === 'fr';
-          var meta = d.missing ? T.gone : [(fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
+          var meta = d.missing ? T.gone : [timeText(x.s.time), (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p></div>' + tools + '</li>';
         }).join('') + '</ol></section>';
@@ -30788,10 +30838,17 @@ ${renderGolfHeaderHtml()}
     var box = el('mtMap');
     if (!window.L || pts.length < 1) { box.hidden = true; return; }
     box.hidden = false;
-    if (!map) { map = L.map(box, { scrollWheelZoom: false }); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map); }
+    // Fit every stop (2026-10-19): a finer zoom step and a taller map for a trip down the valley, sized before fitting.
+    var latSpan = Math.max.apply(null, pts.map(function(p){ return p.lat; })) - Math.min.apply(null, pts.map(function(p){ return p.lat; }));
+    box.style.height = latSpan > 0.4 && window.innerWidth >= 700 ? '460px' : '';
+    if (!map) { map = L.map(box, { scrollWheelZoom: false, zoomSnap: 0.25 }); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map); }
     if (layer) layer.remove();
     layer = L.layerGroup(pts.map(function(p){ return L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: '<span class="mt-num" style="box-shadow:0 2px 6px rgba(0,0,0,.3)">' + p.n + '</span>', iconSize: [24, 24] }), title: p.name }); })).addTo(map);
-    if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [30, 30] });
+    map.invalidateSize();
+    var fit = function(){ if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [36, 36], maxZoom: 15 }); };
+    fit();
+    // Fonts and the list above can still change the width after the first paint; fit again once settled.
+    setTimeout(function(){ map.invalidateSize(); fit(); }, 250);
   }
   function save(){ store(KEY, trip); }
   document.addEventListener('click', function(e){
@@ -30800,13 +30857,16 @@ ${renderGolfHeaderHtml()}
     var i;
     if (t.hasAttribute('data-mt-up')) { i = +t.getAttribute('data-mt-up'); if (i > 0) { var a = trip[i]; trip[i] = trip[i - 1]; trip[i - 1] = a; status(T.movedUp.replace('{name}', trip[i - 1].name)); } }
     else if (t.hasAttribute('data-mt-down')) { i = +t.getAttribute('data-mt-down'); if (i < trip.length - 1) { var b = trip[i]; trip[i] = trip[i + 1]; trip[i + 1] = b; status(T.movedDown.replace('{name}', trip[i + 1].name)); } }
-    else { i = +t.getAttribute('data-mt-remove'); var gone = trip.splice(i, 1)[0]; if (gone && gone.ref) delete days[gone.ref]; store(DAYS, days); status(T.removed.replace('{name}', gone ? gone.name : T.theStop)); }
+    else { i = +t.getAttribute('data-mt-remove'); var gone = trip.splice(i, 1)[0]; if (gone && gone.ref) { delete days[gone.ref]; delete times[gone.ref]; } store(DAYS, days); store(TIMES, times); status(T.removed.replace('{name}', gone ? gone.name : T.theStop)); }
     save(); render();
   });
   function tripLink(){
     var refs = trip.filter(function(x){ return x.ref; });
     var url = location.origin + (document.documentElement.lang === 'fr' ? '/fr' : '') + '/my-trip?stops=' + refs.map(function(x){ return x.ref; }).join(',');
     if (refs.length && refs.some(function(x){ return days[x.ref]; })) url += '&days=' + refs.map(function(x){ return days[x.ref] || 0; }).join(',');
+    // The first planned day's date rides along, so a shared trip keeps its dates.
+    var firstDated = refs.filter(function(x){ return days[x.ref] && times[x.ref] && times[x.ref].d; }).sort(function(a, b){ return days[a.ref] - days[b.ref]; })[0];
+    if (firstDated) url += '&start=' + addDays(times[firstDated.ref].d, 1 - days[firstDated.ref]);
     return { url: url, refs: refs };
   }
   function copyNote(refs){
@@ -30830,12 +30890,12 @@ ${renderGolfHeaderHtml()}
   var clearArmed = false;
   el('mtClear').addEventListener('click', function(){
     if (!clearArmed) { clearArmed = true; el('mtClear').textContent = T.tapClear; setTimeout(function(){ clearArmed = false; el('mtClear').textContent = T.clearTrip; }, 4000); return; }
-    trip = []; days = {}; save(); store(DAYS, days); clearArmed = false; el('mtClear').textContent = T.clearTrip; status(T.cleared); render();
+    trip = []; days = {}; times = {}; save(); store(DAYS, days); store(TIMES, times); clearArmed = false; el('mtClear').textContent = T.clearTrip; status(T.cleared); render();
   });
   el('mtSave').addEventListener('click', function(){
-    trip = []; days = {};
-    shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) days[r] = sharedDays[i]; });
-    save(); store(DAYS, days);
+    trip = []; days = {}; times = {};
+    shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) { days[r] = sharedDays[i]; if (sharedStart) times[r] = { d: addDays(sharedStart, sharedDays[i] - 1) }; } });
+    save(); store(DAYS, days); store(TIMES, times);
     viewing = 'mine';
     // Fix (2026-10-18): no regex here; this sits in a template string, which ate the backslashes.
     history.replaceState(null, '', (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip');
@@ -45746,6 +45806,8 @@ module.exports = {
   tripPlannerLabels,
   parseTripPlanBody,
   runTripPlan,
+  tripOccurrenceEnded,
+  withoutEndedEvents,
   tripStartWeekday,
   tripPlanDate,
   okanaganClock,

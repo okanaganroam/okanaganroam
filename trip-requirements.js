@@ -29,7 +29,8 @@ const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'t
 const WALKING_TRANSPORT = /\b(?:no car|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 // "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
 // not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
-const EVENING_NO_DRIVE = /\b(?:no|not|don t|do not|won t|will not|avoid|without)\s+(?:want to\s+)?(?:driving|drive|car)\s+(?:after|past|once it s|at|in the)\s+(?:(1[0-2]|[1-9])(?::?([0-5]\d))?\s*(am|pm)?|dark|night|nightfall|sunset|dinner|evening|the evening)\b/;
+const EVENING_NO_DRIVE = /\b(?:no|not|don t|do not|won t|will not|avoid|without)\s+(?:want to\s+)?(?:driving|drive|car)\s+(?:after|past|once it s|at|in the)\s+(?:(2[0-3]|1\d|0?[1-9])(?:\s*h)?(?:\s*([0-5]\d))?\s*(am|pm|h)?|dark|night|nightfall|sunset|dinner|evening|the evening)\b/;
+const WINERY_LUNCH = /\b(?:lunch(?:es)?|eat|meal) (?:at|in) (?:a |an |one |the )?(?:winery|wineries|vineyard|vineyards|estate)\b/;
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const WORD_DAYS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7};
 const PER_DAY_MAX = 4; // the most tastings (wineries, breweries) one day can hold (2026-10-18)
@@ -209,7 +210,9 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     let rawClause=clauseText;
     const eveningDrive=EVENING_NO_DRIVE.exec(rawClause);
     if(eveningDrive){
-      const h=eveningDrive[1]?Number(eveningDrive[1])%12+(eveningDrive[3]==='am'?0:12):18;
+      // 2026-10-19: 24-hour times too ("pas de conduite après 18 h" arrives as "no driving after 18 h").
+      const hr=Number(eveningDrive[1]);
+      const h=!eveningDrive[1]?18:hr>=13?hr:hr%12+(eveningDrive[3]==='am'?0:12);
       add('evening_walk',h*60+Number(eveningDrive[2]||0),scopeText,{limitKm:1.5,phrase:eveningDrive[0]});
       rawClause=rawClause.replace(eveningDrive[0],' ');
     }
@@ -227,7 +230,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       add(neg?'excluded_kind':'venue_kind',kind,scopeText);
     }
     for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:/\bbeach(?:es)?\b/,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/})) {
-      const m=re.exec(value==='golf'&&taxonomy?.types?.includes('sport')?c.replace(/\bdisc golf\b/g,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:{});
+      const m=re.exec(value==='golf'&&taxonomy?.types?.includes('sport')?c.replace(/\bdisc golf\b/g,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:value==='restaurant'&&WINERY_LUNCH.test(c)?{wineryLunch:true}:{});
     }
     // "3 wineries a day" / "two breweries per day" is a count for every day (2026-10-18), capped at
     // PER_DAY_MAX (more tastings than that do not fit a day); "3 wineries" alone is a count for the trip.
@@ -253,6 +256,10 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
         add('event',value,scopeText,{eventKind});
       }
     }
+    // "A comedy show", "dinner and a show" (2026-10-19): comedy is an event whose listing says comedy; a show is any
+    // listed performance.
+    const comedy=/\b(?:comedy|comedians?|improv|stand ?up)\b/.exec(c), show=/\b(?:a|the|some|any) (?:\w+ )?shows?\b|\bshows\b/.exec(c);
+    if((comedy||show)&&!items.some(i=>i.kind==='event'&&i.sourceText===scopeText)&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,(comedy||show).index))&&!/\b(?:show (?:me|us)|shows? (?:me|us))\b/.test(c))add('event','any',scopeText,comedy?{eventKind:'comedy',textTerms:['comedy']}:{eventKind:'show'});
     for (const [activity,re] of Object.entries({skiing:/\b(?:ski|skiing)\b/,snowshoeing:/\b(?:snowshoeing|snowshoe)\b/,winter:/\b(?:ski|skiing|snowshoeing|snowshoe|winter activities?)\b/,hiking:/\b(?:hike|hiking|hikes)\b/,viewpoints:/\b(?:viewpoints?|lookouts?|sunset)\b/})) {
       const m=re.exec(c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('activity',activity,scopeText);
     }
@@ -421,6 +428,8 @@ function coffeeEvidence(v){
   return /\b(?:coffee|espresso|cappuccino|latte|americano|flat white|cortado)\b/.test(text);
 }
 function matches(v,i){
+  // "Lunch at a winery restaurant" (2026-10-19): a winery that serves lunch is that restaurant.
+  if(i.wineryLunch&&i.kind==='type'&&v.type==='winery')return true;
   if(i.kind==='day_trip')return v.region===i.value;
   if(i.servesCoffee&&!coffeeEvidence(v))return false;
   if(i.kind==='venue_kind'||i.kind==='excluded_kind')return (v.plannerKinds||inferPlannerKinds(v)).includes(i.value);
@@ -487,6 +496,8 @@ function namedEventInterpretationText(text, events = [], details = false) {
 }
 
 function eventMatches(event,item) {
+  if (item.eventKind === 'comedy' && !/\b(?:comedy|comedian|comedians|comedic|improv|stand ?up|laughs?)\b/.test(norm(`${event.name || ''} ${event.description || ''}`))) return false;
+  if (item.eventKind === 'show' && !(event.categories || []).some(c => ['arts-culture','live-music','nightlife'].includes(c)) && !/\b(?:show|shows|comedy|concert|theatre|theater|performance|musical|play)\b/.test(norm(event.name || ''))) return false;
   if (item.nameTerms?.length && !item.nameTerms.every(term => norm(event.name || '').split(' ').includes(term))) return false;
   if(item.value !== 'any' && !(event.categories || []).includes(item.value)) return false;
   if(item.eventKind === 'hockey') return /\b(?:hockey|nhl|whl|bchl)\b/.test(norm(`${event.name || ''} ${event.description || ''}`));

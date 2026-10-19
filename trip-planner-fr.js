@@ -105,6 +105,8 @@ const PHRASES = [
   ['tout de suite', 'right now'], ['ce mois ci', 'this month'], ['ce mois', 'this month'],
   ['une matinee', 'a morning'], ['la matinee', 'the morning'], ['matinee', 'morning'], ['le matin', 'in the morning'], ['en matinee', 'in the morning'], ['matin', 'morning'],
   ['l apres midi', 'in the afternoon'], ['le apres midi', 'in the afternoon'], ['en apres midi', 'in the afternoon'], ['apres midi', 'afternoon'],
+  // 2026-10-19: "les soirs" (every evening of the trip), as distinct from "le soir".
+  ['les soirs', 'in the evenings'], ['en soirees', 'in the evenings'], ['soirs', 'evenings'], ['soirees', 'evenings'],
   ['le soir', 'in the evening'], ['en soiree', 'in the evening'], ['soir', 'evening'], ['soiree', 'evening'], ['la nuit', 'at night'],
   ['pendant la journee', 'during the day'], ['de jour', 'by day'],
   ['lundi', 'monday'], ['mardi', 'tuesday'], ['mercredi', 'wednesday'], ['jeudi', 'thursday'], ['vendredi', 'friday'],
@@ -238,6 +240,13 @@ const PHRASES = [
   ['favoris locaux', 'local favourites'], ['favori local', 'local favourite'], ['coups de coeur locaux', 'local favourites'],
   ['ou vont les gens du coin', 'where locals go'], ['ou vont les locaux', 'where locals go'], ['gens du coin', 'locals'],
   // budget
+  // 2026-10-19: free things and students are a budget trip ("choses gratuites", "deux étudiants").
+  ['choses gratuites', 'free things'], ['activites gratuites', 'free activities'], ['sorties gratuites', 'free things'], ['gratuitement', 'for free'],
+  ['gratuit', 'free things'], ['gratuits', 'free things'], ['gratuite', 'free things'], ['gratuites', 'free things'],
+  ['etudiant', 'student'], ['etudiants', 'students'], ['etudiante', 'student'], ['etudiantes', 'students'],
+  ['surtout', 'mostly'], ['choses', 'things'], ['chose', 'thing'],
+  ['spectacle d humour', 'comedy show'], ['spectacles d humour', 'comedy shows'], ['soiree d humour', 'comedy night'], ['humour', 'comedy'], ['humoriste', 'comedian'], ['humoristes', 'comedians'],
+  ['un spectacle', 'a show'],
   ['pas cher', 'cheap'], ['pas chere', 'cheap'], ['pas chers', 'cheap'], ['pas cheres', 'cheap'], ['bon marche', 'inexpensive'],
   ['abordable', 'affordable'], ['abordables', 'affordable'], ['petit budget', 'on a budget'], ['a petit prix', 'cheap'],
   ['economique', 'budget friendly'], ['economiques', 'budget friendly'], ['prix raisonnable', 'reasonably priced'],

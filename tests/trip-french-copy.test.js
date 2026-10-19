@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {t3FrenchText,t3FrenchPlan}=require('../trip-french-copy');
 test('French planner copy: timing preserves dates, times and uncertainty',()=>{
  const text=t3FrenchText('Listed event start 19:30 on 2026-10-16; listed end 21:30. Estimated driving assumed travel: 6–17 minutes; allow 30 minutes for arrival. This is a planning estimate, not a verified road route.');
- assert.match(text,/19:30/);assert.match(text,/2026-10-16/);assert.match(text,/6–17/);assert.match(text,/estim/);assert.ok(!/Listed|driving|verified road/.test(text));
+ assert.match(text,/19:30/);assert.match(text,/16 octobre 2026/);assert.match(text,/6–17/);assert.match(text,/estim/);assert.ok(!/Listed|driving|verified road/.test(text));
 });
 test('French planner copy labels complementary stops as optional',()=>{
  assert.equal(t3FrenchText('Optional suggestion: Extra stop added to round out the day'),'Suggestion facultative : arrêt supplémentaire ajouté pour compléter la journée');

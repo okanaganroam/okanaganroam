@@ -18145,6 +18145,30 @@ test('Planner search fixes: live music without the word event returns dated even
  try {for(const text of ['Live music in Kelowna this weekend','Live music events in Kelowna this weekend']){const p=app.runTripPlan({text},new Date('2030-10-02T19:00:00Z'));assert.equal(p.kind,'events');assert.ok(p.events.some(e=>e.id===r.event.id));assert.ok(p.requirementResults.filter(i=>i.kind==='event').every(i=>i.status==='satisfied'));}}
  finally {for(const table of ['event_enrichment_log','event_categories','event_occurrences'])db.prepare(`DELETE FROM ${table} WHERE event_id=?`).run(r.event.id);db.prepare('DELETE FROM events WHERE id=?').run(r.event.id);}
 });
+// Build My Trip pass 5 (2026-10-19): "tonight" and "this weekend" never suggest an event that has already ended (Okanagan time).
+test('Trip planner pass 5: "tonight" and "this weekend" leave out events that have already ended',()=>{
+ const mk=(name,start,end)=>app.createEvent({name,region:'penticton',description:'Live music fixture.',source_type:'official_venue',source_name:name+' Hall',source_url:'https://example.com/pass5-'+encodeURIComponent(name),venue_name_text:name+' Hall',categories:['live-music'],occurrences:[{start_date:'2030-10-06',start_time:start,...(end?{end_time:end}:{})}]},{reason:'planner pass 5 fixture',batch_id:'test-planner-pass5'});
+ const FIX=['Harbour Jazz Trio','Midnight Rock Revue','Sunday Blues Jam'];
+ const made=[mk('Harbour Jazz Trio','17:00','18:30'),mk('Midnight Rock Revue','20:30',null),mk('Sunday Blues Jam','14:00',null)];
+ for(const r of made)assert.equal(r.ok,true,JSON.stringify(r));
+ try{
+  // Sunday 2030-10-06, 21:00 in the Okanagan (UTC-7).
+  const late=new Date('2030-10-07T04:00:00Z');
+  for(const text of ['Live music tonight in Penticton','Live music this weekend in Penticton']){
+   const names=(app.runTripPlan({text},late).events||[]).map(e=>e.name).filter(n=>FIX.includes(n));
+   assert.deepEqual(names,['Midnight Rock Revue'],text);
+  }
+  // At 3 PM the early set is still to come and the jam (2 PM, no end listed) is under way.
+  const names=(app.runTripPlan({text:'Live music tonight in Penticton'},new Date('2030-10-06T22:00:00Z')).events||[]).map(e=>e.name).filter(n=>FIX.includes(n));
+  assert.deepEqual(names.sort(),['Harbour Jazz Trio','Midnight Rock Revue','Sunday Blues Jam']);
+  const clock={date:'2030-10-06',minutes:21*60};
+  assert.equal(app.tripOccurrenceEnded({start_date:'2030-10-06',end_date:'2030-10-06',start_time:'17:00',end_time:'18:30'},clock),true);
+  assert.equal(app.tripOccurrenceEnded({start_date:'2030-10-06',end_date:'2030-10-06',start_time:'20:30'},clock),false);
+  assert.equal(app.tripOccurrenceEnded({start_date:'2030-10-06',end_date:'2030-10-06',start_time:'22:00',end_time:'01:00',ends_next_day:1},clock),false);
+  assert.equal(app.tripOccurrenceEnded({start_date:'2030-10-06',end_date:'2030-10-06',all_day:1},clock),false);
+  assert.equal(app.tripOccurrenceEnded({startDate:'2030-10-05',endDate:'2030-10-05',startTime:'19:00'},clock),true);
+ } finally {for(const r of made){for(const table of ['event_enrichment_log','event_categories','event_occurrences'])db.prepare(`DELETE FROM ${table} WHERE event_id=?`).run(r.event.id);db.prepare('DELETE FROM events WHERE id=?').run(r.event.id);}}
+});
 test('Planner search fixes: operating periods beyond the search excerpt remain available to availability checks',()=>{
  const v=app.createVenue({name:'Planner Search Seasonal Adventure Park',slug:'planner-search-seasonal-adventure-park',region:'kelowna',type:'outdoor',description:'Family attractions. '.repeat(40)+' Opens daily from May into early September.',kid_friendly:true});
  try {const p=app.runTripPlan({text:'Parks in Kelowna'},new Date('2030-10-02T19:00:00Z'));assert.ok(!p.recommendations.some(s=>s.venue.id===v.id));}
