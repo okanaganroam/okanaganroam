@@ -5013,7 +5013,7 @@ function tripPlannerLabels() {
 }
 
 const TRIP_PLAN_MAX_IDS = 200;
-const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|late|evening)$/; // late: a wine day's late-afternoon tasting (2026-10-18)
+const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|late|evening|night)$/; // late: a wine day's late-afternoon tasting; night: an event on an evening with dinner (2026-10-18)
 // Validates the POST /api/trip/plan body; returns { error } or { value }.
 function parseTripPlanBody(body) {
   const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides'];
@@ -5189,6 +5189,25 @@ function selectTripEvents(component, regions, when, now = new Date(), excluded =
   };
 }
 
+// Trip-planner event items, one per scheduled occurrence between from and to (2026-10-18), so a weekend event can be
+// planned on its Sunday as well as its Saturday, each with that occurrence's own times.
+function tripEventOccurrenceItems(events, from, to) {
+  const occStmt = db.prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND end_date >= ? AND start_date <= ? ORDER BY start_date, COALESCE(start_time, ''), id");
+  const locationCandidates = new Map();
+  const out = [];
+  for (const e of events) {
+    const location = tripEventLocation(e, locationCandidates);
+    const base = {
+      id: e.id, name: e.name, description: e.description || '', region: e.region, regionLabel: REGION_LABELS[e.region], venueName: e.venueName || '', url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
+      categories: e.categories || [], dateLabel: e.dateLabel || '', location,
+    };
+    const occs = occStmt.all(e.id, from, to).map(rowToEventOccurrence);
+    if (!occs.length) { out.push({ ...base, time: e.time || '', startDate: e.startDate || null, endDate: e.endDate || null, startTime: e.firstOccurrence?.start_time || null, endTime: e.firstOccurrence?.end_time || null, endsNextDay: e.firstOccurrence?.ends_next_day || 0 }); continue; }
+    for (const o of occs) out.push({ ...base, time: whatsOnTimeLabel([o]) || '', startDate: o.start_date, endDate: o.end_date, startTime: o.start_time || null, endTime: o.end_time || null, endsNextDay: o.ends_next_day || 0 });
+  }
+  return out;
+}
+
 // Stage 3.5 (2026-09-29): the planner applies the visitor's exclusions (see
 // eligible() in trip-planner.js), so a "not ..." clause it applied in full is
 // no longer listed as "not used". Each clause is re-read on its own with the
@@ -5279,7 +5298,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   if(overrides?.startMinutes!==undefined)extracted.startMinutes=overrides.startMinutes;
   if(overrides?.dayStartMinutes)extracted.dayStartMinutes=overrides.dayStartMinutes;
   if(overrides?.shortWalkVenueIds)extracted.shortWalkVenueIds=overrides.shortWalkVenueIds;
-  const requirements = overrides?.shortWalkVenueIds || overrides?.dayStartMinutes || overrides?.startDate || overrides?.startMinutes!==undefined || extracted.startDate || extracted.daypart || extracted.onlyRequested || Number.isInteger(extracted.explicitMealCount) || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
+  let requirements = overrides?.shortWalkVenueIds || overrides?.dayStartMinutes || overrides?.startDate || overrides?.startMinutes!==undefined || extracted.startDate || extracted.daypart || extracted.onlyRequested || Number.isInteger(extracted.explicitMealCount) || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
   if (requirements) {
     trip = requirementModule.expandTripComponents(trip.multi ? trip : {...trip, regions:intent.regions || [], party:intent.party || trip.party, when:intent.when || trip.when}, requirements);
     if (requirements.items.some(i=>i.kind==='rainy'&&i.activityOnly)) intent.occasion=null;
@@ -5344,12 +5363,37 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     const to = addLocalDays(from, Math.max(1, Math.min(7, intent.days)) - 1);
     const window = resolveWhatsOnWindow({ from, to }, now);
     const categories = requirements.items.filter(i => i.kind === 'event' && i.value !== 'any').map(i => i.value);
-    const locationCandidates = new Map();
-    itineraryEvents = eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), intent.regions, categories), intent.excluded).map(e => ({
-      id: e.id, name: e.name, description: e.description || '', region: e.region, regionLabel: REGION_LABELS[e.region], venueName: e.venueName || '', url: discoveryEventUrl(e),
-      categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '', startDate: e.startDate || null, endDate: e.endDate || null,
-      startTime: e.firstOccurrence?.start_time || null, endTime: e.firstOccurrence?.end_time || null, endsNextDay: e.firstOccurrence?.ends_next_day || 0, location: tripEventLocation(e, locationCandidates),
-    }));
+    // 2026-10-18: every town's events, one per dated occurrence; the planner keeps those in each day's town or one
+    // about 30 minutes away. (Only the named towns were read: a Vernon-to-Osoyoos road trip never saw Kelowna's or
+    // Penticton's live music, and a weekend event was only ever on its first day.)
+    itineraryEvents = tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], categories), intent.excluded), window.from, window.to);
+  }
+  // Family trips (2026-10-18): the family events on What's On in the trip's dates (O'Keefe Ranch's fall weekends, a
+  // corn maze, a kids' haunted house), offered as one stop a day. An undated "family weekend" is the coming weekend.
+  let familyEvents = null, familyEventsFrom = null;
+  if (!itineraryEvents && !trip.multi && intent.mode === 'plan' && (intent.party?.kids || intent.occasion === 'family') && !requirements?.items.some(i => i.kind === 'event') && !/\b(?:ski|skiing|snowboard\w*)\b/i.test(interpretationText)) {
+    const days = Math.max(1, Math.min(7, intent.days || requirements?.items.find(i => i.kind === 'days')?.value || 1));
+    let from = requirements?.startDate || null;
+    if (!from && /\bweekends?\b/i.test(interpretationText) && !intent.when) {
+      const today = todayLocal(now), wd = localWeekday(today);
+      from = wd === 6 ? today : addLocalDays(today, (6 - wd + 7) % 7 || 7);
+    }
+    // Only a trip with dates (given, "this weekend", "Saturday" or an undated "family weekend") is matched to What's On.
+    if (!from && intent.when) from = tripPlanDate(intent.when, now);
+    if (from) familyEventsFrom = { from, days };
+  }
+  if (familyEventsFrom) {
+    const from = familyEventsFrom.from, days = familyEventsFrom.days;
+    const window = resolveWhatsOnWindow({ from, to: addLocalDays(from, days - 1) }, now);
+    const found = tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], ['family-kids']), intent.excluded), window.from, window.to);
+    if (found.length) {
+      familyEvents = found;
+      if (!requirements?.startDate) {
+        const dated = requirements || extracted;
+        dated.startDate = from; dated.endDate = days > 1 ? addLocalDays(from, days - 1) : null; dated.dateSource = dated.dateSource || 'the coming weekend';
+        if (!requirements) requirements = dated;
+      }
+    }
   }
   if (requirements) {
     const consumed = requirementModule.consumedTerms(requirements);
@@ -5404,7 +5448,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     excludeIds: excludeVenueIds,
     avoidIds: avoidVenueIds,
     pinned,
-    events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
+    events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || familyEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
+    familyEvents: !!familyEvents,
     tripDate: requirements?.startDate || tripPlanDate(intent.when, now),
     startWeekday: requirements?.startDate ? ['sun','mon','tue','wed','thu','fri','sat'][new Date(`${requirements.startDate}T12:00:00Z`).getUTCDay()] : tripStartWeekday(intent.when, now),
     clock: okanaganClock(now),

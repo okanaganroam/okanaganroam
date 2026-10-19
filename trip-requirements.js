@@ -27,6 +27,9 @@ const KINDS = {
 };
 const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience'};
 const WALKING_TRANSPORT = /\b(?:no car|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
+// "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
+// not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
+const EVENING_NO_DRIVE = /\b(?:no|not|don t|do not|won t|will not|avoid|without)\s+(?:want to\s+)?(?:driving|drive|car)\s+(?:after|past|once it s|at|in the)\s+(?:(1[0-2]|[1-9])(?::?([0-5]\d))?\s*(am|pm)?|dark|night|nightfall|sunset|dinner|evening|the evening)\b/;
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const WORD_DAYS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7};
 const PER_DAY_MAX = 4; // the most tastings (wineries, breweries) one day can hold (2026-10-18)
@@ -202,7 +205,14 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   const clauses=String(text||'').split(/[.;\n]/).flatMap(sentence=>{
     dayHeader='';return sentence.split(/[,]/).map(part=>{const c=norm(part);if(/\bday\s+[1-7]\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\b/.test(c))dayHeader=c;return {c,scopeText:dayHeader&&dayHeader!==c?`${dayHeader} ${c}`:c};});
   });
-  for(const {c:rawClause,scopeText} of clauses){
+  for(const {c:clauseText,scopeText} of clauses){
+    let rawClause=clauseText;
+    const eveningDrive=EVENING_NO_DRIVE.exec(rawClause);
+    if(eveningDrive){
+      const h=eveningDrive[1]?Number(eveningDrive[1])%12+(eveningDrive[3]==='am'?0:12):18;
+      add('evening_walk',h*60+Number(eveningDrive[2]||0),scopeText,{limitKm:1.5,phrase:eveningDrive[0]});
+      rawClause=rawClause.replace(eveningDrive[0],' ');
+    }
     const transport=rawClause.match(WALKING_TRANSPORT);
     if(transport)add('transport','walking',scopeText,{limitKm:1.5});
     const c=sportsVenueInterpretationText(rawClause,taxonomy).replace(WALKING_TRANSPORT,' ').replace(/\s+/g,' ').trim();
@@ -315,6 +325,7 @@ function consumedTerms(requirements) {
   for (const i of requirements?.items || []) {
     if (i.kind === 'venue') add(i.venueName || '');
     if (i.kind === 'transport') add('no car without a our my do not have don t driving free on foot walkable walk walking between the stops places venues we want to');
+    if (i.kind === 'evening_walk') add(`no not don t do won will avoid without want to driving drive car after past once it s at in the dark night nightfall sunset dinner evening am pm ${i.phrase || ''}`);
     if (i.kind === 'deadline') add(`${i.sourceText} back return finish finished done home by before no later than noon midday am pm`);
     if (i.kind === 'duration') add('hour hours hr hrs minute minutes min mins afternoon morning evening');
     if (i.kind === 'unsupported') {
@@ -493,10 +504,23 @@ function selectedStops(plan){
   return [...(plan.itinerary?.stops||[]),...(plan.outing?.stops||[]),...(plan.recommendations||[])].map(s=>({...s,day:1}));
 }
 function km(a,b){const rad=x=>x*Math.PI/180;const dlat=rad(b.lat-a.lat),dlon=rad(b.lng-a.lng);return 6371*2*Math.asin(Math.min(1,Math.sqrt(Math.sin(dlat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dlon/2)**2)));}
+// Road travel (2026-10-18): straight-line km x 1.3 for the road, at 50 km/h for a short hop rising to 70 km/h on a
+// longer highway leg, never under 5 minutes. (It used to be x1.6 at 30 km/h plus 15 minutes: "43 min" for 8.5 km
+// inside Naramata.) Walking stays 3-4 km/h.
+const ROAD_FACTOR=1.3,MIN_DRIVE_MINUTES=5;
+function driveMinutes(distance){
+  const road=distance*ROAD_FACTOR;
+  const speed=road<=10?50:road>=40?70:50+(road-10)*20/30;
+  return Math.max(MIN_DRIVE_MINUTES,Math.ceil(road/speed*60));
+}
+function transferRange(distance,walking=false){
+  if(walking)return {minMinutes:Math.ceil(distance/4*60),maxMinutes:Math.ceil(distance*1.3/3*60)+5};
+  const max=driveMinutes(distance);
+  return {minMinutes:Math.max(MIN_DRIVE_MINUTES,Math.floor(max*0.85)),maxMinutes:max};
+}
 function estimateTransfer(a,b,walking=false){
   if(!a||!b||![a.lat,a.lng,b.lat,b.lng].every(Number.isFinite)||Math.abs(a.lat)>90||Math.abs(b.lat)>90||Math.abs(a.lng)>180||Math.abs(b.lng)>180)return null;
-  const distance=km(a,b);
-  return {minMinutes:Math.ceil(distance/(walking?4:50)*60)+(walking?0:5),maxMinutes:Math.ceil(distance*1.6/(walking?3:30)*60)+(walking?5:15),mode:walking?'walking':'driving assumed'};
+  return {...transferRange(km(a,b),walking),mode:walking?'walking':'driving assumed'};
 }
 // Approximate NOAA general solar equations; no terrain or weather model.
 // https://gml.noaa.gov/grad/solcalc/solareqns.PDF
@@ -571,9 +595,7 @@ function estimateTripTiming({plan,facts,requirements,tripDate=null}){
     if(g.previous){
       const a=g.previous;
       if(v&&[a.lat,a.lng,v.lat,v.lng].every(Number.isFinite)){
-        const distance=km(a,v);
-        const min=Math.ceil(distance/(walking?4:50)*60)+(walking?0:5);
-        const max=Math.ceil(distance*1.6/(walking?3:30)*60)+(walking?5:15);
+        const {minMinutes:min,maxMinutes:max}=transferRange(km(a,v),walking);
         g.minMinutes+=min;g.maxMinutes+=max;g.transfers.push({from:a.id,to:v.id,minMinutes:min,maxMinutes:max,mode:walking?'walking':'driving assumed'});
       }else{g.complete=false;g.unknown.push('transfer');}
     }
@@ -613,12 +635,19 @@ function evaluateTripRequirements({requirements,plan,facts,tripDate}){
       const tooFar=pool.some((s,k)=>k>0&&s.day===pool[k-1].day&&[s.v.lat,s.v.lng,pool[k-1].v.lat,pool[k-1].v.lng].every(Number.isFinite)&&km(pool[k-1].v,s.v)>i.limitKm);
       status=tooFar?'unmet':'unverified';reason=tooFar?`The final sequence exceeds the ${i.limitKm} km straight-line limit; a practical walking itinerary could not be verified.`:`Car-free suggestions use a maximum ${i.limitKm} km straight-line gap between stops. Actual walking routes, crossings, accessibility and travel times are not verified.`;
     }
+    else if(i.kind==='evening_walk'){
+      // The drive to dinner is the day's last; anything after dinner should be a short walk from it.
+      const after=(plan.days||[]).flatMap(d=>{const st=d.stops||[];const k=st.findIndex(x=>x.daypart==='evening'&&x.venue);return k<0?[]:st.slice(k+1).filter(x=>x.venue||x.event).map(x=>({from:st[k].venue,to:x.venue||x.event.location}));});
+      const far=after.some(x=>x.to&&[x.from.latitude,x.from.longitude,x.to.lat??x.to.latitude,x.to.lng??x.to.longitude].every(Number.isFinite)&&km({lat:x.from.latitude,lng:x.from.longitude},{lat:x.to.lat??x.to.latitude,lng:x.to.lng??x.to.longitude})>i.limitKm);
+      status=far?'unverified':'satisfied';
+      reason=far?`Something after dinner is more than ${i.limitKm} km from it; plan a ride, or skip it to keep the evening on foot.`:'Dinner is the last drive of each day, so nothing after it needs a car.';
+    }
     else if(i.kind==='deadline'){status='unverified';reason=`You requested finishing ${i.sourceText}; visit durations and travel time are not verified, so the deadline cannot be guaranteed.`;}
     else if(i.kind==='duration'){
       const estimates=timing.filter(t=>applicable(i,t.day,tripDate));
       status=estimates.some(t=>t.minMinutes>i.value)?'unmet':'unverified';
       reason=estimates.length?estimates.map(t=>`Day ${t.day}: ${t.complete?'estimated':'known-stop subtotal'} ${t.minMinutes}–${t.maxMinutes} minutes for visits and transfers${t.complete?'':'; unknown '+t.unknown.join(', ')}.`).join(' '):'No timed stops were selected.';
-      reason+=` You requested ${i.value} minutes. Assumed visits: coffee 20–40, museum 60–90, easy walk 30–60, winery 45–75, meal 60–90 minutes. Transfer estimates use stored straight-line coordinates, assumed walking at 3–4 km/h or driving at 30–50 km/h plus 5–15 minutes per transfer, and a detour allowance; actual routes, queues, breaks and opening-hour sequencing are not verified.`;
+      reason+=` You requested ${i.value} minutes. Assumed visits: coffee 20–40, museum 60–90, easy walk 30–60, winery 45–75, meal 60–90 minutes. Transfer estimates use stored straight-line coordinates, assumed walking at 3–4 km/h or driving at 50–70 km/h (at least 5 minutes a transfer), and a road allowance of 1.3 times the straight line; actual routes, queues, breaks and opening-hour sequencing are not verified.`;
       if(status==='unmet')reason+=' Even the minimum allowance exceeds your time limit; remove a stop or allow more time.';
       else if(estimates.some(t=>t.maxMinutes>i.value))reason+=' Allow extra time; the upper estimate exceeds your time limit.';
     }

@@ -195,12 +195,14 @@ test('3 days in Penticton with kids: coherent, kid-safe, family places included'
   assert.equal(new Set(stops.map((s) => s.venue.id)).size, stops.length, 'no venue repeats');
   for (const s of stops) {
     const f = byId.get(s.venue.id);
-    assert.equal(f.region, 'penticton');
+    // A dinner can come from a town about 20 minutes away when nothing in Penticton is left (2026-10-18), and says so.
+    if (f.region !== 'penticton') assert.ok(['midday', 'evening'].includes(s.daypart) && s.caveats.some((c) => /minutes’ drive: nothing in Penticton fits (?:lunch|dinner)/.test(c)), `${f.name} (${f.region})`);
     assert.ok(!['cocktail', 'pub', 'distillery'].includes(f.type), `${f.name} is not an adults venue`);
     if (['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery'].includes(f.type)) assert.ok(f.features.kid_friendly, `${f.name} has the Kid-Friendly badge`);
   }
   assert.ok(stops.some((s) => ['beach', 'outdoor'].includes(s.venue.type)), 'family outdoor stops are included');
-  for (const day of p.days) assert.deepEqual(day.stops.map((s) => s.daypart), ['morning', 'afternoon', 'evening']);
+  // Lunch (from a nearby town when Penticton has none left) may join the three slots (2026-10-18).
+  for (const day of p.days) assert.deepEqual(day.stops.map((s) => s.daypart).filter((x) => x !== 'midday'), ['morning', 'afternoon', 'evening']);
 });
 test('Vernon with my dog: only verified dog-friendly places', () => {
   const p = plan('What should I do in Vernon with my dog?');
