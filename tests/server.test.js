@@ -18356,7 +18356,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
       assert.match(gems, /<div class="category-hero">\s*<div class="category-banner" id="lfBanner"><img src="\/images\/hidden-gems-banner\/hidden-gems\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>Hidden Gems in the Okanagan<\/h1>/, '/hidden-gems opens with the Hardy Falls photo');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.HIDDEN_GEMS_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), 'hidden gems thumbnail exists');
       const whatsOn = (await WINTER_GET(base, '/whats-on')).text;
-      assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner" id="whatsOnBanner"><img src="\/images\/whats-on\/whats-on\.jpg"[^>]*><\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
+      assert.match(whatsOn, /<div class="category-hero">\s*<div class="category-banner" id="whatsOnBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/whats-on\/whats-on\.jpg"[^>]*>(?:<\/picture>)?<\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/whats-on opens with its photo above the heading');
       assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', app.WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), "What's On thumbnail exists");
       const dogsRes = await WINTER_GET(base, '/dog-friendly');
       if (dogsRes.status === 200) assert.match(dogsRes.text, /<div class="category-hero">\s*<div class="category-banner" id="dogBanner">(?:<picture class="banner-pic"><source [^>]*>)?<img src="\/images\/dog-friendly\/dog-friendly\.jpg"[^>]*>(?:<\/picture>)?<\/div>\s*<script>[\s\S]*?<\/script>\s*<div class="category-hero-text"><h1>/, '/dog-friendly opens with its photo above the heading');
@@ -20119,12 +20119,16 @@ test('French twins: which addresses have one, and how a /fr request maps to its 
   for (const p of ['/whats-on', '/whats-on/live-music', '/kelowna/events', '/kelowna/events/this-weekend', '/kelowna/restaurants', '/outdoors/hiking',
     '/guides', '/guides/best-patios-kelowna', '/guide/kelowna/patio', '/about', '/privacy', '/terms', '/contact', '/map', '/trip', '/my-trip', '/favorites',
     '/list-your-venue', '/list-an-event']) assert.equal(app.hasFrenchTwin(p), true, p);
-  for (const p of ['/nowhere', '/kelowna/events/test-future-festival', '/admin/x', '/api/venues', '/kelowna/nowhere/x/y']) assert.equal(app.hasFrenchTwin(p), false, p);
+  for (const p of ['/nowhere', '/kelowna/events/no-such-event', '/admin/x', '/api/venues', '/kelowna/nowhere/x/y']) assert.equal(app.hasFrenchTwin(p), false, p);
+  // Round 9 (2026-10-19): an event with no French description still has a French page (English text, noindex).
+  assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), true);
   assert.deepEqual(app.frenchTwinRequest('/fr'), { enPath: '/', enUrl: '/' });
   assert.deepEqual(app.frenchTwinRequest('/fr/food-drink?types=cafe'), { enPath: '/food-drink', enUrl: '/food-drink?types=cafe' });
   assert.deepEqual(app.frenchTwinRequest('/fr/kelowna/'), { enPath: '/kelowna', enUrl: '/kelowna' });
   assert.deepEqual(app.frenchTwinRequest('/fr/whats-on'), { enPath: '/whats-on', enUrl: '/whats-on' });
-  assert.equal(app.frenchTwinRequest('/fr/kelowna/events/test-future-festival'), null, 'event pages stay English');
+  // Round 9 (2026-10-19): every event has a French page, translated or not; a missing one has none.
+  assert.deepEqual(app.frenchTwinRequest('/fr/kelowna/events/test-future-festival'), { enPath: '/kelowna/events/test-future-festival', enUrl: '/kelowna/events/test-future-festival' });
+  assert.equal(app.frenchTwinRequest('/fr/kelowna/events/no-such-event'), null, 'no event, no French page');
   assert.equal(app.frenchTwinRequest('/fr/kelowna/restaurants/test-trattoria'), null, 'place pages keep their own route');
 });
 
@@ -20197,8 +20201,8 @@ test('French twins: /fr/food-drink is the Food & Drink page in French, paired wi
   assert.match(en, /<a class="lang-toggle" id="langToggle" href="\/fr\/food-drink" hreflang="fr"/);
   assert.match(en, /hreflang="fr-CA" href="https:\/\/okanaganroam\.com\/fr\/food-drink"/);
   assert.match(en, /<h1 id="fdHeading">Food &amp; Drink in the Okanagan<\/h1>/, 'the English page is unchanged');
-  const nf = await fetch(`${base}/fr/kelowna/events/test-future-festival`);
-  assert.equal(nf.status, 404, 'event pages have no French twin');
+  const nf = await fetch(`${base}/fr/kelowna/events/no-such-event`);
+  assert.equal(nf.status, 404, 'a missing event has no French page (round 9: every real one does)');
   assert.match(await nf.text(), /<html lang="fr" data-page-lang="fr">/, 'the /fr 404 page is French');
 }));
 
@@ -22656,8 +22660,10 @@ test('SEO round 3: photos declare their size, long names shorten in titles, Fren
     app.frEventTitle('PAG Film Series: The Christophs at Landmark Cinema — Penticton', { region: 'penticton' }));
   assert.notEqual(app.frEventTitle('Freya & Friends: Okanagan Symphony Holiday Concert — Penticton', { region: 'penticton' }),
     app.frEventTitle('Freya & Friends: Okanagan Symphony Holiday Concert — Vernon', { region: 'vernon' }));
-  // A fixture event has no French description, so it stays English-only.
-  assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), false);
+  // A fixture event has no French description: since round 9 (2026-10-19) it has a French page with its English
+  // description, kept out of search until translated.
+  assert.equal(app.hasFrenchTwin('/kelowna/events/test-future-festival'), true);
+  assert.equal(app.frEventUntranslated('/kelowna/events/test-future-festival'), true);
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   const title = (html) => html.match(/<title>([^<]*)<\/title>/)[1];
   const longVenue = { ...venue, name: 'Vernon Recreation Complex – Priest Valley Arena & Centennial Outdoor Rink', description_fr: 'Un aréna.' };
@@ -23526,7 +23532,7 @@ test('Visitor contributions: photo upload (metadata stripped), make main with cr
     assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, publicUrl);
     assert.equal((await t.get(publicUrl)).status, 200);
     let page = (await t.get(pagePath)).text;
-    assert.match(page, new RegExp(`src="${publicUrl}"`));
+    assert.match(page, new RegExp(`src="${publicUrl}(?:\\?v=[0-9a-f]{10})?"`)); // round 9: uploads get their ?v= hash
     assert.match(page, /Photo: Jo N\. \(visitor\)/);
     assert.match(mail[mail.length - 1].subject, /^Your photo is live/);
 
@@ -26322,7 +26328,9 @@ test('Venue page layout (2026-10-18): same hours every day read as one line, the
     assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
     assert.match(en, />example-cafe\.ca ↗<\/a>/, 'the website row shows the address, not the raw URL');
     assert.match(en, /<div class="venue-extra">/);
-    assert.match(en, /@media \(max-width: 959px\) \{[\s\S]*?\.venue-aside \{ order: 1;/);
+    // Round 9 (2026-10-19): the extras follow the sidebar in the page itself, so no CSS order is needed.
+    assert.ok(en.indexOf('</aside>') < en.indexOf('<div class="venue-extra">'));
+    assert.doesNotMatch(en, /\.venue-aside \{ order: 1;/);
     const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang: 'fr' });
     assert.match(fr, /<span>Tous les jours<\/span>/);
   } finally {
@@ -28575,13 +28583,14 @@ test("What's On pass 6: Today + one category: the More upcoming list follows it,
   // The links list under the cards: other kinds of event and finished ones are listed hidden, and not counted.
   const links = app.restLinksHtml('whatsOnRest', (lm.match(/<template id="whatsOnRest">([\s\S]*?)<\/template>/) || [])[1] || '', 'en');
   // Every live-music event left today is on the first page, so all the waiting ones are other kinds or finished.
-  assert.match(links, /<li hidden><a href="[^"]*wo6-pumpkin-day">/, 'a family event is not listed as live music');
+  // Round 9 (2026-10-19): a hidden link keeps its address in data-href, so crawlers don't follow it.
+  assert.match(links, /<li hidden><a data-href="[^"]*wo6-pumpkin-day">/, 'a family event is not listed as live music');
   assert.match(links, /<details class="rest-links" id="whatsOnRestLinks" hidden><summary>More upcoming events \(0\)</);
   assert.doesNotMatch(links, /<li><a /);
   const unit = app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-2" data-group="earlier"><h2><a class="venue-card-link" href="/kelowna/events/b"><span class="venue-card-name">B Show</span></a></h2></li>'
     + '<li class="venue-card whatson-event-card" data-venue-id="event-3" data-group="today"><h2><a class="venue-card-link" href="/kelowna/events/c"><span class="venue-card-name">C Show</span></a></h2></li>', 'en');
-  assert.match(unit, /More upcoming events \(1\)<\/summary><ul><li hidden><a href="\/kelowna\/events\/a">A Show<\/a><li hidden><a href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
+  assert.match(unit, /More upcoming events \(1\)<\/summary><ul><li hidden><a data-href="\/kelowna\/events\/a">A Show<\/a><li hidden><a data-href="\/kelowna\/events\/b">B Show<\/a><li><a href="\/kelowna\/events\/c">C Show<\/a>/);
   assert.match(app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/a"><span class="venue-card-name">A Show</span></a></h2></li>', 'en'), /<details class="rest-links" id="whatsOnRestLinks" hidden>/, 'an empty list is hidden');
   // Markets today: all over, so the block says so and lists the next three markets.
   const mk = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today', categories: 'markets-fairs' }), { now: WO6_NIGHT });
@@ -29490,9 +29499,9 @@ test('Banner speed (round 7): food list pages preload a phone-sized banner first
   // Town pages keep their own hero-first, and pages without body.fd-page are left alone.
   const town = (await get('/kelowna')).text;
   assert.doesNotMatch(town, /picture class="banner-pic"|id="hero-first-cards"/);
-  const plain = '<!DOCTYPE html><html><head><meta charset="UTF-8">\n<meta name="viewport" content="width=device-width">\n</head><body class="golf-page whatson-page"><div class="category-banner"><img src="/images/a.jpg" srcset="/images/a-800.jpg 800w, /images/a.jpg 1600w" sizes="100vw" alt="" fetchpriority="high"></div></body></html>';
+  const plain = '<!DOCTYPE html><html><head><meta charset="UTF-8">\n<meta name="viewport" content="width=device-width">\n</head><body class="golf-page outdoor-page"><div class="category-banner"><img src="/images/a.jpg" srcset="/images/a-800.jpg 800w, /images/a.jpg 1600w" sizes="100vw" alt="" fetchpriority="high"></div></body></html>';
   assert.equal(app.withBannerHeroFirst(plain), plain);
-  const fd = plain.replace('golf-page whatson-page', 'golf-page fd-page');
+  const fd = plain.replace('golf-page outdoor-page', 'golf-page fd-page');
   const once = app.withBannerHeroFirst(fd);
   assert.notEqual(once, fd);
   assert.equal(app.withBannerHeroFirst(once), once, 'a second pass changes nothing');
@@ -29752,22 +29761,18 @@ test('Round 8 phone: My Trip\'s map has French Leaflet labels on /fr/my-trip and
   assert.match(html, /L\.control\.zoom\(mapFr \? \{ zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' \} : \{\}\)\.addTo\(map\);/);
   assert.match(html, /mapFr \? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors'/);
   assert.match(html, /Une bibliothèque JavaScript de cartes interactives/);
-  assert.match(html, /iconAnchor: \[12 - p\.dx, 12 - p\.dy\]/);
-  // The fan-out itself: run the same arithmetic on three stops at one spot and one elsewhere.
-  const m = html.match(/var spots = \{\};[\s\S]*?\n    \}\);\n/);
-  assert.ok(m, 'the same-spot code is in the page');
-  const pts = [{ lat: 49.8929, lng: -119.4751 }, { lat: 49.89291, lng: -119.47512 }, { lat: 49.8929, lng: -119.4751 }, { lat: 49.88, lng: -119.49 }];
-  new Function('pts', m[0])(pts);
-  assert.deepEqual([pts[3].dx, pts[3].dy], [0, 0], 'a stop on its own stays put');
-  const ring = pts.slice(0, 3);
+  assert.match(html, /iconAnchor: \[12 - dx, 12 - dy\]/);
+  // The fan-out itself (round 9: by screen distance, see myTripPinSpread): three stops at one spot and one elsewhere.
+  const off = app.myTripPinSpread([{ x: 100, y: 100 }, { x: 100, y: 100 }, { x: 100, y: 100 }, { x: 200, y: 160 }], 24);
+  assert.deepEqual([off[3].dx, off[3].dy], [0, 0], 'a stop on its own stays put');
   for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) {
-    assert.ok(Math.hypot(ring[i].dx - ring[j].dx, ring[i].dy - ring[j].dy) >= 26, 'pins at one spot no longer cover each other (24px pins)');
+    assert.ok(Math.hypot(off[i].dx - off[j].dx, off[i].dy - off[j].dy) >= 26, 'pins at one spot no longer cover each other (24px pins)');
   }
 });
 
 test('Round 8 phone: "Add to trip" on a venue or event page shows a "View My Trip" status message in the page language', () => {
   const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
-  assert.match(js, /if \(trip\.some\(function\(t\)\{ return sameStop\(t, s\); \}\) && tripBtn\.closest\('\[data-surface="venue_page"\], body\.event-page'\)\) showAddedToast\(\);/);
+  assert.match(js, /if \(trip\.some\(function\(t\)\{ return sameStop\(t, s\); \}\) && tripBtn\.closest\('\[data-surface="venue_page"\], body\.event-page'\)\) showAddedToast\(tripBtn\);/);
   assert.match(js, /box\.setAttribute\('role', 'status'\);/);
   assert.match(js, /link\.href = frPathPrefix\(\) \+ '\/my-trip';/);
   assert.match(js, /'trip\.toastView': 'View My Trip'/);
@@ -30421,3 +30426,764 @@ test('Free to Visit and Arts & Culture badges (2026-10-19): things-to-do badges 
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+// ---- Tech fixes, round 9 (2026-10-19): event schema, What's On ItemList, French event pages, occurrence times,
+// event dateLabel, API CORS and one-hop redirects ----
+test('R9 tech: event offers read stated and free prices; organizer is the source, a food & drink host or a league; every date carries both', () => {
+  const p = (t) => app.parseEventPrice(t);
+  assert.deepEqual(p('A jazz jam. 5–7 pm, free. Listeners welcome.'), { price: '0' });
+  assert.deepEqual(p('Pumpkin painting. Free.'), { price: '0' });
+  assert.deepEqual(p("A gaming night. It's free, and players may bring controllers."), { price: '0' });
+  assert.deepEqual(p('A gallery talk. Free with RSVP; the show stays up.'), { price: '0' });
+  assert.deepEqual(p('A pasta class. $55.'), { price: '55' });
+  assert.deepEqual(p('A haunted farm. Kids $5, adults $10, with a VIP option.'), { lowPrice: '5', highPrice: '10' });
+  assert.equal(p('Free-with-admission guided tours of the museum.'), null, 'free with admission is not free');
+  assert.equal(p('A swap. Free puzzles are set aside for families.'), null);
+  assert.equal(p('A concert. $20 suggested donation.'), null, 'a donation is no price');
+  assert.equal(p('A crawl. In past years it has been free to attend.'), null, 'hedged');
+  assert.equal(p('A market with a $15 five-wine tasting and $2 oysters.'), null, 'a side purchase is not the price');
+
+  const winery = { name: 'R9 Test Winery', type: 'winery', region: 'oliver', slug: 'r9-test-winery', website: 'https://r9-winery.example/' };
+  const theatre = { name: 'R9 Test Theatre', type: 'indoor', region: 'kelowna', slug: 'r9-test-theatre', website: 'https://r9-theatre.example/' };
+  const ev = { name: 'R9', region: 'oliver', source_type: 'tourism_org', source_name: 'Tourism Board', description: 'A tasting. Free.' };
+  assert.deepEqual(app.eventOrganizerSchema(ev, winery), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://r9-winery.example/' });
+  assert.deepEqual(app.eventOrganizerSchema(ev, { ...winery, website: null }), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://okanaganroam.com/oliver/wineries/r9-test-winery' });
+  assert.equal(app.eventOrganizerSchema(ev, theatre), undefined, 'a hall is not assumed to run the show');
+  assert.equal(app.eventOrganizerSchema(ev, null), undefined, 'a tourism listing is not the organizer');
+  assert.deepEqual(app.eventOrganizerSchema({ ...ev, source_type: 'league_feed', source_name: 'Okanagan Hockey League', source_url: 'https://ohl.example/s' }, null),
+    { '@type': 'SportsOrganization', name: 'Okanagan Hockey League', url: 'https://ohl.example/s' });
+  assert.equal(app.eventOrganizerSchema({ ...ev, source_type: 'official_organizer', source_name: 'R9 Society' }, winery).name, 'R9 Society', 'the stated organizer wins');
+
+  const fake = { ...ev, id: 1, status: 'scheduled', slug: 'r9', venue_name_text: 'R9 Test Winery', valley_wide: 0, website: null, image_url: null };
+  const occs = ['2099-07-01', '2099-07-08', '2099-07-15'].map((d, i) => ({ id: i + 1, start_date: d, end_date: d, start_time: '18:00', end_time: '20:00', all_day: 0, ends_next_day: 0 }));
+  const ld = app.eventJsonLd(fake, occs, ['wineries-wine-events'], winery, 'https://okanaganroam.com/oliver/events/r9', '2099-01-01');
+  assert.equal(ld.offers.price, '0');
+  assert.equal(ld.organizer.name, 'R9 Test Winery');
+  assert.equal(ld.subEvent.length, 2);
+  for (const sub of ld.subEvent) {
+    assert.equal(sub.offers.price, '0', 'each date has the offer');
+    assert.equal(sub.organizer.name, 'R9 Test Winery', 'each date has the organizer');
+  }
+  // Valid JSON with no undefined left in it.
+  assert.doesNotMatch(JSON.stringify(ld), /undefined|null,"url"/);
+});
+
+test('R9 tech: /whats-on and /fr/whats-on carry an ItemList of the cards on show', () => withDiscoveryServer(async (base) => {
+  const day = app.addLocalDays(app.todayLocal(), 2);
+  const ev = s5create({ name: 'R9 ItemList Show', occurrences: [{ start_date: day, start_time: '19:00', end_time: '21:00' }] });
+  try {
+    for (const [p, prefix] of [['/whats-on', ''], ['/fr/whats-on', '/fr']]) {
+      const html = await (await fetch(base + p)).text();
+      const lists = s5jsonLd(html).filter((b) => b['@type'] === 'ItemList');
+      assert.equal(lists.length, 1, `${p}: one ItemList`);
+      const urls = lists[0].itemListElement.map((x) => x.url);
+      assert.ok(urls.length > 0 && urls.length <= 100);
+      assert.equal(lists[0].numberOfItems, urls.length);
+      assert.ok(urls.includes(`https://okanaganroam.com${prefix}/kelowna/events/${ev.slug}`), `${p} lists the fixture`);
+      lists[0].itemListElement.forEach((x, i) => assert.equal(x.position, i + 1));
+      // Every listed event is a card in the page's HTML.
+      for (const u of urls) assert.ok(html.includes(`href="${u.replace('https://okanaganroam.com', '')}"`), u);
+    }
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+}));
+
+test('R9 tech: every event in a /fr list has a French page; an untranslated one is English text, noindex, no hreflang', () => withDiscoveryServer(async (base) => {
+  const day = app.addLocalDays(app.todayLocal(), 3);
+  const ev = s5create({ name: 'R9 English Only Show', description: 'R9 fixture text with no French translation at all.', occurrences: [{ start_date: day, start_time: '19:00' }] });
+  try {
+    const enPath = `/kelowna/events/${ev.slug}`;
+    assert.equal(app.hasFrenchTwin(enPath), true);
+    assert.equal(app.frEventUntranslated(enPath), true);
+    const fr = await fetch(`${base}/fr${enPath}`);
+    assert.equal(fr.status, 200);
+    const frHtml = await fr.text();
+    assert.match(frHtml, /<html lang="fr"/);
+    assert.match(frHtml, /<meta name="robots" content="noindex, follow">/);
+    assert.doesNotMatch(frHtml, /hreflang="fr-CA"/);
+    assert.match(frHtml, /<p class="event-body" lang="en">R9 fixture text/);
+    assert.match(frHtml, /Description offerte en anglais seulement/);
+    assert.match(frHtml, /<title>R9 English Only Show — Événement à Kelowna/);
+    const enHtml = await (await fetch(base + enPath)).text();
+    assert.doesNotMatch(enHtml, /hreflang="fr-CA"/, 'the English page names no noindex twin');
+    assert.match(enHtml, new RegExp(`id="langToggle" href="/fr${enPath}"`), 'but its EN / FR switch goes there');
+    const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+    assert.ok(!sitemap.includes(`<loc>https://okanaganroam.com/fr${enPath}</loc>`), 'not in the sitemap');
+
+    // The French lists link only to French event pages, and each of them is there.
+    const seen = new Set();
+    for (const list of ['/fr/whats-on', '/fr/whats-on/live-music', '/fr/kelowna/events']) {
+      const html = await (await fetch(base + list)).text();
+      for (const m of html.matchAll(/(?:href|data-href)="((?:\/fr)?\/[a-z-]+\/events\/[a-z0-9-]+)"/g)) {
+        if (/\/this-weekend$/.test(m[1])) continue;
+        assert.ok(m[1].startsWith('/fr/'), `${list} links ${m[1]}`);
+        seen.add(m[1]);
+      }
+    }
+    assert.ok(seen.has(`/fr${enPath}`), 'the fixture is listed');
+    for (const p of [...seen].slice(0, 80)) assert.equal((await fetch(base + p, { redirect: 'manual' })).status, 200, p);
+
+    // Bunnicula's description has French now.
+    const bunnicula = 'A colourful family musical at The Balsam School: when a mysterious bunny arrives and the veggies start losing their colour, the household pets take the case. Is Bunnicula a vampire, or just a misunderstood bunny? The show runs about 60 minutes and suits all ages. Tickets are $25 adult, $12.50 child, or $35 for a one-adult, one-child Dynamic Duo. Each day has three shows, at 10 am, 1 pm and 4 pm.';
+    assert.match(app.frText(bunnicula), /^Une comédie musicale colorée/);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+}));
+
+test('R9 tech: a type page lists other types\' events without crawlable links; the filter script restores them', () => {
+  const html = app.restLinksHtml('whatsOnRest', '<li class="venue-card whatson-event-card" hidden data-venue-id="event-1"><h2><a class="venue-card-link" href="/kelowna/events/other-kind"><span class="venue-card-name">Other Kind</span></a></h2></li>'
+    + '<li class="venue-card whatson-event-card" data-venue-id="event-2"><h2><a class="venue-card-link" href="/kelowna/events/this-kind"><span class="venue-card-name">This Kind</span></a></h2></li>', 'en');
+  assert.doesNotMatch(html, /\shref="\/kelowna\/events\/other-kind"/);
+  assert.ok(html.includes('data-href="/kelowna/events/other-kind"'));
+  assert.ok(html.includes('<li><a href="/kelowna/events/this-kind">'));
+  const page = app.renderWhatsOnPage(null);
+  assert.ok(page.includes("a.getAttribute('href') || a.getAttribute('data-href')"));
+  assert.ok(page.includes("x.a.setAttribute('href', x.a.getAttribute('data-href'))"));
+  // On a French page the hidden address is French too.
+  const real = html.replace(/\/kelowna\/events\/(?:this|other)-kind/g, '/kelowna/events/test-future-festival');
+  const fr = app.frenchTwinHtml(`<!DOCTYPE html><html lang="en"><head>\n<link rel="canonical" href="https://okanaganroam.com/whats-on">\n</head><body>${real}</body></html>`, '/whats-on');
+  assert.ok(fr.includes(' href="/fr/kelowna/events/test-future-festival"'));
+  assert.ok(fr.includes('data-href="/fr/kelowna/events/test-future-festival"'), 'a hidden link on a French page is French');
+});
+
+test('R9 tech: PATCH an occurrence\'s times (token-guarded, validated, logged) and the set-occurrence-times script', () => withDiscoveryServer(async (base) => {
+  const ev = s5create({ name: 'R9 Morning Show', occurrences: [
+    { start_date: '2032-10-31', start_time: '10:00', end_time: '17:00' }, { start_date: '2032-10-31', start_time: '13:00', end_time: '14:00' },
+  ] });
+  const occs = app.listEventOccurrences(ev.id);
+  const morning = occs.find((o) => o.start_time === '10:00');
+  const url = `${base}/api/events/${ev.id}/occurrences/${morning.id}`;
+  const patch = (body, token = process.env.ENRICHMENT_ADMIN_TOKEN) => fetch(url, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body),
+  }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  const meta = { reason: 'r9 fixture: 60-minute show', batch_id: 'r9-times' };
+  try {
+    assert.equal((await patch({ end_time: '11:00', ...meta }, null)).status, 401);
+    assert.equal((await patch({ end_time: '11:00', ...meta }, 'wrong')).status, 401);
+    assert.equal((await patch({ end_time: '11:00' })).status, 400, 'reason and batch are required');
+    assert.equal((await patch({ end_time: '25:00', ...meta })).status, 400);
+    assert.equal((await patch({ end_time: '09:00', ...meta })).status, 400, 'ends before it starts');
+    assert.equal((await patch({ end_time: '11:00', status: 'cancelled', ...meta })).status, 400, 'times or status, not both');
+    assert.equal((await patch({ start_time: '13:00', ...meta })).status, 409, 'clashes with the 1 pm show');
+    const ok = await patch({ end_time: '11:00', ...meta });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.changed, true);
+    assert.deepEqual([ok.body.occurrence.start_date, ok.body.occurrence.start_time, ok.body.occurrence.end_time], ['2032-10-31', '10:00', '11:00']);
+    const log = db.prepare('SELECT field_name, old_value, new_value, batch_id FROM event_enrichment_log WHERE event_id = ? AND occurrence_id = ? AND batch_id = ?').all(ev.id, morning.id, 'r9-times');
+    assert.deepEqual(log.map((r) => ({ ...r })), [{ field_name: 'end_time', old_value: '17:00', new_value: '11:00', batch_id: 'r9-times' }]);
+    assert.equal((await patch({ end_time: '11:00', ...meta })).body.changed, false, 'a re-run changes nothing');
+    assert.equal(app.getEventById(ev.id).end_datetime, '2032-10-31T14:00:00-07:00', 'the span is recomputed');
+    // The status PATCH still works.
+    assert.equal((await patch({ status: 'scheduled', ...meta })).status, 200);
+    // CORS: the write answer grants nothing to other sites.
+    const r = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    assert.equal(r.headers.get('access-control-allow-origin'), null);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+  const script = require('../scripts/set-occurrence-times.js');
+  assert.deepEqual(script.plan(script.parseArgs(['--event', '505', '--occurrences', '814,815', '--end', '11:00'])), { eventId: 505, occIds: [814, 815], times: { end_time: '11:00' } });
+  assert.deepEqual(script.parseArgs(['--event=5', '--apply']), { event: '5', apply: true });
+  assert.throws(() => script.plan(script.parseArgs(['--event', '505', '--occurrences', '814'])), /--start and\/or --end/);
+  assert.throws(() => script.plan(script.parseArgs(['--event', '505', '--occurrences', '814', '--end', '5pm'])), /HH:MM/);
+}));
+
+test('R9 tech: /api/events/:id dates describe what is still to come', () => {
+  const ev = s5create({ name: 'R9 Weekly Market', recurrence_rule: 'Thursdays', occurrences: ['2032-09-23', '2032-09-30', '2032-10-21', '2032-10-28'].map((d) => ({ start_date: d, start_time: '08:00', end_time: '13:00' })) });
+  try {
+    const detail = app.whatsOnPublicEventDetail(app.getEventById(ev.id), new Date('2032-10-15T18:00:00Z'));
+    assert.match(detail.dateLabel, /next Thu Oct 21$/, detail.dateLabel);
+    assert.equal(detail.occurrences.length, 4, 'every date is still listed');
+    const over = app.whatsOnPublicEventDetail(app.getEventById(ev.id), new Date('2033-01-15T18:00:00Z'));
+    assert.match(over.dateLabel, /next Thu Sep 23$/, 'all over: as before');
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
+  }
+});
+
+test('R9 tech: API CORS covers public reads only (GET/HEAD/OPTIONS)', () => withDiscoveryServer(async (base) => {
+  const get = await fetch(`${base}/api/venues`);
+  assert.equal(get.headers.get('access-control-allow-origin'), '*');
+  assert.equal(get.headers.get('access-control-allow-methods'), 'GET, HEAD, OPTIONS');
+  const pre = (method, p = '/api/events') => fetch(base + p, { method: 'OPTIONS', headers: { Origin: 'https://elsewhere.example', 'Access-Control-Request-Method': method } });
+  const okPre = await pre('GET');
+  assert.equal(okPre.status, 204);
+  assert.equal(okPre.headers.get('access-control-allow-origin'), '*');
+  assert.doesNotMatch(okPre.headers.get('access-control-allow-methods'), /PUT|POST|DELETE|PATCH/);
+  for (const m of ['PUT', 'POST', 'DELETE', 'PATCH']) assert.equal((await pre(m)).headers.get('access-control-allow-origin'), null, m);
+  assert.equal((await pre('GET', '/owner/login')).headers.get('access-control-allow-origin'), null, 'not outside /api/');
+  const post = await fetch(`${base}/api/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(post.status, 401);
+  assert.equal(post.headers.get('access-control-allow-origin'), null);
+  assert.equal((await fetch(`${base}/about`)).headers.get('access-control-allow-origin'), null);
+}));
+
+test('R9 tech: a trailing slash or capital letters on a redirecting address take one hop', () => withDiscoveryServer(async (base) => {
+  const go = (p) => fetch(base + p, { redirect: 'manual' });
+  for (const [from, to, status] of [['/owner/', '/owner/login', 302], ['/fr/owner/', '/fr/owner/login', 302], ['/owner/?utm_source=x', '/owner/login?utm_source=x', 302], ['/kelowna/', '/kelowna', 301]]) {
+    const r = await go(from);
+    assert.equal(r.status, status, from);
+    assert.equal(r.headers.get('location'), to, from);
+  }
+  const old = app.createVenue({ name: 'R9 Old Copy Cafe', region: 'kelowna', type: 'cafe', description: 'fixture', slug: 'r9-old-copy-cafe' });
+  const keep = app.createVenue({ name: 'R9 Kept Cafe', region: 'kelowna', type: 'cafe', description: 'fixture', slug: 'r9-kept-cafe' });
+  try {
+    db.prepare('UPDATE venues SET redirect_to = ? WHERE id = ?').run(keep.id, old.id);
+    for (const p of ['/kelowna/cafes/r9-old-copy-cafe/', '/Kelowna/Cafes/r9-old-copy-cafe', '/kelowna/cafes/r9-old-copy-cafe']) {
+      const r = await go(p);
+      assert.equal(r.status, 301, p);
+      assert.equal(r.headers.get('location'), '/kelowna/cafes/r9-kept-cafe', p);
+    }
+    // A category correction: /kelowna/restaurants/<cafe slug>/ goes straight to the cafe page.
+    const moved = await go('/kelowna/restaurants/r9-kept-cafe/');
+    assert.equal(moved.status, 301);
+    assert.equal(moved.headers.get('location'), '/kelowna/cafes/r9-kept-cafe');
+    // A French address of a place with no French page: one 302 to the English page.
+    const fr = await go('/fr/kelowna/cafes/r9-kept-cafe/');
+    assert.equal(fr.status, 302);
+    assert.equal(fr.headers.get('location'), '/kelowna/cafes/r9-kept-cafe');
+    // A live page just loses the slash.
+    const live = await go('/kelowna/cafes/r9-kept-cafe/?a=1');
+    assert.equal(live.status, 301);
+    assert.equal(live.headers.get('location'), '/kelowna/cafes/r9-kept-cafe?a=1');
+  } finally {
+    db.prepare('UPDATE venues SET redirect_to = NULL WHERE id = ?').run(old.id);
+    for (const v of [old, keep]) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+}));
+
+// ---------- Round 9 (2026-10-19): smaller copies of owner photos, guide and /whats-on phone banners ----------
+
+test('Owner photo copies (round 9): upload with copies, srcset + ?v= + immutable, fallback without copies, admin backfill, reject deletes copies', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Copies Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-copies-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-copies-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  // A small well-formed JPEG: SOF0 with the size, then a scan, so it survives stripJpegMetadata. `fill` varies the bytes.
+  const jpeg = (w, h, fill = 0) => Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xFF, 0xDA, 0x00, 0x08, 1, 1, 0, 0, 0x3F, 0]), Buffer.alloc(64, fill), Buffer.from([0xFF, 0xD9])]);
+  const dataUrl = (buf) => `data:image/jpeg;base64,${buf.toString('base64')}`;
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const up = (body) => fetch(`${base}/owner/${token}/photos`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.9.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const admin = (p, body, auth = true) => fetch(`${base}${p}`, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` } : {}) }, body: body ? JSON.stringify(body) : undefined })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const file = (f) => path.join(app.OWNER_PHOTO_DIR, f);
+  const pageOf = () => fetch(`${base}/kelowna/cafes/owner-copies-fixture`).then((r) => r.text());
+  const made = [];
+  const good = { image: dataUrl(jpeg(1600, 1067, 1)), credit: 'Owner Copies Fixture', rights: true, notify: false, company_website: '', started_at: Date.now() - 10000 };
+  try {
+    // 1. An upload with a good 480px copy, a good 960px copy and a 1200px copy of the wrong shape: the bad one is
+    //    skipped, the photo itself is still accepted.
+    const ok = await up({ ...good, image_w480: dataUrl(jpeg(480, 320, 2)), image_w960: dataUrl(jpeg(960, 640, 3)), image_w1200: dataUrl(jpeg(1200, 1200, 4)) });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    const row = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(ok.body.id);
+    const stem = row.file.replace(/\.jpg$/, '');
+    made.push(row.file, `${stem}-w480.jpg`, `${stem}-w960.jpg`, `${stem}-w1200.jpg`);
+    assert.ok(fs.existsSync(file(`${stem}-w480.jpg`)) && fs.existsSync(file(`${stem}-w960.jpg`)));
+    assert.equal(fs.existsSync(file(`${stem}-w1200.jpg`)), false, 'the wrongly shaped copy is not stored');
+    // Copies are not public before approval either.
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w480.jpg`)).status, 404);
+    assert.equal((await admin(`/admin/owner-photos/${ok.body.id}/approve`, { reviewer: 'test' })).status, 200);
+    let page = await pageOf();
+    const hero = /<div class="venue-hero venue-hero-photo"><img ([^>]+)>/.exec(page);
+    assert.ok(hero, 'hero renders');
+    assert.match(hero[1], new RegExp(`src="/images/owner/${stem}\\.jpg\\?v=[0-9a-f]{10}"`));
+    assert.match(hero[1], new RegExp(`srcset="/images/owner/${stem}-w960\\.jpg\\?v=[0-9a-f]{10} 960w, /images/owner/${stem}\\.jpg\\?v=[0-9a-f]{10} 1600w"`));
+    assert.match(hero[1], /width="1600" height="1067"/);
+    assert.equal(app.photoSized(`/images/owner/${row.file}`, 480), `/images/owner/${stem}-w480.jpg`);
+    assert.equal(app.photoSized(`/images/owner/${row.file}`, 1200), `/images/owner/${row.file}`, 'no 1200px copy yet: the original');
+    // The page's ?v= is the copy's own hash: a year, immutable. A plain or made-up ?v= keeps the day.
+    const v960 = new RegExp(`/images/owner/${stem}-w960\\.jpg\\?v=[0-9a-f]{10}`).exec(page)[0];
+    const r1 = await fetch(base + v960);
+    assert.equal(r1.status, 200);
+    assert.equal(r1.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    assert.equal(Buffer.from(await r1.arrayBuffer()).length, fs.readFileSync(file(`${stem}-w960.jpg`)).length);
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w960.jpg`)).headers.get('cache-control'), 'public, max-age=86400');
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w960.jpg?v=0123456789`)).headers.get('cache-control'), 'public, max-age=86400');
+    assert.equal((await fetch(`${base}/images/owner/${stem}-w1200.jpg`)).status, 404, 'a copy never made is a 404');
+
+    // 2. A photo sent without copies (an old browser, or before this change) keeps its original everywhere.
+    const plain = await up({ ...good, image: dataUrl(jpeg(1600, 1067, 5)) });
+    assert.equal(plain.status, 201);
+    const row2 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(plain.body.id);
+    const stem2 = row2.file.replace(/\.jpg$/, '');
+    made.push(row2.file, ...[480, 960, 1200].map((w) => `${stem2}-w${w}.jpg`));
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/approve`, { reviewer: 'test', main: false })).status, 200);
+    page = await pageOf();
+    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" width="1600" height="1067" alt="" loading="lazy">`), 'the thumbnail falls back to the original');
+    assert.doesNotMatch(page, new RegExp(`${stem2}-w`));
+
+    // 3. The admin backfill: listed with what it needs; token required; bad copies refused; good ones stored.
+    const list = await admin('/admin/owner-photos/sizes');
+    assert.equal(list.status, 200);
+    const item = list.body.photos.find((p) => p.id === plain.body.id);
+    assert.deepEqual(item.needs, [480, 960, 1200]);
+    assert.equal(item.file_present, true);
+    assert.deepEqual(list.body.photos.find((p) => p.id === ok.body.id).needs, [1200]);
+    assert.equal((await admin('/admin/owner-photos/sizes', null, false)).status, 401);
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320)) }, false)).status, 401);
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: 'data:image/png;base64,AAAA' })).status, 400);
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(500, 333)) })).status, 400, 'wrong width');
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { image: 'x' })).status, 400, 'unknown field');
+    const sent = await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320, 6)), w960: dataUrl(jpeg(960, 640, 7)), w1200: dataUrl(jpeg(1200, 800, 8)) });
+    assert.equal(sent.status, 200, JSON.stringify(sent.body));
+    assert.deepEqual(sent.body.written, [480, 960, 1200]);
+    assert.deepEqual(sent.body.has, [480, 960, 1200]);
+    const again = await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320, 9)) });
+    assert.deepEqual(again.body.skipped, [480], 'an existing copy is kept unless replace is set');
+    assert.equal((await admin('/admin/owner-photos/sizes')).body.photos.find((p) => p.id === plain.body.id).needs.length, 0);
+    page = await pageOf();
+    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}-w480\\.jpg\\?v=[0-9a-f]{10}"`), 'the thumbnail now takes the 480px copy');
+    assert.match(page, new RegExp(`<figure class="vg-slide"><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" srcset="/images/owner/${stem2}-w960\\.jpg\\?v=[0-9a-f]{10} 960w, /images/owner/${stem2}-w1200\\.jpg\\?v=[0-9a-f]{10} 1200w, /images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10} 1600w" sizes="100vw"`));
+    // A pending photo cannot be given copies.
+    const pending = await up({ ...good, image: dataUrl(jpeg(1600, 1067, 10)) });
+    const row3 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(pending.body.id);
+    made.push(row3.file);
+    assert.equal((await admin(`/admin/owner-photos/${pending.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320)) })).status, 409);
+
+    // 4. Removing a photo deletes its copies too.
+    assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/remove`, { reviewer: 'test', reason: 'test' })).status, 200);
+    for (const w of [480, 960, 1200]) assert.equal(fs.existsSync(file(`${stem2}-w${w}.jpg`)), false, `${w}px copy deleted`);
+    assert.equal((await fetch(`${base}/images/owner/${stem2}-w480.jpg`)).status, 404);
+  } finally {
+    for (const f of made) { try { fs.unlinkSync(file(f)); } catch (e) { /* gone */ } }
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Owner photo copies (round 9): the upload page makes 480/960/1200px copies in the browser and sends them', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Owner Copies Page Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-copies-page-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-copies-page-fixture');
+  const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  try {
+    const html = await fetch(`http://localhost:${srv.address().port}/owner/${token}`).then((r) => r.text());
+    assert.match(html, /\[480, 960, 1200\]\.forEach\(function\(cw\)\{/);
+    assert.match(html, /image_w480: made\.image_w480, image_w960: made\.image_w960, image_w1200: made\.image_w1200/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
+test('Banner speed (round 9): guides and /whats-on get the 800px phone <source> and preloads like the list pages', () => {
+  const page = (cls) => `<!DOCTYPE html><html><head><meta charset="UTF-8">\n<meta name="viewport" content="width=device-width">\n</head><body class="${cls}"><div class="category-banner"><img src="/images/a.jpg?v=1" srcset="/images/a-800.jpg?v=2 800w, /images/a.jpg?v=1 1600w" sizes="(max-width: 860px) 100vw, 1200px" alt="" fetchpriority="high"></div></body></html>`;
+  for (const cls of ['golf-page ski-guide-page', 'golf-page outdoor-page whatson-page']) {
+    const out = app.withBannerHeroFirst(page(cls));
+    assert.match(out, /<picture class="banner-pic"><source media="\(max-width: 640px\)" srcset="\/images\/a-800\.jpg\?v=2 800w" sizes="100vw"><img src="\/images\/a\.jpg\?v=1"/, cls);
+    assert.match(out, /<link rel="preload" as="image" imagesrcset="\/images\/a-800\.jpg\?v=2 800w" imagesizes="100vw" media="\(max-width: 640px\)" fetchpriority="high">/, cls);
+  }
+});
+
+// ---------- Round 9 phone and accessibility (2026-10-19) ----------
+// My Trip pins spread by screen distance with 44px hit areas, 44px tap targets across the site, the venue page's
+// reading order, a keyboard-reachable "View My Trip" message and the /contact footnote contrast.
+
+test('Round 9 phone: My Trip pins a few pixels apart are spread so none covers another; pins with room stay put', () => {
+  const spread = app.myTripPinSpread;
+  const apart = (o, xy, i, j) => Math.hypot(xy[i].x + o[i].dx - xy[j].x - o[j].dx, xy[i].y + o[i].dy - xy[j].y - o[j].dy);
+  // Pins 9–11 px apart (the live Penticton trip) and two at one spot, plus a chain A–B–C and a pin on its own.
+  const xy = [{ x: 100, y: 100 }, { x: 109, y: 104 }, { x: 118, y: 100 }, { x: 200, y: 200 }, { x: 200, y: 200 }, { x: 300, y: 50 }];
+  const o = spread(xy, 24);
+  for (let i = 0; i < xy.length; i++) for (let j = i + 1; j < xy.length; j++) assert.ok(apart(o, xy, i, j) >= 25, `pins ${i} and ${j} are ${apart(o, xy, i, j).toFixed(1)}px apart`);
+  assert.deepEqual(o[5], { dx: 0, dy: 0 }, 'a pin with room stays on its spot');
+  // A ring keeps its pins close to where they were (within a pin's width or so).
+  for (let i = 0; i < 5; i++) assert.ok(Math.hypot(o[i].dx, o[i].dy) <= 30, `pin ${i} moved ${Math.hypot(o[i].dx, o[i].dy)}`);
+  assert.deepEqual(spread([{ x: 0, y: 0 }, { x: 30, y: 0 }], 24), [{ dx: 0, dy: 0 }, { dx: 0, dy: 0 }], 'pins 30px apart are left alone');
+  assert.deepEqual(spread([], 24), []);
+  // Six at one spot still clear each other.
+  const six = Array.from({ length: 6 }, () => ({ x: 50, y: 50 }));
+  const o6 = spread(six, 24);
+  for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) assert.ok(apart(o6, six, i, j) >= 25);
+});
+
+test('Round 9 phone: /my-trip and /fr/my-trip ship the pin spread, 44px pin hit areas, 44px zoom buttons and pin popups', () => {
+  const vm = require('node:vm');
+  for (const lang of ['en', 'fr']) {
+    const html = app.renderMyTripPage({ lang });
+    // The page's own copy of the helper (shipped with .toString()) runs on its own.
+    const src = html.match(/var myTripPinSpread = (function myTripPinSpread\([\s\S]*?\n\});/);
+    assert.ok(src, 'the helper is in the page');
+    const fn = vm.runInNewContext('(' + src[1] + ')');
+    assert.deepEqual(JSON.parse(JSON.stringify(fn([{ x: 0, y: 0 }, { x: 10, y: 0 }], 24))), JSON.parse(JSON.stringify(app.myTripPinSpread([{ x: 0, y: 0 }, { x: 10, y: 0 }], 24))));
+    assert.match(html, /map\.on\('zoomend', function\(\)\{ if \(spreadPins\) spreadPins\(\); \}\);/, 'the spread is worked out again after every zoom');
+    assert.match(html, /myTripPinSpread\(pts\.map\(function\(p\)\{ return map\.latLngToLayerPoint\(\[p\.lat, p\.lng\]\); \}\), 24\)/);
+    assert.match(html, /body\.my-trip-page \.leaflet-marker-icon\.mt-pin::before \{ content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px;/);
+    assert.match(html, /body\.my-trip-page \.leaflet-control-zoom a \{ width: 44px; height: 44px; line-height: 44px;/);
+    assert.match(html, /mk\.bindPopup\(/);
+    assert.match(html, /url: \(document\.documentElement\.lang === 'fr' && d\.urlFr\) \|\| d\.url/, 'a French pin links to the French page');
+  }
+});
+
+test('Round 9 phone: 44px tap targets on venue, town, category, map, home and planner controls', () => withPass4Server(async (get) => {
+  const ins = db.prepare("INSERT INTO venues (name, region, type, description, description_fr, hours, slug) VALUES ('R9 Targets Winery', 'kelowna', 'winery', 'A round 9 fixture.', 'Une fiche d’essai.', ?, 'r9-targets-winery')").run(SEASON_WEEK);
+  try {
+    for (const p of ['/kelowna/wineries/r9-targets-winery', '/fr/kelowna/wineries/r9-targets-winery']) {
+      const page = await r8PageWithCss(get, p);
+      assert.match(page, /class="venue-lang-switch"/);
+      assert.match(page, /body\.golf-page \.venue-lang-switch a, body\.golf-page \.venue-header \.venue-at-a-glance a \{ display: inline-block; padding: 12px 0; margin: -12px 0; \}/);
+      assert.match(page, /body\.golf-page \.related-card > a, body\.golf-page \.related-card \.related-body > a \{ display: block; padding: 12px 0; margin: -12px 0; \}/);
+      assert.match(page, /body\.golf-page \.related-card > a::after \{ content: ""; position: absolute; inset: 0; \}/);
+    }
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(ins.lastInsertRowid); }
+  for (const p of ['/kelowna', '/fr/kelowna']) {
+    assert.match(await r8PageWithCss(get, p), /@media \(max-width: 700px\) \{[\s\S]*?html body nav\.category-region-selector a, html body nav\.category-region-selector \.category-region-selector-active \{ display: inline-flex; align-items: center; min-height: 44px;/);
+  }
+  for (const p of ['/kelowna/restaurants', '/fr/kelowna/restaurants']) {
+    const css = await r8PageWithCss(get, p);
+    assert.match(css, /body\.fd-page \.fd-pop-btn \{[^}]*min-height: 44px;/);
+    assert.match(css, /body\.fd-page \.fd-sort-select \{[^}]*min-height: 44px;/);
+    assert.doesNotMatch(css, /body\.fd-page \.fd-pop-btn \{[^}]*min-height: 40px;/);
+  }
+  for (const p of ['/map', '/fr/map']) assert.match(await r8PageWithCss(get, p), /body\.map-page \.pm-dir, body\.map-page \.pm-link \{ display: inline-flex; align-items: center; min-height: 44px;/);
+  for (const p of ['/', '/fr']) {
+    const home = await r8PageWithCss(get, p);
+    assert.match(home, /\.hero-search-box \{ padding: 2px 2px 2px 16px; \}\n\s*\.hero-search-field input \{ min-height: 44px; padding: 0; \}\n\s*\.hero-search-box button \{ height: 44px; \}/);
+  }
+  // The planner's CSS (trip-planner-v3-page.js): "+N more" and the "Before you go" links.
+  const planner = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(planner, /\.t3-badge-more \{[^}]*min-height: 44px; \}/);
+  assert.match(planner, /\.t3-warnings li a \{ display: inline-block; padding: 12px 0; margin: -12px 0; \}/);
+}));
+
+test('Round 9 accessibility: on a venue page the facts (map, phone, website) come before the visitor photos and guide links in the page itself', () => {
+  seasonInsert.run({ name: 'R9 Order Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'r9-order-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe');
+  try {
+    db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://example.com/', address = '1 Test St, Kelowna' WHERE id = ?").run(v.id);
+    for (const lang of ['en', 'fr']) {
+      const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
+      const aside = html.indexOf('<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = html.indexOf('<div class="venue-extra">');
+      assert.ok(aside > 0 && extra > asideEnd, 'the extras follow the sidebar');
+      assert.ok(html.indexOf('class="map-link"') > aside && html.indexOf('class="map-link"') < asideEnd, 'View on map is in the sidebar');
+      assert.ok(html.indexOf('tel:') < extra, 'the phone comes first');
+      if (html.includes('id="vcOpen"')) assert.ok(html.indexOf('id="vcOpen"') > extra, 'Share a photo or tip comes after the facts');
+      assert.ok(html.indexOf('<div class="venue-main">') < aside, 'the story still comes first');
+      // Desktop keeps two columns: the extras under the story, the sidebar beside both. Phones need no CSS order.
+      assert.match(html, /body\.golf-page \.venue-layout \{ display: grid; grid-template-columns: minmax\(0, 1fr\) 340px; grid-template-rows: auto 1fr;/);
+      assert.match(html, /body\.golf-page \.venue-aside \{ grid-column: 2; grid-row: 1 \/ span 2; \}/);
+      assert.match(html, /body\.golf-page \.venue-extra \{ grid-column: 1; grid-row: 2; \}/);
+      assert.doesNotMatch(html, /\.venue-extra \{ order: 2; \}/);
+    }
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+});
+
+test('Round 9 accessibility: the "View My Trip" message follows the Add button in the page and waits while focus is in it', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const fnSrc = js.match(/function showAddedToast\(afterEl\)\{[\s\S]*?\n  \}\n/);
+  assert.ok(fnSrc, 'showAddedToast takes the button');
+  assert.match(fnSrc[0], /afterEl\.parentNode\.insertBefore\(box, afterEl\.nextSibling\)/);
+  assert.match(fnSrc[0], /if \(!box\.contains\(document\.activeElement\)\) addedToastTimer = setTimeout\(hideAddedToast, 6000\);/);
+  assert.match(fnSrc[0], /if \(e && e\.type === 'mouseleave' && box\.contains\(document\.activeElement\)\) return;/, 'moving the mouse away does not hide it while it has focus');
+  assert.match(fnSrc[0], /var back = box\.contains\(document\.activeElement\) && box\.previousElementSibling;/, 'Esc hands focus back to the button');
+  assert.match(fnSrc[0], /#tripAddedToast\{width:max-content !important;margin:0 !important;/, 'a button row\'s sizing rules do not reach it');
+  assert.match(fnSrc[0], /position:fixed;/, 'it still shows at the foot of the screen');
+});
+
+test('Round 9 accessibility: the /contact and /fr/contact footnote is at least 4.5:1', () => withPass4Server(async (get) => {
+  for (const p of ['/contact', '/fr/contact']) {
+    const html = await r8PageWithCss(get, p);
+    assert.match(html, /class="info-updated"/);
+    const op = Number(html.match(/body\.info-page \.info-updated \{[^}]*opacity: ([\d.]+);/)[1]);
+    // #4A3428 text on the #F5F3ED page at that opacity.
+    const mix = [0x4A, 0x34, 0x28].map((c, i) => c * op + [0xF5, 0xF3, 0xED][i] * (1 - op));
+    const lum = (rgb) => { const l = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]; };
+    const ratio = (lum([0xF5, 0xF3, 0xED]) + 0.05) / (lum(mix) + 0.05);
+    assert.ok(ratio >= 4.5, `${p}: ${ratio.toFixed(2)}:1`);
+  }
+}));
+
+// ---------- Round 9 (2026-10-19): search, map and help-bot gaps (site review pass 8, item 2) ----------
+// Places with any columns (kid_friendly, dog_friendly ...) and What's On events, removed afterwards.
+function r9Fixtures({ venues = [], events = [] }, fn) {
+  const madeV = [], madeE = [];
+  const day = app.addLocalDays(app.todayLocal(), 4);
+  for (const row of venues) {
+    const r = { description: 'Round 9 fixture.', rating: 4.3, reviews: 40, ...row };
+    r.slug = r.slug || app.slugify(r.name);
+    const cols = Object.keys(r);
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c]));
+    madeV.push(db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(r.slug, r.region));
+  }
+  for (const [name, description, cats, region = 'vernon'] of events) {
+    const eid = db.prepare('INSERT INTO events (name, slug, region, description, start_datetime) VALUES (?, ?, ?, ?, ?)').run(name, app.slugify(name), region, description, `${day} 19:00:00`).lastInsertRowid;
+    db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time) VALUES (?, ?, ?, ?, ?)').run(eid, day, day, '19:00', '21:00');
+    cats.forEach((c, i) => db.prepare('INSERT INTO event_categories (event_id, category_key, position) VALUES (?, ?, ?)').run(eid, c, i));
+    madeE.push(eid);
+  }
+  return Promise.resolve().then(() => fn(madeV)).finally(() => {
+    for (const eid of madeE) { db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(eid); db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(eid); db.prepare('DELETE FROM events WHERE id = ?').run(eid); }
+    for (const v of madeV) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  });
+}
+const R9_EVENTS = [
+  ['R9 Hungry for Laughs Comedy Tour', 'A night of stand-up from touring comedians.', ['arts-culture']],
+  ['R9 Little Shop of Horrors', 'The cult musical on stage at the community theatre.', ['arts-culture']],
+  ['R9 Okanagan Symphony Holiday Concert', 'The Okanagan Symphony Orchestra plays seasonal favourites.', ['live-music']],
+  ['R9 Jazz Trio Night', 'A jazz trio plays standards in the lounge.', ['live-music']],
+  ['R9 Fall Art Exhibition', 'An exhibition of new paintings by local artists.', ['arts-culture']],
+  ['R9 Haunted Corn Maze', 'A spooky maze through the corn, with a show at the end.', ['holiday-seasonal']],
+  ['R9 New Year Celebration', 'Live bands, then fireworks over the lake at midnight.', ['events-festivals']],
+];
+const r9Names = (list) => list.map((x) => x.name || (x.row && x.row.name)).filter((n) => /^R9 /.test(n));
+
+test('Round 9 search: French and English show words read as shows, comedy, theatre, music and fireworks', () => {
+  const t = (q, lang = 'en') => app.discoverySearchText(q, lang);
+  assert.equal(t('comédie', 'fr'), 'comedy');
+  assert.equal(t('comedie', 'fr'), 'comedy');
+  assert.equal(t('humoriste', 'fr'), 'comedian');
+  assert.equal(t('spectacle', 'fr'), 'shows');
+  assert.equal(t('pièce de théâtre', 'fr'), 'theatre show');
+  assert.equal(t('musique classique', 'fr'), 'classical music');
+  assert.equal(t('musique live', 'fr'), 'live music');
+  assert.equal(t('sources chaudes', 'fr'), 'hot springs');
+  assert.equal(t('feux d’artifice', 'fr'), 'fireworks');
+  assert.equal(t('stand-up'), 'comedy');
+  assert.equal(t('stand up comedy in kelowna'), 'comedy in kelowna');
+  assert.equal(t('stand up paddleboarding'), 'paddleboarding', 'stand-up paddling is not comedy');
+  assert.equal(t('xmas'), 'christmas');
+  assert.equal(t('xmas market'), 'christmas market');
+  assert.equal(t('apple picking'), 'u-pick orchard');
+  // What counts as a show.
+  const kind = (name, description = '', categories = []) => app.searchShowKind({ name, description, categories });
+  assert.equal(kind('Hungry for Laughs Comedy Tour'), 'comedy');
+  assert.equal(kind('Little Shop of Horrors', 'The cult musical.'), 'theatre');
+  assert.equal(kind('Jazz Trio Night', '', ['live-music']), 'music');
+  assert.equal(kind('Fall Art Exhibition', 'An exhibition of paintings.', ['arts-culture']), null);
+  assert.equal(kind('Square One: Under $500 Art Show & Sale'), null, 'an art sale is not a show');
+  assert.equal(kind('Haunted Corn Maze', 'with a show at the end'), null);
+  assert.equal(kind('Stand Up Paddle Tour'), null);
+});
+
+test('Round 9 search: « spectacle », "show", comedy, theatre, classical music, live music and fireworks list their events', () => withDiscoveryFlag('on', () => r9Fixtures({
+  venues: [
+    { name: 'R9 Playhouse Theatre', region: 'vernon', type: 'indoor', description: 'A community theatre with plays all year.' },
+    { name: 'R9 Bowling Lanes', region: 'vernon', type: 'indoor', description: 'Ten-pin bowling.' },
+    { name: 'R9 Fruit Stand', region: 'vernon', type: 'tour', description: 'A roadside fruit stand.' },
+    { name: 'R9 Live Music Pub', region: 'vernon', type: 'pub', description: 'Live music every Friday.', live_music: 1 },
+  ],
+  events: R9_EVENTS,
+}, () => withDiscoveryServer(async (base) => {
+  const plan = (q, lang = 'en') => app.smartSearchPlan(app.discoverySearchText(q, lang));
+  for (const [q, lang] of [['spectacle', 'fr'], ['show'], ['shows'], ['un spectacle à Vernon', 'fr']]) {
+    const p = plan(q, lang);
+    assert.equal(p.key, 'topic_shows', q);
+    assert.deepEqual(p.list(), [], 'no place is a show');
+    const names = r9Names(p.events().items);
+    assert.equal(names[0], 'R9 Hungry for Laughs Comedy Tour', `${q}: comedy first (${names.join(' | ')})`);
+    assert.ok(names.includes('R9 Little Shop of Horrors') && names.includes('R9 Jazz Trio Night'), q);
+    assert.ok(!names.includes('R9 Fall Art Exhibition') && !names.includes('R9 Haunted Corn Maze'), `${q}: no exhibition or corn maze`);
+  }
+  assert.equal(plan('spectacle', 'fr').headingFr, 'Spectacles');
+  assert.equal(plan('show in vernon').heading, 'Shows in Vernon');
+  // Classical music and fireworks: only those events.
+  const classical = plan('musique classique', 'fr');
+  assert.equal(classical.key, 'topic_classical');
+  assert.deepEqual(r9Names(classical.events().items), ['R9 Okanagan Symphony Holiday Concert']);
+  assert.deepEqual(r9Names(plan('fireworks').events().items), ['R9 New Year Celebration']);
+  assert.deepEqual(r9Names(plan('feux d’artifice', 'fr').events().items), ['R9 New Year Celebration']);
+  // Theatre: the theatres (not every indoor place) and their shows.
+  for (const [q, lang] of [['theatre'], ['théâtre', 'fr'], ['pièce de théâtre', 'fr']]) {
+    const p = plan(q, lang);
+    assert.equal(p.key, 'theatre', q);
+    assert.deepEqual(r9Names(p.list()), ['R9 Playhouse Theatre'], q);
+    const ev = r9Names(p.events().items);
+    assert.equal(ev[0], 'R9 Little Shop of Horrors', q);
+    assert.ok(!ev.includes('R9 Jazz Trio Night') && !ev.includes('R9 Fall Art Exhibition'), q);
+  }
+  // Comedy words go to the comedy events (stand-up never lists the fruit stand).
+  for (const [q, lang] of [['comédie', 'fr'], ['humoriste', 'fr'], ['stand-up']]) {
+    const run = app.runDiscovery(app.discoverySearchText(q, lang), { lang });
+    assert.equal(run.results.kind, 'events', q);
+    assert.deepEqual(r9Names(run.results.items), ['R9 Hungry for Laughs Comedy Tour'], q);
+  }
+  const standUp = await (await fetch(`${base}/search?q=stand-up`)).text();
+  assert.ok(standUp.includes('R9 Hungry for Laughs Comedy Tour') && !standUp.includes('R9 Fruit Stand'));
+  // Live music keeps its places and adds an events block, on both languages.
+  const run = app.runDiscovery('live music');
+  assert.ok(r9Names(run.results.items || []).includes('R9 Live Music Pub'));
+  assert.ok(r9Names(run.events.items).includes('R9 Jazz Trio Night') && !r9Names(run.events.items).includes('R9 Hungry for Laughs Comedy Tour'));
+  const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('musique live')}`)).text();
+  assert.match(fr, /<h2 id="searchEventsHead">Événements \(\d+\)<\/h2>/);
+  assert.ok(fr.includes('R9 Jazz Trio Night') && fr.includes('R9 Live Music Pub'));
+  const spectacle = await (await fetch(`${base}/fr/search?q=spectacle`)).text();
+  assert.ok(spectacle.indexOf('R9 Hungry for Laughs Comedy Tour') > 0 && !spectacle.includes('R9 Fall Art Exhibition'));
+  assert.match(spectacle, /Vous avez cherché « spectacle » : <strong>Spectacles<\/strong>/);
+  const xmas = app.runDiscovery(app.discoverySearchText('xmas'));
+  assert.equal(xmas.results.kind, 'events', 'xmas reads as Christmas');
+}))));
+
+test('Round 9 search: hot springs, kids and dogs, apple picking, museums and Vernon wineries rank the right places first', () => withDiscoveryFlag('on', () => r9Fixtures({
+  venues: [
+    { name: 'R9 Thermal Spa', region: 'penticton', type: 'indoor', description: 'Saunas, cold plunges and a steam room.' },
+    { name: 'R9 Karat Chocolate', region: 'penticton', type: 'cafe', description: 'Hot chocolate and handmade truffles.' },
+    { name: 'R9 Kid Winery', region: 'kelowna', type: 'winery', description: 'Wine tastings.', kid_friendly: 1, dog_friendly: 1, rating: 4.9, reviews: 900 },
+    { name: 'R9 Kid Cafe', region: 'kelowna', type: 'cafe', description: 'A family cafe.', kid_friendly: 1, dog_friendly: 1, rating: 4.1, reviews: 20 },
+    { name: 'R9 Apple Distillery', region: 'kelowna', type: 'distillery', description: 'Apple brandy made from fruit we pick nearby.' },
+    { name: 'R9 U-Pick Orchard', region: 'kelowna', type: 'tour', description: 'U-pick apples every fall.' },
+    { name: 'R9 History Museum', region: 'vernon', type: 'indoor', description: 'Local history.' },
+    { name: 'R9 Climbing Gym', region: 'vernon', type: 'indoor', description: 'Bouldering walls.' },
+    { name: 'R9 Vernon Winery', region: 'vernon', type: 'winery', description: 'Wine tastings.' },
+  ],
+}, () => withDiscoveryServer(async (base) => {
+  const plan = (q, lang = 'en') => app.smartSearchPlan(app.discoverySearchText(q, lang));
+  assert.deepEqual(r9Names(plan('sources chaudes', 'fr').list()), ['R9 Thermal Spa']);
+  for (const [q, lang] of [['museum'], ['musée', 'fr'], ['museums in vernon']]) {
+    const p = plan(q, lang);
+    assert.equal(p.key, 'museum', q);
+    assert.deepEqual(r9Names(p.list()), ['R9 History Museum'], `${q}: museums only`);
+  }
+  const page = async (q, lang = 'en') => (await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`)).text();
+  const order = (html, a, b) => { const i = html.indexOf(a), j = html.indexOf(b); assert.ok(i > 0, a); return j < 0 || i < j; };
+  assert.ok(order(await page('kid friendly'), 'R9 Kid Cafe', 'R9 Kid Winery'), 'kids: not a winery first');
+  assert.ok(order(await page('avec chien', 'fr'), 'R9 Kid Cafe', 'R9 Kid Winery'), 'dogs: not a winery first');
+  assert.ok(app.searchPartyOnly({ features: ['kid_friendly'], types: [], cuisines: [], textTerms: [], collections: [], activities: [] }));
+  assert.ok(!app.searchPartyOnly({ features: ['kid_friendly'], types: ['winery'], cuisines: [], textTerms: [], collections: [], activities: [] }), 'kid-friendly wineries keep their order');
+  assert.ok(order(await page('apple picking'), 'R9 U-Pick Orchard', 'R9 Apple Distillery'), 'apple picking: the U-pick first');
+  const vernon = app.runDiscovery('vernon wineries');
+  assert.ok(r9Names(vernon.results.items).includes('R9 Vernon Winery'));
+  assert.ok(vernon.results.items.every((x) => x.region === 'vernon' && x.type === 'winery'), JSON.stringify(vernon.results.items.map((x) => x.name)));
+}))));
+
+test('Round 9 map: typo correction, « marché » is farmers\' markets, French links, the radius message and the French placeholder', async () => {
+  await withDiscoveryServer(async (base) => {
+    const en = await (await fetch(`${base}/map`)).text();
+    const fr = await (await fetch(`${base}/fr/map`)).text();
+    const vm = require('node:vm');
+    const reader = (html) => {
+      const c = JSON.parse(html.match(/CONF = (\{.*?\});/)[1]);
+      const m = html.match(/<script type="application\/json" id="pmFrWords">([\s\S]*?)<\/script>/);
+      const list = m ? JSON.parse(m[1]) : null;
+      const document = { getElementById: (id) => (id === 'pmFrWords' && list ? { textContent: JSON.stringify(list) } : null) };
+      const ctx = { CONF: c, document, okanaganClock: () => ({ minutes: 600 }), WEEK: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], NEG: ' no not without except avoid never nothing sans pas ni aucun aucune ' };
+      vm.runInNewContext(`${html.slice(html.indexOf('  // Plain words become filters'), html.indexOf('  var wantNear = false;'))}; this.parseWords = parseWords; this.WORD_TO = WORD_TO; this.fixTypos = fixTypos; this.STOP = STOP;`, ctx);
+      const read = (q) => { const fx = ctx.fixTypos(q); return { fixes: JSON.parse(JSON.stringify(fx.fixes)), words: ctx.parseWords(fx.text).map((w) => (w[0] === '#' ? `#${c.tg[Number(w.slice(1))].k}` : ctx.WORD_TO[w] || w)).join(' ') }; };
+      read.STOP = ctx.STOP;
+      return read;
+    };
+    const rEn = reader(en), rFr = reader(fr);
+    // The site search's own typo rule, on the words the map reads.
+    assert.deepEqual(rEn('brewry'), { fixes: [{ from: 'brewry', to: 'brewery' }], words: '#brewery' });
+    assert.deepEqual(rEn('winary in oliver').words, 'wine @oliver');
+    assert.deepEqual(rFr('vignobel'), { fixes: [{ from: 'vignobel', to: 'vignoble' }], words: 'wine' });
+    assert.deepEqual(rEn('pizza').fixes, [], 'a real word is never touched');
+    assert.equal(app.searchTypoWord('brewry', ['brewery', 'breweries'], () => false), 'brewery');
+    assert.equal(app.searchTypoWord('brewry', ['brewery'], (w) => w === 'brewry'), null, 'a known word (a place\'s name) stays');
+    assert.ok(en.includes("return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; })"), 'the correction is named, as on /search');
+    assert.match(fr, /Nous avons lu ' \+ f\.map/);
+    // « marché » alone is the farmers' markets; longer phrases keep their meaning.
+    assert.equal(rFr('marché').words, 'farmers market');
+    assert.equal(rFr('marché de Noël').words, 'christmas market');
+    assert.equal(app.mapFrWords().marche, 'farmers market');
+    assert.equal(app.frSearchSynonyms('marché'), 'market', 'the site search keeps its own reading');
+    // French links: places always, events when they have a French page.
+    for (const src of ['hrefAttr(p.fu || p.url)', 'hrefAttr(e.fu || e.url)', "fu: FR ? '/fr' + a[5] : ''", "fu: FR && a[11] ? '/fr' + a[1] : ''"]) assert.ok(fr.includes(src), src);
+    assert.equal((fr.match(/class="pm-link" ' \+ hrefAttr\(x\.fu \|\| x\.url\)/g) || []).length, 2, 'both Détails links');
+    // A new search clears the last one's distance message and starts from 5 km.
+    assert.ok(en.includes("setStatus(''); readSearch(v, false);") && en.includes('if (me && !radiusFixed && !town) radiusKm = 5;'));
+    // The French placeholder, and its words read as Patio and Dogs.
+    assert.ok(fr.includes('placeholder="Ex. « terrasse, chiens acceptés »"'), 'placeholder');
+    assert.ok(fr.includes("'Ex. « terrasse, chiens acceptés »'"), 'first hint');
+    assert.equal(rFr('terrasse, chiens acceptés').words, 'patio dogs acceptés');
+    assert.ok(rFr.STOP.includes(' acceptés '), 'acceptés is a filler word');
+  });
+  // Each event says whether it has a French page.
+  return r9Fixtures({ events: [['R9 Map Only English Event', 'A fixture with no French translation.', ['community-events'], 'kelowna']] }, () => {
+    const row = app.mapEventsData().find((e) => e[0] === 'R9 Map Only English Event');
+    assert.ok(row, 'listed');
+    assert.equal(row[11], app.hasFrenchTwin(row[1]) ? 1 : 0);
+    // Round 9 merge: #399 gives every scheduled event a French page (English text until translated), so the map links to it.
+  });
+});
+
+test('Round 9 help bot: a week\'s closure in French, uploading a menu, privacy, and who else can edit', () => {
+  const fr = ohbMatcher('edit', { lang: 'fr' }), en = ohbMatcher('edit');
+  const id = (m, q) => { const r = m(q); return r ? [r.id, r.lang] : null; };
+  assert.deepEqual(id(fr, 'nous sommes fermés pour une semaine'), ['closures', 'fr']);
+  assert.deepEqual(id(fr, 'fermé la semaine prochaine'), ['closures', 'fr']);
+  assert.deepEqual(id(en, 'my business is closed for a week, how do I show that'), ['closures', 'en']);
+  assert.deepEqual(id(en, 'how do I upload a menu'), ['menu-add', 'en']);
+  assert.deepEqual(id(fr, 'téléverser mon menu'), ['menu-add', 'fr']);
+  assert.deepEqual(id(en, 'upload photos'), ['photo-add', 'en'], 'photos are still photos');
+  assert.deepEqual(id(en, 'is my info public'), ['privacy', 'en']);
+  assert.deepEqual(id(fr, 'mes infos sont-elles publiques'), ['privacy', 'fr']);
+  assert.deepEqual(id(en, 'can other people edit my listing'), ['access', 'en']);
+  assert.deepEqual(id(en, 'I manage two restaurants'), ['more-businesses', 'en'], 'a second business is still a second business');
+  assert.equal(en('the private link doesnt work').id, 'newlink');
+  const cfg = ohbConfig(app.ownerHelpWidgetHtml('edit', { lang: 'fr' }));
+  const privacy = cfg.topics.find((t) => t.id === 'privacy');
+  assert.match(privacy.a, /href="\/privacy"/);
+  assert.match(privacy.aFr, /href="\/fr\/privacy"/);
+  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics?');
+});
+
+test('Round 9 claim page: « gérant d’Ancient… » before a vowel, and no space before a question mark', () => r9Fixtures({
+  venues: [{ name: 'Ancient R9 Test Winery', region: 'kelowna', type: 'winery' }, { name: 'Quails R9 Test Winery', region: 'kelowna', type: 'winery' }],
+}, ([ancient, quails]) => {
+  assert.equal(app.claimFrDe('Ancient Hill Winery'), 'd’Ancient Hill Winery');
+  assert.equal(app.claimFrDe('Élevage'), 'd’Élevage');
+  assert.equal(app.claimFrDe('Hester Creek'), 'de Hester Creek');
+  assert.equal(app.claimFrDe('Quails’ Gate'), 'de Quails’ Gate');
+  const fr = app.renderClaimPage(ancient, 'fr');
+  assert.ok(fr.includes('Vous êtes propriétaire ou gérant d’Ancient R9 Test Winery? Dites-nous'), 'elided');
+  assert.ok(app.renderClaimPage(quails, 'fr').includes('propriétaire ou gérant de Quails R9 Test Winery?'));
+  assert.doesNotMatch(fr.replace(/<script[\s\S]*?<\/script>/g, ''), /[   ]\?/, 'no space before ?');
+  assert.ok(app.renderClaimPage(ancient, 'en').includes('Own or manage Ancient R9 Test Winery?'));
+}));
+
+// ---- Build My Trip, round 9 (2026-10-19): Swap times, notices on the planned date, French plan links ----
+test('Trip planner round 9: Swap sends each shown stop\'s start time, and only valid times are accepted', () => {
+  const ok = app.parseTripPlanBody({ text: 'Naramata wine day', pinned: { '1-morning': 3 }, swap: { key: '1-afternoon', type: 'winery', id: 5, locked: [], times: { '1-morning': 540, '1-evening': 1080 } } });
+  assert.deepEqual(ok.value.swap.times, { '1-morning': 540, '1-evening': 1080 });
+  for (const times of [[540], { 'day-1': 540 }, { '1-morning': 1440 }, { '1-morning': -1 }, { '1-morning': '540' }]) assert.match(app.parseTripPlanBody({ text: 'x', swap: { key: '1-afternoon', type: 'winery', times } }).error, /^swap must be/, JSON.stringify(times));
+  const html = app.renderTripPlannerV3Page({ preview: true });
+  assert.ok(html.includes('times: shownTimes()'), 'the page sends the times');
+  // An undated plan for a month keeps the month in My Trip, and the month test survives the template.
+  assert.ok(html.includes('else if (planMonth()) t.m = planMonth();'));
+  assert.ok(html.includes("if (/^\\d{4}-\\d{2}-\\d{2}$/.test(date || '')) t.d = date;"));
+});
+
+test('Trip planner round 9: plan stops carry their French page (urlFr) for /fr/trip', () => r8Fixtures([
+  { name: 'R9 Plan Link Winery', region: 'naramata', type: 'winery' },
+], async ([v]) => {
+  const plan = app.withTripFrenchUrls({ days: [{ day: 1, stops: [{ daypart: 'afternoon', venue: { id: v.id, name: v.name, url: `/naramata/wineries/${v.slug}` } }] }], rainBackup: [{ id: 1, name: 'Nowhere', url: '/not-a-real-page/x/y' }] });
+  assert.equal(plan.days[0].stops[0].venue.urlFr, `/fr/naramata/wineries/${v.slug}`);
+  assert.equal(plan.rainBackup[0].urlFr, undefined, 'a page with no French twin keeps only url');
+}));
+
+test('Round 9 My Trip: a season notice is judged on the stop\'s planned date, not today', () => r8Fixtures([
+  { name: 'R9 Ski Hill Fixture', region: 'kelowna', type: 'outdoor' },
+], async ([hill]) => {
+  const today = app.todayLocal();
+  const reopens = app.addLocalDays(today, 30);
+  db.prepare('INSERT INTO venue_seasons (venue_id, status, reopens_date, source_url, checked_at) VALUES (?, ?, ?, ?, ?)').run(hill.id, 'closed', reopens, 'https://example.com/season', today);
+  try {
+    const now = app.tripStopsFor([`venue:${hill.id}`]);
+    assert.equal(now[0].notice.kind, 'closed', 'closed for the season today');
+    // A January trip after the reopening: no "Closed for the season. Reopens ..." on that stop.
+    const later = app.tripStopsFor([`venue:${hill.id}`], new Date(), { [`venue:${hill.id}`]: app.addLocalDays(today, 80) });
+    assert.equal(later[0].notice, null);
+    // A planned date inside the closure still says so.
+    const during = app.tripStopsFor([`venue:${hill.id}`], new Date(), { [`venue:${hill.id}`]: app.addLocalDays(today, 10) });
+    assert.equal(during[0].notice.kind, 'closed');
+    await withDiscoveryServer(async (base) => {
+      const api = await (await fetch(`${base}/api/trip-stops?refs=venue:${hill.id}&on=${app.addLocalDays(today, 80)}`)).json();
+      assert.equal(api.stops[0].notice, null);
+      const page = await (await fetch(`${base}/my-trip`)).text();
+      assert.ok(page.includes("'&on=' + encodeURIComponent(on.join(','))"), 'My Trip sends each stop\'s planned date');
+      assert.ok(page.includes('function plannedDate(t){ return t && /^\\d{4}-\\d{2}-\\d{2}$/.test(t.d'), 'the date test survives the template');
+    });
+  } finally {
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(hill.id);
+  }
+}));

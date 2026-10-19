@@ -2938,8 +2938,11 @@ window.__scrollToVenueCard = function(name){
   // the screen says it was added, with a "View My Trip" link (/fr/my-trip on French pages). It is a polite status
   // message, so screen readers announce it without moving focus; it stays while hovered or focused and goes after
   // about 6 seconds, or when Esc is pressed.
+  // Keyboard (2026-10-19, round 9): the message is placed right after the Add button in the page (it still shows
+  // fixed at the foot of the screen), so Tab from the button reaches "View My Trip" at once. Once focus is in it, it
+  // stays until focus leaves it, Esc is pressed or the link is followed.
   var addedToastTimer = null;
-  function showAddedToast(){
+  function showAddedToast(afterEl){
     var box = document.getElementById('tripAddedToast');
     if (!box) {
       if (!document.getElementById('tripAddedToastStyle')) {
@@ -2947,6 +2950,8 @@ window.__scrollToVenueCard = function(name){
         st.id = 'tripAddedToastStyle';
         st.textContent = '.trip-added-toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:1200;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:6px 8px 6px 18px;border-radius:14px;background:#1B2B3A;color:#fff;font:700 0.95rem/1.3 Nunito,"Nunito Fallback",sans-serif;box-shadow:0 10px 28px -10px rgba(0,0,0,.55)}'
           + '.trip-added-toast:empty,.trip-added-toast[hidden]{display:none}'
+          // Round 9: it now sits beside the Add button, so a button row's own sizing rules must not reach it.
+          + '#tripAddedToast{width:max-content !important;margin:0 !important;justify-content:flex-start;text-align:left}'
           + '.trip-added-toast a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:999px;background:#fff;color:#1B2B3A;text-decoration:none;font-weight:800}'
           + '.trip-added-toast a:focus-visible{outline:3px solid #E8C468;outline-offset:2px}';
         document.head.appendChild(st);
@@ -2958,13 +2963,20 @@ window.__scrollToVenueCard = function(name){
       box.setAttribute('aria-live', 'polite');
       document.body.appendChild(box);
       var hold = function(){ clearTimeout(addedToastTimer); };
-      var later = function(){ clearTimeout(addedToastTimer); addedToastTimer = setTimeout(hideAddedToast, 6000); };
+      var later = function(e){ if (e && e.type === 'mouseleave' && box.contains(document.activeElement)) return; clearTimeout(addedToastTimer); addedToastTimer = setTimeout(hideAddedToast, 6000); };
       box.addEventListener('mouseenter', hold); box.addEventListener('focusin', hold);
       box.addEventListener('mouseleave', later); box.addEventListener('focusout', later);
-      document.addEventListener('keydown', function(e){ if ((e.key === 'Escape' || e.key === 'Esc') && box.firstChild) hideAddedToast(); });
+      document.addEventListener('keydown', function(e){
+        if ((e.key !== 'Escape' && e.key !== 'Esc') || !box.firstChild) return;
+        // Esc from the link hands focus back to the button the message follows, instead of dropping it on the page.
+        var back = box.contains(document.activeElement) && box.previousElementSibling;
+        hideAddedToast();
+        if (back && back.focus) back.focus();
+      });
     }
     clearTimeout(addedToastTimer);
     box.textContent = '';
+    if (afterEl && afterEl.parentNode && afterEl.nextSibling !== box) afterEl.parentNode.insertBefore(box, afterEl.nextSibling);
     // Filled a moment after the (empty) live region exists, so it is announced the first time too.
     setTimeout(function(){
       var msg = document.createElement('span');
@@ -2973,7 +2985,7 @@ window.__scrollToVenueCard = function(name){
       link.href = frPathPrefix() + '/my-trip';
       link.textContent = t('trip.toastView');
       box.appendChild(msg); box.appendChild(link);
-      addedToastTimer = setTimeout(hideAddedToast, 6000);
+      if (!box.contains(document.activeElement)) addedToastTimer = setTimeout(hideAddedToast, 6000);
     }, 60);
   }
   function hideAddedToast(){ clearTimeout(addedToastTimer); var box = document.getElementById('tripAddedToast'); if (box) box.textContent = ''; }
@@ -2998,7 +3010,7 @@ window.__scrollToVenueCard = function(name){
         removeFromTrip(s.name, function(t){ return !sameStop(t, s); });
       } else {
         addToTrip(s);
-        if (trip.some(function(t){ return sameStop(t, s); }) && tripBtn.closest('[data-surface="venue_page"], body.event-page')) showAddedToast();
+        if (trip.some(function(t){ return sameStop(t, s); }) && tripBtn.closest('[data-surface="venue_page"], body.event-page')) showAddedToast(tripBtn);
       }
       return;
     }

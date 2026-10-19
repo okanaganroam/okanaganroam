@@ -842,7 +842,7 @@ const FR_TEXT = {
   'Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved. When you ask for directions, your starting point and the destination go to Mapbox to work out the route. Map tiles come from OpenStreetMap. Opening hours come from each place’s listing and can change; check before you go.': 'Votre position reste sur votre téléphone : elle sert seulement à trier ce qui est près de vous et n’est jamais envoyée à Okanagan Roam ni enregistrée. Quand vous demandez un itinéraire, votre point de départ et la destination sont envoyés à Mapbox pour calculer le trajet. Les fonds de carte proviennent d’OpenStreetMap. Les heures d’ouverture viennent de la fiche de chaque lieu et peuvent changer; vérifiez avant de vous déplacer.',
   'Search, e.g. patio drinks with my dog': 'Rechercher, p. ex. terrasse, un verre avec mon chien',
   'Try “patio drinks dog” or a name': 'Essayez « terrasse verre chien » ou un nom',
-  'Try “dog-friendly patio”': 'Ex. « terrasse chiens OK »',
+  'Try “dog-friendly patio”': 'Ex. « terrasse, chiens acceptés »',
   'What are you after?': 'Que cherchez-vous?',
   'Must have': 'Incontournables',
   'Drinks': 'Un verre', 'Food': 'Manger', 'Coffee': 'Café', 'Things to do': 'À faire',

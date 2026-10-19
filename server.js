@@ -139,14 +139,18 @@ function handleCspReport(req, res) {
 
 function sendJSON(res, status, data) {
   const body = JSON.stringify(data);
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  });
+  // CORS (2026-10-19, round 9): only the public reads under /api/ grant other sites access, and only GET/HEAD; the
+  // request handler sets those headers (apiCorsHeaders). Writes are same-origin (owner portal, forms) or Node scripts
+  // with a Bearer token, which need no CORS.
+  res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(body);
 }
+
+const API_CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -3329,6 +3333,52 @@ function retimeEventOccurrence(eventId, startDate, fromTime, toTime, meta, endTo
   }
 }
 
+// setEventOccurrenceTimes(eventId, occId, times, meta) (2026-10-19, round 9): set one stored date's start and/or end
+// time by its id (Bunnicula's 10 am shows were stored ending at 5 pm). `times` may hold start_time, end_time (HH:MM or
+// null) and ends_next_day (0/1); the date itself never moves. The merged occurrence is checked by the same rules as a
+// new one, a start that would clash with another date of the event is refused, and every change is logged.
+const EVENT_OCCURRENCE_TIME_FIELDS = ['start_time', 'end_time', 'ends_next_day'];
+function setEventOccurrenceTimes(eventId, occId, times, meta) {
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  if (!isPlainObject(times) || !EVENT_OCCURRENCE_TIME_FIELDS.some((k) => Object.prototype.hasOwnProperty.call(times, k))) {
+    return eventFail('occurrence_times_required', `give at least one of ${EVENT_OCCURRENCE_TIME_FIELDS.join(', ')}`);
+  }
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  if (!event) return eventFail('event_not_found', eventId);
+  const occ = db.prepare('SELECT * FROM event_occurrences WHERE id = ? AND event_id = ?').get(occId, eventId);
+  if (!occ) return eventFail('occurrence_not_found', occId);
+  const next = {
+    start_date: occ.start_date, end_date: occ.end_date, all_day: occ.all_day, status: occ.status,
+    start_time: occ.start_time, end_time: occ.end_time, ends_next_day: occ.ends_next_day,
+  };
+  for (const k of EVENT_OCCURRENCE_TIME_FIELDS) if (Object.prototype.hasOwnProperty.call(times, k)) next[k] = isNullish(times[k]) ? (k === 'ends_next_day' ? 0 : null) : times[k];
+  const err = validateEventOccurrence(next, 0);
+  if (err) return err;
+  if (next.start_time !== occ.start_time
+    && db.prepare('SELECT 1 FROM event_occurrences WHERE event_id = ? AND id <> ? AND start_date = ? AND start_time IS ?').get(eventId, occId, occ.start_date, next.start_time)) {
+    return eventFail('duplicate_occurrence', `${occ.start_date} ${next.start_time || ''}`.trim());
+  }
+  const changes = EVENT_OCCURRENCE_TIME_FIELDS.filter((k) => next[k] !== occ[k]);
+  if (!changes.length) return { ok: true, changed: false, occurrence: rowToEventOccurrence(occ) };
+  const logMeta = { ...meta, source: meta.source || event.source_name, confidence: event.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    db.prepare('UPDATE event_occurrences SET start_time = ?, end_time = ?, ends_next_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(next.start_time, next.end_time, next.ends_next_day, occId);
+    for (const k of changes) logEventChange(eventId, occId, k, occ[k] == null ? null : String(occ[k]), next[k] == null ? null : String(next[k]), logMeta);
+    recomputeEventSpan(eventId);
+    db.exec('COMMIT');
+    txOpen = false;
+  } catch (e) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw e;
+  }
+  return { ok: true, changed: true, occurrence: rowToEventOccurrence(db.prepare('SELECT * FROM event_occurrences WHERE id = ?').get(occId)) };
+}
+
 // setEventOccurrenceStatus(eventId, occId, status, meta): cancel /
 // postpone / restore one date. Cancelling or postponing the LAST scheduled
 // occurrence of a scheduled event is refused ('last_occurrence') unless the
@@ -3560,8 +3610,15 @@ function whatsOnPublicOccurrence(o) {
 // Public single-event shape: the card fields for the event's *next* window
 // (from today, no upper bound needed -- the rolling default) plus its
 // scheduled occurrences. Not the detail page (Step 5); just the data.
-function whatsOnPublicEventDetail(event) {
+function whatsOnPublicEventDetail(event, now = new Date()) {
   const occs = listEventOccurrences(event.id, { includeCancelled: false });
+  // Round 9 (2026-10-19): the date and time labels describe the dates still to come in the list API's default window
+  // (the next 90 days), as /api/events does; the past dates of a weekly market said "next Thu Sep 24" in October.
+  // An event with nothing left shows its later dates, else (all over) every date as before.
+  const today = todayLocal(now);
+  const upcoming = occs.filter((o) => o.end_date >= today);
+  const inWindow = upcoming.filter((o) => o.start_date <= addLocalDays(today, WHATSON_DEFAULT_WINDOW_DAYS));
+  const labelOccs = inWindow.length ? inWindow : upcoming.length ? upcoming : occs;
   const venue = event.venue_id ? getVenue(event.venue_id) : null;
   return {
     id: event.id, name: event.name, slug: event.slug, region: event.region, valleyWide: event.valley_wide === 1,
@@ -3569,7 +3626,7 @@ function whatsOnPublicEventDetail(event) {
     website: event.website || null, recurrence: event.recurrence_rule || null, status: event.status,
     venueName: venue ? venue.name : (event.venue_name_text || null),
     attribution: EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) ? null : event.source_name,
-    dateLabel: whatsOnDateLabel(event, occs), time: whatsOnTimeLabel(occs),
+    dateLabel: whatsOnDateLabel(event, labelOccs), time: whatsOnTimeLabel(labelOccs),
     occurrences: occs.map(whatsOnPublicOccurrence),
   };
 }
@@ -4259,7 +4316,9 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(),
   };
   // Search pass 5 (2026-10-19), additive: What's On events whose name or description has the words ("cider fest",
   // "corn maze"), for a place search with free-text words. Only present when some event matches.
-  const textEvents = intent.mode === 'events' ? null : searchTextEvents(intent, now);
+  // Round 9 (2026-10-19): "live music" / « musique live » also lists the gigs coming up, beside the places.
+  const topic = intent.mode === 'events' ? null : searchEventTopicFor(smartFold(text), intent);
+  const textEvents = intent.mode === 'events' ? null : topic && topic.keepPlaces ? searchTopicEvents(topic, intent.regions, now) : searchTextEvents(intent, now);
   // The full event cards, for the /search page (not part of the JSON).
   if (textEvents) Object.defineProperty(run, 'textEvents', { value: textEvents, enumerable: false });
   if (textEvents && textEvents.total) run.events = { total: textEvents.total, items: textEvents.items.slice(0, limit).map((e) => ({
@@ -4463,7 +4522,14 @@ const FR_SEARCH_SYNONYMS = [
   ['ski de randonnee nordique', 'cross country skiing'], ['ski nordique', 'nordic skiing'], ['sentiers de ski de fond', 'cross country skiing'], ['pistes de ski de fond', 'cross country skiing'],
   // indoors and events
   ['musee', 'museum'], ['galerie d art', 'art gallery'], ['salle d evasion', 'escape room'], ['jeu d evasion', 'escape room'], ['quilles', 'bowling'], ['salle de quilles', 'bowling'],
-  ['karting', 'go karts'], ['spectacle', 'show'], ['musique en direct', 'live music'], ['humour', 'comedy'], ['visite guidee', 'guided tour'], ['atelier', 'workshop'],
+  ['karting', 'go karts'], ['spectacle', 'shows'], ['musique en direct', 'live music'], ['humour', 'comedy'], ['visite guidee', 'guided tour'], ['atelier', 'workshop'],
+  // Round 9 (2026-10-19): shows, comedy, theatre and music found nothing, or fruit stands for "stand-up". « spectacle »
+  // is any show (it read as the verb "show"); comedy words read as comedy; the rest as the English the search reads.
+  ['spectacles', 'shows'], ['un spectacle', 'shows'], ['show', 'shows'], ['un show', 'shows'], ['comedie', 'comedy'], ['humoriste', 'comedian'], ['humoristes', 'comedians'],
+  ['spectacle d humour', 'comedy'], ['spectacles d humour', 'comedy'], ['soiree d humour', 'comedy'], ['soirees d humour', 'comedy'], ['stand up', 'comedy'], ['standup', 'comedy'],
+  ['comedie musicale', 'musical'], ['comedies musicales', 'musicals'], ['piece de theatre', 'theatre show'], ['pieces de theatre', 'theatre show'],
+  ['musique live', 'live music'], ['musique classique', 'classical music'], ['concert classique', 'classical music'], ['concerts classiques', 'classical music'],
+  ['orchestre symphonique', 'symphony'], ['orchestre', 'orchestra'], ['symphonie', 'symphony'], ['source chaude', 'hot springs'], ['sources chaudes', 'hot springs'],
 ];
 const FR_SEARCH_SYNONYM_MAP = (() => {
   const m = new Map();
@@ -4546,27 +4612,32 @@ function searchTypoFix(text) {
   const { targets, known } = searchTypoTargets();
   const corrections = [];
   const out = parts.map((p) => {
-    const w = frSearchFold(p);
-    if (w.length < 5 || !/^[a-z]+$/.test(w) || known.has(w)) return p;
-    const max = w.length >= 8 ? 2 : 1;
-    let best = max + 1, hits = [];
-    for (const t of targets) {
-      if (t[0] !== w[0] || Math.abs(t.length - w.length) > max) continue;
-      const d = smartEditDistance(w, t, max);
-      if (d > max) continue;
-      if (d < best) { best = d; hits = [t]; } else if (d === best) hits.push(t);
-    }
-    // Two equally close words: only the same word in the singular and the plural ("pumkins" -> pumpkins over pumpkin).
-    if (hits.length > 1) {
-      const one = (a, b) => a === b || [`${a}s`, `${a}es`, a.replace(/y$/, 'ies')].includes(b) || [`${b}s`, `${b}es`, b.replace(/y$/, 'ies')].includes(a);
-      if (!hits.every((h) => one(h, hits[0]))) return p;
-      hits.sort((a, b) => Math.abs(a.length - w.length) - Math.abs(b.length - w.length) || a.length - b.length);
-    }
-    if (!hits.length) return p;
-    corrections.push({ from: p, to: hits[0] });
-    return hits[0];
+    const t = searchTypoWord(frSearchFold(p), targets, (w) => known.has(w));
+    if (!t) return p;
+    corrections.push({ from: p, to: t });
+    return t;
   });
   return corrections.length ? { text: out.join(' '), corrections } : { text: raw, corrections };
+}
+// One folded word -> the word it nearly spells, or null (the rules above). Round 9 (2026-10-19): on its own so /map runs
+// the very same correction in the browser (MAP_PAGE_SCRIPT inlines it with smartEditDistance); keep it self-contained.
+function searchTypoWord(w, targets, isKnown) {
+  if (w.length < 5 || !/^[a-z]+$/.test(w) || isKnown(w)) return null;
+  var max = w.length >= 8 ? 2 : 1, best = max + 1, hits = [];
+  for (var i = 0; i < targets.length; i++) {
+    var t = targets[i];
+    if (t[0] !== w[0] || Math.abs(t.length - w.length) > max) continue;
+    var d = smartEditDistance(w, t, max);
+    if (d > max) continue;
+    if (d < best) { best = d; hits = [t]; } else if (d === best) hits.push(t);
+  }
+  // Two equally close words: only the same word in the singular and the plural ("pumkins" -> pumpkins over pumpkin).
+  if (hits.length > 1) {
+    var one = function(a, b){ return a === b || [a + 's', a + 'es', a.replace(/y$/, 'ies')].indexOf(b) !== -1 || [b + 's', b + 'es', b.replace(/y$/, 'ies')].indexOf(a) !== -1; };
+    if (!hits.every(function(h){ return one(h, hits[0]); })) return null;
+    hits.sort(function(a, b){ return Math.abs(a.length - w.length) - Math.abs(b.length - w.length) || a.length - b.length; });
+  }
+  return hits.length ? hits[0] : null;
 }
 // Search phrases (2026-10-19, round 7), English and French alike (a French search reaches them through the list
 // above): a phrase whose words mean something else one by one, read as the word the listings use. "haunted house"
@@ -4580,6 +4651,15 @@ const SEARCH_PHRASE_REWRITES = [
   ['horse drawn sleigh rides', 'sleigh'], ['dog sled', 'sled'], ['dog sleds', 'sled'], ['dog sledding', 'sled'], ['dogsled', 'sled'], ['dogsledding', 'sled'],
   ['dog sled tour', 'sled'], ['dog sled tours', 'sled'], ['dog sled ride', 'sled'], ['dog sled rides', 'sled'], ['mushing', 'sled'],
   ['u pick', 'u-pick orchard'], ['upick', 'u-pick orchard'], ['u picks', 'u-pick orchard'], ['pick your own', 'u-pick orchard'],
+  // Round 9 (2026-10-19): "apple picking" listed a distillery and a bakery first; it means the U-picks.
+  ['apple picking', 'u-pick orchard'], ['pick apples', 'u-pick orchard'], ['fruit picking', 'u-pick orchard'], ['pick fruit', 'u-pick orchard'], ['cherry picking', 'u-pick orchard'],
+  ['pick cherries', 'u-pick orchard'], ['berry picking', 'u-pick orchard'], ['pick berries', 'u-pick orchard'], ['peach picking', 'u-pick orchard'], ['blueberry picking', 'u-pick orchard'],
+  ['strawberry picking', 'u-pick orchard'], ['pick your own apples', 'u-pick orchard'], ['pick your own fruit', 'u-pick orchard'],
+  // "stand-up" is comedy ("stand" listed every fruit stand), but stand-up paddling is paddleboarding; "xmas" is Christmas.
+  ['stand up', 'comedy'], ['standup', 'comedy'], ['stand up comedy', 'comedy'], ['standup comedy', 'comedy'], ['stand up comedian', 'comedian'], ['stand up comedians', 'comedians'],
+  ['stand up paddle', 'paddleboard'], ['stand up paddling', 'paddleboarding'], ['stand up paddleboard', 'paddleboard'], ['stand up paddleboarding', 'paddleboarding'],
+  ['stand up paddle board', 'paddleboard'], ['stand up paddle boarding', 'paddleboarding'],
+  ['xmas', 'christmas'], ['x mas', 'christmas'], ['xmas market', 'christmas market'], ['xmas markets', 'christmas market'],
 ];
 const SEARCH_PHRASE_REWRITE_MAP = new Map(SEARCH_PHRASE_REWRITES);
 const SEARCH_PHRASE_REWRITE_MAX = Math.max(...SEARCH_PHRASE_REWRITES.map(([k]) => k.split(' ').length));
@@ -4950,6 +5030,13 @@ const SMART_ACTIVITIES = [
     re: /\bpumpkins?\b/i, guide: '/guides/fall-farms-u-pick-okanagan', events: true },
   { key: 'farmers_market', label: 'Farmers’ markets', labelFr: 'Marchés fermiers', words: ['farmers market', 'farmers markets', 'farmer s market', 'farmer s markets', 'farmers marketplace', 'farm market', 'farm markets'],
     re: /\bfarmers?['’]?s? ?markets?\b|\bfarm markets?\b/i, nameOnly: true, events: true, whatsOn: 'markets-fairs' },
+  // Round 9 (2026-10-19): "museum" / « musée » listed all 125 indoor places, and "theatre" / « théâtre » the same with no
+  // events. Each now lists its own places, and theatre its shows (eventTest: plays, musicals and comedy, not every
+  // concert that mentions a theatre).
+  { key: 'museum', label: 'Museums', labelFr: 'Musées', words: ['museum', 'museums', 'history museum', 'art museum', 'museums and galleries', 'museum and archives', 'musee', 'musees'],
+    re: /\bmuseums?\b|\bmus[ée]es?\b/i, types: ['indoor', 'outdoor', 'tour'], events: true },
+  { key: 'theatre', label: 'Theatre', labelFr: 'Théâtre', words: ['theatre', 'theatres', 'theater', 'theaters', 'live theatre', 'live theater', 'community theatre', 'theatre company', 'playhouse', 'theatre show', 'theatre shows', 'theater show', 'theater shows', 'a play'],
+    re: /\btheat(?:re|er)s?\b|\bplayhouse\b/i, types: ['indoor', 'outdoor', 'tour'], events: true, eventTest: (e) => searchShowKind(e) === 'theatre' || searchShowKind(e) === 'comedy', eventRank: (e) => (searchShowKind(e) === 'theatre' ? 2 : 1) },
 ];
 // Words that add nothing to an activity request ("escape rooms near me", "best go karts in kelowna").
 const SMART_ACTIVITY_GENERIC = ['in', 'near', 'me', 'the', 'a', 'an', 'okanagan', 'best', 'top', 'places', 'place', 'spots', 'spot', 'where', 'to', 'go', 'for', 'find', 'fun',
@@ -5028,7 +5115,8 @@ function searchWordIn(folded, word) {
 // What's On events (the next WHATSON_DEFAULT_WINDOW_DAYS) whose name or description has every word, best first: the
 // most words in the name, then the soonest. With three or more words and no event that has them all, the events
 // that miss only one. `test` (optional) is a plan's own rule (free events) and replaces the words.
-function searchEventsFor({ terms = [], regions = [], test = null, now = new Date() } = {}) {
+// rank (round 9, optional): with test, a score for each event that fits, best first (comedy before the other shows).
+function searchEventsFor({ terms = [], regions = [], test = null, rank = null, now = new Date() } = {}) {
   const words = uniqueList((terms || []).map(smartFold).filter(Boolean));
   if (!words.length && !test) return { total: 0, items: [] };
   const win = resolveWhatsOnWindow({}, now);
@@ -5036,7 +5124,7 @@ function searchEventsFor({ terms = [], regions = [], test = null, now = new Date
   const rows = [];
   for (const e of events) {
     const name = smartFold(e.name), text = `${name} ${smartFold(e.description || '')}`;
-    if (test) { if (test(e, text)) rows.push({ e, hits: 1, inName: 0 }); continue; }
+    if (test) { if (test(e, text)) rows.push({ e, hits: 1, inName: rank ? rank(e) : 0 }); continue; }
     const hits = words.filter((w) => searchWordIn(text, w)).length;
     rows.push({ e, hits, inName: words.filter((w) => searchWordIn(name, w)).length });
   }
@@ -5136,6 +5224,62 @@ function smartOpenNowPick(intent, now = new Date()) {
   return rows.filter((r) => info.openIds.has(r.id)).map((r) => ({ row: r, why: (info.byId.get(r.id) || {}).text || 'Open now', rank: 0 }));
 }
 
+// ---------- Search round 9 (2026-10-19): shows, classical music, live music and fireworks ----------
+// « spectacle » and "show" found nothing (or every exhibition and the haunted corn maze), "classical music" a curry
+// house, and "live music" places but none of the week's gigs. A show is a performance listing: comedy, theatre, a
+// concert, magic or a tribute, never a tour, exhibition, class, market, fair or maze.
+const SEARCH_COMEDY_RE = /\b(?:comed(?:y|ies|ian|ians|ic)|stand[- ]?up(?![- ]paddl)|improv(?:ised|isation)?|laughs?)\b/i;
+const SEARCH_NOT_SHOW_RE = /\b(?:tours?|exhibitions?|exhibits?|workshops?|class(?:es)?|lectures?|talks?|markets?|bazaars?|museums?|gallery|galleries|art shows?|crafts?|sales?|fairs?|maze|haunted|trails?|pumpkins?|members show)\b/i;
+const SEARCH_THEATRE_RE = /\b(?:theatre|theater|musicals?|panto(?:mime)?|ballet|opera|cabaret|playhouse|a play|the play)\b/i;
+const SEARCH_SHOW_NAME_RE = /\b(?:shows?|performances?|concerts?|tribute|magic(?:ian)?|drag|burlesque|circus|symphony|orchestra|live)\b/i;
+const SEARCH_CLASSICAL_RE = /\b(?:symphon\w*|orchestra\w*|classical|chamber (?:music|choir|orchestra)|string quartet|quartets?|choirs?|choral|recitals?|philharmoni\w*|baroque|operas?|concertos?|sonatas?)\b/i;
+// 'comedy', 'theatre', 'music' or 'show' for a performance, else null.
+function searchShowKind(e) {
+  const name = String(e.name || ''), desc = String(e.description || ''), cats = e.categories || [];
+  // A comedy tour is a show; a comedy class is not.
+  if (SEARCH_COMEDY_RE.test(name) && !/\b(?:workshops?|class(?:es)?|lessons?)\b/i.test(name)) return 'comedy';
+  if (SEARCH_NOT_SHOW_RE.test(name)) return null;
+  if (SEARCH_COMEDY_RE.test(desc.slice(0, 240))) return 'comedy';
+  if (SEARCH_THEATRE_RE.test(name) || /\b(?:a play|the play|musical|stage production|on stage|playwright)\b/i.test(desc)) return 'theatre';
+  // An exhibition or an open house listed under Arts & Culture is not a show.
+  if (/\b(?:exhibitions?|exhibits?|open house)\b/i.test(desc) && !SEARCH_SHOW_NAME_RE.test(name)) return null;
+  if (cats.includes('live-music') || /\b(?:concerts?|symphony|orchestra|live music|band)\b/i.test(name)) return 'music';
+  return SEARCH_SHOW_NAME_RE.test(name) || (cats.includes('arts-culture') && /\b(?:perform\w*|show)\b/i.test(desc)) ? 'show' : null;
+}
+// keepPlaces: the place search stays as it is ("live music" lists the places with live music) and these events come
+// with it; otherwise /search lists these events alone, under heading.
+const SEARCH_EVENT_TOPICS = [
+  { key: 'shows', heading: 'Shows', headingFr: 'Spectacles',
+    words: ['show', 'shows', 'a show', 'the show', 'live show', 'live shows', 'stage show', 'stage shows', 'performance', 'performances', 'live performance', 'live performances',
+      'musical', 'musicals', 'spectacle', 'spectacles', 'un spectacle', 'magic show', 'magic shows'],
+    test: (e) => !!searchShowKind(e), rank: (e) => ({ comedy: 4, theatre: 3, show: 2, music: 1 })[searchShowKind(e)] || 0,
+    emptyText: 'No shows are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun spectacle n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
+  { key: 'classical', heading: 'Classical music', headingFr: 'Musique classique',
+    words: ['classical', 'classical music', 'classical concert', 'classical concerts', 'symphony', 'symphonies', 'symphony orchestra', 'orchestra', 'orchestras', 'chamber music', 'string quartet',
+      'choir', 'choirs', 'choral', 'opera', 'recital', 'recitals'],
+    test: (e) => SEARCH_CLASSICAL_RE.test(`${e.name || ''} ${e.description || ''}`), rank: (e) => (SEARCH_CLASSICAL_RE.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No classical concerts are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun concert classique n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
+  { key: 'fireworks', heading: 'Fireworks', headingFr: 'Feux d’artifice', words: ['fireworks', 'firework', 'fireworks show', 'fireworks display', 'fireworks displays'],
+    test: (e) => /\bfireworks?\b|\bfeux d['’]artifice\b/i.test(`${e.name || ''} ${e.description || ''}`), rank: (e) => (/\bfireworks?\b/i.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No fireworks are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun feu d’artifice n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
+  { key: 'live_music', keepPlaces: true, words: ['live music', 'live band', 'live bands', 'live entertainment', 'gig', 'gigs'],
+    test: (e) => searchShowKind(e) === 'music' || ((e.categories || []).includes('live-music') && searchShowKind(e) !== 'comedy'), rank: (e) => (/\blive music\b|\bband\b/i.test(String(e.name || '')) ? 1 : 0) },
+];
+// The topic a request is about, when its words are only that topic (plus a town and words like "events" or "in").
+function searchEventTopicFor(folded, intent) {
+  if (!folded || !intent || intent.when || (intent.types || []).length || (intent.cuisines || []).length || (intent.collections || []).length || hasDiscoveryExclusion(intent.excluded)) return null;
+  for (const topic of SEARCH_EVENT_TOPICS) {
+    if (!smartHas(folded, topic.words)) continue;
+    if (!topic.keepPlaces && (intent.features || []).length) continue;
+    if (topic.keepPlaces && (intent.features || []).some((f) => f !== 'live_music')) continue;
+    if (!smartTopicWords(folded, intent, [...topic.words, ...SMART_EVENT_GENERIC, 'music', 'musique']).length) return topic;
+  }
+  return null;
+}
+function searchTopicEvents(topic, regions, now = new Date()) {
+  return searchEventsFor({ regions, test: topic.test, rank: topic.rank, now });
+}
+
 // The plan for a request, or null to keep the routing above:
 //   { key, url } -> send the visitor straight to that page
 //   { key, list() } -> /search shows exactly that list (heading, headingFr)
@@ -5167,12 +5311,27 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
         headingFr: `${activity.labelFr}${town ? ` à ${town}` : ''}`,
         guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
         list: pick,
-        ...(activity.events ? { events: () => searchEventsFor({ regions: R, test: (e) => activity.re.test(`${e.name || ''} ${e.description || ''}`), now }) } : {}),
+        ...(activity.events ? { events: () => searchEventsFor({ regions: R, test: activity.eventTest || ((e) => activity.re.test(`${e.name || ''} ${e.description || ''}`)), rank: activity.eventRank || null, now }) } : {}),
       };
     }
     if (guide && !F.length) return { key: `${activity.key}_guide`, url: guide.path };
     // No place by that name (farmers' markets are events): What's On's markets for the town.
     if (activity.whatsOn && !F.length) return { key: activity.key, url: `/whats-on${discoveryQueryString({ regions: R, categories: [activity.whatsOn] })}` };
+  }
+
+  // Round 9 (2026-10-19): shows, classical music and fireworks are events, not places: /search lists those events.
+  const eventTopic = searchEventTopicFor(folded, intent);
+  if (eventTopic && !eventTopic.keepPlaces) {
+    const comedyGuide = eventTopic.key === 'shows' ? liveGuides().find((g) => g.path === '/guides/okanagan-comedy-shows') : null;
+    return {
+      key: `topic_${eventTopic.key}`,
+      heading: `${eventTopic.heading}${town ? ` in ${town}` : ''}`,
+      headingFr: `${eventTopic.headingFr}${town ? ` à ${town}` : ''}`,
+      emptyText: eventTopic.emptyText, emptyTextFr: eventTopic.emptyTextFr,
+      guides: comedyGuide ? [{ path: comedyGuide.path, heading: comedyGuide.heading }] : [],
+      list: () => [],
+      events: () => searchTopicEvents(eventTopic, R, now),
+    };
   }
 
   // Search pass 5 (2026-10-19): "open now" -> what is open right now (Food & Drink types alone keep their own page's
@@ -5532,6 +5691,13 @@ function searchEventsHtml(model, lang) {
     </ul>${more}
   </section>`;
 }
+const SEARCH_ADULT_TYPES = new Set(['winery', 'brewery', 'distillery', 'pub', 'cocktail']);
+// A request for nothing but kids or dogs welcome (and maybe a town).
+function searchPartyOnly(intent) {
+  const f = (intent && intent.features) || [];
+  return !!f.length && f.every((x) => x === 'kid_friendly' || x === 'dog_friendly') && !(intent.types || []).length && !(intent.cuisines || []).length
+    && !(intent.textTerms || []).length && !(intent.collections || []).length && !(intent.activities || []).length;
+}
 function searchPageModel(run, now = new Date(), lang = 'en') {
   // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
   // from (a French search goes through the planner's French words first, see discoverySearchText).
@@ -5564,6 +5730,9 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
       if (text) why.set(v.id, text);
     }
   }
+  // Round 9 (2026-10-19): "kid friendly" or « avec chien » alone listed wineries first. The places for the whole party
+  // come first; wineries, breweries, distilleries, pubs and lounges follow in their own order.
+  if (!(plan && plan.list) && searchPartyOnly(run.intent)) venues = [...venues.filter((v) => !SEARCH_ADULT_TYPES.has(v.type)), ...venues.filter((v) => SEARCH_ADULT_TYPES.has(v.type))];
   // Search pass 5 (2026-10-19): a place whose name holds the words typed comes first ("19 bistro" -> 19 Bistro @ Fitz).
   if (!(plan && plan.list) && run.results.kind !== 'events') {
     const named = smartNameMatches(sq, run.intent);
@@ -5706,7 +5875,8 @@ function renderSearchSimplePage(model, lang) {
   if (model.plan && model.plan.events && model.events.items.length) {
     // Search pass 5 (2026-10-19): a plan's own events ("free events").
     resultsHtml = searchEventsHtml(model, lang);
-  } else if (run.results.kind === 'events' && items.length) {
+  } else if (run.results.kind === 'events' && items.length && !(model.plan && model.plan.events)) {
+    // (Round 9: a plan with its own events and none on yet says so, rather than listing every event.)
     resultsHtml = `<p class="search-count">${fr ? `${total} événement${total === 1 ? '' : 's'}${total > items.length ? `, voici les ${items.length} premiers` : ''}` : `${total} event${total === 1 ? '' : 's'}${total > items.length ? `, showing the first ${items.length}` : ''}`}</p>
   <ul class="card-grid">${items.map((e) => `
     <li class="category-card"><h2>${e.url ? `<a href="${esc(e.url)}">${esc(e.name)}</a>` : esc(e.name)}</h2>
@@ -6003,9 +6173,11 @@ function parseTripPlanBody(body) {
     const w = body.swap;
     // id (round 7): the place being swapped out, kept with a note when nothing else fits.
     // locked (round 8): the stops the visitor locked; the other pins only keep the plan steady and may give way.
-    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
-      || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"] }.' };
-    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}) };
+    // times (round 9, 2026-10-19): the start of each shown stop, so a Swap keeps every other stop's time of day.
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
+      || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))
+      || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => TRIP_PLAN_PIN_RE.test(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
+    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}) };
   }
   return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap } };
 }
@@ -6213,8 +6385,10 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // Calendar dates are handled by requirements, not mistaken for a day count.
   const requirementModule = require('./trip-requirements');
   const calendar = requirementModule.tripCalendar(planText, todayLocal(now));
-  let interpretationText = requirementModule.sportsVenueInterpretationText(calendar.cleanText, taxonomy);
-  let requirementsText = planText;
+  // Round 9 (2026-10-19): « soirée spectacle » / "a show on Saturday night" is dinner and a show, like "dinner and a show".
+  const showEvening = tripPlannerModule().showEveningText;
+  let interpretationText = requirementModule.sportsVenueInterpretationText(showEvening(calendar.cleanText), taxonomy);
+  let requirementsText = showEvening(planText);
   let namedEventAmbiguity = null;
   const eventChoiceDate = overrides?.startDate || calendar.startDate;
   let namedEventCandidates = [];
@@ -6226,7 +6400,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     interpretationText = detected.text;
     namedEventAmbiguity = detected.ambiguity;
     namedEventCandidates = detected.ambiguity ? listed.filter(e => detected.ambiguity.candidateIds.includes(e.id)) : [];
-    requirementsText = requirementModule.namedEventInterpretationText(planText, listed);
+    requirementsText = requirementModule.namedEventInterpretationText(showEvening(planText), listed);
   }
   let selectedNamedEvent = null;
   if (overrides?.eventId !== undefined) {
@@ -6243,6 +6417,12 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
   let trip = discoveryIntentModule().interpretTripComponents(interpretationText, taxonomy, intent);
+  // Round 9: dinner and a show with no town is planned in Kelowna, where most shows are (it was West Kelowna, or a
+  // haunted corn maze in Vernon); the Where chip can change it.
+  if (!(intent.regions || []).length && trip.multi && !trip.route && trip.components.some((c) => c.kind === 'event' && c.event && ['show', 'performance', 'comedy'].includes(c.event.kind)) && trip.components.some((c) => c.meal)) {
+    intent.regions = ['kelowna'];
+    trip.regions = ['kelowna'];
+  }
   const extracted = requirementModule.extractTripRequirements({ text: requirementsText, intent, trip, taxonomy, referenceDate:todayLocal(now) });
   // "Wine tour" means wineries unless a tour company or shuttle was asked for (2026-10-18); planTrip applies it too.
   tripPlannerModule().applyWineTourMeaning(requirementsText, intent, extracted);
@@ -6470,6 +6650,23 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   return plan;
 }
 
+// French plan links (round 9, 2026-10-19): every place and event in a plan also carries its /fr page (urlFr) when it has
+// one, so /fr/trip links to French pages (it used safeUrl(v.url), the English page). Places without a French page keep
+// only url.
+function withTripFrenchUrls(plan) {
+  const seen = new Set();
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 8 || seen.has(o)) return;
+    seen.add(o);
+    if (Array.isArray(o)) { for (const x of o) walk(x, depth + 1); return; }
+    if (typeof o.url === 'string' && /^\/(?!\/|fr\/)/.test(o.url) && typeof o.name === 'string' && o.urlFr === undefined) {
+      try { const fr = frHref(o.url); if (fr && fr !== o.url) o.urlFr = fr; } catch (e) { /* English page only */ }
+    }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') walk(o[k], depth + 1);
+  };
+  walk(plan, 0);
+  return plan;
+}
 // ---------- Temporary-condition advisories (2026-09-19) ----------
 // A venue's permanent, verified facts live in its description. Temporary
 // conditions -- a swimming advisory, a partial wildfire closure, a
@@ -6922,7 +7119,8 @@ function recurringSeasonRow(venueId, openMonths, today) {
   return { venue_id: venueId, status: 'closed', until_date: null, reopens_date: reopens, source_url: null, checked_at: closedFrom };
 }
 
-function getSeasonRows() {
+// today (round 9): the date a recurring owner season is judged from (a planned stop's date on My Trip).
+function getSeasonRows(today = todayLocal()) {
   const map = new Map();
   for (const r of db.prepare(`
     SELECT s.venue_id, s.status, s.until_date, s.reopens_date, s.source_url, s.checked_at
@@ -6930,7 +7128,6 @@ function getSeasonRows() {
     WHERE v.redirect_to IS NULL
   `).all()) map.set(r.venue_id, r);
   // Owners' yearly seasons, where no dated closure has been set by hand.
-  const today = todayLocal();
   for (const r of db.prepare(`SELECT l.venue_id, l.open_months FROM venue_links l JOIN venues v ON v.id = l.venue_id
     WHERE l.open_months IS NOT NULL AND v.redirect_to IS NULL`).all()) {
     if (map.has(r.venue_id)) continue;
@@ -11021,6 +11218,11 @@ function renderHomepageDiscoveryStyles() {
     .hero-search-box { max-width: 100%; padding: 5px 5px 5px 16px; }
     .hero-search-field input { padding: 7px 0; }
     .hero-search-box button { height: 38px; padding: 0 20px; }
+    /* Tap targets (2026-10-19, round 9): the field and the button are 44px tall; the box's padding shrinks to match,
+       so the box stays 48px. */
+    .hero-search-box { padding: 2px 2px 2px 16px; }
+    .hero-search-field input { min-height: 44px; padding: 0; }
+    .hero-search-box button { height: 44px; }
     .hero-search-faux-sub { display: none; }
   }
 
@@ -11460,6 +11662,8 @@ const SEO_PAGE_CSS = `
     html body nav.category-region-selector { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 6px; }
     html body nav.category-region-selector::-webkit-scrollbar { display: none; }
     html body nav.category-region-selector a, html body nav.category-region-selector .category-region-selector-active { flex: none; white-space: nowrap; }
+    /* Tap targets (2026-10-19, round 9): the town and category chips are 44px tall on phones (they were 33px). */
+    html body nav.category-region-selector a, html body nav.category-region-selector .category-region-selector-active { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; }
   }
 
   /* Back-link on a category's single-region page (e.g. /kelowna/golf)
@@ -12559,7 +12763,9 @@ const BANNER_HERO_HOLD_HEAD = `<style id="hero-first-cards">html.hf li.venue-car
 function withBannerHeroFirst(html) {
   if (typeof html !== 'string' || html.indexOf('window.roamAfterHero = ') !== -1) return html;
   const body = /<body class="([^"]*)"/.exec(html);
-  if (!body || !/(^|\s)fd-page(\s|$)/.test(body[1])) return html;
+  // Round 9 (2026-10-19): the guides (body.ski-guide-page) and /whats-on (body.whatson-page) too. Their banners sent
+  // phones the 1200px or 1600px photo (352 KB on /guides/fall-okanagan); they get the same 800px phone <source>.
+  if (!body || !/(^|\s)(?:fd-page|ski-guide-page|whatson-page)(\s|$)/.test(body[1])) return html;
   const m = BANNER_HERO_IMG_RE.exec(html);
   if (!m || !/<meta name="viewport"[^>]*>/i.test(html)) return html;
   const [whole, open, img, , srcset, sizes] = m;
@@ -13151,13 +13357,15 @@ function imageHashes(url) {
   const now = Date.now();
   const memo = imageVersionMemo.get(url);
   if (memo && now - memo.at < 60000) return memo.h ? memo : null;
+  // Round 9 (2026-10-19): owner and visitor uploads (and their smaller copies) are on the volume, not in public/.
+  const file = uploadedPhotoFilePath(url) || path.join(__dirname, 'public', url);
   let st;
-  try { st = fs.statSync(path.join(__dirname, 'public', url)); } catch (e) { imageVersionMemo.set(url, { h: null, at: now }); return null; }
+  try { st = fs.statSync(file); } catch (e) { imageVersionMemo.set(url, { h: null, at: now }); return null; }
   if (!st.isFile()) return null;
   if (memo && memo.h && memo.size === st.size && memo.mtime === st.mtimeMs) { memo.at = now; return memo; }
   let h = null, sha = null;
   try {
-    const buf = fs.readFileSync(path.join(__dirname, 'public', url));
+    const buf = fs.readFileSync(file);
     h = crypto.createHash('md5').update(buf).digest('hex');
     sha = crypto.createHash('sha256').update(buf).digest('hex');
   } catch (e) { /* unreadable: leave the URL plain */ }
@@ -13287,7 +13495,10 @@ function restLinksHtml(kind, inner, lang, shown = '') {
   const summary = events
     ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `More upcoming events (${n})`)
     : (fr ? `Toutes les adresses de cette page, de A \u00e0 Z (${n})` : `All places on this page, A\u2013Z (${n})`);
-  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"${n ? '' : ' hidden'}><summary>${summary}</summary><ul>${links.map((l) => `<li${l.off ? ' hidden' : ''}><a href="${l.href}">${escapeHtml(l.name)}</a>`).join('')}</ul></details>`;
+  // Round 9 (2026-10-19): a link the filters hide carries its address as data-href, not href, so a type page
+  // (/whats-on/sports-recreation) no longer links every other type's events to crawlers (Bunnicula showed up on the
+  // sports and food & drink pages); the filter script restores href when a visitor's filters show the event.
+  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"${n ? '' : ' hidden'}><summary>${summary}</summary><ul>${links.map((l) => `<li${l.off ? ' hidden' : ''}><a ${l.off ? 'data-href' : 'href'}="${l.href}">${escapeHtml(l.name)}</a>`).join('')}</ul></details>`;
 }
 // Venue JSON (2026-10-18): the filter data of a list page (#fdVenueData,
 // #bhVenueData) was 0.3-0.5 MB of every page view, mostly search words, and
@@ -13954,7 +14165,7 @@ function renderOutdoorsSimplifiedStyles() {
 
   body.outdoor-page .outdoors-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.outdoor-page .outdoors-pop { position: relative; }
-  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.outdoor-page .outdoors-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.outdoor-page .outdoors-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.outdoor-page .outdoors-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.outdoor-page .outdoors-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -15309,6 +15520,9 @@ const PHOTO_SIZE_FILES = (() => {
   return set;
 })();
 function photoSized(src, width) {
+  // Owner uploads (2026-10-19, round 9): their copies are on the volume (see OWNER_PHOTO_SIZES), checked per file.
+  const own = /^\/images\/owner\/([a-z0-9]{24})\.jpg(?:\?[^#]*)?$/.exec(String(src || ''));
+  if (own) return ownerPhotoHasCopy(`${own[1]}.jpg`, width) ? `/images/owner/${own[1]}-w${width}.jpg` : src;
   const m = /^(\/images\/(?:venues|hiking\/venues|beaches\/venues|sports\/venues)\/[^?#]+?)\.(?:jpe?g|png|webp)(\?[^#]*)?$/i.exec(String(src || ''));
   if (!m) return src;
   const sized = `${m[1]}-w${width}.jpg`;
@@ -16137,7 +16351,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-st.is-open { color: #166534; }
   body.map-page .pm-st.is-closed { color: #92400E; }
   body.map-page .pm-acts { display: flex; gap: 8px; padding: 0 14px 12px; }
-  body.map-page .pm-dir, body.map-page .pm-link { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 999px; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
+  body.map-page .pm-dir, body.map-page .pm-link { display: inline-flex; align-items: center; min-height: 44px; /* round 9: 44px tap targets */ padding: 0 16px; border-radius: 999px; font-weight: 800; font-size: 0.88rem; text-decoration: none; }
   body.map-page .pm-dir { background: #1D4ED8; color: #fff; }
   body.map-page .pm-dir:hover { background: #1E40AF; color: #fff; }
   body.map-page .pm-link { border: 1px solid rgba(27,43,58,0.25); color: var(--ink); }
@@ -16230,6 +16444,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
     micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
+    typoRead: function(f){ return 'Nous avons lu ' + f.map(function(x){ return '« ' + x.from + ' » comme « ' + x.to + ' »'; }).join(', ') + '.'; },
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Voici ce qui est près de vous.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
@@ -16256,6 +16471,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
     micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
+    typoRead: function(f){ return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; }).join(', ') + '.'; },
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Showing what’s near you.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
@@ -16405,8 +16621,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return out;
   }
   function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
-  function popupFor(p){ return '<div class="pm-pop"><a ' + hrefAttr(p.url) + '>' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" data-k="p' + p.ix + '" ' + hrefAttr(dirUrl(p.lat, p.lng, p.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
-  function popupForEvent(e){ return '<div class="pm-pop"><a ' + hrefAttr(e.url) + '>' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" data-k="e' + e.ix + '" ' + hrefAttr(dirUrl(e.lat, e.lng, e.venue || e.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  // French map (2026-10-19, round 9): on /fr/map a place's name and Détails open its French page (fu), and an event's
+  // its French page when it has one; the English page otherwise.
+  function popupFor(p){ return '<div class="pm-pop"><a ' + hrefAttr(p.fu || p.url) + '>' + esc(p.name) + '</a><small>' + esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '')) + '</small>' + statusHtml(statusOf(p)) + '<a class="pm-pop-dir" data-dir="place" data-k="p' + p.ix + '" ' + hrefAttr(dirUrl(p.lat, p.lng, p.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
+  function popupForEvent(e){ return '<div class="pm-pop"><a ' + hrefAttr(e.fu || e.url) + '>' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" data-k="e' + e.ix + '" ' + hrefAttr(dirUrl(e.lat, e.lng, e.venue || e.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
   // Messages show briefly over the map; tap one to hide it.
   var statusTimer = null;
   function setStatus(text, ms){ clearTimeout(statusTimer); statusEl.textContent = text || ''; statusEl.hidden = !text; if (text) statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
@@ -16540,12 +16758,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
         html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
-          + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.url) + '>' + esc(T.details) + '</a></div></li>';
+          + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
         var where = [x.venue, CONF.r[x.region], x.d != null && me ? T.km(x.d) : ''].filter(Boolean).join(' · ');
         html += '<li class="pm-item pm-event"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span><span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></button>'
-          + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" ' + hrefAttr(x.url) + '>' + esc(T.details) + '</a></div></li>';
+          + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       }
     });
     if (!listItems.length && (me || tab === 'events' || listOn)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(T.noEvents)) + '</li>';
@@ -17019,7 +17237,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live/g, ' music '],
     [/lake ?views?|vue sur le lac/g, ' lake '], [/close ?(by|to (me|us|here)|to)|near ?by|near (me|us|here)|nearest|closest|around here|près de moi|près d’ici|pas loin/g, ' nearme '], [/top rated|highly rated|well reviewed|best rated/g, ' top ']
   ];
-  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly free serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre ';
+  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly free serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre accepte acceptes acceptée acceptées accepté acceptés bienvenu bienvenus bienvenue bienvenues admis ';
   var WORD_TO = {};
   Object.keys(WORDS).forEach(function(k){ WORDS[k].split(' ').forEach(function(w){ WORD_TO[w] = k; }); });
   var TAG_RX = (CONF.tg || []).map(function(t, i){
@@ -17110,7 +17328,37 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return FS && !english ? frWords(words) : words;
   }
   function special(w){ var c = w.charAt(0); return c === '#' || c === '@' || c === '$' || c === '^' || w.indexOf('~r:') === 0; }
-  function hasWords(v){ return parseWords(v).some(function(w){ return WORD_TO[w] || special(w); }); }
+  function hasWords(v){ return parseWords(fixTypos(v).text).some(function(w){ return WORD_TO[w] || special(w); }); }
+  // Map typos (2026-10-19, round 9): the site search's own correction (searchTypoWord) onto the words this map reads, so
+  // "brewry" finds breweries and « vignobel » wineries. A word in a place's name, or one the map already reads, stays.
+  ${smartEditDistance.toString()}
+  ${searchTypoWord.toString()}
+  var TYPO = null;
+  function typoVocab(names){
+    var targets = {}, known = {};
+    function add(w){ var f = foldFr(w); if (f && f.indexOf(' ') === -1 && !targets[f]) targets[f] = w; }
+    function know(text, min){ foldFr(text).split(' ').forEach(function(w){ if (w && w.length >= (min || 1)) known[w] = 1; }); }
+    Object.keys(WORD_TO).forEach(add);
+    (CONF.tg || []).forEach(function(t){ t.s.split('|').forEach(function(w){ add(w); know(w); }); });
+    if (FS) Object.keys(FS).forEach(function(k){ add(k); know(k); });
+    Object.keys(CONF.r).forEach(function(k){ know(CONF.r[k]); });
+    know(STOP); know(NEG); Object.keys(targets).forEach(function(w){ known[w] = 1; });
+    names.forEach(function(p){ know(p.name, 5); });
+    return { list: Object.keys(targets).filter(function(w){ return w.length >= 5; }), orig: targets, known: known, n: names.length };
+  }
+  function fixTypos(v){
+    var names = (typeof places !== 'undefined' && places) || [];
+    if (!TYPO || TYPO.n !== names.length) TYPO = typoVocab(names);
+    var fixes = [], out = String(v || '').split(/\\s+/).map(function(tok){
+      var f = foldFr(tok);
+      if (!f || f.indexOf(' ') !== -1) return tok;
+      var t = searchTypoWord(f, TYPO.list, function(w){ return !!TYPO.known[w]; });
+      if (!t) return tok;
+      fixes.push({ from: tok, to: TYPO.orig[t] });
+      return TYPO.orig[t];
+    });
+    return { text: fixes.length ? out.join(' ') : String(v || ''), fixes: fixes };
+  }
   var wantNear = false;
   // While typing, the words are read on top of the filters as they were before typing began, so changing the words
   // changes the filters; Search (or the microphone) keeps them.
@@ -17145,7 +17393,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     SET_FIELDS.forEach(function(f){ if (d.f[f] && s[f] === d.f[f][1]) s[f] = d.f[f][0]; });
     restore(s);
   }
+  var lastFixes = [];
   function readSearch(v, typing){
+    var fx = fixTypos(v); v = fx.text; lastFixes = fx.fixes;
     if (typing) { if (!liveBase) { undoLastSearch(); liveBase = snapshot(); } restore(JSON.parse(JSON.stringify(liveBase))); }
     else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); }
     var before = snapshot();
@@ -17182,7 +17432,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
     // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
-    clearTimeout(timer); wantNear = false; radiusFixed = false; readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
+    // Round 9 (2026-10-19): each search starts from the usual 5 km and clears the last search's message, so "Not much
+    // right nearby, so this shows up to 25 km away" never stays on for a search that fits close by.
+    clearTimeout(timer); wantNear = false; radiusFixed = false; setStatus(''); readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
+    if (me && !radiusFixed && !town) radiusKm = 5;
+    if (lastFixes.length) setStatus(T.typoRead(lastFixes));
     track('map_search', { words: term ? 1 : 0, how: how || 'typed' }); changed();
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
@@ -17190,7 +17444,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   searchEl.addEventListener('keydown', function(e){ if (e.key !== 'Enter') return; e.preventDefault(); runSearch(searchEl.value); });
   // The search hint cycles through real examples the search understands (each fits beside the microphone on a phone),
   // and stops while the visitor is typing or the box has words in it.
-  var HINTS = FR ? ['Ex. « terrasse chiens OK »', 'Ex. « glace près de moi »', 'Ex. « sushi à Penticton »', 'Ex. « happy hour »', 'Ex. « brunch demain »', 'Ex. « vignobles à Oliver »', 'Ex. « pizza et bière »', 'Ex. « végane près de moi »']
+  var HINTS = FR ? ['Ex. « terrasse, chiens acceptés »', 'Ex. « glace près de moi »', 'Ex. « sushi à Penticton »', 'Ex. « happy hour »', 'Ex. « brunch demain »', 'Ex. « vignobles à Oliver »', 'Ex. « pizza et bière »', 'Ex. « végane près de moi »']
     : ['Try “dog-friendly patio”', 'Try “ice cream near me”', 'Try “sushi in Penticton”', 'Try “happy hour now”', 'Try “brunch tomorrow”', 'Try “cheap eats open late”', 'Try “wineries in Oliver”', 'Try “live music tonight”', 'Try “pizza and craft beer”', 'Try “vegan food near me”'];
   var hintAt = 0;
   setInterval(function(){ if (document.hidden || searchEl.value || document.activeElement === searchEl) return; hintAt = (hintAt + 1) % HINTS.length; searchEl.placeholder = HINTS[hintAt]; }, 3500);
@@ -17288,12 +17542,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
     events = []; d.e.forEach(function(a){
-      var e = { ix: events.length, name: a[0], url: a[1], region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], d: null };
+      var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], d: null };
       if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(pmPopup(function(){ return popupForEvent(e); }));
       events.push(e);
     });
@@ -17457,7 +17711,7 @@ function mapPlacesData(now = new Date()) {
   });
 }
 // Events in the next week, one entry each (its next date):
-// [name, url, region, venue name, lat, lng, startDate, startTime, endDate, endTime, allDay].
+// [name, url, region, venue name, lat, lng, startDate, startTime, endDate, endTime, allDay, hasFrenchPage].
 // lat/lng only through the event's own venue link; an event without one is listed, never pinned.
 function mapEventsData(now = new Date()) {
   const today = todayLocal(now);
@@ -17493,7 +17747,9 @@ function mapEventsData(now = new Date()) {
     if (!venue && r.venue_name_text) venue = nameMatch(r.venue_name_text, r.region);
     const pin = venue && Number.isFinite(Number(venue.latitude)) && Number.isFinite(Number(venue.longitude)) && venue.latitude !== null && venue.longitude !== null && !(Number(venue.latitude) === 0 && Number(venue.longitude) === 0);
     out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), pin ? mapRound(venue.latitude) : null, pin ? mapRound(venue.longitude) : null,
-      r.start_date, r.start_time || '', r.end_date, r.end_time || '', r.all_day ? 1 : 0]);
+      r.start_date, r.start_time || '', r.end_date, r.end_time || '', r.all_day ? 1 : 0,
+      // [11] 1 when the event has a French page (round 9, 2026-10-19), so /fr/map links to it.
+      hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0]);
   }
   return out;
 }
@@ -17503,6 +17759,11 @@ function mapLiveData(now = new Date()) {
   const json = JSON.stringify({ p: mapPlacesData(now), e: mapEventsData(now) });
   mapDataCache = { version, json };
   return mapDataCache;
+}
+// The search's French words for /fr/map. Round 9 (2026-10-19): « marché » alone is the farmers' markets there, not
+// every place with Market in its name ("marché de Noël" and "marché fermier" keep their own longer phrases).
+function mapFrWords() {
+  return { ...Object.fromEntries(FR_SEARCH_SYNONYM_MAP), marche: 'farmers market', marches: 'farmers market' };
 }
 function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const count = placeCount == null ? mapPlaces().length : placeCount;
@@ -17621,7 +17882,7 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
-${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.stringify(Object.fromEntries(FR_SEARCH_SYNONYM_MAP)).replace(/</g, '\\u003c')}</script>
+${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.stringify(mapFrWords()).replace(/</g, '\\u003c')}</script>
 ` : ''}<script>
 (function(){
   var okanaganClockFormatter = new Intl.DateTimeFormat('en-US', ${JSON.stringify(OKANAGAN_CLOCK_FORMAT)});
@@ -20390,7 +20651,7 @@ function renderFoodDrinkHubStyles() {
 
   body.fd-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.fd-page .fd-pop { position: relative; }
-  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.fd-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.fd-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.fd-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.fd-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -20446,7 +20707,7 @@ function renderFoodDrinkHubStyles() {
   /* Sort (2026-10-14), at the end of the count line. */
   body.fd-page .fd-sort { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.84rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
   body.fd-page .fd-sort-label { opacity: 0.8; }
-  body.fd-page .fd-sort-select { font: inherit; font-weight: 800; color: var(--ref-navy); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 6px 30px 6px 12px; min-height: 40px; cursor: pointer; appearance: none; -webkit-appearance: none;
+  body.fd-page .fd-sort-select { font: inherit; font-weight: 800; color: var(--ref-navy); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 6px 30px 6px 12px; min-height: 44px; /* round 9: 44px tap target */ cursor: pointer; appearance: none; -webkit-appearance: none;
     background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
   body.fd-page .fd-sort-select:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   /* iPhones zoom into a select under 16px (2026-10-18), so the sort menu is 16px. */
@@ -22393,7 +22654,7 @@ function renderDogHubStyles() {
 
   body.dog-page .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.dog-page .fd-pop { position: relative; }
-  body.dog-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.dog-page .fd-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.dog-page .fd-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.dog-page .fd-pop-btn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
   body.dog-page .fd-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
@@ -24777,7 +25038,7 @@ function buildWhatsOnStyles() {
 
   body.whatson-page .whatson-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
   body.whatson-page .whatson-pop { position: relative; }
-  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  body.whatson-page .whatson-pop-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 800; color: var(--ink); background: var(--paper); border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; padding: 8px 14px; min-height: 44px; /* 44px tap target (2026-10-19, round 9) */ cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
   body.whatson-page .whatson-pop-btn:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.whatson-page .whatson-pop-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: var(--paper); border-color: var(--ref-navy, #1B2B3A); }
   body.whatson-page .whatson-pop-count[hidden] { display: none; }
@@ -24863,7 +25124,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   if (restLinks) {
     var byHref = {};
     cards.forEach(function(c){ var a = c.querySelector('.venue-card-link'); if (a) byHref[a.getAttribute('href')] = c; });
-    Array.prototype.forEach.call(restLinks.querySelectorAll('li'), function(li){ var a = li.querySelector('a'); restItems.push({ li: li, card: a ? byHref[a.getAttribute('href')] : null }); });
+    Array.prototype.forEach.call(restLinks.querySelectorAll('li'), function(li){ var a = li.querySelector('a'); restItems.push({ li: li, a: a, card: a ? byHref[a.getAttribute('href') || a.getAttribute('data-href')] : null }); });
   }
   var summary = document.getElementById('whatsOnResultsSummary');
   var showBtn = document.getElementById('whatsOnShowResults');
@@ -24976,7 +25237,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     if (nextOn && empty) empty.hidden = true;
     if (restSummary) {
       var nLinks = 0;
-      restItems.forEach(function(x){ var on = !x.card || (!x.card.hidden && !isEarlier(x.card)); x.li.hidden = !on; if (on) nLinks++; });
+      restItems.forEach(function(x){ var on = !x.card || (!x.card.hidden && !isEarlier(x.card)); x.li.hidden = !on; if (on) { nLinks++; if (x.a && !x.a.getAttribute('href') && x.a.getAttribute('data-href')) x.a.setAttribute('href', x.a.getAttribute('data-href')); } });
       restSummary.textContent = restSummary.textContent.replace(/\\(\\d+\\)/, '(' + nLinks + ')');
       restLinks.hidden = nLinks === 0;
     }
@@ -25490,7 +25751,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
         : `\n      <li class="whatson-group-head" data-group="${g.key}" aria-hidden="false"><h3>${escapeHtml(g.label)}</h3></li>` });
     }
     lastGroup = g.key;
-    items.push({ g: g.key, shown, html: card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`) });
+    items.push({ g: g.key, shown, ev: e, html: card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`) });
   }
   let firstShown = 0;
   const groupsInFirst = new Set();
@@ -25507,6 +25768,19 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   }
   const listHtml = firstHtml.join('');
   const restHtml = restParts.join('');
+  // Round 9 (2026-10-19): the main /whats-on page (and /fr/whats-on) carries an ItemList of the event cards a visitor
+  // sees before "Show more", in their order, as the town and type pages do with their own lists.
+  const pageItemList = itemList || (!scope && hasInventory ? (() => {
+    const shownEvents = items.filter((it) => it.first && !it.head && it.ev).map((it) => it.ev);
+    return shownEvents.length ? {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: heading,
+      url: canonical,
+      numberOfItems: shownEvents.length,
+      itemListElement: shownEvents.map((e, i) => ({ '@type': 'ListItem', position: i + 1, name: e.name, url: `https://okanaganroam.com/${e.region}/events/${e.slug}` })),
+    } : null;
+  })() : null);
   const cardsHtml = events.length
     ? `<ul class="card-grid" id="whatsOnResults"${grouped.some((x) => x.g.key === 'earlier') ? ' data-earlier="closed"' : ''}${matching.length ? '' : ' hidden'}>${listHtml}
   </ul>${restHtml ? `\n  <template id="whatsOnRest">${restHtml}</template>` : ''}
@@ -25526,7 +25800,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, pageItemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
 ${renderWhatsOnStyles()}
 ${WHATSON_LIST_STYLE}
 ${CATEGORY_BANNER_STYLE}
@@ -25817,8 +26091,30 @@ function hasFrenchTwin(p) {
   if (seg.length === 1) return !!REGION_LABELS[seg[0]];
   if (seg.length === 2) return FR_TWIN_SECTIONS.has(seg[0]) || (!!REGION_LABELS[seg[0]] && (!!SLUG_TO_TYPE[seg[1]] || seg[1] === 'events'));
   if (seg.length === 3) return (seg[0] === 'guide' && !!REGION_LABELS[seg[1]]) || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && seg[2] === 'this-weekend') || frIsVenuePath(path)
-    || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && !!frEventForPath(path));
+    || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && !!frEventPageForPath(path));
   return false;
+}
+// Round 9 (2026-10-19): every published event has a French page, so a French list never links to an English one
+// (Bunnicula's /fr page was a 404 and /fr/whats-on linked to its English page). An event whose description has no
+// French yet gets the French page with its English description (marked lang="en"), kept out of search (noindex, no
+// hreflang, not in the sitemap) until the translation lands; frEventForPath stays "has a French description".
+function frEventPageForPath(p) {
+  const seg = String(p || '').split('/').filter(Boolean);
+  if (seg.length !== 3 || seg[1] !== 'events' || !REGION_LABELS[seg[0]] || seg[2] === 'this-weekend') return null;
+  const key = `page:${seg[0]}/${seg[2]}`, now = Date.now(), hit = frEventCache.get(key);
+  if (hit && now - hit.at < 5 * 60 * 1000) return hit.ev;
+  let ev = null;
+  try {
+    const e = findEventBySlug(seg[0], seg[2]);
+    if (e && (getEventById(e.id) || {}).status === 'scheduled') ev = e;
+  } catch (err) { ev = null; }
+  if (frEventCache.size > 5000) frEventCache.clear();
+  frEventCache.set(key, { ev, at: now });
+  return ev;
+}
+// An event page whose French page has only the English description (see frEventPageForPath).
+function frEventUntranslated(p) {
+  return !!frEventPageForPath(p) && !frEventForPath(p);
 }
 // The event behind /<town>/events/<slug> when its description has a French translation, else null. Cached for five
 // minutes: links on every French page ask this.
@@ -26018,7 +26314,7 @@ function withFrenchTwinEntries(entries) {
   for (const e of entries) {
     const m = /<loc>https:\/\/okanaganroam\.com(\/[^<]*)<\/loc>/.exec(e);
     const p = m ? m[1].replace(/(.)\/$/, '$1') : null;
-    if (!p || !hasFrenchTwin(p) || frIsVenuePath(p) || /xhtml:link/.test(e)) { out.push(e); continue; }
+    if (!p || !hasFrenchTwin(p) || frIsVenuePath(p) || frEventUntranslated(p) || /xhtml:link/.test(e)) { out.push(e); continue; }
     const alts = twinHeadLinks(p).trim().split('\n').map((l) => `\n    ${l.replace('<link ', '<xhtml:link ').replace(/>$/, '/>')}`).join('');
     const withAlts = e.replace(/(<\/loc>)/, `$1${alts}`);
     out.push(withAlts, withAlts.replace(/<loc>https:\/\/okanaganroam\.com[^<]*<\/loc>/, `<loc>https://okanaganroam.com${frTwinPath(p)}</loc>`));
@@ -26040,7 +26336,7 @@ function frMarkupRaw(part) {
     })
     // A card shows the French blurb only.
     .replace(/<span class="desc-en" lang="en">[\s\S]*?<\/span><span class="desc-fr" lang="fr">([\s\S]*?)<\/span>/g, '$1')
-    .replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)))
+    .replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action|data-href)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)))
     .replace(/(\s(?:alt|aria-label|placeholder|title|data-tooltip|content)=")([^"]+)"/g, (m, a, v) => {
       if (a.includes('content') && !/[a-z]{3,} [a-z]/i.test(v)) return m;
       const t = frText(frDecode(v));
@@ -26141,7 +26437,8 @@ function addTwinHead(html, enPath, search = '') {
 function englishTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frHrefPath = frTwinPath(enPath);
-  let out = addTwinHead(html, enPath, search)
+  // An event whose French page is noindex (English description only, round 9) names no fr-CA alternate.
+  let out = (frEventUntranslated(enPath) ? html : addTwinHead(html, enPath, search))
     .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
     .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
   out = withTwinLangSwitch(out, frHrefPath + search.replace(/&/g, '&amp;'), 'en');
@@ -26152,8 +26449,11 @@ function englishTwinHtml(html, enPath, search = '') {
 function frenchTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frPath = frTwinPath(enPath);
-  const frEvent = frEventForPath(enPath);
+  const frEvent = frEventPageForPath(enPath);
   if (frEvent) html = frEventHead(html, frEvent);
+  // An event with no French description yet: its French page is kept out of search (round 9, see frEventPageForPath).
+  const enOnlyEvent = !!frEvent && !frEventForPath(enPath);
+  if (enOnlyEvent && !/<meta name="robots"/.test(html.split('</head>')[0])) html = html.replace(/(<link rel="canonical" href="[^"]*">\n)/, '<meta name="robots" content="noindex, follow">\n$1');
   // French advisories (2026-10-19, round 7): a card's "Check before you go" text in French (its own note_fr, the
   // French list or the known-phrasing fallback), never the English sentence.
   html = html.replace(/(<p class="venue-advisory-text">)([^<]*)(<\/p>)/g, (m, a, t, b) => `${a}${escapeHtml(frAdvisoryText(frDecode(t)))}${b}`);
@@ -26183,6 +26483,7 @@ function frenchTwinHtml(html, enPath, search = '') {
     .replace(/(<a [^>]*data-gcal href="[^"]*?details=)Details%3A%20https%3A%2F%2Fokanaganroam\.com%2F/g, '$1D%C3%A9tails%20%3A%20https%3A%2F%2Fokanaganroam.com%2Ffr%2F');
   // French pass 6 (2026-10-19): the photo credit under a town or hub banner has the French space before its colon.
   out = out.replace(/(<p class="region-photo-credit">)Photo: /g, '$1Photo : ');
+  if (enOnlyEvent) out = out.replace(/<p class="event-body">([\s\S]*?)<\/p>/, '<p class="event-body" lang="en">$1</p>\n  <p class="event-body-note"><em>Description offerte en anglais seulement pour le moment.</em></p>');
   // Deferred card batches and the rest of /browse load from their French addresses.
   return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
 }
@@ -26448,12 +26749,12 @@ function renderVenuePageLayoutStyles() {
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
   /* Venue page layout (2026-10-18): on narrower screens the facts (address, phone, hours) come straight after the
-     buttons, and the menu, visitor tips and guide links follow them. */
+     buttons, and the menu, visitor tips and guide links follow them. Round 9 (2026-10-19): .venue-extra now follows
+     the sidebar in the page itself, so the tab and reading order match what is on screen (no CSS order). */
   @media (max-width: 959px) {
     body.golf-page .venue-layout { display: flex; flex-direction: column; }
     body.golf-page .venue-main { display: contents; }
-    body.golf-page .venue-aside { order: 1; margin-top: 8px; }
-    body.golf-page .venue-extra { order: 2; }
+    body.golf-page .venue-aside { margin-top: 8px; }
   }
   /* The photo leaves room for the name and the open-now line on a laptop screen. */
   @media (min-width: 641px) {
@@ -26470,9 +26771,23 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .detail-row .map-link { margin-top: -7px; }
   body.golf-page .category-back-link, body.golf-page .venue-back-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: -10px; margin-bottom: 3px; }
   body.golf-page nav.breadcrumb a { display: inline-block; padding: 13px 5px; margin: -13px -5px; }
+  /* Tap targets (2026-10-19, round 9): the English/Français switch, the town link in the at-a-glance line and the
+     names on the "Other … in" and "More to explore near" cards are 44px tall to a finger; negative margins keep every
+     line where it was. Cards without a photo are whole-card links too, like the photo cards. */
+  body.golf-page .venue-lang-switch a, body.golf-page .venue-header .venue-at-a-glance a { display: inline-block; padding: 12px 0; margin: -12px 0; }
+  body.golf-page .related-card > a, body.golf-page .related-card .related-body > a { display: block; padding: 12px 0; margin: -12px 0; }
+  body.golf-page .related-card { position: relative; }
+  body.golf-page .related-card > a::after { content: ""; position: absolute; inset: 0; }
   @media (min-width: 960px) {
-    body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 40px; align-items: start; }
+    body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto 1fr; gap: 0 40px; align-items: start; }
     body.golf-page .venue-aside { position: sticky; top: 84px; }
+    /* Round 9: the extras sit under the story in the left column, with the sidebar beside both, as before. */
+    body.golf-page .venue-main { grid-column: 1; grid-row: 1; }
+    body.golf-page .venue-aside { grid-column: 2; grid-row: 1 / span 2; }
+    body.golf-page .venue-extra { grid-column: 1; grid-row: 2; }
+    /* The story's last bottom margin used to merge with the extras' top margin; now that they are two boxes, it is
+       dropped so the gap stays the same. */
+    body.golf-page .venue-main > :last-child { margin-bottom: 0; }
   }
   body.golf-page .venue-aside .venue-section { margin-top: 0; margin-bottom: 16px; }
   body.golf-page .venue-aside .detail-row { display: flex; gap: 12px; }
@@ -26925,11 +27240,6 @@ ${VENUE_MENU_CSS}` : ''}
   </div>
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${venueAdvisoryHtml}${editorialHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
-  <div class="venue-extra">
-  ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
-  ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
-  ${guideLinks}
-  </div>
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
@@ -26956,6 +27266,13 @@ ${VENUE_MENU_CSS}` : ''}
   })();
   </script>`}
   </aside>
+  <!-- Reading order (2026-10-19, round 9): the menu, visitor photos and tips, and guide links come after the facts
+       in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
+  <div class="venue-extra">
+  ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
+  ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
+  ${guideLinks}
+  </div>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
@@ -27227,6 +27544,10 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
   const others = occurrences.filter((o) => o.id !== main.id && o.end_date >= todayStr).slice(0, 10);
   const schemaType = eventSchemaType(event, categories);
   const location = eventPlaceSchema(event, hostVenue);
+  // Round 9 (2026-10-19): each date of a series carries the series' organizer and price too (Google reads every
+  // subEvent as an Event, and 64% of them had no offers).
+  const organizer = eventOrganizerSchema(event, hostVenue);
+  const offers = eventOffersSchema(event);
   const sub = (o) => ({
     '@type': schemaType,
     name: o.label ? `${event.name} – ${o.label}` : event.name,
@@ -27235,6 +27556,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     eventStatus: 'https://schema.org/EventScheduled',
     location,
+    organizer,
+    offers,
   });
   return {
     '@context': 'https://schema.org',
@@ -27248,8 +27571,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     url: canonical,
     image: [eventImageUrl(event, categories)],
     location,
-    organizer: eventOrganizerSchema(event),
-    offers: eventOffersSchema(event),
+    organizer,
+    offers,
     subEvent: others.length ? others.map(sub) : undefined,
   };
 }
@@ -27263,10 +27586,26 @@ function eventOfficialUrl(event) {
   if (EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) && ok(event.source_url)) return event.source_url.trim();
   return null;
 }
-function eventOrganizerSchema(event) {
-  if (event.source_type !== 'official_organizer' || typeof event.source_name !== 'string' || !event.source_name.trim()) return undefined;
-  const url = eventOfficialUrl(event);
-  return { '@type': 'Organization', name: event.source_name.trim(), url: url || undefined };
+// Round 9 (2026-10-19): an event hosted at a winery, brewery, distillery, pub, lounge, restaurant or café listed on
+// the site is that place's own event, so the place is the organizer (with its website, else its page here); so is a
+// league's own schedule feed. A ticket seller or a theatre that only rents its hall is still never named.
+const EVENT_HOST_ORGANIZER_TYPES = new Set(['winery', 'brewery', 'distillery', 'pub', 'cocktail', 'restaurant', 'cafe']);
+function eventOrganizerSchema(event, hostVenue = null) {
+  const sourceName = typeof event.source_name === 'string' ? event.source_name.trim() : '';
+  if (event.source_type === 'official_organizer' && sourceName) {
+    const url = eventOfficialUrl(event);
+    return { '@type': 'Organization', name: sourceName, url: url || undefined };
+  }
+  if (hostVenue && typeof hostVenue.name === 'string' && hostVenue.name.trim() && EVENT_HOST_ORGANIZER_TYPES.has(hostVenue.type) && !hostVenue.redirect_to) {
+    const site = typeof hostVenue.website === 'string' && /^https?:\/\/\S+$/i.test(hostVenue.website.trim()) ? hostVenue.website.trim() : null;
+    const page = CATEGORY_SLUGS[hostVenue.type] && hostVenue.slug && REGION_LABELS[hostVenue.region] ? `https://okanaganroam.com${venuePagePath(hostVenue)}` : null;
+    return { '@type': 'Organization', name: hostVenue.name.trim(), url: site || page || undefined };
+  }
+  if (event.source_type === 'league_feed' && sourceName) {
+    const url = eventOfficialUrl(event);
+    return { '@type': 'SportsOrganization', name: sourceName, url: url || undefined };
+  }
+  return undefined;
 }
 // Event prices (2026-10-18): Google flags an Offer with no price, so an offer is emitted only when the listing states
 // one: a stored price field when there is one, else the description. "Tickets are about $68–79" -> lowPrice 68,
@@ -27275,12 +27614,18 @@ function eventOrganizerSchema(event) {
 // "By donation" and "early-bird tickets cost less" state no price, so no offer.
 const EVENT_PRICE_CONTEXT_RE = /\b(tickets?|admission|entry|entrance|cover|cost|costs|price[sd]?|register|registration|per (person|adult|child|ticket|couple|team)|passes?|seats?|in advance|at the door|early[- ]bird|from \$)/i;
 const EVENT_FREE_RE = /\b(?:(?:admission|entry|entrance)(?: is)? free|free (?:admission|entry|entrance|event|to attend|of charge|for (?:all|everyone)|and open)|(?:a|this|the) free(?:,? [\w'’-]+){0,3}? (?:event|fair|market|show|concert|festival|workshop|walk|tour|talk|screening|night|party|celebration|drop-in|session|class|day|afternoon|evening|parade|light-up|bazaar|program|gathering|exhibit|exhibition|skate|kick-off|open house|film|performance)|admission: free|^free(?:[.!]|$))/i;
+const EVENT_PRICE_PERSON_RE = /\b(?:kids|adults?|children|child|seniors|students|youth|members)\s\$\s?\d|\$\s?\d[\d.]*\s(?:per\s)?(?:adults?|kids|children|child|seniors|students|youth|guest|per guest)\b/i;
+const EVENT_FREE_SENTENCE_RE = /^(?:(?:it['\u2019]s|it is|admission is|entry is|entrance is|the event is|this event is)\s)?free(?:[.;!]?$|[.;!,]\s|\s(?:with|to (?:attend|watch|play|join|enter)|at the|and (?:open|all-ages|aimed|family)|tickets|for (?:all|everyone|the whole family)|admission|entry)\b)|^[^.;]{0,40}, free\.?$/i;
 function parseEventPrice(text) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   if (!t) return null;
   const amounts = [];
-  for (const sentence of t.split(/(?<=[.!?;])\s+/)) {
-    if (!EVENT_PRICE_CONTEXT_RE.test(sentence) && !/^\s*\$\d/.test(t)) continue;
+  const sentences = t.split(/(?<=[.!?;])\s+/);
+  for (const sentence of sentences) {
+    // Round 9 (2026-10-19): a sentence that is the price itself ("$55.", "$62 ($52.70 wine club).", "Kids $5, adults
+    // $10") counts too; a suggested donation still states no price.
+    const priceLed = (/^\$\s?\d/.test(sentence) || EVENT_PRICE_PERSON_RE.test(sentence)) && !/\bdonation\b/i.test(sentence);
+    if (!EVENT_PRICE_CONTEXT_RE.test(sentence) && !priceLed && !/^\s*\$\d/.test(t)) continue;
     // "$68–79", "$49–$59", "$68 to $79", "$25 - 35"
     const re = /\$\s?(\d{1,4}(?:\.\d{2})?)(?:\s?(?:–|—|-|to)\s?\$?\s?(\d{1,4}(?:\.\d{2})?)(?![\d,]))?/g;
     let m;
@@ -27295,8 +27640,12 @@ function parseEventPrice(text) {
     return lo === hi ? { price: fmt(lo) } : { lowPrice: fmt(lo), highPrice: fmt(hi) };
   }
   // "Free" counts unless it's hedged ("in past years it has been free") or names one part ("opens with a free parade").
+  if (/\b(past years|usually|typically|has been free|was free)\b/i.test(t)) return null;
+  // Round 9 (2026-10-19): a sentence that says the event is free on its own ("Free.", "It's free, and ...", "Free with
+  // RSVP", "5-7 pm, free.") counts; "Free-with-admission tours" or "Free puzzles are set aside" do not.
+  if (sentences.some((x) => EVENT_FREE_SENTENCE_RE.test(x.trim()))) return { price: '0' };
   const free = EVENT_FREE_RE.exec(t);
-  if (free && !/\b(past years|usually|typically|has been free|was free)\b/i.test(t)) {
+  if (free) {
     const before = t.slice(0, free.index).split(/[.!?;]\s/).pop();
     if (!/\b(opens|starts|begins|kicks off|ends|closes|wraps up) with\s*$|\b(plus|includes|including)\s*$/i.test(before)) return { price: '0' };
   }
@@ -32987,7 +33336,8 @@ ${banner ? CATEGORY_BANNER_STYLE : ''}
   body.info-page .info-body p, body.info-page .info-body li { font-size: 1rem; line-height: 1.65; }
   body.info-page .info-body ul { padding-left: 1.2em; }
   body.info-page .info-body li { margin: 0 0 6px; }
-  body.info-page .info-updated { font-size: 0.86rem; opacity: 0.7; margin-top: 30px; }
+  /* Contrast (2026-10-19, round 9): 0.7 opacity was 4.45:1 on the paper background; 0.8 is above 4.5:1. */
+  body.info-page .info-updated { font-size: 0.86rem; opacity: 0.8; margin-top: 30px; }
   body.info-page .info-cta { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
   body.info-page .info-cta a, body.info-page .info-cta button { display: inline-block; padding: 10px 18px; border-radius: 999px; font: inherit; font-weight: 800; font-size: 0.95rem; text-decoration: none; border: 0; cursor: pointer; background: var(--ref-navy, #1B2B3A); color: #fff; }
   body.info-page .info-cta a.secondary { background: var(--sand-deep, #ece3d3); color: var(--ink); }
@@ -33072,7 +33422,20 @@ const MY_TRIP_MAX_REFS = 30;
 // My Trip notices (2026-10-19, round 8): a stop with a closure or a "Check before you go" advisory says so on My Trip,
 // as its card does: the dated season or closure tag ("Closed Oct 21–28, reopens Oct 29.") when there is one, else the
 // written advisory. -> null | { kind, text, textFr }
-function tripStopNotice(venueId, seasons, advisories) {
+// Round 9 (2026-10-19): a stop with a planned date (or month) is judged on that date: a January ski trip no longer says
+// "Closed for the season. Reopens Nov 26" because the hill is closed today. A season that says nothing about that
+// date shows nothing; the written advisory (not dated) still shows.
+function tripStopNotice(venueId, seasons, advisories, onDate = null) {
+  if (onDate) {
+    let st = null;
+    try { const rows = getSeasonRows(onDate); st = rows.has(venueId) ? seasonStateOn(rows.get(venueId), onDate) : null; } catch (e) { st = null; }
+    if (st) {
+      let fr = null;
+      try { fr = frText(seasonTagShortText(st)); } catch (e) { fr = null; }
+      return { kind: st.kind, text: seasonTagShortText(st), textFr: fr || seasonTagShortText(st), on: onDate };
+    }
+    seasons = new Map();
+  }
   const st = seasons.get(venueId);
   if (st) {
     const text = seasonTagShortText(st);
@@ -33088,7 +33451,8 @@ function tripStopNotice(venueId, seasons, advisories) {
   try { fr = frAdvisoryText(text); } catch (e) { fr = text; }
   return { kind: 'advisory', text, textFr: fr };
 }
-function tripStopsFor(refs, now = new Date()) {
+// onDates (round 9): ref -> 'YYYY-MM-DD', each stop's planned date, for its notice.
+function tripStopsFor(refs, now = new Date(), onDates = {}) {
   const out = [];
   const venueQ = db.prepare('SELECT * FROM venues WHERE id = ?');
   let seasons = new Map(), advisories = new Map();
@@ -33112,7 +33476,7 @@ function tripStopsFor(refs, now = new Date()) {
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
-        notice: tripStopNotice(v.id, seasons, advisories),
+        notice: tripStopNotice(v.id, seasons, advisories, parseLocalDate(onDates[ref]) && onDates[ref] !== todayLocal(now) ? onDates[ref] : null),
       });
     } else {
       const e = eventQ.get(Number(m[2]));
@@ -33268,6 +33632,43 @@ function tripShareCardPng(card) {
   return png;
 }
 
+// My Trip map (2026-10-19, round 9): pins that sit closer than `gap` pixels on screen (not only at the very same spot)
+// are spread in a small ring around their middle, so every number shows and each pin can be tapped. `xy` holds each
+// pin's screen point ({ x, y }); the result is each pin's { dx, dy } shift in pixels. Pins near one another are grouped
+// in chains (A near B, B near C), and neighbours on a ring end up gap + 2 pixels apart. Shipped into the page with
+// .toString(), so it uses nothing from outside itself (and keeps its comments out here). Pins go round the ring in
+// their own directions from the middle (list order for pins at the same spot), so each moves as little as it can; the
+// first starts at the top when they all share one spot.
+function myTripPinSpread(xy, gap) {
+  var n = xy.length, parent = [], out = [], groups = {}, i, j;
+  for (i = 0; i < n; i++) parent[i] = i;
+  function root(k) { while (parent[k] !== k) { parent[k] = parent[parent[k]]; k = parent[k]; } return k; }
+  for (i = 0; i < n; i++) {
+    for (j = i + 1; j < n; j++) {
+      var ddx = xy[i].x - xy[j].x, ddy = xy[i].y - xy[j].y;
+      if (ddx * ddx + ddy * ddy < gap * gap) parent[root(j)] = root(i);
+    }
+  }
+  for (i = 0; i < n; i++) { out.push({ dx: 0, dy: 0 }); var r0 = root(i); (groups[r0] = groups[r0] || []).push(i); }
+  Object.keys(groups).forEach(function(k){
+    var g = groups[k];
+    if (g.length < 2) return;
+    var cx = 0, cy = 0;
+    g.forEach(function(m){ cx += xy[m].x; cy += xy[m].y; });
+    cx /= g.length; cy /= g.length;
+    var ang = function(m){ var ax = xy[m].x - cx, ay = xy[m].y - cy; return ax * ax + ay * ay < 1 ? null : Math.atan2(ay, ax); };
+    var same = g.every(function(m){ return ang(m) === null; });
+    var order = g.slice().sort(function(a, b){ var x = ang(a), y = ang(b); return x === null || y === null || x === y ? a - b : x - y; });
+    var start = same ? -Math.PI / 2 : ang(order[0]);
+    var r = Math.ceil((gap / 2 + 1) / Math.sin(Math.PI / g.length));
+    order.forEach(function(m, q){
+      var a = start + 2 * Math.PI * q / g.length;
+      out[m] = { dx: Math.round(cx + r * Math.cos(a) - xy[m].x), dy: Math.round(cy + r * Math.sin(a) - xy[m].y) };
+    });
+  });
+  return out;
+}
+
 function renderMyTripPage(opts = {}) {
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
   const share = opts.share || null;
@@ -33318,6 +33719,14 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-shared { margin: 0 0 18px; padding: 14px 18px; border-radius: 14px; background: #FFF4DA; }
   body.my-trip-page .mt-status { min-height: 1.2em; margin: 0 0 10px; font-weight: 700; color: var(--teal-deep, #1F5450); }
   body.my-trip-page #mtMap { height: 320px; border-radius: 16px; margin: 0 0 22px; background: #dfe9e6; z-index: 0; }
+  /* Map tap targets (2026-10-19, round 9): each numbered pin takes taps over a 44px circle, as on /map, and the zoom
+     buttons are 44px (Leaflet's are 30px). */
+  body.my-trip-page .leaflet-marker-icon.mt-pin { background: none; border: 0; }
+  body.my-trip-page .leaflet-marker-icon.mt-pin::before { content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px; border-radius: 50%; }
+  body.my-trip-page .leaflet-marker-icon.mt-pin .mt-num { margin: 0; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+  body.my-trip-page .leaflet-marker-icon.mt-pin:focus { outline: none; }
+  body.my-trip-page .leaflet-marker-icon.mt-pin:focus-visible .mt-num { outline: 3px solid #1B2B3A; outline-offset: 2px; }
+  body.my-trip-page .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; }
   body.my-trip-page .mt-day { margin: 0 0 26px; }
   body.my-trip-page .mt-day-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin: 0 0 10px; }
   body.my-trip-page .mt-day-head h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.3rem; margin: 0; }
@@ -33409,6 +33818,11 @@ ${renderGolfHeaderHtml()}
     var mo = isFr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return isFr ? wd[t.getUTCDay()] + ' ' + t.getUTCDate() + ' ' + mo[t.getUTCMonth()] : wd[t.getUTCDay()] + ', ' + mo[t.getUTCMonth()] + ' ' + t.getUTCDate();
   }
+  function monthText(ym){
+    var n = Number(String(ym).slice(5, 7));
+    var mo = isFr ? ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'] : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return n >= 1 && n <= 12 ? mo[n - 1] + ' ' + String(ym).slice(0, 4) : '';
+  }
   function clockText(m){
     var h = Math.floor(m / 60) % 24, mm = m % 60;
     if (isFr) return h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '');
@@ -33420,17 +33834,24 @@ ${renderGolfHeaderHtml()}
   }
   function timeText(t){ return t && Number.isFinite(t.s) ? clockText(t.s) + (Number.isFinite(t.e) ? (isFr ? '–' : ' – ') + clockText(t.e) : '') : ''; }
   var viewing = shared.length ? 'shared' : 'mine';
-  var info = {}, map = null, layer = null;
+  var info = {}, map = null, layer = null, spreadPins = null;
+  var myTripPinSpread = ${myTripPinSpread.toString()};
   var el = function(id){ return document.getElementById(id); };
   function status(t){ var s = el('mtStatus'); s.textContent = ''; setTimeout(function(){ s.textContent = t; }, 30); }
   function list(){
     if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: sharedStart && sharedDays[i] ? { d: addDays(sharedStart, sharedDays[i] - 1) } : null }; });
     return trip.map(function(t){ var k = keyOf(t); return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (k && days[k]) || 0, time: k && times[k] || null, raw: t }; });
   }
+  // Round 9 (2026-10-19): each stop's planned date (or the middle of its planned month) goes with it, so a season
+  // notice is the one for that day ("Closed for the season" today is not a January ski trip's problem).
+  function plannedDate(t){ return t && /^\\d{4}-\\d{2}-\\d{2}$/.test(t.d || '') ? t.d : t && /^\\d{4}-\\d{2}$/.test(t.m || '') ? t.m + '-15' : ''; }
   function fetchInfo(refs){
     var need = refs.filter(function(r){ return r && !info[r]; });
     if (!need.length) return Promise.resolve();
-    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(','))).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
+    var when = {};
+    list().forEach(function(s){ var d = plannedDate(s.time); if (d && !when[s.ref]) when[s.ref] = d; });
+    var on = need.map(function(r){ return when[r] || ''; });
+    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(',')) + (on.some(Boolean) ? '&on=' + encodeURIComponent(on.join(',')) : '')).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
   }
   function dirUrl(stops){
     // At most 11 stops: an origin, nine waypoints and a destination, Google's limit for one route link (2026-10-18).
@@ -33465,7 +33886,9 @@ ${renderGolfHeaderHtml()}
     var mine = viewing === 'mine';
     el('mtDays').innerHTML = groups.map(function(g){
       var gDate = g.key ? g.stops.map(function(x){ return x.s.time && x.s.time.d; }).filter(Boolean)[0] : null;
-      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
+      // An undated plan for a month ("skiing in January") keeps its month (round 9).
+      var gMonth = g.key && !gDate ? g.stops.map(function(x){ return x.s.time && x.s.time.m; }).filter(Boolean)[0] : null;
+      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : gMonth ? ' · ' + esc(monthText(gMonth)) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
         '<a class="mt-btn" ' + hrefAttr(dirUrl(g.stops.map(function(x){ return x.s; }))) + ' target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
         '<ol class="mt-list">' + (g.key && mine && drives[g.key] && drives[g.key].f && drives[g.key].t ? '<li class="mt-drive">' + esc(driveText(drives[g.key])) + '</li>' : '') + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
@@ -33482,7 +33905,7 @@ ${renderGolfHeaderHtml()}
     drawMap(shown);
   }
   function drawMap(stops){
-    var pts = stops.map(function(s, i){ var d = info[s.ref]; return d && d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng, n: i + 1, name: d.name } : null; }).filter(Boolean);
+    var pts = stops.map(function(s, i){ var d = info[s.ref]; return d && d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng, n: i + 1, name: d.name, url: (document.documentElement.lang === 'fr' && d.urlFr) || d.url } : null; }).filter(Boolean);
     var box = el('mtMap');
     if (!window.L || pts.length < 1) { box.hidden = true; return; }
     box.hidden = false;
@@ -33497,20 +33920,31 @@ ${renderGolfHeaderHtml()}
       L.control.zoom(mapFr ? { zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' } : {}).addTo(map);
       if (mapFr && map.attributionControl) map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="Une bibliothèque JavaScript de cartes interactives">Leaflet</a>');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: mapFr ? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map);
+      map.on('zoomend', function(){ if (spreadPins) spreadPins(); });
     }
     if (layer) layer.remove();
-    // Stops at the same spot (2026-10-19, round 8): a winery and its restaurant, or one place saved on two days, used to
-    // sit exactly on top of one another, so only the top number showed. Pins that share a spot are now fanned out in a
-    // small ring around it (a fixed pixel offset, so they stay apart at every zoom).
-    var spots = {};
-    pts.forEach(function(p){ var k = p.lat.toFixed(4) + ',' + p.lng.toFixed(4); (spots[k] = spots[k] || []).push(p); });
-    Object.keys(spots).forEach(function(k){
-      var g = spots[k], r = Math.max(16, Math.ceil(15 * g.length / Math.PI));
-      g.forEach(function(p, j){ p.dx = g.length > 1 ? Math.round(r * Math.cos(2 * Math.PI * j / g.length - Math.PI / 2)) : 0; p.dy = g.length > 1 ? Math.round(r * Math.sin(2 * Math.PI * j / g.length - Math.PI / 2)) : 0; });
+    // Stops close together (2026-10-19, round 8 and 9): a winery and its restaurant, one place saved on two days, or
+    // two stops a few streets apart used to sit on top of one another, so only the top number showed. After each fit
+    // or zoom, pins closer than a pin's width on screen are fanned out in a small ring (myTripPinSpread); zooming in
+    // brings them back to their own spots once there is room. A tap on a pin shows its name, linked to its page.
+    var pinIcon = function(p, dx, dy){ return L.divIcon({ className: 'mt-pin', html: '<span class="mt-num">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12 - dx, 12 - dy], popupAnchor: [dx, dy - 12] }); };
+    var shift = pts.map(function(){ return { dx: 0, dy: 0 }; });
+    var markers = pts.map(function(p){
+      var mk = L.marker([p.lat, p.lng], { icon: pinIcon(p, 0, 0), title: p.n + '. ' + p.name });
+      mk.bindPopup('<strong>' + p.n + '.</strong> ' + (p.url ? '<a ' + hrefAttr(p.url) + '>' + esc(p.name) + '</a>' : esc(p.name)));
+      return mk;
     });
-    layer = L.layerGroup(pts.map(function(p){ return L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: '<span class="mt-num" style="box-shadow:0 2px 6px rgba(0,0,0,.3)">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12 - p.dx, 12 - p.dy] }), title: p.name }); })).addTo(map);
+    layer = L.layerGroup(markers).addTo(map);
+    spreadPins = function(){
+      var off = myTripPinSpread(pts.map(function(p){ return map.latLngToLayerPoint([p.lat, p.lng]); }), 24);
+      markers.forEach(function(mk, i){
+        if (off[i].dx === shift[i].dx && off[i].dy === shift[i].dy) return;
+        shift[i] = off[i];
+        mk.setIcon(pinIcon(pts[i], off[i].dx, off[i].dy));
+      });
+    };
     map.invalidateSize();
-    var fit = function(){ if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [36, 36], maxZoom: 15 }); };
+    var fit = function(){ if (pts.length === 1) map.setView([pts[0].lat, pts[0].lng], 13); else map.fitBounds(L.latLngBounds(pts.map(function(p){ return [p.lat, p.lng]; })), { padding: [36, 36], maxZoom: 15 }); spreadPins(); };
     fit();
     // Fonts and the list above can still change the width after the first paint; fit again once settled.
     setTimeout(function(){ map.invalidateSize(); fit(); }, 250);
@@ -35964,15 +36398,99 @@ const OWNER_PHOTO_DIR = process.env.OWNER_PHOTO_DIR
   || (fs.existsSync('/data') ? '/data/owner-photos' : path.join(__dirname, '.owner-photos-local'));
 const OWNER_PHOTO_MAX_BYTES = 3 * 1024 * 1024; // decoded JPEG
 const OWNER_PHOTO_MAX_BODY = 4 * 1024 * 1024 + 4096; // base64 + fields
+// An owner upload may also carry the photo's smaller copies (round 9, 2026-10-19; about 0.5 MB together).
+const OWNER_PHOTO_UPLOAD_MAX_BODY = OWNER_PHOTO_MAX_BODY + 2 * 1024 * 1024;
 const OWNER_PHOTO_MIN_EDGE = 800;
 const OWNER_PHOTO_MAX_EDGE = 2400;
 const OWNER_PHOTO_PENDING_LIMIT = 12; // per venue, waiting for review
 const OWNER_PHOTO_RATE_LIMIT = 30;
-const OWNER_PHOTO_KEYS = new Set(['image', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at']);
+const OWNER_PHOTO_KEYS = new Set(['image', 'image_w480', 'image_w960', 'image_w1200', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at']);
 
 function ownerPhotoPath(file) {
   if (!/^[a-z0-9]{24}\.jpg$/.test(file)) return null;
   return path.join(OWNER_PHOTO_DIR, file);
+}
+
+// Smaller copies of uploaded photos (2026-10-19, round 9): an owner photo was served only as its 1600px original
+// (180-470 KB), so a phone took 1.6 MB of photos on Red Rooster's page (LCP 10.5 s) and /browse used the original as
+// a card background. Each photo can now have <name>-w480.jpg (cards, thumbnails), <name>-w960.jpg (the venue photo
+// on phones) and <name>-w1200.jpg (computers) beside it on the volume. The browser makes them with canvas when the
+// owner uploads (free, no image library on the server); photos sent before that get them from
+// scripts/owner-photo-copies.js (Dayton runs it on his Mac with sips) through /admin/owner-photos/:id/sizes. A copy is
+// only ever listed in a page once its file exists, so a photo without copies keeps its original and nothing breaks.
+const OWNER_PHOTO_SIZES = [480, 960, 1200];
+const OWNER_COPY_MAX_BYTES = 1024 * 1024;
+function ownerPhotoCopyFile(file, width) {
+  const m = /^([a-z0-9]{24})\.jpg$/.exec(String(file || ''));
+  return m && OWNER_PHOTO_SIZES.includes(Number(width)) ? `${m[1]}-w${Number(width)}.jpg` : null;
+}
+function ownerPhotoCopyPath(file, width) {
+  const copy = ownerPhotoCopyFile(file, width);
+  return copy ? path.join(OWNER_PHOTO_DIR, copy) : null;
+}
+const ownerCopyMemo = new Map(); // "<file>|<width>" -> true/false
+function ownerPhotoHasCopy(file, width) {
+  const key = `${file}|${width}`;
+  if (!ownerCopyMemo.has(key)) {
+    const fp = ownerPhotoCopyPath(file, width);
+    let ok = false;
+    try { ok = !!fp && fs.statSync(fp).isFile(); } catch (e) { ok = false; }
+    ownerCopyMemo.set(key, ok);
+  }
+  return ownerCopyMemo.get(key);
+}
+function forgetOwnerPhotoCopies(file) {
+  for (const w of OWNER_PHOTO_SIZES) ownerCopyMemo.delete(`${file}|${w}`);
+  for (const u of [`/images/owner/${file}`, ...OWNER_PHOTO_SIZES.map((w) => `/images/owner/${ownerPhotoCopyFile(file, w)}`)]) imageVersionMemo.delete(u);
+}
+function deleteOwnerPhotoCopies(file) {
+  for (const w of OWNER_PHOTO_SIZES) {
+    const fp = ownerPhotoCopyPath(file, w);
+    if (fp) { try { fs.unlinkSync(fp); } catch (e) { /* none made */ } }
+  }
+  forgetOwnerPhotoCopies(file);
+}
+// The file on the volume for an /images/owner/ or /images/visitor/ URL (the original or one of its copies), else
+// null. Used for the ?v= hash and the width/height attributes; the routes still check the photo is approved.
+function uploadedPhotoFilePath(url) {
+  const m = /^\/images\/(?:owner|visitor)\/([a-z0-9]{24})(-w(?:480|960|1200))?\.jpg$/.exec(String(url || ''));
+  return m ? path.join(OWNER_PHOTO_DIR, `${m[1]}${m[2] || ''}.jpg`) : null;
+}
+// A copy the browser or the backfill script sent: a JPEG data URL `width` pixels wide (or the original's own width
+// when that is narrower), the original's shape (within 2%), at most 1 MB, metadata removed. -> Buffer or null.
+function validOwnerPhotoCopy(dataUrl, width, original) {
+  const m = typeof dataUrl === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl) : null;
+  if (!m || !original || !original.width || !original.height) return null;
+  const raw = Buffer.from(m[1], 'base64');
+  const buf = raw.length <= OWNER_COPY_MAX_BYTES ? stripJpegMetadata(raw) : null;
+  const d = buf ? jpegDimensions(buf) : null;
+  if (!d || !d.width || !d.height) return null;
+  if (Math.abs(d.width - Math.min(width, original.width)) > 2) return null;
+  if (Math.abs(d.width / d.height - original.width / original.height) > 0.02 * (original.width / original.height)) return null;
+  return buf;
+}
+// Writes the valid copies in `copies` ({ w480, w960, w1200 } data URLs) for one stored photo. A size at or above
+// the original's width is skipped (the original is already that size). replace: overwrite a copy that exists.
+// -> { written: [widths], skipped: [widths], invalid: [widths] }
+function saveOwnerPhotoCopies(file, original, copies, { replace = false } = {}) {
+  const out = { written: [], skipped: [], invalid: [] };
+  if (!copies || typeof copies !== 'object' || !ownerPhotoPath(file)) return out;
+  for (const w of OWNER_PHOTO_SIZES) {
+    const value = copies[`w${w}`];
+    if (value == null) continue;
+    if (w >= original.width) { out.skipped.push(w); continue; }
+    const buf = validOwnerPhotoCopy(value, w, original);
+    if (!buf) { out.invalid.push(w); continue; }
+    try {
+      fs.writeFileSync(ownerPhotoCopyPath(file, w), buf, { flag: replace ? 'w' : 'wx' });
+      out.written.push(w);
+    } catch (err) {
+      if (err && err.code === 'EEXIST') out.skipped.push(w);
+      else { console.error(`[owner-photos] writing the ${w}px copy of ${file} failed: ${err.message}`); out.invalid.push(w); }
+    }
+  }
+  forgetOwnerPhotoCopies(file);
+  return out;
 }
 
 // Width and height from a JPEG's start-of-frame marker, or null if the bytes
@@ -36004,7 +36522,8 @@ function imgDimsAttr(src) {
   if (!imageDimsCache.has(p)) {
     let d = null;
     try {
-      const fd = fs.openSync(path.join(__dirname, 'public', p), 'r');
+      // Round 9 (2026-10-19): owner and visitor uploads live on the volume, not in public/.
+      const fd = fs.openSync(uploadedPhotoFilePath(p) || path.join(__dirname, 'public', p), 'r');
       try { const buf = Buffer.alloc(65536); const n = fs.readSync(fd, buf, 0, buf.length, 0); d = jpegDimensions(buf.subarray(0, n)); } finally { fs.closeSync(fd); }
     } catch (e) { d = null; }
     imageDimsCache.set(p, d && d.width && d.height ? ` width="${d.width}" height="${d.height}"` : '');
@@ -36093,7 +36612,13 @@ function venueGalleryHtml(venue, photos, L) {
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
     return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
   }).join('');
-  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(String(p.credit).replace(/^\s*photos?\s*:\s*/i, ''))}</figcaption>` : ''}</figure>`).join('');
+  // Round 9 (2026-10-19): the full-screen viewer lists the smaller copies too, so a phone takes the 960px one.
+  const slideSrcset = (src) => {
+    const w = Number((/width="(\d+)"/.exec(imgDimsAttr(src)) || [])[1]) || 0;
+    const list = [960, 1200].filter((x) => x < w).map((x) => [photoSized(src, x), x]).filter(([u]) => u !== src);
+    return list.length ? ` srcset="${list.map(([u, x]) => `${escapeHtml(u)} ${x}w`).join(', ')}, ${escapeHtml(src)} ${w}w" sizes="100vw"` : '';
+  };
+  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${slideSrcset(p.src)}${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(String(p.credit).replace(/^\s*photos?\s*:\s*/i, ''))}</figcaption>` : ''}</figure>`).join('');
   return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
       <dialog class="vg-dialog" id="venueGallery" aria-label="${L(`Photos of ${name}`, `Photos de ${name}`)}">
         <div class="vg-bar"><span class="vg-count" aria-live="polite">1 / ${n}</span><button type="button" class="vg-close" aria-label="${L('Close photos', 'Fermer les photos')}">&times;</button></div>
@@ -36188,7 +36713,7 @@ async function handleOwnerPhotoUpload(req, res, token) {
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
   try {
-    body = await readLimitedJsonBody(req, OWNER_PHOTO_MAX_BODY);
+    body = await readLimitedJsonBody(req, OWNER_PHOTO_UPLOAD_MAX_BODY);
   } catch (err) {
     return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'That photo is too large.' : generic }, err.status === 413);
   }
@@ -36228,6 +36753,9 @@ async function handleOwnerPhotoUpload(req, res, token) {
     console.error(`[owner-photos] writing ${file} for venue #${venue.id} failed: ${err.message}`);
     return sendSubmissionResponse(res, 500, { ok: false, error: generic });
   }
+  // The smaller copies the browser made (round 9, 2026-10-19). A missing or bad one is skipped, never an error:
+  // the page then uses the original, and the backfill script can add it later.
+  saveOwnerPhotoCopies(file, dims, { w480: body.image_w480, w960: body.image_w960, w1200: body.image_w1200 });
   const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
   const id = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, contact_name, contact_email, rights_confirmed_at, ip_hash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`).run(venue.id, file, previewKey, dims.width, dims.height, buf.length, credit, contactName, contact.email,
@@ -39720,6 +40248,7 @@ function rejectOwnerPhoto(id, reviewer, reason) {
   db.prepare("UPDATE owner_photos SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
     .run(reviewer, String(reason || '').slice(0, 300) || null, id);
   try { fs.unlinkSync(ownerPhotoPath(p.file)); } catch (err) { /* already gone */ }
+  deleteOwnerPhotoCopies(p.file); // round 9 (2026-10-19): its smaller copies too
   return { ok: true };
 }
 
@@ -39747,7 +40276,37 @@ function removeOwnerPhoto(id, reviewer, reason) {
   db.prepare("UPDATE owner_photos SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
     .run(reviewer, String(reason || 'removed').slice(0, 300), id);
   try { fs.unlinkSync(ownerPhotoPath(p.file)); } catch (err) { /* already gone */ }
+  deleteOwnerPhotoCopies(p.file); // round 9 (2026-10-19): its smaller copies too
   return { ok: true, was_main: wasMain };
+}
+
+// The approved owner photos with the copies each has and still needs (round 9, 2026-10-19). A copy is needed only
+// below the original's width.
+function ownerPhotoOriginalDims(row) {
+  let d = null;
+  try { d = jpegDimensions(fs.readFileSync(ownerPhotoPath(row.file))); } catch (e) { d = null; }
+  return d || (row.width && row.height ? { width: row.width, height: row.height } : null);
+}
+function ownerPhotoSizesList() {
+  return db.prepare("SELECT id, venue_id, file, width, height FROM owner_photos WHERE status = 'approved' ORDER BY id").all().map((r) => {
+    const has = OWNER_PHOTO_SIZES.filter((w) => ownerPhotoHasCopy(r.file, w));
+    const needs = OWNER_PHOTO_SIZES.filter((w) => w < (r.width || 0) && !has.includes(w));
+    return { id: r.id, venue_id: r.venue_id, file: r.file, url: `/images/owner/${r.file}`, width: r.width, height: r.height,
+      file_present: !!ownerPhotoPath(r.file) && fs.existsSync(ownerPhotoPath(r.file)), has, needs };
+  });
+}
+// body: { w480, w960, w1200 (JPEG data URLs), replace?: true } -> { status, body }
+function saveOwnerPhotoCopiesById(id, body) {
+  const row = db.prepare('SELECT id, file, status, width, height FROM owner_photos WHERE id = ?').get(id);
+  if (!row) return { status: 404, body: { error: 'not_found' } };
+  if (row.status !== 'approved') return { status: 409, body: { error: 'not_approved', status: row.status } };
+  if (!fs.existsSync(ownerPhotoPath(row.file))) return { status: 410, body: { error: 'file_missing' } };
+  const dims = ownerPhotoOriginalDims(row);
+  if (!dims) return { status: 410, body: { error: 'file_unreadable' } };
+  const extra = Object.keys(body).filter((k) => !['w480', 'w960', 'w1200', 'replace'].includes(k));
+  if (extra.length) return { status: 400, body: { error: `Unknown fields: ${extra.join(', ')}` } };
+  const r = saveOwnerPhotoCopies(row.file, dims, body, { replace: body.replace === true });
+  return { status: r.invalid.length && !r.written.length ? 400 : 200, body: { id, file: row.file, ...r, has: OWNER_PHOTO_SIZES.filter((w) => ownerPhotoHasCopy(row.file, w)) } };
 }
 
 function sendOwnerPhotoFile(res, file, headers) {
@@ -40077,8 +40636,11 @@ const OWNER_HELP_TOPICS = [
   { id: 'access', over: ['staff'], q: 'Who has access to my listing? Remove someone', qFr: 'Qui a accès à ma fiche? Retirer quelqu\u2019un', pages: ['account', 'edit', 'settings'],
     keys: ['who has access', 'who can edit', 'who else can edit', 'people with access', 'who has a login', 'remove a person', 'remove someone', 'remove a login', 'remove their access', 'remove access', 'remove staff', 'remove an employee', 'remove my manager', 'take away access', 'take someone off', 'revoke', 'kick out', 'lock them out',
       'still has access', 'still have access', 'still has a login', 'old manager', 'former manager', 'ex manager', 'former employee', 'ex employee', 'old employee', 'former staff', 'left the company', 'no longer works here', 'doesnt work here anymore', 'doesnt work here',
-      'reset edit link', 'reset the edit link', 'reset our edit link', 'still has the link', 'still has our link', 'kept the link'],
-    keysFr: ['qui a acces', 'qui peut modifier', 'personnes qui ont acces', 'retirer une personne', 'retirer quelqu un', 'retirer l acces', 'enlever l acces', 'supprimer un compte', 'retirer un employe', 'ancien gerant', 'ancienne gerante', 'ancien employe', 'ancienne employee', 'a toujours acces', 'encore acces', 'ne travaille plus ici', 'ne travaille plus pour nous', 'reinitialiser le lien', 'a garde le lien'],
+      'reset edit link', 'reset the edit link', 'reset our edit link', 'still has the link', 'still has our link', 'kept the link',
+      // Round 9 (2026-10-19): "can other people edit my listing" read as managing a second business.
+      'other people edit', 'can other people edit', 'other people change', 'others edit', 'can anyone edit', 'anyone else edit', 'can someone else edit', 'who can change', 'who can update'],
+    keysFr: ['qui a acces', 'qui peut modifier', 'personnes qui ont acces', 'retirer une personne', 'retirer quelqu un', 'retirer l acces', 'enlever l acces', 'supprimer un compte', 'retirer un employe', 'ancien gerant', 'ancienne gerante', 'ancien employe', 'ancienne employee', 'a toujours acces', 'encore acces', 'ne travaille plus ici', 'ne travaille plus pour nous', 'reinitialiser le lien', 'a garde le lien',
+      'd autres personnes peuvent modifier', 'autres personnes modifier', 'qui d autre peut modifier', 'quelqu un d autre peut modifier', 'n importe qui peut modifier'],
     a: {
       in: '<p>{ON}, open <strong>People with access</strong>. It lists every login that can update this listing, with each person’s email.</p><ul><li><strong>Added after you</strong>, like a former manager or staff member? Tap <strong>Remove</strong> beside them. They get an email saying so, and so does Dayton. Removing someone also <strong>resets the private edit link</strong>, so they can’t use the old one to get back in; we email the new link to you.</li><li><strong>Added before you?</strong> You can’t remove them yourself: tap <strong>Message us</strong> and Dayton will check it.</li><li><strong>Remove me</strong> takes your own login off the listing.</li></ul><p>Worried someone kept an old edit link? The person who has been on the listing longest has a <strong>Reset edit link</strong> button there: the old link stops working straight away, and everyone with a login keeps their access. Everyone on the listing gets an email whenever a new login is added.</p>',
       link: '<p><strong>People with access</strong> is for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open the listing from <strong>My listings</strong> to see every login that can update it.</p><p>You can remove people added after you, which also resets this edit link so they can’t get back in. A login added <strong>before</strong> yours (a former manager, say) only Dayton can remove: tap <strong>Message us</strong> and say who it is.</p><p>Worried someone kept an old edit link? Signed in, the person who has been on the listing longest can tap <strong>Reset edit link</strong> under People with access, so the old one stops working.</p>',
@@ -40089,6 +40651,14 @@ const OWNER_HELP_TOPICS = [
       link: '<p><strong>Personnes ayant accès</strong> est réservé aux comptes. Utilisez <strong>Créer un compte</strong> en haut de cette page, puis ouvrez la fiche depuis <strong>Mes fiches</strong> pour voir tous les comptes qui peuvent la modifier.</p><p>Vous pouvez retirer les personnes ajoutées après vous, ce qui réinitialise aussi ce lien de modification pour qu’elles ne puissent pas revenir. Un compte ajouté <strong>avant</strong> le vôtre (un ancien gérant, par exemple), seul Dayton peut le retirer : touchez <strong>Écrivez-nous</strong> et dites-nous de qui il s’agit.</p><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? Avec un compte, la personne qui est sur la fiche depuis le plus longtemps peut toucher <strong>Réinitialiser le lien de modification</strong> sous Personnes ayant accès, pour que l’ancien cesse de fonctionner.</p>',
       out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>. <strong>Personnes ayant accès</strong> montre tous les comptes qui peuvent la modifier.</p><ul><li>Une personne ajoutée <strong>après</strong> vous? Touchez <strong>Retirer</strong> à côté de son nom. Elle et Dayton reçoivent un courriel, et le lien de modification privé est réinitialisé pour qu’elle ne puisse pas revenir avec.</li><li>Une personne ajoutée <strong>avant</strong> vous? Touchez <strong>Écrivez-nous</strong> et Dayton vérifiera.</li></ul><p>Vous craignez qu’une personne ait gardé un ancien lien de modification? La personne qui est sur la fiche depuis le plus longtemps peut y toucher <strong>Réinitialiser le lien de modification</strong>, pour que l’ancien cesse de fonctionner.</p>',
     } },
+  // Round 9 (2026-10-19): "is my info public" / « mes infos sont-elles publiques » had no answer.
+  { id: 'privacy', q: 'Is my information public?', qFr: 'Mes renseignements sont-ils publics?', pages: ['account', 'edit', 'settings', 'login', 'claim'],
+    keys: ['public', 'is my info public', 'is my information public', 'my info', 'my information', 'personal information', 'privacy', 'privacy policy', 'is it private', 'kept private',
+      'who can see my email', 'see my email', 'my email public', 'is my email shown', 'show my email', 'my data', 'who sees my details'],
+    keysFr: ['public', 'publique', 'publiques', 'publics', 'mes infos', 'mes informations', 'mes renseignements', 'renseignements personnels', 'confidentialite', 'confidentiel',
+      'est ce prive', 'reste prive', 'qui voit mon courriel', 'mon courriel est il visible', 'mes donnees'],
+    a: '<p>Your listing is public: its name, address, phone, website, hours, photos, menu and description are what visitors see on your page. Your login is private: your email and password only sign you in and get you edit links, and are never shown on your page (others who manage the listing see your email under <strong>People with access</strong>). What you send us to claim a listing, or in a message, stays private too.</p><p>Want something off your page, like a phone number? {ON}, change it and tap {SEND}, or tap <strong>Message us</strong> and we’ll take it off. More in our <a href="/privacy">privacy policy</a>.</p>',
+    aFr: '<p>Votre fiche est publique : son nom, son adresse, son téléphone, son site Web, ses heures, ses photos, son menu et sa description sont ce que les visiteurs voient sur votre page. Votre compte est privé : votre courriel et votre mot de passe servent seulement à vous connecter et à recevoir vos liens de modification, et ne sont jamais affichés sur votre page (les autres personnes qui gèrent la fiche voient votre courriel dans <strong>Personnes ayant accès</strong>). Ce que vous nous envoyez pour réclamer une fiche, ou dans un message, reste privé aussi.</p><p>Vous voulez retirer quelque chose de votre page, comme un numéro de téléphone? {ON}, modifiez-le et touchez {SEND}, ou touchez <strong>Écrivez-nous</strong> et nous le retirerons. Plus de détails dans notre <a href="/fr/privacy">politique de confidentialité</a>.</p>' },
   { id: 'login-create', q: 'How do I make a login?', qFr: 'Comment créer un compte?', pages: ['edit', 'login'],
     keys: ['create login', 'create a login', 'make login', 'make a login', 'make an account', 'create an account', 'sign up', 'register', 'why login', 'need a login', 'set up a login', 'set up an account', 'get a login'],
     keysFr: ['creer un compte', 'creer un login', 'ouvrir un compte', 'faire un compte', 'inscription', 's inscrire', 'pourquoi un compte', 'besoin d un compte'],
@@ -40195,8 +40765,11 @@ const OWNER_HELP_TOPICS = [
     aFr: '<ol><li>{ON}, ouvrez <strong>Heures saisonnières</strong> (sous vos heures d’ouverture) et cochez <strong>Nous avons d’autres heures pendant une partie de l’année</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Ouvert certains mois seulement</strong>. Fermé un jour ou deux? Utilisez <strong>Fermetures spéciales</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],
     keys: ['holiday', 'holidays', 'stat', 'stat holiday', 'statutory holiday', 'christmas', 'christmas day', 'christmas eve', 'xmas', 'boxing day', 'new years', 'new years day', 'new years eve', 'thanksgiving', 'easter', 'good friday', 'victoria day', 'canada day', 'bc day', 'labour day', 'labor day', 'remembrance day', 'family day',
-      'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days'],
+      'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closed for two weeks', 'closed for a few weeks', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days'],
     keysFr: ['ferie', 'jour ferie', 'jours feries', 'conge', 'noel', 'jour de noel', 'veille de noel', 'lendemain de noel', 'jour de l an', 'nouvel an', 'action de grace', 'paques', 'vendredi saint', 'fete du canada', 'fete du travail', 'fetes',
+      // Round 9 (2026-10-19): "nous sommes fermés pour une semaine" found nothing.
+      'fermes pour une semaine', 'ferme pour une semaine', 'fermes une semaine', 'ferme une semaine', 'fermes la semaine prochaine', 'ferme la semaine prochaine',
+      'fermes deux semaines', 'ferme deux semaines', 'fermes quelques semaines', 'ferme quelques semaines', 'fermes cette semaine', 'ferme cette semaine', 'fermes quelques jours',
       'fermeture speciale', 'fermetures speciales', 'ferme le', 'fermes le', 'ferme un jour', 'fermes un jour', 'fermeture temporaire', 'temporairement ferme', 'temporairement fermes', 'vacances', 'renovation', 'renovations', 'evenement prive', 'ferme demain', 'ferme aujourd hui', 'fermeture', 'quelques jours'],
     a: '<ol><li>{ON}, open <strong>Special closures</strong> (with your opening hours) and tap <strong>+ Add a closed day</strong>.</li><li>Pick the <strong>First day</strong> (for example December 25). Closed for longer, like renovations or a vacation? Add a <strong>Last day</strong> too. Add a short <strong>Note</strong> if you like (“Christmas”).</li><li>Tap {SEND}.</li></ol><p>On those days your page says “Closed today” with your note, for example “Closed today (Christmas)”, and visitors won’t see you as open. Past closures drop off by themselves. {LIVE}</p><p>Open on a holiday, just with different hours? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Fermetures spéciales</strong> (sous vos heures d’ouverture) et touchez <strong>+ Ajouter un jour de fermeture</strong>.</li><li>Choisissez le <strong>Premier jour</strong> (par exemple le 25 décembre). Fermé plus longtemps, pour des rénovations ou des vacances? Ajoutez aussi un <strong>Dernier jour</strong>. Ajoutez une courte <strong>Note</strong> si vous voulez (« Noël »).</li><li>Touchez {SEND}.</li></ol><p>Ces jours-là, votre page indique « Fermé aujourd’hui » avec votre note, par exemple « Fermé aujourd’hui (Noël) », et les visiteurs ne vous verront pas ouvert. Les fermetures passées disparaissent d’elles-mêmes. {LIVE}</p><p>Ouvert un jour férié, mais avec d’autres heures? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
@@ -40277,8 +40850,11 @@ const OWNER_HELP_TOPICS = [
     a: '<p>In the event form, use <strong>Partner businesses</strong>: start typing a business name and pick it from the list (up to 5 businesses listed on Okanagan Roam). Once the event is approved it shows on each partner\u2019s page too, and the event page names them. For an event you already sent, tap <strong>Change</strong> next to it under <strong>Your updates</strong> and add them there.</p>',
     aFr: '<p>Dans le formulaire de l’événement, utilisez <strong>Entreprises partenaires</strong> : commencez à taper le nom d’une entreprise et choisissez-la dans la liste (jusqu’à 5 entreprises présentes sur Okanagan Roam). Une fois l’événement approuvé, il paraît aussi sur la page de chaque partenaire, et la page de l’événement les nomme. Pour un événement déjà envoyé, touchez <strong>Modifier</strong> à côté de celui-ci sous <strong>Vos mises à jour</strong> et ajoutez-les.</p>' },
   { id: 'menu-add', q: 'How do I add my menu or prices?', qFr: 'Comment ajouter mon menu ou mes prix?', pages: ['edit', 'menu'],
-    keys: ['menu', 'menus', 'prices', 'price list', 'rates', 'green fees', 'tours and prices', 'add menu', 'add my menu', 'add our menu', 'scan', 'type my menu', 'type it in', 'type it myself', 'type it in myself', 'by hand', 'manually', 'enter my menu', 'food menu', 'drinks menu', 'drink menu', 'wine list', 'dishes'],
-    keysFr: ['menu', 'menus', 'carte', 'la carte', 'liste de prix', 'tarifs', 'nos prix', 'mes prix', 'ajouter nos prix', 'ajouter le menu', 'ajouter mon menu', 'ajouter notre menu', 'numeriser', 'carte des vins', 'moi meme', 'a la main', 'manuellement', 'plats'],
+    keys: ['menu', 'menus', 'prices', 'price list', 'rates', 'green fees', 'tours and prices', 'add menu', 'add my menu', 'add our menu', 'scan',
+      'upload a menu', 'upload my menu', 'upload our menu', 'upload the menu', 'upload menu', 'menu upload', 'upload a pdf menu', 'upload menu pdf', 'type my menu', 'type it in', 'type it myself', 'type it in myself', 'by hand', 'manually', 'enter my menu', 'food menu', 'drinks menu', 'drink menu', 'wine list', 'dishes'],
+    keysFr: ['menu', 'menus', 'carte', 'la carte', 'liste de prix', 'tarifs', 'nos prix', 'mes prix', 'ajouter nos prix', 'ajouter le menu', 'ajouter mon menu', 'ajouter notre menu', 'numeriser',
+      // Round 9 (2026-10-19): uploading a menu read as uploading photos (or nothing).
+      'televerser mon menu', 'televerser le menu', 'televerser notre menu', 'televerser un menu', 'telecharger mon menu', 'telecharger le menu', 'telecharger notre menu', 'mettre mon menu en ligne', 'carte des vins', 'moi meme', 'a la main', 'manuellement', 'plats'],
     a: '<p>{ON}, tap <strong>Add your menu</strong> (or prices). Then choose one:</p><ul><li><strong>My menu is on my website:</strong> paste the link and we read it in,</li><li><strong>Take a photo</strong> of each page (or upload a PDF), or</li><li><strong>Type it in myself:</strong> add sections, dishes and prices by hand.</li></ul><p>Check the result: tap each <strong>yellow</strong> line, fix it if needed and press <strong>Done</strong> (or delete it). <strong>Publish</strong> works once every yellow line is checked. Busy? Tap <strong>Can you do it for me?</strong> and we\u2019ll type it up, free.</p>',
     aFr: '<p>{ON}, touchez <strong>Ajouter votre menu</strong> (ou vos prix). Choisissez ensuite :</p><ul><li><strong>Mon menu est sur mon site</strong> : collez le lien et nous le lisons,</li><li><strong>Prendre votre menu en photo</strong> : photographiez chaque page (ou téléversez un PDF), ou</li><li><strong>Je le tape moi-même</strong> : ajoutez les sections, les plats et les prix à la main.</li></ul><p>Vérifiez le résultat : touchez chaque ligne en <strong>jaune</strong>, corrigez-la au besoin et appuyez sur <strong>Terminé</strong> (ou supprimez-la). <strong>C’est bon, publier!</strong> fonctionne une fois toutes les lignes jaunes vérifiées. Pas le temps? Touchez <strong>Pouvez-vous le faire pour moi?</strong> et nous le taperons pour vous, gratuitement.</p>' },
   { id: 'menu-blurry', over: ['menu-add'], q: 'The menu scan didn\u2019t work', qFr: 'La numérisation du menu n\u2019a pas fonctionné', pages: ['menu'],
@@ -41661,11 +42237,11 @@ const CLAIM_TEXT = {
   },
   fr: {
     title: 'Réclamer cette fiche', eyebrow: 'Pour les entreprises',
-    intro: 'Vous êtes propriétaire ou gérant de {name} ? Dites-nous qui vous êtes et comment vérifier que c’est bien vous. Ensuite, nous vous enverrons par courriel un lien privé pour modifier la fiche : photos, heures, menu ou tarifs, et événements. C’est gratuit.',
+    intro: 'Vous êtes propriétaire ou gérant {deName}? Dites-nous qui vous êtes et comment vérifier que c’est bien vous. Ensuite, nous vous enverrons par courriel un lien privé pour modifier la fiche : photos, heures, menu ou tarifs, et événements. C’est gratuit.',
     name: 'Votre nom', role: 'Votre rôle', choose: 'Choisissez', email: 'Courriel de l’entreprise', emailHint: 'Nous enverrons le lien de modification à cette adresse.',
-    phone: 'Numéro de téléphone', verify: 'Comment vérifier que c’est bien vous ?', detailSocial: 'Quel compte ? (par exemple @votreentreprise)', detailOther: 'Expliquez-nous',
-    message: 'Autre chose ? (facultatif)', submit: 'Envoyer ma demande', sending: 'Envoi…',
-    callNumber: ' ({phone})', already: 'Vous avez déjà un compte ?', signIn: 'Connectez-vous', haveEmail: 'Vous avez déjà reçu un courriel de nous ?', newLink: 'Recevoir un nouveau lien',
+    phone: 'Numéro de téléphone', verify: 'Comment vérifier que c’est bien vous?', detailSocial: 'Quel compte? (par exemple @votreentreprise)', detailOther: 'Expliquez-nous',
+    message: 'Autre chose? (facultatif)', submit: 'Envoyer ma demande', sending: 'Envoi…',
+    callNumber: ' ({phone})', already: 'Vous avez déjà un compte?', signIn: 'Connectez-vous', haveEmail: 'Vous avez déjà reçu un courriel de nous?', newLink: 'Recevoir un nouveau lien',
     doneTitle: 'Merci, c’est reçu',
     done: 'Nous vérifierons que c’est bien vous{how} et enverrons à {email} un lien privé pour modifier {name}, en général d’ici un jour ou deux. Rien ne change sur la fiche d’ici là.',
     doneCall: ' (nous appellerons peut-être l’entreprise)', back: 'Retour à {name}', noJs: 'Ce formulaire a besoin de JavaScript. Vous pouvez aussi écrire à info@okanaganroam.com.',
@@ -41678,6 +42254,12 @@ const CLAIM_TEXT = {
     errVenue: 'Nous n’avons pas trouvé cette fiche.', errConnect: 'Connexion impossible. Veuillez réessayer.',
   },
 };
+// "de" before a place's name, elided before a vowel (round 9, 2026-10-19): « gérant d’Ancient Hill Winery », « gérant de
+// Quails’ Gate ». An English name's h is not elided (« de Hester Creek »).
+function claimFrDe(name) {
+  const n = String(name || '').trim();
+  return /^[aeiouy\u00e0\u00e2\u00e9\u00e8\u00ea\u00ee\u00ef\u00f4\u00fb]/i.test(n) ? `d\u2019${n}` : `de ${n}`;
+}
 function claimText(lang, key, vars = {}) {
   const t = (CLAIM_TEXT[lang] || CLAIM_TEXT.en)[key] || CLAIM_TEXT.en[key] || '';
   return t.replace(/\{(\w+)\}/g, (m, k) => (vars[k] == null ? '' : String(vars[k])));
@@ -41832,7 +42414,7 @@ function renderClaimPage(venue, lang) {
     <span class="eyebrow">${T('eyebrow')}</span>
     <h1>${T('title')}</h1>
     <p><strong>${escapeHtml(venue.name)}</strong> &middot; ${escapeHtml(REGION_LABELS[venue.region] || venue.region)}</p>
-    <p>${T('intro', { name: venue.name })}</p>
+    <p>${T('intro', { name: venue.name, deName: claimFrDe(venue.name) })}</p>
     <form class="venue-form" id="clForm" novalidate>
       <div class="lyv-hp" aria-hidden="true"><label>${fr ? 'Laissez ce champ vide' : 'Leave this empty'} <input type="text" id="clCompanyWebsite" name="company_website" tabindex="-1" autocomplete="off"></label></div>
       ${field('clName', 'name', T('name'), '<input type="text" id="clName" autocomplete="name" maxlength="100" required>')}
@@ -44584,7 +45166,19 @@ ${ownerFooterHtml(fr)}
         var c = document.createElement('canvas');
         c.width = Math.round(w * scale); c.height = Math.round(h * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/jpeg', 0.85));
+        // Round 9 (2026-10-19): 480, 960 and 1200px wide copies go with the photo, so phones and cards get a small one.
+        var out = { image: c.toDataURL('image/jpeg', 0.85) };
+        [480, 960, 1200].forEach(function(cw){
+          if (cw >= c.width) return;
+          try {
+            var s = document.createElement('canvas'), sc = s.getContext('2d');
+            s.width = cw; s.height = Math.round(c.height * cw / c.width);
+            sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = 'high';
+            sc.drawImage(c, 0, 0, s.width, s.height);
+            out['image_w' + cw] = s.toDataURL('image/jpeg', 0.72);
+          } catch (e) { /* the original alone still works */ }
+        });
+        resolve(out);
       };
       img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('read')); };
       img.src = url;
@@ -44605,9 +45199,9 @@ ${ownerFooterHtml(fr)}
     files.forEach(function(file, i){
       chain = chain.then(function(){
         progress.textContent = T.uploading.replace('{i}', i + 1).replace('{n}', files.length);
-        return resize(file).then(function(dataUrl){
+        return resize(file).then(function(made){
           return fetch(location.pathname + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ image: dataUrl, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
+            body: JSON.stringify({ image: made.image, image_w480: made.image_w480, image_w960: made.image_w960, image_w1200: made.image_w1200, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
             .then(function(r){ return r.json(); })
             .then(function(j){
               if (j && j.ok) { sent++; if (j.live) liveCount++; return; }
@@ -44920,6 +45514,47 @@ function lowercasePageRedirect(p) {
   if (/^\/(?:fr\/)?(?:api|images|styles|scripts|fonts|owner|contribute|claim|admin|share|menu-scan|r)(?:\/|$)/i.test(path)) return null;
   return path.toLowerCase();
 }
+// One hop (2026-10-19, round 9): a redirect that would land on another redirect goes straight to the end. The
+// trailing-slash and lower-case redirects below ask this for the address they would send to: the portal root
+// (/owner -> /owner/login, 302) and a place's moved address (a retired duplicate, a corrected category or town;
+// 301), the same answers the routes further down give. null: that address is not itself a redirect.
+function pageRedirectHop(p, search = '') {
+  if (/^(?:\/fr)?\/owner$/.test(p)) return { status: 302, location: withCampaignParams(p.startsWith('/fr/') ? '/fr/owner/login' : '/owner/login', search) };
+  const m = /^(\/fr)?\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)$/.exec(p);
+  if (!m) return null;
+  const [, fr, region, categorySlug, slug] = m;
+  const type = SLUG_TO_TYPE[categorySlug];
+  if (!REGION_LABELS[region] || !type) return null;
+  const page = (v) => (fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : venuePagePath(v));
+  try {
+    const venue = findVenueBySlug(region, type, slug);
+    if (venue) {
+      if (venue.redirect_to) {
+        const target = getVenue(venue.redirect_to);
+        if (target && !target.redirect_to && CATEGORY_SLUGS[target.type] && target.slug) return { status: 301, location: fr ? withCampaignParams(page(target), search) : `${venuePagePath(target)}${search}` };
+        return null;
+      }
+      if (fr && !venueHasFrench(venue)) return { status: 302, location: withCampaignParams(venuePagePath(venue), search) };
+      return null;
+    }
+    if (fr) {
+      const moved = findActiveVenueBySlugAcrossTypes(region, slug) || findActiveVenueBySlugAcrossRegions(type, slug);
+      if (moved && CATEGORY_SLUGS[moved.type] && (moved.type !== type || moved.region !== region)) return { status: 301, location: withCampaignParams(page(moved), search) };
+      return null;
+    }
+    const moved = findActiveVenueBySlugAcrossTypes(region, slug);
+    if (moved && CATEGORY_SLUGS[moved.type] && CATEGORY_SLUGS[moved.type] !== categorySlug) return { status: 301, location: `/${region}/${CATEGORY_SLUGS[moved.type]}/${slug}${search}` };
+    const relocated = findActiveVenueBySlugAcrossRegions(type, slug);
+    if (relocated && relocated.region !== region) return { status: 301, location: `/${relocated.region}/${categorySlug}/${slug}${search}` };
+  } catch (e) { /* no hop: the plain redirect still works */ }
+  return null;
+}
+function sendPageRedirect(res, target, search) {
+  const hop = pageRedirectHop(target, search);
+  if (hop && hop.status === 302) res.writeHead(302, { Location: hop.location, 'Cache-Control': 'no-store' });
+  else res.writeHead(301, { Location: hop ? hop.location : target + search });
+  return res.end();
+}
 const server = http.createServer(async (req, res) => {
   applySecurityHeaders(res);
   if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
@@ -44932,8 +45567,8 @@ const server = http.createServer(async (req, res) => {
   // One address per page (2026-10-16): /kelowna/ redirects to /kelowna.
   if ((req.method === 'GET' || req.method === 'HEAD') && /^\/(?!api\/|images\/|styles\/|scripts\/)[^?#]*[^/]\/(\?|$)/.test(req.url)) {
     const [p, q] = String(req.url).split('?');
-    res.writeHead(301, { Location: p.replace(/\/+$/, '') + (q != null ? `?${q}` : '') });
-    return res.end();
+    const stripped = p.replace(/\/+$/, '');
+    return sendPageRedirect(res, lowercasePageRedirect(stripped) || stripped, q != null ? `?${q}` : '');
   }
   // One address per page, pass 5 (2026-10-19): /Kelowna or /Whats-On 301 to the lower-case address, and /index.html
   // to /. Paths that carry a token or a file name (/owner/..., /contribute/confirm/..., /api/, /images/ ...) keep
@@ -44941,10 +45576,7 @@ const server = http.createServer(async (req, res) => {
   if ((req.method === 'GET' || req.method === 'HEAD')) {
     const [p, q] = String(req.url).split('?');
     const target = lowercasePageRedirect(p);
-    if (target) {
-      res.writeHead(301, { Location: target + (q != null ? `?${q}` : '') });
-      return res.end();
-    }
+    if (target) return sendPageRedirect(res, target, q != null ? `?${q}` : '');
   }
   // French business portal (2026-10-18): /fr/owner/account, /fr/owner/<edit link> ... are served by the English
   // routes with res.ownerLang = 'fr' (see ownerPortalLangRequest); English portal pages get the EN / FR switch.
@@ -44981,12 +45613,15 @@ const server = http.createServer(async (req, res) => {
     res.end = () => realEnd();
   }
 
+  // CORS, round 9 (2026-10-19): public /api/ reads may be fetched from other sites (GET/HEAD); nothing advertises
+  // PUT/POST/DELETE any more. A preflight for anything else gets no grant, so a browser on another site cannot write.
+  if (pathname.startsWith('/api/') && method === 'GET') {
+    for (const [k, v] of Object.entries(API_CORS_HEADERS)) res.setHeader(k, v);
+  }
   if (method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    });
+    const wanted = String(req.headers['access-control-request-method'] || 'GET').toUpperCase();
+    const grant = pathname.startsWith('/api/') && (wanted === 'GET' || wanted === 'HEAD');
+    res.writeHead(204, grant ? { ...API_CORS_HEADERS, 'Access-Control-Max-Age': '86400' } : { Allow: 'GET, HEAD, OPTIONS' });
     return res.end();
   }
 
@@ -45705,11 +46340,19 @@ const server = http.createServer(async (req, res) => {
           ...(row.kind === 'pdf' ? { 'Content-Security-Policy': "frame-ancestors 'self'" } : {}) });
         return res.end(buf);
       }
-      const im = /^\/images\/owner\/([a-z0-9]{24}\.jpg)$/.exec(pathname);
+      // Round 9 (2026-10-19): also the photo's smaller copies (<name>-w480/-w960/-w1200.jpg), and a URL carrying the
+      // file's own ?v= hash (what withVersionedImages writes) is kept for a year like every other image.
+      const im = /^\/images\/owner\/([a-z0-9]{24})(?:-w(480|960|1200))?\.jpg$/.exec(pathname);
       if (im && method === 'GET') {
-        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(im[1]);
+        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(`${im[1]}.jpg`);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'public, max-age=86400' });
+        const cache = { 'Cache-Control': imageVersionMatches(pathname, query.v) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' };
+        if (!im[2]) return sendOwnerPhotoFile(res, row.file, cache);
+        let buf = null;
+        try { buf = fs.readFileSync(ownerPhotoCopyPath(row.file, Number(im[2]))); } catch (e) { buf = null; }
+        if (!buf) { res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }); return res.end('Not found'); }
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', ...cache });
+        return res.end(buf);
       }
       // Visitor photos (2026-10-17): private previews while waiting for review, public once approved.
       const vp = /^\/visitor-photos\/preview\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
@@ -45724,7 +46367,7 @@ const server = http.createServer(async (req, res) => {
         const row = db.prepare(`SELECT p.file FROM visitor_contribution_photos p JOIN visitor_contributions c ON c.id = p.contribution_id
           WHERE p.file = ? AND c.status = 'approved'`).get(vi[1]);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'public, max-age=86400' });
+        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': imageVersionMatches(pathname, query.v) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' });
       }
     }
     // Visitor photos & tips, token API (2026-10-17): the same bearer check and
@@ -45744,6 +46387,23 @@ const server = http.createServer(async (req, res) => {
         const reviewer = validateReviewer(body.reviewer);
         if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
         const out = await visitorAdminAction(Number(m[1]), m[2], body, reviewer);
+        return sendJSON(res, out.status, out.body);
+      }
+    }
+    // Smaller copies backfill (2026-10-19, round 9): scripts/owner-photo-copies.js lists the approved owner photos
+    // and the copies each still needs, makes them on Dayton's Mac and sends them here. Bearer token, like the rest.
+    if (pathname === '/admin/owner-photos/sizes' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      return sendJSON(res, 200, { sizes: OWNER_PHOTO_SIZES, photos: ownerPhotoSizesList() });
+    }
+    {
+      const m = /^\/admin\/owner-photos\/(\d+)\/sizes$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!requireAdminToken(req, res)) return;
+        let body;
+        try { body = await readLimitedJsonBody(req, 4 * 1024 * 1024); } catch (err) { return sendJSON(res, err.status === 413 ? 413 : 400, { error: err.status === 413 ? 'Body too large.' : 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const out = saveOwnerPhotoCopiesById(Number(m[1]), body);
         return sendJSON(res, out.status, out.body);
       }
     }
@@ -46938,6 +47598,15 @@ const server = http.createServer(async (req, res) => {
             return respond(upsertEventOccurrences(eventId, body.occurrences, metaFromBody()));
           }
           if (eventId !== null && subResource === 'occurrences' && occurrenceId !== null && method === 'PATCH') {
+            // Round 9 (2026-10-19): the same PATCH sets a date's times ({ start_time, end_time, ends_next_day }); a
+            // request changes either the status or the times, never both.
+            const timeKeys = EVENT_OCCURRENCE_TIME_FIELDS.filter((k) => Object.prototype.hasOwnProperty.call(body, k));
+            if (timeKeys.length) {
+              if (rejectUnexpected([...EVENT_OCCURRENCE_TIME_FIELDS, ...EVENT_META_KEYS])) return;
+              const times = {};
+              for (const k of timeKeys) times[k] = body[k];
+              return respond(setEventOccurrenceTimes(eventId, occurrenceId, times, metaFromBody()));
+            }
             if (rejectUnexpected(['status', ...EVENT_META_KEYS])) return;
             return respond(setEventOccurrenceStatus(eventId, occurrenceId, body.status, metaFromBody()));
           }
@@ -47300,7 +47969,7 @@ const server = http.createServer(async (req, res) => {
       }
       const parsed = parseTripPlanBody(body);
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
-      try { return sendJSON(res, 200, runTripPlan(parsed.value)); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
+      try { return sendJSON(res, 200, withTripFrenchUrls(runTripPlan(parsed.value))); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
@@ -47511,7 +48180,11 @@ const server = http.createServer(async (req, res) => {
     // page link, photo, map position and directions query for My Trip.
     if (pathname === '/api/trip-stops' && method === 'GET') {
       const refs = String(query.refs || '').split(',').map((x) => x.trim()).filter(Boolean);
-      return sendJSON(res, 200, { stops: tripStopsFor(refs) });
+      // on= (round 9): each ref's planned date, in the same order ("" for none).
+      const on = String(query.on || '').split(',').slice(0, MY_TRIP_MAX_REFS);
+      const onDates = {};
+      refs.forEach((r, i) => { const dt = (on[i] || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(dt) && parseLocalDate(dt) && !onDates[r]) onDates[r] = dt; });
+      return sendJSON(res, 200, { stops: tripStopsFor(refs, new Date(), onDates) });
     }
     if (pathname === '/site.webmanifest' && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
@@ -48643,6 +49316,7 @@ module.exports = {
   seasonalHeroText,
   isFallHeroSeason,
   retimeEventOccurrence,
+  setEventOccurrenceTimes,
   fitTitle,
   localizeHtml,
   localizeStaticFr,
@@ -48653,6 +49327,8 @@ module.exports = {
   mapEventsData,
   mapLiveData,
   hasFrenchTwin,
+  frEventPageForPath,
+  frEventUntranslated,
   frenchTwinRequest,
   frText,
   frenchTwinHtml,
@@ -48897,7 +49573,9 @@ module.exports = {
   skiKinds,
   outdoorActivitiesByVenue,
   renderMyTripPage,
+  myTripPinSpread,
   tripStopsFor,
+  withTripFrenchUrls,
   tripShareSummary,
   tripShareSearch,
   tripCardPhotoKey,
@@ -48909,6 +49587,7 @@ module.exports = {
   venueLookup,
   venueLookupByWords,
   lowercasePageRedirect,
+  pageRedirectHop,
   eventCalendarTimes,
   googleCalendarUrl,
   eventCalendarLocation,
@@ -49307,4 +49986,11 @@ module.exports = {
   renderHomeFooterHTML,
   FOOTER_REGION_GROUPS,
   BOOL_FIELDS,
+  // Round 9 (2026-10-19): search, map and help bot
+  searchShowKind,
+  searchEventTopicFor,
+  searchTypoWord,
+  searchPartyOnly,
+  mapFrWords,
+  claimFrDe,
 };
