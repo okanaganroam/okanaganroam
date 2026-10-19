@@ -476,6 +476,8 @@ function renderStyles() {
   .t3-warnings { background: #FFF6E6; border: 1px solid rgba(201,162,39,0.45); color: #5B4212; border-radius: 12px; padding: 12px 16px; margin: 0 0 16px; font-size: 0.9rem; }
   .t3-event-choices { display: flex; flex-wrap: wrap; gap: 8px; }
   .t3-warnings ul { margin: 0; padding-left: 18px; }
+  /* Round 9 (2026-10-19): "Check venue details" and the other links here take taps over 44px; the line stays put. */
+  .t3-warnings li a { display: inline-block; padding: 12px 0; margin: -12px 0; }
 
   /* Sticks just under the sticky site header (2026-10-18; at top: 0 it slid under it). --t3-head-h is set below. */
   .t3-daynav { position: sticky; top: var(--t3-head-h, 0px); z-index: 20; display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; margin: 0 0 8px; background: var(--ref-cream); scrollbar-width: none; }
@@ -598,7 +600,7 @@ function renderStyles() {
   .t3-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; }
   .t3-badges li { background: rgba(42,107,103,0.1); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font-size: 0.76rem; font-weight: 800; }
   .t3-badges li.is-more { background: none; padding: 0; }
-  .t3-badge-more { background: none; border: 1px dashed rgba(42,107,103,0.45); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 0.76rem; font-weight: 800; cursor: pointer; min-height: 28px; }
+  .t3-badge-more { background: none; border: 1px dashed rgba(42,107,103,0.45); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 0.76rem; font-weight: 800; cursor: pointer; min-height: 44px; } /* round 9 (2026-10-19): 44px tap target */
   .t3-badges li.is-collection { background: rgba(201,162,39,0.16); color: #6B5410; }
   .t3-hours { margin: 0 0 8px; font-size: 0.84rem; color: rgba(27,43,58,0.8); }
   .t3-why { margin: 0 0 6px; padding-left: 18px; font-size: 0.88rem; line-height: 1.5; }

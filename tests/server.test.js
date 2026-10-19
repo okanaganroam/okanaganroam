@@ -26327,7 +26327,9 @@ test('Venue page layout (2026-10-18): same hours every day read as one line, the
     assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
     assert.match(en, />example-cafe\.ca ↗<\/a>/, 'the website row shows the address, not the raw URL');
     assert.match(en, /<div class="venue-extra">/);
-    assert.match(en, /@media \(max-width: 959px\) \{[\s\S]*?\.venue-aside \{ order: 1;/);
+    // Round 9 (2026-10-19): the extras follow the sidebar in the page itself, so no CSS order is needed.
+    assert.ok(en.indexOf('</aside>') < en.indexOf('<div class="venue-extra">'));
+    assert.doesNotMatch(en, /\.venue-aside \{ order: 1;/);
     const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang: 'fr' });
     assert.match(fr, /<span>Tous les jours<\/span>/);
   } finally {
@@ -29758,22 +29760,18 @@ test('Round 8 phone: My Trip\'s map has French Leaflet labels on /fr/my-trip and
   assert.match(html, /L\.control\.zoom\(mapFr \? \{ zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' \} : \{\}\)\.addTo\(map\);/);
   assert.match(html, /mapFr \? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors'/);
   assert.match(html, /Une bibliothèque JavaScript de cartes interactives/);
-  assert.match(html, /iconAnchor: \[12 - p\.dx, 12 - p\.dy\]/);
-  // The fan-out itself: run the same arithmetic on three stops at one spot and one elsewhere.
-  const m = html.match(/var spots = \{\};[\s\S]*?\n    \}\);\n/);
-  assert.ok(m, 'the same-spot code is in the page');
-  const pts = [{ lat: 49.8929, lng: -119.4751 }, { lat: 49.89291, lng: -119.47512 }, { lat: 49.8929, lng: -119.4751 }, { lat: 49.88, lng: -119.49 }];
-  new Function('pts', m[0])(pts);
-  assert.deepEqual([pts[3].dx, pts[3].dy], [0, 0], 'a stop on its own stays put');
-  const ring = pts.slice(0, 3);
+  assert.match(html, /iconAnchor: \[12 - dx, 12 - dy\]/);
+  // The fan-out itself (round 9: by screen distance, see myTripPinSpread): three stops at one spot and one elsewhere.
+  const off = app.myTripPinSpread([{ x: 100, y: 100 }, { x: 100, y: 100 }, { x: 100, y: 100 }, { x: 200, y: 160 }], 24);
+  assert.deepEqual([off[3].dx, off[3].dy], [0, 0], 'a stop on its own stays put');
   for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) {
-    assert.ok(Math.hypot(ring[i].dx - ring[j].dx, ring[i].dy - ring[j].dy) >= 26, 'pins at one spot no longer cover each other (24px pins)');
+    assert.ok(Math.hypot(off[i].dx - off[j].dx, off[i].dy - off[j].dy) >= 26, 'pins at one spot no longer cover each other (24px pins)');
   }
 });
 
 test('Round 8 phone: "Add to trip" on a venue or event page shows a "View My Trip" status message in the page language', () => {
   const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
-  assert.match(js, /if \(trip\.some\(function\(t\)\{ return sameStop\(t, s\); \}\) && tripBtn\.closest\('\[data-surface="venue_page"\], body\.event-page'\)\) showAddedToast\(\);/);
+  assert.match(js, /if \(trip\.some\(function\(t\)\{ return sameStop\(t, s\); \}\) && tripBtn\.closest\('\[data-surface="venue_page"\], body\.event-page'\)\) showAddedToast\(tripBtn\);/);
   assert.match(js, /box\.setAttribute\('role', 'status'\);/);
   assert.match(js, /link\.href = frPathPrefix\(\) \+ '\/my-trip';/);
   assert.match(js, /'trip\.toastView': 'View My Trip'/);
@@ -30743,3 +30741,121 @@ test('Banner speed (round 9): guides and /whats-on get the 800px phone <source> 
     assert.match(out, /<link rel="preload" as="image" imagesrcset="\/images\/a-800\.jpg\?v=2 800w" imagesizes="100vw" media="\(max-width: 640px\)" fetchpriority="high">/, cls);
   }
 });
+
+// ---------- Round 9 phone and accessibility (2026-10-19) ----------
+// My Trip pins spread by screen distance with 44px hit areas, 44px tap targets across the site, the venue page's
+// reading order, a keyboard-reachable "View My Trip" message and the /contact footnote contrast.
+
+test('Round 9 phone: My Trip pins a few pixels apart are spread so none covers another; pins with room stay put', () => {
+  const spread = app.myTripPinSpread;
+  const apart = (o, xy, i, j) => Math.hypot(xy[i].x + o[i].dx - xy[j].x - o[j].dx, xy[i].y + o[i].dy - xy[j].y - o[j].dy);
+  // Pins 9–11 px apart (the live Penticton trip) and two at one spot, plus a chain A–B–C and a pin on its own.
+  const xy = [{ x: 100, y: 100 }, { x: 109, y: 104 }, { x: 118, y: 100 }, { x: 200, y: 200 }, { x: 200, y: 200 }, { x: 300, y: 50 }];
+  const o = spread(xy, 24);
+  for (let i = 0; i < xy.length; i++) for (let j = i + 1; j < xy.length; j++) assert.ok(apart(o, xy, i, j) >= 25, `pins ${i} and ${j} are ${apart(o, xy, i, j).toFixed(1)}px apart`);
+  assert.deepEqual(o[5], { dx: 0, dy: 0 }, 'a pin with room stays on its spot');
+  // A ring keeps its pins close to where they were (within a pin's width or so).
+  for (let i = 0; i < 5; i++) assert.ok(Math.hypot(o[i].dx, o[i].dy) <= 30, `pin ${i} moved ${Math.hypot(o[i].dx, o[i].dy)}`);
+  assert.deepEqual(spread([{ x: 0, y: 0 }, { x: 30, y: 0 }], 24), [{ dx: 0, dy: 0 }, { dx: 0, dy: 0 }], 'pins 30px apart are left alone');
+  assert.deepEqual(spread([], 24), []);
+  // Six at one spot still clear each other.
+  const six = Array.from({ length: 6 }, () => ({ x: 50, y: 50 }));
+  const o6 = spread(six, 24);
+  for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) assert.ok(apart(o6, six, i, j) >= 25);
+});
+
+test('Round 9 phone: /my-trip and /fr/my-trip ship the pin spread, 44px pin hit areas, 44px zoom buttons and pin popups', () => {
+  const vm = require('node:vm');
+  for (const lang of ['en', 'fr']) {
+    const html = app.renderMyTripPage({ lang });
+    // The page's own copy of the helper (shipped with .toString()) runs on its own.
+    const src = html.match(/var myTripPinSpread = (function myTripPinSpread\([\s\S]*?\n\});/);
+    assert.ok(src, 'the helper is in the page');
+    const fn = vm.runInNewContext('(' + src[1] + ')');
+    assert.deepEqual(JSON.parse(JSON.stringify(fn([{ x: 0, y: 0 }, { x: 10, y: 0 }], 24))), JSON.parse(JSON.stringify(app.myTripPinSpread([{ x: 0, y: 0 }, { x: 10, y: 0 }], 24))));
+    assert.match(html, /map\.on\('zoomend', function\(\)\{ if \(spreadPins\) spreadPins\(\); \}\);/, 'the spread is worked out again after every zoom');
+    assert.match(html, /myTripPinSpread\(pts\.map\(function\(p\)\{ return map\.latLngToLayerPoint\(\[p\.lat, p\.lng\]\); \}\), 24\)/);
+    assert.match(html, /body\.my-trip-page \.leaflet-marker-icon\.mt-pin::before \{ content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px;/);
+    assert.match(html, /body\.my-trip-page \.leaflet-control-zoom a \{ width: 44px; height: 44px; line-height: 44px;/);
+    assert.match(html, /mk\.bindPopup\(/);
+    assert.match(html, /url: \(document\.documentElement\.lang === 'fr' && d\.urlFr\) \|\| d\.url/, 'a French pin links to the French page');
+  }
+});
+
+test('Round 9 phone: 44px tap targets on venue, town, category, map, home and planner controls', () => withPass4Server(async (get) => {
+  const ins = db.prepare("INSERT INTO venues (name, region, type, description, description_fr, hours, slug) VALUES ('R9 Targets Winery', 'kelowna', 'winery', 'A round 9 fixture.', 'Une fiche d’essai.', ?, 'r9-targets-winery')").run(SEASON_WEEK);
+  try {
+    for (const p of ['/kelowna/wineries/r9-targets-winery', '/fr/kelowna/wineries/r9-targets-winery']) {
+      const page = await r8PageWithCss(get, p);
+      assert.match(page, /class="venue-lang-switch"/);
+      assert.match(page, /body\.golf-page \.venue-lang-switch a, body\.golf-page \.venue-header \.venue-at-a-glance a \{ display: inline-block; padding: 12px 0; margin: -12px 0; \}/);
+      assert.match(page, /body\.golf-page \.related-card > a, body\.golf-page \.related-card \.related-body > a \{ display: block; padding: 12px 0; margin: -12px 0; \}/);
+      assert.match(page, /body\.golf-page \.related-card > a::after \{ content: ""; position: absolute; inset: 0; \}/);
+    }
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(ins.lastInsertRowid); }
+  for (const p of ['/kelowna', '/fr/kelowna']) {
+    assert.match(await r8PageWithCss(get, p), /@media \(max-width: 700px\) \{[\s\S]*?html body nav\.category-region-selector a, html body nav\.category-region-selector \.category-region-selector-active \{ display: inline-flex; align-items: center; min-height: 44px;/);
+  }
+  for (const p of ['/kelowna/restaurants', '/fr/kelowna/restaurants']) {
+    const css = await r8PageWithCss(get, p);
+    assert.match(css, /body\.fd-page \.fd-pop-btn \{[^}]*min-height: 44px;/);
+    assert.match(css, /body\.fd-page \.fd-sort-select \{[^}]*min-height: 44px;/);
+    assert.doesNotMatch(css, /body\.fd-page \.fd-pop-btn \{[^}]*min-height: 40px;/);
+  }
+  for (const p of ['/map', '/fr/map']) assert.match(await r8PageWithCss(get, p), /body\.map-page \.pm-dir, body\.map-page \.pm-link \{ display: inline-flex; align-items: center; min-height: 44px;/);
+  for (const p of ['/', '/fr']) {
+    const home = await r8PageWithCss(get, p);
+    assert.match(home, /\.hero-search-box \{ padding: 2px 2px 2px 16px; \}\n\s*\.hero-search-field input \{ min-height: 44px; padding: 0; \}\n\s*\.hero-search-box button \{ height: 44px; \}/);
+  }
+  // The planner's CSS (trip-planner-v3-page.js): "+N more" and the "Before you go" links.
+  const planner = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.match(planner, /\.t3-badge-more \{[^}]*min-height: 44px; \}/);
+  assert.match(planner, /\.t3-warnings li a \{ display: inline-block; padding: 12px 0; margin: -12px 0; \}/);
+}));
+
+test('Round 9 accessibility: on a venue page the facts (map, phone, website) come before the visitor photos and guide links in the page itself', () => {
+  seasonInsert.run({ name: 'R9 Order Cafe', type: 'cafe', hours: SEASON_WEEK, slug: 'r9-order-cafe' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe');
+  try {
+    db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://example.com/', address = '1 Test St, Kelowna' WHERE id = ?").run(v.id);
+    for (const lang of ['en', 'fr']) {
+      const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
+      const aside = html.indexOf('<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = html.indexOf('<div class="venue-extra">');
+      assert.ok(aside > 0 && extra > asideEnd, 'the extras follow the sidebar');
+      assert.ok(html.indexOf('class="map-link"') > aside && html.indexOf('class="map-link"') < asideEnd, 'View on map is in the sidebar');
+      assert.ok(html.indexOf('tel:') < extra, 'the phone comes first');
+      if (html.includes('id="vcOpen"')) assert.ok(html.indexOf('id="vcOpen"') > extra, 'Share a photo or tip comes after the facts');
+      assert.ok(html.indexOf('<div class="venue-main">') < aside, 'the story still comes first');
+      // Desktop keeps two columns: the extras under the story, the sidebar beside both. Phones need no CSS order.
+      assert.match(html, /body\.golf-page \.venue-layout \{ display: grid; grid-template-columns: minmax\(0, 1fr\) 340px; grid-template-rows: auto 1fr;/);
+      assert.match(html, /body\.golf-page \.venue-aside \{ grid-column: 2; grid-row: 1 \/ span 2; \}/);
+      assert.match(html, /body\.golf-page \.venue-extra \{ grid-column: 1; grid-row: 2; \}/);
+      assert.doesNotMatch(html, /\.venue-extra \{ order: 2; \}/);
+    }
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(v.id); }
+});
+
+test('Round 9 accessibility: the "View My Trip" message follows the Add button in the page and waits while focus is in it', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  const fnSrc = js.match(/function showAddedToast\(afterEl\)\{[\s\S]*?\n  \}\n/);
+  assert.ok(fnSrc, 'showAddedToast takes the button');
+  assert.match(fnSrc[0], /afterEl\.parentNode\.insertBefore\(box, afterEl\.nextSibling\)/);
+  assert.match(fnSrc[0], /if \(!box\.contains\(document\.activeElement\)\) addedToastTimer = setTimeout\(hideAddedToast, 6000\);/);
+  assert.match(fnSrc[0], /if \(e && e\.type === 'mouseleave' && box\.contains\(document\.activeElement\)\) return;/, 'moving the mouse away does not hide it while it has focus');
+  assert.match(fnSrc[0], /var back = box\.contains\(document\.activeElement\) && box\.previousElementSibling;/, 'Esc hands focus back to the button');
+  assert.match(fnSrc[0], /#tripAddedToast\{width:max-content !important;margin:0 !important;/, 'a button row\'s sizing rules do not reach it');
+  assert.match(fnSrc[0], /position:fixed;/, 'it still shows at the foot of the screen');
+});
+
+test('Round 9 accessibility: the /contact and /fr/contact footnote is at least 4.5:1', () => withPass4Server(async (get) => {
+  for (const p of ['/contact', '/fr/contact']) {
+    const html = await r8PageWithCss(get, p);
+    assert.match(html, /class="info-updated"/);
+    const op = Number(html.match(/body\.info-page \.info-updated \{[^}]*opacity: ([\d.]+);/)[1]);
+    // #4A3428 text on the #F5F3ED page at that opacity.
+    const mix = [0x4A, 0x34, 0x28].map((c, i) => c * op + [0xF5, 0xF3, 0xED][i] * (1 - op));
+    const lum = (rgb) => { const l = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]; };
+    const ratio = (lum([0xF5, 0xF3, 0xED]) + 0.05) / (lum(mix) + 0.05);
+    assert.ok(ratio >= 4.5, `${p}: ${ratio.toFixed(2)}:1`);
+  }
+}));
