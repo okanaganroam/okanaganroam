@@ -30817,7 +30817,7 @@ test('Round 9 phone: /my-trip and /fr/my-trip ship the pin spread, 44px pin hit 
     const fn = vm.runInNewContext('(' + src[1] + ')');
     assert.deepEqual(JSON.parse(JSON.stringify(fn([{ x: 0, y: 0 }, { x: 10, y: 0 }], 24))), JSON.parse(JSON.stringify(app.myTripPinSpread([{ x: 0, y: 0 }, { x: 10, y: 0 }], 24))));
     assert.match(html, /map\.on\('zoomend', function\(\)\{ if \(spreadPins\) spreadPins\(\); \}\);/, 'the spread is worked out again after every zoom');
-    assert.match(html, /myTripPinSpread\(pts\.map\(function\(p\)\{ return map\.latLngToLayerPoint\(\[p\.lat, p\.lng\]\); \}\), 24\)/);
+    assert.match(html, /myTripPinSpread\(pts\.map\(function\(p\)\{ return map\.latLngToLayerPoint\(\[p\.lat, p\.lng\]\); \}\), 26\)/);  // round 10: 26px
     assert.match(html, /body\.my-trip-page \.leaflet-marker-icon\.mt-pin::before \{ content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px;/);
     assert.match(html, /body\.my-trip-page \.leaflet-control-zoom a \{ width: 44px; height: 44px; line-height: 44px;/);
     assert.match(html, /mk\.bindPopup\(/);
@@ -31187,3 +31187,113 @@ test('Round 9 My Trip: a season notice is judged on the stop\'s planned date, no
     db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(hill.id);
   }
 }));
+
+
+// ---------- Round 10 My Trip (2026-10-19) ----------
+// Seasonal stops judged by their usual season, events saved with their next date and time, and the map's keyboard and
+// screen-reader names and pin spread.
+
+test('Round 10 My Trip: a ski-hill place closed for the season with no reopening date says "Seasonal" on a January stop', () => r8Fixtures([
+  { name: 'R10 Ski Village Pizza', region: 'silverstar', type: 'restaurant' },
+  { name: 'R10 Lakeside Ice Cream', region: 'penticton', type: 'cafe' },
+  { name: 'R10 Ski Village Known', region: 'big-white', type: 'restaurant' },
+], async ([pizza, cream, known]) => {
+  const ins = db.prepare('INSERT INTO venue_seasons (venue_id, status, reopens_date, source_url, checked_at) VALUES (?, ?, ?, ?, ?)');
+  ins.run(pizza.id, 'closed', null, 'https://example.com/a', '2026-10-01');
+  ins.run(cream.id, 'closed', null, 'https://example.com/b', '2026-10-01');
+  ins.run(known.id, 'closed', '2027-02-01', 'https://example.com/c', '2026-10-01');
+  try {
+    const now = new Date('2026-10-19T19:00:00Z');
+    const on = (v, d) => app.tripStopsFor([`venue:${v.id}`], now, { [`venue:${v.id}`]: d })[0].notice;
+    // In its usual season (December to March for a ski-hill place): seasonal, in English and French.
+    const jan = on(pizza, '2027-01-09');
+    assert.equal(jan.kind, 'seasonal');
+    assert.equal(jan.text, 'Seasonal — opening date not announced yet');
+    assert.equal(jan.textFr, 'Saisonnier — date d’ouverture pas encore annoncée');
+    // Out of its season (mid-November) it is still closed.
+    assert.equal(on(pizza, '2026-11-15').kind, 'closed');
+    // Before a known reopening date it is closed, even in the ski season.
+    assert.equal(on(known, '2027-01-16').kind, 'closed');
+    // A valley café's usual season is May to September: a February stop is still closed.
+    assert.equal(on(cream, '2027-02-10').kind, 'closed');
+    // The rule itself.
+    assert.deepEqual(app.tripUsualSeasonMonths({ region: 'kelowna', name: 'Kelowna Nordic Ski Club' }), [12, 1, 2, 3]);
+    assert.deepEqual(app.tripUsualSeasonMonths({ region: 'penticton', name: 'Beach Hut' }), [5, 6, 7, 8, 9]);
+    assert.equal(app.tripSeasonUnannouncedOn({ status: 'closed', reopens_date: null, checked_at: '2027-01-05' }, { region: 'silverstar', name: 'X' }, '2027-02-01'), false, 'a closure that began in the season is not overridden');
+    // The page shows the seasonal kind with its own icon.
+    const html = app.renderMyTripPage({ lang: 'fr' });
+    assert.ok(html.includes("d.notice.kind === 'seasonal' ? '🗓️'"));
+  } finally {
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id IN (?, ?, ?)').run(pizza.id, cream.id, known.id);
+  }
+}));
+
+test('Round 10 My Trip: an event stop carries its upcoming dates and times, and the page saves one with the stop', () => r8Fixtures([
+  { name: 'R10 Comedy Hall', region: 'kelowna', type: 'indoor' },
+], async ([hall]) => {
+  db.prepare("INSERT INTO events (name, slug, region, start_datetime, end_datetime, venue_id) VALUES ('R10 Comedy Night', 'r10-comedy-night', 'kelowna', '2026-10-19T19:30', '2026-10-28T23:00', ?)").run(hall.id);
+  const eid = db.prepare("SELECT id FROM events WHERE slug = 'r10-comedy-night'").get().id;
+  const occ = db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time, ends_next_day, all_day) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  occ.run(eid, '2026-10-19', '2026-10-19', '12:00', '13:00', 0, 0); // over by 3 pm
+  occ.run(eid, '2026-10-21', '2026-10-21', '19:30', '22:00', 0, 0);
+  occ.run(eid, '2026-10-24', '2026-10-25', '22:00', '01:00', 1, 0);
+  occ.run(eid, '2026-10-28', '2026-10-28', null, null, 0, 1);
+  try {
+    const now = new Date('2026-10-19T22:00:00Z'); // 3 pm in the Okanagan
+    assert.deepEqual(app.tripEventOccurrences(eid, now), [
+      { d: '2026-10-21', s: 1170, e: 1320 },
+      { d: '2026-10-24', u: '2026-10-25', s: 1320, e: 1500 },
+      { d: '2026-10-28' },
+    ]);
+    const [stop] = app.tripStopsFor([`event:${eid}`], now);
+    assert.equal(stop.occ.length, 3);
+    for (const lang of ['en', 'fr']) {
+      const html = app.renderMyTripPage({ lang });
+      assert.ok(html.includes('function fillEventTimes(){'));
+      assert.ok(html.includes("times[k] = { d: p.o.d, ev: 1 };"), 'the date is saved with the stop');
+      assert.ok(html.includes('.then(function(){ fillEventTimes(); render(); });'));
+      assert.ok(html.includes("var ownDate = x.s.time && x.s.time.d && x.s.time.d !== gDate ? dateText(x.s.time.d) : '';"), 'a date outside its day heading is shown');
+      // The page's own eventPick: a planned day's date wins, else the next date.
+      const src = html.match(/  function eventPick\(occ, dates\)\{[\s\S]*?\n  \}\n/);
+      assert.ok(src);
+      const pick = require('node:vm').runInNewContext('(' + src[0].trim().replace(/^function eventPick/, 'function') + ')');
+      const list = app.tripEventOccurrences(eid, now);
+      assert.deepEqual(JSON.parse(JSON.stringify(pick(list, []))), { o: { d: '2026-10-21', s: 1170, e: 1320 }, i: -1 });
+      assert.deepEqual(JSON.parse(JSON.stringify(pick(list, ['2026-10-23', '2026-10-24']))), { o: { d: '2026-10-24', s: 1320, e: 1500 }, i: 1 });
+      assert.deepEqual(JSON.parse(JSON.stringify(pick(list, ['2026-10-25']))), { o: { d: '2026-10-25', s: 1320, e: 1500 }, i: 0 }, 'a run spanning the planned day');
+    }
+    await withDiscoveryServer(async (base) => {
+      const api = await (await fetch(`${base}/api/trip-stops?refs=event:${eid}`)).json();
+      assert.ok(Array.isArray(api.stops[0].occ));
+    });
+  } finally {
+    db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(eid);
+    db.prepare('DELETE FROM events WHERE id = ?').run(eid);
+  }
+}));
+
+test('Round 10 My Trip: map label, pin names, Escape on pins and a 26px pin spread, in English and French', () => {
+  const vm = require('node:vm');
+  for (const [lang, label] of [['en', 'Map of your trip stops'], ['fr', 'Carte des arrêts de votre voyage']]) {
+    const html = app.renderMyTripPage({ lang });
+    assert.ok(html.includes(`<div id="mtMap" role="region" aria-label="${label}" hidden></div>`));
+    assert.ok(html.includes(`<span class="mt-num" aria-hidden="true">' + p.n + '</span>`), 'the number is hidden from screen readers');
+    assert.ok(html.includes("e.setAttribute('aria-label', p.n + '. ' + p.name)"), 'the pin is named "1. Name"');
+    assert.ok(html.includes("if ((e.key === 'Escape' || e.key === 'Esc') && map._popup && map.hasLayer(map._popup)"), 'Escape closes the pin popup');
+    assert.ok(html.includes('if (target && document.body.contains(target)) target.focus({ preventScroll: true });'), 'focus goes back to the pin');
+    // The page's own spread helper keeps every pin 26px clear, also when a ring lands next to another pin.
+    const fn = vm.runInNewContext('(' + html.match(/var myTripPinSpread = (function myTripPinSpread\([\s\S]*?\n\});/)[1] + ')');
+    for (let t = 0; t < 300; t++) {
+      const n = 2 + (t % 8);
+      const xy = Array.from({ length: n }, (_, i) => ({ x: (i * 37 + t * 13) % 70, y: (i * 53 + t * 7) % 70 }));
+      const o = fn(xy, 26);
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        assert.ok(Math.hypot(xy[i].x + o[i].dx - xy[j].x - o[j].dx, xy[i].y + o[i].dy - xy[j].y - o[j].dy) >= 25.5, `case ${t}: pins ${i} and ${j}`);
+      }
+    }
+  }
+  // A two-pin ring that used to land 14px from a third pin: the three are laid out together.
+  const xy = [{ x: 100, y: 100 }, { x: 110, y: 100 }, { x: 135, y: 100 }];
+  const o = app.myTripPinSpread(xy, 26);
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) assert.ok(Math.hypot(xy[i].x + o[i].dx - xy[j].x - o[j].dx, xy[i].y + o[i].dy - xy[j].y - o[j].dy) >= 26);
+});
