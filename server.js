@@ -1251,10 +1251,37 @@ function guardedAmenityCorrectUpdate(id, fieldValues, meta) {
   }
 }
 
+// Deleting a listing (2026-10-19): foreign keys are enforced, so a venue with owner links, photos, menus, seasons,
+// claims or visitor tips failed with "FOREIGN KEY constraint failed" (Misato's Kitchen). The rows that only exist
+// for this venue go with it; events and venue submissions are kept with their venue link cleared, and any listing
+// that redirected here stops redirecting. All in one transaction, so a failure leaves nothing half-deleted.
+const VENUE_DELETE_CHILDREN = [
+  // Grandchildren first: they point at child rows of this venue.
+  ['venue_menu_files', 'menu_id IN (SELECT id FROM venue_menus WHERE venue_id = ?)'],
+  ['visitor_contribution_photos', 'contribution_id IN (SELECT id FROM visitor_contributions WHERE venue_id = ?)'],
+  ['venue_seasons', 'venue_id = ?'], ['venue_owner_links', 'venue_id = ?'], ['owner_change_requests', 'venue_id = ?'],
+  ['owner_photos', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
+  ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
+  ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'],
+];
+const VENUE_DELETE_UNLINK = [['events', 'venue_id'], ['venue_submissions', 'venue_id'], ['venues', 'redirect_to']];
 function deleteVenue(id) {
-  const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
-
-  return info.changes > 0;
+  const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((r) => r.name));
+  db.exec('BEGIN');
+  try {
+    for (const [table, where] of VENUE_DELETE_CHILDREN) {
+      if (tables.has(table)) db.prepare(`DELETE FROM ${table} WHERE ${where}`).run(id);
+    }
+    for (const [table, col] of VENUE_DELETE_UNLINK) {
+      if (tables.has(table)) db.prepare(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ?`).run(id);
+    }
+    const info = db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+    db.exec('COMMIT');
+    return info.changes > 0;
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ }
+    throw err;
+  }
 }
 
 // ---------- Phase 2.8E/2.8F: narrow field-merge + retire ----------
@@ -46828,6 +46855,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  deleteVenue,
   withChipWidths,
   eventTextPlace,
   CHIP_TEXT_EM,
