@@ -530,7 +530,7 @@ function renderStyles() {
   p.t3-drive-in { margin: 12px 0 0 126px; padding: 0 0 0 4px; }
   .t3-card { background: #fff; border-radius: 14px; padding: 16px 18px 14px; box-shadow: 0 12px 26px -20px rgba(27,43,58,0.5); border: 1px solid rgba(27,43,58,0.06); }
   .t3-card.is-kept { border-color: var(--ref-gold); box-shadow: 0 0 0 1px var(--ref-gold), 0 12px 26px -20px rgba(27,43,58,0.5); }
-  .t3-card-top { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(27,43,58,0.6); }
+  .t3-card-top { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ref-navy-muted, #56636E); }
   .t3-card h4 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.22rem; margin: 4px 0 4px; line-height: 1.25; }
   .t3-card h4 a { color: var(--ref-navy); text-decoration: none; } .t3-card h4 a:hover { text-decoration: underline; }
   .t3-event-place { margin: 0 0 8px; color: rgba(27,43,58,0.78); font-size: 0.92rem; font-weight: 700; }

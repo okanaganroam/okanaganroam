@@ -1923,7 +1923,9 @@ ${rest.map((p) => `      ${para(p)}`).join('\n')}
   </div>`;
 }
 const REGION_INTRO_STYLE = `<style>
-body.region-page .region-intro { max-width: 68ch; margin: 0 0 26px; }
+/* Layout shift (2026-10-19, review pass 5): em, not ch -- a ch is the width of the font's "0", which is 6% wider in
+   Nunito than in its Arial fallback, so the column changed width when the web font arrived. 40.8em = 68ch in Nunito. */
+body.region-page .region-intro { max-width: 40.8em; margin: 0 0 26px; }
 body.region-page .region-intro p { font-size: 1.02rem; line-height: 1.65; margin: 0 0 12px; }
 body.region-page .region-intro-toggle { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
 body.region-page .region-intro-readmore { display: none; font-weight: 700; color: var(--teal-deep); cursor: pointer; }
@@ -1933,6 +1935,11 @@ body.region-page .region-intro-toggle:focus-visible + .region-intro-more + .regi
   body.region-page .region-intro-readmore { display: inline-block; }
   body.region-page .region-intro-toggle:checked + .region-intro-more { display: block; }
   body.region-page .region-intro-toggle:checked + .region-intro-more + .region-intro-readmore { display: none; }
+}
+/* Keyboard (2026-10-19, review pass 5): desktop shows the whole intro and hides
+   the label, so the 1x1 checkbox leaves the tab order there too. */
+@media (min-width: 641px) {
+  body.region-page .region-intro-toggle { display: none; }
 }
 </style>`;
 
@@ -9852,10 +9859,12 @@ function renderCanonicalFooterStyles() {
   }
   .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
   .home-footer-region-group a { font-size: 0.82rem; line-height: 1.3; }
-  .home-footer-social-row { display: flex; gap: 10px; }
+  /* Tap targets (2026-10-19, review pass 5): each icon is a 44px target; a 5px clear border keeps the round badge 34px
+     (and the row's visible 10px gaps) as before. */
+  .home-footer-social-row { display: flex; gap: 0; }
   .home-footer-social-icon {
     position: relative; display: flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; border-radius: 50%;
+    box-sizing: border-box; width: 44px; height: 44px; border: 5px solid transparent; border-radius: 50%;
     background: rgba(245,243,237,0.1); color: rgba(245,243,237,0.8);
     cursor: default; transition: background 0.15s, opacity 0.15s;
   }
@@ -9867,6 +9876,7 @@ function renderCanonicalFooterStyles() {
   .home-footer-social-icon.icon-facebook { background: #1877F2; color: #fff; }
   .home-footer-social-icon.icon-tiktok { background: #010101; color: #25F4EE; opacity: 1; }
   .home-footer-social-icon.icon-tiktok:hover { opacity: 0.85; }
+  .home-footer-social-row .home-footer-social-icon { background-clip: padding-box; }
   .home-footer-social-icon::after {
     content: attr(data-tooltip);
     position: absolute; bottom: calc(100% + 8px); left: 50%;
@@ -10733,7 +10743,8 @@ const SEO_PAGE_CSS = `
     font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 2rem;
     line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 6px;
   }
-  .subtitle { color: var(--ink); opacity: 0.66; font-size: 1.02rem; margin: 0 0 26px; }
+  /* Contrast (2026-10-19, review pass 5): one solid muted token instead of opacity (was 2.57:1). */
+  .subtitle { color: var(--ink-muted, #6B5D54); font-size: 1.02rem; margin: 0 0 26px; }
 
   .card-grid { padding: 0; margin: 0; }
   .venue-card, .category-card {
@@ -10929,7 +10940,7 @@ const SEO_PAGE_CSS = `
   .venue-hours-season { margin: 4px 0 6px; font-weight: 800; }
   .venue-hours-usual summary { cursor: pointer; font-size: 0.9rem; font-weight: 700; opacity: 0.8; }
   .venue-hours-usual .hours-list { opacity: 0.75; }
-  .venue-hours-checked { margin: 8px 0 0; font-size: 0.8rem; opacity: 0.7; }
+  .venue-hours-checked { margin: 8px 0 0; font-size: 0.8rem; color: var(--ink-muted, #6B5D54); }
   .venue-hours-stale { margin: 4px 0 0; font-size: 0.84rem; font-weight: 700; color: #8A4B1F; }
 
   footer.site-footer {
@@ -11532,6 +11543,9 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
   #navHamburger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
   #navHamburger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
   body.nav-menu-open { overflow: hidden; }
+  /* A dimmed backdrop behind the open phone menu (2026-10-19, review pass 5): it sits under the sticky header
+     (z-index 60) and over the page; a tap on it closes the menu. */
+  body.nav-menu-open::after { content: ''; position: fixed; inset: 0; z-index: 59; background: rgba(16,27,36,0.45); }
   .nav-links.open { max-height: calc(100vh - 72px); max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain; }
 }
 @media (prefers-reduced-motion: reduce) { #navHamburger span { transition: none; } }
@@ -11592,12 +11606,21 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
   // Tab and Shift+Tab go round the open phone menu: its links, then the Close menu button, then back to the first
   // link (2026-10-18, review pass 4). Without it Tab left the menu for the browser's address bar and came back in at
   // the skip link. Focus that is somehow outside the menu is brought back to its first item.
-  document.addEventListener('keydown', function(e){
-    if (e.key !== 'Tab' || !links || !links.classList.contains('open') || (phoneMq && !phoneMq.matches)) return;
+  // Visual order (2026-10-19, review pass 5): the ring follows what the eye sees, top to bottom then left to right
+  // (Close menu, Build My Trip, My Trip, the language buttons, then Discover and the rest), not the page's source
+  // order, which had the menu's links first and Build My Trip near the end.
+  function menuRing(){
     var all = links.querySelectorAll('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])');
     var ring = [];
-    for (var i = 0; i < all.length; i++) if (visible(all[i]) && !all[i].closest('[inert]')) ring.push(all[i]);
+    for (var i = 0; i < all.length; i++) if (visible(all[i]) && !(all[i].closest && all[i].closest('[inert]'))) ring.push(all[i]);
     if (burger && visible(burger)) ring.push(burger);
+    var pos = ring.map(function(el, i){ var r = el.getBoundingClientRect ? el.getBoundingClientRect() : { top: 0, left: 0 }; return { el: el, top: r.top, left: r.left, i: i }; });
+    pos.sort(function(a, b){ return Math.abs(a.top - b.top) > 4 ? a.top - b.top : (a.left - b.left) || (a.i - b.i); });
+    return pos.map(function(x){ return x.el; });
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Tab' || !links || !links.classList.contains('open') || (phoneMq && !phoneMq.matches)) return;
+    var ring = menuRing();
     if (!ring.length) return;
     var at = ring.indexOf(document.activeElement), next = null;
     if (at === -1) next = e.shiftKey ? ring[ring.length - 1] : ring[0];
@@ -11632,7 +11655,12 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
       var menuWasOpen = links.classList.contains('open');
       new MutationObserver(function(){
         var open = links.classList.contains('open');
-        if (open && !menuWasOpen) setTimeout(function(){ if (links.classList.contains('open')) focusEl(firstFocusable(links)); }, 0);
+        if (open && !menuWasOpen) setTimeout(function(){
+          if (!links.classList.contains('open')) return;
+          // The first item on screen (Build My Trip), not the first in the page's source (2026-10-19).
+          var ring = (!phoneMq || phoneMq.matches) ? menuRing().filter(function(el){ return el !== burger; }) : [];
+          focusEl(ring[0] || firstFocusable(links));
+        }, 0);
         menuWasOpen = open;
         syncMenu();
       }).observe(links, { attributes: true, attributeFilter: ['class'] });
@@ -11691,6 +11719,42 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
       if (burger) { burger.setAttribute('aria-expanded', 'false'); focusEl(burger); }
       e.preventDefault();
     }
+  });
+  // Filter panels on phones (2026-10-19, review pass 5): a panel opened from a button low on the screen ran past the
+  // bottom edge, with its "Show N results" button out of sight. When one opens on a phone, the page scrolls so its
+  // button sits just under the sticky header, then the panel's height is capped at the space actually left on screen
+  // (its Show results row is sticky at its foot, so it stays in view while the panel scrolls inside).
+  function fitPopPanel(btn){
+    var pnl = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!pnl || btn.getAttribute('aria-expanded') !== 'true' || !visible(pnl)) return;
+    var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    if (window.innerWidth > 640) { pnl.style.maxHeight = ''; return; }
+    var head = document.getElementById('top'), headBottom = 0;
+    if (head && /sticky|fixed/.test(getComputedStyle(head).position)) headBottom = Math.max(0, head.getBoundingClientRect().bottom);
+    var bt = btn.getBoundingClientRect().top;
+    if (pnl.getBoundingClientRect().bottom > vh - 16 && bt > headBottom + 12) {
+      // Instant, not the page's smooth scrolling, so the room below is measured after the move.
+      try { window.scrollBy({ top: bt - headBottom - 12, behavior: 'instant' }); } catch (e) { window.scrollBy(0, bt - headBottom - 12); }
+    }
+    var room = Math.floor(vh - pnl.getBoundingClientRect().top - 16);
+    pnl.style.maxHeight = Math.max(200, room) + 'px';
+  }
+  document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest ? e.target.closest('button[aria-controls][class*="pop-btn"]') : null;
+    if (!btn) return;
+    setTimeout(function(){ fitPopPanel(btn); }, 0);
+  }, true); // capture: the pages' own button handlers stop the click's propagation
+  if (window.addEventListener) window.addEventListener('resize', function(){
+    var open = document.querySelectorAll('button[aria-controls][class*="pop-btn"][aria-expanded="true"]');
+    for (var i = 0; i < open.length; i++) fitPopPanel(open[i]);
+  });
+  // A tap on the phone menu's dimmed backdrop (the body's ::after, with the page under it inert) closes the menu
+  // (2026-10-19, review pass 5).
+  document.addEventListener('click', function(e){
+    if (!links || !links.classList.contains('open') || (phoneMq && !phoneMq.matches)) return;
+    if (e.target !== document.body && e.target !== document.documentElement) return;
+    links.classList.remove('open');
+    if (burger) burger.setAttribute('aria-expanded', 'false');
   });
   // Skip to content: focus the page's main element (#main where it has that id, else the first one).
   document.addEventListener('click', function(e){
@@ -11996,7 +12060,14 @@ const BMT_HEADER_STYLE = `<style id="bmt-header">
 .nav #navTripBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; position: relative; flex-shrink: 0; min-height: 40px; padding: 0 18px; white-space: nowrap; text-decoration: none; }
 .nav #navTripBtn:focus-visible { outline: 2px solid var(--ref-gold); outline-offset: 2px; }
 .nav #navTripBtn::after { content: ""; position: absolute; inset: -2px; }
+/* Tap targets (2026-10-19, review pass 5): the button's own box is 44px tall; a clear top and bottom border keeps the
+   visible pill at 40px here (36px on phones). */
+.nav #navTripBtn, .nav #navTripBtn:hover { border-top: 2px solid transparent; border-bottom: 2px solid transparent; background-clip: padding-box; }
+.nav #navTripBtn { min-height: 44px; }
 .nav .logo-wordmark, .nav .lang-toggle { white-space: nowrap; }
+/* Layout shift (2026-10-19, review pass 5): on wide screens the wordmark keeps one width in either face (its fallback
+   is 9.92em, Nunito's Fraunces 9.69em), so the menu beside it does not slide sideways when the web font arrives. */
+@media (min-width: 941px) { .nav .logo-wordmark { display: inline-block; min-width: 9.95em; } }
 /* Venue descriptions ship in both languages (2026-10-12); app.js sets the page's lang attribute from the EN / FR toggle, so CSS shows the chosen one. */
 .desc-fr { display: none; }
 html[lang="fr"] .desc-fr { display: inline; }
@@ -12021,7 +12092,8 @@ html[lang="fr"] .desc-en { display: none; }
   .nav-brand { flex: 1 1 0; min-width: 0; }
   .nav .lang-toggle { display: none; }
   .nav-hamburger { padding: 8px 4px; flex-shrink: 0; }
-  .nav #navTripBtn { min-height: 36px; padding: 0 12px; font-size: 0.8rem; gap: 4px; }
+  .nav #navTripBtn { min-height: 44px; padding: 0 12px; font-size: 0.8rem; gap: 4px; }
+  .nav #navTripBtn, .nav #navTripBtn:hover { border-top-width: 4px; border-bottom-width: 4px; }
   /* The phone header button is text only: a trailing arrow there reads like a menu or a next-step control. (Desktop keeps its arrow; the menu's Build My Trip row keeps its own.) */
   .nav #navTripBtn svg { display: none; }
   .nav #navTripBtn::after { inset: -4px -2px; }
@@ -13237,7 +13309,7 @@ function renderGolfThemeStyles() {
     font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; line-height: 1.15;
     font-size: clamp(1.7rem, 3vw, 2.2rem); margin: 0 0 6px; color: var(--ink);
   }
-  body.golf-page .subtitle { font-size: 0.95rem; color: rgba(42,32,25,0.65); margin: 0 0 22px; }
+  body.golf-page .subtitle { font-size: 0.95rem; color: var(--ink-muted, #6B5D54); margin: 0 0 22px; }
 
   /* Region selector: homepage redesign pills -- resting/hover from
      .lang-toggle, active from .region-chip[aria-pressed="true"] (app.css). */
@@ -14646,7 +14718,8 @@ const REGION_PAGE_STYLE = `<style id="region-page">
   /* Wide screens (2026-10-14): the guide on the left, Places to start beside
      it in two columns, instead of the guide alone in the left half. */
   @media (min-width: 1100px) {
-    body.region-page .region-lead-split { display: grid; grid-template-columns: minmax(0, 64ch) minmax(0, 1fr); gap: 40px; align-items: start; }
+    /* 38.4em = 64ch in Nunito, in em so the column keeps its width when the web font replaces the fallback (2026-10-19). */
+    body.region-page .region-lead-split { display: grid; grid-template-columns: minmax(0, 38.4em) minmax(0, 1fr); gap: 40px; align-items: start; }
     body.region-page .region-lead-split .region-start { margin-top: 2px; position: sticky; top: 96px; }
     body.region-page .region-lead-split .region-start .category-subsection-heading { margin-top: 0; }
     body.region-page .region-lead-split .region-start .region-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 0; }
@@ -15421,6 +15494,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     loading: 'Chargement de la carte…', loadFailed: 'La carte n’a pas pu se charger. Rechargez la page pour réessayer.',
     placesNear: function(n, r){ return n + (n === 1 ? ' lieu' : ' lieux') + (r ? ' à moins de ' + r + ' km' : ' autour de vous'); },
     placesHere: function(n){ return n + (n === 1 ? ' lieu' : ' lieux') + ' dans cette zone de la carte'; },
+    clusterPlaces: function(n){ return n + ' lieux ici, zoomez pour les voir'; }, clusterEvents: function(n){ return n + ' événements ici, zoomez pour les voir'; },
     openSuffix: ' ouverts', eventsCount: function(n){ return n + (n === 1 ? ' événement' : ' événements') + ' cette semaine'; },
     eventsNear: function(n, r){ return n + (n === 1 ? ' événement' : ' événements') + (r ? ' à moins de ' + r + ' km' : ' près de vous') + ' cette semaine'; },
     zoomHint: 'Touchez le bouton de position pour voir ce qui est près de vous.',
@@ -15446,6 +15520,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     loading: 'Loading the map…', loadFailed: 'The map couldn’t load. Reload the page to try again.',
     placesNear: function(n, r){ return n + (n === 1 ? ' place' : ' places') + (r ? ' within ' + r + ' km' : ' near you'); },
     placesHere: function(n){ return n + (n === 1 ? ' place' : ' places') + ' in this part of the map'; },
+    clusterPlaces: function(n){ return n + ' places here, zoom in'; }, clusterEvents: function(n){ return n + ' events here, zoom in'; },
     openSuffix: ' open', eventsCount: function(n){ return n + (n === 1 ? ' event' : ' events') + ' this week'; },
     eventsNear: function(n, r){ return n + (n === 1 ? ' event' : ' events') + (r ? ' within ' + r + ' km' : ' near you') + ' this week'; },
     zoomHint: 'Tap the locate button to see what’s near you.',
@@ -15552,7 +15627,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function dayText(d){ return new Date(d + 'T12:00:00Z').toLocaleDateString(FR ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); }
   ${MAP_EVENT_GROUP_SRC}
   ${MAP_PLACE_LIST_SRC}
-  var listOn = false;
+  var listOn = false, lastLayerKey = null;
   function whenText(e, g){
     var times = e.st ? timeText(e.st) + (e.et ? '–' + timeText(e.et) : '') : '';
     if (g === 'now') return e.ed > e.sd && !e.st ? T.onNow + ' · ' + T.until + ' ' + dayText(e.ed) : T.onNow + (times ? ' · ' + times : '') + (e.ed > e.sd ? ' · ' + T.until + ' ' + dayText(e.ed) : '');
@@ -15656,11 +15731,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       onMap = items.filter(function(e){ return e.lat != null; });
       countEl.textContent = me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
     }
-    cluster.clearLayers();
     // During directions, only the destination stays on the map.
     if (typeof route !== 'undefined' && route) onMap = [route.x];
     var layers = onMap.map(function(x){ return x.m; }).filter(Boolean);
-    if (cluster.addLayers) cluster.addLayers(layers); else layers.forEach(function(m){ cluster.addLayer(m); });
+    // Keyboard (2026-10-19, review pass 5): the pins are rebuilt only when the set on the map changes. Rebuilding them
+    // after every pan (a popup's own pan included) closed the popup that had just opened and threw away the focused pin.
+    var layerKey = tab + '|' + layers.map(function(m){ return L.stamp(m); }).join(',');
+    if (layerKey !== lastLayerKey) {
+      lastLayerKey = layerKey;
+      cluster.clearLayers();
+      if (cluster.addLayers) cluster.addLayers(layers); else layers.forEach(function(m){ cluster.addLayer(m); });
+    }
     listItems = items;
     drawList();
     // Near me opens on the closest dozen places (individual pins, not bubbles); the list still covers the whole distance.
@@ -16337,6 +16418,60 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   $('pmTabPlaces').addEventListener('click', function(){ setTab('places'); });
   $('pmTabEvents').addEventListener('click', function(){ setTab('events'); });
+  // Map keyboard use (2026-10-19, review pass 5).
+  // - A pin opened with Enter moves focus into its place card (the popup); Escape, or its close button, closes the card
+  //   and puts focus back on the pin.
+  // - Each cluster bubble has a name ("22 places here, zoom in"), not just its number.
+  // - Pins sitting under the search bar, the chips, the round buttons, the list sheet or the map's own controls leave the Tab order: they can't
+  //   be seen or tapped there, and come back once the map moves them into the clear.
+  var keyPin = null;
+  map.getContainer().addEventListener('keydown', function(e){
+    var t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t.classList && t.classList.contains('leaflet-marker-icon') && !t.classList.contains('marker-cluster')) keyPin = t;
+    // Leaflet only hears Escape while the map itself has focus, not from inside a popup.
+    if ((e.key === 'Escape' || e.key === 'Esc') && t.closest && t.closest('.leaflet-popup')) { e.preventDefault(); map.closePopup(); }
+  }, true);
+  map.on('popupopen', function(e){
+    var pin = keyPin; keyPin = null;
+    if (!pin) return;
+    var el = e.popup.getElement(), first = el && el.querySelector('.pm-pop a[href]');
+    e.popup._pmOpener = pin;
+    if (first) setTimeout(function(){ try { first.focus({ preventScroll: true }); } catch (err) { first.focus(); } }, 0);
+  });
+  map.on('popupclose', function(e){
+    var pin = e.popup._pmOpener, src = e.popup._source;
+    e.popup._pmOpener = null;
+    if (!pin) return;
+    var a = document.activeElement, el = e.popup.getElement();
+    if (a && a !== document.body && !(el && el.contains(a))) return;
+    var target = (src && src.getElement && src.getElement()) || pin;
+    if (target && document.body.contains(target)) target.focus({ preventScroll: true });
+  });
+  var COVERS = [floatEl.querySelector('.pm-searchbar'), $('pmPlaceFilters'), $('pmNavbar'), $('pmStatus'), $('pmNear'), $('pmPinBtn'), sheet];
+  var pinFixQueued = false;
+  function fixPins(){
+    pinFixQueued = false;
+    var rects = [];
+    // The map's own controls too (zoom buttons, the map credits).
+    COVERS.concat(Array.prototype.slice.call(map.getContainer().querySelectorAll('.leaflet-control'))).forEach(function(c){ if (c && !c.hidden && c.offsetWidth) { var r = c.getBoundingClientRect(); if (r.width && r.height) rects.push(r); } });
+    var mr = map.getContainer().getBoundingClientRect();
+    Array.prototype.forEach.call(map.getPane('markerPane').querySelectorAll('.leaflet-marker-icon'), function(el){
+      if (el.classList.contains('marker-cluster')) {
+        var n = parseInt(el.textContent, 10);
+        if (n) { var lbl = tab === 'events' ? T.clusterEvents(n) : T.clusterPlaces(n); if (el.getAttribute('aria-label') !== lbl) el.setAttribute('aria-label', lbl); }
+      }
+      if (!el.hasAttribute('role')) return;
+      var b = el.getBoundingClientRect();
+      var hidden = b.right <= mr.left || b.left >= mr.right || b.bottom <= mr.top || b.top >= mr.bottom || rects.some(function(r){ return b.left < r.right && b.right > r.left && b.top < r.bottom && b.bottom > r.top; });
+      if (hidden && document.activeElement === el) hidden = false;
+      var want = hidden ? '-1' : '0';
+      if (el.getAttribute('tabindex') !== want) el.setAttribute('tabindex', want);
+    });
+  }
+  function queuePinFix(){ if (!pinFixQueued) { pinFixQueued = true; (window.requestAnimationFrame || setTimeout)(fixPins); } }
+  if (window.MutationObserver) new MutationObserver(queuePinFix).observe(map.getPane('markerPane'), { childList: true });
+  map.on('moveend zoomend resize', queuePinFix);
+  if (window.ResizeObserver) new ResizeObserver(queuePinFix).observe(sheet);
   var moveTimer = null;
   map.on('moveend', function(){ if (me || tab !== 'places') return; clearTimeout(moveTimer); moveTimer = setTimeout(function(){ render(false); }, 150); });
   countEl.textContent = T.loading;
@@ -19284,7 +19419,7 @@ function renderFoodDrinkOpenNowStyles() {
   body.fd-page .fd-open-toggle[aria-pressed="true"]:hover { background: var(--ref-navy-deep, #101B24); border-color: var(--ref-navy-deep, #101B24); }
   body.fd-page .fd-open-toggle .outdoor-activity-count { margin-left: 0; }
   body.fd-page .fd-open-toggle[aria-pressed="true"] .outdoor-activity-count { opacity: 0.8; }
-  body.fd-page .fd-open-note { margin: -2px 0 14px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.8rem; line-height: 1.45; color: var(--ink); opacity: 0.7; max-width: 64ch; text-wrap: pretty; }
+  body.fd-page .fd-open-note { margin: -2px 0 14px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.8rem; line-height: 1.45; color: var(--ink-muted, #6B5D54); max-width: 64ch; text-wrap: pretty; }
   /* Open-now footnote (2026-10-14): under the list always; above it only while Open now is on. */
   body.fd-page .fd-controls + .fd-open-note { display: none; }
   body.fd-page .fd-controls:has(.fd-open-toggle[aria-pressed="true"]) + .fd-open-note { display: block; }
@@ -19295,6 +19430,11 @@ function renderFoodDrinkOpenNowStyles() {
   body.fd-page .fd-open-next ul { margin: 0; padding-left: 18px; }
   body.fd-page .fd-open-next li { margin: 2px 0; }
   body.fd-page .fd-open-next-when { white-space: nowrap; }
+  /* Review pass 5 (2026-10-19): the Show all button, and the Opening next links as 44px tap targets. */
+  .fd-open-next .fd-open-next-all { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 10px; padding: 0 18px; border: 1px solid var(--ref-navy, #1B2B3A); border-radius: 999px; background: var(--paper, #FFFCF6); color: var(--ref-navy, #1B2B3A); font: inherit; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.9rem; cursor: pointer; }
+  .fd-open-next .fd-open-next-all:hover { background: rgba(27,43,58,0.06); }
+  .fd-open-next .fd-open-next-all:focus-visible { outline: 3px solid var(--teal, #2A6B67); outline-offset: 2px; }
+  .fd-open-next li a { display: inline-flex; align-items: center; min-height: 44px; }
   /* Card status line: one cluster with the meta line (4px under it), then
      the meta line's own 10px before the description. The .venue-card
      selector outranks the golf theme's ".venue-card p" sizing. Filled dot =
@@ -19474,7 +19614,7 @@ function renderFoodDrinkHubStyles() {
   body.fd-page .fd-no-results[hidden] { display: none; }
   body.fd-page .fd-no-results p { margin: 0 0 6px; }
   body.fd-page .fd-no-results a { color: var(--teal); }
-  body.fd-page .fd-no-results .fd-no-results-try { font-weight: 600; opacity: 0.8; }
+  body.fd-page .fd-no-results .fd-no-results-try { font-weight: 600; color: var(--ink-muted, #6B5D54); }
   body.fd-page .fd-search-note { margin: 0 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--teal); }
   body.fd-page .fd-search-note[hidden] { display: none; }
 
@@ -19546,15 +19686,37 @@ const OPEN_NEXT_CLIENT_SRC = `var OPEN_NEXT_WEEK = ['mon', 'tue', 'wed', 'thu', 
     var parts = String(label.text).split(' \\u00b7 ');
     return { mins: mins, text: parts[parts.length - 1] };
   }
-  function paintOpenNextList(empty, textEl, candidates, next){
+  // Open-now empty state wording (2026-10-19, review pass 5): whenever Open now leaves nothing, the line says so and a
+  // "Show all (including closed)" button turns off Open now alone (the page's own toggle), keeping every other filter.
+  // openEmpty: Open now is on and nothing shows; toggle: the page's Open now button.
+  var OPEN_EMPTY_TEXT = 'Nothing that matches is open right now.';
+  function paintOpenNextList(empty, textEl, candidates, next, openEmpty, toggle){
     var box = document.getElementById('openNextList');
     if (!box && empty) { box = document.createElement('div'); box.id = 'openNextList'; box.className = 'fd-open-next'; box.hidden = true; empty.appendChild(box); }
+    // Without a separate text element (the category pages and /browse), the box's own first line of text is used.
+    var tn = null;
+    if (!textEl && empty) for (var c = empty.firstChild; c; c = c.nextSibling) if (c.nodeType === 3 && c.nodeValue.trim()) { tn = c; break; }
+    var holder = textEl || (tn && empty), openText = OPEN_EMPTY_TEXT + (tn ? ' ' : '');
+    var getT = function(){ return textEl ? textEl.textContent : tn ? tn.nodeValue : null; };
+    var setT = function(v){ if (textEl) textEl.textContent = v; else if (tn) tn.nodeValue = v; };
+    if (holder && !holder.hasAttribute('data-text')) holder.setAttribute('data-text', getT());
     if (!box) return;
     var list = candidates.slice().sort(function(a, b){ return next[a.getAttribute('data-venue-id')].mins - next[b.getAttribute('data-venue-id')].mins; }).slice(0, 5);
-    box.hidden = !list.length;
+    openEmpty = !!(openEmpty || list.length);
+    box.hidden = !openEmpty;
     while (box.firstChild) box.removeChild(box.firstChild);
+    if (!openEmpty) {
+      if (holder && getT() === openText) setT(holder.getAttribute('data-text'));
+      return;
+    }
+    if (holder) setT(openText);
+    if (toggle) {
+      var all = document.createElement('button');
+      all.type = 'button'; all.className = 'fd-open-next-all'; all.textContent = 'Show all (including closed)';
+      all.addEventListener('click', function(){ if (toggle.getAttribute('aria-pressed') === 'true') toggle.click(); });
+      box.appendChild(all);
+    }
     if (!list.length) return;
-    if (textEl) textEl.textContent = 'Nothing that matches is open right now.';
     var h = document.createElement('p'); h.className = 'fd-open-next-title'; h.textContent = 'Opening next:'; box.appendChild(h);
     var ul = document.createElement('ul');
     list.forEach(function(card){
@@ -19679,7 +19841,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     paintOpenNextList(empty, noResultsText, openOn && shown === 0 ? cards.filter(function(card){
       var id = card.getAttribute('data-venue-id'), d = DATA[id] || { c: [], f: [], r: '' };
       return NEXT_OPEN[id] && fdMatches(types, features, regions, d.c, d.f, d.r) && (!searchTerm || fdSearchHit(card));
-    }) : [], NEXT_OPEN);
+    }) : [], NEXT_OPEN, openOn && shown === 0, openToggle);
   }
   ${FD_HOURS_CLIENT_SRC}
   refreshOpen();
@@ -20642,7 +20804,7 @@ ${golfEngagementHeadHtml('winery', true, 'hub')}
   body.wine-hub-page .wine-towns nav { display: flex; flex-wrap: wrap; gap: 8px; }
   body.wine-hub-page .wine-towns a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); text-decoration: none; background: var(--paper); }
   body.wine-hub-page .wine-towns a:hover { background: rgba(27,43,58,0.06); }
-  body.wine-hub-page .wine-towns a span { font-size: 0.74rem; opacity: 0.6; }
+  body.wine-hub-page .wine-towns a span { font-size: 0.74rem; color: var(--ref-navy-muted, #56636E); }
 </style>
 </head>
 <body class="golf-page outdoor-page fd-page winery-page wine-hub-page">
@@ -24200,7 +24362,7 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
   body.whatson-page .whatson-earlier-toggle::after { content: " \\25B8"; display: inline-block; }
   body.whatson-page .whatson-earlier-toggle[aria-expanded="true"]::after { content: " \\25BE"; }
   body.whatson-page .whatson-earlier-toggle:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; border-radius: 4px; }
-  body.whatson-page .whatson-earlier-count { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.85rem; opacity: 0.7; }
+  body.whatson-page .whatson-earlier-count { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.85rem; color: var(--ink-muted, #6B5D54); }
   /* A photo across the top of each card, edge to edge. */
   body.whatson-page .whatson-event-card { position: relative; }
   body.whatson-page .whatson-event-card > .whatson-event-photo { display: block; width: calc(100% + 40px); max-width: none; height: 110px; aspect-ratio: auto; object-fit: cover; margin: -18px -20px 12px; border-radius: 13px 13px 0 0; background: #2A6B67; }
@@ -25419,7 +25581,13 @@ function renderVenuePageLayoutStyles() {
   /* Gallery pages: the 2x2 thumbnails beside the photo keep the photo's height. */
   @media (min-width: 900px) { body.golf-page .vg-mosaic .vg-strip { height: clamp(220px, 42vh, 380px); } }
   body.golf-page .venue-hours-daily { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 4px; font-weight: 800; color: var(--ink); }
-  body.golf-page .venue-hours-days summary { cursor: pointer; font-size: 0.84rem; font-weight: 700; opacity: 0.8; }
+  /* Tap targets (2026-10-19, review pass 5): the Each day summary, the contact and map links, the back link and the
+     breadcrumb are 44px tall to a finger (the links keep their spacing through negative margins). */
+  body.golf-page .venue-hours-days summary { cursor: pointer; font-size: 0.84rem; font-weight: 700; color: var(--ink); padding: 12px 0; line-height: 20px; }
+  body.golf-page .detail-row a, body.golf-page .venue-aside .map-link { display: inline-block; max-width: 100%; padding: 11px 0; margin: -11px 0; }
+  body.golf-page .detail-row .map-link { margin-top: -7px; }
+  body.golf-page .category-back-link, body.golf-page .venue-back-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: -10px; margin-bottom: 3px; }
+  body.golf-page nav.breadcrumb a { display: inline-block; padding: 13px 5px; margin: -13px -5px; }
   @media (min-width: 960px) {
     body.golf-page .venue-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 40px; align-items: start; }
     body.golf-page .venue-aside { position: sticky; top: 84px; }
@@ -26748,7 +26916,7 @@ function renderTripPlannerStyles() {
   .trip-planner-breadcrumb a { color: var(--teal-deep); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
   .trip-planner-breadcrumb a:hover { text-decoration-thickness: 2px; }
   .trip-planner-intro h1, .trip-planner-intro h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 2rem; margin: 0 0 6px; color: var(--ink); }
-  .trip-planner-intro .subtitle { color: var(--ink); opacity: 0.7; font-size: 1.02rem; margin: 0 0 28px; max-width: 640px; }
+  .trip-planner-intro .subtitle { color: var(--ink-muted, #6B5D54); font-size: 1.02rem; margin: 0 0 28px; max-width: 640px; }
 
   /* Conversational hero (primary /trip experience) -- same design tokens
      as the wizard below it, so the two feel like one coherent page even
@@ -28774,7 +28942,7 @@ function withoutFavoritesNavLink(headerHtml) {
 function browseSearchHtml(q) {
   return `<div class="fd-search">
     <label class="visually-hidden" for="bhSearch">Search all places</label>
-    <input type="search" id="bhSearch" class="fd-search-input" placeholder="Search a place, cuisine, or what you're craving" autocomplete="off" spellcheck="false" value="${escapeHtml(q || '')}">
+    <input type="search" id="bhSearch" class="fd-search-input" placeholder="Search places, cuisines…" autocomplete="off" spellcheck="false" value="${escapeHtml(q || '')}">
     <button type="button" class="fd-search-clear" id="bhSearchClear" aria-label="Clear search"${q ? '' : ' hidden'}>&#215;</button>
   </div>`;
 }
@@ -29195,7 +29363,7 @@ function bhStart(){
     paintOpenNextList(empty, null, openOn && shown === 0 ? ordered.filter(function(card){
       var id = card.getAttribute('data-venue-id');
       return NEXT_OPEN[id] && bhMatches(types, features, regions, cuisine, price, dataOf(card)) && (!favs || !!favs[id]) && (!searchTerm || (card.__bh || '').indexOf(searchTerm) !== -1);
-    }) : [], NEXT_OPEN);
+    }) : [], NEXT_OPEN, openOn && shown === 0, openToggle);
     if (results) results.hidden = shown === 0;
     var next = window.location.pathname + queryFor(types, features, regions) + window.location.hash;
     if (window.history && historyMode !== 'none') {
@@ -30718,7 +30886,7 @@ ${CATEGORY_BANNER_STYLE}
   body.ski-guide-page .ski-guide-list li { margin: 0 0 10px; line-height: 1.55; }
   body.ski-guide-page .patio-picks { width: 100%; border-collapse: collapse; margin: 8px 0 18px; }
   body.ski-guide-page .patio-picks th, body.ski-guide-page .patio-picks td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgba(27,43,58,.12); line-height: 1.5; }
-  body.ski-guide-page .patio-picks thead th { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+  body.ski-guide-page .patio-picks thead th { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted, #6B5D54); }
   body.ski-guide-page .patio-picks tbody th { width: 38%; font-weight: 700; }
 </style>
 </head>
@@ -32462,7 +32630,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.list-venue-page .lyv-steps li { background: var(--paper); border-radius: 14px; padding: 14px 16px; font-size: 0.88rem; color: rgba(42,32,25,0.75); counter-increment: lyv; }
   body.list-venue-page .lyv-steps li::before { content: counter(lyv); display: block; font-weight: 800; color: var(--ref-navy); margin-bottom: 4px; }
   body.list-venue-page .lyv-steps strong { color: var(--ink); }
-  body.list-venue-page .form-field .lyv-hint { font-size: 0.78rem; color: rgba(42,32,25,0.62); margin-top: 6px; }
+  body.list-venue-page .form-field .lyv-hint { font-size: 0.78rem; color: var(--ink-muted, #6B5D54); margin-top: 6px; }
   body.list-venue-page .lyv-error { font-size: 0.8rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
   body.list-venue-page .form-field [aria-invalid="true"] { border-color: #C0392B; }
   body.list-venue-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 26px 0 12px; }
@@ -42996,7 +43164,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.list-event-page .lyv-steps li { background: var(--paper); border-radius: 14px; padding: 14px 16px; font-size: 0.88rem; color: rgba(42,32,25,0.75); counter-increment: lyv; }
   body.list-event-page .lyv-steps li::before { content: counter(lyv); display: block; font-weight: 800; color: var(--ref-navy); margin-bottom: 4px; }
   body.list-event-page .lyv-steps strong { color: var(--ink); }
-  body.list-event-page .form-field .lyv-hint { font-size: 0.78rem; color: rgba(42,32,25,0.62); margin-top: 6px; }
+  body.list-event-page .form-field .lyv-hint { font-size: 0.78rem; color: var(--ink-muted, #6B5D54); margin-top: 6px; }
   body.list-event-page .lyv-error { font-size: 0.8rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
   body.list-event-page .form-field [aria-invalid="true"] { border-color: #C0392B; }
   body.list-event-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 26px 0 12px; }
