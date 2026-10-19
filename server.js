@@ -8366,6 +8366,18 @@ function eventKindPhoto(e) {
   if ((e.categories || []).includes('live-music')) return eventThemePhoto('rock');
   return null;
 }
+// Event card photos (2026-10-19): each 800px event photo has a 480px copy beside it (foo-800.jpg -> foo-800-w480.jpg,
+// made locally with sips). ' srcset="..." sizes="..."' for a card <img>, or '' when there is no copy.
+const eventCardSmallCache = new Map();
+function eventCardSrcsetAttrs(src, sizes) {
+  if (!/^\/images\/[\w\/-]+-800\.jpg$/.test(String(src || ''))) return '';
+  if (!eventCardSmallCache.has(src)) {
+    const small = src.replace(/\.jpg$/, '-w480.jpg');
+    eventCardSmallCache.set(src, fs.existsSync(path.join(__dirname, 'public', small)) ? small : null);
+  }
+  const small = eventCardSmallCache.get(src);
+  return small ? ` srcset="${escapeHtml(small)} 480w, ${escapeHtml(src)} 800w" sizes="${sizes}"` : '';
+}
 function homeEventImage(e, used = new Set()) {
   if (e.image && /^\/(?!\/)/.test(e.image)) return e.image;
   const kind = eventKindPhoto(e);
@@ -8409,14 +8421,14 @@ function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
   let total = 0;
   try { total = getWhatsOnEvents(resolveWhatsOnWindow({}, now)).length; } catch (e) { total = 0; }
   const usedImages = new Set();
-  const cards = chosen.map((e) => `<a class="home-event-card" href="${escapeHtml(discoveryEventUrl(e))}">
-      <span class="home-event-media"><img src="${escapeHtml(homeEventImage(e, usedImages))}" alt="" width="800" height="533" loading="lazy" decoding="async"></span>
+  const cards = chosen.map((e) => { const img = homeEventImage(e, usedImages); return `<a class="home-event-card" href="${escapeHtml(discoveryEventUrl(e))}">
+      <span class="home-event-media"><img src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, '(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 260px')} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
       <span class="home-event-body">
         <span class="home-event-date">${escapeHtml(e.dateLabel || '')}${e.time ? ` · ${escapeHtml(e.time)}` : ''}</span>
         <span class="home-event-name">${escapeHtml(e.name)}</span>
         <span class="home-event-place">${escapeHtml(e.valleyWide ? 'Across the Okanagan' : (REGION_LABELS[e.region] || ''))}</span>
       </span>
-    </a>`).join('');
+    </a>`; }).join('');
   return `
 <section class="discover-section home-row" id="thisWeekend">
   <div class="wrap-wide">
@@ -10641,10 +10653,15 @@ function renderGa4ConfigIifeJs(cfgInit) {
       if (/(?:^|;\\s*)${GA4_INTERNAL_COOKIE}=1(?:;|$)/.test(document.cookie)) cfg.traffic_type = 'internal';
     } catch (e) { /* analytics must never break the site */ }
     if (location.hostname === '${GA4_LIVE_HOSTNAME}') {
-      var s = document.createElement('script');
-      s.async = true;
-      s.src = 'https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}';
-      document.head.appendChild(s);
+      var load = function(){
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=${GA4_MEASUREMENT_ID}';
+        document.head.appendChild(s);
+      };
+      // Speed (2026-10-19): the homepage defines roamAfterHero (HOME_HERO_FIRST_HEAD), so gtag.js waits for its hero
+      // photo there; the calls below still queue in dataLayer and are sent once it loads. Everywhere else: at once.
+      if (typeof window.roamAfterHero === 'function') window.roamAfterHero(load); else load();
     }
     gtag('js', new Date());
     gtag('config', '${GA4_MEASUREMENT_ID}', cfg);
@@ -11186,32 +11203,55 @@ const HOME_CARD_SIZES = {
 };
 // How many cards of each sideways row are (at least partly) on a 375px phone screen; they load as usual.
 const HOME_ROW_EAGER = { 'mood-card-img': 3, 'region-card-img': 2 };
-const HOME_CARD_LAZY_SCRIPT = `<style id="home-card-lz">img[data-home-lz]{background:rgba(27,43,58,0.14)}</style>
+// Hero first (2026-10-19): on a slow phone the hero photo shared the connection with the first card photos, the
+// event photos, gtag.js and Leaflet, and its LCP was 6.5 s. HOME_HERO_FIRST_HEAD (first thing in <head>) defines
+// window.roamAfterHero(fn): fn runs once the hero photo has loaded (or failed), at window load at the latest, and
+// after 8 s whatever happens. The card photos that used to load at once (data-home-hero) and gtag.js wait for it;
+// the off-screen ones (data-home-lz) start watching the screen only then too. <noscript> keeps the plain images.
+const HOME_HERO_FIRST_HEAD = `<script>
+(function(){
+  var q = [], done = false;
+  function go(){ if (done) return; done = true; var l = q; q = []; for (var i = 0; i < l.length; i++) { try { l[i](); } catch (e) {} } }
+  window.roamAfterHero = function(fn){ if (done) fn(); else q.push(fn); };
+  function hit(e){ var t = e.target; if (t && t.tagName === 'IMG' && /(^|\\s)hero-media-img(\\s|$)/.test(t.className)) go(); }
+  document.addEventListener('load', hit, true);
+  document.addEventListener('error', hit, true);
+  window.addEventListener('load', go);
+  setTimeout(go, 8000);
+})();
+</script>`;
+const HOME_CARD_LAZY_SCRIPT = `<style id="home-card-lz">img[data-home-lz],img[data-home-hero]{background:rgba(27,43,58,0.14)}</style>
 <script>
 (function(){
-  var imgs = document.querySelectorAll('img[data-home-lz]');
   function load(img){
-    if (!img || !img.hasAttribute('data-home-lz')) return;
-    img.removeAttribute('data-home-lz');
+    var attr = img && (img.hasAttribute('data-home-lz') ? 'data-home-lz' : img.hasAttribute('data-home-hero') ? 'data-home-hero' : null);
+    if (!attr) return;
+    img.removeAttribute(attr);
     var s = img.getAttribute('data-srcset');
     if (s) img.setAttribute('srcset', s);
     img.setAttribute('src', img.getAttribute('data-src'));
   }
-  if (!window.IntersectionObserver) { for (var i = 0; i < imgs.length; i++) load(imgs[i]); return; }
-  var io = new IntersectionObserver(function(es){
-    for (var i = 0; i < es.length; i++) if (es[i].isIntersecting) { io.unobserve(es[i].target); load(es[i].target); }
-  }, { rootMargin: '300px 0px' });
-  var rows = [];
-  for (var j = 0; j < imgs.length; j++) {
-    io.observe(imgs[j]);
-    var row = imgs[j].parentNode && imgs[j].parentNode.parentNode;
-    if (row && rows.indexOf(row) === -1) rows.push(row);
+  function start(){
+    var first = document.querySelectorAll('img[data-home-hero]');
+    for (var f = 0; f < first.length; f++) load(first[f]);
+    var imgs = document.querySelectorAll('img[data-home-lz]');
+    if (!window.IntersectionObserver) { for (var i = 0; i < imgs.length; i++) load(imgs[i]); return; }
+    var io = new IntersectionObserver(function(es){
+      for (var i = 0; i < es.length; i++) if (es[i].isIntersecting) { io.unobserve(es[i].target); load(es[i].target); }
+    }, { rootMargin: '300px 0px' });
+    var rows = [];
+    for (var j = 0; j < imgs.length; j++) {
+      io.observe(imgs[j]);
+      var row = imgs[j].parentNode && imgs[j].parentNode.parentNode;
+      if (row && rows.indexOf(row) === -1) rows.push(row);
+    }
+    // A swipe loads the rest of that row: its cards are clipped sideways, so they never intersect the screen.
+    rows.forEach(function(row){
+      var go = function(){ row.removeEventListener('scroll', go); var l = row.querySelectorAll('img[data-home-lz]'); for (var k = 0; k < l.length; k++) load(l[k]); };
+      row.addEventListener('scroll', go, { passive: true });
+    });
   }
-  // A swipe loads the rest of that row: its cards are clipped sideways, so they never intersect the screen.
-  rows.forEach(function(row){
-    var go = function(){ row.removeEventListener('scroll', go); var l = row.querySelectorAll('img[data-home-lz]'); for (var k = 0; k < l.length; k++) load(l[k]); };
-    row.addEventListener('scroll', go, { passive: true });
-  });
+  if (typeof window.roamAfterHero === 'function') window.roamAfterHero(start); else start();
 })();
 </script>`;
 function withHomeCardPhotos(html) {
@@ -11225,15 +11265,32 @@ function withHomeCardPhotos(html) {
     const srcset = `${small} 320w, ${mid} 480w, ${src} ${w}w`;
     const sizes = HOME_CARD_SIZES[cls];
     seen[cls] = (seen[cls] || 0) + 1;
-    if (!(cls in HOME_ROW_EAGER) || seen[cls] <= HOME_ROW_EAGER[cls]) {
-      return `<img class="${cls}" src="${src}" srcset="${srcset}" sizes="${sizes}" width="${w}" height="${h}" alt="" loading="lazy">`;
-    }
     lazy++;
-    return `<img class="${cls}" data-src="${src}" data-srcset="${srcset}" sizes="${sizes}" width="${w}" height="${h}" alt="" loading="lazy" data-home-lz><noscript><img class="${cls}" src="${src}" width="${w}" height="${h}" alt=""></noscript>`;
+    const wait = !(cls in HOME_ROW_EAGER) || seen[cls] <= HOME_ROW_EAGER[cls] ? 'data-home-hero' : 'data-home-lz';
+    return `<img class="${cls}" data-src="${src}" data-srcset="${srcset}" sizes="${sizes}" width="${w}" height="${h}" alt="" loading="lazy" ${wait}><noscript><img class="${cls}" src="${src}" width="${w}" height="${h}" alt=""></noscript>`;
+  });
+  // The "This weekend" event photos: the 480px copy where there is one (eventCardSrcset), after the hero.
+  html = html.replace(/<span class="home-event-media"><img src="([^"]+)"( srcset="[^"]*" sizes="[^"]*")? alt="" width="(\d+)" height="(\d+)" loading="lazy" decoding="async"><\/span>/g, (m, src, set, w, h) => {
+    lazy++;
+    const srcset = set ? set.replace(' srcset="', ' data-srcset="') : '';
+    return `<span class="home-event-media"><img data-src="${src}"${srcset} alt="" width="${w}" height="${h}" loading="lazy" decoding="async" data-home-hero><noscript><img src="${src}" alt="" width="${w}" height="${h}"></noscript></span>`;
   });
   if (!lazy) return html;
   const at = html.indexOf('</main>');
   return at === -1 ? html.replace('</body>', `${HOME_CARD_LAZY_SCRIPT}\n</body>`) : `${html.slice(0, at)}${HOME_CARD_LAZY_SCRIPT}\n${html.slice(at)}`;
+}
+// Hero first (2026-10-19): the homepage has no map (the near-me map is /map), yet okanagan.html loads Leaflet's
+// stylesheet in <head> (render-blocking) and its 147 KB script before app.js. app.js only touches L for #okMap
+// (/browse/classic) and #tripPlannerMap, so the homepage drops both when neither is on the page; and the hero-ready
+// signal goes first in <head>, before the GA4 snippet that waits on it.
+function withHomeHeroFirst(html) {
+  if (typeof html !== 'string') return html;
+  if (!/id="(okMap|tripPlannerMap)"/.test(html)) {
+    html = html
+      .replace(/<link rel="stylesheet" href="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\/[^"]+\/leaflet\.min\.css"\s*\/?>\n?/, '')
+      .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\/[^"]+\/leaflet\.min\.js"><\/script>\n?/, '');
+  }
+  return html.replace(/<meta charset="UTF-8">\n?/i, (m) => `${m}${HOME_HERO_FIRST_HEAD}\n`);
 }
 // The homepage's <main id="main"> (2026-10-18): from the hero to just before the footer. No-op if either end is missing
 // or the page already has a <main>.
@@ -19336,10 +19393,23 @@ function smallBannerFor(src) {
   smallBannerCache.set(src, found);
   return found;
 }
+// Speed (2026-10-19): phones with a 3x screen (375px wide = 1125 device pixels) skipped the 800px copy and took
+// the full 1600px photo (250-450 KB). List-page banners now also have a 1200px copy (foo.jpg -> foo-1200.jpg,
+// made locally with sips at quality 50), listed between the two so those phones download about half the bytes.
+const midBannerCache = new Map();
+function midBannerFor(src) {
+  if (midBannerCache.has(src)) return midBannerCache.get(src);
+  const mid = /^\/images\/[\w\/-]+\.(jpe?g|webp|png)$/.test(src) ? src.replace(/\.(jpe?g|webp|png)$/, '-1200.jpg') : null;
+  const found = mid && fs.existsSync(path.join(__dirname, 'public', mid)) ? mid : null;
+  midBannerCache.set(src, found);
+  return found;
+}
 function withSmallBanner(bannerHtml) {
   return bannerHtml.replace(/<img src="([^"]+)"(?![^>]*\ssrcset=)/, (m, src) => {
     const small = smallBannerFor(src);
-    return small ? `<img src="${src}" srcset="${small} 800w, ${src} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : m;
+    if (!small) return m;
+    const mid = midBannerFor(src);
+    return `<img src="${src}" srcset="${small} 800w, ${mid ? `${mid} 1200w, ` : ''}${src} 1600w" sizes="(max-width: 860px) 100vw, 1200px"`;
   });
 }
 function categoryHeroHtml(bannerHtml, textHtml) {
@@ -22701,6 +22771,10 @@ function whatsOnGroupOf(ev, today) {
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return { key: `m-${y}-${mo}`, label: `Later in ${MONTHS[mo - 1]}`, rank: 5 + (y * 12 + mo) / 100000 };
 }
+// Event card photos (2026-10-19): the photo is a strip only 96-110px tall across the card, so these sizes ask for
+// the 480px copy on phones and desktop cards alike (about 1.3 photo pixels per screen pixel on a phone); the 800px
+// photo is still listed for wider, sharper screens.
+const WHATSON_CARD_PHOTO_SIZES = '(max-width: 640px) 160px, 240px';
 function whatsOnEventCardHtml(ev, todayArg = null) {
   // Only a real YYYY-MM-DD turns on the dated card (so .map() indexes never do).
   const today = typeof todayArg === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(todayArg) ? todayArg : null;
@@ -22712,7 +22786,7 @@ function whatsOnEventCardHtml(ev, todayArg = null) {
   const tripQuery = `${ev.name}, ${REGION_LABELS[ev.region] || ev.region}, Okanagan Valley, BC`;
   return `
       <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''}${savedOccurrenceAttrs(ev.firstOccurrence)} data-surface="whatson_card">
-        ${today ? `<img class="whatson-event-img whatson-event-photo" src="${escapeHtml(homeEventImage(ev))}" alt="" loading="lazy" width="800" height="450">` : (ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : '')}
+        ${today ? (() => { const img = homeEventImage(ev); return `<img class="whatson-event-img whatson-event-photo" src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, WHATSON_CARD_PHOTO_SIZES)} alt="" loading="lazy" width="800" height="450">`; })() : (ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : '')}
         <h2><a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(ev.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>
         <p class="venue-meta">${meta}</p>
         ${today ? (() => { const sum = whatsOnCardSummary(ev); return `${sum.text ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(sum.text)}</p></div>` : ''}${sum.source ? `\n        <p class="whatson-source">${escapeHtml(sum.source)}</p>` : ''}`; })() : (ev.description ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(ev.description)}</p></div>
@@ -23243,6 +23317,7 @@ const WHATSON_LIST_STYLE = `<style id="whatson-list">
 // Lighter pages (2026-10-18): puts the waiting events (whatsOnRest) back at
 // the end of the list, then runs whatever waited on window.__whatsOnReady
 // (the paging script below and the filter script).
+const WHATSON_REST_BATCH = 40;
 const WHATSON_REST_SCRIPT = `<script>
 (function(){
   var list = document.getElementById('whatsOnResults'), el = document.getElementById('whatsOnRest');
@@ -23265,10 +23340,25 @@ const WHATSON_REST_SCRIPT = `<script>
   fetch('/cards/rest/' + hash + '.html?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
     .then(function(r){ if (!r.ok) throw new Error('rest ' + r.status); return r.text(); })
     .then(function(html){
-      var t = document.createElement('template'); t.innerHTML = html; place(t.content);
-      // Favorite / Add to trip state for the cards that just arrived.
-      if (window.__syncFavButtons) window.__syncFavButtons();
-      if (window.__syncTripButtons) window.__syncTripButtons();
+      // Batches (2026-10-19): the waiting events were parsed and put in the list in one go -- about 12,000
+      // elements in one long task on a phone. They now go in BATCH items at a time, yielding between batches.
+      // Every item they hold comes after the first page, so each shown card and heading goes in already paged
+      // (whatson-paged: display none) and costs no layout; the paging script lays out the final list at the end.
+      var parts = html.split(/(?=<li class="(?:whatson-group-head|venue-card whatson-event-card)")/), BATCH = ${WHATSON_REST_BATCH}, i = 0;
+      return new Promise(function(done){
+        (function step(){
+          var t = document.createElement('template');
+          t.innerHTML = parts.slice(i, i + BATCH).join('');
+          i += BATCH;
+          Array.prototype.forEach.call(t.content.children, function(li){ if (!li.hidden) li.classList.add('whatson-paged'); });
+          place(t.content);
+          if (i < parts.length) setTimeout(step, 0); else done();
+        })();
+      }).then(function(){
+        // Favorite / Add to trip state for the cards that just arrived.
+        if (window.__syncFavButtons) window.__syncFavButtons();
+        if (window.__syncTripButtons) window.__syncTripButtons();
+      });
     })
     .catch(function(){})
     .then(finish);
@@ -28101,18 +28191,49 @@ function bhStart(){
   var dataTag = document.getElementById('bhVenueData'), dataHash = dataTag && dataTag.getAttribute('data-rest');
   if ((!src && !dataHash) || !window.fetch) { bhStart(); return; }
   var waits = [];
-  if (src) waits.push(fetch(src).then(function(r){ return r.json(); }).then(function(d){
-    var have = {};
-    Array.prototype.forEach.call(document.querySelectorAll('#bhResults > .venue-card'), function(c){ have[c.getAttribute('data-venue-id')] = 1; });
-    var t = document.createElement('template'); t.innerHTML = d.html || '';
-    Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) tplEl.content.appendChild(c); });
-    window.__bhWords = d.k || {};
-  }).catch(function(){}));
   if (dataHash) waits.push(fetch('/cards/rest/' + dataHash + '.json?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
     .then(function(r){ if (!r.ok) throw new Error('data ' + r.status); return r.text(); })
     .then(function(t){ dataTag.textContent = t; })
     .catch(function(){}));
-  Promise.all(waits).then(bhStart);
+  // Speed (2026-10-19): /browse/cards.json is every other card (3.2 MB unpacked, about 490 KB on the wire). It was
+  // fetched as soon as the script ran and shared a phone's connection with the first cards' photos. It now waits
+  // for the page's load event and an idle moment, or for the visitor's first tap, key or focus, whichever is first.
+  // A filter, Show more or popover tap made before the filters are ready is replayed once they are, and anything
+  // typed in the search box is kept.
+  var ready = false, pending = null, searchEl = document.getElementById('bhSearch');
+  var REPLAY = '[data-bh-type],[data-bh-type-all],[data-bh-feature],[data-region],[data-bh-price],[data-bh-apply],#bhOpenNow,#bhFavOnly,#bhShowMore,.fd-pop-btn,.outdoor-region-group-toggle';
+  function early(e){
+    if (ready) return;
+    var t = e.target && e.target.closest ? e.target.closest(REPLAY) : null;
+    if (t && t.tagName !== 'A') { pending = t; e.preventDefault(); e.stopPropagation(); }
+  }
+  document.addEventListener('click', early, true);
+  var cardsWait = null;
+  function getCards(){
+    if (cardsWait || !src) return;
+    ['pointerdown', 'keydown', 'focusin'].forEach(function(ev){ document.removeEventListener(ev, getCards, true); });
+    cardsWait = fetch(src).then(function(r){ return r.json(); }).then(function(d){
+      var have = {};
+      Array.prototype.forEach.call(document.querySelectorAll('#bhResults > .venue-card'), function(c){ have[c.getAttribute('data-venue-id')] = 1; });
+      var t = document.createElement('template'); t.innerHTML = d.html || '';
+      Array.prototype.slice.call(t.content.querySelectorAll('.venue-card')).forEach(function(c){ if (!have[c.getAttribute('data-venue-id')]) tplEl.content.appendChild(c); });
+      window.__bhWords = d.k || {};
+    }).catch(function(){});
+    waits.push(cardsWait);
+    Promise.all(waits).then(finish);
+  }
+  function finish(){
+    var typed = searchEl ? searchEl.value : '';
+    bhStart();
+    ready = true;
+    document.removeEventListener('click', early, true);
+    if (searchEl && typed && searchEl.value !== typed) { searchEl.value = typed; try { searchEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} }
+    if (pending) { var p = pending; pending = null; p.click(); }
+  }
+  if (!src) { Promise.all(waits).then(finish); return; }
+  ['pointerdown', 'keydown', 'focusin'].forEach(function(ev){ document.addEventListener(ev, getCards, true); });
+  var idle = function(){ if (window.requestIdleCallback) window.requestIdleCallback(getCards, { timeout: 1500 }); else setTimeout(getCards, 200); };
+  if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
 })();
 </script>`;
 }
@@ -30223,9 +30344,14 @@ function featuredInGuidesHtml(ref) {
   if (!gs.length) return '';
   return `<p class="venue-meta guide-featured-in">Featured in our guides: ${gs.map((x) => `<a href="${x.path}">${escapeHtml(x.heading)}</a>`).join(', ')}</p>`;
 }
+// Guide thumbnails (2026-10-19): a guide whose banner is a town photo has no thumbs/ copy, so its card took the
+// full 1600px photo (200-290 KB); it now takes the town photo's 3:2 card copy (foo.jpg -> foo-card.jpg, 800x533,
+// the same shape as the guide card) when there is one.
 const guideCardImage = (b) => {
   const thumb = b.src.replace(/\/([^/]+)$/, '/thumbs/$1');
-  return fs.existsSync(path.join(__dirname, 'public', thumb)) ? thumb : b.src;
+  if (fs.existsSync(path.join(__dirname, 'public', thumb))) return thumb;
+  const card = /^\/images\/[\w\/-]+\.jpe?g$/.test(b.src) ? b.src.replace(/\.jpe?g$/, '-card.jpg') : null;
+  return card && fs.existsSync(path.join(__dirname, 'public', card)) ? card : b.src;
 };
 // The homepage's seasonal guide link (Sep-Mar only; nothing in summer).
 function seasonalGuideLink(now = new Date()) {
@@ -41904,6 +42030,8 @@ const server = http.createServer(async (req, res) => {
         html = wrapHomeMain(html);
         // Homepage weight (2026-10-18): smaller card photos, and the sideways rows' off-screen cards wait (see withHomeCardPhotos).
         html = withHomeCardPhotos(html);
+        // Hero first (2026-10-19): no Leaflet on the homepage, and the hero-ready signal first in <head> (see withHomeHeroFirst).
+        html = withHomeHeroFirst(html);
 
         html = html.includes('</body>')
           ? html.replace('</body>', `${footer}\n${openNowScript}\n${hiddenElementsScript}\n</body>`)
@@ -45102,6 +45230,10 @@ module.exports = {
   // Lazy card photos (2026-10-18)
   withLazyCardPhotos,
   withHomeCardPhotos,
+  withHomeHeroFirst,
+  guideCardImage,
+  withSmallBanner,
+  eventCardSrcsetAttrs,
   withFilterBarReady,
   withFontFallbacks,
   HOME_CARD_SIZE_FILES,
@@ -45113,6 +45245,9 @@ module.exports = {
   withSharedStylesheets,
   inlineSharedStylesheets,
   WHATSON_PAGE_SIZE,
+  WHATSON_REST_BATCH,
+  EVENT_PHOTO_SPECIAL,
+  HOME_EVENT_IMAGES,
   recurringSeasonRow,
   // Visitor photos & tips (2026-10-17)
   visitorDisplayName,
