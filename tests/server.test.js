@@ -21578,7 +21578,7 @@ test('Claim this listing (2026-10-18): venue button (EN + FR), form validation, 
     assert.match(formHtml, /Call the business number on this listing \(250-555-0199\)/);
     assert.match(formHtml, /name="company_website"/);
     const frForm = await fetch(`${base}/fr/claim/kelowna/cafes/claim-fixture-cafe`).then((r) => r.text());
-    assert.match(frForm, /<html lang="fr-CA">/);
+    assert.match(frForm, /<html lang="fr" data-page-lang="fr">/, 'French pass 6: the French twin markup, like the other French pages');
     assert.match(frForm, /<h1>Réclamer cette fiche<\/h1>/);
     assert.match(frForm, /Envoyer ma demande/);
     assert.equal((await fetch(`${base}/claim/kelowna/cafes/no-such-cafe`)).status, 404);
@@ -21756,7 +21756,7 @@ const OHB_QUESTIONS = [
   ['how do i add photoes', 'edit', 'photo-add'], ['my pictre wont uplaod', 'edit', 'photo-small'], ['summer hours are diffrent from winter', 'edit', 'seasonal-hours'],
   ['closed for thanksgiving monday', 'edit', 'closures'], ['we’re closed new year’s day', 'edit', 'closures'], ['how long until my changes are live', 'edit', 'live-speed'],
   ['do i need approval for hour changes', 'edit', 'live-speed'], ['remove my old manager from the listing', 'account', 'access'], ['who else can edit our page', 'account', 'access'],
-  ['how do i add our trivia night every thursday', 'edit', 'event-repeat'], ['change the buisness name', 'edit', 'name-address'], ['our phone number is wrong', 'edit', 'links'],
+  ['how do i add our trivia night every thursday', 'edit', 'event-repeat'], ['change the buisness name', 'edit', 'name-address'], ['our phone number is wrong', 'edit', 'phone'],
   ['how do i put my menu on', 'edit', 'menu-add'], ['can i type the menu myself', 'menu', 'menu-add'], ['where is the log out button', 'settings', 'logout'],
   ['I didnt get the password reset email', 'forgot', 'noemail'], ['can 2 people manage the listing', 'account', 'staff'], ['how much does it cost to be featured', 'edit', 'cost'],
   ['someone else claimed my busness', 'claim', 'dispute'], ['we have diffrent hours on stat holidays', 'edit', 'seasonal-hours'], ['how do i make a login', 'edit', 'login-create'],
@@ -21768,6 +21768,10 @@ const OHB_QUESTIONS = [
   ['comment ajouter un événement chaque samedi', 'edit', 'event-repeat', 'fr'], ['heures d’été différentes', 'edit', 'seasonal-hours', 'fr'], ['changer notre gamme de prix', 'edit', 'price-range', 'fr'],
   ['comment changer l’adresse', 'edit', 'name-address', 'fr'], ['je n’ai jamais reçu le courriel', 'link', 'noemail', 'fr'], ['mot de passe oublié', 'login', 'forgot', 'fr'],
   ['qui a accès à ma fiche', 'account', 'access', 'fr'], ['nous avons déménagé', 'edit', 'name-address', 'fr'],
+  // French pass 6 (2026-10-19): a phone number, an ugly photo and a second business.
+  ['changer mon numéro de téléphone', 'edit', 'phone', 'fr'], ['how do i change my phone number', 'edit', 'phone'], ['my phone number is wrong on google', 'edit', 'google'],
+  ['ma photo est laide', 'edit', 'photo-main', 'fr'], ['my photo is ugly', 'edit', 'photo-main'], ['deuxième établissement', 'account', 'more-businesses', 'fr'],
+  ['ajouter un deuxième établissement', 'edit', 'more-businesses', 'fr'], ['add a second business', 'account', 'more-businesses'],
   // Not about the portal, or too vague: "not sure", never a confident wrong answer.
   ['what’s the weather like in kelowna', 'edit', null], ['can you build me a website for my bakery', 'edit', null], ['asdfgh', 'edit', null],
   ['hello', 'login', null], ['my dog ate my homework', 'edit', null], ['tell me a joke', 'account', null], ['how do I get more customers', 'edit', null], ['pouvez-vous m’aider', 'login', null, 'fr'],
@@ -26591,7 +26595,7 @@ test('Portal polish (2026-10-18): the help bot answers Instagram posting, login 
     ['mon numéro est erroné sur google', 'edit', 'google', 'fr'], ['le lien de mon site ne fonctionne pas', 'edit', 'website-broken', 'fr'],
     ['importer ma carte des vins depuis mon site', 'menu', 'menu-import', 'fr'],
     // The near misses keep their old answers.
-    ['our phone number is wrong', 'edit', 'links'], ['update my instagram', 'edit', 'links'], ['the link in my email doesn’t work', 'link', 'newlink'],
+    ['our phone number is wrong', 'edit', 'phone'], ['update my instagram', 'edit', 'links'], ['the link in my email doesn’t work', 'link', 'newlink'],
     ['we couldnt find a menu on that page', 'menu', 'menu-website'], ['how to add a menu', 'edit', 'menu-add'], ['how do I get reviews', 'edit', 'reviews'],
     ['who else can edit our page', 'account', 'access'],
   ];
@@ -28034,3 +28038,140 @@ test('Season end (2026-10-19): trip facts and /map read the ended season on the 
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
+
+// ---------- French pass 6 (2026-10-19): French search words, the French claim page, English data on French pages ----------
+test('French pass 6: French search words are read in English before matching, and a place name is never rewritten', () => {
+  assert.ok(app.FR_SEARCH_SYNONYMS.length >= 80, `${app.FR_SEARCH_SYNONYMS.length} entries`);
+  const fr = (q) => app.discoverySearchText(q, 'fr');
+  assert.equal(fr('patin'), 'skating');
+  assert.equal(fr('patinoire'), 'skating');
+  assert.equal(fr('cidre'), 'cider');
+  assert.equal(fr('Cidrerie'), 'cidery');
+  assert.equal(fr('citrouilles'), 'pumpkin');
+  assert.equal(fr('marché de Noël'), 'christmas market');
+  assert.equal(fr('labyrinthe de maïs'), 'corn maze');
+  assert.equal(fr('crème glacée à Penticton'), 'ice cream in penticton');
+  assert.equal(fr('vignobles à Oliver'), 'wineries in oliver');
+  assert.equal(fr("l'Action de grâce"), 'thanksgiving');
+  // Canadian meals: déjeuner, dîner, souper.
+  assert.equal(app.frSearchSynonyms('déjeuner'), 'breakfast');
+  assert.equal(app.frSearchSynonyms('dîner'), 'lunch');
+  assert.equal(app.frSearchSynonyms('souper'), 'dinner');
+  // "marche facile" is a walk, not a market; nothing French: the text exactly as typed.
+  assert.equal(app.frSearchSynonyms('marche facile'), 'easy walk');
+  assert.equal(app.frSearchSynonyms('Gyro Beach'), 'Gyro Beach');
+  // English pages are untouched.
+  assert.equal(app.discoverySearchText('patin', 'en'), 'patin');
+  // A place's own name keeps its words ("Plage" in a name is not "beach").
+  const id = db.prepare("INSERT INTO venues (name, region, type, slug, description) VALUES ('La Plage Cidre Bistro', 'kelowna', 'restaurant', 'la-plage-cidre-bistro', 'Fixture.')").run().lastInsertRowid;
+  try {
+    assert.equal(app.frSearchSynonyms('La Plage Cidre Bistro'), 'La Plage Cidre Bistro');
+    assert.equal(app.frSearchSynonyms('plage'), 'beach');
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(id); }
+});
+
+test('French pass 6: a French search also reads the French descriptions, and "christmas market" lists the Christmas markets first', () => withDiscoveryFlag('on', async () => {
+  const id = db.prepare("INSERT INTO venues (name, region, type, slug, description, description_fr) VALUES ('FR6 Herb Farm Cafe', 'kelowna', 'cafe', 'fr6-herb-farm-cafe', 'Coffee and scones on a farm.', 'Café et scones à la ferme, entourés de lavande.')").run().lastInsertRowid;
+  const day = app.addLocalDays(app.todayLocal(), 4);
+  const events = [];
+  const addEvent = (name, description, cats) => {
+    const eid = db.prepare('INSERT INTO events (name, slug, region, description, start_datetime) VALUES (?, ?, ?, ?, ?)').run(name, name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), 'vernon', description, `${day} 10:00:00`).lastInsertRowid;
+    db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time) VALUES (?, ?, ?, ?, ?)').run(eid, day, day, '10:00', '16:00');
+    cats.forEach((c, i) => db.prepare('INSERT INTO event_categories (event_id, category_key, position) VALUES (?, ?, ?)').run(eid, c, i));
+    events.push(eid);
+  };
+  // Listed first by date order alone: a haunted maze in the holiday category, then a craft fair.
+  addEvent('FR6 Field of Frights', 'A haunted corn maze for the spooky season.', ['holiday-seasonal']);
+  addEvent('FR6 Fall Craft Fair', 'Local makers and a bake sale.', ['markets-fairs']);
+  addEvent('FR6 Holiday Gifts Evening', 'Shop local gifts at our Christmas market night, with Santa.', ['markets-fairs']);
+  addEvent('FR6 Christmas Market at the Hall', 'Wreaths, cookies and carols.', ['holiday-seasonal', 'markets-fairs']);
+  try {
+    const venues = (run) => (run.results.items || []).map((x) => x.name);
+    assert.ok(venues(app.runDiscovery('lavande', { lang: 'fr' })).includes('FR6 Herb Farm Cafe'), 'the French description');
+    assert.ok(!venues(app.runDiscovery('lavande')).includes('FR6 Herb Farm Cafe'), 'an English search reads the English description only');
+    const names = app.runDiscovery('christmas market').results.items.map((e) => e.name).filter((n) => n.startsWith('FR6'));
+    assert.equal(names[0], 'FR6 Christmas Market at the Hall', names.join(' | '));
+    assert.equal(names[1], 'FR6 Holiday Gifts Evening', names.join(' | '));
+    assert.ok(!names.includes('FR6 Field of Frights'), 'a haunted maze is not a Christmas event');
+    const frNames = app.runDiscovery(app.discoverySearchText('marché de Noël', 'fr'), { lang: 'fr' }).results.items.map((e) => e.name).filter((n) => n.startsWith('FR6'));
+    assert.equal(frNames[0], 'FR6 Christmas Market at the Hall');
+    await withDiscoveryServer(async (base) => {
+      const page = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('marché de Noël')}`)).text();
+      assert.ok(page.indexOf('FR6 Christmas Market at the Hall') > 0 && (page.indexOf('FR6 Fall Craft Fair') < 0 || page.indexOf('FR6 Christmas Market at the Hall') < page.indexOf('FR6 Fall Craft Fair')));
+    });
+  } finally {
+    for (const eid of events) { db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(eid); db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(eid); db.prepare('DELETE FROM events WHERE id = ?').run(eid); }
+    db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+}));
+
+test('French pass 6: the French claim page has the French header, the FR / EN switch and a French honeypot label', () => {
+  const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const fr = app.renderClaimPage(venue, 'fr'), en = app.renderClaimPage(venue, 'en');
+  assert.match(fr, /<html lang="fr" data-page-lang="fr">/);
+  assert.ok(!/<html lang>/.test(fr) && !/<html lang>/.test(en), 'no bare "<html lang>" anywhere, even in a comment');
+  assert.match(fr, /Découvrir/, 'the French menu');
+  assert.ok(!/>Discover</.test(fr), 'not the English menu');
+  assert.match(fr, /id="langToggle" href="\/claim\/kelowna\/restaurants\/test-trattoria" hreflang="en"/);
+  assert.match(en, /id="langToggle" href="\/fr\/claim\/kelowna\/restaurants\/test-trattoria" hreflang="fr"/);
+  assert.match(fr, /<label>Laissez ce champ vide <input type="text" id="clCompanyWebsite"/);
+  assert.match(en, /<label>Leave this empty <input type="text" id="clCompanyWebsite"/);
+  assert.match(fr, /href="\/fr\/owner\/login">Connectez-vous</);
+});
+
+test('French pass 6: English data on French pages reads French (gems, awards, dog notes, sports, tours, golf, privacy, forms)', () => {
+  const cases = {
+    'Stone ovens built in 1911-1915 still stand beside the old Kettle Valley Railway grade above Naramata.': /^Des fours en pierre/,
+    'Voted Best Golf Course in the North Okanagan (2026)': /^Élu meilleur terrain de golf/,
+    'Off-leash; the biggest off-leash dog beach in Kelowna': /^Sans laisse; la plus grande plage/,
+    'Fenced off-leash dog beach; main Peach Orchard Beach is no-dogs in season (off-leash approx. Oct–Apr)': /^Plage clôturée/,
+    'Pump track and four dirt jump lanes, beginner to expert': /^Piste à bosses/,
+    'More places to play': /^Autres endroits/,
+    'Captained sightseeing, fishing and wine-by-boat tours': /^Excursions en bateau/,
+    'Masked session recordings': /^Enregistrements de session/,
+    'Sort:': /^Trier :$/,
+    '$121': /^121 \$$/,
+    '$47.50': /^47,50 \$$/,
+    'Standard adult rate · April 1 to close · 2026 rates': /Du 1er avril à la fermeture/,
+    'Standard adult rate · High season (May 1 - October), Primetime, dawn-4 pm · 2026 rates': /Haute saison \(du 1er mai à octobre\)/,
+    'e.g. Mon–Fri 3–6pm': /^p\. ex\. lun\.–ven\. 15 h–18 h$/,
+  };
+  for (const [en, want] of Object.entries(cases)) assert.match(String(app.frText(en)), want, en);
+  // The privacy paragraph with its link is read whole.
+  const html = app.frenchTwinHtml(`<!DOCTYPE html>\n<html lang="en">\n<head><title>Privacy</title></head><body><p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p><p class="region-photo-credit">Photo: <a href="https://x.example">A. Person</a>, CC BY 4.0</p></body></html>`, '/privacy');
+  assert.match(html, /Nous respectons les signaux Global Privacy Control/);
+  assert.match(html, />Déclaration de confidentialité de Microsoft<\/a>\. Ce réglage sans témoins/);
+  assert.match(html, /<p class="region-photo-credit">Photo : <a/);
+  // A map card's dog note in French, when it has one.
+  assert.match(String(app.mapFrenchNote('Dog-friendly patio')), /^Terrasse/);
+  assert.equal(app.mapFrenchNote('An English note with no French yet'), 0);
+});
+
+test('French pass 6: French dates, the doubled photo credit, the contact message, the forgot page and two event titles', () => {
+  // No ISO date in a French translation (a booking link's "?date=" is part of an address and stays).
+  const fs = require('node:fs');
+  const dir = path.join(__dirname, '..', 'data', 'french');
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+    for (const [en, frv] of Object.entries(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))) {
+      assert.ok(!/(?<![=\d/-])\b20\d\d-\d\d-\d\d\b/.test(String(frv)), `${f}: ${en.slice(0, 60)}`);
+    }
+  }
+  const credits = require('../data/venue-photo-credits.json');
+  const img = Object.keys(credits).find((k) => /^photo:/i.test(credits[k]));
+  const venue = { ...app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), image_url: img, description_fr: 'Un restaurant.' };
+  const frPage = app.renderVenuePage(venue, [], [], [], { lang: 'fr' }), enPage = app.renderVenuePage(venue, [], [], []);
+  assert.ok(!/Photo\s?: Photo/.test(frPage) && !/Photo: Photo/.test(enPage), 'one "Photo:" only');
+  assert.match(frPage, /class="venue-photo-credit"[^>]*>Photo : /);
+  assert.match(enPage, /class="venue-photo-credit"[^>]*>Photo: /);
+  assert.match(frPage, /Okanagan Roam a bien reçu votre message\. Nous répondons habituellement en quelques jours\./);
+  assert.ok(!/received your message/.test(frPage));
+  assert.notEqual(app.frEventTitle('The Sweet Caroline Tour: A Tribute to Neil Diamond (Kelowna)', { region: 'kelowna' }), 'The Sweet Caroline Tour: A Tribute to Neil Diamond (Kelowna)');
+  assert.notEqual(app.frEventTitle('God Is a Scottish Drag Queen: Halloween Spooktacular (Vernon)', { region: 'vernon' }), 'God Is a Scottish Drag Queen: Halloween Spooktacular (Vernon)');
+  assert.ok(app.frEventTitle('God Is a Scottish Drag Queen: Halloween Spooktacular (Vernon)', { region: 'vernon' }).length <= 65);
+});
+
+test('French pass 6: /fr/owner/forgot says "Ça peut prendre quelques heures"', () => withDiscoveryServer(async (base) => {
+  const html = await (await fetch(`${base}/fr/owner/forgot`)).text();
+  assert.match(html, /Ça peut prendre quelques heures\./);
+  assert.ok(!/Il peut prendre quelques heures/.test(html));
+}));

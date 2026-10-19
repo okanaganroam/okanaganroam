@@ -1089,6 +1089,8 @@ const FR_PATTERNS = [
 ];
 
 const FR_SCRIPT = [
+  // French pass 6 (2026-10-19): the banner's photo credit, rewritten when a filter changes the banner.
+  ["cr.appendChild(document.createTextNode('Photo: '));", "cr.appendChild(document.createTextNode('Photo : '));"],
   // Result counts and buttons the filter scripts write.
   ["'Show ' + shown + ' result' + (shown === 1 ? '' : 's')", "'Voir ' + shown + ' résultat' + (shown === 1 ? '' : 's')"],
   ["'Show all results'", "'Voir tous les résultats'"],
