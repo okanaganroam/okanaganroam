@@ -139,14 +139,18 @@ function handleCspReport(req, res) {
 
 function sendJSON(res, status, data) {
   const body = JSON.stringify(data);
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  });
+  // CORS (2026-10-19, round 9): only the public reads under /api/ grant other sites access, and only GET/HEAD; the
+  // request handler sets those headers (apiCorsHeaders). Writes are same-origin (owner portal, forms) or Node scripts
+  // with a Bearer token, which need no CORS.
+  res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(body);
 }
+
+const API_CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -3321,6 +3325,52 @@ function retimeEventOccurrence(eventId, startDate, fromTime, toTime, meta, endTo
   }
 }
 
+// setEventOccurrenceTimes(eventId, occId, times, meta) (2026-10-19, round 9): set one stored date's start and/or end
+// time by its id (Bunnicula's 10 am shows were stored ending at 5 pm). `times` may hold start_time, end_time (HH:MM or
+// null) and ends_next_day (0/1); the date itself never moves. The merged occurrence is checked by the same rules as a
+// new one, a start that would clash with another date of the event is refused, and every change is logged.
+const EVENT_OCCURRENCE_TIME_FIELDS = ['start_time', 'end_time', 'ends_next_day'];
+function setEventOccurrenceTimes(eventId, occId, times, meta) {
+  const metaErr = validateEventMeta(meta);
+  if (metaErr) return metaErr;
+  if (!isPlainObject(times) || !EVENT_OCCURRENCE_TIME_FIELDS.some((k) => Object.prototype.hasOwnProperty.call(times, k))) {
+    return eventFail('occurrence_times_required', `give at least one of ${EVENT_OCCURRENCE_TIME_FIELDS.join(', ')}`);
+  }
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  if (!event) return eventFail('event_not_found', eventId);
+  const occ = db.prepare('SELECT * FROM event_occurrences WHERE id = ? AND event_id = ?').get(occId, eventId);
+  if (!occ) return eventFail('occurrence_not_found', occId);
+  const next = {
+    start_date: occ.start_date, end_date: occ.end_date, all_day: occ.all_day, status: occ.status,
+    start_time: occ.start_time, end_time: occ.end_time, ends_next_day: occ.ends_next_day,
+  };
+  for (const k of EVENT_OCCURRENCE_TIME_FIELDS) if (Object.prototype.hasOwnProperty.call(times, k)) next[k] = isNullish(times[k]) ? (k === 'ends_next_day' ? 0 : null) : times[k];
+  const err = validateEventOccurrence(next, 0);
+  if (err) return err;
+  if (next.start_time !== occ.start_time
+    && db.prepare('SELECT 1 FROM event_occurrences WHERE event_id = ? AND id <> ? AND start_date = ? AND start_time IS ?').get(eventId, occId, occ.start_date, next.start_time)) {
+    return eventFail('duplicate_occurrence', `${occ.start_date} ${next.start_time || ''}`.trim());
+  }
+  const changes = EVENT_OCCURRENCE_TIME_FIELDS.filter((k) => next[k] !== occ[k]);
+  if (!changes.length) return { ok: true, changed: false, occurrence: rowToEventOccurrence(occ) };
+  const logMeta = { ...meta, source: meta.source || event.source_name, confidence: event.event_confidence };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    db.prepare('UPDATE event_occurrences SET start_time = ?, end_time = ?, ends_next_day = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(next.start_time, next.end_time, next.ends_next_day, occId);
+    for (const k of changes) logEventChange(eventId, occId, k, occ[k] == null ? null : String(occ[k]), next[k] == null ? null : String(next[k]), logMeta);
+    recomputeEventSpan(eventId);
+    db.exec('COMMIT');
+    txOpen = false;
+  } catch (e) {
+    if (txOpen) db.exec('ROLLBACK');
+    throw e;
+  }
+  return { ok: true, changed: true, occurrence: rowToEventOccurrence(db.prepare('SELECT * FROM event_occurrences WHERE id = ?').get(occId)) };
+}
+
 // setEventOccurrenceStatus(eventId, occId, status, meta): cancel /
 // postpone / restore one date. Cancelling or postponing the LAST scheduled
 // occurrence of a scheduled event is refused ('last_occurrence') unless the
@@ -3552,8 +3602,15 @@ function whatsOnPublicOccurrence(o) {
 // Public single-event shape: the card fields for the event's *next* window
 // (from today, no upper bound needed -- the rolling default) plus its
 // scheduled occurrences. Not the detail page (Step 5); just the data.
-function whatsOnPublicEventDetail(event) {
+function whatsOnPublicEventDetail(event, now = new Date()) {
   const occs = listEventOccurrences(event.id, { includeCancelled: false });
+  // Round 9 (2026-10-19): the date and time labels describe the dates still to come in the list API's default window
+  // (the next 90 days), as /api/events does; the past dates of a weekly market said "next Thu Sep 24" in October.
+  // An event with nothing left shows its later dates, else (all over) every date as before.
+  const today = todayLocal(now);
+  const upcoming = occs.filter((o) => o.end_date >= today);
+  const inWindow = upcoming.filter((o) => o.start_date <= addLocalDays(today, WHATSON_DEFAULT_WINDOW_DAYS));
+  const labelOccs = inWindow.length ? inWindow : upcoming.length ? upcoming : occs;
   const venue = event.venue_id ? getVenue(event.venue_id) : null;
   return {
     id: event.id, name: event.name, slug: event.slug, region: event.region, valleyWide: event.valley_wide === 1,
@@ -3561,7 +3618,7 @@ function whatsOnPublicEventDetail(event) {
     website: event.website || null, recurrence: event.recurrence_rule || null, status: event.status,
     venueName: venue ? venue.name : (event.venue_name_text || null),
     attribution: EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) ? null : event.source_name,
-    dateLabel: whatsOnDateLabel(event, occs), time: whatsOnTimeLabel(occs),
+    dateLabel: whatsOnDateLabel(event, labelOccs), time: whatsOnTimeLabel(labelOccs),
     occurrences: occs.map(whatsOnPublicOccurrence),
   };
 }
@@ -13275,7 +13332,10 @@ function restLinksHtml(kind, inner, lang, shown = '') {
   const summary = events
     ? (fr ? `Autres \u00e9v\u00e9nements \u00e0 venir (${n})` : `More upcoming events (${n})`)
     : (fr ? `Toutes les adresses de cette page, de A \u00e0 Z (${n})` : `All places on this page, A\u2013Z (${n})`);
-  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"${n ? '' : ' hidden'}><summary>${summary}</summary><ul>${links.map((l) => `<li${l.off ? ' hidden' : ''}><a href="${l.href}">${escapeHtml(l.name)}</a>`).join('')}</ul></details>`;
+  // Round 9 (2026-10-19): a link the filters hide carries its address as data-href, not href, so a type page
+  // (/whats-on/sports-recreation) no longer links every other type's events to crawlers (Bunnicula showed up on the
+  // sports and food & drink pages); the filter script restores href when a visitor's filters show the event.
+  return `\n  ${REST_LINKS_CSS}<details class="rest-links" id="${kind}Links"${n ? '' : ' hidden'}><summary>${summary}</summary><ul>${links.map((l) => `<li${l.off ? ' hidden' : ''}><a ${l.off ? 'data-href' : 'href'}="${l.href}">${escapeHtml(l.name)}</a>`).join('')}</ul></details>`;
 }
 // Venue JSON (2026-10-18): the filter data of a list page (#fdVenueData,
 // #bhVenueData) was 0.3-0.5 MB of every page view, mostly search words, and
@@ -24848,7 +24908,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   if (restLinks) {
     var byHref = {};
     cards.forEach(function(c){ var a = c.querySelector('.venue-card-link'); if (a) byHref[a.getAttribute('href')] = c; });
-    Array.prototype.forEach.call(restLinks.querySelectorAll('li'), function(li){ var a = li.querySelector('a'); restItems.push({ li: li, card: a ? byHref[a.getAttribute('href')] : null }); });
+    Array.prototype.forEach.call(restLinks.querySelectorAll('li'), function(li){ var a = li.querySelector('a'); restItems.push({ li: li, a: a, card: a ? byHref[a.getAttribute('href') || a.getAttribute('data-href')] : null }); });
   }
   var summary = document.getElementById('whatsOnResultsSummary');
   var showBtn = document.getElementById('whatsOnShowResults');
@@ -24961,7 +25021,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     if (nextOn && empty) empty.hidden = true;
     if (restSummary) {
       var nLinks = 0;
-      restItems.forEach(function(x){ var on = !x.card || (!x.card.hidden && !isEarlier(x.card)); x.li.hidden = !on; if (on) nLinks++; });
+      restItems.forEach(function(x){ var on = !x.card || (!x.card.hidden && !isEarlier(x.card)); x.li.hidden = !on; if (on) { nLinks++; if (x.a && !x.a.getAttribute('href') && x.a.getAttribute('data-href')) x.a.setAttribute('href', x.a.getAttribute('data-href')); } });
       restSummary.textContent = restSummary.textContent.replace(/\\(\\d+\\)/, '(' + nLinks + ')');
       restLinks.hidden = nLinks === 0;
     }
@@ -25475,7 +25535,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
         : `\n      <li class="whatson-group-head" data-group="${g.key}" aria-hidden="false"><h3>${escapeHtml(g.label)}</h3></li>` });
     }
     lastGroup = g.key;
-    items.push({ g: g.key, shown, html: card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`) });
+    items.push({ g: g.key, shown, ev: e, html: card.replace(' data-surface="whatson_card">', ` data-surface="whatson_card" data-group="${g.key}">`) });
   }
   let firstShown = 0;
   const groupsInFirst = new Set();
@@ -25492,6 +25552,19 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   }
   const listHtml = firstHtml.join('');
   const restHtml = restParts.join('');
+  // Round 9 (2026-10-19): the main /whats-on page (and /fr/whats-on) carries an ItemList of the event cards a visitor
+  // sees before "Show more", in their order, as the town and type pages do with their own lists.
+  const pageItemList = itemList || (!scope && hasInventory ? (() => {
+    const shownEvents = items.filter((it) => it.first && !it.head && it.ev).map((it) => it.ev);
+    return shownEvents.length ? {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: heading,
+      url: canonical,
+      numberOfItems: shownEvents.length,
+      itemListElement: shownEvents.map((e, i) => ({ '@type': 'ListItem', position: i + 1, name: e.name, url: `https://okanaganroam.com/${e.region}/events/${e.slug}` })),
+    } : null;
+  })() : null);
   const cardsHtml = events.length
     ? `<ul class="card-grid" id="whatsOnResults"${grouped.some((x) => x.g.key === 'earlier') ? ' data-earlier="closed"' : ''}${matching.length ? '' : ' hidden'}>${listHtml}
   </ul>${restHtml ? `\n  <template id="whatsOnRest">${restHtml}</template>` : ''}
@@ -25511,7 +25584,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, pageItemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
 ${renderWhatsOnStyles()}
 ${WHATSON_LIST_STYLE}
 ${CATEGORY_BANNER_STYLE}
@@ -25802,8 +25875,30 @@ function hasFrenchTwin(p) {
   if (seg.length === 1) return !!REGION_LABELS[seg[0]];
   if (seg.length === 2) return FR_TWIN_SECTIONS.has(seg[0]) || (!!REGION_LABELS[seg[0]] && (!!SLUG_TO_TYPE[seg[1]] || seg[1] === 'events'));
   if (seg.length === 3) return (seg[0] === 'guide' && !!REGION_LABELS[seg[1]]) || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && seg[2] === 'this-weekend') || frIsVenuePath(path)
-    || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && !!frEventForPath(path));
+    || (!!REGION_LABELS[seg[0]] && seg[1] === 'events' && !!frEventPageForPath(path));
   return false;
+}
+// Round 9 (2026-10-19): every published event has a French page, so a French list never links to an English one
+// (Bunnicula's /fr page was a 404 and /fr/whats-on linked to its English page). An event whose description has no
+// French yet gets the French page with its English description (marked lang="en"), kept out of search (noindex, no
+// hreflang, not in the sitemap) until the translation lands; frEventForPath stays "has a French description".
+function frEventPageForPath(p) {
+  const seg = String(p || '').split('/').filter(Boolean);
+  if (seg.length !== 3 || seg[1] !== 'events' || !REGION_LABELS[seg[0]] || seg[2] === 'this-weekend') return null;
+  const key = `page:${seg[0]}/${seg[2]}`, now = Date.now(), hit = frEventCache.get(key);
+  if (hit && now - hit.at < 5 * 60 * 1000) return hit.ev;
+  let ev = null;
+  try {
+    const e = findEventBySlug(seg[0], seg[2]);
+    if (e && (getEventById(e.id) || {}).status === 'scheduled') ev = e;
+  } catch (err) { ev = null; }
+  if (frEventCache.size > 5000) frEventCache.clear();
+  frEventCache.set(key, { ev, at: now });
+  return ev;
+}
+// An event page whose French page has only the English description (see frEventPageForPath).
+function frEventUntranslated(p) {
+  return !!frEventPageForPath(p) && !frEventForPath(p);
 }
 // The event behind /<town>/events/<slug> when its description has a French translation, else null. Cached for five
 // minutes: links on every French page ask this.
@@ -26003,7 +26098,7 @@ function withFrenchTwinEntries(entries) {
   for (const e of entries) {
     const m = /<loc>https:\/\/okanaganroam\.com(\/[^<]*)<\/loc>/.exec(e);
     const p = m ? m[1].replace(/(.)\/$/, '$1') : null;
-    if (!p || !hasFrenchTwin(p) || frIsVenuePath(p) || /xhtml:link/.test(e)) { out.push(e); continue; }
+    if (!p || !hasFrenchTwin(p) || frIsVenuePath(p) || frEventUntranslated(p) || /xhtml:link/.test(e)) { out.push(e); continue; }
     const alts = twinHeadLinks(p).trim().split('\n').map((l) => `\n    ${l.replace('<link ', '<xhtml:link ').replace(/>$/, '/>')}`).join('');
     const withAlts = e.replace(/(<\/loc>)/, `$1${alts}`);
     out.push(withAlts, withAlts.replace(/<loc>https:\/\/okanaganroam\.com[^<]*<\/loc>/, `<loc>https://okanaganroam.com${frTwinPath(p)}</loc>`));
@@ -26025,7 +26120,7 @@ function frMarkupRaw(part) {
     })
     // A card shows the French blurb only.
     .replace(/<span class="desc-en" lang="en">[\s\S]*?<\/span><span class="desc-fr" lang="fr">([\s\S]*?)<\/span>/g, '$1')
-    .replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)))
+    .replace(/<(a|form)\b[^>]*>/g, (tag) => (/\shreflang=/.test(tag) ? tag : tag.replace(/(\s(?:href|action|data-href)=")([^"]*)"/, (m, a, h) => `${a}${frHref(h)}"`)))
     .replace(/(\s(?:alt|aria-label|placeholder|title|data-tooltip|content)=")([^"]+)"/g, (m, a, v) => {
       if (a.includes('content') && !/[a-z]{3,} [a-z]/i.test(v)) return m;
       const t = frText(frDecode(v));
@@ -26126,7 +26221,8 @@ function addTwinHead(html, enPath, search = '') {
 function englishTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frHrefPath = frTwinPath(enPath);
-  let out = addTwinHead(html, enPath, search)
+  // An event whose French page is noindex (English description only, round 9) names no fr-CA alternate.
+  let out = (frEventUntranslated(enPath) ? html : addTwinHead(html, enPath, search))
     .replace(/<html lang="en"(?! data-page-lang)/, '<html lang="en" data-page-lang="en"')
     .replace(/(<head>\n?)/, `$1<script>try{if(localStorage.getItem('okanaganLang')==='fr')location.replace(${JSON.stringify(frHrefPath)}+location.search+location.hash)}catch(e){}</script>\n`);
   out = withTwinLangSwitch(out, frHrefPath + search.replace(/&/g, '&amp;'), 'en');
@@ -26137,8 +26233,11 @@ function englishTwinHtml(html, enPath, search = '') {
 function frenchTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frPath = frTwinPath(enPath);
-  const frEvent = frEventForPath(enPath);
+  const frEvent = frEventPageForPath(enPath);
   if (frEvent) html = frEventHead(html, frEvent);
+  // An event with no French description yet: its French page is kept out of search (round 9, see frEventPageForPath).
+  const enOnlyEvent = !!frEvent && !frEventForPath(enPath);
+  if (enOnlyEvent && !/<meta name="robots"/.test(html.split('</head>')[0])) html = html.replace(/(<link rel="canonical" href="[^"]*">\n)/, '<meta name="robots" content="noindex, follow">\n$1');
   // French advisories (2026-10-19, round 7): a card's "Check before you go" text in French (its own note_fr, the
   // French list or the known-phrasing fallback), never the English sentence.
   html = html.replace(/(<p class="venue-advisory-text">)([^<]*)(<\/p>)/g, (m, a, t, b) => `${a}${escapeHtml(frAdvisoryText(frDecode(t)))}${b}`);
@@ -26168,6 +26267,7 @@ function frenchTwinHtml(html, enPath, search = '') {
     .replace(/(<a [^>]*data-gcal href="[^"]*?details=)Details%3A%20https%3A%2F%2Fokanaganroam\.com%2F/g, '$1D%C3%A9tails%20%3A%20https%3A%2F%2Fokanaganroam.com%2Ffr%2F');
   // French pass 6 (2026-10-19): the photo credit under a town or hub banner has the French space before its colon.
   out = out.replace(/(<p class="region-photo-credit">)Photo: /g, '$1Photo : ');
+  if (enOnlyEvent) out = out.replace(/<p class="event-body">([\s\S]*?)<\/p>/, '<p class="event-body" lang="en">$1</p>\n  <p class="event-body-note"><em>Description offerte en anglais seulement pour le moment.</em></p>');
   // Deferred card batches and the rest of /browse load from their French addresses.
   return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
 }
@@ -27210,6 +27310,10 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
   const others = occurrences.filter((o) => o.id !== main.id && o.end_date >= todayStr).slice(0, 10);
   const schemaType = eventSchemaType(event, categories);
   const location = eventPlaceSchema(event, hostVenue);
+  // Round 9 (2026-10-19): each date of a series carries the series' organizer and price too (Google reads every
+  // subEvent as an Event, and 64% of them had no offers).
+  const organizer = eventOrganizerSchema(event, hostVenue);
+  const offers = eventOffersSchema(event);
   const sub = (o) => ({
     '@type': schemaType,
     name: o.label ? `${event.name} – ${o.label}` : event.name,
@@ -27218,6 +27322,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     eventStatus: 'https://schema.org/EventScheduled',
     location,
+    organizer,
+    offers,
   });
   return {
     '@context': 'https://schema.org',
@@ -27231,8 +27337,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     url: canonical,
     image: [eventImageUrl(event, categories)],
     location,
-    organizer: eventOrganizerSchema(event),
-    offers: eventOffersSchema(event),
+    organizer,
+    offers,
     subEvent: others.length ? others.map(sub) : undefined,
   };
 }
@@ -27246,10 +27352,26 @@ function eventOfficialUrl(event) {
   if (EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) && ok(event.source_url)) return event.source_url.trim();
   return null;
 }
-function eventOrganizerSchema(event) {
-  if (event.source_type !== 'official_organizer' || typeof event.source_name !== 'string' || !event.source_name.trim()) return undefined;
-  const url = eventOfficialUrl(event);
-  return { '@type': 'Organization', name: event.source_name.trim(), url: url || undefined };
+// Round 9 (2026-10-19): an event hosted at a winery, brewery, distillery, pub, lounge, restaurant or café listed on
+// the site is that place's own event, so the place is the organizer (with its website, else its page here); so is a
+// league's own schedule feed. A ticket seller or a theatre that only rents its hall is still never named.
+const EVENT_HOST_ORGANIZER_TYPES = new Set(['winery', 'brewery', 'distillery', 'pub', 'cocktail', 'restaurant', 'cafe']);
+function eventOrganizerSchema(event, hostVenue = null) {
+  const sourceName = typeof event.source_name === 'string' ? event.source_name.trim() : '';
+  if (event.source_type === 'official_organizer' && sourceName) {
+    const url = eventOfficialUrl(event);
+    return { '@type': 'Organization', name: sourceName, url: url || undefined };
+  }
+  if (hostVenue && typeof hostVenue.name === 'string' && hostVenue.name.trim() && EVENT_HOST_ORGANIZER_TYPES.has(hostVenue.type) && !hostVenue.redirect_to) {
+    const site = typeof hostVenue.website === 'string' && /^https?:\/\/\S+$/i.test(hostVenue.website.trim()) ? hostVenue.website.trim() : null;
+    const page = CATEGORY_SLUGS[hostVenue.type] && hostVenue.slug && REGION_LABELS[hostVenue.region] ? `https://okanaganroam.com${venuePagePath(hostVenue)}` : null;
+    return { '@type': 'Organization', name: hostVenue.name.trim(), url: site || page || undefined };
+  }
+  if (event.source_type === 'league_feed' && sourceName) {
+    const url = eventOfficialUrl(event);
+    return { '@type': 'SportsOrganization', name: sourceName, url: url || undefined };
+  }
+  return undefined;
 }
 // Event prices (2026-10-18): Google flags an Offer with no price, so an offer is emitted only when the listing states
 // one: a stored price field when there is one, else the description. "Tickets are about $68–79" -> lowPrice 68,
@@ -27258,12 +27380,18 @@ function eventOrganizerSchema(event) {
 // "By donation" and "early-bird tickets cost less" state no price, so no offer.
 const EVENT_PRICE_CONTEXT_RE = /\b(tickets?|admission|entry|entrance|cover|cost|costs|price[sd]?|register|registration|per (person|adult|child|ticket|couple|team)|passes?|seats?|in advance|at the door|early[- ]bird|from \$)/i;
 const EVENT_FREE_RE = /\b(?:(?:admission|entry|entrance)(?: is)? free|free (?:admission|entry|entrance|event|to attend|of charge|for (?:all|everyone)|and open)|(?:a|this|the) free(?:,? [\w'’-]+){0,3}? (?:event|fair|market|show|concert|festival|workshop|walk|tour|talk|screening|night|party|celebration|drop-in|session|class|day|afternoon|evening|parade|light-up|bazaar|program|gathering|exhibit|exhibition|skate|kick-off|open house|film|performance)|admission: free|^free(?:[.!]|$))/i;
+const EVENT_PRICE_PERSON_RE = /\b(?:kids|adults?|children|child|seniors|students|youth|members)\s\$\s?\d|\$\s?\d[\d.]*\s(?:per\s)?(?:adults?|kids|children|child|seniors|students|youth|guest|per guest)\b/i;
+const EVENT_FREE_SENTENCE_RE = /^(?:(?:it['\u2019]s|it is|admission is|entry is|entrance is|the event is|this event is)\s)?free(?:[.;!]?$|[.;!,]\s|\s(?:with|to (?:attend|watch|play|join|enter)|at the|and (?:open|all-ages|aimed|family)|tickets|for (?:all|everyone|the whole family)|admission|entry)\b)|^[^.;]{0,40}, free\.?$/i;
 function parseEventPrice(text) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   if (!t) return null;
   const amounts = [];
-  for (const sentence of t.split(/(?<=[.!?;])\s+/)) {
-    if (!EVENT_PRICE_CONTEXT_RE.test(sentence) && !/^\s*\$\d/.test(t)) continue;
+  const sentences = t.split(/(?<=[.!?;])\s+/);
+  for (const sentence of sentences) {
+    // Round 9 (2026-10-19): a sentence that is the price itself ("$55.", "$62 ($52.70 wine club).", "Kids $5, adults
+    // $10") counts too; a suggested donation still states no price.
+    const priceLed = (/^\$\s?\d/.test(sentence) || EVENT_PRICE_PERSON_RE.test(sentence)) && !/\bdonation\b/i.test(sentence);
+    if (!EVENT_PRICE_CONTEXT_RE.test(sentence) && !priceLed && !/^\s*\$\d/.test(t)) continue;
     // "$68–79", "$49–$59", "$68 to $79", "$25 - 35"
     const re = /\$\s?(\d{1,4}(?:\.\d{2})?)(?:\s?(?:–|—|-|to)\s?\$?\s?(\d{1,4}(?:\.\d{2})?)(?![\d,]))?/g;
     let m;
@@ -27278,8 +27406,12 @@ function parseEventPrice(text) {
     return lo === hi ? { price: fmt(lo) } : { lowPrice: fmt(lo), highPrice: fmt(hi) };
   }
   // "Free" counts unless it's hedged ("in past years it has been free") or names one part ("opens with a free parade").
+  if (/\b(past years|usually|typically|has been free|was free)\b/i.test(t)) return null;
+  // Round 9 (2026-10-19): a sentence that says the event is free on its own ("Free.", "It's free, and ...", "Free with
+  // RSVP", "5-7 pm, free.") counts; "Free-with-admission tours" or "Free puzzles are set aside" do not.
+  if (sentences.some((x) => EVENT_FREE_SENTENCE_RE.test(x.trim()))) return { price: '0' };
   const free = EVENT_FREE_RE.exec(t);
-  if (free && !/\b(past years|usually|typically|has been free|was free)\b/i.test(t)) {
+  if (free) {
     const before = t.slice(0, free.index).split(/[.!?;]\s/).pop();
     if (!/\b(opens|starts|begins|kicks off|ends|closes|wraps up) with\s*$|\b(plus|includes|including)\s*$/i.test(before)) return { price: '0' };
   }
@@ -44611,6 +44743,47 @@ function lowercasePageRedirect(p) {
   if (/^\/(?:fr\/)?(?:api|images|styles|scripts|fonts|owner|contribute|claim|admin|share|menu-scan|r)(?:\/|$)/i.test(path)) return null;
   return path.toLowerCase();
 }
+// One hop (2026-10-19, round 9): a redirect that would land on another redirect goes straight to the end. The
+// trailing-slash and lower-case redirects below ask this for the address they would send to: the portal root
+// (/owner -> /owner/login, 302) and a place's moved address (a retired duplicate, a corrected category or town;
+// 301), the same answers the routes further down give. null: that address is not itself a redirect.
+function pageRedirectHop(p, search = '') {
+  if (/^(?:\/fr)?\/owner$/.test(p)) return { status: 302, location: withCampaignParams(p.startsWith('/fr/') ? '/fr/owner/login' : '/owner/login', search) };
+  const m = /^(\/fr)?\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)$/.exec(p);
+  if (!m) return null;
+  const [, fr, region, categorySlug, slug] = m;
+  const type = SLUG_TO_TYPE[categorySlug];
+  if (!REGION_LABELS[region] || !type) return null;
+  const page = (v) => (fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : venuePagePath(v));
+  try {
+    const venue = findVenueBySlug(region, type, slug);
+    if (venue) {
+      if (venue.redirect_to) {
+        const target = getVenue(venue.redirect_to);
+        if (target && !target.redirect_to && CATEGORY_SLUGS[target.type] && target.slug) return { status: 301, location: fr ? withCampaignParams(page(target), search) : `${venuePagePath(target)}${search}` };
+        return null;
+      }
+      if (fr && !venueHasFrench(venue)) return { status: 302, location: withCampaignParams(venuePagePath(venue), search) };
+      return null;
+    }
+    if (fr) {
+      const moved = findActiveVenueBySlugAcrossTypes(region, slug) || findActiveVenueBySlugAcrossRegions(type, slug);
+      if (moved && CATEGORY_SLUGS[moved.type] && (moved.type !== type || moved.region !== region)) return { status: 301, location: withCampaignParams(page(moved), search) };
+      return null;
+    }
+    const moved = findActiveVenueBySlugAcrossTypes(region, slug);
+    if (moved && CATEGORY_SLUGS[moved.type] && CATEGORY_SLUGS[moved.type] !== categorySlug) return { status: 301, location: `/${region}/${CATEGORY_SLUGS[moved.type]}/${slug}${search}` };
+    const relocated = findActiveVenueBySlugAcrossRegions(type, slug);
+    if (relocated && relocated.region !== region) return { status: 301, location: `/${relocated.region}/${categorySlug}/${slug}${search}` };
+  } catch (e) { /* no hop: the plain redirect still works */ }
+  return null;
+}
+function sendPageRedirect(res, target, search) {
+  const hop = pageRedirectHop(target, search);
+  if (hop && hop.status === 302) res.writeHead(302, { Location: hop.location, 'Cache-Control': 'no-store' });
+  else res.writeHead(301, { Location: hop ? hop.location : target + search });
+  return res.end();
+}
 const server = http.createServer(async (req, res) => {
   applySecurityHeaders(res);
   if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
@@ -44623,8 +44796,8 @@ const server = http.createServer(async (req, res) => {
   // One address per page (2026-10-16): /kelowna/ redirects to /kelowna.
   if ((req.method === 'GET' || req.method === 'HEAD') && /^\/(?!api\/|images\/|styles\/|scripts\/)[^?#]*[^/]\/(\?|$)/.test(req.url)) {
     const [p, q] = String(req.url).split('?');
-    res.writeHead(301, { Location: p.replace(/\/+$/, '') + (q != null ? `?${q}` : '') });
-    return res.end();
+    const stripped = p.replace(/\/+$/, '');
+    return sendPageRedirect(res, lowercasePageRedirect(stripped) || stripped, q != null ? `?${q}` : '');
   }
   // One address per page, pass 5 (2026-10-19): /Kelowna or /Whats-On 301 to the lower-case address, and /index.html
   // to /. Paths that carry a token or a file name (/owner/..., /contribute/confirm/..., /api/, /images/ ...) keep
@@ -44632,10 +44805,7 @@ const server = http.createServer(async (req, res) => {
   if ((req.method === 'GET' || req.method === 'HEAD')) {
     const [p, q] = String(req.url).split('?');
     const target = lowercasePageRedirect(p);
-    if (target) {
-      res.writeHead(301, { Location: target + (q != null ? `?${q}` : '') });
-      return res.end();
-    }
+    if (target) return sendPageRedirect(res, target, q != null ? `?${q}` : '');
   }
   // French business portal (2026-10-18): /fr/owner/account, /fr/owner/<edit link> ... are served by the English
   // routes with res.ownerLang = 'fr' (see ownerPortalLangRequest); English portal pages get the EN / FR switch.
@@ -44672,12 +44842,15 @@ const server = http.createServer(async (req, res) => {
     res.end = () => realEnd();
   }
 
+  // CORS, round 9 (2026-10-19): public /api/ reads may be fetched from other sites (GET/HEAD); nothing advertises
+  // PUT/POST/DELETE any more. A preflight for anything else gets no grant, so a browser on another site cannot write.
+  if (pathname.startsWith('/api/') && method === 'GET') {
+    for (const [k, v] of Object.entries(API_CORS_HEADERS)) res.setHeader(k, v);
+  }
   if (method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    });
+    const wanted = String(req.headers['access-control-request-method'] || 'GET').toUpperCase();
+    const grant = pathname.startsWith('/api/') && (wanted === 'GET' || wanted === 'HEAD');
+    res.writeHead(204, grant ? { ...API_CORS_HEADERS, 'Access-Control-Max-Age': '86400' } : { Allow: 'GET, HEAD, OPTIONS' });
     return res.end();
   }
 
@@ -46629,6 +46802,15 @@ const server = http.createServer(async (req, res) => {
             return respond(upsertEventOccurrences(eventId, body.occurrences, metaFromBody()));
           }
           if (eventId !== null && subResource === 'occurrences' && occurrenceId !== null && method === 'PATCH') {
+            // Round 9 (2026-10-19): the same PATCH sets a date's times ({ start_time, end_time, ends_next_day }); a
+            // request changes either the status or the times, never both.
+            const timeKeys = EVENT_OCCURRENCE_TIME_FIELDS.filter((k) => Object.prototype.hasOwnProperty.call(body, k));
+            if (timeKeys.length) {
+              if (rejectUnexpected([...EVENT_OCCURRENCE_TIME_FIELDS, ...EVENT_META_KEYS])) return;
+              const times = {};
+              for (const k of timeKeys) times[k] = body[k];
+              return respond(setEventOccurrenceTimes(eventId, occurrenceId, times, metaFromBody()));
+            }
             if (rejectUnexpected(['status', ...EVENT_META_KEYS])) return;
             return respond(setEventOccurrenceStatus(eventId, occurrenceId, body.status, metaFromBody()));
           }
@@ -48332,6 +48514,7 @@ module.exports = {
   seasonalHeroText,
   isFallHeroSeason,
   retimeEventOccurrence,
+  setEventOccurrenceTimes,
   fitTitle,
   localizeHtml,
   localizeStaticFr,
@@ -48342,6 +48525,8 @@ module.exports = {
   mapEventsData,
   mapLiveData,
   hasFrenchTwin,
+  frEventPageForPath,
+  frEventUntranslated,
   frenchTwinRequest,
   frText,
   frenchTwinHtml,
@@ -48598,6 +48783,7 @@ module.exports = {
   venueLookup,
   venueLookupByWords,
   lowercasePageRedirect,
+  pageRedirectHop,
   eventCalendarTimes,
   googleCalendarUrl,
   eventCalendarLocation,
