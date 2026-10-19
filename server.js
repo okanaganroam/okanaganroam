@@ -61,23 +61,28 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
 // Security headers (2026-10-18): set on every response before any route runs. A route that writes its own value
 // (the owner portal's 'Referrer-Policy: no-referrer') wins, since writeHead overrides setHeader.
-// - The enforced CSP carries frame-ancestors only (report-only can't enforce it), so the site, and above all
-//   /owner/*, can't be framed elsewhere. X-Frame-Options says the same to older browsers.
-// - The full policy is report-only for now: it lists the real outside sources (Leaflet and pdf.js on cdnjs,
-//   Tesseract on jsdelivr with its language data, OSM tiles, GA4, Clarity, Google Fonts, FormSubmit, Open-Meteo,
-//   Cloudflare's own scripts) and sends violations to /csp-report, which only logs.
+// - The full policy lists the real outside sources (Leaflet and pdf.js on cdnjs, Tesseract on jsdelivr with its
+//   language data, OSM tiles, GA4, Clarity, Google Fonts, FormSubmit, Open-Meteo, Cloudflare's own scripts) and sends
+//   violations to /csp-report, which only logs.
 // - Inline scripts and styles are everywhere, so 'unsafe-inline' stays until pages carry nonces.
 // - connect-src lists fonts.googleapis.com too (2026-10-18, review pass 4): a script that fetches the font stylesheet
 //   (a session recorder such as Clarity can re-read a page's stylesheets) is governed by connect-src, not style-src,
 //   and would otherwise be reported as a violation.
+// Enforced CSP (2026-10-19, round 7): report-only showed zero violations across the reviewers' crawl, so the policy is
+// now enforced (it also carries frame-ancestors, which report-only could not). Two outside fetches the crawl never
+// reached were added first: /map's turn-by-turn directions (api.mapbox.com, when MAPBOX_TOKEN is set, as it is live)
+// and the admin Places lookup in app.js (places.googleapis.com, with the admin's own key). Images stay open to any
+// https: host (listing photos, OSM tiles). Cross-Origin-Opener-Policy: same-origin-allow-popups keeps the site's
+// own window apart from other sites' windows; the popups it opens (maps, calendars, websites) all use noopener, and
+// owner sign-in is a same-site form, so nothing relies on window.opener.
 const CSP_REPORT_PATH = '/csp-report';
-const CSP_REPORT_ONLY = [
+const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms https://static.cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://stats.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://stats.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://api.mapbox.com https://places.googleapis.com",
   "worker-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
   "frame-src 'self'",
   "media-src 'self' blob: data:",
@@ -86,23 +91,25 @@ const CSP_REPORT_ONLY = [
   "form-action 'self'",
   `report-uri ${CSP_REPORT_PATH}`,
 ].join('; ');
+// The report-only name is kept for older callers (tests, other branches).
+const CSP_REPORT_ONLY = CSP_POLICY;
 const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'SAMEORIGIN',
-  'Content-Security-Policy': "frame-ancestors 'self'",
+  'Content-Security-Policy': `${CSP_POLICY}; frame-ancestors 'self'`,
+  'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   // /map uses location, the microphone (voice search), the motion sensors (the compass arrow), a screen wake lock
   // (directions) and the clipboard (Share); the menu scanner takes photos (a file input with capture; camera=(self)
   // keeps a live-camera scan possible). Web Share (trip and favourites) is left at its default, self: Chrome warns
   // that web-share is an unrecognized feature. The rest is off.
   'Permissions-Policy': 'geolocation=(self), camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self), screen-wake-lock=(self), clipboard-write=(self), fullscreen=(self), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=(), display-capture=(), browsing-topics=()',
-  'Content-Security-Policy-Report-Only': CSP_REPORT_ONLY,
 };
 function applySecurityHeaders(res) {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
 }
-// POST /csp-report: browsers send report-only violations here. Logged (deduplicated, at most 100 distinct per hour)
+// POST /csp-report: browsers send policy violations here. Logged (deduplicated, at most 100 distinct per hour)
 // so Railway's logs show what an enforced policy would block; nothing is stored.
 const cspReportSeen = new Set();
 let cspReportHour = 0;
@@ -6682,7 +6689,52 @@ function getSeasonStates(now = new Date()) {
       if (st) map.set(id, st);
     }
   }
+  // Temporary closures (2026-10-19, round 7): a special closure becomes a dated notice too (see tempClosureStateOn).
+  // A place closed for the season keeps that notice; an "open until" or "reopening" note gives way while the place
+  // is actually shut.
+  let extras = new Map();
+  try { extras = hoursExtrasMap(); } catch (e) { /* not set up yet (module load): no closure notices */ }
+  for (const [id, x] of extras) {
+    if (!x.closures.length) continue;
+    const st = tempClosureStateOn(x.closures, today);
+    if (!st) continue;
+    const cur = map.get(id);
+    if (cur && (cur.kind === 'closed' || !st.current)) continue;
+    map.set(id, st);
+  }
   return map;
+}
+
+// Temporary closures (2026-10-19, round 7): a venue shut for a few days (Beat Patisserie, Oct 21-28) is a special
+// closure in venue_hours_extra, the same list an owner keeps under Special closures and Dayton sets with POST
+// /admin/set-closure. hours.js already reads it as closed on those dates (Open Now, the map, Build My Trip); this
+// turns it into the notice the cards and the venue page show: "Closed Oct 21–28, reopens Oct 29." A closure
+// of two days or more shows from TEMP_CLOSURE_NOTICE_DAYS before it starts; a single day shows on that day only.
+// Back-to-back closures read as one. Each notice expires on its own the day the venue reopens.
+const TEMP_CLOSURE_NOTICE_DAYS = 14;
+function tempClosureDay(d) { return `${SEASON_TAG_MONTHS[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`; }
+function tempClosureText(from, to, today) {
+  const range = to === from ? tempClosureDay(from)
+    : from.slice(0, 7) === to.slice(0, 7) ? `${tempClosureDay(from)}\u2013${Number(to.slice(8, 10))}` : `${tempClosureDay(from)}\u2013${tempClosureDay(to)}`;
+  const back = addLocalDays(to, 1);
+  return `Closed ${range}, reopens ${tempClosureDay(back)}${back.slice(0, 4) !== String(today).slice(0, 4) ? `, ${back.slice(0, 4)}` : ''}.`;
+}
+// -> null | { kind: 'temp_closed', text, note, until: null, from, to, current }
+function tempClosureStateOn(closures, today) {
+  if (!parseLocalDate(today)) return null;
+  const list = (closures || []).filter((c) => c && parseLocalDate(c.from))
+    .map((c) => ({ from: c.from, to: c.to && parseLocalDate(c.to) && c.to >= c.from ? c.to : c.from }))
+    .sort((a, b) => a.from.localeCompare(b.from));
+  for (let i = 0; i < list.length; i++) {
+    const c = { ...list[i] };
+    while (i + 1 < list.length && list[i + 1].from <= addLocalDays(c.to, 1)) { i++; if (list[i].to > c.to) c.to = list[i].to; }
+    if (today > c.to) continue;
+    const showFrom = c.to > c.from ? addLocalDays(c.from, -TEMP_CLOSURE_NOTICE_DAYS) : c.from;
+    if (today < showFrom) return null;
+    const text = tempClosureText(c.from, c.to, today);
+    return { kind: 'temp_closed', text, note: text, until: null, from: c.from, to: c.to, current: today >= c.from };
+  }
+  return null;
 }
 
 // The advisory collection's notes with each venue's season note in front.
@@ -6732,13 +6784,24 @@ function advisoryNotOperating(note) {
   const t = String(note || '');
   return !!t && !/\bpartial(?:ly)?\b/i.test(t) && ADVISORY_NOT_OPERATING_RE.test(t);
 }
+// The legacy /api/trip/generate (2026-10-19, round 7): trip-planner.js's advisoryUnavailable (an evacuation order or a
+// closure, or a place not operating), with this file's own copy of the rule when trip-planner.js is not there.
+const LEGACY_TRIP_ADVISORY_CLOSED_RE = /\b(evacuation order|temporarily closed|closed until|closed for the season|is closed|are closed)\b/i;
+function legacyTripAdvisoryUnavailable(note) {
+  if (!note) return false;
+  try {
+    const tp = tripPlannerModule();
+    if (tp && typeof tp.advisoryUnavailable === 'function') return tp.advisoryUnavailable(note);
+  } catch (e) { /* trip-planner.js missing: the copy below */ }
+  return LEGACY_TRIP_ADVISORY_CLOSED_RE.test(note) || advisoryNotOperating(note);
+}
 // Ids of live venues whose written advisory (not a season note) says they are not operating.
 function advisoryNotOperatingIds() {
   const ids = new Set();
   for (const [id, note] of getCollectionNotes(ADVISORY_COLLECTION_KIND)) if (advisoryNotOperating(note)) ids.add(id);
   return ids;
 }
-const SEASON_TAG_ICON = { closed: '\u{1F342}', open_until: '\u23F3', reopening: '\u{1F331}' };
+const SEASON_TAG_ICON = { closed: '\u{1F342}', open_until: '\u23F3', reopening: '\u{1F331}', temp_closed: '\u{1F4C5}' };
 // "Open until Oct 31" (2026-10-18): the card tag's short form of "Open for the season until October 31."; the venue
 // page keeps the full sentence.
 const SEASON_TAG_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -6923,6 +6986,60 @@ function guardedSeasonUpdate(id, season, meta, now = new Date()) {
     if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
     throw err;
   }
+}
+
+// POST /admin/set-closure (2026-10-19, round 7): Dayton's way to add (or take off) a temporary closure, such as a
+// venue's note that it is shut Oct 21-28. It writes the same special-closures list the owner portal keeps
+// (venue_hours_extra.closures), so the owner sees it on their edit page and can change it; a closure that overlaps
+// the new one is replaced by it. Logged in venue_enrichment_log as 'hours_closures'.
+// -> { ok, changed, closures, showing } | { ok: false, reason, detail }
+function guardedClosureUpdate(id, input, meta, now = new Date()) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  const x = input || {};
+  const today = todayLocal(now);
+  const from = typeof x.from === 'string' && parseLocalDate(x.from) ? x.from : null;
+  const to = x.to === undefined || x.to === null || x.to === '' ? from : (typeof x.to === 'string' && parseLocalDate(x.to) ? x.to : null);
+  if (!from || !to) return { ok: false, reason: 'invalid_closure', detail: 'from (and to, if given) must be real YYYY-MM-DD dates' };
+  if (to < from) return { ok: false, reason: 'invalid_closure', detail: 'to is before from' };
+  const remove = x.remove === true;
+  if (!remove) {
+    if (to < today) return { ok: false, reason: 'invalid_closure', detail: 'the closure is already over' };
+    if (localDateToDayNumber(to) - localDateToDayNumber(from) > 366) return { ok: false, reason: 'invalid_closure', detail: 'a closure can be up to a year long; use /admin/set-season for longer' };
+  }
+  const note = typeof x.note === 'string' ? x.note.trim().replace(/\s+/g, ' ') : '';
+  if (note.length > HOURS_EXTRA_NOTE_MAX || /[<>&()]/.test(note)) return { ok: false, reason: 'invalid_closure', detail: `note: up to ${HOURS_EXTRA_NOTE_MAX} characters, without < > & or brackets` };
+  const venue = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!venue) return { ok: false, reason: 'venue_not_found' };
+  if (venue.redirect_to) return { ok: false, reason: 'venue_redirected' };
+  const row = db.prepare('SELECT closures FROM venue_hours_extra WHERE venue_id = ?').get(id);
+  let prev = [];
+  try { prev = JSON.parse((row && row.closures) || '[]') || []; } catch (e) { prev = []; }
+  if (!Array.isArray(prev)) prev = [];
+  const overlaps = (c) => c && c.from <= to && (c.to || c.from) >= from;
+  let next = remove ? prev.filter((c) => !(c && c.from === from && (c.to || c.from) === to)) : prev.filter((c) => !overlaps(c)).concat([{ from, to, note }]);
+  next = next.filter(Boolean).sort((a, b) => a.from.localeCompare(b.from) || String(a.to).localeCompare(String(b.to)));
+  if (next.length > HOURS_CLOSURE_MAX) return { ok: false, reason: 'invalid_closure', detail: `at most ${HOURS_CLOSURE_MAX} closures` };
+  const before = row && row.closures ? row.closures : null;
+  const json = next.length ? JSON.stringify(next) : null;
+  if (before === json || (!before && !json)) return { ok: true, changed: false, closures: next, showing: (tempClosureStateOn(next, today) || {}).text || null };
+  db.exec('BEGIN');
+  try {
+    db.prepare('INSERT INTO venue_hours_extra (venue_id, closures) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET closures = excluded.closures, updated_at = CURRENT_TIMESTAMP').run(id, json);
+    db.prepare(`
+      INSERT INTO venue_enrichment_log
+        (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'hours_closures', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)
+    `).run(id, before, json, m.reason.trim(), m.batch_id.trim());
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    throw err;
+  }
+  clearHoursExtraCache();
+  return { ok: true, changed: true, closures: next, showing: (tempClosureStateOn(next, today) || {}).text || null };
 }
 
 // Same .chip convention as the Hidden Gem / Local Favourite badges. The
@@ -12676,39 +12793,69 @@ function withSharedStylesheets(html) {
 // a photo changed Cloudflare and browsers kept the old bytes (the 2026-10-19 review asked Dayton for a purge). Like
 // app.js and the shared CSS, every image URL the server writes into a page (src, data-src, srcset, data-srcset and
 // url() in a style attribute) gets ?v=<first 10 hex of the file's md5>, and the /images/ route already keeps a
-// ?v= URL for a year as immutable; a plain URL still works and still gets a day. A URL that already has a query
-// (the venue photos' own ?v=), is not a local file, or is inside a <style> block or JSON is left alone. Hashes are
-// remembered per file and rechecked against its size and mtime at most once a minute.
+// ?v= URL for a year as immutable; a plain URL still works and still gets a day. A URL that is not a local file, has
+// any other query, or is inside a <style> block or JSON is left alone. Hashes are remembered per file and rechecked
+// against its size and mtime at most once a minute.
+// Round 7 (2026-10-19): the route now keeps only the file's own hash for a year (imageVersionMatches), so a URL that
+// already carries a hand-set ?v= (the venue photos' "?v=20261016") gets the hash in its place here too, in pages,
+// /cards/rest/ and /browse/cards.json alike.
 const IMAGE_VERSION_RE = /^\/images\/(?!.*\.\.)[\w\/.-]+\.(?:jpe?g|png|webp)$/i;
-const imageVersionMemo = new Map(); // url -> { h, size, mtime, at }
-function imageVersion(url) {
+const imageVersionMemo = new Map(); // url -> { h, sha, size, mtime, at }
+function imageHashes(url) {
   if (!IMAGE_VERSION_RE.test(url)) return null;
   const now = Date.now();
   const memo = imageVersionMemo.get(url);
-  if (memo && now - memo.at < 60000) return memo.h;
+  if (memo && now - memo.at < 60000) return memo.h ? memo : null;
   let st;
   try { st = fs.statSync(path.join(__dirname, 'public', url)); } catch (e) { imageVersionMemo.set(url, { h: null, at: now }); return null; }
   if (!st.isFile()) return null;
-  if (memo && memo.h && memo.size === st.size && memo.mtime === st.mtimeMs) { memo.at = now; return memo.h; }
-  let h = null;
-  try { h = crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', url))).digest('hex').slice(0, 10); } catch (e) { /* unreadable: leave the URL plain */ }
-  imageVersionMemo.set(url, { h, size: st.size, mtime: st.mtimeMs, at: now });
-  return h;
+  if (memo && memo.h && memo.size === st.size && memo.mtime === st.mtimeMs) { memo.at = now; return memo; }
+  let h = null, sha = null;
+  try {
+    const buf = fs.readFileSync(path.join(__dirname, 'public', url));
+    h = crypto.createHash('md5').update(buf).digest('hex');
+    sha = crypto.createHash('sha256').update(buf).digest('hex');
+  } catch (e) { /* unreadable: leave the URL plain */ }
+  const next = { h, sha, size: st.size, mtime: st.mtimeMs, at: now };
+  imageVersionMemo.set(url, next);
+  return h ? next : null;
+}
+function imageVersion(url) {
+  const x = imageHashes(url);
+  return x ? x.h.slice(0, 10) : null;
+}
+// Immutable only for the file's own hash (2026-10-19, round 7): the /images/ route kept ANY ?v= for a year, so a
+// hand-set token ("?v=20261016", "?v=sports-photo-1") that outlived a photo change, or a made-up one, pinned whatever
+// bytes the edge saw first. Now a ?v= gets the year-long immutable cache only when it is the start (8+ hex) of the
+// file's current md5 (what versionedImageUrl writes) or sha256 (the hashed hero file names); anything else gets the
+// plain day.
+function imageVersionMatches(url, v) {
+  if (typeof v !== 'string' || !/^[0-9a-f]{8,64}$/i.test(v)) return false;
+  const x = imageHashes(url);
+  if (!x) return false;
+  const t = v.toLowerCase();
+  return x.h.startsWith(t) || (!!x.sha && x.sha.startsWith(t));
 }
 function versionedImageUrl(url) {
   const h = imageVersion(url);
   return h ? `${url}?v=${h}` : url;
 }
-const IMAGE_URL_IN_LIST_RE = /\/images\/[\w\/.-]+\.(?:jpe?g|png|webp)(?=[\s,]|$)/gi;
+// A local image URL that already carries a hand-set ?v= token (the venue photos' "?v=20261016") gets the file's hash
+// in its place, so it keeps the immutable cache; a file that is missing or not a local image keeps its URL.
+function rehashedImageUrl(url, token) {
+  const h = imageVersion(url);
+  return h ? `${url}?v=${h}` : `${url}?v=${token}`;
+}
+const IMAGE_URL_IN_LIST_RE = /\/images\/[\w\/.-]+\.(?:jpe?g|png|webp)(?:\?v=([\w.-]{1,64}))?(?=[\s,]|$)/gi;
 function withVersionedImages(html) {
   if (typeof html !== 'string' || html.indexOf('/images/') === -1) return html;
   // <style> blocks (the shared stylesheets match them by their exact text) and scripts stay as they are.
   return html.split(/(<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>)/).map((part, i) => {
     if (i % 2 === 1 || part.indexOf('/images/') === -1) return part;
     return part
-      .replace(/(\s(?:src|data-src)=")(\/images\/[^"?#]+)"/g, (m, a, url) => `${a}${versionedImageUrl(url)}"`)
-      .replace(/(\s(?:srcset|data-srcset)=")([^"]*)"/g, (m, a, list) => `${a}${list.replace(IMAGE_URL_IN_LIST_RE, (u) => versionedImageUrl(u))}"`)
-      .replace(/(\sstyle=")([^"]*url\([^"]*)"/g, (m, a, css) => `${a}${css.replace(/url\((['"]?|&#39;|&quot;)(\/images\/[^'"()?#&]+)\1\)/g, (mm, q, url) => `url(${q}${versionedImageUrl(url)}${q})`)}"`);
+      .replace(/(\s(?:src|data-src)=")(\/images\/[^"?#]+)(?:\?v=([\w.-]{1,64}))?"/g, (m, a, url, t) => `${a}${t ? rehashedImageUrl(url, t) : versionedImageUrl(url)}"`)
+      .replace(/(\s(?:srcset|data-srcset)=")([^"]*)"/g, (m, a, list) => `${a}${list.replace(IMAGE_URL_IN_LIST_RE, (u, t) => (t ? rehashedImageUrl(u.slice(0, u.indexOf('?')), t) : versionedImageUrl(u)))}"`)
+      .replace(/(\sstyle=")([^"]*url\([^"]*)"/g, (m, a, css) => `${a}${css.replace(/url\((['"]?|&#39;|&quot;)(\/images\/[^'"()?#&]+)(?:\?v=([\w.-]{1,64}))?\1\)/g, (mm, q, url, t) => `url(${q}${t ? rehashedImageUrl(url, t) : versionedImageUrl(url)}${q})`)}"`);
   }).join('');
 }
 // Lighter pages (2026-10-18): the Food & Drink style hubs (/food-drink,
@@ -25081,7 +25228,7 @@ const FR_STATIC_ATTRS = { 'aria-label="Search all places"': 'aria-label="Recherc
 // A seasonal notice in French ("Closed for the season. Reopens November 26." -> "Fermé pour la saison. Réouverture le
 // 26 novembre."), from french-text.js's season patterns; null for any other text.
 function frSeasonText(t) {
-  if (!/^(Closed for the season|Open for the season until|Reopening for the season|Open until )/.test(t)) return null;
+  if (!/^(Closed for the season|Open for the season until|Reopening for the season|Open until |Closed (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d)/.test(t)) return null;
   // Only the season patterns (2026-10-16): a notice with a comma in its date
   // ("Reopens May 1, 2027.") also fits the general list pattern, which needs
   // the translate helper -- it crashed the whole French page.
@@ -26381,14 +26528,17 @@ function venuePostalAddress(address, fallbackLocality) {
   const raw = String(address || '').replace(/\s+/g, ' ').trim();
   if (!raw) return undefined;
   const out = { '@type': 'PostalAddress', streetAddress: raw, addressLocality: fallbackLocality || undefined, addressRegion: 'BC', postalCode: undefined, addressCountry: 'CA' };
-  const core = raw.replace(/\s*[;(].*$/, '').replace(/,?\s*Canada\s*$/i, '').trim();
+  // Postal codes (2026-10-19, round 7): a note in brackets mid-address ("1223 Water St (Prospera Place, Gate #3),
+  // Kelowna, BC V1Y 9V1") is taken out where it stands, instead of cutting the rest of the address (and its postal
+  // code) off with it; only a ";" or an unclosed bracket still ends the address.
+  const core = raw.replace(/\s*\([^()]*\)/g, '').replace(/\s*[;(].*$/, '').replace(/,?\s*Canada\s*$/i, '').trim();
   const m = /^(.+?),\s*([^,]+?),\s*(?:BC|B\.C\.|British Columbia)\.?(?:,?\s*([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d))?$/.exec(core);
   if (m) {
     out.streetAddress = m[1].trim();
     if (m[2].length <= 30 && !/\d/.test(m[2])) out.addressLocality = m[2].trim();
     if (m[3]) out.postalCode = `${m[3]} ${m[4]}`.toUpperCase();
   } else {
-    const pc = /\b([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d)\b/.exec(core);
+    const pc = /\b([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d)\b/.exec(core) || /\b([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d)\b/.exec(raw.replace(/\([^()]*\)/g, ''));
     if (pc) out.postalCode = `${pc[1]} ${pc[2]}`.toUpperCase();
   }
   for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
@@ -26457,6 +26607,9 @@ function eventVenueAddressTable() {
   for (const v of rows) {
     if (!v || !v.name || !v.streetAddress || !REGION_LABELS[v.region]) continue;
     for (const n of [v.name, ...(v.aliases || [])]) map.set(eventVenueKey(n), v);
+    // Round 7 (2026-10-19): regionAliases are names that only mean this place for an event in its own town
+    // ("Landmark Cinemas" is a different cinema in Kelowna and West Kelowna).
+    for (const n of v.regionAliases || []) map.set(`${v.region}|${eventVenueKey(n)}`, v);
   }
   eventVenueTable = map;
   return map;
@@ -26476,9 +26629,12 @@ function eventVenueTextKeys(text) {
   if (parts.length > 1) keys.push(eventVenueKey(parts[parts.length - 1]));
   return uniqueList(keys.filter(Boolean));
 }
-function eventKnownVenue(text) {
+function eventKnownVenue(text, region = null) {
   const table = eventVenueAddressTable();
-  for (const k of eventVenueTextKeys(text)) if (table.has(k)) return table.get(k);
+  for (const k of eventVenueTextKeys(text)) {
+    if (table.has(k)) return table.get(k);
+    if (region && table.has(`${region}|${k}`)) return table.get(`${region}|${k}`);
+  }
   return null;
 }
 // Listings by name, for a place that is a listing but not linked to it. Refreshed every ten minutes.
@@ -26514,7 +26670,7 @@ function knownVenuePlace(v) {
 }
 function eventPlaceSchema(event, hostVenue) {
   if (hostVenue && hostVenue.address) return { '@type': 'Place', name: hostVenue.name, address: eventLocationAddress(event, hostVenue) };
-  const known = eventKnownVenue(hostVenue ? hostVenue.name : event.venue_name_text);
+  const known = eventKnownVenue(hostVenue ? hostVenue.name : event.venue_name_text, event.region);
   if (known) return knownVenuePlace(known);
   if (hostVenue) return { '@type': 'Place', name: hostVenue.name, address: eventLocationAddress(event, hostVenue) };
   if (event.venue_name_text) {
@@ -28201,7 +28357,9 @@ function tripV3MapHeaders(dir = TRIP_V3_MAPS_DIR) {
       // z and view (2026-10-18): the picture's zoom and centre, so the page can place each stop on it.
       const z = Number(x.zoom), view = Array.isArray(x.view) ? x.view.map(Number) : null;
       const geo = Number.isFinite(z) && view && view.length === 2 && view.every(Number.isFinite) ? { z, view } : {};
-      return { src: `/images/regions/maps/${x.file}?v=${encodeURIComponent(String(x.version || ''))}`, w: n[0], h: n[1], dx: n[2], dy: n[3], below: n[4], ...geo };
+      // Round 7 (2026-10-19): the file's own hash, so the /images/ route keeps it for a year (the manifest's version
+      // when the file is not under public/, as in tests).
+      return { src: rehashedImageUrl(`/images/regions/maps/${x.file}`, encodeURIComponent(String(x.version || ''))), w: n[0], h: n[1], dx: n[2], dy: n[3], below: n[4], ...geo };
     };
     const desktop = asset('desktop'), narrow = asset('narrow');
     if (!desktop || !narrow) continue;
@@ -30339,6 +30497,25 @@ function findExistingVenuesForSubmission(name, region) {
   return db.prepare(
     'SELECT id, name, type, region, slug FROM venues WHERE region = ? AND LOWER(TRIM(name)) = LOWER(TRIM(?)) AND redirect_to IS NULL'
   ).all(region, name);
+}
+
+// Round 7 (2026-10-19): live venues a new one would duplicate, for POST /api/venues: the same name in the same town
+// (compared as slugs, so "Sushi Sai" = "SUSHI SAI" = "Sushi-Sai"), or the same phone number (last 10 digits) for the
+// same type of place in that town. Different types may share a phone (a town's parks all list the town office), so
+// only the same type counts there.
+function findLikelyDuplicateVenues(data) {
+  const name = slugify(String((data && data.name) || ''));
+  const region = data && data.region;
+  if (!name || !region) return [];
+  const digits = (p) => String(p || '').replace(/\D/g, '').slice(-10);
+  const phone = digits(data.phone);
+  const out = [];
+  for (const v of db.prepare('SELECT id, name, type, region, slug, phone FROM venues WHERE region = ? AND redirect_to IS NULL').all(region)) {
+    const sameName = slugify(v.name) === name;
+    const samePhone = phone.length === 10 && v.type === data.type && digits(v.phone) === phone;
+    if (sameName || samePhone) out.push({ id: v.id, name: v.name, type: v.type, region: v.region, slug: v.slug, match: sameName ? 'name' : 'phone' });
+  }
+  return out;
 }
 
 function formatSubmissionTimestamp(sqliteUtc) {
@@ -44436,7 +44613,10 @@ const server = http.createServer(async (req, res) => {
         let buf = null;
         try { if (row && (row.kind === 'pdf') === (mp[2] === 'pdf')) buf = fs.readFileSync(menuFilePath(row.file)); } catch (e) { /* missing */ }
         if (!buf) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-        res.writeHead(200, { 'Content-Type': row.kind === 'pdf' ? 'application/pdf' : 'image/jpeg', 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
+        // Enforced CSP (2026-10-19, round 7): Chrome's PDF viewer is an embedded object, which the page policy's
+        // object-src 'none' would block, so a PDF preview carries the framing rule only.
+        res.writeHead(200, { 'Content-Type': row.kind === 'pdf' ? 'application/pdf' : 'image/jpeg', 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer',
+          ...(row.kind === 'pdf' ? { 'Content-Security-Policy': "frame-ancestors 'self'" } : {}) });
         return res.end(buf);
       }
       const im = /^\/images\/owner\/([a-z0-9]{24}\.jpg)$/.exec(pathname);
@@ -44513,7 +44693,8 @@ const server = http.createServer(async (req, res) => {
         const body = fs.readFileSync(requestedPath);
         // Caching (2026-10-18): a versioned URL (?v=, changed whenever the file changes) is kept for a year; a
         // plain one stays at a day, since the same name may get a new photo.
-        const versioned = typeof query.v === 'string' && /^[\w.-]{1,64}$/.test(query.v);
+        // Round 7 (2026-10-19): only the file's own hash counts (imageVersionMatches).
+        const versioned = imageVersionMatches(pathname, query.v);
         res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': versioned ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' });
         return res.end(body);
       }
@@ -45387,6 +45568,44 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changed: result.changed, season: result.season, showing: state ? state.text : null });
     }
 
+    // POST /admin/set-closure (2026-10-19, round 7): a temporary closure; see guardedClosureUpdate.
+    if (pathname === '/admin/set-closure' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Set-closure endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const unexpectedClosureKeys = Object.keys(body).filter((k) => !['id', 'from', 'to', 'note', 'remove', 'reason', 'batch_id'].includes(k));
+      if (unexpectedClosureKeys.length > 0) {
+        return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedClosureKeys.join(', ')}` });
+      }
+      if (!Number.isInteger(body.id) || body.id <= 0) {
+        return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      }
+      if (body.remove !== undefined && typeof body.remove !== 'boolean') return sendJSON(res, 400, { error: 'remove must be a boolean.' });
+      let result;
+      try {
+        result = guardedClosureUpdate(body.id, body, { reason: body.reason, batch_id: body.batch_id });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Closure update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { venue_not_found: 404, venue_redirected: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail });
+      }
+      return sendJSON(res, 200, { id: body.id, changed: result.changed, closures: result.closures, showing: result.showing });
+    }
+
     // POST /admin/correct-amenities
     //
     // Scoped to the Phase 2.9 need: carrying verified-true amenity flags
@@ -45783,6 +46002,19 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 401, { error: 'Unauthorized.' });
       }
       const body = await readBody(req);
+      // Duplicates (2026-10-19, round 7): the Oct 12 bulk import created /kelowna/restaurants/sushi-sai-1651 next to
+      // the existing /sushi-sai, because this route (unlike approving a List Your Venue submission) never looked for
+      // the place first and the slug step quietly added the id. A live venue with the same name in the same town, or
+      // the same phone number for the same kind of place there, is now a 409 listing it; allow_duplicate: true
+      // (a real second location) creates it anyway.
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        const allowDuplicate = body.allow_duplicate === true;
+        delete body.allow_duplicate;
+        const existing = allowDuplicate ? [] : findLikelyDuplicateVenues(body);
+        if (existing.length) {
+          return sendJSON(res, 409, { error: 'A live venue that looks like this one already exists. Pass allow_duplicate: true to create it anyway.', existing });
+        }
+      }
       const created = createVenue(body);
       return sendJSON(res, 201, created);
     }
@@ -45895,11 +46127,15 @@ const server = http.createServer(async (req, res) => {
       // browsable venues but not a planner interest yet, see
       // TRIP_PLANNER_EXCLUDED_TYPES), so an itinerary can never pick a
       // type the interests validation above would have rejected.
+      // Advisory venues (2026-10-19, round 7): like the new planner (#376), a place whose advisory says it is closed
+      // or not operating (receivership, for sale, "Temporarily closed", an evacuation order, closed for the season)
+      // never goes into a plan here either.
+      const advisoryNotes = getAdvisoryNotes();
       const regionVenues = db
         .prepare('SELECT * FROM venues WHERE region = ? AND redirect_to IS NULL')
         .all(region)
         .map(rowToVenue)
-        .filter((v) => isTripPlannerType(v.type));
+        .filter((v) => isTripPlannerType(v.type) && !legacyTripAdvisoryUnavailable(advisoryNotes.get(v.id)));
 
       const plan = buildTripItinerary(regionVenues, {
         region,
@@ -47590,6 +47826,12 @@ module.exports = {
   browseRecommendedOrder,
   advisoryNotOperating,
   advisoryNotOperatingIds,
+  legacyTripAdvisoryUnavailable,
+  guardedClosureUpdate,
+  findLikelyDuplicateVenues,
+  tempClosureStateOn,
+  tempClosureText,
+  imageVersionMatches,
   ADVISORY_NOT_OPERATING_RE,
   openNowFirst,
   venueHoursCheckedHtml,
@@ -47599,6 +47841,7 @@ module.exports = {
   cardFillActionsJs,
   APP_TRIP_LABEL_HTML,
   CSP_REPORT_ONLY,
+  CSP_POLICY,
   seasonOnlyStates,
   parseAdvisoryNote,
   renderAdvisoryStyles,

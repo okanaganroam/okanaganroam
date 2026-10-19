@@ -24086,10 +24086,11 @@ test('Photo sizes: cards and thumbnails use the 480px copy, the venue photo load
     const hero = (venuePage.match(/<div class="venue-hero venue-hero-photo"><img[^>]*>/) || [''])[0];
     assert.match(hero, /fetchpriority="high"/);
     assert.doesNotMatch(hero, /loading="lazy"/);
-    assert.match(hero, /srcset="[^"]*-w960\.jpg\?v=t1 960w, [^"]*\.jpg\?v=t1 \d+w"/);
+    // Round 7 (2026-10-19): served pages swap the hand-set ?v=t1 for each file's own hash.
+    assert.match(hero, /srcset="[^"]*-w960\.jpg\?v=[0-9a-f]{10} 960w, [^"]*\.jpg\?v=[0-9a-f]{10} \d+w"/);
     const list = app.inlineSharedStylesheets(await fetch(`${base}/kelowna/restaurants`).then((r) => r.text()));
     const card = (list.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${v.id}"[^>]*>`)) || [''])[0];
-    assert.match(card, /--fd-ph:url\((?:'|&#39;)[^'&]*-w480\.jpg\?v=t1(?:'|&#39;)\);--fd-ph-2x:url\((?:'|&#39;)[^'&]*-w960\.jpg\?v=t1(?:'|&#39;)\)/);
+    assert.match(card, /--fd-ph:url\((?:'|&#39;)[^'&]*-w480\.jpg\?v=[0-9a-f]{10}(?:'|&#39;)\);--fd-ph-2x:url\((?:'|&#39;)[^'&]*-w960\.jpg\?v=[0-9a-f]{10}(?:'|&#39;)\)/);
     assert.match(list, /min-resolution: 1\.5dppx/);
   } finally {
     srv.close();
@@ -27125,12 +27126,14 @@ test('SEO security headers (2026-10-18): HSTS, nosniff, referrer, framing, permi
     assert.equal(r.headers.get('strict-transport-security'), 'max-age=31536000; includeSubDomains', p);
     assert.equal(r.headers.get('x-content-type-options'), 'nosniff', p);
     assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN', p);
-    assert.equal(r.headers.get('content-security-policy'), "frame-ancestors 'self'", p);
+    // Enforced CSP (2026-10-19, round 7): the full policy, with frame-ancestors, and no report-only copy.
+    assert.equal(r.headers.get('content-security-policy'), `${app.CSP_POLICY}; frame-ancestors 'self'`, p);
+    assert.equal(r.headers.get('cross-origin-opener-policy'), 'same-origin-allow-popups', p);
     assert.match(r.headers.get('permissions-policy'), /geolocation=\(self\)/, p);
     assert.match(r.headers.get('permissions-policy'), /camera=\(self\)/, p);
     assert.match(r.headers.get('permissions-policy'), /microphone=\(self\)/, `${p}: the map's voice search`);
     assert.match(r.headers.get('permissions-policy'), /payment=\(\)/, p);
-    assert.ok(r.headers.get('content-security-policy-report-only'), p);
+    assert.equal(r.headers.get('content-security-policy-report-only'), null, p);
     if (!p.startsWith('/owner')) assert.equal(r.headers.get('referrer-policy'), 'strict-origin-when-cross-origin', p);
   }
   // The owner portal keeps its stricter no-referrer.
@@ -27431,7 +27434,9 @@ test('Speed/CLS (2026-10-18): filter bar final from the first paint, font fallba
 
 test('Caching (2026-10-18): versioned images are immutable, /browse/cards.json has a content-hash URL, a /cards/rest/ JSON miss on a non-200 page is {}', () => withDiscoveryServer(async (base) => {
   const img = '/images/mood/indoor.jpg';
-  assert.equal((await fetch(`${base}${img}?v=abc123`)).headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  // Round 7 (2026-10-19): only the file's own hash is immutable; any other ?v= gets the plain day.
+  assert.equal((await fetch(`${base}${img}?v=${app.imageVersion(img)}`)).headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.equal((await fetch(`${base}${img}?v=abc123`)).headers.get('cache-control'), 'public, max-age=86400', 'a made-up ?v= is not immutable');
   assert.equal((await fetch(`${base}${img}`)).headers.get('cache-control'), 'public, max-age=86400', 'unversioned stays a day');
   const html = await (await fetch(`${base}/browse`)).text();
   const src = (html.match(/data-src="(\/browse\/cards\.json\?h=[0-9a-f]{12})"/) || [])[1];
@@ -27953,7 +27958,9 @@ test('Speed pass 6 (2026-10-19): server-rendered image URLs carry a content hash
   assert.equal(v(`<img src="${file}" alt="">`), `<img src="${file}?v=${h}" alt="">`);
   assert.equal(v(`<img data-src="${file}" data-srcset="${file} 640w, /images/mood/indoor-w480.jpg 480w">`), `<img data-src="${file}?v=${h}" data-srcset="${file}?v=${h} 640w, /images/mood/indoor-w480.jpg?v=${app.imageVersion('/images/mood/indoor-w480.jpg')} 480w">`);
   assert.equal(v(`<li style="--a:url('${file}')">`), `<li style="--a:url('${file}?v=${h}')">`);
-  for (const same of [`<img src="${file}?v=old">`, '<img src="/images/nope/missing.jpg">', `<style>.x{background:url('${file}')}</style>`, `<script>var s = ' src="${file}"';</script>`, `<a href="${file}">`]) assert.equal(v(same), same, `unchanged: ${same}`);
+  // Round 7 (2026-10-19): a hand-set ?v= on a local file becomes the file's hash; on a missing file it stays.
+  assert.equal(v(`<img src="${file}?v=old">`), `<img src="${file}?v=${h}">`);
+  for (const same of ['<img src="/images/nope/missing.jpg?v=old">', '<img src="/images/nope/missing.jpg">', `<style>.x{background:url('${file}')}</style>`, `<script>var s = ' src="${file}"';</script>`, `<a href="${file}">`]) assert.equal(v(same), same, `unchanged: ${same}`);
   // Served pages.
   const home = await (await fetch(base + '/')).text();
   assert.match(home, /src="\/images\/[\w\/.-]+\.(?:jpe?g|webp|png)\?v=[0-9a-f]{10}"/);
@@ -29137,5 +29144,213 @@ test('Round 7 French: the help bot answers "can’t find my business" and the we
     assert.match(t.features.aFr, /chiens acceptés/);
     assert.doesNotMatch(t.features.aFr, /chiens bienvenus/);
     assert.match(t.features.a, /<strong>Badges<\/strong>/);
+  }
+});
+
+// ---- Round 7 tech (2026-10-19): enforced CSP, hash-only immutable images, event venues, legacy trips, temporary
+// closures, duplicate guard ----------------------------------------------------------------------------------------
+test('Round 7 tech: the CSP is enforced (with Mapbox directions and the Places lookup) and COOP is set', async () => {
+  const csp = app.CSP_POLICY;
+  assert.equal(app.CSP_REPORT_ONLY, csp, 'the old name still points at the policy');
+  for (const src of ['https://api.mapbox.com', 'https://places.googleapis.com', 'https://formsubmit.co', 'https://*.clarity.ms', 'https://cdn.jsdelivr.net']) {
+    assert.match(csp, new RegExp(`connect-src [^;]*${src.replace(/[.*]/g, '\\$&')}`), src);
+  }
+  const r = await seo3get('/map');
+  assert.equal(r.headers.get('content-security-policy'), `${csp}; frame-ancestors 'self'`);
+  assert.equal(r.headers.get('content-security-policy-report-only'), null);
+  assert.equal(r.headers.get('cross-origin-opener-policy'), 'same-origin-allow-popups');
+  // Every outside script the map page loads is allowed by the enforced policy.
+  for (const [, url] of r.text.matchAll(/<script\b[^>]*src="(https:\/\/[^/"]+)/g)) assert.ok(csp.includes(url), url);
+  // Every fetch() to an outside host in the page scripts is allowed by connect-src.
+  const connect = /connect-src ([^;]*)/.exec(csp)[1].split(' ');
+  for (const [, host] of (r.text + fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8')).matchAll(/fetch\('https:\/\/([^/']+)/g)) {
+    assert.ok(connect.some((s) => s === `https://${host}` || (s.startsWith('https://*.') && host.endsWith(s.slice(9)))), `${host} is in connect-src`);
+  }
+});
+
+test('Round 7 tech: a ?v= image is immutable only when it is the file\'s own hash; hand-set tokens in pages and cards.json become the hash', async () => {
+  const crypto = require('node:crypto');
+  const file = '/images/mood/indoor.jpg';
+  const buf = fs.readFileSync(path.join(__dirname, '..', 'public', file.slice(1)));
+  const md5 = crypto.createHash('md5').update(buf).digest('hex');
+  const sha = crypto.createHash('sha256').update(buf).digest('hex');
+  assert.equal(app.imageVersionMatches(file, md5.slice(0, 10)), true);
+  assert.equal(app.imageVersionMatches(file, md5.slice(0, 12)), true);
+  assert.equal(app.imageVersionMatches(file, sha.slice(0, 12)), true, 'the hashed hero names use sha256');
+  for (const bad of ['20261016', 'sports-photo-1', 'abc123', md5.slice(0, 6), '0000000000', undefined, ['x']]) assert.equal(app.imageVersionMatches(file, bad), false, String(bad));
+  assert.equal(app.imageVersionMatches('/images/nope/missing.jpg', md5.slice(0, 10)), false);
+  await withDiscoveryServer(async (base) => {
+    const cc = async (u) => (await fetch(base + u)).headers.get('cache-control');
+    assert.equal(await cc(`${file}?v=${md5.slice(0, 10)}`), 'public, max-age=31536000, immutable');
+    assert.equal(await cc(`${file}?v=20261016`), 'public, max-age=86400');
+    assert.equal(await cc('/images/venue-hero-okanagan.a01552e12e24.jpg?v=a01552e12e24'), 'public, max-age=31536000, immutable', 'the hero fallback keeps its year');
+  });
+  // In served HTML, src, srcset and style url() all trade a hand-set token for the hash.
+  const h = md5.slice(0, 10);
+  const v = app.withVersionedImages;
+  assert.equal(v(`<img src="${file}?v=20261016" srcset="${file}?v=20261016 800w">`), `<img src="${file}?v=${h}" srcset="${file}?v=${h} 800w">`);
+  assert.equal(v(`<li style="--fd-ph:url(&#39;${file}?v=20261016&#39;)">`), `<li style="--fd-ph:url(&#39;${file}?v=${h}&#39;)">`);
+  assert.equal(v(`<img src="${file}?w=1">`), `<img src="${file}?w=1">`, 'any other query is left alone');
+  // /browse/cards.json: a card whose stored photo has a date token gets the hash.
+  seasonInsert.run({ name: 'Round7 Cards Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'round7-cards-fixture' });
+  const venue = app.findVenueBySlug('kelowna', 'cafe', 'round7-cards-fixture');
+  try {
+    db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run(`${file}?v=20261016`, venue.id);
+    const payload = app.browseRestPayload([app.findVenueBySlug('kelowna', 'cafe', 'round7-cards-fixture')]);
+    assert.match(payload.html, new RegExp(`/images/mood/indoor[\\w-]*\\.jpg\\?v=[0-9a-f]{10}`));
+    assert.doesNotMatch(payload.html, /\?v=20261016/);
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(venue.id); }
+});
+
+test('Round 7 tech: more event venues get a street address (town-only names need the event\'s town); postal codes survive a bracketed note', () => {
+  app.resetEventVenueCaches();
+  const place = (text, region) => app.eventPlaceSchema({ venue_name_text: text, region, valley_wide: 0 }, null);
+  assert.equal(place('Landmark Cinemas', 'penticton').address.streetAddress, '250 Winnipeg St');
+  assert.equal(place('Landmark Cinemas', 'penticton').address.postalCode, 'V2A 5M3');
+  assert.notEqual((place('Landmark Cinemas', 'kelowna').address || {}).streetAddress, '250 Winnipeg St', 'another town\'s Landmark is not the Penticton one');
+  assert.deepEqual(place('Socialē on Lakeshore', 'okanagan-falls').address, { '@type': 'PostalAddress', streetAddress: '950 Lakeshore Dr W', addressLocality: 'Penticton', addressRegion: 'BC', postalCode: 'V2A 1C1', addressCountry: 'CA' });
+  assert.equal(place('Ex Nihilo Vineyards, Lake Country', 'lake-country').address.streetAddress, '1525 Camp Rd');
+  assert.equal(place('The Broken Hearts Club @ Crown & Thieves, West Kelowna', 'west-kelowna').address.streetAddress, '3887 Brown Rd');
+  assert.equal(place('Kettle Valley Steam Railway, Prairie Valley Station', 'summerland').address.streetAddress, '18404 Bathville Rd');
+  assert.equal(place('The Sonora Room Restaurant at Burrowing Owl Estate Winery, Oliver', 'oliver').address.streetAddress, '500 Burrowing Owl Pl');
+  assert.equal(place('Metro Hub Kelowna', 'kelowna').address.streetAddress, '1265 Ellis St');
+  // Every entry is well formed: a known town, a street, and a postal code shaped like one when given.
+  const rows = require('../data/event-venue-addresses.json').venues;
+  assert.ok(rows.length >= 58);
+  for (const r of rows) {
+    assert.ok(app.REGION_LABELS[r.region], r.name);
+    assert.match(r.streetAddress, /^\d/, r.name);
+    if (r.postalCode) assert.match(r.postalCode, /^[A-Z]\d[A-Z] \d[A-Z]\d$/, r.name);
+  }
+  const a = app.venuePostalAddress;
+  assert.deepEqual(a('1223 Water St (Prospera Place, 2nd floor, Gate #3), Kelowna, BC V1Y 9V1', 'Kelowna'), { '@type': 'PostalAddress', streetAddress: '1223 Water St', addressLocality: 'Kelowna', addressRegion: 'BC', postalCode: 'V1Y 9V1', addressCountry: 'CA' });
+  assert.equal(a('Oliver Parks & Recreation (Oliver Community Centre), 6359 Park Dr, Oliver, BC V0H 1T0', 'Oliver').postalCode, 'V0H 1T0');
+  assert.deepEqual(a('Westlake Road, West Kelowna, BC (parking lot near the pond)', 'West Kelowna'), { '@type': 'PostalAddress', streetAddress: 'Westlake Road', addressLocality: 'West Kelowna', addressRegion: 'BC', addressCountry: 'CA' }, 'a trailing note is still dropped');
+});
+
+test('Round 7 tech: the legacy /api/trip/generate leaves out places whose advisory says they are closed or not operating', async () => {
+  const meta = { reason: 'test', batch_id: 'round7-legacy-trip' };
+  const slugs = ['round7-legacy-closed', 'round7-legacy-open'];
+  for (const slug of slugs) seasonInsert.run({ name: `Round7 Legacy ${slug}`, type: 'winery', hours: SEASON_WEEK, slug });
+  const [shut, open] = slugs.map((s) => app.findVenueBySlug('kelowna', 'winery', s));
+  for (const v of [shut, open]) db.prepare('UPDATE venues SET rating = 5, reviews = 9000 WHERE id = ?').run(v.id);
+  app.guardedCollectionMembershipUpdate('advisory', shut.id, 'add', ADVISORY_LIVE_NOTES.notOperating[0], meta);
+  try {
+    assert.equal(app.legacyTripAdvisoryUnavailable(ADVISORY_LIVE_NOTES.notOperating[0]), true);
+    assert.equal(app.legacyTripAdvisoryUnavailable(ADVISORY_LIVE_NOTES.operating[0]), false);
+    assert.equal(app.legacyTripAdvisoryUnavailable(null), false);
+    await withDiscoveryServer(async (base) => {
+      const res = await fetch(`${base}/api/trip/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ region: 'kelowna', days: 3, interests: ['winery'], pace: 'packed' }) });
+      assert.equal(res.status, 200);
+      const text = await res.text();
+      assert.match(text, /Round7 Legacy round7-legacy-open/, 'the open winery is planned');
+      assert.doesNotMatch(text, /Round7 Legacy round7-legacy-closed/, 'the advisory winery is not in the plan');
+    });
+  } finally {
+    app.guardedCollectionMembershipUpdate('advisory', shut.id, 'remove', null, meta);
+    for (const v of [shut, open]) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
+test('Round 7 tech: a temporary closure shows "Closed Oct 21–28, reopens Oct 29." on the venue page and cards, in French too, and Open Now is closed', async () => {
+  // The notice itself.
+  const s = (list, today) => app.tempClosureStateOn(list, today);
+  const beat = [{ from: '2026-10-21', to: '2026-10-28', note: '' }];
+  assert.equal(s(beat, '2026-10-06'), null, 'more than two weeks ahead: nothing yet');
+  assert.equal(s(beat, '2026-10-07').text, 'Closed Oct 21–28, reopens Oct 29.');
+  assert.equal(s(beat, '2026-10-07').current, false);
+  assert.equal(s(beat, '2026-10-21').current, true);
+  assert.equal(s(beat, '2026-10-28').kind, 'temp_closed');
+  assert.equal(s(beat, '2026-10-29'), null, 'gone the day it reopens');
+  assert.equal(s([{ from: '2026-12-25', to: '2026-12-25' }], '2026-12-20'), null, 'a single day shows on the day only');
+  assert.equal(s([{ from: '2026-12-25', to: '2026-12-25' }], '2026-12-25').text, 'Closed Dec 25, reopens Dec 26.');
+  assert.equal(s([{ from: '2026-12-28', to: '2026-12-31' }, { from: '2027-01-01', to: '2027-01-03' }], '2026-12-28').text, 'Closed Dec 28–Jan 3, reopens Jan 4, 2027.', 'back-to-back closures read as one');
+  assert.equal(s([{ from: '2026-10-30', to: '2026-11-02' }], '2026-10-30').text, 'Closed Oct 30–Nov 2, reopens Nov 3.');
+  const fr = require('../french-text.js');
+  const frOf = (t) => { for (const [rx, fn] of fr.FR_PATTERNS) { const m = t.match(rx); if (m) return fn(m, (x) => x, {}); } return null; };
+  assert.equal(frOf('Closed Oct 21–28, reopens Oct 29.'), 'Fermé du 21 au 28 oct., réouverture le 29 oct.');
+  assert.equal(frOf('Closed Oct 30–Nov 1, reopens Nov 2.'), 'Fermé du 30 oct. au 1er nov., réouverture le 2 nov.');
+  assert.equal(frOf('Closed Dec 25, reopens Dec 26.'), 'Fermé le 25 déc., réouverture le 26 déc.');
+  assert.equal(frOf('Closed Dec 28–Jan 3, reopens Jan 4, 2027.'), 'Fermé du 28 déc. au 3 janv., réouverture le 4 janv. 2027.');
+
+  // POST /admin/set-closure, then the pages.
+  seasonInsert.run({ name: 'Round7 Closure Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'round7-closure-fixture' });
+  const venue = app.findVenueBySlug('kelowna', 'cafe', 'round7-closure-fixture');
+  db.prepare("UPDATE venues SET description_fr = 'Un café pour les tests.' WHERE id = ?").run(venue.id);
+  const today = app.todayLocal();
+  const from = app.addLocalDays(today, -1), to = app.addLocalDays(today, 6);
+  const expected = app.tempClosureText(from, to, today);
+  try {
+    await withDiscoveryServer(async (base) => {
+      const post = (body, token = process.env.ENRICHMENT_ADMIN_TOKEN) => fetch(`${base}/admin/set-closure`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      assert.equal((await post({ id: venue.id, from, to, reason: 'r', batch_id: 'b' }, 'wrong')).status, 401);
+      assert.equal((await post({ id: venue.id, from, to, reason: 'r', batch_id: 'b', extra: 1 })).status, 400);
+      assert.equal((await post({ id: venue.id, from: to, to: from, reason: 'r', batch_id: 'b' })).status, 400, 'ends before it starts');
+      assert.equal((await post({ id: venue.id, from, to })).status, 400, 'reason and batch_id are required');
+      assert.equal((await post({ id: 99999999, from, to, reason: 'r', batch_id: 'b' })).status, 404);
+      const ok = await post({ id: venue.id, from, to, note: 'Staff holiday', reason: 'Venue Instagram post', batch_id: 'round7' });
+      assert.equal(ok.status, 200);
+      const okBody = await ok.json();
+      assert.equal(okBody.changed, true);
+      assert.equal(okBody.showing, expected);
+      assert.deepEqual(okBody.closures, [{ from, to, note: 'Staff holiday' }]);
+      assert.equal((await (await post({ id: venue.id, from, to, note: 'Staff holiday', reason: 'again', batch_id: 'round7' })).json()).changed, false, 'the same closure again changes nothing');
+      const log = db.prepare("SELECT new_value FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'hours_closures' ORDER BY id DESC").get(venue.id);
+      assert.match(log.new_value, new RegExp(from));
+      // The owner portal reads the same list.
+      assert.deepEqual(app.venueHoursExtras(venue.id).closures, [{ from, to, note: 'Staff holiday' }]);
+
+      const page = await (await fetch(`${base}/kelowna/cafes/round7-closure-fixture`)).text();
+      assert.ok(page.includes(`<p class="venue-advisory-text">${expected}</p>`), 'the venue page notice');
+      const frPage = await (await fetch(`${base}/fr/kelowna/cafes/round7-closure-fixture`)).text();
+      assert.match(frPage, /<p class="venue-advisory-text">Fermé du \d+ [^<]*réouverture le [^<]+<\/p>/);
+      assert.ok(!frPage.includes(expected), 'no English notice on the French page');
+      const list = await (await fetch(`${base}/kelowna/cafes`)).text();
+      assert.ok(list.includes(`<p class="season-tag season-tag-temp_closed"><span aria-hidden="true">\u{1F4C5}</span> ${expected}</p>`), 'the card tag');
+      const info = app.foodDrinkOpenNowInfo([app.findVenueBySlug('kelowna', 'cafe', 'round7-closure-fixture')], app.getAdvisoryNotes(), new Date(), { requireVerified: false }).byId.get(venue.id);
+      assert.equal(info.state, 'closed', 'Open Now treats it as closed');
+      // Taking it off again.
+      const off = await (await post({ id: venue.id, from, to, remove: true, reason: 'reopened early', batch_id: 'round7' })).json();
+      assert.deepEqual(off.closures, []);
+      assert.equal(off.showing, null);
+      assert.equal(app.getSeasonStates().get(venue.id), undefined);
+    });
+  } finally {
+    db.prepare('DELETE FROM venue_hours_extra WHERE venue_id = ?').run(venue.id);
+    db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(venue.id);
+    app.clearHoursExtraCache();
+    db.prepare('DELETE FROM venues WHERE id = ?').run(venue.id);
+  }
+});
+
+test('Round 7 tech: POST /api/venues refuses a likely duplicate (same name in the town, or the same phone for the same kind of place) unless allow_duplicate', async () => {
+  const created = [];
+  try {
+    await withDiscoveryServer(async (base) => {
+      const post = (body) => fetch(`${base}/api/venues`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` }, body: JSON.stringify(body) });
+      const first = await post({ name: 'Round7 Sushi Fixture', region: 'kelowna', type: 'restaurant', description: 'fixture', phone: '236-555-0199' });
+      assert.equal(first.status, 201);
+      created.push((await first.json()).id);
+      const again = await post({ name: 'ROUND7 sushi fixture', region: 'kelowna', type: 'restaurant', description: 'fixture' });
+      assert.equal(again.status, 409, 'same name, same town');
+      const body = await again.json();
+      assert.equal(body.existing[0].id, created[0]);
+      assert.equal(body.existing[0].match, 'name');
+      const byPhone = await post({ name: 'Round7 Renamed Sushi', region: 'kelowna', type: 'restaurant', description: 'fixture', phone: '+1 (236) 555-0199' });
+      assert.equal(byPhone.status, 409, 'same phone, same kind of place');
+      assert.equal((await byPhone.json()).existing[0].match, 'phone');
+      const otherType = await post({ name: 'Round7 Sushi Park', region: 'kelowna', type: 'beach', description: 'fixture', phone: '236-555-0199' });
+      assert.equal(otherType.status, 201, 'a different kind of place may share the phone');
+      created.push((await otherType.json()).id);
+      const otherTown = await post({ name: 'Round7 Sushi Fixture', region: 'vernon', type: 'restaurant', description: 'fixture' });
+      assert.equal(otherTown.status, 201, 'another town is another place');
+      created.push((await otherTown.json()).id);
+      const forced = await post({ name: 'Round7 Sushi Fixture', region: 'kelowna', type: 'restaurant', description: 'fixture', allow_duplicate: true });
+      assert.equal(forced.status, 201);
+      const f = await forced.json();
+      created.push(f.id);
+    });
+  } finally {
+    for (const id of created) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
 });

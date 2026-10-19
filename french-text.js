@@ -1048,6 +1048,14 @@ const FR_PATTERNS = [
   [new RegExp(`^Closed for the season\\. Reopens ${SEASON_DATE}\\.$`), (m) => `Fermé pour la saison. Réouverture le ${seasonDate(m, 1)}.`],
   [new RegExp(`^Open for the season until ${SEASON_DATE}\\.$`), (m) => `Ouvert pour la saison jusqu’au ${seasonDate(m, 1)}.`],
   [new RegExp(`^Reopening for the season ${SEASON_DATE}\\. Check current hours with the venue before you go\\.$`), (m) => `Réouverture pour la saison le ${seasonDate(m, 1)}. Vérifiez les heures auprès de l’établissement avant d’y aller.`],
+  // Temporary closures (2026-10-19, round 7): "Closed Oct 21–28, reopens Oct 29." on cards and the venue page.
+  [/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:–(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) )?(\d{1,2}))?, reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?\.$/, (m) => {
+    const day = (d) => (d === '1' ? '1er' : d);
+    const back = `${day(m[6])} ${MONTHS[m[5]]}${m[7] ? ` ${m[7]}` : ''}`.replace(/\.$/, '');
+    if (!m[4]) return `Fermé le ${day(m[2])} ${MONTHS[m[1]]}, réouverture le ${back}.`;
+    return m[3] ? `Fermé du ${day(m[2])} ${MONTHS[m[1]]} au ${day(m[4])} ${MONTHS[m[3]]}, réouverture le ${back}.`
+      : `Fermé du ${day(m[2])} au ${day(m[4])} ${MONTHS[m[1]]}, réouverture le ${back}.`;
+  }],
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
   [/^Open until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
