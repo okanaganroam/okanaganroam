@@ -33662,10 +33662,31 @@ const MY_TRIP_MAX_REFS = 30;
 // Round 9 (2026-10-19): a stop with a planned date (or month) is judged on that date: a January ski trip no longer says
 // "Closed for the season. Reopens Nov 26" because the hill is closed today. A season that says nothing about that
 // date shows nothing; the written advisory (not dated) still shows.
-function tripStopNotice(venueId, seasons, advisories, onDate = null) {
+// Round 10 (2026-10-19): a place stored as closed for the season with no reopening date is judged by its usual season.
+// A ski-hill village place (or a snow activity) is usually open December to March, anything else May to September;
+// a planned date in that season, when the closure began outside it, says "Seasonal - opening date not announced yet"
+// instead of "Closed for the season" (a January SilverStar trip). A date out of season, or before a known reopening
+// date, still says closed.
+const TRIP_WINTER_SEASON_MONTHS = [12, 1, 2, 3];
+const TRIP_SUMMER_SEASON_MONTHS = [5, 6, 7, 8, 9];
+const TRIP_WINTER_NAME_RE = /\b(?:ski|skiing|snowshoe\w*|nordic|tube park|tube town|snow tubing|sleigh\w*|skating|toboggan\w*|snowmobil\w*|dog ?sled\w*)\b/i;
+function tripUsualSeasonMonths(venue) {
+  if (!venue) return null;
+  return SKI_RESORT_REGIONS.has(venue.region) || TRIP_WINTER_NAME_RE.test(String(venue.name || '')) ? TRIP_WINTER_SEASON_MONTHS : TRIP_SUMMER_SEASON_MONTHS;
+}
+function tripSeasonUnannouncedOn(s, venue, onDate) {
+  if (!s || s.reopens_date || !parseLocalDate(onDate)) return false;
+  const months = tripUsualSeasonMonths(venue);
+  const closed = seasonClosedRange(s);
+  if (!months || !closed) return false;
+  return months.includes(Number(onDate.slice(5, 7))) && !months.includes(Number(closed.from.slice(5, 7)));
+}
+const TRIP_SEASONAL_NOTICE = { kind: 'seasonal', text: 'Seasonal \u2014 opening date not announced yet', textFr: 'Saisonnier \u2014 date d\u2019ouverture pas encore annonc\u00e9e' };
+function tripStopNotice(venueId, seasons, advisories, onDate = null, venue = null) {
   if (onDate) {
-    let st = null;
-    try { const rows = getSeasonRows(onDate); st = rows.has(venueId) ? seasonStateOn(rows.get(venueId), onDate) : null; } catch (e) { st = null; }
+    let st = null, row = null;
+    try { const rows = getSeasonRows(onDate); row = rows.get(venueId) || null; st = row ? seasonStateOn(row, onDate) : null; } catch (e) { st = null; }
+    if (st && st.kind === 'closed' && tripSeasonUnannouncedOn(row, venue, onDate)) return { ...TRIP_SEASONAL_NOTICE, on: onDate };
     if (st) {
       let fr = null;
       try { fr = frText(seasonTagShortText(st)); } catch (e) { fr = null; }
@@ -33687,6 +33708,35 @@ function tripStopNotice(venueId, seasons, advisories, onDate = null) {
   let fr = text;
   try { fr = frAdvisoryText(text); } catch (e) { fr = text; }
   return { kind: 'advisory', text, textFr: fr };
+}
+// Events on My Trip (2026-10-19, round 10): an event added from What's On or its page had no date or time, so it sat
+// undated in the list. Its upcoming dates go with it (still to come today on the Okanagan clock, at most
+// TRIP_EVENT_MAX_OCC), each as { d: 'YYYY-MM-DD', s: start minutes, e: end minutes }, the planner's own shape; the page
+// keeps the one on a planned day (else the next one) with the stop. A multi-day run already under way starts today;
+// an untimed or all-day date has no s/e; an end after midnight is past 1440.
+const TRIP_EVENT_MAX_OCC = 60;
+function tripEventOccurrences(eventId, now = new Date()) {
+  const today = todayLocal(now), minutes = okanaganClock(now).minutes;
+  const toMin = (t) => (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t) ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null);
+  let rows = [];
+  try {
+    rows = db.prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND end_date >= ? ORDER BY start_date, COALESCE(start_time, ''), id LIMIT ?").all(eventId, today, TRIP_EVENT_MAX_OCC + 5).map(rowToEventOccurrence);
+  } catch (e) { return []; }
+  const out = [];
+  for (const o of rows) {
+    if (whatsOnOccurrenceOver(o, today, minutes)) continue;
+    const x = { d: o.start_date < today ? today : o.start_date };
+    if (o.end_date > x.d) x.u = o.end_date;
+    const s = Number(o.all_day) === 1 || o.start_time === '00:00' ? null : toMin(o.start_time);
+    let e = Number(o.all_day) === 1 ? null : toMin(o.end_time);
+    if (s != null) {
+      x.s = s;
+      if (e != null) { if (Number(o.ends_next_day) === 1 || e <= s) e += 1440; x.e = e; }
+    }
+    out.push(x);
+    if (out.length >= TRIP_EVENT_MAX_OCC) break;
+  }
+  return out;
 }
 // onDates (round 9): ref -> 'YYYY-MM-DD', each stop's planned date, for its notice.
 function tripStopsFor(refs, now = new Date(), onDates = {}) {
@@ -33713,7 +33763,7 @@ function tripStopsFor(refs, now = new Date(), onDates = {}) {
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
-        notice: tripStopNotice(v.id, seasons, advisories, parseLocalDate(onDates[ref]) && onDates[ref] !== todayLocal(now) ? onDates[ref] : null),
+        notice: tripStopNotice(v.id, seasons, advisories, parseLocalDate(onDates[ref]) && onDates[ref] !== todayLocal(now) ? onDates[ref] : null, v),
       });
     } else {
       const e = eventQ.get(Number(m[2]));
@@ -33727,6 +33777,7 @@ function tripStopsFor(refs, now = new Date(), onDates = {}) {
         lat: host && host.latitude !== null ? Number(host.latitude) : null,
         lng: host && host.longitude !== null ? Number(host.longitude) : null,
         query: `${host ? host.name : (e.venue_name_text || e.name)}, ${REGION_LABELS[e.region]}, Okanagan Valley, BC`,
+        occ: tripEventOccurrences(e.id, now),
       });
     }
   }
@@ -33875,9 +33926,11 @@ function tripShareCardPng(card) {
 // in chains (A near B, B near C), and neighbours on a ring end up gap + 2 pixels apart. Shipped into the page with
 // .toString(), so it uses nothing from outside itself (and keeps its comments out here). Pins go round the ring in
 // their own directions from the middle (list order for pins at the same spot), so each moves as little as it can; the
-// first starts at the top when they all share one spot.
+// first starts at the top when they all share one spot. Round 10 (2026-10-19): a ring can land a pin next to a pin of
+// another group (14px apart on an Oliver two-day plan), so groups that end up closer than `gap` are joined and laid out
+// again, until no two pins are.
 function myTripPinSpread(xy, gap) {
-  var n = xy.length, parent = [], out = [], groups = {}, i, j;
+  var n = xy.length, parent = [], out = [], i, j, pass;
   for (i = 0; i < n; i++) parent[i] = i;
   function root(k) { while (parent[k] !== k) { parent[k] = parent[parent[k]]; k = parent[k]; } return k; }
   for (i = 0; i < n; i++) {
@@ -33886,23 +33939,39 @@ function myTripPinSpread(xy, gap) {
       if (ddx * ddx + ddy * ddy < gap * gap) parent[root(j)] = root(i);
     }
   }
-  for (i = 0; i < n; i++) { out.push({ dx: 0, dy: 0 }); var r0 = root(i); (groups[r0] = groups[r0] || []).push(i); }
-  Object.keys(groups).forEach(function(k){
-    var g = groups[k];
-    if (g.length < 2) return;
-    var cx = 0, cy = 0;
-    g.forEach(function(m){ cx += xy[m].x; cy += xy[m].y; });
-    cx /= g.length; cy /= g.length;
-    var ang = function(m){ var ax = xy[m].x - cx, ay = xy[m].y - cy; return ax * ax + ay * ay < 1 ? null : Math.atan2(ay, ax); };
-    var same = g.every(function(m){ return ang(m) === null; });
-    var order = g.slice().sort(function(a, b){ var x = ang(a), y = ang(b); return x === null || y === null || x === y ? a - b : x - y; });
-    var start = same ? -Math.PI / 2 : ang(order[0]);
-    var r = Math.ceil((gap / 2 + 1) / Math.sin(Math.PI / g.length));
-    order.forEach(function(m, q){
-      var a = start + 2 * Math.PI * q / g.length;
-      out[m] = { dx: Math.round(cx + r * Math.cos(a) - xy[m].x), dy: Math.round(cy + r * Math.sin(a) - xy[m].y) };
+  function layout() {
+    var groups = {}, res = [];
+    for (var a = 0; a < n; a++) { res.push({ dx: 0, dy: 0 }); var r0 = root(a); (groups[r0] = groups[r0] || []).push(a); }
+    Object.keys(groups).forEach(function(k){
+      var g = groups[k];
+      if (g.length < 2) return;
+      var cx = 0, cy = 0;
+      g.forEach(function(m){ cx += xy[m].x; cy += xy[m].y; });
+      cx /= g.length; cy /= g.length;
+      var ang = function(m){ var ax = xy[m].x - cx, ay = xy[m].y - cy; return ax * ax + ay * ay < 1 ? null : Math.atan2(ay, ax); };
+      var same = g.every(function(m){ return ang(m) === null; });
+      var order = g.slice().sort(function(p, q){ var x = ang(p), y = ang(q); return x === null || y === null || x === y ? p - q : x - y; });
+      var start = same ? -Math.PI / 2 : ang(order[0]);
+      var r = Math.ceil((gap / 2 + 1) / Math.sin(Math.PI / g.length));
+      order.forEach(function(m, q){
+        var t = start + 2 * Math.PI * q / g.length;
+        res[m] = { dx: Math.round(cx + r * Math.cos(t) - xy[m].x), dy: Math.round(cy + r * Math.sin(t) - xy[m].y) };
+      });
     });
-  });
+    return res;
+  }
+  for (pass = 0; pass <= n; pass++) {
+    out = layout();
+    var merged = false;
+    for (i = 0; i < n; i++) {
+      for (j = i + 1; j < n; j++) {
+        if (root(i) === root(j)) continue;
+        var ex = xy[i].x + out[i].dx - xy[j].x - out[j].dx, ey = xy[i].y + out[i].dy - xy[j].y - out[j].dy;
+        if (ex * ex + ey * ey < gap * gap) { parent[root(j)] = root(i); merged = true; }
+      }
+    }
+    if (!merged) break;
+  }
   return out;
 }
 
@@ -33934,6 +34003,8 @@ function renderMyTripPage(opts = {}) {
     shareTitle: L('My Okanagan trip', 'Mon voyage dans l’Okanagan'),
     tapClear: L('Tap again to clear', 'Touchez de nouveau pour vider'), clearTrip: L('Clear trip', 'Vider le voyage'),
     cleared: L('Your trip is cleared.', 'Votre voyage est vidé.'), saved: L('Saved to My Trip.', 'Enregistré dans Mon voyage.'),
+    // Round 10 (2026-10-19): the map's name for screen readers.
+    mapLabel: L('Map of your trip stops', 'Carte des arrêts de votre voyage'),
   };
   const title = share ? share.title : L('My Trip | Okanagan Roam', 'Mon voyage | Okanagan Roam');
   const description = share ? share.description : L('Your Okanagan trip: every stop in order, by day, with a map, directions and a link to share it.', 'Votre voyage dans l’Okanagan : chaque arrêt dans l’ordre, par jour, avec une carte, les itinéraires et un lien à partager.');
@@ -34009,7 +34080,7 @@ ${renderGolfHeaderHtml()}
       <div class="mt-actions" style="margin-top:10px"><button type="button" class="mt-btn primary" id="mtSave">${L('Save to My Trip', 'Enregistrer dans Mon voyage')}</button><a class="mt-btn" id="mtOwn" href="/trip">${L('Plan your own trip in one sentence', 'Planifiez votre propre voyage en une phrase')}</a></div>
     </div>
     <p class="mt-status" id="mtStatus" role="status" aria-live="polite"></p>
-    <div id="mtMap" hidden></div>
+    <div id="mtMap" role="region" aria-label="${T.mapLabel}" hidden></div>
     <div id="mtDays"></div>
     <div class="mt-empty" id="mtEmpty" hidden>
       <h2>${L('Your trip is empty', 'Votre voyage est vide')}</h2>
@@ -34076,7 +34147,7 @@ ${renderGolfHeaderHtml()}
   var el = function(id){ return document.getElementById(id); };
   function status(t){ var s = el('mtStatus'); s.textContent = ''; setTimeout(function(){ s.textContent = t; }, 30); }
   function list(){
-    if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: sharedStart && sharedDays[i] ? { d: addDays(sharedStart, sharedDays[i] - 1) } : null }; });
+    if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; var dd = sharedStart && sharedDays[i] ? addDays(sharedStart, sharedDays[i] - 1) : ''; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: (x.occ && x.occ.length ? eventPick(x.occ, dd ? [dd] : []).o : null) || (dd ? { d: dd } : null) }; });
     return trip.map(function(t){ var k = keyOf(t); return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (k && days[k]) || 0, time: k && times[k] || null, raw: t }; });
   }
   // Round 9 (2026-10-19): each stop's planned date (or the middle of its planned month) goes with it, so a season
@@ -34089,6 +34160,47 @@ ${renderGolfHeaderHtml()}
     list().forEach(function(s){ var d = plannedDate(s.time); if (d && !when[s.ref]) when[s.ref] = d; });
     var on = need.map(function(r){ return when[r] || ''; });
     return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(',')) + (on.some(Boolean) ? '&on=' + encodeURIComponent(on.join(',')) : '')).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
+  }
+  // Events on My Trip (2026-10-19, round 10): an event added from What's On or its own page is saved with its date and
+  // start and end time (the API's occ list, its upcoming dates): the date of a planned day when it is on then (and it
+  // joins that day, after the stops that start before it), else its next date. Kept with ev: 1 so a date that has
+  // passed is replaced by the next one; the planner's own times are never touched.
+  function eventPick(occ, dates){
+    for (var i = 0; i < dates.length; i++) {
+      for (var j = 0; j < occ.length; j++) {
+        var o = occ[j];
+        if (o.d === dates[i] || (o.u && o.d <= dates[i] && o.u >= dates[i])) return { o: { d: dates[i], s: o.s, e: o.e }, i: i };
+      }
+    }
+    return { o: occ[0] ? { d: occ[0].d, s: occ[0].s, e: occ[0].e } : null, i: -1 };
+  }
+  function fillEventTimes(){
+    if (viewing !== 'mine') return;
+    var dayNums = [], dayDates = [];
+    trip.forEach(function(t){ var k = keyOf(t), tm = k && times[k]; if (k && days[k] && tm && tm.d && !tm.ev && dayNums.indexOf(days[k]) < 0) { dayNums.push(days[k]); dayDates.push(tm.d); } });
+    var changed = false;
+    trip.slice().forEach(function(t){
+      var k = keyOf(t), d = info[t.ref], cur = k && times[k];
+      if (!k || String(t.ref || '').indexOf('event:') !== 0 || !d || !d.occ || !d.occ.length) return;
+      if (cur && !cur.ev) return;
+      var p = eventPick(d.occ, dayDates);
+      if (!p.o) return;
+      var day = p.i >= 0 ? dayNums[p.i] : 0;
+      if (cur && cur.d === p.o.d && cur.s === p.o.s && cur.e === p.o.e && (days[k] || 0) === day) return;
+      times[k] = { d: p.o.d, ev: 1 };
+      if (p.o.s != null) times[k].s = p.o.s;
+      if (p.o.e != null) times[k].e = p.o.e;
+      if (day) {
+        days[k] = day;
+        // Into its place in that day: after the day's stops that start before it.
+        var from = trip.indexOf(t); trip.splice(from, 1);
+        var at = -1, first = -1;
+        trip.forEach(function(x, q){ var kx = keyOf(x), tx = kx && times[kx]; if (days[kx] !== day) return; if (first < 0) first = q; if (!tx || tx.s == null || p.o.s == null || tx.s <= p.o.s) at = q; });
+        trip.splice(at >= 0 ? at + 1 : first >= 0 ? first : Math.min(from, trip.length), 0, t);
+      } else if (cur && cur.ev) delete days[k];
+      changed = true;
+    });
+    if (changed) { save(); store(DAYS, days); store(TIMES, times); }
   }
   function dirUrl(stops){
     // At most 11 stops: an origin, nine waypoints and a destination, Google's limit for one route link (2026-10-18).
@@ -34131,11 +34243,13 @@ ${renderGolfHeaderHtml()}
           var d = info[x.s.ref] || {};
           var name = d.url ? '<a class="mt-name" ' + hrefAttr((document.documentElement.lang === 'fr' && d.urlFr) || d.url) + '>' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
           var fr = document.documentElement.lang === 'fr';
-          var meta = d.missing ? T.gone : [timeText(x.s.time), (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
+          // A dated stop outside a day with that date (an event saved with its next date, round 10) shows its date too.
+          var ownDate = x.s.time && x.s.time.d && x.s.time.d !== gDate ? dateText(x.s.time.d) : '';
+          var meta = d.missing ? T.gone : [ownDate, timeText(x.s.time), (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
-          var notice = nt ? '<p class="mt-notice mt-notice-' + esc(d.notice.kind) + '"><span aria-hidden="true">' + (d.notice.kind === 'advisory' ? '⚠️' : d.notice.kind === 'open_until' ? '⏳' : d.notice.kind === 'reopening' ? '🌱' : '📅') + '</span> ' + (d.notice.kind === 'advisory' ? '<strong>' + esc(T.checkFirst) + '</strong> ' : '') + esc(nt) + '</p>' : '';
+          var notice = nt ? '<p class="mt-notice mt-notice-' + esc(d.notice.kind) + '"><span aria-hidden="true">' + (d.notice.kind === 'advisory' ? '⚠️' : d.notice.kind === 'open_until' ? '⏳' : d.notice.kind === 'reopening' ? '🌱' : d.notice.kind === 'seasonal' ? '🗓️' : '📅') + '</span> ' + (d.notice.kind === 'advisory' ? '<strong>' + esc(T.checkFirst) + '</strong> ' : '') + esc(nt) + '</p>' : '';
           return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + notice + '</div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
@@ -34158,13 +34272,44 @@ ${renderGolfHeaderHtml()}
       if (mapFr && map.attributionControl) map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="Une bibliothèque JavaScript de cartes interactives">Leaflet</a>');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: mapFr ? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors', maxZoom: 17 }).addTo(map);
       map.on('zoomend', function(){ if (spreadPins) spreadPins(); });
+      // Keyboard (2026-10-19, round 10), as on /map: a pin opened with Enter moves focus into its popup; Escape (from the
+      // pin or the popup) or the popup's close button closes it and puts focus back on the pin.
+      var keyPin = null;
+      map.getContainer().addEventListener('keydown', function(e){
+        var t = e.target;
+        if ((e.key === 'Enter' || e.key === ' ') && t.classList && t.classList.contains('leaflet-marker-icon')) keyPin = t;
+        if ((e.key === 'Escape' || e.key === 'Esc') && map._popup && map.hasLayer(map._popup) && t.closest && (t.closest('.leaflet-popup') || t.closest('.leaflet-marker-icon'))) {
+          e.preventDefault();
+          if (t.closest('.leaflet-marker-icon')) map._popup._mtOpener = t.closest('.leaflet-marker-icon');
+          map.closePopup();
+        }
+      }, true);
+      map.on('popupopen', function(e){
+        var pin = keyPin; keyPin = null;
+        if (!pin) return;
+        var pe = e.popup.getElement(), first = pe && pe.querySelector('.leaflet-popup-content a[href]');
+        e.popup._mtOpener = pin;
+        if (first) setTimeout(function(){ try { first.focus({ preventScroll: true }); } catch (err) { first.focus(); } }, 0);
+      });
+      map.on('popupclose', function(e){
+        var pin = e.popup._mtOpener, src = e.popup._source;
+        e.popup._mtOpener = null;
+        if (!pin) return;
+        var a = document.activeElement, pe = e.popup.getElement();
+        if (a && a !== document.body && a !== pin && !(pe && pe.contains(a))) return;
+        var target = (src && src.getElement && src.getElement()) || pin;
+        if (target && document.body.contains(target)) target.focus({ preventScroll: true });
+      });
     }
     if (layer) layer.remove();
     // Stops close together (2026-10-19, round 8 and 9): a winery and its restaurant, one place saved on two days, or
     // two stops a few streets apart used to sit on top of one another, so only the top number showed. After each fit
     // or zoom, pins closer than a pin's width on screen are fanned out in a small ring (myTripPinSpread); zooming in
     // brings them back to their own spots once there is room. A tap on a pin shows its name, linked to its page.
-    var pinIcon = function(p, dx, dy){ return L.divIcon({ className: 'mt-pin', html: '<span class="mt-num">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12 - dx, 12 - dy], popupAnchor: [dx, dy - 12] }); };
+    // Round 10 (2026-10-19): each pin is named "1. Chef De Cuisine" (its number span is hidden from screen readers, which
+    // read "1, button" before), set again whenever the spread gives the pin a new icon.
+    var pinIcon = function(p, dx, dy){ return L.divIcon({ className: 'mt-pin', html: '<span class="mt-num" aria-hidden="true">' + p.n + '</span>', iconSize: [24, 24], iconAnchor: [12 - dx, 12 - dy], popupAnchor: [dx, dy - 12] }); };
+    var pinName = function(mk, p){ var e = mk.getElement && mk.getElement(); if (e) e.setAttribute('aria-label', p.n + '. ' + p.name); };
     var shift = pts.map(function(){ return { dx: 0, dy: 0 }; });
     var markers = pts.map(function(p){
       var mk = L.marker([p.lat, p.lng], { icon: pinIcon(p, 0, 0), title: p.n + '. ' + p.name });
@@ -34172,12 +34317,13 @@ ${renderGolfHeaderHtml()}
       return mk;
     });
     layer = L.layerGroup(markers).addTo(map);
+    // Round 10: pins closer than 26px on screen are spread (24 left 14px between pins of an Oliver two-day plan). The
+    // pins only exist once the map has a view (the first fit), so they are named here.
     spreadPins = function(){
-      var off = myTripPinSpread(pts.map(function(p){ return map.latLngToLayerPoint([p.lat, p.lng]); }), 24);
+      var off = myTripPinSpread(pts.map(function(p){ return map.latLngToLayerPoint([p.lat, p.lng]); }), 26);
       markers.forEach(function(mk, i){
-        if (off[i].dx === shift[i].dx && off[i].dy === shift[i].dy) return;
-        shift[i] = off[i];
-        mk.setIcon(pinIcon(pts[i], off[i].dx, off[i].dy));
+        if (off[i].dx !== shift[i].dx || off[i].dy !== shift[i].dy) { shift[i] = off[i]; mk.setIcon(pinIcon(pts[i], off[i].dx, off[i].dy)); }
+        pinName(mk, pts[i]);
       });
     };
     map.invalidateSize();
@@ -34243,6 +34389,7 @@ ${renderGolfHeaderHtml()}
     });
     save(); store(DAYS, days); store(TIMES, times); store(DRIVES, drives);
     viewing = 'mine';
+    fillEventTimes();
     // Fix (2026-10-18): no regex here; this sits in a template string, which ate the backslashes.
     history.replaceState(null, '', (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip');
     status(T.saved);
@@ -34251,7 +34398,7 @@ ${renderGolfHeaderHtml()}
   });
   el('mtOwn').addEventListener('click', function(){ track('shared_trip_cta_click', { stop_count: shared.length }); });
   if (viewing === 'shared') track('shared_trip_view', { stop_count: shared.length });
-  fetchInfo(viewing === 'shared' ? shared : trip.map(function(x){ return x.ref; })).then(render);
+  fetchInfo(viewing === 'shared' ? shared : trip.map(function(x){ return x.ref; })).then(function(){ fillEventTimes(); render(); });
 })();
 </script>
 </body>
@@ -49826,6 +49973,9 @@ module.exports = {
   renderMyTripPage,
   myTripPinSpread,
   tripStopsFor,
+  tripEventOccurrences,
+  tripSeasonUnannouncedOn,
+  tripUsualSeasonMonths,
   withTripFrenchUrls,
   tripShareSummary,
   tripShareSearch,
