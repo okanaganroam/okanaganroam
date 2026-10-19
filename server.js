@@ -31231,7 +31231,12 @@ function buildVenueSubmissionEmail(sub) {
   return payload;
 }
 
-async function sendVenueSubmissionViaFormSubmit(payload) {
+// FormSubmit can take well over 10 seconds to answer (Oct 19 2026: nine
+// notices timed out). Cutting the request off mid-wait lost the notice and
+// sometimes made FormSubmit send a blank "New submission" email, so it now
+// gets 45 seconds, and a notice that still fails goes to info@ through Brevo.
+const VENUE_SUBMISSION_NOTIFY_TIMEOUT_MS = 45000;
+async function postVenueSubmissionToFormSubmit(payload) {
   const res = await fetch(VENUE_SUBMISSION_NOTIFY_URL, {
     method: 'POST',
     headers: {
@@ -31241,13 +31246,33 @@ async function sendVenueSubmissionViaFormSubmit(payload) {
       Referer: 'https://okanaganroam.com/list-your-venue',
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(VENUE_SUBMISSION_NOTIFY_TIMEOUT_MS),
   });
   let result = null;
   try { result = await res.json(); } catch (_) { /* non-JSON reply is a failure below */ }
   if (!res.ok || !result || String(result.success) !== 'true') {
     throw new Error(`FormSubmit HTTP ${res.status}: ${String((result && result.message) || 'no JSON body').slice(0, 200)}`);
   }
+}
+// The notice as plain text, for the Brevo fallback.
+function notificationText(payload) {
+  return Object.entries(payload || {}).filter(([k]) => !k.startsWith('_')).map(([k, v]) => `${k}: ${v}`).join('\n\n');
+}
+async function sendVenueSubmissionViaFormSubmit(payload) {
+  try {
+    await postVenueSubmissionToFormSubmit(payload);
+  } catch (err) {
+    const direct = ownerDirectEmail();
+    if (!direct) throw err;
+    const why = String((err && err.message) || err).slice(0, 200);
+    await direct({ to: INFO_CONTACT_EMAIL, subject: (payload && payload._subject) || 'Okanagan Roam notification', text: `${notificationText(payload)}\n\n(Sent through Brevo because FormSubmit failed: ${why})` });
+    console.error(`[notify] FormSubmit failed (${why}); sent "${(payload && payload._subject) || ''}" to info@ through Brevo instead`);
+  }
+}
+// Sends a notice without making the visitor or owner wait for it. The send
+// functions log their own failures; this only catches anything unexpected.
+function notifyInBackground(label, send) {
+  Promise.resolve().then(send).catch((err) => console.error(`[notify] ${label} failed: ${String((err && err.message) || err).slice(0, 300)}`));
 }
 
 // Stored first, notified second: a failed send leaves the submission
@@ -34555,7 +34580,7 @@ async function sendContactViaFormSubmit(payload) {
       Referer: 'https://okanaganroam.com/',
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(25000),
   });
   let result = null;
   try { result = await res.json(); } catch (_) { /* non-JSON reply is a failure below */ }
@@ -35627,7 +35652,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
   }
   ownerMarkFrench(res, 'owner_change_requests', id);
   ownerMarkFrench(res, 'owner_change_requests', liveId);
-  if (id && Object.keys(review).length) await notifyOwnerChange(id);
+  if (id && Object.keys(review).length) notifyInBackground(`owner update #${id}`, () => notifyOwnerChange(id));
   return sendSubmissionResponse(res, 201, { ok: true, id: id || liveId, live_id: liveId, fields: Object.keys(changes), live: Object.keys(live), review: Object.keys(review), ...(Object.keys(carried).length ? { carried: Object.keys(carried) } : {}) });
 }
 
@@ -36140,11 +36165,14 @@ async function handleOwnerPhotoUpload(req, res, token) {
   if (body.notify === true) {
     // One email per upload batch: the browser sets notify on the last photo.
     const recent = db.prepare(`SELECT id, preview_key, credit FROM owner_photos WHERE venue_id = ? AND status = ? AND submitted_at >= datetime('now', '-1 hour') ORDER BY id`).all(venue.id, live ? 'approved' : 'pending');
-    try {
-      await venueSubmissionTransport(buildOwnerPhotoEmail(venue, recent.length ? recent : [{ id, preview_key: previewKey, credit }], live));
-    } catch (err) {
-      console.error(`[owner-photos] notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
-    }
+    const notice = buildOwnerPhotoEmail(venue, recent.length ? recent : [{ id, preview_key: previewKey, credit }], live);
+    notifyInBackground(`owner photos for venue #${venue.id}`, async () => {
+      try {
+        await venueSubmissionTransport(notice);
+      } catch (err) {
+        console.error(`[owner-photos] notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+      }
+    });
   }
   return sendSubmissionResponse(res, 201, { ok: true, id, live, main, preview: `/owner-photos/preview/${previewKey}.jpg` });
 }
@@ -37765,12 +37793,12 @@ async function handleMenuApi(req, res, ctx, action, arg) {
     if (ctx.live) {
       const r = publishMenu(menu.id, ctx.actor);
       if (!r.ok) return send(400, { ok: false, error: generic });
-      if (!ctx.menuId) await sendMenuNotice(venue, fresh, 'published');
+      if (!ctx.menuId) notifyInBackground(`menu for venue #${venue.id}`, () => sendMenuNotice(venue, fresh, 'published'));
       else await notifyReviewDecision('menu', menu.id, 'approve');
       return send(200, { ok: true, live: true, url: menuPagePath(venue) });
     }
     db.prepare("UPDATE venue_menus SET status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(menu.id);
-    await sendMenuNotice(venue, fresh, 'pending');
+    notifyInBackground(`menu for venue #${venue.id}`, () => sendMenuNotice(venue, fresh, 'pending'));
     return send(200, { ok: true, live: false });
   }
   if (action === 'help') {
