@@ -316,7 +316,7 @@ test('Stage 5C: V3 same-name notice removed; stop buttons carry refs; the Stage 
   const src = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.ok(!src.includes('t3-samename') && !src.includes('My Trip lists places by name'), 'no same-name notice or its style');
   assert.ok(src.includes(`(v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '')`) && src.includes(`(e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '')`));
-  assert.ok(src.includes("var n = b.getAttribute('data-trip-ref') || b.getAttribute('data-trip-name');"), 'Add whole trip / Add day: one stop per ref');
+  assert.ok(src.includes("var n = tripKey(b) || b.getAttribute('data-trip-name');"), 'Add whole trip / Add day: one stop per ref (and day, for a repeated place: 2026-10-19)');
   // A fixed state -> the same link as before (keep / skip / pin / avoid / rm, order and encoding).
   const qs = v3.t3StateToQuery({ text: 'Plan 2 days in Kelowna', seed: 3, overrides: { days: 2, pace: 'relaxed' }, locks: { '2-morning': 9, '1-evening': 8 }, exclude: [4, 5], pinned: { '1-morning': 3, '1-midday': 4 }, avoid: [7], removed: { '2-evening': 1 } });
   assert.equal(qs, '?q=Plan%202%20days%20in%20Kelowna&seed=3&days=2&pace=relaxed&keep=1-evening%3A8%2C2-morning%3A9&skip=4%2C5&pin=1-morning%3A3%2C1-midday%3A4&avoid=7&rm=2-evening');

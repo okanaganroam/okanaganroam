@@ -250,7 +250,7 @@ test('No driving after 18 h (French) is an evening rule, not a car-free day', ()
   const en = fr.tripPlannerText('Route des vins à Naramata le 24 octobre, pas de conduite après 18 h', TAXONOMY);
   const { p } = plan(en, { startDate: '2026-10-24' });
   assert.ok(stopsOf(p.days[0]).filter((x) => x.fact.type === 'winery').length >= 2, 'a full wine day');
-  assert.equal(t3FrenchText(p.notes.find((n) => /^No driving after/.test(n))), 'Pas de voiture après 18:00 : le souper est le dernier trajet de chaque jour, et ce qui suit est à quelques pas.');
+  assert.equal(t3FrenchText(p.notes.find((n) => /^No driving after/.test(n))), 'Pas de voiture après 18:00 : le souper est à quelques pas du dernier arrêt de la journée, ou le trajet pour s’y rendre se termine avant.'); // applied since 2026-10-19 (trip-pass6)
 });
 
 test('French: the planner’s notes, reasons, checks and dates read in French', () => {

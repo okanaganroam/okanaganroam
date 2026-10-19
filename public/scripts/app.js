@@ -2710,13 +2710,18 @@ window.__scrollToVenueCard = function(name){
   if (!Array.isArray(trip)) trip = [];
   trip = trip.filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
   trip.forEach(function(x){ if (x.ref !== undefined && !REF_RE.test(x.ref)) delete x.ref; });
+  // The same place on another day of a Build My Trip plan (2026-10-19) is its own stop: key "venue:12@2" (ref @ day).
+  var KEY_RE = /^(venue|event):[1-9][0-9]*@[1-9][0-9]?$/;
+  trip.forEach(function(x){ if (x.key !== undefined && !(x.ref && KEY_RE.test(x.key) && x.key.indexOf(x.ref + '@') === 0)) delete x.key; });
 
   function stopOf(btn){
-    var ref = btn.dataset.tripRef;
-    return { ref: REF_RE.test(ref || '') ? ref : null, name: btn.dataset.tripName, query: btn.dataset.tripQuery, region: btn.dataset.tripRegion || null };
+    var ref = btn.dataset.tripRef, slot = btn.dataset.tripSlot;
+    var s = { ref: REF_RE.test(ref || '') ? ref : null, name: btn.dataset.tripName, query: btn.dataset.tripQuery, region: btn.dataset.tripRegion || null };
+    if (s.ref && /^[1-9][0-9]?$/.test(slot || '')) s.key = s.ref + '@' + slot;
+    return s;
   }
   function sameStop(x, s){
-    if (x.ref && s.ref) return x.ref === s.ref;
+    if (x.ref && s.ref) return (x.key || x.ref) === (s.key || s.ref);
     if (x.name !== s.name) return false;
     return !x.region || !s.region || x.region === s.region;
   }
@@ -2784,10 +2789,11 @@ window.__scrollToVenueCard = function(name){
   }
   function dayGroups(){
     var days = savedDays();
-    if (!trip.some(function(x){ return x.ref && days[x.ref] > 0; })) return null;
+    var k = function(x){ return x.key || x.ref; };
+    if (!trip.some(function(x){ return k(x) && days[k(x)] > 0; })) return null;
     var byDay = {}, order = [];
     trip.forEach(function(x, i){
-      var d = x.ref && days[x.ref] > 0 ? Number(days[x.ref]) : 0;
+      var d = k(x) && days[k(x)] > 0 ? Number(days[k(x)]) : 0;
       if (!byDay[d]) { byDay[d] = { day: d, items: [] }; order.push(d); }
       byDay[d].items.push({ t: x, i: i });
     });
@@ -2878,7 +2884,7 @@ window.__scrollToVenueCard = function(name){
     clearTimeout(trayMsg._hideTimer);
     // Never a duplicate, never past the cap, never dropping another stop. (Any
     // change since the removal has already withdrawn the Undo; these guard it.)
-    var present = trip.indexOf(u.item) !== -1 || (u.item.ref && trip.some(function(x){ return x.ref === u.item.ref; }));
+    var present = trip.indexOf(u.item) !== -1 || (u.item.ref && trip.some(function(x){ return (x.key || x.ref) === (u.item.key || u.item.ref); }));
     if (present) {
       trayMsg.style.display = 'none';
       trayMsg.innerHTML = '';
@@ -2908,6 +2914,7 @@ window.__scrollToVenueCard = function(name){
     }
     var entry = { name: s.name, query: s.query, region: s.region || null };
     if (s.ref) entry.ref = s.ref;
+    if (s.key) entry.key = s.key;
     withdrawUndo();
     trip.push(entry);
     if (window.trackEvent) window.trackEvent('add_to_trip', { venue_name: s.name, region: s.region || null, trip_size: trip.length });
@@ -2983,7 +2990,7 @@ window.__scrollToVenueCard = function(name){
   window.__roamTripReplace = function(){
     withdrawUndo();
     trip = [];
-    try { window.localStorage.setItem('okanaganTripDays', '{}'); window.localStorage.setItem('okanaganTripTimes', '{}'); } catch (e) {}
+    try { window.localStorage.setItem('okanaganTripDays', '{}'); window.localStorage.setItem('okanaganTripTimes', '{}'); window.localStorage.setItem('okanaganTripDrives', '{}'); } catch (e) {}
     save();
     syncButtons();
     render();
@@ -3962,6 +3969,9 @@ window.__scrollToVenueCard = function(name){
     document.querySelectorAll('.fav-btn').forEach(function(btn){
       var isFav = isFavorite(btn.dataset.favName, favItemOf(btn));
       btn.classList.toggle('is-fav', isFav);
+      // The pressed state for screen readers (2026-10-19), only where the button declares one.
+      var pressedNow = typeof btn.getAttribute === 'function' ? btn.getAttribute('aria-pressed') : null;
+      if (pressedNow != null && pressedNow !== String(isFav)) btn.setAttribute('aria-pressed', String(isFav));
       var html = (isFav ? HEART_FILLED : HEART_OUTLINE) + ' ' + (isFav ? t('card.favorited') : t('card.favorite'));
       if (btn.__favHtml !== html) { btn.innerHTML = html; btn.__favHtml = html; }
 
