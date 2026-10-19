@@ -531,7 +531,7 @@ function renderStyles() {
     /* Attribution sits in its own quiet strip beneath the map, never over it. */
     .t3-dh-attr { position: static; display: flex; align-items: center; justify-content: flex-end; min-height: 22px; padding: 0 2px; background: none; border-radius: 0; font-size: 0.68rem; color: rgba(245,243,237,0.74); }
     .t3-day-head--map .t3-day-actions { padding: 0 12px 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-    .t3-day-head--map .t3-day-actions .t3-btn { justify-content: center; text-align: center; min-height: 44px; padding: 6px 4px; font-size: 0.78rem; line-height: 1.15; }
+    .t3-day-head--map .t3-day-actions .t3-btn { justify-content: center; text-align: center; min-height: 44px; padding: 6px 4px; font-size: 0.8125rem; line-height: 1.15; }
     .t3-day-head--map .t3-day-actions [data-t3-map-day] { order: -1; }
   }
   @media (max-width: 1099px) {
@@ -555,7 +555,7 @@ function renderStyles() {
   .t3-when::after { content: ""; position: absolute; left: 6px; top: 40px; bottom: -16px; width: 2px; background: rgba(27,43,58,0.12); }
   .t3-stop:last-child .t3-when::after { display: none; }
   /* Contrast (2026-10-19, round 7): the see-through navy measured 4.11:1 on the cream page; the solid muted navy passes 4.5:1. */
-  .t3-leg { list-style: none; margin-left: 126px; font-size: 0.8rem; font-weight: 700; color: var(--ref-navy-muted, #56636E); padding: 8px 0 8px 4px; }
+  .t3-leg { list-style: none; margin-left: 126px; font-size: 0.8125rem; font-weight: 700; color: var(--ref-navy-muted, #56636E); padding: 8px 0 8px 4px; }
   .t3-leg::before { content: "\\2193  "; }
   .t3-leg-drive { color: rgba(27,43,58,0.78); }
   p.t3-drive-in { margin: 12px 0 0 126px; padding: 0 0 0 4px; }
@@ -609,14 +609,14 @@ function renderStyles() {
   .t3-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 44px; }
   .t3-card.is-swapped { box-shadow: 0 0 0 3px var(--ref-gold, #C9A227); transition: box-shadow 0.4s; }
-  .t3-swap-note { margin: 0 0 6px; font-size: 0.78rem; font-weight: 800; color: #6B5410; }
+  .t3-swap-note { margin: 0 0 6px; font-size: 0.8125rem; font-weight: 800; color: #6B5410; }
   .t3-more { position: relative; display: inline-block; }
   .t3-more > summary { list-style: none; display: inline-flex; align-items: center; white-space: nowrap; box-sizing: border-box; }
   .t3-more > summary::-webkit-details-marker { display: none; }
   .t3-more > summary::after { content: ' \\25BE'; margin-left: 4px; }
   .t3-more-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 20; display: flex; flex-direction: column; gap: 6px; min-width: 168px; padding: 8px; background: #fff; border: 1px solid rgba(27,43,58,0.15); border-radius: 12px; box-shadow: 0 12px 28px -12px rgba(27,43,58,0.45); }
   .t3-more-menu > * { justify-content: flex-start; width: 100%; }
-  .t3-act { background: transparent; border: 1px solid rgba(27,43,58,0.2); color: var(--ref-navy); border-radius: 999px; padding: 7px 13px; min-height: 44px; font-size: 0.8rem; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  .t3-act { background: transparent; border: 1px solid rgba(27,43,58,0.2); color: var(--ref-navy); border-radius: 999px; padding: 7px 13px; min-height: 44px; font-size: 0.8125rem; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
   .t3-act:hover { background: rgba(27,43,58,0.06); }
   .t3-act[aria-pressed="true"] { background: var(--ref-gold); border-color: var(--ref-gold); color: var(--ref-navy-deep); }
   .t3-removed { background: transparent; border: 1px dashed rgba(27,43,58,0.3); border-radius: 14px; padding: 14px 18px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -685,7 +685,7 @@ function renderStyles() {
     .t3-tools .t3-map-toggle { width: 100%; min-height: 44px; justify-content: center; font-size: 0.84rem; }
     /* Phone: a stop's four actions sit on one row (2026-10-14). */
     .t3-plan .t3-actions { display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 6px; }
-    .t3-plan .t3-actions > button, .t3-plan .t3-actions > a, .t3-plan .t3-actions .t3-more > summary { justify-content: center; text-align: center; padding: 6px 4px; font-size: 0.78rem; line-height: 1.15; width: 100%; box-sizing: border-box; }
+    .t3-plan .t3-actions > button, .t3-plan .t3-actions > a, .t3-plan .t3-actions .t3-more > summary { justify-content: center; text-align: center; padding: 6px 4px; font-size: 0.8125rem; line-height: 1.15; width: 100%; box-sizing: border-box; }
     .t3-plan .t3-actions .t3-more { display: block; }
     .t3-plan .t3-actions .t3-more > summary { display: flex; align-items: center; min-height: 44px; }
     .t3-plan .t3-actions .t3-more > summary::after { margin-left: 2px; }
@@ -985,6 +985,56 @@ function renderScript(d) {
     }); });
     return times;
   }
+  // Round 10 (2026-10-19): a short plan's stops (itinerary or outing), what a Swap sends of them, and their shown starts.
+  // Round 10 (2026-10-19): a suggested start as people read it, "11:30 AM" (« 11 h 30 » in French), not "11:30".
+  function clockLabel(m){ var h = Math.floor(m / 60) % 24, mm = m % 60; if (lang() === 'fr') return h + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : ''); return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM'); }
+  function shortStops(){ var p = state.last || {}; return (p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []; }
+  function shortShown(list){
+    return list.slice(0, 12).map(function(s){
+      var o = { ref: s.kind !== 'event' && s.venue && s.venue.id ? 'venue:' + s.venue.id : s.event && s.event.id ? 'event:' + s.event.id : null };
+      if (typeof s.label === 'string') o.label = s.label.slice(0, 60);
+      if (typeof s.daypart === 'string' && /^[a-z]{1,12}$/.test(s.daypart)) o.daypart = s.daypart;
+      if (typeof s.component === 'number' && s.component >= 0 && s.component < 20) o.component = s.component;
+      if (s.gapFill === true) o.gapFill = true;
+      if (s.wineryLunch === true) o.wineryLunch = true;
+      return o;
+    });
+  }
+  function shortTimes(list){
+    var times = {}, rows = (state.last && state.last.schedule) || [];
+    list.slice(0, 12).forEach(function(s, i){
+      for (var k = 0; k < rows.length; k++) { var r = rows[k]; if (((s.kind !== 'event' && s.venue && r.venueId === s.venue.id) || (s.event && r.eventId === s.event.id)) && typeof r.startMinutes === 'number' && r.startMinutes >= 0 && r.startMinutes < 1440) { times['it-' + i] = Math.round(r.startMinutes); break; } }
+    });
+    return times;
+  }
+  // What a Swap did, said and shown: "Swapped Lachi for Poplar Grove" in the status line, a note on the new card and a
+  // short highlight; or, when nothing else fits, why the stop stayed.
+  function swapFeedback(key, oldName, ns, findBtn){
+    var fr = lang() === 'fr';
+    // Nothing else fits (round 7): the stop stays, and the visitor is told so rather than seeing nothing happen.
+    if (state.last && state.last.swapKept && state.last.swapKept.key === key) {
+      var keptMsg = fr ? 'Aucune autre option à proximité ne convient à ce moment de la journée : ' + state.last.swapKept.name + ' reste dans votre plan.' : (state.last.swapNote || ('Nothing else nearby fits here, so ' + state.last.swapKept.name + ' stays in your plan.'));
+      announce(keptMsg);
+      var kb = findBtn() || resultEl.querySelector('[data-t3-swap-id="' + state.last.swapKept.id + '"]');
+      var kc = kb && kb.closest('.t3-card');
+      if (kc) { var kn = document.createElement('p'); kn.className = 't3-swap-note'; kn.textContent = keptMsg; kc.insertBefore(kn, kc.firstChild); try { kb.focus({ preventScroll: true }); } catch (e) {} }
+      return;
+    }
+    if (!ns || !ns.venue || ns.venue.name === oldName) return;
+    announce(oldName ? (fr ? oldName + ' a été remplacé par ' + ns.venue.name + '.' : 'Swapped ' + oldName + ' for ' + ns.venue.name + '.') : (fr ? 'Nouvelle suggestion : ' + ns.venue.name + '.' : 'New suggestion: ' + ns.venue.name + '.'));
+    var nb = findBtn();
+    var card = nb && nb.closest('.t3-card');
+    if (card) {
+      var note = document.createElement('p');
+      note.className = 't3-swap-note';
+      note.textContent = oldName ? (fr ? 'Remplace ' + oldName : 'Replaces ' + oldName) : (fr ? 'Nouvelle suggestion' : 'New suggestion');
+      card.insertBefore(note, card.firstChild);
+      card.classList.add('is-swapped');
+      try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+      try { nb.focus({ preventScroll: true }); } catch (e) {}
+      setTimeout(function(){ card.classList.remove('is-swapped'); }, 2400);
+    }
+  }
   function shownIds(){
     var ids = [], p = state.last || {};
     days().forEach(function(d){ d.stops.forEach(function(s){ if (s.venue) ids.push(s.venue.id); }); });
@@ -1237,7 +1287,7 @@ function renderScript(d) {
       // grid row can share row tracks (see .t3-grid) and line up. Each group
       // is always present, empty or not.
       + '<div class="t3-card-head">' + photoHtml
-      + '<div class="t3-card-top"><span>' + esc(frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
+      + '<div class="t3-card-top"><span>' + esc(v.indoorGolf ? (lang() === 'fr' ? 'Golf intérieur' : 'Indoor golf') : frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a ' + hrefAttr(url) + '>' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
       + factsLine(v)
@@ -1632,14 +1682,14 @@ function renderScript(d) {
     }
     if(p.dayDepartureRepairs && !Object.keys(state.removed).length){
       var drFr=lang()==='fr';
-      html+='<section class="t3-warnings" aria-label="'+(drFr?'Ajuster une journée':'Adjust an individual day')+'"><h3>'+(drFr?'Corriger la lumière du jour':'Fix a daylight conflict')+'</h3><p>'+(drFr?'Conservez les mêmes arrêts et les autres journées. Horaires provisoires : confirmez les durées et les conditions.':'Keep the same stops and the other days. Provisional times: confirm durations and conditions.')+'</p>'+p.dayDepartureRepairs.map(function(dr){var drTime=String(Math.floor(dr.startMinutes/60)).padStart(2,'0')+':'+String(dr.startMinutes%60).padStart(2,'0');return '<button type="button" data-t3-day-start="'+dr.day+'" data-t3-minutes="'+dr.startMinutes+'">'+(drFr?'Jour ':'Day ')+dr.day+(drFr?' : essayer un départ à ':' — try departing at ')+drTime+'</button>';}).join(' ')+'</section>';
+      html+='<section class="t3-warnings" aria-label="'+(drFr?'Ajuster une journée':'Adjust an individual day')+'"><h3>'+(drFr?'Corriger la lumière du jour':'Fix a daylight conflict')+'</h3><p>'+(drFr?'Conservez les mêmes arrêts et les autres journées. Horaires provisoires : confirmez les durées et les conditions.':'Keep the same stops and the other days. Provisional times: confirm durations and conditions.')+'</p>'+p.dayDepartureRepairs.map(function(dr){var drTime=clockLabel(dr.startMinutes);return '<button type="button" data-t3-day-start="'+dr.day+'" data-t3-minutes="'+dr.startMinutes+'">'+(drFr?'Jour ':'Day ')+dr.day+(drFr?' : essayer un départ à ':' — try departing at ')+drTime+'</button>';}).join(' ')+'</section>';
     }
     if(p.earlierDeparture && !Object.keys(state.removed).length){
-      var ed=p.earlierDeparture,edFr=lang()==='fr',edTime=String(Math.floor(ed.startMinutes/60)).padStart(2,'0')+':'+String(ed.startMinutes%60).padStart(2,'0');
+      var ed=p.earlierDeparture,edFr=lang()==='fr',edTime=clockLabel(ed.startMinutes);
       html+='<section class="t3-warnings" aria-label="'+(edFr?'Ajuster pour la lumière du jour':'Adjust for daylight')+'"><h3>'+(edFr?'Partez plus tôt pour cette activité':'Start earlier for this activity')+'</h3><p>'+(edFr?'Les mêmes arrêts, dans le même ordre, avec des horaires compatibles avec la lumière du jour estimée.':'The same stops, in the same order, with times that fit the estimated daylight window.')+' '+(ed.provisional?(edFr?'Suggestion provisoire : confirmez les horaires, les durées et les conditions.':'Provisional suggestion: confirm hours, durations and conditions.'):(edFr?'Durées et trajets estimés; confirmez avant de partir.':'Durations and travel are estimates; confirm before visiting.'))+'</p><button type="button" data-t3-later-start="'+ed.startMinutes+'">'+(edFr?'Essayer un départ à ':'Try departing at ')+edTime+'</button></section>';
     }
     if(p.laterDeparture && !Object.keys(state.removed).length){
-      var ld=p.laterDeparture,ldFr=lang()==='fr',ldTime=String(Math.floor(ld.startMinutes/60)).padStart(2,'0')+':'+String(ld.startMinutes%60).padStart(2,'0');
+      var ld=p.laterDeparture,ldFr=lang()==='fr',ldTime=clockLabel(ld.startMinutes);
       html+='<section class="t3-warnings" aria-label="'+(ldFr?'Moins d’attente':'Less waiting')+'"><h3>'+(ldFr?'Évitez une longue pause':'Avoid a long gap')+'</h3><p>'+(ldFr?'Les mêmes arrêts avec environ '+ld.savedMinutes+' minutes d’attente en moins.':'The same stops with about '+ld.savedMinutes+' fewer minutes waiting.')+' '+(ld.provisional?(ldFr?'Suggestion provisoire : confirmez les horaires et durées.':'Provisional suggestion: confirm hours and durations.'):(ldFr?'Horaires indiqués vérifiés; durées et trajets estimés.':'Checked against listed hours; durations and travel are estimates.'))+'</p><button type="button" data-t3-later-start="'+ld.startMinutes+'">'+(ldFr?'Essayer un départ à ':'Try departing at ')+ldTime+'</button></section>';
     }
     // Dates read as dates (2026-10-19), never 2026-10-21.
@@ -1941,8 +1991,11 @@ function renderScript(d) {
     var b;
     if ((b=t.closest('[data-t3-badges-more]'))) {
       var list=b.closest('.t3-badges');
-      Array.prototype.forEach.call(list.querySelectorAll('[data-t3-badge-extra]'),function(li){ li.hidden=false; });
+      var shown=list.querySelectorAll('[data-t3-badge-extra]');
+      Array.prototype.forEach.call(shown,function(li){ li.hidden=false; });
       b.parentNode.parentNode.removeChild(b.parentNode);
+      // Round 10 (2026-10-19): focus moves to the first badge it showed, not back to the top of the page.
+      if (shown[0]) { shown[0].setAttribute('tabindex','-1'); try { shown[0].focus({ preventScroll: true }); } catch (e) { shown[0].focus(); } }
       return;
     }
     if ((b=t.closest('[data-t3-event-date]'))) {
@@ -2061,38 +2114,26 @@ function renderScript(d) {
       var swapped = request(ss && ss.venue && ss.venue.type ? { pinned: currentPins([sk]), swap: { key: sk, type: ss.venue.type, id: ss.venue.id, locked: Object.keys(state.locks).filter(function(k){ return k !== sk; }), times: shownTimes() } } : { pinned: currentPins([sk]) }, { requestType: 'replace', trigger: b, focus: false });
       // Say what changed and show where: "Swapped Lachi for Poplar Grove", with the new card briefly highlighted.
       if (swapped && swapped.then) swapped.then(function(){
-        var ns = stopAt(sk);
-        var fr = lang() === 'fr';
-        // Nothing else fits (round 7): the stop stays, and the visitor is told so rather than seeing nothing happen.
-        if (state.last && state.last.swapKept && state.last.swapKept.key === sk) {
-          var keptMsg = fr ? 'Aucune autre option à proximité ne convient à ce moment de la journée : ' + state.last.swapKept.name + ' reste dans votre plan.' : (state.last.swapNote || ('Nothing else nearby fits here, so ' + state.last.swapKept.name + ' stays in your plan.'));
-          announce(keptMsg);
-          var kb = resultEl.querySelector('[data-t3-swap="' + sk + '"]');
-          var kc = kb && kb.closest('.t3-card');
-          if (kc) { var kn = document.createElement('p'); kn.className = 't3-swap-note'; kn.textContent = keptMsg; kc.insertBefore(kn, kc.firstChild); try { kb.focus({ preventScroll: true }); } catch (e) {} }
-          return;
-        }
-        if (!ns || !ns.venue || ns.venue.name === oldName) return;
-        announce(oldName ? (fr ? oldName + ' a été remplacé par ' + ns.venue.name + '.' : 'Swapped ' + oldName + ' for ' + ns.venue.name + '.') : (fr ? 'Nouvelle suggestion : ' + ns.venue.name + '.' : 'New suggestion: ' + ns.venue.name + '.'));
-        var nb = resultEl.querySelector('[data-t3-swap="' + sk + '"]');
-        var card = nb && nb.closest('.t3-card');
-        if (card) {
-          var note = document.createElement('p');
-          note.className = 't3-swap-note';
-          note.textContent = oldName ? (fr ? 'Remplace ' + oldName : 'Replaces ' + oldName) : (fr ? 'Nouvelle suggestion' : 'New suggestion');
-          card.insertBefore(note, card.firstChild);
-          card.classList.add('is-swapped');
-          try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
-          try { nb.focus({ preventScroll: true }); } catch (e) {}
-          setTimeout(function(){ card.classList.remove('is-swapped'); }, 2400);
-        }
+        swapFeedback(sk, oldName, stopAt(sk), function(){ return resultEl.querySelector('[data-t3-swap="' + sk + '"]'); });
       });
       return;
     }
     if ((b = t.closest('[data-t3-swap-id]'))) {
       var sid = Number(b.getAttribute('data-t3-swap-id'));
       if (state.exclude.indexOf(sid) === -1) state.exclude.push(sid);
-      request({}, { requestType: 'replace', trigger: b, focus: false });
+      // Round 10 (2026-10-19): a short plan's stop (a brewery crawl, dinner and a show) is swapped on its own, like a
+      // day plan's: the stops on screen and their times go with the request, and only this one changes.
+      var list = shortStops(), si = -1;
+      for (var li = 0; li < list.length; li++) if (list[li].kind !== 'event' && list[li].venue && list[li].venue.id === sid) { si = li; break; }
+      if (si < 0) { request({}, { requestType: 'replace', trigger: b, focus: false }); return; }
+      var skey = 'it-' + si, sOld = list[si].venue.name;
+      var sReq = request({ swap: { key: skey, type: list[si].venue.type, id: sid, stops: shortShown(list), times: shortTimes(list) } }, { requestType: 'replace', trigger: b, focus: false });
+      if (sReq && sReq.then) sReq.then(function(){
+        var now = shortStops(), ns = null;
+        for (var ni = 0; ni < now.length; ni++) if (now[ni].swapSlot && now[ni].venue) { ns = now[ni]; break; }
+        if (!ns && now[si] && now[si].venue) ns = now[si];
+        swapFeedback(skey, sOld, ns, function(){ return ns && ns.venue ? resultEl.querySelector('[data-t3-swap-id="' + ns.venue.id + '"]') : null; });
+      });
       return;
     }
     if ((b = t.closest('[data-t3-regen-day]'))) {
