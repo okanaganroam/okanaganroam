@@ -30258,3 +30258,241 @@ test('Trip planner round 8: Swap sends the visitor\'s locks, and only valid ones
   // The dated one-day outing check survives the template (a single backslash became "d").
   assert.ok(html.includes("/^\\d{4}-\\d{2}-\\d{2}$/.test(r.date || '')"));
 });
+
+// ---------- Round 9 (2026-10-19): search, map and help-bot gaps (site review pass 8, item 2) ----------
+// Places with any columns (kid_friendly, dog_friendly ...) and What's On events, removed afterwards.
+function r9Fixtures({ venues = [], events = [] }, fn) {
+  const madeV = [], madeE = [];
+  const day = app.addLocalDays(app.todayLocal(), 4);
+  for (const row of venues) {
+    const r = { description: 'Round 9 fixture.', rating: 4.3, reviews: 40, ...row };
+    r.slug = r.slug || app.slugify(r.name);
+    const cols = Object.keys(r);
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c]));
+    madeV.push(db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(r.slug, r.region));
+  }
+  for (const [name, description, cats, region = 'vernon'] of events) {
+    const eid = db.prepare('INSERT INTO events (name, slug, region, description, start_datetime) VALUES (?, ?, ?, ?, ?)').run(name, app.slugify(name), region, description, `${day} 19:00:00`).lastInsertRowid;
+    db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time) VALUES (?, ?, ?, ?, ?)').run(eid, day, day, '19:00', '21:00');
+    cats.forEach((c, i) => db.prepare('INSERT INTO event_categories (event_id, category_key, position) VALUES (?, ?, ?)').run(eid, c, i));
+    madeE.push(eid);
+  }
+  return Promise.resolve().then(() => fn(madeV)).finally(() => {
+    for (const eid of madeE) { db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(eid); db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(eid); db.prepare('DELETE FROM events WHERE id = ?').run(eid); }
+    for (const v of madeV) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  });
+}
+const R9_EVENTS = [
+  ['R9 Hungry for Laughs Comedy Tour', 'A night of stand-up from touring comedians.', ['arts-culture']],
+  ['R9 Little Shop of Horrors', 'The cult musical on stage at the community theatre.', ['arts-culture']],
+  ['R9 Okanagan Symphony Holiday Concert', 'The Okanagan Symphony Orchestra plays seasonal favourites.', ['live-music']],
+  ['R9 Jazz Trio Night', 'A jazz trio plays standards in the lounge.', ['live-music']],
+  ['R9 Fall Art Exhibition', 'An exhibition of new paintings by local artists.', ['arts-culture']],
+  ['R9 Haunted Corn Maze', 'A spooky maze through the corn, with a show at the end.', ['holiday-seasonal']],
+  ['R9 New Year Celebration', 'Live bands, then fireworks over the lake at midnight.', ['events-festivals']],
+];
+const r9Names = (list) => list.map((x) => x.name || (x.row && x.row.name)).filter((n) => /^R9 /.test(n));
+
+test('Round 9 search: French and English show words read as shows, comedy, theatre, music and fireworks', () => {
+  const t = (q, lang = 'en') => app.discoverySearchText(q, lang);
+  assert.equal(t('comédie', 'fr'), 'comedy');
+  assert.equal(t('comedie', 'fr'), 'comedy');
+  assert.equal(t('humoriste', 'fr'), 'comedian');
+  assert.equal(t('spectacle', 'fr'), 'shows');
+  assert.equal(t('pièce de théâtre', 'fr'), 'theatre show');
+  assert.equal(t('musique classique', 'fr'), 'classical music');
+  assert.equal(t('musique live', 'fr'), 'live music');
+  assert.equal(t('sources chaudes', 'fr'), 'hot springs');
+  assert.equal(t('feux d’artifice', 'fr'), 'fireworks');
+  assert.equal(t('stand-up'), 'comedy');
+  assert.equal(t('stand up comedy in kelowna'), 'comedy in kelowna');
+  assert.equal(t('stand up paddleboarding'), 'paddleboarding', 'stand-up paddling is not comedy');
+  assert.equal(t('xmas'), 'christmas');
+  assert.equal(t('xmas market'), 'christmas market');
+  assert.equal(t('apple picking'), 'u-pick orchard');
+  // What counts as a show.
+  const kind = (name, description = '', categories = []) => app.searchShowKind({ name, description, categories });
+  assert.equal(kind('Hungry for Laughs Comedy Tour'), 'comedy');
+  assert.equal(kind('Little Shop of Horrors', 'The cult musical.'), 'theatre');
+  assert.equal(kind('Jazz Trio Night', '', ['live-music']), 'music');
+  assert.equal(kind('Fall Art Exhibition', 'An exhibition of paintings.', ['arts-culture']), null);
+  assert.equal(kind('Square One: Under $500 Art Show & Sale'), null, 'an art sale is not a show');
+  assert.equal(kind('Haunted Corn Maze', 'with a show at the end'), null);
+  assert.equal(kind('Stand Up Paddle Tour'), null);
+});
+
+test('Round 9 search: « spectacle », "show", comedy, theatre, classical music, live music and fireworks list their events', () => withDiscoveryFlag('on', () => r9Fixtures({
+  venues: [
+    { name: 'R9 Playhouse Theatre', region: 'vernon', type: 'indoor', description: 'A community theatre with plays all year.' },
+    { name: 'R9 Bowling Lanes', region: 'vernon', type: 'indoor', description: 'Ten-pin bowling.' },
+    { name: 'R9 Fruit Stand', region: 'vernon', type: 'tour', description: 'A roadside fruit stand.' },
+    { name: 'R9 Live Music Pub', region: 'vernon', type: 'pub', description: 'Live music every Friday.', live_music: 1 },
+  ],
+  events: R9_EVENTS,
+}, () => withDiscoveryServer(async (base) => {
+  const plan = (q, lang = 'en') => app.smartSearchPlan(app.discoverySearchText(q, lang));
+  for (const [q, lang] of [['spectacle', 'fr'], ['show'], ['shows'], ['un spectacle à Vernon', 'fr']]) {
+    const p = plan(q, lang);
+    assert.equal(p.key, 'topic_shows', q);
+    assert.deepEqual(p.list(), [], 'no place is a show');
+    const names = r9Names(p.events().items);
+    assert.equal(names[0], 'R9 Hungry for Laughs Comedy Tour', `${q}: comedy first (${names.join(' | ')})`);
+    assert.ok(names.includes('R9 Little Shop of Horrors') && names.includes('R9 Jazz Trio Night'), q);
+    assert.ok(!names.includes('R9 Fall Art Exhibition') && !names.includes('R9 Haunted Corn Maze'), `${q}: no exhibition or corn maze`);
+  }
+  assert.equal(plan('spectacle', 'fr').headingFr, 'Spectacles');
+  assert.equal(plan('show in vernon').heading, 'Shows in Vernon');
+  // Classical music and fireworks: only those events.
+  const classical = plan('musique classique', 'fr');
+  assert.equal(classical.key, 'topic_classical');
+  assert.deepEqual(r9Names(classical.events().items), ['R9 Okanagan Symphony Holiday Concert']);
+  assert.deepEqual(r9Names(plan('fireworks').events().items), ['R9 New Year Celebration']);
+  assert.deepEqual(r9Names(plan('feux d’artifice', 'fr').events().items), ['R9 New Year Celebration']);
+  // Theatre: the theatres (not every indoor place) and their shows.
+  for (const [q, lang] of [['theatre'], ['théâtre', 'fr'], ['pièce de théâtre', 'fr']]) {
+    const p = plan(q, lang);
+    assert.equal(p.key, 'theatre', q);
+    assert.deepEqual(r9Names(p.list()), ['R9 Playhouse Theatre'], q);
+    const ev = r9Names(p.events().items);
+    assert.equal(ev[0], 'R9 Little Shop of Horrors', q);
+    assert.ok(!ev.includes('R9 Jazz Trio Night') && !ev.includes('R9 Fall Art Exhibition'), q);
+  }
+  // Comedy words go to the comedy events (stand-up never lists the fruit stand).
+  for (const [q, lang] of [['comédie', 'fr'], ['humoriste', 'fr'], ['stand-up']]) {
+    const run = app.runDiscovery(app.discoverySearchText(q, lang), { lang });
+    assert.equal(run.results.kind, 'events', q);
+    assert.deepEqual(r9Names(run.results.items), ['R9 Hungry for Laughs Comedy Tour'], q);
+  }
+  const standUp = await (await fetch(`${base}/search?q=stand-up`)).text();
+  assert.ok(standUp.includes('R9 Hungry for Laughs Comedy Tour') && !standUp.includes('R9 Fruit Stand'));
+  // Live music keeps its places and adds an events block, on both languages.
+  const run = app.runDiscovery('live music');
+  assert.ok(r9Names(run.results.items || []).includes('R9 Live Music Pub'));
+  assert.ok(r9Names(run.events.items).includes('R9 Jazz Trio Night') && !r9Names(run.events.items).includes('R9 Hungry for Laughs Comedy Tour'));
+  const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('musique live')}`)).text();
+  assert.match(fr, /<h2 id="searchEventsHead">Événements \(\d+\)<\/h2>/);
+  assert.ok(fr.includes('R9 Jazz Trio Night') && fr.includes('R9 Live Music Pub'));
+  const spectacle = await (await fetch(`${base}/fr/search?q=spectacle`)).text();
+  assert.ok(spectacle.indexOf('R9 Hungry for Laughs Comedy Tour') > 0 && !spectacle.includes('R9 Fall Art Exhibition'));
+  assert.match(spectacle, /Vous avez cherché « spectacle » : <strong>Spectacles<\/strong>/);
+  const xmas = app.runDiscovery(app.discoverySearchText('xmas'));
+  assert.equal(xmas.results.kind, 'events', 'xmas reads as Christmas');
+}))));
+
+test('Round 9 search: hot springs, kids and dogs, apple picking, museums and Vernon wineries rank the right places first', () => withDiscoveryFlag('on', () => r9Fixtures({
+  venues: [
+    { name: 'R9 Thermal Spa', region: 'penticton', type: 'indoor', description: 'Saunas, cold plunges and a steam room.' },
+    { name: 'R9 Karat Chocolate', region: 'penticton', type: 'cafe', description: 'Hot chocolate and handmade truffles.' },
+    { name: 'R9 Kid Winery', region: 'kelowna', type: 'winery', description: 'Wine tastings.', kid_friendly: 1, dog_friendly: 1, rating: 4.9, reviews: 900 },
+    { name: 'R9 Kid Cafe', region: 'kelowna', type: 'cafe', description: 'A family cafe.', kid_friendly: 1, dog_friendly: 1, rating: 4.1, reviews: 20 },
+    { name: 'R9 Apple Distillery', region: 'kelowna', type: 'distillery', description: 'Apple brandy made from fruit we pick nearby.' },
+    { name: 'R9 U-Pick Orchard', region: 'kelowna', type: 'tour', description: 'U-pick apples every fall.' },
+    { name: 'R9 History Museum', region: 'vernon', type: 'indoor', description: 'Local history.' },
+    { name: 'R9 Climbing Gym', region: 'vernon', type: 'indoor', description: 'Bouldering walls.' },
+    { name: 'R9 Vernon Winery', region: 'vernon', type: 'winery', description: 'Wine tastings.' },
+  ],
+}, () => withDiscoveryServer(async (base) => {
+  const plan = (q, lang = 'en') => app.smartSearchPlan(app.discoverySearchText(q, lang));
+  assert.deepEqual(r9Names(plan('sources chaudes', 'fr').list()), ['R9 Thermal Spa']);
+  for (const [q, lang] of [['museum'], ['musée', 'fr'], ['museums in vernon']]) {
+    const p = plan(q, lang);
+    assert.equal(p.key, 'museum', q);
+    assert.deepEqual(r9Names(p.list()), ['R9 History Museum'], `${q}: museums only`);
+  }
+  const page = async (q, lang = 'en') => (await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`)).text();
+  const order = (html, a, b) => { const i = html.indexOf(a), j = html.indexOf(b); assert.ok(i > 0, a); return j < 0 || i < j; };
+  assert.ok(order(await page('kid friendly'), 'R9 Kid Cafe', 'R9 Kid Winery'), 'kids: not a winery first');
+  assert.ok(order(await page('avec chien', 'fr'), 'R9 Kid Cafe', 'R9 Kid Winery'), 'dogs: not a winery first');
+  assert.ok(app.searchPartyOnly({ features: ['kid_friendly'], types: [], cuisines: [], textTerms: [], collections: [], activities: [] }));
+  assert.ok(!app.searchPartyOnly({ features: ['kid_friendly'], types: ['winery'], cuisines: [], textTerms: [], collections: [], activities: [] }), 'kid-friendly wineries keep their order');
+  assert.ok(order(await page('apple picking'), 'R9 U-Pick Orchard', 'R9 Apple Distillery'), 'apple picking: the U-pick first');
+  const vernon = app.runDiscovery('vernon wineries');
+  assert.ok(r9Names(vernon.results.items).includes('R9 Vernon Winery'));
+  assert.ok(vernon.results.items.every((x) => x.region === 'vernon' && x.type === 'winery'), JSON.stringify(vernon.results.items.map((x) => x.name)));
+}))));
+
+test('Round 9 map: typo correction, « marché » is farmers\' markets, French links, the radius message and the French placeholder', async () => {
+  await withDiscoveryServer(async (base) => {
+    const en = await (await fetch(`${base}/map`)).text();
+    const fr = await (await fetch(`${base}/fr/map`)).text();
+    const vm = require('node:vm');
+    const reader = (html) => {
+      const c = JSON.parse(html.match(/CONF = (\{.*?\});/)[1]);
+      const m = html.match(/<script type="application\/json" id="pmFrWords">([\s\S]*?)<\/script>/);
+      const list = m ? JSON.parse(m[1]) : null;
+      const document = { getElementById: (id) => (id === 'pmFrWords' && list ? { textContent: JSON.stringify(list) } : null) };
+      const ctx = { CONF: c, document, okanaganClock: () => ({ minutes: 600 }), WEEK: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], NEG: ' no not without except avoid never nothing sans pas ni aucun aucune ' };
+      vm.runInNewContext(`${html.slice(html.indexOf('  // Plain words become filters'), html.indexOf('  var wantNear = false;'))}; this.parseWords = parseWords; this.WORD_TO = WORD_TO; this.fixTypos = fixTypos; this.STOP = STOP;`, ctx);
+      const read = (q) => { const fx = ctx.fixTypos(q); return { fixes: JSON.parse(JSON.stringify(fx.fixes)), words: ctx.parseWords(fx.text).map((w) => (w[0] === '#' ? `#${c.tg[Number(w.slice(1))].k}` : ctx.WORD_TO[w] || w)).join(' ') }; };
+      read.STOP = ctx.STOP;
+      return read;
+    };
+    const rEn = reader(en), rFr = reader(fr);
+    // The site search's own typo rule, on the words the map reads.
+    assert.deepEqual(rEn('brewry'), { fixes: [{ from: 'brewry', to: 'brewery' }], words: '#brewery' });
+    assert.deepEqual(rEn('winary in oliver').words, 'wine @oliver');
+    assert.deepEqual(rFr('vignobel'), { fixes: [{ from: 'vignobel', to: 'vignoble' }], words: 'wine' });
+    assert.deepEqual(rEn('pizza').fixes, [], 'a real word is never touched');
+    assert.equal(app.searchTypoWord('brewry', ['brewery', 'breweries'], () => false), 'brewery');
+    assert.equal(app.searchTypoWord('brewry', ['brewery'], (w) => w === 'brewry'), null, 'a known word (a place\'s name) stays');
+    assert.ok(en.includes("return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; })"), 'the correction is named, as on /search');
+    assert.match(fr, /Nous avons lu ' \+ f\.map/);
+    // « marché » alone is the farmers' markets; longer phrases keep their meaning.
+    assert.equal(rFr('marché').words, 'farmers market');
+    assert.equal(rFr('marché de Noël').words, 'christmas market');
+    assert.equal(app.mapFrWords().marche, 'farmers market');
+    assert.equal(app.frSearchSynonyms('marché'), 'market', 'the site search keeps its own reading');
+    // French links: places always, events when they have a French page.
+    for (const src of ['hrefAttr(p.fu || p.url)', 'hrefAttr(e.fu || e.url)', "fu: FR ? '/fr' + a[5] : ''", "fu: FR && a[11] ? '/fr' + a[1] : ''"]) assert.ok(fr.includes(src), src);
+    assert.equal((fr.match(/class="pm-link" ' \+ hrefAttr\(x\.fu \|\| x\.url\)/g) || []).length, 2, 'both Détails links');
+    // A new search clears the last one's distance message and starts from 5 km.
+    assert.ok(en.includes("setStatus(''); readSearch(v, false);") && en.includes('if (me && !radiusFixed && !town) radiusKm = 5;'));
+    // The French placeholder, and its words read as Patio and Dogs.
+    assert.ok(fr.includes('placeholder="Ex. « terrasse, chiens acceptés »"'), 'placeholder');
+    assert.ok(fr.includes("'Ex. « terrasse, chiens acceptés »'"), 'first hint');
+    assert.equal(rFr('terrasse, chiens acceptés').words, 'patio dogs acceptés');
+    assert.ok(rFr.STOP.includes(' acceptés '), 'acceptés is a filler word');
+  });
+  // Each event says whether it has a French page.
+  return r9Fixtures({ events: [['R9 Map Only English Event', 'A fixture with no French translation.', ['community-events'], 'kelowna']] }, () => {
+    const row = app.mapEventsData().find((e) => e[0] === 'R9 Map Only English Event');
+    assert.ok(row, 'listed');
+    assert.equal(row[11], app.hasFrenchTwin(row[1]) ? 1 : 0);
+    assert.equal(row[11], 0);
+  });
+});
+
+test('Round 9 help bot: a week\'s closure in French, uploading a menu, privacy, and who else can edit', () => {
+  const fr = ohbMatcher('edit', { lang: 'fr' }), en = ohbMatcher('edit');
+  const id = (m, q) => { const r = m(q); return r ? [r.id, r.lang] : null; };
+  assert.deepEqual(id(fr, 'nous sommes fermés pour une semaine'), ['closures', 'fr']);
+  assert.deepEqual(id(fr, 'fermé la semaine prochaine'), ['closures', 'fr']);
+  assert.deepEqual(id(en, 'my business is closed for a week, how do I show that'), ['closures', 'en']);
+  assert.deepEqual(id(en, 'how do I upload a menu'), ['menu-add', 'en']);
+  assert.deepEqual(id(fr, 'téléverser mon menu'), ['menu-add', 'fr']);
+  assert.deepEqual(id(en, 'upload photos'), ['photo-add', 'en'], 'photos are still photos');
+  assert.deepEqual(id(en, 'is my info public'), ['privacy', 'en']);
+  assert.deepEqual(id(fr, 'mes infos sont-elles publiques'), ['privacy', 'fr']);
+  assert.deepEqual(id(en, 'can other people edit my listing'), ['access', 'en']);
+  assert.deepEqual(id(en, 'I manage two restaurants'), ['more-businesses', 'en'], 'a second business is still a second business');
+  assert.equal(en('the private link doesnt work').id, 'newlink');
+  const cfg = ohbConfig(app.ownerHelpWidgetHtml('edit', { lang: 'fr' }));
+  const privacy = cfg.topics.find((t) => t.id === 'privacy');
+  assert.match(privacy.a, /href="\/privacy"/);
+  assert.match(privacy.aFr, /href="\/fr\/privacy"/);
+  assert.equal(privacy.qFr, 'Mes renseignements sont-ils publics?');
+});
+
+test('Round 9 claim page: « gérant d’Ancient… » before a vowel, and no space before a question mark', () => r9Fixtures({
+  venues: [{ name: 'Ancient R9 Test Winery', region: 'kelowna', type: 'winery' }, { name: 'Quails R9 Test Winery', region: 'kelowna', type: 'winery' }],
+}, ([ancient, quails]) => {
+  assert.equal(app.claimFrDe('Ancient Hill Winery'), 'd’Ancient Hill Winery');
+  assert.equal(app.claimFrDe('Élevage'), 'd’Élevage');
+  assert.equal(app.claimFrDe('Hester Creek'), 'de Hester Creek');
+  assert.equal(app.claimFrDe('Quails’ Gate'), 'de Quails’ Gate');
+  const fr = app.renderClaimPage(ancient, 'fr');
+  assert.ok(fr.includes('Vous êtes propriétaire ou gérant d’Ancient R9 Test Winery? Dites-nous'), 'elided');
+  assert.ok(app.renderClaimPage(quails, 'fr').includes('propriétaire ou gérant de Quails R9 Test Winery?'));
+  assert.doesNotMatch(fr.replace(/<script[\s\S]*?<\/script>/g, ''), /[   ]\?/, 'no space before ?');
+  assert.ok(app.renderClaimPage(ancient, 'en').includes('Own or manage Ancient R9 Test Winery?'));
+}));
