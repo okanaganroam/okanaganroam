@@ -5086,7 +5086,7 @@ test('Stage 5C V3: no same-name notice; stop buttons carry refs; "Add whole trip
   assert.ok(!html.includes('t3-samename') && !html.includes('My Trip lists places by name'), 'the obsolete notice is gone');
   assert.ok(html.includes(`(v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '')`));
   assert.ok(html.includes(`(e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '')`));
-  assert.ok(html.includes("var n = b.getAttribute('data-trip-ref') || b.getAttribute('data-trip-name');"));
+  assert.ok(html.includes("var n = tripKey(b) || b.getAttribute('data-trip-name');")); // one stop per ref, and per day for a repeated place (2026-10-19)
   // The share link (Stage 5A) and the V3 events are byte-for-byte what they were.
   for (const s of ["add('pin'", "add('avoid'", "add('rm'", "add('keep'", "add('skip'", "track('trip_plan_share', { share_method: method, plan_kind: f.plan_kind, day_count: f.day_count })", "track('trip_plan_edit', { edit_action: 'remove', plan_kind: planFacts(state.last).plan_kind })"]) assert.ok(html.includes(s), s);
   const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
@@ -10688,6 +10688,38 @@ test('Trip itinerary (server): dinner + a hockey game, a family activity + an ev
   }
 });
 
+// Build My Trip pass 6 (2026-10-19): a comedian listed under Live Music is found by "comedy show" (by its
+// description) and is never a live-music evening; Swap's new optional body field is validated.
+test('Trip pass 6 (server): "comedy show this week" finds a comedian’s show; live music leaves it out; swap is validated', () => withPlannerFlag('on', () => withDiscoveryServer(async (base) => {
+  const meta = { reason: 'trip pass 6 fixture', batch_id: 'test-trip-pass6' };
+  const now = new Date('2030-10-07T17:00:00Z'); // Monday 2030-10-07, Okanagan
+  const ids = [];
+  try {
+    for (const [name, description, cats, date] of [['TP6 Danny Bhoy Live', 'Scottish comedian TP6 returns with a stand-up and theatre hybrid.', ['live-music'], '2030-10-09'], ['TP6 Evening Jazz Trio', 'A jazz trio plays standards.', ['live-music'], '2030-10-09']]) {
+      const r = app.createEvent({ name, region: 'kelowna', description, source_type: 'official_venue', source_name: 'Fixture Theatre', source_url: `https://example.com/${app.slugify(name)}`, venue_name_text: 'Fixture Theatre', categories: cats, occurrences: [{ start_date: date, start_time: '19:30', end_time: '22:00' }] }, meta);
+      assert.equal(r.ok, true, JSON.stringify(r));
+      ids.push(r.event.id);
+    }
+    const comedy = app.runTripPlan({ text: 'comedy show Kelowna this week' }, now);
+    assert.equal(comedy.kind, 'events');
+    assert.ok(comedy.events.some((e) => e.name === 'TP6 Danny Bhoy Live'), JSON.stringify(comedy.events.map((e) => e.name)));
+    assert.ok(!comedy.events.some((e) => e.name === 'TP6 Evening Jazz Trio'));
+    const music = app.runTripPlan({ text: 'live music every evening in Kelowna 2 days', overrides: { startDate: '2030-10-09' } }, now);
+    assert.ok((music.days || []).some((d) => d.stops.some((s) => s.event && s.event.name === 'TP6 Evening Jazz Trio')), JSON.stringify((music.days || []).map((d) => d.stops.map((s) => s.event ? s.event.name : s.daypart))));
+    assert.ok(!(music.days || []).some((d) => d.stops.some((s) => s.event && s.event.name === 'TP6 Danny Bhoy Live')), 'a comedian is not live music');
+    const post = (body) => fetch(`${base}/api/trip/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    for (const bad of [{ text: 'x', swap: { key: '1-noon', type: 'winery' } }, { text: 'x', swap: { key: '1-morning', type: 'Winery!' } }, { text: 'x', swap: { key: '1-morning', type: 'winery', extra: 1 } }, { text: 'x', swap: [] }]) assert.equal((await post(bad)).status, 400, JSON.stringify(bad));
+    assert.equal((await post({ text: 'Plan 2 days in Kelowna', swap: { key: '1-afternoon', type: 'winery' } })).status, 200);
+  } finally {
+    for (const id of ids) {
+      db.prepare('DELETE FROM event_enrichment_log WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_categories WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id);
+      db.prepare('DELETE FROM events WHERE id = ?').run(id);
+    }
+  }
+})));
+
 test('Trip itinerary (server): "live music" / "concert at night" pick a real evening music performance, never a daytime children’s musical', () => {
   const meta = { reason: 'trip event intent fixture', batch_id: 'test-trip-event-intent' };
   const mk = (name, categories, start) => {
@@ -13897,7 +13929,8 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
   // The planner also uses requestType to preserve the current itinerary when
   // an edit would lose a matched activity; remaining uses should be analytics.
   assert.ok(js.includes("t3EditLosesMatch(state.last,res.j)"), 'edit safety guard remains');
-  for (const use of js.split('\n').filter((l) => /\brequestType\b/.test(l) && !/requestType: '|requestType: arrival|var requestType = /.test(l) && !/t3EditLosesMatch/.test(l))) assert.match(use, /track\(|facts\.request_type = requestType/, use.trim());
+  // 2026-10-19: a failed edit also restores the exclusions it added (state.exclude), so the next Swap still works.
+  for (const use of js.split('\n').filter((l) => /\brequestType\b/.test(l) && !/requestType: '|requestType: arrival|var requestType = /.test(l) && !/t3EditLosesMatch/.test(l) && !/state\.exclude = \(state\.lastReq\.exclude \|\| \[\]\)\.slice\(\);$/.test(l.trim()))) assert.match(use, /track\(|facts\.request_type = requestType/, use.trim());
   // V2 untouched.
   const v2 = app.renderTripPlannerPage(true);
   for (const s of ['facts.pace', "'restore'", 'arrival']) assert.ok(!v2.includes(s), s);
@@ -17093,7 +17126,7 @@ test('Build My Trip wine tour (server): "wine tour Oliver Osoyoos 2 days" plans 
 test('My Trip page: stops saved with a planner day are grouped by day even when older stops have none', () => {
   const html = app.renderMyTripPage({ lang: 'en' });
   assert.match(html, /var byDay = stops\.length && stops\.some\(function\(s\)\{ return s\.day > 0; \}\);/);
-  assert.match(html, /refs\.some\(function\(x\)\{ return days\[x\.ref\]; \}\)/);
+  assert.match(html, /refs\.some\(function\(x\)\{ return days\[keyOf\(x\)\]; \}\)/); // keyed by ref, or ref@day for a repeated place (2026-10-19)
   assert.match(app.renderMyTripPage({ lang: 'fr' }), /Itinéraire du jour \{d\} dans Google Maps/);
 });
 

@@ -500,6 +500,8 @@ function eventMatches(event,item) {
   if (item.eventKind === 'show' && !(event.categories || []).some(c => ['arts-culture','live-music','nightlife'].includes(c)) && !/\b(?:show|shows|comedy|concert|theatre|theater|performance|musical|play)\b/.test(norm(event.name || ''))) return false;
   if (item.nameTerms?.length && !item.nameTerms.every(term => norm(event.name || '').split(' ').includes(term))) return false;
   if(item.value !== 'any' && !(event.categories || []).includes(item.value)) return false;
+  // A comedian listed under Live Music is not live music (2026-10-19).
+  if((item.value === 'live-music' || ['live-music','concert'].includes(item.eventKind)) && /\b(?:comedian|comedians|stand up comedy|standup comedy|comedy tour|comedy show|comedy night)\b/.test(norm(`${event.name || ''} ${event.description || ''}`))) return false;
   if(item.eventKind === 'hockey') return /\b(?:hockey|nhl|whl|bchl)\b/.test(norm(`${event.name || ''} ${event.description || ''}`));
   return true;
 }

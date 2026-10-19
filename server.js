@@ -4054,6 +4054,8 @@ function searchEventRankWords(text) {
   const towns = new Set(Object.values(REGION_LABELS).flatMap((t) => smartFold(t).split(' ')));
   return uniqueList(smartFold(text).split(' ').filter((w) => w.length > 1 && !SEARCH_EVENT_RANK_SKIP.has(w) && !towns.has(w)));
 }
+// "Comedy show" also finds a comedian's own show (2026-10-19: "Danny Bhoy Live", a Scottish comedian, was missing).
+const DISCOVERY_EVENT_TERM_SYNONYMS = { comedy: ['comedian', 'comedians', 'comedic', 'stand up', 'standup', 'improv'] };
 function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null, opts = {}) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(intent.when, now), now);
@@ -4061,7 +4063,7 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
   if (intent.textTerms.length) {
     events = events.filter((e) => {
       const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
-      return intent.textTerms.every((t) => discoveryTextHas(text, t));
+      return intent.textTerms.every((t) => discoveryTextHas(text, t) || (DISCOVERY_EVENT_TERM_SYNONYMS[t] || []).some((w) => discoveryTextHas(text, w)));
     });
   }
   // A named holiday ("Halloween events", "Christmas markets") narrows the Holiday & Seasonal category to that holiday
@@ -4088,6 +4090,8 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
   const items = events.slice(0, limit).map((e) => ({
     id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
     categories: e.categories || [], dateLabel: e.dateLabel || '', time: whatsOnCardTime(e),
+    // The start of the description (2026-10-19), so "a comedy show" can tell a comedian's show from a concert.
+    ...(e.description ? { description: String(e.description).slice(0, 240) } : {}),
   }));
   return { total: events.length, items, window: { from: win.from, to: win.to, preset: win.preset } };
 }
@@ -5640,7 +5644,7 @@ const TRIP_PLAN_MAX_IDS = 200;
 const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|late|evening|night)$/; // late: a wine day's late-afternoon tasting; night: an event on an evening with dinner (2026-10-18)
 // Validates the POST /api/trip/plan body; returns { error } or { value }.
 function parseTripPlanBody(body) {
-  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides'];
+  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap'];
   const unexpected = Object.keys(body || {}).filter((k) => !allowed.includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
   const text = body.text;
@@ -5688,7 +5692,15 @@ function parseTripPlanBody(body) {
     if(o.dayStartMinutes!==undefined&&(!o.dayStartMinutes||typeof o.dayStartMinutes!=='object'||Array.isArray(o.dayStartMinutes)||Object.keys(o.dayStartMinutes).length>7||!Object.entries(o.dayStartMinutes).every(([d,m])=>/^[1-7]$/.test(d)&&Number.isInteger(m)&&m>=0&&m<1440)))return {error:'Invalid dayStartMinutes.'};
     overrides = { ...o };
   }
-  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides } };
+  // Swap (2026-10-19), optional: the slot being swapped and the kind of place it held, so the new stop is the same
+  // kind (a winery for a winery, never a waterfall in a wine plan).
+  let swap = null;
+  if (body.swap !== undefined) {
+    const w = body.swap;
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '')) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>" }.' };
+    swap = { key: w.key, type: w.type };
+  }
+  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap } };
 }
 
 // The weekday of day 1, only when the request names a date ("tonight",
@@ -5870,7 +5882,7 @@ function buildTripPlannerTaxonomy() {
   const taxonomy = buildDiscoveryTaxonomy();
   return { ...taxonomy, types: [...new Set([...taxonomy.types, ...Object.keys(CATEGORY_SLUGS)])].filter((t) => !TRIP_PLANNER_DROPPED_TYPES.has(t)), venues: taxonomy.venues.filter((v) => !TRIP_PLANNER_DROPPED_TYPES.has(v.type)) };
 }
-function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null }, now = new Date()) {
+function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
   // Calendar dates are handled by requirements, not mistaken for a day count.
@@ -5931,6 +5943,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // (every existing caller) nothing below changes.
   if (overrides) {
     if (overrides.durationMinutes !== undefined && requirements?.items.some(i=>i.kind==='duration')) requirements.items=requirements.items.map(i=>i.kind==='duration'?{...i,value:overrides.durationMinutes,sourceText:'Updated time budget'}:i);
+    // A length chosen for a request that had none ("dog-friendly Vernon") makes it a day-by-day plan (2026-10-19).
+    if (overrides.days !== undefined && ['find', 'recommend'].includes(intent.mode)) intent.mode = 'plan';
     if (overrides.days !== undefined) { if (intent.mode === 'plan') intent.days = overrides.days; if (requirements) requirements.items = requirements.items.filter(i => i.kind !== 'days').concat({ id: 'override-days', kind: 'days', value: overrides.days, strength: 'must', dayIndex: null, sourceText: 'Updated trip length' }); }
     if (overrides.pace !== undefined) intent.pace = overrides.pace;
     if (overrides.baseRegion !== undefined) {
@@ -5949,10 +5963,14 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     const appliedExclusions = appliedTripExclusions(plan, intent, taxonomy);
     if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
     const result = tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).flatMap((d) => d.regions || [d.region]) });
+    // "No driving after 7pm" is applied by the planner (2026-10-19), so it is never listed as not used.
+    if (requirements?.items.some(i=>i.kind==='evening_walk')) result.notUsed = (result.notUsed || []).filter(u=>!/\b(?:driv\w*|car)\b/i.test(String(u)));
     if (requirements?.items.some(i=>i.kind==='transport')) {
       const consumed = requirementModule.consumedTerms(requirements);
       result.notUsed = result.notUsed.filter(u=>discoveryIntentModule().normalizeDiscoveryText(u).split(' ').every(w=>consumed.has(w)) === false);
     }
+    // No length in the request (2026-10-19): the page asks for one.
+    result.lengthAsked = intent.days != null || overrides?.days !== undefined || !!requirements?.items.some(i=>i.kind==='days');
     if (requirements?.startDate) {const endDate=(plan.days || []).at(-1)?.date || requirements.endDate || requirements.startDate;const nice=(iso)=>{const d=new Date(`${iso}T12:00:00Z`);return Number.isFinite(d.getTime())?`${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()]}, ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]} ${d.getUTCDate()}`:iso;};result.when = endDate!==requirements.startDate ? `${nice(requirements.startDate)} – ${nice(endDate)}` : nice(requirements.startDate);result.season=null;}
     return result;
   };
@@ -6072,6 +6090,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     excludeIds: excludeVenueIds,
     avoidIds: avoidVenueIds,
     pinned,
+    swap,
     events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || familyEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
     familyEvents: !!familyEvents,
     tripDate: requirements?.startDate || tripPlanDate(intent.when, now),
@@ -32176,6 +32195,7 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-day-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin: 0 0 10px; }
   body.my-trip-page .mt-day-head h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.3rem; margin: 0; }
   body.my-trip-page .mt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  body.my-trip-page .mt-drive { list-style: none; margin: 0 0 8px; padding: 8px 12px; border-left: 3px solid var(--teal, #1F5C5C); font-weight: 700; font-size: 0.92rem; }
   body.my-trip-page .mt-stop { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px; border-radius: 14px; background: var(--paper, #fffaf2); box-shadow: 0 8px 20px -16px rgba(74,52,40,0.45); }
   body.my-trip-page .mt-photo { width: 120px; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; background: #2A6B67; }
   body.my-trip-page .mt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -32239,6 +32259,12 @@ ${renderGolfHeaderHtml()}
   // The planner's dates and times (2026-10-19): ref -> { d: 'YYYY-MM-DD', s: start minutes, e: end minutes }.
   var times = load(TIMES, {}) || {};
   if (typeof times !== 'object' || Array.isArray(times)) times = {};
+  // Drive legs between towns (2026-10-19): day -> { f: from, t: to, a: min, b: max minutes }, a row of their own.
+  var DRIVES = 'okanaganTripDrives', drives = load(DRIVES, {}) || {};
+  if (typeof drives !== 'object' || Array.isArray(drives)) drives = {};
+  // The same place on another planned day is its own stop (2026-10-19): its days and times are kept under key
+  // "venue:12@2" (ref @ day) rather than its ref.
+  function keyOf(t){ return (t && t.key) || (t && t.ref) || null; }
   var params = new URLSearchParams(location.search);
   var shared = (params.get('stops') || '').split(',').filter(function(r){ return REF.test(r); }).slice(0, ${MY_TRIP_MAX_REFS});
   var sharedDays = (params.get('days') || '').split(',').map(function(n){ return parseInt(n, 10) || 0; });
@@ -32258,6 +32284,10 @@ ${renderGolfHeaderHtml()}
     if (isFr) return h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '');
     return (h % 12 || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + (h < 12 ? ' AM' : ' PM');
   }
+  function driveText(x){
+    var a = Number(x.a) || null, b = Number(x.b) || null, mins = a && b && a !== b ? (isFr ? a + ' à ' + b : a + '–' + b) : String(b || a || '');
+    return isFr ? 'Trajet de ' + x.f + ' à ' + x.t + (mins ? ' : environ ' + mins + ' min (estimation)' : '') : 'Drive from ' + x.f + ' to ' + x.t + (mins ? ': about ' + mins + ' min (estimate)' : '');
+  }
   function timeText(t){ return t && Number.isFinite(t.s) ? clockText(t.s) + (Number.isFinite(t.e) ? (isFr ? '–' : ' – ') + clockText(t.e) : '') : ''; }
   var viewing = shared.length ? 'shared' : 'mine';
   var info = {}, map = null, layer = null;
@@ -32265,7 +32295,7 @@ ${renderGolfHeaderHtml()}
   function status(t){ var s = el('mtStatus'); s.textContent = ''; setTimeout(function(){ s.textContent = t; }, 30); }
   function list(){
     if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: sharedStart && sharedDays[i] ? { d: addDays(sharedStart, sharedDays[i] - 1) } : null }; });
-    return trip.map(function(t){ return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (t.ref && days[t.ref]) || 0, time: t.ref && times[t.ref] || null, raw: t }; });
+    return trip.map(function(t){ var k = keyOf(t); return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (k && days[k]) || 0, time: k && times[k] || null, raw: t }; });
   }
   function fetchInfo(refs){
     var need = refs.filter(function(r){ return r && !info[r]; });
@@ -32307,7 +32337,7 @@ ${renderGolfHeaderHtml()}
       var gDate = g.key ? g.stops.map(function(x){ return x.s.time && x.s.time.d; }).filter(Boolean)[0] : null;
       return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
         '<a class="mt-btn" href="' + esc(dirUrl(g.stops.map(function(x){ return x.s; }))) + '" target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
-        '<ol class="mt-list">' + g.stops.map(function(x){
+        '<ol class="mt-list">' + (g.key && mine && drives[g.key] && drives[g.key].f && drives[g.key].t ? '<li class="mt-drive">' + esc(driveText(drives[g.key])) + '</li>' : '') + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
           var name = d.url ? '<a class="mt-name" href="' + esc((document.documentElement.lang === 'fr' && d.urlFr) || d.url) + '">' + esc(d.name || x.s.name) + '</a>' : '<span class="mt-name">' + esc(x.s.name) + '</span>';
           var fr = document.documentElement.lang === 'fr';
@@ -32342,16 +32372,16 @@ ${renderGolfHeaderHtml()}
     var i;
     if (t.hasAttribute('data-mt-up')) { i = +t.getAttribute('data-mt-up'); if (i > 0) { var a = trip[i]; trip[i] = trip[i - 1]; trip[i - 1] = a; status(T.movedUp.replace('{name}', trip[i - 1].name)); } }
     else if (t.hasAttribute('data-mt-down')) { i = +t.getAttribute('data-mt-down'); if (i < trip.length - 1) { var b = trip[i]; trip[i] = trip[i + 1]; trip[i + 1] = b; status(T.movedDown.replace('{name}', trip[i + 1].name)); } }
-    else { i = +t.getAttribute('data-mt-remove'); var gone = trip.splice(i, 1)[0]; if (gone && gone.ref) { delete days[gone.ref]; delete times[gone.ref]; } store(DAYS, days); store(TIMES, times); status(T.removed.replace('{name}', gone ? gone.name : T.theStop)); }
+    else { i = +t.getAttribute('data-mt-remove'); var gone = trip.splice(i, 1)[0]; if (keyOf(gone)) { delete days[keyOf(gone)]; delete times[keyOf(gone)]; } store(DAYS, days); store(TIMES, times); status(T.removed.replace('{name}', gone ? gone.name : T.theStop)); }
     save(); render();
   });
   function tripLink(){
     var refs = trip.filter(function(x){ return x.ref; });
     var url = location.origin + (document.documentElement.lang === 'fr' ? '/fr' : '') + '/my-trip?stops=' + refs.map(function(x){ return x.ref; }).join(',');
-    if (refs.length && refs.some(function(x){ return days[x.ref]; })) url += '&days=' + refs.map(function(x){ return days[x.ref] || 0; }).join(',');
+    if (refs.length && refs.some(function(x){ return days[keyOf(x)]; })) url += '&days=' + refs.map(function(x){ return days[keyOf(x)] || 0; }).join(',');
     // The first planned day's date rides along, so a shared trip keeps its dates.
-    var firstDated = refs.filter(function(x){ return days[x.ref] && times[x.ref] && times[x.ref].d; }).sort(function(a, b){ return days[a.ref] - days[b.ref]; })[0];
-    if (firstDated) url += '&start=' + addDays(times[firstDated.ref].d, 1 - days[firstDated.ref]);
+    var firstDated = refs.filter(function(x){ return days[keyOf(x)] && times[keyOf(x)] && times[keyOf(x)].d; }).sort(function(a, b){ return days[keyOf(a)] - days[keyOf(b)]; })[0];
+    if (firstDated) url += '&start=' + addDays(times[keyOf(firstDated)].d, 1 - days[keyOf(firstDated)]);
     return { url: url, refs: refs };
   }
   function copyNote(refs){
@@ -32375,12 +32405,22 @@ ${renderGolfHeaderHtml()}
   var clearArmed = false;
   el('mtClear').addEventListener('click', function(){
     if (!clearArmed) { clearArmed = true; el('mtClear').textContent = T.tapClear; setTimeout(function(){ clearArmed = false; el('mtClear').textContent = T.clearTrip; }, 4000); return; }
-    trip = []; days = {}; times = {}; save(); store(DAYS, days); store(TIMES, times); clearArmed = false; el('mtClear').textContent = T.clearTrip; status(T.cleared); render();
+    trip = []; days = {}; times = {}; drives = {}; save(); store(DAYS, days); store(TIMES, times); store(DRIVES, drives); clearArmed = false; el('mtClear').textContent = T.clearTrip; status(T.cleared); render();
   });
   el('mtSave').addEventListener('click', function(){
-    trip = []; days = {}; times = {};
-    shared.forEach(function(r, i){ var d = info[r]; if (!d || d.missing) return; trip.push({ ref: r, name: d.name, query: d.query, region: d.region }); if (sharedDays[i]) { days[r] = sharedDays[i]; if (sharedStart) times[r] = { d: addDays(sharedStart, sharedDays[i] - 1) }; } });
-    save(); store(DAYS, days); store(TIMES, times);
+    trip = []; days = {}; times = {}; drives = {};
+    var seenRef = {};
+    shared.forEach(function(r, i){
+      var d = info[r]; if (!d || d.missing) return;
+      var entry = { ref: r, name: d.name, query: d.query, region: d.region };
+      if (seenRef[r] && sharedDays[i]) entry.key = r + '@' + sharedDays[i];
+      if (seenRef[r] && !entry.key) return;
+      seenRef[r] = true;
+      trip.push(entry);
+      var k = keyOf(entry);
+      if (sharedDays[i]) { days[k] = sharedDays[i]; if (sharedStart) times[k] = { d: addDays(sharedStart, sharedDays[i] - 1) }; }
+    });
+    save(); store(DAYS, days); store(TIMES, times); store(DRIVES, drives);
     viewing = 'mine';
     // Fix (2026-10-18): no regex here; this sits in a template string, which ate the backslashes.
     history.replaceState(null, '', (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip');

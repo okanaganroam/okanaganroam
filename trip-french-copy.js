@@ -116,6 +116,15 @@ function t3FrenchText(value){
   ['A drink first','Un verre pour commencer'],['What to expect','À quoi s’attendre'],['Matched an actual listing.','Correspond à une fiche existante.'],
   ['live show','spectacle'],['comedy show','spectacle d’humour']
  );
+ // Reason lines built from a badge, a type and an occasion, or a word in the description (2026-10-19: "Has the Lake View
+ // badge", "A restaurant suits a romantic outing" and "mentions “cozy”" were still English on /fr/trip).
+ const FR_BADGES={'Lake View':'Vue sur le lac',Patio:'Terrasse','Kid-Friendly':'Adapté aux enfants','Dog-Friendly':'Accepte les chiens','Vegan-Friendly':'Options véganes','Vegetarian-Friendly':'Options végétariennes','Gluten-Free':'Sans gluten','Live Music':'Musique en direct','Great for Groups':'Idéal pour les groupes','Happy Hour':'5 à 7','Sports TV':'Sports à la télé','Non-Alcoholic':'Options sans alcool','Non-Alcoholic Options':'Options sans alcool'};
+ const FR_TYPES={restaurant:'Un restaurant',winery:'Un vignoble',cafe:'Un café',café:'Un café',brewery:'Une microbrasserie',pub:'Un pub','cocktail lounge':'Un bar à cocktails',distillery:'Une distillerie',beach:'Une plage','outdoor destination':'Un lieu de plein air','golf course':'Un terrain de golf',tour:'Une visite','indoor attraction':'Une attraction intérieure',indoor:'Un lieu intérieur',sport:'Un lieu sportif'};
+ const FR_OCCASIONS={'romantic outing':'une sortie romantique','date night':'une soirée en amoureux','family trip':'un voyage en famille','rainy day':'un jour de pluie',celebration:'une célébration','group getaway':'une escapade en groupe','relaxing getaway':'une escapade relaxante',adventure:'une aventure','adults-only trip':'un voyage entre adultes'};
+ const FR_WORDS={romantic:'romantique',intimate:'intime',candlelit:'aux chandelles','candle lit':'aux chandelles','date night':'soirée en amoureux',sunset:'coucher de soleil',cozy:'chaleureux',cosy:'chaleureux','year-round':'toute l’année'};
+ text=text.replace(/^Has the (.+) badge$/,(raw,b)=>FR_BADGES[b]?'Possède le badge '+FR_BADGES[b]:raw);
+ text=text.replace(/^An? (.+?) suits an? (.+)$/,(raw,t,o)=>FR_TYPES[t.toLowerCase()]&&FR_OCCASIONS[o]?FR_TYPES[t.toLowerCase()]+' convient à '+FR_OCCASIONS[o]:raw);
+ text=text.replace(/^Its description mentions “(.+)”$/,(_,w)=>'Sa description mentionne « '+(FR_WORDS[w]||w)+' »');
  for(const [a,b] of phrases)text=text.split(a).join(b);
  text=text.replace(/^Day (\d+): Confirm times before you go\. /,'Jour $1 : confirmez les heures avant de partir. ');
  const frDay=d=>({Monday:'lundi',Tuesday:'mardi',Wednesday:'mercredi',Thursday:'jeudi',Friday:'vendredi',Saturday:'samedi',Sunday:'dimanche'}[d]||d);
@@ -132,6 +141,12 @@ function t3FrenchText(value){
  text=text.replace(/^No winery with its own kitchen fits lunch on day (\d+)( in (.+))?, so lunch is at a restaurant near the wineries\.$/,(_,d,w,t)=>'Aucun vignoble avec sa propre cuisine ne convient pour le dîner du jour '+d+(t?' à '+t.replace(/ and (?!.* and )/,' et '):'')+'; le dîner est donc dans un restaurant près des vignobles.');
  text=text.replace(/^Lunch here could not start until ([\d:]+) on (\S+) under its listed hours, so it does not fit a midday meal\. Choose another lunch spot nearby\.$/,'Selon ses horaires indiqués, le dîner ici ne pourrait pas commencer avant $1 le $2; il ne convient donc pas pour le midi. Choisissez un autre endroit à proximité.');
  text=text.replace(/^(.+): Lunch here could not start until ([\d:]+) on (\S+) under its listed hours, so it does not fit a midday meal\. Choose another lunch spot nearby\.$/,'$1 : selon ses horaires indiqués, le dîner ici ne pourrait pas commencer avant $2 le $3; il ne convient donc pas pour le midi. Choisissez un autre endroit à proximité.');
+ // "No driving after 7pm", applied (2026-10-19).
+ text=text.replace(/^No driving after ([\d:]+): dinner is a short walk from the day’s last stop( on the other days)?, or the drive to it ends by then\.$/,(_,t,o)=>'Pas de voiture après '+t+' : le souper est à quelques pas du dernier arrêt de la journée'+(o?' les autres jours':'')+', ou le trajet pour s’y rendre se termine avant.');
+ text=text.replace(/^No driving after ([\d:]+): we could not keep the evenings car-free with the places listed; see the note above\.$/,'Pas de voiture après $1 : impossible de garder les soirées sans voiture avec les lieux répertoriés; voir la note ci-dessus.');
+ text=text.replace(/^The drive to dinner comes after ([\d:]+) on day ([\d, and]+): no listed dinner spot is within walking distance of the day’s last stop\.$/,(_,t,d)=>'Le trajet pour le souper se fait après '+t+' le jour '+d.replace(/ and (?!.* and )/,' et ')+' : aucun restaurant répertorié n’est à distance de marche du dernier arrêt de la journée.');
+ text=text.replace(/^(Under 1 km|About ([\d.]+) km) on foot from (.+), so the evening needs no car$/,(_,a,k,n)=>(k?'Environ '+k.replace('.',',')+' km':'Moins de 1 km')+' à pied de '+n+' : pas besoin de voiture le soir');
+ text=text.replace(/^Lunch at a winery’s restaurant$/,'Dîner au restaurant d’un vignoble');
  text=text.replace(/^No driving after ([\d:]+): dinner is each day’s last drive, and anything after it is a short walk away\.$/,'Pas de voiture après $1 : le souper est le dernier trajet de chaque jour, et ce qui suit est à quelques pas.');
  text=text.replace(/^In (.+), about (\d+) minutes’ drive: nothing in (.+) fits (lunch|dinner) that day$/,(_,t,m,h,meal)=>'À '+t+', à environ '+m+' minutes en voiture : rien à '+h.replace(/ and (?!.* and )/,' et ')+' ne convient pour le '+(meal==='lunch'?'dîner':'souper')+' ce jour-là');
  text=text.replace(/^In (.+), about (\d+) minutes’ drive from (.+)$/,'À $1, à environ $2 minutes en voiture de $3');
