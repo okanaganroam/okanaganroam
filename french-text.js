@@ -1348,4 +1348,16 @@ FR_PATTERNS.unshift(
 // also where its name runs on ("The Dream (live music venue) · 67 Front St").
 FR_PATTERNS.unshift([/^(.+?) \(live music venue\)(.*)$/, (m) => `${m[1]} (salle de concerts)${m[2]}`]);
 
+// Round 10 (2026-10-19): the Free to Visit guide (#405) showed "Free Things to Do" as a chip and in the breadcrumb, and
+// its search label ("Search free things to do in kelowna") and the Arts & Culture one stayed in English.
+FR_TEXT['Free Things to Do'] = 'Activités gratuites';
+FR_TEXT['› Free Things to Do'] = '› Activités gratuites';
+FR_TEXT['› Arts & Culture'] = '› Arts et culture';
+FR_TEXT['Free things to do'] = 'Activités gratuites';
+FR_PATTERNS.unshift([/^Search (free things to do|arts & culture|arts &amp; culture) in (.+)$/i, (m, tr, c) => {
+  const town = Object.values(c.regions).find((t) => t.toLowerCase() === m[2].toLowerCase());
+  if (!town) return null;
+  return /^free/i.test(m[1]) ? `Rechercher les activités gratuites à ${town}` : `Rechercher les lieux d’arts et de culture à ${town}`;
+}]);
+
 module.exports = { FR_TEXT, FR_PATTERNS, FR_SCRIPT, FR_SCRIPT_STRINGS, FR_CUISINE, frTime };

@@ -4560,6 +4560,13 @@ const FR_SEARCH_SYNONYMS = [
   ['comedie musicale', 'musical'], ['comedies musicales', 'musicals'], ['piece de theatre', 'theatre show'], ['pieces de theatre', 'theatre show'],
   ['musique live', 'live music'], ['musique classique', 'classical music'], ['concert classique', 'classical music'], ['concerts classiques', 'classical music'],
   ['orchestre symphonique', 'symphony'], ['orchestre', 'orchestra'], ['symphonie', 'symphony'], ['source chaude', 'hot springs'], ['sources chaudes', 'hot springs'],
+  // Round 10 (2026-10-19): « danse » and « spectacle de danse » found no events, « vin de glace » the Fire & Ice
+  // festivals; the other kinds of show each read as their own English words.
+  ['danse', 'dance'], ['danser', 'dance'], ['spectacle de danse', 'dance show'], ['spectacles de danse', 'dance shows'], ['soiree dansante', 'dance night'], ['soirees dansantes', 'dance night'],
+  ['vin de glace', 'icewine'], ['vins de glace', 'icewine'], ['spectacle de magie', 'magic show'], ['spectacles de magie', 'magic shows'], ['magie', 'magic'], ['magicien', 'magician'],
+  ['spectacle de drag', 'drag show'], ['spectacles de drag', 'drag shows'], ['salon commercial', 'trade show'], ['salons commerciaux', 'trade shows'], ['salon de l habitation', 'home show'],
+  ['exposition canine', 'dog show'], ['expositions canines', 'dog shows'], ['exposition d art', 'art show'], ['expositions d art', 'art shows'], ['vernissage', 'art show'],
+  ['cine parc', 'drive in'], ['cine parcs', 'drive in'], ['cineparc', 'drive in'], ['club d humour', 'comedy club'], ['clubs d humour', 'comedy club'],
 ];
 const FR_SEARCH_SYNONYM_MAP = (() => {
   const m = new Map();
@@ -4629,7 +4636,9 @@ function searchTypoTargets() {
   SEARCH_TYPO_EXTRA.forEach(add);
   const known = new Set(targets);
   // Every word of a phrase the search already reads is a real word ("hantées" in "maisons hantées").
-  for (const phrase of [...FR_SEARCH_SYNONYM_MAP.keys(), ...SEARCH_PHRASE_REWRITE_MAP.keys(), ...SMART_ACTIVITIES.flatMap((a) => a.words)]) for (const w of frSearchFold(phrase).split(' ')) if (w) known.add(w);
+  // Round 10 (2026-10-19): and the English the French words become, and the show words: "dance" read as « danse ».
+  for (const phrase of [...FR_SEARCH_SYNONYM_MAP.keys(), ...FR_SEARCH_SYNONYM_MAP.values(), ...SEARCH_PHRASE_REWRITE_MAP.keys(), ...SMART_ACTIVITIES.flatMap((a) => a.words),
+    ...SEARCH_EVENT_TOPICS.flatMap((t) => t.words)]) for (const w of frSearchFold(phrase).split(' ')) if (w) known.add(w);
   for (const label of Object.values(REGION_LABELS)) frSearchFold(label).split(' ').forEach((w) => known.add(w));
   for (const v of venues) for (const t of [v.name, v.cuisine, v.textDesc, v.textDescFr]) for (const w of frSearchFold(t).split(' ')) if (w.length >= 5) known.add(w);
   searchTypoIndex = { venues, targets: [...targets], known };
@@ -4690,6 +4699,8 @@ const SEARCH_PHRASE_REWRITES = [
   ['stand up paddle', 'paddleboard'], ['stand up paddling', 'paddleboarding'], ['stand up paddleboard', 'paddleboard'], ['stand up paddleboarding', 'paddleboarding'],
   ['stand up paddle board', 'paddleboard'], ['stand up paddle boarding', 'paddleboarding'],
   ['xmas', 'christmas'], ['x mas', 'christmas'], ['xmas market', 'christmas market'], ['xmas markets', 'christmas market'],
+  // Round 10 (2026-10-19): "ice wine" read as wineries mentioning "ice" and listed the Fire & Ice festivals.
+  ['ice wine', 'icewine'], ['ice wines', 'icewine'], ['icewines', 'icewine'],
 ];
 const SEARCH_PHRASE_REWRITE_MAP = new Map(SEARCH_PHRASE_REWRITES);
 const SEARCH_PHRASE_REWRITE_MAX = Math.max(...SEARCH_PHRASE_REWRITES.map(([k]) => k.split(' ').length));
@@ -4745,6 +4756,9 @@ function heroSearchTarget(text, { lang = 'en' } = {}) {
   const plan = smartSearchPlan(text, intent);
   if (plan && plan.url) return { url: plan.url, reason: `intent_${plan.key}` };
   if (plan && plan.list) return { url: search, reason: `intent_${plan.key}` };
+  // Round 10 (2026-10-19): "live music" went to the badge page, with no gigs; /search lists the places and the gigs.
+  const keepTopic = intent.mode === 'events' ? null : searchEventTopicFor(smartFold(text), intent);
+  if (keepTopic && keepTopic.keepPlaces) return { url: search, reason: `topic_${keepTopic.key}` };
   // Search pass 5 (2026-10-19): a place whose name holds the words typed ("19 bistro") -> /search, that place first.
   if (intent.mode !== 'events' && smartNameMatches(text, intent).length) return { url: search, reason: 'name_match' };
   if (intent.cuisines.length) return { url: search, reason: 'cuisine' };
@@ -4851,6 +4865,16 @@ const SMART_WINE_WORDS = ['wine', 'wines', 'winery', 'wineries', 'vineyard', 'vi
 const SMART_TOUR_WORDS = ['tour', 'tours', 'touring', 'circuit', 'circuits', 'tournee', 'tournees', 'excursion', 'excursions', 'shuttle', 'shuttles', 'hop on hop off'];
 // Cheap eats: places to eat.
 const SMART_BUDGET_TYPES = ['restaurant', 'cafe', 'pub'];
+// Round 10 (2026-10-19): kids without a rainy day -> the family guide, or a town's kid-friendly places, parks and beaches.
+const SMART_FAMILY_GUIDE = '/guides/family-friendly-okanagan';
+const SMART_FAMILY_OUTSIDE = new Set(['beach', 'outdoor', 'sport']);
+const SMART_FAMILY_PARK_RE = /\b(?:park|parks|playground|spray park|splash pad|water park|petting|farm|zoo|mini golf|beach)\b/i;
+function smartFamilyWhy(v) {
+  if (Number(v.row.kid_friendly) === 1 || (v.features && v.features.kid_friendly)) return 'Kid-friendly';
+  if (v.type === 'beach') return 'Beach';
+  if (SMART_FAMILY_OUTSIDE.has(v.type) && SMART_FAMILY_PARK_RE.test(String(v.row.name || ''))) return 'Park or playground';
+  return false;
+}
 const SMART_FAMILY_WORDS = ['kids', 'kid', 'children', 'child', 'family', 'families', 'toddler', 'toddlers', 'little ones', 'enfants', 'enfant', 'famille', 'familles', 'en famille'];
 const SMART_RAINY_WORDS = ['rainy day', 'rainy days', 'rainy', 'rain', 'raining', 'wet day', 'indoor', 'indoors', 'inside', 'jour de pluie', 'pluie', 'pluvieux', 'pluvieuse', 'interieur', 'interieures', 'interieurs', 'a l interieur'];
 const SMART_DATE_WORDS = ['date night', 'date nights', 'date idea', 'date ideas', 'romantic', 'romance', 'anniversary', 'anniversary dinner', 'romantique', 'en amoureux', 'soiree romantique', 'tete a tete'];
@@ -4929,9 +4953,12 @@ function smartGuideQueryWords(folded) {
   return uniqueList(s.trim().split(' ').filter((w) => w && !SMART_GUIDE_STOP.has(w) && !regionSet.has(w) && !/^\d+$/.test(w)).map(smartStem));
 }
 // The live guides that fit, best first: { path, heading, full } (full = every topic word is in the title).
+// Round 10 (2026-10-19): a lone "live" opened the Comedy & Live Shows guide; one word that only describes a guide's
+// topic is not its topic.
+const SMART_GUIDE_WEAK = new Set(['live', 'show', 'night', 'nights', 'local']);
 function smartGuideMatches(text, intent) {
   const words = smartGuideQueryWords(smartFold(text));
-  if (!words.length) return [];
+  if (!words.length || words.every((w) => SMART_GUIDE_WEAK.has(w))) return [];
   const regionFolds = Object.entries(REGION_LABELS).map(([slug, label]) => [slug, smartFold(label)]);
   const out = [];
   for (const g of liveGuides()) {
@@ -5067,6 +5094,10 @@ const SMART_ACTIVITIES = [
     re: /\bmuseums?\b|\bmus[ée]es?\b/i, types: ['indoor', 'outdoor', 'tour'], events: true },
   { key: 'theatre', label: 'Theatre', labelFr: 'Théâtre', words: ['theatre', 'theatres', 'theater', 'theaters', 'live theatre', 'live theater', 'community theatre', 'theatre company', 'playhouse', 'theatre show', 'theatre shows', 'theater show', 'theater shows', 'a play'],
     re: /\btheat(?:re|er)s?\b|\bplayhouse\b/i, types: ['indoor', 'outdoor', 'tour'], events: true, eventTest: (e) => searchShowKind(e) === 'theatre' || searchShowKind(e) === 'comedy', eventRank: (e) => (searchShowKind(e) === 'theatre' ? 2 : 1) },
+  // Round 10 (2026-10-19): "ice wine" / « vin de glace » -> the wineries that make icewine and icewine events, never
+  // "Fire & Ice" festivals (it read as wineries plus the word "ice").
+  { key: 'icewine', label: 'Icewine', labelFr: 'Vin de glace', words: ['icewine', 'icewines', 'ice wine', 'ice wines', 'vin de glace', 'vins de glace', 'icewine tasting', 'icewine festival'],
+    re: /\bice[- ]?wines?\b|\bvins? de glace\b/i, events: true },
 ];
 // Words that add nothing to an activity request ("escape rooms near me", "best go karts in kelowna").
 const SMART_ACTIVITY_GENERIC = ['in', 'near', 'me', 'the', 'a', 'an', 'okanagan', 'best', 'top', 'places', 'place', 'spots', 'spot', 'where', 'to', 'go', 'for', 'find', 'fun',
@@ -5276,18 +5307,87 @@ function searchShowKind(e) {
   if (cats.includes('live-music') || /\b(?:concerts?|symphony|orchestra|live music|band)\b/i.test(name)) return 'music';
   return SEARCH_SHOW_NAME_RE.test(name) || (cats.includes('arts-culture') && /\b(?:perform\w*|show)\b/i.test(desc)) ? 'show' : null;
 }
+// ---------- Search round 10 (2026-10-19): one kind of show at a time ----------
+// "musical" and "magic show" listed all 202 shows, "drag show" an unfiltered What's On, « danse » nothing (English
+// "dance" found 31), "trade show" gyms, "dog show" 422 dog-friendly places, "comedy vernon" the valley-wide guide,
+// and "comedy club", "art show" and "drive-in" nothing at all. Each now lists only its own events (and, for comedy
+// clubs and drive-ins, the places), or says plainly that none are listed. Classical music leaves out jazz nights,
+// bands ("Dirt Road Opera") and tributes.
+const SEARCH_NOT_CLASSICAL_RE = /\b(?:jazz|blues|live music|band|tribute|rock|country|bluegrass|swing|big band|cuban|salsa|latin|fundraiser)\b/i;
+const SEARCH_DANCE_RE = /\b(?:danc(?:e|es|ing|ers?)|ballets?|nutcracker|tango|salsa|ballroom|flamenco|hip[- ]hop|line dancing|square dance)\b/i;
+const SEARCH_DRAG_RE = /\bdrag\b(?! ?rac(?:e|ing)\b(?! tour))/i;
+const SEARCH_MAGIC_RE = /\b(?:magic(?:ian|ians)?|illusion(?:s|ist|ists)?|mentalist|sleight of hand)\b/i;
+const SEARCH_NOT_MAGIC_RE = /\b(?:practical magic|cinema|film|movie|screening|gathering|magic the|tcg|card game|mushrooms?|markets?|parade|light up|workshops?|class(?:es)?|intention|metaphysic\w*)\b/i;
+const SEARCH_MAGIC_SHOW_RE = /\b(?:magicians?|illusion(?:s|ist|ists)?|mentalist|magic shows?|art of magic|sleight of hand)\b/i;
+const SEARCH_MUSICAL_NAME_RE = /\b(?:the (?:broadway )?musical|musical theat(?:re|er)|broadway)\b|\bmusical\s*!?$/i;
+const SEARCH_MUSICAL_DESC_RE = /\b(?:the musical|musical theatre|musical theater|broadway|stage musical|a musical (?:comedy|based|about|adaptation|revue))\b/i;
+const SEARCH_TRADE_SHOW_RE = /\b(?:trade ?shows?|home shows?|home (?:and|&) garden|expos?|trade fairs?|bridal (?:shows?|fairs?|expos?)|wedding (?:shows?|fairs?|expos?)|consumer shows?|boat shows?|rv shows?)\b/i;
+const SEARCH_DOG_SHOW_RE = /\b(?:dog shows?|kennel club|agility trials?|dog trials?|obedience trials?|dock diving|herding trials?)\b/i;
+const SEARCH_ART_SHOW_RE = /\b(?:art shows?|exhibitions?|exhibits?|art sales?|vernissage|retrospective|solo show|group show|members show)\b/i;
+const SEARCH_DRIVE_IN_RE = /\bdrive[- ]?ins?\b/i;
+const SEARCH_COMEDY_PLACE_RE = /\b(?:comedy|improv)\b/i;
+const SEARCH_NARROW_TOPICS = [
+  { key: 'dance', heading: 'Dance', headingFr: 'Danse',
+    words: ['dance', 'dances', 'dancing', 'ballet', 'ballets', 'dance show', 'dance shows', 'dance performance', 'dance performances', 'dance recital', 'dance recitals',
+      'contemporary dance', 'nutcracker', 'the nutcracker', 'casse noisette', 'dance events', 'dance event', 'dance night', 'dance party', 'dance parties'],
+    test: (e) => SEARCH_DANCE_RE.test(String(e.name || '')) || ((e.categories || []).includes('arts-culture') && /\b(?:dance company|ballet|choreograph\w*|dancers)\b/i.test(String(e.description || '').slice(0, 300))),
+    rank: (e) => (/\bballet|nutcracker|dance company\b/i.test(`${e.name || ''} ${e.description || ''}`) ? 2 : SEARCH_DANCE_RE.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No dance events are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun événement de danse n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
+  { key: 'drag', heading: 'Drag shows', headingFr: 'Spectacles de drag',
+    words: ['drag', 'drag show', 'drag shows', 'drag queen', 'drag queens', 'drag brunch', 'drag bingo', 'drag night', 'drag nights', 'drag performance', 'drag performances', 'drag race', 'drag artist', 'drag artists'],
+    test: (e) => SEARCH_DRAG_RE.test(String(e.name || '')) || /\bdrag (?:queens?|artists?|performers?|show)\b/i.test(String(e.description || '').slice(0, 300)), rank: (e) => (SEARCH_DRAG_RE.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No drag shows are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun spectacle de drag n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
+  { key: 'magic', heading: 'Magic shows', headingFr: 'Spectacles de magie',
+    words: ['magic', 'magic show', 'magic shows', 'magician', 'magicians', 'illusionist', 'illusionists', 'illusion show', 'illusion shows', 'mentalist', 'magie', 'magicien', 'magiciens'],
+    test: (e) => !SEARCH_NOT_MAGIC_RE.test(String(e.name || '')) && (SEARCH_MAGIC_SHOW_RE.test(String(e.name || '')) || (SEARCH_MAGIC_RE.test(String(e.name || '')) && !!searchShowKind(e))), rank: () => 0,
+    emptyText: 'No magic shows are listed for the next few weeks yet. See every show on What’s On.', emptyTextFr: 'Aucun spectacle de magie n’est encore annoncé pour les prochaines semaines. Voyez tous les spectacles dans À l’affiche.' },
+  { key: 'musical', heading: 'Musicals', headingFr: 'Comédies musicales',
+    words: ['musical', 'musicals', 'musical theatre', 'musical theater', 'broadway', 'broadway show', 'broadway shows', 'broadway musical', 'broadway musicals'],
+    test: (e) => SEARCH_MUSICAL_NAME_RE.test(String(e.name || '')) || SEARCH_MUSICAL_DESC_RE.test(String(e.description || '')), rank: (e) => (SEARCH_MUSICAL_NAME_RE.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No musicals are listed for the next few weeks yet. See every show on What’s On.', emptyTextFr: 'Aucune comédie musicale n’est encore annoncée pour les prochaines semaines. Voyez tous les spectacles dans À l’affiche.' },
+  { key: 'trade_show', heading: 'Trade & home shows', headingFr: 'Salons commerciaux et salons de l’habitation',
+    words: ['trade show', 'trade shows', 'tradeshow', 'tradeshows', 'home show', 'home shows', 'home and garden show', 'trade fair', 'trade fairs', 'expo', 'expos', 'consumer show', 'bridal show', 'bridal shows', 'wedding show', 'wedding shows', 'boat show', 'rv show'],
+    test: (e) => SEARCH_TRADE_SHOW_RE.test(String(e.name || '')), rank: () => 0,
+    emptyText: 'No trade or home shows are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun salon commercial ou salon de l’habitation n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
+  // "dog show" is about dogs on show, so the Dogs welcome badge it reads does not stop it.
+  { key: 'dog_show', heading: 'Dog shows', headingFr: 'Expositions canines', ignoreFeatures: ['dog_friendly'],
+    words: ['dog show', 'dog shows', 'dog agility', 'agility trial', 'agility trials', 'kennel club', 'dog trial', 'dog trials', 'dock diving', 'exposition canine', 'expositions canines'],
+    test: (e) => SEARCH_DOG_SHOW_RE.test(`${e.name || ''} ${String(e.description || '').slice(0, 300)}`), rank: () => 0,
+    emptyText: 'No dog shows are listed for the next few weeks yet. Looking for places that welcome dogs? See Dog Friendly Finds.', emptyTextFr: 'Aucune exposition canine n’est encore annoncée pour les prochaines semaines. Vous cherchez des endroits qui acceptent les chiens? Voyez Endroits qui acceptent les chiens.' },
+  { key: 'art_show', heading: 'Art shows & exhibitions', headingFr: 'Expositions d’art',
+    words: ['art show', 'art shows', 'art exhibition', 'art exhibitions', 'art exhibit', 'art exhibits', 'exhibition', 'exhibitions', 'exhibit', 'exhibits', 'gallery show', 'gallery shows', 'art sale', 'art sales', 'vernissage', 'vernissages', 'exposition', 'expositions', 'exposition d art', 'expositions d art'],
+    test: (e) => SEARCH_ART_SHOW_RE.test(String(e.name || '')) || ((e.categories || []).includes('arts-culture') && /\b(?:exhibitions?|exhibits?|art show|vernissage)\b/i.test(String(e.description || '').slice(0, 300))),
+    rank: (e) => (SEARCH_ART_SHOW_RE.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No art shows are listed for the next few weeks yet. See the galleries on Indoor & Rainy Day.', emptyTextFr: 'Aucune exposition d’art n’est encore annoncée pour les prochaines semaines. Voyez les galeries dans Activités intérieures.' },
+  { key: 'drive_in', heading: 'Drive-in movies', headingFr: 'Ciné-parcs', ignoreTypes: ['indoor'], extra: ['theatre', 'theater', 'cinema', 'movies', 'movie'],
+    words: ['drive in', 'drive ins', 'drive in theatre', 'drive in theater', 'drive in theatres', 'drive in theaters', 'drive in movie', 'drive in movies', 'drive in cinema', 'cine parc', 'cine parcs', 'cineparc'],
+    test: (e) => SEARCH_DRIVE_IN_RE.test(String(e.name || '')), rank: () => 0,
+    places: (region) => smartPickVenues((v) => (!region || v.region === region) && SEARCH_DRIVE_IN_RE.test(String(v.row.name || '')) && 'Drive-in', () => 0),
+    emptyText: 'No drive-in theatre is listed in the Okanagan right now, and no drive-in movie nights are coming up. For a film, see the cinemas on Indoor & Rainy Day.',
+    emptyTextFr: 'Aucun ciné-parc n’est inscrit dans l’Okanagan pour le moment, et aucune soirée de cinéma en plein air n’est annoncée. Pour un film, voyez les cinémas dans Activités intérieures.' },
+  // Comedy in one town, or a comedy club: the town's comedy nights (and its comedy clubs). "comedy" alone keeps the
+  // valley-wide Comedy & Live Shows guide.
+  { key: 'comedy', heading: 'Comedy', headingFr: 'Humour', applies: (folded, intent) => (intent.regions || []).length === 1 || /\bclubs?\b/.test(folded),
+    words: ['comedy', 'comedy show', 'comedy shows', 'comedy night', 'comedy nights', 'comedy club', 'comedy clubs', 'comedy lounge', 'comedian', 'comedians', 'improv', 'stand up comedy'], extra: ['club', 'clubs', 'lounge', 'lounges'],
+    test: (e) => searchShowKind(e) === 'comedy', rank: (e) => (SEARCH_COMEDY_RE.test(String(e.name || '')) ? 1 : 0),
+    places: (region) => smartPickVenues((v) => (!region || v.region === region) && SEARCH_COMEDY_PLACE_RE.test(String(v.row.name || '')) && 'Comedy club', (v) => foodDrinkRecommendedScore(v.row)),
+    guide: '/guides/okanagan-comedy-shows',
+    emptyText: 'No comedy nights are listed here for the next few weeks yet. See the whole valley in our Comedy & Live Shows guide.', emptyTextFr: 'Aucune soirée d’humour n’est encore annoncée ici pour les prochaines semaines. Voyez toute la vallée dans notre guide de l’humour et des spectacles.' },
+];
 // keepPlaces: the place search stays as it is ("live music" lists the places with live music) and these events come
 // with it; otherwise /search lists these events alone, under heading.
 const SEARCH_EVENT_TOPICS = [
+  ...SEARCH_NARROW_TOPICS,
   { key: 'shows', heading: 'Shows', headingFr: 'Spectacles',
     words: ['show', 'shows', 'a show', 'the show', 'live show', 'live shows', 'stage show', 'stage shows', 'performance', 'performances', 'live performance', 'live performances',
-      'musical', 'musicals', 'spectacle', 'spectacles', 'un spectacle', 'magic show', 'magic shows'],
+      'spectacle', 'spectacles', 'un spectacle'],
     test: (e) => !!searchShowKind(e), rank: (e) => ({ comedy: 4, theatre: 3, show: 2, music: 1 })[searchShowKind(e)] || 0,
     emptyText: 'No shows are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun spectacle n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
   { key: 'classical', heading: 'Classical music', headingFr: 'Musique classique',
     words: ['classical', 'classical music', 'classical concert', 'classical concerts', 'symphony', 'symphonies', 'symphony orchestra', 'orchestra', 'orchestras', 'chamber music', 'string quartet',
       'choir', 'choirs', 'choral', 'opera', 'recital', 'recitals'],
-    test: (e) => SEARCH_CLASSICAL_RE.test(`${e.name || ''} ${e.description || ''}`), rank: (e) => (SEARCH_CLASSICAL_RE.test(String(e.name || '')) ? 1 : 0),
+    test: (e) => !SEARCH_NOT_CLASSICAL_RE.test(String(e.name || '')) && (SEARCH_CLASSICAL_RE.test(String(e.name || ''))
+      || (SEARCH_CLASSICAL_RE.test(String(e.description || '')) && !SEARCH_NOT_CLASSICAL_RE.test(String(e.description || '').slice(0, 300)))), rank: (e) => (SEARCH_CLASSICAL_RE.test(String(e.name || '')) ? 1 : 0),
     emptyText: 'No classical concerts are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun concert classique n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
   { key: 'fireworks', heading: 'Fireworks', headingFr: 'Feux d’artifice', words: ['fireworks', 'firework', 'fireworks show', 'fireworks display', 'fireworks displays'],
     test: (e) => /\bfireworks?\b|\bfeux d['’]artifice\b/i.test(`${e.name || ''} ${e.description || ''}`), rank: (e) => (/\bfireworks?\b/i.test(String(e.name || '')) ? 1 : 0),
@@ -5297,12 +5397,14 @@ const SEARCH_EVENT_TOPICS = [
 ];
 // The topic a request is about, when its words are only that topic (plus a town and words like "events" or "in").
 function searchEventTopicFor(folded, intent) {
-  if (!folded || !intent || intent.when || (intent.types || []).length || (intent.cuisines || []).length || (intent.collections || []).length || hasDiscoveryExclusion(intent.excluded)) return null;
+  if (!folded || !intent || intent.when || (intent.cuisines || []).length || (intent.collections || []).length || hasDiscoveryExclusion(intent.excluded)) return null;
   for (const topic of SEARCH_EVENT_TOPICS) {
     if (!smartHas(folded, topic.words)) continue;
-    if (!topic.keepPlaces && (intent.features || []).length) continue;
+    if ((intent.types || []).some((t) => !(topic.ignoreTypes || []).includes(t))) continue;
+    if (topic.applies && !topic.applies(folded, intent)) continue;
+    if (!topic.keepPlaces && (intent.features || []).some((f) => !(topic.ignoreFeatures || []).includes(f))) continue;
     if (topic.keepPlaces && (intent.features || []).some((f) => f !== 'live_music')) continue;
-    if (!smartTopicWords(folded, intent, [...topic.words, ...SMART_EVENT_GENERIC, 'music', 'musique']).length) return topic;
+    if (!smartTopicWords(folded, intent, [...topic.words, ...(topic.extra || []), ...SMART_EVENT_GENERIC, 'music', 'musique']).length) return topic;
   }
   return null;
 }
@@ -5352,14 +5454,14 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   // Round 9 (2026-10-19): shows, classical music and fireworks are events, not places: /search lists those events.
   const eventTopic = searchEventTopicFor(folded, intent);
   if (eventTopic && !eventTopic.keepPlaces) {
-    const comedyGuide = eventTopic.key === 'shows' ? liveGuides().find((g) => g.path === '/guides/okanagan-comedy-shows') : null;
+    const comedyGuide = eventTopic.key === 'shows' || eventTopic.guide ? liveGuides().find((g) => g.path === (eventTopic.guide || '/guides/okanagan-comedy-shows')) : null;
     return {
       key: `topic_${eventTopic.key}`,
       heading: `${eventTopic.heading}${town ? ` in ${town}` : ''}`,
       headingFr: `${eventTopic.headingFr}${town ? ` à ${town}` : ''}`,
       emptyText: eventTopic.emptyText, emptyTextFr: eventTopic.emptyTextFr,
       guides: comedyGuide ? [{ path: comedyGuide.path, heading: comedyGuide.heading }] : [],
-      list: () => [],
+      list: () => (eventTopic.places ? eventTopic.places(region) : []),
       events: () => searchTopicEvents(eventTopic, R, now),
     };
   }
@@ -5531,6 +5633,24 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
       if (d.url && d.kind !== 'browse') return { key: 'rainy', url: d.url };
       if (d.url) return null;
       return { key: 'rainy', url: `/indoor${discoveryQueryString({ regions: region && smartIndoorCount(region, false) ? [region] : [] })}` };
+    }
+    // Round 10 (2026-10-19): "things to do with kids" / « activités pour enfants » went to indoor places only. Without
+    // a rainy day or "indoor", it is the family guide, or in a town the kid-friendly places (parks and beaches too)
+    // with the family events.
+    const indoorAsked = rainy || T.includes('indoor') || smartHas(folded, ['indoor', 'indoors', 'inside', 'interieur', 'interieures', 'interieurs', 'a l interieur']);
+    if (!indoorAsked) {
+      const guide = liveGuides().find((g) => g.path === SMART_FAMILY_GUIDE);
+      if (!region && guide) return { key: 'family_guide', url: guide.path };
+      if (region && smartPickVenues((v) => v.region === region && smartFamilyWhy(v), () => 0).length) {
+        return {
+          key: 'family',
+          heading: `Things to do with kids in ${town}`,
+          headingFr: `Activités pour enfants à ${town}`,
+          guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
+          list: () => smartPickVenues((v) => v.region === region && smartFamilyWhy(v), (v) => (SMART_FAMILY_OUTSIDE.has(v.type) ? 2 : 0) + (Number(v.row.kid_friendly) === 1 ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+          events: () => searchEventsFor({ regions: R, test: (e) => (e.categories || []).includes('family-kids'), now }),
+        };
+      }
     }
     return { key: 'family', url: `/indoor${discoveryQueryString({ types: ['family'], regions: region && smartIndoorCount(region, true) ? [region] : [] })}` };
   }
@@ -16503,6 +16623,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
     micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     typoRead: function(f){ return 'Nous avons lu ' + f.map(function(x){ return '« ' + x.from + ' » comme « ' + x.to + ' »'; }).join(', ') + '.'; },
+    awayN: function(n){ return n === 1 ? '1 résultat hors de cette zone de la carte.' : n + ' résultats hors de cette zone de la carte.'; }, showThem: function(n){ return n === 1 ? 'L’afficher' : 'Les afficher'; },
+    eventsFor: function(w){ return w ? 'Événements de la semaine avec « ' + w + ' ».' : 'Voici les événements de la semaine sur la carte.'; },
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Voici ce qui est près de vous.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
@@ -16530,6 +16652,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
     micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     typoRead: function(f){ return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; }).join(', ') + '.'; },
+    awayN: function(n){ return n === 1 ? '1 match outside this part of the map.' : n + ' matches outside this part of the map.'; }, showThem: function(n){ return n === 1 ? 'Show it' : 'Show them'; },
+    eventsFor: function(w){ return w ? 'This week’s events with “' + w + '”.' : 'Showing this week’s events on the map.'; },
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Showing what’s near you.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
@@ -16773,7 +16897,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4 };
       // An event without a pin counts as near when its town centre is within the distance.
       var nearTown = function(e){ var c = CONF.c[e.region]; return c && distKm(me.lat, me.lng, c[0], c[1]) <= radiusKm; };
-      items = events.filter(function(e){ return e.g && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
+      items = events.filter(function(e){ return e.g && (!evTerm || evHit(e)) && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
         .sort(function(a, b){ return order[a.g] - order[b.g] || (a.sd < b.sd ? -1 : a.sd > b.sd ? 1 : 0) || ((a.st || '') < (b.st || '') ? -1 : (a.st || '') > (b.st || '') ? 1 : 0) || (me && a.d != null && b.d != null ? a.d - b.d : 0); });
       onMap = items.filter(function(e){ return e.lat != null; });
       countEl.textContent = me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
@@ -17204,7 +17328,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (part[0] === 'notf') delete notFeats[part[1]];
     liveBase = null; changed();
   });
-  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
+  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; evTerm = ''; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
   function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
   // When nothing matches: the first filter worth dropping that gives results at some distance ("Try without Open at
   // 3 AM"), with a button that drops it (the distance then chooses itself). Tried one at a time on a copy of the filters.
@@ -17230,6 +17354,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function relaxHtml(){
     var best = null, base = snapshot(), t0 = term, cs = candidates();
+    // Round 10 (2026-10-19): "farmers market" over Kelowna said "Nothing called ... here" while Penticton's and
+    // Vernon's markets matched outside the view. Without a location, say how many match elsewhere and offer to show them.
+    var away = me ? 0 : places.filter(matchesPlace).length;
+    if (away) return esc(T.awayN(away)) + ' <button type="button" class="pm-relax" data-relax="fit">' + esc(T.showThem(away)) + '</button>';
     if (cs.length === 1 && cs[0].id === 'term') return esc(T.noName(term));
     cs.forEach(function(c){
       if (best) return;
@@ -17239,7 +17367,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (!best) return esc(T.none);
     return esc(T.without(best.label)) + ' <button type="button" class="pm-relax" data-relax="' + esc(best.id) + '">' + esc(T.dropIt) + '</button>';
   }
-  listEl.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-relax]'); if (!b) return; dropOne(b.getAttribute('data-relax')); if (b.getAttribute('data-relax') === 'term') searchEl.value = ''; liveBase = null; changed(); });
+  listEl.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-relax]'); if (!b) return;
+    if (b.getAttribute('data-relax') === 'fit') { var ms = places.filter(matchesPlace).slice(0, 300); if (ms.length) { fitTo(L.latLngBounds(ms.map(function(p){ return [p.lat, p.lng]; })), 15); } return; }
+    dropOne(b.getAttribute('data-relax')); if (b.getAttribute('data-relax') === 'term') searchEl.value = ''; liveBase = null; changed(); });
   function kindLabel(k){ var c = kindChips.filter(function(x){ return x.getAttribute('data-pm-kind') === k; })[0]; return c ? c.textContent.replace(/^\\s+|\\s+$/g, '').replace(/^\\S+\\s+/, '') : k; }
   function featLabel(k){ return T.feat[k] || k; }
   function tagLabel(k){ var t = CONF.tg[TAGIX[k]]; return FR ? t.fr : t.en; }
@@ -17402,7 +17532,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     Object.keys(CONF.r).forEach(function(k){ know(CONF.r[k]); });
     know(STOP); know(NEG); Object.keys(targets).forEach(function(w){ known[w] = 1; });
     names.forEach(function(p){ know(p.name, 5); });
-    return { list: Object.keys(targets).filter(function(w){ return w.length >= 5; }), orig: targets, known: known, n: names.length };
+    // Round 10 (2026-10-19): on /fr/map the note names the French word (« brewry » comme « brasserie », not « brewery »):
+    // the first one-word French search word that reads as that English word, with its accents where the map knows them.
+    var fr = {}, acc = { musee: 'musée', musees: 'musées', randonnee: 'randonnée', randonnees: 'randonnées', cafe: 'café', theatre: 'théâtre', marche: 'marché', evenement: 'événement', evenements: 'événements', biere: 'bière', glacee: 'glacée' };
+    Object.keys(WORDS).forEach(function(k){ WORDS[k].split(' ').forEach(function(w){ if (/[^a-z]/.test(w)) acc[foldFr(w)] = w; }); });
+    if (FS) Object.keys(FS).forEach(function(k){ var e = FS[k]; if (k.indexOf(' ') === -1 && e.indexOf(' ') === -1 && !fr[e] && k !== e) fr[e] = acc[k] || k; });
+    return { list: Object.keys(targets).filter(function(w){ return w.length >= 5; }), orig: targets, known: known, n: names.length, fr: fr };
   }
   function fixTypos(v){
     var names = (typeof places !== 'undefined' && places) || [];
@@ -17412,7 +17547,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (!f || f.indexOf(' ') !== -1) return tok;
       var t = searchTypoWord(f, TYPO.list, function(w){ return !!TYPO.known[w]; });
       if (!t) return tok;
-      fixes.push({ from: tok, to: TYPO.orig[t] });
+      fixes.push({ from: tok, to: (typeof FR !== 'undefined' && FR && TYPO.fr[TYPO.orig[t]]) || TYPO.orig[t] });
       return TYPO.orig[t];
     });
     return { text: fixes.length ? out.join(' ') : String(v || ''), fixes: fixes };
@@ -17452,14 +17587,25 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     restore(s);
   }
   var lastFixes = [];
+  // Round 10 (2026-10-19): « spectacle » (read as "shows") said « Rien ne s’appelle « shows » »: the map has no place
+  // called that, but it has this week's events. These words open the Events tab, filtered by any other words typed
+  // ("comedy shows"), as the site search sends them to What's On. "show" alone stays a common word ("show me wineries").
+  var EVENT_WORDS = ' shows concert concerts gig gigs event events evenement evenements événement événements spectacle spectacles festival festivals ';
+  // A kind of event the map has no places for (« danse » reads as "dance") also opens the Events tab, filtered by it.
+  var EVENT_KINDS = { dance: 'danc', dances: 'danc', dancing: 'danc', ballet: 'ballet', drag: 'drag', nutcracker: 'nutcracker' };
+  var wantEvents = false, evTerm = '', evBySearch = false, evFilt = [], evSaid = [];
+  function evHit(e){ var hay = foldFr((e.name || '') + ' ' + (e.venue || '')); return evTerm.split(' ').every(function(w){ return !w || hay.indexOf(foldFr(w)) !== -1; }); }
   function readSearch(v, typing){
     var fx = fixTypos(v); v = fx.text; lastFixes = fx.fixes;
     if (typing) { if (!liveBase) { undoLastSearch(); liveBase = snapshot(); } restore(JSON.parse(JSON.stringify(liveBase))); }
     else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); }
     var before = snapshot();
     var left = [], neg = false, toks = parseWords(v), ors = toks.indexOf('or') !== -1 || toks.indexOf('ou') !== -1;
+    wantEvents = false; evFilt = []; evSaid = [];
     toks.forEach(function(w){
       if (NEG.indexOf(' ' + w + ' ') !== -1) { neg = true; return; }
+      if (EVENT_WORDS.indexOf(' ' + w + ' ') !== -1) { wantEvents = true; return; }
+      if (EVENT_KINDS[w]) { wantEvents = true; evFilt.push(EVENT_KINDS[w]); evSaid.push((FR && TYPO && TYPO.fr[w]) || w); return; }
       var k = WORD_TO[w];
       if (w.charAt(0) === '#' && CONF.tg[Number(w.slice(1))]) { var tk = CONF.tg[Number(w.slice(1))].k; if (neg) notTags[tk] = true; else tags[tk] = true; }
       else if (w.charAt(0) === '@' && CONF.r[w.slice(1)]) town = w.slice(1);
@@ -17495,6 +17641,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     clearTimeout(timer); wantNear = false; radiusFixed = false; setStatus(''); readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
     if (me && !radiusFixed && !town) radiusKm = 5;
     if (lastFixes.length) setStatus(T.typoRead(lastFixes));
+    if (wantEvents) { evTerm = [term].concat(evFilt).join(' ').trim(); setStatus(T.eventsFor([term].concat(evSaid).join(' ').trim()), 9000); term = ''; evBySearch = true; setTab('events'); }
+    else { evTerm = ''; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
     track('map_search', { words: term ? 1 : 0, how: how || 'typed' }); changed();
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
@@ -17539,8 +17687,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     syncChips();
     render(!!me);
   }
-  $('pmTabPlaces').addEventListener('click', function(){ setTab('places'); });
-  $('pmTabEvents').addEventListener('click', function(){ setTab('events'); });
+  $('pmTabPlaces').addEventListener('click', function(){ evTerm = ''; evBySearch = false; setTab('places'); });
+  $('pmTabEvents').addEventListener('click', function(){ evTerm = ''; evBySearch = false; setTab('events'); });
   // Map keyboard use (2026-10-19, review pass 5).
   // - A pin opened with Enter moves focus into its place card (the popup); Escape, or its close button, closes the card
   //   and puts focus back on the pin.
@@ -41026,7 +41174,9 @@ const OWNER_HELP_TOPICS = [
       // Round 9 (2026-10-19): "can other people edit my listing" read as managing a second business.
       'other people edit', 'can other people edit', 'other people change', 'others edit', 'can anyone edit', 'anyone else edit', 'can someone else edit', 'who can change', 'who can update'],
     keysFr: ['qui a acces', 'qui peut modifier', 'personnes qui ont acces', 'retirer une personne', 'retirer quelqu un', 'retirer l acces', 'enlever l acces', 'supprimer un compte', 'retirer un employe', 'ancien gerant', 'ancienne gerante', 'ancien employe', 'ancienne employee', 'a toujours acces', 'encore acces', 'ne travaille plus ici', 'ne travaille plus pour nous', 'reinitialiser le lien', 'a garde le lien',
-      'd autres personnes peuvent modifier', 'autres personnes modifier', 'qui d autre peut modifier', 'quelqu un d autre peut modifier', 'n importe qui peut modifier'],
+      'd autres personnes peuvent modifier', 'autres personnes modifier', 'qui d autre peut modifier', 'quelqu un d autre peut modifier', 'n importe qui peut modifier',
+      // Round 10 (2026-10-19): « est-ce que d'autres peuvent modifier ma fiche » got the Claim answer; « quelqu'un d'autre peut changer ma page » got "not sure".
+      'd autres peuvent modifier', 'autres peuvent modifier', 'd autres peuvent changer', 'quelqu un peut modifier', 'quelqu un peut changer', 'quelqu un d autre peut changer', 'modifier ma fiche sans moi', 'changer ma fiche sans moi', 'sans moi', 'peut changer ma page', 'peut modifier ma page', 'qui peut changer'],
     a: {
       in: '<p>{ON}, open <strong>People with access</strong>. It lists every login that can update this listing, with each person’s email.</p><ul><li><strong>Added after you</strong>, like a former manager or staff member? Tap <strong>Remove</strong> beside them. They get an email saying so, and so does Dayton. Removing someone also <strong>resets the private edit link</strong>, so they can’t use the old one to get back in; we email the new link to you.</li><li><strong>Added before you?</strong> You can’t remove them yourself: tap <strong>Message us</strong> and Dayton will check it.</li><li><strong>Remove me</strong> takes your own login off the listing.</li></ul><p>Worried someone kept an old edit link? The person who has been on the listing longest has a <strong>Reset edit link</strong> button there: the old link stops working straight away, and everyone with a login keeps their access. Everyone on the listing gets an email whenever a new login is added.</p>',
       link: '<p><strong>People with access</strong> is for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open the listing from <strong>My listings</strong> to see every login that can update it.</p><p>You can remove people added after you, which also resets this edit link so they can’t get back in. A login added <strong>before</strong> yours (a former manager, say) only Dayton can remove: tap <strong>Message us</strong> and say who it is.</p><p>Worried someone kept an old edit link? Signed in, the person who has been on the listing longest can tap <strong>Reset edit link</strong> under People with access, so the old one stops working.</p>',
@@ -41145,25 +41295,33 @@ const OWNER_HELP_TOPICS = [
     aFr: '<ol><li>{ON}, trouvez <strong>Heures d\u2019ouverture</strong> (le bouton <strong>Heures</strong> en haut de la page y mène). Entrez l\u2019heure d\u2019ouverture et de fermeture de chaque jour, ou cochez <strong>Fermé</strong>.</li><li>Fermé l\u2019après-midi? Touchez <strong>+ deuxième plage</strong> pour une deuxième plage horaire ce jour-là.</li><li>Même horaire tous les jours de semaine? Remplissez lundi, puis touchez <strong>Copier le lundi sur mar.\u2013ven.</strong> (ou <strong>tous les jours</strong>).</li><li>Touchez {SEND} au bas de la page.</li></ol><p>{LIVE} Chaque jour d\u2019ouverture demande les deux heures. Ouvert après minuit? Indiquez l\u2019heure réelle de fermeture, comme 01:00.</p><p>Heures différentes l\u2019été et l\u2019hiver, ou fermé un jour férié? Demandez-moi les <strong>heures saisonnières</strong> ou les <strong>fermetures des fêtes</strong>.</p>' },
   // Help bot v2 (2026-10-18): seasonal hour sets and special closure dates on the edit page.
   { id: 'seasonal-hours', over: ['hours', 'season'], q: 'Different summer and winter hours', qFr: 'Heures différentes l\u2019été et l\u2019hiver', pages: ['edit'],
-    keys: ['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'holiday hours', 'christmas hours', 'hours over the holidays', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on'],
-    keysFr: ['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison', 'heures des fetes', 'horaire des fetes'],
+    keys: ['seasonal hours', 'summer hours', 'winter hours', 'fall hours', 'spring hours', 'shoulder season', 'different hours', 'hours in summer', 'hours in winter', 'hours for summer', 'hours for winter', 'longer hours', 'shorter hours', 'two sets of hours', 'summer and winter', 'winter and summer', 'winter', 'summer', 'close early', 'close earlier', 'open later', 'hours on holidays', 'hours on stat holidays', 'different hours on'],
+    keysFr: ['heures saisonnieres', 'heures d ete', 'heures d hiver', 'horaire d ete', 'horaire d hiver', 'heures de saison', 'horaire saisonnier', 'heures differentes', 'heures changent', 'l ete et l hiver', 'ete et hiver', 'basse saison', 'haute saison'],
     a: '<ol><li>{ON}, open <strong>Seasonal hours</strong> (with your opening hours) and tick <strong>We have different hours part of the year</strong>.</li><li>Give it a name if you like (“Winter hours”), pick the first and last day (for example November 1 to April 30), and fill in that season’s hours for each day.</li><li>Tap {SEND}.</li></ol><p>Every year between those days your page shows these hours instead of your usual ones, then switches back by itself. {LIVE}</p><p>Closed for the whole off-season instead? Choose <strong>Open some months only</strong>. Closed for a day or two? Use <strong>Special closures</strong>. Different hours on just one holiday? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Heures saisonnières</strong> (sous vos heures d’ouverture) et cochez <strong>Nous avons d’autres heures pendant une partie de l’année</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Ouvert certains mois seulement</strong>. Fermé un jour ou deux? Utilisez <strong>Fermetures spéciales</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],
     keys: ['holiday', 'holidays', 'stat', 'stat holiday', 'statutory holiday', 'christmas', 'christmas day', 'christmas eve', 'xmas', 'boxing day', 'new years', 'new years day', 'new years eve', 'thanksgiving', 'easter', 'good friday', 'victoria day', 'canada day', 'bc day', 'labour day', 'labor day', 'remembrance day', 'family day',
-      'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closed for two weeks', 'closed for a few weeks', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days'],
+      'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closed for two weeks', 'closed for a few weeks', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days',
+      // Round 10 (2026-10-19): "holiday hours" got Seasonal hours and "change my hours for christmas" the weekly hours.
+      'holiday hours', 'christmas hours', 'hours over the holidays', 'hours for the holidays', 'hours for christmas', 'hours over christmas', 'hours at christmas', 'new years hours', 'closed for 1 week', 'closed for 2 weeks', 'closed 1 week'],
     keysFr: ['ferie', 'jour ferie', 'jours feries', 'conge', 'noel', 'jour de noel', 'veille de noel', 'lendemain de noel', 'jour de l an', 'nouvel an', 'action de grace', 'paques', 'vendredi saint', 'fete du canada', 'fete du travail', 'fetes',
       // Round 9 (2026-10-19): "nous sommes fermés pour une semaine" found nothing.
       'fermes pour une semaine', 'ferme pour une semaine', 'fermes une semaine', 'ferme une semaine', 'fermes la semaine prochaine', 'ferme la semaine prochaine',
       'fermes deux semaines', 'ferme deux semaines', 'fermes quelques semaines', 'ferme quelques semaines', 'fermes cette semaine', 'ferme cette semaine', 'fermes quelques jours',
-      'fermeture speciale', 'fermetures speciales', 'ferme le', 'fermes le', 'ferme un jour', 'fermes un jour', 'fermeture temporaire', 'temporairement ferme', 'temporairement fermes', 'vacances', 'renovation', 'renovations', 'evenement prive', 'ferme demain', 'ferme aujourd hui', 'fermeture', 'quelques jours'],
+      'fermeture speciale', 'fermetures speciales', 'ferme le', 'fermes le', 'ferme un jour', 'fermes un jour', 'fermeture temporaire', 'temporairement ferme', 'temporairement fermes', 'vacances', 'renovation', 'renovations', 'evenement prive', 'ferme demain', 'ferme aujourd hui', 'fermeture', 'quelques jours',
+      // Round 10 (2026-10-19): « ferme pour 1 semaine » got "not sure"; « heures des fêtes » got Seasonal hours.
+      'ferme pour 1 semaine', 'fermes pour 1 semaine', 'ferme 1 semaine', 'fermes 1 semaine', 'ferme pour 2 semaines', 'fermes pour 2 semaines', 'pour 1 semaine', 'pour une semaine', 'pour 2 semaines',
+      'heures des fetes', 'horaire des fetes', 'horaires des fetes', 'heures de noel', 'horaire de noel', 'heures du temps des fetes', 'temps des fetes'],
     a: '<ol><li>{ON}, open <strong>Special closures</strong> (with your opening hours) and tap <strong>+ Add a closed day</strong>.</li><li>Pick the <strong>First day</strong> (for example December 25). Closed for longer, like renovations or a vacation? Add a <strong>Last day</strong> too. Add a short <strong>Note</strong> if you like (“Christmas”).</li><li>Tap {SEND}.</li></ol><p>On those days your page says “Closed today” with your note, for example “Closed today (Christmas)”, and visitors won’t see you as open. Past closures drop off by themselves. {LIVE}</p><p>Open on a holiday, just with different hours? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Fermetures spéciales</strong> (sous vos heures d’ouverture) et touchez <strong>+ Ajouter un jour de fermeture</strong>.</li><li>Choisissez le <strong>Premier jour</strong> (par exemple le 25 décembre). Fermé plus longtemps, pour des rénovations ou des vacances? Ajoutez aussi un <strong>Dernier jour</strong>. Ajoutez une courte <strong>Note</strong> si vous voulez (« Noël »).</li><li>Touchez {SEND}.</li></ol><p>Ces jours-là, votre page indique « Fermé aujourd’hui » avec votre note, par exemple « Fermé aujourd’hui (Noël) », et les visiteurs ne vous verront pas ouvert. Les fermetures passées disparaissent d’elles-mêmes. {LIVE}</p><p>Ouvert un jour férié, mais avec d’autres heures? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'season', over: ['hours'], q: 'I\u2019m only open some months', qFr: 'Nous sommes ouverts seulement certains mois', pages: ['edit'],
-    keys: ['season', 'seasonal', 'months', 'open some months', 'only open', 'closed in winter', 'closed for winter', 'closed for the winter', 'closed all winter', 'closed in the winter', 'closed for the season', 'off season', 'reopen', 'reopening', 'seasonal business', 'summer only', 'open in summer only', 'only in summer', 'opening day', 'season opens'],
-    keysFr: ['saison', 'saisonnier', 'saisonniere', 'certains mois', 'seulement l ete', 'ferme l hiver', 'fermes l hiver', 'ferme pour l hiver', 'fermes pour l hiver', 'ferme pour la saison', 'hors saison', 'reouverture', 'rouvrir', 'rouvre', 'mois'],
-    a: '<p>{ON}, under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then tap {SEND}. {LIVE}</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Different hours in summer and winter? Use <strong>Seasonal hours</strong>. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p>',
-    aFr: '<p>{ON}, sous les heures, choisissez <strong>Ouvert certains mois seulement</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Touchez ensuite {SEND}. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Heures saisonnières</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Fermetures spéciales</strong>.</p>' },
+    keys: ['season', 'seasonal', 'months', 'open some months', 'only open', 'closed in winter', 'closed for winter', 'closed for the winter', 'closed all winter', 'closed in the winter', 'closed for the season', 'off season', 'reopen', 'reopening', 'seasonal business', 'summer only', 'open in summer only', 'only in summer', 'opening day', 'season opens',
+      // Round 10 (2026-10-19): « ouvert à l'année maintenant » got "not sure".
+      'open all year', 'open year round', 'year round', 'all year', 'all year round', 'open every month', 'no longer seasonal', 'not seasonal anymore'],
+    keysFr: ['saison', 'saisonnier', 'saisonniere', 'certains mois', 'seulement l ete', 'ferme l hiver', 'fermes l hiver', 'ferme pour l hiver', 'fermes pour l hiver', 'ferme pour la saison', 'hors saison', 'reouverture', 'rouvrir', 'rouvre', 'mois',
+      'a l annee', 'ouvert a l annee', 'ouverts a l annee', 'toute l annee', 'ouvert toute l annee', 'ouverts toute l annee', 'plus saisonnier', 'tous les mois de l annee'],
+    a: '<p>{ON}, under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then tap {SEND}. {LIVE}</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Different hours in summer and winter? Use <strong>Seasonal hours</strong>. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p><p>Open all year now? Choose <strong>Open all year</strong> in the same list and tap {SEND}.</p>',
+    aFr: '<p>{ON}, sous les heures, choisissez <strong>Ouvert certains mois seulement</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Touchez ensuite {SEND}. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Heures saisonnières</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Fermetures spéciales</strong>.</p><p>Maintenant ouvert toute l\u2019année? Choisissez <strong>Ouvert toute l\u2019année</strong> dans la même liste et touchez {SEND}.</p>' },
   { id: 'changes-review', q: 'I sent changes but nothing changed', qFr: 'J\u2019ai envoyé des modifications, mais rien n\u2019a changé', pages: ['edit', 'account'],
     keys: ['sent changes', 'my changes', 'changes not showing', 'changes not', 'didnt change', 'not changed', 'still old', 'still shows', 'update not', 'saved', 'submitted', 'approve', 'approval', 'hours not updated', 'description not', 'nothing happened', 'didnt save', 'didnt work', 'waiting for review chip', 'review chip', 'what does waiting for review mean'],
     keysFr: ['mes modifications', 'modifications envoyees', 'rien n a change', 'pas change', 'toujours l ancienne', 'pas mis a jour', 'pas a jour', 'enregistre', 'envoye', 'rien ne s est passe'],
@@ -41282,7 +41440,9 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['autre entreprise', 'deux entreprises', 'deux restaurants', 'deux succursales', 'deuxieme succursale', 'plusieurs entreprises', 'plusieurs succursales', 'autre fiche', 'ajouter une fiche',
       // French pass 6 (2026-10-19): "deuxième établissement" found nothing.
       'deuxieme etablissement', 'second etablissement', 'autre etablissement', 'un autre etablissement', 'deux etablissements', 'plusieurs etablissements',
-      'deuxieme entreprise', 'deuxieme commerce', 'autre commerce', 'deux commerces', 'deuxieme restaurant', 'autre restaurant', 'deuxieme fiche', 'etablissements'],
+      'deuxieme entreprise', 'deuxieme commerce', 'autre commerce', 'deux commerces', 'deuxieme restaurant', 'autre restaurant', 'deuxieme fiche', 'etablissements',
+      // Round 10 (2026-10-19): « ajouter un deuxième emplacement » got "not sure".
+      'deuxieme emplacement', 'second emplacement', 'autre emplacement', 'un autre emplacement', 'deux emplacements', 'plusieurs emplacements', 'nouvel emplacement', 'emplacements', 'autre succursale', 'nouvelle succursale'],
     a: {
       in: '<p>Open the other business’s private edit link on this device while you’re signed in, and tap <strong>Add to my login</strong>. <a href="/owner/account">My listings</a> then shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
       out: '<p>Sign in first, then open the other business’s private edit link on the same device and tap <strong>Add to my login</strong>. (No login yet? Use <strong>Create a login</strong> on the first one, then do this for the others.) <a href="/owner/account">My listings</a> shows them all.</p><p>No edit link for it? <a href="/owner/link">Email me a new link</a>, or tap <strong>Claim this listing</strong> on its page. Not listed yet? <a href="/list-your-venue">List your business</a>, free.</p>',
@@ -41357,7 +41517,7 @@ const OWNER_HELP_TOPICS = [
       'privacy', 'private', 'is my login private', 'personal information', 'my data', 'my information', 'share my email', 'sell my email'],
     keysFr: ['qui peut voir mon compte', 'qui peut voir mon courriel', 'qui peut voir', 'voir mon courriel', 'voir mon mot de passe', 'courriel public', 'courriel visible', 'confidentialite', 'vie privee', 'prive', 'renseignements personnels', 'mes donnees'],
     a: '<p>Your login is private:</p><ul><li><strong>Visitors never see it.</strong> Your login email isn’t shown on your listing, and we don’t share or sell it.</li><li><strong>Your password</strong> is stored scrambled, so nobody can read it, us included.</li><li>The only people who see your login email are the others with a login for the same listing, in <strong>People with access</strong> on your edit page, and Dayton at Okanagan Roam.</li></ul><p>What <em>is</em> public is what you put on the listing itself: phone, website, address and links. Want someone off your listing? Ask me about <strong>who has access</strong>. More in our <a href="/privacy">privacy policy</a>.</p>',
-    aFr: '<p>Votre compte est privé :</p><ul><li><strong>Les visiteurs ne le voient jamais.</strong> Le courriel de votre compte n’est pas affiché sur votre fiche, et nous ne le partageons ni ne le vendons.</li><li><strong>Votre mot de passe</strong> est enregistré sous forme brouillée : personne ne peut le lire, pas même nous.</li><li>Les seules personnes qui voient le courriel de votre compte sont les autres personnes ayant un compte pour la même fiche, dans <strong>Personnes ayant accès</strong> sur votre page de modification, et Dayton chez Okanagan Roam.</li></ul><p>Ce qui <em>est</em> public, c’est ce que vous mettez sur la fiche : téléphone, site Web, adresse et liens. Vous voulez retirer quelqu’un de votre fiche? Demandez-moi <strong>qui a accès</strong>. Plus de détails dans notre <a href="/fr/privacy">politique de confidentialité</a>.</p>' },
+    aFr: '<p>Votre compte est privé :</p><ul><li><strong>les visiteurs ne le voient jamais.</strong> Le courriel de votre compte n’est pas affiché sur votre fiche, et nous ne le partageons ni ne le vendons.</li><li><strong>votre mot de passe</strong> est enregistré sous forme brouillée : personne ne peut le lire, pas même nous.</li><li>les seules personnes qui voient le courriel de votre compte sont les autres personnes ayant un compte pour la même fiche, dans <strong>Personnes ayant accès</strong> sur votre page de modification, et Dayton chez Okanagan Roam.</li></ul><p>Ce qui <em>est</em> public, c’est ce que vous mettez sur la fiche : téléphone, site Web, adresse et liens. Vous voulez retirer quelqu’un de votre fiche? Demandez-moi <strong>qui a accès</strong>. Plus de détails dans notre <a href="/fr/privacy">politique de confidentialité</a>.</p>' },
   { id: 'google', over: ['links', 'phone', 'hours', 'name-address', 'reviews'], q: 'My phone number or hours are wrong on Google', qFr: 'Mon numéro ou mes heures sont erronés sur Google', pages: ['edit', 'account'],
     keys: ['on google', 'wrong on google', 'google maps', 'google listing', 'google business', 'google business profile', 'google profile', 'google search', 'google shows', 'google says', 'google has', 'in google', 'from google'],
     keysFr: ['sur google', 'google maps', 'fiche google', 'profil google', 'profil d entreprise google', 'google affiche', 'dans google'],
@@ -41377,6 +41537,23 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['en francais', 'version francaise', 'anglais', 'en anglais', 'langue', 'traduire', 'traduction', 'traduit'],
     a: '<p>Yes. Every business portal page has a French version: sign-in, <strong>My listings</strong>, your edit page, <strong>Account settings</strong> and the menu screen. Tap <strong>EN / FR</strong> at the top of the page to switch; this device remembers your choice. Emails you ask for from a French page (a new edit link, a password reset) come in French too.</p>',
     aFr: '<p>Oui. Toutes les pages de l\u2019espace entreprises sont en français : la connexion, <strong>Mes fiches</strong>, votre page de modification (<strong>Heures d\u2019ouverture</strong>, <strong>Photos</strong>, <strong>Ajouter un événement</strong>, <strong>Enregistrer les modifications</strong>…), les <strong>Paramètres du compte</strong> et l\u2019écran du menu. Touchez <strong>FR / EN</strong> en haut de la page pour changer de langue; cet appareil retient votre choix. Les courriels demandés à partir d\u2019une page en français (nouveau lien, réinitialisation du mot de passe) arrivent aussi en français.</p>' },
+  // Round 10 (2026-10-19): « ma fiche dit fermé mais on est ouvert » got the Claim answer on My listings; "my photos
+  // are blurry" had no photo tips; "who are you" / « qui êtes-vous » got "not sure".
+  { id: 'shows-closed', over: ['hours', 'season', 'claim'], q: 'My page says closed but we’re open', qFr: 'Ma fiche dit fermé, mais nous sommes ouverts', pages: ['edit', 'account'],
+    keys: ['says closed', 'says were closed', 'says we are closed', 'shows closed', 'shows as closed', 'showing closed', 'listed as closed', 'marked closed', 'marked as closed', 'says closed but', 'closed but we are open', 'closed but were open', 'says closed now', 'wrong closed'],
+    keysFr: ['dit ferme', 'dit fermes', 'indique ferme', 'indique fermes', 'affiche ferme', 'affiche fermes', 'marque ferme', 'ferme mais on est ouvert', 'ferme mais nous sommes ouverts', 'fermes mais nous sommes ouverts', 'mais on est ouvert', 'mais on est ouverts', 'mais nous sommes ouverts'],
+    a: '<p>Your page works out “open” or “closed” from three things on your edit page. Check each one:</p><ol><li><strong>Opening hours:</strong> today needs an open and a close time, and <strong>Closed</strong> must not be ticked.</li><li><strong>Open some months only:</strong> if you’re open all year now, choose <strong>Open all year</strong>; otherwise check the first and last month.</li><li><strong>Special closures</strong> and <strong>Seasonal hours:</strong> remove an old closed day, or fix the dates.</li></ol><p>{ON}, fix what’s wrong and tap {SEND}. {LIVE} Still wrong after that? <strong>Message us</strong>.</p>',
+    aFr: '<p>Votre page calcule « ouvert » ou « fermé » à partir de trois éléments de votre page de modification. Vérifiez chacun :</p><ol><li><strong>Heures d’ouverture :</strong> aujourd’hui doit avoir une heure d’ouverture et de fermeture, et <strong>Fermé</strong> ne doit pas être coché.</li><li><strong>Ouvert certains mois seulement :</strong> si vous êtes maintenant ouvert toute l’année, choisissez <strong>Ouvert toute l’année</strong>; sinon, vérifiez le premier et le dernier mois.</li><li><strong>Fermetures spéciales</strong> et <strong>Heures saisonnières :</strong> retirez un ancien jour de fermeture ou corrigez les dates.</li></ol><p>{ON}, corrigez ce qui ne va pas et touchez {SEND}. {LIVE} Toujours incorrect? <strong>Écrivez-nous</strong>.</p>' },
+  { id: 'photo-blurry', over: ['photo-add', 'photo-main', 'menu-blurry'], q: 'My photos look blurry', qFr: 'Mes photos sont floues', pages: ['edit'],
+    keys: ['blurry photos', 'photos are blurry', 'photos look blurry', 'photo looks blurry', 'blurry pictures', 'pictures are blurry', 'blurry picture', 'blurry image', 'blurry images', 'fuzzy photo', 'fuzzy photos', 'pixelated', 'pixelated photo', 'grainy', 'grainy photo', 'low quality photo', 'low quality photos', 'photo quality', 'photo tips', 'tips for photos', 'better photos', 'good photos', 'sharper photo', 'sharper photos', 'not sharp'],
+    keysFr: ['photos floues', 'sont floues', 'photos sont floues', 'images floues', 'photo pixelisee', 'photos pixelisees', 'pixelisee', 'pixelisees', 'photos de mauvaise qualite', 'mauvaise qualite', 'qualite des photos', 'conseils photo', 'conseils pour les photos', 'meilleures photos', 'belles photos', 'photos plus nettes', 'pas nette', 'pas nettes'],
+    a: '<ul><li>Upload the <strong>original</strong> photo from your phone or camera. Screenshots and photos saved from Facebook, Instagram or a website are shrunk and look blurry on a big screen.</li><li>Shoot in daylight, wipe the lens, and hold the phone steady. Don’t zoom in: step closer instead.</li><li>Hold the phone sideways: wide photos fill the banner without being cropped.</li><li>Best subjects: the inside of your place, your patio or view, your food or drinks, or your storefront with the name.</li></ul><p>{ON}, add the sharper photos under <strong>Photos</strong>. To take an old one down, ask me about <strong>changing or removing a photo</strong>.</p>',
+    aFr: '<ul><li>Téléversez la photo <strong>originale</strong> de votre téléphone ou de votre appareil photo. Les captures d’écran et les photos enregistrées depuis Facebook, Instagram ou un site Web sont réduites et paraissent floues sur un grand écran.</li><li>Photographiez à la lumière du jour, essuyez l’objectif et tenez le téléphone bien droit. Évitez le zoom : approchez-vous plutôt.</li><li>Tenez le téléphone à l’horizontale : les photos larges remplissent la bannière sans être recadrées.</li><li>Meilleurs sujets : l’intérieur de votre établissement, votre terrasse ou la vue, vos plats ou vos boissons, ou votre devanture avec le nom.</li></ul><p>{ON}, ajoutez les photos plus nettes sous <strong>Photos</strong>. Pour retirer une ancienne photo, demandez-moi comment <strong>changer ou retirer une photo</strong>.</p>' },
+  { id: 'about', q: 'Who are you?', qFr: 'Qui êtes-vous?', pages: [],
+    keys: ['who are you', 'what are you', 'are you a bot', 'are you a robot', 'are you real', 'are you human', 'are you a person', 'is this a bot', 'is this a robot', 'who am i talking to', 'who is this', 'who runs this', 'who runs okanagan roam', 'what is okanagan roam'],
+    keysFr: ['qui etes vous', 'vous etes qui', 'qui es tu', 't es qui', 'etes vous un robot', 'es tu un robot', 'etes vous humain', 'etes vous une personne', 'c est un robot', 'qui parle', 'a qui je parle', 'qui gere okanagan roam', 'c est quoi okanagan roam'],
+    a: '<p>I’m the Okanagan Roam help guide for businesses: a list of ready answers about your listing (photos, hours, events, menus, logins), not a person or an AI. Okanagan Roam is a free guide to the Okanagan run by Dayton.</p><p>Need a real person? Tap <strong>Message us</strong> and Dayton will reply by email, usually within a day.</p>',
+    aFr: '<p>Je suis le guide d’aide d’Okanagan Roam pour les entreprises : une liste de réponses toutes prêtes sur votre fiche (photos, heures, événements, menus, connexion), pas une personne ni une IA. Okanagan Roam est un guide gratuit de l’Okanagan tenu par Dayton.</p><p>Besoin de parler à quelqu’un? Touchez <strong>Écrivez-nous</strong> et Dayton vous répondra par courriel, en général d’ici un jour.</p>' },
   { id: 'cost', q: 'Does this cost anything?', qFr: 'Est-ce que c\u2019est payant?', pages: ['edit', 'account', 'login', 'claim'],
     keys: ['cost', 'costs', 'does it cost', 'how much does', 'pay', 'paid', 'free', 'charge', 'fee', 'fees', 'subscription', 'featured', 'advertise', 'advertising', 'premium', 'sponsored'],
     keysFr: ['gratuit', 'cout', 'coute', 'combien ca coute', 'payer', 'payant', 'frais', 'abonnement', 'publicite', 'en vedette', 'commandite'],
@@ -42623,7 +42800,7 @@ const CLAIM_TEXT = {
   },
   fr: {
     title: 'Réclamer cette fiche', eyebrow: 'Pour les entreprises',
-    intro: 'Vous êtes propriétaire ou gérant {deName}? Dites-nous qui vous êtes et comment vérifier que c’est bien vous. Ensuite, nous vous enverrons par courriel un lien privé pour modifier la fiche : photos, heures, menu ou tarifs, et événements. C’est gratuit.',
+    intro: 'Vous êtes propriétaire, gérant ou gérante {deName}? Dites-nous qui vous êtes et comment vérifier que c’est bien vous. Ensuite, nous vous enverrons par courriel un lien privé pour modifier la fiche : photos, heures, menu ou tarifs, et événements. C’est gratuit.',
     name: 'Votre nom', role: 'Votre rôle', choose: 'Choisissez', email: 'Courriel de l’entreprise', emailHint: 'Nous enverrons le lien de modification à cette adresse.',
     phone: 'Numéro de téléphone', verify: 'Comment vérifier que c’est bien vous?', detailSocial: 'Quel compte? (par exemple @votreentreprise)', detailOther: 'Expliquez-nous',
     message: 'Autre chose? (facultatif)', submit: 'Envoyer ma demande', sending: 'Envoi…',
