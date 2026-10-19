@@ -258,13 +258,15 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
         const word=event[0].toLowerCase();
         const eventKind=/hockey/.test(word)?'hockey':/concert|music/.test(word)?'live-music':/festivals?/.test(word)?'festival':/markets?/.test(word)?'market':null;
         const value=eventKind==='hockey'?'sports-recreation':eventKind==='live-music'?'live-music':eventKind==='festival'?'events-festivals':eventKind==='market'?'markets-fairs':'any';
-        add('event',value,scopeText,{eventKind});
+        // Round 10 (2026-10-19): "Christmas markets" are the holiday markets, not any market.
+        add('event',value,scopeText,eventKind==='market'&&/\b(?:christmas|xmas|holiday|festive)\s+(?:craft\s+)?markets?\b/.test(c)?{eventKind,holiday:true}:{eventKind});
       }
     }
     // "A comedy show", "dinner and a show" (2026-10-19): comedy is an event whose listing says comedy; a show is any
     // listed performance.
     const comedy=/\b(?:comedy|comedians?|improv|stand ?up)\b/.exec(c), show=/\b(?:a|the|some|any) (?:\w+ )?shows?\b|\bshows\b/.exec(c);
-    if((comedy||show)&&!items.some(i=>i.kind==='event'&&i.sourceText===scopeText)&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,(comedy||show).index))&&!/\b(?:show (?:me|us)|shows? (?:me|us))\b/.test(c))add('event','any',scopeText,comedy?{eventKind:'comedy',textTerms:['comedy']}:{eventKind:'show'});
+    // Round 10: "shows and live music" asks for both (the show was dropped once live music was read).
+    if((comedy||show)&&!items.some(i=>i.kind==='event'&&i.sourceText===scopeText&&!['live-music','hockey','festival','market'].includes(i.eventKind))&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,(comedy||show).index))&&!/\b(?:show (?:me|us)|shows? (?:me|us))\b/.test(c))add('event','any',scopeText,comedy?{eventKind:'comedy',textTerms:['comedy']}:{eventKind:'show'});
     for (const [activity,re] of Object.entries({skiing:/\b(?:ski|skiing)\b/,snowshoeing:/\b(?:snowshoeing|snowshoe)\b/,winter:/\b(?:ski|skiing|snowshoeing|snowshoe|winter activities?)\b/,hiking:/\b(?:hike|hiking|hikes)\b/,viewpoints:/\b(?:viewpoints?|lookouts?|sunset)\b/})) {
       const m=re.exec(c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('activity',activity,scopeText);
     }
@@ -325,7 +327,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // 2026-10-14: "pizza one night", "sushi once" -- that food is wanted on one meal, not every day (a 3-day family trip
   // planned pizza for all three dinners). The word just before the frequency phrase is kept; the planner uses it once.
   const {onceTerms,onceEvening}=onceFoods(normalizedText);
-  return {onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null};
+  return {onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null};
 }
 // Words covered by verified requirement grammar must not also become
 // unmatched cuisine searches. Unknown terms still reach the old interpreter.
@@ -509,7 +511,9 @@ function namedEventInterpretationText(text, events = [], details = false) {
 
 function eventMatches(event,item) {
   if (item.eventKind === 'comedy' && !/\b(?:comedy|comedian|comedians|comedic|improv|stand ?up|laughs?)\b/.test(norm(`${event.name || ''} ${event.description || ''}`))) return false;
-  if (item.eventKind === 'show' && !(event.categories || []).some(c => ['arts-culture','live-music','nightlife'].includes(c)) && !/\b(?:show|shows|comedy|concert|theatre|theater|performance|musical|play)\b/.test(norm(event.name || ''))) return false;
+  // Round 10: a nightlife listing alone (a coffee social, a boutique night) is not a show.
+  if (item.eventKind === 'show' && !(event.categories || []).some(c => ['arts-culture','live-music'].includes(c)) && !/\b(?:show|shows|comedy|concert|theatre|theater|performance|musical|play|dance|ballet|opera|symphony)\b/.test(norm(event.name || ''))) return false;
+  if (item.holiday && !(event.categories || []).includes('holiday-seasonal') && !/\b(?:christmas|xmas|holiday|festive|santa|noel)\b/.test(norm(event.name || ''))) return false;
   if (item.nameTerms?.length && !item.nameTerms.every(term => norm(event.name || '').split(' ').includes(term))) return false;
   if(item.value !== 'any' && !(event.categories || []).includes(item.value)) return false;
   // A comedian listed under Live Music is not live music (2026-10-19).

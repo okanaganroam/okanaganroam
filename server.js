@@ -6185,10 +6185,16 @@ function parseTripPlanBody(body) {
     // id (round 7): the place being swapped out, kept with a note when nothing else fits.
     // locked (round 8): the stops the visitor locked; the other pins only keep the plan steady and may give way.
     // times (round 9, 2026-10-19): the start of each shown stop, so a Swap keeps every other stop's time of day.
-    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times'].includes(k)) || !TRIP_PLAN_PIN_RE.test(w.key || '') || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
+    // stops (round 10, 2026-10-19): a short plan's shown stops in order, for a Swap of stop "it-<n>" on that plan.
+    const itKey = (k) => /^it-\d{1,2}$/.test(k || '');
+    const swapKey = (k) => TRIP_PLAN_PIN_RE.test(k || '') || itKey(k);
+    const stopsOk = (a) => Array.isArray(a) && a.length <= 12 && a.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['ref', 'label', 'daypart', 'component', 'gapFill', 'wineryLunch'].includes(k))
+      && (x.ref === null || x.ref === undefined || /^(?:venue|event):\d{1,9}$/.test(x.ref)) && (x.label === undefined || (typeof x.label === 'string' && x.label.length <= 60)) && (x.daypart === undefined || /^[a-z]{1,12}$/.test(x.daypart))
+      && (x.component === undefined || x.component === null || (Number.isInteger(x.component) && x.component >= 0 && x.component < 20)) && (x.gapFill === undefined || typeof x.gapFill === 'boolean') && (x.wineryLunch === undefined || typeof x.wineryLunch === 'boolean'));
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times', 'stops'].includes(k)) || !swapKey(w.key) || (itKey(w.key) && !stopsOk(w.stops)) || (w.stops !== undefined && !itKey(w.key)) || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
       || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))
-      || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => TRIP_PLAN_PIN_RE.test(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
-    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}) };
+      || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => swapKey(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
+    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}), ...(w.stops !== undefined ? { stops: w.stops.map((x) => ({ ...x })) } : {}) };
   }
   return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap } };
 }
@@ -6241,6 +6247,21 @@ function tripRequestedMonthDate(intent, now = new Date()) {
   if (!month) return null;
   if (month === current) return today;
   return `${Number(today.slice(0, 4)) + (month < current ? 1 : 0)}-${String(month).padStart(2, '0')}-15`;
+}
+
+// Round 10 (2026-10-19): when a trip in a month the request names starts -- the month's first Saturday for a weekend or
+// a 2-day trip, its first Friday for 3 days, otherwise the 1st -- never before today. Null when no month is named
+// (a season keeps tripRequestedMonthDate's mid-month date). "Family weekend in Vernon in November" was this weekend.
+function tripMonthStart(intent, days, now = new Date()) {
+  if (!intent || !Number.isInteger(intent.month)) return null;
+  const anchor = tripRequestedMonthDate(intent, now);
+  if (!anchor) return null;
+  const today = todayLocal(now);
+  let from = `${anchor.slice(0, 8)}01`;
+  if (from < today) from = today;
+  const want = days === 3 ? 5 : !days || days <= 2 ? 6 : null;
+  if (want != null) from = addLocalDays(from, (want - localWeekday(from) + 7) % 7);
+  return from;
 }
 
 // The Okanagan wall clock at an instant: { weekday: 'thu', minutes: 1266 }
@@ -6490,6 +6511,19 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     // No length in the request (2026-10-19): the page asks for one.
     result.lengthAsked = intent.days != null || overrides?.days !== undefined || !!requirements?.items.some(i=>i.kind==='days');
     if (requirements?.startDate) {const endDate=(plan.days || []).at(-1)?.date || requirements.endDate || requirements.startDate;const nice=(iso)=>{const d=new Date(`${iso}T12:00:00Z`);return Number.isFinite(d.getTime())?`${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()]}, ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]} ${d.getUTCDate()}`:iso;};result.when = endDate!==requirements.startDate ? `${nice(requirements.startDate)} – ${nice(endDate)}` : nice(requirements.startDate);result.season=null;}
+    // Round 10 (2026-10-19): a French request's unused words are the visitor's own French words (« novembre »,
+    // « marchés »), never the English rewrite.
+    if (planText !== text && typeof text === 'string') {
+      const quoted = (list) => (list || []).flatMap((w) => [...String(w).matchAll(/“([^”]{1,40})”/g)].map((m) => m[1]));
+      const own = tripPlannerFrModule().frenchWordsFor ? tripPlannerFrModule().frenchWordsFor(text, taxonomy, [...(result.notUsed || []), ...(plan.unsupported || []), ...quoted(plan.warnings), ...quoted(plan.notes)]) : new Map();
+      if (own.size) {
+        result.notUsed = (result.notUsed || []).map((u) => own.get(String(u)) || u);
+        plan.unsupported = (plan.unsupported || []).map((u) => own.get(String(u)) || u);
+        const requote = (w) => String(w).replace(/“([^”]{1,40})”/g, (m, x) => (own.has(x) ? `“${own.get(x)}”` : m));
+        if (Array.isArray(plan.warnings)) plan.warnings = plan.warnings.map(requote);
+        if (Array.isArray(plan.notes)) plan.notes = plan.notes.map(requote);
+      }
+    }
     return result;
   };
   if (requirements && !trip.multi && !requirements.items.some(i=>['days','venue_kind','venue','type'].includes(i.kind)) && requirements.items.some(i=>i.kind==='event')) {
@@ -6519,10 +6553,14 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     if (overrides?.pace !== undefined) intent.pace = overrides.pace;
     intent.days = overrides && overrides.days !== undefined ? overrides.days : requirements.items.find(i => i.kind === 'days').value;
     trip.multi = false;
+    // Round 10 (2026-10-19): "3 days in Vernon in November with shows" reads November's shows, and the plan is dated.
+    const monthFrom = !requirements.startDate && !intent.when ? tripMonthStart(intent, intent.days, now) : null;
+    if (monthFrom) { requirements.startDate = monthFrom; requirements.endDate = intent.days > 1 ? addLocalDays(monthFrom, Math.min(7, intent.days) - 1) : null; requirements.dateSource = requirements.dateSource || 'the month you named'; }
     const from = requirements.startDate || tripPlanDate(intent.when, now);
     const to = addLocalDays(from, Math.max(1, Math.min(7, intent.days)) - 1);
     const window = resolveWhatsOnWindow({ from, to }, now);
-    const categories = requirements.items.filter(i => i.kind === 'event' && i.value !== 'any').map(i => i.value);
+    // Round 10: "shows and live music" reads every category (a show is not only Live Music).
+    const categories = requirements.items.some(i => i.kind === 'event' && i.value === 'any') ? [] : requirements.items.filter(i => i.kind === 'event' && i.value !== 'any').map(i => i.value);
     // 2026-10-18: every town's events, one per dated occurrence; the planner keeps those in each day's town or one
     // about 30 minutes away. (Only the named towns were read: a Vernon-to-Osoyoos road trip never saw Kelowna's or
     // Penticton's live music, and a weekend event was only ever on its first day.)
@@ -6537,6 +6575,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     // 2026-10-19: an undated "Halloween weekend ... with my kids" is the Halloween weekend, not the coming one.
     const halloween = tripPlannerModule().holidayTheme(interpretationText)?.key === 'halloween';
     if (!from && halloween && !intent.when) from = halloweenTripStart(days, now);
+    // A named month wins over "weekend" (round 10): a November weekend, not this one.
+    if (!from && !intent.when) from = tripMonthStart(intent, days, now);
     if (!from && /\bweekends?\b/i.test(interpretationText) && !intent.when) {
       const today = todayLocal(now), wd = localWeekday(today);
       from = wd === 6 ? today : addLocalDays(today, (6 - wd + 7) % 7 || 7);
@@ -6600,6 +6640,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       seed,
       excludeIds: excludeVenueIds,
       avoidIds: avoidVenueIds,
+      // Round 10 (2026-10-19): a Swap on a short plan ("dinner and a show") changes that one stop.
+      swap,
       startWeekday: tripStartWeekday(trip.when, now),
       clock: okanaganClock(now),
       tripDate: (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),

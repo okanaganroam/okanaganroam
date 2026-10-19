@@ -197,6 +197,11 @@ const PHRASES = [
   // Round 8 (2026-10-19): « spectacle » is any show (theatre, comedy, a concert), not only a concert.
   ['spectacle musical', 'concert'], ['spectacle de musique', 'concert'], ['le spectacle', 'the show'], ['du spectacle', 'the show'], ['des spectacles', 'shows'],
   ['spectacle', 'a show'], ['spectacles', 'shows'], ['evenement', 'event'], ['evenements', 'events'],
+  // Round 10: Christmas markets, and « de la musique » with shows is live music.
+  ['marches de noel', 'christmas markets'], ['marche de noel', 'christmas market'], ['marches du temps des fetes', 'christmas markets'], ['marche des fetes', 'christmas market'],
+  ['noel', 'christmas'], ['temps des fetes', 'holidays'],
+  ['de la musique', 'live music'], ['musique', 'live music'],
+  ['marches', 'markets'],
   ['marche fermier', 'farmers market'], ['marche des fermiers', 'farmers market'], ['marche public', 'farmers market'],
   ['marches publics', 'farmers markets'], ['marche de producteurs', 'farmers market'], ['marches fermiers', 'farmers markets'],
   ['partie de hockey', 'hockey game'], ['match de hockey', 'hockey game'], ['galerie', 'gallery'], ['galeries', 'galleries'],
@@ -382,16 +387,62 @@ function isFrenchTripRequest(text, taxonomy) {
 // The request the planner reads: the English rewrite of a French request, or
 // the original string, unchanged, for anything else. { frenchPage: true } (a
 // search from a French page) also counts the French-only drink words.
-function tripPlannerText(text, taxonomy, { frenchPage = false } = {}) {
-  if (typeof text !== 'string') return text;
+function tripPlannerText(text, taxonomy, opts = {}) {
+  const r = translateTrip(text, taxonomy, opts);
+  return r ? r.text : text;
+}
+// The same tokens with their accents (round 10): « novembre », « marchés », for showing the visitor's own words back.
+function displayTokens(text) {
+  return String(text)
+    .slice(0, di.DISCOVERY_MAX_TEXT_LENGTH)
+    .normalize('NFC').replace(/(^|[^a-zà-ÿ])où(?![a-zà-ÿ])/gi, '$1 où ')
+    .toLowerCase()
+    .replace(/œ/g, 'oe').replace(/æ/g, 'ae')
+    .replace(/[‘’`]/g, "'")
+    .replace(/\bs'(ils?)\b/g, 'si $1')
+    .replace(/\b(l|d|j|qu|n|m|t|c|s|jusqu|lorsqu|puisqu)'/g, '$1 ')
+    .replace(/'s\b/g, 's')
+    .replace(/20\d{2}-\d{2}-\d{2}|[-–—_/]/g, m => /^20\d/.test(m) ? m : ' ')
+    .replace(/&/g, ' and ')
+    .replace(/\n/g, ' ; ')
+    .match(/20\d{2}-\d{2}-\d{2}|[a-z0-9à-ÿ]+|[,.;]/g) || [];
+}
+// Round 10 (2026-10-19): the visitor's own French words for English words the planner could not use ("november" ->
+// "novembre", "marches" -> "marchés"), so /fr/trip never quotes the English rewrite back. Words not found are left out
+// of the map.
+function frenchWordsFor(text, taxonomy, words) {
+  const out = new Map();
+  const r = translateTrip(text, taxonomy, {});
+  if (!r || !Array.isArray(words)) return out;
+  const shown = displayTokens(text);
+  if (shown.length !== r.tokens.length) return out;
+  for (const w of words) {
+    const want = di.normalizeDiscoveryText(String(w || '')).split(' ').filter(Boolean);
+    if (!want.length) continue;
+    const piece = r.pieces.find((p) => { const en = di.normalizeDiscoveryText(p.en).split(' '); return want.every((x) => en.includes(x)); })
+      || (want.length > 1 ? null : r.pieces.find((p) => p.to - p.from === 1 && r.tokens[p.from] === want[0]));
+    if (piece) out.set(String(w), shown.slice(piece.from, piece.to).join(' '));
+  }
+  return out;
+}
+function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
+  if (typeof text !== 'string') return null;
   const tokens = tokenize(text);
-  if (!mayBeFrench(tokens, text, frenchPage)) return text;
+  if (!mayBeFrench(tokens, text, frenchPage)) return null;
   const places = placesFor(taxonomy);
   const keep = protectedPositions(tokens, places.names);
-  if (!isFrenchTokens(tokens, keep, text, frenchPage)) return text;
+  if (!isFrenchTokens(tokens, keep, text, frenchPage)) return null;
+  const pieces = [];
   const out = [];
+  const realPush = out.push.bind(out);
+  // Each English piece remembers the French tokens it came from.
+  let pieceFrom = 0;
+  out.push = (...xs) => { for (const x of xs) pieces.push({ en: String(x), from: pieceFrom, to: pieceFrom + 1 }); return realPush(...xs); };
   let fromOpen = false;
-  for (let i = 0; i < tokens.length;) {
+  for (let i = 0, mark = 0; i < tokens.length;) {
+    // The pieces pushed in the last step span the tokens it consumed.
+    for (let k = mark; k < pieces.length; k++) pieces[k].to = Math.max(pieces[k].to, i);
+    mark = pieces.length; pieceFrom = i;
     const w = tokens[i];
     if (keep.has(i) || /^[,.;]$/.test(w)) { out.push(w); i += 1; continue; }
     // French departure clocks use 24-hour h notation. Rewrite only an
@@ -413,8 +464,14 @@ function tripPlannerText(text, taxonomy, { frenchPage = false } = {}) {
     const fr = Object.keys(REGION_FRENCH).find((p) => tokens.slice(i, i + p.split(' ').length).join(' ') === p);
     if (fr) { out.push(REGION_FRENCH[fr]); i += fr.split(' ').length; continue; }
     const nextRegion = regionAt(tokens, i + 1, places.regions);
-    if ((w === 'de' || w === 'depuis') && nextRegion && tokens.slice(i + 1 + nextRegion, i + 4 + nextRegion).some((x) => x === 'a' || x === 'vers' || x === 'jusqu')) {
+    // Round 10 (2026-10-19): « d'Osoyoos à Vernon » (the elided d') is a route too, and so is « Osoyoos à Vernon » with no
+    // « de » at all: both were read "of osoyoos in vernon", a trip that ran north to south.
+    if ((w === 'de' || w === 'd' || w === 'depuis') && nextRegion && tokens.slice(i + 1 + nextRegion, i + 4 + nextRegion).some((x) => x === 'a' || x === 'vers' || x === 'jusqu')) {
       out.push('from'); fromOpen = true; i += 1; continue;
+    }
+    const hereRegion = fromOpen ? 0 : regionAt(tokens, i, places.regions);
+    if (hereRegion && !['de', 'd', 'depuis', 'from', 'a', 'vers', 'en', 'au'].includes(tokens[i - 1] || '') && ['a', 'vers'].includes(tokens[i + hereRegion]) && regionAt(tokens, i + hereRegion + 1, places.regions)) {
+      out.push('from', tokens.slice(i, i + hereRegion).join(' ')); fromOpen = true; i += hereRegion; continue;
     }
     if (w === 'jusqu' && tokens[i + 1] === 'a') { out.push(fromOpen ? 'to' : 'in'); fromOpen = false; i += 2; continue; }
     if ((w === 'a' || w === 'vers') && nextRegion) { out.push(fromOpen ? 'to' : 'in'); fromOpen = false; i += 1; continue; }
@@ -436,7 +493,7 @@ function tripPlannerText(text, taxonomy, { frenchPage = false } = {}) {
     out.push(w);
     i += 1;
   }
-  return out.join(' ').replace(/\s+,/g, ',').replace(/\s+/g, ' ').trim();
+  return { text: out.join(' ').replace(/\s+,/g, ',').replace(/\s+/g, ' ').trim(), pieces, tokens };
 }
 
-module.exports = { tripPlannerText, isFrenchTripRequest };
+module.exports = { tripPlannerText, isFrenchTripRequest, frenchWordsFor };
