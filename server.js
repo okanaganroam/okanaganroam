@@ -23881,6 +23881,10 @@ ${cfg.extraHead || ''}
 <style id="curated-hub">
   body.curated-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
   body.curated-hub-page .card-note-label { font-weight: 800; }
+  /* How we pick (2026-10-19): a short note under the heading on Hidden Gems, Secret Spots and Local Favourites. */
+  body.curated-hub-page .how-we-pick { background: var(--paper, #FBF6EC); border-left: 4px solid var(--teal-deep, #1F5450); border-radius: 12px; padding: 12px 16px; margin: 4px 0 18px; max-width: 760px; }
+  body.curated-hub-page .how-we-pick h2 { font-size: 1rem; margin: 0 0 4px; color: var(--ink, #2A2019); }
+  body.curated-hub-page .how-we-pick p { margin: 0; font-size: 0.92rem; line-height: 1.5; color: rgba(42,32,25,0.85); }
 </style>
 </head>
 <body class="golf-page outdoor-page fd-page curated-hub-page ${cfg.bodyClass}">
@@ -23909,7 +23913,8 @@ ${renderGolfHeaderHtml()}
   })();
   </script>`, `<h1>${escapeHtml(content.heading)}</h1>
   ${content.intro ? `<p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>` : ''}${cfg.heroExtraHtml || ''}`)}
-  ${cfg.leadHtml || ''}
+  ${cfg.leadHtml || ''}${cfg.howWePick ? `
+  <section class="how-we-pick" aria-labelledby="howWePickHead"><h2 id="howWePickHead">${escapeHtml(cfg.howWePick.heading)}</h2><p>${escapeHtml(cfg.howWePick.text)}</p></section>` : ''}
   ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
   ${chips}
   ${controlsHtml}
@@ -23960,6 +23965,8 @@ function renderLocalFavouritesHubPage(venues, filter = null, now = new Date()) {
     photoKeyFor: (v) => curatedPhotoKey(v),
     cardNotes: getPublicCollectionNotes('local_favorite'),
     cardNoteLabel: 'Local pick:',
+    // How we pick (2026-10-19): the written Local Favourites standard (AI_HANDOFF.md), in plain words.
+    howWePick: { heading: 'How we pick our Local Favourites', text: 'A Local Favourite is a place people who live here genuinely love and recommend. We pick each one by hand and look for real local roots: locally owned or run, part of the community for years, recognized by local media, community groups or the town itself, or simply a place locals send their friends. High ratings or being popular with tourists aren\u2019t enough on their own. Each card has a short \u201cLocal pick\u201d note saying why it\u2019s here.' },
     cardOpts: { hideLocalFavouriteBadge: true },
     features: LOCAL_FAVOURITES_FEATURES,
     openNow: true,
@@ -24009,6 +24016,8 @@ function renderSecretSpotsHubPage(venues, filter = null, now = new Date()) {
     cardNotes: getPublicCollectionNotes('hidden_gem'),
     cardNoteLabel: 'Why it\u2019s a gem:',
     cardOpts: { hideHiddenGemBadge: true },
+    // How we pick (2026-10-19): Secret Spots are the Hidden Gems that are places to explore (SECRET_SPOT_TYPES).
+    howWePick: { heading: 'How we pick our Secret Spots', text: 'Secret Spots are the Hidden Gems that are places to explore rather than places to eat: parks, gardens, waterfalls, trails and quieter beaches. We choose each one by hand, looking for spots a local parks, tourism or community source points to as quieter or lesser known, the kind you\u2019d only find if someone told you. They aren\u2019t picked or ranked by popularity or ratings. Each card says why it\u2019s worth seeking out.' },
     features: ['free_entry', 'dog_friendly', 'kid_friendly', 'lake_view'],
     openNow: false,
     search: { label: 'Search secret spots', placeholder: 'Search by name, town, waterfall or trail...' },
@@ -24460,6 +24469,8 @@ function renderHiddenGemsHubPage(venues, filter = null, feature = null, now = ne
     photoKeyFor: (v) => curatedPhotoKey(v),
     cardNotes: getPublicCollectionNotes('hidden_gem'),
     cardNoteLabel: 'Why it’s a gem:',
+    // How we pick (2026-10-19): hand-picked, easy to miss, not ranked by ratings; "Mixed" order reshuffles daily.
+    howWePick: { heading: 'How we pick our Hidden Gems', text: 'Every Hidden Gem is chosen by hand, one place at a time. We look for spots that are easy to miss: small independents, places off the main strip, or somewhere a local tourism, parks or community source points to as a lesser-known find. Each one has to be worth the trip on its own merits. Star ratings and review counts don\u2019t decide it, and the list isn\u2019t ranked: \u201cMixed\u201d order changes every day. Every card tells you why it made the cut.' },
     cardOpts: { hideHiddenGemBadge: true },
     features: badge ? [] : ['patio', 'dog_friendly', 'kid_friendly', 'lake_view'],
     openNow: true,
