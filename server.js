@@ -59,6 +59,74 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
 // ---------- helpers ----------
 
+// Security headers (2026-10-18): set on every response before any route runs. A route that writes its own value
+// (the owner portal's 'Referrer-Policy: no-referrer') wins, since writeHead overrides setHeader.
+// - The enforced CSP carries frame-ancestors only (report-only can't enforce it), so the site, and above all
+//   /owner/*, can't be framed elsewhere. X-Frame-Options says the same to older browsers.
+// - The full policy is report-only for now: it lists the real outside sources (Leaflet and pdf.js on cdnjs,
+//   Tesseract on jsdelivr with its language data, OSM tiles, GA4, Clarity, Google Fonts, FormSubmit, Open-Meteo,
+//   Cloudflare's own scripts) and sends violations to /csp-report, which only logs.
+// - Inline scripts and styles are everywhere, so 'unsafe-inline' stays until pages carry nonces.
+const CSP_REPORT_PATH = '/csp-report';
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms https://static.cloudflareinsights.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://stats.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com",
+  "worker-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+  "frame-src 'self'",
+  "media-src 'self' blob: data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  `report-uri ${CSP_REPORT_PATH}`,
+].join('; ');
+const SECURITY_HEADERS = {
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Content-Security-Policy': "frame-ancestors 'self'",
+  // /map uses location, the microphone (voice search), the motion sensors (the compass arrow), a screen wake lock
+  // (directions) and the clipboard (Share); the menu scanner takes photos (a file input with capture; camera=(self)
+  // keeps a live-camera scan possible). Web Share (trip and favourites) is left at its default, self: Chrome warns
+  // that web-share is an unrecognized feature. The rest is off.
+  'Permissions-Policy': 'geolocation=(self), camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self), screen-wake-lock=(self), clipboard-write=(self), fullscreen=(self), payment=(), usb=(), serial=(), bluetooth=(), hid=(), midi=(), display-capture=(), browsing-topics=()',
+  'Content-Security-Policy-Report-Only': CSP_REPORT_ONLY,
+};
+function applySecurityHeaders(res) {
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
+}
+// POST /csp-report: browsers send report-only violations here. Logged (deduplicated, at most 100 distinct per hour)
+// so Railway's logs show what an enforced policy would block; nothing is stored.
+const cspReportSeen = new Set();
+let cspReportHour = 0;
+function handleCspReport(req, res) {
+  let size = 0, body = '';
+  req.on('data', (c) => { size += c.length; if (size <= 16384) body += c; });
+  req.on('end', () => {
+    try {
+      const j = JSON.parse(body || '{}');
+      const list = Array.isArray(j) ? j.map((x) => x && x.body).filter(Boolean) : [j['csp-report'] || j];
+      const hour = Math.floor(Date.now() / 3600000);
+      if (hour !== cspReportHour) { cspReportHour = hour; cspReportSeen.clear(); }
+      for (const r of list) {
+        const dir = r['effective-directive'] || r.effectiveDirective || r['violated-directive'] || '';
+        const blocked = String(r['blocked-uri'] || r.blockedURL || '').slice(0, 200);
+        const page = String(r['document-uri'] || r.documentURL || '').replace(/[?#].*$/, '').slice(0, 200);
+        const key = `${dir} ${blocked.replace(/^(https?:\/\/[^/]+).*$/, '$1')}`;
+        if (cspReportSeen.has(key) || cspReportSeen.size >= 100) continue;
+        cspReportSeen.add(key);
+        console.log(`[csp-report] ${dir} blocked=${blocked} page=${page}`);
+      }
+    } catch (e) { /* a malformed report is ignored */ }
+    res.writeHead(204, { 'Cache-Control': 'no-store' });
+    res.end();
+  });
+}
+
 function sendJSON(res, status, data) {
   const body = JSON.stringify(data);
   res.writeHead(status, {
@@ -14057,7 +14125,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
 // runs from its start time (for a multi-day run, its daily start), so an evening event is "later today" in the
 // afternoon, and one that has finished for the day moves to tomorrow if it runs on. Untimed multi-day runs
 // (exhibitions, season-long events; 2026-10-18) are "On now" only in the daytime, 10:00-17:00; outside those hours
-// they are listed as running until their last day, never "On now" at 2 am.
+// they are listed as running until their last day, never "On now" at 2 am. An untimed one-day event (2026-10-18)
+// follows the same 10:00-17:00 day: "Later today" before 10, "On now" from 10 to 17, gone after 17:00.
 const MAP_EVENT_GROUP_SRC = `function eventGroup(e, today, nowMin){
     if (e.sd > today) return e.sd === addDays(today, 1) ? 'tomorrow' : 'week';
     if (e.ed < today) return null;
@@ -14065,6 +14134,10 @@ const MAP_EVENT_GROUP_SRC = `function eventGroup(e, today, nowMin){
     if (sm == null && e.ed > e.sd) {
       if (nowMin >= 600 && nowMin < 1020) return 'now';
       return e.ed === today && nowMin >= 1020 ? null : 'running';
+    }
+    if (sm == null) {
+      if (nowMin >= 600 && nowMin < 1020) return 'now';
+      return nowMin < 600 ? 'later' : null;
     }
     if (sm != null && nowMin < sm) return 'later';
     if (sm != null && em != null && em > sm && nowMin >= em) return next;
@@ -23823,9 +23896,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     description: editorial ? editorial.intro : ((fr ? venue.description_fr : venue.description) || undefined),
     url: canonical,
     telephone: venue.phone || undefined,
-    address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
+    address: venuePostalAddress(venue.address, regionLabel),
     geo: (venue.latitude && venue.longitude) ? { '@type': 'GeoCoordinates', latitude: venue.latitude, longitude: venue.longitude } : undefined,
-    image: venue.image_url || undefined,
+    image: absoluteSiteUrl(venue.image_url),
     sameAs: normalizeWebsiteUrl(venue.website) || undefined,
     // Golf (2026-09-26): the legacy price level is not a green fee, so it is
     // never shown on golf pages; verified green fees are shown instead.
@@ -24272,8 +24345,38 @@ function occurrenceIsoEnd(o) {
 // results. A host venue's stored street address is used exactly as before;
 // any other event gets its region as a locality-level PostalAddress -- never
 // a guessed street address. Valley-wide events are "Okanagan Valley".
+// Venue JSON-LD (2026-10-18): Google reads a split PostalAddress far better than one string. A stored address
+// "262 Bernard Ave, Kelowna, BC V1Y 6N4" becomes streetAddress "262 Bernard Ave", addressLocality "Kelowna",
+// postalCode "V1Y 6N4"; a descriptive one ("Westlake Road, West Kelowna, BC (parking lot near ...)") drops the
+// trailing note. An address that doesn't end in a town and BC stays whole, with the listing's town as the locality.
+function venuePostalAddress(address, fallbackLocality) {
+  const raw = String(address || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return undefined;
+  const out = { '@type': 'PostalAddress', streetAddress: raw, addressLocality: fallbackLocality || undefined, addressRegion: 'BC', postalCode: undefined, addressCountry: 'CA' };
+  const core = raw.replace(/\s*[;(].*$/, '').replace(/,?\s*Canada\s*$/i, '').trim();
+  const m = /^(.+?),\s*([^,]+?),\s*(?:BC|B\.C\.|British Columbia)\.?(?:,?\s*([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d))?$/.exec(core);
+  if (m) {
+    out.streetAddress = m[1].trim();
+    if (m[2].length <= 30 && !/\d/.test(m[2])) out.addressLocality = m[2].trim();
+    if (m[3]) out.postalCode = `${m[3]} ${m[4]}`.toUpperCase();
+  } else {
+    const pc = /\b([A-Za-z]\d[A-Za-z])\s?(\d[A-Za-z]\d)\b/.exec(core);
+    if (pc) out.postalCode = `${pc[1]} ${pc[2]}`.toUpperCase();
+  }
+  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
+  return out;
+}
+// A site path ("/images/venues/x.jpg") as a full URL; an http(s) URL is kept; nothing stays nothing.
+function absoluteSiteUrl(u) {
+  const v = String(u || '').trim();
+  if (!v) return undefined;
+  if (/^https?:\/\//i.test(v)) return v;
+  if (v.startsWith('//')) return `https:${v}`;
+  return `https://okanaganroam.com${v.startsWith('/') ? '' : '/'}${v}`;
+}
 function eventLocationAddress(event, hostVenue) {
-  if (hostVenue && hostVenue.address) return hostVenue.address;
+  // A host venue's address is split like the venue page's (2026-10-18).
+  if (hostVenue && hostVenue.address) return venuePostalAddress(hostVenue.address, REGION_LABELS[hostVenue.region]);
   const region = hostVenue && hostVenue.region ? hostVenue.region : event.region;
   const locality = !hostVenue && event.valley_wide === 1 ? 'Okanagan Valley' : (REGION_LABELS[region] || 'Okanagan Valley');
   return { '@type': 'PostalAddress', addressLocality: locality, addressRegion: 'BC', addressCountry: 'CA' };
@@ -24330,8 +24433,8 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
 }
 // Organizer and offers (2026-10-13), Google's recommended Event fields, from
 // stored data only: the organizer is named only when the listing's source IS
-// the organizer; the offer is just the official event/ticket link (no price
-// or availability is stored, so none is claimed). Both are omitted otherwise.
+// the organizer; the offer carries the official event/ticket link when there is
+// one. Both are omitted otherwise (the offer also needs a stated price, below).
 function eventOfficialUrl(event) {
   const ok = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
   if (ok(event.website)) return event.website.trim();
@@ -24343,9 +24446,58 @@ function eventOrganizerSchema(event) {
   const url = eventOfficialUrl(event);
   return { '@type': 'Organization', name: event.source_name.trim(), url: url || undefined };
 }
+// Event prices (2026-10-18): Google flags an Offer with no price, so an offer is emitted only when the listing states
+// one: a stored price field when there is one, else the description. "Tickets are about $68–79" -> lowPrice 68,
+// highPrice 79; "Admission is $10" -> price 10; "free admission" or "a free holiday market" -> price 0. A dollar amount
+// counts only in a sentence about tickets, admission or cost, so "$2 oysters" or "a $15 tasting" never become the price.
+// "By donation" and "early-bird tickets cost less" state no price, so no offer.
+const EVENT_PRICE_CONTEXT_RE = /\b(tickets?|admission|entry|entrance|cover|cost|costs|price[sd]?|register|registration|per (person|adult|child|ticket|couple|team)|passes?|seats?|in advance|at the door|early[- ]bird|from \$)/i;
+const EVENT_FREE_RE = /\b(?:(?:admission|entry|entrance)(?: is)? free|free (?:admission|entry|entrance|event|to attend|of charge|for (?:all|everyone)|and open)|(?:a|this|the) free(?:,? [\w'’-]+){0,3}? (?:event|fair|market|show|concert|festival|workshop|walk|tour|talk|screening|night|party|celebration|drop-in|session|class|day|afternoon|evening|parade|light-up|bazaar|program|gathering|exhibit|exhibition|skate|kick-off|open house|film|performance)|admission: free|^free(?:[.!]|$))/i;
+function parseEventPrice(text) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  const amounts = [];
+  for (const sentence of t.split(/(?<=[.!?;])\s+/)) {
+    if (!EVENT_PRICE_CONTEXT_RE.test(sentence) && !/^\s*\$\d/.test(t)) continue;
+    // "$68–79", "$49–$59", "$68 to $79", "$25 - 35"
+    const re = /\$\s?(\d{1,4}(?:\.\d{2})?)(?:\s?(?:–|—|-|to)\s?\$?\s?(\d{1,4}(?:\.\d{2})?)(?![\d,]))?/g;
+    let m;
+    while ((m = re.exec(sentence))) {
+      amounts.push(Number(m[1]));
+      if (m[2] && Number(m[2]) > Number(m[1])) amounts.push(Number(m[2]));
+    }
+  }
+  const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  if (amounts.length) {
+    const lo = Math.min(...amounts), hi = Math.max(...amounts);
+    return lo === hi ? { price: fmt(lo) } : { lowPrice: fmt(lo), highPrice: fmt(hi) };
+  }
+  // "Free" counts unless it's hedged ("in past years it has been free") or names one part ("opens with a free parade").
+  const free = EVENT_FREE_RE.exec(t);
+  if (free && !/\b(past years|usually|typically|has been free|was free)\b/i.test(t)) {
+    const before = t.slice(0, free.index).split(/[.!?;]\s/).pop();
+    if (!/\b(opens|starts|begins|kicks off|ends|closes|wraps up) with\s*$|\b(plus|includes|including)\s*$/i.test(before)) return { price: '0' };
+  }
+  return null;
+}
+function eventPriceInfo(event) {
+  for (const f of ['price_text', 'price']) {
+    const v = event && event[f];
+    if (v == null || v === '') continue;
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return { price: String(v) };
+    const p = parseEventPrice(/^\s*\d/.test(String(v)) ? `$${String(v).trim()}` : v);
+    if (p) return p;
+  }
+  return parseEventPrice(event && event.description);
+}
 function eventOffersSchema(event) {
-  const url = eventOfficialUrl(event);
-  return url ? { '@type': 'Offer', url } : undefined;
+  const info = eventPriceInfo(event);
+  if (!info) return undefined;
+  const url = eventOfficialUrl(event) || undefined;
+  const common = { priceCurrency: 'CAD', availability: 'https://schema.org/InStock', url };
+  return info.price != null
+    ? { '@type': 'Offer', price: info.price, ...common }
+    : { '@type': 'AggregateOffer', lowPrice: info.lowPrice, highPrice: info.highPrice, ...common };
 }
 // SEO-1 E (2026-10-02): when another event has exactly the same name in the
 // same region, both pages would carry an identical <title>; such pages add
@@ -30227,9 +30379,14 @@ function venueLookup(q, region) {
   const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
     .all(...[like, ...(r ? [r] : []), `${term}%`]);
+  // French lookup (2026-10-18): the French type label, the French page and both claim links ride along, so
+  // /fr/list-your-venue shows French results and every result can be claimed.
   return rows.filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]).map((v) => ({
     name: v.name, region: REGION_LABELS[v.region], type: CATEGORY_LABELS[v.type].singular,
+    typeFr: (CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular,
     url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+    urlFr: `/fr/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
+    claim: claimPagePath(v, 'en'), claimFr: claimPagePath(v, 'fr'),
   }));
 }
 function renderListYourVenuePage() {
@@ -30289,7 +30446,9 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.list-venue-page .lyv-lookup-results { list-style: none; margin: 10px 0 0; padding: 0; }
   body.list-venue-page .lyv-lookup-results li { padding: 8px 0; border-top: 1px solid rgba(74,52,40,0.1); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
   body.list-venue-page .lyv-lookup-results a { font-weight: 800; }
-  body.list-venue-page .lyv-correct { margin-left: auto; font: inherit; font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; background: var(--sand-deep, #ece3d3); color: var(--ink); }
+  body.list-venue-page .lyv-actions { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  body.list-venue-page .lyv-lookup-results a.lyv-claim { font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; text-decoration: none; background: var(--ink, #1b2b3a); color: #fff; }
+  body.list-venue-page .lyv-correct { font: inherit; font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; background: var(--sand-deep, #ece3d3); color: var(--ink); }
   body.list-venue-page .lyv-photos-note { margin: -4px 0 18px; }
 </style>
 <body class="golf-page list-venue-page">
@@ -30425,6 +30584,12 @@ ${renderGolfHeaderHtml()}
     var input = document.getElementById('lyvLookup'), list = document.getElementById('lyvLookupResults');
     if (!input || !list) return;
     var timer = null, seq = 0;
+    // French lookup (2026-10-18): /fr/list-your-venue (html lang="fr") shows French labels and links to the French
+    // pages; each result also gets a "Claim this listing" link to its claim page.
+    var FR = String(document.documentElement.getAttribute('lang') || '').slice(0, 2) === 'fr';
+    var TX = FR
+      ? { correct: 'Demander une correction', claim: 'R\\u00e9clamer cette fiche', none: 'Aucun r\\u00e9sultat pour l\\u2019instant. Si votre entreprise est nouvelle pour nous, utilisez le formulaire ci-dessous.', note: 'Correction pour ' }
+      : { correct: 'Request a correction', claim: 'Claim this listing', none: 'No match yet. If your venue is new to us, use the form below.', note: 'Correction for ' };
     function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     input.addEventListener('input', function(){
       clearTimeout(timer);
@@ -30436,8 +30601,9 @@ ${renderGolfHeaderHtml()}
           if (mine !== seq) return;
           var v = (d && d.venues) || [];
           list.innerHTML = v.length ? v.map(function(x){
-            return '<li><a href="' + esc(x.url) + '">' + esc(x.name) + '</a> <span class="lyv-hint">' + esc(x.type) + ' &middot; ' + esc(x.region) + '</span> <button type="button" class="lyv-correct" data-name="' + esc(x.name) + '" data-url="https://okanaganroam.com' + esc(x.url) + '">Request a correction</button></li>';
-          }).join('') : '<li class="lyv-hint">No match yet. If your venue is new to us, use the form below.</li>';
+            var href = FR && x.urlFr ? x.urlFr : x.url, claim = FR ? x.claimFr : x.claim;
+            return '<li><a href="' + esc(href) + '">' + esc(x.name) + '</a> <span class="lyv-hint">' + esc(FR && x.typeFr ? x.typeFr : x.type) + ' &middot; ' + esc(x.region) + '</span> <span class="lyv-actions">' + (claim ? '<a class="lyv-claim" href="' + esc(claim) + '">' + esc(TX.claim) + '</a> ' : '') + '<button type="button" class="lyv-correct" data-name="' + esc(x.name) + '" data-url="https://okanaganroam.com' + esc(href) + '">' + esc(TX.correct) + '</button></span></li>';
+          }).join('') : '<li class="lyv-hint">' + esc(TX.none) + '</li>';
         }).catch(function(){});
       }, 250);
     });
@@ -30445,7 +30611,7 @@ ${renderGolfHeaderHtml()}
       var b = e.target.closest && e.target.closest('.lyv-correct');
       if (!b) return;
       var msg = document.getElementById('contactMessage');
-      if (msg) msg.value = 'Correction for ' + b.getAttribute('data-name') + ' (' + b.getAttribute('data-url') + '):\\n';
+      if (msg) msg.value = TX.note + b.getAttribute('data-name') + ' (' + b.getAttribute('data-url') + '):\\n';
       var opener = document.querySelector('[data-contact-open]');
       var tp = document.getElementById('contactTopic'); if (tp) tp.value = 'correction';
       if (opener) opener.click();
@@ -35944,7 +36110,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     name: venue.name,
     url: venueUrl,
     telephone: venue.phone || undefined,
-    address: venue.address ? { '@type': 'PostalAddress', streetAddress: venue.address, addressLocality: regionLabel, addressRegion: 'BC', addressCountry: 'CA' } : undefined,
+    address: venuePostalAddress(venue.address, regionLabel),
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
     hasMenu: tours ? undefined : menuSchema(venue, menu, lang),
     hasOfferCatalog: tours ? priceListOfferCatalog(venue, menu, lang) : undefined,
@@ -40988,6 +41154,8 @@ ${renderGolfHeaderHtml()}
 }
 
 const server = http.createServer(async (req, res) => {
+  applySecurityHeaders(res);
+  if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
   // Lighter pages (2026-10-18): shared CSS goes out as cached files, and a
   // hub's waiting cards load after the page (see withRestCardsDeferred).
   if (req.method === 'GET' || req.method === 'HEAD') {
@@ -44566,6 +44734,9 @@ module.exports = {
   WHATSON_SCOPE_MIN_EVENTS,
   eventOrganizerSchema,
   eventOffersSchema,
+  parseEventPrice,
+  venuePostalAddress,
+  absoluteSiteUrl,
   guideItemListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,
@@ -44833,6 +45004,7 @@ module.exports = {
   openNowFirst,
   venueHoursCheckedHtml,
   MAP_EVENT_GROUP_SRC,
+  CSP_REPORT_ONLY,
   seasonOnlyStates,
   parseAdvisoryNote,
   renderAdvisoryStyles,

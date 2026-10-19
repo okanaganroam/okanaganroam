@@ -19,10 +19,10 @@
    "heading": "Icewine specialists",
    "items": [
     {
-     "ref": "kelowna/grizzli-winery",
+     "ref": "west-kelowna/grizzli-winery",
      "name": "Grizzli Winery",
      "text": "specializes in icewine, poured from a striking welcome centre that's also earned an official live-music venue designation. A stop worth making to taste icewine done by specialists rather than as an afterthought pour. Rated 4.5 stars.",
-     "where": "Kelowna"
+     "where": "West Kelowna"
     },
     {
      "ref": "west-kelowna/kalala-organic-estate-winery",
@@ -70,7 +70,7 @@
    [
     "Icewine from a specialist",
     [
-     "kelowna/grizzli-winery|Grizzli Winery"
+     "west-kelowna/grizzli-winery|Grizzli Winery"
     ]
    ],
    [

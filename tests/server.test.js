@@ -4070,8 +4070,8 @@ test('S5 #18: no fabricated dates or times -- untimed occurrences stay date-only
 test('SEO-1: Event location always has an address; same-name same-region events get dated titles, others unchanged', async () => {
   try {
     const locality = (name) => ({ '@type': 'PostalAddress', addressLocality: name, addressRegion: 'BC', addressCountry: 'CA' });
-    // A -- host venue with a stored street address: kept exactly.
-    assert.equal(app.eventLocationAddress({ region: 'kelowna' }, { region: 'kelowna', address: '1 Test St, Kelowna, BC' }), '1 Test St, Kelowna, BC');
+    // A -- host venue with a stored street address: split into its parts (2026-10-18).
+    assert.deepEqual(app.eventLocationAddress({ region: 'kelowna' }, { region: 'kelowna', address: '1 Test St, Kelowna, BC' }), { '@type': 'PostalAddress', streetAddress: '1 Test St', addressLocality: 'Kelowna', addressRegion: 'BC', addressCountry: 'CA' });
     // Host venue without an address: the venue's region as locality.
     assert.deepEqual(app.eventLocationAddress({ region: 'kelowna' }, { region: 'penticton', address: null }), locality('Penticton'));
     // No host venue: the event's region; valley-wide: Okanagan Valley.
@@ -4088,9 +4088,9 @@ test('SEO-1: Event location always has an address; same-name same-region events 
     // Host-venue event: the venue's stored address when present, else its region.
     const hosted = s5create({ name: 'SEO1 Hosted Night' });
     const hostedLd = s5jsonLd((await s5get(`/kelowna/events/${hosted.slug}`)).text).find((b) => b['@type'] !== 'BreadcrumbList');
-    assert.deepEqual(hostedLd.location.address, s5venue.address || locality('Kelowna'));
+    assert.deepEqual(hostedLd.location.address, s5venue.address ? app.venuePostalAddress(s5venue.address, 'Kelowna') : locality('Kelowna'));
     // Nothing else in the Event JSON-LD changed shape.
-    assert.deepEqual(Object.keys(ld).sort(), ['@context', '@type', 'description', 'endDate', 'eventAttendanceMode', 'eventStatus', 'image', 'location', 'name', 'offers', 'startDate', 'subEvent', 'url'].sort(), 'the official ticketing source adds an offers link (2026-10-13); no organizer, since a venue source is not the organizer');
+    assert.deepEqual(Object.keys(ld).sort(), ['@context', '@type', 'description', 'endDate', 'eventAttendanceMode', 'eventStatus', 'image', 'location', 'name', 'startDate', 'subEvent', 'url'].sort(), 'no offers without a stated price (2026-10-18); no organizer, since a venue source is not the organizer');
 
     // E -- a unique name keeps the plain title.
     const titleOf = (html) => (/<title>([^<]*)<\/title>/.exec(html) || [])[1];
@@ -19163,20 +19163,24 @@ test('Destination photos (2026-10-13): every /destinations card shows its town p
   }
 });
 
-test('Event schema (2026-10-13): organizer only when the source is the organizer; offers carry only the official link', () => {
-  const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x' };
+test('Event schema (2026-10-13): organizer only when the source is the organizer; offers need a stated price and carry the official link', () => {
+  const base = { name: 'X', region: 'kelowna', website: null, source_type: 'official_organizer', source_name: 'Kettle Valley Steam Railway', source_url: 'https://www.kettlevalleyrail.org/x', description: 'A steam train ride. Tickets are $45.' };
+  const offer = (url, price = '45') => ({ '@type': 'Offer', price, priceCurrency: 'CAD', availability: 'https://schema.org/InStock', url });
   assert.deepEqual(app.eventOrganizerSchema(base), { '@type': 'Organization', name: 'Kettle Valley Steam Railway', url: 'https://www.kettlevalleyrail.org/x' });
-  assert.deepEqual(app.eventOffersSchema(base), { '@type': 'Offer', url: 'https://www.kettlevalleyrail.org/x' });
+  assert.deepEqual(app.eventOffersSchema(base), offer('https://www.kettlevalleyrail.org/x'));
   assert.equal(app.eventOrganizerSchema({ ...base, source_type: 'official_venue' }), undefined, 'a ticket seller is not the organizer');
-  assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'official_venue' }), { '@type': 'Offer', url: 'https://www.kettlevalleyrail.org/x' }, 'an official ticketing page is the offer link');
-  assert.equal(app.eventOffersSchema({ ...base, source_type: 'tourism_org' }), undefined, 'a tourism listing is not a ticket link');
-  assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'tourism_org', website: 'https://example.com/tickets' }), { '@type': 'Offer', url: 'https://example.com/tickets' }, 'the event\'s own website always counts');
-  const ev = s5create({ name: 'Schema Organizer Fixture', source_type: 'official_organizer', source_name: 'Fixture Society' });
+  assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'official_venue' }), offer('https://www.kettlevalleyrail.org/x'), 'an official ticketing page is the offer link');
+  assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'tourism_org' }), offer(undefined), 'a tourism listing is not a ticket link, but the price still counts');
+  assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'tourism_org', website: 'https://example.com/tickets' }), offer('https://example.com/tickets'), 'the event\'s own website always counts');
+  assert.equal(app.eventOffersSchema({ ...base, description: 'A steam train ride.' }), undefined, 'no stated price: no offer (2026-10-18)');
+  const ev = s5create({ name: 'Schema Organizer Fixture', source_type: 'official_organizer', source_name: 'Fixture Society', description: 'A fixture concert. Tickets are $20 to $30.' });
   try {
     const ld = app.eventJsonLd(app.getEventById(ev.id), app.listEventOccurrences(ev.id), ['live-music'], null, 'https://x', app.todayLocal());
     assert.equal(ld.organizer.name, 'Fixture Society');
-    assert.equal(ld.offers['@type'], 'Offer');
-    assert.equal(ld.offers.price, undefined, 'no price is claimed');
+    assert.equal(ld.offers['@type'], 'AggregateOffer');
+    assert.equal(ld.offers.lowPrice, '20');
+    assert.equal(ld.offers.highPrice, '30');
+    assert.equal(ld.offers.priceCurrency, 'CAD');
   } finally {
     for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
     db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
@@ -26643,3 +26647,185 @@ test('Portal polish (2026-10-18): Make main photo keeps the old main photo near 
     for (const f of files) { try { nodeFs.unlinkSync(nodePath.join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
   }
 }));
+
+// ---- SEO and security pass (2026-10-18) -------------------------------------
+async function seo3get(urlPath, init) {
+  const http = require('node:http');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${srv.address().port}${urlPath}`, { redirect: 'manual', ...(init || {}) });
+    return { status: res.status, headers: res.headers, text: await res.text() };
+  } finally { srv.close(); }
+}
+
+test('SEO security headers (2026-10-18): HSTS, nosniff, referrer, framing, permissions and a report-only CSP on pages, the API and files', async () => {
+  for (const p of ['/', '/fr', '/map', '/kelowna/restaurants/test-trattoria', '/owner/login', '/api/venues?limit=1', '/favicon.svg', '/no-such-page-xyz']) {
+    const r = await seo3get(p);
+    assert.equal(r.headers.get('strict-transport-security'), 'max-age=31536000; includeSubDomains', p);
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff', p);
+    assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN', p);
+    assert.equal(r.headers.get('content-security-policy'), "frame-ancestors 'self'", p);
+    assert.match(r.headers.get('permissions-policy'), /geolocation=\(self\)/, p);
+    assert.match(r.headers.get('permissions-policy'), /camera=\(self\)/, p);
+    assert.match(r.headers.get('permissions-policy'), /microphone=\(self\)/, `${p}: the map's voice search`);
+    assert.match(r.headers.get('permissions-policy'), /payment=\(\)/, p);
+    assert.ok(r.headers.get('content-security-policy-report-only'), p);
+    if (!p.startsWith('/owner')) assert.equal(r.headers.get('referrer-policy'), 'strict-origin-when-cross-origin', p);
+  }
+  // The owner portal keeps its stricter no-referrer.
+  const owner = await seo3get('/owner/login');
+  assert.match(owner.headers.get('referrer-policy') || '', /no-referrer|strict-origin-when-cross-origin/);
+  // The image route still sends a real type, so nosniff never blocks a photo.
+  assert.match((await seo3get('/favicon.svg')).headers.get('content-type') || '', /image\/svg\+xml/);
+});
+
+test('SEO CSP report-only (2026-10-18): lists the real outside sources and reports to /csp-report, which only logs', async () => {
+  const csp = app.CSP_REPORT_ONLY;
+  for (const src of ['https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://www.googletagmanager.com', 'https://*.clarity.ms', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://formsubmit.co', 'https://api.open-meteo.com', 'https://*.google-analytics.com', 'https://tessdata.projectnaptha.com', "'wasm-unsafe-eval'", 'blob:', "connect-src 'self' data: blob:"]) {
+    assert.ok(csp.includes(src), src);
+  }
+  assert.match(csp, /img-src [^;]*https:/, 'OSM tiles and listing photos');
+  assert.match(csp, /object-src 'none'/);
+  assert.match(csp, /report-uri \/csp-report/);
+  // Every outside script or stylesheet a page loads is allowed by the policy.
+  const pages = [app.renderPlacesMapPage(), (await seo3get('/')).text, (await seo3get('/kelowna/restaurants/test-trattoria')).text];
+  for (const html of pages) {
+    for (const [, url] of html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="(https:\/\/[^/"]+)/g)) {
+      if (/^https:\/\/(okanaganroam\.com|www\.instagram\.com|www\.facebook\.com|www\.tiktok\.com)/.test(url)) continue;
+      assert.ok(csp.includes(url) || csp.includes(url.replace(/^https:\/\/[^.]+/, 'https://*')), `${url} is in the policy`);
+    }
+  }
+  const quiet = console.log; const logged = [];
+  console.log = (...a) => logged.push(a.join(' '));
+  try {
+    const body = JSON.stringify({ 'csp-report': { 'document-uri': 'https://okanaganroam.com/map?x=1', 'effective-directive': 'script-src-elem', 'blocked-uri': 'https://evil.example/x.js' } });
+    const r = await seo3get('/csp-report', { method: 'POST', headers: { 'Content-Type': 'application/csp-report' }, body });
+    assert.equal(r.status, 204);
+    const bad = await seo3get('/csp-report', { method: 'POST', body: 'not json' });
+    assert.equal(bad.status, 204, 'a broken report is ignored');
+  } finally { console.log = quiet; }
+  assert.ok(logged.some((l) => l.includes('[csp-report] script-src-elem blocked=https://evil.example/x.js page=https://okanaganroam.com/map')), logged.join('\n'));
+});
+
+test('SEO event offers (2026-10-18): a stated price, a range or "free" becomes the offer; nothing stated, no offer', () => {
+  const p = app.parseEventPrice;
+  assert.deepEqual(p('A touring comic at the theatre. Tickets are about $68–79.'), { lowPrice: '68', highPrice: '79' });
+  assert.deepEqual(p('Tickets in Vernon are $49–$59, including fees.'), { lowPrice: '49', highPrice: '59' });
+  assert.deepEqual(p('Tickets range from $18 to $75.'), { lowPrice: '18', highPrice: '75' });
+  assert.deepEqual(p('Admission is $10; reserve your table.'), { price: '10' });
+  assert.deepEqual(p('Tickets in Oliver are $82.50.'), { price: '82.50' });
+  assert.deepEqual(p('A holiday market with local makers. Admission is free.'), { price: '0' });
+  assert.deepEqual(p('A free holiday fair at the nature centre with local makers.'), { price: '0' });
+  assert.deepEqual(p('Free'), { price: '0' }, 'a price field that just says Free');
+  assert.equal(p('A winery market with a $15 five-wine tasting and $2 oysters on Sunday.'), null, 'a menu price is not the ticket price');
+  assert.equal(p('Early-bird tickets cost less.'), null);
+  assert.equal(p('Admission is by donation.'), null);
+  assert.equal(p('A gluten-free bake sale and free parking.'), null);
+  assert.equal(p('In past years it has been free to attend.'), null, 'a hedged free is not claimed');
+  assert.equal(p('A three-day arts weekend. It opens with a free parade downtown.'), null, 'one free part is not the whole event');
+  assert.equal(p(''), null);
+  const range = app.eventOffersSchema({ description: 'Tickets are $35–$110.', website: 'https://example.com/t' });
+  assert.deepEqual(range, { '@type': 'AggregateOffer', lowPrice: '35', highPrice: '110', priceCurrency: 'CAD', availability: 'https://schema.org/InStock', url: 'https://example.com/t' });
+  assert.deepEqual(app.eventOffersSchema({ description: 'Free admission.', website: null }), { '@type': 'Offer', price: '0', priceCurrency: 'CAD', availability: 'https://schema.org/InStock', url: undefined });
+  assert.equal(app.eventOffersSchema({ description: 'A night of music.', website: 'https://example.com/t' }), undefined);
+  assert.deepEqual(app.eventOffersSchema({ description: 'A night of music.', price_text: '$25 in advance' }).price, '25', 'a stored price field wins');
+});
+
+test('SEO venue JSON-LD (2026-10-18): the address is split into its parts and the image URL is absolute', () => {
+  const a = app.venuePostalAddress;
+  assert.deepEqual(a('262 Bernard Ave, Kelowna, BC V1Y 6N4', 'Kelowna'), { '@type': 'PostalAddress', streetAddress: '262 Bernard Ave', addressLocality: 'Kelowna', addressRegion: 'BC', postalCode: 'V1Y 6N4', addressCountry: 'CA' });
+  assert.deepEqual(a('3604 Carrington Rd #309, Westbank, BC V4T 3K7', 'West Kelowna'), { '@type': 'PostalAddress', streetAddress: '3604 Carrington Rd #309', addressLocality: 'Westbank', addressRegion: 'BC', postalCode: 'V4T 3K7', addressCountry: 'CA' });
+  assert.deepEqual(a('103-889 Vaughan Avenue, Kelowna, BC', 'Kelowna'), { '@type': 'PostalAddress', streetAddress: '103-889 Vaughan Avenue', addressLocality: 'Kelowna', addressRegion: 'BC', addressCountry: 'CA' });
+  assert.deepEqual(a('Westlake Road, West Kelowna, BC (parking lot near the pond)', 'West Kelowna'), { '@type': 'PostalAddress', streetAddress: 'Westlake Road', addressLocality: 'West Kelowna', addressRegion: 'BC', addressCountry: 'CA' });
+  assert.deepEqual(a('Skaha Lake Marina', 'Penticton'), { '@type': 'PostalAddress', streetAddress: 'Skaha Lake Marina', addressLocality: 'Penticton', addressRegion: 'BC', addressCountry: 'CA' }, 'no town in it: the listing\'s town');
+  assert.equal(a(null, 'Kelowna'), undefined);
+  assert.equal(app.absoluteSiteUrl('/images/venues/x-2610-w480.jpg?v=1'), 'https://okanaganroam.com/images/venues/x-2610-w480.jpg?v=1');
+  assert.equal(app.absoluteSiteUrl('https://example.com/a.jpg'), 'https://example.com/a.jpg');
+  assert.equal(app.absoluteSiteUrl(''), undefined);
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
+  const before = v.image_url;
+  db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run('/images/venues/test-trattoria.jpg', v.id);
+  try {
+    const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria'), [], [], []);
+    const ld = s5jsonLd(html).find((b) => b['@type'] === 'Restaurant');
+    assert.equal(ld.image, 'https://okanaganroam.com/images/venues/test-trattoria.jpg');
+    assert.deepEqual(ld.address, { '@type': 'PostalAddress', streetAddress: '123 Test St', addressLocality: 'Kelowna', addressRegion: 'BC', postalCode: 'V1Y 0A0', addressCountry: 'CA' });
+  } finally { db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run(before, v.id); }
+});
+
+test('French gaps (2026-10-18): the comedy and Christmas market guides have French titles, headings and text; the holiday events have French descriptions', () => {
+  const fr = (s) => app.frText(s);
+  assert.equal(fr('Okanagan Comedy & Live Shows 2026–27 | Okanagan Roam'), 'Humour et spectacles dans l’Okanagan 2026–27 | Okanagan Roam');
+  assert.equal(fr('Okanagan Christmas Markets 2026 | Okanagan Roam'), 'Marchés de Noël de l’Okanagan 2026 | Okanagan Roam');
+  for (const slug of ['okanagan-comedy-shows', 'okanagan-christmas-markets']) {
+    const g = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'guides', `${slug}.json`), 'utf8'));
+    for (const s of [g.heading, g.description, ...g.intro, ...g.sections.map((x) => x.heading)]) assert.ok(fr(s), `${slug}: ${s}`);
+  }
+  // Every translated event description is found the way a French event page looks it up.
+  const evFile = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'french', 'events-2026-10-18-holidays.json'), 'utf8'));
+  assert.ok(Object.keys(evFile).length >= 160);
+  for (const [en, frText] of Object.entries(evFile)) {
+    assert.equal(fr(en), frText);
+    assert.notEqual(frText, en);
+  }
+  const html = app.frenchTwinHtml(`<!DOCTYPE html><html lang="en"><head><title>Okanagan Comedy &amp; Live Shows 2026–27 | Okanagan Roam</title></head><body><main><h1>${'Comedy &amp; Live Shows in the Okanagan, Fall &amp; Winter 2026–27'}</h1></main></body></html>`, '/guides/okanagan-comedy-shows');
+  assert.match(html, /<title>Humour et spectacles dans l’Okanagan 2026–27 \| Okanagan Roam<\/title>/);
+  assert.match(html, /<h1>Humour et spectacles dans l’Okanagan, automne et hiver 2026–27<\/h1>/);
+});
+
+test('list-your-venue lookup (2026-10-18): French labels and /fr links on the French page, and a Claim this listing button in EN and FR', async () => {
+  const [hit] = app.venueLookup('Test Trattoria');
+  assert.equal(hit.url, '/kelowna/restaurants/test-trattoria');
+  assert.equal(hit.urlFr, '/fr/kelowna/restaurants/test-trattoria');
+  assert.equal(hit.claim, '/claim/kelowna/restaurants/test-trattoria');
+  assert.equal(hit.claimFr, '/fr/claim/kelowna/restaurants/test-trattoria');
+  assert.equal(hit.typeFr, 'Restaurant');
+  const en = app.renderListYourVenuePage();
+  assert.match(en, /claim: 'Claim this listing'/);
+  assert.match(en, /claim: 'R\\u00e9clamer cette fiche'/);
+  assert.match(en, /correct: 'Demander une correction'/);
+  assert.match(en, /<a class="lyv-claim" href="' \+ esc\(claim\) \+ '">/);
+  const frPage = await seo3get('/fr/list-your-venue');
+  assert.equal(frPage.status, 200);
+  assert.match(frPage.text, /<html lang="fr"/);
+  assert.match(frPage.text, /var FR = String\(document\.documentElement\.getAttribute\('lang'\)/, 'the French page picks French at run time');
+  // The lookup script itself, run against both languages.
+  const src = /\(function\(\)\{\n    var input = document\.getElementById\('lyvLookup'\)[\s\S]*?\n  \}\)\(\);/.exec(en)[0];
+  const run = (lang) => {
+    const list = { innerHTML: '', addEventListener() {} };
+    let onInput = null;
+    const input = { value: 'Test Trattoria', addEventListener: (t, f) => { onInput = f; } };
+    const document = { documentElement: { getAttribute: () => lang }, getElementById: (id) => (id === 'lyvLookup' ? input : id === 'lyvLookupResults' ? list : null) };
+    let pending = null;
+    const fetch = () => ({ then: (f) => { const d = f({ json: () => ({ venues: [hit] }) }); return { then: (g) => { pending = () => g({ venues: [hit] }); return { catch() {} }; } }; } });
+    new Function('document', 'fetch', 'setTimeout', 'clearTimeout', src)(document, fetch, (f) => f(), () => {});
+    onInput(); pending();
+    return list.innerHTML;
+  };
+  const enHtml = run('en'), frHtml = run('fr');
+  assert.match(enHtml, /<a href="\/kelowna\/restaurants\/test-trattoria">Test Trattoria<\/a>/);
+  assert.match(enHtml, /<a class="lyv-claim" href="\/claim\/kelowna\/restaurants\/test-trattoria">Claim this listing<\/a>/);
+  assert.match(enHtml, />Request a correction<\/button>/);
+  assert.match(frHtml, /<a href="\/fr\/kelowna\/restaurants\/test-trattoria">Test Trattoria<\/a>/);
+  assert.match(frHtml, /<a class="lyv-claim" href="\/fr\/claim\/kelowna\/restaurants\/test-trattoria">Réclamer cette fiche<\/a>/);
+  assert.match(frHtml, />Demander une correction<\/button>/);
+  const claim = await seo3get('/fr/claim/kelowna/restaurants/test-trattoria');
+  assert.equal(claim.status, 200, 'the French claim link works');
+});
+
+test('Seasons everywhere: /map lists an untimed one-day event as "On now" only from 10:00 to 17:00 (2026-10-18)', () => {
+  const eventGroup = new Function(`function addDays(d, n){ var x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+    function mins(t){ if (!t) return null; var p = t.split(':'); return Number(p[0]) * 60 + Number(p[1]); }
+    ${app.MAP_EVENT_GROUP_SRC}
+    return eventGroup;`)();
+  const today = '2026-10-18', at = (h, m = 0) => h * 60 + m;
+  const fair = { sd: today, ed: today, st: null, et: null };
+  assert.equal(eventGroup(fair, today, at(2)), 'later', '2 am: later today, not "On now"');
+  assert.equal(eventGroup(fair, today, at(9, 59)), 'later');
+  assert.equal(eventGroup(fair, today, at(10)), 'now');
+  assert.equal(eventGroup(fair, today, at(16, 59)), 'now');
+  assert.equal(eventGroup(fair, today, at(17)), null, 'over for the day after 17:00');
+  assert.equal(eventGroup({ ...fair, sd: '2026-10-19', ed: '2026-10-19' }, today, at(2)), 'tomorrow');
+  assert.equal(eventGroup({ ...fair, st: '19:00', et: '21:00' }, today, at(2)), 'later', 'a timed one keeps its time');
+});
