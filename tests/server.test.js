@@ -19793,8 +19793,8 @@ test('Event page: photo, status line, short summary, Tickets / directions / cale
   assert.equal(app.readableRecurrence('Home games 2026-09-25 to 2027-03-26', '2026'), 'Home games Sep 25 to Mar 26, 2027');
   const ics = app.eventIcs({ id: 9, name: 'Gala, Night; Two' }, [o('2099-06-01', '19:00', { end_time: '22:00' }), { id: 2, start_date: '2099-06-03', end_date: '2099-06-04', all_day: 1 }], 'Hall, 1 Main St', 'https://okanaganroam.com/kelowna/events/gala', new Date('2026-10-14T12:00:00Z'));
   assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
-  assert.match(ics, /BEGIN:VTIMEZONE\r\nTZID:America\/Vancouver/);
-  assert.match(ics, /DTSTART;TZID=America\/Vancouver:20990601T190000\r\nDTEND;TZID=America\/Vancouver:20990601T220000/);
+  assert.match(ics, /BEGIN:VTIMEZONE\r\nTZID:Etc\/GMT\+7/);
+  assert.match(ics, /DTSTART;TZID=Etc\/GMT\+7:20990601T190000\r\nDTEND;TZID=Etc\/GMT\+7:20990601T220000/);
   assert.match(ics, /DTSTART;VALUE=DATE:20990603\r\nDTEND;VALUE=DATE:20990605/, 'all-day end is exclusive');
   assert.ok(ics.includes('SUMMARY:Gala\\, Night\\; Two'), 'commas and semicolons escaped');
   assert.ok(ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75), 'lines folded at 75 octets');
@@ -22732,11 +22732,11 @@ test('SEO audit 2 (2026-10-17): FR breadcrumbs, event end dates, summary ItemLis
     ids.push(timed.id, spanning.id);
     const ev = ldBlocks((await s5get(`/kelowna/events/${timed.slug}`)).text).find((b) => /Event/.test(b['@type']) && b.startDate);
     assert.equal(ev.startDate, '2032-05-15T19:30:00-07:00');
-    assert.ok(!('endDate' in ev), 'no endDate before the start');
+    assert.equal(ev.endDate, '2032-05-15T21:30:00-07:00', 'round 7: start + 2 hours, never midnight before the start');
     assert.equal(ev.subEvent.length, 1);
     assert.equal(ev.subEvent[0].eventStatus, 'https://schema.org/EventScheduled');
     assert.equal(ev.subEvent[0].eventAttendanceMode, 'https://schema.org/OfflineEventAttendanceMode');
-    assert.ok(!('endDate' in ev.subEvent[0]));
+    assert.equal(ev.subEvent[0].endDate, '2032-05-16T21:30:00-07:00');
     const fair = ldBlocks((await s5get(`/kelowna/events/${spanning.slug}`)).text).find((b) => /Event/.test(b['@type']) && b.startDate);
     assert.equal(fair.endDate, '2032-06-02', 'a multi-day event keeps its later end date');
 
@@ -28342,24 +28342,25 @@ test('Calendar pass 6: a DTEND on every event, Add to Google Calendar, and the F
   assert.deepEqual(app.eventCalendarTimes({ start_date: '2099-06-01', end_date: '2099-06-01', start_time: '21:00', end_time: '01:00', ends_next_day: 1, all_day: 0 }).end, '20990602T010000');
   assert.deepEqual(app.eventCalendarTimes({ start_date: '2099-06-01', end_date: '2099-06-02', all_day: 1 }), { allDay: true, start: '20990601', end: '20990603' });
   const ics = app.eventIcs({ id: 9, name: 'Gala' }, [{ id: 1, start_date: '2099-06-01', end_date: '2099-06-01', start_time: '19:00', all_day: 0 }], 'Hall', 'https://okanaganroam.com/fr/kelowna/events/gala', new Date('2026-10-14T12:00:00Z'), 'fr');
-  assert.match(ics, /DTSTART;TZID=America\/Vancouver:20990601T190000\r\nDTEND;TZID=America\/Vancouver:20990601T210000/);
+  assert.match(ics, /DTSTART;TZID=Etc\/GMT\+7:20990601T190000\r\nDTEND;TZID=Etc\/GMT\+7:20990601T210000/);
   assert.match(ics, /DESCRIPTION:Détails : https:\/\/okanaganroam\.com\/fr\/kelowna\/events\/gala/);
   const g = new URL(app.googleCalendarUrl({ name: 'Gala' }, { start_date: '2099-06-01', end_date: '2099-06-01', start_time: '19:00', all_day: 0 }, 'Hall, 1 Main St', 'https://okanaganroam.com/kelowna/events/gala'));
   assert.equal(g.hostname, 'calendar.google.com');
   assert.equal(g.searchParams.get('action'), 'TEMPLATE');
-  assert.equal(g.searchParams.get('dates'), '20990601T190000/20990601T210000');
-  assert.equal(g.searchParams.get('ctz'), 'America/Vancouver');
+  // Round 7: UTC instants (7 pm UTC-7 = 02:00Z next day), no ctz.
+  assert.equal(g.searchParams.get('dates'), '20990602T020000Z/20990602T040000Z');
+  assert.equal(g.searchParams.get('ctz'), null);
   assert.equal(g.searchParams.get('details'), 'Details: https://okanaganroam.com/kelowna/events/gala');
   assert.equal(g.searchParams.get('location'), 'Hall, 1 Main St');
   const ev = s5create({ name: 'Pass6 Calendar Night', occurrences: [{ start_date: '2032-05-15', start_time: '19:30' }] });
   try {
     const page = (await s5get(`/kelowna/events/${ev.slug}`)).text;
-    assert.match(page, /<a class="cta secondary" data-gcal href="https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE&amp;text=Pass6%20Calendar%20Night&amp;dates=20320515T193000%2F20320515T213000&amp;ctz=America%2FVancouver&amp;details=Details%3A%20https%3A%2F%2Fokanaganroam\.com%2Fkelowna%2Fevents%2F/);
+    assert.match(page, /<a class="cta secondary" data-gcal href="https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE&amp;text=Pass6%20Calendar%20Night&amp;dates=20320516T023000Z%2F20320516T043000Z&amp;details=Details%3A%20https%3A%2F%2Fokanaganroam\.com%2Fkelowna%2Fevents%2F/);
     assert.match(page, />Add to Google Calendar<\/a>/);
     const frIcs = await s5get(`/fr/kelowna/events/${ev.slug}/calendar.ics`);
     assert.equal(frIcs.status, 200);
     assert.match(frIcs.text.replace(/\r\n /g, ''), new RegExp(`DESCRIPTION:Détails : https://okanaganroam\\.com/fr/kelowna/events/${ev.slug}`));
-    assert.match(frIcs.text, /DTEND;TZID=America\/Vancouver:20320515T213000/);
+    assert.match(frIcs.text, /DTEND;TZID=Etc\/GMT\+7:20320515T213000/);
     // The French page links the French .ics and gives Google Calendar the French details and address.
     const fr = app.frenchTwinHtml(page, `/kelowna/events/${ev.slug}`);
     assert.match(fr, new RegExp(`href="/fr/kelowna/events/${ev.slug}/calendar\\.ics"`));
@@ -29484,3 +29485,82 @@ test('Banner speed (round 7): /destinations card photos list their 360/480px cop
   }
   assert.match(app.DESTINATION_TILE_SIZES, /^\(max-width: 559px\) 160px, /);
 }));
+
+// ---- Time zone from Nov 1 (2026-10-19, round 7): B.C. stays on UTC-7; UTC feed times, .ics zone, Google link, JSON-LD endDate, calendar town ----
+test('Round 7 time zone: a Nov 13 2026 UTC feed time converts with the permanent UTC-7 rule, not PST', () => {
+  // Showpass lists Femme Fatale (Crown & Thieves) as 2026-11-14T03:00:00Z: 8 pm on Nov 13 in the Okanagan, not 7 pm.
+  assert.deepEqual(app.okanaganLocalFromUtc('2026-11-14T03:00:00Z'), { date: '2026-11-13', time: '20:00', offset: '-07:00' });
+  assert.deepEqual(app.okanaganLocalFromUtc(new Date('2026-11-14T03:00:00.000Z')), { date: '2026-11-13', time: '20:00', offset: '-07:00' });
+  assert.deepEqual(app.okanaganLocalFromUtc('2026-11-13T19:00:00-08:00'), { date: '2026-11-13', time: '20:00', offset: '-07:00' }, 'an old -08:00 feed offset is the same instant');
+  assert.deepEqual(app.okanaganLocalFromUtc('2026-10-25T03:00:00Z'), { date: '2026-10-24', time: '20:00', offset: '-07:00' }, 'October (PDT) is unchanged');
+  assert.equal(app.okanaganLocalFromUtc('2026-11-01T08:59:00Z').time, '01:59', 'the last minute before the change');
+  assert.equal(app.okanaganLocalFromUtc('2026-11-01T09:00:00Z').time, '02:00', 'no repeated hour on Nov 1');
+  assert.equal(app.okanaganLocalFromUtc('2026-01-15T03:00:00Z').offset, '-08:00', 'last winter was still PST');
+  assert.equal(app.okanaganLocalFromUtc('Nov 13 8pm'), null);
+  assert.equal(app.okanaganLocalFromUtc('2026-11-14T03:00:00'), null, 'a time with no zone is refused, never guessed');
+  assert.equal(app.vancouverOffsetFor('2026-11-13', '20:00'), '-07:00');
+  // The event API takes start_utc / end_utc and stores the Okanagan wall-clock values.
+  const conv = app.occurrencesFromUtc([{ start_utc: '2026-11-14T03:00:00Z', end_utc: '2026-11-14T05:00:00Z', label: 'Show' }, { start_utc: '2026-11-21T05:00:00Z', end_utc: '2026-11-21T09:00:00Z' }]);
+  assert.deepEqual(conv.list[0], { label: 'Show', start_date: '2026-11-13', start_time: '20:00', end_date: '2026-11-13', end_time: '22:00' });
+  assert.deepEqual(conv.list[1], { start_date: '2026-11-20', start_time: '22:00', end_date: '2026-11-20', ends_next_day: 1, end_time: '02:00' }, 'past midnight is ends_next_day');
+  assert.equal(app.occurrencesFromUtc([{ start_utc: '2026-11-14T03:00:00Z', start_date: '2026-11-13' }]).fail.reason, 'occurrence_utc_conflict');
+  assert.equal(app.occurrencesFromUtc([{ start_utc: 'tomorrow' }]).fail.reason, 'occurrence_utc_invalid');
+  const name = 'R7 TZ Femme Fatale Fixture';
+  const r = app.createEvent({ name, region: 'west-kelowna', description: 'Round 7 fixture.', source_type: 'secondary', source_name: 'Showpass',
+    source_url: 'https://example.com/r7-tz', venue_name_text: 'Crown & Thieves', categories: ['nightlife'],
+    occurrences: [{ start_utc: '2026-11-14T03:00:00Z', end_utc: '2026-11-14T05:00:00Z' }] }, { reason: 'round 7 fixture', batch_id: 'test-r7-tz' });
+  try {
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const occ = app.listEventOccurrences(r.event.id)[0];
+    assert.equal(occ.start_date, '2026-11-13');
+    assert.equal(occ.start_time, '20:00');
+    assert.equal(occ.end_time, '22:00');
+    assert.equal(db.prepare('SELECT start_datetime FROM events WHERE id = ?').get(r.event.id).start_datetime, '2026-11-13T20:00:00-07:00');
+  } finally {
+    if (r.ok) for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences', 'events']) db.prepare(`DELETE FROM ${t} WHERE ${t === 'events' ? 'id' : 'event_id'} = ?`).run(r.event.id);
+  }
+});
+
+test('Round 7 time zone: the .ics uses a fixed UTC-7 zone and the Google link sends UTC instants for November dates', () => {
+  const nov = { id: 1, start_date: '2026-11-13', end_date: '2026-11-13', start_time: '20:00', end_time: '22:00', all_day: 0 };
+  const ics = app.eventIcs({ id: 7, name: 'Femme Fatale' }, [nov, { id: 2, start_date: '2026-10-24', end_date: '2026-10-24', start_time: '20:00', all_day: 0 }], 'Crown & Thieves', 'https://okanaganroam.com/x', new Date('2026-10-19T12:00:00Z'));
+  const zone = ics.slice(ics.indexOf('BEGIN:VTIMEZONE'), ics.indexOf('END:VTIMEZONE'));
+  assert.ok(!/-0800/.test(zone), 'no -08:00 rule');
+  assert.ok(!/RRULE/.test(zone), 'no yearly switch');
+  assert.match(zone, /TZID:Etc\/GMT\+7\r\nBEGIN:STANDARD\r\nTZOFFSETFROM:-0700\r\nTZOFFSETTO:-0700/);
+  assert.match(ics, /DTSTART;TZID=Etc\/GMT\+7:20261113T200000\r\nDTEND;TZID=Etc\/GMT\+7:20261113T220000/);
+  assert.match(ics, /DTSTART;TZID=Etc\/GMT\+7:20261024T200000\r\nDTEND;TZID=Etc\/GMT\+7:20261024T220000/, 'October (PDT) is also UTC-7');
+  // A past winter (PST) date, only reachable with an old `now`, is written in UTC rather than under the UTC-7 zone.
+  const old = app.eventIcs({ id: 7, name: 'Winter' }, [{ id: 3, start_date: '2026-01-14', end_date: '2026-01-14', start_time: '19:00', end_time: '21:00', all_day: 0 }], '', 'u', new Date('2026-01-01T12:00:00Z'));
+  assert.match(old, /DTSTART:20260115T030000Z\r\nDTEND:20260115T050000Z/);
+  const g = new URL(app.googleCalendarUrl({ name: 'Femme Fatale' }, nov, 'Crown & Thieves', 'https://okanaganroam.com/x'));
+  assert.equal(g.searchParams.get('dates'), '20261114T030000Z/20261114T050000Z', '8-10 pm UTC-7 on Nov 13');
+  assert.equal(g.searchParams.get('ctz'), null);
+  const late = new URL(app.googleCalendarUrl({ name: 'Late' }, { start_date: '2026-12-31', end_date: '2026-12-31', start_time: '23:00', all_day: 0 }, '', 'u'));
+  assert.equal(late.searchParams.get('dates'), '20270101T060000Z/20270101T080000Z', 'start + 2 hours, into the new year');
+  const allDay = new URL(app.googleCalendarUrl({ name: 'Fair' }, { start_date: '2026-11-20', end_date: '2026-11-21', all_day: 1 }, '', 'u'));
+  assert.equal(allDay.searchParams.get('dates'), '20261120/20261122', 'all-day stays dates');
+});
+
+test('Round 7: JSON-LD always has an endDate for a timed event, and calendar locations name the town once', () => {
+  const o = { start_date: '2026-11-13', end_date: '2026-11-13', start_time: '19:30', end_time: null, all_day: 0, ends_next_day: 0 };
+  assert.equal(app.occurrenceIsoEnd(o), '2026-11-13T21:30:00-07:00', 'start + 2 hours');
+  assert.equal(app.occurrenceIsoEnd({ ...o, start_time: '23:00' }), '2026-11-14T01:00:00-07:00', 'past midnight');
+  assert.equal(app.occurrenceIsoEnd({ ...o, end_time: '21:00' }), '2026-11-13T21:00:00-07:00', 'a stored end time wins');
+  assert.equal(app.occurrenceIsoEnd({ ...o, start_time: null, all_day: 1 }), '2026-11-13');
+  const ld = app.eventJsonLd({ id: 1, name: 'R7 Show', region: 'kelowna', status: 'scheduled' }, [{ id: 1, ...o }, { id: 2, ...o, start_date: '2026-11-14', end_date: '2026-11-14' }], ['live-music'], null, 'https://okanaganroam.com/kelowna/events/r7', '2026-10-19');
+  assert.equal(ld.endDate, '2026-11-13T21:30:00-07:00');
+  assert.equal(ld.subEvent[0].endDate, '2026-11-14T21:30:00-07:00');
+  const loc = (venue_name_text, region = 'kelowna') => app.eventCalendarLocation({ region, venue_name_text }, null);
+  assert.equal(loc('Prospera Place, 1223 Water St, Kelowna'), 'Prospera Place, 1223 Water St, Kelowna, BC');
+  assert.equal(loc('Westbank Museum, 2376 Dobbin Rd (Hwy 97), West Kelowna', 'west-kelowna'), 'Westbank Museum, 2376 Dobbin Rd (Hwy 97), West Kelowna, BC');
+  assert.equal(loc('1169 Bellagio Ave, Kelowna (private home)'), '1169 Bellagio Ave, Kelowna (private home), BC');
+  assert.equal(loc('Hall, Kelowna, B.C.'), 'Hall, Kelowna, B.C.');
+  assert.equal(loc('Some Hall'), 'Some Hall, Kelowna, BC', 'a place with no town still gets one');
+  assert.equal(loc(''), 'Kelowna, BC');
+  for (const text of ['The HOV - Hall on Valley, Kelowna', 'Oliver Legion, 6417 Main Street, Oliver']) {
+    const out = loc(text, text.includes('Oliver') ? 'oliver' : 'kelowna');
+    const parts = out.split(', ').map((p) => p.toLowerCase());
+    assert.equal(parts.length, new Set(parts).size, `no repeated part in "${out}"`);
+  }
+});
