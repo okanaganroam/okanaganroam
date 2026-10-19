@@ -1269,7 +1269,7 @@ const VENUE_DELETE_CHILDREN = [
   ['venue_seasons', 'venue_id = ?'], ['venue_owner_links', 'venue_id = ?'], ['owner_change_requests', 'venue_id = ?'],
   ['owner_photos', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
-  ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'],
+  ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'], ['event_partner_venues', 'venue_id = ?'],
 ];
 const VENUE_DELETE_UNLINK = [['events', 'venue_id'], ['venue_submissions', 'venue_id'], ['venues', 'redirect_to']];
 function deleteVenue(id) {
@@ -3054,14 +3054,15 @@ function listUpcomingEventsAtVenue(venueId, { limit = 3, now = new Date() } = {}
         (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date,
         (SELECT o.end_date FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? ORDER BY o.start_date, o.end_date LIMIT 1) AS next_end_date
       FROM events e
-      WHERE e.venue_id = ?
+      WHERE (e.venue_id = ? OR e.id IN (SELECT event_id FROM event_partner_venues WHERE venue_id = ?))
         AND e.status = 'scheduled'
         AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
         AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
       ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
-    .all(today, today, venueId, today);
-  // One event the business posted itself still shows on its page (it expects to see it there).
-  if (rows.length < MIN_VENUE_EVENTS && !rows.some((r) => r.source_type === 'official_venue')) return [];
+    .all(today, today, venueId, venueId, today);
+  // One event the business posted itself still shows on its page (it expects to see it there), and so does one it
+  // was tagged on as a partner (2026-10-19): the host named it, so it belongs there.
+  if (rows.length < MIN_VENUE_EVENTS && !rows.some((r) => r.source_type === 'official_venue' || r.venue_id !== venueId)) return [];
   return rows.slice(0, limit).map((r) => ({
     ...rowToEvent(r),
     primaryCategory: r.primary_category || null,
@@ -26720,7 +26721,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // copy, where one has been made (scripts/make-photo-w1200.sh), is listed between the two.
   const hero1200 = heroW > 1200 ? photoSized(venue.image_url, 1200) : venue.image_url;
   const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${hero1200 !== venue.image_url ? `${escapeHtml(hero1200)} 1200w, ` : ''}${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
-  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
+  // The owner's chosen height for the banner crop (2026-10-19), if they've moved this photo.
+  const heroPosY = venue.image_url ? venuePhotoPosY(venue.id, venue.image_url) : null;
+  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}"${heroPosY === null ? '' : ` style="object-position: 50% ${heroPosY}%"`} fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   // The credit's colour (2026-10-18): a solid #6B5E55 (5.6:1 on the cream page); the old 0.65 opacity was 3.9-4.5:1.
   // French pass 6 (2026-10-19): a credit stored as "Photo: City of Kelowna" read "Photo: Photo: …"; French has its space before the colon.
   const creditText = photoCredit ? String(photoCredit).replace(/^\s*photos?\s*:\s*/i, '') : '';
@@ -27537,6 +27540,9 @@ ${pastOccs.map(dateItem).join('\n')}
   const venueHtml = hostVenue
     ? `<a href="/${hostVenue.region}/${CATEGORY_SLUGS[hostVenue.type]}/${hostVenue.slug}">${escapeHtml(hostVenue.name)}</a>${hostVenue.address ? ` &middot; ${escapeHtml(hostVenue.address)}` : ''}`
     : (full.venue_name_text ? escapeHtml(full.venue_name_text) : (full.valley_wide === 1 ? 'Across the Okanagan Valley' : null));
+  // Partner businesses the host tagged (2026-10-19), linked to their pages.
+  const partnersHtml = (full.id ? eventPartnerVenues(full.id) : []).filter((v) => !hostVenue || v.id !== hostVenue.id)
+    .map((v) => `<a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a>`).join(', ');
   const attribution = full.source_type && !EVENT_OFFICIAL_SOURCE_TYPES.includes(full.source_type) && full.source_name
     ? `<p class="event-attribution">Listed by ${escapeHtml(full.source_name)}</p>` : '';
   const chips = categories.filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
@@ -27544,6 +27550,7 @@ ${pastOccs.map(dateItem).join('\n')}
     ['When', whenHtml],
     full.recurrence_rule ? ['Recurs', escapeHtml(readableRecurrence(full.recurrence_rule, (occurrences[0] || {}).start_date ? occurrences[0].start_date.slice(0, 4) : ''))] : null,
     venueHtml ? ['Where', venueHtml] : null,
+    partnersHtml ? ['With', partnersHtml] : null,
     ['Region', `<a href="/${full.region}">${escapeHtml(regionLabel)}</a>`],
     full.website ? ['Website', `<a href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">${escapeHtml(String(full.website).replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, ''))}</a>`] : null,
   ].filter(Boolean)
@@ -33733,7 +33740,7 @@ function venueLookup(q, region) {
   if (term.length < 2) return [];
   const r = typeof region === 'string' && REGION_LABELS[region] ? region : null;
   const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  let rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
+  let rows = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
     .all(...[like, ...(r ? [r] : []), `${term}%`]);
   // Forgiving lookup (2026-10-19, site review pass 4): "quails gate", "Quail's Gate", "the hatching post", "sandhill"
   // and "mission hills" find the listing too: names compared without spaces, apostrophes, accents, a leading "the"
@@ -33743,7 +33750,7 @@ function venueLookup(q, region) {
     if (keys[0].length >= 3) {
       const seen = new Set(rows.map((v) => `${v.region}/${v.slug}`));
       const more = [];
-      for (const v of db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []))) {
+      for (const v of db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []))) {
         if (seen.has(`${v.region}/${v.slug}`)) continue;
         let at = -1;
         for (const nk of venueLookupKeys(v.name)) for (const k of keys) { const i = nk.indexOf(k); if (i !== -1 && (at === -1 || i < at)) at = i; }
@@ -33755,14 +33762,14 @@ function venueLookup(q, region) {
   }
   if (rows.length < 8) {
     const seen = new Set(rows.map((v) => `${v.region}/${v.slug}`));
-    const all = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []));
+    const all = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []));
     const byWords = venueLookupByWords(term, all).filter((v) => !seen.has(`${v.region}/${v.slug}`));
     rows = [...rows, ...byWords.slice(0, 8 - rows.length)];
   }
   // French lookup (2026-10-18): the French type label, the French page and both claim links ride along, so
   // /fr/list-your-venue shows French results and every result can be claimed.
   return rows.filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]).map((v) => ({
-    name: v.name, region: REGION_LABELS[v.region], type: CATEGORY_LABELS[v.type].singular,
+    id: v.id, name: v.name, region: REGION_LABELS[v.region], type: CATEGORY_LABELS[v.type].singular,
     typeFr: (CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular,
     url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
     urlFr: `/fr/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
@@ -34241,7 +34248,7 @@ function validateEventSubmission(body, now = new Date()) {
 
 function rowToEventSubmission(row) {
   if (!row) return null;
-  return { ...row, consent: !!row.consent, categories: JSON.parse(row.categories || '[]') };
+  return { ...row, consent: !!row.consent, categories: JSON.parse(row.categories || '[]'), partner_venue_ids: parsePartnerIds(row.partner_venue_ids) };
 }
 
 function getEventSubmission(id) {
@@ -34301,6 +34308,7 @@ function buildEventSubmissionEmail(sub) {
     'Region': REGION_LABELS[sub.region],
     'Venue / location': sub.venue_name,
     ...(sub.owner_venue_id ? { 'Sent from': `The venue's owner edit page (venue #${sub.owner_venue_id}); approving links it to that venue` } : {}),
+    ...(sub.partner_venue_ids && sub.partner_venue_ids.length ? { 'Partner venues': `${partnerVenueNamesText(sub.partner_venue_ids)} (the event also shows on their pages)` } : {}),
     'Categories': sub.categories.map((k) => WHATSON_CATEGORY_BY_KEY[k].label).join(', '),
     'Description': sub.description,
     'Event website / tickets': sub.event_url || '(none given)',
@@ -34341,8 +34349,8 @@ function insertEventSubmission(data, ip, userAgent, ownerVenueId) {
     `INSERT INTO event_submissions
        (name, region, categories, description, venue_name, start_date, end_date, start_time, end_time, all_day, ends_next_day,
         event_url, organizer_name, schedule_notes, contact_name, contact_email, consent, consent_version, ip_hash, user_agent,
-        price_text, image_link, owner_venue_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`
+        price_text, image_link, owner_venue_id, partner_venue_ids)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     data.name, data.region, JSON.stringify(data.categories), data.description, data.venue_name,
     data.start_date, data.end_date, data.start_time, data.end_time, data.all_day, data.ends_next_day,
@@ -34350,7 +34358,8 @@ function insertEventSubmission(data, ip, userAgent, ownerVenueId) {
     EVENT_SUBMISSION_CONSENT_VERSION,
     crypto.createHash('sha256').update(`okanagan-roam-event-submission:${ip}`).digest('hex'),
     String(userAgent || '').slice(0, 300) || null,
-    data.price_text || null, data.image_link || null, ownerVenueId || null
+    data.price_text || null, data.image_link || null, ownerVenueId || null,
+    data.partner_venue_ids && data.partner_venue_ids.length ? JSON.stringify(data.partner_venue_ids) : null
   );
   return Number(info.lastInsertRowid);
 }
@@ -34504,6 +34513,7 @@ function approveEventSubmission(id, body, now = new Date()) {
     `UPDATE event_submissions SET status = 'approved', event_id = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
        WHERE id = ? AND status = 'pending'`
   ).run(result.event.id, reviewer, id);
+  setEventPartners(result.event.id, sub.partner_venue_ids);
   return { status: 200, body: { submission: getEventSubmission(id), event: result.event, categories: result.categories, occurrences: result.occurrences, review: result.review } };
 }
 
@@ -35671,7 +35681,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
 // Dayton gets an email either way. Owner events have one date; a change to
 // the date of an event with several dates is refused (we handle those).
 const OWNER_EVENT_DATA_KEYS = ['name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day', 'ends_next_day',
-  'event_url', 'schedule_notes', 'price_text', 'image_link'];
+  'event_url', 'schedule_notes', 'price_text', 'image_link', 'partner_venue_ids'];
 
 function ownerEventSubmission(venueId, subId) {
   const sub = getEventSubmission(subId);
@@ -35696,6 +35706,11 @@ function ownerEventFormData(sub) {
     if (occ.length === 1) for (const k of ['start_date', 'end_date', 'start_time', 'end_time', 'all_day', 'ends_next_day']) out[k] = occ[0][k] == null ? '' : occ[0][k];
   }
   out.all_day = !!Number(out.all_day);
+  // Partners (2026-10-19): a pending change's list, else the live event's, else what was sent; with names for the chips.
+  let ids = pending ? parsePartnerIds(JSON.parse(pending.data).partner_venue_ids) : sub.status === 'approved' && sub.event_id ? eventPartnerIds(sub.event_id) : sub.partner_venue_ids || [];
+  if (!Array.isArray(ids)) ids = [];
+  out.partner_venue_ids = ids;
+  out.partners = partnerVenueRows(ids).map((v) => ({ id: v.id, name: v.name, town: REGION_LABELS[v.region] || '' }));
   return out;
 }
 
@@ -35713,10 +35728,12 @@ async function handleOwnerEventChange(req, res, venue, subId, data) {
   if (!sub || sub.status === 'rejected') return sendSubmissionResponse(res, 404, { ok: false, error: 'This event can’t be changed any more. Send it as a new event instead.' });
   if (sub.status === 'pending') {
     db.prepare(`UPDATE event_submissions SET name = ?, categories = ?, description = ?, start_date = ?, end_date = ?, start_time = ?, end_time = ?,
-        all_day = ?, ends_next_day = ?, event_url = ?, schedule_notes = ?, price_text = ?, image_link = ?, contact_name = ?, contact_email = ?
+        all_day = ?, ends_next_day = ?, event_url = ?, schedule_notes = ?, price_text = ?, image_link = ?, contact_name = ?, contact_email = ?,
+        partner_venue_ids = ?
       WHERE id = ? AND status = 'pending'`).run(data.name, JSON.stringify(data.categories), data.description, data.start_date, data.end_date,
       data.start_time, data.end_time, data.all_day, data.ends_next_day, data.event_url, data.schedule_notes || null, data.price_text || null,
-      data.image_link || null, data.contact_name, data.contact_email, sub.id);
+      data.image_link || null, data.contact_name, data.contact_email,
+      data.partner_venue_ids && data.partner_venue_ids.length ? JSON.stringify(data.partner_venue_ids) : null, sub.id);
     ownerMarkFrench(res, 'event_submissions', sub.id);
     await notifyEventSubmission(sub.id);
     return sendSubmissionResponse(res, 200, { ok: true, id: sub.id, updated: true });
@@ -35732,6 +35749,7 @@ async function handleOwnerEventChange(req, res, venue, subId, data) {
   await notifyOwnerEventAction(`[PENDING REVIEW] Event change #${id}: ${data.name} (${venue.name})`, {
     'Status': 'PENDING REVIEW. The live event has not changed yet.', 'Venue': venue.name, 'Event': sub.name,
     'New details': `${data.name}; ${data.start_date}${data.start_time ? ` ${data.start_time}` : ''}${data.end_time ? `-${data.end_time}` : ''}`,
+    ...(data.partner_venue_ids && data.partner_venue_ids.length ? { 'Partner venues': partnerVenueNamesText(data.partner_venue_ids) } : {}),
   });
   return sendSubmissionResponse(res, 200, { ok: true, change: id });
 }
@@ -35816,6 +35834,8 @@ function approveOwnerEventChange(id, reviewer) {
       return { ok: false, reason: 'write_failed', detail: String(e.message || e) };
     }
   }
+  // Partners: a change sent before partners existed has no list (undefined) and leaves them as they are.
+  if (Array.isArray(d.partner_venue_ids)) setEventPartners(event.id, d.partner_venue_ids);
   db.prepare("UPDATE owner_event_changes SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(reviewer, id);
   return { ok: true };
 }
@@ -35829,8 +35849,52 @@ function rejectOwnerEventChange(id, reviewer, reason) {
   return { ok: true };
 }
 
+// Event partners (2026-10-19, JoieFarm asked): an owner can tag other businesses listed on the site as partners on
+// their event (a collaboration, a pop-up, a shared tasting). Once approved, the event also shows on each partner's
+// venue page and its own page names them. Stored as a JSON id list on the submission and in owner_event_changes
+// data, and in event_partner_venues once live. The host venue stays events.venue_id.
+const EVENT_PARTNER_MAX = 5;
+function parsePartnerIds(raw) {
+  if (raw == null || raw === '') return [];
+  let v = raw;
+  if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return []; } }
+  return Array.isArray(v) ? v.map(Number).filter((n) => Number.isInteger(n) && n > 0) : [];
+}
+// From the owner's form: ids of live listings, not their own, at most EVENT_PARTNER_MAX. -> array, or null if invalid.
+function cleanPartnerIds(raw, ownVenueId) {
+  if (raw == null || raw === '') return [];
+  if (!Array.isArray(raw) || raw.length > EVENT_PARTNER_MAX * 2) return null;
+  const ids = [...new Set(raw.map(Number))].filter((n) => n !== ownVenueId);
+  if (ids.length > EVENT_PARTNER_MAX || ids.some((n) => !Number.isInteger(n) || n <= 0)) return null;
+  if (partnerVenueRows(ids).length !== ids.length) return null;
+  return ids;
+}
+// Live listings for these ids, in the given order (a retired or merged listing drops out).
+function partnerVenueRows(ids) {
+  const list = parsePartnerIds(ids);
+  if (!list.length) return [];
+  const rows = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND id IN (${list.map(() => '?').join(',')})`).all(...list);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return list.map((id) => byId.get(id)).filter((v) => v && CATEGORY_SLUGS[v.type]);
+}
+function partnerVenueNamesText(ids) {
+  return partnerVenueRows(ids).map((v) => `${v.name} (#${v.id})`).join(', ');
+}
+function eventPartnerIds(eventId) {
+  return db.prepare('SELECT venue_id FROM event_partner_venues WHERE event_id = ? ORDER BY position, venue_id').all(eventId).map((r) => r.venue_id);
+}
+function eventPartnerVenues(eventId) {
+  return partnerVenueRows(eventPartnerIds(eventId));
+}
+function setEventPartners(eventId, ids) {
+  const list = parsePartnerIds(ids);
+  db.prepare('DELETE FROM event_partner_venues WHERE event_id = ?').run(eventId);
+  const add = db.prepare('INSERT OR IGNORE INTO event_partner_venues (event_id, venue_id, position) VALUES (?, ?, ?)');
+  list.slice(0, EVENT_PARTNER_MAX).forEach((v, n) => add.run(eventId, v, n));
+}
+
 const OWNER_EVENT_KEYS = new Set(['change_of', 'name', 'description', 'categories', 'start_date', 'end_date', 'start_time', 'end_time', 'all_day',
-  'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'company_website', 'started_at']);
+  'event_url', 'schedule_notes', 'contact_name', 'contact_email', 'price_text', 'image_link', 'partner_venue_ids', 'company_website', 'started_at']);
 async function handleOwnerEventSubmission(req, res, token) {
   const generic = 'Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.';
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Events are only accepted from the Okanagan Roam website.' });
@@ -35856,7 +35920,11 @@ async function handleOwnerEventSubmission(req, res, token) {
   delete full.company_website;
   delete full.started_at;
   delete full.change_of;
+  delete full.partner_venue_ids;
   const { data, errors } = validateEventSubmission(full);
+  const partners = cleanPartnerIds(body.partner_venue_ids, venue.id);
+  if (partners === null) errors.partner_venue_ids = `Choose up to ${EVENT_PARTNER_MAX} businesses listed on Okanagan Roam.`;
+  else data.partner_venue_ids = partners;
   if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
   if (body.change_of !== undefined && body.change_of !== null && body.change_of !== '') return await handleOwnerEventChange(req, res, venue, Number(body.change_of), data);
   const duplicate = db.prepare(
@@ -40086,6 +40154,20 @@ const OWNER_HELP_TOPICS = [
       link: '<p><strong>Choisir comme photo principale</strong>, <strong>Retirer</strong> et les flèches <strong>↑ ↓</strong> sont réservés aux comptes. Utilisez <strong>Créer un compte</strong> en haut de cette page, puis ouvrez votre fiche depuis <strong>Mes fiches</strong> : ils sont sur chaque photo en ligne, dans <strong>Photos</strong>.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Choisir comme photo principale</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
       out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>. Dans <strong>Photos</strong>, chaque photo en ligne a les boutons <strong>Choisir comme photo principale</strong>, <strong>Retirer</strong> et les flèches <strong>↑ ↓</strong> pour changer l’ordre.</p><p>Vous voulez remplacer la photo que nous avons choisie? Téléversez la vôtre, puis touchez <strong>Choisir comme photo principale</strong> une fois qu’elle est en ligne. Sinon, <strong>écrivez-nous</strong> et nous la remplacerons.</p>',
     } },
+  // 2026-10-19 (JoieFarm asked): slide the main photo up or down in the banner.
+  { id: 'photo-position', over: ['photo-main', 'photo-add'], q: 'My main photo is cut off', qFr: 'Ma photo principale est coupée', pages: ['edit'],
+    keys: ['cut off', 'cropped', 'crop', 'cropping', 'photo cut off', 'photo is cut off', 'cut off photo', 'move photo', 'move the photo', 'move my photo', 'photo position', 'position', 'reposition', 'placement', 'adjust photo', 'adjust the photo', 'center photo', 'centre photo', 'top of photo', 'head cut off', 'focal point', 'maneuver', 'manoeuvre'],
+    keysFr: ['coupee', 'coupe', 'photo coupee', 'recadrer', 'recadrage', 'deplacer la photo', 'position de la photo', 'position', 'ajuster la photo', 'centrer la photo', 'haut de la photo'],
+    a: {
+      in: '<p>{ON}, in <strong>Photos</strong>, the <strong>Main photo on your page</strong> box shows your banner the way it looks on a computer and on a phone. Move the slider until the best part shows, then tap <strong>Save position</strong>. Your page changes straight away. <strong>Centre it</strong> puts it back in the middle.</p>',
+      link: '<p>Moving the photo up or down is for signed-in owners. Use <strong>Create a login</strong> near the top of this page, then open your listing from <strong>My listings</strong>: in <strong>Photos</strong>, the <strong>Main photo on your page</strong> box has a slider and <strong>Save position</strong>.</p>',
+      out: '<p>Sign in at <a href="/owner/login">Business login</a> and open your listing from <strong>My listings</strong>. In <strong>Photos</strong>, the <strong>Main photo on your page</strong> box has a slider: move it until the best part shows, then tap <strong>Save position</strong>.</p>',
+    },
+    aFr: {
+      in: '<p>{ON}, dans <strong>Photos</strong>, l’encadré <strong>Photo principale de votre page</strong> montre votre bannière telle qu’elle paraît sur un ordinateur et sur un téléphone. Déplacez le curseur jusqu’à ce que la meilleure partie paraisse, puis touchez <strong>Enregistrer la position</strong>. Votre page change tout de suite. <strong>Centrer</strong> la remet au milieu.</p>',
+      link: '<p>Déplacer la photo est réservé aux comptes. Utilisez <strong>Créer un compte</strong> en haut de cette page, puis ouvrez votre fiche depuis <strong>Mes fiches</strong> : dans <strong>Photos</strong>, l’encadré <strong>Photo principale de votre page</strong> a un curseur et <strong>Enregistrer la position</strong>.</p>',
+      out: '<p>Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> et ouvrez votre fiche depuis <strong>Mes fiches</strong>. Dans <strong>Photos</strong>, l’encadré <strong>Photo principale de votre page</strong> a un curseur : déplacez-le jusqu’à ce que la meilleure partie paraisse, puis touchez <strong>Enregistrer la position</strong>.</p>',
+    } },
   { id: 'hours', q: 'How do I set my hours?', qFr: 'Comment changer mes heures d\u2019ouverture?', pages: ['edit'],
     keys: ['hours', 'opening hours', 'open', 'close', 'closing', 'times', 'closed', 'schedule', 'split', 'lunch', 'time', 'change hours', 'change my hours', 'change our hours', 'update hours', 'update our hours', 'set hours', 'closing time', 'opening time', 'open late', 'past midnight'],
     keysFr: ['heures', 'heure', 'heures d ouverture', 'horaire', 'horaires', 'heure d ouverture', 'heure de fermeture', 'ouvert', 'ouverts', 'ouverture', 'changer mes heures', 'changer nos heures', 'modifier mes heures', 'modifier nos heures', 'modifier les heures', 'changer l horaire', 'modifier l horaire', 'changer les heures', 'midi', 'apres minuit'],
@@ -40174,6 +40256,12 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['modifier un evenement', 'modifier mon evenement', 'changer un evenement', 'annuler', 'annuler un evenement', 'annuler mon evenement', 'evenement annule', 'reporter', 'reporte', 'mauvaise date', 'supprimer un evenement'],
     a: '<p>At the top of your edit page, under <strong>Your updates</strong>, each event you sent has <strong>Change</strong> and <strong>Cancel</strong>. Change opens the event form with your details filled in. Once an event has passed it can\u2019t be changed. Send it as a new one instead.</p>',
     aFr: '<p>En haut de votre page de modification, sous <strong>Vos mises à jour</strong>, chaque événement envoyé a les boutons <strong>Modifier</strong> et <strong>Annuler l’événement</strong> (<strong>Retirer</strong> s’il attend encore notre vérification). Modifier ouvre le formulaire avec vos renseignements déjà remplis. Un événement passé ne peut plus être modifié; envoyez-le plutôt comme un nouvel événement.</p>' },
+  // 2026-10-19 (JoieFarm asked): partner businesses on an event.
+  { id: 'event-partners', over: ['event-add'], q: 'Add partner businesses to an event', qFr: 'Ajouter des entreprises partenaires à un événement', pages: ['edit'],
+    keys: ['partner', 'partners', 'partner business', 'collaborator', 'collaborators', 'collaboration', 'collab', 'co host', 'cohost', 'co hosted', 'tag a business', 'tag another business', 'other businesses', 'another business', 'other venue', 'joint event', 'together with'],
+    keysFr: ['partenaire', 'partenaires', 'entreprise partenaire', 'collaborateur', 'collaborateurs', 'collaboration', 'coorganise', 'autre entreprise', 'autres entreprises', 'evenement conjoint'],
+    a: '<p>In the event form, use <strong>Partner businesses</strong>: start typing a business name and pick it from the list (up to 5 businesses listed on Okanagan Roam). Once the event is approved it shows on each partner\u2019s page too, and the event page names them. For an event you already sent, tap <strong>Change</strong> next to it under <strong>Your updates</strong> and add them there.</p>',
+    aFr: '<p>Dans le formulaire de l’événement, utilisez <strong>Entreprises partenaires</strong> : commencez à taper le nom d’une entreprise et choisissez-la dans la liste (jusqu’à 5 entreprises présentes sur Okanagan Roam). Une fois l’événement approuvé, il paraît aussi sur la page de chaque partenaire, et la page de l’événement les nomme. Pour un événement déjà envoyé, touchez <strong>Modifier</strong> à côté de celui-ci sous <strong>Vos mises à jour</strong> et ajoutez-les.</p>' },
   { id: 'menu-add', q: 'How do I add my menu or prices?', qFr: 'Comment ajouter mon menu ou mes prix?', pages: ['edit', 'menu'],
     keys: ['menu', 'menus', 'prices', 'price list', 'rates', 'green fees', 'tours and prices', 'add menu', 'add my menu', 'add our menu', 'scan', 'type my menu', 'type it in', 'type it myself', 'type it in myself', 'by hand', 'manually', 'enter my menu', 'food menu', 'drinks menu', 'drink menu', 'wine list', 'dishes'],
     keysFr: ['menu', 'menus', 'carte', 'la carte', 'liste de prix', 'tarifs', 'nos prix', 'mes prix', 'ajouter nos prix', 'ajouter le menu', 'ajouter mon menu', 'ajouter notre menu', 'numeriser', 'carte des vins', 'moi meme', 'a la main', 'manuellement', 'plats'],
@@ -42858,6 +42946,7 @@ function renderAdminEventCard(s) {
   return `<article class="rv-card" data-kind="event" data-id="${s.id}">
       <h3>${adminReviewEsc(s.name)}</h3>
       <p class="rv-meta">Event #${s.id} · ${adminReviewEsc(when)} · ${adminReviewEsc(s.venue_name || '')}, ${adminReviewEsc(REGION_LABELS[s.region] || s.region)} · by ${adminReviewEsc(s.organizer_name)} (${adminReviewEsc(s.contact_email)})${s.owner_venue_id ? ' · <strong>from the venue owner</strong>' : ''}${s.event_url ? ` · <a href="${adminReviewEsc(s.event_url)}" target="_blank" rel="noopener nofollow">their link</a>` : ''}</p>
+      ${s.partner_venue_ids && s.partner_venue_ids.length ? `<p class="rv-meta">Partner venues (the event also shows on their pages): ${adminReviewEsc(partnerVenueNamesText(s.partner_venue_ids))}</p>` : ''}
       <label class="rv-field">Name ${adminEditBox('name', s.name, { max: 120 })}</label>
       <label class="rv-field">Description ${adminEditBox('description', s.description, { multiline: true, rows: 5, max: 2000 })}</label>
       ${dupHtml}
@@ -42878,6 +42967,7 @@ function renderAdminEventChangeCard(c) {
     ['When', adminOccText(now), adminOccText(d)],
     ['Description', ev.description, d.description],
     ['Link', ev.website || '', d.event_url || ''],
+    ...(Array.isArray(d.partner_venue_ids) ? [['Partners', partnerVenueNamesText(ev.id ? eventPartnerIds(ev.id) : []), partnerVenueNamesText(d.partner_venue_ids)]] : []),
   ].filter(([, a, b]) => String(a || '') !== String(b || '')).map(([label, a, b]) => `<tr><th>${label}</th><td class="rv-old">${adminReviewEsc(a)}</td><td class="rv-new">${adminReviewEsc(b)}</td></tr>`).join('');
   return `<article class="rv-card" data-kind="eventchange" data-id="${c.id}">
       <h3>${adminReviewEsc(ev.name)} <span class="rv-meta">(${adminReviewEsc(c.venue_name)})</span></h3>
@@ -43029,6 +43119,17 @@ function ownerLocalDate(utc, fr = false) {
 function ownerVenueMainImage(venueId) {
   const row = db.prepare('SELECT image_url FROM venues WHERE id = ?').get(venueId);
   return row ? row.image_url || null : null;
+}
+
+// Main photo position (2026-10-19): the height (0-100, the CSS object-position) a signed-in owner slid this photo
+// to in the venue banner, or null (centred). Keyed by the path without ?v=, so a re-versioned photo keeps it.
+function venuePhotoPath(imageUrl) {
+  return String(imageUrl || '').split('?')[0];
+}
+function venuePhotoPosY(venueId, imageUrl) {
+  if (!imageUrl) return null;
+  const row = db.prepare('SELECT pos_y FROM venue_photo_positions WHERE venue_id = ? AND image_path = ?').get(venueId, venuePhotoPath(imageUrl));
+  return row ? row.pos_y : null;
 }
 
 // Everything sent for this venue, newest first.
@@ -43210,6 +43311,35 @@ async function handleOwnerPhotoAction(req, res, account, venueId, photoId, actio
   return sendSubmissionResponse(res, 200, { ok: true, removed: true, new_main: newMain });
 }
 
+// POST /owner/account/venue/<id>/photo-position {y: 0-100}, signed-in owners only (2026-10-19): where the main photo
+// sits in the venue banner. Saved for the photo that is main right now; 50 (centred) removes the row.
+async function handleOwnerPhotoPosition(req, res, account, venueId) {
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
+  if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
+  const found = venueForOwnerAccount(account, venueId);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'That listing isn’t available any more.' });
+  let body;
+  try { body = await readLimitedJsonBody(req, 1024); } catch (err) { body = null; }
+  const y = body && typeof body === 'object' ? Number(body.y) : NaN;
+  if (!Number.isFinite(y) || y < 0 || y > 100) return sendSubmissionResponse(res, 400, { ok: false, error: 'Sorry, that didn’t work. Please try again.' });
+  const main = ownerVenueMainImage(venueId);
+  if (!main || !/^(?:https:\/\/|\/images\/)/.test(main)) return sendSubmissionResponse(res, 409, { ok: false, error: 'Your page doesn’t have a main photo yet.' });
+  const pos = Math.round(y);
+  const before = venuePhotoPosY(venueId, main);
+  if (pos === 50) db.prepare('DELETE FROM venue_photo_positions WHERE venue_id = ? AND image_path = ?').run(venueId, venuePhotoPath(main));
+  else {
+    db.prepare(`INSERT INTO venue_photo_positions (venue_id, image_path, pos_y, updated_by) VALUES (?, ?, ?, ?)
+      ON CONFLICT (venue_id, image_path) DO UPDATE SET pos_y = excluded.pos_y, updated_at = CURRENT_TIMESTAMP, updated_by = excluded.updated_by`)
+      .run(venueId, venuePhotoPath(main), pos, `owner:${account.email}`);
+  }
+  if (before !== (pos === 50 ? null : pos)) {
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'image_position', ?, ?, 'venue_owner', ?, 'high', NULL, 1, ?)`)
+      .run(venueId, before === null ? null : String(before), pos === 50 ? null : String(pos), venuePhotoPath(main), `owner:${account.email}`);
+  }
+  return sendSubmissionResponse(res, 200, { ok: true, y: pos });
+}
+
 function renderOwnerInvalidLinkPage(lang = 'en') {
   const fr = lang === 'fr';
   return `<!DOCTYPE html>
@@ -43267,6 +43397,16 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-fold > summary .lyv-section-label { display: inline; margin: 0; }
   body.owner-page .op-fold-hint { display: block; font-size: 0.84rem; color: rgba(42,32,25,0.66); margin-top: 2px; }
   body.owner-page .op-count-low { color: #9C2F22; font-weight: 700; }
+  body.owner-page .oe-partner-chips { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  body.owner-page .oe-partner-chips:empty { display: none; }
+  body.owner-page .oe-partner-chips li { display: inline-flex; align-items: center; gap: 4px; background: var(--paper); border-radius: 999px; padding: 4px 4px 4px 12px; font-size: 0.9rem; font-weight: 600; }
+  body.owner-page .oe-partner-chips button { border: 0; background: none; min-width: 32px; min-height: 32px; font-size: 1.1rem; line-height: 1; cursor: pointer; border-radius: 999px; color: inherit; }
+  body.owner-page .oe-partner-pick { position: relative; }
+  body.owner-page .oe-partner-list { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin: 4px 0 0; padding: 4px 0; list-style: none; background: #fff; border: 1px solid rgba(42,32,25,0.18); border-radius: 10px; box-shadow: 0 6px 18px rgba(42,32,25,0.12); max-height: 280px; overflow-y: auto; }
+  body.owner-page .oe-partner-list li { padding: 10px 12px; cursor: pointer; font-size: 0.92rem; }
+  body.owner-page .oe-partner-list li small { display: block; color: rgba(42,32,25,0.7); font-size: 0.8rem; }
+  body.owner-page .oe-partner-list li[aria-selected="true"], body.owner-page .oe-partner-list li:hover { background: rgba(42,32,25,0.06); }
+  body.owner-page .oe-partner-list li.oe-partner-empty { cursor: default; color: rgba(42,32,25,0.7); }
   body.owner-page .op-changing { background: #FFF4D6; border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; margin: 0 0 12px; }
   body.owner-page .op-changing[hidden] { display: none; }
   /* Phones (2026-10-18). Checkboxes and radios never shrink (a flex row squashed the photo rights box
@@ -43404,6 +43544,41 @@ function ownerPhotoGridHtml(venueId, signedIn, lang = 'en') {
   }).join('')}</div>`;
 }
 
+// Main photo position (2026-10-19, JoieFarm asked): the venue banner crops the main photo to a wide strip, and the
+// photo was always centred, so a vineyard or a sign near the top could be cut off. This shows the main photo (ours
+// or the owner's) cropped the way the page crops it, on a computer and on a phone, with a slider to move it up or
+// down. Signed-in owners save it straight away; with only the edit link it shows how to sign in.
+function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
+  const L = (en, f) => (lang === 'fr' ? f : en);
+  const main = ownerVenueMainImage(venue.id);
+  if (!main || !/^(?:https:\/\/|\/images\/)/.test(main)) return '';
+  const pos = venuePhotoPosY(venue.id, main);
+  const y = pos === null ? 50 : pos;
+  // The computer banner is about 795 x 380 beside the photo strip (2 or more photos), or up to 1200 x 420 alone.
+  let wide = false;
+  try { wide = venueGalleryPhotos({ ...venue, image_url: main }, L).length < 2; } catch (e) { wide = false; }
+  const own = /^\/images\/owner\//.test(main);
+  const img = (cls) => `<img src="${escapeHtml(main)}" alt="" loading="lazy" class="op-pos-img ${cls}" style="object-position: 50% ${y}%">`;
+  const controls = signedIn
+    ? `<div class="op-pos-controls">
+        <label for="opPosY">${L('Move the photo', 'Déplacer la photo')}</label>
+        <div class="op-pos-range"><span aria-hidden="true">${L('Top', 'Haut')}</span><input type="range" id="opPosY" min="0" max="100" step="1" value="${y}" data-saved="${y}" aria-valuetext="${y}%"><span aria-hidden="true">${L('Bottom', 'Bas')}</span></div>
+        <span class="op-pos-btns"><button type="button" class="op-btn" id="opPosSave" disabled>${L('Save position', 'Enregistrer la position')}</button><button type="button" class="op-btn" id="opPosReset"${y === 50 ? ' disabled' : ''}>${L('Centre it', 'Centrer')}</button></span>
+      </div>`
+    : `<p class="op-hint">${L('To move the photo up or down in the banner, <a href="#opLogin">create a login</a> (it takes 30 seconds) and open your listing from <strong>My listings</strong>.', 'Pour monter ou descendre la photo dans la bannière, <a href="#opLogin">créez un compte</a> (ça prend 30 secondes) et ouvrez votre fiche depuis <strong>Mes fiches</strong>.')}</p>`;
+  return `<div class="op-pos" id="opPos">
+      <h3 class="op-pos-title">${L('Main photo on your page', 'Photo principale de votre page')}</h3>
+      <p class="op-hint">${L('Your page crops the main photo to a wide banner. Slide it so the best part shows.', 'Votre page recadre la photo principale en bannière large. Faites-la glisser pour montrer la meilleure partie.')}${own ? '' : ' ' + (ownerPhotosForVenue(venue.id).some((p) => p.status === 'approved')
+        ? L('We chose this photo for you. To use one of yours instead, tap <strong>Make main photo</strong> on it below.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, touchez <strong>Choisir comme photo principale</strong> sous celle-ci.')
+        : L('We chose this photo for you. To use one of yours instead, upload it below, then tap <strong>Make main photo</strong> on it.', 'Nous avons choisi cette photo pour vous. Pour utiliser l’une des vôtres, téléversez-la ci-dessous, puis touchez <strong>Choisir comme photo principale</strong>.'))}</p>
+      <div class="op-pos-previews">
+        <figure class="op-pos-computer${wide ? ' op-pos-wide' : ''}">${img('')}<figcaption>${L('Computer', 'Ordinateur')}</figcaption></figure>
+        <figure class="op-pos-phone">${img('')}<figcaption>${L('Phone', 'Téléphone')}</figcaption></figure>
+      </div>
+      ${controls}
+    </div>`;
+}
+
 function renderOwnerPage(found, token, pending, lang = 'en') {
   return ownerA11y(renderOwnerPageHtml(found, token, pending, lang === 'fr' ? 'fr' : 'en'));
 }
@@ -43507,12 +43682,14 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     wrong: L('Sorry, something went wrong. Please try again.', 'Désolés, un problème est survenu. Veuillez réessayer.'),
     sendNet: L('Could not send. Please check your connection and try again.', 'Envoi impossible. Vérifiez votre connexion Internet et réessayez.'),
     sendEvent: L('Send event', 'Envoyer l’événement'), addEvent: L('Add an event', 'Ajouter un événement'),
+    partnerRemove: L('Remove {name}', 'Retirer {name}'), partnerMax: L(`You can add up to ${EVENT_PARTNER_MAX} partner businesses.`, `Vous pouvez ajouter jusqu’à ${EVENT_PARTNER_MAX} entreprises partenaires.`),
+    partnerNone: L('No listing by that name yet.', 'Aucune fiche à ce nom pour l’instant.'),
     yourEvent: L('your event', 'votre événement'), sendChange: L('Send change', 'Envoyer la modification'), changeEvent: L('Change your event', 'Modifier votre événement'),
     tapCancel: L('Tap again to cancel it on What\u2019s On', 'Touchez encore pour l’annuler dans À l’affiche'), tapWithdraw: L('Tap again to withdraw it', 'Touchez encore pour le retirer'),
     again: L('Please try again.', 'Veuillez réessayer.'), connect: L('Could not connect. Please try again.', 'Connexion impossible. Veuillez réessayer.'),
     removePhoto: L('Remove this photo from your page? This can\u2019t be undone.', 'Retirer cette photo de votre page? Cette action est définitive.'),
     photoRemoved: L('Photo removed.', 'Photo retirée.'), moved: L('Moved. It\u2019s now photo {n} of {total} after the main photo.', 'Déplacée. C’est maintenant la photo {n} sur {total} après la photo principale.'),
-    noMove: L('It can\u2019t move further.', 'Elle ne peut pas aller plus loin.'), mainChanged: L('Main photo changed.', 'Photo principale changée.'),
+    noMove: L('It can\u2019t move further.', 'Elle ne peut pas aller plus loin.'), mainChanged: L('Main photo changed.', 'Photo principale changée.'), posSaved: L('Saved. Your page shows the photo this way now.', 'Enregistré. Votre page montre maintenant la photo ainsi.'), posSaving: L('Saving…', 'Enregistrement…'),
     removeMe: L('Take this business off your login? You\u2019ll need its edit link to add it back.', 'Retirer cette entreprise de votre compte? Il vous faudra son lien de modification pour la rajouter.'),
     removeOther: L('Remove {who}? They won\u2019t be able to update this listing any more, and we\u2019ll email them to say so. The private edit link is reset too, so they can\u2019t use it to get back in; we\u2019ll email you the new one.', 'Retirer {who}? Cette personne ne pourra plus modifier cette fiche, et nous l’en informerons par courriel. Le lien de modification privé est aussi réinitialisé, pour qu’elle ne puisse pas revenir avec; nous vous enverrons le nouveau par courriel.'),
     removed: L('Removed. We\u2019ve emailed them to say so.', 'Retiré. Nous en avons informé la personne par courriel.'),
@@ -43605,6 +43782,21 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-photo-btns .op-btn { padding: 6px 8px; font-size: 0.85rem; }
   body.owner-page .op-photo-btns .op-make-main { grid-column: 1 / -1; }
   body.owner-page .op-photo-move { display: contents; }
+  body.owner-page .op-pos { background: var(--paper); border-radius: 14px; padding: 14px 16px; margin: 12px 0 18px; }
+  body.owner-page .op-pos-title { font-size: 1rem; margin: 0 0 4px; }
+  body.owner-page .op-pos-previews { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 10px 0; }
+  body.owner-page .op-pos-previews figure { margin: 0; }
+  body.owner-page .op-pos-previews figcaption { font-size: 0.78rem; font-weight: 700; color: rgba(42,32,25,0.7); margin-top: 4px; }
+  body.owner-page .op-pos-img { display: block; width: 100%; object-fit: cover; border-radius: 10px; background: rgba(42,32,25,0.08); }
+  body.owner-page .op-pos-computer { flex: 3 1 260px; }
+  body.owner-page .op-pos-computer .op-pos-img { aspect-ratio: 795 / 380; }
+  body.owner-page .op-pos-computer.op-pos-wide .op-pos-img { aspect-ratio: 1200 / 420; }
+  body.owner-page .op-pos-phone { flex: 1 1 140px; max-width: 220px; }
+  body.owner-page .op-pos-phone .op-pos-img { aspect-ratio: 375 / 220; }
+  body.owner-page .op-pos-controls label { font-weight: 700; font-size: 0.9rem; }
+  body.owner-page .op-pos-range { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin: 6px 0 10px; }
+  body.owner-page .op-pos-range input { flex: 1; min-height: 44px; }
+  body.owner-page .op-pos-btns { display: flex; flex-wrap: wrap; gap: 8px; }
   body.owner-page .op-photo-move .op-btn { padding: 0; width: 40px; font-size: 1.1rem; }
   body.owner-page .op-activity ul { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper); border-radius: 14px; }
   body.owner-page .op-activity li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(42,32,25,0.08); }
@@ -43786,7 +43978,7 @@ ${renderGolfHeaderHtml()}
     <details class="op-fold op-sec" id="photos" open>
     <summary><h2 class="lyv-section-label">Photos</h2></summary>
     <p class="op-hint">${L('Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best.', 'Envoyez jusqu’à 5 photos à la fois : votre espace, vos plats, vos boissons ou ce que vous offrez. Les photos à l’horizontale donnent les meilleurs résultats.')} ${found.account ? L('Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.', 'Comme vous êtes connecté, vos photos sont mises en ligne tout de suite. Si votre page n’a pas encore sa propre photo, la première devient sa photo principale, avec votre nom en crédit.') : L('We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.', 'Nous vérifions chaque photo; la meilleure peut devenir la photo principale de votre page, avec votre nom en crédit. Avec un compte, vos photos sont mises en ligne tout de suite.')}</p>
-    <div id="opPhotoBox">${ownerPhotoGridHtml(venue.id, !!found.account, lang)}</div>
+    <div id="opPhotoBox">${ownerMainPhotoPositionHtml(venue, !!found.account, lang)}${ownerPhotoGridHtml(venue.id, !!found.account, lang)}</div>
     <p class="lyv-error" id="opPhotoActionError" hidden></p>
     <p class="op-hint" id="opPhotoStatus" role="status"></p>
     <form class="venue-form" id="ofForm" novalidate>
@@ -43836,6 +44028,16 @@ ${renderGolfHeaderHtml()}
         <div class="form-field"><label for="oePrice">${L('Price', 'Prix')}</label><input type="text" id="oePrice" maxlength="80" placeholder="${L('e.g. Free, or $25', 'ex. Gratuit ou 25 $')}"></div>
       </div>
       <div class="form-row full"><div class="form-field"><label for="oeNotes">${L('Repeats or other dates?', 'Récurrent ou autres dates?')}</label><textarea id="oeNotes" rows="2" maxlength="500" placeholder="${L("e.g. every Friday until December. We'll add the dates.", 'ex. tous les vendredis jusqu’en décembre. Nous ajouterons les dates.')}"></textarea></div></div>
+      <div class="form-row full"><div class="form-field oe-partners">
+        <label for="oePartnerSearch">${L('Partner businesses (optional)', 'Entreprises partenaires (facultatif)')}</label>
+        <p class="op-hint" id="oePartnerHint" style="margin:0 0 6px">${L(`Working with other businesses on this event? Add up to ${EVENT_PARTNER_MAX} listed on Okanagan Roam and the event shows on their pages too.`, `Vous organisez cet événement avec d’autres entreprises? Ajoutez-en jusqu’à ${EVENT_PARTNER_MAX} présentes sur Okanagan Roam : l’événement paraîtra aussi sur leurs pages.`)}</p>
+        <ul class="oe-partner-chips" id="oePartnerChips" aria-label="${L('Partner businesses', 'Entreprises partenaires')}"></ul>
+        <div class="oe-partner-pick">
+          <input type="text" id="oePartnerSearch" autocomplete="off" maxlength="60" aria-describedby="oePartnerHint" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="oePartnerList" placeholder="${L('Start typing a business name', 'Commencez à taper le nom d’une entreprise')}">
+          <ul class="oe-partner-list" id="oePartnerList" role="listbox" hidden></ul>
+        </div>
+        <p class="lyv-error" id="oePartnersError" hidden></p>
+      </div></div>
       <div class="form-row">
         <div class="form-field"><label for="oeContactName">${L('Your name', 'Votre nom')} *</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
         <div class="form-field"><label for="oeContactEmail">${L('Your email', 'Votre courriel')} *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
@@ -44064,6 +44266,63 @@ ${ownerFooterHtml(fr)}
   var evStarted = Date.now();
   var allDay = document.getElementById('oeAllDay');
   allDay.addEventListener('change', function(){ ['oeStartTime','oeEndTime'].forEach(function(id){ document.getElementById(id).disabled = allDay.checked; }); });
+  // Partner businesses (2026-10-19): search listed businesses (the List Your Venue lookup), pick up to the max; each
+  // shows as a chip with a remove button. Cleared whenever the form resets; filled from the event when changing it.
+  var partners = [], partnerMax = ${EVENT_PARTNER_MAX}, ownVenueId = ${Number(venue.id)};
+  var pSearch = document.getElementById('oePartnerSearch'), pList = document.getElementById('oePartnerList'), pChips = document.getElementById('oePartnerChips');
+  var pSeq = 0, pTimer = null, pResults = [], pActive = -1;
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return '&#' + c.charCodeAt(0) + ';'; }); }
+  function drawPartners(){
+    pChips.innerHTML = partners.map(function(p, i){ return '<li>' + esc(p.name) + (p.town ? ' <small>(' + esc(p.town) + ')</small>' : '') + '<button type="button" data-partner-remove="' + i + '" aria-label="' + esc(T.partnerRemove.replace('{name}', p.name)) + '">&times;</button></li>'; }).join('');
+    pSearch.disabled = partners.length >= partnerMax;
+    show('oePartnersError', partners.length >= partnerMax ? T.partnerMax : '');
+  }
+  function closePartnerList(){ pList.hidden = true; pList.innerHTML = ''; pResults = []; pActive = -1; pSearch.setAttribute('aria-expanded', 'false'); pSearch.removeAttribute('aria-activedescendant'); }
+  function setPartners(list){ partners = (list || []).slice(0, partnerMax); drawPartners(); closePartnerList(); pSearch.value = ''; }
+  function addPartner(p){
+    if (!p || partners.length >= partnerMax || p.id === ownVenueId || partners.some(function(x){ return x.id === p.id; })) return;
+    partners.push({ id: p.id, name: p.name, town: p.region || '' });
+    drawPartners(); closePartnerList(); pSearch.value = ''; if (!pSearch.disabled) pSearch.focus();
+  }
+  function markActive(){
+    Array.prototype.forEach.call(pList.children, function(li, i){ li.setAttribute('aria-selected', i === pActive ? 'true' : 'false'); });
+    if (pActive >= 0 && pList.children[pActive]) { pSearch.setAttribute('aria-activedescendant', pList.children[pActive].id); pList.children[pActive].scrollIntoView({ block: 'nearest' }); }
+    else pSearch.removeAttribute('aria-activedescendant');
+  }
+  pSearch.addEventListener('input', function(){
+    clearTimeout(pTimer);
+    var q = pSearch.value.trim();
+    if (q.length < 2) { closePartnerList(); return; }
+    pTimer = setTimeout(function(){
+      var seq = ++pSeq;
+      fetch('/api/venue-lookup?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } })
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (seq !== pSeq) return;
+          pResults = ((j && j.venues) || []).filter(function(v){ return v.id && v.id !== ownVenueId && !partners.some(function(x){ return x.id === v.id; }); });
+          pActive = -1;
+          pList.innerHTML = pResults.length ? pResults.map(function(v, i){ return '<li role="option" id="oePartnerOpt' + i + '" data-i="' + i + '" aria-selected="false">' + esc(v.name) + '<small>' + esc((document.documentElement.lang === 'fr' ? v.typeFr : v.type) + ' · ' + v.region) + '</small></li>'; }).join('')
+            : '<li class="oe-partner-empty" role="option" aria-disabled="true">' + esc(T.partnerNone) + '</li>';
+          pList.hidden = false; pSearch.setAttribute('aria-expanded', 'true');
+        })
+        .catch(function(){ closePartnerList(); });
+    }, 200);
+  });
+  pSearch.addEventListener('keydown', function(e){
+    if (pList.hidden || !pResults.length) { if (e.key === 'Escape') closePartnerList(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); pActive = (pActive + 1) % pResults.length; markActive(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); pActive = pActive <= 0 ? pResults.length - 1 : pActive - 1; markActive(); }
+    else if (e.key === 'Enter') { e.preventDefault(); addPartner(pResults[pActive >= 0 ? pActive : 0]); }
+    else if (e.key === 'Escape') { e.preventDefault(); closePartnerList(); }
+  });
+  pList.addEventListener('mousedown', function(e){ e.preventDefault(); });
+  pList.addEventListener('click', function(e){ var li = e.target.closest ? e.target.closest('li[data-i]') : null; if (li) addPartner(pResults[Number(li.getAttribute('data-i'))]); });
+  pSearch.addEventListener('blur', function(){ setTimeout(closePartnerList, 150); });
+  pChips.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('[data-partner-remove]') : null; if (!b) return;
+    partners.splice(Number(b.getAttribute('data-partner-remove')), 1); drawPartners(); pSearch.focus();
+  });
+  ev.addEventListener('reset', function(){ setPartners([]); });
   // Change or cancel an event from "Your updates".
   var changeOf = null;
   function stopChange(){
@@ -44086,6 +44345,7 @@ ${ownerFooterHtml(fr)}
       [['oeDescription', 'description'], ['oeStartDate', 'start_date'], ['oeEndDate', 'end_date'], ['oeStartTime', 'start_time'], ['oeEndTime', 'end_time'],
         ['oeUrl', 'event_url'], ['oePrice', 'price_text'], ['oeNotes', 'schedule_notes']].forEach(function(p){ var el = document.getElementById(p[0]); if (el) el.value = d[p[1]] == null ? '' : d[p[1]]; });
       allDay.checked = !!d.all_day; allDay.dispatchEvent(new Event('change'));
+      setPartners(d.partners || []);
       if (lastEmail && !document.getElementById('oeContactEmail').value) document.getElementById('oeContactEmail').value = lastEmail;
       changeOf = c.getAttribute('data-ev-change');
       document.getElementById('oeChangingName').textContent = d.name || T.yourEvent;
@@ -44137,6 +44397,40 @@ ${ownerFooterHtml(fr)}
         return refreshPhotos(move ? 'button.op-' + move + '[data-photo="' + id + '"]' : null);
       })
       .catch(function(){ btn.disabled = false; show('opPhotoActionError', T.connect); });
+  });
+  // Main photo position (2026-10-19): the slider moves both previews; Save sends the height. The block lives inside
+  // opPhotoBox, so it is replaced after a photo change and the listeners are delegated from there.
+  function posPreview(y){
+    var imgs = photoBox ? photoBox.querySelectorAll('.op-pos-img') : [];
+    for (var i = 0; i < imgs.length; i++) imgs[i].style.objectPosition = '50% ' + y + '%';
+  }
+  function posSave(y){
+    var range = document.getElementById('opPosY'), save = document.getElementById('opPosSave'), reset = document.getElementById('opPosReset');
+    if (!range) return;
+    save.disabled = true; reset.disabled = true; show('opPhotoActionError', '');
+    if (photoStatus) photoStatus.textContent = T.posSaving;
+    fetch(location.pathname + '/photo-position', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ y: y }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) { save.disabled = false; reset.disabled = false; if (photoStatus) photoStatus.textContent = ''; show('opPhotoActionError', (j && j.error) || T.again); return; }
+        range.value = j.y; range.setAttribute('data-saved', j.y); range.setAttribute('aria-valuetext', j.y + '%'); posPreview(j.y);
+        reset.disabled = j.y === 50;
+        if (photoStatus) photoStatus.textContent = T.posSaved;
+      })
+      .catch(function(){ save.disabled = false; reset.disabled = false; if (photoStatus) photoStatus.textContent = ''; show('opPhotoActionError', T.connect); });
+  }
+  if (photoBox) photoBox.addEventListener('input', function(e){
+    if (!e.target || e.target.id !== 'opPosY') return;
+    var y = Number(e.target.value);
+    e.target.setAttribute('aria-valuetext', y + '%');
+    posPreview(y);
+    document.getElementById('opPosSave').disabled = String(y) === e.target.getAttribute('data-saved');
+    document.getElementById('opPosReset').disabled = y === 50;
+  });
+  if (photoBox) photoBox.addEventListener('click', function(e){
+    var t = e.target;
+    if (t && t.id === 'opPosSave') posSave(Number(document.getElementById('opPosY').value));
+    else if (t && t.id === 'opPosReset') posSave(50);
   });
   // Links to a folded part of the page (the menu at the top, "Add another event", help answers) open it first.
   function openFor(hash){
@@ -44211,14 +44505,14 @@ ${ownerFooterHtml(fr)}
   ev.addEventListener('submit', function(e){
     e.preventDefault();
     var ids = { name:'oeNameError', categories:'oeCategoriesError', description:'oeDescriptionError', start_date:'oeStartDateError', end_date:'oeEndDateError',
-      start_time:'oeStartTimeError', end_time:'oeEndTimeError', event_url:'oeEventUrlError', contact_name:'oeContactNameError', contact_email:'oeContactEmailError' };
+      start_time:'oeStartTimeError', end_time:'oeEndTimeError', event_url:'oeEventUrlError', contact_name:'oeContactNameError', contact_email:'oeContactEmailError', partner_venue_ids:'oePartnersError' };
     Object.keys(ids).forEach(function(k){ show(ids[k], ''); }); show('oeFormError', '');
     var cats = Array.prototype.map.call(document.querySelectorAll('#oeCategories input:checked'), function(c){ return c.value; });
     var v = function(id){ return document.getElementById(id).value; };
     var payload = { name: v('oeName'), categories: cats, description: v('oeDescription'), start_date: v('oeStartDate'), end_date: v('oeEndDate'),
       start_time: allDay.checked ? '' : v('oeStartTime'), end_time: allDay.checked ? '' : v('oeEndTime'), all_day: allDay.checked,
       event_url: v('oeUrl'), price_text: v('oePrice'), schedule_notes: v('oeNotes'), contact_name: v('oeContactName'), contact_email: v('oeContactEmail'),
-      company_website: v('oeHp'), started_at: evStarted };
+      company_website: v('oeHp'), started_at: evStarted, partner_venue_ids: partners.map(function(p){ return p.id; }) };
     if (changeOf) payload.change_of = changeOf;
     var b = document.getElementById('oeSubmit'); b.disabled = true;
     fetch(location.pathname + '/events', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
@@ -47331,6 +47625,8 @@ const server = http.createServer(async (req, res) => {
       if (lr && method === 'POST') return await handleOwnerLoginRemoval(req, res, account, Number(lr[1]), Number(lr[2]));
       const rl = /^\/owner\/account\/venue\/(\d+)\/reset-link$/.exec(pathname);
       if (rl && method === 'POST') return await handleOwnerLinkReset(req, res, account, Number(rl[1]));
+      const pp = /^\/owner\/account\/venue\/(\d+)\/photo-position$/.exec(pathname);
+      if (pp && method === 'POST') return await handleOwnerPhotoPosition(req, res, account, Number(pp[1]));
       const pa = /^\/owner\/account\/venue\/(\d+)\/photos\/(\d+)\/(remove|main|up|down)$/.exec(pathname);
       if (pa && method === 'POST') return await handleOwnerPhotoAction(req, res, account, Number(pa[1]), Number(pa[2]), pa[3]);
       const mr = /^\/owner\/account\/venue\/(\d+)\/menu(\/[a-z0-9/]*)?$/.exec(pathname);

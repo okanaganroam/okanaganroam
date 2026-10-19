@@ -714,7 +714,7 @@ CREATE INDEX IF NOT EXISTS idx_event_submissions_status ON event_submissions(sta
 // notification email and the admin list); none is published automatically.
 for (const [table, cols] of [
   ['venue_submissions', ['hours_text TEXT', 'happy_hour_text TEXT', 'social_url TEXT', 'submitter_role TEXT']],
-  ['event_submissions', ['price_text TEXT', 'image_link TEXT', 'owner_venue_id INTEGER']],
+  ['event_submissions', ['price_text TEXT', 'image_link TEXT', 'owner_venue_id INTEGER', 'partner_venue_ids TEXT']],
 ]) {
   const have = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
   for (const col of cols) if (!have.has(col.split(' ')[0])) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
@@ -937,6 +937,32 @@ for (const table of ['owner_change_requests', 'owner_photos']) {
   const cols = db.prepare('PRAGMA table_info(owner_photos)').all().map((c) => c.name);
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE owner_photos ADD COLUMN sort_order INTEGER');
 }
+// Event partners (2026-10-19, JoieFarm asked): other listed businesses an owner tagged on their event. The event
+// also shows on their venue pages. No foreign keys, so deleting an event or a venue never fails on this table
+// (deleteVenue clears its rows; a missing event simply matches nothing).
+db.exec(`
+CREATE TABLE IF NOT EXISTS event_partner_venues (
+  event_id INTEGER NOT NULL,
+  venue_id INTEGER NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (event_id, venue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_event_partner_venues_venue ON event_partner_venues (venue_id);
+`);
+// Main photo position (2026-10-19, JoieFarm asked): the venue banner crops its main photo to a wide strip, so a
+// signed-in owner can slide the photo up or down. pos_y is the CSS object-position height (0 = show the top,
+// 100 = the bottom). One row per photo (path without ?v=), so it applies only while that photo is the main one
+// and comes back if the owner makes it main again. No row = centred, as before.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_photo_positions (
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  image_path TEXT NOT NULL,
+  pos_y INTEGER NOT NULL CHECK (pos_y BETWEEN 0 AND 100),
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_by TEXT,
+  PRIMARY KEY (venue_id, image_path)
+);
+`);
 
 // Owner event changes (2026-10-15): an owner's change to an event that is
 // already live waits here for review; approving it updates the event.

@@ -1268,6 +1268,7 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'Upcoming dates': 'Dates à venir',
   '(past)': '(passée)',
   'Recurs': 'Récurrence',
+  'With': 'Avec',
   'All day': 'Toute la journée',
   'Matinee': 'Matinée',
   'Mondays & Thursdays until the end of October': 'Les lundis et jeudis jusqu’à la fin d’octobre',
