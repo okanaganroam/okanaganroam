@@ -24387,7 +24387,7 @@ test('Lighter pages: crawlable links: every place and event waiting for "Show mo
       // A visible, closed <details> list right after the empty template: no hiding tricks.
       const list = html.match(/<template id="fdRest" data-rest="[0-9a-f]{12}"><\/template>\n  <style id="rest-links-css">[^<]*<\/style><details class="rest-links" id="fdRestLinks"><summary>([^<]*)<\/summary><ul>([\s\S]*?)<\/ul><\/details>/);
       assert.ok(list, `${p}: the A-Z list follows the template`);
-      assert.match(list[1], fr ? /^Toutes les autres adresses, de A à Z \(\d+\)$/ : /^All the other places here, A–Z \(\d+\)$/);
+      assert.match(list[1], fr ? /^Toutes les adresses de cette page, de A à Z \(\d+\)$/ : /^All places on this page, A–Z \(\d+\)$/);
       const names = [...list[2].matchAll(/<li><a href="[^"]+">([^<]*)<\/a>/g)].map((m) => m[1]);
       assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b, fr ? 'fr' : 'en', { sensitivity: 'base' })), `${p}: A to Z`);
       assert.doesNotMatch(list[0], /display:\s*none|hidden/, `${p}: nothing is hidden`);
@@ -24744,10 +24744,12 @@ test('Smarter search: breakfast, kids and rainy days, date night, dated events a
   assert.equal(go('kids rainy day osoyoos'), '/indoor?types=family');
   // Badge requests keep their own pages.
   assert.equal(go('kid friendly restaurants kelowna'), app.resolveDiscoveryDestination(app.interpretDiscoveryText('kid friendly restaurants kelowna')).url);
-  // Date night -> the town's restaurants and cocktail lounges.
-  assert.equal(go('date night kelowna'), '/food-drink?types=restaurant,cocktail&regions=kelowna');
-  assert.equal(go('romantic dinner kelowna'), '/food-drink?types=restaurant&regions=kelowna', 'dinner: restaurants');
-  assert.equal(go('soirée romantique kelowna'), '/food-drink?types=restaurant,cocktail&regions=kelowna');
+  // Date night -> /search: the town's restaurants and cocktail lounges ranked by the planner's romance scoring
+  // (search ranking, 2026-10-18; it was the generic /food-drink list).
+  assert.equal(go('date night kelowna'), search('date night kelowna'));
+  assert.equal(go('romantic dinner kelowna'), search('romantic dinner kelowna'), 'dinner: restaurants');
+  assert.equal(go('soirée romantique kelowna'), search('soirée romantique kelowna'));
+  assert.equal(app.smartSearchPlan('date night kelowna').key, 'date_night');
   // Dated events -> What's On with the window and category.
   assert.equal(go('live music this weekend'), '/whats-on?when=this-weekend&categories=live-music');
   assert.equal(go('things to do this weekend'), '/whats-on?when=this-weekend');
@@ -24885,7 +24887,7 @@ test('Smarter search: /search uses the standard cards, name matches first, Show 
   assert.ok(frPage.html.includes('href="/search?q=zorbly%20fizz"'), 'the EN / FR switch keeps the words');
   const frIntent = await fetch(`${base}/fr/browse?q=${encodeURIComponent('date night kelowna')}`, { redirect: 'manual' });
   await frIntent.text();
-  assert.equal(frIntent.headers.get('location'), '/fr/food-drink?types=restaurant,cocktail&regions=kelowna');
+  assert.equal(frIntent.headers.get('location'), '/fr/search?q=date%20night%20kelowna');
   // The homepage hero box (app.js) sends a French visitor to /fr/browse.
   assert.ok(fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8').includes("? '/fr/browse' : '/browse'"));
 }))));
@@ -26643,3 +26645,242 @@ test('Portal polish (2026-10-18): Make main photo keeps the old main photo near 
     for (const f of files) { try { nodeFs.unlinkSync(nodePath.join(app.OWNER_PHOTO_DIR, f)); } catch (e) { /* gone */ } }
   }
 }));
+
+// ---- Search ranking (2026-10-18): activities, dietary and date-night ranking, guide order, A-Z lists, the desktop
+// map list and the Show more card buttons (site review, third pass) ----
+function withSearchRankingFixtures(fn) {
+  const cols = ['name', 'region', 'type', 'slug', 'description', 'rating', 'reviews', 'cuisine', 'price', 'vegan', 'vegetarian', 'gluten_free', 'lake_view', 'hours'];
+  const add = (row) => {
+    const r = { description: 'Search ranking fixture.', rating: 4.3, reviews: 40, cuisine: null, price: null, vegan: 0, vegetarian: 0, gluten_free: 0, lake_view: 0, hours: null, ...row };
+    r.slug = r.slug || app.slugify(r.name);
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c]));
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(r.slug, r.region);
+  };
+  const made = [
+    // Activities: one place says it in its name, a better-rated one only in its description.
+    add({ name: 'SR Exit Escape Games', region: 'kelowna', type: 'indoor', rating: 4.1, reviews: 30, description: 'Puzzle rooms for groups.' }),
+    add({ name: 'SR Mega Fun Centre', region: 'kelowna', type: 'indoor', rating: 4.9, reviews: 900, description: 'Escape rooms, laser tag, an arcade, axe throwing, go-karts, mini golf and 10-pin bowling.' }),
+    add({ name: 'SR Quiet Museum', region: 'kelowna', type: 'indoor', rating: 5, reviews: 900, description: 'Local history.' }),
+    add({ name: 'SR Lanes Pub', region: 'penticton', type: 'pub', description: 'Wings, beer and five-pin bowling lanes.' }),
+    add({ name: 'SR Bounce Trampoline Park', region: 'west-kelowna', type: 'indoor', description: 'Trampolines for all ages.' }),
+    add({ name: 'SR Crux Climbing Gym', region: 'vernon', type: 'indoor', description: 'Bouldering and ropes.' }),
+    add({ name: 'SR Valley Bike Rentals', region: 'kelowna', type: 'tour', description: 'Cruisers and e-bikes by the hour.' }),
+    add({ name: 'SR Pedal Shop', region: 'penticton', type: 'tour', description: 'A bike shop that rents e-bikes for the KVR.' }),
+    // Dietary: a fully vegan kitchen (cuisine), one that says "100% plant-based", one that mentions vegan twice,
+    // one that can be "made fully vegan on request", and a badge-only chain with a high rating.
+    add({ name: 'SR Plant Table', region: 'peachland', type: 'restaurant', cuisine: 'Vegan', vegan: 1, vegetarian: 1, rating: 4.4, reviews: 80, description: 'Bowls and curries.' }),
+    add({ name: 'SR Green Leaf', region: 'peachland', type: 'cafe', vegan: 1, vegetarian: 1, rating: 4.2, reviews: 30, description: 'A 100% plant-based cafe with oat lattes.' }),
+    add({ name: 'SR Two Mentions', region: 'peachland', type: 'restaurant', vegan: 1, rating: 4.1, reviews: 50, description: 'Vegan pasta and a vegan cheesecake.' }),
+    add({ name: 'SR On Request', region: 'peachland', type: 'restaurant', vegan: 1, rating: 4.3, reviews: 50, description: 'The bowl can be made fully vegan on request.' }),
+    add({ name: 'SR Big Chain', region: 'peachland', type: 'restaurant', vegan: 1, rating: 4.8, reviews: 8000, description: 'A busy chain restaurant.' }),
+    add({ name: 'SR Pizza Spot', region: 'peachland', type: 'restaurant', vegan: 1, rating: 4.9, reviews: 40, cuisine: 'Pizza', description: 'Pizza by the slice.' }),
+    // Date night: an intimate $$$$ tasting-menu room, a lake-view lounge, a burger bar and a pub.
+    add({ name: 'SR Candle Room', region: 'summerland', type: 'restaurant', price: 4, rating: 4.6, reviews: 300, description: 'An intimate tasting menu room.' }),
+    add({ name: 'SR Lakeside Lounge', region: 'summerland', type: 'cocktail', lake_view: 1, rating: 4.4, reviews: 200, description: 'Cocktails by the water.' }),
+    add({ name: 'SR Burger Bar', region: 'summerland', type: 'restaurant', price: 1, rating: 4.9, reviews: 3000, cuisine: 'Burgers', description: 'Burgers and fries.' }),
+    add({ name: 'SR Corner Pub', region: 'summerland', type: 'pub', rating: 4.9, reviews: 3000, description: 'Pints.' }),
+    add({ name: 'SR Family Grill', region: 'summerland', type: 'restaurant', price: 2, rating: 4.9, reviews: 4000, description: 'Big plates for the whole family.' }),
+  ];
+  return Promise.resolve().then(fn).finally(() => {
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  });
+}
+
+test('Search ranking: activity phrases (escape room, bowling, axe throwing...) go to /search, name matches first, then description matches', () => withDiscoveryFlag('on', () => withSearchRankingFixtures(() => withDiscoveryServer(async (base) => {
+  const go = (q) => app.heroSearchTarget(q).url;
+  const search = (q) => `/search?q=${encodeURIComponent(q)}`;
+  const names = (q) => app.smartSearchPlan(q).list().map((x) => x.row.name);
+  // Before: "escape room" went to all of /indoor (Exit Kelowna was #24), "bowling" and "climbing gym" too.
+  for (const q of ['escape room', 'bowling', 'axe throwing', 'mini golf', 'go karts', 'trampoline park', 'climbing gym', 'arcade', 'laser tag', 'bike rental']) {
+    assert.equal(go(q), search(q), `${q}: /search`);
+    assert.ok(app.smartSearchPlan(q).list().length, `${q}: something to show`);
+  }
+  const escape = names('escape room');
+  assert.ok(escape.indexOf('SR Exit Escape Games') < escape.indexOf('SR Mega Fun Centre'), 'the name match leads a better-rated description match');
+  assert.ok(!escape.includes('SR Quiet Museum'), 'only places that have it');
+  assert.equal(app.smartSearchPlan('escape room').key, 'escape_room');
+  assert.equal(app.smartSearchPlan('escape room').list().find((x) => x.row.name === 'SR Exit Escape Games').why, 'Name says escape rooms');
+  assert.equal(app.smartSearchPlan('escape room').list().find((x) => x.row.name === 'SR Mega Fun Centre').why, 'Mentions escape rooms');
+  // A town keeps its own places.
+  assert.ok(app.smartSearchPlan('escape rooms in kelowna').list().every((x) => x.row.region === 'kelowna'));
+  assert.equal(app.smartSearchPlan('escape rooms in kelowna').heading, 'Escape rooms in Kelowna');
+  // A place to do it comes before a pub that also has it.
+  const bowling = names('bowling');
+  assert.ok(bowling.indexOf('SR Mega Fun Centre') < bowling.indexOf('SR Lanes Pub'));
+  // Bike rentals: a name, and a shop that "rents e-bikes".
+  assert.ok(names('bike rental').includes('SR Valley Bike Rentals') && names('bike rental').includes('SR Pedal Shop'));
+  assert.ok(names('trampoline park').includes('SR Bounce Trampoline Park'));
+  assert.ok(names('climbing gym').includes('SR Crux Climbing Gym'));
+  // Something else asked for keeps the routing it had.
+  assert.notEqual((app.smartSearchPlan('escape room and sushi') || {}).key, 'escape_room');
+  // /search and /api/discover show the same list.
+  const html = await (await fetch(`${base}/search?q=${encodeURIComponent('escape room')}`)).text();
+  assert.ok(html.indexOf('data-venue-name="SR Exit Escape Games"') < html.indexOf('data-venue-name="SR Mega Fun Centre"'));
+  assert.ok(!html.includes('data-venue-name="SR Quiet Museum"'));
+  const api = await (await fetch(`${base}/api/discover?q=${encodeURIComponent('escape room')}`)).json();
+  assert.equal(api.destination.url, '/search?q=escape%20room');
+  assert.equal(api.results.items[0].name, app.smartSearchPlan('escape room').list()[0].row.name);
+}))));
+
+test('Search ranking: date night, romantic, anniversary and Thanksgiving dinners rank by the planner\'s romance scoring', () => withDiscoveryFlag('on', () => withSearchRankingFixtures(() => {
+  const search = (q) => `/search?q=${encodeURIComponent(q)}`;
+  for (const q of ['date night summerland', 'romantic dinner summerland', 'anniversary dinner summerland', 'thanksgiving dinner summerland']) {
+    assert.equal(app.heroSearchTarget(q).url, search(q), q);
+    const list = app.smartSearchPlan(q).list().map((x) => x.row.name);
+    assert.equal(list[0], 'SR Candle Room', `${q}: the intimate tasting-menu room leads`);
+    assert.ok(!list.includes('SR Burger Bar'), `${q}: no burger bar`);
+    assert.ok(!list.includes('SR Corner Pub'), `${q}: no pub`);
+    assert.ok(list.indexOf('SR Family Grill') > 0, `${q}: a highly rated family grill is listed, not first`);
+  }
+  // Date night includes cocktail lounges (the lake view counts); a dinner request is restaurants.
+  const date = app.smartSearchPlan('date night summerland').list().map((x) => x.row.name);
+  assert.ok(date.indexOf('SR Lakeside Lounge') !== -1 && date.indexOf('SR Lakeside Lounge') < date.indexOf('SR Family Grill'));
+  assert.ok(!app.smartSearchPlan('romantic dinner summerland').list().some((x) => x.row.type === 'cocktail'));
+  assert.equal(app.smartSearchPlan('thanksgiving dinner summerland').key, 'special_dinner');
+  assert.equal(app.smartSearchPlan('thanksgiving dinner summerland').heading, 'Thanksgiving dinner in Summerland');
+  // The scoring is the planner's: its occasion points plus its special-dinner rule.
+  const candle = app.discoverySearchVenues().find((v) => v.name === 'SR Candle Room');
+  const s = app.smartRomanceScore(candle);
+  assert.match(s.why, /intimate|Fine dining/);
+  assert.ok(s.score > app.smartRomanceScore(app.discoverySearchVenues().find((v) => v.name === 'SR Family Grill')).score);
+})));
+
+test('Search ranking: vegan, vegetarian and gluten-free guides lead with fully dedicated places, then the most mentions', () => withSearchRankingFixtures(() => {
+  const st = (v, b = 'vegan') => app.dietMatchStrength(v, b);
+  assert.equal(st({ name: 'X', cuisine: 'Vegan', description: '' }).tier, 0, 'listed cuisine');
+  assert.equal(st({ name: "Zen's Plant-Based Cuisine", cuisine: '', description: '' }).tier, 0, 'name');
+  assert.equal(st({ name: 'X', cuisine: '', description: 'A 100% vegan bakery.' }).tier, 0, '"100% vegan"');
+  assert.equal(st({ name: 'X', cuisine: '', description: 'A dedicated vegan restaurant.' }).tier, 0, '"vegan restaurant"');
+  assert.equal(st({ name: 'X', cuisine: '', description: 'It can be made fully vegan on request.' }).tier, 1, 'an option is not a vegan kitchen');
+  assert.equal(st({ name: 'X', cuisine: '', description: 'They removed egg to make it fully vegan.' }).tier, 1);
+  assert.equal(st({ name: 'X', cuisine: '', description: 'Has dedicated vegan and gluten-free lines.' }).tier, 1);
+  assert.equal(st({ name: 'X', cuisine: '', description: 'Pizza.' }).tier, 2, 'badge only');
+  assert.equal(st({ name: 'X', cuisine: 'Thai', description: 'Vegan curry and vegan rolls.' }).mentions, 2);
+  assert.equal(st({ name: 'X', cuisine: '', description: 'A dedicated gluten-free bakery.' }, 'gluten_free').tier, 0);
+  assert.equal(st({ name: 'X', cuisine: '', description: 'A dedicated gluten-free fryer.' }, 'gluten_free').tier, 1);
+  assert.equal(st({ name: "King's Vegetarian Food", cuisine: '', description: '' }, 'vegetarian').tier, 0);
+  const rows = db.prepare("SELECT * FROM venues WHERE region = 'peachland' AND vegan = 1 AND name LIKE 'SR %'").all();
+  assert.deepEqual(app.sortByDietStrength(rows, 'vegan').map((v) => v.name),
+    ['SR Plant Table', 'SR Green Leaf', 'SR Two Mentions', 'SR On Request', 'SR Big Chain', 'SR Pizza Spot']);
+  // The guide page keeps that order (at 3 am, when the open-first split is off), and calls it Best match.
+  const night = new Date('2026-10-18T10:00:00Z');
+  const html = app.renderGuidePage('peachland', 'vegan', rows, null, night);
+  const order = [...html.matchAll(/data-venue-name="(SR [^"]+)"/g)].map((m) => m[1]).filter((n, i, a) => a.indexOf(n) === i);
+  assert.deepEqual(order, ['SR Plant Table', 'SR Green Leaf', 'SR Two Mentions', 'SR On Request', 'SR Big Chain', 'SR Pizza Spot']);
+  assert.ok(html.includes('<option value="recommended" selected>Best match</option>'));
+  // Other guides keep Mixed.
+  assert.ok(app.renderGuidePage('peachland', 'patio', rows, null, night).includes('<option value="recommended" selected>Mixed</option>'));
+}));
+
+test('Search ranking: guide pages put places open now first from 7 am to 11 pm, keeping a dietary guide\'s tiers', () => {
+  const ins = db.prepare(`INSERT INTO venues (name, region, type, description, hours, slug, rating, reviews, patio, vegan, cuisine) VALUES (@name, 'peachland', 'restaurant', @description, @hours, @slug, 4.5, 100, 1, 1, @cuisine)`);
+  const day = JSON.stringify({ mon: [['11:00', '21:00']], tue: [['11:00', '21:00']], wed: [['11:00', '21:00']], thu: [['11:00', '21:00']], fri: [['11:00', '21:00']], sat: [['11:00', '21:00']], sun: [['11:00', '21:00']] });
+  const shut = JSON.stringify({ mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] });
+  const rows = [['GO Vegan A Shut', shut, 'Vegan', ''], ['GO Vegan B Open', day, 'Vegan', ''], ['GO Mention Shut', shut, null, 'Vegan bowls.'], ['GO Plain Open', day, null, 'Plates.'], ['GO Plain Season', day, null, 'Plates.']];
+  const ids = rows.map(([name, hours, cuisine, description]) => Number(ins.run({ name, hours, cuisine, description, slug: app.slugify(name) }).lastInsertRowid));
+  const meta = { reason: 'test', batch_id: 'guide-open-first' };
+  try {
+    assert.equal(app.guardedSeasonUpdate(ids[4], { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: '2026-10-11' }, meta, SEASON_NOW).ok, true);
+    const venues = ids.map((id) => db.prepare('SELECT * FROM venues WHERE id = ?').get(id));
+    const noon = new Date('2026-10-18T20:00:00Z'), late = new Date('2026-10-19T06:30:00Z'), early = new Date('2026-10-18T13:30:00Z');
+    assert.equal(app.guideOpenFirstHours(noon), true);
+    assert.equal(app.guideOpenFirstHours(late), false, '11:30 pm');
+    assert.equal(app.guideOpenFirstHours(early), false, '6:30 am');
+    const order = (html) => [...html.matchAll(/data-venue-name="(GO [^"]+)"/g)].map((m) => m[1]).filter((n, i, a) => a.indexOf(n) === i);
+    // Vegan guide at noon: within each tier the open place first; closed for the season stays last.
+    assert.deepEqual(order(app.renderGuidePage('peachland', 'vegan', venues, null, noon)), ['GO Vegan B Open', 'GO Vegan A Shut', 'GO Mention Shut', 'GO Plain Open', 'GO Plain Season']);
+    // A Mixed guide at noon: every open place before every closed one.
+    const patio = order(app.renderGuidePage('peachland', 'patio', venues, null, noon));
+    assert.deepEqual(patio.slice(0, 2).sort(), ['GO Plain Open', 'GO Vegan B Open']);
+    assert.equal(patio[patio.length - 1], 'GO Plain Season');
+    // At 11:30 pm the dietary order is left as ranked.
+    assert.deepEqual(order(app.renderGuidePage('peachland', 'vegan', venues, null, late)), ['GO Vegan A Shut', 'GO Vegan B Open', 'GO Mention Shut', 'GO Plain Open', 'GO Plain Season']);
+    // The helper itself: a plain open-first split, season last.
+    assert.deepEqual(app.guideOpenFirst(venues, noon).map((v) => v.name), ['GO Vegan B Open', 'GO Plain Open', 'GO Vegan A Shut', 'GO Mention Shut', 'GO Plain Season']);
+  } finally {
+    app.guardedSeasonUpdate(ids[4], null, meta, SEASON_NOW);
+    for (const id of ids) { db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id); db.prepare('DELETE FROM venues WHERE id = ?').run(id); }
+  }
+});
+
+test('Search ranking: A-Z lists add the town to a repeated name, show ALL-CAPS names in Title Case and say they list the whole page', () => {
+  const card = (href, name) => `<li class="venue-card"><a class="venue-card-link" href="${href}"><span class="venue-card-name">${name}</span></a></li>`;
+  const shown = `<ul class="card-grid" id="fdResults">${card('/kelowna/restaurants/earls', 'Earls')}</ul>`;
+  const inner = [card('/penticton/restaurants/earls', 'Earls'), card('/vernon/restaurants/joes-bbq', 'JOE&#39;S BBQ AT THE LAKE'), card('/kelowna/restaurants/a-w', 'A&amp;W'),
+    card('/oliver/wineries/solo', 'Solo Winery'), card('/kelowna/restaurants/earls', 'Earls')].join('');
+  const en = app.restLinksHtml('fdRest', inner, 'en', shown);
+  assert.match(en, /<summary>All places on this page, A–Z \(5\)<\/summary>/, 'shown cards are counted too, once each');
+  const names = [...en.matchAll(/<li><a href="[^"]+">([^<]*)<\/a>/g)].map((m) => m[1]);
+  assert.deepEqual(names, ['A&amp;W', 'Earls (Kelowna)', 'Earls (Penticton)', 'Joe&#39;s BBQ at the Lake', 'Solo Winery']);
+  const fr = app.restLinksHtml('fdRest', inner.replace(/href="\//g, 'href="/fr/'), 'fr', '');
+  assert.match(fr, /<summary>Toutes les adresses de cette page, de A à Z \(5\)<\/summary>/);
+  assert.ok(fr.includes('>Earls (Penticton)<') && fr.includes('>Earls (Kelowna)<'));
+  // A name that appears once keeps no town; events keep their order and label.
+  assert.ok(en.includes('>Solo Winery<'));
+  assert.match(app.restLinksHtml('whatsOnRest', card('/kelowna/events/b', 'B Show') + card('/kelowna/events/a', 'A Show'), 'en'), /More upcoming events \(2\)[\s\S]*B Show[\s\S]*A Show/);
+});
+
+test('Search ranking: the desktop /map lists the places in view, open first then by rating; Open now over the clusters lists them', () => {
+  const pick = new Function(`${app.MAP_PLACE_LIST_SRC}\n return mapPlaceList;`)();
+  const P = (name, open, r, inView = true, extra = {}) => ({ name, r, st: open === 'season' ? { state: 'closed', season: true } : { state: open ? 'open' : 'closed' }, inView, ...extra });
+  const places = [P('Alpha', false, 4.9), P('Bravo', true, 4.1), P('Charlie', true, 4.8), P('Delta', true, 5, false), P('Echo', 'season', 5), P('Foxtrot', false, 3)];
+  const inView = (p) => p.inView;
+  // Desktop, zoomed out, nothing chosen: every place in view, open first, then the best rated.
+  assert.deepEqual(pick(places, { wide: true, zoom: 9, filtering: false, inView }).map((p) => p.name), ['Charlie', 'Bravo', 'Alpha', 'Foxtrot', 'Echo']);
+  // Phone, zoomed out, nothing chosen: no list (the locate hint), as before.
+  assert.deepEqual(pick(places, { wide: false, zoom: 9, filtering: false, inView }), []);
+  // Phone, zoomed in: in view, open first, then A-Z, as before.
+  assert.deepEqual(pick(places, { wide: false, zoom: 13, filtering: false, inView }).map((p) => p.name), ['Bravo', 'Charlie', 'Alpha', 'Foxtrot', 'Echo']);
+  // Open now (a filter) over the clusters, zoomed out on a phone: the places in view are listed, not "0 places".
+  const openOnly = places.filter((p) => p.st.state === 'open');
+  assert.deepEqual(pick(openOnly, { wide: false, zoom: 9, filtering: true, inView }).map((p) => p.name), ['Bravo', 'Charlie']);
+  // Near me: open first, then the closest, whatever the view.
+  const near = [P('Far open', true, 4, false, { d: 3 }), P('Close shut', false, 4, true, { d: 0.2 }), P('Close open', true, 4, true, { d: 0.5 })];
+  assert.deepEqual(pick(near, { me: true, wide: true, zoom: 9, inView }).map((p) => p.name), ['Close open', 'Far open', 'Close shut']);
+  // The page script uses it, redraws on pan and zoom (moveend), and counts the listed places.
+  const html = app.renderPlacesMapPage();
+  assert.ok(html.includes('function mapPlaceList(onMap, o)'));
+  assert.match(html, /items = mapPlaceList\(onMap, \{ me: !!me, town: town, wide: WIDE\.matches/);
+  assert.match(html, /map\.on\('moveend', function\(\)\{ if \(me \|\| tab !== 'places'\) return;/);
+  assert.match(html, /var filtering = !!\(anyOn\(kinds\) \|\| anyOn\(feats\) \|\| openOnly/);
+});
+
+test('Search ranking: Show more cards get the same Favorite / Add to trip buttons as the first 48, in English and French', async () => {
+  // One template builds the waiting cards' buttons on every list page.
+  const fake = () => {
+    const el = { attrs: {}, children: [], setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k] == null ? null : this.attrs[k]; }, removeAttribute(k) { delete this.attrs[k]; }, appendChild(c) { this.children.push(c); } };
+    return el;
+  };
+  const box = fake(); box.attrs['data-fd-lazy'] = '';
+  const card = fake(); Object.assign(card.attrs, { 'data-venue-name': 'Test Place', 'data-venue-region': 'kelowna', 'data-venue-id': '7' });
+  card.querySelector = () => box;
+  const fill = new Function('document', 'LABELS', 'HEART_USE', `${app.cardFillActionsJs('fill')}\n return fill;`)({ createElement: () => fake() }, { regions: { kelowna: 'Kelowna' } }, '<svg></svg>');
+  fill(card);
+  const [fav, trip] = box.children;
+  assert.equal(trip.textContent, app.APP_TRIP_LABEL_HTML, 'the label of the first 48 cards');
+  assert.equal(trip.textContent, '\u{1F9F3} Add to trip');
+  assert.equal(trip.attrs['data-trip-ref'], 'venue:7');
+  assert.equal(fav.innerHTML, '<svg></svg> Favorite');
+  assert.equal(box.attrs['data-fd-lazy'], undefined);
+  const srv = lpHttp.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  try {
+    for (const [p, label] of [['/food-drink', "trip.textContent = '\u{1F9F3} Add to trip';"], ['/fr/food-drink', "trip.textContent = '\u{1F9F3} Ajouter au voyage';"]]) {
+      const html = await (await fetch(base + p)).text();
+      assert.ok(html.includes(label), `${p}: the waiting cards' label`);
+      assert.ok(html.includes(p === '/fr/food-drink' ? '>\u{1F9F3} Ajouter au voyage</button>' : '>\u{1F9F3} Add to trip</button>'), `${p}: the same label on the first cards`);
+      // Show more no longer runs the older card script's sync, which wrote "＋ Add to Trip" over app.js's labels.
+      const wire = html.slice(html.indexOf('window.__ogWireVenueCards = function'));
+      assert.match(wire.slice(0, 1500), /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{\s*if \(window\.__syncTripButtons\) window\.__syncTripButtons\(\);/);
+      assert.match(wire.slice(0, 1500), /\} else if \(typeof syncAll === 'function'\) syncAll\(\);/);
+    }
+    // /browse builds them from the same template.
+    const browse = await (await fetch(base + '/browse')).text();
+    const body = (h, fn) => { const i = h.indexOf(`function ${fn}(card){`); return h.slice(i, h.indexOf('\n  }', i)).replace(fn, 'F'); };
+    const fd = await (await fetch(base + '/food-drink')).text();
+    if (browse.includes('function bhFillActions(card){')) assert.equal(body(browse, 'bhFillActions'), body(fd, 'fdFillActions'));
+  } finally {
+    srv.close();
+  }
+});
