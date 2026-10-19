@@ -29624,3 +29624,61 @@ test('Round 7 trip planner: Swap may name the place it replaces; French pages op
   assert.ok(fr.includes("full.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip'"), 'the tray link follows the page language');
   assert.ok(app.renderTripPlannerPage(true).includes("window.location.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip';"));
 }));
+
+// Speed, round 8 (2026-10-19): versioned placeholder photos in the shared CSS, the recompressed banners, the
+// preloaded first /browse card photo.
+test('Round 8 speed: placeholder photos in the shared CSS carry the image hash, so a banner placeholder is the hero URL', () => withPass4Server(async (get) => {
+  const file = '/images/food-drink/restaurants-800.jpg';
+  const h = app.imageVersion(file);
+  assert.ok(h, 'the banner is a local file');
+  assert.equal(app.withVersionedCssImages(`a{--x:url('${file}')}b{--y:url(${file})}`), `a{--x:url('${file}?v=${h}')}b{--y:url(${file}?v=${h})}`);
+  assert.equal(app.withVersionedCssImages(`a{--x:url('${file}?v=abc')}`), `a{--x:url('${file}?v=abc')}`, 'a URL with a query is left alone');
+  assert.equal(app.withVersionedCssImages("a{--x:url('/images/no-such-photo.jpg')}"), "a{--x:url('/images/no-such-photo.jpg')}", 'a missing file stays plain');
+  const sheet = app.sharedStyles().get('food-drink');
+  assert.ok(sheet.css.includes(`[data-ph="restaurant-3"]{--fd-ph:url('${file}?v=${h}')}`), 'restaurant-3 is the versioned banner');
+  assert.ok(!sheet.block.includes('?v='), 'the inline block the pages are matched against is unchanged');
+  for (const m of sheet.css.matchAll(/url\('(\/images\/[^']+)'\)/g)) assert.match(m[1], /\?v=[0-9a-f]{10}$/, `${m[1]} is versioned`);
+  const r = await get(sheet.href);
+  assert.equal(r.text, sheet.css);
+  assert.equal(r.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  // The /restaurants hero and its placeholder cards ask for the very same URL, so the banner is fetched once.
+  const page = (await get('/restaurants')).text;
+  assert.ok(page.includes(`${file}?v=${h} 800w`), 'the hero names the versioned banner');
+  assert.ok(page.includes(`<link rel="stylesheet" href="${sheet.href}">`));
+}));
+
+test('Round 8 speed: the hidden-gems and wineries 800px banners are recompressed to about 80 KB at the same size', () => {
+  for (const f of ['public/images/hidden-gems-banner/hidden-gems-800.jpg', 'public/images/food-drink/wineries-800.jpg']) {
+    const buf = fs.readFileSync(path.join(__dirname, '..', f));
+    assert.ok(buf.length < 90 * 1024, `${f} is ${buf.length} bytes`);
+    // JPEG SOF0/SOF2 frame: height then width.
+    let i = 2, size = null;
+    while (i < buf.length) {
+      const marker = buf[i + 1], len = buf.readUInt16BE(i + 2);
+      if (marker === 0xc0 || marker === 0xc2) { size = [buf.readUInt16BE(i + 7), buf.readUInt16BE(i + 5)]; break; }
+      i += 2 + len;
+    }
+    assert.deepEqual(size, [800, 533], `${f} is still 800x533`);
+  }
+});
+
+test('Round 8 speed: /browse preloads its first card photo; a banner page keeps only its hero preload', () => withPass4Server(async (get) => {
+  for (const p of ['/browse', '/fr/browse']) {
+    const html = (await get(p)).text;
+    const head = html.slice(0, html.indexOf('</head>'));
+    const card = /<ul class="card-grid" id="bhResults"[^>]*>\s*<li class="venue-card"([^>]*)>/.exec(html);
+    assert.ok(card, `${p}: the first card is in the HTML`);
+    const own = /--fd-ph:url\('([^']+)'\)/.exec(card[1]);
+    const key = (/data-ph="([^"]+)"/.exec(card[1]) || [])[1];
+    const want = own ? own[1] : `${app.cardPhotoKeyUrl(key)}?v=${app.imageVersion(app.cardPhotoKeyUrl(key))}`;
+    assert.ok(head.includes(`<link rel="preload" as="image" href="${want}"`), `${p}: preloads ${want}`);
+    assert.ok(!/data-lz/.test(card[1]), `${p}: the first card's photo is not held back`);
+  }
+  const rest = (await get('/restaurants')).text;
+  assert.ok(!/<link rel="preload" as="image" href=/.test(rest), 'the banner page keeps only its hero preload');
+  // An own photo: the 480px copy for most screens, the 960px one for wide sharp screens (the --fd-ph-2x rule).
+  const own = app.withFirstCardPhotoPreload(`<html><head><meta name="viewport" content="x">\n</head><body><ul class="card-grid" id="bhResults"><li class="venue-card" data-venue-id="1" data-ph="own" style="--fd-ph:url('/images/venues/a-w480.jpg?v=1');--fd-ph-2x:url('/images/venues/a-w960.jpg?v=2')"></li></ul></body></html>`);
+  assert.ok(own.includes(`<link rel="preload" as="image" href="/images/venues/a-w480.jpg?v=1" media="not all and (min-width: 900px) and (min-resolution: 1.5dppx)" fetchpriority="high">\n<link rel="preload" as="image" href="/images/venues/a-w960.jpg?v=2" media="(min-width: 900px) and (min-resolution: 1.5dppx)" fetchpriority="high">`), own);
+  // Pure: a page without the card grid is unchanged.
+  assert.equal(app.withFirstCardPhotoPreload('<html><head><meta name="viewport" content="x"></head><body></body></html>'), '<html><head><meta name="viewport" content="x"></head><body></body></html>');
+}));
