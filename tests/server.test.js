@@ -28933,3 +28933,79 @@ test('deleteVenue removes a listing that has an owner link, a season and a linke
     db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(id, other);
   }
 });
+
+// ---- Round 7 phone and accessibility fixes (2026-10-19, review pass 6 items 4 and 8) ----
+test('Round 7 phone: /map popups pan clear of the search bar and chips, a phone opens close in, and Leaflet labels are French on /fr/map', () => withPass4Server(async (get) => {
+  const en = (await get('/map')).text;
+  const fr = (await get('/fr/map')).text;
+  // The popup's own pan uses the room pad() gives (below the chips, above the list sheet).
+  assert.match(en, /var PmPopup = L\.Popup\.extend\(\{/);
+  assert.match(en, /this\.options\.autoPanPaddingTopLeft = L\.point\(p\.paddingTopLeft\); this\.options\.autoPanPaddingBottomRight = L\.point\(p\.paddingBottomRight\);/);
+  assert.match(en, /\.bindPopup\(pmPopup\(function\(\)\{ return popupFor\(p\); \}\)\)/);
+  assert.match(en, /\.bindPopup\(pmPopup\(function\(\)\{ return popupForEvent\(e\); \}\)\)/);
+  // A phone opens on downtown Kelowna (zoom 13 at most), not the zoom-10 fit; a wide screen keeps its wider view.
+  assert.match(en, /if \(WIDE\.matches\) fitTo\(L\.latLngBounds\(\[49\.80, -119\.70\], \[50\.02, -119\.38\]\), 11\);\n\s*else fitTo\(L\.latLngBounds\(\[49\.858, -119\.505\], \[49\.900, -119\.470\]\), 13\);/);
+  assert.match(en, /else render\(true\);/, 'a town or short search in the address opens fitted to its results');
+  // French Leaflet labels: the close button, the zoom buttons and the credits.
+  for (const html of [en, fr]) {
+    assert.match(html, /this\._closeButton\.setAttribute\('aria-label', FR \? 'Fermer la fenêtre' : 'Close popup'\)/);
+    assert.match(html, /zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière'/);
+  }
+  assert.match(en, /attribution: FR \? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors'/);
+  assert.match(fr, /contributeurs OpenStreetMap/);
+  assert.match(fr, /<html lang="fr"/);
+}));
+
+test('Round 7 phone: town event cards are tappable across the whole card with one link each', () => withPass4Server(async (get) => {
+  const counts = app.getRegionCategoryCounts('kelowna');
+  const html = app.renderRegionPage('kelowna', counts, []);
+  const block = (html.match(/<h2>Upcoming events in [^<]*<\/h2>[\s\S]*?<\/div>\s*<p>/) || [''])[0];
+  const cards = [...block.matchAll(/<div class="related-card related-card-event">([\s\S]*?)<\/div>/g)];
+  assert.ok(cards.length > 0, 'the fixture region shows event cards');
+  for (const c of cards) assert.equal((c[1].match(/<a /g) || []).length, 1, 'one link per card');
+  const page = (await get('/kelowna')).text;
+  const hrefs = [...page.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
+  const css = page + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
+  assert.match(css, /\.related-card-event \{ position: relative; \}/);
+  assert.match(css, /\.related-card-event > a::after \{ content: ""; position: absolute; inset: 0;/);
+  assert.match(css, /\.related-card-event > a:focus-visible::after \{ outline: 3px solid/);
+}));
+
+test('Round 7 phone: the open phone menu leaves a dimmed strip to tap, and a tap there closes it', () => withPass4Server(async (get) => {
+  const page = (await get('/kelowna')).text;
+  const hrefs = [...page.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
+  const all = page + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
+  assert.match(all, /\.nav-links\.open \{ max-height: calc\(100vh - 160px\); max-height: calc\(100dvh - 160px\); \}/);
+  assert.match(all, /if \(t && t\.nodeType === 1 && \(links\.contains\(t\) \|\| \(burger && burger\.contains\(t\)\)\)\) return;\s*e\.preventDefault\(\); e\.stopPropagation\(\);\s*links\.classList\.remove\('open'\);/);
+}));
+
+test('Round 7 phone: 44px tap targets on My Trip, venue Favorite/Add and badge chips; plan selects are 16px and 44px', () => withPass4Server(async (get) => {
+  const withCss = async (p) => {
+    const html = (await get(p)).text;
+    const hrefs = [...html.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
+    return html + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
+  };
+  const myTrip = await withCss('/my-trip');
+  assert.match(myTrip, /body\.my-trip-page \.mt-tools button \{ width: 44px; height: 44px;/);
+  assert.doesNotMatch(myTrip, /\.mt-tools button \{ width: 38px/);
+  const venue = await withCss('/kelowna/restaurants/test-trattoria');
+  assert.match(venue, /body\.golf-page \.venue-cta-row \.card-action \{ min-height: 44px; box-sizing: border-box; \}/);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(src, /aria-label="\$\{escapeHtml\(BADGE_LABELS\[c\.badge\]\.title\)\} places in \$\{escapeHtml\(regionLabel\)\}" style="display:inline-flex;align-items:center;min-height:44px;/, 'the "More in" badge chips are 44px pills');
+  const v3 = require('../trip-planner-v3-page.js');
+  const page = v3.renderTripPlannerV3Page({ esc: (s) => String(s), title: '', description: '', canonical: '', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', analyticsHead: '', regions: [], regionImages: {}, preview: false });
+  assert.match(page, /\.t3-chip select \{ font-size: 16px; min-height: 44px; margin: -6px 0; \}/);
+  assert.match(page, /\.t3-length-ask select \{ font: inherit; font-size: 16px; min-height: 44px;/);
+}));
+
+test('Round 7 accessibility: .t3-leg uses the solid muted navy, and Favorite in the More menu keeps focus', () => {
+  const v3 = require('../trip-planner-v3-page.js');
+  const page = v3.renderTripPlannerV3Page({ esc: (s) => String(s), title: '', description: '', canonical: '', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', analyticsHead: '', regions: [], regionImages: {}, preview: false });
+  assert.match(page, /\.t3-leg \{[^}]*color: var\(--ref-navy-muted, #56636E\);/);
+  assert.doesNotMatch(page, /\.t3-leg \{[^}]*color: rgba\(27,43,58,0\.62\)/);
+  // #56636E on the cream page (--ref-cream #F5F3ED) is above 4.5:1.
+  const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  assert.ok((lum('#F5F3ED') + 0.05) / (lum('#56636E') + 0.05) >= 4.5);
+  assert.match(page, /if \(d\.contains\(e\.target\) && \(!item \|\| item\.classList\.contains\('fav-btn'\)\)\) return;/);
+  assert.match(page, /if \(item && had\) \{ var sm = d\.querySelector\('summary'\);/);
+});

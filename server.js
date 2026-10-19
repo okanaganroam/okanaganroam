@@ -10948,6 +10948,13 @@ const SEO_PAGE_CSS = `
   .related-card a { font-weight: 700; text-decoration: none; color: var(--ink); }
   .related-card a:hover { color: var(--plum); }
   .related-card .related-meta { font-size: 0.8rem; color: rgba(74,52,40,0.8); }
+  /* Town event cards (2026-10-19, round 7): the whole card opens the event, not just its name. The card's one link
+     is stretched over it by its own ::after (as the Browse cards), so there is still one link per card. */
+  .related-card-event { position: relative; }
+  .related-card-event > a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+  .related-card-event > a:focus-visible { outline: none; }
+  .related-card-event > a:focus-visible::after { outline: 3px solid var(--teal, #2A6B67); outline-offset: 2px; }
+  .related-card-event:hover { border-color: rgba(74,52,40,0.22); }
 
   .detail-row {
     display: flex; gap: 10px; margin: 0; padding: 9px 0; font-size: 0.95rem;
@@ -11593,6 +11600,9 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
      (z-index 60) and over the page; a tap on it closes the menu. */
   body.nav-menu-open::after { content: ''; position: fixed; inset: 0; z-index: 59; background: rgba(16,27,36,0.45); }
   .nav-links.open { max-height: calc(100vh - 72px); max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain; }
+  /* Phone menu (2026-10-19, round 7): on a small phone the menu filled the screen and left only a sliver of the dimmed
+     page to tap. It now stops at least 88px above the bottom (scrolling inside itself), leaving a real strip to close it. */
+  .nav-links.open { max-height: calc(100vh - 160px); max-height: calc(100dvh - 160px); }
 }
 @media (prefers-reduced-motion: reduce) { #navHamburger span { transition: none; } }
 </style>
@@ -11710,6 +11720,16 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
         menuWasOpen = open;
         syncMenu();
       }).observe(links, { attributes: true, attributeFilter: ['class'] });
+      // Phone menu (2026-10-19, round 7): a tap on the dimmed page below or beside the open menu closes it (the page
+      // under it is inert, so the tap lands on the body) and focus goes back to the menu button.
+      document.addEventListener('click', function(e){
+        if (!links.classList.contains('open') || (phoneMq && !phoneMq.matches)) return;
+        var t = e.target;
+        if (t && t.nodeType === 1 && (links.contains(t) || (burger && burger.contains(t)))) return;
+        e.preventDefault(); e.stopPropagation();
+        links.classList.remove('open');
+        if (burger) { burger.setAttribute('aria-expanded', 'false'); focusEl(burger); }
+      }, true);
       // app.js re-labels the button from its dictionary when the language changes; put the open/closed label back.
       new MutationObserver(syncMenu).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
       if (phoneMq && phoneMq.addEventListener) phoneMq.addEventListener('change', syncMenu);
@@ -13493,6 +13513,8 @@ function renderGolfThemeStyles() {
   body.golf-page .venue-cta-row .card-action {
     background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2);
   }
+  /* Tap targets (2026-10-19, round 7): the venue page's Favorite and Add to trip buttons are at least 44px tall. */
+  body.golf-page .venue-cta-row .card-action { min-height: 44px; box-sizing: border-box; }
   body.golf-page .venue-card[data-venue-category="golf"] .card-action:hover,
   body.golf-page .venue-cta-row .card-action:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.golf-page .venue-card[data-venue-category="golf"] .fav-btn.is-fav,
@@ -14841,7 +14863,7 @@ ${upcomingEvents.map((e) => {
       const when = upcomingEventDateLabel(e.nextDate, e.nextEndDate);
       const cat = e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '';
       const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
-      return `          <div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
+      return `          <div class="related-card related-card-event"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
     }).join('\n')}
         </div>
         <p><a href="/${encodeURIComponent(region)}/events">See what&rsquo;s on in ${escapeHtml(regionLabel)} &rarr;</a></p>
@@ -15578,12 +15600,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var mapEl = document.getElementById('okMap');
   var WIDE = window.matchMedia ? window.matchMedia('(min-width: 900px)') : { matches: false };
   var map = L.map(mapEl, { zoomControl: false }).setView([49.75, -119.5], 9);
-  if (WIDE.matches) L.control.zoom({ position: 'bottomright' }).addTo(map);
+  // French map (2026-10-19, round 7): Leaflet's zoom buttons, credits link and map credits in French on /fr/map.
+  if (WIDE.matches) L.control.zoom(FR ? { position: 'bottomright', zoomInTitle: 'Zoom avant', zoomOutTitle: 'Zoom arrière' } : { position: 'bottomright' }).addTo(map);
+  if (FR && map.attributionControl) map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="Une bibliothèque JavaScript de cartes interactives">Leaflet</a>');
   // The Okanagan only (Osoyoos to Enderby, Big White and the Lumby lakes): the map can't be panned or zoomed out past it.
   var OK_BOUNDS = L.latLngBounds([48.95, -120.2], [50.8, -118.25]);
   map.setMaxBounds(OK_BOUNDS.pad(0.04)); map.options.maxBoundsViscosity = 1;
   function okLimits(){ map.setMinZoom(Math.max(6, map.getBoundsZoom(OK_BOUNDS))); }
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: FR ? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
   // Overlapping pins (2026-10-18, review pass 4): clustering used to switch off at zoom 17, so places and events at the
   // very same spot (a winery and its restaurant, every event at one hall) sat on one another and only the top pin could
   // be tapped. From zoom 17 only pins within a pixel of each other still group; tapping that group fans them out.
@@ -15627,7 +15651,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   if (WIDE.addEventListener) WIDE.addEventListener('change', sheetH);
   sheetH();
   // Opens on Kelowna and around, where most places are.
-  fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);
+  // Phone map (2026-10-19, round 7): on a phone that fit came out at zoom 10, all bubbles and no list. A phone now opens
+  // on downtown Kelowna and Pandosy (about zoom 12-13), close enough for single pins and a list of the places in view;
+  // Near me, a town or a search then moves it as before. A wide screen keeps the wider view beside its list.
+  if (WIDE.matches) fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);
+  else fitTo(L.latLngBounds([49.858, -119.505], [49.900, -119.470]), 13);
   // Filters: everything beyond the quick chips, in one panel.
   function openPanel(){ panel.hidden = false; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus(); }
   function closePanel(){ if (panel.hidden) return; panel.hidden = true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
@@ -15712,6 +15740,21 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(Math.min(sheetPx, H * 0.42)) + 20] };
   }
   function fitTo(bounds, maxZoom){ var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
+  // Phone map (2026-10-19, round 7): a popup's own pan keeps it clear of the search bar, the chips and the list sheet
+  // (the same room pad() gives fitted pins), instead of Leaflet's 5px from the map's edge, which left the popup's top
+  // under the chips.
+  // French map (2026-10-19, round 7): Leaflet's own "Close popup" label is English, so /fr/map names it in French.
+  var PmPopup = L.Popup.extend({
+    _initLayout: function(){
+      L.Popup.prototype._initLayout.apply(this, arguments);
+      if (this._closeButton) this._closeButton.setAttribute('aria-label', FR ? 'Fermer la fenêtre' : 'Close popup');
+    },
+    _adjustPan: function(){
+      try { var p = pad(); this.options.autoPanPaddingTopLeft = L.point(p.paddingTopLeft); this.options.autoPanPaddingBottomRight = L.point(p.paddingBottomRight); } catch (e) {}
+      return L.Popup.prototype._adjustPan.apply(this, arguments);
+    }
+  });
+  function pmPopup(fn){ return new PmPopup().setContent(fn); }
   var TAGIX = {}; (CONF.tg || []).forEach(function(t, i){ TAGIX[t.k] = i; });
   function onTags(){ return Object.keys(tags).filter(function(k){ return tags[k]; }); }
   function matchesPlace(p){
@@ -16524,12 +16567,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
       var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
-      p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(function(){ return popupFor(p); });
+      p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
     events = []; d.e.forEach(function(a){
       var e = { ix: events.length, name: a[0], url: a[1], region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], d: null };
-      if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(function(){ return popupForEvent(e); });
+      if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(pmPopup(function(){ return popupForEvent(e); }));
       events.push(e);
     });
     refreshStatus();
@@ -16544,7 +16587,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = qs.get('q'); }
     } catch (e) {}
     syncChips();
-    if (location.hash === '#events') setTab('events'); else render(false);
+    // A town or a short search in the address opens fitted to its results (Phone map, 2026-10-19, round 7).
+    if (location.hash === '#events') setTab('events'); else render(true);
     // Near me starts by itself when asked for (#near-me, the home-screen shortcut) or when this browser already allows it.
     if (location.hash === '#near-me') nearBtn.click();
     else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching) nearBtn.click(); }).catch(function(){});
@@ -26028,7 +26072,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     : '';
 
   const guideLinks = fr ? '' : featuredInGuidesHtml(`${venue.region}/${venue.slug}`) + (venueGuidePages.length
-    ? `<p class="venue-meta venue-more-in" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px"><span>More in ${escapeHtml(regionLabel)}:</span> ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}" aria-label="${escapeHtml(BADGE_LABELS[c.badge].title)} places in ${escapeHtml(regionLabel)}" style="display:inline-block;padding:3px 10px;border:1px solid rgba(42,107,103,0.35);border-radius:999px;text-decoration:none;font-weight:700;font-size:.82rem">${escapeHtml(BADGE_LABELS[c.badge].title)}</a>`).join(' ')}</p>`
+    // Tap targets (2026-10-19, round 7): the "More in" badge chips are 44px tall pills (they were 30px).
+    ? `<p class="venue-meta venue-more-in" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px"><span>More in ${escapeHtml(regionLabel)}:</span> ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}" aria-label="${escapeHtml(BADGE_LABELS[c.badge].title)} places in ${escapeHtml(regionLabel)}" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 14px;border:1px solid rgba(42,107,103,0.35);border-radius:999px;text-decoration:none;font-weight:700;font-size:.82rem">${escapeHtml(BADGE_LABELS[c.badge].title)}</a>`).join(' ')}</p>`
     : '');
 
   // Back-link to the venue's regional category page (2026-09-19), only
@@ -32213,7 +32258,7 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-head p { margin: 4px 0 0; opacity: 0.75; }
   body.my-trip-page .mt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   body.my-trip-page [hidden] { display: none !important; }
-  body.my-trip-page .mt-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 800; font-size: 0.92rem; cursor: pointer; text-decoration: none; }
+  body.my-trip-page .mt-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 800; font-size: 0.92rem; cursor: pointer; text-decoration: none; }
   body.my-trip-page .mt-btn.primary { background: var(--teal-deep, #1F5450); border-color: transparent; color: #fff; }
   body.my-trip-page .mt-shared { margin: 0 0 18px; padding: 14px 18px; border-radius: 14px; background: #FFF4DA; }
   body.my-trip-page .mt-status { min-height: 1.2em; margin: 0 0 10px; font-weight: 700; color: var(--teal-deep, #1F5450); }
@@ -32231,7 +32276,8 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-meta { margin: 2px 0 0; font-size: 0.86rem; opacity: 0.75; }
   body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
   body.my-trip-page .mt-tools { display: flex; gap: 6px; }
-  body.my-trip-page .mt-tools button { width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: #fff; font-size: 1rem; cursor: pointer; color: var(--ink); }
+  /* Tap targets (2026-10-19, round 7): the move and remove buttons are 44px, the size a thumb can hit. */
+  body.my-trip-page .mt-tools button { width: 44px; height: 44px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: #fff; font-size: 1rem; cursor: pointer; color: var(--ink); }
   body.my-trip-page .mt-tools button[disabled] { opacity: 0.35; cursor: default; }
   body.my-trip-page .mt-empty { padding: 26px; border-radius: 16px; background: var(--paper, #fffaf2); }
   @media (max-width: 600px) {
