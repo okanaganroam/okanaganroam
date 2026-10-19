@@ -5091,7 +5091,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
   // from (a French search goes through the planner's French words first, see discoverySearchText).
   const q = run.query.trim(), sq = String(run.searchText || run.query).trim();
   const plan = smartSearchPlan(sq, run.intent, now);
-  let venues = [], why = new Map();
+  let venues = [], why = new Map(), nameOnly = false, pinnedIds = [];
   if (plan && plan.list) {
     const picked = plan.list().slice(0, SEARCH_PAGE_MAX_RESULTS);
     venues = picked.map((x) => x.row);
@@ -5123,8 +5123,13 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
     const named = smartNameMatches(sq, run.intent);
     if (named.length) {
       const ids = new Set(named.map((x) => x.row.id));
-      venues = [...named.map((x) => x.row), ...venues.filter((v) => !ids.has(v.id))];
+      // Fix (2026-10-18): "19 bistro" on live read "bistro" as Restaurants and listed all 579 under 19 Bistro @ Fitz.
+      // When the rest is only an any-word list or a plain kind-of-place list (no words of the request's own), the
+      // name matches are the answer and the rest is left off.
+      nameOnly = run.results.match === 'any' || !(run.intent.textTerms || []).length;
+      venues = [...named.map((x) => x.row), ...(nameOnly ? [] : venues.filter((v) => !ids.has(v.id)))];
       for (const x of named) why.set(x.row.id, 'Name matches');
+      pinnedIds = named.map((x) => x.row.id);
     }
   }
   // What's On events for the words ("cider fest") or the plan's own (free events), soonest best match first.
@@ -5132,7 +5137,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
   const events = { total: found.total, items: found.items.slice(0, SEARCH_PAGE_EVENT_LIMIT) };
   const guides = plan && plan.guides ? plan.guides : smartGuideMatches(sq, run.intent).slice(0, 3);
   const fuzzy = !venues.length && run.results.kind !== 'events' ? smartFuzzyVenues(sq, run.intent).slice(0, 5).map((m) => m.venue) : [];
-  return { run, q, plan, venues, why, guides, fuzzy, events, now };
+  return { run, q, plan, venues, why, guides, fuzzy, events, now, nameOnly, pinnedIds };
 }
 // French words for the page's own text (the cards and filters are translated with every French page).
 const SEARCH_PAGE_TEXT = {
@@ -5176,8 +5181,10 @@ const SEARCH_PAGE_STYLES = `<style id="search-page">
 function searchSummaryHtml(model, lang) {
   const { run, q, plan } = model, p = run.presentation, L = SEARCH_PAGE_TEXT[lang], labels = tripPlannerLabels(), esc = escapeHtml;
   // French gaps (2026-10-18): the French page says what it understood, its corrections and notes in French too.
+  const one = model.venues && model.venues.length === 1;
   const interpreted = plan && plan.heading ? (lang === 'fr' ? plan.headingFr : plan.heading)
-    : (lang === 'fr' ? (p.status === 'ambiguous' ? null : discoveryInterpretedTextFr(run.intent, labels)) : p.interpreted);
+    : model.nameOnly ? (lang === 'fr' ? (one ? 'le lieu de ce nom' : 'les lieux de ce nom') : (one ? 'the place by that name' : 'the places by that name'))
+      : (lang === 'fr' ? (p.status === 'ambiguous' ? null : discoveryInterpretedTextFr(run.intent, labels)) : p.interpreted);
   const correctionText = !p.corrections.length ? ''
     : lang === 'fr' ? `<p class="search-corrected">Nous avons lu ${p.corrections.map((c) => `« ${esc(c.from)} » comme « ${esc(c.to)} »`).join(', ')}.</p>`
       : `<p class="search-corrected">We read ${p.corrections.map((c) => `“${esc(c.from)}” as “${esc(c.to)}”`).join(', ')}.</p>`;
@@ -5185,6 +5192,7 @@ function searchSummaryHtml(model, lang) {
   // applies its occasion and dates itself, so their notes are left off.
   // Search gaps (2026-10-18): the cheap-eats list applies the budget itself.
   const notes = p.notes.filter((n) => !(plan && plan.list && (['occasion', 'when'].includes(n.field) || (plan.key === 'budget' && n.field === 'budget'))))
+    .filter((n) => !(model.nameOnly && n.code === 'any_words'))
     .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
@@ -5206,8 +5214,11 @@ function renderSearchResultsHubPage(model, lang) {
   for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
   const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
     .map((t) => ({ type: t, label: CATEGORY_LABELS[t].plural }));
-  const total = model.plan && model.plan.list ? venues.length : (model.run.results.total || venues.length);
+  const total = (model.plan && model.plan.list) || model.nameOnly ? venues.length : (model.run.results.total || venues.length);
+  // Fix (2026-10-18): the name matches stay first even when closed for the season (the card still says so).
+  const pinRank = new Map((model.pinnedIds || []).map((id, i) => [id, i + 1]));
   return renderCuratedHubPage({
+    pinFirst: pinRank.size ? (v) => pinRank.get(v.id) || 0 : null,
     path: `/search?q=${encodeURIComponent(q)}`,
     name: L.title,
     title: `${L.title}${lang === 'fr' ? ' : ' : ': '}${q.length > 60 ? `${q.slice(0, 60)}…` : q} | Okanagan Roam`,
@@ -22125,7 +22136,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const pinnedIds = new Set(pinned.map((v) => v.id));
   // cfg.keepOrder (2026-10-18): the list is already ranked (search results), so its first order is the given one.
   // Seasons everywhere (2026-10-18): places closed for the season go last in this first order (pinned places stay first).
-  let mixed = cfg.keepOrder ? seasonClosedLast(venues, now) : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), now)];
+  // Fix (2026-10-18): a kept order keeps its pinned places first too (search's name matches, even closed for the season).
+  let mixed = cfg.keepOrder ? [...pinned, ...seasonClosedLast(venues.filter((v) => !pinnedIds.has(v.id)), now)] : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), now)];
   // cfg.openFirst (2026-10-18): guide pages lead with places open now, 7 am to 11 pm (guideOpenFirst).
   if (cfg.openFirst) mixed = guideOpenFirst(mixed, now, cfg.tierOf || null);
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));

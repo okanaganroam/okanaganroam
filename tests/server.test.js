@@ -27546,6 +27546,63 @@ test('Search pass 5: an exact or whole-phrase name match comes first ("77 bistro
   assert.equal(app.smartNameMatches('wineries in kelowna', app.interpretDiscoveryText('wineries in kelowna')).length, 0);
 }))));
 
+// Fix (2026-10-18): on live "19 bistro" read "bistro" as Restaurants, listed all 579 and sent 19 Bistro @ Fitz (closed
+// for the season) to the end. Fixtures mirror the live data.
+test('Exact names first on live data: "19 bistro" puts 19 Bistro @ Fitz first even closed for the season, without the 500-place list', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+  const cols = ['name', 'region', 'type', 'cuisine', 'slug', 'description', 'rating', 'reviews'];
+  const add = (r) => {
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c] ?? null));
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(r.slug, r.region);
+  };
+  // The local database has 19 Bistro @ Fitz (as live does); a fresh one gets it as a fixture.
+  const made = [];
+  let fitz = db.prepare("SELECT * FROM venues WHERE name = '19 Bistro @ Fitz' AND redirect_to IS NULL").get();
+  if (!fitz) { fitz = add({ name: '19 Bistro @ Fitz', region: 'peachland', type: 'restaurant', cuisine: 'West Coast', slug: 'xn-19-bistro-fitz', description: 'Bistro at a winery.', rating: 4.2, reviews: 80 }); made.push(fitz); }
+  made.push(add({ name: 'Chaos Bistro', region: 'kelowna', type: 'restaurant', cuisine: 'French', slug: 'xn-chaos-bistro', description: 'A busy bistro.', rating: 4.9, reviews: 2000 }));
+  made.push(add({ name: 'Zen Test Bistro', region: 'kelowna', type: 'restaurant', cuisine: 'Japanese', slug: 'xn-zen-test-bistro', description: 'A calm bistro.', rating: 4.8, reviews: 1500 }));
+  const before = db.prepare('SELECT * FROM venue_seasons WHERE venue_id = ?').get(fitz.id);
+  const today = app.todayLocal();
+  try {
+    const r = app.guardedSeasonUpdate(fitz.id, { status: 'closed', reopens_date: app.addLocalDays(today, 200), source_url: 'https://example-season.ca/fitz', checked_at: today }, { reason: 'test', batch_id: 'exact-name-test' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const names = (html) => [...html.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1].replace(/&#39;/g, "'").replace(/&amp;/g, '&'));
+    for (const q of ['19 bistro', '19 Bistro @ Fitz', '19 bistro fitz', '19-Bistro!']) {
+      const page = await (await fetch(`${base}/search?q=${encodeURIComponent(q)}`)).text();
+      const shown = names(page);
+      assert.equal(shown[0], '19 Bistro @ Fitz', `${q}: the named place first`);
+      assert.ok(!shown.includes('Chaos Bistro') && shown.length < 10, `${q}: not drowned in every bistro (${shown.length})`);
+      assert.match(page, /Closed for the season/, `${q}: the season notice still shows`);
+      assert.match(page, /search-count">1 place</);
+    }
+    const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('19 bistro')}`)).text();
+    assert.equal(names(fr)[0], '19 Bistro @ Fitz');
+    assert.match(fr, /le lieu de ce nom/);
+    // Every bistro is still one search away.
+    // (Rendered in-process from here on: /search is rate limited per visitor.)
+    const render = (q) => app.renderSearchPage(app.runDiscovery(q, { limit: 3000 }));
+    const all = names(render('bistros'));
+    assert.ok(all.includes('Chaos Bistro') && all.includes('Zen Test Bistro'));
+    // The other names from the review (found, or added as fixtures beside a decoy that shares a word).
+    const ensure = (r) => db.prepare('SELECT * FROM venues WHERE name = ? AND redirect_to IS NULL').get(r.name) || (made.push(add(r)), made[made.length - 1]);
+    ensure({ name: '19 Okanagan Grill + Bar', region: 'west-kelowna', type: 'restaurant', cuisine: 'Canadian', slug: 'xn-19-okanagan-grill-bar', description: 'Golf course grill.', rating: 4.1, reviews: 300 });
+    ensure({ name: 'The Hatching Post Brewery & Smokery', region: 'kelowna', type: 'brewery', slug: 'xn-the-hatching-post', description: 'Smoked meats and beer.', rating: 4.5, reviews: 900 });
+    ensure({ name: "Quails' Gate Winery", region: 'west-kelowna', type: 'winery', slug: 'xn-quails-gate-winery', description: 'A family winery.', rating: 4.7, reviews: 1200 });
+    ensure({ name: 'Mission Hill Family Estate Winery', region: 'west-kelowna', type: 'winery', slug: 'xn-mission-hill', description: 'A hilltop winery.', rating: 4.7, reviews: 3000 });
+    made.push(add({ name: 'Okanagan Test Grill House', region: 'kelowna', type: 'restaurant', slug: 'xn-okanagan-test-grill-house', description: 'Another grill.', rating: 4.9, reviews: 5000 }));
+    const first = (q) => names(render(q))[0];
+    assert.equal(first('19 okanagan grill'), '19 Okanagan Grill + Bar');
+    assert.match(first('the hatching post'), /^The Hatching Post/);
+    for (const [q, re] of [['quails gate', /quails-gate/], ['mission hill', /mission-hill/]]) {
+      assert.match(String(app.heroSearchTarget(q).url), re, `${q} goes straight to the winery`);
+      assert.match(String(first(q)), new RegExp(q.replace(' ', '.*'), 'i'));
+    }
+  } finally {
+    db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(fitz.id);
+    if (before) db.prepare(`INSERT INTO venue_seasons (${Object.keys(before).join(', ')}) VALUES (${Object.keys(before).map(() => '?').join(', ')})`).run(...Object.values(before));
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+})));
+
 test('Search pass 5: the List Your Venue lookup forgives spaces, apostrophes, a leading "the" and plurals', () => withSearchPass5Fixtures(() => {
   const names = (q) => app.venueLookup(q).map((v) => v.name);
   assert.ok(names('hatchery test taproom').includes('The Hatchery Test Taproom'));
