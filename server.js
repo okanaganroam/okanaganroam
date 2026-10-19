@@ -9521,7 +9521,9 @@ function renderHomepageDiscoveryStyles() {
     width: 100%; border: none; background: transparent; padding: 9px 0;
     font-size: 1rem; /* 16px+ so iPhones do not zoom in (2026-10-18) */ color: var(--ink); outline: none; font-family: 'Nunito', sans-serif;
     position: relative; z-index: 1;
+    -webkit-appearance: none; appearance: none; /* type="search" (2026-10-18) keeps the plain look */
   }
+  .hero-search-field input::-webkit-search-decoration { -webkit-appearance: none; }
   /* Faux two-line placeholder (bold prompt + smaller example line), CSS-
      only: hidden once the input has real content or focus, matching the
      reference's "What are you looking for? / Wineries, restaurants,
@@ -10699,7 +10701,16 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
   .nav-hamburger, #navHamburger { min-width: 44px; min-height: 44px; padding: 8px 10px; margin-right: -6px; align-items: center; justify-content: center; }
   #navHamburger::before { content: none; display: none; animation: none; }
   #navHamburger .nav-hamburger-count { top: 3px; right: -2px; }
+  /* The open phone menu (2026-10-18): the three bars turn into an X, the page under it stays still, and a menu
+     taller than the screen scrolls inside itself. */
+  #navHamburger span { transition: transform .18s ease, opacity .18s ease; }
+  #navHamburger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+  #navHamburger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+  #navHamburger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+  body.nav-menu-open { overflow: hidden; }
+  .nav-links.open { max-height: calc(100vh - 72px); max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain; }
 }
+@media (prefers-reduced-motion: reduce) { #navHamburger span { transition: none; } }
 </style>
 <script>
 (function(){
@@ -10718,8 +10729,51 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
     if (focusEl(document.querySelector('.nav-mytrip-btn'))) return;
     focusEl(burger) || focusEl(document.getElementById('tripTrayToggle'));
   }
+  // The open phone menu (2026-10-18, accessibility review pass 3): the button reads "Close menu" and shows an X, the
+  // page behind it is inert (main, footer, the tray: every top-level block that does not hold the menu), so Tab
+  // stays in the header instead of walking into hidden links, and the page under it does not scroll.
+  var MENU_LABELS = { en: ['Open menu', 'Close menu'], fr: ['Ouvrir le menu', 'Fermer le menu'] };
+  var phoneMq = window.matchMedia ? window.matchMedia('(max-width: 940px)') : null;
+  var inerted = [];
+  function syncMenu(){
+    if (!links) return;
+    var open = links.classList.contains('open') && (!phoneMq || phoneMq.matches);
+    var lang = /^fr/i.test(document.documentElement.lang || '') ? 'fr' : 'en';
+    if (burger) {
+      var label = MENU_LABELS[lang][open ? 1 : 0];
+      if (burger.getAttribute('aria-label') !== label) burger.setAttribute('aria-label', label);
+    }
+    if (document.body) document.body.classList.toggle('nav-menu-open', open);
+    if (open && !inerted.length && document.body) {
+      Array.prototype.forEach.call(document.body.children, function(el){
+        if (el.contains(links) || el.inert || /^(SCRIPT|STYLE|LINK|NOSCRIPT|TEMPLATE)$/.test(el.tagName)) return;
+        el.inert = true; el.setAttribute('inert', ''); inerted.push(el);
+      });
+    } else if (!open && inerted.length) {
+      inerted.forEach(function(el){ el.inert = false; el.removeAttribute('inert'); });
+      inerted = [];
+    }
+  }
+  window.__navMenuSync = syncMenu;
   function init(){
     burger = document.getElementById('navHamburger'); links = document.getElementById('navLinks'); panel = document.getElementById('tripTrayPanel');
+    // Pages without app.js (the claim and business login pages, 2026-10-18): the phone menu button and the menu's
+    // Discover-style sections did nothing there, so they get app.js's same simple open/close.
+    if (burger && links && !document.querySelector('script[src*="/scripts/app.js"]')) {
+      burger.addEventListener('click', function(){ burger.setAttribute('aria-expanded', String(links.classList.toggle('open'))); });
+      Array.prototype.forEach.call(links.querySelectorAll('a'), function(l){ l.addEventListener('click', function(){ links.classList.remove('open'); burger.setAttribute('aria-expanded', 'false'); }); });
+      var dds = links.querySelectorAll('.nav-dropdown');
+      Array.prototype.forEach.call(dds, function(dd){
+        var trig = dd.querySelector('.nav-link-label');
+        if (trig) trig.addEventListener('click', function(e){
+          e.stopPropagation();
+          var was = dd.classList.contains('open');
+          Array.prototype.forEach.call(dds, function(o){ o.classList.remove('open'); var t = o.querySelector('.nav-link-label'); if (t) t.setAttribute('aria-expanded', 'false'); });
+          if (!was) { dd.classList.add('open'); trig.setAttribute('aria-expanded', 'true'); }
+        });
+      });
+      document.addEventListener('click', function(){ Array.prototype.forEach.call(dds, function(o){ o.classList.remove('open'); var t = o.querySelector('.nav-link-label'); if (t) t.setAttribute('aria-expanded', 'false'); }); });
+    }
     // The phone menu: when it opens, focus goes to its first item (the list sits before the button in the page, so the
     // next Tab would otherwise skip it). Watched, not clicked, so app.js stays the menu's only click handler.
     if (links && window.MutationObserver) {
@@ -10728,7 +10782,12 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
         var open = links.classList.contains('open');
         if (open && !menuWasOpen) setTimeout(function(){ if (links.classList.contains('open')) focusEl(firstFocusable(links)); }, 0);
         menuWasOpen = open;
+        syncMenu();
       }).observe(links, { attributes: true, attributeFilter: ['class'] });
+      // app.js re-labels the button from its dictionary when the language changes; put the open/closed label back.
+      new MutationObserver(syncMenu).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+      if (phoneMq && phoneMq.addEventListener) phoneMq.addEventListener('change', syncMenu);
+      syncMenu();
     }
     // My Trip: focus moves into the tray when it opens, and back to the button that opened it when it closes.
     document.addEventListener('click', function(e){
@@ -10749,6 +10808,19 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
       }).observe(panel, { attributes: true, attributeFilter: ['class'] });
     }
   }
+  // Filter panels on list pages, What's On and the map (2026-10-18): the pages' own Escape handlers close the panel;
+  // focus then goes back to the button that opened it instead of falling to the page body. Runs first (capture), and
+  // checks once the page has closed the panel. The header's own menus are handled below.
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape' && e.key !== 'Esc') return;
+    var a = document.activeElement, btns = document.querySelectorAll('button[aria-expanded="true"][aria-controls]');
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i], p = document.getElementById(b.getAttribute('aria-controls'));
+      if (!p || b.closest('#top') || (a !== b && !p.contains(a))) continue;
+      setTimeout(function(btn){ return function(){ if (btn.getAttribute('aria-expanded') !== 'true') focusEl(btn); }; }(b), 0);
+      return;
+    }
+  }, true);
   document.addEventListener('keydown', function(e){
     if (e.key !== 'Escape' && e.key !== 'Esc') return;
     var dd = document.querySelector('.nav-dropdown.open');
@@ -11241,8 +11313,10 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
 function withTripNav(html) {
   if (!html || !html.includes('<div id="tripTray">') || html.includes('<style id="trip-nav">')) return html;
   // Accessibility (2026-10-18): the tray's title is an h2, not an h4 sitting before the page's h1 (same look, see nav-a11y).
+  // The tray is a (non-modal) dialog named by its title, "Your trip" / "Votre voyage" (2026-10-18).
   return html.replace('<div id="tripTray">', `${TRIP_NAV_SNIPPET}<div id="tripTray">`)
-    .replace('<h4 data-i18n="trip.yourTrip">Your trip</h4>', '<h2 data-i18n="trip.yourTrip">Your trip</h2>');
+    .replace('<div id="tripTrayPanel">', '<div id="tripTrayPanel" role="dialog" aria-labelledby="tripTrayTitle">')
+    .replace('<h4 data-i18n="trip.yourTrip">Your trip</h4>', '<h2 id="tripTrayTitle" data-i18n="trip.yourTrip">Your trip</h2>');
 }
 
 // app.js cache busting (2026-10-05): every page loads /scripts/app.js with
@@ -11363,7 +11437,8 @@ const REST_TEMPLATE_RE = /<template id="(fdRest|whatsOnRest)">([\s\S]*?)<\/templ
 // It stays on the page for everyone, closed by default, so nothing is hidden
 // from anybody and it never duplicates the cards visibly.
 const REST_LINK_RE = /<a class="venue-card-link" href="([^"]+)"><span class="venue-card-name">([^<]*)<\/span>/g;
-const REST_LINKS_CSS = '<style id="rest-links-css">.rest-links{margin:18px 0 6px;font-size:.88rem}.rest-links summary{cursor:pointer;font-weight:700;padding:8px 0}.rest-links ul{columns:15em;column-gap:24px;margin:6px 0 0;padding:0;list-style:none}.rest-links li{break-inside:avoid;padding:2px 0}</style>';
+// The A-Z summary gets the site's 3px focus ring (2026-10-18; summaries are not in app.css's focus rule).
+const REST_LINKS_CSS = '<style id="rest-links-css">.rest-links{margin:18px 0 6px;font-size:.88rem}.rest-links summary{cursor:pointer;font-weight:700;padding:8px 0}.rest-links summary:focus-visible{outline:3px solid var(--teal,#1F5C5C);outline-offset:3px;border-radius:4px}.rest-links ul{columns:15em;column-gap:24px;margin:6px 0 0;padding:0;list-style:none}.rest-links li{break-inside:avoid;padding:2px 0}</style>';
 function restLinksHtml(kind, inner, lang) {
   const seen = new Set(), links = [];
   for (const m of inner.matchAll(REST_LINK_RE)) {
@@ -11481,6 +11556,22 @@ function inlineSharedStylesheets(html) {
   for (const s of sharedStyles().values()) html = html.split(`<link rel="stylesheet" href="${s.href}">`).join(s.block);
   return html.replace(/(<link rel="stylesheet" href="\/styles\/(?:tokens|app)\.css)\?v=[0-9a-f]{12}"/g, '$1"');
 }
+// Skip link target (2026-10-18, accessibility review pass 3): every page's <main> takes focus (tabindex="-1"), and
+// where the main element keeps another id (/browse's #directory, which app.js scrolls to; /trip's #tripV3) the
+// "Skip to content" link points at that id instead of a missing #main. Only the first <main> tag is touched.
+function withMainSkipTarget(html) {
+  if (typeof html !== 'string') return html;
+  const m = /<main\b([^>]*)>/.exec(html);
+  if (!m) return html;
+  let attrs = m[1];
+  if (!/\stabindex=/.test(attrs)) attrs += ' tabindex="-1"';
+  const idm = /\sid="([^"]+)"/.exec(attrs);
+  if (!idm) attrs += ' id="main"';
+  const out = html.slice(0, m.index) + `<main${attrs}>` + html.slice(m.index + m[0].length);
+  const id = idm ? idm[1] : 'main';
+  if (id === 'main' || out.includes('id="main"')) return out;
+  return out.replace(/(<a class="skip-link" href=")#main(")/, `$1#${id}$2`);
+}
 // Wraps one response so a 200 text/html body goes through
 // withSharedStylesheets. writeHead is held until end (like
 // installTwinResponse) so the body can change; anything that writes in
@@ -11513,7 +11604,7 @@ function installSharedStylesheetResponse(res, req = {}) {
       return realEnd(m[2]);
     }
     if (held && body != null && typeof body !== 'function') {
-      try { body = withRestCardsDeferred(withSharedStylesheets(withLazyCardPhotos(String(body)))); } catch (e) { /* the inline page is still correct */ }
+      try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(withLazyCardPhotos(String(body))))); } catch (e) { /* the inline page is still correct */ }
     }
     flush();
     return realEnd(body, ...rest);
@@ -13896,6 +13987,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   @keyframes pm-mic { 0%, 100% { box-shadow: 0 0 0 0 rgba(225,29,72,0.45); } 50% { box-shadow: 0 0 0 8px rgba(225,29,72,0); } }
   @media (prefers-reduced-motion: reduce) { body.map-page .pm-mic.is-listening { animation: none; } }
   body.map-page .pm-filters-btn[aria-expanded="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
+  /* Filters in use (2026-10-18): the button turns solid navy like an open panel, instead of navy lines on faint grey. */
+  body.map-page .pm-filters-btn:has(.pm-badge:not([hidden])) { background: var(--ref-navy, #1B2B3A); color: #fff; }
   body.map-page .pm-badge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #1D4ED8; color: #fff; font-size: 0.7rem; font-weight: 800; line-height: 18px; text-align: center; }
   body.map-page .pm-badge[hidden] { display: none; }
   body.map-page .pm-quick { display: flex; gap: 8px; margin: 8px -10px 0; padding: 2px 10px 6px; overflow-x: auto; scrollbar-width: none; }
@@ -14037,7 +14130,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-pop a.pm-pop-dir { display: inline-block; margin-top: 2px; padding: 6px 12px; border-radius: 999px; background: #1D4ED8; color: #fff; text-decoration: none; }
   /* Pins: one colour per kind of place; events in pink. */
   .pm-pin { background: none; border: 0; }
-  .pm-pin span { display: block; width: 16px; height: 16px; margin: 2px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.35); background: #475569; }
+  /* Pins are 24px tap targets (2026-10-18, WCAG 2.2 target size; were 20px) with the same 16px dot in the middle. */
+  .pm-pin span { display: block; width: 16px; height: 16px; margin: 4px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.35); background: #475569; }
   .pm-pin-food span { background: #C2410C; }
   .pm-pin-wine span { background: #7B2D4F; }
   .pm-pin-beach span { background: #0E7490; }
@@ -14185,7 +14279,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   function dirUrl(lat, lng, name){ return IOS ? 'https://maps.apple.com/?daddr=' + lat + ',' + lng + '&q=' + encodeURIComponent(name) : 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng; }
   function distKm(lat1, lng1, lat2, lng2){ var R = 6371, r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLng = (lng2 - lng1) * r; var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLng / 2) * Math.sin(dLng / 2); return 2 * R * Math.asin(Math.sqrt(a)); }
-  function icon(kind){ return L.divIcon({ className: 'pm-pin pm-pin-' + kind, html: '<span></span>', iconSize: [20, 20], iconAnchor: [10, 10], popupAnchor: [0, -8] }); }
+  function icon(kind){ return L.divIcon({ className: 'pm-pin pm-pin-' + kind, html: '<span></span>', iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -10] }); }
   var ICONS = {};
   function iconFor(kind){ return ICONS[kind] || (ICONS[kind] = icon(kind)); }
   // Opening status, from the listed hours on the Okanagan clock (same rules as the hub pages).
@@ -22160,7 +22254,8 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-empty p { margin: 0; color: var(--ink); opacity: 0.8; line-height: 1.55; }
   body.whatson-page .whatson-empty a { color: var(--ref-navy); font-weight: 700; }
   /* Step 6: the "When are you visiting?" step -- preset chips reuse the region-chip rules; the custom-range form and the "Showing" line are page-scoped. */
-  body.whatson-page a.whatson-date-chip { text-decoration: none; }
+  /* Links (block boxes with a min-height) put their text at the top; centred like the Choose Dates button (2026-10-18). */
+  body.whatson-page a.whatson-date-chip { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
   body.whatson-page .whatson-custom-dates { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0 4px; }
   body.whatson-page .whatson-custom-dates[hidden] { display: none; }
   body.whatson-page .whatson-custom-dates label { display: flex; flex-direction: column; gap: 4px; font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 800; color: var(--ink); }
@@ -23701,7 +23796,8 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-open-status[data-open="open"] { color: var(--teal, #2A6B67); }
   body.golf-page .venue-open-status[data-open="closed"] { color: rgba(42,32,25,0.72); }
   body.golf-page .venue-open-status[data-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
-  body.golf-page .venue-open-status a { font-weight: 700; color: inherit; opacity: 0.85; margin-left: 4px; }
+  /* Full strength (2026-10-18): at 0.85 opacity the "See hours" link was 4.27:1 next to a closed status. */
+  body.golf-page .venue-open-status a { font-weight: 700; color: inherit; margin-left: 4px; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
@@ -23967,7 +24063,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const hero960 = photoSized(venue.image_url, 960);
   const heroSrcset = hero960 !== venue.image_url && heroW > 960 ? ` srcset="${escapeHtml(hero960)} 960w, ${escapeHtml(venue.image_url)} ${heroW}w" sizes="(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px"` : '';
   const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}" fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
-  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;opacity:0.65;text-align:right">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
+  // The credit's colour (2026-10-18): a solid #6B5E55 (5.6:1 on the cream page); the old 0.65 opacity was 3.9-4.5:1.
+  const creditHtml = photoCredit ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;color:#6B5E55;text-align:right">${L('Photo', 'Photo')}: ${escapeHtml(photoCredit)}</p>` : '';
   const imageHtml = venue.image_url
     ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
     : themedHeroTitle
@@ -26098,7 +26195,7 @@ ${renderAnalyticsHeadHtml('not_found')}
 <body class="golf-page not-found-page">
   ${renderGolfTripTrayHtml()}
 ${renderGolfHeaderHtml()}
-  <main class="wrap-wide golf-main not-found-main" id="main">
+  <main class="wrap-wide golf-main not-found-main" id="main" tabindex="-1">
     <h1>We couldn\u2019t find that page</h1>
     <p class="nf-lead">The place or page may have moved, or the address has a typo. Search for it, or pick up from one of these.</p>
     <form class="nf-search" action="/browse" method="get" role="search">
@@ -41165,6 +41262,9 @@ const server = http.createServer(async (req, res) => {
           .replace(/<img class="hero-media-img" src="\/images\/hero\.webp"[^>]*>/, (img) => `<picture><source media="(max-width: 640px)" srcset="/images/okanagan-valley-sunset-hero-mobile-800.jpg 800w, /images/okanagan-valley-sunset-hero-mobile.webp 1159w" sizes="100vw" width="1159" height="1358">${img.replace('src="/images/hero.webp" width="1376" height="768"', 'src="/images/okanagan-valley-sunset-hero.webp" width="2000" height="667"')}</picture>`)
           .replace('</head>', `${HOME_HERO_STYLE}\n${HOME_SCREEN_HEAD_LINKS}\n</head>`)
           // The near-me map, one tap from the home page (2026-10-14).
+          // The hero search box is a search field (2026-10-18): a Search key on phones, and no spell-check, autocorrect
+          // capitals or saved-entry list on place names.
+          .replace('<input type="text" id="heroSearchInput"', '<input type="search" id="heroSearchInput" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocomplete="off"')
           .replace(/(<button type="submit" id="heroSearchBtn"[^>]*>[^<]*<\/button>\s*<\/form>)/, '$1\n    <a class="hero-near-me" href="/map#near-me"><span class="live-dot" aria-hidden="true"></span>Roam Now: what’s open near me</a>');
 
         // Anything still pointing at the now-removed sections (the header's
@@ -44764,6 +44864,7 @@ module.exports = {
   withNavRefresh,
   NAV_A11Y_SNIPPET,
   wrapHomeMain,
+  withMainSkipTarget,
   browseRestPayload,
   renderOutdoorsHubPage,
   renderBeachesHubPage,
