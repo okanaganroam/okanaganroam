@@ -11587,6 +11587,11 @@ const HOME_CARD_SIZES = {
   'hidden-gem-card-img': '(max-width: 640px) calc(100vw - 48px), (max-width: 1099px) 47vw, 444px',
   'region-card-img': '(max-width: 640px) 57vw, (max-width: 899px) 30vw, (max-width: 1099px) 15vw, 214px',
 };
+// Speed pass 6 (2026-10-19): on a 3x phone the town cards (57vw) and Hidden Gems cards (full width) still chose the
+// 640-800px file, and so did the event photos (72vw). On screens up to 640px a <picture> <source> offers only the
+// 320px and 480px copies (the event photos: the 480px one), so a phone never takes more than the 480px copy. The
+// mood cards (42vw) already pick it. picture.home-pic is display: contents, so the card layout is unchanged.
+const HOME_PHONE_CAP = new Set(['hidden-gem-card-img', 'region-card-img']);
 // How many cards of each sideways row are (at least partly) on a 375px phone screen; they load as usual.
 const HOME_ROW_EAGER = { 'mood-card-img': 3, 'region-card-img': 2 };
 // Hero first (2026-10-19): on a slow phone the hero photo shared the connection with the first card photos, the
@@ -11594,25 +11599,32 @@ const HOME_ROW_EAGER = { 'mood-card-img': 3, 'region-card-img': 2 };
 // window.roamAfterHero(fn): fn runs once the hero photo has loaded (or failed), at window load at the latest, and
 // after 8 s whatever happens. The card photos that used to load at once (data-home-hero) and gtag.js wait for it;
 // the off-screen ones (data-home-lz) start watching the screen only then too. <noscript> keeps the plain images.
+// Speed pass 6 (2026-10-19): town pages use it too (withRegionHeroFirst); their banner is the fetchpriority="high"
+// image, so either marks the hero.
 const HOME_HERO_FIRST_HEAD = `<script>
 (function(){
   var q = [], done = false;
   function go(){ if (done) return; done = true; var l = q; q = []; for (var i = 0; i < l.length; i++) { try { l[i](); } catch (e) {} } }
   window.roamAfterHero = function(fn){ if (done) fn(); else q.push(fn); };
-  function hit(e){ var t = e.target; if (t && t.tagName === 'IMG' && /(^|\\s)hero-media-img(\\s|$)/.test(t.className)) go(); }
+  function hit(e){ var t = e.target; if (t && t.tagName === 'IMG' && (/(^|\\s)hero-media-img(\\s|$)/.test(t.className) || (t.getAttribute && t.getAttribute('fetchpriority') === 'high'))) go(); }
   document.addEventListener('load', hit, true);
   document.addEventListener('error', hit, true);
   window.addEventListener('load', go);
   setTimeout(go, 8000);
 })();
 </script>`;
-const HOME_CARD_LAZY_SCRIPT = `<style id="home-card-lz">img[data-home-lz],img[data-home-hero]{background:rgba(27,43,58,0.14)}</style>
+const HOME_CARD_LAZY_SCRIPT = `<style id="home-card-lz">img[data-home-lz],img[data-home-hero]{background:rgba(27,43,58,0.14)}picture.home-pic{display:contents}</style>
 <script>
 (function(){
   function load(img){
     var attr = img && (img.hasAttribute('data-home-lz') ? 'data-home-lz' : img.hasAttribute('data-home-hero') ? 'data-home-hero' : null);
     if (!attr) return;
     img.removeAttribute(attr);
+    var pic = img.parentNode;
+    if (pic && pic.tagName === 'PICTURE') {
+      var src = pic.getElementsByTagName('source');
+      for (var k = 0; k < src.length; k++) { var d = src[k].getAttribute('data-srcset'); if (d) { src[k].removeAttribute('data-srcset'); src[k].setAttribute('srcset', d); } }
+    }
     var s = img.getAttribute('data-srcset');
     if (s) img.setAttribute('srcset', s);
     img.setAttribute('src', img.getAttribute('data-src'));
@@ -11628,7 +11640,9 @@ const HOME_CARD_LAZY_SCRIPT = `<style id="home-card-lz">img[data-home-lz],img[da
     var rows = [];
     for (var j = 0; j < imgs.length; j++) {
       io.observe(imgs[j]);
-      var row = imgs[j].parentNode && imgs[j].parentNode.parentNode;
+      var card = imgs[j].parentNode;
+      if (card && card.tagName === 'PICTURE') card = card.parentNode;
+      var row = card && card.parentNode;
       if (row && rows.indexOf(row) === -1) rows.push(row);
     }
     // A swipe loads the rest of that row: its cards are clipped sideways, so they never intersect the screen.
@@ -11653,13 +11667,17 @@ function withHomeCardPhotos(html) {
     seen[cls] = (seen[cls] || 0) + 1;
     lazy++;
     const wait = !(cls in HOME_ROW_EAGER) || seen[cls] <= HOME_ROW_EAGER[cls] ? 'data-home-hero' : 'data-home-lz';
-    return `<img class="${cls}" data-src="${src}" data-srcset="${srcset}" sizes="${sizes}" width="${w}" height="${h}" alt="" loading="lazy" ${wait}><noscript><img class="${cls}" src="${src}" width="${w}" height="${h}" alt=""></noscript>`;
+    const img = `<img class="${cls}" data-src="${src}" data-srcset="${srcset}" sizes="${sizes}" width="${w}" height="${h}" alt="" loading="lazy" ${wait}>`;
+    const noscript = `<noscript><img class="${cls}" src="${src}" width="${w}" height="${h}" alt=""></noscript>`;
+    return HOME_PHONE_CAP.has(cls) ? `<picture class="home-pic"><source media="(max-width: 640px)" data-srcset="${small} 320w, ${mid} 480w" sizes="${sizes}">${img}</picture>${noscript}` : img + noscript;
   });
   // The "This weekend" event photos: the 480px copy where there is one (eventCardSrcset), after the hero.
   html = html.replace(/<span class="home-event-media"><img src="([^"]+)"( srcset="[^"]*" sizes="[^"]*")? alt="" width="(\d+)" height="(\d+)" loading="lazy" decoding="async"><\/span>/g, (m, src, set, w, h) => {
     lazy++;
     const srcset = set ? set.replace(' srcset="', ' data-srcset="') : '';
-    return `<span class="home-event-media"><img data-src="${src}"${srcset} alt="" width="${w}" height="${h}" loading="lazy" decoding="async" data-home-hero><noscript><img src="${src}" alt="" width="${w}" height="${h}"></noscript></span>`;
+    const img = `<img data-src="${src}"${srcset} alt="" width="${w}" height="${h}" loading="lazy" decoding="async" data-home-hero>`;
+    const small = set && (/ srcset="([^" ]+-w480\.jpg) 480w/.exec(set) || [])[1];
+    return `<span class="home-event-media">${small ? `<picture class="home-pic"><source media="(max-width: 640px)" data-srcset="${small}">${img}</picture>` : img}<noscript><img src="${src}" alt="" width="${w}" height="${h}"></noscript></span>`;
   });
   if (!lazy) return html;
   const at = html.indexOf('</main>');
@@ -11675,6 +11693,26 @@ function withHomeHeroFirst(html) {
     html = html
       .replace(/<link rel="stylesheet" href="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\/[^"]+\/leaflet\.min\.css"\s*\/?>\n?/, '')
       .replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\/[^"]+\/leaflet\.min\.js"><\/script>\n?/, '');
+  }
+  return html.replace(/<meta charset="UTF-8">\n?/i, (m) => `${m}${HOME_HERO_FIRST_HEAD}\n`);
+}
+// Speed pass 6 (2026-10-19): town pages get the homepage's hero-first loading. On a slow phone /kelowna's banner
+// (its LCP, 6.5 s) shared the connection with 17 category tiles and 6 "Places to start" photos (about 1 MB) and
+// gtag.js. The hero-ready signal goes first in <head> (gtag.js waits for it, see renderGa4ConfigIifeJs), and every
+// tile photo keeps its src in data-src until the banner has loaded (8 s at the latest); <noscript> keeps the plain
+// image. French town pages are translated from this HTML, so they get the same.
+const REGION_TILE_IMG_RE = /<div class="region-card-photo"><img src="([^"]+)"((?: srcset="[^"]*" sizes="[^"]*")?) alt="" width="(\d+)" height="(\d+)" loading="lazy" decoding="async"><\/div>/g;
+function withRegionHeroFirst(html) {
+  if (typeof html !== 'string') return html;
+  let n = 0;
+  html = html.replace(REGION_TILE_IMG_RE, (m, src, set, w, h) => {
+    n++;
+    const srcset = set ? set.replace(' srcset="', ' data-srcset="') : '';
+    return `<div class="region-card-photo"><img data-src="${src}"${srcset} alt="" width="${w}" height="${h}" loading="lazy" decoding="async" data-home-hero><noscript><img src="${src}" alt="" width="${w}" height="${h}"></noscript></div>`;
+  });
+  if (n) {
+    const at = html.lastIndexOf('</main>');
+    if (at !== -1) html = `${html.slice(0, at)}${HOME_CARD_LAZY_SCRIPT}\n${html.slice(at)}`;
   }
   return html.replace(/<meta charset="UTF-8">\n?/i, (m) => `${m}${HOME_HERO_FIRST_HEAD}\n`);
 }
@@ -12226,6 +12264,45 @@ function withSharedStylesheets(html) {
     return h ? `${a}/styles/${f}.css?v=${h}"` : m;
   });
 }
+// Image cache busting (2026-10-19, speed pass 6): /images/ files were served for a day under the same URL, so after
+// a photo changed Cloudflare and browsers kept the old bytes (the 2026-10-19 review asked Dayton for a purge). Like
+// app.js and the shared CSS, every image URL the server writes into a page (src, data-src, srcset, data-srcset and
+// url() in a style attribute) gets ?v=<first 10 hex of the file's md5>, and the /images/ route already keeps a
+// ?v= URL for a year as immutable; a plain URL still works and still gets a day. A URL that already has a query
+// (the venue photos' own ?v=), is not a local file, or is inside a <style> block or JSON is left alone. Hashes are
+// remembered per file and rechecked against its size and mtime at most once a minute.
+const IMAGE_VERSION_RE = /^\/images\/(?!.*\.\.)[\w\/.-]+\.(?:jpe?g|png|webp)$/i;
+const imageVersionMemo = new Map(); // url -> { h, size, mtime, at }
+function imageVersion(url) {
+  if (!IMAGE_VERSION_RE.test(url)) return null;
+  const now = Date.now();
+  const memo = imageVersionMemo.get(url);
+  if (memo && now - memo.at < 60000) return memo.h;
+  let st;
+  try { st = fs.statSync(path.join(__dirname, 'public', url)); } catch (e) { imageVersionMemo.set(url, { h: null, at: now }); return null; }
+  if (!st.isFile()) return null;
+  if (memo && memo.h && memo.size === st.size && memo.mtime === st.mtimeMs) { memo.at = now; return memo.h; }
+  let h = null;
+  try { h = crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', url))).digest('hex').slice(0, 10); } catch (e) { /* unreadable: leave the URL plain */ }
+  imageVersionMemo.set(url, { h, size: st.size, mtime: st.mtimeMs, at: now });
+  return h;
+}
+function versionedImageUrl(url) {
+  const h = imageVersion(url);
+  return h ? `${url}?v=${h}` : url;
+}
+const IMAGE_URL_IN_LIST_RE = /\/images\/[\w\/.-]+\.(?:jpe?g|png|webp)(?=[\s,]|$)/gi;
+function withVersionedImages(html) {
+  if (typeof html !== 'string' || html.indexOf('/images/') === -1) return html;
+  // <style> blocks (the shared stylesheets match them by their exact text) and scripts stay as they are.
+  return html.split(/(<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>)/).map((part, i) => {
+    if (i % 2 === 1 || part.indexOf('/images/') === -1) return part;
+    return part
+      .replace(/(\s(?:src|data-src)=")(\/images\/[^"?#]+)"/g, (m, a, url) => `${a}${versionedImageUrl(url)}"`)
+      .replace(/(\s(?:srcset|data-srcset)=")([^"]*)"/g, (m, a, list) => `${a}${list.replace(IMAGE_URL_IN_LIST_RE, (u) => versionedImageUrl(u))}"`)
+      .replace(/(\sstyle=")([^"]*url\([^"]*)"/g, (m, a, css) => `${a}${css.replace(/url\((['"]?|&#39;|&quot;)(\/images\/[^'"()?#&]+)\1\)/g, (mm, q, url) => `url(${q}${versionedImageUrl(url)}${q})`)}"`);
+  }).join('');
+}
 // Lighter pages (2026-10-18): the Food & Drink style hubs (/food-drink,
 // /restaurants, /wineries, /dog-friendly, the town category pages...) ship
 // their first page of cards and keep every other card in an inert
@@ -12557,10 +12634,13 @@ function installSharedStylesheetResponse(res, req = {}) {
       if (!m) { realWriteHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return realEnd('Not found'); }
       const same = rememberRestCards(m[2]) === req.restCardsHash;
       realWriteHead(200, { 'Content-Type': req.restCardsJson ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'no-store', 'X-Robots-Tag': 'noindex' });
-      return realEnd(m[2]);
+      return realEnd(req.restCardsJson ? m[2] : withVersionedImages(m[2]));
     }
     if (held && body != null && typeof body !== 'function') {
       try { body = withMainSkipTarget(withRestCardsDeferred(withSharedStylesheets(withFontFallbacks(withFilterBarReady(withLazyCardPhotos(withChipWidths(String(body)))))))); } catch (e) { /* the inline page is still correct */ }
+      // Image cache busting (2026-10-19): last, so nothing above sees a query on an image URL, and the waiting cards'
+      // hash (withRestCardsDeferred) is of their plain text, as /cards/rest/ computes it.
+      try { body = withVersionedImages(body); } catch (e) { /* plain image URLs still work */ }
     }
     flush();
     return realEnd(body, ...rest);
@@ -14291,6 +14371,25 @@ function photoSized(src, width) {
   const sized = `${m[1]}-w${width}.jpg`;
   return PHOTO_SIZE_FILES.has(sized) ? sized + (m[2] || '') : src;
 }
+// Speed pass 6 (2026-10-19): the 800px tile photos (<dir>/thumbs/<name>.jpg and the regions/photos/<town>-card.jpg
+// guide cards) were the only size, about 2 MB on a town page for tiles shown 160-320px wide. Each now has 360px and
+// 480px copies beside it (<name>-w360.jpg, <name>-w480.jpg, mozjpeg q72); tileSrcsetAttrs gives an <img> a srcset
+// with them when both files exist, and nothing otherwise (so a new tile without copies keeps its plain src).
+const TILE_SIZE_RE = /^\/images\/(?:[\w-]+\/thumbs\/[\w-]+|regions\/photos\/[\w-]+-card)\.jpg$/;
+const tileSizeCache = new Map();
+function tileSrcsetAttrs(src, sizes) {
+  src = String(src || '');
+  if (!TILE_SIZE_RE.test(src)) return '';
+  if (!tileSizeCache.has(src)) {
+    const base = src.slice(0, -4);
+    const ok = [360, 480].every((w) => fs.existsSync(path.join(__dirname, 'public', `${base}-w${w}.jpg`)));
+    tileSizeCache.set(src, ok ? `${base}-w360.jpg 360w, ${base}-w480.jpg 480w, ${src} 800w` : '');
+  }
+  const set = tileSizeCache.get(src);
+  return set ? ` srcset="${set}" sizes="${sizes}"` : '';
+}
+// Town page tiles: two columns up to 899px, then four inside .wrap-wide (1360px, 24px padding, 18px gaps).
+const REGION_TILE_SIZES = '(max-width: 899px) calc(50vw - 31px), (max-width: 1359px) calc(25vw - 26px), 315px';
 // Card photo CSS variables: the 480px copy, plus a 960px copy for sharp large screens (see PHOTO_2X_CSS).
 function cardPhotoVars(name, src) {
   const small = photoSized(src, 480), big = photoSized(src, 960);
@@ -14371,7 +14470,7 @@ function regionCategoryGridHtml(region, categories) {
       <li class="category-card">
         <h3><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h3>
         <p class="venue-meta">${c.count} ${escapeHtml(c.count === 1 ? c.nounOne : c.nounMany)} in ${escapeHtml(label)}</p>${img ? `
-        <div class="region-card-photo"><img src="${img}" alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
+        <div class="region-card-photo"><img src="${img}"${tileSrcsetAttrs(img, REGION_TILE_SIZES)} alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
       </li>`;
     }).join('\n')}
   </ul>`;
@@ -14497,7 +14596,7 @@ ${upcomingEvents.map((e) => {
   // with the destination's categories as pill tabs above the existing
   // category cards. Every tab and card is a category with at least one
   // active venue, linking to its /{region}/{category} page.
-  return `<!DOCTYPE html>
+  return withRegionHeroFirst(`<!DOCTYPE html>
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
@@ -14532,7 +14631,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
 </body>
-</html>`;
+</html>`);
 }
 
 // Destination categories (2026-09-25): every destination page lists the
@@ -28521,6 +28620,53 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   ${rest}`;
 }
 
+// Speed pass 6 (2026-10-19): /browse early taps. On slow 3G a tap on a chip made while the page was still loading
+// was lost (the listener was in the page script, after every card), and a tap made before the cards were in showed
+// nothing until they were. This small script goes right after the chips and the filter bar: from then on a tap on
+// a filter shows at once (the chip is pressed, "Loading all places..." appears by the count), a filter panel opens
+// or closes at once (it needs no card data), and the tap is queued in window.__bhEarly; the page script asks for the
+// cards (E.wake) and replays the queue once the filters are ready (bhStart resets every chip from the address
+// first, so each replayed click lands on the state the visitor saw before it).
+const BROWSE_EARLY_TAP_SCRIPT = `<script>
+(function(){
+  var REPLAY = '[data-bh-type],[data-bh-type-all],[data-bh-feature],[data-region],[data-bh-price],[data-bh-apply],#bhOpenNow,#bhFavOnly,#bhShowMore,.fd-pop-btn,.outdoor-region-group-toggle';
+  var E = window.__bhEarly = { q: [], ready: false, wake: null };
+  function all(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function note(){
+    var s = document.getElementById('bhResultsSummary');
+    if (!s || s.querySelector('.bh-loading')) return;
+    var n = document.createElement('span');
+    n.className = 'bh-loading';
+    n.textContent = ' \\u00b7 Loading all places\\u2026';
+    s.appendChild(n);
+  }
+  function panel(b, open){ var p = document.getElementById(b.getAttribute('aria-controls')); b.setAttribute('aria-expanded', open ? 'true' : 'false'); if (p) p.hidden = !open; }
+  function press(t){
+    if (t.hasAttribute('aria-pressed')) {
+      var on = t.getAttribute('aria-pressed') !== 'true';
+      if (t.hasAttribute('data-bh-price')) { on = true; all('[data-bh-price]').forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); }
+      else if (t.hasAttribute('data-bh-type-all')) { on = true; all('[data-bh-type]').forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); }
+      else if (t.hasAttribute('data-bh-type')) all('[data-bh-type-all]').forEach(function(c){ c.setAttribute('aria-pressed', 'false'); });
+      t.setAttribute('aria-pressed', on ? 'true' : 'false');
+    } else if (t.hasAttribute('aria-expanded') && t.hasAttribute('aria-controls')) panel(t, t.getAttribute('aria-expanded') !== 'true');
+  }
+  document.addEventListener('click', function(e){
+    if (E.ready) return;
+    var t = e.target && e.target.closest ? e.target.closest(REPLAY) : null;
+    if (!t || t.tagName === 'A') return;
+    e.preventDefault(); e.stopPropagation();
+    if (/(^|\\s)fd-pop-btn(\\s|$)/.test(t.className) && t.hasAttribute('aria-controls')) {
+      var open = t.getAttribute('aria-expanded') !== 'true';
+      all('.fd-pop-btn[aria-controls]').forEach(function(b){ if (b !== t) panel(b, false); });
+      panel(t, open);
+    } else if (t.hasAttribute('data-bh-apply')) {
+      all('.fd-pop-btn[aria-controls]').forEach(function(b){ panel(b, false); });
+    } else { press(t); E.q.push(t); }
+    note();
+    if (E.wake) E.wake();
+  }, true);
+})();
+</script>`;
 // The inline script: the Food & Drink hub's interaction contract (chips,
 // popovers, URL sync with pushState/popstate, Show more over a template-held
 // pool) plus what /browse always had: cuisine, price, favourites-only, sort,
@@ -28925,29 +29071,29 @@ function bhStart(){
   // /cards/rest/<hash>.json at the same time; the filters wait for both.
   var tplEl = document.getElementById('bhRest'), src = tplEl && tplEl.getAttribute('data-src');
   var dataTag = document.getElementById('bhVenueData'), dataHash = dataTag && dataTag.getAttribute('data-rest');
-  if ((!src && !dataHash) || !window.fetch) { bhStart(); return; }
+  if ((!src && !dataHash) || !window.fetch) { bhStart(); if (window.__bhEarly) { window.__bhEarly.ready = true; window.__bhEarly.q.splice(0).forEach(function(t){ t.click(); }); } return; }
   var waits = [];
   if (dataHash) waits.push(fetch('/cards/rest/' + dataHash + '.json?u=' + encodeURIComponent(window.location.pathname + window.location.search), { credentials: 'same-origin', redirect: 'manual' })
     .then(function(r){ if (!r.ok) throw new Error('data ' + r.status); return r.text(); })
     .then(function(t){ dataTag.textContent = t; })
     .catch(function(){}));
   // Speed (2026-10-19): /browse/cards.json is every other card (3.2 MB unpacked, about 490 KB on the wire). It was
-  // fetched as soon as the script ran and shared a phone's connection with the first cards' photos. It now waits
-  // for the page's load event and an idle moment, or for the visitor's first tap, key or focus, whichever is first.
-  // A filter, Show more or popover tap made before the filters are ready is replayed once they are, and anything
-  // typed in the search box is kept.
-  var ready = false, pending = null, searchEl = document.getElementById('bhSearch');
-  var REPLAY = '[data-bh-type],[data-bh-type-all],[data-bh-feature],[data-region],[data-bh-price],[data-bh-apply],#bhOpenNow,#bhFavOnly,#bhShowMore,.fd-pop-btn,.outdoor-region-group-toggle';
-  function early(e){
-    if (ready) return;
-    var t = e.target && e.target.closest ? e.target.closest(REPLAY) : null;
-    if (t && t.tagName !== 'A') { pending = t; e.preventDefault(); e.stopPropagation(); }
-  }
-  document.addEventListener('click', early, true);
+  // fetched as soon as the script ran and shared a phone's connection with the first cards' photos.
+  // Speed pass 6 (2026-10-19): it still loaded (and took up to 772 ms of main thread) on every visit, after the load
+  // event. Now it loads only when it is needed: the first tap, key or focus in the search box, the chips, the filter
+  // bar or the result bar; a scroll that nears the end of the first cards (Show more); or, for an address that
+  // already carries filters, after the load event as before. Taps made before the filters are ready are caught by
+  // the small script right after the chips (BROWSE_EARLY_TAP_SCRIPT, window.__bhEarly), which shows them at once
+  // and queues them; they are replayed, in order, once the filters are ready, and anything typed in the search box
+  // is kept.
+  var E = window.__bhEarly || { q: [] }, searchEl = document.getElementById('bhSearch');
+  function replay(){ E.ready = true; var q = (E.q || []).splice(0); q.forEach(function(t){ t.click(); }); }
   var cardsWait = null;
+  var ZONE = '.fd-search,.fd-type-row,.fd-controls,.fd-resultbar,.outdoor-selected,.fd-more-row';
+  function onTouch(e){ if (e.target && e.target.closest && e.target.closest(ZONE)) getCards(); }
   function getCards(){
     if (cardsWait || !src) return;
-    ['pointerdown', 'keydown', 'focusin'].forEach(function(ev){ document.removeEventListener(ev, getCards, true); });
+    ['pointerdown', 'keydown', 'focusin'].forEach(function(ev){ document.removeEventListener(ev, onTouch, true); });
     cardsWait = fetch(src).then(function(r){ return r.json(); }).then(function(d){
       var have = {};
       Array.prototype.forEach.call(document.querySelectorAll('#bhResults > .venue-card'), function(c){ have[c.getAttribute('data-venue-id')] = 1; });
@@ -28961,15 +29107,22 @@ function bhStart(){
   function finish(){
     var typed = searchEl ? searchEl.value : '';
     bhStart();
-    ready = true;
-    document.removeEventListener('click', early, true);
     if (searchEl && typed && searchEl.value !== typed) { searchEl.value = typed; try { searchEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} }
-    if (pending) { var p = pending; pending = null; p.click(); }
+    replay();
   }
   if (!src) { Promise.all(waits).then(finish); return; }
-  ['pointerdown', 'keydown', 'focusin'].forEach(function(ev){ document.addEventListener(ev, getCards, true); });
-  var idle = function(){ if (window.requestIdleCallback) window.requestIdleCallback(getCards, { timeout: 1500 }); else setTimeout(getCards, 200); };
-  if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
+  E.wake = getCards;
+  if ((E.q && E.q.length) || document.querySelector('.fd-pop-btn[aria-expanded="true"]') || (searchEl && searchEl.value)) { getCards(); return; }
+  ['pointerdown', 'keydown', 'focusin'].forEach(function(ev){ document.addEventListener(ev, onTouch, true); });
+  var more = document.querySelector('.fd-more-row');
+  if (more && window.IntersectionObserver) {
+    var io = new IntersectionObserver(function(es){ if (es.some(function(x){ return x.isIntersecting; })) { io.disconnect(); getCards(); } }, { rootMargin: '0px 0px 1500px 0px' });
+    io.observe(more);
+  }
+  if (/[?&](types|features|regions|cuisine|price|q|open|fav|sort)=/.test(window.location.search) || !more || !window.IntersectionObserver) {
+    var idle = function(){ if (window.requestIdleCallback) window.requestIdleCallback(getCards, { timeout: 1500 }); else setTimeout(getCards, 200); };
+    if (document.readyState === 'complete') idle(); else window.addEventListener('load', idle);
+  }
 })();
 </script>`;
 }
@@ -28988,8 +29141,9 @@ function browseRestPayload(venues, now = new Date()) {
   const advisoryNotes = getAdvisoryNotes();
   const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
   // Trimmed (2026-10-18): the hidden "Read more" button never shows on these photo cards (see the fd-page CSS).
-  const html = browseBatchedCardsHtml(recommended, new Set(), 0, advisoryNotes, openInfo.byId, orderById, { restOnly: true })
-    .replace(/\s*<button type="button" class="desc-toggle"[^>]*\shidden>[^<]*<\/button>/g, '');
+  // Image cache busting (2026-10-19): the same versioned image URLs as the page's first cards.
+  const html = withVersionedImages(browseBatchedCardsHtml(recommended, new Set(), 0, advisoryNotes, openInfo.byId, orderById, { restOnly: true })
+    .replace(/\s*<button type="button" class="desc-toggle"[^>]*\shidden>[^<]*<\/button>/g, ''));
   const k = {};
   for (const v of venues) { const w = descSearchWords(v.description || ''); if (w) k[String(v.id)] = w; }
   return { html, k };
@@ -29008,9 +29162,14 @@ function browseRestJson(venues, now = new Date(), fresh = false) {
   const version = browseRestVersion(venues, now);
   const m = browseRestMemo;
   if (!fresh && m && m.version === version && Date.now() - m.at < BROWSE_REST_TTL_MS) return m;
-  const json = JSON.stringify(browseRestPayload(venues, now));
+  const payload = browseRestPayload(venues, now);
+  const json = JSON.stringify(payload);
+  // Speed pass 6 (2026-10-19): English readers get the cards without their French blurbs (about 330 KB of the
+  // 2.7 MB; englishTwinHtml drops them from the page itself the same way). The French twin is made from the full
+  // text, so the hash covers both.
+  const jsonEn = JSON.stringify({ ...payload, html: payload.html.replace(/<span class="desc-en" lang="en">([\s\S]*?)<\/span><span class="desc-fr" lang="fr">[\s\S]*?<\/span>/g, '$1') });
   const hash = crypto.createHash('md5').update(json).digest('hex').slice(0, 12);
-  return (browseRestMemo = { version, json, hash, at: Date.now() });
+  return (browseRestMemo = { version, json, jsonEn, hash, at: Date.now() });
 }
 function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   const cuisines = browseCuisines(venues);
@@ -29087,6 +29246,7 @@ ${withoutFavoritesNavLink(renderGolfHeaderHtml())}
   ${browseSearchHtml(f.q)}
   ${browseTypeChipsHtml(state)}
   ${browseFilterBarHtml(venues, cuisines, state, openCount)}
+  ${BROWSE_EARLY_TAP_SCRIPT}
   <p class="fd-open-note">${escapeHtml(BROWSE_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="bhResultsTop">
   <h2 class="visually-hidden" id="bhResultsTop">Results</h2>
@@ -31089,6 +31249,8 @@ const guideCardImage = (b) => {
   const card = /^\/images\/[\w\/-]+\.jpe?g$/.test(b.src) ? b.src.replace(/\.jpe?g$/, '-card.jpg') : null;
   return card && fs.existsSync(path.join(__dirname, 'public', card)) ? card : b.src;
 };
+// /guides cards: a grid of minmax(240px, 1fr) columns in 1100px (24px page padding, 16px gaps).
+const GUIDE_TILE_SIZES = '(max-width: 559px) calc(100vw - 48px), (max-width: 815px) calc(50vw - 32px), (max-width: 1071px) calc(33vw - 27px), 263px';
 // The homepage's seasonal guide link (Sep-Mar only; nothing in summer).
 function seasonalGuideLink(now = new Date()) {
   const m = Number(todayLocal(now).slice(5, 7));
@@ -31130,14 +31292,23 @@ function renderGuidesIndexPage(now = new Date()) {
     name: 'Okanagan Roam guides',
     itemListElement: listed.map((x, i) => ({ '@type': 'ListItem', position: i + 1, url: `https://okanaganroam.com${x.path}`, name: x.heading })),
   };
-  // Speed (2026-10-18): the first row of guide photos (up to 4 across) is on the first
-  // screen, so it loads right away; the rest stay lazy.
+  // Speed (2026-10-18): the first guide photo loads right away (fetchpriority="high").
+  // Speed pass 6 (2026-10-19): only that one; the rest of the first row went "eager" too and competed with it on a
+  // phone, where the grid is one column and only the first card is on screen. Each card offers the 360px and 480px
+  // copies (tileSrcsetAttrs) for the two- to four-column layouts. On a phone (one column, about 330px) a 3x screen
+  // still chose the 800px file, so up to 559px a <source> offers only the 360px and 480px copies.
   let cardIndex = 0;
-  const card = (x) => `
+  const card = (x) => {
+    const img = guideCardImage(x.banner);
+    const set = tileSrcsetAttrs(img, GUIDE_TILE_SIZES);
+    const tag = `<img src="${img}"${set} alt="" width="800" height="533" ${cardIndex++ === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" style="object-position: 50% ${x.banner.pos || 50}%">`;
+    const phone = set ? `<source media="(max-width: 559px)" srcset="${img.slice(0, -4)}-w360.jpg 360w, ${img.slice(0, -4)}-w480.jpg 480w" sizes="calc(100vw - 48px)">` : '';
+    return `
         <li class="guide-card"><a href="${x.path}">
-          <span class="guide-card-img"><img src="${guideCardImage(x.banner)}" alt="" width="800" height="533" ${cardIndex++ < 4 ? (cardIndex === 1 ? 'fetchpriority="high"' : 'loading="eager"') : 'loading="lazy"'} decoding="async" style="object-position: 50% ${x.banner.pos || 50}%"></span>
+          <span class="guide-card-img">${phone ? `<picture>${phone}${tag}</picture>` : tag}</span>
           <span class="guide-card-body"><span class="guide-card-title">${escapeHtml(x.heading)}</span><span class="guide-card-desc">${escapeHtml(x.description)}</span></span>
         </a></li>`;
+  };
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31152,6 +31323,7 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { golfTheme: t
   body.guides-index-page .guide-card a:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
   body.guides-index-page .guide-card-img { display: block; aspect-ratio: 3 / 2; background: #2A6B67; }
   body.guides-index-page .guide-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  body.guides-index-page .guide-card-img picture { display: contents; }
   body.guides-index-page .guide-card-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 16px; }
   body.guides-index-page .guide-card-title { font-weight: 800; font-size: 1.02rem; line-height: 1.3; }
   body.guides-index-page .guide-card-desc { font-size: .9rem; line-height: 1.45; opacity: .8; }
@@ -43019,7 +43191,7 @@ const server = http.createServer(async (req, res) => {
       if (rest.hash !== query.h) rest = browseRestJson(venues, new Date(), true);
       const same = typeof query.h === 'string' && rest.hash === query.h;
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': same ? 'public, max-age=31536000, immutable' : 'public, max-age=600' });
-      return res.end(rest.json);
+      return res.end(res.twinLang === 'fr' ? rest.json : rest.jsonEn);
     }
     // /browse (2026-10-05) is the hub-style all-venue directory
     // (renderBrowseHubPage). The previous wizard page -- okanagan.html with the
@@ -46547,6 +46719,11 @@ module.exports = {
   wrapHomeMain,
   withMainSkipTarget,
   browseRestPayload,
+  browseRestJson,
+  withVersionedImages,
+  imageVersion,
+  tileSrcsetAttrs,
+  withRegionHeroFirst,
   renderOutdoorsHubPage,
   renderBeachesHubPage,
   renderToursSectionPage,
