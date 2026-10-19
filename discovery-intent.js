@@ -183,7 +183,9 @@ const CUISINE_SYNONYMS = {
 };
 
 const BUDGET_ALIASES = {
-  budget: ['cheap', 'inexpensive', 'affordable', 'on a budget', 'low cost', 'budget friendly', 'cheap eats', 'budget', 'low budget', 'tight budget', 'budget conscious', 'cheaper', 'frugal', 'cheap eat'],
+  budget: ['cheap', 'inexpensive', 'affordable', 'on a budget', 'low cost', 'budget friendly', 'cheap eats', 'budget', 'low budget', 'tight budget', 'budget conscious', 'cheaper', 'frugal', 'cheap eat',
+    // 2026-10-19: free things and students mean a budget trip (they were read as romance or a word to search for).
+    'student', 'students', 'student budget', 'for free', 'free things', 'free stuff', 'free things to do', 'free activities', 'free admission', 'free entry', 'mostly free', 'no cost', 'broke'],
   moderate: ['mid range', 'reasonable', 'reasonably priced', 'moderately priced'],
   upscale: ['upscale', 'high end', 'higher end', 'luxury', 'luxurious', 'splurge', 'premium', 'fancy', 'fine dining', 'expensive'],
 };
@@ -215,7 +217,11 @@ const OCCASION_EXTRAS = {
 
 // Event nouns switch the request to mode 'events'. Category words are only
 // honoured once the request is about events.
-const EVENT_PHRASES = ['event', 'events', 'whats on', 'what is on', 'happening', 'happenings', 'going on', 'things happening', 'festival', 'festivals', 'concert', 'concerts', 'gig', 'gigs', 'live show', 'live shows'];
+const EVENT_PHRASES = ['event', 'events', 'whats on', 'what is on', 'happening', 'happenings', 'going on', 'things happening', 'festival', 'festivals', 'concert', 'concerts', 'gig', 'gigs', 'live show', 'live shows',
+  // 2026-10-19: "a show" or "shows" is a listed performance (bare "show" stays a verb: "show us the best").
+  'a show', 'shows', 'magic show', 'drag show', 'theatre show', 'comedy night'];
+// Comedy (2026-10-19): an events request whose listings must say so; the word itself stays a search term.
+const COMEDY_WORDS = ['comedy', 'comedian', 'comedians', 'improv', 'standup'];
 const EVENT_CATEGORY_ALIASES = {
   'events-festivals': ['festival', 'festivals'],
   'live-music': ['concert', 'concerts', 'gig', 'gigs', 'live music'],
@@ -332,6 +338,8 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'if then than else only one ones all more most much many few little lot lots kind sort type types option options idea ideas '
   + 'around tonight today tomorrow while during after before next last then take takes taking bring bringing stay staying '
   + 'whats wanna gonna ive id nearby close near '
+  // 2026-10-19: times of day are when, not something a listing should mention ("live music in the evenings").
+  + 'evening evenings mornings afternoons nightly daily mostly mainly '
   // Step 1 (2026-09-29): verbs, pronouns and filler that were reaching the
   // planner as "food" searches ("Nothing matching explore").
   + 'not have has had coming come them they their explore exploring experience experiences anything everything nothing easy '
@@ -694,7 +702,7 @@ function findLengths(normalized) {
   }
   // 2026-10-14: "a beach day", "a wine day", "a day out" are one-day plans. Only the word "day" (or "day out") is
   // claimed, so "beach" and "wine" are still read as what the day is for.
-  const THEMED_DAY_RE = /(?:^|\b(?:a|one|our|my) )(?:beach|lake|wine|winery|ski|golf|hiking|family|fun|lazy|chill|girls|guys|brewery|patio|museum) (day)\b|\b(day) out\b/g;
+  const THEMED_DAY_RE = /(?:^|\b(?:a|one|our|my) )(?:beach|lake|wine|winery|ski|golf|hiking|family|fun|lazy|chill|girls|guys|brewery|patio|museum|budget|cheap|student) (day)\b|\b(day) out\b/g;
   // "A rainy day in Vernon" too, but not "coffee and dinner on a rainy day" (the weather on an outing).
   const RAINY_DAY_RE = /(?<!\bon )\b(?:a|one) rainy (day)\b/g;
   for (const re of [THEMED_DAY_RE, RAINY_DAY_RE]) while ((m = re.exec(normalized)) !== null) {
@@ -1041,7 +1049,8 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // Everything below reads the corrected words; the corrections are listed.
   const fixed = correctDiscoveryTokens(normalized.split(' '), index);
   intent.corrections = fixed.corrections;
-  const tokens = fixed.tokens;
+  // "Pizzeria" is a pizza place (2026-10-19); listings say "pizza".
+  const tokens = fixed.tokens.map((w) => (w === 'pizzeria' || w === 'pizzerias' ? 'pizza' : w));
   // 2. Trip lengths claim their tokens first ("3 relaxed days").
   const lengths = findLengths(tokens.join(' '));
   const preClaimed = new Array(tokens.length).fill(false);
@@ -1181,6 +1190,15 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   intent.pace = lastOf('pace', paceMentions.filter(themedPace));
   // "a romantic weekend for two ... a couple of hidden gems": adults is the
   // weakest occasion, so any other named occasion wins over it.
+  // 2026-10-19: "for two students", "for two friends" is a head count, not romance; and on a budget trip the weak
+  // romance words ("for two", "couples") don't make it a romantic outing.
+  const PEOPLE_AFTER_TWO = /^(?:students?|friends?|kids?|children|adults|people|guys|girls|teens?|teenagers|families|couples|days?|nights?|buddies|sisters|brothers|moms|dads|seniors)$/;
+  const weakRomance = (m) => m.value === 'romantic' && (m.phrase === 'for two' || m.phrase === 'couples');
+  for (let k = occasionMentions.length - 1; k >= 0; k--) {
+    const m = occasionMentions[k];
+    if (m.phrase === 'for two' && PEOPLE_AFTER_TWO.test(tokens[m.start + 2] || '')) occasionMentions.splice(k, 1);
+    else if (weakRomance(m) && budgetMentions.some((b) => b.value === 'budget')) occasionMentions.splice(k, 1);
+  }
   const occasionPool = occasionMentions.some((m) => m.value !== 'adults') ? occasionMentions.filter((m) => m.value !== 'adults') : occasionMentions;
   const occasion = lastOf('occasion', occasionPool);
   intent.occasion = occasion;
@@ -1287,6 +1305,11 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // 2026-10-14: "Halloween things to do" or "Christmas in Vernon" is about that holiday's listed events, unless a kind
   // of place or a trip length was asked for.
   if (!flags.event && eventCats.includes('holiday-seasonal') && /\b(?:halloween|christmas|xmas)\b/.test(normalized) && !intent.types.length && !lengthMentions.length && !flags.plan) flags.event = true;
+  if (tokens.some((w) => COMEDY_WORDS.includes(w)) && !intent.types.length) {
+    flags.event = true;
+    intent.textTerms = intent.textTerms.filter((w) => !COMEDY_WORDS.includes(w) && w !== 'stand');
+    intent.textTerms.push('comedy');
+  }
   // 8. Mode.
   if (flags.event) {
     intent.mode = 'events';
@@ -1558,6 +1581,9 @@ const TRIP_EVENT_KINDS = [
   { kind: 'festival', phrases: ['festival', 'festivals'], category: 'events-festivals', terms: [], noun: 'festival' },
   { kind: 'market', phrases: ['farmers market', 'farmers markets', 'market', 'markets'], category: 'markets-fairs', terms: [], noun: 'market' },
   { kind: 'show', phrases: ['theatre', 'theater', 'theatre show', 'play'], category: 'arts-culture', terms: [], noun: 'show' },
+  // 2026-10-19: "a comedy show" is an event that says comedy; "dinner and a show" is any listed performance.
+  { kind: 'comedy', phrases: ['comedy show', 'comedy shows', 'comedy night', 'comedy', 'stand up comedy', 'standup comedy', 'improv', 'comedian', 'comedians'], category: null, terms: ['comedy'], noun: 'comedy show' },
+  { kind: 'performance', phrases: ['a show', 'the show', 'shows', 'magic show', 'drag show'], category: null, terms: [], noun: 'show' },
   { kind: 'event', phrases: ['event', 'events', 'whats on', 'something happening', 'something on'], category: null, terms: [], noun: 'event' },
 ];
 const TRIP_MEALS = {

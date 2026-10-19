@@ -2983,7 +2983,7 @@ window.__scrollToVenueCard = function(name){
   window.__roamTripReplace = function(){
     withdrawUndo();
     trip = [];
-    try { window.localStorage.setItem('okanaganTripDays', '{}'); } catch (e) {}
+    try { window.localStorage.setItem('okanaganTripDays', '{}'); window.localStorage.setItem('okanaganTripTimes', '{}'); } catch (e) {}
     save();
     syncButtons();
     render();

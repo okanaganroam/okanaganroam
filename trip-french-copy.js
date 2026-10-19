@@ -102,8 +102,36 @@ function t3FrenchText(value){
  ];
  // Planner realism pass (2026-10-18).
  phrases.push(['Early evening','Début de soirée'],['Night','Soirée'],['Opening hours, visit lengths and drive times are estimates.','Les horaires, les durées de visite et les trajets sont des estimations.'],['Dinner is the last drive of each day, so nothing after it needs a car.','Le souper est le dernier trajet en voiture de chaque jour; rien après ne demande de voiture.']);
+ // Build My Trip pass 5 (2026-10-19): the notes, reasons and checks still shown in English on /fr.
+ phrases.push(
+  ['Stops are timed against each venue’s listed hours on Okanagan Roam where it has them; hours can change, so check before you go.','Les arrêts sont planifiés selon les horaires indiqués sur Okanagan Roam lorsqu’ils existent; les horaires peuvent changer, alors vérifiez avant de partir.'],
+  ['Stops are checked against each venue’s listed hours on Okanagan Roam where it has them; hours can change, so check before you go.','Les arrêts sont vérifiés selon les horaires indiqués sur Okanagan Roam lorsqu’ils existent; les horaires peuvent changer, alors vérifiez avant de partir.'],
+  ['Budget ranks venues with a known price; venues without price data are never excluded and their price is never inferred.','Le budget classe les lieux dont le prix est connu; les lieux sans prix ne sont jamais exclus et leur prix n’est jamais deviné.'],
+  ['No trip length was given, so this is a one-day plan.','Aucune durée n’a été indiquée : voici un plan d’une journée.'],
+  ['No region was given, so these stops were chosen in the same community, anywhere in the valley.','Aucune région n’a été indiquée : ces arrêts ont été choisis dans une même localité de la vallée.'],
+  ['Some stops have no map location on file; they were chosen within the same community, but their distance from the other stops isn’t measured.','Certains arrêts n’ont pas de position sur la carte; ils ont été choisis dans la même localité, mais leur distance des autres arrêts n’est pas mesurée.'],
+  ['Events aren’t checked for dogs; the dog-friendly requirement applies to the places.','Les événements ne sont pas vérifiés pour les chiens; l’exigence « chiens acceptés » s’applique aux lieux.'],
+  ['No live-music event is listed for those dates, so places with a verified Live Music badge are suggested instead.','Aucun spectacle de musique n’est répertorié à ces dates; des lieux avec le badge vérifié Musique en direct sont proposés à la place.'],
+  ['Price level $ fits your budget preference','Niveau de prix $ : convient à votre budget'],['Price level $$ fits your budget preference','Niveau de prix $$ : convient à votre budget'],['Price level $$$ fits your budget preference','Niveau de prix $$$ : convient à votre budget'],
+  ['A drink first','Un verre pour commencer'],['What to expect','À quoi s’attendre'],['Matched an actual listing.','Correspond à une fiche existante.'],
+  ['live show','spectacle'],['comedy show','spectacle d’humour']
+ );
  for(const [a,b] of phrases)text=text.split(a).join(b);
  text=text.replace(/^Day (\d+): Confirm times before you go\. /,'Jour $1 : confirmez les heures avant de partir. ');
+ const frDay=d=>({Monday:'lundi',Tuesday:'mardi',Wednesday:'mercredi',Thursday:'jeudi',Friday:'vendredi',Saturday:'samedi',Sunday:'dimanche'}[d]||d);
+ const frMon=m=>({January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre','the fall':'l’automne','the off-season':'la basse saison',winter:'l’hiver',spring:'le printemps',summer:'l’été'}[m]||m);
+ text=text.replace(/^Listed hours (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday): /,(_,d)=>'Horaires indiqués le '+frDay(d)+' : ');
+ text=text.replace(/^Day (\d+) is planned as a (\w+)\.$/,(_,n,d)=>'Le jour '+n+' est planifié comme un '+frDay(d)+'.');
+ text=text.replace(/^Hours were checked for (\w+) \(Okanagan time\)\.$/,(_,d)=>'Les horaires ont été vérifiés pour '+frDay(d)+' (heure de l’Okanagan).');
+ text=text.replace(/^Planned for (.+?)(?: \(Okanagan time\))?: seasonal (?:places|activities) such as .+, and nothing is left out for the season alone\.$/,(_,m)=>'Planifié pour '+frMon(m)+' : les lieux saisonniers (plages, activités nautiques, ski, camping, golf extérieur) sont classés selon la période de l’année, sans rien exclure pour la seule saison.');
+ text=text.replace(/^Hours shown are each place’s current listed hours on Okanagan Roam and can change by season, so check them before you go in (.+)\.$/,(_,m)=>'Les horaires affichés sont ceux indiqués actuellement sur Okanagan Roam et peuvent changer selon la saison; vérifiez-les avant de partir en '+frMon(m)+'.');
+ text=text.replace(/^Day (\d+) is planned around your (.+)\.$/,'Le jour $1 est planifié autour de votre demande : $2.');
+ text=text.replace(/^No single region was given, so the plan moves through (.+) from north to south\.$/,(_,t)=>'Aucune région n’a été indiquée : le plan traverse '+t.replace(/ and (?!.* and )/,' et ')+' du nord au sud.');
+ text=text.replace(/^(\d+) days? planned\.$/,(_,n)=>n+(n==='1'?' jour prévu.':' jours prévus.'));
+ text=text.replace(/Found for (\d+) of (\d+) evenings; nothing matching is listed on What’s On for day ([\d, and]+)\./,(_,a,b,d)=>'Trouvé pour '+a+' soirée'+(a==='1'?'':'s')+' sur '+b+'; rien de correspondant n’est répertorié à l’affiche pour le jour '+d.replace(/ and (?!.* and )/,' et ')+'.');
+ text=text.replace(/^No winery with its own kitchen fits lunch on day (\d+)( in (.+))?, so lunch is at a restaurant near the wineries\.$/,(_,d,w,t)=>'Aucun vignoble avec sa propre cuisine ne convient pour le dîner du jour '+d+(t?' à '+t.replace(/ and (?!.* and )/,' et '):'')+'; le dîner est donc dans un restaurant près des vignobles.');
+ text=text.replace(/^Lunch here could not start until ([\d:]+) on (\S+) under its listed hours, so it does not fit a midday meal\. Choose another lunch spot nearby\.$/,'Selon ses horaires indiqués, le dîner ici ne pourrait pas commencer avant $1 le $2; il ne convient donc pas pour le midi. Choisissez un autre endroit à proximité.');
+ text=text.replace(/^(.+): Lunch here could not start until ([\d:]+) on (\S+) under its listed hours, so it does not fit a midday meal\. Choose another lunch spot nearby\.$/,'$1 : selon ses horaires indiqués, le dîner ici ne pourrait pas commencer avant $2 le $3; il ne convient donc pas pour le midi. Choisissez un autre endroit à proximité.');
  text=text.replace(/^No driving after ([\d:]+): dinner is each day’s last drive, and anything after it is a short walk away\.$/,'Pas de voiture après $1 : le souper est le dernier trajet de chaque jour, et ce qui suit est à quelques pas.');
  text=text.replace(/^In (.+), about (\d+) minutes’ drive: nothing in (.+) fits (lunch|dinner) that day$/,(_,t,m,h,meal)=>'À '+t+', à environ '+m+' minutes en voiture : rien à '+h.replace(/ and (?!.* and )/,' et ')+' ne convient pour le '+(meal==='lunch'?'dîner':'souper')+' ce jour-là');
  text=text.replace(/^In (.+), about (\d+) minutes’ drive from (.+)$/,'À $1, à environ $2 minutes en voiture de $3');
@@ -126,7 +154,7 @@ function t3FrenchText(value){
  text=text.replace(/Used instead of (.+) because its listed hours do not fit the estimated sequence\./g,'Choisi à la place de $1, dont les horaires indiqués ne conviennent pas à la séquence estimée.');
  text=text.replace(/No suitable (morning|afternoon|evening) stop was found for day (\d+)( in (.+))?\./g,(_,part,day,where,town)=>'Aucun arrêt approprié '+({morning:'le matin',afternoon:'l’après-midi',evening:'le soir'}[part])+' du jour '+day+(town?' à '+town:'')+'.');
  text=text.replace(/^Nothing matching (.+) is listed in (.+); the closest is (.+) in (.+)\.$/,(_,w,t,n,c)=>'Aucune option correspondant à '+w+' n’est répertoriée à '+t.replace(/ and (?!.* and )/,' et ')+'; la plus proche est '+n+' à '+c+'.');
- text=text.replace(/Nothing matching (.+) was available( in (.+))?\./g,(_,what,where,town)=>'Aucune option correspondant à '+what+(town?' à '+town:'')+' n’était disponible.');
+ text=text.replace(/Nothing matching (.+) was available( in (.+))?\./g,(_,what,where,town)=>'Aucune option correspondant à '+what+(town?' à '+town.replace(/ and (?!.* and )/,' et '):'')+' n’était disponible.');
  text=text.replace(/(Morning|Afternoon|Evening) on day (\d+) is kept free for the event’s listed duration\./g,(_,part,day)=>({Morning:'Le matin',Afternoon:'L’après-midi',Evening:'Le soir'}[part])+' du jour '+day+' reste libre pour la durée indiquée de l’événement.');
  text=text.replace('Reserved for the listed event time.','Réservé pour l’horaire indiqué de l’événement.');
  text=text.replace(/A later assumed start reduces waiting while keeping the same stops and listed opening hours\. Estimated first visit: ([\d:]+)\. Change your request to specify a start time\./g,'Un départ supposé plus tard réduit l’attente tout en conservant les mêmes arrêts et horaires indiqués. Première visite estimée : $1. Précisez une heure de départ dans votre demande.');
@@ -170,6 +198,8 @@ function t3FrenchText(value){
   return 'Selon ses horaires indiqués, il ne convient '+when+' que '+(/[,–]/.test(days)||days==='jours'?'les ':'le ')+days.replace(/^les? /,'')+' — vérifiez le jour de votre visite';
  });
  text=text.replace(/ on (\d{4}-\d{2}-\d{2})/g,' le $1');
+ // ISO dates read as dates (2026-10-19): "le 2026-10-24" -> "le 24 octobre 2026".
+ text=text.replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g,(raw,y,m,d)=>{const mo=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][Number(m)-1];return mo?(Number(d)===1?'1er':String(Number(d)))+' '+mo+' '+y:raw;});
  const words={'Lakeside walk':'Promenade au bord du lac',Cafes:'Cafés',Wineries:'Vignobles',Breweries:'Microbrasseries',Beaches:'Plages',Dinner:'Souper',Supper:'Souper',Lunch:'Dîner',Breakfast:'Déjeuner','Live-music':'Musique en direct','Live music':'Musique en direct',Morning:'Matin',Afternoon:'Après-midi',Evening:'Soir',cafes:'cafés',wineries:'vignobles',walks:'promenades','kid-friendly spots':'endroits adaptés aux enfants','indoor & rainy day spots':'lieux intérieurs et jours de pluie','outdoor destinations':'lieux de plein air','Hiking & Trails':'Randonnées et sentiers','hiking & trails':'randonnées et sentiers','dog-friendly spots':'endroits qui acceptent les chiens','vegetarian-friendly venues':'lieux avec options végétariennes','vegan-friendly venues':'lieux avec options véganes','lake time':'temps au bord du lac','golf courses':'terrains de golf','cocktail lounges':'bars à cocktails','tours & experiences':'visites et expériences',breweries:'microbrasseries',beaches:'plages',daily:'tous les jours','Mon–Thu':'lun.–jeu.','Fri–Sat':'ven.–sam.',Sun:'dim.'};
  for(const [a,b] of Object.entries(words)){if(text===a)text=b;else if(a===a.toLowerCase()||a.includes('–')||a.includes('&'))text=text.replace(new RegExp('\\b'+a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'),b);}
  text=text.replace(/^In (.+), où a lieu l’événement$/, 'À $1, où a lieu l’événement');
@@ -207,6 +237,9 @@ function t3FrenchPlan(plan){
  for(const s of stops)translateStop(s);
  if(p.events)p.events=p.events.map(t3FrenchEvent);
  for(const i of p.requirementResults||[])if(i.reason)i.reason=t3FrenchText(i.reason);
+ for(const d of p.days||[]){if(d.confirmNote)d.confirmNote=t3FrenchText(d.confirmNote);if(d.mealNote)d.mealNote=t3FrenchText(d.mealNote);}
+ if(p.experience?.title)p.experience.title=t3FrenchText(p.experience.title);
+ if(p.understood&&Array.isArray(p.understood.notUsed))p.understood.notUsed=p.understood.notUsed.map(t3FrenchText);
  p.warnings=(p.warnings||[]).map(t3FrenchText);p.notes=(p.notes||[]).map(t3FrenchText);p.contextNotes=(p.contextNotes||[]).map(t3FrenchText);
  const names=stops.map(s=>s.venue?.name||s.event?.name).filter(Boolean);
  if(names.length){

@@ -155,6 +155,20 @@ function t3EditLosesMatch(previous,next) {
   });
 }
 
+// What the visitor asked for that the plan could not use (2026-10-19): the "not used" words and anything the planner
+// reported as unsupported, once each.
+// "Drive from Kelowna to Penticton: about 42–50 min (estimate)" (2026-10-19).
+function t3DriveText(leg, lang) {
+  if (!leg || !leg.fromLabel || !leg.toLabel) return '';
+  var fr = lang === 'fr', a = leg.minMinutes, b = leg.maxMinutes;
+  var mins = a && b && a !== b ? (fr ? a + ' à ' + b : a + '–' + b) : String(b || a);
+  return fr ? 'Trajet de ' + leg.fromLabel + ' à ' + leg.toLabel + ' : environ ' + mins + ' min (estimation)' : 'Drive from ' + leg.fromLabel + ' to ' + leg.toLabel + ': about ' + mins + ' min (estimate)';
+}
+function t3DroppedRequests(p) {
+  var out = [];
+  ((p && p.understood && p.understood.notUsed) || []).concat((p && p.unsupported) || []).forEach(function(w){ w = String(w || '').trim(); if (w && out.indexOf(w) === -1) out.push(w); });
+  return out;
+}
 // Straight-line kilometres between two stored coordinates, or null.
 function t3Km(a, b) {
   const ok = (v) => v && typeof v.latitude === 'number' && typeof v.longitude === 'number' && isFinite(v.latitude) && isFinite(v.longitude);
@@ -327,7 +341,7 @@ function t3DayPinLayout(points, assets) {
   const fits = pins.every((q) => Math.abs(q.d.dx) <= LIMIT.desktop.x && Math.abs(q.d.dy) <= LIMIT.desktop.y && Math.abs(q.w.dx) <= LIMIT.narrow.x && Math.abs(q.w.dy) <= LIMIT.narrow.y);
   return { fits, pins };
 }
-const CLIENT_HELPERS_SRC = [t3LocalTimes, t3DayPinLayout, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
@@ -512,6 +526,8 @@ function renderStyles() {
   .t3-stop:last-child .t3-when::after { display: none; }
   .t3-leg { list-style: none; margin-left: 126px; font-size: 0.8rem; font-weight: 700; color: rgba(27,43,58,0.62); padding: 8px 0 8px 4px; }
   .t3-leg::before { content: "\\2193  "; }
+  .t3-leg-drive { color: rgba(27,43,58,0.78); }
+  p.t3-drive-in { margin: 12px 0 0 126px; padding: 0 0 0 4px; }
   .t3-card { background: #fff; border-radius: 14px; padding: 16px 18px 14px; box-shadow: 0 12px 26px -20px rgba(27,43,58,0.5); border: 1px solid rgba(27,43,58,0.06); }
   .t3-card.is-kept { border-color: var(--ref-gold); box-shadow: 0 0 0 1px var(--ref-gold), 0 12px 26px -20px rgba(27,43,58,0.5); }
   .t3-card-top { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(27,43,58,0.6); }
@@ -654,7 +670,7 @@ function renderStyles() {
     .t3-stop { grid-template-columns: 1fr; gap: 6px; }
     .t3-when { padding-top: 6px; }
     .t3-when::after { display: none; }
-    .t3-leg { margin-left: 0; }
+    .t3-leg { margin-left: 0; } p.t3-drive-in { margin-left: 0; }
     .t3-plan-head { padding: 20px 18px 16px; border-radius: 14px; }
     .t3-plan-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .t3-plan-actions .t3-btn { min-width: 0; padding: 10px 12px; justify-content: center; text-align: center; }
@@ -1203,6 +1219,7 @@ function renderScript(d) {
     }
     if (u.season) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(u.season.label) + '</li>');
     else if (u.when) chips.push('<li class="t3-chip"><span class="t3-chip-label">' + esc(tx('tripv3.when')) + '</span>' + esc(u.when) + '</li>');
+    if (u.budget) chips.push('<li class="t3-chip">' + esc(lang() === 'fr' ? ({ budget: 'Petit budget', moderate: 'Prix moyens', upscale: 'Haut de gamme' }[u.budget] || u.budget) : ({ budget: 'On a budget', moderate: 'Mid-range prices', upscale: 'Upscale' }[u.budget] || u.budget)) + '</li>');
     if (u.occasion) chips.push('<li class="t3-chip">' + esc(frLabel(OCCASION_KEYS[u.occasion], u.occasion.charAt(0).toUpperCase() + u.occasion.slice(1))) + '</li>');
     (u.party || []).forEach(function(x){ chips.push('<li class="t3-chip">' + esc(frLabel(PARTY_KEYS[x], x.charAt(0).toUpperCase() + x.slice(1))) + '</li>'); });
     // A word the visitor typed (“pizza”) shows as a plain chip, “Pizza”, like the others.
@@ -1245,7 +1262,9 @@ function renderScript(d) {
       }
       if (prev) {
         var km = kmText(t3Km(prev.venue, s.venue));
-        if (km) html += '<li class="t3-leg" aria-label="' + esc(tx('tripv3.distanceLabel')) + '">' + esc(km) + '</li>';
+        // A stop in another town shows the drive there (2026-10-19), not only the straight-line distance.
+        var drive = s.driveFrom ? t3DriveText(s.driveFrom, lang()) : '';
+        if (km || drive) html += '<li class="t3-leg' + (drive ? ' t3-leg-drive' : '') + '" aria-label="' + esc(tx('tripv3.distanceLabel')) + '">' + esc(drive ? drive + (km ? ' \u00b7 ' + km : '') : km) + '</li>';
       }
       html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div>' + cardHtml(s, key, { planStop: true, counts: counts, swapId: !key }) + '</div></li>';
       prev = s;
@@ -1364,6 +1383,7 @@ function renderScript(d) {
       + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>');
     return '<section class="t3-day" id="t3-day-' + d.day + '" aria-labelledby="t3-day-title-' + d.day + '">'
       + head
+      + (d.driveIn ? '<p class="t3-leg t3-leg-drive t3-drive-in">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
       + '</section>';
   }
@@ -1386,10 +1406,18 @@ function renderScript(d) {
     if(repeated.length)html+='<details class="t3-warnings"><summary>'+(lang()==='fr'?'Détails horaires déjà indiqués avec vos arrêts':'Timing details already shown with your stops')+' ('+repeated.length+')</summary>'+list(repeated)+'</details>';
     return html;
   }
+  function droppedHtml(p, fr){
+    var dropped = t3DroppedRequests(p);
+    if (!dropped.length) return '';
+    var q = function(w){ return (fr ? '«\u00a0' : '“') + esc(w) + (fr ? '\u00a0»' : '”'); };
+    return '<details open><summary>' + esc(fr ? 'Non utilisé' : 'Not used') + ' (' + dropped.length + ')</summary><ul>' + dropped.map(function(w){ return '<li>' + q(w) + ' — ' + esc(fr ? 'le planificateur n’a pas pu l’appliquer à ce plan' : 'the planner couldn’t apply this to the plan') + '</li>'; }).join('') + '</ul></details>';
+  }
   // When every request matched, the check is good news, not a warning: one quiet line that opens to the details.
   function requirementSummaryBlock(p){
     var html = requirementSummaryHtml(p);
     var checks = p.requirementResults || [];
+    // A request the planner could not use (2026-10-19) means it is not "all matched": the checks stay open and list it.
+    if (html && t3DroppedRequests(p).length) return html.slice(0, html.length - ('</' + 'section>').length) + droppedHtml(p, lang() === 'fr') + '</' + 'section>';
     if (!html || !checks.every(function(i){ return i.status === 'satisfied'; })) return html;
     var fr = lang() === 'fr';
     var h3End = html.indexOf('</' + 'h3>');
@@ -1476,7 +1504,10 @@ function renderScript(d) {
         if(row.notScheduledMeal)detail.push(french?'Aucun restaurant ne convient avant l’événement.':'No restaurant fits before the event.');
         else if(row.status==='unmet')detail.push(french?'Conflit d’horaire':'Timing conflict');
         var nextRow=timeline[n+1],lastOfDay=!nextRow||nextRow.day!==row.day;
-        return '<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+time)+'</strong><br>'+esc(row.notScheduledMeal?(french?'Souper non planifié':'Dinner not scheduled'):row.name)+(detail.length?'<br><small>'+esc(detail.join(' · '))+'</small>':'')+'</li>'
+        // The drive from the last town opens a road-trip day (2026-10-19), with when to leave when the first stop is timed.
+        var dayRow=(n===0||timeline[n-1].day!==row.day)?(p.days||[]).filter(function(x){return x.day===row.day;})[0]:null;
+        var driveLi=dayRow&&dayRow.driveIn?'<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+(Number.isFinite(row.startMinutes)&&!row.notScheduledMeal?(french?'départ vers ':'leave about ')+clock(Math.max(0,row.startMinutes-dayRow.driveIn.maxMinutes)):(french?'avant le premier arrêt':'before the first stop')))+'</strong><br>'+esc(t3DriveText(dayRow.driveIn,lang()))+'</li>':'';
+        return driveLi+'<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+time)+'</strong><br>'+esc(row.notScheduledMeal?(french?'Souper non planifié':'Dinner not scheduled'):row.name)+(detail.length?'<br><small>'+esc(detail.join(' · '))+'</small>':'')+'</li>'
           +(lastOfDay&&confirmDays[row.day]?'<li class="t3-confirm-day" style="margin:0 0 1rem;list-style:none"><small>'+esc(french?'Jour '+row.day+' : confirmez les heures avant de partir.':'Day '+row.day+': Confirm times before you go.')+'</small></li>':'');
       }).join('')+'</ol></section>';
     }
@@ -1646,6 +1677,25 @@ function renderScript(d) {
         if (ref && d > 0 && b.classList.contains('in-trip') && !(offset && dayMap[ref] > 0)) dayMap[ref] = d + (offset || 0);
       });
       localStorage.setItem('okanaganTripDays', JSON.stringify(dayMap));
+      // The plan's dates and times go with them (2026-10-19): ref -> { d: date, s: start, e: end } (minutes), so
+      // /my-trip shows "Day 1 · Sat, Oct 24" and each stop's planned time.
+      var timeMap = {};
+      try { timeMap = JSON.parse(localStorage.getItem('okanaganTripTimes') || '{}') || {}; } catch (e2) { timeMap = {}; }
+      if (typeof timeMap !== 'object' || Array.isArray(timeMap)) timeMap = {};
+      var rows = (state.last && state.last.schedule) || [];
+      buttons.forEach(function(b){
+        var ref = b.getAttribute('data-trip-ref'), d = parseInt(b.getAttribute('data-plan-day'), 10);
+        if (!ref || !(d > 0) || !b.classList.contains('in-trip') || (offset && timeMap[ref])) return;
+        var m = /^(venue|event):(\\d+)$/.exec(ref);
+        var row = m && rows.filter(function(r){ return r.day === d && (m[1] === 'venue' ? r.venueId : r.eventId) === Number(m[2]); })[0];
+        var date = row && row.date || ((state.last && state.last.days) || []).filter(function(x){ return x.day === d; }).map(function(x){ return x.date; })[0];
+        if (!date && !row) return;
+        var t = {};
+        if (/^\\d{4}-\\d{2}-\\d{2}$/.test(date || '')) t.d = date;
+        if (row && Number.isFinite(row.startMinutes) && row.status !== 'unmet') { t.s = row.startMinutes; if (Number.isFinite(row.endMinutes)) t.e = row.endMinutes; }
+        if (t.d || t.s != null) timeMap[ref] = t;
+      });
+      localStorage.setItem('okanaganTripTimes', JSON.stringify(timeMap));
     } catch (e) {}
     if (window.__roamTripRender) window.__roamTripRender();
   }
@@ -2051,4 +2101,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3LocalTimes, t3DayPinLayout, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
