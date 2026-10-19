@@ -12605,7 +12605,9 @@ const BANNER_HERO_HOLD_HEAD = `<style id="hero-first-cards">html.hf li.venue-car
 function withBannerHeroFirst(html) {
   if (typeof html !== 'string' || html.indexOf('window.roamAfterHero = ') !== -1) return html;
   const body = /<body class="([^"]*)"/.exec(html);
-  if (!body || !/(^|\s)fd-page(\s|$)/.test(body[1])) return html;
+  // Round 9 (2026-10-19): the guides (body.ski-guide-page) and /whats-on (body.whatson-page) too. Their banners sent
+  // phones the 1200px or 1600px photo (352 KB on /guides/fall-okanagan); they get the same 800px phone <source>.
+  if (!body || !/(^|\s)(?:fd-page|ski-guide-page|whatson-page)(\s|$)/.test(body[1])) return html;
   const m = BANNER_HERO_IMG_RE.exec(html);
   if (!m || !/<meta name="viewport"[^>]*>/i.test(html)) return html;
   const [whole, open, img, , srcset, sizes] = m;
@@ -13197,13 +13199,15 @@ function imageHashes(url) {
   const now = Date.now();
   const memo = imageVersionMemo.get(url);
   if (memo && now - memo.at < 60000) return memo.h ? memo : null;
+  // Round 9 (2026-10-19): owner and visitor uploads (and their smaller copies) are on the volume, not in public/.
+  const file = uploadedPhotoFilePath(url) || path.join(__dirname, 'public', url);
   let st;
-  try { st = fs.statSync(path.join(__dirname, 'public', url)); } catch (e) { imageVersionMemo.set(url, { h: null, at: now }); return null; }
+  try { st = fs.statSync(file); } catch (e) { imageVersionMemo.set(url, { h: null, at: now }); return null; }
   if (!st.isFile()) return null;
   if (memo && memo.h && memo.size === st.size && memo.mtime === st.mtimeMs) { memo.at = now; return memo; }
   let h = null, sha = null;
   try {
-    const buf = fs.readFileSync(path.join(__dirname, 'public', url));
+    const buf = fs.readFileSync(file);
     h = crypto.createHash('md5').update(buf).digest('hex');
     sha = crypto.createHash('sha256').update(buf).digest('hex');
   } catch (e) { /* unreadable: leave the URL plain */ }
@@ -15358,6 +15362,9 @@ const PHOTO_SIZE_FILES = (() => {
   return set;
 })();
 function photoSized(src, width) {
+  // Owner uploads (2026-10-19, round 9): their copies are on the volume (see OWNER_PHOTO_SIZES), checked per file.
+  const own = /^\/images\/owner\/([a-z0-9]{24})\.jpg(?:\?[^#]*)?$/.exec(String(src || ''));
+  if (own) return ownerPhotoHasCopy(`${own[1]}.jpg`, width) ? `/images/owner/${own[1]}-w${width}.jpg` : src;
   const m = /^(\/images\/(?:venues|hiking\/venues|beaches\/venues|sports\/venues)\/[^?#]+?)\.(?:jpe?g|png|webp)(\?[^#]*)?$/i.exec(String(src || ''));
   if (!m) return src;
   const sized = `${m[1]}-w${width}.jpg`;
@@ -36082,15 +36089,99 @@ const OWNER_PHOTO_DIR = process.env.OWNER_PHOTO_DIR
   || (fs.existsSync('/data') ? '/data/owner-photos' : path.join(__dirname, '.owner-photos-local'));
 const OWNER_PHOTO_MAX_BYTES = 3 * 1024 * 1024; // decoded JPEG
 const OWNER_PHOTO_MAX_BODY = 4 * 1024 * 1024 + 4096; // base64 + fields
+// An owner upload may also carry the photo's smaller copies (round 9, 2026-10-19; about 0.5 MB together).
+const OWNER_PHOTO_UPLOAD_MAX_BODY = OWNER_PHOTO_MAX_BODY + 2 * 1024 * 1024;
 const OWNER_PHOTO_MIN_EDGE = 800;
 const OWNER_PHOTO_MAX_EDGE = 2400;
 const OWNER_PHOTO_PENDING_LIMIT = 12; // per venue, waiting for review
 const OWNER_PHOTO_RATE_LIMIT = 30;
-const OWNER_PHOTO_KEYS = new Set(['image', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at']);
+const OWNER_PHOTO_KEYS = new Set(['image', 'image_w480', 'image_w960', 'image_w1200', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at']);
 
 function ownerPhotoPath(file) {
   if (!/^[a-z0-9]{24}\.jpg$/.test(file)) return null;
   return path.join(OWNER_PHOTO_DIR, file);
+}
+
+// Smaller copies of uploaded photos (2026-10-19, round 9): an owner photo was served only as its 1600px original
+// (180-470 KB), so a phone took 1.6 MB of photos on Red Rooster's page (LCP 10.5 s) and /browse used the original as
+// a card background. Each photo can now have <name>-w480.jpg (cards, thumbnails), <name>-w960.jpg (the venue photo
+// on phones) and <name>-w1200.jpg (computers) beside it on the volume. The browser makes them with canvas when the
+// owner uploads (free, no image library on the server); photos sent before that get them from
+// scripts/owner-photo-copies.js (Dayton runs it on his Mac with sips) through /admin/owner-photos/:id/sizes. A copy is
+// only ever listed in a page once its file exists, so a photo without copies keeps its original and nothing breaks.
+const OWNER_PHOTO_SIZES = [480, 960, 1200];
+const OWNER_COPY_MAX_BYTES = 1024 * 1024;
+function ownerPhotoCopyFile(file, width) {
+  const m = /^([a-z0-9]{24})\.jpg$/.exec(String(file || ''));
+  return m && OWNER_PHOTO_SIZES.includes(Number(width)) ? `${m[1]}-w${Number(width)}.jpg` : null;
+}
+function ownerPhotoCopyPath(file, width) {
+  const copy = ownerPhotoCopyFile(file, width);
+  return copy ? path.join(OWNER_PHOTO_DIR, copy) : null;
+}
+const ownerCopyMemo = new Map(); // "<file>|<width>" -> true/false
+function ownerPhotoHasCopy(file, width) {
+  const key = `${file}|${width}`;
+  if (!ownerCopyMemo.has(key)) {
+    const fp = ownerPhotoCopyPath(file, width);
+    let ok = false;
+    try { ok = !!fp && fs.statSync(fp).isFile(); } catch (e) { ok = false; }
+    ownerCopyMemo.set(key, ok);
+  }
+  return ownerCopyMemo.get(key);
+}
+function forgetOwnerPhotoCopies(file) {
+  for (const w of OWNER_PHOTO_SIZES) ownerCopyMemo.delete(`${file}|${w}`);
+  for (const u of [`/images/owner/${file}`, ...OWNER_PHOTO_SIZES.map((w) => `/images/owner/${ownerPhotoCopyFile(file, w)}`)]) imageVersionMemo.delete(u);
+}
+function deleteOwnerPhotoCopies(file) {
+  for (const w of OWNER_PHOTO_SIZES) {
+    const fp = ownerPhotoCopyPath(file, w);
+    if (fp) { try { fs.unlinkSync(fp); } catch (e) { /* none made */ } }
+  }
+  forgetOwnerPhotoCopies(file);
+}
+// The file on the volume for an /images/owner/ or /images/visitor/ URL (the original or one of its copies), else
+// null. Used for the ?v= hash and the width/height attributes; the routes still check the photo is approved.
+function uploadedPhotoFilePath(url) {
+  const m = /^\/images\/(?:owner|visitor)\/([a-z0-9]{24})(-w(?:480|960|1200))?\.jpg$/.exec(String(url || ''));
+  return m ? path.join(OWNER_PHOTO_DIR, `${m[1]}${m[2] || ''}.jpg`) : null;
+}
+// A copy the browser or the backfill script sent: a JPEG data URL `width` pixels wide (or the original's own width
+// when that is narrower), the original's shape (within 2%), at most 1 MB, metadata removed. -> Buffer or null.
+function validOwnerPhotoCopy(dataUrl, width, original) {
+  const m = typeof dataUrl === 'string' ? /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl) : null;
+  if (!m || !original || !original.width || !original.height) return null;
+  const raw = Buffer.from(m[1], 'base64');
+  const buf = raw.length <= OWNER_COPY_MAX_BYTES ? stripJpegMetadata(raw) : null;
+  const d = buf ? jpegDimensions(buf) : null;
+  if (!d || !d.width || !d.height) return null;
+  if (Math.abs(d.width - Math.min(width, original.width)) > 2) return null;
+  if (Math.abs(d.width / d.height - original.width / original.height) > 0.02 * (original.width / original.height)) return null;
+  return buf;
+}
+// Writes the valid copies in `copies` ({ w480, w960, w1200 } data URLs) for one stored photo. A size at or above
+// the original's width is skipped (the original is already that size). replace: overwrite a copy that exists.
+// -> { written: [widths], skipped: [widths], invalid: [widths] }
+function saveOwnerPhotoCopies(file, original, copies, { replace = false } = {}) {
+  const out = { written: [], skipped: [], invalid: [] };
+  if (!copies || typeof copies !== 'object' || !ownerPhotoPath(file)) return out;
+  for (const w of OWNER_PHOTO_SIZES) {
+    const value = copies[`w${w}`];
+    if (value == null) continue;
+    if (w >= original.width) { out.skipped.push(w); continue; }
+    const buf = validOwnerPhotoCopy(value, w, original);
+    if (!buf) { out.invalid.push(w); continue; }
+    try {
+      fs.writeFileSync(ownerPhotoCopyPath(file, w), buf, { flag: replace ? 'w' : 'wx' });
+      out.written.push(w);
+    } catch (err) {
+      if (err && err.code === 'EEXIST') out.skipped.push(w);
+      else { console.error(`[owner-photos] writing the ${w}px copy of ${file} failed: ${err.message}`); out.invalid.push(w); }
+    }
+  }
+  forgetOwnerPhotoCopies(file);
+  return out;
 }
 
 // Width and height from a JPEG's start-of-frame marker, or null if the bytes
@@ -36122,7 +36213,8 @@ function imgDimsAttr(src) {
   if (!imageDimsCache.has(p)) {
     let d = null;
     try {
-      const fd = fs.openSync(path.join(__dirname, 'public', p), 'r');
+      // Round 9 (2026-10-19): owner and visitor uploads live on the volume, not in public/.
+      const fd = fs.openSync(uploadedPhotoFilePath(p) || path.join(__dirname, 'public', p), 'r');
       try { const buf = Buffer.alloc(65536); const n = fs.readSync(fd, buf, 0, buf.length, 0); d = jpegDimensions(buf.subarray(0, n)); } finally { fs.closeSync(fd); }
     } catch (e) { d = null; }
     imageDimsCache.set(p, d && d.width && d.height ? ` width="${d.width}" height="${d.height}"` : '');
@@ -36211,7 +36303,13 @@ function venueGalleryHtml(venue, photos, L) {
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
     return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy">${more}</button>`;
   }).join('');
-  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(String(p.credit).replace(/^\s*photos?\s*:\s*/i, ''))}</figcaption>` : ''}</figure>`).join('');
+  // Round 9 (2026-10-19): the full-screen viewer lists the smaller copies too, so a phone takes the 960px one.
+  const slideSrcset = (src) => {
+    const w = Number((/width="(\d+)"/.exec(imgDimsAttr(src)) || [])[1]) || 0;
+    const list = [960, 1200].filter((x) => x < w).map((x) => [photoSized(src, x), x]).filter(([u]) => u !== src);
+    return list.length ? ` srcset="${list.map(([u, x]) => `${escapeHtml(u)} ${x}w`).join(', ')}, ${escapeHtml(src)} ${w}w" sizes="100vw"` : '';
+  };
+  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${slideSrcset(p.src)}${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(String(p.credit).replace(/^\s*photos?\s*:\s*/i, ''))}</figcaption>` : ''}</figure>`).join('');
   return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
       <dialog class="vg-dialog" id="venueGallery" aria-label="${L(`Photos of ${name}`, `Photos de ${name}`)}">
         <div class="vg-bar"><span class="vg-count" aria-live="polite">1 / ${n}</span><button type="button" class="vg-close" aria-label="${L('Close photos', 'Fermer les photos')}">&times;</button></div>
@@ -36306,7 +36404,7 @@ async function handleOwnerPhotoUpload(req, res, token) {
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
   let body;
   try {
-    body = await readLimitedJsonBody(req, OWNER_PHOTO_MAX_BODY);
+    body = await readLimitedJsonBody(req, OWNER_PHOTO_UPLOAD_MAX_BODY);
   } catch (err) {
     return sendSubmissionResponse(res, err.status === 413 ? 413 : 400, { ok: false, error: err.status === 413 ? 'That photo is too large.' : generic }, err.status === 413);
   }
@@ -36346,6 +36444,9 @@ async function handleOwnerPhotoUpload(req, res, token) {
     console.error(`[owner-photos] writing ${file} for venue #${venue.id} failed: ${err.message}`);
     return sendSubmissionResponse(res, 500, { ok: false, error: generic });
   }
+  // The smaller copies the browser made (round 9, 2026-10-19). A missing or bad one is skipped, never an error:
+  // the page then uses the original, and the backfill script can add it later.
+  saveOwnerPhotoCopies(file, dims, { w480: body.image_w480, w960: body.image_w960, w1200: body.image_w1200 });
   const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
   const id = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, contact_name, contact_email, rights_confirmed_at, ip_hash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`).run(venue.id, file, previewKey, dims.width, dims.height, buf.length, credit, contactName, contact.email,
@@ -39838,6 +39939,7 @@ function rejectOwnerPhoto(id, reviewer, reason) {
   db.prepare("UPDATE owner_photos SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
     .run(reviewer, String(reason || '').slice(0, 300) || null, id);
   try { fs.unlinkSync(ownerPhotoPath(p.file)); } catch (err) { /* already gone */ }
+  deleteOwnerPhotoCopies(p.file); // round 9 (2026-10-19): its smaller copies too
   return { ok: true };
 }
 
@@ -39865,7 +39967,37 @@ function removeOwnerPhoto(id, reviewer, reason) {
   db.prepare("UPDATE owner_photos SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?")
     .run(reviewer, String(reason || 'removed').slice(0, 300), id);
   try { fs.unlinkSync(ownerPhotoPath(p.file)); } catch (err) { /* already gone */ }
+  deleteOwnerPhotoCopies(p.file); // round 9 (2026-10-19): its smaller copies too
   return { ok: true, was_main: wasMain };
+}
+
+// The approved owner photos with the copies each has and still needs (round 9, 2026-10-19). A copy is needed only
+// below the original's width.
+function ownerPhotoOriginalDims(row) {
+  let d = null;
+  try { d = jpegDimensions(fs.readFileSync(ownerPhotoPath(row.file))); } catch (e) { d = null; }
+  return d || (row.width && row.height ? { width: row.width, height: row.height } : null);
+}
+function ownerPhotoSizesList() {
+  return db.prepare("SELECT id, venue_id, file, width, height FROM owner_photos WHERE status = 'approved' ORDER BY id").all().map((r) => {
+    const has = OWNER_PHOTO_SIZES.filter((w) => ownerPhotoHasCopy(r.file, w));
+    const needs = OWNER_PHOTO_SIZES.filter((w) => w < (r.width || 0) && !has.includes(w));
+    return { id: r.id, venue_id: r.venue_id, file: r.file, url: `/images/owner/${r.file}`, width: r.width, height: r.height,
+      file_present: !!ownerPhotoPath(r.file) && fs.existsSync(ownerPhotoPath(r.file)), has, needs };
+  });
+}
+// body: { w480, w960, w1200 (JPEG data URLs), replace?: true } -> { status, body }
+function saveOwnerPhotoCopiesById(id, body) {
+  const row = db.prepare('SELECT id, file, status, width, height FROM owner_photos WHERE id = ?').get(id);
+  if (!row) return { status: 404, body: { error: 'not_found' } };
+  if (row.status !== 'approved') return { status: 409, body: { error: 'not_approved', status: row.status } };
+  if (!fs.existsSync(ownerPhotoPath(row.file))) return { status: 410, body: { error: 'file_missing' } };
+  const dims = ownerPhotoOriginalDims(row);
+  if (!dims) return { status: 410, body: { error: 'file_unreadable' } };
+  const extra = Object.keys(body).filter((k) => !['w480', 'w960', 'w1200', 'replace'].includes(k));
+  if (extra.length) return { status: 400, body: { error: `Unknown fields: ${extra.join(', ')}` } };
+  const r = saveOwnerPhotoCopies(row.file, dims, body, { replace: body.replace === true });
+  return { status: r.invalid.length && !r.written.length ? 400 : 200, body: { id, file: row.file, ...r, has: OWNER_PHOTO_SIZES.filter((w) => ownerPhotoHasCopy(row.file, w)) } };
 }
 
 function sendOwnerPhotoFile(res, file, headers) {
@@ -44701,7 +44833,19 @@ ${ownerFooterHtml(fr)}
         var c = document.createElement('canvas');
         c.width = Math.round(w * scale); c.height = Math.round(h * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/jpeg', 0.85));
+        // Round 9 (2026-10-19): 480, 960 and 1200px wide copies go with the photo, so phones and cards get a small one.
+        var out = { image: c.toDataURL('image/jpeg', 0.85) };
+        [480, 960, 1200].forEach(function(cw){
+          if (cw >= c.width) return;
+          try {
+            var s = document.createElement('canvas'), sc = s.getContext('2d');
+            s.width = cw; s.height = Math.round(c.height * cw / c.width);
+            sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = 'high';
+            sc.drawImage(c, 0, 0, s.width, s.height);
+            out['image_w' + cw] = s.toDataURL('image/jpeg', 0.72);
+          } catch (e) { /* the original alone still works */ }
+        });
+        resolve(out);
       };
       img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('read')); };
       img.src = url;
@@ -44722,9 +44866,9 @@ ${ownerFooterHtml(fr)}
     files.forEach(function(file, i){
       chain = chain.then(function(){
         progress.textContent = T.uploading.replace('{i}', i + 1).replace('{n}', files.length);
-        return resize(file).then(function(dataUrl){
+        return resize(file).then(function(made){
           return fetch(location.pathname + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ image: dataUrl, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
+            body: JSON.stringify({ image: made.image, image_w480: made.image_w480, image_w960: made.image_w960, image_w1200: made.image_w1200, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
             .then(function(r){ return r.json(); })
             .then(function(j){
               if (j && j.ok) { sent++; if (j.live) liveCount++; return; }
@@ -45863,11 +46007,19 @@ const server = http.createServer(async (req, res) => {
           ...(row.kind === 'pdf' ? { 'Content-Security-Policy': "frame-ancestors 'self'" } : {}) });
         return res.end(buf);
       }
-      const im = /^\/images\/owner\/([a-z0-9]{24}\.jpg)$/.exec(pathname);
+      // Round 9 (2026-10-19): also the photo's smaller copies (<name>-w480/-w960/-w1200.jpg), and a URL carrying the
+      // file's own ?v= hash (what withVersionedImages writes) is kept for a year like every other image.
+      const im = /^\/images\/owner\/([a-z0-9]{24})(?:-w(480|960|1200))?\.jpg$/.exec(pathname);
       if (im && method === 'GET') {
-        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(im[1]);
+        const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(`${im[1]}.jpg`);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'public, max-age=86400' });
+        const cache = { 'Cache-Control': imageVersionMatches(pathname, query.v) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' };
+        if (!im[2]) return sendOwnerPhotoFile(res, row.file, cache);
+        let buf = null;
+        try { buf = fs.readFileSync(ownerPhotoCopyPath(row.file, Number(im[2]))); } catch (e) { buf = null; }
+        if (!buf) { res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }); return res.end('Not found'); }
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', ...cache });
+        return res.end(buf);
       }
       // Visitor photos (2026-10-17): private previews while waiting for review, public once approved.
       const vp = /^\/visitor-photos\/preview\/([A-Za-z0-9_-]{24})\.jpg$/.exec(pathname);
@@ -45882,7 +46034,7 @@ const server = http.createServer(async (req, res) => {
         const row = db.prepare(`SELECT p.file FROM visitor_contribution_photos p JOIN visitor_contributions c ON c.id = p.contribution_id
           WHERE p.file = ? AND c.status = 'approved'`).get(vi[1]);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
-        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': 'public, max-age=86400' });
+        return sendOwnerPhotoFile(res, row.file, { 'Cache-Control': imageVersionMatches(pathname, query.v) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400' });
       }
     }
     // Visitor photos & tips, token API (2026-10-17): the same bearer check and
@@ -45902,6 +46054,23 @@ const server = http.createServer(async (req, res) => {
         const reviewer = validateReviewer(body.reviewer);
         if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
         const out = await visitorAdminAction(Number(m[1]), m[2], body, reviewer);
+        return sendJSON(res, out.status, out.body);
+      }
+    }
+    // Smaller copies backfill (2026-10-19, round 9): scripts/owner-photo-copies.js lists the approved owner photos
+    // and the copies each still needs, makes them on Dayton's Mac and sends them here. Bearer token, like the rest.
+    if (pathname === '/admin/owner-photos/sizes' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      return sendJSON(res, 200, { sizes: OWNER_PHOTO_SIZES, photos: ownerPhotoSizesList() });
+    }
+    {
+      const m = /^\/admin\/owner-photos\/(\d+)\/sizes$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!requireAdminToken(req, res)) return;
+        let body;
+        try { body = await readLimitedJsonBody(req, 4 * 1024 * 1024); } catch (err) { return sendJSON(res, err.status === 413 ? 413 : 400, { error: err.status === 413 ? 'Body too large.' : 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const out = saveOwnerPhotoCopiesById(Number(m[1]), body);
         return sendJSON(res, out.status, out.body);
       }
     }
