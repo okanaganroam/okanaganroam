@@ -108,3 +108,19 @@ test('French conditional dinner window preserves uncertainty and times',()=>{
  const text=t3FrenchText('Possible dinner arrival window 20:00–22:30, if travel permits. Allows 90 minutes for dinner within listed opening hours. This is not a scheduled visit: confirm the event-to-restaurant journey and kitchen service before booking.');
  assert.match(text,/20 h–22 h 30/);assert.match(text,/si le trajet le permet/);assert.match(text,/90 minutes/);assert.match(text,/Aucune visite n’est programmée/);assert.match(text,/service en cuisine/);assert.doesNotMatch(text,/Possible dinner|Allows|scheduled visit/);
 });
+test('French planner copy runs in the browser with a season or month (2026-10-19: FR_SEASON_WORDS was not shipped)',()=>{
+ const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+ const fr=require('../trip-french-copy');
+ const pageSrc=fs.readFileSync(path.join(__dirname,'..','trip-planner-v3-page.js'),'utf8');
+ assert.match(pageSrc,/var FR_MONTHS_BY_EN = \$\{JSON\.stringify\(FR_MONTHS_BY_EN\)\}/);
+ assert.match(pageSrc,/var FR_SEASON_WORDS = \$\{JSON\.stringify\(FR_SEASON_WORDS\)\}/);
+ // Same shape as the page: the lookups, then the functions as source text, in a fresh context.
+ const src='var FR_MONTHS_BY_EN = '+JSON.stringify(fr.FR_MONTHS_BY_EN)+';\nvar FR_SEASON_WORDS = '+JSON.stringify(fr.FR_SEASON_WORDS)+';\n'
+  +fr.t3FrenchText.toString()+'\n'+fr.t3FrenchEvent.toString()+'\n'+fr.t3FrenchPlan.toString()+'\nthis.run=t3FrenchPlan;';
+ const ctx={};vm.createContext(ctx);vm.runInContext(src,ctx);
+ const fall=ctx.run({summary:'3 days in Kelowna',understood:{season:{label:'fall'}},itinerary:{stops:[]}});
+ assert.equal(fall.understood.season.label,'Automne');
+ const jan=ctx.run({summary:'3 days in Kelowna',understood:{season:{label:'January'}},contextNotes:['The Okanagan’s ski hills usually run from December to early April, so skiing isn’t part of this July plan.'],itinerary:{stops:[]}});
+ assert.equal(jan.understood.season.label,'Janvier');
+ assert.match(JSON.stringify(jan),/juillet/);
+});
