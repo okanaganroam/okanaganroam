@@ -24325,7 +24325,8 @@ test("Lighter pages: What's On ships its first page of events and every other it
       const first = items(list), rest = items(tpl);
       const shownFirst = first.filter((x) => !x.head);
       assert.ok(shownFirst.every((x) => !x.hidden), `${p}: only shown events in the HTML`);
-      const shownAll = (page.match(/<li class="venue-card whatson-event-card" data-venue-id/g) || []).length;
+      // Search pass 5 (2026-10-19): today's events that are already over fold into "Earlier today", outside the first page.
+      const shownAll = (page.match(/<li class="venue-card whatson-event-card" data-venue-id[^>]*>/g) || []).filter((t) => !t.includes('data-group="earlier"')).length;
       assert.equal(shownFirst.length, Math.min(app.WHATSON_PAGE_SIZE, shownAll), `${p}: one page of them`);
       assert.ok(rest.every((x) => x.at !== null && x.at >= 0 && x.at <= first.length), `${p}: every waiting item knows its place`);
       // Put the list back together the way the page does and check it is whole and in date-group order.
@@ -27276,3 +27277,199 @@ test('Caching (2026-10-18): versioned images are immutable, /browse/cards.json h
     assert.equal(await miss.text(), '{}', u);
   }
 }));
+
+// ---- Search pass 5 (2026-10-19): events in search, any-word fallback, views / free / open now, exact names,
+// a forgiving List Your Venue lookup, and What's On's folded "Earlier today" ----
+function withSearchPass5Fixtures(fn) {
+  const cols = ['name', 'region', 'type', 'slug', 'description', 'rating', 'reviews', 'patio', 'lake_view', 'hours'];
+  const allDay = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['00:00', '23:59']]])));
+  const closed = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, []])));
+  const add = (row) => {
+    const r = { description: 'Search pass 5 fixture.', rating: 4.4, reviews: 60, patio: 0, lake_view: 0, hours: null, ...row };
+    db.prepare(`INSERT INTO venues (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`).run(...cols.map((c) => r[c]));
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(r.slug, r.region);
+  };
+  const made = [
+    add({ name: 'SP Ridge Lookout', region: 'kelowna', type: 'outdoor', slug: 'sp-ridge-lookout', description: 'A short climb to a rocky lookout.' }),
+    add({ name: 'SP Lakeside Patio Grill', region: 'kelowna', type: 'restaurant', slug: 'sp-lakeside-patio-grill', patio: 1, lake_view: 1 }),
+    add({ name: 'SP Plain Diner', region: 'kelowna', type: 'restaurant', slug: 'sp-plain-diner', description: 'Burgers and fries.' }),
+    add({ name: 'SP Sand Beach', region: 'kelowna', type: 'beach', slug: 'sp-sand-beach', description: 'A sandy beach.' }),
+    add({ name: 'SP Little Museum', region: 'kelowna', type: 'indoor', slug: 'sp-little-museum', description: 'Local history. Free admission every day.' }),
+    add({ name: 'SP Wifi Cafe', region: 'kelowna', type: 'cafe', slug: 'sp-wifi-cafe', description: 'Free wifi and gluten-free muffins.' }),
+    add({ name: 'SP Always Open Winery', region: 'kelowna', type: 'winery', slug: 'sp-always-open-winery', hours: allDay }),
+    add({ name: 'SP Never Open Winery', region: 'kelowna', type: 'winery', slug: 'sp-never-open-winery', hours: closed }),
+    add({ name: '77 Bistro @ Quillfield', region: 'peachland', type: 'winery', slug: '77-bistro-quillfield', rating: 3.9, reviews: 10 }),
+    add({ name: 'SP Pumpkin Patch Farm', region: 'vernon', type: 'outdoor', slug: 'sp-pumpkin-patch-farm', description: 'Pumpkins and hay rides on a family farm.' }),
+    add({ name: 'SP Farm Stand', region: 'vernon', type: 'restaurant', slug: 'sp-farm-stand', rating: 4.9, reviews: 900, description: 'Fresh from the farm.' }),
+    add({ name: 'The Hatchery Test Taproom', region: 'kelowna', type: 'brewery', slug: 'the-hatchery-test-taproom' }),
+    add({ name: 'Sandhill Test Cellars', region: 'kelowna', type: 'winery', slug: 'sandhill-test-cellars' }),
+    add({ name: "Joe's Test Diner", region: 'kelowna', type: 'restaurant', slug: 'joes-test-diner' }),
+  ];
+  const day = app.addLocalDays(app.todayLocal(), 3);
+  const events = [];
+  const addEvent = (name, slug, description) => {
+    const id = db.prepare('INSERT INTO events (name, slug, region, description, start_datetime) VALUES (?, ?, ?, ?, ?)').run(name, slug, 'kelowna', description, `${day} 10:00:00`).lastInsertRowid;
+    db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time) VALUES (?, ?, ?, ?, ?)').run(id, day, day, '10:00', '16:00');
+    events.push(id);
+  };
+  addEvent('SP Lake Country Cider Fest', 'sp-lake-country-cider-fest', 'Ciders from across the valley.');
+  addEvent('SP Fall Weekends: Corn Maze and Hay Rides', 'sp-fall-weekends-corn-maze', 'A corn maze for all ages.');
+  addEvent('SP Concert in the Park', 'sp-concert-in-the-park', 'Bring a chair. Free admission.');
+  addEvent('SP Baking Class', 'sp-baking-class', 'Gluten-free baking for beginners, $40.');
+  return Promise.resolve().then(fn).finally(() => {
+    for (const id of events) { db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id); db.prepare('DELETE FROM events WHERE id = ?').run(id); }
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  });
+}
+const sp5Names = (html) => [...html.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1].replace(/&#39;/g, "'").replace(/&amp;/g, '&'));
+
+test('Search pass 5: What\'s On events are in search results ("cider fest", "corn maze"), on /search and in /api/discover', () => withDiscoveryFlag('on', () => withSearchPass5Fixtures(() => withDiscoveryServer(async (base) => {
+  assert.equal(app.heroSearchTarget('cider fest').url, '/search?q=cider%20fest');
+  const page = await (await fetch(`${base}/search?q=${encodeURIComponent('cider fest')}`)).text();
+  assert.ok(page.includes('href="/kelowna/events/sp-lake-country-cider-fest"'), 'the event is listed');
+  assert.match(page, /Events \(1\)/);
+  assert.ok(!page.includes('sp-baking-class'));
+  const api = await (await fetch(`${base}/api/discover?q=${encodeURIComponent('corn maze')}`)).json();
+  assert.ok(api.events && api.events.items.some((e) => e.name.startsWith('SP Fall Weekends: Corn Maze')), 'corn maze finds the event');
+  const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('cider fest')}`)).text();
+  assert.match(fr, /Événements \(1\)/);
+  assert.ok(fr.includes('sp-lake-country-cider-fest'));
+}))));
+
+test('Search pass 5: when no place has every word, the places with some of them, most words first', () => withDiscoveryFlag('on', () => withSearchPass5Fixtures(() => {
+  const run = app.runDiscovery('pumpkin zzqqx farm', { limit: 480 });
+  assert.equal(run.results.match, 'any');
+  assert.equal(run.presentation.status, 'results');
+  const names = run.results.items.map((i) => i.name);
+  assert.ok(names.includes('SP Pumpkin Patch Farm') && names.includes('SP Farm Stand'));
+  assert.ok(names.indexOf('SP Pumpkin Patch Farm') < names.indexOf('SP Farm Stand'), 'two words beat one, whatever the rating');
+  const html = app.renderSearchPage(run);
+  assert.ok(html.includes('No place has every one of those words'));
+  const shown = sp5Names(html);
+  assert.ok(shown.indexOf('SP Pumpkin Patch Farm') < shown.indexOf('SP Farm Stand'));
+  // A typo in a name still offers the place instead ("Did you mean"), and nonsense still finds nothing.
+  assert.notEqual(app.runDiscovery('xqzvbn plorf').results.match, 'any');
+  assert.equal(app.runDiscovery('xqzvbn plorf').results.total, 0);
+})));
+
+test('Search pass 5: "best views", "patios with a view" and French "vue" list viewpoints and lake views', () => withDiscoveryFlag('on', () => withSearchPass5Fixtures(() => withDiscoveryServer(async (base) => {
+  assert.equal(app.heroSearchTarget('best views').url, '/search?q=best%20views');
+  const names = app.smartSearchPlan('best views').list().map((x) => x.row.name);
+  assert.ok(names.includes('SP Ridge Lookout') && names.includes('SP Lakeside Patio Grill'));
+  assert.ok(names.indexOf('SP Ridge Lookout') < names.indexOf('SP Lakeside Patio Grill'), 'a lookout first');
+  assert.ok(!names.includes('SP Plain Diner'));
+  const patios = app.smartSearchPlan('patios with a view in kelowna');
+  assert.equal(patios.heading, 'Patios with a view in Kelowna');
+  const pn = patios.list().map((x) => x.row.name);
+  assert.ok(pn.includes('SP Lakeside Patio Grill') && !pn.includes('SP Ridge Lookout'));
+  // "lake view" alone is still the Lake View badge.
+  assert.notEqual((app.smartSearchPlan('lake view') || {}).key, 'views');
+  const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('meilleures vues')}`)).text();
+  assert.ok(fr.includes('Les plus belles vues'));
+  assert.ok(sp5Names(fr).includes('SP Ridge Lookout'));
+}))));
+
+test('Search pass 5: "free things to do" lists free places and free events, never gluten-free; French "gratuit"', () => withDiscoveryFlag('on', () => withSearchPass5Fixtures(() => withDiscoveryServer(async (base) => {
+  const plan = app.smartSearchPlan('free things to do');
+  assert.equal(plan.key, 'free');
+  const names = plan.list().map((x) => x.row.name);
+  assert.ok(names.includes('SP Sand Beach') && names.includes('SP Little Museum'));
+  assert.ok(!names.includes('SP Wifi Cafe') && !names.includes('SP Plain Diner'));
+  const events = plan.events().items.map((e) => e.name);
+  assert.ok(events.includes('SP Concert in the Park'));
+  assert.ok(!events.includes('SP Baking Class'), 'gluten-free is not free');
+  assert.notEqual((app.smartSearchPlan('gluten free') || {}).key, 'free');
+  const page = await (await fetch(`${base}/search?q=${encodeURIComponent('free things to do')}`)).text();
+  assert.ok(page.includes('Free things to do'));
+  assert.ok(page.includes('sp-concert-in-the-park'));
+  assert.ok(sp5Names(page).includes('SP Sand Beach'));
+  const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('activités gratuites')}`)).text();
+  assert.ok(fr.includes('Activités gratuites'));
+  assert.ok(sp5Names(fr).includes('SP Little Museum'));
+}))));
+
+test('Search pass 5: "open now" lists what is open by its listed hours; Food & Drink types keep their own Open now page', () => withDiscoveryFlag('on', () => withSearchPass5Fixtures(() => withDiscoveryServer(async (base) => {
+  const now = new Date();
+  const wineries = app.smartSearchPlan('wineries open now', app.interpretDiscoveryText('wineries open now'), now);
+  assert.equal(wineries.key, 'open_now');
+  assert.equal(wineries.heading, 'Wineries open now');
+  const names = wineries.list().map((x) => x.row.name);
+  assert.ok(names.includes('SP Always Open Winery'));
+  assert.ok(!names.includes('SP Never Open Winery'));
+  assert.ok(names.every((n) => n !== 'SP Plain Diner'), 'only the type asked for');
+  assert.ok(app.smartSearchPlan('open now').list().some((x) => x.row.name === 'SP Always Open Winery'));
+  assert.equal(app.heroSearchTarget('wineries open now').url, '/search?q=wineries%20open%20now');
+  assert.match(app.heroSearchTarget('restaurants open now').url, /^\/food-drink\?types=restaurant&open=now$/);
+  const page = await (await fetch(`${base}/search?q=${encodeURIComponent('open now')}`)).text();
+  assert.ok(sp5Names(page).includes('SP Always Open Winery') && !sp5Names(page).includes('SP Never Open Winery'));
+  const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('vignobles ouverts maintenant')}`)).text();
+  assert.ok(fr.includes('Ouvert maintenant'));
+  assert.ok(sp5Names(fr).includes('SP Always Open Winery') && !sp5Names(fr).includes('SP Never Open Winery'));
+}))));
+
+test('Search pass 5: an exact or whole-phrase name match comes first ("77 bistro")', () => withDiscoveryFlag('on', () => withSearchPass5Fixtures(() => withDiscoveryServer(async (base) => {
+  assert.equal(app.heroSearchTarget('77 bistro').url, '/search?q=77%20bistro');
+  const page = await (await fetch(`${base}/search?q=${encodeURIComponent('77 bistro')}`)).text();
+  assert.equal(sp5Names(page)[0], '77 Bistro @ Quillfield');
+  // Plain structured requests are not turned into name searches.
+  assert.equal(app.smartNameMatches('wineries in kelowna', app.interpretDiscoveryText('wineries in kelowna')).length, 0);
+}))));
+
+test('Search pass 5: the List Your Venue lookup forgives spaces, apostrophes, a leading "the" and plurals', () => withSearchPass5Fixtures(() => {
+  const names = (q) => app.venueLookup(q).map((v) => v.name);
+  assert.ok(names('hatchery test taproom').includes('The Hatchery Test Taproom'));
+  assert.ok(names('the hatchery test taprooms').includes('The Hatchery Test Taproom'));
+  assert.ok(names('sand hill test').includes('Sandhill Test Cellars'));
+  assert.ok(names('the sandhill tests cellar').includes('Sandhill Test Cellars'));
+  assert.ok(names('joes test diner').includes("Joe's Test Diner"));
+  assert.ok(names('Joe’s   Test  Diner').includes("Joe's Test Diner"));
+  assert.ok(names('joestestdiner').includes("Joe's Test Diner"));
+  assert.ok(app.venueLookup('sandhill test').length <= 8);
+}));
+
+test('Search pass 5: What\'s On Today folds events that have already ended into "Earlier today", after upcoming and on-now events', () => {
+  const day = '2030-03-14';
+  const now = new Date('2030-03-14T21:00:00Z'); // 2:00 pm in the Okanagan
+  const ids = [];
+  const add = (name, slug, occ) => {
+    const id = db.prepare('INSERT INTO events (name, slug, region, description, start_datetime) VALUES (?, ?, ?, ?, ?)').run(name, slug, 'kelowna', 'Earlier today fixture.', `${day} 09:00:00`).lastInsertRowid;
+    db.prepare('INSERT INTO event_occurrences (event_id, start_date, end_date, start_time, end_time, all_day, ends_next_day) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(id, occ.start_date || day, occ.end_date || day, occ.start_time || null, occ.end_time || null, occ.all_day || 0, occ.ends_next_day || 0);
+    ids.push(id);
+  };
+  try {
+    add('ET Morning Yoga', 'et-morning-yoga', { start_time: '08:00', end_time: '09:00' });
+    add('ET Lunch Talk', 'et-lunch-talk', { start_time: '11:00' }); // no end: over three hours after the start
+    add('ET Evening Concert', 'et-evening-concert', { start_time: '19:00', end_time: '21:00' });
+    add('ET All Day Fair', 'et-all-day-fair', { all_day: 1 });
+    add('ET Late Party', 'et-late-party', { start_time: '22:00', end_time: '01:00', end_date: '2030-03-15', ends_next_day: 1 });
+    const ev = (name) => app.getWhatsOnEvents({ from: day, to: day }).find((e) => e.name === name);
+    const mins = 14 * 60;
+    assert.equal(app.whatsOnEndedToday(ev('ET Morning Yoga'), day, mins, true), true);
+    assert.equal(app.whatsOnEndedToday(ev('ET Lunch Talk'), day, mins, true), true);
+    assert.equal(app.whatsOnEndedToday(ev('ET Lunch Talk'), day, 13 * 60, true), false);
+    assert.equal(app.whatsOnEndedToday(ev('ET Evening Concert'), day, mins, true), false);
+    assert.equal(app.whatsOnEndedToday(ev('ET All Day Fair'), day, mins, true), false);
+    assert.equal(app.whatsOnEndedToday(ev('ET Late Party'), day, 23 * 60 + 30, true), false);
+    const html = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today' }), { now });
+    const at = (s) => html.indexOf(s);
+    assert.ok(html.includes('id="whatsOnResults" data-earlier="closed"'), 'folded by default');
+    assert.ok(at('class="whatson-earlier-toggle" aria-expanded="false"') !== -1);
+    assert.ok(at('data-venue-name="ET Evening Concert"') !== -1 && at('data-venue-name="ET Evening Concert"') < at('>Earlier today</button>'), 'upcoming first');
+    assert.ok(at('data-venue-name="ET All Day Fair"') < at('>Earlier today</button>'));
+    assert.ok(at('>Earlier today</button>') < at('data-venue-name="ET Morning Yoga"'), 'ended events after the heading');
+    assert.match(html, /data-venue-name="ET Morning Yoga"[^>]*data-group="earlier"/);
+    assert.match(html, /data-venue-name="ET Lunch Talk"[^>]*data-group="earlier"/);
+    assert.match(html, /data-venue-name="ET Evening Concert"[^>]*data-group="today"/);
+    // Before they end, they are Today's events and nothing is folded.
+    const morning = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'today' }), { now: new Date('2030-03-14T14:30:00Z') });
+    assert.ok(!morning.includes('id="whatsOnResults" data-earlier'));
+    assert.ok(!morning.includes('>Earlier today</button>'));
+    assert.match(morning, /data-venue-name="ET Morning Yoga"[^>]*data-group="today"/);
+    // French.
+    assert.equal(app.frText('Earlier today'), 'Plus tôt aujourd’hui');
+    assert.ok(app.frenchTwinHtml(html, '/whats-on', '?when=today').includes('Plus tôt aujourd’hui'));
+  } finally {
+    for (const id of ids) { db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(id); db.prepare('DELETE FROM events WHERE id = ?').run(id); }
+  }
+});
