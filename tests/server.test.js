@@ -11757,12 +11757,16 @@ let lyvIp = 0;
 const lyvSent = [];
 app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
 
+// Round 8 (2026-10-19): each submission gets its own phone and street number, since approval now also treats the
+// same phone or street address for the same kind of place in the town as a likely duplicate.
+let lyvSeq = 0;
 function lyvValid(overrides = {}) {
+  lyvSeq += 1;
   return {
     name: 'Lakeside Test Kitchen', type: 'restaurant', region: 'kelowna',
     description: 'Wood-fired pizza and local wine on a lakeside patio.',
     contact_name: 'Pat Owner', contact_email: 'pat@example.com', consent: true,
-    address: '1 Test Way, Kelowna', website: 'lakesidetest.example.com', phone: '250-555-0199',
+    address: `${lyvSeq} Test Way, Kelowna`, website: 'lakesidetest.example.com', phone: `250-555-${String(2000 + lyvSeq).slice(-4)}`,
     cuisine: 'Pizza', amenities: ['patio', 'dog_friendly'],
     company_website: '', started_at: Date.now() - 10000,
     ...overrides,
@@ -13138,7 +13142,7 @@ const ga4Check = (html, pageType, label) => {
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
   // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip). 2026-10-05: + 'browse' (the hub-style /browse). 2026-10-16: + 'my_trip' (/my-trip, for the shared-trip events).
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hub', 'listing_form', 'my_trip', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hub', 'info', 'listing_form', 'my_trip', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
@@ -26250,13 +26254,16 @@ test('Owner portal venue box (2026-10-18): the owner sees "You manage this listi
     const code = ownerUiInlineScripts(html).find((c) => c.includes('okrOwnerVenues'));
     assert.ok(code, 'the swap script is on the page');
     // Run it against a tiny fake page: mine -> swapped, not mine -> unchanged.
+    // Round 8: the Edit link's address is set as a property (no glued href text in the page), so the fake box has a link.
+    let edit = null;
     const run = (stored) => {
-      const box = { innerHTML: 'Claim this listing', getAttribute: () => String(v.id) };
+      edit = { href: '' };
+      const box = { innerHTML: 'Claim this listing', getAttribute: () => String(v.id), querySelector: () => edit };
       vm.runInNewContext(code, { document: { getElementById: () => box }, localStorage: { getItem: () => stored }, JSON, Number });
       return box.innerHTML;
     };
-    assert.match(run(JSON.stringify([v.id])), /You manage this listing[\s\S]*href="\/owner\/account\/venue\/' \+ box|You manage this listing/);
-    assert.match(run(JSON.stringify([v.id])), /\/owner\/account\/venue\//);
+    assert.match(run(JSON.stringify([v.id])), /You manage this listing[\s\S]*class="venue-claim-btn"/);
+    assert.equal(edit.href, `/owner/account/venue/${v.id}`);
     assert.equal(run('[1]'), 'Claim this listing');
     assert.equal(run(null), 'Claim this listing');
   } finally { await s.close(); }
@@ -26836,13 +26843,15 @@ test('Portal polish (2026-10-18): folded seasonal-hours and closures headers say
     const seasonal = specs.filter((x) => x.validFrom && x.opens !== '00:00');
     assert.equal(seasonal.length, 5);
     assert.deepEqual(seasonal[0], { '@type': 'OpeningHoursSpecification', dayOfWeek: seasonal[0].dayOfWeek, opens: '10:00', closes: '16:00', validFrom: '2026-11-01', validThrough: '2027-04-30' });
-    const closed = specs.filter((x) => x.opens === '00:00' && x.closes === '00:00');
+    assert.equal(specs.filter((x) => x.opens === '00:00' && x.closes === '00:00').length, 0, 'round 8: closures are not mixed into the week');
+    const closed = ld(app.renderVenuePage(fresh, [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang })).specialOpeningHoursSpecification;
     assert.deepEqual(closed, [{ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: '2026-12-25', validThrough: '2026-12-26' }], 'the closure already over is left out');
   }
   // A venue with no extras: unchanged.
   seasonInsert.run({ name: 'Polish Plain Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'polish-plain-fixture' });
   const plainPage = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'polish-plain-fixture'), [], [], [], { now: new Date('2026-10-18T19:00:00Z') });
   assert.ok(ld(plainPage).openingHoursSpecification.every((x) => !x.validFrom));
+  assert.equal(ld(plainPage).specialOpeningHoursSpecification, undefined);
 }));
 
 test('Portal polish (2026-10-18): Make main photo keeps the old main photo near the front, not at the end', () => withOwnerPortalServer(async ({ post }) => {
@@ -27347,7 +27356,7 @@ test('list-your-venue lookup (2026-10-18): French labels and /fr links on the Fr
   assert.match(en, /claim: 'Claim this listing'/);
   assert.match(en, /claim: 'R\\u00e9clamer cette fiche'/);
   assert.match(en, /correct: 'Demander une correction'/);
-  assert.match(en, /<a class="lyv-claim" href="' \+ esc\(claim\) \+ '">/);
+  assert.match(en, /<a class="lyv-claim" ' \+ hrefAttr\(claim\) \+ '>/); // round 8: no glued href text
   const frPage = await seo3get('/fr/list-your-venue');
   assert.equal(frPage.status, 200);
   assert.match(frPage.text, /<html lang="fr"/);
@@ -29609,3 +29618,199 @@ test('Round 7 trip planner: Swap may name the place it replaces; French pages op
   assert.ok(fr.includes("full.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip'"), 'the tray link follows the page language');
   assert.ok(app.renderTripPlannerPage(true).includes("window.location.href = (location.pathname === '/fr' || location.pathname.indexOf('/fr/') === 0) ? '/fr/my-trip' : '/my-trip';"));
 }));
+
+// ---- Round 8 tech (2026-10-19): GA on every page, closures in JSON-LD, /owner, removed places, duplicate guard,
+// crawlable planner links ----
+const R8_GA = 'googletagmanager.com/gtag/js';
+// Pages deliberately left without Google Analytics: the business portal family (/owner/*, the claim form, which
+// render through ownerSimplePage) and /admin/* -- private, signed-in or token pages. Everything else is tracked.
+const R8_UNTRACKED = [/^\/(?:fr\/)?owner(?:\/|$)/, /^\/(?:fr\/)?claim\//, /^\/admin(?:\/|$)/];
+
+test('Round 8 tech: every public page template carries the GA snippet', async () => {
+  const before = process.env.TRIP_PLANNER_V3;
+  process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    await withDiscoveryServer(async (base) => {
+      const paths = new Set(['/', '/fr', '/browse', '/destinations', '/kelowna', '/fr/kelowna', '/kelowna/restaurants', '/fr/kelowna/restaurants',
+        '/kelowna/restaurants/test-trattoria', '/whats-on', '/fr/whats-on', '/map', '/fr/map', '/trip', '/fr/trip', '/my-trip', '/fr/my-trip',
+        '/favorites', '/fr/favorites', '/list-your-venue', '/fr/list-your-venue', '/list-an-event', '/guides', '/fr/guides',
+        '/about', '/fr/about', '/contact', '/fr/contact', '/privacy', '/fr/privacy', '/terms', '/fr/terms']);
+      for (const g of app.allGuides()) { paths.add(g.path); paths.add(`/fr${g.path}`); }
+      const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+      for (const m of sitemap.matchAll(/<loc>https:\/\/okanaganroam\.com([^<]*)<\/loc>/g)) paths.add(m[1] || '/');
+      const missing = [];
+      let checked = 0;
+      for (const p of paths) {
+        if (R8_UNTRACKED.some((re) => re.test(p)) || /\.(?:xml|txt|json|ics)$/.test(p)) continue;
+        const r = await fetch(base + p, { redirect: 'manual' });
+        const text = await r.text();
+        if (r.status !== 200 || !/text\/html/.test(r.headers.get('content-type') || '')) continue;
+        checked++;
+        if (!text.includes(R8_GA)) missing.push(p);
+      }
+      assert.ok(checked > 60, `checked ${checked} pages`);
+      assert.deepEqual(missing, [], 'pages without GA');
+      // The 404 page and the info pages' own page type.
+      assert.ok((await (await fetch(`${base}/kelowna/restaurants/no-such-place-r8`)).text()).includes(R8_GA));
+      assert.match(await (await fetch(`${base}/about`)).text(), /page_type: 'info'/);
+      assert.match(await (await fetch(`${base}/guides`)).text(), /page_type: 'hub'/);
+      assert.match(await (await fetch(`${base}${app.allGuides()[0].path}`)).text(), /page_type: 'guide'/);
+    });
+  } finally {
+    if (before === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = before;
+  }
+});
+
+test('Round 8 tech: no page has a link whose address is glued-together script code', async () => {
+  const before = process.env.TRIP_PLANNER_V3;
+  process.env.TRIP_PLANNER_V3 = 'on';
+  try {
+    await withDiscoveryServer(async (base) => {
+      const bad = [];
+      for (const p of ['/', '/whats-on', '/map', '/fr/map', '/trip', '/fr/trip', '/my-trip', '/favorites', '/fr/favorites', '/list-your-venue', '/fr/list-your-venue',
+        '/kelowna/restaurants/test-trattoria', '/fr/kelowna/restaurants/test-trattoria', '/guides', '/kelowna']) {
+        const html = await (await fetch(base + p)).text();
+        // The same scan a crawler (and the site review) makes: every <a ... href="..."> in the raw HTML, scripts included.
+        for (const m of html.matchAll(/<a\b[^>]*\bhref\s*=\s*("([^"]*)"|'([^']*)')/gi)) {
+          const h = m[2] ?? m[3];
+          if (/'\s*\+|\+\s*'/.test(h)) bad.push(`${p}: ${h}`);
+        }
+      }
+      assert.deepEqual(bad, []);
+    });
+  } finally {
+    if (before === undefined) delete process.env.TRIP_PLANNER_V3; else process.env.TRIP_PLANNER_V3 = before;
+  }
+  // The planner's pure helpers still build the same links.
+  const v3 = require('../trip-planner-v3-page.js');
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.ok(!/href="'\s*\+/.test(src), 'no glued href in the planner');
+  if (typeof v3.t3OptionalAlternativesHtml === 'function') {
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const html = v3.t3OptionalAlternativesHtml({ alternatives: [{ name: 'A & B', url: '/kelowna/restaurants/a-b', reasonCode: 'similar_activity' }] }, false, esc);
+    assert.match(html, /<a href="\/kelowna\/restaurants\/a-b">A &amp; B<\/a>/);
+  }
+});
+
+test('Round 8 tech: a temporary closure is a specialOpeningHoursSpecification, also without weekly hours', () => {
+  seasonInsert.run({ name: 'R8 Closure Fixture', type: 'restaurant', hours: PE_WEEK, slug: 'r8-closure-fixture' });
+  seasonInsert.run({ name: 'R8 No Hours Fixture', type: 'cafe', hours: null, slug: 'r8-no-hours-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'r8-closure-fixture');
+  const nh = app.findVenueBySlug('kelowna', 'cafe', 'r8-no-hours-fixture');
+  try {
+    for (const x of [v, nh]) {
+      db.prepare('INSERT INTO venue_hours_extra (venue_id, closures) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET closures = excluded.closures')
+        .run(x.id, JSON.stringify([{ from: '2026-10-21', to: '2026-10-28', note: 'Holidays' }, { from: '2026-10-01', to: '2026-10-02', note: '' }]));
+    }
+    app.clearHoursExtraCache();
+    const ld = (html) => [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1])).find((x) => x.name && x.url && x['@type'] !== 'BreadcrumbList');
+    const now = new Date('2026-10-19T19:00:00Z');
+    const expected = [{ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: '2026-10-21', validThrough: '2026-10-28' }];
+    for (const lang of ['en', 'fr']) {
+      const biz = ld(app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'r8-closure-fixture'), [], [], [], { now, lang }));
+      assert.deepEqual(biz.specialOpeningHoursSpecification, expected, lang);
+      assert.equal(biz.openingHoursSpecification.length, 7, 'the week is only the week');
+    }
+    const noHours = ld(app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r8-no-hours-fixture'), [], [], [], { now }));
+    assert.equal(noHours.openingHoursSpecification, undefined);
+    assert.deepEqual(noHours.specialOpeningHoursSpecification, expected);
+    assert.deepEqual(app.closureSpecialHoursSpecification(v.id, new Date('2026-11-05T19:00:00Z')), [], 'gone once the closure is over');
+  } finally {
+    db.prepare('DELETE FROM venue_hours_extra WHERE venue_id IN (?, ?)').run(v.id, nh.id);
+    db.prepare('DELETE FROM venues WHERE id IN (?, ?)').run(v.id, nh.id);
+    app.clearHoursExtraCache();
+  }
+});
+
+test('Round 8 tech: /owner and /fr/owner go to their login pages', () => withDiscoveryServer(async (base) => {
+  for (const [p, to] of [['/owner', '/owner/login'], ['/fr/owner', '/fr/owner/login'], ['/owner?utm_source=ig', '/owner/login?utm_source=ig']]) {
+    const r = await fetch(base + p, { redirect: 'manual' });
+    assert.equal(r.status, 302, p);
+    assert.equal(r.headers.get('location'), to, p);
+  }
+  assert.equal((await fetch(`${base}/owner/login`)).status, 200);
+  assert.equal((await fetch(`${base}/fr/owner/login`)).status, 200);
+}));
+
+test('Round 8 tech: a removed place answers 410 "has closed" with similar places nearby; deleteVenue records it', () => withDiscoveryServer(async (base) => {
+  // The listings removed on 2026-10-19 are seeded.
+  for (const [region, type, slug] of [['kelowna', 'restaurant', 'the-hot-box'], ['kelowna', 'restaurant', 'misato-s-kitchen'], ['west-kelowna', 'restaurant', 'beef-broccoli'], ['penticton', 'restaurant', 'queen-city-eats']]) {
+    assert.ok(app.findRemovedVenue(region, type, slug), slug);
+  }
+  const r = await fetch(`${base}/kelowna/restaurants/misato-s-kitchen`);
+  assert.equal(r.status, 410);
+  const html = await r.text();
+  assert.match(html, /<h1>Misato&#39;s Kitchen has closed<\/h1>/);
+  assert.match(html, /<meta name="robots" content="noindex/);
+  assert.ok(html.includes(R8_GA));
+  assert.match(html, /<a href="\/kelowna\/restaurants\/test-trattoria">/, 'a similar place in the same town');
+  assert.match(html, /href="\/kelowna\/restaurants">Restaurants in Kelowna</);
+  const fr = await fetch(`${base}/fr/kelowna/restaurants/misato-s-kitchen`);
+  assert.equal(fr.status, 410);
+  const frHtml = await fr.text();
+  assert.match(frHtml, /<html lang="fr"/);
+  assert.match(frHtml, /a fermé<\/h1>/);
+  assert.match(frHtml, /Lieux semblables à proximité/);
+  // A new deletion is recorded; a place listed again at the address shows again.
+  seasonInsert.run({ name: 'R8 Removed Fixture', type: 'restaurant', hours: null, slug: 'r8-removed-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'restaurant', 'r8-removed-fixture');
+  assert.equal(app.deleteVenue(v.id), true);
+  try {
+    assert.equal((await fetch(`${base}/kelowna/restaurants/r8-removed-fixture`)).status, 410);
+    seasonInsert.run({ name: 'R8 Removed Fixture', type: 'restaurant', hours: null, slug: 'r8-removed-fixture' });
+    assert.equal((await fetch(`${base}/kelowna/restaurants/r8-removed-fixture`)).status, 200, 'listed again: the page is back');
+  } finally {
+    db.prepare("DELETE FROM venues WHERE slug = 'r8-removed-fixture'").run();
+    db.prepare("DELETE FROM removed_venues WHERE slug = 'r8-removed-fixture'").run();
+  }
+  assert.equal((await fetch(`${base}/kelowna/restaurants/never-listed-r8`)).status, 404, 'an address never listed is still a 404');
+}));
+
+test('Round 8 tech: one duplicate guard for POST /api/venues and List Your Venue approval (near names, address, nearby towns, shared phones)', async () => {
+  assert.equal(app.duplicateNameKey('The Hot Box'), app.duplicateNameKey('Hot Box Restaurant'));
+  assert.equal(app.duplicateNameKey('Beef & Broccoli'), app.duplicateNameKey('Beef and Broccoli'));
+  assert.equal(app.duplicateNameKey("Misato's Kitchen"), app.duplicateNameKey('Misatos'));
+  assert.notEqual(app.duplicateNameKey('Thai Kitchen'), app.duplicateNameKey('Thai Restaurant'), 'one short word left: the whole name counts');
+  assert.deepEqual(app.duplicateAddressKey('#101-1234 Main Street, Kelowna, BC'), { unit: '101', key: '1234 main st' });
+  assert.deepEqual(app.duplicateAddressKey('1234 Main St., Kelowna'), { unit: null, key: '1234 main st' });
+  assert.equal(app.duplicateAddressKey('Highway 97, Oliver'), null);
+  const created = [];
+  try {
+    await withDiscoveryServer(async (base) => {
+      const post = (body) => fetch(`${base}/api/venues`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ENRICHMENT_ADMIN_TOKEN}` }, body: JSON.stringify(body) });
+      const first = await post({ name: 'The R8 Smokehouse', region: 'kelowna', type: 'restaurant', description: 'fixture', phone: '236-555-0188', address: '4410 Lakeshore Road, Kelowna, BC' });
+      assert.equal(first.status, 201);
+      created.push((await first.json()).id);
+      const near = await post({ name: 'R8 Smokehouse Restaurant', region: 'kelowna', type: 'restaurant', description: 'fixture' });
+      assert.equal(near.status, 409, 'a near name');
+      assert.equal((await near.json()).existing[0].match, 'name');
+      const nearbyTown = await post({ name: 'R8 Smokehouse', region: 'west-kelowna', type: 'restaurant', description: 'fixture' });
+      assert.equal(nearbyTown.status, 409, 'the same place in a nearby town');
+      const address = await post({ name: 'R8 Lakeshore Grill House', region: 'kelowna', type: 'restaurant', description: 'fixture', address: '4410 Lakeshore Rd, Kelowna' });
+      assert.equal(address.status, 409, 'the same street address');
+      assert.equal((await address.json()).existing[0].match, 'address');
+      const sharedPhone = await post({ name: 'R8 Lakeshore Park', region: 'kelowna', type: 'beach', description: 'fixture', phone: '(236) 555-0188' });
+      assert.equal(sharedPhone.status, 201, 'a shared office number only warns');
+      const sp = await sharedPhone.json();
+      created.push(sp.id);
+      assert.equal(sp.duplicate_warnings[0].match, 'phone');
+      assert.equal(sp.duplicate_warnings[0].blocking, false);
+      const farTown = await post({ name: 'R8 Smokehouse', region: 'osoyoos', type: 'restaurant', description: 'fixture' });
+      assert.equal(farTown.status, 201, 'a town further away is another place');
+      created.push((await farTown.json()).id);
+      // List Your Venue approval uses the same check: a near name is held, with the match explained.
+      const sub = await (await lyvPost(base, lyvValid({ name: 'R8 Smokehouse Bistro', region: 'kelowna', contact_email: 'r8@smoke.example', phone: '236-555-0177', address: '9 R8 Way, Kelowna' }))).json();
+      const held = await lyvAdmin(base, `/admin/venue-submissions/${sub.id}/approve`, { reviewer: 'r' });
+      assert.equal(held.status, 409);
+      const hb = await held.json();
+      assert.deepEqual(hb.existing.map((d) => [d.id, d.match]), [[created[0], 'name']]);
+      const list = await (await lyvAdmin(base, '/admin/venue-submissions')).json();
+      assert.deepEqual(list.submissions.find((s) => s.id === sub.id).possible_existing_venues.map((d) => d.match), ['name']);
+      const forced = await (await lyvAdmin(base, `/admin/venue-submissions/${sub.id}/approve`, { reviewer: 'r', allow_duplicate: true })).json();
+      created.push(forced.venue.id);
+    });
+  } finally {
+    for (const id of created) if (id) app.deleteVenue(id);
+    db.prepare("DELETE FROM removed_venues WHERE name LIKE 'R8 %' OR name LIKE 'The R8 %'").run();
+  }
+});

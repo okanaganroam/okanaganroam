@@ -73,10 +73,11 @@ function t3ListingGapGroups(p){
  return Object.keys(groups).filter(kind=>groups[kind].length).map(kind=>({kind,venues:groups[kind]}));
 }
 function t3ListingGapSummaryHtml(p,fr,esc){
+ const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const groups=t3ListingGapGroups(p);
  if(!groups.length)return '';
  const labels=fr?{title:'Détails à confirmer',hours:'Horaires non indiqués',location:'Emplacement sur la carte manquant',confirm:'Confirmez directement auprès de ces lieux.'}:{title:'Details to confirm',hours:'Hours not listed',location:'Map location missing',confirm:'Confirm directly with these venues.'};
- return '<section class="t3-warnings" aria-label="'+esc(labels.title)+'"><h3>'+esc(labels.title)+'</h3>'+groups.map(g=>'<p><strong>'+esc(labels[g.kind])+':</strong> '+g.venues.map(v=>v.id!=null?'<a href="#'+esc(t3VenueCardId(v.id))+'">'+esc(v.name)+'</a>':esc(v.name)).join(', ')+'.</p>').join('')+'<p>'+esc(labels.confirm)+'</p></section>';
+ return '<section class="t3-warnings" aria-label="'+esc(labels.title)+'"><h3>'+esc(labels.title)+'</h3>'+groups.map(g=>'<p><strong>'+esc(labels[g.kind])+':</strong> '+g.venues.map(v=>v.id!=null?'<a '+hrefAttr('#'+t3VenueCardId(v.id))+'>'+esc(v.name)+'</a>':esc(v.name)).join(', ')+'.</p>').join('')+'<p>'+esc(labels.confirm)+'</p></section>';
 }
 function t3PlanNextSteps(p) {
   var steps=[],seen={};
@@ -137,11 +138,12 @@ function t3PlanNextSteps(p) {
 }
 
 function t3OptionalAlternativesHtml(step,fr,esc){
+ const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
  if(!alternatives.length)return '';
  const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing'};
  const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing};
- return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a href="'+esc(a.url)+'">'+esc(a.name)+'</a>'+(reason[a.reasonCode]?' — '+esc(reason[a.reasonCode]):'')+'</li>';}).join('')+'</ul></div>';
+ return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(reason[a.reasonCode]?' — '+esc(reason[a.reasonCode]):'')+'</li>';}).join('')+'</ul></div>';
 }
 
 function t3TimingChecklist(step,fr){
@@ -781,6 +783,10 @@ function renderScript(d) {
   var renderedVenueCardAnchors = {};
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  // Crawlable links (2026-10-19, round 8): link markup glued together in this script as a quoted href attribute
+  // around esc(url) read to crawlers that scan the page's HTML as links to the code itself (fake 404s). The
+  // attribute is joined from parts instead, so the script holds no href="..." text.
+  function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); }
   function safeUrl(u){ return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' ? u : null; }
   function setStatus(text, mode){ statusEl.textContent = text || ''; statusEl.className = 't3-status' + (mode ? ' is-' + mode : ''); }
   // Interface text in the visitor's language (2026-10-04): the tripv3.* keys
@@ -898,11 +904,15 @@ function renderScript(d) {
         if (pace === 'relaxed' || pace === 'standard' || pace === 'packed') facts.pace = pace;
         track('trip_plan_complete', facts);
       })
-      .catch(function(){
+      .catch(function(err){
         done();
         setStatus(tx('tripv3.error'), 'error');
         showEditError(trigger, statusEl.textContent);
-        track('trip_plan_error', { request_type: requestType, error_type: 'exception' });
+        // Round 8: a failure here (often a bug while drawing the plan, not the network) was silent; the console and
+        // the event now say what it was. error_detail is the error's name and message (code text, never the request).
+        var detail = '';
+        try { detail = String(err && err.name ? err.name + ': ' + err.message : err).slice(0, 100); if (window.console && console.error) console.error('[trip] plan failed:', err); } catch (e) {}
+        track('trip_plan_error', { request_type: requestType, error_type: 'exception', error_detail: detail });
       });
   }
   // An edit that fails (Swap, Regenerate day, a changed setting, ...) is also
@@ -1203,7 +1213,7 @@ function renderScript(d) {
       // is always present, empty or not.
       + '<div class="t3-card-head">' + photoHtml
       + '<div class="t3-card-top"><span>' + esc(frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
-      + '<h4>' + (url ? '<a href="' + esc(url) + '">' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
+      + '<h4>' + (url ? '<a ' + hrefAttr(url) + '>' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
       + factsLine(v)
       + '</div>'
@@ -1217,7 +1227,7 @@ function renderScript(d) {
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + '>Add to trip</button>'
     // The list cards' Favorite button (2026-10-19): named for the place, with its pressed state.
     var favHtml = '<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>';
-    var detailsHtml = url ? '<a class="t3-act" href="' + esc(url) + '">' + esc(tx('tripv3.viewDetails')) + '</a>' : '';
+    var detailsHtml = url ? '<a class="t3-act" ' + hrefAttr(url) + '>' + esc(tx('tripv3.viewDetails')) + '</a>' : '';
     if (key) {
       // A plan stop: the everyday actions show; Keep, Favorite and View details sit under "More" (2026-10-14).
       var keepHtml = '<button type="button" class="t3-act" data-t3-keep="' + esc(key) + '" aria-pressed="' + (kept ? 'true' : 'false') + '" aria-label="' + esc(tx('tripv3.keepLabel', { name: v.name })) + '">' + esc(kept ? tx('tripv3.kept') : tx('tripv3.keep')) + '</button>';
@@ -1292,10 +1302,10 @@ function renderScript(d) {
       if (!s.venue) {
         if (s.kind === 'event' && s.event) {
           var e = s.event, u = safeUrl(e.url);
-          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>Add to trip</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
         }
         // Round 7: a long wait before dinner with nothing nearby that fits is labelled free time, not left blank.
@@ -1308,7 +1318,7 @@ function renderScript(d) {
         if ((s.freeEvening || []).length) {
           // One dinner was asked for: this evening is free on purpose, with a couple of places in case they want to eat out.
           var feFr = lang() === 'fr';
-          var feLinks = s.freeEvening.map(function(x){ var u = safeUrl(x.url); return u ? '<a href="' + esc(u) + '">' + esc(x.name) + '</a>' : esc(x.name); }).join(feFr ? ' ou ' : ' or ');
+          var feLinks = s.freeEvening.map(function(x){ var u = safeUrl(x.url); return u ? '<a ' + hrefAttr(u) + '>' + esc(x.name) + '</a>' : esc(x.name); }).join(feFr ? ' ou ' : ' or ');
           html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty t3-free"><strong>' + (feFr ? 'Soirée libre' : 'Free evening') + '</strong><p>' + esc(feFr ? 'Vous avez demandé un seul souper, alors cette soirée reste libre. Si vous voulez sortir manger : ' : 'You asked for one dinner, so this evening is yours. If you’d like to eat out: ') + feLinks + '.</p></div></li>';
           return;
         }
@@ -1368,7 +1378,7 @@ function renderScript(d) {
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
-      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div>'
+      + (maps ? '<a class="t3-btn" ' + hrefAttr(maps) + ' target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div>'
       + staticMapHtml(mh.assets, d.day === 1, d)
       + '</div>';
   }
@@ -1436,7 +1446,7 @@ function renderScript(d) {
       + (d.theme && d.theme.label ? '<p class="t3-day-theme">' + esc(tx('tripv3.plannedAround', { theme: d.theme.label })) + '</p>' : '') + '</div>'
       + '<div class="t3-day-actions"><button type="button" class="t3-btn" data-t3-regen-day="' + d.day + '">' + esc(tx('tripv3.regenDay')) + '</button>'
       + '<button type="button" class="t3-btn" data-t3-add-day="' + d.day + '">' + esc(tx('tripv3.addDay')) + '</button>'
-      + (maps ? '<a class="t3-btn" href="' + esc(maps) + '" target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>');
+      + (maps ? '<a class="t3-btn" ' + hrefAttr(maps) + ' target="_blank" rel="noopener" data-t3-map-day>' + esc(tx('tripv3.mapDay')) + '</a>' : '') + '</div></div></div>');
     // A label of its own for each day (2026-10-19): "Day 1 · Kelowna", not "Kelowna" twice.
     return '<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \u00b7 ' + (d.regionLabel || tx('tripv3.theOkanagan'))) + '">'
       + head
@@ -1512,7 +1522,7 @@ function renderScript(d) {
     // The rainy-day backups are shown up front with links, so their note is not repeated under "How this plan was made".
     var rainNote = /^(?:If it rains:|S’il pleut :)/;
     var notes = (p.notes || []).filter(function(n){ return (p.contextNotes || []).indexOf(n) === -1 && !((p.rainBackup || []).length && rainNote.test(n)); });
-    var rainHtml = (p.rainBackup || []).length ? '<p class="t3-expect t3-rain">' + esc(lang() === 'fr' ? 'S’il pleut : ' : 'If it rains: ') + p.rainBackup.map(function(v){ var u = safeUrl(v.url); return u ? '<a href="' + esc(u) + '">' + esc(v.name) + '</a>' : esc(v.name); }).join(lang() === 'fr' ? ' ou ' : ' or ') + esc(lang() === 'fr' ? ' — des options intérieures à proximité pour remplacer une plage ou une sortie en plein air.' : ' — indoor backups nearby, to swap in for a beach or outdoor stop.') + '</p>' : '';
+    var rainHtml = (p.rainBackup || []).length ? '<p class="t3-expect t3-rain">' + esc(lang() === 'fr' ? 'S’il pleut : ' : 'If it rains: ') + p.rainBackup.map(function(v){ var u = safeUrl(v.url); return u ? '<a ' + hrefAttr(u) + '>' + esc(v.name) + '</a>' : esc(v.name); }).join(lang() === 'fr' ? ' ou ' : ' or ') + esc(lang() === 'fr' ? ' — des options intérieures à proximité pour remplacer une plage ou une sortie en plein air.' : ' — indoor backups nearby, to swap in for a beach or outdoor stop.') + '</p>' : '';
     var html = understoodHtml(p)
       + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
       + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
@@ -1596,20 +1606,20 @@ function renderScript(d) {
     var niceIso=function(iso){ return /^\\d{4}-\\d{2}-\\d{2}$/.test(iso||'') ? new Date(iso+'T12:00:00Z').toLocaleDateString(lang()==='fr'?'fr-CA':'en-CA',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'}) : String(iso||''); };
     if(p.eventAlternatives && p.eventAlternatives.length){
       var eaFr=lang()==='fr';
-      html+='<section class="t3-warnings" aria-label="'+(eaFr?'Événements à d’autres dates':'Events on nearby dates')+'"><h3>'+(eaFr?'Si vos dates sont flexibles':'If your dates are flexible')+'</h3><p>'+(eaFr?'Ces événements du même type sont en dehors des dates du voyage. Ils ne sont pas ajoutés au programme. Consultez la fiche, puis choisissez une date pour refaire le programme en gardant votre demande.':'These events of the requested type fall outside your trip dates. They are not added to your itinerary. Check the listing, then choose a date to replan while keeping your request.')+'</p><ul>'+p.eventAlternatives.map(function(e){var eventDate=String(e.startDate||''),planDate=String(e.suggestedDate||eventDate),eventUrl=typeof e.url==='string'&&e.url.charAt(0)==='/'&&e.url.charAt(1)!=='/'?e.url:null,planDateLabel=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?new Date(planDate+'T12:00:00Z').toLocaleDateString(eaFr?'fr-CA':'en-CA',{month:'short',day:'numeric'}):'',choose=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?'<button type="button" class="t3-act" data-t3-event-date="'+esc(planDate)+'">'+(eaFr?'Planifier le ':'Plan for ')+esc(planDateLabel)+'</button>':'';return '<li>'+(eventUrl?'<a href="'+esc(eventUrl)+'">'+esc(e.name)+'</a>':esc(e.name))+(eventDate?' — '+esc(niceIso(eventDate)+(e.endDate&&e.endDate!==eventDate?' – '+niceIso(e.endDate):'')):'')+(e.time?' · '+esc(e.time):'')+' '+choose+'</li>';}).join('')+'</ul></section>';
+      html+='<section class="t3-warnings" aria-label="'+(eaFr?'Événements à d’autres dates':'Events on nearby dates')+'"><h3>'+(eaFr?'Si vos dates sont flexibles':'If your dates are flexible')+'</h3><p>'+(eaFr?'Ces événements du même type sont en dehors des dates du voyage. Ils ne sont pas ajoutés au programme. Consultez la fiche, puis choisissez une date pour refaire le programme en gardant votre demande.':'These events of the requested type fall outside your trip dates. They are not added to your itinerary. Check the listing, then choose a date to replan while keeping your request.')+'</p><ul>'+p.eventAlternatives.map(function(e){var eventDate=String(e.startDate||''),planDate=String(e.suggestedDate||eventDate),eventUrl=typeof e.url==='string'&&e.url.charAt(0)==='/'&&e.url.charAt(1)!=='/'?e.url:null,planDateLabel=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?new Date(planDate+'T12:00:00Z').toLocaleDateString(eaFr?'fr-CA':'en-CA',{month:'short',day:'numeric'}):'',choose=/^\\d{4}-\\d{2}-\\d{2}$/.test(planDate)?'<button type="button" class="t3-act" data-t3-event-date="'+esc(planDate)+'">'+(eaFr?'Planifier le ':'Plan for ')+esc(planDateLabel)+'</button>':'';return '<li>'+(eventUrl?'<a '+hrefAttr(eventUrl)+'>'+esc(e.name)+'</a>':esc(e.name))+(eventDate?' — '+esc(niceIso(eventDate)+(e.endDate&&e.endDate!==eventDate?' – '+niceIso(e.endDate):'')):'')+(e.time?' · '+esc(e.time):'')+' '+choose+'</li>';}).join('')+'</ul></section>';
     }
     if(p.accessConflicts && p.accessConflicts.length){
       var acFr=lang()==='fr';
-      html+='<section class="t3-warnings" aria-label="'+(acFr?'Accès à confirmer':'Potential access conflict')+'"><h3>'+(acFr?'L’accès du matin est à confirmer':'Morning access needs confirmation')+'</h3><p>'+(acFr?'La fiche limite l’accès les jours d’école. La date demandée est en semaine; nous ne savons pas si l’école est ouverte ce jour-là. Cet arrêt n’est pas programmé. Confirmez avec l’exploitant ou choisissez une autre heure.':'The listing limits access on school days. Your requested date is a weekday; we do not know whether school is in session that day. This stop is not scheduled. Confirm with the operator or choose a different time.')+'</p>'+p.accessConflicts.map(function(a){return '<p><strong>'+esc(a.name)+'</strong> — '+esc(a.source)+(safeUrl(a.url)?' <a href="'+esc(a.url)+'">'+(acFr?'Consulter la fiche':'Check access details')+'</a>':'')+'</p>'+(a.alternatives&&a.alternatives.length?'<p>'+(acFr?'Autres lieux pour cette activité, non ajoutés au programme; confirmez leur accès et leurs horaires :':'Other places for this activity, not added to the itinerary; confirm their access and hours:')+'</p><ul>'+a.alternatives.filter(function(v){return safeUrl(v.url);}).map(function(v){return '<li><a href="'+esc(v.url)+'">'+esc(v.name)+'</a></li>';}).join('')+'</ul>':'');}).join('')+'</section>';
+      html+='<section class="t3-warnings" aria-label="'+(acFr?'Accès à confirmer':'Potential access conflict')+'"><h3>'+(acFr?'L’accès du matin est à confirmer':'Morning access needs confirmation')+'</h3><p>'+(acFr?'La fiche limite l’accès les jours d’école. La date demandée est en semaine; nous ne savons pas si l’école est ouverte ce jour-là. Cet arrêt n’est pas programmé. Confirmez avec l’exploitant ou choisissez une autre heure.':'The listing limits access on school days. Your requested date is a weekday; we do not know whether school is in session that day. This stop is not scheduled. Confirm with the operator or choose a different time.')+'</p>'+p.accessConflicts.map(function(a){return '<p><strong>'+esc(a.name)+'</strong> — '+esc(a.source)+(safeUrl(a.url)?' <a '+hrefAttr(a.url)+'>'+(acFr?'Consulter la fiche':'Check access details')+'</a>':'')+'</p>'+(a.alternatives&&a.alternatives.length?'<p>'+(acFr?'Autres lieux pour cette activité, non ajoutés au programme; confirmez leur accès et leurs horaires :':'Other places for this activity, not added to the itinerary; confirm their access and hours:')+'</p><ul>'+a.alternatives.filter(function(v){return safeUrl(v.url);}).map(function(v){return '<li><a '+hrefAttr(v.url)+'>'+esc(v.name)+'</a></li>';}).join('')+'</ul>':'');}).join('')+'</section>';
     }
     var nextSteps=t3PlanNextSteps(p);
     if(nextSteps.length){
       var nextFr=lang()==='fr';
       html+='<section class="t3-warnings" aria-label="'+(nextFr?'Avant de partir':'Before you go')+'"><h3>'+(nextFr?'Avant de partir':'Before you go')+'</h3><ul>'+nextSteps.map(function(step){
-        if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
-        if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
+        if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
+        if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
-        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a href="'+esc(step.url)+'">'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
+        return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
       }).join('')+'</ul></section>';
     }
     html += requirementSummaryBlock(p);
@@ -1617,7 +1627,7 @@ function renderScript(d) {
       var sr=p.sparseRecovery, srFr=lang()==='fr';
       html+='<section class="t3-warnings" aria-label="'+(srFr?'Options pour les journées libres':'Options for activity gaps')+'"><h3>'+(srFr?'Adapter ce voyage':'Make this trip fit')+'</h3><p>'+(srFr?'Certaines journées n’ont aucune autre activité correspondante. Choisissez une option; votre plan ne change pas automatiquement.':'Some days have no additional matching activity. Choose an option; your plan stays unchanged until you do.')+'</p>';
       if(sr.shorterDays)html+='<button type="button" class="t3-btn" data-t3-shorten="'+sr.shorterDays+'">'+(srFr?'Essayer '+sr.shorterDays+' jour(s)':'Try '+sr.shorterDays+' day(s)')+'</button> ';
-      if(sr.region&&REGIONS.some(function(r){return r.slug===sr.region;})){var regionHref='/'+esc(sr.region);html+='<a class="t3-btn t3-btn-ghost" href="'+regionHref+'">'+(srFr?'Voir les lieux de cette région':'Review local places')+'</a>';}
+      if(sr.region&&REGIONS.some(function(r){return r.slug===sr.region;})){html+='<a class="t3-btn t3-btn-ghost" '+hrefAttr('/'+sr.region)+'>'+(srFr?'Voir les lieux de cette région':'Review local places')+'</a>';}
       html+='</section>';
     }
     html += t3ListingGapSummaryHtml(p,lang()==='fr',esc);
@@ -1625,7 +1635,7 @@ function renderScript(d) {
     // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
-      if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a href="#t3-day-' + d.day + '">' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
+      if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a ' + hrefAttr('#t3-day-' + d.day) + '>' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
       html += (p.days || []).map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
       html += schedHtml ? '<div class="t3-tools">' + schedHtml + '</div>' : '';
@@ -1642,13 +1652,13 @@ function renderScript(d) {
       html += '<h3 class="t3-section-title">' + esc(tx('tripv3.placesFit')) + '</h3><div class="t3-grid">' + p.recommendations.map(function(s){ return cardHtml(s, null, { counts: {} }); }).join('') + '</div>';
     } else if (p.kind === 'events') {
       var ev = p.events || [];
-      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.whatsOn')) + '</h3>' + (ev.length ? '<div class="t3-grid">' + ev.map(function(e){ var u = safeUrl(e.url); return '<article class="t3-card"><div class="t3-card-top"><span>' + esc(e.dateLabel) + (e.time ? ' · ' + esc(e.time) : '') + '</span></div><h4>' + (u ? '<a href="' + esc(u) + '">' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>' + (u ? '<div class="t3-actions"><a class="t3-act" href="' + esc(u) + '">' + esc(tx('tripv3.viewEvent')) + '</a></div>' : '') + '</article>'; }).join('') + '</div>' : '<p class="t3-empty">' + esc(tx('tripv3.nothingListed')) + '</p>');
+      html += '<h3 class="t3-section-title">' + esc(tx('tripv3.whatsOn')) + '</h3>' + (ev.length ? '<div class="t3-grid">' + ev.map(function(e){ var u = safeUrl(e.url); return '<article class="t3-card"><div class="t3-card-top"><span>' + esc(e.dateLabel) + (e.time ? ' · ' + esc(e.time) : '') + '</span></div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>' + (u ? '<div class="t3-actions"><a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a></div>' : '') + '</article>'; }).join('') + '</div>' : '<p class="t3-empty">' + esc(tx('tripv3.nothingListed')) + '</p>');
     } else if (p.kind === 'navigate' && p.venue && safeUrl(p.venue.url)) {
-      html += '<p class="t3-empty">' + esc(tx('tripv3.placeIs')) + ' <a class="t3-seeall" href="' + esc(p.venue.url) + '">' + esc(tx('tripv3.openPage')) + '</a></p>';
+      html += '<p class="t3-empty">' + esc(tx('tripv3.placeIs')) + ' <a class="t3-seeall" ' + hrefAttr(p.venue.url) + '>' + esc(tx('tripv3.openPage')) + '</a></p>';
     } else {
       html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
-    if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" href="' + esc(p.seeAll.url) + '">' + esc(tx('tripv3.seeAll')) + '</a>';
+    if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';
     detachMap();
     resultEl.innerHTML = html;
