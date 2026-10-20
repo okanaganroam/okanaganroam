@@ -12,6 +12,8 @@ const { sportsPhotoForVenue } = (() => { try { return require('./sports-photo-fa
 // links to official course maps -- golf pages only. Guarded like db.js so a
 // copy of the app without golf-data.js renders exactly as before.
 const golfData = (() => { try { return require('./golf-data.js'); } catch (e) { return null; } })();
+// French golf "At a glance" wording (round 12, 2026-10-20); null keeps the French card off (isolated-child tests).
+const golfGlanceFr = (() => { try { return require('./golf-glance-fr.js'); } catch (e) { return null; } })();
 function golfDetailsFor(venues) {
   return golfData ? golfData.getGolfDetails(db, venues) : new Map();
 }
@@ -85,7 +87,8 @@ const CSP_POLICY = [
   "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms https://static.cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "img-src 'self' data: blob: https:",
+  // Round 12 (2026-10-20): the map tile hosts are named too (already covered by https:) now that /map preconnects to them.
+  "img-src 'self' data: blob: https: https://*.tile.openstreetmap.org",
   "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.google.com https://*.google.ca https://*.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://api.mapbox.com https://places.googleapis.com",
   "worker-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
   "frame-src 'self'",
@@ -14872,7 +14875,7 @@ function renderGolfVenuePolishStyles() {
   }
   body.golf-page .golf-glance dt {
     font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em;
-    text-transform: uppercase; color: rgba(42,32,25,0.55); margin: 0 0 3px;
+    text-transform: uppercase; color: rgba(42,32,25,0.76); margin: 0 0 3px; /* round 12 (2026-10-20): was 0.55, 3.65:1 */
   }
   body.golf-page .golf-glance dd { margin: 0; font-size: 0.95rem; line-height: 1.45; color: var(--ink); }
   @media (max-width: 640px) {
@@ -15236,15 +15239,21 @@ const GOLF_AT_A_GLANCE_FACTS = {
   ],
 };
 
-function golfAtAGlanceHtml(venue) {
+function golfAtAGlanceHtml(venue, fr = false) {
   if (venue.type !== 'golf' || venue.redirect_to) return '';
   const facts = GOLF_AT_A_GLANCE_FACTS[`${venue.region}/${venue.slug}`];
   if (!facts || !facts.length) return '';
+  // French (round 12, 2026-10-20): the same facts restated in golf-glance-fr.js; a value with no French yet keeps
+  // its English wording, marked lang="en".
+  if (fr && !golfGlanceFr) return '';
   const items = facts
-    .map(([lbl, val]) => `<div class="golf-glance-item"><dt>${escapeHtml(lbl)}</dt><dd>${escapeHtml(val)}</dd></div>`)
+    .map(([lbl, val]) => {
+      const [l, v, en] = fr ? golfGlanceFr.frGlanceFact(lbl, val) : [lbl, val, false];
+      return `<div class="golf-glance-item"><dt>${escapeHtml(l)}</dt><dd${en ? ' lang="en"' : ''}>${escapeHtml(v)}</dd></div>`;
+    })
     .join('\n      ');
   return `<div class="venue-section golf-glance">
-    <h2>At a glance</h2>
+    <h2>${fr ? 'En bref' : 'At a glance'}</h2>
     <dl>
       ${items}
     </dl>
@@ -16874,7 +16883,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var OK_BOUNDS = L.latLngBounds([48.95, -120.2], [50.8, -118.25]);
   map.setMaxBounds(OK_BOUNDS.pad(0.04)); map.options.maxBoundsViscosity = 1;
   function okLimits(){ map.setMinZoom(Math.max(6, map.getBoundsZoom(OK_BOUNDS))); }
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: FR ? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
+  // Speed (round 12, 2026-10-20): a map tile is this page's largest paint (2.6-2.85 s on a throttled phone). The tile
+  // hosts are preconnected in <head>, and the first view's tiles are fetched at high priority (the attribute is set in
+  // the same task as Leaflet sets their src, before the browser starts the fetch); later tiles keep the default.
+  var firstTiles = true;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: FR ? '&copy; contributeurs OpenStreetMap' : '&copy; OpenStreetMap contributors', maxZoom: 19 })
+    .on('tileloadstart', function(e){ if (firstTiles && e.tile && e.tile.setAttribute) e.tile.setAttribute('fetchpriority', 'high'); })
+    .once('load', function(){ firstTiles = false; })
+    .addTo(map);
   // Overlapping pins (2026-10-18, review pass 4): clustering used to switch off at zoom 17, so places and events at the
   // very same spot (a winery and its restaurant, every event at one hall) sat on one another and only the top pin could
   // be tapped. From zoom 17 only pins within a pixel of each other still group; tapping that group fans them out.
@@ -18215,6 +18231,9 @@ function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
 <html lang="en">
 <head>
 ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
+<link rel="preconnect" href="https://a.tile.openstreetmap.org">
+<link rel="preconnect" href="https://b.tile.openstreetmap.org">
+<link rel="preconnect" href="https://c.tile.openstreetmap.org">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css"/>
@@ -25585,7 +25604,9 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-browse { margin: 40px 0 8px; }
   body.whatson-page .whatson-browse-list { list-style: none; padding: 0; margin: 8px 0 20px; display: flex; flex-wrap: wrap; gap: 8px 10px; }
   body.whatson-page .whatson-browse-list a, body.whatson-page .whatson-browse-list span { display: inline-block; background: var(--paper); border-radius: 999px; padding: 8px 14px; min-height: 44px; box-sizing: border-box; font-weight: 700; text-decoration: none; }
-  body.whatson-page .whatson-browse-list span { opacity: .6; }
+  /* Round 12 (2026-10-20): the current place ("The whole valley") was faded with opacity (3.59:1); it now reads as the
+     current item through an outline instead, in the breadcrumb's own colour (AA). */
+  body.whatson-page .whatson-browse-list span { background: transparent; border: 1px solid rgba(42,32,25,0.28); color: rgba(42,32,25,0.76); }
   body.whatson-page .whatson-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.whatson-page .whatson-results-step { margin-top: 4px; }
@@ -27435,6 +27456,10 @@ function renderVenuePageLayoutStyles() {
     body.golf-page .venue-cta-row { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; flex-direction: initial; align-items: stretch; }
     body.golf-page .venue-cta-row > * { width: auto !important; min-width: 0; margin: 0 !important; justify-content: center; text-align: center; line-height: 1.25; }
     body.golf-page .venue-cta-row .card-action, body.golf-page .venue-cta-row .cta { line-height: 1.25; }
+    /* Round 12 (2026-10-20): that line height left the one-line website, directions and phone buttons at 39px (#419), and the
+       10px padding stood a wrapped French « Ajouter au voyage » 56px tall. A 44px floor with a slimmer padding keeps
+       every button at 44px and a two-line label at about 46px. */
+    body.golf-page .venue-cta-row .card-action, body.golf-page .venue-cta-row .cta { min-height: 44px; box-sizing: border-box; padding: 6px 12px; }
     body.golf-page .venue-cta-row > .cta:not(.secondary) { grid-column: 1 / -1; }
     body.golf-page .venue-cta-row > :last-child:nth-child(even):not(.cta) { grid-column: auto; }
     body.golf-page .venue-hero-fallback.venue-hero-has-photo { min-height: 190px; }
@@ -27784,7 +27809,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frAdvisoryText).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
-  const golfGlanceHtml = fr ? '' : golfAtAGlanceHtml(venue);
+  const golfGlanceHtml = golfAtAGlanceHtml(venue, fr);
   // Golf data (2026-09-26): link to the club's own course map/scorecard page
   // and the verified green fees ('' when there is no data for this course).
   const golfMapHtml = !fr && golfData && golfDetail ? golfData.golfCourseMapHtml(golfDetail) : '';
@@ -28519,6 +28544,7 @@ function readableRecurrence(rule, refYear) {
 }
 // The event's picture: its own, else the photo for its kind of event (the
 // What's On card's picker), at full size when one exists beside the -800 copy.
+const EVENT_HERO_SIZES = '(max-width: 640px) and (min-resolution: 2dppx) 260px, (max-width: 640px) calc(100vw - 32px), (max-width: 860px) 100vw, 1200px';
 function eventHeroImage(full, categories) {
   if (full.image_url && /^https:\/\//.test(full.image_url)) return { small: full.image_url, big: full.image_url };
   const small = homeEventImage({ id: full.id, name: full.name, description: full.description, categories, image: full.image_url });
@@ -28679,7 +28705,7 @@ function renderEventPage(event, hostVenue, opts = {}) {
   const pastOccs = occurrences.filter((o) => o.end_date < todayStr);
   const comingOccs = occurrences.filter((o) => o.end_date >= todayStr);
   const datesListHtml = isSeries ? `
-  <section class="event-dates" aria-labelledby="eventDatesHeading">
+  <section class="event-dates" aria-labelledby="eventDatesHeading" tabindex="0">
     <h2 id="eventDatesHeading">${comingOccs.length ? 'Upcoming dates' : 'All dates'}</h2>
     <ol class="event-date-list">
 ${(comingOccs.length ? comingOccs : occurrences).map(dateItem).join('\n')}
@@ -28712,7 +28738,10 @@ ${pastOccs.map(dateItem).join('\n')}
   // A photo for every event page (2026-10-14): its own, else one for its kind.
   const hero = eventHeroImage(full, categories);
   const ownImage = !!(full.image_url && /^\/(?!\/)|^https:\/\//.test(full.image_url));
-  const imageHtml = `<div class="event-hero"><img src="${escapeHtml(hero.big)}"${imgDimsAttr(hero.big)}${hero.big !== hero.small ? ` srcset="${escapeHtml(hero.small)} 800w, ${escapeHtml(hero.big)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''} alt="${ownImage ? escapeHtml(full.name) : ''}" fetchpriority="high">${ownImage ? '' : '<span class="event-hero-example">Example photo</span>'}</div>`;
+  // Speed (round 12, 2026-10-20): on a phone the photo is a 160px-tall strip, so the 800px copy is already about 2.3x
+  // its width; a 2x or 3x phone asks for 260px (the 800px copy) instead of taking the 1600px one (258 KB), as the
+  // venue heroes do. Tablets and computers keep their sizes.
+  const imageHtml = `<div class="event-hero"><img src="${escapeHtml(hero.big)}"${imgDimsAttr(hero.big)}${hero.big !== hero.small ? ` srcset="${escapeHtml(hero.small)} 800w, ${escapeHtml(hero.big)} 1600w" sizes="${EVENT_HERO_SIZES}"` : ''} alt="${ownImage ? escapeHtml(full.name) : ''}" fetchpriority="high">${ownImage ? '' : '<span class="event-hero-example">Example photo</span>'}</div>`;
   const next = eventNextOccurrence(occurrences, todayStr);
   const statusText = expired ? null : eventStatusText(next, todayStr, isSeries);
   // The calendar-import sentence becomes its short summary (the What's On card's).
@@ -28818,12 +28847,19 @@ ${renderAnalyticsHeadHtml('event')}
     .event-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0 40px; align-items: start; }
     .event-aside { position: sticky; top: 84px; }
     .event-aside .event-dates { max-height: 60vh; overflow: auto; }
+    /* Round 12 (2026-10-20): the scrolling date list takes keyboard focus (tabindex=0) so arrow keys can scroll it. */
+    .event-aside .event-dates:focus-visible { outline: 2px solid var(--ref-navy, #1B2B3A); outline-offset: 4px; border-radius: 4px; }
   }
   @media (max-width: 640px) {
     .event-hero { height: 160px; border-radius: 12px; }
     .event-cta-row { display: grid; grid-template-columns: 1fr 1fr; }
     .event-cta-row .event-cta-primary { grid-column: 1 / -1; }
     .event-cta-row .cta { display: flex; align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box; text-align: center; line-height: 1.3; }
+    /* Round 12 (2026-10-20): a slimmer padding, and a button left alone on the last row takes the whole row, so
+       « Ajouter à Google Agenda » is one line instead of three at 320px. */
+    .event-cta-row .cta { padding: 8px 10px; line-height: 1.25; }
+    .event-cta-row > .event-cta-primary ~ .cta:last-child:nth-child(even),
+    .event-cta-row > .cta:first-child:not(.event-cta-primary) ~ .cta:last-child:nth-child(odd) { grid-column: 1 / -1; }
     /* Tap targets (2026-10-20, round 11): the Where / Region / Website links and the "More events" names are 44px
        tall to a finger (they were 20-23px). The details rows keep their spacing through negative margins; the
        related list gets the room instead, so neighbouring names never overlap. */
@@ -34612,6 +34648,8 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page a.mt-name { display: inline-block; padding: 10px 0; margin: -10px 0; }
   body.my-trip-page .leaflet-container a.leaflet-popup-close-button { width: 44px; height: 44px; font-size: 26px; line-height: 44px; text-align: center; }
   body.my-trip-page .leaflet-popup-content { margin-right: 44px; }
+  /* Round 12 (2026-10-20): no 200px floor (app.css), so the popup fits beside the zoom buttons on a 320px phone. */
+  body.my-trip-page .leaflet-popup-content { min-width: 0; }
   body.my-trip-page .leaflet-popup-content a { display: inline-flex; align-items: center; min-height: 44px; }
   body.my-trip-page .mt-meta { margin: 2px 0 0; font-size: 0.86rem; opacity: 0.75; }
   body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
@@ -34880,7 +34918,10 @@ ${renderGolfHeaderHtml()}
     var shift = pts.map(function(){ return { dx: 0, dy: 0 }; });
     var markers = pts.map(function(p){
       var mk = L.marker([p.lat, p.lng], { icon: pinIcon(p, 0, 0), title: p.n + '. ' + p.name });
-      mk.bindPopup('<strong>' + p.n + '.</strong> ' + (p.url ? '<a ' + hrefAttr(p.url) + '>' + esc(p.name) + '</a>' : esc(p.name)));
+      // Round 12 (2026-10-20): the popup pans clear of the zoom buttons (top left) instead of opening under them on a
+      // phone, and is narrow enough to fit beside them (66px for the buttons, 64px for the popup's own margins and its
+      // close button, a few px on the right), so a long name wraps instead of running off a 320px screen.
+      mk.bindPopup('<strong>' + p.n + '.</strong> ' + (p.url ? '<a ' + hrefAttr(p.url) + '>' + esc(p.name) + '</a>' : esc(p.name)), { autoPanPaddingTopLeft: [66, 12], maxWidth: Math.max(120, Math.min(300, (box.clientWidth || 400) - 140)) });
       return mk;
     });
     layer = L.layerGroup(markers).addTo(map);
@@ -37628,6 +37669,10 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-strip { display: flex; gap: 6px; margin: 6px 0 0; }
         .vg-thumb { position: relative; flex: 1 1 0; min-width: 0; max-width: 96px; height: 64px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: #EAE6D9; }
         .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        /* Round 12 (2026-10-20): without JavaScript the waiting (src-less) image showed a broken-image icon over the
+           <noscript> copy. It is now hidden and out of the flow until the loader gives it a src; it keeps its box, so
+           the loader (which skips images with no layout box) still finds it. */
+        .vg-thumb img[data-src]:not([src]) { position: absolute; inset: 0; visibility: hidden; }
         .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
         .vg-mosaic + .venue-photo-credit { margin-top: 6px !important; margin-bottom: 14px !important; }
         /* Round 11 (2026-10-20): phones show the strip and credit after the buttons (.vg-phone), wider screens by the photo. */

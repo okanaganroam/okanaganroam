@@ -4298,6 +4298,11 @@ document.addEventListener('click', function(e){
   function doScroll(){
     var headerEl = document.querySelector('header');
     var offset = (headerEl ? headerEl.offsetHeight : 0) + 12;
+    // Round 12 (2026-10-20): a target's own scroll-margin-top wins when it is larger (the planner's .t3-day keeps
+    // 140px for the site header plus the sticky day tabs; header + 12 left the day heading under the tabs).
+    var margin = 0;
+    try { margin = parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0; } catch (err) {}
+    if (margin > offset) offset = margin;
     var top = target.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({ top: top, behavior: 'smooth' });
     try { history.pushState(null, '', '#' + id); } catch (err) {}
