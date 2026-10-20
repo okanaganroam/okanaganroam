@@ -34130,7 +34130,7 @@ ${renderGolfHeaderHtml()}
 // deliver the pages); the Terms are short and in plain English.
 const INFO_PAGE_UPDATED = 'October 14, 2026';
 const INFO_CONTACT_EMAIL = 'info@okanaganroam.com';
-function renderInfoPage({ path, name, title, description, heading, lead, bodyHtml, banner = null }) {
+function renderInfoPage({ path, name, title, description, heading, lead, bodyHtml, banner = null, jsonLd = [] }) {
   const canonical = `https://okanaganroam.com${path}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -34139,7 +34139,7 @@ function renderInfoPage({ path, name, title, description, heading, lead, bodyHtm
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true, ...(banner ? { shareImage: banner.src } : {}) })}
+${pageHead(title, description, canonical, [breadcrumb, ...jsonLd], { golfTheme: true, ...(banner ? { shareImage: banner.src } : {}) })}
 ${renderAnalyticsHeadHtml('info')}
 ${banner ? CATEGORY_BANNER_STYLE : ''}
 <style>
@@ -34174,8 +34174,38 @@ ${renderGolfHeaderHtml()}
 </body>
 </html>`;
 }
+// About page (2026-10-20, SEO after the Oct 11 drop): who runs the site, live counts and how listings are checked, so
+// people and Google can see a real, accountable local guide. Counts are read live; French is in data/french/about-*.json.
+function aboutPageStats() {
+  try {
+    const places = db.prepare('SELECT region FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all().filter((v) => REGION_LABELS[v.region]).length;
+    const events = listEventsForSitemap().filter((e) => REGION_LABELS[e.region]).length;
+    const guides = Object.keys(FILE_GUIDES).filter((p) => !guideIsThin(FILE_GUIDES[p])).length + 6;
+    return { places, events, guides, towns: Object.keys(REGION_LABELS).length };
+  } catch (e) { return null; }
+}
+function aboutPageSchema() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    url: 'https://okanaganroam.com/about',
+    name: 'About Okanagan Roam',
+    mainEntity: {
+      '@type': 'Organization',
+      name: 'Okanagan Roam',
+      url: 'https://okanaganroam.com/',
+      email: INFO_CONTACT_EMAIL,
+      founder: { '@type': 'Person', name: 'Dayton' },
+      areaServed: { '@type': 'Place', name: 'Okanagan Valley, British Columbia, Canada' },
+      sameAs: ['https://www.instagram.com/okanaganroam', 'https://www.facebook.com/okanaganroam', 'https://www.tiktok.com/@okanaganroam'],
+    },
+  };
+}
 function renderAboutPage() {
+  const stats = aboutPageStats();
+  const n = (x) => Number(x).toLocaleString('en-CA');
   return renderInfoPage({
+    jsonLd: [aboutPageSchema()],
     path: '/about',
     name: 'About',
     title: 'About Okanagan Roam | A Local Guide to the Okanagan Valley',
@@ -34184,21 +34214,37 @@ function renderAboutPage() {
     banner: { src: regionPhoto('kelowna').src, alt: regionPhoto('kelowna').alt, pos: regionPhoto('kelowna').pos },
     lead: 'Okanagan Roam is a free, locally run guide to the Okanagan Valley &mdash; the restaurants, wineries, beaches, trails, hidden corners and events worth knowing about, from Enderby to Osoyoos, all in one place.',
     bodyHtml: `<h2>Made here, by a local</h2>
+    <p>Hi, I&rsquo;m Dayton.</p>
     <p>I was born and raised in Kelowna, and Okanagan Roam began with a simple love for this valley. For the people behind its caf&eacute;s, wineries and family-run businesses. For the lakes, orchards and mountains that never get old. For the quiet trails where you can still spot an osprey over the water or a bighorn sheep on the hillside.</p>
     <p>The Okanagan is truly one of the best places in the world. It deserves a guide that does it justice.</p>
     <h2>Why it exists</h2>
     <p>Planning a day here used to mean a dozen open tabs: one for hours, one for a patio, another for what&rsquo;s on tonight, and a map to tie it all together. Okanagan Roam brings it into one place. Find a lakeside lunch, a winery for the afternoon, a beach the kids will love and something happening tonight, then build your whole trip as you go.</p>
     <p>Whether you&rsquo;re here for a weekend or you&rsquo;ve lived here all your life, the goal is the same: make it easy to see the very best the Okanagan has to offer.</p>
+    ${stats ? `<h2>What&rsquo;s on the site</h2>
+    <ul>
+      <li><strong>Places to go.</strong> ${n(stats.places)} restaurants, wineries, caf&eacute;s, beaches, trails and more in ${n(stats.towns)} towns, from Enderby to Osoyoos.</li>
+      <li><strong>What&rsquo;s on.</strong> ${n(stats.events)} upcoming events, updated every week.</li>
+      <li><strong>Local guides.</strong> ${n(stats.guides)} guides written for the season, from fall farms to ski days.</li>
+      <li><strong>Build My Trip.</strong> A free planner that turns one sentence into a day or a weekend, using only the places listed here.</li>
+    </ul>` : ''}
     <h2>How places get on the site</h2>
     <ul>
       <li><strong>Every listing is free.</strong> Restaurants, wineries, caf&eacute;s, parks and events are listed at no cost.</li>
       <li><strong>Details are checked.</strong> Hours, addresses and features come from official sources &mdash; the business&rsquo;s own website, its Google listing or the business itself &mdash; and get updated when they change.</li>
       <li><strong>Picks have a reason.</strong> Hidden Gems, Local Favourites and the guides are chosen by hand, and every card says why it made the list.</li>
+      <li><strong>Owners keep their listing up to date.</strong> Every business gets a free edit link to change its hours, add photos and menus, and post events.</li>
+      <li><strong>Star ratings come from Google reviews.</strong> We don&rsquo;t write, buy or edit reviews.</li>
+      <li><strong>Photos come with credit.</strong> When a business sends its own photos, its name goes with them.</li>
+      <li><strong>Nothing here is paid for.</strong> No business pays to be listed, ranked or featured.</li>
     </ul>
+    <h2>Spotted a mistake?</h2>
+    <p>Hours change and places close. If something is out of date, tell us and we&rsquo;ll fix it, usually within a couple of days.</p>
+    <p class="info-cta"><button type="button" data-contact-open data-contact-topic="correction" aria-haspopup="dialog" aria-controls="contactDialog">Report a mistake</button></p>
     <h2>Run a business or an event?</h2>
     <p>If your business is missing, a detail is out of date or you have photos to share, we would love to hear from you. Event organizers can send their events for the What&rsquo;s On calendar, free.</p>
     <p class="info-cta"><a href="/list-your-venue">List your venue</a><a href="/list-an-event">List an event</a><button type="button" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog">Say hello</button></p>
-    <p class="info-updated">Okanagan Roam &middot; Kelowna, British Columbia &middot; <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a></p>`,
+    <p class="info-updated">Run by Dayton in Kelowna, British Columbia. Page updated in October 2026.</p>
+    <p>Okanagan Roam &middot; Kelowna, British Columbia &middot; <a href="mailto:${INFO_CONTACT_EMAIL}">${INFO_CONTACT_EMAIL}</a></p>`,
   });
 }
 function renderContactPage() {
