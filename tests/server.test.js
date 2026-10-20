@@ -4326,15 +4326,15 @@ test('H1 Step 3: venue pages link the next publishable events at that venue, omi
     assert.ok(!href.includes('?'), 'no query-string links');
   }
 
-  // 7. The relationship is venue_id only -- an event naming this venue in
-  //    venue_name_text is never picked up.
+  // 7. Round 11 (2026-10-20): an event naming exactly this venue (same town) in
+  //    venue_name_text is picked up too (eventAutoVenueIndex).
   const byName = app.createEvent({
     region: 'kelowna', name: 'Nameplate Gathering', description: 'H1 Step 3 fixture.', source_type: 'official_organizer',
     source_name: 'H1S3 name-only', source_url: 'https://example.com/h1s3/name-only',
     venue_name_text: venue.name, categories: ['community-events'], occurrences: [{ start_date: '2033-05-06' }],
   }, { reason: 'H1 Step 3 fixture', batch_id: 'test-h1s3' });
   assert.equal(byName.ok, true, JSON.stringify(byName));
-  assert.ok(!app.listUpcomingEventsAtVenue(venue.id, { limit: 50 }).map((e) => e.slug).includes(byName.event.slug), 'venue_name_text match is never linked');
+  assert.ok(app.listUpcomingEventsAtVenue(venue.id, { limit: 50 }).map((e) => e.slug).includes(byName.event.slug), 'an exact venue_name_text match is linked (round 11)');
 
   // 8. A different venue never picks up this venue's events.
   assert.deepEqual(app.listUpcomingEventsAtVenue(other.id, { limit: 50 }).map((e) => e.slug).sort(), otherBaseline,
@@ -22920,7 +22920,7 @@ test('Menus (2026-10-17): reading, checking and publishing a menu; private links
     assert.equal(s.menu.pages.length, 2);
     assert.equal(s.menu.status, 'draft');
     // Nothing public yet.
-    assert.equal((await get('/kelowna/restaurants/menu-fixture-bistro/menu')).status, 302);
+    assert.equal((await get('/kelowna/restaurants/menu-fixture-bistro/menu')).status, 404, 'round 11: no live menu is a 404');
 
     // Reading: both pages go to the reader; the result is cleaned up.
     assert.equal((await post(`${menuBase}/read`, {})).status, 200);
@@ -23008,7 +23008,7 @@ test('Menus (2026-10-17): reading, checking and publishing a menu; private links
     assert.doesNotMatch(await get('/sitemap.xml').then((r) => r.text()), /menu-fixture-cafe\/menu/);
     // Taking it down removes the page.
     assert.equal((await post(`${cBase}/unpublish`, {}, oc)).status, 200);
-    assert.equal((await get('/kelowna/cafes/menu-fixture-cafe/menu')).status, 302);
+    assert.equal((await get('/kelowna/cafes/menu-fixture-cafe/menu')).status, 404, 'round 11: no live menu is a 404');
 
     // "Can you do it for me?" goes to info@, with the photos, and lands in Dayton's queue.
     assert.equal((await post(`${cBase}/pages`, { image: dataUrl(jpeg(1600, 1200)) }, oc)).status, 201);
@@ -23150,7 +23150,7 @@ test('Tours & prices (2026-10-17): tour operators use the uploader for their pri
     assert.deepEqual(offer, { '@type': 'Offer', itemOffered: { '@type': 'TouristTrip', name: 'Naramata Bench Tour', description: '4 hours, includes lunch' }, price: '129.00', priceCurrency: 'CAD' });
     assert.equal(biz.hasOfferCatalog.itemListElement[0].itemListElement[2].price, '1299.00');
     // A tour operator has no /menu page, and the place page links to /prices.
-    assert.equal((await get('/kelowna/tours/prices-fixture-tours/menu')).status, 302);
+    assert.equal((await get('/kelowna/tours/prices-fixture-tours/menu')).status, 301, 'round 11: /menu goes to its /prices');
     const venuePage = await get('/kelowna/tours/prices-fixture-tours').then((r) => r.text());
     assert.match(venuePage, /See all tours &amp; prices \(3 tours\)/);
     assert.doesNotMatch(venuePage, /"hasMenu"/);
@@ -26873,7 +26873,8 @@ test('Portal polish (2026-10-18): folded seasonal-hours and closures headers say
     const seasonal = specs.filter((x) => x.validFrom && x.opens !== '00:00');
     assert.equal(seasonal.length, 5);
     assert.deepEqual(seasonal[0], { '@type': 'OpeningHoursSpecification', dayOfWeek: seasonal[0].dayOfWeek, opens: '10:00', closes: '16:00', validFrom: '2026-11-01', validThrough: '2027-04-30' });
-    assert.equal(specs.filter((x) => x.opens === '00:00' && x.closes === '00:00').length, 0, 'round 8: closures are not mixed into the week');
+    // Round 11: the closed days are also dated entries in openingHoursSpecification (Google's way), never undated.
+    assert.deepEqual(specs.filter((x) => x.opens === '00:00' && x.closes === '00:00'), [{ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: '2026-12-25', validThrough: '2026-12-26' }]);
     const closed = ld(app.renderVenuePage(fresh, [], [], [], { now: new Date('2026-10-18T19:00:00Z'), lang })).specialOpeningHoursSpecification;
     assert.deepEqual(closed, [{ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: '2026-12-25', validThrough: '2026-12-26' }], 'the closure already over is left out');
   }
@@ -29900,10 +29901,10 @@ test('Round 8 tech: a temporary closure is a specialOpeningHoursSpecification, a
     for (const lang of ['en', 'fr']) {
       const biz = ld(app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'r8-closure-fixture'), [], [], [], { now, lang }));
       assert.deepEqual(biz.specialOpeningHoursSpecification, expected, lang);
-      assert.equal(biz.openingHoursSpecification.length, 7, 'the week is only the week');
+      assert.equal(biz.openingHoursSpecification.length, 8, 'the week, plus the dated closure (round 11)');
     }
     const noHours = ld(app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r8-no-hours-fixture'), [], [], [], { now }));
-    assert.equal(noHours.openingHoursSpecification, undefined);
+    assert.deepEqual(noHours.openingHoursSpecification, expected, 'round 11: only the dated closure');
     assert.deepEqual(noHours.specialOpeningHoursSpecification, expected);
     assert.deepEqual(app.closureSpecialHoursSpecification(v.id, new Date('2026-11-05T19:00:00Z')), [], 'gone once the closure is over');
   } finally {
@@ -30458,7 +30459,8 @@ test('R9 tech: event offers read stated and free prices; organizer is the source
   const ev = { name: 'R9', region: 'oliver', source_type: 'tourism_org', source_name: 'Tourism Board', description: 'A tasting. Free.' };
   assert.deepEqual(app.eventOrganizerSchema(ev, winery), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://r9-winery.example/' });
   assert.deepEqual(app.eventOrganizerSchema(ev, { ...winery, website: null }), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://okanaganroam.com/oliver/wineries/r9-test-winery' });
-  assert.equal(app.eventOrganizerSchema(ev, theatre), undefined, 'a hall is not assumed to run the show');
+  // Round 11: with no presenter named, the linked hall is the organizer.
+  assert.deepEqual(app.eventOrganizerSchema(ev, theatre), { '@type': 'Organization', name: 'R9 Test Theatre', url: 'https://r9-theatre.example/' });
   assert.equal(app.eventOrganizerSchema(ev, null), undefined, 'a tourism listing is not the organizer');
   assert.deepEqual(app.eventOrganizerSchema({ ...ev, source_type: 'league_feed', source_name: 'Okanagan Hockey League', source_url: 'https://ohl.example/s' }, null),
     { '@type': 'SportsOrganization', name: 'Okanagan Hockey League', url: 'https://ohl.example/s' });
@@ -31285,8 +31287,9 @@ test('R10 tech: event offers and organizer backfill (free wording, linked places
   assert.deepEqual(app.eventOrganizerSchema(ev, hill), { '@type': 'Organization', name: 'R10 Ski Hill', url: 'https://r10-hill.example/' });
   assert.equal(app.eventOrganizerSchema(ev, gallery).name, 'R10 Art Gallery');
   assert.match(app.eventOrganizerSchema(ev, gallery).url, /^https:\/\/okanaganroam\.com\/kelowna\//);
-  assert.equal(app.eventOrganizerSchema(ev, arena), undefined, 'an arena that rents its ice is not assumed to run the event');
-  assert.equal(app.eventOrganizerSchema(ev, pac), undefined, 'nor a performing arts centre');
+  // Round 11: a hall is the organizer when no presenter is named.
+  assert.equal(app.eventOrganizerSchema(ev, arena).name, 'R10 Memorial Arena');
+  assert.equal(app.eventOrganizerSchema(ev, pac).name, 'R10 Performing Arts Centre');
   assert.equal(app.eventOrganizerSchema(ev, null), undefined, 'a tourism listing is still not the organizer');
   const city = { ...ev, source_type: 'municipal', source_name: 'City of Enderby', source_url: 'https://enderby.example/events', description: 'A parade organized free by the City of Enderby with help from local businesses.' };
   assert.deepEqual(app.eventOrganizerSchema(city, null), { '@type': 'GovernmentOrganization', name: 'City of Enderby', url: 'https://enderby.example/events' });
