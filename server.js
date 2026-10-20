@@ -28106,6 +28106,26 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-hours-temp-closed { margin: 6px 0 8px; font-weight: 700; }
   body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 today"; font-weight: 700; opacity: 0.6; }
   html[lang="fr"] body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 aujourd\u2019hui"; }
+  /* Close by (2026-10-20): the closest places, right under the actions. A row that scrolls sideways on a phone, a
+     three-across grid on wider screens. */
+  body.golf-page .nearby-strip { margin: 18px 0 22px; }
+  body.golf-page .nearby-strip h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  body.golf-page .nearby-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  body.golf-page .nearby-card { display: flex; flex-direction: column; gap: 8px; background: var(--paper, #FBF6EC); border-radius: 14px; overflow: hidden; padding-bottom: 10px; }
+  body.golf-page .nearby-link { display: flex; flex-direction: column; gap: 3px; text-decoration: none; color: var(--ink, #2A2019); }
+  body.golf-page .nearby-link img { width: 100%; height: 120px; object-fit: cover; display: block; background: rgba(42,32,25,0.08); }
+  body.golf-page .nearby-type { font-size: 0.78rem; font-weight: 700; color: rgba(42,32,25,0.72); padding: 0 12px; margin-top: 6px; }
+  body.golf-page .nearby-name { font-weight: 800; line-height: 1.25; padding: 0 12px; }
+  body.golf-page .nearby-link:hover .nearby-name { text-decoration: underline; }
+  body.golf-page .nearby-card .trip-btn { align-self: flex-start; margin: auto 12px 0; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px;
+    background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); border-radius: 999px; padding: 6px 14px; font: 700 0.84rem 'Nunito', 'Nunito Fallback', sans-serif; cursor: pointer; }
+  body.golf-page .nearby-card .trip-btn.in-trip { background: var(--teal); color: var(--paper); border-color: var(--teal); }
+  @media (max-width: 640px) {
+    body.golf-page .nearby-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; gap: 10px; margin: 0 -16px; padding: 0 16px 6px; scrollbar-width: none; }
+    body.golf-page .nearby-list::-webkit-scrollbar { display: none; }
+    body.golf-page .nearby-card { flex: 0 0 62%; scroll-snap-align: start; }
+    body.golf-page .nearby-link img { height: 104px; }
+  }
   /* Actions: one primary button, then the rest two by two on a phone. */
   @media (max-width: 640px) {
     /* Round 11 (2026-10-20): the buttons of a row share its height (French « Ajouter au voyage » wraps to two lines and
@@ -28461,9 +28481,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // CTA buttons — only ever rendered when the underlying data already
   // exists; nothing here fabricates a website, phone number, or address.
   const ctaButtons = [
-    venue.website ? `<a class="cta" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${L('Visit Website', 'Visiter le site Web')}</a>` : null,
-    venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book', 'R\u00e9server')}</a>` : null,
-    mapsUrl ? `<a class="cta secondary" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('Get Directions', 'Itin\u00e9raire')}</a>` : null,
+    // Phone visitors (2026-10-20): Directions is the main button (what someone on the move wants, and it keeps them
+    // with us afterwards), and Website is a plain button marked as opening elsewhere. With no address, Website stays
+    // the main button as before.
+    mapsUrl ? `<a class="cta" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('Get Directions', 'Itin\u00e9raire')}</a>` : null,
+    venue.website ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
+    venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
@@ -28523,6 +28546,48 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       <div class="related-meta">${metaLine ? escapeHtml(metaLine) + ' ' : ''}${frChip(badge)}</div></div>
     </div>`;
   }
+
+  // Close by (2026-10-20, phone visitors): right under the action buttons, the closest places of any kind (this one's
+  // neighbours, not the whole town), each with "N min walk / drive" and a one-tap Add to trip, so a phone visit that
+  // came for one place can turn into a plan. Straight-line distance, so the times are rough ("about"). Only places with
+  // coordinates within 15 km; shown when there are at least two. The full "Other … in" / "More to explore" sections
+  // stay at the bottom.
+  const nearbyStripPhotos = new Set();
+  const nearbyStripHtml = (() => {
+    if (venue.redirect_to) return '';
+    const seen = new Set([venue.id]);
+    const pool = [...nearbyVenues, ...relatedVenues].map((v) => {
+      const km = typeof v.distance_km === 'number' ? v.distance_km : venueDistanceKm(venue, v);
+      return km === null || km === undefined ? null : { v, km };
+    }).filter((x) => x && x.km <= 15 && x.v.slug && CATEGORY_SLUGS[x.v.type] && !seen.has(x.v.id) && seen.add(x.v.id))
+      .sort((a, b) => a.km - b.km).slice(0, 6);
+    if (pool.length < 2) return '';
+    const away = (km) => (km <= 1.2
+      ? L(`${Math.max(1, Math.round(km * 12))} min walk`, `${Math.max(1, Math.round(km * 12))} min à pied`)
+      : L(`${Math.round(km * 1.6 + 2)} min drive`, `${Math.round(km * 1.6 + 2)} min en voiture`));
+    const cards = pool.map(({ v, km }) => {
+      const typeLabel = ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type;
+      const href = fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
+      const photo = venueThumbPhoto(v, nearbyStripPhotos);
+      const tripQuery = `${v.name}, ${REGION_LABELS[v.region] || v.region}, Okanagan Valley, BC`;
+      return `<li class="nearby-card" data-venue-id="${v.id}">
+        <a class="nearby-link" href="${href}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="nearby-type">${escapeHtml(typeLabel)} · ${escapeHtml(away(km))}</span><span class="nearby-name">${escapeHtml(v.name)}</span></a>
+        <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(L(`Add ${v.name} to trip`, `Ajouter ${v.name} au voyage`))}">${APP_TRIP_LABEL_HTML}</button>
+      </li>`;
+    }).join('');
+    return `<section class="nearby-strip" aria-labelledby="nearbyStripHead">
+    <h2 id="nearbyStripHead">${L('Close by', 'À proximité')}</h2>
+    <ul class="nearby-list">${cards}</ul>
+    <script>(function(){
+      document.querySelectorAll('.nearby-strip .nearby-link').forEach(function(a){
+        a.addEventListener('click', function(){
+          var c = a.closest('.nearby-card');
+          if (window.trackEvent) window.trackEvent('nearby_click', { from_venue_id: ${Number(venue.id)}, venue_id: c ? Number(c.getAttribute('data-venue-id')) : null, surface: 'venue_page' });
+        });
+      });
+    })();</script>
+  </section>`;
+  })();
 
   // H1 Step 3 (2026-09-22): a short "Events at {Venue}" block, built from the
   // same live predicate as the sitemap and the event/region blocks, so links
@@ -28633,6 +28698,7 @@ ${VENUE_MENU_CSS}` : ''}
        a phone and come first in the tab order. Wider screens keep the description first (renderVenuePageLayoutStyles). -->${venueAdvisoryHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${galleryHtml ? `\n  ${galleryHtml.phone(creditHtml)}` : ''}
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${editorialHtml}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
+  ${nearbyStripHtml}
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
