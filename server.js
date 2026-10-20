@@ -146,7 +146,8 @@ function sendJSON(res, status, data) {
   // CORS (2026-10-19, round 9): only the public reads under /api/ grant other sites access, and only GET/HEAD; the
   // request handler sets those headers (apiCorsHeaders). Writes are same-origin (owner portal, forms) or Node scripts
   // with a Bearer token, which need no CORS.
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  // Round 12 (2026-10-20): an error answer (a deep /api 404, the 401 of an admin read) is never cached.
+  res.writeHead(status, status >= 400 && !res.getHeader('cache-control') ? { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } : { 'Content-Type': 'application/json' });
   res.end(body);
 }
 
@@ -2380,6 +2381,16 @@ function rowToEvent(row) {
   };
 }
 
+// The published event with the same name in another town, for an unpublished event's old address (round 12). -> the
+// twin's { region, slug } or null (also when the event is published, missing, or the name matches several).
+function eventMovedTwin(region, slug) {
+  try {
+    const row = db.prepare('SELECT id, name, status FROM events WHERE region = ? AND slug = ?').get(region, slug);
+    if (!row || row.status === 'scheduled') return null;
+    const twins = db.prepare("SELECT region, slug FROM events WHERE status = 'scheduled' AND region != ? AND LOWER(TRIM(name)) = LOWER(TRIM(?))").all(region, row.name);
+    return twins.length === 1 && REGION_LABELS[twins[0].region] && twins[0].slug ? twins[0] : null;
+  } catch (e) { return null; }
+}
 function findEventBySlug(region, slug) {
   const row = db.prepare('SELECT * FROM events WHERE region = ? AND slug = ?').get(region, slug);
   return row ? rowToEvent(row) : null;
@@ -9084,6 +9095,55 @@ function closureSpecialHoursSpecification(venueId, now = new Date()) {
   for (const c of x.closures || []) {
     if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(c.from) || (c.to || c.from) < today) continue;
     out.push({ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: c.from, validThrough: c.to || c.from });
+  }
+  return out;
+}
+
+// Closures in force (2026-10-20, round 12): 57 venues "Closed for the season" and Wings Tap & Grill ("Temporarily
+// closed") published their weekly hours with no dates, so Google read them as open; the other 130 season-closed
+// venues only looked right because they have no hours stored at all. While a season closure, a current temporary
+// closure or a written "Temporarily closed" advisory is in force, the venue's structured data says closed from today
+// (Pacific) through the day before it reopens (or six months when no date is known), and the weekly hours start on
+// the reopening date (or are left out when there is none).
+// -> null | { validFrom, validThrough, reopens }
+const ADVISORY_TEMP_CLOSED_RE = /^\s*(?:temporarily closed|closed temporarily)\b/i;
+function addLocalMonths(dateStr, months) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
+function venueClosureInForce(venueId, now = new Date()) {
+  const today = todayLocal(now);
+  const range = (reopens, from = today) => {
+    const r = reopens && parseLocalDate(reopens) && reopens > today ? reopens : null;
+    return { validFrom: from, validThrough: r ? addLocalDays(r, -1) : addLocalMonths(today, 6), reopens: r };
+  };
+  const st = getSeasonStates(now).get(venueId);
+  if (st && st.kind === 'closed') {
+    const row = getSeasonRows(today).get(venueId);
+    return range(row && row.reopens_date);
+  }
+  // A temporary closure keeps its own first day (the same closed spec as specialOpeningHoursSpecification).
+  if (st && st.kind === 'temp_closed' && st.current) return range(addLocalDays(st.to, 1), st.from);
+  const note = getCollectionNotes(ADVISORY_COLLECTION_KIND).get(venueId);
+  const text = note ? parseAdvisoryNote(note).text : '';
+  // Only an open-ended notice: one that names a return ("until", "reopens Nov 5") is left to the dated closures.
+  if (text && ADVISORY_TEMP_CLOSED_RE.test(text) && !/\buntil\b/i.test(text) && !ADVISORY_REOPENING_RE.test(text)) return range(null);
+  return null;
+}
+// The venue's openingHoursSpecification while `closure` is in force: one closed spec for the closure, the undated
+// weekly specs from the reopening date (left out with no date), and dated specs (seasons, closures) only where they
+// run past the closure.
+function closureAwareOpeningHours(specs, closure) {
+  const out = [{ '@type': 'OpeningHoursSpecification', opens: '00:00', closes: '00:00', validFrom: closure.validFrom, validThrough: closure.validThrough }];
+  for (const spec of specs || []) {
+    if (spec.validFrom || spec.validThrough) {
+      if ((spec.validThrough || '9999-12-31') > closure.validThrough) {
+        out.push(!spec.validFrom || spec.validFrom <= closure.validThrough ? { ...spec, validFrom: addLocalDays(closure.validThrough, 1) } : spec);
+      }
+      continue;
+    }
+    if (closure.reopens) out.push({ ...spec, validFrom: closure.reopens });
   }
   return out;
 }
@@ -18175,6 +18235,14 @@ function mapEventsData(now = new Date()) {
     seen.add(r.id);
     let venue = r.venue_id ? venueQ.get(r.venue_id) : null;
     if (venue && venue.redirect_to) venue = venueQ.get(venue.redirect_to);
+    // Round 12 (2026-10-20): else the listing the event is linked to by name (eventAutoVenueIndex: "Cannery Brewing",
+    // "Historic O'Keefe Ranch, 9380 Hwy 97 N, Vernon", "The Sage Pub, Osoyoos"), then the exact-name match.
+    if (!venue) {
+      const autoId = eventAutoVenueIndex().byEvent.get(r.id);
+      let auto = autoId ? venueQ.get(autoId) : null;
+      if (auto && auto.redirect_to) auto = venueQ.get(auto.redirect_to);
+      if (auto && !auto.redirect_to) venue = auto;
+    }
     if (!venue && r.venue_name_text) venue = nameMatch(r.venue_name_text, r.region);
     const pin = venue && Number.isFinite(Number(venue.latitude)) && Number.isFinite(Number(venue.longitude)) && venue.latitude !== null && venue.longitude !== null && !(Number(venue.latitude) === 0 && Number(venue.longitude) === 0);
     out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), pin ? mapRound(venue.latitude) : null, pin ? mapRound(venue.longitude) : null,
@@ -26974,6 +27042,9 @@ function frJsonLd(json) {
         else n[k] = walk(v);
       }
       if (o['@type'] === 'ItemList' || o['@type'] === 'CollectionPage' || o['@type'] === 'WebPage') n.inLanguage = 'fr-CA';
+      // Round 12 (2026-10-20): a French list is named without the site name (« Plages de l’Okanagan », not « ... |
+      // Okanagan Roam »); 530 French lists carried the page title's ending.
+      if (o['@type'] === 'ItemList' && typeof n.name === 'string') n.name = n.name.replace(/\s*\|\s*Okanagan Roam\s*$/, '');
       return n;
     }
     return o;
@@ -27554,6 +27625,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // closure (a dated spec with opens = closes = 00:00); with only the special list, Sugar Quail (shut Oct 11 - Nov
     // 3) still read as open to Google. A dated spec outranks the undated weekly ones for its dates.
     if (closedDays.length) localBusiness.openingHoursSpecification = (localBusiness.openingHoursSpecification || []).concat(closedDays.map((c) => ({ ...c })));
+    // Round 12 (2026-10-20): a closure in force (season, current temporary closure, "Temporarily closed" advisory)
+    // replaces the undated weekly hours; see venueClosureInForce. Also for a place with no hours stored.
+    const closure = venueClosureInForce(venue.id, opts.now || new Date());
+    if (closure) localBusiness.openingHoursSpecification = closureAwareOpeningHours(localBusiness.openingHoursSpecification, closure);
   }
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
   const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
@@ -27838,19 +27913,39 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // {category} in {region}" and "more to explore" discovery sections.
   // Round 11 (2026-10-20): a busy theatre (Kelowna Community Theatre has 38) also says how many there are and links
   // the town's What's On.
-  const venueEvents = listUpcomingEventsAtVenue(venue.id, { limit: 3 });
-  const venueEventsMore = venueEvents.length && venueEvents.total > venueEvents.length
-    ? `<p class="related-more" style="margin:12px 0 0"><a href="/${venue.region}/events">${fr ? `Tous les \u00e9v\u00e9nements \u00e0 ${escapeHtml(regionLabel)}` : `All events in ${escapeHtml(regionLabel)}`} &rarr;</a> <span class="related-meta">(${venueEvents.total} ${fr ? '\u00e0 venir ici' : 'coming up here'})</span></p>`
+  // Round 12 (2026-10-20): up to ten events show (three sat beside "(39 coming up here)"), the rest fold into a
+  // "Show all" list on the page itself, and the count says "N coming up at this venue" and opens that list, since
+  // "All events in Kelowna" is the whole town.
+  const VENUE_EVENTS_SHOWN = 10;
+  const venueEvents = listUpcomingEventsAtVenue(venue.id, { limit: 60 });
+  const venueEventCard = (e) => {
+    const when = fr ? (e.nextDate ? (e.nextEndDate && e.nextDate < todayLocal() && e.nextEndDate >= todayLocal() ? `Jusqu\u2019au ${frDateShort(e.nextEndDate)}` : frDateShort(e.nextDate)) : '') : upcomingEventDateLabel(e.nextDate, e.nextEndDate);
+    const cat = fr ? '' : (e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '');
+    const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
+    return `<div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
+  };
+  const venueEventsRest = venueEvents.slice(VENUE_EVENTS_SHOWN);
+  const venueEventsTotal = venueEvents.total || venueEvents.length;
+  const venueEventsCount = `${venueEventsTotal} ${fr ? '\u00e0 venir dans ce lieu' : 'coming up at this venue'}`;
+  const venueEventsAll = venueEventsRest.length
+    ? `<details class="venue-events-all" id="venue-events-all" style="margin-top:12px"><summary style="cursor:pointer;font-weight:800;min-height:44px;display:flex;align-items:center">${fr ? `Voir les ${venueEventsTotal} \u00e9v\u00e9nements dans ce lieu` : `Show all ${venueEventsTotal} events at this venue`}</summary>
+        <div class="related-grid" style="margin-top:8px">${venueEventsRest.map(venueEventCard).join('')}</div></details>
+        <script>(function () {
+          var all = document.getElementById('venue-events-all');
+          if (!all) return;
+          function openAll() { all.open = true; }
+          if (location.hash === '#venue-events-all') openAll();
+          var links = document.querySelectorAll('a[href="#venue-events-all"]');
+          for (var i = 0; i < links.length; i++) links[i].addEventListener('click', openAll);
+        })();</script>`
+    : '';
+  const venueEventsMore = venueEvents.length && venueEventsTotal > Math.min(venueEvents.length, VENUE_EVENTS_SHOWN)
+    ? `<p class="related-more" style="margin:12px 0 0"><a href="/${venue.region}/events">${fr ? `Tous les \u00e9v\u00e9nements \u00e0 ${escapeHtml(regionLabel)}` : `All events in ${escapeHtml(regionLabel)}`} &rarr;</a> <span class="related-meta">(${venueEventsRest.length ? `<a href="#venue-events-all">${venueEventsCount}</a>` : venueEventsCount})</span></p>`
     : '';
   const venueEventsHtml = venueEvents.length
-    ? `<div class="related-section">
+    ? `<div class="related-section" id="venue-events">
         <h2>${L('Events at', '\u00c9v\u00e9nements \u00e0')} ${escapeHtml(venue.name)}</h2>
-        <div class="related-grid">${venueEvents.map((e) => {
-      const when = fr ? (e.nextDate ? (e.nextEndDate && e.nextDate < todayLocal() && e.nextEndDate >= todayLocal() ? `Jusqu\u2019au ${frDateShort(e.nextEndDate)}` : frDateShort(e.nextDate)) : '') : upcomingEventDateLabel(e.nextDate, e.nextEndDate);
-      const cat = fr ? '' : (e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '');
-      const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
-      return `<div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
-    }).join('')}</div>${venueEventsMore}
+        <div class="related-grid">${venueEvents.slice(0, VENUE_EVENTS_SHOWN).map(venueEventCard).join('')}</div>${venueEventsAll}${venueEventsMore}
       </div>`
     : '';
 
@@ -28136,7 +28231,8 @@ function eventImageUrl(event, categories) {
 // one gets its street address and postal code. An event linked to a listing keeps the listing's address, and an
 // unknown place that is a listing's name ("Sandhill Wines, Kelowna") gets that listing's address.
 function eventVenueKey(text) {
-  return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ')
+  // Round 12 (2026-10-20): "+" reads like "&" and "and" ("Revelry Food + Music Hub" = "Revelry Food and Music Hub").
+  return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[&+]/g, ' and ')
     .replace(/['\u2018\u2019`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/^the /, '');
 }
 let eventVenueTable = null;
@@ -28178,6 +28274,56 @@ function eventKnownVenue(text, region = null) {
   }
   return null;
 }
+// Event -> venue linking, round 12 (2026-10-20): about 25 events named a listed place in a form the exact match
+// missed. The auto-link also tries the text's first comma part ("Hester Creek Estate Winery, 877 Road 8, Oliver",
+// "Sun Bowl Arena, 9301 Hummingbird Lane, Osoyoos") and both sides without a trailing "(...)" ("South Okanagan
+// Events Centre (SOEC)"). Still exact names only, and only in the event's own town.
+function stripTrailingParen(text) {
+  return String(text || '').replace(/\s*\([^()]*\)\s*$/, '').trim();
+}
+function eventAutoVenueTextKeys(text) {
+  const keys = eventVenueTextKeys(text);
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  const first = raw.split(/\s*,\s*/)[0];
+  for (const t of [stripTrailingParen(raw), first, stripTrailingParen(first)]) {
+    for (const k of eventVenueTextKeys(t)) if (!keys.includes(k)) keys.push(k);
+  }
+  return keys.filter(Boolean);
+}
+// Other names of a listing, for an event in the same town only: 'region|eventVenueKey(name in the event)' -> the
+// listing's exact name. Checked against the live listings on 2026-10-20. Left out on purpose: Kal Tire Place (the
+// Vernon arena; "The Kal" is a pub, not the arena), "Okanagan Golf Club" (two listings, Bear and Quail; the event does
+// not say which), "Westbank Centre" (the town centre, not the park listing) and Kelowna "Landmark Cinemas" (two
+// Landmark cinemas there).
+const EVENT_VENUE_LISTING_ALIASES = {
+  'penticton|soec': 'South Okanagan Events Centre (SOEC)',
+  'lake-country|ex nihilo vineyards': 'Ex Nihilo Vineyards & Tasting Room',
+  'lake-country|ex nihilo': 'Ex Nihilo Vineyards & Tasting Room',
+  'lake-country|ex nihilo winery': 'Ex Nihilo Vineyards & Tasting Room',
+  'penticton|cannery brewing': 'Cannery Brewing Co.',
+  'penticton|cannery brewing company': 'Cannery Brewing Co.',
+  'penticton|ss sicamous': 'SS Sicamous Museum & Heritage Park',
+  'penticton|s s sicamous': 'SS Sicamous Museum & Heritage Park',
+  'penticton|ss sicamous museum': 'SS Sicamous Museum & Heritage Park',
+  'osoyoos|sage pub': 'The Sage Pub & Liquor Store',
+  'kelowna|laurel packinghouse': 'Okanagan Wine & Orchard Museum (Laurel Packinghouse)',
+  'kelowna|revelry': 'Revelry Food + Music Hub',
+  'kelowna|revelry food and music': 'Revelry Food + Music Hub',
+  'penticton|landmark cinemas': 'Landmark Cinemas 7 Penticton',
+  'penticton|landmark cinema': 'Landmark Cinemas 7 Penticton',
+  'penticton|landmark cinemas penticton': 'Landmark Cinemas 7 Penticton',
+  'west-kelowna|landmark cinemas': 'Landmark Cinemas 8 Xtreme West Kelowna',
+  'west-kelowna|landmark cinemas west kelowna': 'Landmark Cinemas 8 Xtreme West Kelowna',
+  'vernon|okeefe ranch': "Historic O'Keefe Ranch",
+  'west-kelowna|grizzli': 'Grizzli Winery',
+  'oliver|hester creek': 'Hester Creek Estate Winery',
+  'oliver|hester creek winery': 'Hester Creek Estate Winery',
+  'west-kelowna|mission hill family estate': 'Mission Hill Family Estate Winery',
+  'west-kelowna|mission hill': 'Mission Hill Family Estate Winery',
+  'penticton|cleland theatre': 'Cleland Community Theatre',
+  'kelowna|okanagan regional library kelowna branch': 'Okanagan Regional Library \u2013 Kelowna Downtown Branch',
+  'kelowna|tugboat beach': 'Waterfront Park \u2013 Tugboat Bay Beach',
+};
 // Listings by name, for a place that is a listing but not linked to it. Refreshed every ten minutes.
 let eventListingNames = null, eventListingNamesAt = 0;
 function eventListingByName(text, region) {
@@ -28217,19 +28363,27 @@ function eventAutoVenueIndex() {
   if (eventAutoVenueCache && eventAutoVenueCache.version === version) return eventAutoVenueCache;
   const byEvent = new Map(), byVenue = new Map();
   try {
-    const venues = new Map();
+    const venues = new Map(), venuesBare = new Map();
+    const add = (map, k, id) => { if (!map.has(k)) map.set(k, []); if (!map.get(k).includes(id)) map.get(k).push(id); };
     for (const v of db.prepare('SELECT id, name, region FROM venues WHERE redirect_to IS NULL').all()) {
-      const k = `${v.region}|${eventVenueKey(v.name)}`;
-      if (!venues.has(k)) venues.set(k, []);
-      venues.get(k).push(v.id);
+      add(venues, `${v.region}|${eventVenueKey(v.name)}`, v.id);
+      // Round 12: and without a trailing "(...)" ("South Okanagan Events Centre (SOEC)"), looked up only when the
+      // full names give nothing.
+      const bare = eventVenueKey(stripTrailingParen(v.name));
+      if (bare && bare !== eventVenueKey(v.name)) add(venuesBare, `${v.region}|${bare}`, v.id);
     }
     const rows = db.prepare("SELECT id, region, venue_name_text FROM events WHERE venue_id IS NULL AND venue_name_text IS NOT NULL AND TRIM(venue_name_text) != ''").all();
     for (const e of rows) {
-      const keys = eventVenueTextKeys(e.venue_name_text);
+      const keys = eventAutoVenueTextKeys(e.venue_name_text);
       const known = eventKnownVenue(e.venue_name_text, e.region);
       if (known && known.region === e.region) keys.push(eventVenueKey(known.name));
-      for (const k of keys) {
-        const hits = venues.get(`${e.region}|${k}`);
+      // Round 12: other names of a listing in that town (EVENT_VENUE_LISTING_ALIASES).
+      for (const k of keys.slice()) {
+        const alias = EVENT_VENUE_LISTING_ALIASES[`${e.region}|${k}`];
+        if (alias) keys.push(eventVenueKey(alias));
+      }
+      const lookups = keys.map((k) => venues.get(`${e.region}|${k}`)).concat(keys.map((k) => venuesBare.get(`${e.region}|${k}`)));
+      for (const hits of lookups) {
         if (!hits || hits.length !== 1) continue;
         byEvent.set(e.id, hits[0]);
         if (!byVenue.has(hits[0])) byVenue.set(hits[0], []);
@@ -28339,8 +28493,29 @@ function eventDescriptionNamesOrganizer(description, name) {
   const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`\\b(?:organi[sz]ed|hosted|presented|put on|run|produced)(?: free)? by (?:the )?${esc}\\b`, 'i').test(String(description || ''));
 }
+// Organizer names, round 12 (2026-10-20): a ticket seller, a schedule feed or a listing platform is never the
+// organizer ("Ticket Seller (official box office)", "WHL schedule feed (HockeyTech)", "Race Roster (The Starting
+// Block)"), and a source note in brackets is not part of a name ("SilverStar Mountain Resort (Eventbrite)" ->
+// "SilverStar Mountain Resort"). -> the cleaned name, or '' when it is not an organizer.
+const EVENT_PLATFORM_ORGANIZER_RE = /\b(?:ticket\s*sellers?|box\s*office|ticketing|tickets?|feeds?|hockeytech|race\s*roster|eventbrite|ticketmaster|showpass|tixr|ticketweb|ticket\s*leap|ticket\s*tailor|zeffy|allevents|meetup|facebook|instagram)\b/i;
+function eventOrganizerName(name) {
+  const cleaned = String(name || '').replace(/\s*\([^()]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  if (cleaned.length < 2 || EVENT_PLATFORM_ORGANIZER_RE.test(cleaned)) return '';
+  return cleaned;
+}
+// A title sponsor is not the organizer: "A Night Under OneSky Legacy Gala Presented by Penticton Honda" (the gala's
+// description says "presented by Penticton Honda" too), or a car dealer, bank, realtor or credit union that "presents".
+const EVENT_SPONSOR_NAME_RE = /\b(?:honda|toyota|ford|chevrolet|chevy|gmc|nissan|hyundai|kia|subaru|mazda|volkswagen|vw|bmw|mercedes(?:-benz)?|audi|lexus|acura|dodge|jeep|chrysler|tesla|motors|auto(?:motive)?(?:\s+group)?|dealership|realty|re\/max|remax|royal lepage|credit union|bank|insurance)\b/i;
+function eventPresenterIsSponsor(event, presenter) {
+  const n = String(presenter || '').trim();
+  if (!n) return false;
+  if (EVENT_SPONSOR_NAME_RE.test(n)) return true;
+  const esc = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b(?:presented|sponsored) by (?:the )?${esc}\\b`, 'i').test(String((event && event.name) || ''));
+}
 function eventOrganizerSchema(event, hostVenue = null) {
-  const sourceName = typeof event.source_name === 'string' ? event.source_name.trim() : '';
+  // Round 12: the source's name only when it reads as an organizer (eventOrganizerName).
+  const sourceName = eventOrganizerName(typeof event.source_name === 'string' ? event.source_name.trim() : '');
   if (event.source_type === 'official_organizer' && sourceName) {
     const url = eventOfficialUrl(event);
     return { '@type': 'Organization', name: sourceName, url: url || undefined };
@@ -28363,7 +28538,9 @@ function eventOrganizerSchema(event, hostVenue = null) {
   // Round 11 (2026-10-20): the presenter when the listing names one ("Kelvern Celtic Society presents Tulua",
   // "... presented by Children Believe"), else the theatre, arena or hall the event is linked to (stored or matched by
   // name, see eventAutoVenueIndex): Google reads organizer as who hosts it, and a hall's own page is the best contact.
-  const presenter = eventPresenterName(event);
+  // Round 12: a presenter is cleaned like a source name, and a title sponsor is skipped.
+  const presenterRaw = eventPresenterName(event);
+  const presenter = presenterRaw && !eventPresenterIsSponsor(event, presenterRaw) ? eventOrganizerName(presenterRaw) : '';
   const presenterIsHost = (n) => {
     if (!hostVenue) return false;
     const known = eventKnownVenue(n, hostVenue.region);
@@ -28451,11 +28628,20 @@ function eventPriceInfo(event) {
   }
   return parseEventPrice(event && event.description);
 }
+// Sold out (2026-10-20, round 12): an offer said InStock even when the listing says "SOLD OUT ... join the waitlist"
+// (Murder in the Vineyard). A sentence of the description or price that says it is sold out now makes the offer
+// SoldOut; "may sell out", "sold out last year", "before it sells out" do not.
+const EVENT_SOLD_OUT_RE = /\bsold[\s-]*out\b/i;
+const EVENT_SOLD_OUT_HEDGE_RE = /\b(?:not|never|before|may|might|could|can|usually|often|typically|always|quickly|fast|last year|previous|past|in \d{4}|every year|each year)\b/i;
+function eventIsSoldOut(event) {
+  const text = [event && event.price_text, event && event.description].filter((x) => typeof x === 'string').join('. ');
+  return text.split(/(?<=[.!?;])\s+|\n+/).some((x) => EVENT_SOLD_OUT_RE.test(x) && !EVENT_SOLD_OUT_HEDGE_RE.test(x));
+}
 function eventOffersSchema(event) {
   const info = eventPriceInfo(event);
   if (!info) return undefined;
   const url = eventOfficialUrl(event) || undefined;
-  const common = { priceCurrency: 'CAD', availability: 'https://schema.org/InStock', url };
+  const common = { priceCurrency: 'CAD', availability: eventIsSoldOut(event) ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock', url };
   return info.price != null
     ? { '@type': 'Offer', price: info.price, ...common }
     : { '@type': 'AggregateOffer', lowPrice: info.lowPrice, highPrice: info.highPrice, ...common };
@@ -30326,6 +30512,87 @@ function findRemovedVenue(region, type, slug) {
     return db.prepare('SELECT region, type, slug, name, latitude, longitude, removed_at FROM removed_venues WHERE region = ? AND type = ? AND slug = ?').get(region, type, slug) || null;
   } catch (e) { return null; } // table missing in an old copy
 }
+// Slug changes (2026-10-20, round 12): a listing renamed by its owner (M&J's Country Kitchen is now Gino's Family
+// Kitchen, Cozy Nook is The Cozy Cafe + Bar) kept its old address. POST /api/admin/venues/:id/slug (admin token)
+// changes the slug and records the old one here, so the old English and French addresses 301 to the listing's page
+// (looked up after the listing itself and the moved-listing checks, before the 410 for removed places), and guide
+// refs that name the old slug still find it. `dry_run: true` only reports what would change.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS venue_slug_redirects (
+    region TEXT NOT NULL,
+    type TEXT NOT NULL,
+    old_slug TEXT NOT NULL,
+    venue_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (region, type, old_slug)
+  )`);
+} catch (e) { /* read-only copy: no slug redirects */ }
+const VENUE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// The live listing an old slug now belongs to (type null: any category in that town), or null.
+function findSlugRedirectVenue(region, type, slug) {
+  try {
+    const rows = type
+      ? db.prepare('SELECT venue_id FROM venue_slug_redirects WHERE region = ? AND type = ? AND old_slug = ?').all(region, type, slug)
+      : db.prepare('SELECT venue_id FROM venue_slug_redirects WHERE region = ? AND old_slug = ?').all(region, slug);
+    const ids = uniqueList(rows.map((r) => r.venue_id));
+    if (ids.length !== 1) return null;
+    const v = getVenue(ids[0]);
+    return v && !v.redirect_to && v.slug && CATEGORY_SLUGS[v.type] && v.slug !== slug ? v : null;
+  } catch (e) { return null; }
+}
+// Files that still name the old address (data/*.json, data/guides/*.json, server.js), for the dry run's report.
+function slugReferenceFiles(region, slug) {
+  const out = [];
+  const scan = (file) => {
+    try {
+      const text = fs.readFileSync(file, 'utf8');
+      if (text.includes(`${region}/${slug}`) || text.includes(`"${slug}"`)) out.push(path.relative(__dirname, file));
+    } catch (e) { /* unreadable: skipped */ }
+  };
+  for (const dir of [path.join(__dirname, 'data'), path.join(__dirname, 'data', 'guides')]) {
+    let names = [];
+    try { names = fs.readdirSync(dir).filter((n) => n.endsWith('.json')); } catch (e) { names = []; }
+    for (const n of names) scan(path.join(dir, n));
+  }
+  scan(__filename);
+  return out;
+}
+// -> { status, body }
+function changeVenueSlug(venueId, input = {}) {
+  const dryRun = input.dry_run === true || input.dryRun === true;
+  const slug = typeof input.slug === 'string' ? input.slug.trim() : '';
+  if (!VENUE_SLUG_RE.test(slug) || slug.length > 80) return { status: 400, body: { ok: false, error: 'slug must be lower-case letters, digits and single hyphens (at most 80 characters).' } };
+  const venue = getVenue(venueId);
+  if (!venue) return { status: 404, body: { ok: false, error: 'Venue not found' } };
+  if (venue.redirect_to) return { status: 409, body: { ok: false, error: 'This venue redirects to another listing; change that listing instead.' } };
+  if (!CATEGORY_SLUGS[venue.type] || !REGION_LABELS[venue.region] || !venue.slug) return { status: 409, body: { ok: false, error: 'This venue has no page address to change.' } };
+  if (venue.slug === slug) return { status: 409, body: { ok: false, error: 'The venue already has this slug.' } };
+  const taken = db.prepare('SELECT id, name FROM venues WHERE region = ? AND type = ? AND slug = ? AND id != ?').get(venue.region, venue.type, slug, venue.id);
+  if (taken) return { status: 409, body: { ok: false, error: `Another listing already uses this address (#${taken.id} ${taken.name}).` } };
+  const next = { ...venue, slug };
+  const fromPaths = { en: venuePagePath(venue), fr: venuePagePath(venue, 'fr') };
+  const toPaths = { en: venuePagePath(next), fr: venueHasFrench(next) ? venuePagePath(next, 'fr') : venuePagePath(next) };
+  const body = {
+    ok: true, dry_run: dryRun, venue_id: venue.id, name: venue.name, old_slug: venue.slug, new_slug: slug,
+    redirects: [{ from: fromPaths.en, to: toPaths.en, status: 301 }, { from: fromPaths.fr, to: toPaths.fr, status: 301 }],
+    references: slugReferenceFiles(venue.region, venue.slug),
+  };
+  if (dryRun) return { status: 200, body };
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE venues SET slug = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(slug, venue.id);
+    db.prepare('INSERT OR REPLACE INTO venue_slug_redirects (region, type, old_slug, venue_id, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)').run(venue.region, venue.type, venue.slug, venue.id);
+    // Changing it back: the new address is the listing itself again, not a redirect.
+    db.prepare('DELETE FROM venue_slug_redirects WHERE region = ? AND type = ? AND old_slug = ?').run(venue.region, venue.type, slug);
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) { /* nothing to roll back */ }
+    throw err;
+  }
+  resetEventVenueCaches();
+  return { status: 200, body };
+}
+
 function removedVenueAlternatives(gone, limit = 6) {
   const at = { id: -1, region: gone.region, type: gone.type, latitude: gone.latitude, longitude: gone.longitude };
   const same = getRelatedVenues(at, 200).filter((v) => v.slug && CATEGORY_SLUGS[v.type]);
@@ -32764,7 +33031,10 @@ const SKI_GUIDE = {
 // a public page (removed, redirected, or a type with no category URL).
 function skiGuideVenue(region, slug) {
   const v = db.prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL').get(region, slug);
-  return v && CATEGORY_SLUGS[v.type] ? v : null;
+  if (v && CATEGORY_SLUGS[v.type]) return v;
+  // Round 12 (2026-10-20): a guide ref with a listing's old slug (changeVenueSlug) still finds it.
+  const renamed = findSlugRedirectVenue(region, null, slug);
+  return renamed ? db.prepare('SELECT * FROM venues WHERE id = ?').get(renamed.id) : null;
 }
 
 function renderSkiGuidePage() {
@@ -34329,14 +34599,19 @@ function tripStopsFor(refs, now = new Date(), onDates = {}) {
     } else {
       const e = eventQ.get(Number(m[2]));
       if (!e || !REGION_LABELS[e.region] || !e.slug) { out.push({ ref, missing: true }); continue; }
-      const host = (() => { const hid = eventLinkedVenueId(e); return hid ? venueQ.get(hid) : null; })();
+      let host = (() => { const hid = eventLinkedVenueId(e); return hid ? venueQ.get(hid) : null; })();
+      if (host && host.redirect_to) host = venueQ.get(host.redirect_to) || null;
+      // Round 12 (2026-10-20): the pin is the linked listing's (stored or matched by name), else the exact or curated
+      // location (tripEventLocation); with neither, lat/lng stay null and My Trip says the event is not on the map.
+      const hostPin = host && host.latitude !== null && host.longitude !== null && Number.isFinite(Number(host.latitude)) && Number.isFinite(Number(host.longitude))
+        ? { lat: Number(host.latitude), lng: Number(host.longitude) } : (() => { try { return tripEventLocation(e); } catch (err) { return null; } })();
       out.push({
         ref, kind: 'event', name: e.name, type: 'Event', typeFr: '\u00c9v\u00e9nement', region: e.region, regionLabel: REGION_LABELS[e.region],
         urlFr: frHref(`/${e.region}/events/${e.slug}`),
         url: `/${e.region}/events/${e.slug}`,
         photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(e.image_url || '')) ? e.image_url : WHATS_ON_BANNER.src.replace(/\/([^/]+)$/, '/thumbs/$1'),
-        lat: host && host.latitude !== null ? Number(host.latitude) : null,
-        lng: host && host.longitude !== null ? Number(host.longitude) : null,
+        lat: hostPin ? hostPin.lat : null,
+        lng: hostPin ? hostPin.lng : null,
         query: `${host ? host.name : (e.venue_name_text || e.name)}, ${REGION_LABELS[e.region]}, Okanagan Valley, BC`,
         occ: tripEventOccurrences(e.id, now),
       });
@@ -34553,6 +34828,8 @@ function renderMyTripPage(opts = {}) {
     // A planned trip's stops without a day (2026-10-18): their link maps only them, so it says so.
     otherStops: L('Other stops', 'Autres arrêts'), dirOther: L('Directions for other stops', 'Itinéraire des autres arrêts'),
     gone: L('No longer listed', 'N’est plus répertorié'),
+    // Round 12 (2026-10-20): an event with no known location is not pinned on the map, and says so.
+    noPin: L('Not on the map: no exact location is listed yet. Its page says where it is.', 'Pas sur la carte : aucun lieu précis n’est encore indiqué. Sa page dit où il a lieu.'),
     checkFirst: L('Check before you go:', 'À vérifier avant d’y aller :'),
     moveUp: L('Move {name} up', 'Monter {name}'), moveDown: L('Move {name} down', 'Descendre {name}'), remove: L('Remove {name}', 'Retirer {name}'),
     movedUp: L('Moved {name} up.', '{name} déplacé vers le haut.'), movedDown: L('Moved {name} down.', '{name} déplacé vers le bas.'),
@@ -34817,7 +35094,8 @@ ${renderGolfHeaderHtml()}
           // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
           var notice = nt ? '<p class="mt-notice mt-notice-' + esc(d.notice.kind) + '"><span aria-hidden="true">' + (d.notice.kind === 'advisory' ? '⚠️' : d.notice.kind === 'open_until' ? '⏳' : d.notice.kind === 'reopening' ? '🌱' : d.notice.kind === 'seasonal' ? '🗓️' : '📅') + '</span> ' + (d.notice.kind === 'advisory' ? '<strong>' + esc(T.checkFirst) + '</strong> ' : '') + esc(nt) + '</p>' : '';
-          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + notice + '</div>' + tools + '</li>';
+          var noPin = d.kind === 'event' && !d.missing && d.lat == null ? '<p class="mt-meta mt-nopin">' + esc(T.noPin) + '</p>' : '';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + notice + noPin + '</div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
     drawMap(shown);
@@ -46643,7 +46921,9 @@ const server = http.createServer(async (req, res) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && /^\/(?!api\/|images\/|styles\/|scripts\/)[^?#]*[^/]\/(\?|$)/.test(req.url)) {
     const [p, q] = String(req.url).split('?');
     const stripped = p.replace(/\/+$/, '');
-    return sendPageRedirect(res, lowercasePageRedirect(stripped) || stripped, q != null ? `?${q}` : '');
+    // Round 12 (2026-10-20): /fr/events/ (and /events/) go straight to What's On in one hop, not via /fr/events.
+    const moved = { '/events': '/whats-on', '/fr/events': '/fr/whats-on' }[stripped];
+    return sendPageRedirect(res, moved || lowercasePageRedirect(stripped) || stripped, q != null ? `?${q}` : '');
   }
   // One address per page, pass 5 (2026-10-19): /Kelowna or /Whats-On 301 to the lower-case address, and /index.html
   // to /. Paths that carry a token or a file name (/owner/..., /contribute/confirm/..., /api/, /images/ ...) keep
@@ -46652,6 +46932,18 @@ const server = http.createServer(async (req, res) => {
     const [p, q] = String(req.url).split('?');
     const target = lowercasePageRedirect(p);
     if (target) return sendPageRedirect(res, target, q != null ? `?${q}` : '');
+  }
+  // Round 12 (2026-10-20): an event that is no longer published (cancelled, postponed or hidden) whose same-name twin
+  // is published in another town 301s to it, in the same language. An event's town can't change, so a wrongly filed
+  // event (Sociale x Wild Goose under Okanagan Falls, re-created under Penticton) is re-created and the old one hidden.
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    const em = /^(\/fr)?\/([a-z-]+)\/events\/([a-z0-9-]+)\/?$/.exec(String(req.url).split('?')[0]);
+    const twin = em && REGION_LABELS[em[2]] && em[3] !== 'this-weekend' ? eventMovedTwin(em[2], em[3]) : null;
+    if (twin) {
+      const q = String(req.url).split('?')[1];
+      res.writeHead(301, { Location: withCampaignParams(`${em[1] || ''}/${twin.region}/events/${twin.slug}`, q != null ? `?${q}` : '') });
+      return res.end();
+    }
   }
   // Round 11 (2026-10-20): /fr/events goes to /fr/whats-on, as /events goes to /whats-on (it was a 404).
   if ((req.method === 'GET' || req.method === 'HEAD') && String(req.url).split('?')[0] === '/fr/events') {
@@ -48794,6 +49086,18 @@ const server = http.createServer(async (req, res) => {
       return sendPublicListJSON(res, getStats());
     }
 
+    // POST /api/admin/venues/:id/slug (round 12, 2026-10-20): change a listing's slug; its old English and French
+    // addresses 301 to the new page. Body { slug, dry_run }. Admin token.
+    const slugChangeMatch = pathname.match(/^\/api\/admin\/venues\/(\d+)\/slug$/);
+    if (slugChangeMatch) {
+      if (method !== 'POST') return sendJSON(res, 405, { error: 'Method not allowed' });
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const r = changeVenueSlug(Number(slugChangeMatch[1]), body && typeof body === 'object' && !Array.isArray(body) ? body : {});
+      return sendJSON(res, r.status, r.body);
+    }
+
     // /api/venues/:id
     const venueIdMatch = pathname.match(/^\/api\/venues\/(\d+)$/);
     if (venueIdMatch) {
@@ -49771,6 +50075,12 @@ const server = http.createServer(async (req, res) => {
           return res.end();
         }
       }
+      // Slug changes (round 12): an old French address 301s to the listing's page (French when it has one).
+      const renamed = !venue && REGION_LABELS[region] && type ? findSlugRedirectVenue(region, type, slug) : null;
+      if (renamed) {
+        res.writeHead(301, { Location: withCampaignParams(venueHasFrench(renamed) ? venuePagePath(renamed, 'fr') : venuePagePath(renamed), parsed.search) });
+        return res.end();
+      }
       // Removed places (2026-10-19, round 8): the French "has closed" page.
       const gone = !venue && REGION_LABELS[region] && type ? findRemovedVenue(region, type, slug) : null;
       if (gone) {
@@ -49832,6 +50142,12 @@ const server = http.createServer(async (req, res) => {
         const relocated = findActiveVenueBySlugAcrossRegions(type, slug);
         if (relocated && relocated.region !== region) {
           res.writeHead(301, { Location: `/${relocated.region}/${categorySlug}/${slug}${parsed.search || ''}` });
+          return res.end();
+        }
+        // Slug changes (round 12): the old address 301s to the listing's page (changeVenueSlug).
+        const renamed = findSlugRedirectVenue(region, type, slug);
+        if (renamed) {
+          res.writeHead(301, { Location: withCampaignParams(venuePagePath(renamed), parsed.search) });
           return res.end();
         }
         // Removed places (2026-10-19, round 8): 410 "This place has closed", with similar places nearby.
@@ -50206,6 +50522,9 @@ if (require.main === module) {
 module.exports = {
   // Events and tech (2026-10-20, round 11)
   eventAutoVenueIndex, eventLinkedVenueId, eventHostVenue, eventFrenchStatus, listEventsNeedingFrench, eventPresenterName,
+  // Round 12 (2026-10-20)
+  venueClosureInForce, closureAwareOpeningHours, addLocalMonths, eventAutoVenueTextKeys, EVENT_VENUE_LISTING_ALIASES, eventOrganizerName,
+  eventPresenterIsSponsor, changeVenueSlug, findSlugRedirectVenue, eventVenueKey, eventIsSoldOut, eventMovedTwin,
   frHideEnglishEventCardText, frJsonLd,
   // Round 11 (2026-10-20), search-fr
   searchTextEvents,
