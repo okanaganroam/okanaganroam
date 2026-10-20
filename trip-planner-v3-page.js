@@ -578,6 +578,9 @@ function renderStyles() {
   .t3-card-top { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ref-navy-muted, #56636E); }
   .t3-card h4 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.22rem; margin: 4px 0 4px; line-height: 1.25; }
   .t3-card h4 a { color: var(--ref-navy); text-decoration: none; } .t3-card h4 a:hover { text-decoration: underline; }
+  /* Round 12 (2026-10-20, phone-a11y): 44px tap areas without moving the layout (stop titles were 24px, the breadcrumb's
+     Home 35x18), and the badges keep their own height beside the 44px "+N" button. */
+  .t3-card h4 a { display: inline-block; padding: 10px 0; margin: -10px 0; } .t3-crumb a { display: inline-block; padding: 13px 5px; margin: -13px -5px; } .t3-badges { align-items: center; }
   .t3-event-place { margin: 0 0 8px; color: rgba(27,43,58,0.78); font-size: 0.92rem; font-weight: 700; }
   .t3-address { margin: 0 0 6px; font-size: 0.84rem; color: rgba(27,43,58,0.72); }
   .t3-facts { margin: 0 0 8px; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
@@ -705,6 +708,8 @@ function renderStyles() {
     .t3-plan .t3-actions .t3-more { display: block; }
     .t3-plan .t3-actions .t3-more > summary { display: flex; align-items: center; min-height: 44px; }
     .t3-plan .t3-actions .t3-more > summary::after { margin-left: 2px; }
+    /* Round 12 (2026-10-20, phone-a11y): « Ajouter au voyage » wrapped to 3 lines in a quarter of the row; in French it takes the first row. */
+    html[lang="fr"] .t3-plan .t3-actions { display: flex; flex-wrap: wrap; } html[lang="fr"] .t3-plan .t3-actions > * { flex: 1 1 0; min-width: 0; } html[lang="fr"] .t3-plan .t3-actions > .trip-btn { flex-basis: 100%; }
     .t3-dh-frame { height: 100px; }
     .t3 .t3-wrap { padding: 0 16px; }
     .t3-hero-inner { padding-top: 20px; padding-bottom: 30px; }
