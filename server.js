@@ -1500,6 +1500,12 @@ function getStats() {
 // keeps thin/near-empty pages out of the sitemap.
 
 const MIN_GUIDE_VENUES = 8;
+// SEO (2026-10-20): the thin templated pages stay live for visitors but are noindex and out of the sitemap, to shrink the
+// site Google sees after the Oct 11 drop (see FRENCH_INDEXABLE): badge and combination guides need this many places,
+// town x category pages MIN_INDEXABLE_CATEGORY_VENUES, and the weekend pages are never indexed (their town / valley
+// What's On page is).
+const MIN_INDEXABLE_GUIDE_VENUES = 10;
+const MIN_INDEXABLE_CATEGORY_VENUES = 3;
 
 const REGION_LABELS = {
   kelowna: 'Kelowna', 'west-kelowna': 'West Kelowna', peachland: 'Peachland',
@@ -9298,6 +9304,7 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
   </section>`;
   return renderCuratedHubPage({
     path,
+    noindex: venues.length < MIN_INDEXABLE_GUIDE_VENUES,
     region,
     name: heading.replace(` in ${regionLabel}`, ''),
     crumbs: [{ name: regionLabel, href: `/${region}` }],
@@ -9492,6 +9499,7 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
   if (singles[0]) crumbs.push({ name: guideBadgeHeading(region, singles[0]).heading.slice(0, -(` in ${regionLabel}`).length), href: `/guide/${region}/${singles[0]}` });
   return renderCuratedHubPage({
     path,
+    noindex: venues.length < MIN_INDEXABLE_GUIDE_VENUES,
     region,
     name: heading.replace(` in ${regionLabel}`, ''),
     crumbs,
@@ -19180,7 +19188,7 @@ function renderCategoryPage(region, type, venues, categoryGuidePages, opts = {})
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_IMAGES[type].src : null, golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', indoorTheme: type === 'indoor', tourTheme: type === 'tour', sportTheme: type === 'sport', advisoryStyles: [...venues, ...sportsAlso].some((v) => advisoryNotes.has(v.id)), noindex: venues.length + sportsAlso.length === 0, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_IMAGES[type].src : null, golfTheme: usesThemedCategoryLayout(type), beachTheme: type === 'beach', outdoorTheme: type === 'outdoor', indoorTheme: type === 'indoor', tourTheme: type === 'tour', sportTheme: type === 'sport', advisoryStyles: [...venues, ...sportsAlso].some((v) => advisoryNotes.has(v.id)), noindex: venues.length + sportsAlso.length < MIN_INDEXABLE_CATEGORY_VENUES, golfDataStyles: golfDetails.size > 0, savedSidecar: usesEngagementControls(type) })}${engagementOnly ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(type, true, 'category')}
 </head>
 <body${themedBodyClassAttr(type)}>
@@ -22112,7 +22120,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope, now = new Date()) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_IMAGES[type].src : null, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0, savedSidecar: true })}
+${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_IMAGES[type].src : null, golfTheme: true, advisoryStyles: venues.some((v) => advisoryNotes.has(v.id)), noindex: venues.length === 0 || (!valleyWide && venues.length < MIN_INDEXABLE_CATEGORY_VENUES), savedSidecar: true })}
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
@@ -26184,7 +26192,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
     ...(scope ? [{ name: scopeText.crumb, url: canonical }] : []),
   ]);
   const live = hasInventory ? liveWhatsOnScopes() : [];
-  const scopeThin = scope ? (scope.weekend ? !liveWhatsOnWeekendPaths(live).includes(basePath) : !live.some((x) => x.path === basePath)) : false;
+  const scopeThin = scope ? (scope.weekend ? true : !live.some((x) => x.path === basePath)) : false;
   const scopeList = scope ? (scope.weekend ? matching : whatsOnScopeEvents(scope, matching).concat(scope.region ? matching.filter((e) => e.valleyWide) : [])) : [];
   // A quiet weekend still gives the visitor something: the next events after it (up to 6 in the following 30 days).
   const comingUp = scope && scope.weekend && scopeList.length < WHATSON_SCOPE_MIN_EVENTS
@@ -26724,6 +26732,11 @@ function twinSearchFor(enPath, rawUrl) {
   return '';
 }
 function frTwinPath(enPath) { return enPath === '/' ? '/fr' : `/fr${enPath}`; }
+// SEO (2026-10-20): the French pages stay live for visitors (EN / FR switch, French readers redirected) but are kept out of
+// Google: noindex on every /fr page, no hreflang pairs, no French URLs in the sitemap. Google traffic fell 96% on Oct 11
+// (most likely the September 2026 spam update, "scaled content"), and the ~3,100 French copies doubled the site's size
+// with 0 clicks. Set back to true once the English site has recovered; everything else is unchanged.
+const FRENCH_INDEXABLE = false;
 // A /fr request for a main or town page -> the English address it is rendered from (place pages have their own route).
 function frenchTwinRequest(rawUrl) {
   const m = /^\/fr(\/[^?#]*)?(\?[^#]*)?$/.exec(String(rawUrl || ''));
@@ -26861,6 +26874,7 @@ function frSearchData(json) {
 }
 // Sitemap (2026-10-14): each main or town page with a French twin lists both addresses, each naming the pair.
 function withFrenchTwinEntries(entries) {
+  if (!FRENCH_INDEXABLE) return entries;
   const out = [];
   for (const e of entries) {
     const m = /<loc>https:\/\/okanaganroam\.com(\/[^<]*)<\/loc>/.exec(e);
@@ -26998,6 +27012,7 @@ function withTwinLangSwitch(html, href, lang) {
   return withMobileLanguageItem(html);
 }
 function addTwinHead(html, enPath, search = '') {
+  if (!FRENCH_INDEXABLE) return html;
   if (/hreflang="fr-CA"/.test(html)) return html;
   // A noindex page (a thin town events page ...) carries no hreflang: Google ignores the pair on a page it won't index,
   // and the noindex'd twin is not in the sitemap either (SEO audit, 2026-10-17). The EN / FR switch still links them.
@@ -27037,7 +27052,7 @@ function frenchTwinHtml(html, enPath, search = '') {
   // An event with no French description yet: its French page is kept out of search (round 9, see frEventPageForPath).
   const enOnlyEvent = !!frEvent && !frEventForPath(enPath);
   html = frHideEnglishEventCardText(html);
-  if (enOnlyEvent && !/<meta name="robots"/.test(html.split('</head>')[0])) html = html.replace(/(<link rel="canonical" href="[^"]*">\n)/, '<meta name="robots" content="noindex, follow">\n$1');
+  if ((enOnlyEvent || !FRENCH_INDEXABLE) && !/<meta name="robots"/.test(html.split('</head>')[0])) html = html.replace(/(<link rel="canonical" href="[^"]*">\n)/, '<meta name="robots" content="noindex, follow">\n$1');
   // French advisories (2026-10-19, round 7): a card's "Check before you go" text in French (its own note_fr, the
   // French list or the known-phrasing fallback), never the English sentence.
   html = html.replace(/(<p class="venue-advisory-text">)([^<]*)(<\/p>)/g, (m, a, t, b) => `${a}${escapeHtml(frAdvisoryText(frDecode(t)))}${b}`);
@@ -27889,7 +27904,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const page = `<!DOCTYPE html>
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { alternates: hasFrench ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { noindex: fr && !FRENCH_INDEXABLE, alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
 ${VENUE_MENU_CSS}` : ''}
 </head>
@@ -41125,7 +41140,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   const page = `<!DOCTYPE html>
 <html lang="${lang}"${hasFrench ? ` data-page-lang="${lang}"` : ''}>
 <head>
-${pageHead(title, description, canonical, [breadcrumb, business], { noindex: !menuIndexable(menu, venue), alternates: hasFrench ? [{ hreflang: 'en-CA', href: menuMenuUrl(venue) }, { hreflang: 'fr-CA', href: menuMenuUrl(venue, 'fr') }, { hreflang: 'x-default', href: menuMenuUrl(venue) }] : null, locale: hasFrench && fr ? 'fr_CA' : null, shareImage: venueShareCardUrl(venue, lang), golfTheme: themedShell })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, business], { noindex: !menuIndexable(menu, venue) || (fr && !FRENCH_INDEXABLE), alternates: hasFrench && FRENCH_INDEXABLE ? [{ hreflang: 'en-CA', href: menuMenuUrl(venue) }, { hreflang: 'fr-CA', href: menuMenuUrl(venue, 'fr') }, { hreflang: 'x-default', href: menuMenuUrl(venue) }] : null, locale: hasFrench && fr ? 'fr_CA' : null, shareImage: venueShareCardUrl(venue, lang), golfTheme: themedShell })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}
 ${renderAnalyticsHeadHtml('venue')}
 ${VENUE_MENU_CSS}
 </head>
@@ -47148,7 +47163,10 @@ const server = http.createServer(async (req, res) => {
         if (!REGION_LABELS[v.region]) continue;
         const combo = categoryCombos.find((r) => r.region === v.region && r.type === 'sport');
         if (!combo) categoryCombos.push({ region: v.region, type: 'sport', n: 1, lastmod: v.updated_at });
-        else if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
+        else {
+          combo.n += 1; // the page counts them too (MIN_INDEXABLE_CATEGORY_VENUES)
+          if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
+        }
       }
 
       // Venue pages: every venue that has a real, non-null slug (should be
@@ -47166,7 +47184,7 @@ const server = http.createServer(async (req, res) => {
         // of every event detail URL below, so it belongs in the sitemap too.
         `  <url>\n    <loc>https://okanaganroam.com/whats-on</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>`,
         // What's On by type and by town (2026-10-13): only scopes with enough upcoming events (see liveWhatsOnScopes).
-        ...(() => { const live = whatsOnInventoryExists() ? liveWhatsOnScopes() : []; return [...live.map((x) => x.path), ...(live.length ? liveWhatsOnWeekendPaths(live) : [])]; })()
+        ...(() => { const live = whatsOnInventoryExists() ? liveWhatsOnScopes() : []; return live.map((x) => x.path); })()
           .map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`),
         `  <url>\n    <loc>https://okanaganroam.com/outdoors</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
         `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
@@ -47220,15 +47238,15 @@ const server = http.createServer(async (req, res) => {
           ({ region, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
         ),
-        ...categoryCombos.map(
+        ...categoryCombos.filter((r) => r.n >= MIN_INDEXABLE_CATEGORY_VENUES).map(
           ({ region, type, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
         ),
-        ...combos.map(
+        ...combos.filter((c) => c.count >= MIN_INDEXABLE_GUIDE_VENUES).map(
           ({ region, badge, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${badge}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
         ),
-        ...listComboGuides().map(
+        ...listComboGuides(MIN_INDEXABLE_GUIDE_VENUES).map(
           ({ region, slug, lastmod }) =>
             `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${slug}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
         ),
@@ -47242,13 +47260,13 @@ const server = http.createServer(async (req, res) => {
         ...venueRows.flatMap((v) => {
           const { region, type, slug, updated_at } = v;
           const enUrl = `https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}`;
-          const alts = venueHasFrench(v) ? venueAlternates(v).map((a) => `\n    <xhtml:link rel="alternate" hreflang="${a.hreflang}" href="${a.href}"/>`).join('') : '';
+          const alts = FRENCH_INDEXABLE && venueHasFrench(v) ? venueAlternates(v).map((a) => `\n    <xhtml:link rel="alternate" hreflang="${a.hreflang}" href="${a.href}"/>`).join('') : '';
           const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
           return alts ? [entry(enUrl), entry(`https://okanaganroam.com${venuePagePath(v, 'fr')}`)] : [entry(enUrl)];
         }),
         // Menus (2026-10-17): menu pages with enough dishes to be indexed, with the French twin when the place has one.
         ...listIndexableMenusForSitemap().flatMap(({ venue: v, publishedAt }) => {
-          const alts = venueHasFrench(v) ? [['en-CA', menuMenuUrl(v)], ['fr-CA', menuMenuUrl(v, 'fr')], ['x-default', menuMenuUrl(v)]]
+          const alts = FRENCH_INDEXABLE && venueHasFrench(v) ? [['en-CA', menuMenuUrl(v)], ['fr-CA', menuMenuUrl(v, 'fr')], ['x-default', menuMenuUrl(v)]]
             .map(([hl, href]) => `\n    <xhtml:link rel="alternate" hreflang="${hl}" href="${href}"/>`).join('') : '';
           const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(publishedAt)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
           return alts ? [entry(menuMenuUrl(v)), entry(menuMenuUrl(v, 'fr'))] : [entry(menuMenuUrl(v))];
