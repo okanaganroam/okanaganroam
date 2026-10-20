@@ -154,6 +154,12 @@ const PHRASES = [
   ['vinerie', 'winery'], ['vineries', 'wineries'], ['etablissement vinicole', 'winery'], ['etablissements vinicoles', 'wineries'],
   ['vignoble', 'vineyard'], ['vignobles', 'vineyards'], ['vignes', 'vineyards'], ['vin', 'wine'], ['vins', 'wines'],
   ['biere artisanale', 'craft beer'], ['bieres artisanales', 'craft beer'], ['brasserie artisanale', 'brewery'],
+  // Round 11 (2026-10-20): a brewery crawl, however it is said (« tournée des brasseries », « crawl de brasseries »,
+  // « route des bières »); they were a flat list or a single brewery.
+  ['tournee des microbrasseries', 'brewery crawl'], ['tournee des brasseries', 'brewery crawl'], ['tournee de brasseries', 'brewery crawl'],
+  ['tournee des bieres', 'brewery crawl'], ['crawl de brasseries', 'brewery crawl'], ['crawl des brasseries', 'brewery crawl'],
+  ['crawl de microbrasseries', 'brewery crawl'], ['crawl de bieres', 'brewery crawl'], ['route des bieres', 'brewery crawl'],
+  ['route de la biere', 'brewery crawl'], ['circuit des brasseries', 'brewery crawl'], ['circuit des microbrasseries', 'brewery crawl'],
   ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['brasserie', 'brewery'], ['brasseries', 'breweries'],
   ['biere', 'beer'], ['bieres', 'beers'], ['distillerie', 'distillery'], ['distilleries', 'distilleries'],
   ['cidrerie', 'cidery'], ['cidreries', 'cideries'],
@@ -231,6 +237,8 @@ const PHRASES = [
   ['grand groupe', 'large group'], ['grands groupes', 'large groups'], ['en groupe', 'groups'], ['groupe', 'groups'], ['groupes', 'groups'],
   // Transport phrases map to the existing English walking constraints.
   ['nous n avons pas de voiture', 'we do not have a car'], ['je n ai pas de voiture', 'i do not have a car'],
+  // Round 11 (2026-10-20): « de Kelowna à Osoyoos (en voiture) » is a road trip; « en voiture » is how, not a word to match.
+  ['en voiture', 'by car'], ['en auto', 'by car'],
   ['pas de voiture', 'no car'], ['sans voiture', 'without a car'], ['sans auto', 'without a car'],
   ['a pied', 'on foot'], ['pas de conduite', 'no driving'], ['sans conduire', 'no driving'],
   ['marcher entre les arrets', 'walk between stops'], ['marcher entre les lieux', 'walk between places'],

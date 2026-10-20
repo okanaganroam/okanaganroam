@@ -327,7 +327,51 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // 2026-10-14: "pizza one night", "sushi once" -- that food is wanted on one meal, not every day (a 3-day family trip
   // planned pizza for all three dinners). The word just before the frequency phrase is kept; the planner uses it once.
   const {onceTerms,onceEvening}=onceFoods(normalizedText);
-  return {onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null};
+  return bareTimeWindow({onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null},intent,trip,referenceDate);
+}
+// Time windows (2026-10-20, round 11): a request that names only a town and a time -- "this weekend in Penticton",
+// "Saturday evening in Penticton", "an afternoon in Kelowna", "morning in Peachland" -- is a plan for that time, not
+// an Ideas list. "This weekend" is the coming Saturday and Sunday (only Sunday on a Sunday); a morning, afternoon or
+// evening is a one-day plan for that window (timeWindow, read by explicitOutingComponents), on the named day.
+const WINDOW_START={morning:540,afternoon:780,evening:1020};
+function isoAdd(iso,n){return new Date(new Date(`${iso}T12:00:00Z`).getTime()+n*86400000).toISOString().slice(0,10);}
+function bareTimeWindow(out,intent={},trip={},referenceDate=null){
+  const i=intent||{},when=i.when||null;
+  const empty=k=>!(i[k]||[]).length;
+  if(i.mode!=='find'||(i.regions||[]).length!==1||trip?.route||trip?.multi||out.items.length||out.conflicts.length||out.startDate||out.onlyRequested||out.outingScope)return out;
+  if(!['types','features','collections','activities','cuisines','foodTerms','textTerms','eventCategories'].every(empty)||i.occasion||i.budget||i.lake)return out;
+  if((i.excluded?.types||[]).length||(i.excluded?.concepts||[]).length)return out;
+  const ref=/^\d{4}-\d{2}-\d{2}$/.test(referenceDate||'')?referenceDate:null;
+  const wd=ref?new Date(`${ref}T12:00:00Z`).getUTCDay():null;
+  const weekday=when?.weekday?DAYS.indexOf(String(when.weekday).slice(0,3)):-1;
+  // Only the words morning, afternoon or evening ("tonight" at 7 PM keeps the Ideas list, timed by the clock).
+  const window=out.daypart&&new RegExp(`\\b${out.daypart}\\b`).test(out.text||'')&&WINDOW_START[out.daypart]!=null&&!out.items.some(x=>x.kind==='deadline')?out.daypart:null;
+  if(!window&&when?.preset==='this-weekend'&&weekday<0){
+    if(ref){out.startDate=wd===0||wd===6?ref:isoAdd(ref,6-wd);out.dateSource='this weekend';}
+    const n=wd===0?1:2;
+    out.items.push({id:'weekend',kind:'days',value:n,strength:'must',sourceText:'this weekend',dayIndex:null,weekday:null});
+    out.endDate=ref&&n>1?isoAdd(out.startDate,1):null;out.planDays=n;
+    return out;
+  }
+  if(!window)return out;
+  out.timeWindow=window;
+  out.startMinutes=WINDOW_START[window];
+  if(ref){
+    if(weekday>=0)out.startDate=isoAdd(ref,(weekday-wd+7)%7);
+    else if(when?.relative==='tomorrow')out.startDate=isoAdd(ref,1);
+    else if(when?.preset==='this-weekend')out.startDate=wd===0||wd===6?ref:isoAdd(ref,6-wd);
+    if(out.startDate)out.dateSource=out.dateSource||'the day you named';
+  }
+  return out;
+}
+// The stops of a time-window plan (round 11): what a morning, an afternoon or an evening in a town is made of.
+function timeWindowComponents(trip,requirements){
+  const w=requirements.timeWindow;
+  const make=(types,phrase,extra={})=>({kind:'venue',types,phrase,activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:w,generic:false,windowStop:true,...extra});
+  const parts=w==='morning'?[make(['cafe'],'coffee'),make(['outdoor','indoor'],'a walk or a sight'),make(['restaurant'],'lunch',{meal:'lunch',daypart:'midday'})]
+    :w==='afternoon'?[make(['outdoor','indoor'],'a walk or a sight'),make(['winery','brewery'],'a tasting'),make(['cafe'],'coffee or a treat')]
+    :[make(['winery','brewery','cocktail'],'drinks'),make(['restaurant'],'dinner',{meal:'dinner'}),make(['cocktail','pub','brewery'],'a nightcap')];
+  return {...trip,multi:true,components:parts,leftoverTerms:[],explicitStops:true,timeWindow:w,regions:trip?.regions||[],party:trip?.party||{dog:false,kids:false},when:trip?.when||null,route:trip?.route||null,unknownPlaces:trip?.unknownPlaces||[]};
 }
 // Words covered by verified requirement grammar must not also become
 // unmatched cuisine searches. Unknown terms still reach the old interpreter.
@@ -372,7 +416,7 @@ function explicitOutingComponents(trip,requirements) {
   if(days>1 || items.some(i=>i.dayIndex>1))return trip;
   const kinds=items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
   const scoped=kinds.some(i=>SPORT_KINDS[i.value])&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
-  if(!scoped)return trip;
+  if(!scoped)return requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip;
   const text=requirements.text||'',parts=[];
   const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor';
   const make=(types,phrase,extra={})=>({kind:'venue',types,phrase,activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:requirements.daypart,generic:false,...extra});
@@ -449,8 +493,35 @@ function matches(v,i){
   if(i.kind==='rainy')return v.indoorEvidence==='explicit'||v.type==='indoor'||v.indoorGolf===true;
   return false;
 }
+// Round 11 (2026-10-20): a place with no stored hours whose listing says it runs on one day of the week ("every Saturday
+// morning from mid-April to the end of October", the Penticton Farmers' Market) is only planned on that day and in those
+// months. null when the listing says nothing that clear.
+const WEEKDAY_WORDS=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const MONTH_WORDS=['january','february','march','april','may','june','july','august','september','october','november','december'];
+function listedWeekdays(v){
+  // Not food and drink: "live music every Friday" at a restaurant is a night of the week, not its only open day.
+  if(!v||DINING.has(v.type)||['winery','brewery','distillery','pub','cocktail'].includes(v.type)||(v.hours&&v.hours!=='[]'&&v.hours!=='{}'&&v.hours!=='null'))return null;
+  const text=String(v.plannerDescription||v.description||'').toLowerCase();
+  if(!text)return null;
+  const days=new Set();
+  const day='(sunday|monday|tuesday|wednesday|thursday|friday|saturday)';
+  for(const m of text.matchAll(new RegExp(`\\b(?:every|each) ${day}\\b|\\b${day}s only\\b|\\bon ${day} (?:mornings|afternoons|evenings)\\b|\\b(?:only|just) on ${day}s?\\b`,'g')))days.add(WEEKDAY_WORDS.indexOf(m[1]||m[2]||m[3]||m[4]));
+  if(!days.size||days.size>2)return null;
+  const range=new RegExp(`\\bfrom (?:(?:early|mid|late)[- ])?(${MONTH_WORDS.join('|')})(?: \\d{1,2}(?:st|nd|rd|th)?)? (?:to|until|through) (?:the (?:end|middle) of |(?:early|mid|late)[- ])?(${MONTH_WORDS.join('|')})\\b`).exec(text);
+  return {days,months:range?[MONTH_WORDS.indexOf(range[1])+1,MONTH_WORDS.indexOf(range[2])+1]:null};
+}
+function listedDayConflict(v,day,date){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return false;
+  const listed=listedWeekdays(v);
+  if(!listed)return false;
+  const on=new Date(new Date(`${date}T12:00:00Z`).getTime()+((day||1)-1)*86400000);
+  if(!listed.days.has(on.getUTCDay()))return true;
+  if(listed.months){const m=on.getUTCMonth()+1,[a,b]=listed.months;if(a<=b?(m<a||m>b):(m<a&&m>b))return true;}
+  return false;
+}
 function venueAllowed(v,requirements,day,date){
   if(listedAccessConflict(v,requirements,day,date))return false;
+  if(listedDayConflict(v,day,date))return false;
   for(const i of requirements?.items||[]){
     if(i.strength==='prefer'||!applicable(i,day,date))continue;
     if(i.servesCoffee&&(v.type==='cafe'||(v.fdTypes||[]).includes('cafe'))&&!coffeeEvidence(v))return false;
@@ -513,7 +584,7 @@ function eventMatches(event,item) {
   if (item.eventKind === 'comedy' && !/\b(?:comedy|comedian|comedians|comedic|improv|stand ?up|laughs?)\b/.test(norm(`${event.name || ''} ${event.description || ''}`))) return false;
   // Round 10: a nightlife listing alone (a coffee social, a boutique night) is not a show.
   if (item.eventKind === 'show' && !(event.categories || []).some(c => ['arts-culture','live-music'].includes(c)) && !/\b(?:show|shows|comedy|concert|theatre|theater|performance|musical|play|dance|ballet|opera|symphony)\b/.test(norm(event.name || ''))) return false;
-  if (item.holiday && !(event.categories || []).includes('holiday-seasonal') && !/\b(?:christmas|xmas|holiday|festive|santa|noel)\b/.test(norm(event.name || ''))) return false;
+  if (item.holiday && !(event.categories || []).includes('holiday-seasonal') && !/\b(?:christmas|xmas|holiday|festive|santa|noel|christkindl\w*|yule\w*)\b/.test(norm(event.name || ''))) return false;
   if (item.nameTerms?.length && !item.nameTerms.every(term => norm(event.name || '').split(' ').includes(term))) return false;
   if(item.value !== 'any' && !(event.categories || []).includes(item.value)) return false;
   // A comedian listed under Live Music is not live music (2026-10-19).
@@ -785,4 +856,4 @@ function sparseDayRecovery(plan,requirements){
  const safe=last>0&&last<days.length&&!requirements?.endDate&&!(requirements?.items||[]).some(i=>i.kind==='event'||requirementDay(i,requirements.startDate)>last||i.kind==='venue'&&i.strength==='must'&&!retained.has(i.value));
  return {days:gaps.map(d=>d.day),shorterDays:safe?last:null,region:gaps.every(d=>d.region===gaps[0].region)?gaps[0].region:null};
 }
-module.exports={travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

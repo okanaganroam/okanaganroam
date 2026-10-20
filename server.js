@@ -4263,7 +4263,7 @@ function searchEventRankWords(text) {
   return uniqueList(smartFold(text).split(' ').filter((w) => w.length > 1 && !SEARCH_EVENT_RANK_SKIP.has(w) && !towns.has(w)));
 }
 // "Comedy show" also finds a comedian's own show (2026-10-19: "Danny Bhoy Live", a Scottish comedian, was missing).
-const DISCOVERY_EVENT_TERM_SYNONYMS = { comedy: ['comedian', 'comedians', 'comedic', 'stand up', 'standup', 'improv'] };
+const DISCOVERY_EVENT_TERM_SYNONYMS = { comedy: ['comedian', 'comedians', 'comedic', 'stand up', 'standup', 'improv', 'laughs'] };
 function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null, opts = {}) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(intent.when, now), now);
@@ -4285,7 +4285,9 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
     });
   }
   // With kids, bar nights and winery events are left out unless they are also listed for families.
-  if (intent.eventKids || (intent.party && intent.party.kids)) events = events.filter((e) => (e.categories || []).includes('family-kids') || !(e.categories || []).some((c) => c === 'nightlife' || c === 'wineries-wine-events'));
+  const kidsAsked = !!(intent.eventKids || (intent.party && intent.party.kids));
+  // Round 11: a drinks listing (a Halloween cocktail flight at a brewery) is not a family event either.
+  if (kidsAsked) events = events.filter((e) => (e.categories || []).includes('family-kids') || (!(e.categories || []).some((c) => c === 'nightlife' || c === 'wineries-wine-events') && !/\b(?:cocktails?|brewery|brewing|beer|wine|winery|pub crawl|19\+|adults? only)\b/i.test(e.name || '')));
   events = eventsAllowedByExclusions(events, intent.excluded);
   const rankWords = opts.text ? searchEventRankWords(opts.text) : [];
   if (rankWords.length) {
@@ -4295,6 +4297,9 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
     };
     events = events.map((e, i) => ({ e, i, s: score(e) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.e);
   }
+  // Round 11 (2026-10-20): with kids, family events come first (« Halloween en famille à Kelowna » listed adult events
+  // first); the order is otherwise unchanged.
+  if (kidsAsked) events = events.map((e, i) => ({ e, i, f: (e.categories || []).includes('family-kids') ? 0 : 1 })).sort((a, b) => a.f - b.f || a.i - b.i).map((x) => x.e);
   const items = events.slice(0, limit).map((e) => ({
     id: e.id, name: e.name, region: e.region, url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
     categories: e.categories || [], dateLabel: e.dateLabel || '', time: whatsOnCardTime(e),
@@ -6573,9 +6578,11 @@ function selectTripEvents(component, regions, when, now = new Date(), excluded =
   if (ev.terms && ev.terms.length) {
     events = events.filter((e) => {
       const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
+      // Round 11 (2026-10-20): "comedy" also finds a comedian's show listed under Live Music whose listing says
+      // stand-up or laughs (Ron James in Kelowna), as the events search does.
       return ev.terms.every((t) => String(t).toLowerCase() === 'hockey'
         ? requirementModule.eventSearchTermMatches(e, t, ev.category)
-        : discoveryTextHas(text, t));
+        : discoveryTextHas(text, t) || (DISCOVERY_EVENT_TERM_SYNONYMS[t] || []).some((w) => discoveryTextHas(text, w)));
     });
   }
   events = eventsAllowedByExclusions(events, excluded);
@@ -6840,10 +6847,13 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // Holiday trips (round 8, 2026-10-19): "Halloween weekend in Kelowna" uses What's On's Halloween events on those
   // dates (one a day where there is one). An undated request is the Halloween weekend itself.
   let holidayEvents = null;
-  const holiday = !itineraryEvents && !familyEvents && !trip.multi && intent.mode === 'plan' && !requirements?.items.some(i => i.kind === 'event') ? tripPlannerModule().holidayTheme(interpretationText) : null;
-  if (holiday && holiday.key === 'halloween') {
+  // Round 11 (2026-10-20): Christmas too ("Christmas in Penticton Dec 12-13" skipped the holiday markets on those dates);
+  // a dated request with a length is a plan even when it reads as an events search.
+  const holiday = !itineraryEvents && !familyEvents && !trip.multi && (intent.mode === 'plan' || (intent.mode === 'events' && !!requirements?.items.some(i => i.kind === 'days'))) && !requirements?.items.some(i => i.kind === 'event') ? tripPlannerModule().holidayTheme(interpretationText) : null;
+  if (holiday && ['halloween', 'christmas'].includes(holiday.key)) {
     const days = Math.max(1, Math.min(7, intent.days || requirements?.items.find(i => i.kind === 'days')?.value || 1));
     let from = requirements?.startDate || null;
+    if (!from && holiday.key === 'christmas') from = (intent.when ? tripPlanDate(intent.when, now) : tripMonthStart(Number.isInteger(intent.month) ? intent : { ...intent, month: 12 }, days, now)) || null;
     if (!from) from = halloweenTripStart(days, now);
     const window = resolveWhatsOnWindow({ from, to: addLocalDays(from, days - 1) }, now);
     const found = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], []), intent.excluded), window.from, window.to), now)
@@ -6852,7 +6862,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       holidayEvents = found;
       if (!requirements?.startDate) {
         const dated = requirements || extracted;
-        dated.startDate = from; dated.endDate = days > 1 ? addLocalDays(from, days - 1) : null; dated.dateSource = dated.dateSource || 'Halloween';
+        dated.startDate = from; dated.endDate = days > 1 ? addLocalDays(from, days - 1) : null; dated.dateSource = dated.dateSource || holiday.label;
         if (!requirements) requirements = dated;
       }
     }
