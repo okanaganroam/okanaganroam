@@ -339,6 +339,8 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'if then than else only one ones all more most much many few little lot lots kind sort type types option options idea ideas '
   + 'around tonight today tomorrow while during after before next last then take takes taking bring bringing stay staying '
   + 'whats wanna gonna ive id nearby close near '
+  // Round 11 (2026-10-20): "road trip through the Okanagan Valley" -- "through" and "valley" were read as interests.
+  + 'through thru valley '
   // French search (2026-10-19, round 7): French articles and joiners left in a French request after its words are read
   // in English ("bonhomme de neige" listed 1,650 places, every one with "de" somewhere). "a" (à) is above.
   + 'de du des la le les l d et au aux en '
@@ -1336,6 +1338,21 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     intent.textTerms = intent.textTerms.filter((w) => !COMEDY_WORDS.includes(w) && w !== 'stand');
     intent.textTerms.push('comedy');
   }
+  // 8a. Round 11 (2026-10-20): two towns joined by "to" and nothing else ("Kelowna to Osoyoos", « de Kelowna à Osoyoos
+  // (en voiture) ») is a road trip, planned with the default length; "by car", "drive" are part of that request.
+  const ROUTE_WORDS = ['car', 'drive', 'driving', 'voiture'];
+  if (!flags.event && !flags.plan && !lengthMentions.length && intent.regions.length === 2 && !intent.types.length && !intent.features.length
+    && !intent.collections.length && !intent.activities.length && !intent.cuisines.length && !occasion && intent.textTerms.every((w) => ROUTE_WORDS.includes(w))) {
+    const label = (r) => normalizeDiscoveryText(String((t.regionLabels || {})[r] || r).replace(/-/g, ' '));
+    const [a, b] = intent.regions.map(label);
+    const joined = new RegExp(`\\b(?:${a} (?:to|down to|up to) ${b}|${b} (?:to|down to|up to) ${a})\\b`).test(normalized);
+    if (joined) {
+      flags.plan = true;
+      intent.roadTrip = true;
+      intent.textTerms = intent.textTerms.filter((w) => !ROUTE_WORDS.includes(w));
+      intent.foodTerms = intent.foodTerms.filter((f) => f.cuisine || !ROUTE_WORDS.includes(f.term));
+    }
+  }
   // 8. Mode.
   if (flags.event) {
     intent.mode = 'events';
@@ -1349,6 +1366,14 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
     || intent.activities.length || intent.cuisines.length || intent.textTerms.length || occasion || flags.scopeAnything
     || intent.budget || intent.when || intent.pace || (intent.excluded.concepts && intent.excluded.concepts.length)) {
     intent.mode = 'find';
+  }
+  // 8c. Round 11 (2026-10-20): an open road trip ("road trip through the Okanagan") with no town and no length runs the
+  // valley north to south, Vernon to Osoyoos; the planner gives it its default length.
+  if (intent.mode === 'plan' && !intent.regions.length && !lengthMentions.length && !intent.days && /\broad ?trips?\b/.test(normalized)
+    && (t.regions || []).includes('vernon') && (t.regions || []).includes('osoyoos') && !intent.types.length && !intent.activities.length) {
+    intent.regions = ['vernon', 'osoyoos'];
+    intent.roadTrip = true;
+    intent.openRoadTrip = true;
   }
   // Outside an events request, event category words are just words; inside
   // one, venue fields are dropped -- events never select venues.
