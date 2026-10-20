@@ -24859,13 +24859,13 @@ test('Accessibility pass 3: contrast, target-size and small markup fixes', async
 // The review's French leftovers: What's On descriptions and chips, the date form, the business login link, Roam Now,
 // the contact hints, /fr/list-your-venue, /fr/search, the trip address, number formats and the owner entry pages.
 test('French gaps (2026-10-18): What\'s On chips, the date form and the header words read French', () => {
-  assert.equal(app.frText('Enderby · Today + 4 more dates · Times vary'), 'Enderby · Aujourd’hui + 4 autres dates · Heures variables');
+  assert.equal(app.frText('Enderby · Today + 4 more dates · Times vary'), 'Enderby · Aujourd’hui + 4 autres dates · Horaires variables');
   assert.equal(app.frText('Oliver · Wed Oct 21 + 1 more date · 17 h'), 'Oliver · mer. 21 oct. + 1 autre date · 17 h');
   assert.equal(app.frText('Kelowna · Sun Nov 1 + 3 more dates'), 'Kelowna · dim. 1er nov. + 3 autres dates');
   assert.equal(app.frText('Kelowna · Thursdays until Dec 17 · today · 17 h'), 'Kelowna · Les jeudis jusqu’au 17 déc. · aujourd’hui · 17 h');
   assert.equal(app.frText('Vernon · Tous les soirs du 24 au 30 oct., 19 h · next Sat Oct 24 · 19 h'), 'Vernon · Tous les soirs du 24 au 30 oct., 19 h · prochaine : sam. 24 oct. · 19 h');
   assert.equal(app.frText('From'), 'Du', 'the custom-dates form no longer reads "selon"');
-  assert.equal(app.frText('Times vary'), 'Heures variables');
+  assert.equal(app.frText('Times vary'), 'Horaires variables');
   assert.equal(app.frText('Business login'), 'Espace entreprises');
   assert.equal(app.frText('Roam Now: what’s open near me'), 'Ce qui est ouvert près de moi · Roam Now');
   for (const [en, fr] of [['Soup', 'Soupes'], ['Coffee', 'Café'], ['West Coast', 'Cuisine de la côte Ouest'], ['Vegan', 'Végane'], ['Dessert', 'Desserts']]) assert.equal(app.frCuisine(en), fr, en);

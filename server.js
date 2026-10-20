@@ -6881,6 +6881,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   // Round 12 (2026-10-20): an evening/afternoon window keeps its own start when the page sends the default 9 AM start
   // ("one evening in West Kelowna" with &start=540 began with a winery at 11 AM).
   { const ws = { morning: 540, afternoon: 780, evening: 1020 }[extracted.timeWindow]; if (ws && Number.isFinite(extracted.startMinutes) && extracted.startMinutes < ws) extracted.startMinutes = ws; }
+  // Round 13 (2026-10-21): the same for a window that has already started today ("tonight" at 8:20 PM starts at 8:30).
+  { const late = extracted.windowClock && !extracted.windowClock.rolled ? extracted.windowClock.start : null; if (late && !overrides?.startDate && Number.isFinite(extracted.startMinutes) && extracted.startMinutes < late) extracted.startMinutes = late; }
   if(overrides?.dayStartMinutes)extracted.dayStartMinutes=overrides.dayStartMinutes;
   if(overrides?.shortWalkVenueIds)extracted.shortWalkVenueIds=overrides.shortWalkVenueIds;
   let requirements = overrides?.shortWalkVenueIds || overrides?.dayStartMinutes || overrides?.startDate || overrides?.startMinutes!==undefined || extracted.startDate || extracted.daypart || extracted.onlyRequested || Number.isInteger(extracted.explicitMealCount) || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
@@ -7036,6 +7038,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     intent.foodTerms = (intent.foodTerms || []).filter(f => f.cuisine || !consumed.has(f.term));
     intent.textTerms = (intent.textTerms || []).filter(t => !consumed.has(t));
   }
+  const rolledWindow = !!(requirements?.windowClock?.rolled && requirements.startDate);
   if (trip.multi) {
     const planner = tripPlannerModule();
     const eventRegions = trip.route ? planner.routeRegions(trip.route.from, trip.route.to) : trip.regions;
@@ -7055,9 +7058,10 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
       avoidIds: avoidVenueIds,
       // Round 10 (2026-10-19): a Swap on a short plan ("dinner and a show") changes that one stop.
       swap,
-      startWeekday: tripStartWeekday(trip.when, now),
-      clock: okanaganClock(now),
-      tripDate: (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
+      // Round 13: a window moved to tomorrow is planned for tomorrow's hours, not tonight's clock.
+      startWeekday: rolledWindow ? localWeekdayKey(requirements.startDate) : tripStartWeekday(trip.when, now),
+      clock: rolledWindow ? null : okanaganClock(now),
+      tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
     });
     plan.seeAll = null;
     if (eventWindow) plan.eventWindow = eventWindow;
@@ -7074,6 +7078,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     if (namedEventAmbiguity) plan.eventAmbiguity = namedEventAmbiguity;
   plan.understood = understood(plan);
     addEventRecovery(plan);
+    tripWindowClockNote(plan, requirements);
     return plan;
   }
   if (intent.mode === 'events') { intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
@@ -7087,12 +7092,12 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     avoidIds: avoidVenueIds,
     pinned,
     swap,
-    events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || familyEvents || holidayEvents || (events ? events.items.filter(e=>!requirements || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
+    events: selectedNamedEvent ? (itineraryEvents || events?.items || []).filter(e=>e.id===selectedNamedEvent.id) : itineraryEvents || familyEvents || holidayEvents || (events ? events.items.filter(e=>!requirements || !requirements.items.some(i=>i.kind==='event') || requirements.items.filter(i=>i.kind==='event').some(i=>requirementModule.eventMatches(e,i) && tripPlannerModule().eventSuitsKind(e,i.eventKind))) : null),
     familyEvents: !!familyEvents,
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripPlanDate(intent.when, now),
-    startWeekday: requirements?.startDate ? ['sun','mon','tue','wed','thu','fri','sat'][new Date(`${requirements.startDate}T12:00:00Z`).getUTCDay()] : tripStartWeekday(intent.when, now),
-    clock: okanaganClock(now),
+    startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
+    clock: rolledWindow ? null : okanaganClock(now),
   });
   if (intent.mode === 'navigate' && intent.exactVenue) {
     plan.venue = { id: intent.exactVenue.id, url: discoveryVenueUrl(intent.exactVenue) };
@@ -7109,12 +7114,33 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
   if (namedEventAmbiguity) plan.eventAmbiguity = namedEventAmbiguity;
   plan.understood = understood(plan);
   addEventRecovery(plan);
+  tripWindowClockNote(plan, requirements);
   return plan;
+}
+// Round 13 (2026-10-21): a morning, afternoon or evening asked for after it started says what the plan did -- moved to
+// tomorrow, or started at the next quarter hour -- at the top of the plan (contextNotes; French in trip-french-copy.js).
+function localWeekdayKey(iso) { return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${iso}T12:00:00Z`).getUTCDay()]; }
+function tripClock12(m) { const h = Math.floor(m / 60) % 24, mm = m % 60; return `${h % 12 || 12}:${String(mm).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; }
+function tripWindowClockNote(plan, requirements) {
+  const c = requirements && requirements.windowClock;
+  if (!c || !plan || plan.kind !== 'itinerary') return;
+  const note = c.rolled
+    ? { morning: 'It’s already afternoon, so this plan is for tomorrow morning.', afternoon: 'It’s already evening, so this plan is for tomorrow afternoon.', evening: 'It’s already late, so this plan is for tomorrow evening.' }[c.window]
+    : `${{ morning: 'The morning', afternoon: 'The afternoon', evening: 'The evening' }[c.window]} has already started, so this plan starts at ${tripClock12(c.start)}.`;
+  if (!note) return;
+  plan.contextNotes = [note].concat(plan.contextNotes || []);
+  plan.notes = [note].concat((plan.notes || []).filter((n) => n !== note));
+  if (c.rolled && typeof plan.summary === 'string') plan.summary = plan.summary.replace(/^(?:This|An?) (morning|afternoon|evening)\b/, 'Tomorrow $1');
 }
 
 // French plan links (round 9, 2026-10-19): every place and event in a plan also carries its /fr page (urlFr) when it has
 // one, so /fr/trip links to French pages (it used safeUrl(v.url), the English page). Places without a French page keep
 // only url.
+function tripEventLabelFr(text) {
+  let any = false;
+  const parts = String(text).split(' · ').map((x) => { let fr = null; try { fr = frText(x); } catch (e) { fr = null; } if (fr && fr !== x) any = true; return fr || x; });
+  return any ? parts.join(' · ') : null;
+}
 function withTripFrenchUrls(plan) {
   const seen = new Set();
   const walk = (o, depth) => {
@@ -7124,6 +7150,10 @@ function withTripFrenchUrls(plan) {
     if (typeof o.url === 'string' && /^\/(?!\/|fr\/)/.test(o.url) && typeof o.name === 'string' && o.urlFr === undefined) {
       try { const fr = frHref(o.url); if (fr && fr !== o.url) o.urlFr = fr; } catch (e) { /* English page only */ }
     }
+    // Round 13 (2026-10-21): an event's date and time labels in French ("Nightly Oct 24 to Oct 30 · next Sat Oct 24",
+    // "Times vary"), through the same French text as the /fr pages; /fr/trip shows them (t3FrenchEvent).
+    if (typeof o.dateLabel === 'string' && o.dateLabel && o.dateLabelFr === undefined) { const fr = tripEventLabelFr(o.dateLabel); if (fr) o.dateLabelFr = fr; }
+    if (typeof o.dateLabel === 'string' && typeof o.time === 'string' && o.time && o.timeFr === undefined) { const fr = tripEventLabelFr(o.time); if (fr) o.timeFr = fr; }
     for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') walk(o[k], depth + 1);
   };
   walk(plan, 0);
@@ -9278,11 +9308,15 @@ function venueClosureInForce(venueId, now = new Date()) {
   }
   // A temporary closure keeps its own first day (the same closed spec as specialOpeningHoursSpecification).
   if (st && st.kind === 'temp_closed' && st.current) return range(addLocalDays(st.to, 1), st.from);
+  if (venueAdvisoryTempClosed(venueId)) return range(null);
+  return null;
+}
+// A written, open-ended "Temporarily closed" advisory (Wings Tap & Grill). One that names a return ("until",
+// "reopens Nov 5") is left to the dated closures. Used by the structured data above and the venue page's hours.
+function venueAdvisoryTempClosed(venueId) {
   const note = getCollectionNotes(ADVISORY_COLLECTION_KIND).get(venueId);
   const text = note ? parseAdvisoryNote(note).text : '';
-  // Only an open-ended notice: one that names a return ("until", "reopens Nov 5") is left to the dated closures.
-  if (text && ADVISORY_TEMP_CLOSED_RE.test(text) && !/\buntil\b/i.test(text) && !ADVISORY_REOPENING_RE.test(text)) return range(null);
-  return null;
+  return !!(text && ADVISORY_TEMP_CLOSED_RE.test(text) && !/\buntil\b/i.test(text) && !ADVISORY_REOPENING_RE.test(text));
 }
 // The venue's openingHoursSpecification while `closure` is in force: one closed spec for the closure, the undated
 // weekly specs from the reopening date (left out with no date), and dated specs (seasons, closures) only where they
@@ -17180,7 +17214,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     try { var clock = okanaganClock(new Date()); var l = hoursStatusLabel(statusAt(parseHours(expandFoodDrinkHours(p.h)), clock), clock); return l.state === 'unknown' ? null : l; } catch (e) { return null; }
   }
   // Happy hour now (2026-10-14): from the researched times; a place without times never shows as happy hour now.
-  function clockText(m){ m = ((m % 1440) + 1440) % 1440; var h = Math.floor(m / 60), mm = m % 60; return FR ? h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '') : (h % 12 || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
+  function clockText(m){ m = ((m % 1440) + 1440) % 1440; var h = Math.floor(m / 60), mm = m % 60; return FR ? (h === 0 && !mm ? 'minuit' : h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '')) : (h % 12 || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
   function hhOf(p){
     if (!p.hh) return null;
     try {
@@ -17200,7 +17234,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function addDays(d, n){ var x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
   function mins(t){ if (!t) return null; var p = t.split(':'); return Number(p[0]) * 60 + Number(p[1]); }
-  function timeText(t){ var m = mins(t); if (m == null) return ''; var h = Math.floor(m / 60), mm = m % 60, pad = (mm < 10 ? '0' : '') + mm; if (FR) return h + ' h' + (mm ? ' ' + pad : ''); return (h % 12 || 12) + (mm ? ':' + pad : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
+  function timeText(t){ var m = mins(t); if (m == null) return ''; var h = Math.floor(m / 60), mm = m % 60, pad = (mm < 10 ? '0' : '') + mm; if (FR) return h === 0 && !mm ? 'minuit' : h + ' h' + (mm ? ' ' + pad : ''); return (h % 12 || 12) + (mm ? ':' + pad : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
   // Round 12 (2026-10-20): the 1st of a month is « 1er » in French (« dim. 1er nov. », not « dim. 1 nov. »).
   function dayText(d){ var t = new Date(d + 'T12:00:00Z').toLocaleDateString(FR ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); return FR ? t.replace(/(^|\\D)1(?=\\s)/, '$11er') : t; }
   ${MAP_EVENT_GROUP_SRC}
@@ -28239,9 +28273,13 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // Seasons everywhere (2026-10-18): closed for the season, the weekly hours are only the usual ones, so they
     // fold away under that heading and no day is marked as today; the page never reads as open.
     const seasonShut = !venue.redirect_to && (getSeasonStates(opts.now || new Date()).get(venue.id) || {}).kind === 'closed';
+    // Round 13 (2026-10-21): a written "Temporarily closed" advisory folds the weekly hours away the same way
+    // (Wings Tap & Grill showed its full week of hours under the closure notice). Season closures are unchanged.
+    const tempShut = !venue.redirect_to && !seasonShut && venueAdvisoryTempClosed(venue.id);
+    const shut = seasonShut || tempShut;
     // Seasonal hours and special closures (2026-10-18): each row is that weekday's next date in the coming week, so
     // a seasonal set shows on its dates and a closed day reads "Closed (Thanksgiving)".
-    const datedWeek = !!(parsedHours.seasons || parsedHours.closures) && !seasonShut && clockNow.date;
+    const datedWeek = !!(parsedHours.seasons || parsedHours.closures) && !shut && clockNow.date;
     const dateOf = (d) => hoursModule.shiftDate(clockNow.date, (hoursModule.HOURS_WEEKDAYS.indexOf(d) - hoursModule.HOURS_WEEKDAYS.indexOf(today) + 7) % 7);
     // Round 8 (2026-10-19): a closure of three days or more without a note is a temporary closure, not "(holiday)".
     // Round 10 (2026-10-19): the owner's note is their own words, usually English, so a French page says only « Fermé »
@@ -28261,11 +28299,13 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     const rowsFor = (dayOf) => hoursModule.HOURS_WEEKDAYS.map((d) => {
       const day = dayOf(d);
       const text = day && day.closure ? closedWord(day.closure) : escapeHtml(venueDayHoursText(day, fr));
-      return `<li${d === today && !seasonShut ? ' class="is-today"' : ''}${day && day.closure ? ' data-closed-date="1"' : ''}><span>${dayNames[d]}</span><span>${text}</span></li>`;
+      return `<li${d === today && !shut ? ' class="is-today"' : ''}${day && day.closure ? ' data-closed-date="1"' : ''}><span>${dayNames[d]}</span><span>${text}</span></li>`;
     }).join('');
     const rows = datedWeek ? rowsFor((d) => dayOnShown(dateOf(d))) : rowsFor((d) => parsedHours.days[d]);
     hoursHtml = seasonShut
       ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
+      : tempShut
+      ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season venue-hours-temp-shut">${L('Temporarily closed', 'Fermé temporairement')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles quand c’est ouvert')}</summary><ul class="hours-list">${rows}</ul></details>`
       : (() => {
         // Venue page layout (2026-10-18): seven identical rows read as noise, so a week with the same hours every day
         // shows one line and keeps the day-by-day list folded under it. With seasonal hours or closures the rows are
@@ -28291,7 +28331,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // An owner's yearly season ("Open May \u2013 October") goes with the hours.
   const openMonths = venue.redirect_to ? null : venueLinks(venue.id).open_months;
   if (openMonths) {
-    const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${L('Open', 'Ouvert de')} ${escapeHtml(openMonthsText(openMonths, fr ? 'fr' : 'en'))}${fr ? '' : ' each year'}</p>`;
+    // Round 13 (2026-10-21): French elides before avril, août and octobre (« Ouvert d’avril à octobre »).
+    const monthsText = openMonthsText(openMonths, fr ? 'fr' : 'en');
+    const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (/^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? '' : ' each year'}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
   }
 
@@ -29255,9 +29297,15 @@ function eventPriceInfo(event) {
 // sold out for five years" are about other shows and never make the offer SoldOut.
 const EVENT_SOLD_OUT_RE = /\b(?:is|are|['\u2019]s|['\u2019]re)\s+(?:(?:now|currently|already|officially|completely|fully|totally)\s+)*sold[\s-]*out\b(?![\s-]+(?:shows?|runs?|houses?|crowds?|tours?|venues?|audiences?|performances?|events?|concerts?|nights?|dates?)\b)|\bnow sold[\s-]*out\b|^[^A-Za-z0-9]*sold[\s-]*out\b\s*(?:[!.;:,*\u2013\u2014-]|$)|^[^A-Za-z0-9]*sold[\s-]*out\b[^.;!?]*\bwait[\s-]?list\b/i;
 const EVENT_SOLD_OUT_HEDGE_RE = /\b(?:not|never|before|may|might|could|can|usually|often|typically|always|quickly|fast|last year|previous|past|in \d{4}|every year|each year)\b/i;
+// Round 13 (2026-10-21): a status anywhere in the sentence counts too -- "Murder Mystery *SOLD OUT*", "Garth Brooks,
+// Nov 7 - SOLD OUT", "Tickets: sold out" -- but never "sold-out" (or "SOLD OUT") before a noun: run, houses, crowds,
+// shows, tour, audiences...
+const EVENT_SOLD_OUT_NOUNS = '(?:shows?|runs?|houses?|crowds?|tours?|venues?|audiences?|performances?|events?|concerts?|nights?|dates?|seasons?|engagements?|theatres?|theaters?|arenas?|stadiums?|rooms?)';
+const EVENT_SOLD_OUT_STATUS_RE = new RegExp(`\\*+\\s*sold[\\s-]*out\\s*!*\\s*\\*+|\\b(?:tickets?|status|availability)\\s*[:\u2013\u2014-]\\s*sold[\\s-]*out\\b(?![\\s-]+${EVENT_SOLD_OUT_NOUNS}\\b)`, 'i');
+const EVENT_SOLD_OUT_CAPS_RE = new RegExp(`(?<!\\b(?i:a|an|the|of|to|their|his|her|its|many|several|multiple|two|three)\\s+)\\bSOLD[\\s-]OUT\\b(?![\\s-]+(?i:${EVENT_SOLD_OUT_NOUNS})\\b)`);
 function eventIsSoldOut(event) {
   const text = [event && event.price_text, event && event.description].filter((x) => typeof x === 'string').join('. ');
-  return text.split(/(?<=[.!?;])\s+|\n+/).some((x) => EVENT_SOLD_OUT_RE.test(x.trim()) && !EVENT_SOLD_OUT_HEDGE_RE.test(x));
+  return text.split(/(?<=[.!?;])\s+|\n+/).some((x) => (EVENT_SOLD_OUT_RE.test(x.trim()) || EVENT_SOLD_OUT_STATUS_RE.test(x) || EVENT_SOLD_OUT_CAPS_RE.test(x)) && !EVENT_SOLD_OUT_HEDGE_RE.test(x));
 }
 function eventOffersSchema(event) {
   const info = eventPriceInfo(event);
@@ -35687,7 +35735,7 @@ ${renderGolfHeaderHtml()}
   }
   function clockText(m){
     var h = Math.floor(m / 60) % 24, mm = m % 60;
-    if (isFr) return h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '');
+    if (isFr) return h === 0 && !mm ? 'minuit' : h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '');
     return (h % 12 || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + (h < 12 ? ' AM' : ' PM');
   }
   function driveText(x){

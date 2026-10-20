@@ -360,13 +360,21 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
     out.endDate=ref&&n>1?isoAdd(out.startDate,1):null;out.planDays=n;
     return out;
   }
+  // Round 13 (2026-10-21): "Saturday in Osoyoos" (a town and a weekday, nothing else) is a one-day plan on that day,
+  // not an Ideas list. "What can we do Saturday in Osoyoos" still asks for ideas.
+  if(!window&&weekday>=0&&ref&&!out.daypart&&!when?.preset&&!/\b(?:what|where|things?|ideas?|suggest\w*|recommend\w*|anything|something)\b/.test(out.text||'')){
+    out.startDate=isoAdd(ref,(weekday-wd+7)%7);out.dateSource=out.dateSource||'the day you named';
+    out.items.push({id:'weekday-day',kind:'days',value:1,strength:'must',sourceText:String(when.weekday),dayIndex:null,weekday:null});
+    out.planDays=1;
+    return out;
+  }
   if(!window)return out;
   out.timeWindow=window;
   out.startMinutes=WINDOW_START[window];
   if(ref){
     if(weekday>=0)out.startDate=isoAdd(ref,(weekday-wd+7)%7);
     else if(when?.relative==='tomorrow')out.startDate=isoAdd(ref,1);
-    else if(/\btonight\b/.test(out.text||'')||when?.preset==='today')out.startDate=ref;
+    else if(/\btonight\b/.test(out.text||'')||when?.preset==='today'){out.startDate=ref;out.windowToday=true;}
     else if(when?.preset==='this-weekend')out.startDate=wd===0||wd===6?ref:isoAdd(ref,6-wd);
     if(out.startDate)out.dateSource=out.dateSource||'the day you named';
   }
@@ -374,13 +382,29 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
 }
 // Round 12 (2026-10-20): an undated window that has already passed today ("an afternoon in Kelowna" asked at 6:45 PM
 // Pacific) is planned for tomorrow, not for hours that are over. clock is okanaganClock(now): {date, minutes}.
+// Round 13 (2026-10-21): the same for "tonight" / « ce soir » (dated today). A window that has started but still has
+// at least 90 minutes left starts at the next quarter hour, with fewer stops (the first ones are dropped: at 8:20 PM
+// "tonight" is dinner at 8:30 and a nightcap, not drinks at 5 PM). requirements.windowClock records what was done, so
+// the plan can say so. Returns true when the plan moved to tomorrow.
 const WINDOW_END={morning:840,afternoon:1140,evening:1440};
+const WINDOW_STOP_MINUTES=75;
 function rollPastTimeWindow(requirements,clock){
   const w=requirements?.timeWindow;
-  if(!w||requirements.startDate||!clock||!/^\d{4}-\d{2}-\d{2}$/.test(clock.date||'')||!Number.isFinite(clock.minutes))return false;
-  if(clock.minutes<WINDOW_END[w]-90)return false;
-  requirements.startDate=isoAdd(clock.date,1);requirements.dateSource='tomorrow';
-  return true;
+  if(!w||!clock||!/^\d{4}-\d{2}-\d{2}$/.test(clock.date||'')||!Number.isFinite(clock.minutes))return false;
+  if(requirements.startDate&&requirements.startDate!==clock.date)return false;
+  const canRoll=!requirements.startDate||!!requirements.windowToday;
+  if(clock.minutes<=WINDOW_START[w])return false;
+  const start=Math.ceil(clock.minutes/15)*15,left=WINDOW_END[w]-start;
+  if(left<90){
+    if(!canRoll)return false;
+    requirements.startDate=isoAdd(clock.date,1);requirements.dateSource='tomorrow';requirements.startMinutes=WINDOW_START[w];
+    requirements.windowClock={rolled:true,window:w,now:clock.minutes};
+    return true;
+  }
+  requirements.startMinutes=start;
+  requirements.windowStops=Math.max(1,Math.min(3,Math.floor(left/WINDOW_STOP_MINUTES)));
+  requirements.windowClock={rolled:false,window:w,now:clock.minutes,start};
+  return false;
 }
 // The stops of a time-window plan (round 11): what a morning, an afternoon or an evening in a town is made of.
 function timeWindowComponents(trip,requirements){
@@ -389,7 +413,9 @@ function timeWindowComponents(trip,requirements){
   const parts=w==='morning'?[make(['cafe'],'coffee'),make(['outdoor','indoor'],'a walk or a sight'),make(['restaurant'],'lunch',{meal:'lunch',daypart:'midday'})]
     :w==='afternoon'?[make(['outdoor','indoor'],'a walk or a sight'),make(['winery','brewery'],'a tasting'),make(['cafe'],'coffee or a treat')]
     :[make(['winery','brewery','cocktail'],'drinks'),make(['restaurant'],'dinner',{meal:'dinner'}),make(['cocktail','pub','brewery'],'a nightcap')];
-  return {...trip,multi:true,components:parts,leftoverTerms:[],explicitStops:true,timeWindow:w,regions:trip?.regions||[],party:trip?.party||{dog:false,kids:false},when:trip?.when||null,route:trip?.route||null,unknownPlaces:trip?.unknownPlaces||[]};
+  // Round 13: a window that has already started keeps only the stops that still fit (the last ones).
+  const n=Number.isInteger(requirements.windowStops)?requirements.windowStops:parts.length;
+  return {...trip,multi:true,components:parts.slice(Math.max(0,parts.length-n)),leftoverTerms:[],explicitStops:true,timeWindow:w,regions:trip?.regions||[],party:trip?.party||{dog:false,kids:false},when:trip?.when||null,route:trip?.route||null,unknownPlaces:trip?.unknownPlaces||[]};
 }
 // Words covered by verified requirement grammar must not also become
 // unmatched cuisine searches. Unknown terms still reach the old interpreter.
