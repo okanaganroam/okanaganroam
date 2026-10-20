@@ -967,6 +967,7 @@ const ROTATE_MARGIN = 6;
 const ROTATE_TOP = 8;
 const ROTATE_MAX_KM = 12;
 const ROTATE_DEFAULT_GIVE = 2.5;
+const ROTATE_KEEP_BEST = 0.34;
 // A rental base, tour, charter or lesson is booked ahead, so it never rotates in as a walk-in stop.
 const ROTATE_BOOKED_NAME_RE = /\b(?:ballooning|balloon|sports cent(?:re|er)|watersports|water sports|marina|boat club|ski school)\b/;
 const ROTATE_BOOKED_DESC_RE = /\b(?:rental base|rentals? (?:shop|base|company|outlet)|grab a boat|balloon (?:tours?|rides?|flights?)|hot air balloon|guided (?:tours?|trips?|rides?|hikes?)|tour (?:company|operator)|adventure tour|book (?:a|your) (?:tour|trip|ride|spot|flight|seat))\b/;
@@ -1023,6 +1024,9 @@ function rotateWithinType(cands, ctx, score = (c) => c.score, opts = {}) {
   }
   if (process.env.ROTDBG) console.error('ROT', opts.slot, best.v.name, score(best).toFixed(1), '=>', pool.map((c) => c.v.name + ' ' + score(c).toFixed(1)).join(' | '), 'need', [...need].join(','));
   if (pool.length < 2) return best;
+  // Round 15 (2026-10-20): the town's best place still wins about a third of the time (seeded, so one request always
+  // gets the same plan); after round 14 Knox Mountain, Frankie We Salute You! and Rosalinda's were in no plan at all.
+  if (rotationSlotNudge({ id: 0 }, ctx, `${opts.slot || ''}|keep`) < ROTATE_KEEP_BEST) return best;
   let pick = best, top = -Infinity;
   for (const c of pool) {
     let t = plain(c) + rotationSlotNudge(c.v, ctx, opts.slot) * ROTATE_MARGIN;
@@ -5756,7 +5760,7 @@ function scheduleNotes(result, ctx) {
 module.exports = {
   tripTheme,
   // Build My Trip round 14 (2026-10-20)
-  rotateWithinType, rotateBooked, withoutRepeatedAlternates, appointmentKept, KIDS_ONLY_RE, BRUNCH_FOOD_RE,
+  rotateWithinType, rotateBooked, withoutRepeatedAlternates, ROTATE_KEEP_BEST, appointmentKept, KIDS_ONLY_RE, BRUNCH_FOOD_RE,
   // Build My Trip round 12 (2026-10-20)
   notAMeal, appointmentOnly, appointmentNotice, rotationNudge, daytimeEvent, swapVerb,
   // Build My Trip round 10 (2026-10-19)
