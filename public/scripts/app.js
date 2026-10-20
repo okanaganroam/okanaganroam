@@ -2755,7 +2755,7 @@ window.__scrollToVenueCard = function(name){
       var s = stopOf(btn);
       var inTrip = trip.some(function(t){ return sameStop(t, s); });
       btn.classList.toggle('in-trip', inTrip);
-      btn.setAttribute('aria-pressed', inTrip ? 'true' : 'false');
+      if (btn.setAttribute) btn.setAttribute('aria-pressed', inTrip ? 'true' : 'false');
       var html = tripLabelHtml(inTrip ? t('trip.inTrip') : t('trip.addToTrip'));
       if (btn.innerHTML !== html) btn.innerHTML = html;
     });
