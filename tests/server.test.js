@@ -22147,7 +22147,8 @@ test('Venue photo gallery (2026-10-16): main photo plus approved owner photos op
   assert.deepEqual(slides, ['/images/owner/galleryfixture0000000001.jpg', '/images/owner/galleryfixture0000000002.jpg', '/images/owner/galleryfixture0000000003.jpg'], 'main photo first, once; pending photos stay hidden');
   assert.match(page, /<figcaption>Photo: Gallery Cafe<\/figcaption>/);
   // The thumbnails skip the main photo (it is already the big one) and open the viewer at photo 2.
-  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 2);
+  // Round 11 (2026-10-20): the strip is in the page twice, by the photo and after the buttons for phones (.vg-phone).
+  assert.equal((page.match(/class="vg-thumb"/g) || []).length, 4);
   assert.match(page, /<div class="vg-mosaic"><div class="venue-hero venue-hero-photo">[\s\S]*?<\/div><div class="vg-strip vg-count-2"><button type="button" class="vg-thumb" data-vg-open="1" aria-label="Open photo 2 of 3">/);
   assert.match(page, /<\/div><\/div><p class="venue-photo-credit"[^>]*>Photo: Gallery Cafe<\/p>/, 'credit sits under the whole gallery');
   assert.match(page, /aria-label="Next photo"/);
@@ -30743,16 +30744,17 @@ test('Owner photo copies (round 9): upload with copies, srcset + ?v= + immutable
     made.push(row2.file, ...[480, 960, 1200].map((w) => `${stem2}-w${w}.jpg`));
     assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/approve`, { reviewer: 'test', main: false })).status, 200);
     page = await pageOf();
-    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" width="1600" height="1067" alt="" loading="lazy" fetchpriority="low">`), 'the thumbnail falls back to the original');
+    // Round 11: the thumbnail's src waits in data-src until the main photo has loaded.
+    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img data-src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" width="1600" height="1067" alt="" loading="lazy" fetchpriority="low" decoding="async">`), 'the thumbnail falls back to the original');
     assert.doesNotMatch(page, new RegExp(`${stem2}-w`));
 
     // 3. The admin backfill: listed with what it needs; token required; bad copies refused; good ones stored.
     const list = await admin('/admin/owner-photos/sizes');
     assert.equal(list.status, 200);
     const item = list.body.photos.find((p) => p.id === plain.body.id);
-    assert.deepEqual(item.needs, [480, 960, 1200]);
+    assert.deepEqual(item.needs, [160, 240, 480, 960, 1200]);
     assert.equal(item.file_present, true);
-    assert.deepEqual(list.body.photos.find((p) => p.id === ok.body.id).needs, [1200]);
+    assert.deepEqual(list.body.photos.find((p) => p.id === ok.body.id).needs, [160, 240, 1200]);
     assert.equal((await admin('/admin/owner-photos/sizes', null, false)).status, 401);
     assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320)) }, false)).status, 401);
     assert.equal((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: 'data:image/png;base64,AAAA' })).status, 400);
@@ -30762,11 +30764,13 @@ test('Owner photo copies (round 9): upload with copies, srcset + ?v= + immutable
     assert.equal(sent.status, 200, JSON.stringify(sent.body));
     assert.deepEqual(sent.body.written, [480, 960, 1200]);
     assert.deepEqual(sent.body.has, [480, 960, 1200]);
+    assert.deepEqual((await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w160: dataUrl(jpeg(160, 107, 11)), w240: dataUrl(jpeg(240, 160, 12)) })).body.has, [160, 240, 480, 960, 1200]);
+    made.push(`${stem2}-w160.jpg`, `${stem2}-w240.jpg`);
     const again = await admin(`/admin/owner-photos/${plain.body.id}/sizes`, { w480: dataUrl(jpeg(480, 320, 9)) });
     assert.deepEqual(again.body.skipped, [480], 'an existing copy is kept unless replace is set');
     assert.equal((await admin('/admin/owner-photos/sizes')).body.photos.find((p) => p.id === plain.body.id).needs.length, 0);
     page = await pageOf();
-    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img src="/images/owner/${stem2}-w480\\.jpg\\?v=[0-9a-f]{10}"`), 'the thumbnail now takes the 480px copy');
+    assert.match(page, new RegExp(`class="vg-thumb"[^>]*><img data-src="/images/owner/${stem2}-w480\\.jpg\\?v=[0-9a-f]{10}"`), 'the thumbnail now takes the 480px copy');
     assert.match(page, new RegExp(`<figure class="vg-slide"><img src="/images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10}" srcset="/images/owner/${stem2}-w960\\.jpg\\?v=[0-9a-f]{10} 960w, /images/owner/${stem2}-w1200\\.jpg\\?v=[0-9a-f]{10} 1200w, /images/owner/${stem2}\\.jpg\\?v=[0-9a-f]{10} 1600w" sizes="100vw"`));
     // A pending photo cannot be given copies.
     const pending = await up({ ...good, image: dataUrl(jpeg(1600, 1067, 10)) });
@@ -30793,8 +30797,9 @@ test('Owner photo copies (round 9): the upload page makes 480/960/1200px copies 
   await new Promise((resolve) => srv.listen(0, resolve));
   try {
     const html = await fetch(`http://localhost:${srv.address().port}/owner/${token}`).then((r) => r.text());
-    assert.match(html, /\[480, 960, 1200\]\.forEach\(function\(cw\)\{/);
-    assert.match(html, /image_w480: made\.image_w480, image_w960: made\.image_w960, image_w1200: made\.image_w1200/);
+    // Round 11 (2026-10-20): 160 and 240px thumbnail copies too.
+    assert.match(html, /\[160, 240, 480, 960, 1200\]\.forEach\(function\(cw\)\{/);
+    assert.match(html, /image_w160: made\.image_w160, image_w240: made\.image_w240, image_w480: made\.image_w480, image_w960: made\.image_w960, image_w1200: made\.image_w1200/);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
