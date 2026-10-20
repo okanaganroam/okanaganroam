@@ -107,8 +107,8 @@ test('R11 linking: the venue page lists the matched events; the event page links
 test('R11 linking: event JSON-LD has the venue as location and organizer, or the presenter', async () => {
   const a = eventLd(await page(`/kelowna/events/${evA.slug}`));
   assert.equal(a.location.name, 'Fixture Community Theatre');
-  assert.equal(a.organizer.name, 'Fixture Community Theatre');
-  assert.equal(a.organizer.url, 'https://theatre.example.com');
+  // SEO r13 (2026-10-20): a theatre is no longer the fallback organizer (it mostly hosts touring presenters).
+  assert.equal(a.organizer, undefined);
   const c = eventLd(await page(`/kelowna/events/${evC.slug}`));
   assert.deepEqual(c.organizer, { '@type': 'Organization', name: 'Fixture Celtic Society' });
   assert.equal(app.eventPresenterName({ name: 'Show', description: 'A holiday concert presented by Children Believe: Christmas classics.' }), 'Children Believe');

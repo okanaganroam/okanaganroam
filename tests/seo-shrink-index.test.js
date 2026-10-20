@@ -12,7 +12,7 @@ test('French pages are noindex, have no hreflang pairs and are not in the sitema
   assert.match(src, /\nconst FRENCH_INDEXABLE = false;\n/);
   assert.ok(src.includes("function addTwinHead(html, enPath, search = '') {\n  if (!FRENCH_INDEXABLE) return html;"), 'no hreflang pair on twin pages');
   assert.ok(src.includes('if ((enOnlyEvent || !FRENCH_INDEXABLE) && !/<meta name="robots"/'), 'French twin pages get noindex');
-  assert.ok(src.includes('{ noindex: fr && !FRENCH_INDEXABLE, alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null'), 'French place pages');
+  assert.ok(src.includes('{ noindex: (fr && !FRENCH_INDEXABLE) || venuePageIsThin(venue), alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null'), 'French place pages');
   assert.ok(src.includes('noindex: !menuIndexable(menu, venue) || (fr && !FRENCH_INDEXABLE), alternates: hasFrench && FRENCH_INDEXABLE ? ['), 'French menu pages');
   assert.ok(src.includes('function withFrenchTwinEntries(entries) {\n  if (!FRENCH_INDEXABLE) return entries;'), 'no French twins in the sitemap');
   assert.equal((src.match(/const alts = FRENCH_INDEXABLE && venueHasFrench\(v\)/g) || []).length, 2, 'no xhtml:link alternates for places or menus');

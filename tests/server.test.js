@@ -30462,8 +30462,8 @@ test('R9 tech: event offers read stated and free prices; organizer is the source
   const ev = { name: 'R9', region: 'oliver', source_type: 'tourism_org', source_name: 'Tourism Board', description: 'A tasting. Free.' };
   assert.deepEqual(app.eventOrganizerSchema(ev, winery), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://r9-winery.example/' });
   assert.deepEqual(app.eventOrganizerSchema(ev, { ...winery, website: null }), { '@type': 'Organization', name: 'R9 Test Winery', url: 'https://okanaganroam.com/oliver/wineries/r9-test-winery' });
-  // Round 11: with no presenter named, the linked hall is the organizer.
-  assert.deepEqual(app.eventOrganizerSchema(ev, theatre), { '@type': 'Organization', name: 'R9 Test Theatre', url: 'https://r9-theatre.example/' });
+  // SEO r13 (2026-10-20): with no presenter named, a linked hall is no longer the organizer.
+  assert.equal(app.eventOrganizerSchema(ev, theatre), undefined);
   assert.equal(app.eventOrganizerSchema(ev, null), undefined, 'a tourism listing is not the organizer');
   assert.deepEqual(app.eventOrganizerSchema({ ...ev, source_type: 'league_feed', source_name: 'Okanagan Hockey League', source_url: 'https://ohl.example/s' }, null),
     { '@type': 'SportsOrganization', name: 'Okanagan Hockey League', url: 'https://ohl.example/s' });
@@ -31291,12 +31291,8 @@ test('R10 tech: event offers and organizer backfill (free wording, linked places
   const gallery = { name: 'R10 Art Gallery', type: 'indoor', region: 'kelowna', slug: 'r10-art-gallery', website: null };
   const arena = { name: 'R10 Memorial Arena', type: 'sport', region: 'kelowna', slug: 'r10-memorial-arena', website: 'https://arena.example/' };
   const pac = { name: 'R10 Performing Arts Centre', type: 'indoor', region: 'vernon', slug: 'r10-pac', website: 'https://pac.example/' };
-  assert.deepEqual(app.eventOrganizerSchema(ev, hill), { '@type': 'Organization', name: 'R10 Ski Hill', url: 'https://r10-hill.example/' });
-  assert.equal(app.eventOrganizerSchema(ev, gallery).name, 'R10 Art Gallery');
-  assert.match(app.eventOrganizerSchema(ev, gallery).url, /^https:\/\/okanaganroam\.com\/kelowna\//);
-  // Round 11: a hall is the organizer when no presenter is named.
-  assert.equal(app.eventOrganizerSchema(ev, arena).name, 'R10 Memorial Arena');
-  assert.equal(app.eventOrganizerSchema(ev, pac).name, 'R10 Performing Arts Centre');
+  // SEO r13 (2026-10-20): only a food or drink place is the fallback organizer; a ski hill, gallery, arena or hall is not.
+  for (const host of [hill, gallery, arena, pac]) assert.equal(app.eventOrganizerSchema(ev, host), undefined, host.name);
   assert.equal(app.eventOrganizerSchema(ev, null), undefined, 'a tourism listing is still not the organizer');
   const city = { ...ev, source_type: 'municipal', source_name: 'City of Enderby', source_url: 'https://enderby.example/events', description: 'A parade organized free by the City of Enderby with help from local businesses.' };
   assert.deepEqual(app.eventOrganizerSchema(city, null), { '@type': 'GovernmentOrganization', name: 'City of Enderby', url: 'https://enderby.example/events' });
@@ -31305,7 +31301,7 @@ test('R10 tech: event offers and organizer backfill (free wording, linked places
   const fake = { ...ev, id: 1, status: 'scheduled', slug: 'r10', venue_name_text: null, valley_wide: 0, website: null, image_url: null, description: 'A free family storytime at the gallery.' };
   const ld = app.eventJsonLd(fake, [{ id: 1, start_date: '2099-01-02', start_time: '10:00', end_date: '2099-01-02', end_time: '11:00', status: 'scheduled' }], ['family-kids'], gallery, 'https://okanaganroam.com/kelowna/events/r10', '2099-01-01');
   assert.equal(ld.offers.price, '0');
-  assert.equal(ld.organizer.name, 'R10 Art Gallery');
+  assert.equal(ld.organizer, undefined);
   assert.doesNotMatch(JSON.stringify(ld), /undefined/);
 });
 
