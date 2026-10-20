@@ -34235,7 +34235,7 @@ function renderAboutPage() {
       <li><strong>Owners keep their listing up to date.</strong> Every business gets a free edit link to change its hours, add photos and menus, and post events.</li>
       <li><strong>Star ratings come from Google reviews.</strong> We don&rsquo;t write, buy or edit reviews.</li>
       <li><strong>Photos come with credit.</strong> When a business sends its own photos, its name goes with them.</li>
-      <li><strong>Nothing here is paid for.</strong> No business pays to be listed, ranked or featured.</li>
+      <li><strong>Sponsored spots are always labelled.</strong> Some businesses may pay for a featured spot. It&rsquo;s marked &ldquo;Sponsored&rdquo;, and paying never changes a listing&rsquo;s details or its Google rating.</li>
     </ul>
     <h2>Spotted a mistake?</h2>
     <p>Hours change and places close. If something is out of date, tell us and we&rsquo;ll fix it, usually within a couple of days.</p>

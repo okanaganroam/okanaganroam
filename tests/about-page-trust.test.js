@@ -16,7 +16,7 @@ test('About page names Dayton (first name only), shows live counts, the listing 
   assert.ok(about.includes('born and raised in Kelowna'), 'the existing story stays');
   assert.ok(about.includes("founder: { '@type': 'Person', name: 'Dayton' }"));
   assert.ok(about.includes("'@type': 'AboutPage'"));
-  for (const s of ['Star ratings come from Google reviews.', 'Nothing here is paid for.', 'Photos come with credit.', 'Owners keep their listing up to date.', 'Spotted a mistake?', 'data-contact-topic="correction"'])
+  for (const s of ['Star ratings come from Google reviews.', 'Sponsored spots are always labelled.', 'Photos come with credit.', 'Owners keep their listing up to date.', 'Spotted a mistake?', 'data-contact-topic="correction"'])
     assert.ok(about.includes(s), s);
   assert.ok(about.includes('${n(stats.places)}') && about.includes('${n(stats.events)}') && about.includes('${n(stats.guides)}'), 'counts are live, not typed in');
   assert.ok(!/PO Box/i.test(about));
