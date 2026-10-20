@@ -38,7 +38,11 @@ const SITE_PATH = path.join(__dirname, 'okanagan.html');
 // The key itself has no secrecy requirement (it's published at
 // /{key}.txt by design, per the IndexNow protocol) — it just has to match
 // between the hosted file and whatever key is sent with a submission.
-const INDEXNOW_KEY = 'b25ba530bda42cb30e339b0dd848dadf';
+// IndexNow (2026-10-20, IndexNow): kept the key already served at /b25ba530bda42cb30e339b0dd848dadf.txt (engines may
+// already know it); env INDEXNOW_KEY overrides it (8-128 letters, digits or dashes, per the protocol).
+const INDEXNOW_KEY = /^[A-Za-z0-9-]{8,128}$/.test(String(process.env.INDEXNOW_KEY || '').trim())
+  ? String(process.env.INDEXNOW_KEY).trim()
+  : 'b25ba530bda42cb30e339b0dd848dadf';
 
 // Phase 2.5B: a genuine shared-secret bearer token for the new enrichment
 // endpoint below. This is deliberately NOT hardcoded — it's read from an
@@ -27169,6 +27173,315 @@ function frSearchData(json) {
   for (const [id, v] of Object.entries(data)) if (v && typeof v === 'object' && typeof v.k === 'string') v.k = frSearchWords(id) || v.k;
   return JSON.stringify(data).replace(/</g, '\\u003c');
 }
+// Sitemap (2026-10-20, IndexNow): the sitemap body is built here so IndexNow submits exactly the sitemap's URLs
+// (listSitemapUrls below); the /sitemap.xml route only sends it.
+function buildSitemapXml() {
+  const today = new Date().toISOString().slice(0, 10);
+  // lastmod (2026-09-19): individual/aggregate pages now report the real
+  // underlying data's updated_at instead of "today" for every URL on
+  // every request. toLastmod() takes a SQLite CURRENT_TIMESTAMP string
+  // (or the MAX() of several) and reduces it to the YYYY-MM-DD sitemap
+  // expects; the `today` fallback only applies if a row somehow has no
+  // updated_at at all (every venues/events row has one via its column
+  // DEFAULT, so this is a defensive fallback, not the normal path). The
+  // homepage and /events index aggregate many records with no single
+  // "the" modification date, so those two keep the rolling `today` value.
+  const toLastmod = (ts) => (ts ? String(ts).slice(0, 10) : today);
+  const combos = listGuideCombos(MIN_GUIDE_VENUES).map((combo) => ({
+    ...combo,
+    lastmod: toLastmod(
+      db
+        .prepare(`SELECT MAX(updated_at) AS m FROM venues WHERE region = ? AND ${combo.badge} = 1 AND redirect_to IS NULL`)
+        .get(combo.region).m
+    ),
+  }));
+
+  // Region pages: one per region that has at least one venue.
+  const regionCounts = db
+    .prepare('SELECT region, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region')
+    .all()
+    .filter((r) => REGION_LABELS[r.region] && r.n > 0);
+
+  // Category pages: one per region+type combo that has at least one
+  // venue — computed live, same pattern as the guide-page combos above.
+  const categoryCombos = db
+    .prepare('SELECT region, type, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region, type')
+    .all()
+    .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && r.n > 0);
+  // /:region/sports also renders for regions whose places to play are
+  // only tagged sports_also venues (2026-10-12), so list those too.
+  for (const v of getSportsAlsoVenues()) {
+    if (!REGION_LABELS[v.region]) continue;
+    const combo = categoryCombos.find((r) => r.region === v.region && r.type === 'sport');
+    if (!combo) categoryCombos.push({ region: v.region, type: 'sport', n: 1, lastmod: v.updated_at });
+    else {
+      combo.n += 1; // the page counts them too (MIN_INDEXABLE_CATEGORY_VENUES)
+      if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
+    }
+  }
+  // SEO (2026-10-20, SEO r13): /:region/tours lists that town's tours_also operators too (renderToursSectionPage),
+  // so they count toward MIN_INDEXABLE_CATEGORY_VENUES here as well and the sitemap matches the page's noindex.
+  for (const v of getToursAlsoVenues()) {
+    if (!REGION_LABELS[v.region] || v.type === 'tour') continue;
+    const combo = categoryCombos.find((r) => r.region === v.region && r.type === 'tour');
+    if (!combo) categoryCombos.push({ region: v.region, type: 'tour', n: 1, lastmod: v.updated_at });
+    else {
+      combo.n += 1;
+      if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
+    }
+  }
+
+  // Venue pages: every venue that has a real, non-null slug (should be
+  // all of them after the startup backfill, but this guards against any
+  // edge case rather than emitting a broken sitemap entry).
+  const venueRows = db
+    .prepare('SELECT id, region, type, slug, updated_at, description, description_fr, hours FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
+    .all()
+    // SEO r13 (2026-10-20): thin place pages are noindex, so they are left out here too (venuePageIsThin).
+    .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && !venuePageIsThin(v));
+
+  const urlEntries = [
+    `  <url>\n    <loc>https://okanaganroam.com/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`,
+    // Valley-wide landing hubs (2026-09-22). All four are already live,
+    // self-canonical and indexable; /whats-on is the only internal parent
+    // of every event detail URL below, so it belongs in the sitemap too.
+    `  <url>\n    <loc>https://okanaganroam.com/whats-on</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>`,
+    // What's On by type and by town (2026-10-13): only scopes with enough upcoming events (see liveWhatsOnScopes).
+    ...(() => { const live = whatsOnInventoryExists() ? liveWhatsOnScopes() : []; return live.map((x) => x.path); })()
+      .map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`),
+    `  <url>\n    <loc>https://okanaganroam.com/outdoors</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    // Ski & Snow and Indoor & Rainy Day (2026-10-11): both always render.
+    `  <url>\n    <loc>https://okanaganroam.com${SKI_SNOW_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.indoor}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    // Tours & Experiences (2026-10-11): always renders.
+    `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.tour}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    // Sports & Recreation (2026-10-12): always renders.
+    `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.sport}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    // Activity pages (SEO, 2026-10-13): one per tour, sport and indoor
+    // activity that currently lists at least one place.
+    ...liveActivityPagePaths().map((path) => `  <url>\n    <loc>https://okanaganroam.com${path}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`),
+    `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    // Valley-wide Food & Drink type pages (SEO, 2026-10-13).
+    ...FOOD_DRINK_TYPES.filter((t) => countVenuesByCategory(t) >= MIN_CATEGORY_VENUES).map((t) => `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS[t]}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
+    `  <url>\n    <loc>https://okanaganroam.com/dog-friendly</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    ...(getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES
+      ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
+      : []),
+    `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    // About, Privacy and Terms (2026-10-14).
+    `  <url>\n    <loc>https://okanaganroam.com/map</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`,
+    // Build My Trip, the all-places directory and the two listing forms (SEO audit, 2026-10-17): all live,
+    // self-canonical and indexable, with French twins, but missing from the sitemap.
+    `  <url>\n    <loc>https://okanaganroam.com/trip</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com/browse</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`,
+    ...['/list-your-venue', '/list-an-event'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.4</priority>\n  </url>`),
+    ...['/about', '/contact', '/privacy', '/terms'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>${p === '/about' || p === '/contact' ? '0.6' : '0.3'}</priority>\n  </url>`),
+    // Editorial guides (2026-10-10).
+    `  <url>\n    <loc>https://okanaganroam.com/guides</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    ...Object.keys(FILE_GUIDES).filter((p) => !guideIsThin(FILE_GUIDES[p])).map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
+    `  <url>\n    <loc>https://okanaganroam.com${RAINY_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com${BRUNCH_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com${DOG_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com${WINE_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com${PATIO_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    `  <url>\n    <loc>https://okanaganroam.com${SKI_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
+    // Hidden Gems and the category directory (SEO, 2026-10-13): both live
+    // but were missing from the sitemap.
+    ...(getHiddenGemCollectionVenues(null).length >= MIN_CATEGORY_VENUES
+      ? [`  <url>\n    <loc>https://okanaganroam.com/hidden-gems</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
+      : []),
+    `  <url>\n    <loc>https://okanaganroam.com/categories</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`,
+    ...(getSecretSpotVenues().length >= MIN_CATEGORY_VENUES
+      ? [`  <url>\n    <loc>https://okanaganroam.com/secret-spots</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
+      : []),
+    ...regionCounts.map(
+      ({ region, lastmod }) =>
+        `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
+    ),
+    ...categoryCombos.filter((r) => r.n >= MIN_INDEXABLE_CATEGORY_VENUES).map(
+      ({ region, type, lastmod }) =>
+        `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
+    ),
+    ...combos.filter((c) => c.count >= MIN_INDEXABLE_GUIDE_VENUES).map(
+      ({ region, badge, lastmod }) =>
+        `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${badge}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
+    ),
+    ...listComboGuides(MIN_INDEXABLE_GUIDE_VENUES).map(
+      ({ region, slug, lastmod }) =>
+        `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${slug}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
+    ),
+    // Outdoors Phase 2: activity pages, only those that actually render
+    // (same MIN_ACTIVITY_VENUES gate as the route).
+    ...listLiveOutdoorActivities().map(
+      ({ slug }) =>
+        `  <url>\n    <loc>https://okanaganroam.com/outdoors/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
+    ),
+    // French twins (2026-10-13): a place with a French page lists both URLs, each carrying the pair as xhtml:link alternates.
+    ...venueRows.flatMap((v) => {
+      const { region, type, slug, updated_at } = v;
+      const enUrl = `https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}`;
+      const alts = FRENCH_INDEXABLE && venueHasFrench(v) ? venueAlternates(v).map((a) => `\n    <xhtml:link rel="alternate" hreflang="${a.hreflang}" href="${a.href}"/>`).join('') : '';
+      const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
+      return alts ? [entry(enUrl), entry(`https://okanaganroam.com${venuePagePath(v, 'fr')}`)] : [entry(enUrl)];
+    }),
+    // Menus (2026-10-17): menu pages with enough dishes to be indexed, with the French twin when the place has one.
+    ...listIndexableMenusForSitemap().flatMap(({ venue: v, publishedAt }) => {
+      const alts = FRENCH_INDEXABLE && venueHasFrench(v) ? [['en-CA', menuMenuUrl(v)], ['fr-CA', menuMenuUrl(v, 'fr')], ['x-default', menuMenuUrl(v)]]
+        .map(([hl, href]) => `\n    <xhtml:link rel="alternate" hreflang="${hl}" href="${href}"/>`).join('') : '';
+      const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(publishedAt)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
+      return alts ? [entry(menuMenuUrl(v)), entry(menuMenuUrl(v, 'fr'))] : [entry(menuMenuUrl(v))];
+    }),
+    // Phase 1 (Events architecture gate): only non-expired events —
+    // listEventsForSitemap() already applies the same "don't advertise
+    // dead pages" filtering the venue rows above get via redirect_to.
+    ...listEventsForSitemap()
+      .filter((e) => REGION_LABELS[e.region])
+      .map(
+        ({ region, slug, updated_at }) =>
+          `  <url>\n    <loc>https://okanaganroam.com/${region}/events/${slug}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
+      ),
+  ];
+  const sitemap = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+    ...withFrenchTwinEntries(urlEntries),
+    '</urlset>',
+    '',
+  ].join('\n');
+  return sitemap;
+}
+
+// IndexNow (2026-10-20, IndexNow): tell Bing (and Yandex, Seznam and the other IndexNow engines) about changed pages
+// right away instead of waiting for a crawl. Free; no account. The admin write routes queue the canonical English
+// address of the page they changed (indexNowVenueChanged / indexNowEventChanged); the queue waits ~60 s so a batch
+// of edits goes out as one POST, never more than once a minute. Off under NODE_ENV=test or INDEXNOW_DISABLED=1, and
+// only requests to the production host queue anything, so local and preview servers never ping. Fire-and-forget:
+// failures are logged, never thrown into a request handler.
+const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';
+const INDEXNOW_HOST = 'okanaganroam.com';
+const INDEXNOW_MAX_URLS = 10000; // the protocol's limit per POST
+const INDEXNOW_DEBOUNCE_MS = 60 * 1000;
+const INDEXNOW_TIMEOUT_MS = 15 * 1000;
+function indexNowEnabled() {
+  return process.env.NODE_ENV !== 'test' && process.env.INDEXNOW_DISABLED !== '1';
+}
+function indexNowIsProductionRequest(req) {
+  const raw = String((req && req.headers && (req.headers['x-forwarded-host'] || req.headers.host)) || '');
+  const host = raw.split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
+  return host === INDEXNOW_HOST || host === `www.${INDEXNOW_HOST}`;
+}
+// Only absolute https://okanaganroam.com URLs, English (never /fr while FRENCH_INDEXABLE is false), no query or hash,
+// each once.
+function indexNowCleanUrls(urls) {
+  const out = new Set();
+  for (const u of urls || []) {
+    if (typeof u !== 'string') continue;
+    const m = /^https:\/\/okanaganroam\.com(\/[^?#\s]*)$/.exec(u.trim());
+    if (!m) continue;
+    if (!FRENCH_INDEXABLE && (m[1] === '/fr' || m[1].startsWith('/fr/'))) continue;
+    out.add(`https://${INDEXNOW_HOST}${m[1]}`);
+  }
+  return [...out];
+}
+// Every URL in the sitemap, English only: the same list Google and Bing read, so the noindex / thin rules match.
+function listSitemapUrls() {
+  return indexNowCleanUrls([...buildSitemapXml().matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].replace(/&amp;/g, '&')));
+}
+// POSTs the URLs in batches of INDEXNOW_MAX_URLS. Never throws: resolves { ok, status, submitted, batches }.
+async function indexNowSubmit(urls, opts = {}) {
+  const list = indexNowCleanUrls(urls);
+  const fetchImpl = opts.fetchImpl || globalThis.fetch;
+  const timeoutMs = opts.timeoutMs || INDEXNOW_TIMEOUT_MS;
+  const batches = [];
+  for (let i = 0; i < list.length; i += INDEXNOW_MAX_URLS) {
+    const urlList = list.slice(i, i + INDEXNOW_MAX_URLS);
+    const entry = { count: urlList.length, status: null, error: null };
+    try {
+      const r = await fetchImpl(INDEXNOW_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ host: INDEXNOW_HOST, key: INDEXNOW_KEY, keyLocation: `https://${INDEXNOW_HOST}/${INDEXNOW_KEY}.txt`, urlList }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      entry.status = r.status;
+      if (r.status !== 200 && r.status !== 202) {
+        try { entry.error = String(await r.text()).slice(0, 300) || null; } catch (e) { /* no body */ }
+      }
+    } catch (err) {
+      entry.error = String((err && err.message) || err);
+    }
+    batches.push(entry);
+  }
+  const ok = batches.length > 0 && batches.every((b) => b.status === 200 || b.status === 202);
+  return { ok, status: batches.length ? batches[batches.length - 1].status : null, submitted: ok ? list.length : batches.filter((b) => b.status === 200 || b.status === 202).reduce((n, b) => n + b.count, 0), batches };
+}
+// A batching queue: the first add starts a delayMs timer; everything added until it fires goes out in one submit.
+function createIndexNowQueue({ submit = (urls) => indexNowSubmit(urls), delayMs = INDEXNOW_DEBOUNCE_MS, log = (m) => console.log(m) } = {}) {
+  let pending = new Set();
+  let timer = null;
+  const flush = async () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    const urls = [...pending];
+    pending = new Set();
+    if (!urls.length) return null;
+    try {
+      const r = await submit(urls);
+      log(`[indexnow] ${urls.length} URL(s) -> ${r && r.status}${r && r.ok ? '' : ' (not accepted)'}`);
+      return r;
+    } catch (err) {
+      log(`[indexnow] submit failed: ${String((err && err.message) || err)}`);
+      return null;
+    }
+  };
+  return {
+    add(urls) {
+      for (const u of indexNowCleanUrls(urls)) if (pending.size < INDEXNOW_MAX_URLS) pending.add(u);
+      if (pending.size && !timer) {
+        timer = setTimeout(() => { flush(); }, delayMs);
+        if (timer.unref) timer.unref();
+      }
+    },
+    flush,
+    pending: () => [...pending],
+  };
+}
+const indexNowQueue = createIndexNowQueue();
+function indexNowQueueUrls(req, urls) {
+  try {
+    if (!indexNowEnabled() || !indexNowIsProductionRequest(req)) return;
+    indexNowQueue.add(urls);
+  } catch (e) { /* never break the admin write that called this */ }
+}
+// The English page address of a venue row when that page is live and indexable, else null.
+function indexNowVenueUrl(v) {
+  if (!v || !v.slug || v.redirect_to || !REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type] || venuePageIsThin(v)) return null;
+  return `https://${INDEXNOW_HOST}${venuePagePath(v)}`;
+}
+function indexNowVenueRow(id) {
+  try { return db.prepare('SELECT * FROM venues WHERE id = ?').get(Number(id)) || null; } catch (e) { return null; }
+}
+// Call after a venue write. Pass the row read before the write (indexNowVenueRow) when the address can change
+// (slug, region, retire, delete): the old address is queued too, so engines learn it moved or is gone.
+function indexNowVenueChanged(req, id, before) {
+  try {
+    if (!indexNowEnabled() || !indexNowIsProductionRequest(req)) return;
+    const urls = [indexNowVenueUrl(indexNowVenueRow(id))];
+    if (before) urls.push(indexNowVenueUrl(before));
+    indexNowQueueUrls(req, urls.filter(Boolean));
+  } catch (e) { /* never break the admin write that called this */ }
+}
+// Call after an event write; `before` (getEventById before the write) adds the old address when it can change.
+function indexNowEventChanged(req, id, before) {
+  try {
+    if (!indexNowEnabled() || !indexNowIsProductionRequest(req)) return;
+    const url = (e) => (e && e.slug && REGION_LABELS[e.region] ? `https://${INDEXNOW_HOST}/${e.region}/events/${e.slug}` : null);
+    indexNowQueueUrls(req, [url(getEventById(Number(id))), url(before)].filter(Boolean));
+  } catch (e) { /* never break the admin write that called this */ }
+}
+
 // Sitemap (2026-10-14): each main or town page with a French twin lists both addresses, each naming the pair.
 function withFrenchTwinEntries(entries) {
   if (!FRENCH_INDEXABLE) return entries;
@@ -47881,8 +48194,8 @@ const server = http.createServer(async (req, res) => {
 
     // IndexNow key file — required at the domain root so search engines can
     // verify submissions actually come from whoever controls this site.
-    if (pathname === `/${INDEXNOW_KEY}.txt` && method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    if (pathname === `/${INDEXNOW_KEY}.txt` && (method === 'GET' || method === 'HEAD')) {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
       return res.end(INDEXNOW_KEY);
     }
 
@@ -47906,183 +48219,8 @@ const server = http.createServer(async (req, res) => {
     // that has enough venues to be worth indexing. This list is computed
     // live from the DB, so it grows automatically as more venues get badges.
     if (pathname === '/sitemap.xml' && method === 'GET') {
-      const today = new Date().toISOString().slice(0, 10);
-      // lastmod (2026-09-19): individual/aggregate pages now report the real
-      // underlying data's updated_at instead of "today" for every URL on
-      // every request. toLastmod() takes a SQLite CURRENT_TIMESTAMP string
-      // (or the MAX() of several) and reduces it to the YYYY-MM-DD sitemap
-      // expects; the `today` fallback only applies if a row somehow has no
-      // updated_at at all (every venues/events row has one via its column
-      // DEFAULT, so this is a defensive fallback, not the normal path). The
-      // homepage and /events index aggregate many records with no single
-      // "the" modification date, so those two keep the rolling `today` value.
-      const toLastmod = (ts) => (ts ? String(ts).slice(0, 10) : today);
-      const combos = listGuideCombos(MIN_GUIDE_VENUES).map((combo) => ({
-        ...combo,
-        lastmod: toLastmod(
-          db
-            .prepare(`SELECT MAX(updated_at) AS m FROM venues WHERE region = ? AND ${combo.badge} = 1 AND redirect_to IS NULL`)
-            .get(combo.region).m
-        ),
-      }));
-
-      // Region pages: one per region that has at least one venue.
-      const regionCounts = db
-        .prepare('SELECT region, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region')
-        .all()
-        .filter((r) => REGION_LABELS[r.region] && r.n > 0);
-
-      // Category pages: one per region+type combo that has at least one
-      // venue — computed live, same pattern as the guide-page combos above.
-      const categoryCombos = db
-        .prepare('SELECT region, type, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region, type')
-        .all()
-        .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && r.n > 0);
-      // /:region/sports also renders for regions whose places to play are
-      // only tagged sports_also venues (2026-10-12), so list those too.
-      for (const v of getSportsAlsoVenues()) {
-        if (!REGION_LABELS[v.region]) continue;
-        const combo = categoryCombos.find((r) => r.region === v.region && r.type === 'sport');
-        if (!combo) categoryCombos.push({ region: v.region, type: 'sport', n: 1, lastmod: v.updated_at });
-        else {
-          combo.n += 1; // the page counts them too (MIN_INDEXABLE_CATEGORY_VENUES)
-          if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
-        }
-      }
-      // SEO (2026-10-20, SEO r13): /:region/tours lists that town's tours_also operators too (renderToursSectionPage),
-      // so they count toward MIN_INDEXABLE_CATEGORY_VENUES here as well and the sitemap matches the page's noindex.
-      for (const v of getToursAlsoVenues()) {
-        if (!REGION_LABELS[v.region] || v.type === 'tour') continue;
-        const combo = categoryCombos.find((r) => r.region === v.region && r.type === 'tour');
-        if (!combo) categoryCombos.push({ region: v.region, type: 'tour', n: 1, lastmod: v.updated_at });
-        else {
-          combo.n += 1;
-          if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
-        }
-      }
-
-      // Venue pages: every venue that has a real, non-null slug (should be
-      // all of them after the startup backfill, but this guards against any
-      // edge case rather than emitting a broken sitemap entry).
-      const venueRows = db
-        .prepare('SELECT id, region, type, slug, updated_at, description, description_fr, hours FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
-        .all()
-        // SEO r13 (2026-10-20): thin place pages are noindex, so they are left out here too (venuePageIsThin).
-        .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && !venuePageIsThin(v));
-
-      const urlEntries = [
-        `  <url>\n    <loc>https://okanaganroam.com/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`,
-        // Valley-wide landing hubs (2026-09-22). All four are already live,
-        // self-canonical and indexable; /whats-on is the only internal parent
-        // of every event detail URL below, so it belongs in the sitemap too.
-        `  <url>\n    <loc>https://okanaganroam.com/whats-on</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>`,
-        // What's On by type and by town (2026-10-13): only scopes with enough upcoming events (see liveWhatsOnScopes).
-        ...(() => { const live = whatsOnInventoryExists() ? liveWhatsOnScopes() : []; return live.map((x) => x.path); })()
-          .map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`),
-        `  <url>\n    <loc>https://okanaganroam.com/outdoors</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com/golf</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com/beaches</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        // Ski & Snow and Indoor & Rainy Day (2026-10-11): both always render.
-        `  <url>\n    <loc>https://okanaganroam.com${SKI_SNOW_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.indoor}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        // Tours & Experiences (2026-10-11): always renders.
-        `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.tour}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        // Sports & Recreation (2026-10-12): always renders.
-        `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS.sport}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        // Activity pages (SEO, 2026-10-13): one per tour, sport and indoor
-        // activity that currently lists at least one place.
-        ...liveActivityPagePaths().map((path) => `  <url>\n    <loc>https://okanaganroam.com${path}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`),
-        `  <url>\n    <loc>https://okanaganroam.com/wineries</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com/food-drink</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        // Valley-wide Food & Drink type pages (SEO, 2026-10-13).
-        ...FOOD_DRINK_TYPES.filter((t) => countVenuesByCategory(t) >= MIN_CATEGORY_VENUES).map((t) => `  <url>\n    <loc>https://okanaganroam.com/${CATEGORY_SLUGS[t]}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
-        `  <url>\n    <loc>https://okanaganroam.com/dog-friendly</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        ...(getLocalFavouriteVenues().length >= MIN_CATEGORY_VENUES
-          ? [`  <url>\n    <loc>https://okanaganroam.com/local-favorites</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
-          : []),
-        `  <url>\n    <loc>https://okanaganroam.com/destinations</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        // About, Privacy and Terms (2026-10-14).
-        `  <url>\n    <loc>https://okanaganroam.com/map</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`,
-        // Build My Trip, the all-places directory and the two listing forms (SEO audit, 2026-10-17): all live,
-        // self-canonical and indexable, with French twins, but missing from the sitemap.
-        `  <url>\n    <loc>https://okanaganroam.com/trip</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com/browse</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`,
-        ...['/list-your-venue', '/list-an-event'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.4</priority>\n  </url>`),
-        ...['/about', '/contact', '/privacy', '/terms'].map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>${p === '/about' || p === '/contact' ? '0.6' : '0.3'}</priority>\n  </url>`),
-        // Editorial guides (2026-10-10).
-        `  <url>\n    <loc>https://okanaganroam.com/guides</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        ...Object.keys(FILE_GUIDES).filter((p) => !guideIsThin(FILE_GUIDES[p])).map((p) => `  <url>\n    <loc>https://okanaganroam.com${p}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`),
-        `  <url>\n    <loc>https://okanaganroam.com${RAINY_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com${BRUNCH_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com${DOG_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com${WINE_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com${PATIO_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        `  <url>\n    <loc>https://okanaganroam.com${SKI_GUIDE_PATH}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`,
-        // Hidden Gems and the category directory (SEO, 2026-10-13): both live
-        // but were missing from the sitemap.
-        ...(getHiddenGemCollectionVenues(null).length >= MIN_CATEGORY_VENUES
-          ? [`  <url>\n    <loc>https://okanaganroam.com/hidden-gems</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
-          : []),
-        `  <url>\n    <loc>https://okanaganroam.com/categories</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`,
-        ...(getSecretSpotVenues().length >= MIN_CATEGORY_VENUES
-          ? [`  <url>\n    <loc>https://okanaganroam.com/secret-spots</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`]
-          : []),
-        ...regionCounts.map(
-          ({ region, lastmod }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/${region}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`
-        ),
-        ...categoryCombos.filter((r) => r.n >= MIN_INDEXABLE_CATEGORY_VENUES).map(
-          ({ region, type, lastmod }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
-        ),
-        ...combos.filter((c) => c.count >= MIN_INDEXABLE_GUIDE_VENUES).map(
-          ({ region, badge, lastmod }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${badge}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
-        ),
-        ...listComboGuides(MIN_INDEXABLE_GUIDE_VENUES).map(
-          ({ region, slug, lastmod }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/guide/${region}/${slug}</loc>\n    <lastmod>${toLastmod(lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
-        ),
-        // Outdoors Phase 2: activity pages, only those that actually render
-        // (same MIN_ACTIVITY_VENUES gate as the route).
-        ...listLiveOutdoorActivities().map(
-          ({ slug }) =>
-            `  <url>\n    <loc>https://okanaganroam.com/outdoors/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`
-        ),
-        // French twins (2026-10-13): a place with a French page lists both URLs, each carrying the pair as xhtml:link alternates.
-        ...venueRows.flatMap((v) => {
-          const { region, type, slug, updated_at } = v;
-          const enUrl = `https://okanaganroam.com/${region}/${CATEGORY_SLUGS[type]}/${slug}`;
-          const alts = FRENCH_INDEXABLE && venueHasFrench(v) ? venueAlternates(v).map((a) => `\n    <xhtml:link rel="alternate" hreflang="${a.hreflang}" href="${a.href}"/>`).join('') : '';
-          const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
-          return alts ? [entry(enUrl), entry(`https://okanaganroam.com${venuePagePath(v, 'fr')}`)] : [entry(enUrl)];
-        }),
-        // Menus (2026-10-17): menu pages with enough dishes to be indexed, with the French twin when the place has one.
-        ...listIndexableMenusForSitemap().flatMap(({ venue: v, publishedAt }) => {
-          const alts = FRENCH_INDEXABLE && venueHasFrench(v) ? [['en-CA', menuMenuUrl(v)], ['fr-CA', menuMenuUrl(v, 'fr')], ['x-default', menuMenuUrl(v)]]
-            .map(([hl, href]) => `\n    <xhtml:link rel="alternate" hreflang="${hl}" href="${href}"/>`).join('') : '';
-          const entry = (loc) => `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${toLastmod(publishedAt)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>${alts}\n  </url>`;
-          return alts ? [entry(menuMenuUrl(v)), entry(menuMenuUrl(v, 'fr'))] : [entry(menuMenuUrl(v))];
-        }),
-        // Phase 1 (Events architecture gate): only non-expired events —
-        // listEventsForSitemap() already applies the same "don't advertise
-        // dead pages" filtering the venue rows above get via redirect_to.
-        ...listEventsForSitemap()
-          .filter((e) => REGION_LABELS[e.region])
-          .map(
-            ({ region, slug, updated_at }) =>
-              `  <url>\n    <loc>https://okanaganroam.com/${region}/events/${slug}</loc>\n    <lastmod>${toLastmod(updated_at)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`
-          ),
-      ];
-      const sitemap = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-        ...withFrenchTwinEntries(urlEntries),
-        '</urlset>',
-        '',
-      ].join('\n');
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
-      return res.end(sitemap);
+      return res.end(buildSitemapXml());
     }
 
 
@@ -48377,54 +48515,24 @@ const server = http.createServer(async (req, res) => {
       return res.end(render404Page(pathname));
     }
 
-    // GET /admin/indexnow-submit?key=<INDEXNOW_KEY>
-    //
-    // Triggers a server-side bulk submission of every URL in the sitemap to
-    // the IndexNow API (api.indexnow.org), which fans out to Bing, Yandex,
-    // Seznam, and other participating engines. This has to happen
-    // server-side rather than from a browser: IndexNow's bulk POST endpoint
-    // doesn't send CORS headers, so browser JS gets silently blocked, while
-    // a server calling another server has no such restriction.
-    //
-    // Protected by requiring the IndexNow key itself as a query param —
-    // not real auth, just enough to keep this off search-engine crawlers'
-    // radar as a normal page (it's already excluded via robots.txt-style
-    // reasoning: nobody guesses a 32-char hex key by accident). Re-run this
-    // any time a bunch of venues get new badges and you want search engines
-    // to know sooner than the next passive sitemap crawl.
-    if (pathname === '/admin/indexnow-submit' && method === 'GET') {
-      if (query.key !== INDEXNOW_KEY) {
-        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end('Forbidden');
-      }
-      const today = new Date().toISOString().slice(0, 10);
-      const combos = listGuideCombos(MIN_GUIDE_VENUES);
-      const urlList = [
-        'https://okanaganroam.com/',
-        ...combos.map(({ region, badge }) => `https://okanaganroam.com/guide/${region}/${badge}`),
-        ...listComboGuides().map(({ region, slug }) => `https://okanaganroam.com/guide/${region}/${slug}`),
-      ];
-      try {
-        const submitRes = await fetch('https://api.indexnow.org/indexnow', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json; charset=utf-8' },
-          body: JSON.stringify({
-            host: 'okanaganroam.com',
-            key: INDEXNOW_KEY,
-            keyLocation: `https://okanaganroam.com/${INDEXNOW_KEY}.txt`,
-            urlList,
-          }),
-        });
-        const bodyText = await submitRes.text();
-        return sendJSON(res, 200, {
-          submitted_at: today,
-          url_count: urlList.length,
-          indexnow_status: submitRes.status,
-          indexnow_response: bodyText || '(empty body — normal for a 200/202 success)',
-        });
-      } catch (err) {
-        return sendJSON(res, 502, { error: `IndexNow submission failed: ${err.message}` });
-      }
+    // POST /api/admin/indexnow/submit-sitemap (2026-10-20, IndexNow): submits every sitemap URL (English, indexable;
+    // listSitemapUrls) to IndexNow in batches of 10,000. Admin token. Body { dry_run: true } only counts them.
+    // It replaces GET /admin/indexnow-submit, which anyone could trigger with the public key and sent only the
+    // guide pages.
+    if (pathname === '/api/admin/indexnow/submit-sitemap') {
+      if (method !== 'POST') return sendJSON(res, 405, { error: 'Method not allowed' });
+      if (!requireAdminToken(req, res)) return;
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const dryRun = !!(body && typeof body === 'object' && (body.dry_run === true || body.dryRun === true));
+      const urls = listSitemapUrls();
+      const batches = Math.ceil(urls.length / INDEXNOW_MAX_URLS);
+      const out = { ok: true, dry_run: dryRun, url_count: urls.length, batches, key_location: `https://${INDEXNOW_HOST}/${INDEXNOW_KEY}.txt`, sample: urls.slice(0, 5) };
+      if (dryRun) return sendJSON(res, 200, out);
+      if (!indexNowEnabled()) return sendJSON(res, 409, { ...out, ok: false, error: 'IndexNow is disabled here (NODE_ENV=test or INDEXNOW_DISABLED=1).' });
+      if (!indexNowIsProductionRequest(req)) return sendJSON(res, 409, { ...out, ok: false, error: `Only the production host (${INDEXNOW_HOST}) submits to IndexNow.` });
+      const r = await indexNowSubmit(urls);
+      return sendJSON(res, r.ok ? 200 : 502, { ...out, ok: r.ok, submitted: r.submitted, indexnow_status: r.status, results: r.batches });
     }
 
     // POST /admin/enrich-venue
@@ -48516,6 +48624,7 @@ const server = http.createServer(async (req, res) => {
       if (!result.found) {
         return sendJSON(res, 404, { error: 'Venue not found.' });
       }
+      indexNowVenueChanged(req, id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { id, results: result.results });
     }
 
@@ -48645,6 +48754,7 @@ const server = http.createServer(async (req, res) => {
           live: { address: result.live.address, latitude: result.live.latitude, longitude: result.live.longitude },
         });
       }
+      indexNowVenueChanged(req, id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, {
         id,
         changedFields: result.changedFields,
@@ -48689,6 +48799,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'canonical_id must be a positive integer.' });
       }
 
+      const indexNowBefore = indexNowVenueRow(duplicateId); // IndexNow (2026-10-20, IndexNow)
       let result;
       try {
         result = guardedRetireUpdate(duplicateId, canonicalId);
@@ -48708,6 +48819,7 @@ const server = http.createServer(async (req, res) => {
         };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
       }
+      indexNowVenueChanged(req, canonicalId, indexNowBefore); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, venue: result.venue });
     }
 
@@ -48752,6 +48864,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'corrected_region must be a non-empty string.' });
       }
 
+      const indexNowBefore = indexNowVenueRow(id); // IndexNow (2026-10-20, IndexNow)
       let result;
       try {
         result = guardedRegionCorrectUpdate(id, expectedCurrentRegion, correctedRegion);
@@ -48768,6 +48881,7 @@ const server = http.createServer(async (req, res) => {
         };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
       }
+      indexNowVenueChanged(req, id, indexNowBefore); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { id, noop: result.noop, venue: result.venue });
     }
 
@@ -48858,6 +48972,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason });
       }
       if (missingFrench) result.warning = 'No French text (note_fr): /fr pages show a French fallback until it is added.';
+      indexNowVenueChanged(req, body.venue_id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, result);
     }
 
@@ -48931,6 +49046,7 @@ const server = http.createServer(async (req, res) => {
           live: { phone: result.live.phone },
         });
       }
+      indexNowVenueChanged(req, id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, {
         id,
         changed: result.changed,
@@ -49003,6 +49119,7 @@ const server = http.createServer(async (req, res) => {
           live: { website: result.live.website },
         });
       }
+      indexNowVenueChanged(req, id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { id, changed: true, venue: { website: result.venue.website } });
     }
 
@@ -49074,6 +49191,7 @@ const server = http.createServer(async (req, res) => {
         };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
+      indexNowVenueChanged(req, body.id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, {
         id: body.id,
         changedFields: result.changedFields,
@@ -49130,6 +49248,7 @@ const server = http.createServer(async (req, res) => {
         const statusMap = { invalid_meta: 400, invalid_times: 400, invalid_source: 400, invalid_checked_at: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
+      indexNowVenueChanged(req, body.id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, venue: { happy_hour_times: result.happy_hour_times, happy_hour_source: result.happy_hour_source, happy_hour_checked_at: result.happy_hour_checked_at } });
     }
 
@@ -49169,6 +49288,7 @@ const server = http.createServer(async (req, res) => {
         const statusMap = { venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
       }
+      indexNowVenueChanged(req, body.id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { id: body.id, changed: result.changed, cuisine: result.cuisine });
     }
 
@@ -49208,6 +49328,7 @@ const server = http.createServer(async (req, res) => {
         const statusMap = { venue_not_found: 404, venue_redirected: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail });
       }
+      indexNowVenueChanged(req, body.id); // IndexNow (2026-10-20, IndexNow)
       const state = result.season ? seasonStateOn(result.season, todayLocal()) : null;
       return sendJSON(res, 200, { id: body.id, changed: result.changed, season: result.season, showing: state ? state.text : null });
     }
@@ -49247,6 +49368,7 @@ const server = http.createServer(async (req, res) => {
         const statusMap = { venue_not_found: 404, venue_redirected: 409 };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail });
       }
+      indexNowVenueChanged(req, body.id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { id: body.id, changed: result.changed, closures: result.closures, showing: result.showing });
     }
 
@@ -49348,6 +49470,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 404, { error: 'Venue not found.' });
       }
 
+      indexNowVenueChanged(req, id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, {
         id,
         results: result.results,
@@ -49399,6 +49522,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'fields must be an object.' });
       }
 
+      const indexNowBefore = indexNowVenueRow(duplicateId); // IndexNow (2026-10-20, IndexNow)
       let result;
       try {
         result = guardedMergeAndRetireUpdate(duplicateId, canonicalId, fields);
@@ -49423,6 +49547,7 @@ const server = http.createServer(async (req, res) => {
         };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result });
       }
+      indexNowVenueChanged(req, canonicalId, indexNowBefore); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 200, { duplicate_id: duplicateId, canonical_id: canonicalId, merged_fields: result.mergedFields, canonical: result.canonical, duplicate: result.duplicate });
     }
 
@@ -49480,7 +49605,9 @@ const server = http.createServer(async (req, res) => {
           reason: body.reason, batch_id: body.batch_id, reviewed_by: body.reviewed_by,
           reviewed_duplicates: body.reviewed_duplicates, event_status: body.event_status,
         });
+        const indexNowBefore = eventId !== null ? getEventById(eventId) : null; // IndexNow (2026-10-20, IndexNow)
         const respond = (result, successStatus = 200) => {
+          if (result.ok) indexNowEventChanged(req, eventId !== null ? eventId : result.event && result.event.id, indexNowBefore); // IndexNow (2026-10-20, IndexNow)
           if (result.ok) return sendJSON(res, successStatus, result);
           return sendJSON(res, EVENT_WRITE_STATUS_MAP[result.reason] || 400, { error: result.reason, detail: result.detail });
         };
@@ -49613,7 +49740,9 @@ const server = http.createServer(async (req, res) => {
       if (!requireAdminToken(req, res)) return;
       let body;
       try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const indexNowBefore = indexNowVenueRow(slugChangeMatch[1]); // IndexNow (2026-10-20, IndexNow)
       const r = changeVenueSlug(Number(slugChangeMatch[1]), body && typeof body === 'object' && !Array.isArray(body) ? body : {});
+      if (r.status === 200 && r.body && !r.body.dry_run) indexNowVenueChanged(req, slugChangeMatch[1], indexNowBefore); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, r.status, r.body);
     }
 
@@ -49646,8 +49775,10 @@ const server = http.createServer(async (req, res) => {
           return sendJSON(res, 401, { error: 'Unauthorized.' });
         }
         const body = await readBody(req);
+        const indexNowBefore = indexNowVenueRow(id); // IndexNow (2026-10-20, IndexNow)
         const updated = updateVenue(id, body);
         if (!updated) return sendJSON(res, 404, { error: 'Venue not found' });
+        indexNowVenueChanged(req, id, indexNowBefore); // IndexNow (2026-10-20, IndexNow)
         return sendJSON(res, 200, updated);
       }
 
@@ -49660,8 +49791,10 @@ const server = http.createServer(async (req, res) => {
         if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
           return sendJSON(res, 401, { error: 'Unauthorized.' });
         }
+        const indexNowBefore = indexNowVenueRow(id); // IndexNow (2026-10-20, IndexNow)
         const deleted = deleteVenue(id);
         if (!deleted) return sendJSON(res, 404, { error: 'Venue not found' });
+        indexNowVenueChanged(req, id, indexNowBefore); // IndexNow (2026-10-20, IndexNow)
         return sendJSON(res, 200, { success: true });
       }
     }
@@ -49698,10 +49831,12 @@ const server = http.createServer(async (req, res) => {
         const warnings = likely.filter((d) => !d.blocking);
         if (warnings.length) {
           const createdVenue = createVenue(body);
+          if (createdVenue && createdVenue.id) indexNowVenueChanged(req, createdVenue.id); // IndexNow (2026-10-20, IndexNow)
           return sendJSON(res, 201, createdVenue && typeof createdVenue === 'object' ? { ...createdVenue, duplicate_warnings: warnings } : createdVenue);
         }
       }
       const created = createVenue(body);
+      if (created && created.id) indexNowVenueChanged(req, created.id); // IndexNow (2026-10-20, IndexNow)
       return sendJSON(res, 201, created);
     }
 
@@ -51039,6 +51174,9 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // IndexNow (2026-10-20, IndexNow)
+  INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
+  indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,
   // Events and tech (2026-10-20, round 11)
   eventAutoVenueIndex, eventLinkedVenueId, eventHostVenue, eventFrenchStatus, listEventsNeedingFrench, eventPresenterName,
   // Round 12 (2026-10-20)
