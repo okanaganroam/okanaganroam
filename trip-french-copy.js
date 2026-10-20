@@ -8,6 +8,12 @@ function t3FrenchText(value){
  if(Object.prototype.hasOwnProperty.call(directLabels,text))return directLabels[text];
  const accessPrefix='Access / schedule from the listing: “',accessSuffix='” Confirm access and scheduling with the operator before visiting.';
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';
+ // Round 13 (2026-10-21): a window asked for after it started (server.js tripWindowClockNote).
+ const frClock12=(h,m,ap)=>{let x=Number(h)%12+(ap==='PM'?12:0);return x===0&&m==='00'?'minuit':x+' h'+(m==='00'?'':' '+m);};
+ text=text.replace(/^It’s already late, so this plan is for tomorrow evening\.$/,'Il est déjà tard; ce plan est donc pour demain soir.');
+ text=text.replace(/^It’s already evening, so this plan is for tomorrow afternoon\.$/,'Il est déjà le soir; ce plan est donc pour demain après-midi.');
+ text=text.replace(/^It’s already afternoon, so this plan is for tomorrow morning\.$/,'Il est déjà l’après-midi; ce plan est donc pour demain matin.');
+ text=text.replace(/^The (morning|afternoon|evening) has already started, so this plan starts at (\d{1,2}):(\d{2}) (AM|PM)\.$/,(_,w,h,m,a)=>({morning:'La matinée est déjà commencée',afternoon:'L’après-midi est déjà commencé',evening:'La soirée est déjà commencée'}[w])+'; ce plan commence donc à '+frClock12(h,m,a)+'.');
  const phrases=[
  ['Because you mentioned kids, kid-friendly places come first. Check ages and bookings with each place.','Comme vous voyagez avec des enfants, les lieux adaptés aux enfants passent en premier. Vérifiez l’âge requis et les réservations auprès de chaque lieu.'],['Because you mentioned kids, kid-friendly places, parks and beaches come first. Kid-Friendly is the badge Okanagan Roam verifies.','Comme vous voyagez avec des enfants, les lieux adaptés aux enfants, les parcs et les plages passent en premier. Adapté aux enfants est le badge vérifié par Okanagan Roam.'],
  ['An Okanagan Roam Local Favourite','Un coup de cœur local d’Okanagan Roam'],['One of Okanagan Roam’s Hidden Gems','L’un des trésors cachés d’Okanagan Roam'],
@@ -296,18 +302,23 @@ function t3FrenchText(value){
  // French typography (round 11, 2026-10-20): a space before the colon after a translated label, and « d’Osoyoos ».
  text=text.replace(/(\(mode supposé\)|Trajet estimé à pied|Horaires indiqués|vers l’événement):(?=\s)/g,'$1 :');
  text=text.replace(/\b(de|De) (?=(?:Osoyoos|Oliver|Okanagan|Armstrong|Enderby|Apex)\b)/g,(_,d)=>d==='De'?'D’':'d’');
- if(/\b\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2}\b/.test(text))text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>Number(h)+' h'+(m==='00'?'':' '+m));
+ if(/\b\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2}\b/.test(text))text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>Number(h)%24===0&&m==='00'?'minuit':Number(h)+' h'+(m==='00'?'':' '+m));
  return text;
 }
 function t3FrenchEvent(event){
  const e={...event};
  const days={Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'};
  const months={Jan:'janv.',Feb:'févr.',Mar:'mars',Apr:'avr.',May:'mai',Jun:'juin',Jul:'juill.',Aug:'août',Sep:'sept.',Oct:'oct.',Nov:'nov.',Dec:'déc.'};
- e.dateLabel=String(e.dateLabel||'').replace(/\+\s*(\d+) more dates?\b/g,(_,n)=>'+ '+n+' '+(n==='1'?'autre date':'autres dates')).replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>days[d]).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}(?:[–-]\d{1,2})?)/g,(_,m,d)=>(d==='1'?'1er':d)+' '+months[m]);
+ // Round 13 (2026-10-21): the server's French labels (server.js tripEventLabelFr) when it sent them; otherwise these rules.
+ if(e.dateLabelFr){e.dateLabel=e.dateLabelFr;}else
+ e.dateLabel=String(e.dateLabel||'').replace(/^Nightly\b/,'Tous les soirs').replace(/ · next /g,' · prochaine : ').replace(/\+\s*(\d+) more dates?\b/g,(_,n)=>'+ '+n+' '+(n==='1'?'autre date':'autres dates')).replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>days[d]).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}(?:[–-]\d{1,2})?)/g,(_,m,d)=>(d==='1'?'1er':d)+' '+months[m]);
+ if(e.timeFr){e.time=e.timeFr;return e;}
+ if(e.time==='Times vary'){e.time='Horaires variables';return e;}
+ if(e.time==='All day'){e.time='Toute la journée';return e;}
  e.time=String(e.time||'').replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,part)=>{
   if(Number(h)<1||Number(h)>12||Number(m||0)>59)return raw;
   const hour=Number(h)%12+(part.toLowerCase()==='pm'?12:0);
-  return String(hour).padStart(2,'0')+' h'+(m&&m!=='00'?' '+m:'');
+  return hour===0&&(!m||m==='00')?'minuit':String(hour).padStart(2,'0')+' h'+(m&&m!=='00'?' '+m:'');
  });
  return e;
 }

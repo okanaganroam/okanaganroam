@@ -1175,7 +1175,7 @@ const FR_SCRIPT = [
   ["function hoursStatusLabel(status, clock) {", "function hoursStatusLabel(status, clock) { var __l = hoursStatusLabelEn(status, clock); __l.text = __frStatusText(__l.text); return __l; }\n" +
     "function __frStatusText(text) { var D = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };\n" +
     "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace(' (holiday)', ' (jour f\\u00e9ri\\u00e9)').replace(' (temporary closure)', ' (fermeture temporaire)').replace(') \\u00b7 Opens ', ') \\u00b7 ouvre ').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
-    "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
+    "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H === 0 && !mm ? 'minuit' : H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
     "function hoursStatusLabelEn(status, clock) {"],
 ];
 
@@ -1264,7 +1264,7 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   // What's On chips and the custom-dates form (2026-10-18). "From" alone read "selon" through app.js's lower-case list.
   'today': 'aujourd’hui',
   'tomorrow': 'demain',
-  'Times vary': 'Heures variables',
+  'Times vary': 'Horaires variables',
   'From': 'Du',
   'From:': 'Du :',
   'Example photo': 'Photo d’exemple',
@@ -1305,6 +1305,12 @@ FR_PATTERNS.unshift(
   [/^(Today|Tomorrow|(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})) \+ (\d+) more dates?$/, (m) => {
     const first = m[1] === 'Today' ? 'Aujourd’hui' : m[1] === 'Tomorrow' ? 'Demain' : `${DAYS[m[2]]} ${m[4] === '1' ? '1er' : m[4]} ${MONTHS[m[3]]}`;
     return `${first} + ${m[5]} ${m[5] === '1' ? 'autre date' : 'autres dates'}`;
+  }],
+  // Round 13 (2026-10-21): "Nightly Oct 24 to Oct 30" -> « Tous les soirs du 24 au 30 oct. » (planner and What's On cards).
+  [/^(Nightly|Daily|Weekly) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}) to (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => {
+    const d = (n) => (n === '1' ? '1er' : n);
+    const range = m[2] === m[4] ? `du ${d(m[3])} au ${d(m[5])} ${MONTHS[m[4]]}` : `du ${d(m[3])} ${MONTHS[m[2]]} au ${d(m[5])} ${MONTHS[m[4]]}`;
+    return `${{ Nightly: 'Tous les soirs', Daily: 'Tous les jours', Weekly: 'Chaque semaine' }[m[1]]} ${range}${m[6] ? ` ${m[6]}` : ''}`;
   }],
   [/^next (Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => `prochaine : ${DAYS[m[1]]} ${m[3] === '1' ? '1er' : m[3]} ${MONTHS[m[2]]}`],
   [/^Show (\d+) past dates?$/, (m) => (m[1] === '1' ? 'Afficher 1 date passée' : `Afficher ${m[1]} dates passées`)],

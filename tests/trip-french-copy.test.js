@@ -63,7 +63,7 @@ test('French planner summary keeps an unscheduled dinner clear when no restauran
 test('French event labels: date ranges and clock times preserve the occurrence',()=>{
  const {t3FrenchEvent}=require('../trip-french-copy');
  assert.deepEqual(t3FrenchEvent({dateLabel:'Fri Oct 16',time:'7:30 pm',name:'Friday Night Live',url:'/event'}),{dateLabel:'ven. 16 oct.',time:'19 h 30',name:'Friday Night Live',url:'/event'});
- assert.equal(t3FrenchEvent({dateLabel:'Oct 16–18',time:'12 am'}).time,'00 h');
+ assert.equal(t3FrenchEvent({dateLabel:'Oct 16–18',time:'12 am'}).time,'minuit'); // round 13: « minuit », not « 00 h »
  assert.equal(t3FrenchEvent({dateLabel:'Dates to confirm',time:''}).time,'');
 });
 test('French less-common messages: missing activities and replacements keep the names and reason',()=>{
