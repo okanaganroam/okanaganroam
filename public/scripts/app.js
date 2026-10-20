@@ -526,14 +526,15 @@ var TRANSLATIONS = {
     'hero.headlineFall': 'L\u2019automne dans l\u2019Okanagan',
     'hero.leadFall': 'Okanagan Roam est votre guide de l\u2019automne dans la vall\u00e9e de l\u2019Okanagan, d\u2019Enderby \u00e0 Osoyoos \u2014 vignobles et cidreries en pleine r\u00e9colte, restos chaleureux, randonn\u00e9es d\u2019automne et \u00e9v\u00e9nements saisonniers, le tout au m\u00eame endroit.',
     'hero.leadMobileFall': 'D\u00e9couvrez les vignobles en r\u00e9colte, la cuisine r\u00e9confortante, les randonn\u00e9es d\u2019automne et les \u00e9v\u00e9nements partout dans l\u2019Okanagan.',
-    'mood.heading': "Qu'est-ce qui vous tente aujourd'hui?",
+    // Round 12 (2026-10-20): curly apostrophes, like the rest of the French homepage.
+    'mood.heading': "Qu\u2019est-ce qui vous tente aujourd\u2019hui?",
     'mood.lead': 'Commencez par ce qui vous fait envie. On vous aide \u00e0 trouver un endroit qui en vaut la peine.',
     'mood.golf.title': 'Golf',
     'mood.golf.desc': 'Jouez dans un cadre magnifique.',
     // Corrected 2026-09-17: "Quoi de neuf" reads as a casual "what's new
     // with you" greeting, not an events listing. "\u00c0 l'affiche" is the
     // standard Canadian French way to say "what's on/showing now."
-    'mood.whatsOn.title': "\u00c0 l'affiche",
+    'mood.whatsOn.title': "\u00c0 l\u2019affiche",
     'mood.whatsOn.desc': 'D\u00e9couvrez ce qui se passe dans la vall\u00e9e.',
     'mood.outdoors.title': 'Plein air',
     'mood.wine.title': 'Vin',

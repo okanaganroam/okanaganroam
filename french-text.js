@@ -1217,8 +1217,11 @@ const FR_SCRIPT_STRINGS = {
   "Removed from your favorites.": "Retiré de vos favoris.",
   "Saved to your favorites.": "Enregistré dans vos favoris.",
   "Saved your choice.": "Votre choix a été enregistré.",
-  "Send message": "Envoyer le message",
+  "Send message": "Envoyer",
   "Sending...": "Envoi en cours…",
+  // App sign-up (2026-10-20, round 12): its two error lines.
+  "Sorry, something went wrong. Please try again.": "Désolés, une erreur est survenue. Réessayez.",
+  "Sorry, we could not reach Okanagan Roam. Please try again.": "Désolés, impossible de joindre Okanagan Roam. Réessayez.",
   "Sorry, something went wrong. Please try again, or email us at info@okanaganroam.com.": "Désolés, une erreur est survenue. Réessayez ou écrivez-nous à info@okanaganroam.com.",
   "Sorry, we could not reach Okanagan Roam. Please check your connection and try again, or email us at info@okanaganroam.com.": "Désolés, impossible de joindre Okanagan Roam. Vérifiez votre connexion et réessayez, ou écrivez-nous à info@okanaganroam.com.",
   "Sports on TV": "Sports à la télé",

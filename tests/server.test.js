@@ -11675,7 +11675,8 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
   const withFavorites = [...HEADER_SPEC.slice(0, -1), { href: '/favorites', key: null, label: 'Favorites' }, HEADER_SPEC[HEADER_SPEC.length - 1]];
   for (const [name, html] of Object.entries(pages)) {
     const nav = parseNav(html);
-    const spec = (name === '/' || name === '/browse' || name === '/browse/classic') ? HEADER_SPEC : withFavorites;
+    // Round 12 (2026-10-20): the homepage header has Favorites too; /browse still doesn't.
+    const spec = (name === '/browse' || name === '/browse/classic') ? HEADER_SPEC : withFavorites;
     assert.deepEqual(nav.items.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: i.mobileOnly })),
       spec.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: !!i.mobileOnly })), name);
     // The desktop Build My Trip button is still the header CTA.
@@ -15624,10 +15625,10 @@ test('Stage 4.4: GET /favorites is a noindex, uncached shell page measured as pa
   assert.doesNotMatch(sitemap, /favorites|favourites/);
 }));
 
-test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile menu list) on shell pages and /trip, never on / or /browse (either version)', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
+test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile menu list) on shell pages, / and /trip, never on /browse (either version)', () => withPlannerFlag('on', () => withDiscoveryFlag('on', () => withDiscoveryServer(async (base) => {
   const item = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
   const page = async (p) => (await fetch(`${base}${p}`)).text();
-  for (const p of ['/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/restaurants/test-trattoria', '/whats-on', '/kelowna', '/search?q=fixture', '/map', '/favorites', '/trip', '/food-drink', '/dog-friendly', '/destinations']) {
+  for (const p of ['/golf', '/kelowna/golf/test-golf-course', '/kelowna/wineries/test-winery', '/kelowna/restaurants/test-trattoria', '/whats-on', '/kelowna', '/search?q=fixture', '/map', '/favorites', '/trip', '/food-drink', '/dog-friendly', '/destinations', '/']) {
     const html = await page(p);
     assert.equal(html.split(item).length - 1, 1, `${p}: one Favorites nav item`);
     const links = html.slice(html.indexOf('<ul class="nav-links" id="navLinks">'), html.indexOf('</ul>', html.indexOf('<ul class="nav-links" id="navLinks">')) + 5);
@@ -15637,7 +15638,8 @@ test('Stage 4.4: "Favorites" is in the shared navigation (desktop and the mobile
     assert.equal(html.split(rule).length - 1, 1, `${p}: one 941-1099px rule`);
     assert.ok(html.indexOf(rule) > html.indexOf('</header>') && html.indexOf(rule) - html.indexOf('</header>') < 20, `${p}: right after the header`);
   }
-  for (const p of ['/', '/browse', '/browse/classic']) assert.doesNotMatch(await page(p), /href="\/favorites"|nav-links-favorites/, `${p}: unchanged`);
+  // Round 12 (2026-10-20): the homepage menu has Favorites too; /browse still leaves it out.
+  for (const p of ['/browse', '/browse/classic']) assert.doesNotMatch(await page(p), /href="\/favorites"|nav-links-favorites/, `${p}: unchanged`);
   // The helper is idempotent and leaves a header without the marker alone.
   const once = app.withFavoritesNavLink('<ul><li class="nav-links-trip">x</li></ul>');
   assert.equal(app.withFavoritesNavLink(once), once);
