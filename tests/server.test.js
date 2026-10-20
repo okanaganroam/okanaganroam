@@ -11675,7 +11675,8 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
   const withFavorites = [...HEADER_SPEC.slice(0, -1), { href: '/favorites', key: null, label: 'Favorites' }, HEADER_SPEC[HEADER_SPEC.length - 1]];
   for (const [name, html] of Object.entries(pages)) {
     const nav = parseNav(html);
-    const spec = (name === '/' || name === '/browse' || name === '/browse/classic') ? HEADER_SPEC : withFavorites;
+    // Round 12 (2026-10-20): the homepage header has Favorites too; /browse still doesn't.
+    const spec = (name === '/browse' || name === '/browse/classic') ? HEADER_SPEC : withFavorites;
     assert.deepEqual(nav.items.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: i.mobileOnly })),
       spec.map((i) => (i.items ? { label: i.label, key: i.key, items: i.items } : { href: i.href, key: i.key, label: i.label, mobileOnly: !!i.mobileOnly })), name);
     // The desktop Build My Trip button is still the header CTA.
