@@ -899,8 +899,9 @@ test('Phase 1 overview: facts only -- no quality adjectives, seasonal or impleme
 test('Phase 1 overview: adding it changes nothing else in the plan (same picks, notes, reasons)', () => {
   for (const q of EXAMPLES) {
     const p = plan(q);
-    const copy = { ...p }; delete copy.headline; delete copy.experience;
-    const again = plan(q); delete again.headline; delete again.experience;
+    // Round 15 (2026-10-20): every plan also has a plain-words story and suggested times (schedule, suggestedTimes).
+    const copy = { ...p }; delete copy.headline; delete copy.experience; delete copy.story; delete copy.schedule; delete copy.suggestedTimes;
+    const again = plan(q); delete again.headline; delete again.experience; delete again.story; delete again.schedule; delete again.suggestedTimes;
     assert.deepEqual(copy, again);
     assert.ok(Object.keys(copy).every((k) => ['kind', 'summary', 'overview', 'days', 'recommendations', 'outing', 'events', 'notes', 'warnings', 'unsupported', 'needs', 'totalMatches', 'contextNotes'].includes(k)), `${q}: only the two new fields were added`);
   }

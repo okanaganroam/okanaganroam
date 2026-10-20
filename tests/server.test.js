@@ -13947,7 +13947,7 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'trip-event-location.js', 'trip-french-copy.js'];
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'trip-event-location.js', 'trip-french-copy.js', 'trip-story.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -13998,7 +13998,7 @@ test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in
 // with the module's own error instead of quietly planning in English only.
 test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails clearly without it (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js'];
+  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'trip-story.js'];
   const run = async (port, files, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripfr-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));

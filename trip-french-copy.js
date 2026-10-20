@@ -77,6 +77,8 @@ function t3FrenchText(value){
  ['Visits after the event remain unverified until its duration and travel time are confirmed.','Les visites après l’événement restent non vérifiées tant que sa durée et le trajet ne sont pas confirmés.'],
  ['Visits after the event remain unverified until travel time is confirmed.','Les visites après l’événement restent non vérifiées tant que le trajet n’est pas confirmé.'],
  ['Listed hours vary by day — see the venue page','Les horaires varient selon le jour — consultez la fiche'],
+ // Round 15 (2026-10-20): every plan is timed; an undated one says its times are a suggestion.
+ ['Times are a suggested schedule for a typical day; check each place’s hours before you go.','Les heures sont un horaire suggéré pour une journée type; vérifiez les heures de chaque lieu avant de partir.'],
  ['shorter transfers are preferred. Confirm the route.','les trajets plus courts sont privilégiés. Confirmez le parcours.'],
  // Round 7 (2026-10-19): an event with no listed end time gets an allowance, and the day carries on from it.
  ['Later visits are timed from the end shown here.','Les visites suivantes partent de la fin indiquée ici.'],
@@ -348,7 +350,9 @@ function t3FrenchStory(p){
   if(!parts.length)continue;
   // Round 14 (2026-10-20): an evening or afternoon plan is « Votre soirée » / « Votre après-midi », not « Votre journée ».
   const parts0=d.stops.map(s=>s.daypart);
-  const span=parts0.length&&parts0.every(x=>x==='evening'||x==='night')?'Votre soirée':parts0.length&&parts0.every(x=>x==='afternoon'||x==='late'||x==='evening'||x==='night')&&parts0.some(x=>x==='afternoon'||x==='late')?'Votre après-midi':'Votre journée';
+  // Round 15 (2026-10-20): a brewery or wine crawl is « Votre tournée », not « Votre journée commence par une bière ».
+  const drinks=d.stops.filter(s=>s.venue&&['brewery','pub','cocktail','distillery','winery'].includes(s.venue.type));
+  const span=drinks.length>=2&&drinks.every(s=>s.venue.type===drinks[0].venue.type)&&!(p.days&&p.days.length)?'Votre tournée':parts0.length&&parts0.every(x=>x==='evening'||x==='night')?'Votre soirée':parts0.length&&parts0.every(x=>x==='afternoon'||x==='late'||x==='evening'||x==='night')&&parts0.some(x=>x==='afternoon'||x==='late')?'Votre après-midi':'Votre journée';
   const lead=one?span+(d.town?' à '+d.town:''):'Le jour '+d.day+(d.town?', à '+d.town+',':'');
   if(parts.length===1){out.push(lead.replace(/,$/,'')+' : '+parts[0]+'.');continue;}
   const first=parts[0],last=parts[parts.length-1],mid=parts.slice(1,-1);
@@ -385,6 +389,8 @@ function t3FrenchPlan(plan){
  if(p.understood&&Array.isArray(p.understood.notUsed))p.understood.notUsed=p.understood.notUsed.map(t3FrenchText);
  p.warnings=(p.warnings||[]).map(t3FrenchText);p.notes=(p.notes||[]).map(t3FrenchText);p.contextNotes=(p.contextNotes||[]).map(t3FrenchText);
  const names=stops.map(s=>s.venue?.name||s.event?.name).filter(Boolean);
+ // Round 15 (2026-10-20): the plan's own French summary, written from the same data as the English one.
+ if(p.story&&p.story.textFr)p.story={...p.story,text:p.story.textFr};
  if(names.length){
   const translatedSummary=p.summary?t3FrenchText(p.summary):'';
   const towns=[...new Set(stops.map(s=>s.venue?.regionLabel).filter(Boolean))],at=towns.length===1?' à '+towns[0]:towns.length===2?' à '+towns[0]+' et '+towns[1]:' dans l’Okanagan';

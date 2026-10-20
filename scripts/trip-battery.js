@@ -144,7 +144,7 @@ for (const [id, text, nowArg, french] of CASES) {
   let p;
   try { p = await plan(text, now); } catch (e) { results.push({ id, text, error: String(e && e.message || e) }); if (!quiet) console.log(`\n## ${id}: ${text}\n  ERROR ${e && e.message}`); continue; }
   const stops = stopsOf(p);
-  results.push({ id, text, kind: p.kind, french: !!french, stops: stops.map((x) => ({ day: x.day, region: x.region, daypart: x.s.daypart, label: x.s.label, id: x.s.venue ? x.s.venue.id : null, eventId: x.s.event ? x.s.event.id : null, name: name(x.s), town: town(x.s), type: kindOf(x.s), start: x.r ? x.r.startMinutes : null, end: x.r ? x.r.endMinutes : null })) });
+  results.push({ id, text, kind: p.kind, french: !!french, story: (p.story && p.story.text) || (p.experience && p.experience.text) || '', storyFr: (t3FrenchPlan(p).story || {}).text || '', untimed: stopsOf(p).filter((x) => !x.r || !Number.isFinite(x.r.startMinutes)).length, stops: stops.map((x) => ({ day: x.day, region: x.region, daypart: x.s.daypart, label: x.s.label, id: x.s.venue ? x.s.venue.id : null, eventId: x.s.event ? x.s.event.id : null, name: name(x.s), town: town(x.s), type: kindOf(x.s), start: x.r ? x.r.startMinutes : null, end: x.r ? x.r.endMinutes : null })) });
   if (quiet) continue;
   console.log(`\n## ${id}: ${text}${now === EVENING ? '  [20:30]' : ''}`);
   console.log(`  ${p.kind} | ${p.headline || ''} | ${p.summary || ''}`);
@@ -157,11 +157,12 @@ for (const [id, text, nowArg, french] of CASES) {
   }
   if (!stops.length && (p.recommendations || []).length) console.log(`  ideas: ${p.recommendations.slice(0, 6).map((r) => (r.venue ? r.venue.name : r.name)).join(' · ')}`);
   if (!stops.length && (p.events || []).length) console.log(`  events: ${p.events.slice(0, 6).map((e) => e.name).join(' · ')}`);
-  if (p.experience && p.experience.text) console.log(`  story: ${p.experience.text.slice(0, 300)}`);
+  const story = (p.story && p.story.text) || (p.experience && p.experience.text);
+  if (story) console.log(`  story: ${story.slice(0, 400)}`);
   for (const n of [...(p.warnings || []), ...(p.notes || [])].slice(0, 4)) console.log(`  note: ${String(n).slice(0, 200)}`);
   if (french) {
     const f = t3FrenchPlan(p);
-    console.log(`  FR: ${f.headline || ''} | ${(f.experience && f.experience.text || '').slice(0, 300)}`);
+    console.log(`  FR: ${f.headline || ''} | ${((f.story && f.story.text) || (f.experience && f.experience.text) || '').slice(0, 400)}`);
   }
 }
 

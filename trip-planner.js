@@ -20,6 +20,7 @@
 
 const hoursModule = require('./hours.js');
 const tripRequirements = require('./trip-requirements');
+const tripStory = require('./trip-story');
 
 const PLAN_DAYPARTS = {
   relaxed: ['morning', 'afternoon', 'evening'],
@@ -903,6 +904,10 @@ function varietyNudge(v, ctx) {
   const key = `${ctx.queryText}|${v.id}`;
   for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
   return (h % 1000) / 250;
+}
+function openKind(v) {
+  if (v.type !== 'outdoor') return v.type;
+  return (v.activities || []).some((a) => ['hiking', 'viewpoints'].includes(a)) || /\b(?:mountain|trail|trails|peak|ridge|bluffs?|canyon|lookout)\b/.test(v.textName || '') ? 'outdoor:trail' : 'outdoor';
 }
 function daytimePart(part) { return ['morning', 'midday', 'afternoon', 'late'].includes(part); }
 function bookedOutfitter(v) {
@@ -1811,9 +1816,14 @@ function buildDays(facts, ctx, days, pinned) {
           if (vFocus.length) score += strongFocus.some((f) => !met.has(f.key)) ? 20 : vFocus.some((f) => !met.has(f.key)) ? (DINING_TYPES.includes(v.type) ? 0 : 8) : (DINING_TYPES.includes(v.type) ? 0 : 6);
           else if (focuses.length) extra.push({ code: 'complement', text: 'Optional suggestion: Extra stop added to round out the day', weight: 2 });
           if (dayTypes[v.type]) score -= 18;
+          // Round 15 (2026-10-20): two days of one trip don't open with the same kind of stop (a hike, then another
+          // hike) when another good kind of place is open.
+          if (daypart === dayDayparts[0] && out.length) { const pf = ((out[out.length - 1].stops || []).find((x) => x.venue) || {}).venue; const pv = pf && byId.get(pf.id); if (pv && openKind(pv) === openKind(v) && !(ctx.activities.has('hiking') && v.type === 'outdoor') && !ctx.types.has(v.type)) score -= 10; }
           score += varietyNudge(v, ctx);
           // Round 11: an outfitter or charter is booked ahead; it is not a walk-in pick unless tours were asked for.
           if (v.type !== 'tour' && !ctx.types.has('tour') && !ctx.plannerKinds.length && bookedOutfitter(v)) score -= 20;
+          // Round 15: a rental base, guided-tour company or forest-road campsite is not a stand-in day opener either.
+          else if (v.type !== 'tour' && !ctx.types.has('tour') && !ctx.plannerKinds.length && rotateBooked(v)) score -= 20;
           // Round 12: appointment-only places are booked, not walk-ins.
           if (appointmentOnly(v) && !namedInRequest(v, ctx)) score -= 25;
           // Round 12: no café straight after lunch (a $ lunch, then a café five minutes later).
@@ -4069,7 +4079,93 @@ function withoutRepeatedAlternates(result) {
   if (result.outing && Array.isArray(result.outing.alternates)) result.outing.alternates = keep(result.outing.alternates);
   return result;
 }
-function planTrip(input) { return withoutRepeatedAlternates(planTripUnchecked(input)); }
+// Round 15 (2026-10-20): every plan has clock times. A plan with no date or start time is timed as a suggested schedule
+// for a typical day (the named weekday, else the coming Saturday), with the same hours, visit
+// lengths and drive times a dated plan uses; the rows carry no date (My Trip keeps the times, not a date) and are
+// marked suggested. The plan's stops, notes and warnings are not changed.
+const SUGGESTED_TIMES_NOTE = 'Times are a suggested schedule for a typical day; check each place’s hours before you go.';
+function typicalDate(input, result, wantDay) {
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(input.tripDate || '') ? input.tripDate : null;
+  if (!base) return null;
+  const at = (iso, n) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+  const wd = new Date(`${base}T12:00:00Z`).getUTCDay();
+  const want = WEEKDAYS.includes(input.startWeekday) ? ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(input.startWeekday)
+    : wantDay != null ? wantDay : 6; // a Saturday: the day most places are open, and when most visitors go
+  return want == null ? base : at(base, (want - wd + 7) % 7);
+}
+function addSuggestedTimes(result, input) {
+  if (!result || !['day_plan', 'multi_day', 'itinerary', 'outing'].includes(result.kind) || (result.schedule || []).length) return result;
+  const stops = (result.days || []).flatMap((d) => d.stops || []).concat((result.itinerary && result.itinerary.stops) || [], (result.outing && result.outing.stops) || []);
+  if (!stops.some((s) => s.venue || s.event)) return result;
+  if (!typicalDate(input, result)) return result;
+  const req = input.requirements || { items: [], conflicts: [] };
+  // "tonight" / « ce soir » keep today and the window's start (the late-window rules), not a typical Saturday.
+  const windowed = !!(req.windowClock || req.windowToday || (input.intent && input.intent.when && input.intent.when.preset === 'today'));
+  const fixedDate = windowed && /^\d{4}-\d{2}-\d{2}$/.test(req.startDate || input.tripDate || '') ? (req.startDate || input.tripDate) : null;
+  const partStart = { morning: 540, afternoon: 780, evening: 1020, night: 1140 }[input.intent && input.intent.when && input.intent.when.daypart] || null;
+  const fixedStart = windowed && req.windowClock && Number.isFinite(req.windowClock.start) ? req.windowClock.start
+    : windowed && fixedDate && input.clock && Number.isInteger(input.clock.minutes) && fixedDate === input.tripDate ? Math.max(Math.ceil(input.clock.minutes / 15) * 15, partStart || 0) : null;
+  const run = (startMinutes, date = fixedDate || typicalDate(input, result)) => {
+    if (startMinutes == null && fixedStart != null) startMinutes = fixedStart;
+    const probe = JSON.parse(JSON.stringify(result));
+    probe.days = probe.days || [];
+    try { scheduleTripByHours(probe, input, { ...req, items: req.items || [], conflicts: [], startDate: date, endDate: null, ...(startMinutes != null ? { startMinutes } : {}) }, { probe: true }); } catch (e) { return null; }
+    const rows = probe.schedule || [];
+    return { probe, rows, untimed: rows.filter((r) => !Number.isFinite(r.startMinutes)).length, timed: rows.filter((r) => Number.isFinite(r.startMinutes)).length };
+  };
+  // The usual start for the plan's first stop first; then a few other starts, kept only when they time more stops
+  // (an evening outing whose first stop closes at 5 PM starts earlier).
+  let best = run(null);
+  const first = stops.find((x) => x.venue || x.event);
+  const tries = ['evening', 'night'].includes(first && first.daypart) ? [1020, 960, 900, 1110] : ['afternoon', 'late'].includes(first && first.daypart) ? [720, 840, 900] : [600, 660, 720, 480];
+  for (const m of tries) { if (!best || !best.untimed) break; if (fixedStart != null && m < fixedStart) continue; const t = run(m); if (t && t.untimed < best.untimed) best = t; }
+  // With no weekday named, a Friday or Thursday is tried when a stop is closed on the Saturday (or the Sunday after).
+  if (best && best.untimed && !fixedDate && !WEEKDAYS.includes(input.startWeekday)) for (const wd of [5, 4]) { const t = run(null, typicalDate(input, result, wd)); if (t && t.untimed < best.untimed) best = t; if (!best.untimed) break; }
+  // A crawl's lunch that falls after the first tasting (a brewery that opens at 4 PM) is its dinner.
+  if (best && best.untimed && result.kind === 'itinerary' && result.itinerary) {
+    const list = result.itinerary.stops || [];
+    let changed = false;
+    for (const st of list) {
+      if (!st.venue || st.label !== 'Lunch' || st.component != null) continue;
+      const row = best.rows.find((r) => r.venueId === st.venue.id);
+      const before = best.rows.filter((r) => Number.isFinite(r.endMinutes) && list.findIndex((x) => x.venue && x.venue.id === r.venueId) < list.indexOf(st));
+      if (row && !Number.isFinite(row.startMinutes) && before.some((r) => r.endMinutes >= 870)) {
+        // A dinner place near the last tasting, open in the evening (the lunch place may close at 2:30).
+        const facts = input.facts || [], prevStop = [...list.slice(0, list.indexOf(st))].reverse().find((x) => x.venue), from = prevStop && facts.find((v) => v.id === prevStop.venue.id);
+        const used = new Set(list.filter((x) => x.venue).map((x) => x.venue.id));
+        const ctx = buildContext(input.intent || {}, input.labels || {}, input);
+        const pick = from && facts.filter((v) => v.type === 'restaurant' && !used.has(v.id) && v.region === from.region && hasCoords(v) && eligible(v, ctx, false) && !fastFood(v) && hoursFit(v, 'evening', 'sat').status === 'verified')
+          .map((v) => ({ v, score: scoreVenue(v, ctx).score - (kmBetween(from, v) || 8) * 3 })).sort((a, b) => b.score - a.score || a.v.id - b.v.id)[0];
+        if (pick) { const at = list.indexOf(st); list[at] = { kind: 'venue', label: 'Dinner', daypart: 'evening', component: null, ...stopFrom(pick.v, { reasons: scoreVenue(pick.v, ctx).reasons.concat({ code: 'meal', text: 'Something to eat between the tastings', weight: 3 }), caveats: [] }, regionReason(pick.v, ctx), ctx), alternates: [] }; changed = true; }
+      }
+    }
+    if (changed) { const t = run(null); if (t && t.untimed < best.untimed) best = t; }
+  }
+  if (!best || !best.timed) return result;
+  // A stop the timing replaced because its hours did not fit (with its own "Used instead of" note) is replaced here too.
+  const lists = (x) => ((x.days || []).length ? x.days.map((d) => d.stops || []) : [(x.itinerary && x.itinerary.stops) || (x.outing && x.outing.stops) || []]);
+  const mine = lists(result), theirs = lists(best.probe);
+  mine.forEach((list, i) => list.forEach((st, j) => {
+    const o = theirs[i] && theirs[i][j];
+    if (st && st.venue && o && o.venue && o.venue.id !== st.venue.id) {
+      const { scheduleNote, ...rest } = o;
+      list[j] = { ...rest, caveats: (rest.caveats || []).filter((c) => c !== scheduleNote && !/\b20\d\d-\d\d-\d\d\b/.test(c)) };
+    }
+  }));
+  result.schedule = best.rows.map(({ date: _d, ...r }) => ({ ...r, suggested: true }));
+  result.suggestedTimes = true;
+  if (!(result.notes || []).includes(SUGGESTED_TIMES_NOTE)) result.notes = [...(result.notes || []), SUGGESTED_TIMES_NOTE];
+  return result;
+}
+// Round 15: the summary in plain words, naming each place in order (trip-story.js), in English and French.
+function addStory(result, input) {
+  if (!result || !['day_plan', 'multi_day', 'itinerary', 'outing'].includes(result.kind)) return result;
+  const intent = input.intent || {};
+  const story = tripStory.buildStory(result, input.facts || [], { kids: !!(intent.party && intent.party.kids) || intent.occasion === 'family', dog: !!(intent.party && intent.party.dog) });
+  if (story) result.story = story;
+  return result;
+}
+function planTrip(input) { const result = withoutRepeatedAlternates(planTripUnchecked(input)); addSuggestedTimes(result, input || {}); return addStory(result, input || {}); }
 function planTripUnchecked(input) {
   // A dated plan with nothing else to check is still timed and dated (2026-10-18: a family weekend matched to What's On).
   // 2026-10-19: any start date or start time (the Dates & start time control) is timed too: "romantic weekend in
@@ -5759,6 +5855,8 @@ function scheduleNotes(result, ctx) {
 
 module.exports = {
   tripTheme,
+  // Build My Trip round 15 (2026-10-20)
+  addSuggestedTimes, addStory, SUGGESTED_TIMES_NOTE,
   // Build My Trip round 14 (2026-10-20)
   rotateWithinType, rotateBooked, withoutRepeatedAlternates, ROTATE_KEEP_BEST, appointmentKept, KIDS_ONLY_RE, BRUNCH_FOOD_RE,
   // Build My Trip round 12 (2026-10-20)
