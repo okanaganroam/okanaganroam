@@ -4359,3 +4359,40 @@ loadVenuesAndInit();
     }, 150);
   });
 })();
+
+/* ---------- Save to Pinterest on guide pages (2026-10-19) ----------
+   Guides are built by several renderers, so the button is added here once for
+   every /guides/<slug> page. It is a plain link to Pinterest's pin builder (no
+   Pinterest script, no tracking pixel): the page's canonical URL, its share
+   image (og:image) and its title. Clicks count as a share_click event. */
+(function(){
+  if (!/^\/guides\/[a-z0-9-]+\/?$/.test(window.location.pathname)) return;
+  var main = document.querySelector('main article') || document.querySelector('main');
+  var h1 = main && main.querySelector('h1');
+  var og = document.querySelector('meta[property="og:image"]');
+  if (!h1 || !og || !og.content) return;
+  var canon = document.querySelector('link[rel="canonical"]');
+  var url = (canon && canon.href) || window.location.origin + window.location.pathname;
+  var title = document.title.replace(/\s*\|\s*Okanagan Roam\s*$/, '');
+  var a = document.createElement('a');
+  a.className = 'pin-save';
+  a.href = 'https://www.pinterest.com/pin/create/button/?url=' + encodeURIComponent(url) +
+    '&media=' + encodeURIComponent(og.content) + '&description=' + encodeURIComponent(title);
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.setAttribute('aria-label', 'Save this guide to Pinterest (opens in a new tab)');
+  a.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.64 19.31c-.09-.78-.16-1.98.03-2.83l1.17-4.97s-.3-.6-.3-1.48c0-1.39.8-2.42 1.8-2.42.85 0 1.26.64 1.26 1.4 0 .85-.54 2.13-.82 3.31-.24.99.5 1.8 1.47 1.8 1.77 0 3.13-1.86 3.13-4.55 0-2.38-1.71-4.04-4.15-4.04-2.83 0-4.49 2.12-4.49 4.31 0 .85.33 1.77.74 2.27.08.1.09.18.07.28l-.28 1.13c-.04.18-.15.22-.34.13-1.25-.58-2.03-2.41-2.03-3.88 0-3.16 2.3-6.06 6.62-6.06 3.48 0 6.18 2.48 6.18 5.79 0 3.45-2.18 6.23-5.2 6.23-1.02 0-1.97-.53-2.3-1.15l-.62 2.38c-.23.87-.84 1.96-1.25 2.62A10 10 0 1 0 12 2z"/></svg><span>Save to Pinterest</span>';
+  a.addEventListener('click', function(){
+    if (window.trackEvent) window.trackEvent('share_click', { method: 'pinterest', page_path: window.location.pathname });
+  });
+  var style = document.createElement('style');
+  style.textContent = '.pin-save-row{margin:14px 0 4px}.pin-save{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 16px;border-radius:999px;border:1px solid rgba(27,43,58,.2);background:#fff;color:#1B2B3A;font-weight:700;font-size:.9rem;text-decoration:none}.pin-save:hover,.pin-save:focus-visible{border-color:#1B2B3A}.pin-save svg{color:#E60023;flex:none}';
+  document.head.appendChild(style);
+  var row = document.createElement('p');
+  row.className = 'pin-save-row';
+  row.appendChild(a);
+  // Right under the heading's block (the photo hero, or the h1 itself).
+  var block = h1;
+  while (block.parentElement && block.parentElement !== main) block = block.parentElement;
+  main.insertBefore(row, block.nextSibling);
+})();
