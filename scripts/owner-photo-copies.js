@@ -8,6 +8,9 @@
 // them next to the original on the Railway volume. Pages list a copy only once it exists, so running this is safe at
 // any time and running it twice does nothing the second time.
 //
+// Round 11 (2026-10-20): the server now also lists 160 and 240px copies (the gallery thumbnails), so photos that
+// already have their 480/960/1200px copies get just those two small ones on the next run.
+//
 //   ENRICHMENT_ADMIN_TOKEN=... node scripts/owner-photo-copies.js           # dry run: shows what it would make
 //   ENRICHMENT_ADMIN_TOKEN=... node scripts/owner-photo-copies.js --apply   # makes and uploads the copies
 //
@@ -62,7 +65,7 @@ async function main() {
   console.log(`${list.body.photos.length} approved owner photos on ${BASE}; ${todo.length} need copies${missing ? ` (${missing} have no file on the volume and are skipped)` : ''}.`);
   if (!todo.length) return;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'okr-owner-copies-'));
-  let sent = 0, failed = 0, savedKB = 0;
+  let sent = 0, failed = 0, savedKB = 0, thumbKB = 0;
   try {
     for (const p of todo) {
       const orig = path.join(tmp, p.file);
@@ -81,6 +84,7 @@ async function main() {
         body[`w${w}`] = `data:image/jpeg;base64,${fs.readFileSync(out).toString('base64')}`;
         made.push(`${w}px ${kb} KB`);
         if (w === 960) savedKB += origKB - kb;
+        if (w === 240) thumbKB += kb;
       }
       if (!made.length) continue;
       if (!APPLY) { console.log(`#${p.id} venue ${p.venue_id} ${p.file} (${d.width}x${d.height}, ${origKB} KB): would send ${made.join(', ')}`); continue; }
@@ -92,7 +96,7 @@ async function main() {
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-  if (!APPLY) console.log(`Dry run: nothing was sent. Phones would save about ${savedKB} KB in total on the venue photos. Run again with --apply to upload.`);
+  if (!APPLY) console.log(`Dry run: nothing was sent.${savedKB ? ` Phones would save about ${savedKB} KB in total on the venue photos.` : ''}${thumbKB ? ` The 240px thumbnails come to ${thumbKB} KB in all.` : ''} Run again with --apply to upload.`);
   else console.log(`Done: ${sent} photos updated, ${failed} failed.`);
   if (failed) process.exitCode = 1;
 }
