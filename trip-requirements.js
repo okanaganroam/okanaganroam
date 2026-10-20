@@ -487,6 +487,12 @@ function explicitOutingComponents(trip,requirements) {
     if(existing){existing.venueId=i.value;existing.phrase=i.venueName;}
     else if(i.venueType)parts.push(make([i.venueType],i.venueName,{venueId:i.value}));
   }
+  // Round 14 (2026-10-20): a part of the request with no requirement of its own ("drinks" in "drinks and dinner tonight
+  // in Penticton") is kept; the plan was dinner alone.
+  if(trip?.multi&&parts.length)for(const c of trip.components||[]){
+    if(c.kind!=='venue'||c.meal||c.venueId||!(c.types||[]).length||c.types.some(t=>represented.has(t)))continue;
+    parts.push({...c,daypart:c.daypart||requirements.daypart});for(const t of c.types)represented.add(t);
+  }
   if(parts.length<2&&!((requirements.outingScope==='short'||requirements.daypart||requirements.onlyRequested||items.some(i=>i.kind==='transport'))&&parts.length===1))return trip;
   const pos=c=>{const needle=c.phrase==='BMX'?'bmx':c.phrase==='walk'?'walk':c.phrase;const n=text.indexOf(needle);return n<0?10000:n;};
   parts.sort((a,b)=>pos(a)-pos(b));

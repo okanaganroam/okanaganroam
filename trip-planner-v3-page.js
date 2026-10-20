@@ -30,8 +30,11 @@ function t3TimelineRows(p,removed={}){
   const stop=stops.find(s=>s.day===item.day&&(item.notScheduledMeal?s.unscheduledMeal&&s.daypart===item.daypart:item.venueId!=null?s.venue?.id===item.venueId:s.event?.id===item.eventId));
   if(stop&&removed[stop.day+'-'+stop.daypart]){previous=null;changedDay=item.day;return null;}
   if(changedDay===item.day){const row={...item,name:stop?.venue?.name||stop?.event?.name||'',status:'unverified',gapMinutes:null,transferMinutes:undefined,arrivalAllowanceMinutes:undefined};if(item.venueId!=null){row.startMinutes=undefined;row.endMinutes=undefined;delete row.mealWindow;}return row;}
+  // Round 14 (2026-10-20): the free time before a stop runs from the latest end so far that day, so lunch on the hill
+  // inside a ski day is not followed by a 150-minute "free interval" while the skiing goes on.
   const gap=previous?.day===item.day&&Number.isFinite(previous.endMinutes)&&Number.isFinite(item.startMinutes)&&Number.isFinite(item.transferMinutes)?Math.max(0,item.startMinutes-previous.endMinutes-item.transferMinutes-(item.arrivalAllowanceMinutes||0)):null;
-  const row={...item,name:item.notScheduledMeal?(stop?.label||'Dinner'):stop?.venue?.name||stop?.event?.name||'',gapMinutes:gap};previous=item;return row;
+  const row={...item,name:item.notScheduledMeal?(stop?.label||'Dinner'):stop?.venue?.name||stop?.event?.name||'',gapMinutes:gap};
+  previous=previous?.day===item.day&&Number.isFinite(previous.endMinutes)&&!(Number.isFinite(item.endMinutes)&&item.endMinutes>previous.endMinutes)?{...item,endMinutes:previous.endMinutes}:item;return row;
  }).filter(Boolean);
 }
 // Times as the site's venue pages show them (2026-10-18): English "12 PM – 6 PM" / "7:30 PM", French "12 h–18 h" /
@@ -321,7 +324,7 @@ function t3MapsUrl(queries) {
 // The whole-trip map's points (Stage 5G, 2026-10-02): per day, in plan order,
 // each shown stop numbered by its place among that day's shown stops. Only a
 // stored location inside a generous Okanagan box counts (lat 48.5-51.5, lng
-// -121.5 to -117.5); a stop without one -- including every event -- is
+// -121.5 to -117.5); a stop without one (an event with no known place) is
 // counted as "not on the map". Removed stops and empty slots have no card, so
 // they are neither numbered nor counted.
 function t3MapPoints(days, removed) {
@@ -336,7 +339,9 @@ function t3MapPoints(days, removed) {
       const key = d.day + '-' + s.daypart;
       if (removed && Object.prototype.hasOwnProperty.call(removed, key)) return;
       n += 1;
-      const v = s.venue;
+      // Round 14 (2026-10-20): an event with a known place (its listing's pin, or a curated host such as the Penticton
+      // Trade & Convention Centre) is on the map too; Christkindl and the Penticton holiday markets were "not on the map".
+      const v = s.venue || (s.event && s.event.location ? { name: s.event.name, latitude: s.event.location.lat, longitude: s.event.location.lng } : null);
       if (!v || !inRange(v.latitude, 48.5, 51.5) || !inRange(v.longitude, -121.5, -117.5)) { out.skipped += 1; return; }
       points.push({ n, key, label: String(s.label || ''), name: String(v.name || ''), lat: v.latitude, lng: v.longitude });
     });
@@ -363,7 +368,13 @@ function t3DayPinLayout(points, assets) {
   const fits = pins.every((q) => Math.abs(q.d.dx) <= LIMIT.desktop.x && Math.abs(q.d.dy) <= LIMIT.desktop.y && Math.abs(q.w.dx) <= LIMIT.narrow.x && Math.abs(q.w.dy) <= LIMIT.narrow.y);
   return { fits, pins };
 }
-const CLIENT_HELPERS_SRC = [t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+// A stop card's "why" lines (round 14, 2026-10-20): at most two, without the listed hours (shown once, as the hours line
+// below; « Les horaires varient… » was printed twice in French) or a straight-line distance.
+function t3WhyLines(stop) {
+  const v = (stop && stop.venue) || {};
+  return ((stop && stop.why) || []).filter((w) => !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
+}
+const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
@@ -1300,7 +1311,7 @@ function renderScript(d) {
     if (v.id != null) renderedVenueCardAnchors[v.id] = true;
     var kept = key && state.locks[key] === v.id;
     // The listed hours are shown once, as the fact line above the reasons (in French too, 2026-10-18).
-    var why = (stop.why || []).filter(function(w){ return !(v.listedHours && /^(Listed hours|Horaires indiqu\u00e9s)/.test(w)) && !/\(straight line\)/.test(w); }).slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
+    var why = t3WhyLines(stop).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
     // A dated plan's timing ("Provisional visit 09:00–10:00 ...") is already in the timeline and the Before you go list.
     var cav = (stop.caveats || []).filter(function(c){ return !/No usable hours listed|Aucun horaire utilisable|No map location on file|emplacement.*carte|^Provisional visit|^Visite provisoire/i.test(c); }).map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('');
     var same = counts[v.name] > 1;
@@ -2339,4 +2350,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3WhyLines, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
