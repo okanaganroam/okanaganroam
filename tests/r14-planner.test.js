@@ -295,3 +295,63 @@ test('Rotation (round 15): a town’s top pick still wins about a third of the t
     'a packed day in Kelowna', 'a cheap day in Kelowna', 'a day in Kelowna in November', 'a long weekend in Kelowna', '2 days in Kelowna', 'a day trip to Kelowna'];
   assert.ok(texts.some((t) => plan(t).days.some((day) => day.stops.some((s) => s.venue && s.venue.id === PARKS[0].id))), 'the top park is in some plans');
 });
+
+// ---- 10. Round 15: times on every plan, plain-words summaries, day shape ----
+const { buildStory, BANNED_RE } = require('../trip-story.js');
+const GARDEN = add({ name: 'Kelowna Waterfront Gardens', region: 'kelowna', type: 'outdoor', rating: null, features: { lake_view: true }, desc: 'Flower beds and lawns on the waterfront.', dLat: 0.004 });
+const timedStops = (p) => allStops(p).map((s) => ({ s, row: (p.schedule || []).find((r) => (s.venue && r.venueId === s.venue.id) || (s.event && r.eventId === s.event.id)) }));
+test('Times (round 15): every stop of an undated plan has a suggested start and end, with no date', () => {
+  for (const q of ['a day in Kelowna', 'a weekend in Kelowna', 'brewery crawl in Penticton', 'dinner and drinks in Penticton', 'a wine day in Oliver', 'brunch and a walk in Kelowna', 'cafe hopping in Kelowna']) {
+    const p = plan(q);
+    assert.ok(['day_plan', 'multi_day', 'itinerary', 'outing'].includes(p.kind), `${q}: ${p.kind}`);
+    for (const { s, row } of timedStops(p)) {
+      assert.ok(row, `${q}: ${(s.venue || s.event).name} has a row`);
+      assert.ok(Number.isFinite(row.startMinutes) && Number.isFinite(row.endMinutes) && row.endMinutes > row.startMinutes, `${q}: ${(s.venue || s.event).name} ${row.startMinutes}-${row.endMinutes}`);
+      assert.equal(row.suggested, true);
+      assert.equal(row.date, undefined, 'a suggested schedule carries no date');
+    }
+    assert.ok(p.notes.includes(tp.SUGGESTED_TIMES_NOTE), q);
+  }
+  // A dated plan keeps its own dated schedule.
+  const dated = plan('a day in Kelowna', { startDate: '2026-10-24' });
+  assert.ok(dated.schedule.length && dated.schedule.every((r) => r.date === '2026-10-24' && !r.suggested));
+  // The page's timeline reads a suggested schedule like any other.
+  const rows = v3.t3TimelineRows(plan('a day in Kelowna'));
+  assert.ok(rows.length >= 3 && rows.every((r) => Number.isFinite(r.startMinutes)));
+});
+
+test('Summaries (round 15): name every stop in order, in English and French, with no claims the data does not hold', () => {
+  for (const q of ['a day in Kelowna', 'a weekend in Kelowna', 'brewery crawl in Penticton', 'dinner and drinks in Penticton', 'a wine day in Oliver', 'brunch and a walk in Kelowna', 'ski day at Big White on January 16 2027']) {
+    const p = plan(q);
+    assert.ok(p.story && p.story.text && p.story.textFr, q);
+    let at = -1;
+    for (const s of allStops(p)) {
+      const name = (s.venue || s.event).name;
+      assert.ok(p.story.text.includes(name), `${q}: ${name} in “${p.story.text}”`);
+      assert.ok(p.story.textFr.includes(name), `${q}: ${name} in « ${p.story.textFr} »`);
+      if ((p.days || []).length <= 1) { const k = p.story.text.indexOf(name); assert.ok(k > at, `${q}: order`); at = k; }
+    }
+    assert.doesNotMatch(p.story.text, BANNED_RE, q);
+    assert.doesNotMatch(p.story.textFr, BANNED_RE, q);
+    assert.doesNotMatch(p.story.textFr, /^Votre journée commence par/, q);
+  }
+  // French crawls and evenings never open with « Votre journée commence par ».
+  const crawl = t3FrenchPlan(plan('brewery crawl in Penticton'));
+  assert.match(crawl.story.text, /^Goûtez la bière à /);
+  const st = (name, type, daypart) => ({ daypart, label: '', venue: { name, type } });
+  assert.match(t3FrenchStory({ itinerary: { stops: [st('A', 'brewery', 'afternoon'), st('L', 'restaurant', 'midday'), st('B', 'brewery', 'afternoon')] } }), /^Votre tournée commence par/);
+  // A reason is only what the data holds: a lake-view park mentions the lake; a stop without the badge does not.
+  const story = buildStory({ kind: 'itinerary', days: [], itinerary: { stops: [{ daypart: 'morning', venue: { id: PARKS[1].id, name: PARKS[1].name, type: 'outdoor', regionLabel: 'Kelowna' } }, { daypart: 'midday', label: 'Lunch', venue: { id: KITCHENS[0].id, name: KITCHENS[0].name, type: 'restaurant', regionLabel: 'Kelowna' } }] } }, FACTS, {});
+  assert.match(story.text, /^Walk the trails at Mission Flats Park, (?:which looks out over the lake|with views over the lake|with a lake view), then have lunch at Kelowna Kitchen 1\.$/);
+  const plainStory = buildStory({ kind: 'itinerary', days: [], itinerary: { stops: [{ daypart: 'afternoon', venue: { id: MUSEUM.id, name: MUSEUM.name, type: 'indoor', regionLabel: 'Kelowna' } }] } }, FACTS, {});
+  assert.equal(plainStory.text, 'Visit Kelowna History Museum.');
+  assert.equal(plainStory.textFr, 'Visitez Kelowna History Museum.');
+});
+
+test('Day shape (round 15): two days of a weekend do not both open on a trail when another good place is open', () => {
+  assert.ok(GARDEN.id > 0);
+  const p = plan('a weekend in Kelowna');
+  const open = p.days.map((d) => d.stops.find((s) => s.venue).venue.id);
+  const trail = (id) => PARKS.some((x) => x.id === id);
+  assert.ok(!(trail(open[0]) && trail(open[1])), JSON.stringify(p.days.map((d) => d.stops[0].venue && d.stops[0].venue.name)));
+});

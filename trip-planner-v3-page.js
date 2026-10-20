@@ -123,14 +123,14 @@ function t3PlanNextSteps(p) {
   });
   var stops=p.days&&p.days.length?p.days.reduce(function(a,d){return a.concat(d.stops||[]);},[]):((p.itinerary&&p.itinerary.stops)||(p.outing&&p.outing.stops)||[]);
   (p.schedule||[]).forEach(function(i){
-    if(i.status==='estimated'||!i.venueId||seen['venue:'+i.venueId])return;
+    if(i.status==='estimated'||i.suggested||!i.venueId||seen['venue:'+i.venueId])return;
     var stop=stops.find(function(s){return s.venue&&s.venue.id===i.venueId;});if(!stop)return;
     seen['venue:'+i.venueId]=true;
     var url=stop.venue.url;
     steps.push({kind:'timing',name:stop.venue.name,checks:i.confirmationReasons,mealWindow:i.mealWindow,url:typeof url==='string'&&/^\/(?!\/)/.test(url)?url:null,urlFr:typeof stop.venue.urlFr==='string'?stop.venue.urlFr:null});
   });
   (p.schedule||[]).forEach(function(i){
-    if(i.status==='estimated'||i.venueId)return;
+    if(i.status==='estimated'||i.suggested||i.venueId)return;
     var stop=stops.find(function(s){return s.event&&s.event.id===i.eventId;});
     if(!stop){if(!seen.eventFallback){
       var fallbackChecks=[];
@@ -1022,7 +1022,7 @@ function renderScript(d) {
   }
   // Round 10 (2026-10-19): a short plan's stops (itinerary or outing), what a Swap sends of them, and their shown starts.
   // Round 10 (2026-10-19): a suggested start as people read it, "11:30 AM" (« 11 h 30 » in French), not "11:30".
-  function clockLabel(m){ var h = Math.floor(m / 60) % 24, mm = m % 60; if (lang() === 'fr') return h === 0 && !mm ? 'minuit' : h + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : ''); return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM'); }
+  function clockLabel(m){ var h = Math.floor(m / 60) % 24, mm = m % 60; if (lang() === 'fr') return h === 0 && !mm ? 'minuit' : h === 12 && !mm ? 'midi' : h + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : ''); return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? ' AM' : ' PM'); }
   function shortStops(){ var p = state.last || {}; return (p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []; }
   function shortShown(list){
     return list.slice(0, 12).map(function(s){
@@ -1268,7 +1268,18 @@ function renderScript(d) {
   var BADGE_FR_EXTRA = { open_early: 'Ouvert t\u00f4t', open_late: 'Ouvert tard' };
   var DAYPARTS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', late: 'Late afternoon', evening: 'Evening', night: 'Night' };
   // A day plan's slot label is the planner's fixed daypart name; any other label is the planner's own wording.
-  function whenLabel(s){ return DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; }
+  function whenLabel(s, key){ var w = DAYPARTS[s.daypart] === s.label ? frLabel('tripv3.daypart.' + s.daypart, s.label) : s.label; var t = stopTime(s, key); return t ? w + ' · ' + t : w; }
+  // Round 15 (2026-10-20): each stop shows its start and end ("9 AM–10:30 AM", « 9 h–10 h 30 »), from the plan's schedule.
+  function stopTime(s, key){
+    var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-/.exec(key) : null, day = m ? Number(m[1]) : null;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (day != null && r.day !== day) continue;
+      var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
+      if (hit && typeof r.startMinutes === 'number') return clockLabel(r.startMinutes) + (typeof r.endMinutes === 'number' ? '–' + clockLabel(r.endMinutes) : '');
+    }
+    return '';
+  }
   // Stop photos: each card in a plan gets a different photo where we have more than one for that kind of place, and a
   // dog trip uses the dog photos first (2026-10-14: two restaurants showed the same photo).
   var STOP_PHOTO_ALTS = { restaurant: ['restaurant', 'restaurant-2', 'restaurant-3'], winery: ['winery', 'winery-2', 'winery-3'], hiking: ['hiking', 'hiking-2', 'hiking-3'], beach: ['beach', 'beach-2', 'outdoor-2'], outdoor: ['outdoor', 'outdoor-2', 'viewpoints'], cocktail: ['cocktail', 'cocktail-2'], 'tour-farm': ['tour-farm', 'tour'], viewpoints: ['viewpoints', 'outdoor-2'], cafe: ['cafe', 'restaurant-3'] };
@@ -1428,7 +1439,7 @@ function renderScript(d) {
       if (!s.venue) {
         if (s.kind === 'event' && s.event) {
           var e = s.event, u = placeUrl(e);
-          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
+          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s, key)) + '</div><div><article class="t3-card"><div class="t3-card-top"><span>' + esc(tx('tripv3.event')) + '</span><span aria-hidden="true">·</span><span>' + esc([e.dateLabel, e.time, e.regionLabel].filter(Boolean).join(' · ')) + '</span></div><h4>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(e.name) + '</a>' : esc(e.name)) + '</h4>'
             // Round 8: an event says why it is in the plan, like every other stop.
             + ((s.why || []).length ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + s.why.slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
             + t3EventPlaceHtml(e,lang(),esc)
@@ -1658,7 +1669,7 @@ function renderScript(d) {
       + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert" aria-live="polite"><p>' + esc(lang()==='fr' ? 'Plusieurs événements correspondent à «'+p.eventAmbiguity.phrase+'». Choisissez celui que vous voulez ajouter à votre sortie :' : 'More than one listed event matches “'+p.eventAmbiguity.phrase+'”. Choose the one you want to add to your outing:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name,i){var id=p.eventAmbiguity.candidateIds&&p.eventAmbiguity.candidateIds[i];return Number.isSafeInteger(id)&&id>0?'<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="'+id+'">'+esc(name)+'</button>':'';}).join('') + '</div></section>' : '')
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
-      + (p.experience && p.experience.text ? '<p class="t3-expect">' + esc(String(p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p>' : '')
+      + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p>' : '')
       + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
       + rainHtml
       + '<div class="t3-plan-actions">'
