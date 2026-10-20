@@ -43,3 +43,12 @@ test('links: /links is noindex, briefly cached, uses plain internal links and co
   // The page's list styles stay inside the page body (a bare ul rule opened the header menu on phones).
   assert.ok(!/body\.links-page ul \{/.test(src));
 });
+
+test('owner portal (2026-10-19): the Photos section invites a short video by email, in English and French, and the help bot says so', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.ok(src.includes('<p class="op-hint op-video-hint">'));
+  assert.ok(src.includes('Have a short video (10&ndash;30 seconds) of your space, a dish or a drink? Email it to <a href="mailto:info@okanaganroam.com">'));
+  assert.ok(src.includes('Vous avez une courte vidéo (10 à 30 secondes)'));
+  assert.ok(src.includes('A short video (10–30 seconds) of your space or a dish can go to <strong>info@okanaganroam.com</strong>'));
+  assert.ok(!/op-video-hint[^\n]*okanaganroam@gmail\.com/.test(src), 'never the Gmail address');
+});
