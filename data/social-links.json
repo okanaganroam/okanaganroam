@@ -3,17 +3,30 @@
   "posts": [
     { "date": "2026-10-20", "title": "Halloween in the Okanagan: 6 spooky stops", "path": "/guides/halloween-okanagan" },
     { "date": "2026-10-21", "title": "Red Rooster Winery, Naramata", "path": "/naramata/wineries/red-rooster-winery" },
+    { "date": "2026-10-21", "title": "Local Spotlight: Intermezzo Restaurant & Wine Cellar, Vernon", "path": "/vernon/restaurants/intermezzo-restaurant-and-wine-cellar" },
     { "date": "2026-10-22", "title": "Fall waterfall walks", "path": "/guides/okanagan-waterfall-walks" },
+    { "date": "2026-10-22", "title": "Local Spotlight: Pandanus Thai Restaurant, West Kelowna", "path": "/west-kelowna/restaurants/pandanus-thai-restaurant" },
     { "date": "2026-10-23", "title": "This weekend: What's On", "path": "/whats-on" },
+    { "date": "2026-10-23", "title": "Local Spotlight: Haywire Winery, Summerland", "path": "/summerland/wineries/haywire-winery" },
     { "date": "2026-10-24", "title": "Brunch at The Cozy Cafe + Bar, West Kelowna", "path": "/west-kelowna/cafes/cozy-nook-cafe-bar" },
+    { "date": "2026-10-24", "title": "Local Spotlight: Frankie We Salute You!, Kelowna", "path": "/kelowna/restaurants/frankie-we-salute-you" },
     { "date": "2026-10-25", "title": "Fall farms and u-pick", "path": "/guides/fall-farms-u-pick-okanagan" },
+    { "date": "2026-10-25", "title": "Local Spotlight: Bean to Cup, Vernon", "path": "/vernon/cafes/bean-to-cup" },
     { "date": "2026-10-26", "title": "Suda's full menu, Vernon", "path": "/vernon/restaurants/suda-restaurant/menu" },
+    { "date": "2026-10-26", "title": "Local Spotlight: Pizzeria Tratto Napoletana, Penticton", "path": "/penticton/restaurants/pizzeria-tratto-napoletana" },
     { "date": "2026-10-27", "title": "Cozy fireside spots", "path": "/guides/cozy-spots-okanagan" },
+    { "date": "2026-10-27", "title": "Local Spotlight: Miks Food Studio, Osoyoos", "path": "/osoyoos/restaurants/miks-food-studio" },
     { "date": "2026-10-28", "title": "Build My Trip", "path": "/trip" },
+    { "date": "2026-10-28", "title": "Local Spotlight: Karat Chocolate, Kelowna", "path": "/kelowna/cafes/karat-chocolate" },
     { "date": "2026-10-29", "title": "Halloween for little ones", "path": "/guides/halloween-okanagan" },
+    { "date": "2026-10-29", "title": "Local Spotlight: Checkmate Artisanal Winery, Oliver", "path": "/oliver/wineries/checkmate-artisanal-winery" },
     { "date": "2026-10-30", "title": "Halloween for grown-ups", "path": "/whats-on" },
+    { "date": "2026-10-30", "title": "Local Spotlight: Two Brothers Mexican Restaurant, West Kelowna", "path": "/west-kelowna/restaurants/two-brothers-mexican-restaurant" },
     { "date": "2026-10-31", "title": "Happy Halloween: tonight's events", "path": "/whats-on" },
+    { "date": "2026-10-31", "title": "Local Spotlight: Chain Reaction Winery, Naramata", "path": "/naramata/wineries/chain-reaction-winery" },
     { "date": "2026-11-01", "title": "The Okanagan in November", "path": "/guides/okanagan-in-november" },
-    { "date": "2026-11-02", "title": "Soup, ramen and pho", "path": "/guides/soup-ramen-pho-okanagan" }
+    { "date": "2026-11-01", "title": "Local Spotlight: Zias Stonehouse Restaurant, Summerland", "path": "/summerland/restaurants/zias-stonehouse-restaurant" },
+    { "date": "2026-11-02", "title": "Soup, ramen and pho", "path": "/guides/soup-ramen-pho-okanagan" },
+    { "date": "2026-11-02", "title": "Local Spotlight: Sprout Bread, Kelowna", "path": "/kelowna/cafes/sprout-bread" }
   ]
 }
