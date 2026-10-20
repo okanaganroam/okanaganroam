@@ -6787,7 +6787,7 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   const kelownaGolf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
   const html = app.renderVenuePage(kelownaGolf, [], [], []);
   assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
-  assert.match(html, /<a class="cta secondary" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>/);
+  assert.match(html, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>/);
   assert.match(html, /class="map-link"[^>]*data-track="directions"/);
   assert.match(html, new RegExp(`"venue_id":${kelownaGolf.id},"venue_name":"Test Golf Course","venue_region":"kelowna","venue_category":"golf","surface":"venue_page"`));
   assert.match(html, /track\('venue_view', ctx\(\)\)/);
@@ -6814,8 +6814,8 @@ test('Golf venue page shows all five actions: Website, Get Directions, Call, Fav
   assert.ok(row, 'cta row present');
   assert.match(row[1], /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
   const body = row[2];
-  assert.match(body, /class="cta" href="https:\/\/example-golf\.test\/"[^>]*data-track="website">Visit Website</);
-  assert.match(body, /class="cta secondary" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions</);
+  assert.match(body, /class="cta secondary" href="https:\/\/example-golf\.test\/"[^>]*data-track="website">Website ↗</);
+  assert.match(body, /class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions</);
   assert.match(body, /class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call</);
   assert.match(body, /class="card-action fav-btn" data-fav-name="Test Golf Course" aria-pressed="false"/);
   assert.match(body, /class="card-action trip-btn" data-trip-name="Test Golf Course" data-trip-query="Test Golf Course, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false"/);
@@ -7106,7 +7106,7 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.match(html, new RegExp(`<nav class="breadcrumb"[^>]*>[\\s\\S]*?<a href="/kelowna/${slug}">${label.plural}</a>[\\s\\S]*?Test Trattoria[\\s\\S]*?</nav>`), `${type}: breadcrumb nav`);
     // Content and CTAs unchanged.
     assert.match(html, /<p class="venue-description">A fixture restaurant used only by the automated test suite\.<\/p>/);
-    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta secondary" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*>[^<]*Add to trip</button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
+    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*>[^<]*Add to trip</button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
     assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
     assert.match(html, /<h2>Good to Know<\/h2>/);
     // Favorite / Add to Trip (2026-10-14): one of each, in the CTA row.
@@ -7426,9 +7426,9 @@ test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when p
   assert.ok(cta, 'CTA row must render');
   assert.match(cta[1], /data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="venue_page"/);
   // Batch 3: themed venue pages render the canonical app.js labels ("Favorite", "Add to trip").
-  const order = ['Visit Website', 'Get Directions', 'Favorite', 'Add to trip'].map((t) => cta[2].indexOf(t));
-  assert.ok(order.every((i) => i >= 0), 'Visit Website, Get Directions, Favorite, Add to trip all present');
-  assert.deepEqual([...order].sort((a, c) => a - c), order, 'CTA order: Visit Website, Get Directions, Favorite, Add to Trip');
+  const order = ['Get Directions', 'Website ↗', 'Favorite', 'Add to trip'].map((t) => cta[2].indexOf(t));
+  assert.ok(order.every((i) => i >= 0), 'Get Directions, Website, Favorite, Add to trip all present');
+  assert.deepEqual([...order].sort((a, c) => a - c), order, 'CTA order (2026-10-20): Get Directions, Website, Favorite, Add to Trip');
   assert.doesNotMatch(cta[2], />Call</, 'no Call button when phone is null');
   assert.match(cta[2], /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.86,-119\.49"/, 'Get Directions uses the verified coordinates');
   assert.match(cta[2], /data-track="website"/);
@@ -7787,7 +7787,7 @@ test('Beach venue CTA rules: Get Directions from coordinates OR a verified addre
   assert.doesNotMatch(nothing, /Get Directions|Visit Website|>Call</);
   assert.match(nothing, /Favorite/); assert.match(nothing, /Add to trip/); // Batch 3: canonical app.js label
   const full = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://storymaps.arcgis.com/stories/ae662360d11c44c6a8edb3bf2eb315d3', phone: '+1 250-555-0199' });
-  assert.match(full, /href="https:\/\/storymaps\.arcgis\.com\/stories\/ae662360d11c44c6a8edb3bf2eb315d3" rel="nofollow noopener" target="_blank" data-track="website">Visit Website</);
+  assert.match(full, /href="https:\/\/storymaps\.arcgis\.com\/stories\/ae662360d11c44c6a8edb3bf2eb315d3" rel="nofollow noopener" target="_blank" data-track="website">Website ↗</);
   assert.match(full, /query=49\.9,-119\.5/, 'coordinates win over the address for directions');
   assert.match(full, />Call</);
 });
@@ -7925,7 +7925,7 @@ test('Outdoor venue page: hero carries the H1 (exactly one), themed CTA row, can
   assert.match(html, /body\.golf-page \.venue-hero-fallback\.venue-hero-outdoor \{ box-shadow/);
   assert.match(html, /<a class="category-back-link" href="\/kelowna\/outdoors">← Kelowna Outdoors<\/a>/);
   assert.match(html, /data-venue-category="outdoor" data-venue-name="Test Canyon Regional Park" data-surface="venue_page"/);
-  assert.match(html, /Visit Website/); assert.match(html, /Get Directions/); assert.match(html, /Favorite/); assert.match(html, /Add to Trip/);
+  assert.match(html, /Website ↗/); assert.match(html, /Get Directions/); assert.match(html, /Favorite/); assert.match(html, /Add to Trip/);
   assert.doesNotMatch(html, /<span class="label">Type<\/span>/, 'type is in the hero, not repeated in Good to Know (2026-10-14)');
   assert.doesNotMatch(outdoorMarkupOnly(html), /golf-glance|Indoor Golf|beach-page/);
   const bare = app.renderVenuePage(app.findVenueBySlug('vernon', 'outdoor', 'test-nordic-centre'), [], [], []);
@@ -21504,7 +21504,7 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     listing = await fetch(`${base}/kelowna/cafes/links-fixture-cafe`).then((r) => r.text());
     assert.match(listing, /<h1>Links Fixture Cafe &amp; Bakery<\/h1>|Links Fixture Cafe &amp; Bakery/);
     assert.match(listing, /<a href="https:\/\/linksfixture\.ca\/menu" rel="nofollow noopener" target="_blank">See the menu/);
-    assert.match(listing, /<a class="cta secondary" href="https:\/\/www\.opentable\.ca\/r\/links-fixture" rel="nofollow noopener" target="_blank">Book<\/a>/);
+    assert.match(listing, /<a class="cta secondary" href="https:\/\/www\.opentable\.ca\/r\/links-fixture" rel="nofollow noopener" target="_blank" data-track="booking">Book<\/a>/);
     assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
     // The listing card shows the same links (2026-10-16).
     const cards = await fetch(`${base}/kelowna/cafes`).then((r) => r.text());
@@ -31696,4 +31696,38 @@ test('Admin review owner stats (2026-10-19): logins, venues with a login, venues
   assert.match(html, /<section class="rv-owners" id="owners"><h2>Owners<\/h2>/);
   assert.match(html, /venues? ha(s|ve) a login<\/strong>/);
   assert.match(html, /<li>Owner Stats Fixture <span class="rv-meta">Kelowna · since \d{4}-\d{2}-\d{2}<\/span><\/li>/);
+});
+
+test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a Close by strip offers nearby places with Add to trip', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Close By Host Fixture', type: 'winery', hours: SEASON_WEEK, slug: 'close-by-host-fixture' });
+  seasonInsert.run({ name: 'Close By Cafe Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'close-by-cafe-fixture' });
+  seasonInsert.run({ name: 'Close By Pub Fixture', type: 'pub', hours: SEASON_WEEK, slug: 'close-by-pub-fixture' });
+  seasonInsert.run({ name: 'Close By Far Fixture', type: 'restaurant', hours: SEASON_WEEK, slug: 'close-by-far-fixture' });
+  const host = app.findVenueBySlug('kelowna', 'winery', 'close-by-host-fixture');
+  const set = db.prepare('UPDATE venues SET latitude = ?, longitude = ?, website = ?, address = ? WHERE id = ?');
+  set.run(49.70, -119.40, 'https://host.example/', '1 Host Rd, Kelowna, BC', host.id);
+  set.run(49.705, -119.40, null, null, app.findVenueBySlug('kelowna', 'cafe', 'close-by-cafe-fixture').id); // ~0.6 km
+  set.run(49.73, -119.40, null, null, app.findVenueBySlug('kelowna', 'pub', 'close-by-pub-fixture').id); // ~3.3 km
+  set.run(49.99, -119.40, null, null, app.findVenueBySlug('kelowna', 'restaurant', 'close-by-far-fixture').id); // ~32 km
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  try {
+    const html = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries/close-by-host-fixture`).then((r) => r.text());
+    const row = html.slice(html.indexOf('<div class="venue-cta-row"'), html.indexOf('</div>', html.indexOf('<div class="venue-cta-row"')));
+    assert.match(row, /^<div class="venue-cta-row"[^>]*>\s*<a class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions<\/a>/);
+    assert.match(row, /<a class="cta secondary" href="https:\/\/host\.example\/"[^>]*target="_blank" data-track="website">Website ↗<\/a>/);
+    const strip = html.slice(html.indexOf('<section class="nearby-strip"'), html.indexOf('</section>', html.indexOf('<section class="nearby-strip"')));
+    assert.ok(strip.length > 0, 'the Close by strip renders');
+    assert.ok(html.indexOf('class="venue-description"') < html.indexOf('class="nearby-strip"'), 'after the description');
+    assert.match(strip, /Close By Cafe Fixture/);
+    assert.match(strip, /Caf[eé] · \d+ min walk/);
+    assert.match(strip, /Pub · \d+ min drive/);
+    assert.doesNotMatch(strip, /Close By Far Fixture/, 'more than 15 km away is left out');
+    assert.ok(strip.indexOf('Close By Cafe Fixture') < strip.indexOf('Close By Pub Fixture'), 'closest first');
+    assert.match(strip, /class="card-action trip-btn" data-trip-name="Close By Cafe Fixture"[^>]*data-trip-ref="venue:\d+"/);
+    assert.match(strip, /window\.trackEvent\('nearby_click'/);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
 });
