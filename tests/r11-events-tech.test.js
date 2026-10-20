@@ -96,9 +96,10 @@ test('R11 linking: the venue page lists the matched events; the event page links
   const html = await page('/kelowna/indoor/fixture-community-theatre');
   assert.match(html, /Events at Fixture Community Theatre/);
   for (const e of [evA, evB, evC]) assert.ok(html.includes(`href="/kelowna/events/${e.slug}"`), e.name);
-  assert.ok(!html.includes(`/kelowna/events/${evMore[0].slug}`), 'three at most');
+  // Round 12: up to ten show now, so all seven are listed and no "more" line is needed.
+  for (const e of evMore) assert.ok(html.includes(`/kelowna/events/${e.slug}`), e.name);
   assert.ok(!html.includes(`/vernon/events/${evVernon.slug}`));
-  assert.match(html, /<a href="\/kelowna\/events">All events in Kelowna &rarr;<\/a> <span class="related-meta">\(7 coming up here\)/);
+  assert.ok(!html.includes('coming up at this venue'));
   const ev = await page(`/kelowna/events/${evA.slug}`);
   assert.ok(ev.includes('href="/kelowna/indoor/fixture-community-theatre"'), 'the event page links its place');
 });

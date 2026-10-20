@@ -4304,10 +4304,10 @@ test('H1 Step 3: venue pages link the next publishable events at that venue, omi
   assert.deepEqual(cardsOf(two), [`/kelowna/events/${a.slug}`, `/kelowna/events/${b.slug}`], 'two cards in next-date order');
   assert.ok(two.includes(`<h2>Events at ${venue.name}</h2>`), 'heading is "Events at {Venue Name}"');
 
-  // 4. Four events -> capped at 3, still ordered by next occurrence.
+  // 4. Four events -> all four (round 12: up to ten show), still ordered by next occurrence.
   const c = mk('Lanternfall Recital', { categories: ['arts-culture'], occurrences: [{ start_date: '2033-05-05' }] });
-  mk('Duskwine Tasting', { categories: ['nightlife'], occurrences: [{ start_date: '2033-06-20' }] });
-  assert.deepEqual(cardsOf(html()), [`/kelowna/events/${a.slug}`, `/kelowna/events/${c.slug}`, `/kelowna/events/${b.slug}`], 'max 3 cards, next-date order');
+  const d = mk('Duskwine Tasting', { categories: ['nightlife'], occurrences: [{ start_date: '2033-06-20' }] });
+  assert.deepEqual(cardsOf(html()), [`/kelowna/events/${a.slug}`, `/kelowna/events/${c.slug}`, `/kelowna/events/${b.slug}`, `/kelowna/events/${d.slug}`], 'up to ten cards, next-date order');
 
   // 5. Cancelled, postponed and expired events at this venue are never linked.
   const cancelled = mk('Shuttered Doorway', { categories: ['workshops-classes'], occurrences: [{ start_date: '2033-05-03' }] });
