@@ -2741,12 +2741,23 @@ window.__scrollToVenueCard = function(name){
     try { window.localStorage.setItem('okanaganTrip', JSON.stringify(trip)); } catch (e) {}
   }
 
+  // Accessibility (2026-10-20, round 11): every Add to trip button says whether its stop is in the trip (aria-pressed;
+  // What's On and Build My Trip cards never did), and the label's leading emoji or tick is aria-hidden, so a screen
+  // reader says "Add to trip" / « Ajouter au voyage », not "luggage, Add to trip".
+  function tripLabelHtml(label){
+    var esc = function(s){ return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    var i = label.indexOf(' ');
+    if (i > 0 && /[^\x00-\x7F]/.test(label.slice(0, i))) return '<span aria-hidden="true">' + esc(label.slice(0, i)) + '</span>' + esc(label.slice(i));
+    return esc(label);
+  }
   function syncButtons(){
     document.querySelectorAll('.trip-btn').forEach(function(btn){
       var s = stopOf(btn);
       var inTrip = trip.some(function(t){ return sameStop(t, s); });
       btn.classList.toggle('in-trip', inTrip);
-      btn.textContent = inTrip ? t('trip.inTrip') : t('trip.addToTrip');
+      btn.setAttribute('aria-pressed', inTrip ? 'true' : 'false');
+      var html = tripLabelHtml(inTrip ? t('trip.inTrip') : t('trip.addToTrip'));
+      if (btn.innerHTML !== html) btn.innerHTML = html;
     });
   }
 

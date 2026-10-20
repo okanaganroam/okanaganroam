@@ -9224,7 +9224,7 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
   body.guide-page .guide-picks a { color: var(--teal-deep, #1F5450); }
   body.guide-page .guide-more { margin: 32px 0 8px; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
-  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.guide-page .guide-more-chip { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
 </style>`,
     afterHtml,
@@ -9422,7 +9422,7 @@ function renderComboGuidePage(region, combo, venues, filter = null, now = new Da
   body.guide-page .guide-facts li { margin: 2px 0; }
   body.guide-page .guide-more { margin: 32px 0 8px; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
-  body.guide-page .guide-more-chip { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
+  body.guide-page .guide-more-chip { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
 </style>`,
     afterHtml,
@@ -11652,6 +11652,8 @@ ${renderCanonicalFooterStyles()}
     .home-stats { gap: 4px 14px; font-size: 0.8rem; }
     /* Phones: places and upcoming events, on one line. */
     .home-stats li:nth-child(n+3) { display: none; }
+    /* Tap targets (2026-10-20, round 11): the two stat links are 44px tall to a finger (19px); the line stays put. */
+    .home-stats a { display: inline-block; padding: 13px 0; margin: -13px 0; }
     /* The destinations "See all" button sits under the heading like the other sections' (and the row ends with a card). */
     .explore-all-link-heading { display: inline-flex; }
     .home-row .home-scroll-row, .region-card-grid {
@@ -13221,7 +13223,9 @@ html[lang="fr"] .desc-en { display: none; }
 // EN and FR buttons press it. Only pages that carry #langToggle (the ones with app.js) get the menu item.
 const NAV_LANG_ITEM = '<li class="nav-links-lang"><span class="nav-lang-label" id="navLangLabel" data-i18n="nav.switchLanguage">Switch language</span><span class="nav-lang-group" role="group" aria-labelledby="navLangLabel"><button type="button" class="nav-lang-opt" data-lang="en" lang="en" aria-pressed="false">EN</button><button type="button" class="nav-lang-opt" data-lang="fr" lang="fr" aria-pressed="false">FR</button></span></li>';
 function withMobileLanguageItem(html) {
-  if (!html.includes('id="langToggle"') || html.includes('nav-links-lang')) return html;
+  // Round 11 (2026-10-20): look for the item itself. The header's own style text names .nav-links-lang, so on every
+  // page but the homepage and /browse the old includes('nav-links-lang') test found the CSS and skipped the item.
+  if (!html.includes('id="langToggle"') || html.includes('<li class="nav-links-lang"')) return html;
   return html.replace(/(<li class="nav-links-trip">[\s\S]*?<\/li>)/, `$1\n      ${NAV_LANG_ITEM}`);
 }
 const BMT_TRACK_SCRIPT = `<script>
@@ -13279,6 +13283,13 @@ const HOME_HERO_STYLE = `<style id="home-hero">
 @media (max-width: 640px) { .hero-scenic-home { height: clamp(340px, 92vw, 400px); } .hero-scenic-home .hero-media-img { object-position: 50% 100%; } .hero-scenic-home .hero-scrim { background: radial-gradient(ellipse 90% 50% at 50% 42%, rgba(18,12,8,0.32) 0%, rgba(18,12,8,0) 100%), linear-gradient(180deg, rgba(18,12,8,0.24) 0%, rgba(18,12,8,0.14) 42%, rgba(18,12,8,0.34) 100%); } }
 @media (min-width: 471px) and (max-width: 640px) { .hero-scenic-home .hero-media-img { object-position: 50% 78%; } }
 @media (min-width: 561px) and (max-width: 640px) { .hero-scenic-home .hero-media-img { object-position: 50% 66%; } }
+/* Narrow phones (2026-10-20, round 11): the French headline « L’automne dans l’Okanagan » was cut off at 320-345px
+   (one line, no wrap), and the near-me button ran edge to edge. Both keep a 16px gutter; the headline wraps onto a
+   second, balanced line only when it does not fit, so the English one stays on one line. */
+@media (max-width: 640px) {
+  .hero-scenic-home .hero-title { white-space: normal; text-wrap: balance; max-width: calc(100% - 32px); margin-left: auto; margin-right: auto; padding: 0; box-sizing: border-box; }
+  .hero-scenic-home .hero-near-me { max-width: calc(100% - 32px); box-sizing: border-box; text-align: center; line-height: 1.25; padding-top: 6px; padding-bottom: 6px; }
+}
 </style>`;
 const FAVORITES_NAV_ITEM = '<li class="nav-links-favorites"><a href="/favorites">Favorites</a></li>';
 const FAVORITES_NAV_STYLE = '<style>@media (min-width: 941px) and (max-width: 1099px) { #navLinks .nav-links-favorites { display: none; } }</style>';
@@ -14448,7 +14459,15 @@ function renderGolfThemeStyles() {
   body.golf-page .home-footer-col a, body.golf-page .home-footer-region-group a { color: rgba(245,243,237,0.78); }
   body.golf-page .home-footer-col a:hover, body.golf-page .home-footer-region-group a:hover { color: var(--ref-gold); }
   body.golf-page a.app-btn, body.golf-page a.app-btn:hover { color: var(--ref-white); text-decoration: none; }
+  /* Contrast (2026-10-20, round 11): the rule above painted the event page's plum "Tickets & info" button navy on plum
+     (1.42:1) and its hover gold. A .cta link keeps its own colours: paper on plum, plum on paper for .secondary.
+     :where() keeps these at the weight of "body.golf-page a", so the venue CTA row's own navy rules still win. */
+  body.golf-page a.cta, body.golf-page a.cta:where(:hover, :focus-visible) { color: var(--paper); }
+  body.golf-page a.cta:where(.secondary), body.golf-page a.cta:where(.secondary:hover, .secondary:focus-visible) { color: var(--plum); }
   body.golf-page nav.breadcrumb { font-size: 0.8rem; color: rgba(42,32,25,0.76); margin-bottom: 18px; }
+  /* Tap targets (2026-10-20, round 11): breadcrumb links are 44px tall to a finger on every themed page, not only
+     venue pages; negative margins keep the line where it was. */
+  body.golf-page nav.breadcrumb a { display: inline-block; padding: 13px 5px; margin: -13px -5px; }
   body.golf-page nav.breadcrumb a { color: var(--ref-navy); }
   body.golf-page .category-back-link, body.golf-page .venue-back-link {
     display: inline-block; font-weight: 700; font-size: 0.86rem; color: var(--ref-navy);
@@ -16426,7 +16445,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   /* Full-screen map app: the map fills the screen under the header; search and quick filters float on top,
      the list slides up from the bottom (a side panel on a computer), and the rest of the filters sit behind Filters. */
   body.pm-app-page .pm-app { margin: 0; padding: 0; }
-  body.map-page .pm-stage { position: relative; height: calc(100vh - var(--pm-top, 72px)); height: calc(100dvh - var(--pm-top, 72px)); min-height: 440px; overflow: hidden; --pm-sheet-h: 150px; }
+  body.map-page .pm-stage { position: relative; height: calc(100vh - var(--pm-top, 72px)); height: calc(100dvh - var(--pm-top, 72px)); min-height: 440px; overflow: hidden; --pm-sheet-h: 168px; }
   body.map-page #okMap { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
   body.map-page .pm-stage .leaflet-bottom { bottom: var(--pm-sheet-h); transition: bottom 0.25s ease; }
   body.map-page .pm-float { position: absolute; z-index: 660; top: 10px; left: 10px; right: 10px; pointer-events: none; }
@@ -16481,11 +16500,11 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-locate.is-finding svg { animation: pm-spin 1s linear infinite; }
   @keyframes pm-spin { to { transform: rotate(360deg); } }
   /* The list: a sheet that peeks from the bottom; tap or drag the handle for more. */
-  body.map-page .pm-sheet { position: absolute; z-index: 650; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; height: 150px; max-height: calc(100% - 20px); background: var(--bg, #F7F5F0); border-radius: 20px 20px 0 0; box-shadow: 0 -2px 14px rgba(27,43,58,0.2); transition: height 0.25s ease; }
+  body.map-page .pm-sheet { position: absolute; z-index: 650; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; height: 168px; max-height: calc(100% - 20px); background: var(--bg, #F7F5F0); border-radius: 20px 20px 0 0; box-shadow: 0 -2px 14px rgba(27,43,58,0.2); transition: height 0.25s ease; }
   body.map-page .pm-sheet[data-state="half"] { height: 42%; }
   body.map-page .pm-sheet[data-state="full"] { height: calc(100% - 124px); }
   body.map-page .pm-sheet.is-dragging { transition: none; }
-  body.map-page .pm-handle { flex: none; display: flex; justify-content: center; align-items: center; width: 100%; height: 26px; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; }
+  body.map-page .pm-handle { flex: none; display: flex; justify-content: center; align-items: center; width: 100%; height: 44px; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; } /* round 11 (2026-10-20): 44px to a finger (was 26px); the peeking sheet grew by the same 18px */
   body.map-page .pm-handle span { width: 44px; height: 5px; border-radius: 999px; background: rgba(27,43,58,0.28); }
   body.map-page .pm-sheet-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px 10px; touch-action: none; }
   body.map-page .pm-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
@@ -16860,7 +16879,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var st = stage.getBoundingClientRect(), fl = topEl.getBoundingClientRect(), sh = sheet.getBoundingClientRect();
     if (WIDE.matches) return { paddingTopLeft: [Math.round(sh.right - st.left) + 24, 24], paddingBottomRight: [70, 24] };
     // The sheet may still be sliding, so use the height it is heading for.
-    var state = sheet.getAttribute('data-state'), H = st.height, sheetPx = state === 'full' ? H - 124 : state === 'half' ? H * 0.42 : 150;
+    var state = sheet.getAttribute('data-state'), H = st.height, sheetPx = state === 'full' ? H - 124 : state === 'half' ? H * 0.42 : 168;
     return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(Math.min(sheetPx, H * 0.42)) + 20] };
   }
   function fitTo(bounds, maxZoom){ var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
@@ -25406,6 +25425,13 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-resultbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
   body.whatson-page .whatson-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
   body.whatson-page .whatson-results-step { margin-top: 4px; }
+  /* Tap targets (2026-10-20, round 11): on phones each "Further ahead" name is a 44px-tall link (it was 23px), and
+     the rows give it the room, so neighbouring names never overlap. */
+  body.whatson-page .whatson-further-list li { margin: 0 0 8px; }
+  @media (max-width: 640px) {
+    body.whatson-page .whatson-further-list li { margin: 0; }
+    body.whatson-page .whatson-further-list a { display: inline-block; padding: 11px 0; }
+  }
 </style>`;
 }
 // The inline script: the Outdoors filter behaviour with the activity group
@@ -26184,7 +26210,7 @@ ${renderGolfHeaderHtml()}
   ${furtherAhead.length ? `<section class="whatson-further" aria-labelledby="whatsOnFurtherHeading">
     <h2 class="category-subsection-heading" id="whatsOnFurtherHeading">Further ahead</h2>
     <ul class="whatson-further-list" style="list-style:none;padding:0;margin:0 0 24px;columns:18rem auto;column-gap:2rem">${furtherAhead.map((e) => `
-      <li style="margin:0 0 8px;break-inside:avoid"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a> <span class="event-related-meta" style="color:#5f6b73;font-size:0.9rem">${escapeHtml(`${formatLocalDateShort(e.startDate, { weekday: false })}, ${e.startDate.slice(0, 4)}`)}</span></li>`).join('')}
+      <li style="break-inside:avoid"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a> <span class="event-related-meta" style="color:#5f6b73;font-size:0.9rem">${escapeHtml(`${formatLocalDateShort(e.startDate, { weekday: false })}, ${e.startDate.slice(0, 4)}`)}</span></li>`).join('')}
     </ul>
   </section>` : ''}
   ${scope ? whatsOnRelatedGuidesHtml(whatsOnRelatedGuides(scopeList.length ? scopeList : comingUp)) : ''}
@@ -27174,8 +27200,11 @@ function renderVenuePageLayoutStyles() {
   html[lang="fr"] body.golf-page .hours-list li.is-today span:first-child::after { content: " \u00b7 aujourd\u2019hui"; }
   /* Actions: one primary button, then the rest two by two on a phone. */
   @media (max-width: 640px) {
-    body.golf-page .venue-cta-row { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; flex-direction: initial; }
-    body.golf-page .venue-cta-row > * { width: auto !important; min-width: 0; margin: 0 !important; justify-content: center; text-align: center; }
+    /* Round 11 (2026-10-20): the buttons of a row share its height (French « Ajouter au voyage » wraps to two lines and
+       stood 61px tall beside a 44px « Favori »), and a wrapped label keeps a tight line height. */
+    body.golf-page .venue-cta-row { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; flex-direction: initial; align-items: stretch; }
+    body.golf-page .venue-cta-row > * { width: auto !important; min-width: 0; margin: 0 !important; justify-content: center; text-align: center; line-height: 1.25; }
+    body.golf-page .venue-cta-row .card-action, body.golf-page .venue-cta-row .cta { line-height: 1.25; }
     body.golf-page .venue-cta-row > .cta:not(.secondary) { grid-column: 1 / -1; }
     body.golf-page .venue-cta-row > :last-child:nth-child(even):not(.cta) { grid-column: auto; }
     body.golf-page .venue-hero-fallback.venue-hero-has-photo { min-height: 190px; }
@@ -27687,7 +27716,10 @@ ${VENUE_MENU_CSS}` : ''}
 </body>
 </html>`;
   const withPreload = heroPreload ? page.replace(/<meta name="viewport"[^>]*>\n?/i, (v) => `${v}${v.endsWith('\n') ? '' : '\n'}${heroPreload}\n`) : page;
-  return fr ? localizeStaticFr(localizeHtml(withPreload, 'fr')) : withPreload;
+  const out = fr ? localizeStaticFr(localizeHtml(withPreload, 'fr')) : withPreload;
+  // Round 11 (2026-10-20): a place with a French page gets the header's EN / FR switch and the phone menu's language
+  // row, as every other page with a twin does (venue pages had only the small "Français" link by the title).
+  return hasFrench ? withTwinLangSwitch(out, fr ? venuePagePath(venue) : venuePagePath(venue, 'fr'), fr ? 'fr' : 'en') : out;
 }
 
 // GET /:region/events/:slug — Phase 1 (Events architecture gate).
@@ -28460,7 +28492,14 @@ ${renderAnalyticsHeadHtml('event')}
     .event-hero { height: 160px; border-radius: 12px; }
     .event-cta-row { display: grid; grid-template-columns: 1fr 1fr; }
     .event-cta-row .event-cta-primary { grid-column: 1 / -1; }
-    .event-cta-row .cta { text-align: center; }
+    .event-cta-row .cta { display: flex; align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box; text-align: center; line-height: 1.3; }
+    /* Tap targets (2026-10-20, round 11): the Where / Region / Website links and the "More events" names are 44px
+       tall to a finger (they were 20-23px). The details rows keep their spacing through negative margins; the
+       related list gets the room instead, so neighbouring names never overlap. */
+    body.golf-page.event-page .event-aside .detail-row a { display: inline-block; padding: 12px 0; margin: -12px 0; }
+    .event-related-list li { margin: 0; }
+    .event-related-list li > a, .event-related-all a { display: inline-block; padding: 11px 0; }
+    .event-related-all { margin-top: 0; }
   }
 </style>
 </head>
@@ -33705,10 +33744,11 @@ ${renderAnalyticsHeadHtml('hub')}
   body.guides-index-page .guide-card-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 16px; }
   body.guides-index-page .guide-card-title { font-weight: 800; font-size: 1.02rem; line-height: 1.3; }
   body.guides-index-page .guide-card-desc { font-size: .9rem; line-height: 1.45; opacity: .8; }
-  body.guides-index-page .guides-town { border-top: 1px solid var(--line, #d9e0e6); padding: 10px 0; }
-  body.guides-index-page .guides-town summary { cursor: pointer; font-weight: 800; font-size: 1.05rem; }
+  body.guides-index-page .guides-town { border-top: 1px solid var(--line, #d9e0e6); padding: 2px 0; }
+  /* Tap targets (2026-10-20, round 11): each town's heading and its guide links are 44px tall to a finger (28-39px). */
+  body.guides-index-page .guides-town summary { cursor: pointer; font-weight: 800; font-size: 1.05rem; padding: 8px 0; min-height: 44px; box-sizing: border-box; }
   body.guides-index-page .guides-town-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
-  body.guides-index-page .guides-town-links a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); font-weight: 800; font-size: .88rem; text-decoration: none; }
+  body.guides-index-page .guides-town-links a { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; box-sizing: border-box; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: #fff; color: var(--ink); font-weight: 800; font-size: .88rem; text-decoration: none; }
   body.guides-index-page .guides-town-links a:hover { background: rgba(27,43,58,0.06); }
   body.guides-index-page .guides-town-links span { font-weight: 600; opacity: .8; }
 </style>
@@ -34236,6 +34276,12 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   body.my-trip-page .mt-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.05rem; color: var(--ink); text-decoration: none; }
   body.my-trip-page .mt-name:hover { text-decoration: underline; }
+  /* Tap targets (2026-10-20, round 11): each stop's name, the pin popup's link and its close button are 44px to a
+     finger (18-24px), as on /map; negative margins keep the card's lines where they were. */
+  body.my-trip-page a.mt-name { display: inline-block; padding: 10px 0; margin: -10px 0; }
+  body.my-trip-page .leaflet-container a.leaflet-popup-close-button { width: 44px; height: 44px; font-size: 26px; line-height: 44px; text-align: center; }
+  body.my-trip-page .leaflet-popup-content { margin-right: 44px; }
+  body.my-trip-page .leaflet-popup-content a { display: inline-flex; align-items: center; min-height: 44px; }
   body.my-trip-page .mt-meta { margin: 2px 0 0; font-size: 0.86rem; opacity: 0.75; }
   body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
   body.my-trip-page .mt-tools { display: flex; gap: 6px; }
@@ -44622,7 +44668,7 @@ const OWNER_STATUS_CSS = `body.owner-page .op-status { display: inline-block; bo
   body.owner-page .op-linkbtn { min-height: 40px; }
   body.owner-page .op-act-btns button, body.owner-page .op-changing button { padding: 10px 0; }
   body.owner-page .op-footer { max-width: 760px; margin: 0 auto; padding: 18px 16px 90px; font-size: 0.86rem; color: rgba(42,32,25,0.8); text-align: center; border-top: 1px solid rgba(42,32,25,0.12); }
-  body.owner-page .op-footer a { color: var(--ref-navy, #1F3A5F); font-weight: 700; display: inline-block; padding: 10px 4px; }`;
+  body.owner-page .op-footer a { color: var(--ref-navy, #1F3A5F); font-weight: 700; display: inline-block; padding: 11px 4px; min-height: 44px; box-sizing: border-box; } /* round 11 (2026-10-20): 44px, was 43px */`;
 // Accessibility (2026-10-15): error messages announce themselves to screen readers.
 function ownerA11y(html) {
   return html.replace(/<p class="lyv-error" id="/g, '<p class="lyv-error" role="alert" id="');

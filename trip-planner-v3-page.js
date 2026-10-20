@@ -471,7 +471,7 @@ function renderStyles() {
   .t3-edit-error { margin: 8px 0; padding: 8px 12px; border-radius: 10px; background: #FFF6E6; border: 1px solid rgba(181,69,43,0.45); color: #7A2E1B; font-size: 0.88rem; font-weight: 700; }
   .t3-rain a { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
   .t3-details { margin-top: 12px; font-size: 0.84rem; color: rgba(255,255,255,0.8); }
-  .t3-details summary { cursor: pointer; font-weight: 700; }
+  .t3-details summary { cursor: pointer; font-weight: 700; padding: 11px 0; } /* round 11 (2026-10-20): 44px tap target */
   .t3-details ul { margin: 8px 0 0; padding-left: 18px; }
   .t3-warnings { background: #FFF6E6; border: 1px solid rgba(201,162,39,0.45); color: #5B4212; border-radius: 12px; padding: 12px 16px; margin: 0 0 16px; font-size: 0.9rem; }
   .t3-event-choices { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1258,11 +1258,12 @@ function renderScript(d) {
     var items = lead.map(badgeLi)
       .concat((v.collections || []).map(function(c){ return '<li class="is-collection">' + esc(frLabel('tripv3.collection.' + c.key, c.label)) + '</li>'; }))
       .concat(rest.map(badgeLi));
-    // Three badges show; the rest open with "+N more", so a card stays short on a phone (2026-10-14).
+    // Three badges show; the rest open with "+N more", so a card stays short on a phone (2026-10-14). Round 11
+    // (2026-10-20): the button's name says what it does ("Show 4 more features"); French showed only "+4".
     if (items.length > 4) {
       var extra = items.length - 3;
       items = items.slice(0, 3).concat(items.slice(3).map(function(li){ return li.replace('<li', '<li hidden data-t3-badge-extra'); }))
-        .concat('<li class="is-more"><button type="button" class="t3-badge-more" data-t3-badges-more aria-expanded="false">' + esc(lang() === 'fr' ? '+' + extra : '+' + extra + ' more') + '</button></li>');
+        .concat('<li class="is-more"><button type="button" class="t3-badge-more" data-t3-badges-more aria-expanded="false" aria-label="' + esc(lang() === 'fr' ? 'Afficher ' + extra + ' autres caract\u00e9ristiques' : 'Show ' + extra + ' more features') + '">' + esc(lang() === 'fr' ? '+' + extra : '+' + extra + ' more') + '</button></li>');
     }
     return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
   }
@@ -1299,7 +1300,7 @@ function renderScript(d) {
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
       + '<div class="t3-actions">'
-      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + '>' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>'
+      + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' au voyage' : 'Add ' + v.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>'
     // The list cards' Favorite button (2026-10-19): named for the place, with its pressed state.
     var favHtml = '<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>';
     var detailsHtml = url ? '<a class="t3-act" ' + hrefAttr(url) + '>' + esc(tx('tripv3.viewDetails')) + '</a>' : '';
@@ -1395,7 +1396,7 @@ function renderScript(d) {
             + ((s.why || []).length ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + s.why.slice(0, 2).map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>' : '')
             + t3EventPlaceHtml(e,lang(),esc)
             + ((s.caveats || []).length ? '<ul class="t3-caveats">' + s.caveats.map(function(c){ return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '')
-            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + '>' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
+            + '<div class="t3-actions">' + (e.name ? '<button type="button" class="trip-btn" data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name + ', ' + (e.regionLabel || 'Okanagan') + ', Okanagan Valley, BC') + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + e.name + ' au voyage' : 'Add ' + e.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>' : '') + (u ? '<a class="t3-act" ' + hrefAttr(u) + '>' + esc(tx('tripv3.viewEvent')) + '</a>' : '') + '</div></article></div></li>';
           return;
         }
         // Round 7: a long wait before dinner with nothing nearby that fits is labelled free time, not left blank.
