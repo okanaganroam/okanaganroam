@@ -4567,6 +4567,12 @@ const FR_SEARCH_SYNONYMS = [
   ['spectacle de drag', 'drag show'], ['spectacles de drag', 'drag shows'], ['salon commercial', 'trade show'], ['salons commerciaux', 'trade shows'], ['salon de l habitation', 'home show'],
   ['exposition canine', 'dog show'], ['expositions canines', 'dog shows'], ['exposition d art', 'art show'], ['expositions d art', 'art shows'], ['vernissage', 'art show'],
   ['cine parc', 'drive in'], ['cine parcs', 'drive in'], ['cineparc', 'drive in'], ['club d humour', 'comedy club'], ['clubs d humour', 'comedy club'],
+  // Round 11 (2026-10-20): « en direct » alone searched "direct", « cirque » found nothing, and « spectacle pour enfants »
+  // read as "shows pour kids".
+  ['en direct', 'live music'], ['spectacle en direct', 'live show'], ['spectacles en direct', 'live shows'], ['cirque', 'circus'], ['spectacle de cirque', 'circus show'],
+  ['spectacles de cirque', 'circus shows'], ['arts du cirque', 'circus arts'], ['acrobate', 'acrobat'], ['acrobaties', 'acrobatics'], ['acrobatie', 'acrobatics'],
+  ['spectacle pour enfants', 'kids show'], ['spectacles pour enfants', 'kids shows'], ['spectacle jeunesse', 'kids show'], ['spectacles jeunesse', 'kids shows'],
+  ['spectacle familial', 'family show'], ['spectacles familiaux', 'family shows'], ['danse sociale', 'social dance'],
 ];
 const FR_SEARCH_SYNONYM_MAP = (() => {
   const m = new Map();
@@ -4592,8 +4598,11 @@ function frSearchVenueNames() {
 // pairs (round 8, 2026-10-19): when given an array, each rewrite is added to it as { fr: the words typed, en }.
 function frSearchSynonyms(text, pairs = null) {
   const raw = String(text || '');
-  // Elided articles ("l'eau", "d'hiver") split off so the word after them is read.
-  const parts = raw.replace(/\b(l|d|j|qu|n|m|t|c|s|jusqu|lorsqu)['\u2019](?=[a-z\u00e0-\u00ff])/gi, '$1 ').split(/\s+/).filter(Boolean);
+  // Elided articles ("l'eau", "d'hiver") split off so the word after them is read. Round 11 (2026-10-20): each one
+  // remembers its apostrophe, so a label quoting the visitor's words says « spectacle d'humour », not « spectacle d humour ».
+  const marked = raw.replace(/\b(l|d|j|qu|n|m|t|c|s|jusqu|lorsqu)(['\u2019])(?=[a-z\u00e0-\u00ff])/gi, '$1\u0000$2 ').split(/\s+/).filter(Boolean);
+  const parts = marked.map((w) => w.replace(/\u0000.*$/, ''));
+  const shown = (from, to) => marked.slice(from, to).join(' ').replace(/\u0000(['\u2019]) /g, '$1');
   const folded = parts.map(frSearchFold);
   const keep = new Set();
   for (const name of frSearchVenueNames()) {
@@ -4608,7 +4617,7 @@ function frSearchSynonyms(text, pairs = null) {
     for (let len = Math.min(FR_SEARCH_SYNONYM_MAX, parts.length - i); len >= 1 && !hit; len--) {
       if ([...Array(len).keys()].some((k) => keep.has(i + k) || !folded[i + k])) continue;
       const en = FR_SEARCH_SYNONYM_MAP.get(folded.slice(i, i + len).join(' '));
-      if (en != null) { out.push(en); hit = len; if (pairs) pairs.push({ fr: parts.slice(i, i + len).join(' '), en }); }
+      if (en != null) { out.push(en); hit = len; if (pairs) pairs.push({ fr: shown(i, i + len), en }); }
     }
     // "l'Action de grâce" -> "thanksgiving", not "l thanksgiving".
     if (hit) { if (i > 0 && out.length > 1 && /^(l|d|qu)$/i.test(out[out.length - 2]) && out[out.length - 2] === parts[i - 1]) out.splice(out.length - 2, 1); changed = true; i += hit; } else { out.push(parts[i]); i += 1; }
@@ -5084,7 +5093,12 @@ const SMART_ACTIVITIES = [
     re: /\bspas?\b|\bsaunas?\b|\bthermal (?:spa|pools?|baths?)\b|\bhot springs?\b|\bhot pools?\b|\bnordic (?:spa|baths?)\b|\bsteam (?:room|cave)\b|\bsalt cave\b/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-saunas-spas' },
   { key: 'pumpkin_patch', label: 'Pumpkin patches', labelFr: 'Champs de citrouilles', words: ['pumpkin patch', 'pumpkin patches', 'pumpkin', 'pumpkins', 'pumpkin farm', 'pumpkin farms', 'pumpkin picking', 'pick a pumpkin',
     'pick your own pumpkin', 'pick your own pumpkins'],
-    re: /\bpumpkins?\b/i, guide: '/guides/fall-farms-u-pick-okanagan', events: true },
+    re: /\bpumpkins?\b/i, guide: '/guides/fall-farms-u-pick-okanagan', events: true,
+    // Round 11 (2026-10-20): "pumpkin patch" listed a drag show and Halloween parties whose text mentions pumpkins.
+    // An event counts when its name says pumpkin, or its description offers a patch or picking; never an adult show.
+    eventTest: (e) => { const name = String(e.name || ''), desc = String(e.description || '');
+      return (/\bpumpkins?\b/i.test(name) || /\bpumpkin (?:patch|patches|picking|farm|field|fields)\b|\bpick (?:your own |a |your )?pumpkins?\b|\bu[- ]?pick pumpkins?\b/i.test(desc))
+        && !SEARCH_DRAG_RE.test(name) && !/\b(?:burlesque|adults? only|19\+)\b/i.test(`${name} ${desc.slice(0, 300)}`) && searchShowKind(e) !== 'comedy'; } },
   { key: 'farmers_market', label: 'Farmers’ markets', labelFr: 'Marchés fermiers', words: ['farmers market', 'farmers markets', 'farmer s market', 'farmer s markets', 'farmers marketplace', 'farm market', 'farm markets'],
     re: /\bfarmers?['’]?s? ?markets?\b|\bfarm markets?\b/i, nameOnly: true, events: true, whatsOn: 'markets-fairs' },
   // Round 9 (2026-10-19): "museum" / « musée » listed all 125 indoor places, and "theatre" / « théâtre » the same with no
@@ -5177,14 +5191,17 @@ function searchWordIn(folded, word) {
 // most words in the name, then the soonest. With three or more words and no event that has them all, the events
 // that miss only one. `test` (optional) is a plan's own rule (free events) and replaces the words.
 // rank (round 9, optional): with test, a score for each event that fits, best first (comedy before the other shows).
-function searchEventsFor({ terms = [], regions = [], test = null, rank = null, now = new Date() } = {}) {
+function searchEventsFor({ terms = [], regions = [], test = null, rank = null, keep = null, now = new Date() } = {}) {
   const words = uniqueList((terms || []).map(smartFold).filter(Boolean));
   if (!words.length && !test) return { total: 0, items: [] };
   const win = resolveWhatsOnWindow({}, now);
   const events = filterWhatsOnEvents(getWhatsOnEvents(win), regions || [], []);
   const rows = [];
+  // Round 11 (2026-10-20): "stand" (fruit stands) listed 17 comedy nights through "stand-up" in their descriptions.
+  const standUp = (t) => (words.includes('up') ? t : t.replace(/\bstand up\b/g, 'standup'));
   for (const e of events) {
-    const name = smartFold(e.name), text = `${name} ${smartFold(e.description || '')}`;
+    if (keep && !keep(e)) continue;
+    const name = standUp(smartFold(e.name)), text = `${name} ${standUp(smartFold(e.description || ''))}`;
     if (test) { if (test(e, text)) rows.push({ e, hits: 1, inName: rank ? rank(e) : 0 }); continue; }
     const hits = words.filter((w) => searchWordIn(text, w)).length;
     rows.push({ e, hits, inName: words.filter((w) => searchWordIn(name, w)).length });
@@ -5197,7 +5214,13 @@ function searchEventsFor({ terms = [], regions = [], test = null, rank = null, n
 // The events for a place search's own words (runDiscovery): only when the request has free-text words.
 function searchTextEvents(intent, now = new Date()) {
   if (!intent || intent.mode === 'navigate' || intent.mode === 'events' || !(intent.textTerms || []).length) return { total: 0, items: [] };
-  return searchEventsFor({ terms: intent.textTerms, regions: intent.regions, now });
+  // Round 11 (2026-10-20): the events half respects a badge the places half filters by. "kids menu" listed wine dinners
+  // (their "menu") beside the kid-friendly places: Kid-Friendly keeps family events and Live Music the gigs; any other
+  // badge is about places, so no events are listed.
+  const F = intent.features || [];
+  if (F.some((f) => f !== 'kid_friendly' && f !== 'live_music')) return { total: 0, items: [] };
+  const keep = F.length ? (e) => F.every((f) => (e.categories || []).includes(f === 'kid_friendly' ? 'family-kids' : 'live-music')) : null;
+  return searchEventsFor({ terms: intent.textTerms, regions: intent.regions, keep, now });
 }
 
 // Exact names first: places whose name is, starts with, or holds the words typed as a whole phrase ("19 bistro" ->
@@ -5313,7 +5336,10 @@ function searchShowKind(e) {
 // and "comedy club", "art show" and "drive-in" nothing at all. Each now lists only its own events (and, for comedy
 // clubs and drive-ins, the places), or says plainly that none are listed. Classical music leaves out jazz nights,
 // bands ("Dirt Road Opera") and tributes.
-const SEARCH_NOT_CLASSICAL_RE = /\b(?:jazz|blues|live music|band|tribute|rock|country|bluegrass|swing|big band|cuban|salsa|latin|fundraiser)\b/i;
+const SEARCH_NOT_CLASSICAL_RE = /\b(?:jazz|blues|live music|band|tribute|rock|country|bluegrass|swing|big band|cuban|salsa|latin|fundraiser|buena vista|mambo|bolero)\b/i;
+// Round 11 (2026-10-20): "opera" and "classical" listed the Buena Vista Orchestra (Cuban son) first. A description that
+// opens on Cuban or Latin dance music rules a concert out even when its name says orchestra.
+const SEARCH_NOT_CLASSICAL_DESC_RE = /\b(?:cuban|son cubano|havana|salsa|mambo|bolero|cha[- ]cha|latin|buena vista)\b/i;
 const SEARCH_DANCE_RE = /\b(?:danc(?:e|es|ing|ers?)|ballets?|nutcracker|tango|salsa|ballroom|flamenco|hip[- ]hop|line dancing|square dance)\b/i;
 const SEARCH_DRAG_RE = /\bdrag\b(?! ?rac(?:e|ing)\b(?! tour))/i;
 const SEARCH_MAGIC_RE = /\b(?:magic(?:ian|ians)?|illusion(?:s|ist|ists)?|mentalist|sleight of hand)\b/i;
@@ -5326,10 +5352,33 @@ const SEARCH_DOG_SHOW_RE = /\b(?:dog shows?|kennel club|agility trials?|dog tria
 const SEARCH_ART_SHOW_RE = /\b(?:art shows?|exhibitions?|exhibits?|art sales?|vernissage|retrospective|solo show|group show|members show)\b/i;
 const SEARCH_DRIVE_IN_RE = /\bdrive[- ]?ins?\b/i;
 const SEARCH_COMEDY_PLACE_RE = /\b(?:comedy|improv)\b/i;
+const SEARCH_KIDS_SHOW_RE = /\b(?:kids?|children'?s?|family|families|junior|jr|youth|puppets?|puppetry|storytime|ages? \d)\b/i;
+const SEARCH_NOT_DANCE_PARTY_RE = /\b(?:ballet|nutcracker|dance company|recital|choreograph\w*|contemporary dance|dance theatre|lessons?|class(?:es)?|workshops?|camp)\b/i;
+const SEARCH_CIRCUS_RE = /\b(?:circus|circuses|cirque|acrobat\w*|aerialists?|trapeze|big top)\b/i;
 const SEARCH_NARROW_TOPICS = [
+  // Round 11 (2026-10-20): "kids show" listed 762 kid-friendly places, "dance party" led with the ballet, and « cirque »
+  // found nothing. Children's shows, social dances and circus shows each list their own events.
+  { key: 'kids_show', heading: 'Shows for kids', headingFr: 'Spectacles pour enfants', ignoreFeatures: ['kid_friendly'],
+    words: ['kids show', 'kids shows', 'kid show', 'kid shows', 'children s show', 'children s shows', 'childrens show', 'childrens shows', 'children show', 'children shows',
+      'family show', 'family shows', 'kids theatre', 'kids theater', 'children s theatre', 'childrens theatre', 'kids concert', 'kids concerts', 'puppet show', 'puppet shows',
+      'shows for kids', 'show for kids', 'shows for children', 'spectacle pour enfants', 'spectacles pour enfants', 'spectacle jeunesse', 'spectacles jeunesse', 'spectacle familial', 'spectacles familiaux'],
+    test: (e) => !!searchShowKind(e) && searchShowKind(e) !== 'comedy' && ((e.categories || []).includes('family-kids') || SEARCH_KIDS_SHOW_RE.test(`${e.name || ''} ${String(e.description || '').slice(0, 300)}`))
+      && !/\b(?:adults? only|19\+|18\+|burlesque|drag)\b/i.test(`${e.name || ''} ${String(e.description || '').slice(0, 300)}`),
+    rank: (e) => (SEARCH_KIDS_SHOW_RE.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No shows for kids are listed for the next few weeks yet. See the family events on What’s On.', emptyTextFr: 'Aucun spectacle pour enfants n’est encore annoncé pour les prochaines semaines. Voyez les activités familiales dans À l’affiche.' },
+  { key: 'dance_party', heading: 'Dances & dance parties', headingFr: 'Soirées dansantes',
+    words: ['dance party', 'dance parties', 'dance night', 'dance nights', 'social dance', 'social dances', 'community dance', 'community dances', 'barn dance', 'barn dances', 'silent disco', 'disco night', 'disco', 'go dancing',
+      'soiree dansante', 'soirees dansantes', 'danse sociale'],
+    test: (e) => { const name = String(e.name || ''), text = `${name} ${String(e.description || '').slice(0, 300)}`; return (SEARCH_DANCE_RE.test(name) || /\b(?:dance party|silent disco|disco|dj night)\b/i.test(name)) && !SEARCH_NOT_DANCE_PARTY_RE.test(text); },
+    rank: (e) => (/\bdance party|dances?\b/i.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No dances are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucune soirée dansante n’est encore annoncée pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
+  { key: 'circus', heading: 'Circus & acrobatics', headingFr: 'Cirque et acrobaties',
+    words: ['circus', 'circuses', 'circus show', 'circus shows', 'circus arts', 'cirque', 'acrobat', 'acrobats', 'acrobatics', 'acrobatic show', 'aerialist', 'aerialists', 'aerial show', 'big top', 'trapeze'],
+    test: (e) => SEARCH_CIRCUS_RE.test(String(e.name || '')) || SEARCH_CIRCUS_RE.test(String(e.description || '').slice(0, 300)), rank: (e) => (SEARCH_CIRCUS_RE.test(String(e.name || '')) ? 1 : 0),
+    emptyText: 'No circus shows are listed for the next few weeks yet. See every show on What’s On.', emptyTextFr: 'Aucun spectacle de cirque n’est encore annoncé pour les prochaines semaines. Voyez tous les spectacles dans À l’affiche.' },
   { key: 'dance', heading: 'Dance', headingFr: 'Danse',
     words: ['dance', 'dances', 'dancing', 'ballet', 'ballets', 'dance show', 'dance shows', 'dance performance', 'dance performances', 'dance recital', 'dance recitals',
-      'contemporary dance', 'nutcracker', 'the nutcracker', 'casse noisette', 'dance events', 'dance event', 'dance night', 'dance party', 'dance parties'],
+      'contemporary dance', 'nutcracker', 'the nutcracker', 'casse noisette', 'dance events', 'dance event'],
     test: (e) => SEARCH_DANCE_RE.test(String(e.name || '')) || ((e.categories || []).includes('arts-culture') && /\b(?:dance company|ballet|choreograph\w*|dancers)\b/i.test(String(e.description || '').slice(0, 300))),
     rank: (e) => (/\bballet|nutcracker|dance company\b/i.test(`${e.name || ''} ${e.description || ''}`) ? 2 : SEARCH_DANCE_RE.test(String(e.name || '')) ? 1 : 0),
     emptyText: 'No dance events are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun événement de danse n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
@@ -5386,7 +5435,7 @@ const SEARCH_EVENT_TOPICS = [
   { key: 'classical', heading: 'Classical music', headingFr: 'Musique classique',
     words: ['classical', 'classical music', 'classical concert', 'classical concerts', 'symphony', 'symphonies', 'symphony orchestra', 'orchestra', 'orchestras', 'chamber music', 'string quartet',
       'choir', 'choirs', 'choral', 'opera', 'recital', 'recitals'],
-    test: (e) => !SEARCH_NOT_CLASSICAL_RE.test(String(e.name || '')) && (SEARCH_CLASSICAL_RE.test(String(e.name || ''))
+    test: (e) => !SEARCH_NOT_CLASSICAL_RE.test(String(e.name || '')) && !SEARCH_NOT_CLASSICAL_DESC_RE.test(String(e.description || '').slice(0, 300)) && (SEARCH_CLASSICAL_RE.test(String(e.name || ''))
       || (SEARCH_CLASSICAL_RE.test(String(e.description || '')) && !SEARCH_NOT_CLASSICAL_RE.test(String(e.description || '').slice(0, 300)))), rank: (e) => (SEARCH_CLASSICAL_RE.test(String(e.name || '')) ? 1 : 0),
     emptyText: 'No classical concerts are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun concert classique n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
   { key: 'fireworks', heading: 'Fireworks', headingFr: 'Feux d’artifice', words: ['fireworks', 'firework', 'fireworks show', 'fireworks display', 'fireworks displays'],
@@ -5395,6 +5444,18 @@ const SEARCH_EVENT_TOPICS = [
   { key: 'live_music', keepPlaces: true, words: ['live music', 'live band', 'live bands', 'live entertainment', 'gig', 'gigs'],
     test: (e) => searchShowKind(e) === 'music' || ((e.categories || []).includes('live-music') && searchShowKind(e) !== 'comedy'), rank: (e) => (/\blive music\b|\bband\b/i.test(String(e.name || '')) ? 1 : 0) },
 ];
+// Round 11 (2026-10-20): Christmas and holiday markets, craft fairs and bazaars (not concerts, plays or light-ups).
+const SEARCH_XMAS_MARKET_GUIDE = '/guides/okanagan-christmas-markets';
+const SEARCH_XMAS_MARKET_WORDS = ['christmas market', 'christmas markets', 'xmas market', 'xmas markets', 'holiday market', 'holiday markets', 'christmas craft fair', 'christmas craft fairs',
+  'christmas fair', 'christmas fairs', 'christmas bazaar', 'christmas bazaars', 'holiday craft fair', 'holiday craft fairs', 'holiday craft market', 'holiday craft markets', 'christkindl', 'christkindlmarkt', 'german christmas market'];
+const SEARCH_XMAS_RE = /\b(?:christmas|xmas|holiday|holidays|festive|yuletide|noel|santa|winter|christkindl\w*)\b/i;
+const SEARCH_MARKET_RE = /\b(?:markets?|marketplace|bazaars?|craft fairs?|artisan fairs?|makers? fairs?|christkindl\w*|craft sales?|gift fairs?|extravaganza)\b/i;
+function searchIsXmasMarket(e) {
+  const name = String(e.name || '');
+  if (/\b(?:concerts?|theatre|theater|play|musical|symphony|orchestra|choir|carols?|comedy|film|movie|parade|light[- ]?up|dinner|workshop|class)\b/i.test(name)) return false;
+  if (/\bchristkindl\w*\b/i.test(name)) return true;
+  return SEARCH_XMAS_RE.test(name) && (SEARCH_MARKET_RE.test(name) || (e.categories || []).includes('markets-fairs'));
+}
 // The topic a request is about, when its words are only that topic (plus a town and words like "events" or "in").
 function searchEventTopicFor(folded, intent) {
   if (!folded || !intent || intent.when || (intent.cuisines || []).length || (intent.collections || []).length || hasDiscoveryExclusion(intent.excluded)) return null;
@@ -5449,6 +5510,24 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
     if (guide && !F.length) return { key: `${activity.key}_guide`, url: guide.path };
     // No place by that name (farmers' markets are events): What's On's markets for the town.
     if (activity.whatsOn && !F.length) return { key: activity.key, url: `/whats-on${discoveryQueryString({ regions: R, categories: [activity.whatsOn] })}` };
+  }
+
+  // Round 11 (2026-10-20): "christmas market" / « marché de Noël » listed 79 events, concerts and plays included. The
+  // Christmas markets guide when the request is just that (and the guide is up); in a town, or without the guide, the
+  // holiday markets alone.
+  if (smartHas(folded, SEARCH_XMAS_MARKET_WORDS) && !intent.when && !T.length && !F.length && !intent.cuisines.length && !intent.collections.length
+    && !smartTopicWords(folded, intent, [...SEARCH_XMAS_MARKET_WORDS, ...SMART_EVENT_GENERIC, 'christmas', 'xmas', 'holiday', 'holidays', 'market', 'markets']).length) {
+    const guide = liveGuides().find((g) => g.path === SEARCH_XMAS_MARKET_GUIDE);
+    if (guide && !region) return { key: 'christmas_markets_guide', url: guide.path };
+    return {
+      key: 'christmas_markets',
+      heading: `Christmas markets${town ? ` in ${town}` : ''}`,
+      headingFr: `Marchés de Noël${town ? ` à ${town}` : ''}`,
+      emptyText: 'No Christmas markets are listed here yet. See every holiday event on What’s On.', emptyTextFr: 'Aucun marché de Noël n’est encore annoncé ici. Voyez tous les événements des fêtes dans À l’affiche.',
+      guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
+      list: () => [],
+      events: () => searchEventsFor({ regions: R, test: searchIsXmasMarket, rank: (e) => (/\bchristmas market|christkindl/i.test(String(e.name || '')) ? 1 : 0), now }),
+    };
   }
 
   // Round 9 (2026-10-19): shows, classical music and fireworks are events, not places: /search lists those events.
@@ -16646,13 +16725,34 @@ const MAP_EVENT_GROUP_SRC = `function eventGroup(e, today, nowMin){
 // (it showed only "Tap the locate button..."), open first, then the best rated, redrawn on every pan and zoom;
 // on a phone once zoomed in or filtered, open first, then A-Z. Any filter counts, so Open now over the clusters
 // lists them (it said "0 places in this part of the map").
+// Round 11 (2026-10-20): o.fit(p) (0 best, 1 weaker) ranks the places that best fit the search first within each
+// open/closed group: "coffee" / « café » listed gelato shops (filed as cafés) first.
 const MAP_PLACE_LIST_SRC = `function mapPlaceList(onMap, o){
+    var fit = o.fit || function(){ return 0; };
     var rank = function(p){ return p.st && p.st.state === 'open' ? 0 : p.st && p.st.season ? 2 : 1; };
-    if (o.me) return onMap.slice().sort(function(a, b){ return rank(a) - rank(b) || a.d - b.d; });
-    var az = function(a, b){ return rank(a) - rank(b) || a.name.localeCompare(b.name); };
+    if (o.me) return onMap.slice().sort(function(a, b){ return rank(a) - rank(b) || fit(a) - fit(b) || a.d - b.d; });
+    var az = function(a, b){ return rank(a) - rank(b) || fit(a) - fit(b) || a.name.localeCompare(b.name); };
     if (o.town) return onMap.slice().sort(az);
     if (!(o.wide || o.zoom >= 12 || o.filtering)) return [];
-    return onMap.filter(o.inView).sort(o.wide ? function(a, b){ return rank(a) - rank(b) || (b.r || 0) - (a.r || 0) || a.name.localeCompare(b.name); } : az);
+    return onMap.filter(o.inView).sort(o.wide ? function(a, b){ return rank(a) - rank(b) || fit(a) - fit(b) || (b.r || 0) - (a.r || 0) || a.name.localeCompare(b.name); } : az);
+  }`;
+// The coffee search's fit: a café that is really an ice cream, bubble tea or smoothie shop comes after the
+// coffee places, unless its name or tags say coffee. tg: the place's MAP_TAGS positions; ix: those tags by key.
+const MAP_COFFEE_FIT_SRC = `function mapCoffeeFit(p, ix){
+    var has = function(k){ return ix[k] != null && (p.tg || []).indexOf(ix[k]) !== -1; };
+    if (has('specialty') || /\\b(coffee|caf[eé]|espresso|roast\\w*|beans?|latte|java|brew)\\b/i.test(p.name || '')) return 0;
+    return has('icecream') || has('bubbletea') || has('smoothie') ? 1 : 0;
+  }`;
+// Round 11 (2026-10-20): the map's name search matches whole words ("spa" found Spaghetti Factory and Twin Sparks),
+// a plural ("spa" finds "Spas"), and, while the visitor is still typing, the start of the last word. key is the
+// place's folded name between spaces (mapNameKey); words are folded the same way.
+const MAP_NAME_MATCH_SRC = `function mapNameKey(name){ return ' ' + String(name || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/\\u0153/g, 'oe').replace(/['\\u2019]/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' '; }
+  function mapNameHas(key, words, typing){
+    var ws = String(words || '').split(' ').map(function(w){ return mapNameKey(w).trim(); }).filter(Boolean);
+    return ws.every(function(w, i){
+      if (typing && i === ws.length - 1 && key.indexOf(' ' + w) !== -1) return true;
+      return key.indexOf(' ' + w + ' ') !== -1 || key.indexOf(' ' + w + 's ') !== -1 || key.indexOf(' ' + w + 'es ') !== -1 || (w.length > 3 && /s$/.test(w) && key.indexOf(' ' + w.slice(0, -1) + ' ') !== -1);
+    });
   }`;
 const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FR = document.documentElement.lang === 'fr';
@@ -16661,7 +16761,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool' },
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
     micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     typoRead: function(f){ return 'Nous avons lu ' + f.map(function(x){ return '« ' + x.from + ' » comme « ' + x.to + ' »'; }).join(', ') + '.'; },
@@ -16690,7 +16790,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free' },
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
     micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     typoRead: function(f){ return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; }).join(', ') + '.'; },
@@ -16734,7 +16834,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // be tapped. From zoom 17 only pins within a pixel of each other still group; tapping that group fans them out.
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 17 ? 1 : z >= 15 ? 18 : z >= 13 ? 32 : 48; }, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
-  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
+  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', termTyping = false, radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
   var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-open]')), topBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-top]')), tagHolder = document.getElementById('pmTagChips'), activeEl = $('pmActive'), searchEl = $('pmSearch');
@@ -16823,6 +16923,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function dayText(d){ return new Date(d + 'T12:00:00Z').toLocaleDateString(FR ? 'fr-CA' : 'en-CA', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' }); }
   ${MAP_EVENT_GROUP_SRC}
   ${MAP_PLACE_LIST_SRC}
+  ${MAP_NAME_MATCH_SRC}
+  ${MAP_COFFEE_FIT_SRC}
   var listOn = false, lastLayerKey = null;
   function whenText(e, g){
     var times = e.st ? timeText(e.st) + (e.et ? '–' + timeText(e.et) : '') : '';
@@ -16900,7 +17002,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     for (var nf in notFeats) if (notFeats[nf] && (p.f & CONF.f[nf])) return false;
     for (var k in feats) if (feats[k] && (k === 'happy' && hhKnown ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
-    return !term || term.split(' ').every(function(w){ return p.key.indexOf(w) !== -1; });
+    return !term || mapNameHas(p.key, term, termTyping);
   }
   // Open first, then closed, then closed for the season (2026-10-18).
   var isOpen = function(p){ return p.st && p.st.state === 'open' ? 0 : p.st && p.st.season ? 2 : 1; };
@@ -16932,14 +17034,15 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var filtering = !!(anyOn(kinds) || anyOn(feats) || openOnly || term || onTags().length || topOnly || price || atMin != null || atDay);
       var b = me ? null : map.getBounds();
       listOn = !!(me || town || WIDE.matches || map.getZoom() >= 12 || filtering);
-      items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); } });
+      var coffeeOnly = kinds.coffee && Object.keys(kinds).every(function(k){ return !kinds[k] || k === 'coffee'; });
+      items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: coffeeOnly ? function(p){ return mapCoffeeFit(p, TAGIX); } : null });
       countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4 };
       // An event without a pin counts as near when its town centre is within the distance.
       var nearTown = function(e){ var c = CONF.c[e.region]; return c && distKm(me.lat, me.lng, c[0], c[1]) <= radiusKm; };
-      items = events.filter(function(e){ return e.g && (!evTerm || evHit(e)) && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
+      items = events.filter(function(e){ return e.g && ((!evTerm && !evKinds.length) || evHit(e)) && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
         .sort(function(a, b){ return order[a.g] - order[b.g] || (a.sd < b.sd ? -1 : a.sd > b.sd ? 1 : 0) || ((a.st || '') < (b.st || '') ? -1 : (a.st || '') > (b.st || '') ? 1 : 0) || (me && a.d != null && b.d != null ? a.d - b.d : 0); });
       onMap = items.filter(function(e){ return e.lat != null; });
       countEl.textContent = me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
@@ -17458,16 +17561,19 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     gf: 'gf', late: 'late', early: 'early', nonalc: 'nonalc',
     groups: 'group groups party parties groupe groupes',
     sports: 'sports sport tv game games hockey football',
+    free: 'free gratuit gratuits gratuite gratuites gratis',
     open: 'open ouvert ouverts', nearme: 'nearme'
   };
   // Two-word ideas first ("gluten free", "dog friendly", "close by"), so each becomes one filter.
   var PHRASES = [
     [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
     [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '],
-    [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live/g, ' music '],
+    [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
+    // Round 11 (2026-10-20): "free" is Free to visit, but not in "sugar free", "free parking" or "free wifi".
+    [/(sugar|dairy|nut|peanut|lactose|egg|smoke|scent|fragrance)[ -]?free/g, ' $1 '], [/free (parking|wifi|wi-fi|wi fi|refills?|delivery|shipping)/g, ' $1 '],
     [/lake ?views?|vue sur le lac/g, ' lake '], [/close ?(by|to (me|us|here)|to)|near ?by|near (me|us|here)|nearest|closest|around here|près de moi|près d’ici|pas loin/g, ' nearme '], [/top rated|highly rated|well reviewed|best rated/g, ' top ']
   ];
-  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly free serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre accepte acceptes acceptée acceptées accepté acceptés bienvenu bienvenus bienvenue bienvenues admis ';
+  var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre accepte acceptes acceptée acceptées accepté acceptés bienvenu bienvenus bienvenue bienvenues admis ';
   var WORD_TO = {};
   Object.keys(WORDS).forEach(function(k){ WORDS[k].split(' ').forEach(function(w){ WORD_TO[w] = k; }); });
   var TAG_RX = (CONF.tg || []).map(function(t, i){
@@ -17633,21 +17739,36 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // called that, but it has this week's events. These words open the Events tab, filtered by any other words typed
   // ("comedy shows"), as the site search sends them to What's On. "show" alone stays a common word ("show me wineries").
   var EVENT_WORDS = ' shows concert concerts gig gigs event events evenement evenements événement événements spectacle spectacles festival festivals ';
+  var SHOW_NOT_EVENT = ' me us all everything everyone the some any my our you them ';
   // A kind of event the map has no places for (« danse » reads as "dance") also opens the Events tab, filtered by it.
-  var EVENT_KINDS = { dance: 'danc', dances: 'danc', dancing: 'danc', ballet: 'ballet', drag: 'drag', nutcracker: 'nutcracker' };
-  var wantEvents = false, evTerm = '', evBySearch = false, evFilt = [], evSaid = [];
-  function evHit(e){ var hay = foldFr((e.name || '') + ' ' + (e.venue || '')); return evTerm.split(' ').every(function(w){ return !w || hay.indexOf(foldFr(w)) !== -1; }); }
+  // Round 11 (2026-10-20): by the site search's own kinds of event (each event carries the ones it is, e.tp), so
+  // « magie » and "magic show" find the magic shows and "musical" the musicals, whose names rarely say so. For a few
+  // kinds a name that says the word counts too.
+  var EVENT_KINDS = { dance: 'dance', dances: 'dance', dancing: 'dance', ballet: 'dance', nutcracker: 'dance', drag: 'drag', magic: 'magic', magician: 'magic', magicians: 'magic',
+    illusionist: 'magic', musical: 'musical', musicals: 'musical', broadway: 'musical', circus: 'circus', cirque: 'circus', acrobats: 'circus', acrobatics: 'circus',
+    classical: 'classical', symphony: 'classical', orchestra: 'classical', opera: 'classical', fireworks: 'fireworks' };
+  // Magic, musicals and classical go by kind alone: "Holiday Magic Market" and "Musical Memories" say the word but aren't.
+  var EVENT_STEMS = { dance: 'danc', drag: 'drag', circus: 'circus', fireworks: 'firework' };
+  var wantEvents = false, evTerm = '', evBySearch = false, evFilt = [], evSaid = [], evKinds = [];
+  function evHit(e){
+    var hay = foldFr((e.name || '') + ' ' + (e.venue || ''));
+    return evTerm.split(' ').every(function(w){ return !w || hay.indexOf(foldFr(w)) !== -1; })
+      && evKinds.every(function(k){ return (e.tp && e.tp.indexOf(k) !== -1) || (EVENT_STEMS[k] && hay.indexOf(EVENT_STEMS[k]) !== -1); });
+  }
   function readSearch(v, typing){
-    var fx = fixTypos(v); v = fx.text; lastFixes = fx.fixes;
+    var fx = fixTypos(v); v = fx.text; lastFixes = fx.fixes; termTyping = !!typing;
     if (typing) { if (!liveBase) { undoLastSearch(); liveBase = snapshot(); } restore(JSON.parse(JSON.stringify(liveBase))); }
     else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); }
     var before = snapshot();
-    var left = [], neg = false, toks = parseWords(v), ors = toks.indexOf('or') !== -1 || toks.indexOf('ou') !== -1;
+    var left = [], neg = false, toks = parseWords(v), ors = toks.indexOf('or') !== -1 || toks.indexOf('ou') !== -1, sawShow = false;
     wantEvents = false; evFilt = []; evSaid = [];
-    toks.forEach(function(w){
+    toks.forEach(function(w, i){
+      // Round 11 (2026-10-20): "show" acted as no filter at all. It opens the events like "shows", except before
+      // "me"/"us"/"all" ("show me wineries"); "show" or "show me" alone opens them too (below).
+      if (w === 'show') { sawShow = true; if (SHOW_NOT_EVENT.indexOf(' ' + (toks[i + 1] || '') + ' ') === -1) wantEvents = true; return; }
       if (NEG.indexOf(' ' + w + ' ') !== -1) { neg = true; return; }
       if (EVENT_WORDS.indexOf(' ' + w + ' ') !== -1) { wantEvents = true; return; }
-      if (EVENT_KINDS[w]) { wantEvents = true; evFilt.push(EVENT_KINDS[w]); evSaid.push((FR && TYPO && TYPO.fr[w]) || w); return; }
+      if (EVENT_KINDS[w]) { wantEvents = true; if (evFilt.indexOf(EVENT_KINDS[w]) === -1) evFilt.push(EVENT_KINDS[w]); evSaid.push((FR && TYPO && TYPO.fr[w]) || w); return; }
       var k = WORD_TO[w];
       if (w.charAt(0) === '#' && CONF.tg[Number(w.slice(1))]) { var tk = CONF.tg[Number(w.slice(1))].k; if (neg) notTags[tk] = true; else tags[tk] = true; }
       else if (w.charAt(0) === '@' && CONF.r[w.slice(1)]) town = w.slice(1);
@@ -17667,6 +17788,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       neg = false;
     });
     if (ors && onTags().length > 1) tagOr = true;
+    // "kids show", "family shows": the shows for kids, not every event with Kids welcome left on for the places.
+    if (wantEvents && feats.kids && !before.feats.kids) { delete feats.kids; evFilt.push('kids_show'); }
+    if (sawShow && !wantEvents && !left.length) { var d0 = searchDiff(before, snapshot()); if (!SET_FIELDS.some(function(f){ return d0.f[f]; }) && !SET_GROUPS.some(function(g){ return d0.g[g].length; })) wantEvents = true; }
     // "Open on Saturday" or "open at 9" is about then, not now (unless "now" is said too).
     if ((atMin != null || atDay) && toks.indexOf('now') === -1 && toks.indexOf('maintenant') === -1 && !(liveBase && liveBase.openOnly)) openOnly = false;
     term = left.join(' ');
@@ -17674,7 +17798,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); changed(); } }, 450); });
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); termTyping = true; changed(); } }, 450); });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
     // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
@@ -17683,8 +17807,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     clearTimeout(timer); wantNear = false; radiusFixed = false; setStatus(''); readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
     if (me && !radiusFixed && !town) radiusKm = 5;
     if (lastFixes.length) setStatus(T.typoRead(lastFixes));
-    if (wantEvents) { evTerm = [term].concat(evFilt).join(' ').trim(); setStatus(T.eventsFor([term].concat(evSaid).join(' ').trim()), 9000); term = ''; evBySearch = true; setTab('events'); }
-    else { evTerm = ''; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
+    if (wantEvents) { evTerm = term; evKinds = evFilt.slice(); setStatus(T.eventsFor([term].concat(evSaid).join(' ').trim()), 9000); term = ''; evBySearch = true; setTab('events'); }
+    else { evTerm = ''; evKinds = []; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
     track('map_search', { words: term ? 1 : 0, how: how || 'typed' }); changed();
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
@@ -17729,8 +17853,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     syncChips();
     render(!!me);
   }
-  $('pmTabPlaces').addEventListener('click', function(){ evTerm = ''; evBySearch = false; setTab('places'); });
-  $('pmTabEvents').addEventListener('click', function(){ evTerm = ''; evBySearch = false; setTab('events'); });
+  $('pmTabPlaces').addEventListener('click', function(){ evTerm = ''; evKinds = []; evBySearch = false; setTab('places'); });
+  $('pmTabEvents').addEventListener('click', function(){ evTerm = ''; evKinds = []; evBySearch = false; setTab('events'); });
   // Map keyboard use (2026-10-19, review pass 5).
   // - A pin opened with Enter moves focus into its place card (the popup); Escape, or its close button, closes the card
   //   and puts focus back on the pin.
@@ -17790,12 +17914,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: String(a[2]).toLowerCase(), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
     events = []; d.e.forEach(function(a){
-      var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], d: null };
+      var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], tp: a[12] || [], d: null };
       if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(pmPopup(function(){ return popupForEvent(e); }));
       events.push(e);
     });
@@ -17831,7 +17955,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
-const MAP_DATA_FORMAT = 7;
+const MAP_DATA_FORMAT = 8; // 8 (round 11): the Free to visit bit and each event's kinds
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -17851,6 +17975,8 @@ const MAP_FEATURES = [
   { key: 'veg', field: 'vegetarian', bit: 64 }, { key: 'vegan', field: 'vegan', bit: 128 }, { key: 'gf', field: 'gluten_free', bit: 256 },
   { key: 'late', field: 'open_late', bit: 512 }, { key: 'early', field: 'open_early', bit: 1024 }, { key: 'groups', field: 'great_groups', bit: 2048 },
   { key: 'sports', field: 'sports_tv', bit: 4096 }, { key: 'nonalc', field: 'nonalcoholic', bit: 8192 },
+  // Round 11 (2026-10-20): "free", "free things" and « gratuit » acted as no filter; the 322 Free to visit places.
+  { key: 'free', field: 'free_entry', bit: 16384 },
 ];
 // The kinds of place a visitor picks from (any of them), by venue type.
 const MAP_KINDS = [
@@ -17869,7 +17995,7 @@ const MAP_MUST_HAVES = [
   { key: 'lake', label: 'Lake view', icon: '\u{1F30A}' }, { key: 'kids', label: 'Kids welcome', icon: '\u{1F9D2}' },
   { key: 'late', label: 'Open late', icon: '\u{1F319}' }, { key: 'early', label: 'Open early', icon: '\u{1F305}' },
   { key: 'groups', label: 'Good for groups', icon: '\u{1F465}' }, { key: 'sports', label: 'Sports on TV', icon: '\u{1F4FA}' },
-  { key: 'nonalc', label: 'Alcohol-free drinks', icon: '\u{1F9C3}' },
+  { key: 'nonalc', label: 'Alcohol-free drinks', icon: '\u{1F9C3}' }, { key: 'free', label: 'Free to visit', icon: '\u{1F193}' },
 ];
 // What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
 // understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
@@ -17936,7 +18062,7 @@ function mapFrenchNote(note) {
   return fr && fr !== en ? String(fr).slice(0, 160) : 0;
 }
 function mapPlacesData(now = new Date()) {
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, rating, cuisine, description, happy_hour_times, price FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, free_entry, rating, cuisine, description, happy_hour_times, price FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const seasons = getSeasonStates(now);
@@ -17986,6 +18112,17 @@ function mapEventsData(now = new Date()) {
     }
     return null;
   };
+  // Round 11 (2026-10-20): [12] the kinds of event it is, by the site search's own tests (dance, magic, musical,
+  // circus, kids' shows ...), so the map's « magie » or "musical" finds the same events /search does.
+  const kinds = new Map();
+  try {
+    const topics = SEARCH_EVENT_TOPICS.filter((t) => !t.keepPlaces && t.key !== 'shows');
+    for (const e of getWhatsOnEvents(resolveWhatsOnWindow({}, now))) {
+      if (!e || e.id == null) continue;
+      const ks = topics.filter((t) => { try { return !!t.test(e); } catch (err) { return false; } }).map((t) => t.key);
+      if (ks.length) kinds.set(Number(e.id), ks);
+    }
+  } catch (err) { /* the map works without them */ }
   const out = [];
   for (const r of rows) {
     if (seen.has(r.id) || !REGION_LABELS[r.region] || !r.slug) continue;
@@ -17997,7 +18134,7 @@ function mapEventsData(now = new Date()) {
     out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), pin ? mapRound(venue.latitude) : null, pin ? mapRound(venue.longitude) : null,
       r.start_date, r.start_time || '', r.end_date, r.end_time || '', r.all_day ? 1 : 0,
       // [11] 1 when the event has a French page (round 9, 2026-10-19), so /fr/map links to it.
-      hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0]);
+      hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0, kinds.get(Number(r.id)) || 0]);
   }
   return out;
 }
@@ -26233,7 +26370,8 @@ const FR_WEEKDAY_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'
 const FR_MONTH_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 function frDateShort(dateStr) {
   const [, m, d] = dateStr.split('-').map(Number);
-  return `${FR_WEEKDAY_SHORT[localWeekday(dateStr)]} ${d} ${FR_MONTH_SHORT[m - 1]}`;
+  // Round 11 (2026-10-20): the 1st is « 1er » (« dim. 1er nov. »).
+  return `${FR_WEEKDAY_SHORT[localWeekday(dateStr)]} ${d === 1 ? '1er' : d} ${FR_MONTH_SHORT[m - 1]}`;
 }
 // "11:00–22:30" -> "11 h–22 h 30"; "Closed" / "Hours not listed" in French.
 function frHoursText(text) {
@@ -26527,7 +26665,12 @@ function frLookup(key) { const k = frNorm(key); return FR_TEXT_MAP.has(k) ? FR_T
 // A French short month that ends a sentence keeps one period: "jusqu’au 31 oct." not "oct.." (2026-10-18).
 const FR_MONTH_DOUBLE_DOT = /(\b(?:janv|f\u00e9vr|avr|juil|juill|sept|oct|nov|d\u00e9c))\.\.(?!\.)/g;
 function frTidyDots(s) { return typeof s === 'string' ? s.replace(FR_MONTH_DOUBLE_DOT, '$1.') : s; }
-function frText(plain) { return frTidyDots(frTextRaw(plain)); }
+// Round 11 (2026-10-20): French typography every translation gets: the 1st of a month is « 1er » (« jusqu’au 1er
+// nov. », where a pattern put « 1 nov. »), and « de » elides before the towns that start with a vowel (« d’Osoyoos »).
+const FR_FIRST_OF_MONTH = /(^|[^\d,.\u00a0\u202f\w])1 (janv\.|f\u00e9vr\.|mars|avr\.|mai|juin|juil\.|juill\.|ao\u00fbt|sept\.|oct\.|nov\.|d\u00e9c\.|janvier|f\u00e9vrier|avril|juillet|septembre|octobre|novembre|d\u00e9cembre)(?![\w\u00e0-\u00ff])/g;
+const FR_DE_VOWEL_TOWN = /\b([Dd])e (Osoyoos|Oliver|Okanagan|Armstrong|Enderby|Apex)\b/g;
+function frTidy(s) { return typeof s === 'string' ? frTidyDots(s).replace(FR_FIRST_OF_MONTH, '$11er $2').replace(FR_DE_VOWEL_TOWN, '$1\u2019$2') : s; }
+function frText(plain) { return frTidy(frTextRaw(plain)); }
 function frTextRaw(plain) {
   const key = String(plain).replace(/\s+/g, ' ').trim();
   if (!key) return null;
@@ -26998,7 +27141,18 @@ function venueDayHoursText(day, fr) {
 // Okanagan clock, exactly like the Food & Drink cards, and never for a venue
 // with a current advisory or no readable hours.
 const FR_STATUS_DAYS = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };
+// Round 11 (2026-10-20): a closure note in the status ("Closed today (Closed Oct 11 - Nov 3)", Sugar Quail's) read
+// « Fermé aujourd’hui (Closed Oct 11 - Nov 3) » on French list cards. It now reads as the venue page does:
+// « Fermé du 11 oct. au 3 nov. ».
+const FR_STATUS_MONTHS = { Jan: 'janv.', Feb: 'f\u00e9vr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'ao\u00fbt', Sep: 'sept.', Sept: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'd\u00e9c.' };
+const FR_STATUS_CLOSED_RANGE = /^Closed today \(Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.? (\d{1,2})\s*(?:-|\u2013|\u2014|to|until)\s*(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.? )?(\d{1,2})\)/;
 function frStatusText(text) {
+  const day1 = (d) => (d === '1' ? '1er' : d);
+  text = String(text).replace(FR_STATUS_CLOSED_RANGE, (m, m1, d1, m2, d2) => (m2 && m2 !== m1
+    ? `Ferm\u00e9 du ${day1(d1)} ${FR_STATUS_MONTHS[m1]} au ${day1(d2)} ${FR_STATUS_MONTHS[m2]}`
+    : `Ferm\u00e9 du ${day1(d1)} au ${day1(d2)} ${FR_STATUS_MONTHS[m1]}`));
+  // Any other closure note the French list has (an owner's "(Renovations)") in French too.
+  text = text.replace(/^Closed today \(([^()]{2,80})\)/, (m, note) => { const fr = /^(holiday|temporary closure)$/.test(note) ? null : frText(note); return fr ? `Ferm\u00e9 aujourd\u2019hui (${fr})` : m; });
   const time = (t) => t.replace(/\b(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g, (m, h, mm, ap) => { let H = Number(h) % 12; if (ap === 'PM') H += 12; return `${H} h${mm ? ` ${mm}` : ''}`; });
   return time(text
     .replace('Open now \u00b7 Closes ', 'Ouvert \u00b7 ferme \u00e0 ')
@@ -27010,6 +27164,7 @@ function frStatusText(text) {
     .replace(' (holiday)', ' (jour f\u00e9ri\u00e9)')
     .replace(' (temporary closure)', ' (fermeture temporaire)')
     .replace(') \u00b7 Opens ', ') \u00b7 ouvre ')
+    .replace(/^(Ferm\u00e9 du [^\u00b7]+) \u00b7 Opens /, '$1 \u00b7 ouvre ')
     .replace('Closed now', 'Ferm\u00e9 en ce moment')
     .replace('Hours not listed for today', 'Heures non indiqu\u00e9es pour aujourd\u2019hui')
     .replace(/\btomorrow /, 'demain \u00e0 ')
@@ -27302,8 +27457,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const attributeChips = fr
     ? BOOL_FIELDS.filter((f) => venue[f] && !(dogFriendlyNote !== undefined && f === 'dog_friendly')).map((f) => `<span class="chip">${escapeHtml(frBadgeLabel(f))}</span>`).join(' ')
     : badgeChipsHtml(venue, { skipDogFriendly: dogFriendlyNote !== undefined });
+  // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
+  // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
   const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);
-  const hiddenGemChip = frChip((isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(dogFriendlyNote) + ' ' : ''));
+  const hiddenGemChip = frChip((isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(fr && dogFriendlyNote ? frTextOr(String(dogFriendlyNote).trim()) : dogFriendlyNote) + ' ' : ''));
 
   // Stage 2 (2026-09-29): read through hours.js like Open Now and the
   // structured data. A day that is absent or malformed is "Hours not listed",
@@ -41232,8 +41389,8 @@ const OWNER_HELP_TOPICS = [
   // Round 9 (2026-10-19): "is my info public" / « mes infos sont-elles publiques » had no answer.
   { id: 'privacy', q: 'Is my information public?', qFr: 'Mes renseignements sont-ils publics?', pages: ['account', 'edit', 'settings', 'login', 'claim'],
     keys: ['public', 'is my info public', 'is my information public', 'my info', 'my information', 'personal information', 'privacy', 'privacy policy', 'is it private', 'kept private',
-      'who can see my email', 'see my email', 'my email public', 'is my email shown', 'show my email', 'my data', 'who sees my details'],
-    keysFr: ['public', 'publique', 'publiques', 'publics', 'mes infos', 'mes informations', 'mes renseignements', 'renseignements personnels', 'confidentialite', 'confidentiel',
+      'who can see my email', 'see my email', 'my email public', 'is my email shown', 'show my email', 'my data', 'who sees my details', 'privacy settings', 'data privacy'],
+    keysFr: ['public', 'publique', 'publiques', 'publics', 'mes infos', 'mes informations', 'mes renseignements', 'renseignements personnels', 'confidentialite', 'confidentiel', 'politique de confidentialite',
       'est ce prive', 'reste prive', 'qui voit mon courriel', 'mon courriel est il visible', 'mes donnees'],
     a: '<p>Your listing is public: its name, address, phone, website, hours, photos, menu and description are what visitors see on your page. Your login is private: your email and password only sign you in and get you edit links, and are never shown on your page (others who manage the listing see your email under <strong>People with access</strong>). What you send us to claim a listing, or in a message, stays private too.</p><p>Want something off your page, like a phone number? {ON}, change it and tap {SEND}, or tap <strong>Message us</strong> and we’ll take it off. More in our <a href="/privacy">privacy policy</a>.</p>',
     aFr: '<p>Votre fiche est publique : son nom, son adresse, son téléphone, son site Web, ses heures, ses photos, son menu et sa description sont ce que les visiteurs voient sur votre page. Votre compte est privé : votre courriel et votre mot de passe servent seulement à vous connecter et à recevoir vos liens de modification, et ne sont jamais affichés sur votre page (les autres personnes qui gèrent la fiche voient votre courriel dans <strong>Personnes ayant accès</strong>). Ce que vous nous envoyez pour réclamer une fiche, ou dans un message, reste privé aussi.</p><p>Vous voulez retirer quelque chose de votre page, comme un numéro de téléphone? {ON}, modifiez-le et touchez {SEND}, ou touchez <strong>Écrivez-nous</strong> et nous le retirerons. Plus de détails dans notre <a href="/fr/privacy">politique de confidentialité</a>.</p>' },
@@ -41345,7 +41502,9 @@ const OWNER_HELP_TOPICS = [
     keys: ['holiday', 'holidays', 'stat', 'stat holiday', 'statutory holiday', 'christmas', 'christmas day', 'christmas eve', 'xmas', 'boxing day', 'new years', 'new years day', 'new years eve', 'thanksgiving', 'easter', 'good friday', 'victoria day', 'canada day', 'bc day', 'labour day', 'labor day', 'remembrance day', 'family day',
       'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closed for two weeks', 'closed for a few weeks', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days',
       // Round 10 (2026-10-19): "holiday hours" got Seasonal hours and "change my hours for christmas" the weekly hours.
-      'holiday hours', 'christmas hours', 'hours over the holidays', 'hours for the holidays', 'hours for christmas', 'hours over christmas', 'hours at christmas', 'new years hours', 'closed for 1 week', 'closed for 2 weeks', 'closed 1 week'],
+      'holiday hours', 'christmas hours', 'hours over the holidays', 'hours for the holidays', 'hours for christmas', 'hours over christmas', 'hours at christmas', 'new years hours', 'closed for 1 week', 'closed for 2 weeks', 'closed 1 week',
+      // Round 11 (2026-10-20): "change my hours for boxing day" got the weekly hours.
+      'boxing day hours', 'hours for boxing day', 'hours on boxing day', 'hours for new years', 'hours on new years', 'hours for thanksgiving', 'hours on thanksgiving', 'hours for easter', 'hours on christmas', 'hours for the holiday', 'hours on the holiday', 'hours for a holiday', 'hours on a holiday', 'hours for stat', 'stat holiday hours'],
     keysFr: ['ferie', 'jour ferie', 'jours feries', 'conge', 'noel', 'jour de noel', 'veille de noel', 'lendemain de noel', 'jour de l an', 'nouvel an', 'action de grace', 'paques', 'vendredi saint', 'fete du canada', 'fete du travail', 'fetes',
       // Round 9 (2026-10-19): "nous sommes fermés pour une semaine" found nothing.
       'fermes pour une semaine', 'ferme pour une semaine', 'fermes une semaine', 'ferme une semaine', 'fermes la semaine prochaine', 'ferme la semaine prochaine',
@@ -41353,17 +41512,24 @@ const OWNER_HELP_TOPICS = [
       'fermeture speciale', 'fermetures speciales', 'ferme le', 'fermes le', 'ferme un jour', 'fermes un jour', 'fermeture temporaire', 'temporairement ferme', 'temporairement fermes', 'vacances', 'renovation', 'renovations', 'evenement prive', 'ferme demain', 'ferme aujourd hui', 'fermeture', 'quelques jours',
       // Round 10 (2026-10-19): « ferme pour 1 semaine » got "not sure"; « heures des fêtes » got Seasonal hours.
       'ferme pour 1 semaine', 'fermes pour 1 semaine', 'ferme 1 semaine', 'fermes 1 semaine', 'ferme pour 2 semaines', 'fermes pour 2 semaines', 'pour 1 semaine', 'pour une semaine', 'pour 2 semaines',
-      'heures des fetes', 'horaire des fetes', 'horaires des fetes', 'heures de noel', 'horaire de noel', 'heures du temps des fetes', 'temps des fetes'],
+      'heures des fetes', 'horaire des fetes', 'horaires des fetes', 'heures de noel', 'horaire de noel', 'heures du temps des fetes', 'temps des fetes',
+      'lendemain de noel', 'heures du lendemain de noel', 'heures pour le lendemain de noel', 'heures du jour de l an', 'heures pour un jour ferie', 'heures d un jour ferie', 'heures des jours feries'],
     a: '<ol><li>{ON}, open <strong>Special closures</strong> (with your opening hours) and tap <strong>+ Add a closed day</strong>.</li><li>Pick the <strong>First day</strong> (for example December 25). Closed for longer, like renovations or a vacation? Add a <strong>Last day</strong> too. Add a short <strong>Note</strong> if you like (“Christmas”).</li><li>Tap {SEND}.</li></ol><p>On those days your page says “Closed today” with your note, for example “Closed today (Christmas)”, and visitors won’t see you as open. Past closures drop off by themselves. {LIVE}</p><p>Open on a holiday, just with different hours? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Fermetures spéciales</strong> (sous vos heures d’ouverture) et touchez <strong>+ Ajouter un jour de fermeture</strong>.</li><li>Choisissez le <strong>Premier jour</strong> (par exemple le 25 décembre). Fermé plus longtemps, pour des rénovations ou des vacances? Ajoutez aussi un <strong>Dernier jour</strong>. Ajoutez une courte <strong>Note</strong> si vous voulez (« Noël »).</li><li>Touchez {SEND}.</li></ol><p>Ces jours-là, votre page indique « Fermé aujourd’hui » avec votre note, par exemple « Fermé aujourd’hui (Noël) », et les visiteurs ne vous verront pas ouvert. Les fermetures passées disparaissent d’elles-mêmes. {LIVE}</p><p>Ouvert un jour férié, mais avec d’autres heures? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'season', over: ['hours'], q: 'I\u2019m only open some months', qFr: 'Nous sommes ouverts seulement certains mois', pages: ['edit'],
     keys: ['season', 'seasonal', 'months', 'open some months', 'only open', 'closed in winter', 'closed for winter', 'closed for the winter', 'closed all winter', 'closed in the winter', 'closed for the season', 'off season', 'reopen', 'reopening', 'seasonal business', 'summer only', 'open in summer only', 'only in summer', 'opening day', 'season opens',
-      // Round 10 (2026-10-19): « ouvert à l'année maintenant » got "not sure".
-      'open all year', 'open year round', 'year round', 'all year', 'all year round', 'open every month', 'no longer seasonal', 'not seasonal anymore'],
+],
     keysFr: ['saison', 'saisonnier', 'saisonniere', 'certains mois', 'seulement l ete', 'ferme l hiver', 'fermes l hiver', 'ferme pour l hiver', 'fermes pour l hiver', 'ferme pour la saison', 'hors saison', 'reouverture', 'rouvrir', 'rouvre', 'mois',
-      'a l annee', 'ouvert a l annee', 'ouverts a l annee', 'toute l annee', 'ouvert toute l annee', 'ouverts toute l annee', 'plus saisonnier', 'tous les mois de l annee'],
+],
     a: '<p>{ON}, under the hours, choose <strong>Open some months only</strong> and pick your first and last month (for example May to October). Then tap {SEND}. {LIVE}</p><p>Your listing then shows when you\u2019re open each year, and visitors won\u2019t see you as \u201copen now\u201d in the off season. Different hours in summer and winter? Use <strong>Seasonal hours</strong>. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p><p>Open all year now? Choose <strong>Open all year</strong> in the same list and tap {SEND}.</p>',
     aFr: '<p>{ON}, sous les heures, choisissez <strong>Ouvert certains mois seulement</strong> et indiquez votre premier et votre dernier mois (par exemple de mai à octobre). Touchez ensuite {SEND}. {LIVE}</p><p>Votre fiche indique alors vos mois d\u2019ouverture chaque année, et les visiteurs ne vous verront pas « ouvert maintenant » hors saison. Heures différentes l\u2019été et l\u2019hiver? Utilisez <strong>Heures saisonnières</strong>. Fermé quelques jours ou un jour férié? Utilisez <strong>Fermetures spéciales</strong>.</p><p>Maintenant ouvert toute l\u2019année? Choisissez <strong>Ouvert toute l\u2019année</strong> dans la même liste et touchez {SEND}.</p>' },
+  // Round 11 (2026-10-20): "we are open year round now" got the seasonal answer, with the year-round step last. Its own
+  // topic, so the answer starts with it. (Round 10's « ouvert à l'année maintenant » keys moved here.)
+  { id: 'year-round', over: ['season', 'hours', 'shows-closed'], q: 'We\u2019re open all year now', qFr: 'Nous sommes maintenant ouverts toute l\u2019année', pages: ['edit'],
+    keys: ['open all year', 'open year round', 'year round', 'year around', 'all year', 'all year round', 'open every month', 'no longer seasonal', 'not seasonal anymore', 'not seasonal', 'open in winter now', 'open all winter', 'open through the winter', 'staying open all winter'],
+    keysFr: ['a l annee', 'ouvert a l annee', 'ouverts a l annee', 'toute l annee', 'ouvert toute l annee', 'ouverts toute l annee', 'plus saisonnier', 'plus saisonniers', 'tous les mois de l annee', 'ouvert tout l hiver', 'ouverts tout l hiver'],
+    a: '<p>{ON}, under the hours, set <strong>Season</strong> to <strong>Open all year</strong> and tap {SEND}. {LIVE}</p><p>Your page then stops showing a season, and visitors see you as open whenever your opening hours say so. Check those hours too, in case your winter days are different. Closed for a few days or a holiday? Use <strong>Special closures</strong>.</p>',
+    aFr: '<p>{ON}, sous les heures, réglez <strong>Saison</strong> sur <strong>Ouvert toute l\u2019année</strong> et touchez {SEND}. {LIVE}</p><p>Votre page n\u2019indique alors plus de saison, et les visiteurs vous voient ouvert selon vos heures d\u2019ouverture. Vérifiez aussi ces heures, au cas où vos jours d\u2019hiver seraient différents. Fermé quelques jours ou un jour férié? Utilisez <strong>Fermetures spéciales</strong>.</p>' },
   { id: 'changes-review', q: 'I sent changes but nothing changed', qFr: 'J\u2019ai envoyé des modifications, mais rien n\u2019a changé', pages: ['edit', 'account'],
     keys: ['sent changes', 'my changes', 'changes not showing', 'changes not', 'didnt change', 'not changed', 'still old', 'still shows', 'update not', 'saved', 'submitted', 'approve', 'approval', 'hours not updated', 'description not', 'nothing happened', 'didnt save', 'didnt work', 'waiting for review chip', 'review chip', 'what does waiting for review mean'],
     keysFr: ['mes modifications', 'modifications envoyees', 'rien n a change', 'pas change', 'toujours l ancienne', 'pas mis a jour', 'pas a jour', 'enregistre', 'envoye', 'rien ne s est passe'],
@@ -41556,8 +41722,10 @@ const OWNER_HELP_TOPICS = [
     aFr: '<p>Non, nous ne publions pas sur vos comptes et ne gérons pas vos réseaux sociaux, et nous ne pouvons pas promettre une publication sur vous.</p><p>Ce que nous partageons :</p><ul><li>Nos propres pages Instagram et Facebook présentent parfois des endroits, des événements et des guides d’Okanagan Roam.</li><li>Les événements que vous ajoutez s’affichent dans <strong>À l’affiche</strong>, et votre fiche paraît dans les guides et la recherche.</li></ul><p>Pour que les visiteurs vous trouvent, ajoutez votre <strong>Instagram</strong> et votre <strong>Facebook</strong> dans <strong>Nom, adresse et liens</strong>, et ajoutez vos événements. Vous aimeriez que nous partagions quelque chose? <strong>Écrivez-nous</strong>. Une courte vidéo (10 à 30 secondes) de votre espace ou d’un plat peut être envoyée à <strong>info@okanaganroam.com</strong>, et nous pourrions la présenter, avec crédit.</p>' },
   { id: 'login-privacy', over: ['access', 'signin', 'staff', 'settings'], q: 'Who can see my login?', qFr: 'Qui peut voir mon compte?', pages: ['account', 'settings', 'edit', 'login'],
     keys: ['who can see my login', 'who can see my email', 'who sees my email', 'who can see', 'see my login', 'see my email', 'see my password', 'can you see my password', 'is my email public', 'email public', 'email shown', 'email visible',
-      'privacy', 'private', 'is my login private', 'personal information', 'my data', 'my information', 'share my email', 'sell my email'],
-    keysFr: ['qui peut voir mon compte', 'qui peut voir mon courriel', 'qui peut voir', 'voir mon courriel', 'voir mon mot de passe', 'courriel public', 'courriel visible', 'confidentialite', 'vie privee', 'prive', 'renseignements personnels', 'mes donnees'],
+      // Round 11 (2026-10-20): "privacy" / « confidentialité » alone tied with "Is my information public?" and got "not
+      // sure"; the bare words now belong to that topic only (its answer covers the login too).
+      'private', 'is my login private', 'personal information', 'my data', 'my information', 'share my email', 'sell my email'],
+    keysFr: ['qui peut voir mon compte', 'qui peut voir mon courriel', 'qui peut voir', 'voir mon courriel', 'voir mon mot de passe', 'courriel public', 'courriel visible', 'vie privee', 'prive', 'renseignements personnels', 'mes donnees'],
     a: '<p>Your login is private:</p><ul><li><strong>Visitors never see it.</strong> Your login email isn’t shown on your listing, and we don’t share or sell it.</li><li><strong>Your password</strong> is stored scrambled, so nobody can read it, us included.</li><li>The only people who see your login email are the others with a login for the same listing, in <strong>People with access</strong> on your edit page, and Dayton at Okanagan Roam.</li></ul><p>What <em>is</em> public is what you put on the listing itself: phone, website, address and links. Want someone off your listing? Ask me about <strong>who has access</strong>. More in our <a href="/privacy">privacy policy</a>.</p>',
     aFr: '<p>Votre compte est privé :</p><ul><li><strong>les visiteurs ne le voient jamais.</strong> Le courriel de votre compte n’est pas affiché sur votre fiche, et nous ne le partageons ni ne le vendons.</li><li><strong>votre mot de passe</strong> est enregistré sous forme brouillée : personne ne peut le lire, pas même nous.</li><li>les seules personnes qui voient le courriel de votre compte sont les autres personnes ayant un compte pour la même fiche, dans <strong>Personnes ayant accès</strong> sur votre page de modification, et Dayton chez Okanagan Roam.</li></ul><p>Ce qui <em>est</em> public, c’est ce que vous mettez sur la fiche : téléphone, site Web, adresse et liens. Vous voulez retirer quelqu’un de votre fiche? Demandez-moi <strong>qui a accès</strong>. Plus de détails dans notre <a href="/fr/privacy">politique de confidentialité</a>.</p>' },
   { id: 'google', over: ['links', 'phone', 'hours', 'name-address', 'reviews'], q: 'My phone number or hours are wrong on Google', qFr: 'Mon numéro ou mes heures sont erronés sur Google', pages: ['edit', 'account'],
@@ -41592,10 +41760,19 @@ const OWNER_HELP_TOPICS = [
     a: '<ul><li>Upload the <strong>original</strong> photo from your phone or camera. Screenshots and photos saved from Facebook, Instagram or a website are shrunk and look blurry on a big screen.</li><li>Shoot in daylight, wipe the lens, and hold the phone steady. Don’t zoom in: step closer instead.</li><li>Hold the phone sideways: wide photos fill the banner without being cropped.</li><li>Best subjects: the inside of your place, your patio or view, your food or drinks, or your storefront with the name.</li></ul><p>{ON}, add the sharper photos under <strong>Photos</strong>. To take an old one down, ask me about <strong>changing or removing a photo</strong>.</p>',
     aFr: '<ul><li>Téléversez la photo <strong>originale</strong> de votre téléphone ou de votre appareil photo. Les captures d’écran et les photos enregistrées depuis Facebook, Instagram ou un site Web sont réduites et paraissent floues sur un grand écran.</li><li>Photographiez à la lumière du jour, essuyez l’objectif et tenez le téléphone bien droit. Évitez le zoom : approchez-vous plutôt.</li><li>Tenez le téléphone à l’horizontale : les photos larges remplissent la bannière sans être recadrées.</li><li>Meilleurs sujets : l’intérieur de votre établissement, votre terrasse ou la vue, vos plats ou vos boissons, ou votre devanture avec le nom.</li></ul><p>{ON}, ajoutez les photos plus nettes sous <strong>Photos</strong>. Pour retirer une ancienne photo, demandez-moi comment <strong>changer ou retirer une photo</strong>.</p>' },
   { id: 'about', q: 'Who are you?', qFr: 'Qui êtes-vous?', pages: [],
-    keys: ['who are you', 'what are you', 'are you a bot', 'are you a robot', 'are you real', 'are you human', 'are you a person', 'is this a bot', 'is this a robot', 'who am i talking to', 'who is this', 'who runs this', 'who runs okanagan roam', 'what is okanagan roam'],
-    keysFr: ['qui etes vous', 'vous etes qui', 'qui es tu', 't es qui', 'etes vous un robot', 'es tu un robot', 'etes vous humain', 'etes vous une personne', 'c est un robot', 'qui parle', 'a qui je parle', 'qui gere okanagan roam', 'c est quoi okanagan roam'],
+    keys: ['who are you', 'what are you', 'are you a bot', 'are you a robot', 'are you real', 'are you human', 'are you a person', 'is this a bot', 'is this a robot', 'who am i talking to', 'who is this', 'who runs this', 'who runs okanagan roam', 'what is okanagan roam',
+      // Round 11 (2026-10-20): « c'est qui okanagan roam » got "not sure".
+      'who is okanagan roam', 'who are okanagan roam', 'who owns okanagan roam', 'who is behind okanagan roam', 'about okanagan roam'],
+    keysFr: ['qui etes vous', 'vous etes qui', 'qui es tu', 't es qui', 'etes vous un robot', 'es tu un robot', 'etes vous humain', 'etes vous une personne', 'c est un robot', 'qui parle', 'a qui je parle', 'qui gere okanagan roam', 'c est quoi okanagan roam',
+      'c est qui okanagan roam', 'c est qui', 'qui est okanagan roam', 'qui est derriere okanagan roam', 'qui tient okanagan roam', 'qu est ce qu okanagan roam'],
     a: '<p>I’m the Okanagan Roam help guide for businesses: a list of ready answers about your listing (photos, hours, events, menus, logins), not a person or an AI. Okanagan Roam is a free guide to the Okanagan run by Dayton.</p><p>Need a real person? Tap <strong>Message us</strong> and Dayton will reply by email, usually within a day.</p>',
     aFr: '<p>Je suis le guide d’aide d’Okanagan Roam pour les entreprises : une liste de réponses toutes prêtes sur votre fiche (photos, heures, événements, menus, connexion), pas une personne ni une IA. Okanagan Roam est un guide gratuit de l’Okanagan tenu par Dayton.</p><p>Besoin de parler à quelqu’un? Touchez <strong>Écrivez-nous</strong> et Dayton vous répondra par courriel, en général d’ici un jour.</p>' },
+  // Round 11 (2026-10-20): "is this a scam" got "not sure".
+  { id: 'scam', over: ['about', 'cost'], q: 'Is this legit?', qFr: 'Est-ce légitime?', pages: ['login', 'claim', 'link', 'invalid', 'edit', 'account'],
+    keys: ['scam', 'is this a scam', 'is it a scam', 'scammer', 'is this legit', 'is it legit', 'legit', 'legitimate', 'is this real', 'is this for real', 'fraud', 'phishing', 'spam', 'is this spam', 'can i trust you', 'is this safe', 'trustworthy'],
+    keysFr: ['arnaque', 'une arnaque', 'est ce une arnaque', 'c est une arnaque', 'fraude', 'hameconnage', 'pourriel', 'est ce legitime', 'legitime', 'est ce serieux', 'c est serieux', 'est ce vrai', 'peut on vous faire confiance', 'est ce securitaire'],
+    a: '<p>Yes, it\u2019s real. Okanagan Roam is a free guide to the Okanagan run by Dayton, and your business is listed because visitors look for places like yours. Claiming and editing your listing is free, and nothing here asks for a credit card.</p><p>Not sure a message really came from us? Don\u2019t click its links: go to okanaganroam.com yourself, or tap <strong>Message us</strong> and Dayton will reply by email.</p>',
+    aFr: '<p>Oui, c\u2019est réel. Okanagan Roam est un guide gratuit de l\u2019Okanagan tenu par Dayton, et votre entreprise y figure parce que les visiteurs cherchent des endroits comme le vôtre. Réclamer et modifier votre fiche est gratuit, et rien ici ne vous demande de carte de crédit.</p><p>Vous doutez qu\u2019un message vienne vraiment de nous? Ne cliquez pas sur ses liens : allez vous-même sur okanaganroam.com, ou touchez <strong>Écrivez-nous</strong> et Dayton vous répondra par courriel.</p>' },
   { id: 'cost', q: 'Does this cost anything?', qFr: 'Est-ce que c\u2019est payant?', pages: ['edit', 'account', 'login', 'claim'],
     keys: ['cost', 'costs', 'does it cost', 'how much does', 'pay', 'paid', 'free', 'charge', 'fee', 'fees', 'subscription', 'featured', 'advertise', 'advertising', 'premium', 'sponsored'],
     keysFr: ['gratuit', 'cout', 'coute', 'combien ca coute', 'payer', 'payant', 'frais', 'abonnement', 'publicite', 'en vedette', 'commandite'],
@@ -49712,6 +49889,12 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Round 11 (2026-10-20), search-fr
+  searchTextEvents,
+  searchEventsFor,
+  searchIsXmasMarket,
+  frDateShort,
+  frTidy,
   // French and tools (2026-10-19, round 8)
   searchTypoFix,
   frSearchTermLabel,
@@ -50280,6 +50463,8 @@ module.exports = {
   venueHoursCheckedHtml,
   MAP_EVENT_GROUP_SRC,
   MAP_PLACE_LIST_SRC,
+  MAP_NAME_MATCH_SRC,
+  MAP_COFFEE_FIT_SRC,
   restLinksHtml,
   cardFillActionsJs,
   APP_TRIP_LABEL_HTML,
