@@ -18677,10 +18677,16 @@ function renderSocialLinksPage(now = new Date()) {
     { title: 'Guides', path: '/guides', note: 'Local guides by season' },
     { title: 'Map', path: '/map', note: 'What is near you' },
   ];
+  // Our social accounts, so a visitor from one app can find the others (TikTok added 2026-10-19).
+  const socials = [
+    { title: 'Instagram', url: 'https://www.instagram.com/okanaganroam', note: '@okanaganroam' },
+    { title: 'TikTok', url: 'https://www.tiktok.com/@okanaganroam', note: '@okanaganroam' },
+    { title: 'Facebook', url: 'https://www.facebook.com/profile.php?id=61595021770981', note: 'Okanagan Roam' },
+  ];
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-${pageHead('Links | Okanagan Roam', 'Links from Okanagan Roam’s Instagram and Facebook posts: today’s post, recent posts and the main pages.', null, [], { golfTheme: true, noindex: true })}
+${pageHead('Links | Okanagan Roam', 'Links from Okanagan Roam’s Instagram, TikTok and Facebook posts: today’s post, recent posts and the main pages.', null, [], { golfTheme: true, noindex: true })}
 ${renderAnalyticsHeadHtml('info')}
 <style>
   body.links-page .lk-wrap { max-width: 560px; margin: 0 auto; }
@@ -18694,6 +18700,8 @@ ${renderAnalyticsHeadHtml('info')}
   body.links-page .lk-title { font-weight: 800; font-size: 1.05rem; overflow-wrap: anywhere; }
   body.links-page .lk-lead .lk-title { font-size: 1.2rem; }
   body.links-page .lk-note { font-size: 0.85rem; opacity: 0.75; }
+  body.links-page .lk-wrap ul.lk-social { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 380px) { body.links-page .lk-wrap ul.lk-social { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body class="golf-page links-page">
@@ -18701,11 +18709,13 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="lk-wrap">
   <h1>Okanagan Roam links</h1>
-  <p class="lk-intro">The pages from our Instagram and Facebook posts, newest first.</p>
+  <p class="lk-intro">The pages from our Instagram, TikTok and Facebook posts, newest first.</p>
   ${first ? `<ul>${card(first, true)}</ul>` : ''}
   ${rest.length ? `<h2>Recent posts</h2>\n  <ul>${rest.map((p) => card(p, false)).join('')}</ul>` : ''}
   <h2>Explore</h2>
   <ul>${main.map((m) => `<li><a class="lk-card" href="${m.path}" data-post-date="main"><span class="lk-title">${escapeHtml(m.title)}</span><span class="lk-note">${escapeHtml(m.note)}</span></a></li>`).join('')}</ul>
+  <h2>Follow along</h2>
+  <ul class="lk-social">${socials.map((m) => `<li><a class="lk-card" href="${m.url}" target="_blank" rel="noopener" data-post-date="social"><span class="lk-title">${escapeHtml(m.title)}</span><span class="lk-note">${escapeHtml(m.note)}</span></a></li>`).join('')}</ul>
   </div>
   </main>
   ${renderHomeFooterHTML(true)}

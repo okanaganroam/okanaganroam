@@ -52,3 +52,15 @@ test('owner portal (2026-10-19): the Photos section invites a short video by ema
   assert.ok(src.includes('A short video (10–30 seconds) of your space or a dish can go to <strong>info@okanaganroam.com</strong>'));
   assert.ok(!/op-video-hint[^\n]*okanaganroam@gmail\.com/.test(src), 'never the Gmail address');
 });
+
+test('links (2026-10-19): /links lists Instagram, TikTok and Facebook so visitors from any app can follow the others', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const start = src.indexOf('function renderSocialLinksPage(');
+  const body = src.slice(start, src.indexOf('\nfunction ', start + 10));
+  assert.ok(body.includes("url: 'https://www.tiktok.com/@okanaganroam'"));
+  assert.ok(body.includes("url: 'https://www.instagram.com/okanaganroam'"));
+  assert.ok(body.includes("url: 'https://www.facebook.com/profile.php?id=61595021770981'"));
+  assert.ok(body.includes('<h2>Follow along</h2>'));
+  assert.ok(body.includes('target="_blank" rel="noopener" data-post-date="social"'));
+  assert.ok(body.includes('Instagram, TikTok and Facebook posts'));
+});
