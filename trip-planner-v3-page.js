@@ -77,7 +77,19 @@ function t3ListingGapSummaryHtml(p,fr,esc){
  const groups=t3ListingGapGroups(p);
  if(!groups.length)return '';
  const labels=fr?{title:'Détails à confirmer',hours:'Horaires non indiqués',location:'Emplacement sur la carte manquant',confirm:'Confirmez directement auprès de ces lieux.'}:{title:'Details to confirm',hours:'Hours not listed',location:'Map location missing',confirm:'Confirm directly with these venues.'};
- return '<section class="t3-warnings" aria-label="'+esc(labels.title)+'"><h3>'+esc(labels.title)+'</h3>'+groups.map(g=>'<p><strong>'+esc(labels[g.kind])+':</strong> '+g.venues.map(v=>v.id!=null?'<a '+hrefAttr('#'+t3VenueCardId(v.id))+'>'+esc(v.name)+'</a>':esc(v.name)).join(', ')+'.</p>').join('')+'<p>'+esc(labels.confirm)+'</p></section>';
+ return '<section class="t3-warnings" aria-label="'+esc(labels.title)+'"><h3>'+esc(labels.title)+'</h3>'+groups.map(g=>'<p><strong>'+esc(labels[g.kind])+(fr?' :':':')+'</strong> '+g.venues.map(v=>v.id!=null?'<a '+hrefAttr('#'+t3VenueCardId(v.id))+'>'+esc(v.name)+'</a>':esc(v.name)).join(', ')+'.</p>').join('')+'<p>'+esc(labels.confirm)+'</p></section>';
+}
+// French plan links (2026-10-20, round 11): on /fr/trip every site link in a plan goes to its French page -- a place's or
+// event's own urlFr when it has one, otherwise /fr + the path for the pages that all have a French twin (towns, their
+// categories, places and events, What's On, browse, the guides and the category pages). « Voir la fiche » and « Voir tout
+// ce qui correspond » linked to English pages. Anything else (anchors, /api, images) is left as it is.
+function t3FrenchHref(u, urlFr) {
+  if (typeof urlFr === 'string' && /^\/fr(?:\/|$)/.test(urlFr)) return urlFr;
+  if (typeof u !== 'string' || !/^\/(?!\/)/.test(u) || /^\/fr(?:[\/?#]|$)/.test(u)) return u;
+  var path = u.split(/[?#]/)[0], first = path.split('/')[1] || '';
+  var towns = ['kelowna','west-kelowna','peachland','lake-country','naramata','penticton','kaleden','okanagan-falls','summerland','oliver','osoyoos','vernon','coldstream','lumby','armstrong','enderby','big-white','silverstar','apex','baldy'];
+  var pages = ['whats-on','browse','guides','guide','food-drink','restaurants','cafes','breweries','pubs','cocktail-lounges','distilleries','wineries','golf','beaches','outdoors','tours','ski-snow','indoor','sports','dog-friendly','local-favorites','secret-spots','hidden-gems','destinations','categories','map','my-trip','trip','search','favorites'];
+  return towns.indexOf(first) !== -1 || pages.indexOf(first) !== -1 ? '/fr' + u : u;
 }
 function t3PlanNextSteps(p) {
   var steps=[],seen={};
@@ -112,7 +124,7 @@ function t3PlanNextSteps(p) {
     var stop=stops.find(function(s){return s.venue&&s.venue.id===i.venueId;});if(!stop)return;
     seen['venue:'+i.venueId]=true;
     var url=stop.venue.url;
-    steps.push({kind:'timing',name:stop.venue.name,checks:i.confirmationReasons,mealWindow:i.mealWindow,url:typeof url==='string'&&/^\/(?!\/)/.test(url)?url:null});
+    steps.push({kind:'timing',name:stop.venue.name,checks:i.confirmationReasons,mealWindow:i.mealWindow,url:typeof url==='string'&&/^\/(?!\/)/.test(url)?url:null,urlFr:typeof stop.venue.urlFr==='string'?stop.venue.urlFr:null});
   });
   (p.schedule||[]).forEach(function(i){
     if(i.status==='estimated'||i.venueId)return;
@@ -171,7 +183,8 @@ function t3DriveText(leg, lang) {
   var mins = a && b && a !== b ? (fr ? a + ' à ' + b : a + '–' + b) : String(b || a);
   // Round 7: a drive to the other shore of Okanagan Lake goes around it, and says so.
   var lake = leg.aroundLake ? (fr ? ' en contournant le lac' : ' around the lake') : '';
-  return fr ? 'Trajet de ' + leg.fromLabel + ' à ' + leg.toLabel + lake + ' : environ ' + mins + ' min (estimation)' : 'Drive from ' + leg.fromLabel + ' to ' + leg.toLabel + lake + ': about ' + mins + ' min (estimate)';
+  // Round 11 (2026-10-20): « Trajet d’Osoyoos », not « de Osoyoos ».
+  return fr ? 'Trajet ' + (/^[AEIOUYÉÈÊaeiouyéèê]/.test(leg.fromLabel) ? 'd’' : 'de ') + leg.fromLabel + ' à ' + leg.toLabel + lake + ' : environ ' + mins + ' min (estimation)' : 'Drive from ' + leg.fromLabel + ' to ' + leg.toLabel + lake + ': about ' + mins + ' min (estimate)';
 }
 function t3DroppedRequests(p) {
   var out = [];
@@ -485,7 +498,8 @@ function renderStyles() {
   .t3-daynav a { flex: 0 0 auto; text-decoration: none; background: #fff; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.14); border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: 0.84rem; min-height: 40px; display: inline-flex; align-items: center; }
   .t3-daynav a:hover { border-color: var(--ref-navy); }
 
-  .t3-day { margin: 0 0 30px; scroll-margin-top: 64px; }
+  /* Round 11 (2026-10-20): the day tabs land on the day's heading, below the sticky header and day bar. */
+  .t3-day { margin: 0 0 30px; scroll-margin-top: 140px; }
   .t3-day-head { position: relative; border-radius: 16px; overflow: hidden; min-height: 150px; display: flex; align-items: flex-end; background: var(--ref-navy); color: #fff; margin-bottom: 14px; }
   .t3-day-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .t3-day-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 20%, rgba(16,27,36,0.85) 100%); }
@@ -780,6 +794,7 @@ function renderScript(d) {
   var TRIP_MAX_STOPS = 30; // My Trip's own limit (MAX_STOPS in /scripts/app.js; 30 since 2026-10-18)
   ${CLIENT_HELPERS_SRC}
   ${t3EditLosesMatch.toString()}
+  ${t3FrenchHref.toString()}
   ${t3PlanNextSteps.toString()}
   ${t3TimingChecklist.toString()}
   ${t3TimelineRows.toString()}
@@ -889,6 +904,8 @@ function renderScript(d) {
           // A failed edit leaves the plan as it was (2026-10-19): the stop it tried to swap out is not excluded from
           // the next Swap, which would otherwise fail on the same kept stop, and so on for every other Swap.
           if (['replace','regenerate','regenerate_day'].indexOf(requestType) !== -1 && state.lastReq) state.exclude = (state.lastReq.exclude || []).slice();
+          // Round 11 (2026-10-20): one status message at a time -- the last Swap's "Swapped ..." line goes when this fails.
+          var planStatus = document.getElementById('t3PlanStatus'); if (planStatus) planStatus.textContent = '';
           setStatus(res.j && res.j.error ? errorText(res.j.error) : tx('tripv3.error'), 'error');
           showEditError(trigger, statusEl.textContent);
           track('trip_plan_error', { request_type: requestType, error_type: res.incomplete ? 'incomplete_edit' : 'response', http_status: res.status });
@@ -1021,7 +1038,9 @@ function renderScript(d) {
       return;
     }
     if (!ns || !ns.venue || ns.venue.name === oldName) return;
-    announce(oldName ? (fr ? oldName + ' a été remplacé par ' + ns.venue.name + '.' : 'Swapped ' + oldName + ' for ' + ns.venue.name + '.') : (fr ? 'Nouvelle suggestion : ' + ns.venue.name + '.' : 'New suggestion: ' + ns.venue.name + '.'));
+    // Round 11: one full stop after a name that already ends with one ("Kelowna Brewing Co." read "Co..").
+    var stopped = function(t){ return /[.!?…]$/.test(t) ? t : t + '.'; };
+    announce(oldName ? (fr ? stopped(oldName + ' a été remplacé par ' + ns.venue.name) : stopped('Swapped ' + oldName + ' for ' + ns.venue.name)) : (fr ? stopped('Nouvelle suggestion : ' + ns.venue.name) : stopped('New suggestion: ' + ns.venue.name)));
     var nb = findBtn();
     var card = nb && nb.closest('.t3-card');
     if (card) {
@@ -1461,6 +1480,8 @@ function renderScript(d) {
   function mapHeadHtml(d, mh, maps){
     var meta = dayMeta(d);
     var group = mh.group ? (lang() === 'fr' ? tx(mh.group.key) : mh.group.label) : '';
+    // Round 11 (2026-10-20): a day in towns of two parts of the valley (Penticton and Vernon) is not tagged with one of them.
+    if (d.regions && d.regions.length > 1 && d.regions.some(function(r){ var h = MAP_HEADERS[r]; return !h || !h.group || !mh.group || h.group.key !== mh.group.key; })) group = '';
     return '<div class="t3-day-head t3-day-head--map" data-t3-map-header>'
       + '<div class="t3-dh-info"><p class="t3-eyebrow">' + esc(tx('tripv3.day', { n: d.day })) + '</p><h3 class="t3-day-title" id="t3-day-title-' + d.day + '"><span class="t3-sr">' + esc(tx('tripv3.day', { n: d.day })) + ' \u00b7 </span>' + esc(d.regionLabel || tx('tripv3.theOkanagan')) + '</h3>'
       + (group ? '<p class="t3-dh-sub">' + esc(group) + '</p>' : '')
@@ -1706,7 +1727,7 @@ function renderScript(d) {
     if(nextSteps.length){
       var nextFr=lang()==='fr';
       html+='<section class="t3-warnings" aria-label="'+(nextFr?'Avant de partir':'Before you go')+'"><h3>'+(nextFr?'Avant de partir':'Before you go')+'</h3><ul>'+nextSteps.map(function(step){
-        if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
+        if(step.kind==='timing')return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(nextFr?t3FrenchHref(step.url,step.urlFr):step.url)+'>'+(nextFr?'Voir la fiche':'Check venue details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing'&&step.name)return '<li>'+esc(step.name)+' — '+esc(t3TimingChecklist(step,nextFr))+(step.url?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir l’événement':'Check event details')+'</a>':'')+'</li>';
         if(step.kind==='event_timing')return '<li>'+esc(t3TimingChecklist(step,nextFr))+' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a></li>';
         return '<li>'+esc(nextFr?(step.labelFr||t3FrenchText(step.label)):step.label)+' — '+(nextFr?'Non inclus. Essayez une autre date ou destination, ou modifiez votre demande.':'Not included. Try another date or destination, or edit your request.')+(step.url&&safeUrl(step.url)?' <a '+hrefAttr(step.url)+'>'+(nextFr?'Voir les fiches':'Browse listings')+'</a>':'')+(step.kind==='missing_event'?' <a href="/whats-on">'+(nextFr?'Voir les événements':'Check events')+'</a>':'')+t3OptionalAlternativesHtml(step,nextFr,esc)+'</li>';
@@ -1752,6 +1773,8 @@ function renderScript(d) {
     html += '</div>';
     detachMap();
     resultEl.innerHTML = html;
+    // Round 11: French plans link to French pages (see t3FrenchHref).
+    if (lang() === 'fr') Array.prototype.forEach.call(resultEl.querySelectorAll('a[href^="/"]'), function(a){ var u = a.getAttribute('href'), fr = t3FrenchHref(u, a.getAttribute('data-url-fr')); if (fr !== u) a.setAttribute('href', fr); });
     resultEl.hidden = false;
     placeMap();
     watchStaticMaps();
@@ -2305,4 +2328,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

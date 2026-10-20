@@ -21,6 +21,7 @@ function t3FrenchText(value){
  ['Meal option; indoor seating is not confirmed','Option de repas; les places à l’intérieur ne sont pas confirmées'],
  ['Indoor suitability is not confirmed','Le caractère intérieur n’est pas confirmé'],
  ['Timing conflict: ','Conflit d’horaire : '],
+ ['Free time: one round of golf a day leaves this part of the day open.','Temps libre : une seule partie de golf par jour, ce moment de la journée reste libre.'],
  ['Optional suggestion: Extra stop added to round out the day','Suggestion facultative : arrêt supplémentaire ajouté pour compléter la journée'],
  ['Dinner is not scheduled because no listed restaurant can fit before ','Le souper n’est pas planifié : aucun restaurant selon les horaires indiqués ne peut tenir avant '],
  ['Your requested restaurant, ','Le restaurant que vous avez demandé, '],
@@ -254,10 +255,19 @@ function t3FrenchText(value){
  text=text.replace(/Requested (\d+) (\w+) stops? a day; scheduled ([\d, ]+) \(day by day\)\.( (\d+) a day is more than one day holds, so the plan uses (\d+)\.)?/g,(_,n,w,list,x,r,u)=>'Demandé : '+frStop(n,w)+' par jour; prévu : '+list.trim()+' (jour par jour).'+(x?' '+r+' par jour, c’est plus qu’une journée ne peut contenir; le plan en prévoit '+u+'.':''));
  text=text.replace(/Requested (\d+) (\w+) stops?; scheduled (\d+)\./g,(_,n,w,m)=>'Demandé : '+frStop(n,w)+'; prévu : '+m+'.');
  text=text.replace(/^Places that mention (.+) in (.+?)(?:, ranked by how closely they match and by their ratings)?\.$/,(_,w,t)=>'Lieux qui mentionnent '+w.replace(/“/g,'« ').replace(/”/g,' »').replace(/ and (?!.* and )/,' et ')+(t==='the Okanagan'?' dans l’Okanagan':' à '+t.replace(/ and (?!.* and )/,' et '))+'.');
+ // Time windows (2026-10-20, round 11): "Saturday evening in Penticton: drinks, dinner and a nightcap."
+ const FR_WINDOW_PARTS={drinks:'un verre',dinner:'un souper','a nightcap':'un dernier verre',coffee:'un café','a walk or a sight':'une promenade ou une visite',lunch:'un dîner','a tasting':'une dégustation','coffee or a treat':'un café ou une gâterie'};
+ const FR_WINDOW_DAYS={Monday:'Lundi',Tuesday:'Mardi',Wednesday:'Mercredi',Thursday:'Jeudi',Friday:'Vendredi',Saturday:'Samedi',Sunday:'Dimanche',Tomorrow:'Demain'};
+ text=text.replace(/^(A|An|This|Tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) (morning|afternoon|evening)(?: in (.+?))?(?:: (.+))?\.$/,(_,d,w,t,list)=>{
+  const head=d==='A'||d==='An'?{morning:'Une matinée',afternoon:'Un après-midi',evening:'Une soirée'}[w]:d==='This'?{morning:'Ce matin',afternoon:'Cet après-midi',evening:'Ce soir'}[w]:FR_WINDOW_DAYS[d]+' '+{morning:'matin',afternoon:'après-midi',evening:'soir'}[w];
+  const parts=list?list.split(/, | and /).map(x=>FR_WINDOW_PARTS[x]||x):[];
+  return head+(t?' à '+t.replace(/ and (?!.* and )/,' et '):'')+(parts.length?' : '+(parts.length>1?parts.slice(0,-1).join(', ')+' et '+parts[parts.length-1]:parts[0]):'')+'.';
+ });
+ text=text.replace(/^Nothing for (.+) is open (?:in (.+)|along the way from (.+) to (.+)) in that window, so the plan has fewer stops\.$/,(_,x,t,a,b)=>'Rien pour '+(FR_WINDOW_PARTS[x]||x)+' n’est ouvert '+(t?(t==='the Okanagan'?'dans l’Okanagan':'à '+t.replace(/ and (?!.* and )/,' et ')):'entre '+a+' et '+b)+' à ce moment-là; le plan compte moins d’arrêts.');
  text=text.replace(/^Ideas for (.+)\.$/,(_,t)=>'Idées pour '+(t==='the Okanagan'?'l’Okanagan':t.replace(/ and (?!.* and )/,' et '))+'.');
  text=text.replace(/^What’s on in (.+)\.$/,(_,t)=>'À l’affiche '+(t==='the Okanagan'?'dans l’Okanagan':'à '+t.replace(/ and (?!.* and )/,' et '))+'.');
  text=text.replace(/^A ski day at (.+)$/,'Une journée de ski à $1');
- text=text.replace(/^About (<?\d+) km \(straight line\) from (.+)$/,(_,k,w)=>'Environ '+k+' km (à vol d’oiseau) '+({'the previous stop':'de l’arrêt précédent','the wineries':'des vignobles','the morning and afternoon stops':'des arrêts du matin et de l’après-midi'}[w]||'de '+w));
+ text=text.replace(/^About (<?\d+) km \(straight line\) from (.+)$/,(_,k,w)=>'Environ '+k+' km (à vol d’oiseau) '+({'the previous stop':'de l’arrêt précédent','the wineries':'des vignobles','the morning and afternoon stops':'des arrêts du matin et de l’après-midi'}[w]||(/^[AEIOUYÉÈÊaeiouyéèê]/.test(w)?'d’':'de ')+w));
  // "Its listed hours only fit the midday on Mon–Fri, Sun — check the day you go" (2026-10-18).
  text=text.replace(/^Its listed hours only fit the (morning|midday|afternoon|late afternoon|early evening|evening) on (.+) — check the day you go$/,(_,part,list)=>{
   const when={morning:'le matin',midday:'le midi',afternoon:'l’après-midi','late afternoon':'en fin d’après-midi','early evening':'en début de soirée',evening:'le soir'}[part];
@@ -273,6 +283,9 @@ function t3FrenchText(value){
  // Opening hours inside a reason ("Listed hours: 11:00–22:00 Mon–Fri; 10:00–22:00 Sat").
  if(/\d{2}:\d{2}/.test(text))text=text.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d]));
  // Hour ranges read like the place pages (2026-10-18): "07:00–17:00" -> "7 h–17 h", "10:30–22:00" -> "10 h 30–22 h".
+ // French typography (round 11, 2026-10-20): a space before the colon after a translated label, and « d’Osoyoos ».
+ text=text.replace(/(\(mode supposé\)|Trajet estimé à pied|Horaires indiqués|vers l’événement):(?=\s)/g,'$1 :');
+ text=text.replace(/\b(de|De) (?=(?:Osoyoos|Oliver|Okanagan|Armstrong|Enderby|Apex)\b)/g,(_,d)=>d==='De'?'D’':'d’');
  if(/\b\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2}\b/.test(text))text=text.replace(/\b(\d{1,2}):(\d{2})\b/g,(_,h,m)=>Number(h)+' h'+(m==='00'?'':' '+m));
  return text;
 }
@@ -280,7 +293,7 @@ function t3FrenchEvent(event){
  const e={...event};
  const days={Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'};
  const months={Jan:'janv.',Feb:'févr.',Mar:'mars',Apr:'avr.',May:'mai',Jun:'juin',Jul:'juill.',Aug:'août',Sep:'sept.',Oct:'oct.',Nov:'nov.',Dec:'déc.'};
- e.dateLabel=String(e.dateLabel||'').replace(/\+\s*(\d+) more dates?\b/g,(_,n)=>'+ '+n+' '+(n==='1'?'autre date':'autres dates')).replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>days[d]).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}(?:[–-]\d{1,2})?)/g,(_,m,d)=>d+' '+months[m]);
+ e.dateLabel=String(e.dateLabel||'').replace(/\+\s*(\d+) more dates?\b/g,(_,n)=>'+ '+n+' '+(n==='1'?'autre date':'autres dates')).replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>days[d]).replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}(?:[–-]\d{1,2})?)/g,(_,m,d)=>(d==='1'?'1er':d)+' '+months[m]);
  e.time=String(e.time||'').replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,(raw,h,m,part)=>{
   if(Number(h)<1||Number(h)>12||Number(m||0)>59)return raw;
   const hour=Number(h)%12+(part.toLowerCase()==='pm'?12:0);
@@ -314,7 +327,8 @@ function t3FrenchStory(p){
   const first=parts[0],last=parts[parts.length-1],mid=parts.slice(1,-1);
   out.push(lead+' commence par '+first+(mid.length?', puis '+mid.join(', '):'')+', et se termine par '+last+'.');
  }
- if(days.length>3){const rest=days.slice(3).flatMap(d=>d.stops.map(s=>s.venue?.name||s.event?.name));if(rest.length)out.push('Ensuite : '+rest.join(', ')+'.');}
+ // Round 11: the days after the third are named (« Le jour 4 : … », « Les jours 4 à 5 : … »), not « Ensuite ».
+ if(days.length>3){const rest=days.slice(3).flatMap(d=>d.stops.map(s=>s.venue?.name||s.event?.name));if(rest.length)out.push((days.length===4?'Le jour 4':'Les jours 4 à '+days.length)+' : '+rest.join(', ')+'.');}
  return out.join(' ').replace(/\bà (le|les) /g,(m,a)=>a==='le'?'au ':'aux ');
 }
 function t3FrenchPlan(plan){
@@ -335,7 +349,8 @@ function t3FrenchPlan(plan){
  for(const s of stops)translateStop(s);
  if(p.events)p.events=p.events.map(t3FrenchEvent);
  for(const i of p.requirementResults||[])if(i.reason)i.reason=t3FrenchText(i.reason);
- for(const d of p.days||[]){if(d.confirmNote)d.confirmNote=t3FrenchText(d.confirmNote);if(d.mealNote)d.mealNote=t3FrenchText(d.mealNote);}
+ // Round 11 (2026-10-20): « Penticton et Vernon », not « Penticton and Vernon ».
+ for(const d of p.days||[]){if(d.confirmNote)d.confirmNote=t3FrenchText(d.confirmNote);if(d.mealNote)d.mealNote=t3FrenchText(d.mealNote);if(typeof d.regionLabel==='string')d.regionLabel=d.regionLabel.replace(/ and /g,' et ');}
  if(p.experience?.title)p.experience.title=t3FrenchText(p.experience.title);
  if(p.understood&&Array.isArray(p.understood.notUsed))p.understood.notUsed=p.understood.notUsed.map(t3FrenchText);
  p.warnings=(p.warnings||[]).map(t3FrenchText);p.notes=(p.notes||[]).map(t3FrenchText);p.contextNotes=(p.contextNotes||[]).map(t3FrenchText);
