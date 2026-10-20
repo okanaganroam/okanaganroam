@@ -75,6 +75,10 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 // https: host (listing photos, OSM tiles). Cross-Origin-Opener-Policy: same-origin-allow-popups keeps the site's
 // own window apart from other sites' windows; the popups it opens (maps, calendars, websites) all use noopener, and
 // owner sign-in is a same-site form, so nothing relies on window.opener.
+// GA endpoints (2026-10-20, round 11): Google's CSP guide for the Google tag lists, for GA4 alone, connect-src
+// *.google-analytics.com, *.analytics.google.com, *.googletagmanager.com AND *.google.com (Google signals sends hits
+// to www.google.com/g/collect, which the policy blocked); with signals also *.g.doubleclick.net (it was only
+// stats.g.doubleclick.net) and the visitor's country Google domain, here google.ca. img-src is already any https:.
 const CSP_REPORT_PATH = '/csp-report';
 const CSP_POLICY = [
   "default-src 'self'",
@@ -82,7 +86,7 @@ const CSP_POLICY = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://stats.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://api.mapbox.com https://places.googleapis.com",
+  "connect-src 'self' data: blob: https://formsubmit.co https://api.open-meteo.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.google.com https://*.google.ca https://*.g.doubleclick.net https://*.clarity.ms https://c.bing.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://api.mapbox.com https://places.googleapis.com",
   "worker-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
   "frame-src 'self'",
   "media-src 'self' blob: data:",
@@ -3081,35 +3085,41 @@ function regionEventsStillOn(rows, now = new Date()) {
 // happening at one venue. Same predicate as listRelatedEventsInRegion(),
 // listUpcomingEventsForRegion() and the sitemap (scheduled event, at least one
 // scheduled occurrence, not expired on the Okanagan local date), ordered by
-// next scheduled occurrence. The relationship is events.venue_id ONLY -- an
-// event naming its place in venue_name_text is never matched to a venue row,
-// so nothing here depends on name similarity. Returns [] below
+// next scheduled occurrence. The relationship is events.venue_id, a partner tag,
+// or (round 11) an exact name-and-town match of venue_name_text to this one
+// listing (eventAutoVenueIndex), never a fuzzy name similarity. Returns [] below
 // MIN_VENUE_EVENTS so a venue hosting a single event renders no block at all,
 // and the block disappears on its own as events expire.
 const MIN_VENUE_EVENTS = 2;
 function listUpcomingEventsAtVenue(venueId, { limit = 3, now = new Date() } = {}) {
   if (!Number.isInteger(venueId) || venueId <= 0) return [];
   const today = todayLocal(now);
+  // Round 11 (2026-10-20): also the events whose place text names this listing exactly (eventAutoVenueIndex).
+  const autoIds = eventAutoVenueIndex().byVenue.get(venueId) || [];
   const rows = db
     .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
         (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date,
         (SELECT o.end_date FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? ORDER BY o.start_date, o.end_date LIMIT 1) AS next_end_date
       FROM events e
-      WHERE (e.venue_id = ? OR e.id IN (SELECT event_id FROM event_partner_venues WHERE venue_id = ?))
+      WHERE (e.venue_id = ? OR e.id IN (SELECT event_id FROM event_partner_venues WHERE venue_id = ?) OR e.id IN (SELECT value FROM json_each(?)))
         AND e.status = 'scheduled'
         AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
         AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
       ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
-    .all(today, today, venueId, venueId, today);
+    .all(today, today, venueId, venueId, JSON.stringify(autoIds), today);
   // One event the business posted itself still shows on its page (it expects to see it there), and so does one it
   // was tagged on as a partner (2026-10-19): the host named it, so it belongs there.
-  if (rows.length < MIN_VENUE_EVENTS && !rows.some((r) => r.source_type === 'official_venue' || r.venue_id !== venueId)) return [];
-  return rows.slice(0, limit).map((r) => ({
+  const auto = new Set(autoIds);
+  if (rows.length < MIN_VENUE_EVENTS && !rows.some((r) => r.source_type === 'official_venue' || (r.venue_id !== venueId && !auto.has(r.id)))) return [];
+  const out = rows.slice(0, limit).map((r) => ({
     ...rowToEvent(r),
     primaryCategory: r.primary_category || null,
     nextDate: r.next_date || null,
     nextEndDate: r.next_end_date || null,
   }));
+  // Round 11: how many there are in all, so a busy theatre's page can say there are more.
+  out.total = rows.length;
+  return out;
 }
 
 // --- writers ----------------------------------------------------------------
@@ -3549,7 +3559,7 @@ function queryWhatsOnEvents({ from, to, regions = [], categories = [] } = {}) {
   return rows.map((row) => {
     const event = rowToEventFull(row);
     const occs = occStmt.all(row.id, f, t).map(rowToEventOccurrence);
-    const venue = event.venue_id ? getVenue(event.venue_id) : null;
+    const venue = eventHostVenue(event);
     const card = {
       id: event.id,
       name: event.name,
@@ -3649,7 +3659,7 @@ function whatsOnPublicEventDetail(event, now = new Date()) {
   const upcoming = occs.filter((o) => o.end_date >= today);
   const inWindow = upcoming.filter((o) => o.start_date <= addLocalDays(today, WHATSON_DEFAULT_WINDOW_DAYS));
   const labelOccs = inWindow.length ? inWindow : upcoming.length ? upcoming : occs;
-  const venue = event.venue_id ? getVenue(event.venue_id) : null;
+  const venue = eventHostVenue(event);
   return {
     id: event.id, name: event.name, slug: event.slug, region: event.region, valleyWide: event.valley_wide === 1,
     categories: getEventCategoryKeys(event.id), description: event.description || '', image: event.image_url || null,
@@ -15681,7 +15691,14 @@ function venueCardHtml(venue, opts = {}) {
 // category pages it links to that have listings (a summary-page list: each item is its own page). Filtered views (query-string
 // links such as Dog Friendly or What's On) are left out, since their canonical is another page.
 function regionPageSchemas(region, regionLabel, description, canonical, categories) {
-  const items = categories.filter((c) => c.href && c.count > 0 && !c.href.includes('?'));
+  // Round 11 (2026-10-20): the town's events page only when it is indexed (enough events; /coldstream/events with a
+  // few is noindex and was still listed).
+  let eventsLive = null;
+  const items = categories.filter((c) => c.href && c.count > 0 && !c.href.includes('?')).filter((c) => {
+    if (c.href !== `/${region}/events`) return true;
+    if (eventsLive === null) { try { eventsLive = liveWhatsOnScopes().some((x) => x.path === c.href); } catch (e) { eventsLive = false; } }
+    return eventsLive;
+  });
   const destination = {
     '@context': 'https://schema.org',
     '@type': 'TouristDestination',
@@ -26457,6 +26474,37 @@ function frEventForPath(p) {
   frEventCache.set(key, { ev, at: now });
   return ev;
 }
+// Stale French (2026-10-20, round 11): French event descriptions are keyed by their English text
+// (data/french/events-*.json), so editing the English drops the French until it is translated again. -> { status,
+// english_changed_at }: 'translated'; 'stale' (an earlier English description of this event had French, so the
+// French predates the change); 'missing' (never translated); 'none' (no description).
+function eventFrenchStatus(ev) {
+  const desc = String((ev && ev.description) || '').replace(/\s+/g, ' ').trim();
+  if (!desc) return { status: 'none', english_changed_at: null };
+  if (frLookup(desc) != null) return { status: 'translated', english_changed_at: null };
+  let rows = [];
+  try { rows = db.prepare("SELECT old_value, created_at FROM event_enrichment_log WHERE event_id = ? AND field_name = 'description' ORDER BY id DESC").all(ev.id); } catch (e) { rows = []; }
+  const hadFrench = rows.some((r) => r.old_value && frLookup(String(r.old_value).replace(/\s+/g, ' ').trim()) != null);
+  return { status: hadFrench ? 'stale' : 'missing', english_changed_at: rows.length ? rows[0].created_at : null };
+}
+// The published, not yet over events whose description has no French: stale ones first, then by next date. For the
+// admin (GET /api/events/needs-french) and the translation scripts.
+function listEventsNeedingFrench(now = new Date()) {
+  const today = todayLocal(now);
+  const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.description, e.updated_at,
+      (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date
+    FROM events e WHERE e.status = 'scheduled' AND e.description IS NOT NULL AND TRIM(e.description) != ''
+      AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?)`).all(today, today);
+  const out = [];
+  for (const r of rows) {
+    const st = eventFrenchStatus(r);
+    if (st.status !== 'stale' && st.status !== 'missing') continue;
+    out.push({ id: r.id, name: r.name, region: r.region, slug: r.slug, url: `https://okanaganroam.com/${r.region}/events/${r.slug}`,
+      french_url: `https://okanaganroam.com/fr/${r.region}/events/${r.slug}`, status: st.status, english_changed_at: st.english_changed_at,
+      next_date: r.next_date, description: r.description });
+  }
+  return out.sort((a, b) => (a.status === b.status ? 0 : a.status === 'stale' ? -1 : 1) || String(a.next_date).localeCompare(String(b.next_date)) || a.id - b.id);
+}
 // A French event page's title and search description, from the English ones: "Name — Event in Kelowna, BC" reads
 // "Name — Événement à Kelowna (C.-B.)", dates go French, and the description is the French one cut to fit.
 const FR_MONTH_LONG = { January: 'janvier', February: 'février', March: 'mars', April: 'avril', May: 'mai', June: 'juin', July: 'juillet', August: 'août', September: 'septembre', October: 'octobre', November: 'novembre', December: 'décembre' };
@@ -26740,6 +26788,9 @@ function frJsonLd(json) {
       const n = {};
       for (const [k, v] of Object.entries(o)) {
         if (typeof v === 'string' && (k === 'url' || k === 'item' || k === '@id')) n[k] = frHref(v);
+        // Round 11 (2026-10-20): a list named like its page's title ("Things to Do in the Okanagan This Weekend") uses
+        // the French title when the name alone is not in the French list.
+        else if (typeof v === 'string' && k === 'name' && o['@type'] === 'ItemList' && frText(v) == null && frText(`${v} | Okanagan Roam`) != null) n[k] = frText(`${v} | Okanagan Roam`).replace(/ \| Okanagan Roam$/, '');
         else if (typeof v === 'string' && (k === 'name' || k === 'description' || k === 'headline')) n[k] = frTextOr(v); // headline: a guide's Article (2026-10-18)
         else n[k] = walk(v);
       }
@@ -26788,6 +26839,17 @@ function englishTwinHtml(html, enPath, search = '') {
   out = out.replace(/<span class="desc-en" lang="en">([\s\S]*?)<\/span><span class="desc-fr" lang="fr">[\s\S]*?<\/span>/g, '$1');
   return out;
 }
+// Round 11 (2026-10-20): French text for an event whose English description has no French yet (new, or edited after
+// it was translated: see eventFrenchStatus). Event cards on French pages (What's On, town events, guides) show this
+// line instead of the English paragraph; the event's French page shows it above the folded-away English.
+const FR_EVENT_BODY_FALLBACK = 'La description en fran\u00e7ais arrive bient\u00f4t. Les dates, l\u2019heure et le lieu de cette page sont \u00e0 jour.';
+const FR_EVENT_CARD_FALLBACK = 'Description en fran\u00e7ais \u00e0 venir.';
+function frHideEnglishEventCardText(html) {
+  return html.replace(/(<div class="golf-desc" id="golf-desc-event-\d+"><p>)([^<]*)(<\/p><\/div>)/g, (m, a, t, b) => {
+    const plain = frDecode(t).replace(/\s+/g, ' ').trim();
+    return !plain || frText(plain) != null ? m : `${a}${FR_EVENT_CARD_FALLBACK}${b}`;
+  });
+}
 function frenchTwinHtml(html, enPath, search = '') {
   if (!/^<!DOCTYPE html>/i.test(html)) return html;
   const frPath = frTwinPath(enPath);
@@ -26795,6 +26857,7 @@ function frenchTwinHtml(html, enPath, search = '') {
   if (frEvent) html = frEventHead(html, frEvent);
   // An event with no French description yet: its French page is kept out of search (round 9, see frEventPageForPath).
   const enOnlyEvent = !!frEvent && !frEventForPath(enPath);
+  html = frHideEnglishEventCardText(html);
   if (enOnlyEvent && !/<meta name="robots"/.test(html.split('</head>')[0])) html = html.replace(/(<link rel="canonical" href="[^"]*">\n)/, '<meta name="robots" content="noindex, follow">\n$1');
   // French advisories (2026-10-19, round 7): a card's "Check before you go" text in French (its own note_fr, the
   // French list or the known-phrasing fallback), never the English sentence.
@@ -26825,7 +26888,9 @@ function frenchTwinHtml(html, enPath, search = '') {
     .replace(/(<a [^>]*data-gcal href="[^"]*?details=)Details%3A%20https%3A%2F%2Fokanaganroam\.com%2F/g, '$1D%C3%A9tails%20%3A%20https%3A%2F%2Fokanaganroam.com%2Ffr%2F');
   // French pass 6 (2026-10-19): the photo credit under a town or hub banner has the French space before its colon.
   out = out.replace(/(<p class="region-photo-credit">)Photo: /g, '$1Photo : ');
-  if (enOnlyEvent) out = out.replace(/<p class="event-body">([\s\S]*?)<\/p>/, '<p class="event-body" lang="en">$1</p>\n  <p class="event-body-note"><em>Description offerte en anglais seulement pour le moment.</em></p>');
+  // Round 11 (2026-10-20): the English paragraph no longer shows on the French page (16 events edited in English had
+  // their old French dropped): a short French line instead, with the English text folded away for whoever wants it.
+  if (enOnlyEvent) out = out.replace(/<p class="event-body">([\s\S]*?)<\/p>/, `<p class="event-body">${FR_EVENT_BODY_FALLBACK}</p>\n  <details class="event-body-en"><summary>Description offerte en anglais seulement pour le moment\u00a0: la lire</summary><p class="event-body" lang="en">$1</p></details>`);
   // Deferred card batches and the rest of /browse load from their French addresses.
   return out.replace(/"\/browse\/cards\.json\?/g, '"/fr/browse/cards.json?');
 }
@@ -27291,6 +27356,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   if (!venue.redirect_to) {
     const closedDays = closureSpecialHoursSpecification(venue.id, opts.now || new Date());
     if (closedDays.length) localBusiness.specialOpeningHoursSpecification = closedDays;
+    // Round 11 (2026-10-20): and in openingHoursSpecification too, the way Google's LocalBusiness guide marks a
+    // closure (a dated spec with opens = closes = 00:00); with only the special list, Sugar Quail (shut Oct 11 - Nov
+    // 3) still read as open to Google. A dated spec outranks the undated weekly ones for its dates.
+    if (closedDays.length) localBusiness.openingHoursSpecification = (localBusiness.openingHoursSpecification || []).concat(closedDays.map((c) => ({ ...c })));
   }
   // Menus (2026-10-17): a live menu shows a short preview here and has its own page.
   const venueMenu = !venue.redirect_to && MENU_VENUE_TYPES.has(venue.type) ? publishedMenu(venue.id) : null;
@@ -27566,7 +27635,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // URLs only. Reuses the .related-section/.related-grid/.related-card styles
   // this page already loads, so no new CSS. Sits before the broader "other
   // {category} in {region}" and "more to explore" discovery sections.
+  // Round 11 (2026-10-20): a busy theatre (Kelowna Community Theatre has 38) also says how many there are and links
+  // the town's What's On.
   const venueEvents = listUpcomingEventsAtVenue(venue.id, { limit: 3 });
+  const venueEventsMore = venueEvents.length && venueEvents.total > venueEvents.length
+    ? `<p class="related-more" style="margin:12px 0 0"><a href="/${venue.region}/events">${fr ? `Tous les \u00e9v\u00e9nements \u00e0 ${escapeHtml(regionLabel)}` : `All events in ${escapeHtml(regionLabel)}`} &rarr;</a> <span class="related-meta">(${venueEvents.total} ${fr ? '\u00e0 venir ici' : 'coming up here'})</span></p>`
+    : '';
   const venueEventsHtml = venueEvents.length
     ? `<div class="related-section">
         <h2>${L('Events at', '\u00c9v\u00e9nements \u00e0')} ${escapeHtml(venue.name)}</h2>
@@ -27575,7 +27649,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       const cat = fr ? '' : (e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '');
       const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
       return `<div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
-    }).join('')}</div>
+    }).join('')}</div>${venueEventsMore}
       </div>`
     : '';
 
@@ -27921,7 +27995,56 @@ function eventListingByName(text, region) {
   }
   return null;
 }
-function resetEventVenueCaches() { eventVenueTable = null; eventListingNames = null; }
+function resetEventVenueCaches() { eventVenueTable = null; eventListingNames = null; eventAutoVenueCache = null; }
+// Event -> venue linking (2026-10-20, round 11): 156 events named a listed place as their location (Vernon & District
+// Performing Arts Centre 26, Creekside Theatre 25, Kelowna Community Theatre 20 ...) with no events.venue_id, so the
+// place's page never listed them and their JSON-LD had no organizer. An event with no venue_id is linked at render
+// time when its place text, without a trailing town ("Venables Theatre, Oliver"), or its known-venue name
+// (data/event-venue-addresses.json aliases such as "VDPAC") is exactly the name of ONE listing in the event's own
+// town. Never a fuzzy match, never another town. Rebuilt whenever the database has changed (total_changes(), as the
+// discovery index does), so an import or a venue rename shows at once. A stored venue_id always wins.
+let eventAutoVenueCache = null, eventAutoVenueVersionStmt = null;
+function eventAutoVenueIndex() {
+  if (!eventAutoVenueVersionStmt) eventAutoVenueVersionStmt = db.prepare('SELECT total_changes() AS n');
+  const version = eventAutoVenueVersionStmt.get().n;
+  if (eventAutoVenueCache && eventAutoVenueCache.version === version) return eventAutoVenueCache;
+  const byEvent = new Map(), byVenue = new Map();
+  try {
+    const venues = new Map();
+    for (const v of db.prepare('SELECT id, name, region FROM venues WHERE redirect_to IS NULL').all()) {
+      const k = `${v.region}|${eventVenueKey(v.name)}`;
+      if (!venues.has(k)) venues.set(k, []);
+      venues.get(k).push(v.id);
+    }
+    const rows = db.prepare("SELECT id, region, venue_name_text FROM events WHERE venue_id IS NULL AND venue_name_text IS NOT NULL AND TRIM(venue_name_text) != ''").all();
+    for (const e of rows) {
+      const keys = eventVenueTextKeys(e.venue_name_text);
+      const known = eventKnownVenue(e.venue_name_text, e.region);
+      if (known && known.region === e.region) keys.push(eventVenueKey(known.name));
+      for (const k of keys) {
+        const hits = venues.get(`${e.region}|${k}`);
+        if (!hits || hits.length !== 1) continue;
+        byEvent.set(e.id, hits[0]);
+        if (!byVenue.has(hits[0])) byVenue.set(hits[0], []);
+        byVenue.get(hits[0]).push(e.id);
+        break;
+      }
+    }
+  } catch (err) { /* no auto links */ }
+  eventAutoVenueCache = { version, byEvent, byVenue };
+  return eventAutoVenueCache;
+}
+// The listing an event happens at: its stored venue_id, else its exact-name match (above). -> venue id or null.
+function eventLinkedVenueId(event) {
+  if (!event) return null;
+  if (event.venue_id) return event.venue_id;
+  return eventAutoVenueIndex().byEvent.get(event.id) || null;
+}
+// The venues row for an event's place (stored or matched), or null.
+function eventHostVenue(event) {
+  const id = eventLinkedVenueId(event);
+  return id ? getVenue(id) : null;
+}
 function knownVenuePlace(v) {
   return {
     '@type': 'Place', name: v.name,
@@ -28030,7 +28153,40 @@ function eventOrganizerSchema(event, hostVenue = null) {
     const url = eventOfficialUrl(event);
     return { '@type': /^(?:city|town|district|village|regional district|municipality) of\b/i.test(sourceName) ? 'GovernmentOrganization' : 'Organization', name: sourceName, url: url || undefined };
   }
+  // Round 11 (2026-10-20): the presenter when the listing names one ("Kelvern Celtic Society presents Tulua",
+  // "... presented by Children Believe"), else the theatre, arena or hall the event is linked to (stored or matched by
+  // name, see eventAutoVenueIndex): Google reads organizer as who hosts it, and a hall's own page is the best contact.
+  const presenter = eventPresenterName(event);
+  const presenterIsHost = (n) => {
+    if (!hostVenue) return false;
+    const known = eventKnownVenue(n, hostVenue.region);
+    return eventVenueKey(n) === eventVenueKey(hostVenue.name) || (!!known && eventVenueKey(known.name) === eventVenueKey(hostVenue.name));
+  };
+  if (presenter && !presenterIsHost(presenter)) return { '@type': 'Organization', name: presenter };
+  if (hostVenue && typeof hostVenue.name === 'string' && hostVenue.name.trim() && !hostVenue.redirect_to) {
+    const site = typeof hostVenue.website === 'string' && /^https?:\/\/\S+$/i.test(hostVenue.website.trim()) ? hostVenue.website.trim() : null;
+    const page = CATEGORY_SLUGS[hostVenue.type] && hostVenue.slug && REGION_LABELS[hostVenue.region] ? `https://okanaganroam.com${venuePagePath(hostVenue)}` : null;
+    return { '@type': 'Organization', name: hostVenue.name.trim(), url: site || page || undefined };
+  }
   return undefined;
+}
+// "<Name> presents ..." in the event's name, or "presented by <Name>" in its description, when <Name> reads as a
+// proper name (capitalised words, at most seven, no "award-winning magician ..."). -> the name or null.
+const EVENT_PRESENTER_SMALL_WORDS = new Set(['of', 'the', 'and', 'for', 'de', 'du', 'la', 'le', 'des', 'et', '&', 'in', 'on']);
+function eventPresenterLooksLikeName(n) {
+  const words = String(n || '').trim().split(/\s+/);
+  if (!words[0] || words.length > 7 || !/^[A-Z0-9]/.test(words[0])) return false;
+  if (/^(?:a|an|the|this|our|award|local|special|guest|live)$/i.test(words[0]) && words.length === 1) return false;
+  return words.every((w) => EVENT_PRESENTER_SMALL_WORDS.has(w.toLowerCase()) || /^[A-Z0-9\u00c0-\u00de]/.test(w));
+}
+function eventPresenterName(event) {
+  const name = String((event && event.name) || '').trim();
+  const m1 = /^(.{3,60}?)\s+presents?\b/i.exec(name);
+  if (m1 && eventPresenterLooksLikeName(m1[1])) return m1[1].trim();
+  const desc = String((event && event.description) || '');
+  const m2 = /\bpresented by (?:the )?([A-Z][^.;:,()!?]{2,60}?)(?=\s+(?:at|in|on|with|for|and|as|from|to)\b|[.;:,()!?]|$)/.exec(desc);
+  if (m2 && eventPresenterLooksLikeName(m2[1])) return m2[1].trim();
+  return null;
 }
 // Event prices (2026-10-18): Google flags an Offer with no price, so an offer is emitted only when the listing states
 // one: a stored price field when there is one, else the description. "Tickets are about $68–79" -> lowPrice 68,
@@ -33958,7 +34114,7 @@ function tripStopsFor(refs, now = new Date(), onDates = {}) {
     } else {
       const e = eventQ.get(Number(m[2]));
       if (!e || !REGION_LABELS[e.region] || !e.slug) { out.push({ ref, missing: true }); continue; }
-      const host = e.venue_id ? venueQ.get(e.venue_id) : null;
+      const host = (() => { const hid = eventLinkedVenueId(e); return hid ? venueQ.get(hid) : null; })();
       out.push({
         ref, kind: 'event', name: e.name, type: 'Event', typeFr: '\u00c9v\u00e9nement', region: e.region, regionLabel: REGION_LABELS[e.region],
         urlFr: frHref(`/${e.region}/events/${e.slug}`),
@@ -40765,7 +40921,11 @@ function handleVenueMenuPage(req, res, pathname, parsed) {
   // A tour operator's list lives at /prices, everyone else's at /menu.
   const menu = venue && !venue.redirect_to && (suffix === 'prices') === isPriceList(venue) ? publishedMenu(venue.id) : null;
   if (!menu) {
-    if (venue && !venue.redirect_to) { res.writeHead(302, { Location: venuePagePath(venue, frPrefix && venueHasFrench(venue) ? 'fr' : 'en') }); return res.end() || true; }
+    // Round 11 (2026-10-20): a tour operator's /menu goes to its live /prices page (and a menu's /prices to /menu);
+    // any other place with no live menu is a 404, in English and French (both were a 302 to the place page, so a
+    // taken-down menu stayed a live-looking address for crawlers).
+    const other = venue && !venue.redirect_to && (suffix === 'prices') !== isPriceList(venue) ? publishedMenu(venue.id) : null;
+    if (other) { res.writeHead(301, { Location: withCampaignParams(menuPagePath(venue, frPrefix && venueHasFrench(venue) ? 'fr' : 'en'), parsed.search) }); return res.end() || true; }
     res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
     return res.end(render404Page(pathname)) || true;
   }
@@ -46161,8 +46321,22 @@ function sendPageRedirect(res, target, search) {
   else res.writeHead(301, { Location: hop ? hop.location : target + search });
   return res.end();
 }
+// Health check (2026-10-20, round 11): Railway's healthcheckPath (railway.json) asks /healthz until it answers 200
+// before it sends traffic to a new deploy. No page rendering and no queries beyond one trivial SELECT, so it answers
+// in a millisecond; 503 until the start-up work after listen() (badges, slugs, event batches) has finished, and while
+// shutting down, so a deploy only goes live once it can serve pages.
+// Required by a test or script (not `node server.js`): there is no start-up work, so it is ready at once.
+let serverReady = require.main !== module, serverStopping = false;
+let healthStmt = null;
+function handleHealthz(req, res) {
+  let ok = serverReady && !serverStopping;
+  if (ok) { try { if (!healthStmt) healthStmt = db.prepare('SELECT 1 AS ok'); ok = healthStmt.get().ok === 1; } catch (e) { ok = false; } }
+  res.writeHead(ok ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+  return res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ ok, status: ok ? 'ready' : serverStopping ? 'stopping' : 'starting' }));
+}
 const server = http.createServer(async (req, res) => {
   applySecurityHeaders(res);
+  if ((req.method === 'GET' || req.method === 'HEAD') && String(req.url).split('?')[0] === '/healthz') return handleHealthz(req, res);
   if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
   // Lighter pages (2026-10-18): shared CSS goes out as cached files, and a
   // hub's waiting cards load after the page (see withRestCardsDeferred).
@@ -46183,6 +46357,12 @@ const server = http.createServer(async (req, res) => {
     const [p, q] = String(req.url).split('?');
     const target = lowercasePageRedirect(p);
     if (target) return sendPageRedirect(res, target, q != null ? `?${q}` : '');
+  }
+  // Round 11 (2026-10-20): /fr/events goes to /fr/whats-on, as /events goes to /whats-on (it was a 404).
+  if ((req.method === 'GET' || req.method === 'HEAD') && String(req.url).split('?')[0] === '/fr/events') {
+    const q = String(req.url).split('?')[1];
+    res.writeHead(301, { Location: withCampaignParams('/fr/whats-on', q != null ? `?${q}` : '') });
+    return res.end();
   }
   // French business portal (2026-10-18): /fr/owner/account, /fr/owner/<edit link> ... are served by the English
   // routes with res.ownerLang = 'fr' (see ownerPortalLangRequest); English portal pages get the EN / FR switch.
@@ -46224,7 +46404,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/api/') && method === 'GET') {
     for (const [k, v] of Object.entries(API_CORS_HEADERS)) res.setHeader(k, v);
   }
-  if (pathname.startsWith('/api/')) installApiNotFoundJson(res);
+  // Round 11 (2026-10-20): bare /api too (it was the HTML 404 page).
+  if (pathname.startsWith('/api/') || pathname === '/api') installApiNotFoundJson(res);
   if (method === 'OPTIONS') {
     const wanted = String(req.headers['access-control-request-method'] || 'GET').toUpperCase();
     const grant = pathname.startsWith('/api/') && (wanted === 'GET' || wanted === 'HEAD');
@@ -48147,6 +48328,16 @@ const server = http.createServer(async (req, res) => {
     // layer never validates business rules itself, never touches tables and
     // never logs a header. Reads: public, no auth, exactly the What's On
     // card fields (see whatsOnPublicEvent) plus the resolved window.
+    // Round 11 (2026-10-20): the events whose French description is missing or older than the English one, for the
+    // admin and the translation scripts (Bearer admin token; see listEventsNeedingFrench).
+    if (pathname === '/api/events/needs-french' && method === 'GET') {
+      if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Admin reads are not configured.' });
+      const bearer = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+      if (!bearer || !safeTokenEquals(bearer[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+      const events = listEventsNeedingFrench();
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, { count: events.length, stale: events.filter((e) => e.status === 'stale').length, events });
+    }
     if (pathname === '/api/events' || /^\/api\/events\/\d+(\/(categories|occurrences(\/\d+)?))?$/.test(pathname)) {
       const eventRouteMatch = pathname.match(/^\/api\/events(?:\/(\d+)(?:\/(categories|occurrences)(?:\/(\d+))?)?)?$/);
       const eventId = eventRouteMatch && eventRouteMatch[1] ? parseInt(eventRouteMatch[1], 10) : null;
@@ -48245,7 +48436,10 @@ const server = http.createServer(async (req, res) => {
         const bearer = /^Bearer (.+)$/.exec(authHeader);
         const verified = !!(ENRICHMENT_ADMIN_TOKEN && bearer && safeTokenEquals(bearer[1], ENRICHMENT_ADMIN_TOKEN));
         if (verified) {
-          return sendJSON(res, 200, { event, categories: getEventCategoryKeys(eventId), occurrences: listEventOccurrences(eventId) });
+          // Round 11: plus the French status of its description and the listing it is linked to (stored or matched).
+          const linked = eventLinkedVenueId(event);
+          return sendJSON(res, 200, { event, categories: getEventCategoryKeys(eventId), occurrences: listEventOccurrences(eventId),
+            french: eventFrenchStatus(event), linked_venue: linked ? { id: linked, matched_by_name: !event.venue_id } : null });
         }
         return sendJSON(res, 200, whatsOnPublicEventDetail(event));
       }
@@ -48656,7 +48850,7 @@ const server = http.createServer(async (req, res) => {
       const event = REGION_LABELS[region] ? findEventBySlug(region, slug) : null;
       const full = event ? getEventById(event.id) : null;
       if (full && full.status === 'scheduled') {
-        const hostVenue = full.venue_id ? getVenue(full.venue_id) : null;
+        const hostVenue = eventHostVenue(full);
         const location = eventCalendarLocation(full, hostVenue);
         const ics = eventIcs(full, listEventOccurrences(full.id, { includeCancelled: false }), location, `https://okanaganroam.com${frPrefix ? '/fr' : ''}/${region}/events/${slug}`, new Date(), frPrefix ? 'fr' : 'en');
         // A download, not a page: keep it out of search results (SEO audit, 2026-10-17).
@@ -48675,7 +48869,7 @@ const server = http.createServer(async (req, res) => {
         // cancelled/postponed rows 404 like a missing slug. Expired but
         // scheduled events still render 200 + noindex (unchanged).
         if (event && (getEventById(event.id) || {}).status === 'scheduled') {
-          const hostVenue = event.venue_id ? getVenue(event.venue_id) : null;
+          const hostVenue = eventHostVenue(event);
           const html = renderEventPage(event, hostVenue);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
@@ -49626,6 +49820,7 @@ function installShutdownHandlers() {
   const stop = (signal) => {
     if (stopping) return;
     stopping = true;
+    serverStopping = true;
     console.log(`[shutdown] ${signal} received, closing`);
     const finish = () => {
       try { db.close(); } catch (e) { /* already closed */ }
@@ -49688,6 +49883,8 @@ function startServer() {
         console.error('[event-batches] import failed unexpectedly (site remains up):', err);
       }
     }
+    // Round 11: /healthz answers 200 from here on.
+    serverReady = true;
   });
 }
 
@@ -49712,6 +49909,9 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Events and tech (2026-10-20, round 11)
+  eventAutoVenueIndex, eventLinkedVenueId, eventHostVenue, eventFrenchStatus, listEventsNeedingFrench, eventPresenterName,
+  frHideEnglishEventCardText, frJsonLd,
   // French and tools (2026-10-19, round 8)
   searchTypoFix,
   frSearchTermLabel,
