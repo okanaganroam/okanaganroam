@@ -1510,6 +1510,43 @@ const MIN_GUIDE_VENUES = 8;
 // What's On page is).
 const MIN_INDEXABLE_GUIDE_VENUES = 10;
 const MIN_INDEXABLE_CATEGORY_VENUES = 3;
+// SEO (2026-10-20, SEO r13): a place page is thin -- noindex and out of the sitemap, still linked and shown to
+// visitors -- when it has no stored opening hours, an English description under MIN_INDEXABLE_VENUE_DESC_WORDS words
+// and no owner content (an approved owner photo, a published menu or price list, an approved owner edit). It becomes
+// indexable again by itself as soon as it gains any of them. A closed-for-season place with stored hours stays indexable.
+const MIN_INDEXABLE_VENUE_DESC_WORDS = 45;
+let venueOwnerContentCache = null, venueOwnerContentVersionStmt = null;
+function venueOwnerContentIds() {
+  try {
+    if (!venueOwnerContentVersionStmt) venueOwnerContentVersionStmt = db.prepare('SELECT total_changes() AS n');
+    const version = venueOwnerContentVersionStmt.get().n;
+    if (venueOwnerContentCache && venueOwnerContentCache.version === version) return venueOwnerContentCache.ids;
+    const ids = new Set(db.prepare(`SELECT venue_id FROM owner_photos WHERE status = 'approved'
+      UNION SELECT venue_id FROM venue_menus WHERE status = 'published'
+      UNION SELECT venue_id FROM owner_change_requests WHERE status = 'approved'`).all().map((r) => r.venue_id));
+    venueOwnerContentCache = { version, ids };
+    return ids;
+  } catch (e) { return new Set(); }
+}
+function venueHasStoredHours(hours) {
+  if (hours == null) return false;
+  let h = hours;
+  if (typeof h === 'string') {
+    if (!h.trim()) return false;
+    try { h = JSON.parse(h); } catch (e) { return true; } // unparsable text is still stored hours
+  }
+  if (!h || typeof h !== 'object') return false;
+  return Object.values(h).some((d) => d != null && !(Array.isArray(d) && d.length === 0) && d !== '');
+}
+function venueDescriptionWords(text) {
+  return String(text || '').trim().split(/\s+/).filter((w) => /[A-Za-z0-9\u00c0-\u024f]/.test(w)).length;
+}
+function venuePageIsThin(venue) {
+  if (!venue) return false;
+  if (venueHasStoredHours(venue.hours)) return false;
+  if (venueDescriptionWords(venue.description) >= MIN_INDEXABLE_VENUE_DESC_WORDS) return false;
+  return !venueOwnerContentIds().has(venue.id);
+}
 
 const REGION_LABELS = {
   kelowna: 'Kelowna', 'west-kelowna': 'West Kelowna', peachland: 'Peachland',
@@ -24779,11 +24816,15 @@ function renderSecretSpotsHubPage(venues, filter = null, now = new Date()) {
 // Each also renders for one town (/kelowna/beaches, /kelowna/outdoors,
 // /kelowna/tours): the same page scoped to the town, without the Regions
 // control, with the town's other categories as tabs.
-function sectionTownCfg(region, slug, name, typeKey) {
+// SEO (2026-10-20, SEO r13): a town section page (beaches, outdoors, tours) with fewer than
+// MIN_INDEXABLE_CATEGORY_VENUES places is noindex, like the other town x category pages (#424 missed these templates,
+// which render through renderCuratedHubPage). count = the places the page lists.
+function sectionTownCfg(region, slug, name, typeKey, count = Infinity) {
   if (!region) return {};
   const label = REGION_LABELS[region];
   return {
     region,
+    ...(count < MIN_INDEXABLE_CATEGORY_VENUES ? { noindex: true } : {}),
     path: `/${region}/${slug}`,
     crumbs: [{ name: label, href: `/${region}` }],
     leadHtml: regionCategoryTabsHtml(region, getRegionCategoryCounts(region), typeKey),
@@ -24811,7 +24852,7 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
   const live = sortOutdoorActivitiesForDisplay(listLiveOutdoorActivities());
   const acts = outdoorActivitiesByVenue(venues);
   const activity = opts.activity ? OUTDOOR_ACTIVITY_BY_SLUG[opts.activity] : null;
-  const town = sectionTownCfg(opts.region, 'outdoors', 'Outdoor Destinations', 'outdoor');
+  const town = sectionTownCfg(opts.region, 'outdoors', 'Outdoor Destinations', 'outdoor', venues.length);
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   if (activity && !f.types.length) f.types = [activity.slug];
   const allContent = { banner: CATEGORY_BANNER_IMAGES.outdoor, heading: town.townHeading || 'Outdoor Adventures', intro: town.townLabel ? `Parks, trails, viewpoints and nature spots in and around ${town.townLabel}.` : 'Lakeshore rail trails, canyon waterfalls, grassland viewpoints, desert boardwalks and alpine ski runs — the Okanagan’s outdoors run the length of the valley.' };
@@ -24858,7 +24899,7 @@ const BEACH_KINDS = [{ type: 'dog', label: 'Dog beaches' }, { type: 'quiet', lab
 function renderBeachesHubPage(venues, filter = null, opts = {}, now = new Date()) {
   const dogIds = getCollectionVenueIds(DOG_FRIENDLY_COLLECTION_KIND);
   const gemIds = getCollectionVenueIds('hidden_gem');
-  const town = sectionTownCfg(opts.region, 'beaches', 'Beaches', 'beach');
+  const town = sectionTownCfg(opts.region, 'beaches', 'Beaches', 'beach', venues.length);
   return renderCuratedHubPage({
     path: '/beaches',
     name: 'Beaches',
@@ -24890,7 +24931,7 @@ function renderBeachesHubPage(venues, filter = null, opts = {}, now = new Date()
 function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, now = new Date()) {
   const ids = new Set(venues.map((v) => v.id));
   const all = [...venues, ...alsoVenues.filter((v) => !ids.has(v.id))];
-  const town = sectionTownCfg(opts.region, 'tours', 'Tours & Experiences', 'tour');
+  const town = sectionTownCfg(opts.region, 'tours', 'Tours & Experiences', 'tour', all.length);
   const activity = opts.activity ? TOUR_ACTIVITIES.find((a) => a.slug === opts.activity) : null;
   if (activity) {
     filter = { types: [], features: [], regions: [], ...(filter || {}) };
@@ -28199,7 +28240,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const page = `<!DOCTYPE html>
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
 <head>
-${pageHead(title, description, canonical, [breadcrumb, localBusiness], { noindex: fr && !FRENCH_INDEXABLE, alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
+${pageHead(title, description, canonical, [breadcrumb, localBusiness], { noindex: (fr && !FRENCH_INDEXABLE) || venuePageIsThin(venue), alternates: hasFrench && FRENCH_INDEXABLE ? venueAlternates(venue) : null, locale: hasFrench ? (fr ? 'fr_CA' : null) : null, shareImage: venueShareCardUrl(venue, fr ? 'fr' : 'en'), golfTheme: themedShell, beachTheme: venue.type === 'beach', outdoorTheme: venue.type === 'outdoor', indoorTheme: venue.type === 'indoor', tourTheme: venue.type === 'tour', sportTheme: venue.type === 'sport', advisoryStyles: venueAdvisoryNote !== undefined, golfDataStyles: !!golfDetail, savedSidecar: venuePageUsesEngagement(venue.type) })}${themedShell ? '\n' + renderGolfVenuePolishStyles() + '\n' + renderVenuePageLayoutStyles() : ''}${venuePageUsesEngagement(venue.type) && !themedShell ? '\n' + renderEngagementControlStyles() : ''}
 ${golfEngagementHeadHtml(venue.type, true, 'venue')}${venueMenu ? `
 ${VENUE_MENU_CSS}` : ''}
 </head>
@@ -28578,16 +28619,23 @@ function eventAutoVenueIndex() {
   if (eventAutoVenueCache && eventAutoVenueCache.version === version) return eventAutoVenueCache;
   const byEvent = new Map(), byVenue = new Map();
   try {
-    const venues = new Map(), venuesBare = new Map();
+    const venues = new Map(), venuesBare = new Map(), nameKeyById = new Map(), insideByRegion = new Map();
     const add = (map, k, id) => { if (!map.has(k)) map.set(k, []); if (!map.get(k).includes(id)) map.get(k).push(id); };
     for (const v of db.prepare('SELECT id, name, region FROM venues WHERE redirect_to IS NULL').all()) {
       add(venues, `${v.region}|${eventVenueKey(v.name)}`, v.id);
+      nameKeyById.set(v.id, eventVenueKey(v.name));
+      // SEO r13: "<Place> at <Host>" listings ("Terrafina at Hester Creek"), for eventMoreSpecificListing.
+      const at = /^(.+?)\s+at\s+(.+)$/i.exec(String(v.name || '').trim());
+      if (at) {
+        if (!insideByRegion.has(v.region)) insideByRegion.set(v.region, []);
+        insideByRegion.get(v.region).push({ id: v.id, len: v.name.length, full: eventVenueKey(v.name), place: eventVenueKey(at[1]), host: eventVenueKey(at[2]) });
+      }
       // Round 12: and without a trailing "(...)" ("South Okanagan Events Centre (SOEC)"), looked up only when the
       // full names give nothing.
       const bare = eventVenueKey(stripTrailingParen(v.name));
       if (bare && bare !== eventVenueKey(v.name)) add(venuesBare, `${v.region}|${bare}`, v.id);
     }
-    const rows = db.prepare("SELECT id, region, venue_name_text FROM events WHERE venue_id IS NULL AND venue_name_text IS NOT NULL AND TRIM(venue_name_text) != ''").all();
+    const rows = db.prepare("SELECT id, region, name, venue_name_text FROM events WHERE venue_id IS NULL AND venue_name_text IS NOT NULL AND TRIM(venue_name_text) != ''").all();
     for (const e of rows) {
       const keys = eventAutoVenueTextKeys(e.venue_name_text);
       const known = eventKnownVenue(e.venue_name_text, e.region);
@@ -28600,15 +28648,35 @@ function eventAutoVenueIndex() {
       const lookups = keys.map((k) => venues.get(`${e.region}|${k}`)).concat(keys.map((k) => venuesBare.get(`${e.region}|${k}`)));
       for (const hits of lookups) {
         if (!hits || hits.length !== 1) continue;
-        byEvent.set(e.id, hits[0]);
-        if (!byVenue.has(hits[0])) byVenue.set(hits[0], []);
-        byVenue.get(hits[0]).push(e.id);
+        const id = eventMoreSpecificListing(hits[0], nameKeyById.get(hits[0]), insideByRegion.get(e.region) || [], `${e.name || ''} ${e.venue_name_text || ''}`);
+        byEvent.set(e.id, id);
+        if (!byVenue.has(id)) byVenue.set(id, []);
+        byVenue.get(id).push(e.id);
         break;
       }
     }
   } catch (err) { /* no auto links */ }
   eventAutoVenueCache = { version, byEvent, byVenue };
   return eventAutoVenueCache;
+}
+// SEO r13 (2026-10-20): when the matched listing has a more specific listing inside it in the same town ("Terrafina at
+// Hester Creek" inside Hester Creek Estate Winery) and the event's name or place text names that place ("You Be The
+// Judge: Pasta Edition at Terrafina"), the event links to the more specific listing; the longest such name wins. A
+// generic inside name ("The Restaurant at ...", "The Patio At ...") never counts on its own.
+const EVENT_GENERIC_INSIDE_NAMES = new Set(['restaurant', 'patio', 'bistro', 'kitchen', 'cafe', 'lounge', 'deli', 'bar', 'tasting room', 'wine shop', 'grill']);
+function eventMoreSpecificListing(hostId, hostKey, inside, text) {
+  if (!hostKey || !inside.length) return hostId;
+  const words = ` ${eventVenueKey(text)} `;
+  const has = (k) => !!k && words.includes(` ${k} `);
+  let best = null;
+  for (const c of inside) {
+    if (c.id === hostId) continue;
+    const sameHost = c.host && (` ${hostKey} `.includes(` ${c.host} `) || ` ${c.host} `.includes(` ${hostKey} `));
+    if (!sameHost) continue;
+    const named = has(c.full) || (c.place.length >= 4 && !EVENT_GENERIC_INSIDE_NAMES.has(c.place) && has(c.place));
+    if (named && (!best || c.len > best.len)) best = c;
+  }
+  return best ? best.id : hostId;
 }
 // The listing an event happens at: its stored venue_id, else its exact-name match (above). -> venue id or null.
 function eventLinkedVenueId(event) {
@@ -28682,10 +28750,22 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
 // stored data only: the organizer is named only when the listing's source IS
 // the organizer; the offer carries the official event/ticket link when there is
 // one. Both are omitted otherwise (the offer also needs a stated price, below).
+// SEO r13 (2026-10-20): campaign tags (utm_* in any case, "?UTM_SOURCE=GMB_listing" on Sociale's site) are dropped from
+// the organizer and offer links in the JSON-LD; the rest of the address is kept as written.
+function stripUtmParams(url) {
+  const u = String(url || '').trim();
+  const q = u.indexOf('?');
+  if (q < 0 || !/[?&]utm_/i.test(u)) return u;
+  const hashAt = u.indexOf('#', q);
+  const query = u.slice(q + 1, hashAt < 0 ? undefined : hashAt);
+  const hash = hashAt < 0 ? '' : u.slice(hashAt);
+  const kept = query.split('&').filter((p) => p && !/^utm_/i.test(p));
+  return u.slice(0, q) + (kept.length ? `?${kept.join('&')}` : '') + hash;
+}
 function eventOfficialUrl(event) {
   const ok = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
-  if (ok(event.website)) return event.website.trim();
-  if (EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) && ok(event.source_url)) return event.source_url.trim();
+  if (ok(event.website)) return stripUtmParams(event.website);
+  if (EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) && ok(event.source_url)) return stripUtmParams(event.source_url);
   return null;
 }
 // Round 9 (2026-10-19): an event hosted at a winery, brewery, distillery, pub, lounge, restaurant or café listed on
@@ -28697,10 +28777,14 @@ const EVENT_HOST_ORGANIZER_TYPES = new Set(['winery', 'brewery', 'distillery', '
 // arena, events or convention centre, community hall), which is named only when the listing's source is the
 // organizer. A tourism board, a ticket seller or a venue's ticketing page that only re-lists the event is never the
 // organizer, unless the description says that source organizes it.
-const EVENT_RENTED_HALL_RE = /\b(?:theatre|theater|arena|stadium|place|events? cent(?:re|er)|convention|community (?:cent(?:re|er)|hall)|activity cent(?:re|er)|performing arts|centre for the arts|hall|auditorium|cinemas?)\b/i;
+// SEO r13 (2026-10-20): only a food or drink place (winery, brewery, distillery, pub, lounge, restaurant, café) is named as
+// the organizer of an event held there. Arenas, parks, beaches, trails, golf courses, ski hills, theatres, halls and
+// community centres mostly host teams, races and touring presenters ("Rutland Arena" was the organizer of every Kelowna
+// Chiefs game, "Skaha Beach" of a triathlon, VDPAC of a Live Nation tour), so with no stated organizer, presenter or
+// organizing source the organizer is left out: omitting it is better than naming the wrong one.
 function eventHostIsOrganizer(hostVenue) {
   if (!hostVenue || typeof hostVenue.name !== 'string' || !hostVenue.name.trim() || hostVenue.redirect_to) return false;
-  return EVENT_HOST_ORGANIZER_TYPES.has(hostVenue.type) || !EVENT_RENTED_HALL_RE.test(hostVenue.name);
+  return EVENT_HOST_ORGANIZER_TYPES.has(hostVenue.type);
 }
 function eventDescriptionNamesOrganizer(description, name) {
   const n = String(name || '').trim();
@@ -28736,7 +28820,7 @@ function eventOrganizerSchema(event, hostVenue = null) {
     return { '@type': 'Organization', name: sourceName, url: url || undefined };
   }
   if (eventHostIsOrganizer(hostVenue)) {
-    const site = typeof hostVenue.website === 'string' && /^https?:\/\/\S+$/i.test(hostVenue.website.trim()) ? hostVenue.website.trim() : null;
+    const site = typeof hostVenue.website === 'string' && /^https?:\/\/\S+$/i.test(hostVenue.website.trim()) ? stripUtmParams(hostVenue.website) : null;
     const page = CATEGORY_SLUGS[hostVenue.type] && hostVenue.slug && REGION_LABELS[hostVenue.region] ? `https://okanaganroam.com${venuePagePath(hostVenue)}` : null;
     return { '@type': 'Organization', name: hostVenue.name.trim(), url: site || page || undefined };
   }
@@ -28762,11 +28846,7 @@ function eventOrganizerSchema(event, hostVenue = null) {
     return eventVenueKey(n) === eventVenueKey(hostVenue.name) || (!!known && eventVenueKey(known.name) === eventVenueKey(hostVenue.name));
   };
   if (presenter && !presenterIsHost(presenter)) return { '@type': 'Organization', name: presenter };
-  if (hostVenue && typeof hostVenue.name === 'string' && hostVenue.name.trim() && !hostVenue.redirect_to) {
-    const site = typeof hostVenue.website === 'string' && /^https?:\/\/\S+$/i.test(hostVenue.website.trim()) ? hostVenue.website.trim() : null;
-    const page = CATEGORY_SLUGS[hostVenue.type] && hostVenue.slug && REGION_LABELS[hostVenue.region] ? `https://okanaganroam.com${venuePagePath(hostVenue)}` : null;
-    return { '@type': 'Organization', name: hostVenue.name.trim(), url: site || page || undefined };
-  }
+  // SEO r13: no fallback to the hall, arena, park or beach the event is at (see eventHostIsOrganizer).
   return undefined;
 }
 // "<Name> presents ..." in the event's name, or "presented by <Name>" in its description, when <Name> reads as a
@@ -28846,11 +28926,15 @@ function eventPriceInfo(event) {
 // Sold out (2026-10-20, round 12): an offer said InStock even when the listing says "SOLD OUT ... join the waitlist"
 // (Murder in the Vineyard). A sentence of the description or price that says it is sold out now makes the offer
 // SoldOut; "may sell out", "sold out last year", "before it sells out" do not.
-const EVENT_SOLD_OUT_RE = /\bsold[\s-]*out\b/i;
+// SEO r13 (2026-10-20): only a present-tense statement about this event counts ("this year's event is sold out", "Tickets
+// are now sold out", "*SOLD OUT*", "Sold out; join the waitlist", "SOLD OUT!" opening a sentence). "fresh from a sold-out
+// Edinburgh Fringe run", "has played sold-out houses", "has sold out before", "after last year's sold-out show" and "have
+// sold out for five years" are about other shows and never make the offer SoldOut.
+const EVENT_SOLD_OUT_RE = /\b(?:is|are|['\u2019]s|['\u2019]re)\s+(?:(?:now|currently|already|officially|completely|fully|totally)\s+)*sold[\s-]*out\b(?![\s-]+(?:shows?|runs?|houses?|crowds?|tours?|venues?|audiences?|performances?|events?|concerts?|nights?|dates?)\b)|\bnow sold[\s-]*out\b|^[^A-Za-z0-9]*sold[\s-]*out\b\s*(?:[!.;:,*\u2013\u2014-]|$)|^[^A-Za-z0-9]*sold[\s-]*out\b[^.;!?]*\bwait[\s-]?list\b/i;
 const EVENT_SOLD_OUT_HEDGE_RE = /\b(?:not|never|before|may|might|could|can|usually|often|typically|always|quickly|fast|last year|previous|past|in \d{4}|every year|each year)\b/i;
 function eventIsSoldOut(event) {
   const text = [event && event.price_text, event && event.description].filter((x) => typeof x === 'string').join('. ');
-  return text.split(/(?<=[.!?;])\s+|\n+/).some((x) => EVENT_SOLD_OUT_RE.test(x) && !EVENT_SOLD_OUT_HEDGE_RE.test(x));
+  return text.split(/(?<=[.!?;])\s+|\n+/).some((x) => EVENT_SOLD_OUT_RE.test(x.trim()) && !EVENT_SOLD_OUT_HEDGE_RE.test(x));
 }
 function eventOffersSchema(event) {
   const info = eventPriceInfo(event);
@@ -29036,7 +29120,8 @@ function renderEventPage(event, hostVenue, opts = {}) {
     && occurrences[0].start_date === '2026-09-25' && occurrences[0].end_date === '2026-11-01'
     ? require('./data/field-of-screams-2026.json') : null;
   const lead = eventSharedDescriptionLead(full, now);
-  const rawDesc = (lead ? `${lead.date} · ${lead.town}: ` : '') + (full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`);
+  // SEO r13 (2026-10-20): line breaks and runs of spaces in a stored description are one space in the meta description.
+  const rawDesc = ((lead ? `${lead.date} · ${lead.town}: ` : '') + (full.description || `${full.name} is an event in ${regionLabel}, BC, listed on Okanagan Roam.`)).replace(/\s+/g, ' ').trim();
   const description = editorial ? editorial.metaDescription
     : (rawDesc.length > 155 ? rawDesc.slice(0, 152).replace(/\s+\S*$/, '') + '...' : rawDesc);
   const editorialHtml = editorial ? editorial.sections.map((section) => `
@@ -47809,14 +47894,26 @@ const server = http.createServer(async (req, res) => {
           if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
         }
       }
+      // SEO (2026-10-20, SEO r13): /:region/tours lists that town's tours_also operators too (renderToursSectionPage),
+      // so they count toward MIN_INDEXABLE_CATEGORY_VENUES here as well and the sitemap matches the page's noindex.
+      for (const v of getToursAlsoVenues()) {
+        if (!REGION_LABELS[v.region] || v.type === 'tour') continue;
+        const combo = categoryCombos.find((r) => r.region === v.region && r.type === 'tour');
+        if (!combo) categoryCombos.push({ region: v.region, type: 'tour', n: 1, lastmod: v.updated_at });
+        else {
+          combo.n += 1;
+          if (v.updated_at && v.updated_at > combo.lastmod) combo.lastmod = v.updated_at;
+        }
+      }
 
       // Venue pages: every venue that has a real, non-null slug (should be
       // all of them after the startup backfill, but this guards against any
       // edge case rather than emitting a broken sitemap entry).
       const venueRows = db
-        .prepare('SELECT region, type, slug, updated_at, description_fr FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
+        .prepare('SELECT id, region, type, slug, updated_at, description, description_fr, hours FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
         .all()
-        .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
+        // SEO r13 (2026-10-20): thin place pages are noindex, so they are left out here too (venuePageIsThin).
+        .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && !venuePageIsThin(v));
 
       const urlEntries = [
         `  <url>\n    <loc>https://okanaganroam.com/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`,
@@ -50892,6 +50989,7 @@ module.exports = {
   // Round 12 (2026-10-20)
   venueClosureInForce, closureAwareOpeningHours, addLocalMonths, eventAutoVenueTextKeys, EVENT_VENUE_LISTING_ALIASES, eventOrganizerName,
   eventPresenterIsSponsor, changeVenueSlug, findSlugRedirectVenue, eventVenueKey, eventIsSoldOut, eventMovedTwin,
+  stripUtmParams, eventMoreSpecificListing, venuePageIsThin, venueHasStoredHours, MIN_INDEXABLE_VENUE_DESC_WORDS, MIN_INDEXABLE_CATEGORY_VENUES,
   frHideEnglishEventCardText, frJsonLd,
   // Round 11 (2026-10-20), search-fr
   searchTextEvents,

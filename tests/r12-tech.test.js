@@ -198,15 +198,16 @@ test('R12 venue events: ten show, the rest fold into "Show all", and the count s
 test('R12 organizer: never a ticket seller, feed or platform; source notes in brackets go; a title sponsor is skipped', () => {
   const theatre = { id: 1, name: 'Fixture Community Theatre', type: 'indoor', region: 'kelowna', slug: 'fixture-community-theatre', website: 'https://theatre.example.com' };
   const org = (ev, host = null) => app.eventOrganizerSchema({ name: 'Show', description: '', ...ev }, host);
-  assert.deepEqual(org({ source_type: 'official_organizer', source_name: 'Ticket Seller (official box office)' }, theatre), { '@type': 'Organization', name: 'Fixture Community Theatre', url: 'https://theatre.example.com' });
+  // SEO r13 (2026-10-20): a theatre is no longer the fallback organizer, so a ticket seller leaves it out.
+  assert.equal(org({ source_type: 'official_organizer', source_name: 'Ticket Seller (official box office)' }, theatre), undefined);
   const soecHost = app.getVenue(soec);
-  assert.equal(org({ source_type: 'league_feed', source_name: 'WHL schedule feed (HockeyTech)' }, soecHost).name, 'South Okanagan Events Centre (SOEC)');
+  assert.equal(org({ source_type: 'league_feed', source_name: 'WHL schedule feed (HockeyTech)' }, soecHost), undefined, 'SEO r13: not the arena either');
   assert.equal(org({ source_type: 'official_organizer', source_name: 'Race Roster (The Starting Block)' }), undefined);
   assert.equal(org({ source_type: 'official_organizer', source_name: 'SilverStar Mountain Resort (Eventbrite)' }).name, 'SilverStar Mountain Resort');
   assert.equal(org({ source_type: 'official_organizer', source_name: 'Kelowna Actors Studio' }).name, 'Kelowna Actors Studio', 'a real organizer is kept');
   const gala = { name: 'A Night Under OneSky Legacy Gala Presented by Penticton Honda', description: 'An evening for OneSky, presented by Penticton Honda.', source_type: 'tourism_org', source_name: 'Tourism Penticton' };
   assert.equal(org(gala), undefined, 'the sponsor is not the organizer');
-  assert.equal(org(gala, theatre).name, 'Fixture Community Theatre', 'the linked venue instead');
+  assert.equal(org(gala, theatre), undefined, 'SEO r13: nor the linked theatre');
   assert.equal(org({ name: 'Concert', description: 'A holiday concert presented by Children Believe: Christmas classics.' }).name, 'Children Believe');
   for (const n of ['Ticket Seller', 'BCHL schedule feed', 'Eventbrite', 'Ticketmaster', 'Box Office']) assert.equal(app.eventOrganizerName(n), '', n);
 });
