@@ -6360,6 +6360,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) addMember(id, { kind: 'fdTypes', value: type });
   const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all();
   const advisories = getAdvisoryNotesWithDates();
+  let advisoryFrench = new Map();
+  try { advisoryFrench = getAdvisoryFrenchByEnglish(); } catch (e) { advisoryFrench = new Map(); }
   const seasons = getSeasonRows();
   const seasonToday = todayLocal();
   const hoursDate = parseLocalDate(onDate) ? onDate : seasonToday;
@@ -6389,6 +6391,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
       plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds(v) : [],
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
+      // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
+      // planner kinds prepared, Naramata Creek's 2.5 km walk had no text and got the 3-hour hiking allowance).
+      trailText: v.type === 'outdoor' ? v.description || '' : undefined,
       indoorEvidence: v.type === 'indoor' || indoorIds.has(v.id) || (v.type === 'golf' && isIndoorGolfVenue(v)) ? 'explicit' : 'unknown',
       // The stored JSON, parsed (never modified) by the planner -- or, in an owner's seasonal hours (2026-10-18), that
       // week instead. The owner's special closures are dated, like the season below.
@@ -6399,7 +6404,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Seasonal inputs (read only by the multi-part itinerary planner): the
       // venue's current advisory note, its dog-beach access note, and a golf
       // course's published rate windows.
-      advisory: advisories.get(v.id) || null,
+      // Round 12 (2026-10-20): with its French wording (note_fr, the French list or the known-phrasing fallback) for /fr/trip.
+      advisory: (() => { const a = advisories.get(v.id); if (!a) return null; let noteFr = null; try { noteFr = frAdvisoryText(parseAdvisoryNote(a.note).text, advisoryFrench); } catch (e) { noteFr = null; } return { ...a, noteFr }; })(),
       // Seasonal closure (venue_seasons): the dated range the venue says it is
       // closed, so a plan for a later date is judged on that date, plus
       // whether that covers today for plans with no date of their own.
@@ -6811,6 +6817,8 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     trip.regions = ['kelowna'];
   }
   const extracted = requirementModule.extractTripRequirements({ text: requirementsText, intent, trip, taxonomy, referenceDate:todayLocal(now) });
+  // Round 12 (2026-10-20): an undated afternoon/evening that is already over today is planned for tomorrow.
+  if (!overrides?.startDate && requirementModule.rollPastTimeWindow) requirementModule.rollPastTimeWindow(extracted, okanaganClock(now));
   // "Wine tour" means wineries unless a tour company or shuttle was asked for (2026-10-18); planTrip applies it too.
   tripPlannerModule().applyWineTourMeaning(requirementsText, intent, extracted);
   // "Vegan food tour" means cafés and restaurants, not a tour company (round 7); planTrip applies it too.
@@ -6826,6 +6834,9 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     extracted.startDate=overrides.startDate;extracted.endDate=span?addLocalDays(overrides.startDate,span):null;extracted.dateSource='Date control';
   }
   if(overrides?.startMinutes!==undefined)extracted.startMinutes=overrides.startMinutes;
+  // Round 12 (2026-10-20): an evening/afternoon window keeps its own start when the page sends the default 9 AM start
+  // ("one evening in West Kelowna" with &start=540 began with a winery at 11 AM).
+  { const ws = { morning: 540, afternoon: 780, evening: 1020 }[extracted.timeWindow]; if (ws && Number.isFinite(extracted.startMinutes) && extracted.startMinutes < ws) extracted.startMinutes = ws; }
   if(overrides?.dayStartMinutes)extracted.dayStartMinutes=overrides.dayStartMinutes;
   if(overrides?.shortWalkVenueIds)extracted.shortWalkVenueIds=overrides.shortWalkVenueIds;
   let requirements = overrides?.shortWalkVenueIds || overrides?.dayStartMinutes || overrides?.startDate || overrides?.startMinutes!==undefined || extracted.startDate || extracted.daypart || extracted.onlyRequested || Number.isInteger(extracted.explicitMealCount) || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
@@ -8040,12 +8051,12 @@ function frAdvisoryFallback(text) {
 }
 // The French for an advisory's visible text: the French list (data/french) first, then the note's own French
 // (note_fr), also when a season note is in front of it, then the fallback above.
-function frAdvisoryText(text) {
+function frAdvisoryText(text, ownMap = null) {
   const key = String(text || '').replace(/\s+/g, ' ').replace(/[’‘]/g, "'").trim();
   if (!key) return text;
   const listed = frText(key);
   if (listed != null) return listed;
-  const own = getAdvisoryFrenchByEnglish();
+  const own = ownMap || getAdvisoryFrenchByEnglish();
   if (own.has(key)) return own.get(key);
   for (const [en, fr] of own) {
     if (key.endsWith(` ${en}`)) {
@@ -34738,10 +34749,38 @@ function tripSeasonUnannouncedOn(s, venue, onDate) {
   return months.includes(Number(onDate.slice(5, 7))) && !months.includes(Number(closed.from.slice(5, 7)));
 }
 const TRIP_SEASONAL_NOTICE = { kind: 'seasonal', text: 'Seasonal \u2014 opening date not announced yet', textFr: 'Saisonnier \u2014 date d\u2019ouverture pas encore annonc\u00e9e' };
+// Round 12 (2026-10-20): a ski hill's own opening day on What's On ("Big White Opening Day", Nov 26; SilverStar, Nov 27)
+// dates its season on My Trip, instead of "opening date not announced". -> null | { date, name }
+const TRIP_OPENING_DAY_RE = /\bopening (?:day|weekend)\b|\bopens? for the (?:season|winter)\b|\bseason opening\b|\bopening of the season\b/i;
+const tripOpeningDayCache = new Map();
+function tripOpeningDayFor(region, now = new Date()) {
+  if (!SKI_RESORT_REGIONS.has(region)) return null;
+  const today = todayLocal(now), key = `${region}|${today}`;
+  if (tripOpeningDayCache.has(key)) return tripOpeningDayCache.get(key);
+  let found = null;
+  try {
+    const rows = db.prepare(`SELECT e.name AS name, MIN(o.start_date) AS d FROM events e JOIN event_occurrences o ON o.event_id = e.id
+      WHERE e.region = ? AND e.status = 'scheduled' AND o.status = 'scheduled' AND o.start_date >= ? GROUP BY e.id ORDER BY d, e.id`).all(region, today);
+    const hit = rows.find((r) => TRIP_OPENING_DAY_RE.test(String(r.name || '')) && parseLocalDate(r.d));
+    if (hit) found = { date: hit.d, name: hit.name };
+  } catch (e) { found = null; }
+  if (tripOpeningDayCache.size > 50) tripOpeningDayCache.clear();
+  tripOpeningDayCache.set(key, found);
+  return found;
+}
+function tripOpeningDayNotice(opening, onDate) {
+  const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(opening.date);
+  const en = `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m[1]) - 1]} ${Number(m[2])}`;
+  const fr = `${Number(m[2]) === 1 ? '1er' : Number(m[2])} ${['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][Number(m[1]) - 1]}`;
+  if (onDate < opening.date) return { kind: 'closed', text: `Closed for the season. Opens ${en} (opening day on What\u2019s On).`, textFr: `Fermé pour la saison. Ouverture le ${fr} (journée d\u2019ouverture à l\u2019affiche).`, on: onDate };
+  return { kind: 'seasonal', text: `Seasonal \u2014 the season opens ${en} (opening day on What\u2019s On)`, textFr: `Saisonnier \u2014 la saison ouvre le ${fr} (journée d\u2019ouverture à l\u2019affiche)`, on: onDate };
+}
 function tripStopNotice(venueId, seasons, advisories, onDate = null, venue = null) {
   if (onDate) {
     let st = null, row = null;
     try { const rows = getSeasonRows(onDate); row = rows.get(venueId) || null; st = row ? seasonStateOn(row, onDate) : null; } catch (e) { st = null; }
+    const opening = st && st.kind === 'closed' && row && !row.reopens_date && venue ? tripOpeningDayFor(venue.region) : null;
+    if (opening && (tripSeasonUnannouncedOn(row, venue, onDate) || onDate < opening.date)) return tripOpeningDayNotice(opening, onDate);
     if (st && st.kind === 'closed' && tripSeasonUnannouncedOn(row, venue, onDate)) return { ...TRIP_SEASONAL_NOTICE, on: onDate };
     if (st) {
       let fr = null;
@@ -51296,6 +51335,7 @@ module.exports = {
   renderMyTripPage,
   myTripPinSpread,
   tripStopsFor,
+  tripOpeningDayFor, // round 12 (2026-10-20)
   tripEventOccurrences,
   tripSeasonUnannouncedOn,
   tripUsualSeasonMonths,

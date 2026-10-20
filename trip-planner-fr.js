@@ -114,6 +114,9 @@ const PHRASES = [
   ['en mai', 'in may'], ['mai', 'in may'], ['janvier', 'january'], ['fevrier', 'february'], ['mars', 'march'], ['avril', 'april'],
   ['juin', 'june'], ['juillet', 'july'], ['aout', 'august'], ['septembre', 'september'], ['octobre', 'october'],
   ['novembre', 'november'], ['decembre', 'december'],
+  // Round 12 (2026-10-20): « le 1er novembre » is the 1st (« 1er » was read as an interest), and « à travers
+  // l'Okanagan » is "through" (« travers » was an interest: a road trip of meals only).
+  ['1er', '1'], ['1re', '1'], ['a travers', 'through'], ['au travers de', 'through'], ['au travers du', 'through the'], ['travers', 'through'],
   ['cet hiver', 'this winter'], ['en hiver', 'in winter'], ['hiver', 'winter'], ['ce printemps', 'this spring'],
   ['au printemps', 'in spring'], ['printemps', 'spring'], ['cet ete', 'this summer'], ['en ete', 'in summer'], ['l ete', 'summer'],
   ['ete', 'summer'], ['cet automne', 'this autumn'], ['en automne', 'in autumn'], ['l automne', 'autumn'], ['automne', 'autumn'],

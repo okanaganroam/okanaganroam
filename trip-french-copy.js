@@ -139,6 +139,16 @@ function t3FrenchText(value){
  text=text.replace(/^Has the (.+) badge$/,(raw,b)=>FR_BADGES[b]?'Possède le badge '+FR_BADGES[b]:raw);
  text=text.replace(/^An? (.+?) suits an? (.+)$/,(raw,t,o)=>FR_TYPES[t.toLowerCase()]&&FR_OCCASIONS[o]?FR_TYPES[t.toLowerCase()]+' convient à '+FR_OCCASIONS[o]:raw);
  text=text.replace(/^Its description mentions “(.+)”$/,(_,w)=>'Sa description mentionne « '+(FR_WORDS[w]||w)+' »');
+ // Round 12 (2026-10-20): copy added in round 11 that was still English on /fr/trip.
+ phrases.push(['Something to eat between the tastings','De quoi manger entre les dégustations'],['A Christmas event on your dates','Un événement de Noël à vos dates'],['A family Christmas event on your dates','Un événement familial de Noël à vos dates'],['A last drink','Un dernier verre'],['Also planned on an earlier day — few lunch spots at the hill are listed on Okanagan Roam','Déjà prévu un autre jour — peu d’endroits pour dîner à la montagne sont répertoriés sur Okanagan Roam']);
+ text=text.replace(/^Its listed hours only overlap part of the (morning|midday|afternoon|late afternoon|early evening|evening) — check before you go$/,(_,part)=>'Ses horaires indiqués ne couvrent qu’une partie '+{morning:'de la matinée',midday:'du midi',afternoon:'de l’après-midi','late afternoon':'de la fin d’après-midi','early evening':'du début de soirée',evening:'de la soirée'}[part]+' — vérifiez avant de partir');
+ // An advisory with no French notice of its own (venue.advisoryFr is used first): its known opening, never the English.
+ text=text.replace(/^Advisory on Okanagan Roam: (.+)$/,(_,n)=>'Avis d’Okanagan Roam : '+([[/^permanently closed\b/i,'Fermé définitivement.'],[/^temporarily closed\b/i,'Fermé temporairement.'],[/^closed for the season\b/i,'Fermé pour la saison.'],[/\bby appointment\b/i,'Visites ou dégustations sur rendez-vous seulement.'],[/\bswimming advisory\b/i,'Avis de baignade en vigueur.'],[/\broad\b|\bconstruction\b|\bdetour\b/i,'Travaux ou accès routier modifié.'],[/\bclosed\b/i,'Fermeture signalée.']].find(([re])=>re.test(n))||[null,'Une condition temporaire touche cet endroit.'])[1]+' Consultez la fiche avant d’y aller.');
+ text=text.replace(/^By appointment, from the listing: “(.+)” Book ahead\.$/,(_,q)=>'Sur rendez-vous, selon la fiche (texte original) : « '+q+' » Réservez à l’avance.');
+ // Slot labels made of category names joined with "or" ("wineries, breweries or cocktail lounges"): French names, « ou ».
+ const FR_KIND_NAMES={wineries:'vignobles',winery:'vignoble',breweries:'microbrasseries',brewery:'microbrasserie','cocktail lounges':'bars à cocktails','cocktail lounge':'bar à cocktails',pubs:'pubs',pub:'pub',cafes:'cafés',cafe:'café',cafés:'cafés',restaurants:'restaurants',restaurant:'restaurant','outdoor destinations':'lieux de plein air','outdoor destination':'lieu de plein air','indoor & rainy day spots':'lieux intérieurs et jours de pluie',indoor:'lieu intérieur',beaches:'plages',beach:'plage','golf courses':'terrains de golf','golf course':'terrain de golf','tours & experiences':'visites et expériences',tour:'visite',distilleries:'distilleries',distillery:'distillerie','sports & recreation venues':'lieux de sports et loisirs','sports & recreation venue':'lieu de sports et loisirs'};
+ const kinds=text.split(/, | or /);
+ if(kinds.length>1&&/ or /.test(text)&&kinds.every(k=>FR_KIND_NAMES[k.toLowerCase()])){const out=kinds.map(k=>FR_KIND_NAMES[k.toLowerCase()]);const joined=out.slice(0,-1).join(', ')+' ou '+out[out.length-1];return /^[A-Z]/.test(text)?joined.charAt(0).toUpperCase()+joined.slice(1):joined;}
  for(const [a,b] of phrases)text=text.split(a).join(b);
  text=text.replace(/^Day (\d+): Confirm times before you go\. /,'Jour $1 : confirmez les heures avant de partir. ');
  const frDay=d=>({Monday:'lundi',Tuesday:'mardi',Wednesday:'mercredi',Thursday:'jeudi',Friday:'vendredi',Saturday:'samedi',Sunday:'dimanche'}[d]||d);
@@ -304,7 +314,7 @@ function t3FrenchEvent(event){
 // "Votre journée commence par une dégustation à Fox & Archer Wines, puis un dîner à The Bistro, et se termine par un
 // souper à Terroir Kitchen." One sentence a day (three days at most, then the names of the rest).
 const FR_STOP_NOUN={winery:'une dégustation',brewery:'une bière artisanale',distillery:'une dégustation',cafe:'un café',outdoor:'une sortie en plein air',beach:'la plage',golf:'une partie de golf',indoor_golf:'une séance de golf intérieur',indoor:'une visite',tour:'une visite guidée',sport:'une activité',pub:'un verre',cocktail:'un cocktail',restaurant:'un repas'};
-function t3FrenchStopText(s){
+function t3FrenchStopText(s,seen){
  const name=s.venue?.name||s.event?.name;
  if(s.event)return 'l’événement « '+name+' »';
  const t=s.venue?.type,part=s.daypart,label=String(s.label||'');
@@ -313,6 +323,8 @@ function t3FrenchStopText(s){
  else if(['evening','night'].includes(part)&&['restaurant','pub'].includes(t))noun='un souper';
  else if(part==='morning'&&t==='cafe')noun='un café';
  else if(s.skiDay)noun='une journée de ski';
+ // Round 12 (2026-10-20): an evening ends with « un dernier verre », not a second « souper » (Old Vines, then Friends Pub).
+ if(seen){if(noun==='un souper'&&seen.dinner)noun='un dernier verre';else if(noun==='un souper')seen.dinner=true;}
  return noun+' à '+name;
 }
 function t3FrenchStory(p){
@@ -320,7 +332,8 @@ function t3FrenchStory(p){
  const one=days.length===1;
  const out=[];
  for(const d of days.slice(0,3)){
-  const parts=d.stops.map(t3FrenchStopText);
+  const seen={dinner:false};
+  const parts=d.stops.map(s=>t3FrenchStopText(s,seen));
   if(!parts.length)continue;
   const lead=one?'Votre journée'+(d.town?' à '+d.town:''):'Le jour '+d.day+(d.town?', à '+d.town+',':'');
   if(parts.length===1){out.push(lead.replace(/,$/,'')+' : '+parts[0]+'.');continue;}
@@ -329,13 +342,16 @@ function t3FrenchStory(p){
  }
  // Round 11: the days after the third are named (« Le jour 4 : … », « Les jours 4 à 5 : … »), not « Ensuite ».
  if(days.length>3){const rest=days.slice(3).flatMap(d=>d.stops.map(s=>s.venue?.name||s.event?.name));if(rest.length)out.push((days.length===4?'Le jour 4':'Les jours 4 à '+days.length)+' : '+rest.join(', ')+'.');}
- return out.join(' ').replace(/\bà (le|les) /g,(m,a)=>a==='le'?'au ':'aux ');
+ // Round 12 (2026-10-20): a name that ends in a full stop ("Cannery Brewing Co.") ends the sentence once.
+ return out.join(' ').replace(/\bà (le|les) /g,(m,a)=>a==='le'?'au ':'aux ').replace(/([^.])\.\.(?=\s|$)/g,'$1.');
 }
 function t3FrenchPlan(plan){
  const p=JSON.parse(JSON.stringify(plan));
  const translateStop=s=>{
   if(s.event)s.event=t3FrenchEvent(s.event);
-  s.label=t3FrenchText(s.label);s.why=(s.why||[]).map(t3FrenchText);s.caveats=(s.caveats||[]).map(t3FrenchText);
+  // Round 12 (2026-10-20): an advisory caveat reads the venue's own French notice (venue.advisoryFr).
+  const adv=s.venue&&s.venue.advisoryFr;
+  s.label=t3FrenchText(s.label);s.why=(s.why||[]).map(t3FrenchText);s.caveats=(s.caveats||[]).map(c=>adv&&c===adv.en?adv.fr:t3FrenchText(c));
   if(s.unscheduledReason)s.unscheduledReason=t3FrenchText(s.unscheduledReason);
   if(s.scheduleNote)s.scheduleNote=t3FrenchText(s.scheduleNote);
   if(s.venue?.typeLabel)s.venue.typeLabel=t3FrenchText(s.venue.typeLabel);

@@ -1164,7 +1164,10 @@ test('no alcohol: an explicit refusal outranks a positive wish ("we love wine co
 test('no alcohol: food-first, outdoor and other non-alcohol places stay eligible', () => {
   const p = plan("2 days in Kelowna, we don't drink alcohol");
   const types = stopTypes(p);
-  for (const t of ['cafe', 'restaurant']) assert.ok(types.includes(t), `${t} stays`);
+  // Round 12 (2026-10-20): a café is no longer put straight after lunch, so its eligibility is checked on a request
+  // with a morning coffee in it.
+  assert.ok(types.includes('restaurant'), 'restaurant stays');
+  assert.ok(stopTypes(plan("2 days in Kelowna with coffee each morning, we don't drink alcohol")).includes('cafe'), 'cafe stays');
   assert.ok(types.some((t) => ['beach', 'outdoor', 'golf'].includes(t)), `an outdoor type stays (${types})`);
   // "alcohol is merely available": a restaurant that is also filed as a pub keeps its place.
   const gastro = fact({ name: 'Kelowna Gastropub Kitchen', region: 'kelowna', type: 'restaurant', fdTypes: ['pub'], rating: 4.9, reviews: 900 });
