@@ -1,0 +1,18 @@
+{
+  "reason": "Blasted Church Vineyards (2026-10-20): the listing photo changes from a Google Maps photo to the winery's own patio photo looking over Skaha Lake. The winery's marketing manager gave written permission on Oct 20, 2026 to use photos from their website and Instagram, credited to Blasted Church Vineyards.",
+  "batch_id": "venue-photo-blasted-church-2026-10-20",
+  "venues": [
+    {
+      "id": 76,
+      "name": "Blasted Church Vineyards",
+      "region": "okanagan-falls",
+      "slug": "blasted-church-vineyards",
+      "expect": {
+        "image_url": "/images/venues/blasted-church-vineyards-2610.jpg?v=20261016"
+      },
+      "set": {
+        "image_url": "/images/venues/blasted-church-vineyards-20261020.jpg?v=20261020"
+      }
+    }
+  ]
+}
