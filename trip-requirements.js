@@ -339,13 +339,20 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   const i=intent||{},when=i.when||null;
   const empty=k=>!(i[k]||[]).length;
   if(i.mode!=='find'||(i.regions||[]).length!==1||trip?.route||trip?.multi||out.items.length||out.conflicts.length||out.startDate||out.onlyRequested||out.outingScope)return out;
-  if(!['types','features','collections','activities','cuisines','foodTerms','textTerms','eventCategories'].every(empty)||i.occasion||i.budget||i.lake)return out;
+  // Round 12 (2026-10-20): "this weekend in Kelowna with kids / with the family" keeps the window (kid-friendly picks).
+  const familyOnly=(i.features||[]).every(f=>f==='kid_friendly')&&(!i.occasion||i.occasion==='family');
+  if(!['types','collections','activities','cuisines','foodTerms','textTerms','eventCategories'].every(empty)||!familyOnly||i.budget||i.lake)return out;
   if((i.excluded?.types||[]).length||(i.excluded?.concepts||[]).length)return out;
   const ref=/^\d{4}-\d{2}-\d{2}$/.test(referenceDate||'')?referenceDate:null;
   const wd=ref?new Date(`${ref}T12:00:00Z`).getUTCDay():null;
   const weekday=when?.weekday?DAYS.indexOf(String(when.weekday).slice(0,3)):-1;
   // Only the words morning, afternoon or evening ("tonight" at 7 PM keeps the Ideas list, timed by the clock).
-  const window=out.daypart&&new RegExp(`\\b${out.daypart}\\b`).test(out.text||'')&&WINDOW_START[out.daypart]!=null&&!out.items.some(x=>x.kind==='deadline')?out.daypart:null;
+  // Round 12 (2026-10-20): "tonight in Kelowna" and "Friday night / Saturday night in Kelowna" (« ce soir », « vendredi
+  // soir ») are an evening too; "tonight at 7 pm" keeps the Ideas list, timed by the clock.
+  // "What can we do in Kelowna tonight" asks for ideas, and keeps the Ideas list.
+  const night=out.startMinutes==null&&(!out.daypart||out.daypart==='evening')&&/\b(?:tonight|(?:mon|tues|wednes|thurs|fri|satur|sun)day night)\b/.test(out.text||'')&&!/\b(?:what|where|things?|ideas?|suggest\w*|recommend\w*|anything|something)\b/.test(out.text||'');
+  if(night)out.daypart='evening';
+  const window=out.daypart&&(night||new RegExp(`\\b${out.daypart}\\b`).test(out.text||''))&&WINDOW_START[out.daypart]!=null&&!out.items.some(x=>x.kind==='deadline')?out.daypart:null;
   if(!window&&when?.preset==='this-weekend'&&weekday<0){
     if(ref){out.startDate=wd===0||wd===6?ref:isoAdd(ref,6-wd);out.dateSource='this weekend';}
     const n=wd===0?1:2;
@@ -359,10 +366,21 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   if(ref){
     if(weekday>=0)out.startDate=isoAdd(ref,(weekday-wd+7)%7);
     else if(when?.relative==='tomorrow')out.startDate=isoAdd(ref,1);
+    else if(/\btonight\b/.test(out.text||'')||when?.preset==='today')out.startDate=ref;
     else if(when?.preset==='this-weekend')out.startDate=wd===0||wd===6?ref:isoAdd(ref,6-wd);
     if(out.startDate)out.dateSource=out.dateSource||'the day you named';
   }
   return out;
+}
+// Round 12 (2026-10-20): an undated window that has already passed today ("an afternoon in Kelowna" asked at 6:45 PM
+// Pacific) is planned for tomorrow, not for hours that are over. clock is okanaganClock(now): {date, minutes}.
+const WINDOW_END={morning:840,afternoon:1140,evening:1440};
+function rollPastTimeWindow(requirements,clock){
+  const w=requirements?.timeWindow;
+  if(!w||requirements.startDate||!clock||!/^\d{4}-\d{2}-\d{2}$/.test(clock.date||'')||!Number.isFinite(clock.minutes))return false;
+  if(clock.minutes<WINDOW_END[w]-90)return false;
+  requirements.startDate=isoAdd(clock.date,1);requirements.dateSource='tomorrow';
+  return true;
 }
 // The stops of a time-window plan (round 11): what a morning, an afternoon or an evening in a town is made of.
 function timeWindowComponents(trip,requirements){
@@ -856,4 +874,4 @@ function sparseDayRecovery(plan,requirements){
  const safe=last>0&&last<days.length&&!requirements?.endDate&&!(requirements?.items||[]).some(i=>i.kind==='event'||requirementDay(i,requirements.startDate)>last||i.kind==='venue'&&i.strength==='must'&&!retained.has(i.value));
  return {days:gaps.map(d=>d.day),shorterDays:safe?last:null,region:gaps.every(d=>d.region===gaps[0].region)?gaps[0].region:null};
 }
-module.exports={listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

@@ -636,7 +636,9 @@ function renderStyles() {
   .t3-removed { background: transparent; border: 1px dashed rgba(27,43,58,0.3); border-radius: 14px; padding: 14px 18px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   .t3-empty { background: #fff; border-radius: 14px; padding: 16px 18px; font-size: 0.92rem; }
   .t3-free p { margin: 6px 0 0; } .t3-free a { color: var(--ref-navy); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
-  .t3-section-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.25rem; margin: 22px 0 12px; color: var(--ref-navy); }
+  .t3-section-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.25rem; margin: 22px 0 12px; color: var(--ref-navy); overflow-wrap: anywhere; }
+  /* Round 12 (2026-10-20): long French slot labels (« vignobles, microbrasseries ou bars à cocktails ») wrap at 320 px. */
+  .t3-card-top > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
   .t3-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   /* Cards in a grid row line up: badges, details and buttons start at the same
      height whatever the title length or badge count. Without subgrid support
@@ -1640,7 +1642,7 @@ function renderScript(d) {
       + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert" aria-live="polite"><p>' + esc(lang()==='fr' ? 'Plusieurs événements correspondent à «'+p.eventAmbiguity.phrase+'». Choisissez celui que vous voulez ajouter à votre sortie :' : 'More than one listed event matches “'+p.eventAmbiguity.phrase+'”. Choose the one you want to add to your outing:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name,i){var id=p.eventAmbiguity.candidateIds&&p.eventAmbiguity.candidateIds[i];return Number.isSafeInteger(id)&&id>0?'<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="'+id+'">'+esc(name)+'</button>':'';}).join('') + '</div></section>' : '')
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
-      + (p.experience && p.experience.text ? '<p class="t3-expect">' + esc(p.experience.text) + '</p>' : '')
+      + (p.experience && p.experience.text ? '<p class="t3-expect">' + esc(String(p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p>' : '')
       + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
       + rainHtml
       + '<div class="t3-plan-actions">'
@@ -1673,11 +1675,13 @@ function renderScript(d) {
         if(row.mealWindow)detail.push(french?'Fenêtre conditionnelle selon les horaires indiqués; trajet et service en cuisine à confirmer. Aucun horaire de visite fixé.':'Conditional window based on listed hours; travel and kitchen service need confirmation. No visit time is scheduled.');
         if(Number.isFinite(row.transferMinutes)&&row.transferMinutes>0)detail.push((french?'Trajet estimé : ':'Estimated travel: ')+row.transferMinutes+' min');
         if(row.arrivalAllowanceMinutes>0)detail.push((french?'Marge d’arrivée : ':'Arrival allowance: ')+row.arrivalAllowanceMinutes+' min');
-        if(row.gapMinutes>0)detail.push((row.status==='provisional'?(french?'Intervalle libre provisoire : ':'Provisional free interval: '):(french?'Intervalle libre avant cet arrêt : ':'Free interval before this stop: '))+row.gapMinutes+' min');
+        // Round 12 (2026-10-20): a gap of a few minutes is not a "free interval" ("Provisional free interval: 1 min").
+        if(row.gapMinutes>=10)detail.push((row.status==='provisional'?(french?'Intervalle libre provisoire : ':'Provisional free interval: '):(french?'Intervalle libre avant cet arrêt : ':'Free interval before this stop: '))+row.gapMinutes+' min');
         if(row.shortWalkSelected)detail.push(french?'Promenade courte · durée estimée de 30 à 60 min':'Short walk · allow 30–60 min');
         if(row.daylight){
           if(Number.isFinite(row.daylight.sunriseMinutes))detail.push((french?'Lumière du jour estimée : ':'Estimated daylight: ')+clock(row.daylight.sunriseMinutes)+'–'+clock(row.daylight.sunsetMinutes));
-          if(row.daylight.marginMinutes)detail.push((french?'Marge avant le coucher du soleil : ':'Margin before sunset: ')+row.daylight.marginMinutes+' min');
+          // Round 12: the sunset margin only when the visit ends within two hours of sunset (not on a morning hike).
+          if(row.daylight.marginMinutes&&!(Number.isFinite(row.daylight.sunsetMinutes)&&Number.isFinite(row.endMinutes)&&row.daylight.sunsetMinutes-row.endMinutes>120))detail.push((french?'Marge avant le coucher du soleil : ':'Margin before sunset: ')+row.daylight.marginMinutes+' min');
           if(row.daylight.status!=='estimated')detail.push(row.daylight.status==='conflict'?(french?'Conflit avec la lumière du jour · partez plus tôt':'Daylight conflict · start earlier'):(french?'Lumière du jour à confirmer':'Daylight unverified'));
         }
         if(row.notScheduledMeal)detail.push(french?'Aucun restaurant ne convient avant l’événement.':'No restaurant fits before the event.');
@@ -1747,7 +1751,8 @@ function renderScript(d) {
     // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
-      if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a ' + hrefAttr('#t3-day-' + d.day) + '>' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
+      // Round 12 (2026-10-20): French day tabs say « Penticton et Osoyoos » (the plan's own days are not translated).
+      if (days().length > 1) html += '<nav class="t3-daynav" aria-label="' + esc(tx('tripv3.jumpLabel')) + '">' + days().map(function(d){ return '<a ' + hrefAttr('#t3-day-' + d.day) + '>' + esc(tx('tripv3.day', { n: d.day })) + (d.regionLabel ? ' · ' + esc(lang() === 'fr' ? String(d.regionLabel).replace(/ and /g, ' et ') : d.regionLabel) : '') + '</a>'; }).join('') + '</nav>';
       html += (p.days || []).map(function(d){ return dayHtml(d, counts); }).join('');
     } else if (p.kind === 'outing' && p.outing) {
       html += schedHtml ? '<div class="t3-tools">' + schedHtml + '</div>' : '';
