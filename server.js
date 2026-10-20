@@ -27389,7 +27389,7 @@ function renderVenuePageLayoutStyles() {
     body.golf-page .venue-main { display: flex; flex-direction: column; }
     body.golf-page .venue-main > :last-child:not(.venue-description, .venue-editorial),
     body.golf-page .venue-main:not(:has(> .venue-cta-row)) > :last-child,
-    body.golf-page .venue-main > .venue-cta-row:not(:has(~ :not(.venue-description, .venue-editorial))) { margin-bottom: 0; }
+    body.golf-page .venue-main > .venue-cta-row:not(:has(~ :not(.venue-description, .venue-editorial, .vg-phone, script))) { margin-bottom: 0; }
     body.golf-page .venue-main > .venue-header:has(> .chips:last-child:not(:empty)) { margin-bottom: 0; }
     body.golf-page .venue-main > .venue-header > :nth-last-child(2):has(+ .chips:empty) { margin-bottom: 0; }
     body.golf-page .venue-main > .venue-cta-row { margin-top: 0; }
@@ -27696,7 +27696,12 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const heroSet = hero960 !== venue.image_url && heroW > 960
     ? `${hero480 !== venue.image_url ? `${escapeHtml(hero480)} 480w, ` : ''}${escapeHtml(hero960)} 960w, ${hero1200 !== venue.image_url ? `${escapeHtml(hero1200)} 1200w, ` : ''}${escapeHtml(venue.image_url)} ${heroW}w`
     : '';
-  const heroSizes = '(max-width: 480px) 320px, (max-width: 860px) 100vw, 1200px';
+  // Round 11 (2026-10-20): sizes that match the box. Up to 640px wide the photo is 16px in from each side, then 24px;
+  // with a gallery a computer shows it in the left two thirds of the 1312px column (816px at 1280 wide; it said
+  // 1200px, so computers took the 1200px copy for an 816px box; without a gallery they still ask for the 1200px copy).
+  // A 3x phone keeps asking for 320px, which is the 960px copy (about 2.8x on a 343px box): honest sizes would send
+  // iPhones the 1200px copy, 60 KB more for no visible gain. The <head> preload repeats these sizes.
+  const heroSizes = `(max-width: 480px) and (min-resolution: 2.75dppx) 320px, (max-width: 640px) calc(100vw - 32px), (max-width: 899px) calc(100vw - 48px), ${galleryHtml ? '(max-width: 1359px) calc((100vw - 56px) * 2 / 3), 870px' : '1200px'}`;
   const heroSrcset = heroSet ? ` srcset="${heroSet}" sizes="${heroSizes}"` : '';
   // Round 10 (2026-10-19): owner-photo venues were 3-3.5 s LCP on a throttled phone. The hero is preloaded from the
   // <head> (like the guides' banners), so it starts before the CSS and the strip thumbnails.
@@ -27900,7 +27905,7 @@ ${VENUE_MENU_CSS}` : ''}
   <!-- Phone layout (2026-10-19, round 10): Call, Directions, Favorite and Add to trip come straight after the name,
        hours and badges (and any check-before-you-go notice), before the description, so they are on the first screen of
        a phone and come first in the tab order. Wider screens keep the description first (renderVenuePageLayoutStyles). -->${venueAdvisoryHtml}
-  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}
+  ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${galleryHtml ? `\n  ${galleryHtml.phone(creditHtml)}` : ''}
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${editorialHtml}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
   </div>
   <aside class="venue-aside">
@@ -27946,7 +27951,10 @@ ${VENUE_MENU_CSS}` : ''}
   ${golfVenueEngagementScriptHtml(venue)}
 </body>
 </html>`;
-  const withPreload = heroPreload ? page.replace(/<meta name="viewport"[^>]*>\n?/i, (v) => `${v}${v.endsWith('\n') ? '' : '\n'}${heroPreload}\n`) : page;
+  let withPreload = heroPreload ? page.replace(/<meta name="viewport"[^>]*>\n?/i, (v) => `${v}${v.endsWith('\n') ? '' : '\n'}${heroPreload}\n`) : page;
+  // Round 11 (2026-10-20): the hero-ready signal first in <head>, as on the homepage and town pages, so gtag.js (about
+  // 175 KB) and the gallery thumbnails wait for the venue photo instead of sharing a slow phone's connection with it.
+  if (heroPreload) withPreload = withPreload.replace(/<meta charset="UTF-8">\n?/i, (m) => `${m}${HOME_HERO_FIRST_HEAD}\n`);
   const out = fr ? localizeStaticFr(localizeHtml(withPreload, 'fr')) : withPreload;
   // Round 11 (2026-10-20): a place with a French page gets the header's EN / FR switch and the phone menu's language
   // row, as every other page with a twin does (venue pages had only the small "Français" link by the title).
@@ -37337,7 +37345,7 @@ const OWNER_PHOTO_MIN_EDGE = 800;
 const OWNER_PHOTO_MAX_EDGE = 2400;
 const OWNER_PHOTO_PENDING_LIMIT = 12; // per venue, waiting for review
 const OWNER_PHOTO_RATE_LIMIT = 30;
-const OWNER_PHOTO_KEYS = new Set(['image', 'image_w480', 'image_w960', 'image_w1200', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at']);
+const OWNER_PHOTO_KEYS = new Set(['image', 'image_w160', 'image_w240', 'image_w480', 'image_w960', 'image_w1200', 'credit', 'rights', 'contact_name', 'contact_email', 'notify', 'company_website', 'started_at']);
 
 function ownerPhotoPath(file) {
   if (!/^[a-z0-9]{24}\.jpg$/.test(file)) return null;
@@ -37351,7 +37359,9 @@ function ownerPhotoPath(file) {
 // owner uploads (free, no image library on the server); photos sent before that get them from
 // scripts/owner-photo-copies.js (Dayton runs it on his Mac with sips) through /admin/owner-photos/:id/sizes. A copy is
 // only ever listed in a page once its file exists, so a photo without copies keeps its original and nothing breaks.
-const OWNER_PHOTO_SIZES = [480, 960, 1200];
+// Round 11 (2026-10-20): also <name>-w160.jpg and <name>-w240.jpg, the gallery thumbnails (shown about 80px wide on
+// a phone). The strip used the 480px copies, about 140 KB on Red Rooster's page, downloading alongside the main photo.
+const OWNER_PHOTO_SIZES = [160, 240, 480, 960, 1200];
 const OWNER_COPY_MAX_BYTES = 1024 * 1024;
 function ownerPhotoCopyFile(file, width) {
   const m = /^([a-z0-9]{24})\.jpg$/.exec(String(file || ''));
@@ -37386,7 +37396,7 @@ function deleteOwnerPhotoCopies(file) {
 // The file on the volume for an /images/owner/ or /images/visitor/ URL (the original or one of its copies), else
 // null. Used for the ?v= hash and the width/height attributes; the routes still check the photo is approved.
 function uploadedPhotoFilePath(url) {
-  const m = /^\/images\/(?:owner|visitor)\/([a-z0-9]{24})(-w(?:480|960|1200))?\.jpg$/.exec(String(url || ''));
+  const m = /^\/images\/(?:owner|visitor)\/([a-z0-9]{24})(-w(?:160|240|480|960|1200))?\.jpg$/.exec(String(url || ''));
   return m ? path.join(OWNER_PHOTO_DIR, `${m[1]}${m[2] || ''}.jpg`) : null;
 }
 // A copy the browser or the backfill script sent: a JPEG data URL `width` pixels wide (or the original's own width
@@ -37402,7 +37412,7 @@ function validOwnerPhotoCopy(dataUrl, width, original) {
   if (Math.abs(d.width / d.height - original.width / original.height) > 0.02 * (original.width / original.height)) return null;
   return buf;
 }
-// Writes the valid copies in `copies` ({ w480, w960, w1200 } data URLs) for one stored photo. A size at or above
+// Writes the valid copies in `copies` ({ w160, w240, w480, w960, w1200 } data URLs) for one stored photo. A size at or above
 // the original's width is skipped (the original is already that size). replace: overwrite a copy that exists.
 // -> { written: [widths], skipped: [widths], invalid: [widths] }
 function saveOwnerPhotoCopies(file, original, copies, { replace = false } = {}) {
@@ -37530,8 +37540,25 @@ function venueGalleryPhotos(venue, L = (en) => en) {
   return out;
 }
 
+// Venue gallery thumbnails (2026-10-20, round 11): their src waits in data-src until the main photo has loaded (or
+// failed), at window load at the latest, and after 8 s whatever happens (the homepage's roamAfterHero, when the page
+// has it). Only thumbnails on screen are loaded: of the two strips (by the photo, and the phone copy after the
+// buttons) one is display:none, and a resize or rotation loads the other's when it appears.
+const VENUE_THUMB_LOADER_SCRIPT = `<script>
+(function(){
+  function show(img){ var s = img.getAttribute('data-srcset'); if (s) { img.setAttribute('srcset', s); img.removeAttribute('data-srcset'); } img.setAttribute('src', img.getAttribute('data-src')); img.removeAttribute('data-src'); }
+  function run(){ var l = document.querySelectorAll('.vg-strip img[data-src]'); for (var i = 0; i < l.length; i++) if (l[i].getClientRects().length) show(l[i]); }
+  var started = false;
+  function start(){ if (started) return; started = true; run(); window.addEventListener('resize', run); }
+  if (typeof window.roamAfterHero === 'function') return window.roamAfterHero(start);
+  var h = document.querySelector('.venue-hero-photo img');
+  if (!h || h.complete) return start();
+  h.addEventListener('load', start); h.addEventListener('error', start); window.addEventListener('load', start); setTimeout(start, 8000);
+})();
+</script>`;
+
 // The thumbnail row, "See all photos" button and full-screen viewer for a
-// venue page as { strip, viewer }, or null when the venue has fewer than two photos.
+// venue page as { strip, phone(creditHtml), viewer }, or null when the venue has fewer than two photos.
 function venueGalleryHtml(venue, photos, L) {
   if (!photos || photos.length < 2) return null;
   const n = photos.length;
@@ -37540,11 +37567,34 @@ function venueGalleryHtml(venue, photos, L) {
   // second photo; the last one shown carries "+N" for any not shown.
   const rest = photos.slice(1);
   const shown = rest.slice(0, 4);
-  const thumbs = shown.map((p, i) => {
+  // Speed (2026-10-20, round 11): on a throttled phone Red Rooster's photo (the LCP) took 3.5 s because these 81x64px
+  // thumbnails downloaded the 480px copies (about 140 KB) at the same time. Now:
+  //  - each lists its 160 and 240px copies (owner photos, where made) with sizes that match the box, so a phone takes
+  //    about 10 KB per thumbnail; a photo without them keeps the 480px copy (or the original), as before;
+  //  - the src waits in data-src until the main photo has loaded (VENUE_THUMB_LOADER_SCRIPT; 8 s at the latest), and
+  //    <noscript> keeps the plain image; the buttons have a fixed size, so nothing moves when they arrive;
+  //  - on a phone the strip (and the photo credit) sits after Call / Directions (the .vg-phone copy, placed after the
+  //    button row in renderVenuePage), so the buttons are on the first screen; wider screens keep it by the photo.
+  const thumbSrcset = (src) => {
+    const w = Number((/width="(\d+)"/.exec(imgDimsAttr(src)) || [])[1]) || 0;
+    const small = [160, 240].map((x) => [photoSized(src, x), x]).filter(([u]) => u !== src);
+    if (!small.length) return '';
+    const mid = photoSized(src, 480);
+    const top = mid !== src ? [mid, 480] : (w ? [src, w] : null);
+    return top ? small.concat([top]).map(([u, x]) => `${escapeHtml(u)} ${x}w`).join(', ') : '';
+  };
+  const thumbsFor = (phone) => shown.map((p, i) => {
     const hidden = rest.length - shown.length;
     const more = (i === shown.length - 1 && hidden > 0) ? `<span class="vg-more">+${hidden}</span>` : '';
-    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img src="${escapeHtml(photoSized(p.src, 480))}"${imgDimsAttr(p.src)} alt="" loading="lazy" fetchpriority="low">${more}</button>`;
+    const src = escapeHtml(photoSized(p.src, 480));
+    const set = thumbSrcset(p.src);
+    // The box: 80px on a phone (four in a row), up to 96px up to 899px wide, then a 2x2 grid cell (about 210px) or
+    // a full-width cell beside the photo (one or two thumbnails, or the first of three).
+    const wide = shown.length < 3 || (shown.length === 3 && i === 0);
+    const sizes = phone ? '80px' : `(min-width: 900px) ${wide ? '440px' : '220px'}, 96px`;
+    return `<button type="button" class="vg-thumb" data-vg-open="${i + 1}" aria-label="${L(`Open photo ${i + 2} of ${n}`, `Ouvrir la photo ${i + 2} sur ${n}`)}"><img data-src="${src}"${set ? ` data-srcset="${set}" sizes="${sizes}"` : ''}${imgDimsAttr(p.src)} alt="" loading="lazy" fetchpriority="low" decoding="async"><noscript><img src="${src}"${imgDimsAttr(p.src)} alt=""></noscript>${more}</button>`;
   }).join('');
+  const thumbs = thumbsFor(false);
   // Round 9 (2026-10-19): the full-screen viewer lists the smaller copies too, so a phone takes the 960px one.
   const slideSrcset = (src) => {
     const w = Number((/width="(\d+)"/.exec(imgDimsAttr(src)) || [])[1]) || 0;
@@ -37552,7 +37602,9 @@ function venueGalleryHtml(venue, photos, L) {
     return list.length ? ` srcset="${list.map(([u, x]) => `${escapeHtml(u)} ${x}w`).join(', ')}, ${escapeHtml(src)} ${w}w" sizes="100vw"` : '';
   };
   const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${slideSrcset(p.src)}${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(String(p.credit).replace(/^\s*photos?\s*:\s*/i, ''))}</figcaption>` : ''}</figure>`).join('');
-  return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`, viewer: `
+  return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`,
+    phone: (credit) => `<div class="vg-phone"><div class="vg-strip vg-count-${shown.length}">${thumbsFor(true)}</div>${credit || ''}</div>${VENUE_THUMB_LOADER_SCRIPT}`,
+    viewer: `
       <dialog class="vg-dialog" id="venueGallery" aria-label="${L(`Photos of ${name}`, `Photos de ${name}`)}">
         <div class="vg-bar"><span class="vg-count" aria-live="polite">1 / ${n}</span><button type="button" class="vg-close" aria-label="${L('Close photos', 'Fermer les photos')}">&times;</button></div>
         <div class="vg-track" tabindex="0">${slides}</div>
@@ -37568,6 +37620,14 @@ function venueGalleryHtml(venue, photos, L) {
         .vg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .vg-thumb:focus-visible { outline: 3px solid #2A6B67; outline-offset: 2px; }
         .vg-mosaic + .venue-photo-credit { margin-top: 6px !important; margin-bottom: 14px !important; }
+        /* Round 11 (2026-10-20): phones show the strip and credit after the buttons (.vg-phone), wider screens by the photo. */
+        .vg-phone { display: none; }
+        .vg-phone .vg-strip { margin: 0 0 6px; }
+        .vg-phone .venue-photo-credit { margin: 0 2px !important; }
+        @media (max-width: 640px) {
+          .vg-mosaic .vg-strip, .vg-mosaic + .venue-photo-credit { display: none; }
+          .vg-phone { display: block; margin: 0 0 16px; }
+        }
         .vg-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(27,43,58,0.6); color: #fff; font: 800 1rem 'Nunito', 'Nunito Fallback', sans-serif; }
         /* Wide screens: main photo on the left, the other photos as a 2x2
            grid on the right at the same height, so the venue name below is
@@ -37604,7 +37664,8 @@ function venueGalleryHtml(venue, photos, L) {
         function cur(){ return Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); }
         function go(i, smooth){ i = Math.max(0, Math.min(n - 1, i)); track.scrollTo({ left: i * track.clientWidth, behavior: smooth ? 'smooth' : 'auto' }); count.textContent = (i + 1) + ' / ' + n; }
         function open(i){ d.showModal(); go(i, false); track.focus(); }
-        document.querySelectorAll('[data-vg-open]').forEach(function(b){ b.addEventListener('click', function(){ open(+b.getAttribute('data-vg-open') || 0); }); });
+        // Round 11: one listener for every [data-vg-open] button, including the phone strip further down the page.
+        document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('[data-vg-open]') : null; if (b) open(+b.getAttribute('data-vg-open') || 0); });
         d.querySelector('.vg-close').addEventListener('click', function(){ d.close(); });
         d.querySelector('.vg-prev').addEventListener('click', function(){ go(cur() - 1, true); });
         d.querySelector('.vg-next').addEventListener('click', function(){ go(cur() + 1, true); });
@@ -37690,7 +37751,7 @@ async function handleOwnerPhotoUpload(req, res, token) {
   }
   // The smaller copies the browser made (round 9, 2026-10-19). A missing or bad one is skipped, never an error:
   // the page then uses the original, and the backfill script can add it later.
-  saveOwnerPhotoCopies(file, dims, { w480: body.image_w480, w960: body.image_w960, w1200: body.image_w1200 });
+  saveOwnerPhotoCopies(file, dims, { w160: body.image_w160, w240: body.image_w240, w480: body.image_w480, w960: body.image_w960, w1200: body.image_w1200 });
   const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
   const id = Number(db.prepare(`INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, contact_name, contact_email, rights_confirmed_at, ip_hash)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`).run(venue.id, file, previewKey, dims.width, dims.height, buf.length, credit, contactName, contact.email,
@@ -41234,7 +41295,7 @@ function ownerPhotoSizesList() {
       file_present: !!ownerPhotoPath(r.file) && fs.existsSync(ownerPhotoPath(r.file)), has, needs };
   });
 }
-// body: { w480, w960, w1200 (JPEG data URLs), replace?: true } -> { status, body }
+// body: { w160, w240, w480, w960, w1200 (JPEG data URLs), replace?: true } -> { status, body }
 function saveOwnerPhotoCopiesById(id, body) {
   const row = db.prepare('SELECT id, file, status, width, height FROM owner_photos WHERE id = ?').get(id);
   if (!row) return { status: 404, body: { error: 'not_found' } };
@@ -41242,7 +41303,7 @@ function saveOwnerPhotoCopiesById(id, body) {
   if (!fs.existsSync(ownerPhotoPath(row.file))) return { status: 410, body: { error: 'file_missing' } };
   const dims = ownerPhotoOriginalDims(row);
   if (!dims) return { status: 410, body: { error: 'file_unreadable' } };
-  const extra = Object.keys(body).filter((k) => !['w480', 'w960', 'w1200', 'replace'].includes(k));
+  const extra = Object.keys(body).filter((k) => !['replace', ...OWNER_PHOTO_SIZES.map((w) => `w${w}`)].includes(k));
   if (extra.length) return { status: 400, body: { error: `Unknown fields: ${extra.join(', ')}` } };
   const r = saveOwnerPhotoCopies(row.file, dims, body, { replace: body.replace === true });
   return { status: r.invalid.length && !r.written.length ? 400 : 200, body: { id, file: row.file, ...r, has: OWNER_PHOTO_SIZES.filter((w) => ownerPhotoHasCopy(row.file, w)) } };
@@ -46156,8 +46217,9 @@ ${ownerFooterHtml(fr)}
         c.width = Math.round(w * scale); c.height = Math.round(h * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         // Round 9 (2026-10-19): 480, 960 and 1200px wide copies go with the photo, so phones and cards get a small one.
+        // Round 11 (2026-10-20): and 160 and 240px ones for the gallery thumbnails.
         var out = { image: c.toDataURL('image/jpeg', 0.85) };
-        [480, 960, 1200].forEach(function(cw){
+        [160, 240, 480, 960, 1200].forEach(function(cw){
           if (cw >= c.width) return;
           try {
             var s = document.createElement('canvas'), sc = s.getContext('2d');
@@ -46190,7 +46252,7 @@ ${ownerFooterHtml(fr)}
         progress.textContent = T.uploading.replace('{i}', i + 1).replace('{n}', files.length);
         return resize(file).then(function(made){
           return fetch(location.pathname + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ image: made.image, image_w480: made.image_w480, image_w960: made.image_w960, image_w1200: made.image_w1200, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
+            body: JSON.stringify({ image: made.image, image_w160: made.image_w160, image_w240: made.image_w240, image_w480: made.image_w480, image_w960: made.image_w960, image_w1200: made.image_w1200, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
             .then(function(r){ return r.json(); })
             .then(function(j){
               if (j && j.ok) { sent++; if (j.live) liveCount++; return; }
@@ -47357,7 +47419,7 @@ const server = http.createServer(async (req, res) => {
       }
       // Round 9 (2026-10-19): also the photo's smaller copies (<name>-w480/-w960/-w1200.jpg), and a URL carrying the
       // file's own ?v= hash (what withVersionedImages writes) is kept for a year like every other image.
-      const im = /^\/images\/owner\/([a-z0-9]{24})(?:-w(480|960|1200))?\.jpg$/.exec(pathname);
+      const im = /^\/images\/owner\/([a-z0-9]{24})(?:-w(160|240|480|960|1200))?\.jpg$/.exec(pathname);
       if (im && method === 'GET') {
         const row = db.prepare("SELECT file FROM owner_photos WHERE file = ? AND status = 'approved'").get(`${im[1]}.jpg`);
         if (!row) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
