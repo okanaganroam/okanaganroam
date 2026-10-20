@@ -82,6 +82,11 @@ const PHRASES = [
   ['jour', 'day'], ['jours', 'days'], ['journee', 'day'], ['journees', 'days'], ['nuit', 'night'], ['nuits', 'nights'],
   ['un', 'a'], ['une', 'a'], ['deux', 'two'], ['trois', 'three'], ['quatre', 'four'], ['cinq', 'five'], ['sept', 'seven'],
   ['huit', 'eight'], ['neuf', 'nine'], ['dix', 'ten'],
+  // Round 14 (2026-10-20): « une journée vins à Oliver » is a wine day (it read "a day wines in Oliver" and planned one
+  // winery between a bakery and a Thai lunch).
+  ['journee vins', 'wine day'], ['journee vin', 'wine day'], ['journee de vins', 'wine day'], ['journee des vins', 'wine day'], ['journee du vin', 'wine day'],
+  ['journee vignobles', 'wineries day'], ['journee des vignobles', 'wineries day'], ['journee dans les vignobles', 'wineries day'],
+  ['week end vins', 'wine weekend'], ['week end vin', 'wine weekend'], ['week end des vins', 'wine weekend'], ['fin de semaine vins', 'wine weekend'],
   // pace (a French adjective follows its noun: "une journée relaxe")
   ['journee relaxe', 'relaxed day'], ['journee tranquille', 'relaxed day'], ['journee detente', 'relaxed day'],
   ['journee de detente', 'relaxed day'], ['jour de detente', 'relaxed day'], ['journee relax', 'relaxed day'],

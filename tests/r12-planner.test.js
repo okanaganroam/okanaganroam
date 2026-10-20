@@ -395,10 +395,9 @@ test('Server (round 12): My Trip dates a ski hill by its opening-day event on Wh
   assert.deepEqual(app.tripOpeningDayFor('big-white', MONDAY_NOON), { date: '2030-11-26', name: 'R12 Big White Opening Day' });
   assert.equal(app.tripOpeningDayFor('kelowna', MONDAY_NOON), null);
   const on = (d) => app.tripStopsFor([`venue:${hill.id}`], MONDAY_NOON, { [`venue:${hill.id}`]: d })[0].notice;
-  const jan = on('2031-01-16');
-  assert.equal(jan.kind, 'seasonal');
-  assert.equal(jan.text, 'Seasonal — the season opens Nov 26 (opening day on What’s On)');
-  assert.equal(jan.textFr, 'Saisonnier — la saison ouvre le 26 nov. (journée d’ouverture à l’affiche)');
+  // Round 14 (2026-10-20): a January date is in the open season, so there is nothing to warn about (it said
+  // "Seasonal — the season opens Nov 26").
+  assert.equal(on('2031-01-16'), null);
   const before = on('2030-11-20');
   assert.equal(before.kind, 'closed');
   assert.match(before.text, /Opens Nov 26/);

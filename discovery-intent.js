@@ -710,7 +710,8 @@ function findLengths(normalized) {
   // claimed, so "beach" and "wine" are still read as what the day is for.
   // Round 8 (2026-10-19): with or without "a" -- "Naramata wine day", "vegan food day in Penticton" -- and for food and
   // tasting days too. "X day" is one day, never a list of places.
-  const THEMED_DAY_RE = /\b(?:beach|lake|wine|winery|tasting|ski|golf|hiking|family|fun|lazy|chill|girls|guys|brewery|patio|museum|budget|cheap|student|food|foodie|eating|vegan|vegetarian|shopping|outdoor|outdoors|adventure|arts?|culture|kids?|date|romantic|cider|coffee|cafe|brunch|lunch|snow|snowshoe|bike|biking|cycling|paddle|water|farm|market|picnic) (day)\b(?! (?:passes?|tickets?|trips? (?:to|from)|use|camps?|spas?))|\b(day) out\b/g;
+  // Round 14 (2026-10-20): "dog-friendly day in Vernon" too (it gave an Ideas list).
+  const THEMED_DAY_RE = /\b(?:beach|lake|wine|winery|tasting|ski|golf|hiking|family|fun|lazy|chill|girls|guys|brewery|patio|museum|budget|cheap|student|food|foodie|eating|vegan|vegetarian|shopping|outdoor|outdoors|adventure|arts?|culture|kids?|date|romantic|cider|coffee|cafe|brunch|lunch|snow|snowshoe|bike|biking|cycling|paddle|water|farm|market|picnic|dog friendly|dog|dogs|pet friendly) (day)\b(?! (?:passes?|tickets?|trips? (?:to|from)|use|camps?|spas?))|\b(day) out\b/g;
   // "A rainy day in Vernon", "rainy day in Penticton" too, but not "coffee and dinner on a rainy day" (the weather on
   // an outing) or "rainy day ideas".
   const RAINY_DAY_RE = /(?<!\b(?:on|for|if|in case of) (?:a |one )?)\b(?:(?:a|one) rainy (day)\b(?! (?:backups?|plans?|options?|activit\w*|ideas?|spots?|places?|things?))|rainy (day) (?=in |at |around ))/g;
@@ -1924,7 +1925,8 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     out.leftoverTerms = out.leftoverTerms.filter((w) => !lakeWords.includes(w));
   }
   // 2026-10-14: a "brewery crawl", "pub crawl" or "wine hop" is three stops of that kind in a row, not a list.
-  const CRAWL_TYPES = ['brewery', 'pub', 'winery', 'cocktail', 'distillery'];
+  // Round 14 (2026-10-20): "cafe hopping" too (a dated "cafe hopping in Kelowna" gave an Ideas list, not a plan).
+  const CRAWL_TYPES = ['brewery', 'pub', 'winery', 'cocktail', 'distillery', 'cafe'];
   if (parts.length === 1 && parts[0].kind === 'venue' && !parts[0].meal && parts[0].types.length && parts[0].types.every((ty) => CRAWL_TYPES.includes(ty))
     && /\b(?:crawl|crawls|hop|hopping)\b/.test(normalized)) {
     parts = [parts[0], JSON.parse(JSON.stringify(parts[0])), JSON.parse(JSON.stringify(parts[0]))];

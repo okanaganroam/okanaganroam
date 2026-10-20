@@ -333,6 +333,8 @@ function buildContext(intent, labels, options) {
     pace,
     seed: Number.isInteger(opts.seed) ? opts.seed : 0,
     exclude: new Set(opts.excludeIds || []),
+    // Round 14: places the visitor kept on the plan (Swap pins the other stops), so an appointment-only place they kept stays.
+    pinnedIds: new Set(Object.values(opts.pinned || {}).filter((x) => Number.isInteger(x))),
     // Stage 3.5: what the visitor ruled out, split into what is applied and
     // what is not (discovery-search.js exclusionPlan -- the /search rules).
     exclusions: exclusionPlan(intent.excluded),
@@ -539,6 +541,9 @@ function eligible(v, ctx, strict) {
   // Round 7 (2026-10-19): a trip for a named month or season ("in January") is judged on that month's date.
   if (!ctx.itinerary && !ctx.requirements && (ctx.seasonInfo && ctx.tripDate ? seasonClosedOnTrip(v, { date: ctx.tripDate }) : v.seasonClosedToday)) return false;
   if (!ctx.itinerary && !ctx.requirements && v.ownerClosures && seasonClosedOnTrip({ ownerClosures: v.ownerClosures }, null)) return false;
+  // Round 14 (2026-10-20): a place visited only by appointment or reservation (Martin's Lane, a $200 private tour) is
+  // booked ahead, so it is never a default stop or a Swap pick unless the request names it or asks for a booked visit.
+  if (appointmentOnly(v) && !appointmentKept(v, ctx)) return false;
   // A budget request (cheap, budget, affordable) is about food, not wine tastings (2026-10-18).
   if (ctx.budget === 'budget' && BUDGET_SKIPPED_TYPES.includes(v.type) && !ctx.types.has(v.type)) return false;
   if (ctx.budget === 'budget' && !ctx.types.has(v.type) && !ctx.plannerKinds.length && budgetPaid(v)) return false;
@@ -682,6 +687,9 @@ function scoreVenue(v, ctx) {
   // Kids are not taken to a meadery, cidery or casino on a rainy day, nor to indoor golf unless golf was asked for.
   if (ctx.kids && v.type === 'indoor' && KIDS_ADULT_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('kids_adult_setting', -40, null);
   if (ctx.kids && v.type === 'golf' && !ctx.types.has('golf')) add('kids_golf', -15, null);
+  // Round 14 (2026-10-20): an indoor playground for small children is not an afternoon out for adults (Play Area Kelowna
+  // was day 2 of a plain Kelowna weekend).
+  if (!ctx.kids && v.type === 'indoor' && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('kids_only', -30, null);
   if (ctx.kids && v.type === 'indoor' && RAIN_BACKUP_KIDS_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('kids_indoor_fun', 8, 'Indoor fun for kids');
   if (ctx.rainy && v.type === 'indoor' && /\b(?:ranch|farm|garden|gardens|orchard)\b/.test(v.textName || '')) add('rainy_mostly_outdoors', -8, null);
   // A party that doesn't drink is not sent to a winery or brewery restaurant for dinner (2026-10-14).
@@ -696,6 +704,8 @@ function scoreVenue(v, ctx) {
 // arcades, climbing) come first; venues for members or adults (casinos, gyms, studios) only when asked for by name.
 // Dishes and cuisines ("pizza", "sushi", "tacos") are capped per day; words like "quiet" or "local" are not.
 const DISH_WORDS_RE = /^(?:pizzas?|burgers?|sushi|tacos?|ramen|pho|bbq|barbecue|steaks?|steakhouse|seafood|fish and chips|wings|poutine|noodles?|dumplings?|curry|indian|thai|mexican|italian|chinese|japanese|korean|greek|vietnamese|french|middle eastern|lebanese|sandwich(?:es)?|ice cream|gelato|donuts?|doughnuts?|crepes?|waffles?|pancakes?|pasta|tapas|dim sum|shawarma|kebabs?|fried chicken|hot dogs?)$/;
+const BRUNCH_FOOD_RE = /\b(?:brunch|breakfast|breakfasts|eggs benedict|benny|bennies|pancakes?|waffles?|omelett?es?|french toast|hash browns?|diner)\b/;
+const KIDS_ONLY_RE = /\b(?:indoor playground|indoor play (?:centre|center|area|space)|play area|playhouse cafe|ball pit|play structures|for (?:young|little|small) (?:kids|children|ones)|toddlers?|preschoolers?)\b/;
 const THINGS_TO_DO_RE = /\b(?:things? to do|something (?:fun )?to do|stuff to do|what to do|what can we do|activities|something fun|fun things|have fun)\b/;
 const TEEN_FUN_WORDS = ['escape', 'arcade', 'laser tag', 'go kart', 'go karts', 'karting', 'climbing', 'bouldering', 'trampoline', 'mini golf', 'bowling', 'zipline', 'zip line', 'axe throwing', 'paintball', 'virtual reality', 'vr', 'waterslide', 'water park', 'bike park', 'skate park'];
 const SOFT_FEATURES = ['patio', 'lake_view', 'happy_hour', 'live_music', 'great_groups', 'sports_tv', 'open_late', 'open_early'];
@@ -912,14 +922,23 @@ function notAMeal(v) {
 // Round 12: a winery (or any stop) whose own listing or notice says it is by appointment only is booked ahead, so it
 // is not a walk-in first tasting or a filler (Martin's Lane, $200 by appointment). Returns the venue's own sentence.
 const APPOINTMENT_RE = /\b(?:by appointment(?: only)?|appointment only|appointments? (?:required|necessary|only)|reservations? (?:required|only)|booking required|private tastings? only)\b/i;
+// Round 14 (2026-10-20): a sentence that limits appointments to part of the year ("in winter, visits are by appointment
+// only", "by appointment after December 14") does not make the place appointment-only now.
+const APPOINTMENT_SEASONAL_RE = /\b(?:in (?:the )?winter|winter months|off[- ]season|after (?:the )?(?:season|harvest|thanksgiving|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b|from (?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b|until (?:spring|may|april|june)|outside (?:of )?(?:the )?season|unless)\b/i;
 function appointmentNotice(v) {
   if (!v) return null;
   const sources = [v.advisory && v.advisory.note, v.plannerDescription || v.description].filter(Boolean).map(String);
   for (const text of sources) {
-    const sentence = text.replace(/https?:\/\/\S+/g, '').split(/(?<=[.!?])\s+/).find((x) => APPOINTMENT_RE.test(x));
+    const sentence = text.replace(/https?:\/\/\S+/g, '').split(/(?<=[.!?])\s+/).find((x) => APPOINTMENT_RE.test(x) && !APPOINTMENT_SEASONAL_RE.test(x));
     if (sentence) return sentence.trim();
   }
   return null;
+}
+// "A private tasting", "by appointment": the visitor asked for a booked visit, so appointment-only places can be stops.
+const APPOINTMENT_ASKED_RE = /\b(?:by appointment|appointments?|private (?:tours?|tastings?|visits?)|book(?:ed)? (?:a )?(?:private )?(?:tour|tasting))\b/;
+function appointmentKept(v, ctx) {
+  const q = (ctx && ctx.queryText) || '', own = v && (v.textName || normWords(v.name || ''));
+  return namedInRequest(v, ctx) || !!(ctx && ctx.pinnedIds && ctx.pinnedIds.has(v.id)) || APPOINTMENT_ASKED_RE.test(q) || !!(own && own.length >= 4 && q.includes(own));
 }
 function appointmentOnly(v) { return !!appointmentNotice(v) && !/\b(?:walk[- ]?ins? (?:are )?(?:welcome|available)|no appointments? (?:needed|necessary|required)|appointments? (?:are )?not required)\b/i.test(`${v.plannerDescription || v.description || ''}`); }
 function namedInRequest(v, ctx) { return !!(ctx && ctx.requirements && (ctx.requirements.items || []).some((i) => i.kind === 'venue' && i.value === v.id)); }
@@ -935,26 +954,82 @@ function rotationNudge(v, ctx) {
   for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
   return (h % 1000) / 1000 * (DINING_TYPES.includes(v.type) ? 3 : 4);
 }
-// The pick for a slot from candidates sorted best first: the best, or another place of the SAME kind within ROTATE_MARGIN
-// points of it whose rotation nudge lifts it higher. The kind of stop (a pub or a restaurant, a beach or a café) and
-// every hard rule are decided before this, so rotation only chooses among near-equal places of one kind.
-const ROTATE_MARGIN = 3;
-function rotateWithinType(cands, ctx, score = (c) => c.score) {
+// The pick for a slot from candidates sorted best first: the best, or another good place of the SAME kind whose rotation
+// nudge lifts it higher. The kind of stop (a pub or a restaurant, a beach or a café) and every hard rule (open then, in
+// season, in the town asked for) are decided before this, so rotation only chooses among near-equal places of one kind.
+// Round 14 (2026-10-20): the rotation was so narrow that Knox Mountain, Frankie We Salute You! and Rosalinda's were in
+// 7-8 of 60 plans. It now picks among up to ROTATE_TOP good places within ROTATE_MARGIN points, seeded by what the request
+// means, its date and the slot (day and time of day), and the town's default (the best place) gives way a little more for
+// the first stop of a day and for lunch. A place that is farther than ROTATE_MAX_KM from the default, an outfitter or an
+// appointment-only place never rotates in, and neither does one missing a reason the default was chosen for (a badge or
+// cuisine asked for, the season, a theme).
+const ROTATE_MARGIN = 6;
+const ROTATE_TOP = 8;
+const ROTATE_MAX_KM = 12;
+const ROTATE_DEFAULT_GIVE = 2.5;
+// A rental base, tour, charter or lesson is booked ahead, so it never rotates in as a walk-in stop.
+const ROTATE_BOOKED_NAME_RE = /\b(?:ballooning|balloon|sports cent(?:re|er)|watersports|water sports|marina|boat club|ski school)\b/;
+const ROTATE_BOOKED_DESC_RE = /\b(?:rental base|rentals? (?:shop|base|company|outlet)|grab a boat|balloon (?:tours?|rides?|flights?)|hot air balloon|guided (?:tours?|trips?|rides?|hikes?)|tour (?:company|operator)|adventure tour|book (?:a|your) (?:tour|trip|ride|spot|flight|seat))\b/;
+function rotateBooked(v) {
+  if (!v || DINING_TYPES.includes(v.type) || v.type === 'winery') return false;
+  const name = v.textName || normWords(v.name || ''), desc = v.textDesc || normWords(v.plannerDescription || v.description || '');
+  return bookedOutfitter(v) || OUTFITTER_NAME_RE.test(name) || ROTATE_BOOKED_NAME_RE.test(name) || OUTFITTER_DESC_RE.test(desc) || ROTATE_BOOKED_DESC_RE.test(desc)
+    || /\bbook (?:a|an|your)\b.{0,60}\b(?:sessions?|tours?|class(?:es)?|slots?|times?|seats?|spots?)\b|\bwalk ins? (?:aren t|are not|isn t|not) guaranteed\b/.test(desc)
+    // A remote forest-road campsite is a trip of its own, not a stand-in for the town's own park (Lambly Lake for a West Kelowna morning).
+    || /\b(?:recreation site|campground|campsites?|rv park|forest (?:service )?road|backcountry|4x4)\b/.test(`${name} ${desc}`);
+}
+function rotationSlotNudge(v, ctx, slot) {
+  const seed = ctx && (ctx.rotationKey || ctx.queryText);
+  if (!v || !seed) return 0;
+  let h = 2166136261;
+  const key = `r14|${seed}|${slot || ''}|${v.id}`;
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  // murmur3's finalizer, so requests that differ by a word or two don't favour the same place.
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b) >>> 0; h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0; h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function rotateWithinType(cands, ctx, score = (c) => c.score, opts = {}) {
   const best = cands && cands[0];
   if (!best || !ctx || !(ctx.rotationKey || ctx.queryText)) return best || null;
-  let pick = best, top = score(best) + rotationNudge(best.v, ctx);
-  // A reason the best place has beyond its rating and distance (in season, a Local Favourite, the Lake View badge, a
-  // feature asked for) must be one the other place has too.
-  const ROUTINE = ['rating', 'nearby', 'hours', 'jitter', 'region', 'community', 'meal', 'complement', 'gap', 'theme'];
-  const special = (x) => new Set((x.reasons || []).filter((r) => (r.weight == null || r.weight > 0) && !ROUTINE.includes(r.code)).map((r) => `${r.code}:${r.code === 'collection_bonus' || r.code === 'feature' || r.code === 'season' ? r.text : ''}`));
+  // A reason the best place has beyond its rating and distance (in season, the Lake View badge, a feature or food asked
+  // for) must be one the other place has too. Being a Local Favourite or Hidden Gem is a small bonus, not a reason.
+  const ROUTINE = ['rating', 'nearby', 'hours', 'jitter', 'region', 'community', 'meal', 'complement', 'gap', 'theme', 'collection_bonus', 'daypart'];
+  const special = (x) => new Set((x.reasons || []).filter((r) => (r.weight == null || r.weight > 0) && !ROUTINE.includes(r.code)).map((r) => `${r.code}:${r.code === 'feature' || r.code === 'season' || r.code === 'activity' ? r.text : ''}`));
   const need = special(best);
+  // A pick led by the season the visitor named (a ski hill in January) keeps its best match.
+  if ([...need].some((k) => k.startsWith('season:'))) return best;
+  // A ski hill is a destination of its own; another winter park is not a stand-in for it.
+  if (/\bski\b/.test(best.v.textName || normWords(best.v.name || ''))) return best;
+  // The Local Favourite / Hidden Gem bonus (3 points) breaks ties for the best place; it is left out when places rotate.
+  const bonus = (x) => (x.reasons || []).filter((r) => r.code === 'collection_bonus').reduce((n, r) => n + (r.weight || 0), 0);
+  const plain = (x) => score(x) - bonus(x);
+  const pool = [best];
   for (const c of cands) {
-    if (c === best || c.v.type !== best.v.type || score(best) - score(c) > ROTATE_MARGIN) continue;
+    if (pool.length >= ROTATE_TOP) break;
+    if (c === best || !c.v || c.v.type !== best.v.type || plain(best) - plain(c) > ROTATE_MARGIN || score(best) - score(c) > ROTATE_MARGIN + 3) continue;
     if (need.size) { const has = special(c); if ([...need].some((k) => !has.has(k))) continue; }
     if (!!c.v.price !== !!best.v.price || (c.v.price && best.v.price && Math.abs(c.v.price - best.v.price) > 1)) continue; // same price band
-    const t = score(c) + rotationNudge(c.v, ctx);
+    if (c.v.rating != null && best.v.rating != null && best.v.rating - c.v.rating > 0.4) continue; // never a clearly weaker place
+    if (DINING_TYPES.includes(c.v.type)) {
+      // Dinner never rotates down to a $ place (unless the best one is $), and no meal to a fast-food counter.
+      if (opts.dinner && best.v.price >= 2 && c.v.price != null && c.v.price < 2) continue;
+      if (fastFood(c.v) && !fastFood(best.v)) continue;
+    }
+    if (rotateBooked(c.v) && !rotateBooked(best.v)) continue;
+    if (appointmentOnly(c.v) && !appointmentOnly(best.v)) continue;
+    const km = kmOrNull(best.v, c.v);
+    if (km != null && km > ROTATE_MAX_KM) continue;
+    pool.push(c);
+  }
+  if (process.env.ROTDBG) console.error('ROT', opts.slot, best.v.name, score(best).toFixed(1), '=>', pool.map((c) => c.v.name + ' ' + score(c).toFixed(1)).join(' | '), 'need', [...need].join(','));
+  if (pool.length < 2) return best;
+  let pick = best, top = -Infinity;
+  for (const c of pool) {
+    let t = plain(c) + rotationSlotNudge(c.v, ctx, opts.slot) * ROTATE_MARGIN;
+    if (c === best) t -= opts.opening || opts.lunch ? ROTATE_DEFAULT_GIVE : ROTATE_DEFAULT_GIVE / 2;
     if (t > top) { pick = c; top = t; }
   }
+  if (process.env.ROTDBG) console.error('  PICK', pick.v.name);
   return pick;
 }
 function stopFrom(v, scored, extra, ctx) {
@@ -1163,13 +1238,17 @@ function buildOuting(facts, ctx) {
   // 11 km from dinner no longer beats one next door on its own score alone.
   let picks = [];
   if (steps.length === 2) {
-    let best = null;
+    const pairs = [];
     for (const first of candidatesFor(steps[0], null, new Set()).slice(0, 12)) {
       const second = candidatesFor(steps[1], first.v, new Set([first.v.id]))[0];
       const total = first.score + (second ? second.score : -60);
-      if (!best || total > best.total + 1e-9) best = { total, pair: [first, second || null] };
+      pairs.push({ v: first.v, score: total, reasons: first.reasons, pair: [first, second || null] });
     }
-    picks = best ? best.pair : [null, null];
+    // Round 14 (2026-10-20): near-equal drink-and-dinner pairs rotate by request (every Kelowna date night was the same
+    // two places); the pair's first stop must be the same kind as the best pair's, and its dinner must exist.
+    pairs.sort((a, b) => b.score - a.score || compareScored({ score: 0, v: a.v }, { score: 0, v: b.v }));
+    const chosen = pairs.length ? rotateWithinType(pairs.filter((x, i) => i === 0 || x.pair[1]), ctx, undefined, { slot: 'outing', dinner: true }) : null;
+    picks = chosen ? chosen.pair : [null, null];
   } else {
     const used = new Set();
     let prev = null;
@@ -1376,7 +1455,7 @@ function offSeasonSkip(v, ctx) {
 function pickLunchNear(pool, ctx, d, info, near, used, reserved, base, focuses, onceTerms, onceEvening, tripCuisines, centroids, neighbours) {
   const nextToCafe = (neighbours || []).some((st) => st && st.venue && st.venue.type === 'cafe');
   const pick = (towns, far) => {
-    const cands = [];
+    let cands = [];
     for (const v of pool) {
       if (used.has(v.id) || reserved.has(v.id)) continue;
       if (!(v.type === 'restaurant' || v.type === 'pub' || (v.type === 'cafe' && ['coffee', 'unclear'].includes(cafeRole(v))))) continue;
@@ -1400,7 +1479,11 @@ function pickLunchNear(pool, ctx, d, info, near, used, reserved, base, focuses, 
       cands.push({ v, score, reasons: base.get(v.id).reasons.concat(fit.reasons, extra), caveats: fit.caveats.concat(far ? [nearbyTownCaveat(ctx, centroids, info.regionList, v.region, 'lunch')] : []) });
     }
     cands.sort(compareScored);
-    return rotateWithinType(cands, ctx); // round 12: near-equal lunches rotate by request
+    // Round 14: a pub is lunch only when no restaurant or café fits (the midday slot has no pub affinity).
+    // When only a pub is left in town, a restaurant in a town nearby is tried first.
+    if (cands.some((c) => c.v.type !== 'pub')) cands = cands.filter((c) => c.v.type !== 'pub');
+    else if (cands.length && !far && info.regionList.length) return null;
+    return rotateWithinType(cands, ctx, undefined, { slot: `${d}-lunch`, lunch: true }); // near-equal lunches rotate by request
   };
   const here = pick(info.regionList, false);
   if (here || !info.regionList.length) return here;
@@ -1814,7 +1897,7 @@ function buildDays(facts, ctx, days, pinned) {
           cands.push({ v, score, reasons: s.reasons.concat(extra), caveats: fit.caveats.concat(seasonal ? seasonal.caveats : [], dist.caveats) });
         }
         cands.sort(compareScored);
-        chosen = rotateWithinType(cands, ctx); // round 12: near-equal places of the chosen kind rotate by request
+        chosen = rotateWithinType(cands, ctx, undefined, { slot: `${d}-${daypart}`, opening: daypart === dayDayparts[0], lunch: daypart === 'midday' && DINING_TYPES.includes((cands[0] || {}).v?.type), dinner: daypart === 'evening' || daypart === 'night' }); // near-equal places of the chosen kind rotate by request
       }
       // A nice-to-have badge (patio, lake view, happy hour) that leaves an afternoon or evening empty is relaxed for that
       // slot, and the stop says which badge it lacks (2026-10-14: an Osoyoos dog weekend had no second dinner).
@@ -2173,7 +2256,7 @@ function pickMeal(pool, ctx, d, daypart, near, used, opts) {
     return { ...pick, caveats: ['No $$$ or fine-dining restaurant open that evening is listed nearby on Okanagan Roam, so this is the best sit-down dinner left'] };
   }
   themePick(cands); // sorts best first
-  return rotateWithinType(cands, ctx); // round 12: near-equal meals of one kind rotate by request
+  return rotateWithinType(cands, ctx, undefined, { slot: `${d}-${daypart}-meal`, lunch: daypart === 'midday', dinner: daypart !== 'midday' }); // near-equal meals of one kind rotate by request
 }
 function isLunchPart(daypart) { return daypart === 'midday'; }
 
@@ -2955,6 +3038,8 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // (Naramata Creek's 2.5 km waterfall walk and Giant's Head with kids were still given 3 hours).
         const trailTime=(hiking||candidate.type==='outdoor')&&one?.visits?.[0]?.durationSource!=='listing'?trailMinutes(candidate):null;
         let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
+        // Round 14 (2026-10-20): a café that is the brunch or lunch stop is a meal (60-75 minutes), not a 40-minute coffee.
+        if(candidate.type==='cafe'&&!stop.gapFill&&!stop.afterSki){if(/\b(?:brunch|breakfast)\b/i.test(stop.label||''))duration=Math.max(duration,75);else if(isLunchStop(stop))duration=Math.max(duration,60);}
         // Round 11: before a fixed-time show, a walk or a visit leaves room for the meals between it and the show (lunch
         // before a 2 PM show was a "Timing conflict" after a three-hour morning trail).
         if(beforeEvent&&cursor!=null&&!isLunchStop(stop)&&!isDinnerStop(stop)&&SWAP_FLEX_TYPES.includes(candidate.type)){
@@ -3084,7 +3169,10 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         stop.waitMinutes=timed.wait;cursor=timed.end;previous=v;provisional=provisional||timed.provisional;
         if(skiResume){cursor=skiResume.end;previous=skiResume.v;item.onHill=true;}
         note=`Estimated visit ${clock(timed.start)}–${clock(timed.end)} on ${date}, within listed hours${assumed?'; uses an assumed start time':''}. Visit length and transfers are estimates; confirm before visiting.${beforeEvent?' Leaves a 30-minute arrival allowance before the event; event travel time still needs confirmation.':''}`;
-        if(provisional){const certainty=(timed.unknownHours?'This stop’s opening hours are not verified.':timed.textHours?'Opening hours are taken from listing text and remain provisional.':'This visit fits the listed opening hours.')+(precedingProvisional?' Timing remains provisional because a preceding stop is provisional.':'');note=`Provisional visit ${clock(timed.start)}–${clock(timed.end)} on ${date}. ${certainty} Uses planning allowances for visit length and travel. Trail duration is not verified. Confirm trail duration, opening hours and the route before relying on this schedule.`;if((requirements.shortWalkVenueIds||[]).includes(v.id))note+=' Short easy walk selected; 30–60-minute planning allowance, not a verified trail duration.';if(v.type==='sport')note=note.replace(' Trail duration is not verified.','').replace('Confirm trail duration, opening hours and the route before relying on this schedule.','Sports visit length is a planning allowance, not a verified session or booking; confirm access, opening hours and the route with the operator.');if(v.type!=='sport'&&!(v.activities||[]).includes('hiking')&&!(v.plannerKinds||[]).includes('guided_hike'))note=note.replace(' Trail duration is not verified.','').replace('Confirm trail duration, opening hours and the route before relying on this schedule.','Confirm visit duration, opening hours and travel before relying on this schedule.');if(timed.listingTiming)note+=' Uses timing from listing text; confirm the chosen trail and any temporary closures.';dayToConfirm=true;}
+        if(provisional){const certainty=(timed.unknownHours?'This stop’s opening hours are not verified.':timed.textHours?'Opening hours are taken from listing text and remain provisional.':'This visit fits the listed opening hours.')+(precedingProvisional?' Timing remains provisional because a preceding stop is provisional.':'');note=`Provisional visit ${clock(timed.start)}–${clock(timed.end)} on ${date}. ${certainty} Uses planning allowances for visit length and travel. Trail duration is not verified. Confirm trail duration, opening hours and the route before relying on this schedule.`;if((requirements.shortWalkVenueIds||[]).includes(v.id))note+=' Short easy walk selected; 30–60-minute planning allowance, not a verified trail duration.';if(v.type==='sport')note=note.replace(' Trail duration is not verified.','').replace('Confirm trail duration, opening hours and the route before relying on this schedule.','Sports visit length is a planning allowance, not a verified session or booking; confirm access, opening hours and the route with the operator.');if(v.type!=='sport'&&!(v.activities||[]).includes('hiking')&&!(v.plannerKinds||[]).includes('guided_hike'))note=note.replace(' Trail duration is not verified.','').replace('Confirm trail duration, opening hours and the route before relying on this schedule.','Confirm visit duration, opening hours and travel before relying on this schedule.');if(timed.listingTiming)note+=' Uses timing from listing text; confirm the chosen trail and any temporary closures.';
+          // Round 14 (2026-10-20): a ski day runs on lift hours (about 9 to 3:30), not a trail's length.
+          if(stop.skiDay)note=`Provisional ski day ${clock(timed.start)}–${clock(timed.end)} on ${date}, about lift opening to closing; lunch is on the hill. Confirm lift hours, conditions and tickets before you go.`;
+          dayToConfirm=true;}
       }else{
         // Round 8: a stop that cannot fit keeps the day's clock where it was, so the stops after it are still timed.
         if(!timed?.bad)cursor=null;
@@ -3108,7 +3196,8 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // one "Confirm times before you go" note (2026-10-18), not a warning per stop.
         if(timed?.bad||item.mealWindow){const warning=`${v?.name||stop.event?.name||'Stop'}: ${note}`;plan.warnings.push(warning);plan.scheduleWarnings.push(warning);}else dayToConfirm=true;
       }
-      if(v && !stop.lit && !v.indoorGolf && (['outdoor','beach','golf'].includes(v.type)||tripRequirements.isOutdoorSport(v)||(v.plannerKinds||[]).includes('guided_hike'))){
+      // Round 14: a ski day is timed by lift hours, so it carries no daylight or sunset margin ("Margin before sunset 30 min").
+      if(v && !stop.lit && !stop.skiDay && !v.indoorGolf && (['outdoor','beach','golf'].includes(v.type)||tripRequirements.isOutdoorSport(v)||(v.plannerKinds||[]).includes('guided_hike'))){
         const light=tripRequirements.estimateDaylight(date,v),hiking=(v.activities||[]).includes('hiking'),margin=(hiking||tripRequirements.isOutdoorSport(v))?30:0;
         const known=light&&Number.isFinite(item.startMinutes)&&Number.isFinite(item.endMinutes);
         const conflict=known&&(item.startMinutes<light.sunriseMinutes||item.endMinutes>light.sunsetMinutes-margin);
@@ -3486,14 +3575,26 @@ function feedDrinkCrawl(result, input, requirements) {
   for (const c of cands) {
     const stop = { kind: 'venue', label: part === 'midday' ? 'Lunch' : 'Dinner', daypart: part, component: null, ...stopFrom(c.v, { reasons: scoreVenue(c.v, ctx).reasons.concat({ code: 'meal', text: 'Something to eat between the tastings', weight: 3 }), caveats: [] }, regionReason(c.v, ctx), ctx), alternates: [] };
     stops.splice(at, 0, stop);
-    if (!timed) return true;
+    if (!timed) { crawlMealExperience(result, venues, stop); return true; }
     scheduleTripByHours(result, input, requirements);
     const r = rowOf(stop);
-    if (r && Number.isFinite(r.startMinutes) && r.status !== 'unmet' && r.status !== 'unverified') return true;
+    if (r && Number.isFinite(r.startMinutes) && r.status !== 'unmet' && r.status !== 'unverified') { crawlMealExperience(result, venues, stop); return true; }
     stops.splice(stops.indexOf(stop), 1);
     scheduleTripByHours(result, input, requirements);
   }
   return false;
+}
+// Round 14 (2026-10-20): the crawl's summary counts the meal it gained and says where it is (the Vernon crawl said
+// "Try a local craft beer first, then try a local craft beer. Both stops are in Vernon" with a lunch between them).
+function crawlMealExperience(result, crawl, meal) {
+  if (!result.experience || !crawl.length || !meal || !meal.venue) return;
+  const noun = { brewery: 'craft breweries', winery: 'wineries', cocktail: 'cocktail bars', distillery: 'distilleries' }[crawl[0].venue.type];
+  if (!noun || !crawl.every((s) => s.venue.type === crawl[0].venue.type)) return;
+  const all = crawl.concat(meal), towns = [...new Set(all.map(townOf).filter(Boolean))];
+  const n = all.length, family = crawl.some((s) => s.component && s.component.kids) ? ' with the family' : '';
+  const flow = `Work your way through ${COUNT_WORDS[crawl.length] || crawl.length} ${noun}, with ${meal.label === 'Dinner' ? 'dinner' : 'lunch'} at ${meal.venue.name} in between${family}.`;
+  const geo = towns.length === 1 ? `All ${COUNT_WORDS[n] || n} stops are in ${towns[0]}, so there’s no need to move between towns. Plan a safe ride home.` : 'Plan a safe ride home.';
+  result.experience = composeExperience(result.experience.title || EXPERIENCE_TITLE, flow, '', geo, all, crawl, null);
 }
 // A holiday the visitor named (round 7): its events are preferred and the plan is called a Halloween trip.
 const HOLIDAY_THEMES = [
@@ -3953,7 +4054,19 @@ function withDayPartRegions(input, intent) {
   intent.regions = plan.order.slice();
   return { ...input, trip: null, tripEvents: [], partRegions: plan };
 }
-function planTrip(input) {
+// Round 14 (2026-10-20): "Other options" never repeat a stop that is already in the plan (a brewery crawl offered its
+// own second and third breweries as options for the first).
+function withoutRepeatedAlternates(result) {
+  if (!result || typeof result !== 'object') return result;
+  const stops = (result.days || []).flatMap((d) => d.stops || []).concat((result.itinerary && result.itinerary.stops) || [], (result.outing && result.outing.stops) || []);
+  const ids = new Set(stops.filter((s) => s && s.venue).map((s) => s.venue.id));
+  const keep = (list) => (list || []).filter((a) => !(a && a.venue && ids.has(a.venue.id)));
+  for (const s of stops) if (s && Array.isArray(s.alternates)) s.alternates = keep(s.alternates);
+  if (result.outing && Array.isArray(result.outing.alternates)) result.outing.alternates = keep(result.outing.alternates);
+  return result;
+}
+function planTrip(input) { return withoutRepeatedAlternates(planTripUnchecked(input)); }
+function planTripUnchecked(input) {
   // A dated plan with nothing else to check is still timed and dated (2026-10-18: a family weekend matched to What's On).
   // 2026-10-19: any start date or start time (the Dates & start time control) is timed too: "romantic weekend in
   // Kelowna" with a date lost its timeline and its dates in My Trip.
@@ -4905,11 +5018,12 @@ function buildExperience(stops, trip, route, ctx, season) {
   }
   if (venues.length < 2) return null; // a description is for a combination
   let flow, geo = '';
-  const CRAWL_NOUNS = { brewery: 'craft breweries', pub: 'pubs', winery: 'wineries', cocktail: 'cocktail bars', distillery: 'distilleries' };
-  const crawlType = venues.length >= 3 && venues.every((s) => s.venue.type === venues[0].venue.type) ? CRAWL_NOUNS[venues[0].venue.type] : null;
+  const CRAWL_NOUNS = { brewery: 'craft breweries', pub: 'pubs', winery: 'wineries', cocktail: 'cocktail bars', distillery: 'distilleries', cafe: 'cafés' };
+  // Round 14 (2026-10-20): two of one kind is a crawl too ("Try a local craft beer first, then try a local craft beer").
+  const crawlType = venues.length >= 2 && venues.every((s) => s.venue.type === venues[0].venue.type) ? CRAWL_NOUNS[venues[0].venue.type] : null;
   if (oneTown && crawlType) {
     flow = `Work your way through ${COUNT_WORDS[venues.length] || venues.length} ${crawlType}, one after another${family}.`;
-    geo = `${together(venues.length)} in ${oneTown}, so there’s no need to move between towns. Plan a safe ride home.`;
+    geo = `${together(venues.length)} in ${oneTown}, so there’s no need to move between towns.${venues[0].venue.type === 'cafe' ? '' : ' Plan a safe ride home.'}`;
   } else if (oneTown) {
     flow = venues.length === 2 ? `${cap(expVerb(venues[0]))} first, then ${expVerb(venues[1])}${family}.` : `${cap(expVerbList(venues))}${family}.`;
     geo = venues.length === 2 ? `${together(2)} in ${oneTown}, keeping the outing simple.` : `${together(venues.length)} in ${oneTown}, so there’s no need to move between towns.`;
@@ -5363,6 +5477,8 @@ function planItinerary(input) {
       if ((!daypart || daytimePart(daypart)) && eveningOnlyVenue(v) && !c.venueId && !EVENING_VENUE_RE.test(normWords(c.phrase || ''))) continue; // round 11
       if (c.wineryLunch && !wineryLunchSpot(v, wineryWords || (wineryWords = wineryNameWords(facts)))) continue;
       if (c.meal && !c.venueId && notAMeal(v) && !(c.cuisines || []).length) continue; // round 12: a dessert stand is not dinner
+      // Round 14 (2026-10-20): a café hop is coffee houses and bakeries, not a sub shop, juice bar or ice-cream counter.
+      if (trip.crawl && v.type === 'cafe' && !c.venueId && !['coffee', 'unclear'].includes(cafeRole(v))) continue;
       const s = scoreVenue(v, ctx);
       const t = requestedTimeFit(v, ctx);
       if (t && t.skip) continue;
@@ -5385,6 +5501,11 @@ function planItinerary(input) {
       let score = s.score + (t ? t.score : 0) + sf.score + (adv ? adv.score : 0) + varietyNudge(v, ctx);
       // Round 12: an appointment-only winery is booked, not a walk-in "drinks" or "tasting" stop, unless it was named.
       if (!c.venueId && appointmentOnly(v)) score -= 25;
+      // Round 14 (2026-10-20): brunch or breakfast is a place that serves it, not a 40-minute coffee house or bakery
+      // ("brunch and a walk in Kelowna" was brunch at Pulp Fiction Coffee).
+      const brunchPart = ['brunch', 'breakfast'].includes(c.meal) && !c.venueId;
+      if (brunchPart && BRUNCH_FOOD_RE.test(`${v.textName || ''} ${v.textCuisine || ''} ${v.textDesc || ''}`)) score += 14;
+      else if (brunchPart && v.type === 'cafe') score -= 14;
       const nearby = input.requirements && !route ? distanceTerm(previousVenue, v, 4, input.requirements.items.some(i => i.kind === 'duration' && i.value <= 120) ? 3 : 15) : {score:0,reasons:[],caveats:[]};
       score += nearby.score;
       // Round 12 (2026-10-20): a time-window stop was not asked for by kind ("Matches your request for breweries" on
@@ -5472,8 +5593,10 @@ function planItinerary(input) {
     }
 
     // Round 12 (2026-10-20): near-equal places of the best one's kind rotate by request (a walk-only plan keeps its order).
-    // A part with a particular ask (skiing, a cuisine, a kind of place) keeps its best match.
-    const pick = walking || c.venueId || (c.activities || []).length || (c.plannerKinds || []).length || (c.cuisines || []).length || c.lake ? pool[0] : rotateWithinType(pool, ctx);
+    // Round 14: a part with a particular ask (a hike, a cuisine, a kind of place) rotates too, among places that match it
+    // as well as the best one does (rotateWithinType keeps the reasons the best one was chosen for); a named place, a
+    // walk-only plan and a lake day keep their best match.
+    const pick = walking || c.venueId || c.lake ? pool[0] : rotateWithinType(pool, ctx, undefined, { slot: `it-${parts.indexOf(p)}`, opening: parts.indexOf(p) === 0, lunch: !!(c.meal && /lunch|brunch/.test(String(c.meal))), dinner: !!(c.meal && /dinner|supper/.test(String(c.meal))) });
     // Say so when a place that would otherwise have ranked first was left
     // out because its advisory says it is closed or under an evacuation order.
     const bestClosed = closedByAdvisory
@@ -5487,6 +5610,13 @@ function planItinerary(input) {
       if (walking && previousVenue) result.warnings.push(`No nearby ${label} with verified coordinates fits the car-free plan within ${walkingLimit} km straight-line of ${previousVenue.name}; the requested stop is left unfilled.`);
       // Round 11 (2026-10-20): a time-window plan ("an evening in West Kelowna") just has fewer stops.
       else if (c.windowStop) result.notes.push(`Nothing for ${c.phrase} is open ${whereText} in that window, so the plan has fewer stops.`);
+      else if (trip.crawl && stops.some((s) => s.kind === 'venue' && s.component && s.component.types && (c.types || []).every((t) => s.component.types.includes(t)))) {
+        // Round 14 (2026-10-20): a crawl with fewer places than asked says how many it has ("No breweries matched in
+        // Vernon" was shown under a crawl with two Vernon breweries).
+        const have = stops.filter((s) => s.kind === 'venue' && s.component && s.component.types && (c.types || []).every((t) => s.component.types.includes(t))).length;
+        const note = `${label.replace(/^./, (x) => x.toUpperCase())} ${whereText}: only ${COUNT_WORDS[have] || have} ${have === 1 ? 'fits' : 'fit'} the plan, so the crawl has ${have === 1 ? 'that one' : `those ${COUNT_WORDS[have] || have}`}.`;
+        if (!result.notes.includes(note)) result.notes.push(note);
+      }
       else result.warnings.push(`No ${c.dog && !/dog/.test(label) ? 'dog-friendly ' : ''}${label} matched ${whereText}, so the rest of the plan is shown.`);
       continue;
     }
@@ -5625,6 +5755,8 @@ function scheduleNotes(result, ctx) {
 
 module.exports = {
   tripTheme,
+  // Build My Trip round 14 (2026-10-20)
+  rotateWithinType, rotateBooked, withoutRepeatedAlternates, appointmentKept, KIDS_ONLY_RE, BRUNCH_FOOD_RE,
   // Build My Trip round 12 (2026-10-20)
   notAMeal, appointmentOnly, appointmentNotice, rotationNudge, daytimeEvent, swapVerb,
   // Build My Trip round 10 (2026-10-19)

@@ -35338,6 +35338,9 @@ function tripStopNotice(venueId, seasons, advisories, onDate = null, venue = nul
     let st = null, row = null;
     try { const rows = getSeasonRows(onDate); row = rows.get(venueId) || null; st = row ? seasonStateOn(row, onDate) : null; } catch (e) { st = null; }
     const opening = st && st.kind === 'closed' && row && !row.reopens_date && venue ? tripOpeningDayFor(venue.region) : null;
+    // Round 14 (2026-10-20): a date in the season after the hill's opening day needs no notice (a January ski day said
+    // "Seasonal — the season opens Nov 26").
+    if (opening && onDate >= opening.date && onDate <= addLocalDays(opening.date, 150) && (tripUsualSeasonMonths(venue) || []).includes(Number(onDate.slice(5, 7)))) return null;
     if (opening && (tripSeasonUnannouncedOn(row, venue, onDate) || onDate < opening.date)) return tripOpeningDayNotice(opening, onDate);
     if (st && st.kind === 'closed' && tripSeasonUnannouncedOn(row, venue, onDate)) return { ...TRIP_SEASONAL_NOTICE, on: onDate };
     if (st) {

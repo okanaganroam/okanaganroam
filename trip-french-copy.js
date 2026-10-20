@@ -346,7 +346,10 @@ function t3FrenchStory(p){
   const seen={dinner:false};
   const parts=d.stops.map(s=>t3FrenchStopText(s,seen));
   if(!parts.length)continue;
-  const lead=one?'Votre journée'+(d.town?' à '+d.town:''):'Le jour '+d.day+(d.town?', à '+d.town+',':'');
+  // Round 14 (2026-10-20): an evening or afternoon plan is « Votre soirée » / « Votre après-midi », not « Votre journée ».
+  const parts0=d.stops.map(s=>s.daypart);
+  const span=parts0.length&&parts0.every(x=>x==='evening'||x==='night')?'Votre soirée':parts0.length&&parts0.every(x=>x==='afternoon'||x==='late'||x==='evening'||x==='night')&&parts0.some(x=>x==='afternoon'||x==='late')?'Votre après-midi':'Votre journée';
+  const lead=one?span+(d.town?' à '+d.town:''):'Le jour '+d.day+(d.town?', à '+d.town+',':'');
   if(parts.length===1){out.push(lead.replace(/,$/,'')+' : '+parts[0]+'.');continue;}
   const first=parts[0],last=parts[parts.length-1],mid=parts.slice(1,-1);
   out.push(lead+' commence par '+first+(mid.length?', puis '+mid.join(', '):'')+', et se termine par '+last+'.');
