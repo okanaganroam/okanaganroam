@@ -31514,7 +31514,7 @@ test('Round 10 help bot: who else can edit, "says closed", a second location, op
     ['est-ce que d’autres peuvent modifier ma fiche', 'access'], ['quelqu’un peut modifier ma fiche sans moi?', 'access'], ['quelqu’un d’autre peut changer ma page', 'access'],
     ['ma fiche dit fermé mais on est ouvert', 'shows-closed'], ['my listing says closed but we’re open', 'shows-closed'],
     ['ajouter un deuxième emplacement', 'more-businesses'], ['how do i add a second location', 'more-businesses'],
-    ['ouvert à l’année maintenant', 'season'], ['we are open year round now', 'season'],
+    ['ouvert à l’année maintenant', 'year-round'], ['we are open year round now', 'year-round'], // round 11: its own topic
     ['ferme pour 1 semaine', 'closures'], ['fermé pour une semaine', 'closures'],
     ['qui êtes-vous', 'about'], ['who are you', 'about'], ['are you a bot', 'about'],
     ['my photos are blurry', 'photo-blurry'], ['mes photos sont floues', 'photo-blurry'],
@@ -31658,7 +31658,7 @@ test('Round 10 map: matches outside the view, show words open this week’s even
     assert.ok(fr.includes("n + ' résultats hors de cette zone de la carte.'") && fr.includes("'Les afficher'"));
     // Show words (« spectacle » reads as "shows") open the Events tab instead of "Nothing called « shows »".
     assert.ok(en.includes("var EVENT_WORDS = ' shows concert concerts"));
-    assert.ok(en.includes("if (wantEvents) { evTerm = [term].concat(evFilt).join(' ').trim();"));
+    assert.ok(en.includes("if (wantEvents) { evTerm = term; evKinds = evFilt.slice();"), 'round 11: the kind of event filters by kind');
     assert.ok(fr.includes('Voici les événements de la semaine sur la carte.'));
     // The French typo note: « brewry » comme « brasserie ».
     const vm = require('node:vm');
