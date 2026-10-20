@@ -31678,3 +31678,22 @@ test('Round 10 map: matches outside the view, show words open this week’s even
     assert.equal(app.mapFrWords().danse, 'dance');
   });
 });
+
+test('Admin review owner stats (2026-10-19): logins, venues with a login, venues that sent something and links opened', () => {
+  seasonInsert.run({ name: 'Owner Stats Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'owner-stats-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'owner-stats-fixture');
+  const before = app.ownerSignupStats();
+  app.createOwnerLink(v.id, {});
+  const acct = Number(db.prepare("INSERT INTO owner_accounts (email, password_hash) VALUES ('stats-fixture@example.com', 'x')").run().lastInsertRowid);
+  db.prepare('INSERT INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(acct, v.id);
+  const after = app.ownerSignupStats();
+  assert.equal(after.accounts, before.accounts + 1);
+  assert.equal(after.newAccounts, before.newAccounts + 1);
+  assert.equal(after.venuesWithLogin, before.venuesWithLogin + 1);
+  assert.equal(after.links, before.links + 1);
+  assert.equal(after.list[0].name, 'Owner Stats Fixture');
+  const html = app.renderAdminReviewPage();
+  assert.match(html, /<section class="rv-owners" id="owners"><h2>Owners<\/h2>/);
+  assert.match(html, /venues? ha(s|ve) a login<\/strong>/);
+  assert.match(html, /<li>Owner Stats Fixture <span class="rv-meta">Kelowna · since \d{4}-\d{2}-\d{2}<\/span><\/li>/);
+});

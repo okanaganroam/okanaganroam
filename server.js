@@ -45211,6 +45211,12 @@ const ADMIN_REVIEW_CSS = `
   @media (max-width: 600px) { .rv-row { grid-template-columns: 1fr; } }
   .rv-empty { font-size: 0.9rem; color: rgba(42,32,25,0.66); }
   .rv-mail { font-size: 0.84rem; background: var(--paper); border-radius: 10px; padding: 8px 12px; }
+  .rv-owners { background: var(--paper); border-radius: 12px; padding: 10px 14px; margin: 10px 0 14px; }
+  .rv-owners h2 { font-size: 1rem; margin: 0 0 4px; }
+  .rv-owners p { margin: 0; font-size: 0.9rem; }
+  .rv-owners details { margin-top: 6px; font-size: 0.88rem; }
+  .rv-owners summary { cursor: pointer; font-weight: 700; }
+  .rv-owners ul { margin: 6px 0 0; padding-left: 18px; }
 `;
 
 function adminReviewEsc(v) { return escapeHtml(v == null ? '' : String(v)); }
@@ -45377,6 +45383,44 @@ function recentLiveOwnerPhotos() {
   return listOwnerPhotos('approved').filter((p) => ids.has(p.id));
 }
 
+// Owner sign-ups (2026-10-19, Dayton asked "how many venues are signed up"): one line at the top of /admin/review.
+// A login = an owner_accounts row; a venue counts once however many logins manage it. "Sent us something" = an
+// update, photo, event or menu from the venue's own link or login. Retired (redirected) listings are left out.
+function ownerSignupStats(now = new Date()) {
+  const one = (sql, ...a) => { try { return Number((db.prepare(sql).get(...a) || {}).n) || 0; } catch (e) { return 0; } };
+  const live = 'venue_id IN (SELECT id FROM venues WHERE redirect_to IS NULL)';
+  const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 19).replace('T', ' ');
+  const active = new Set();
+  for (const sql of [`SELECT DISTINCT venue_id AS v FROM owner_change_requests WHERE ${live}`, `SELECT DISTINCT venue_id AS v FROM owner_photos WHERE ${live}`,
+    'SELECT DISTINCT owner_venue_id AS v FROM event_submissions WHERE owner_venue_id IN (SELECT id FROM venues WHERE redirect_to IS NULL)',
+    `SELECT DISTINCT venue_id AS v FROM venue_menus WHERE ${live}`]) {
+    try { for (const r of db.prepare(sql).all()) active.add(r.v); } catch (e) { /* table missing on an old copy */ }
+  }
+  let list = [];
+  try {
+    list = db.prepare(`SELECT v.name, v.region, MIN(av.added_at) AS since, COUNT(*) AS logins FROM owner_account_venues av JOIN venues v ON v.id = av.venue_id
+      WHERE v.redirect_to IS NULL GROUP BY v.id ORDER BY since DESC`).all();
+  } catch (e) { list = []; }
+  return {
+    accounts: one('SELECT COUNT(*) AS n FROM owner_accounts'),
+    newAccounts: one('SELECT COUNT(*) AS n FROM owner_accounts WHERE created_at >= ?', weekAgo),
+    venuesWithLogin: list.length,
+    links: one(`SELECT COUNT(*) AS n FROM venue_owner_links WHERE ${live}`),
+    linksOpened: one(`SELECT COUNT(*) AS n FROM venue_owner_links WHERE last_used_at IS NOT NULL AND ${live}`),
+    venuesActive: active.size,
+    list,
+  };
+}
+
+function renderAdminOwnerStats(st) {
+  const n = (x, one, many) => `${x} ${x === 1 ? one : many}`;
+  const rows = st.list.map((v) => `<li>${adminReviewEsc(v.name)} <span class="rv-meta">${adminReviewEsc(REGION_LABELS[v.region] || v.region)} · since ${adminReviewEsc(String(v.since || '').slice(0, 10))}${v.logins > 1 ? ` · ${v.logins} logins` : ''}</span></li>`).join('');
+  return `<section class="rv-owners" id="owners"><h2>Owners</h2>
+      <p><strong>${n(st.venuesWithLogin, 'venue has', 'venues have')} a login</strong> (${n(st.accounts, 'login', 'logins')}${st.newAccounts ? `, ${st.newAccounts} new this week` : ''}) · ${n(st.venuesActive, 'venue has', 'venues have')} sent us updates, photos, events or menus · ${st.linksOpened} of ${st.links} edit links opened</p>
+      ${rows ? `<details><summary>Venues with a login</summary><ul>${rows}</ul></details>` : ''}
+    </section>`;
+}
+
 function renderAdminReviewPage() {
   const changes = listOwnerChanges('pending');
   const photos = listOwnerPhotos('pending');
@@ -45402,6 +45446,7 @@ function renderAdminReviewPage() {
     <div class="op-bar"><span><strong>Review</strong></span><button type="button" class="op-linkbtn" id="rvLogout">Sign out</button></div>
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
+    ${renderAdminOwnerStats(ownerSignupStats())}
     <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a></nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
@@ -51208,6 +51253,7 @@ module.exports = {
   weekJsonOn,
   ownerVenueSummary,
   renderAdminReviewPage,
+  ownerSignupStats,
   rejectOwnerChange,
   listOwnerChanges,
   getOwnerChange,
