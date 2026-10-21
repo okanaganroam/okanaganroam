@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-20",
+ "updated": "2026-10-21",
  "note": "Map points for busy event hosts that have no listing of their own (or whose listing has another name), so their events get a pin on /map (Roam Now). Used only by the map, never by the trip planner or event pages. Each point is the building itself (OpenStreetMap, checked 2026-10-20) or, for Kal Tire Place, Wikipedia's coordinates; street-only matches were left out. Round 15 (2026-10-20): 22 more hosts (hotels, churches, schools, halls, a library), each the building in OpenStreetMap in the event's own town, or for three the OSM address point of the exact civic address the event gives. names are compared after lower-casing, '&' -> 'and' and dropping punctuation, a trailing town, a ', street address' and a trailing '(...)'.",
  "points": [
   { "region": "vernon", "names": ["Kal Tire Place"], "lat": 50.27556, "lng": -119.27806, "address": "3445 43 Ave, Vernon", "source": "https://en.wikipedia.org/wiki/Kal_Tire_Place" },
@@ -37,6 +37,7 @@
   { "region": "lumby", "names": ["White Valley Community Centre"], "lat": 50.25153, "lng": -118.96257, "address": "2250 Shields Ave, Lumby", "source": "https://www.openstreetmap.org/way/677255565" },
   { "region": "naramata", "names": ["Naramata Inn"], "lat": 49.59748, "lng": -119.60352, "address": "3625 1st St, Naramata", "source": "https://www.openstreetmap.org/way/797111717" },
   { "region": "osoyoos", "names": ["Osoyoos Home Hardware", "Home Hardware"], "lat": 49.0327, "lng": -119.46558, "address": "8501 Main St, Osoyoos", "source": "https://www.openstreetmap.org/node/4842879623" },
+  { "region": "osoyoos", "names": ["OSCA Osoyoos Activity Centre", "Osoyoos Activity Centre", "OSCA", "Osoyoos Seniors Centre", "Osoyoos Seniors Centre Association"], "lat": 49.03315, "lng": -119.46275, "address": "17 Park Place, Osoyoos", "source": "https://www.openstreetmap.org/way/1568120800", "note": "Street point: the building is not named in OSM; Park Place is a 73 m one-way loop and 17 Park Place is the address (Osoyoos Seniors Centre Association, 250-495-6921)." },
   { "region": "penticton", "names": ["GARDENWORKS Penticton", "GardenWorks"], "lat": 49.48641, "lng": -119.60511, "address": "670 Duncan Ave W, Penticton", "source": "https://www.openstreetmap.org/way/656686769" },
   { "region": "penticton", "names": ["Penticton Lakeside Resort", "The Lakeside Resort"], "lat": 49.50359, "lng": -119.59468, "address": "21 Lakeshore Dr W, Penticton", "source": "https://www.openstreetmap.org/relation/13265155" },
   { "region": "penticton", "names": ["Cannery Trade Centre", "The Cannery Trade Centre"], "lat": 49.48279, "lng": -119.59458, "address": "1475 Fairview Rd, Penticton", "source": "https://www.openstreetmap.org/way/633515165" },
