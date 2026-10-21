@@ -23,6 +23,8 @@ function golfDetailsFor(venues) {
 // their own hours logic. Guarded like golf-data.js so a copy of the app
 // without hours.js (e.g. the isolated homepage tests) starts exactly as before.
 const hoursModule = (() => { try { return require('./hours.js'); } catch (e) { return null; } })();
+// Guarded the same way: without map-event-pins.js the map pins events by their venue link alone.
+const { mapEventPin } = (() => { try { return require('./map-event-pins'); } catch (e) { return { mapEventPin: () => null }; } })();
 // Guarded like hours.js: a copy of the server without share-card.js (isolated tests) runs on, with the brand share image.
 const shareCardModule = (() => { try { return require('./share-card.js'); } catch (e) { return null; } })();
 
@@ -16866,14 +16868,23 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-locate.is-finding svg { animation: pm-spin 1s linear infinite; }
   @keyframes pm-spin { to { transform: rotate(360deg); } }
   /* The list: a sheet that peeks from the bottom; tap or drag the handle for more. */
-  body.map-page .pm-sheet { position: absolute; z-index: 650; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; height: 168px; max-height: calc(100% - 20px); background: var(--bg, #F7F5F0); border-radius: 20px 20px 0 0; box-shadow: 0 -2px 14px rgba(27,43,58,0.2); transition: height 0.25s ease; }
+  body.map-page .pm-sheet { position: absolute; z-index: 650; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; height: 168px; max-height: calc(100% - var(--pm-float-h, 20px)); background: var(--bg, #F7F5F0); border-radius: 20px 20px 0 0; box-shadow: 0 -2px 14px rgba(27,43,58,0.2); transition: height 0.25s ease, max-height 0.25s ease; }
+  /* Round 13 (2026-10-20): --pm-float-h is the bottom of the search bar, chips and any notice (set by the script), so a
+     notice never covers the sheet's handle: the open sheet stops just below it. */
   body.map-page .pm-sheet[data-state="half"] { height: 42%; }
   body.map-page .pm-sheet[data-state="full"] { height: calc(100% - 124px); }
   body.map-page .pm-sheet.is-dragging { transition: none; }
   body.map-page .pm-handle { flex: none; display: flex; justify-content: center; align-items: center; width: 100%; height: 44px; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; } /* round 11 (2026-10-20): 44px to a finger (was 26px); the peeking sheet grew by the same 18px */
   body.map-page .pm-handle span { width: 44px; height: 5px; border-radius: 999px; background: rgba(27,43,58,0.28); }
   body.map-page .pm-sheet-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px 10px; touch-action: none; }
-  body.map-page .pm-count { margin: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
+  body.map-page .pm-count { margin: 0; min-width: 0; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 1.05rem; font-weight: 800; line-height: 1.25; }
+  /* Round 13 (2026-10-20): on a 320-400 px phone the count stays on two lines at most beside the Places/Events tabs
+     (« 0 événements cette semaine » took four). */
+  @media (max-width: 400px) {
+    body.map-page .pm-count { font-size: 0.9rem; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+    body.map-page .pm-sheet-head { gap: 8px; padding-left: 12px; padding-right: 12px; }
+    body.map-page .pm-tabs .pm-tab { padding: 0 9px; font-size: 0.84rem; }
+  }
   body.map-page .pm-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 16px; }
   body.map-page .pm-tabs { flex: none; display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(27,43,58,0.08); }
   body.map-page .pm-tab { min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
@@ -17033,14 +17044,35 @@ const MAP_EVENT_GROUP_SRC = `function eventGroup(e, today, nowMin){
 // lists them (it said "0 places in this part of the map").
 // Round 11 (2026-10-20): o.fit(p) (0 best, 1 weaker) ranks the places that best fit the search first within each
 // open/closed group: "coffee" / « café » listed gelato shops (filed as cafés) first.
+// Round 13 (2026-10-20): o.cost(p), in km, for searches whose best match is not simply the closest ("hike": Knox
+// Mountain before a marsh 3 km nearer). Near me sorts by distance plus cost; elsewhere by cost, then A-Z. Hours unknown
+// count as open there (a park rarely lists them), so only a place known to be closed goes after.
 const MAP_PLACE_LIST_SRC = `function mapPlaceList(onMap, o){
     var fit = o.fit || function(){ return 0; };
     var rank = function(p){ return p.st && p.st.state === 'open' ? 0 : p.st && p.st.season ? 2 : 1; };
+    if (o.cost) {
+      var cost = o.cost, crank = function(p){ return p.st && p.st.state === 'closed' ? (p.st.season ? 2 : 1) : 0; };
+      var inView = o.me || o.town || o.wide || o.zoom >= 12 || o.filtering ? onMap.slice() : [];
+      if (!o.me && !o.town) inView = inView.filter(o.inView);
+      return inView.sort(function(a, b){ return crank(a) - crank(b) || (o.me ? (a.d + cost(a)) - (b.d + cost(b)) : cost(a) - cost(b) || a.name.localeCompare(b.name)); });
+    }
     if (o.me) return onMap.slice().sort(function(a, b){ return rank(a) - rank(b) || fit(a) - fit(b) || a.d - b.d; });
     var az = function(a, b){ return rank(a) - rank(b) || fit(a) - fit(b) || a.name.localeCompare(b.name); };
     if (o.town) return onMap.slice().sort(az);
     if (!(o.wide || o.zoom >= 12 || o.filtering)) return [];
     return onMap.filter(o.inView).sort(o.wide ? function(a, b){ return rank(a) - rank(b) || fit(a) - fit(b) || (b.r || 0) - (a.r || 0) || a.name.localeCompare(b.name); } : az);
+  }`;
+// Round 13 (2026-10-20): how well a place fits "hike" / « randonnée », as km added to its distance (lower is better).
+// A mountain, canyon, ridge, regional or provincial park or a named trail is the real thing; a marsh, wetland, pond,
+// sanctuary, greenway, linear park, path or bike skills park is a short walk at most. A Local Favourite (lf) and a
+// strong rating pull a place up. Knox Mountain Park (4 km from downtown Kelowna) then comes before Rotary Marsh (1 km).
+const MAP_HIKE_FIT_SRC = `function mapHikeCost(p){
+    var n = String(p.name || '').toLowerCase(), c = 2;
+    if (/\\b(mountain|mtn|mount|canyon|ridge|bluffs?|peak|summit|hump|cliffs?|falls|lookout|rim|regional park|provincial park|trails?|trailhead)\\b/.test(n)) c = 0;
+    if (/\\b(marsh|wetlands?|ponds?|sanctuary|greenway|linear park|path|pathway|parkway|walkway|skills park|bike park|adventures?|conservancy)\\b/.test(n)) c += 3;
+    if (p.lf) c -= 3;
+    if (p.r >= 4.5) c -= 1;
+    return c;
   }`;
 // The coffee search's fit: a café that is really an ice cream, bubble tea or smoothie shop comes after the
 // coffee places, unless its name or tags say coffee. tg: the place's MAP_TAGS positions; ix: those tags by key.
@@ -17086,8 +17118,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     placesNear: function(n, r){ return n + (n === 1 ? ' lieu' : ' lieux') + (r ? ' à moins de ' + r + ' km' : ' autour de vous'); },
     placesHere: function(n){ return n + (n === 1 ? ' lieu' : ' lieux') + ' dans cette zone de la carte'; },
     clusterPlaces: function(n){ return n + ' lieux ici, zoomez pour les voir'; }, clusterEvents: function(n){ return n + ' événements ici, zoomez pour les voir'; },
-    openSuffix: ' ouverts', eventsCount: function(n){ return n + (n === 1 ? ' événement' : ' événements') + ' cette semaine'; },
-    eventsNear: function(n, r){ return n + (n === 1 ? ' événement' : ' événements') + (r ? ' à moins de ' + r + ' km' : ' près de vous') + ' cette semaine'; },
+    // Round 13 (2026-10-20): « 0 événements cette semaine » wrapped onto 4 lines on a 320-375 px phone; none reads « Aucun événement ».
+    openSuffix: ' ouverts', eventsCount: function(n){ return n ? n + (n === 1 ? ' événement' : ' événements') + ' cette semaine' : 'Aucun événement cette semaine'; },
+    moreNear: function(n, r){ return n === 1 ? '1 autre à moins de ' + r + ' km' : n + ' autres à moins de ' + r + ' km'; },
+    nyeEvents: function(n, href){ return (n ? 'Les événements du réveillon de la semaine sont dans l’onglet Événements.' : 'La carte montre les 7 prochains jours : aucun événement du réveillon d’ici là.') + ' Tous les événements du réveillon : <a ' + hrefAttr(href) + '>le réveillon dans la recherche</a>.'; },
+    eventsNear: function(n, r){ return (n ? n + (n === 1 ? ' événement' : ' événements') : 'Aucun événement') + (r ? ' à moins de ' + r + ' km' : ' près de vous') + ' cette semaine'; },
     zoomHint: 'Touchez le bouton de position pour voir ce qui est près de vous.',
     none: 'Rien ne correspond ici. Essayez une plus grande distance ou retirez un filtre.', noEvents: 'Aucun événement cette semaine ici. Essayez une plus grande distance.',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
@@ -17116,8 +17151,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     placesNear: function(n, r){ return n + (n === 1 ? ' place' : ' places') + (r ? ' within ' + r + ' km' : ' near you'); },
     placesHere: function(n){ return n + (n === 1 ? ' place' : ' places') + ' in this part of the map'; },
     clusterPlaces: function(n){ return n + ' places here, zoom in'; }, clusterEvents: function(n){ return n + ' events here, zoom in'; },
-    openSuffix: ' open', eventsCount: function(n){ return n + (n === 1 ? ' event' : ' events') + ' this week'; },
-    eventsNear: function(n, r){ return n + (n === 1 ? ' event' : ' events') + (r ? ' within ' + r + ' km' : ' near you') + ' this week'; },
+    openSuffix: ' open', eventsCount: function(n){ return n ? n + (n === 1 ? ' event' : ' events') + ' this week' : 'No events this week'; },
+    moreNear: function(n, r){ return n + ' more within ' + r + ' km'; },
+    nyeEvents: function(n, href){ return (n ? 'This week’s New Year’s Eve events are on the Events tab.' : 'The map shows the next 7 days, so no New Year’s Eve events yet.') + ' Every New Year’s Eve event: <a ' + hrefAttr(href) + '>New Year’s Eve in Search</a>.'; },
+    eventsNear: function(n, r){ return (n ? n + (n === 1 ? ' event' : ' events') : 'No events') + (r ? ' within ' + r + ' km' : ' near you') + ' this week'; },
     zoomHint: 'Tap the locate button to see what’s near you.',
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
@@ -17159,6 +17196,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // The map fills the screen below the header.
   function fitStage(){ var top = stage.getBoundingClientRect().top + (window.scrollY || 0); document.documentElement.style.setProperty('--pm-top', Math.max(0, Math.round(top)) + 'px'); }
   fitStage(); map.invalidateSize(); okLimits(); window.addEventListener('resize', function(){ fitStage(); map.invalidateSize(); okLimits(); });
+  // Speed (round 13, 2026-10-20): this script now runs before app.js (LCP 2.6-2.8 s waited for app.js's 215 KB to run
+  // first), so the stage is measured again once app.js has set up the header.
+  window.addEventListener('load', function(){ fitStage(); map.invalidateSize(); floatGap(); });
   // The list sheet: peek, half or full. Tap the handle to step up; drag it (or the heading) to any of the three.
   var STATES = ['peek', 'half', 'full'];
   function sheetH(){ stage.style.setProperty('--pm-sheet-h', WIDE.matches ? '0px' : Math.round(Math.min(sheet.offsetHeight, stage.offsetHeight * 0.42)) + 'px'); }
@@ -17241,6 +17281,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   ${MAP_PLACE_LIST_SRC}
   ${MAP_NAME_MATCH_SRC}
   ${MAP_COFFEE_FIT_SRC}
+  ${MAP_HIKE_FIT_SRC}
   var listOn = false, lastLayerKey = null;
   function whenText(e, g){
     var times = e.st ? timeText(e.st) + (e.et ? '–' + timeText(e.et) : '') : '';
@@ -17269,9 +17310,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function popupForEvent(e){ return '<div class="pm-pop"><a ' + hrefAttr(e.fu || e.url) + '>' + esc(e.name) + '</a><small>' + esc(e.venue ? e.venue + ' · ' + (CONF.r[e.region] || '') : (CONF.r[e.region] || '')) + '</small><a class="pm-pop-dir" data-dir="event" data-k="e' + e.ix + '" ' + hrefAttr(dirUrl(e.lat, e.lng, e.venue || e.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + ' &rarr;</a></div>'; }
   // Messages show briefly over the map; tap one to hide it.
   var statusTimer = null;
-  function setStatus(text, ms){ clearTimeout(statusTimer); statusEl.textContent = text || ''; statusEl.hidden = !text; if (text) statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
+  function setStatus(text, ms){ clearTimeout(statusTimer); statusEl.textContent = text || ''; statusEl.hidden = !text; floatGap(); if (text) statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
+  // Round 13 (2026-10-20): the room the search bar, chips and notice take at the top (--pm-float-h), so the list
+  // sheet never slides under a notice and hides its handle.
+  function floatGap(){ try { var st = stage.getBoundingClientRect(), fb = floatEl.getBoundingClientRect(); stage.style.setProperty('--pm-float-h', Math.max(20, Math.round(fb.bottom - st.top + 8)) + 'px'); } catch (e) {} }
+  if (window.ResizeObserver) new ResizeObserver(floatGap).observe(floatEl);
   // A message with a link in it (round 12, 2026-10-20): html is built from the page's own words only.
-  function setStatusHtml(html, ms){ clearTimeout(statusTimer); statusEl.innerHTML = html; statusEl.hidden = false; statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
+  function setStatusHtml(html, ms){ clearTimeout(statusTimer); statusEl.innerHTML = html; statusEl.hidden = false; floatGap(); statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
   statusEl.addEventListener('click', function(e){ if (e.target && e.target.closest && e.target.closest('a')) return; setStatus(''); });
   // Room taken by the search bar and the list, so fitted pins land where they can be seen.
   function pad(){
@@ -17353,7 +17398,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var b = me ? null : map.getBounds();
       listOn = !!(me || town || WIDE.matches || map.getZoom() >= 12 || filtering);
       var coffeeOnly = kinds.coffee && Object.keys(kinds).every(function(k){ return !kinds[k] || k === 'coffee'; });
-      items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: coffeeOnly ? function(p){ return mapCoffeeFit(p, TAGIX); } : null });
+      items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: coffeeOnly ? function(p){ return mapCoffeeFit(p, TAGIX); } : null, cost: tags.hiking ? mapHikeCost : null });
       countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
@@ -17412,11 +17457,35 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       }
     });
     if (!listItems.length && (me || tab === 'events' || listOn)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(T.noEvents)) + '</li>';
+    // Round 13 (2026-10-20): a short list near the visitor ("hikes": 4 within 5 km) offers the next distance that has more.
+    var wider = tab === 'places' && listItems.length && listItems.length < 8 ? widerRadius(listItems.length) : null;
+    if (wider) html += '<li class="pm-group pm-wider"><button type="button" class="pm-more pm-wider-btn" data-wider="' + wider.r + '">' + esc(T.moreNear(wider.n, wider.r)) + '</button></li>';
     listEl.innerHTML = html;
     if (typeof route !== 'undefined' && route) drawRoute();
     moreBtn.hidden = listItems.length <= limit;
     moreBtn.textContent = T.more;
   }
+  // The smallest distance with at least 8 of the events searched for (all of them when fewer) (an event without a pin by its town centre), or Any.
+  function pickEventRadius(){
+    var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
+    var hits = events.filter(function(e){ return eventGroup(e, today, nowMin) && evHit(e); });
+    var d = function(e){ if (e.lat != null) return distKm(me.lat, me.lng, e.lat, e.lng); var c = CONF.c[e.region]; return c ? distKm(me.lat, me.lng, c[0], c[1]) : 999; };
+    var pick = [1, 5, 10, 25].filter(function(r){ return hits.filter(function(e){ return d(e) <= r; }).length >= Math.min(8, hits.length); })[0];
+    return hits.length ? (pick || 0) : radiusKm;
+  }
+  function widerRadius(have){
+    if (!me || !radiusKm || town || (typeof route !== 'undefined' && route)) return null;
+    var steps = [5, 10, 25].filter(function(r){ return r > radiusKm; });
+    for (var i = 0; i < steps.length; i++) {
+      var r = steps[i], n = places.filter(function(p){ return matchesPlace(p) && distKm(me.lat, me.lng, p.lat, p.lng) <= r; }).length - have;
+      if (n > 0) return { r: r, n: n };
+    }
+    return null;
+  }
+  listEl.addEventListener('click', function(e){
+    var w = e.target.closest && e.target.closest('[data-wider]'); if (!w) return;
+    radiusKm = Number(w.getAttribute('data-wider')); radiusFixed = true; radiusSel.value = String(radiusKm); limit = 25; render(true);
+  });
   function focusItem(x){
     if (x.lat == null || !x.m) return;
     setSheet('peek');
@@ -17765,10 +17834,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (onTags().length > 1 && !places.some(matchesPlace)) { tagAny = true; setStatus(T.anyOf); }
     if (term && (anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || town || price || atMin != null || atDay) && !places.some(matchesPlace)) { setStatus(T.ignored(term)); term = ''; }
     syncChips(); limit = 25;
-    if (me && !radiusFixed && !town) {
+    // Round 13: a search that opened the Events tab keeps the distance its events picked (pickEventRadius).
+    if (me && !radiusFixed && !town && !(evBySearch && tab === 'events')) {
       var filtering = anyOn(kinds) || anyOn(feats) || onTags().length || topOnly || openOnly || price || atMin != null || atDay || term;
       if (places.some(matchesPlace)) {
-        var r = pickRadius(filtering ? 3 : 8), wider = r === 0 || (radiusKm && r > radiusKm);
+        // Round 13: a hike is worth a short drive, so "hikes" looks for 6 before settling on a distance.
+        var r = pickRadius(tags.hiking ? 6 : filtering ? 3 : 8), wider = r === 0 || (radiusKm && r > radiusKm);
         if (r !== radiusKm) { radiusKm = r; radiusSel.value = String(r); if (wider && filtering) setStatus(r ? T.widened(r) : T.widenedAny); }
       }
     }
@@ -17821,7 +17892,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // Vernon's markets matched outside the view. Without a location, say how many match elsewhere and offer to show them.
     var away = me ? 0 : places.filter(matchesPlace).length;
     if (away) return esc(T.awayN(away)) + ' <button type="button" class="pm-relax" data-relax="fit">' + esc(T.showThem(away)) + '</button>';
-    if (cs.length === 1 && cs[0].id === 'term') return esc(T.noName(term));
+    // Round 13 (2026-10-20): on /fr/map the words left over are the English the French was read as, so the message
+    // names what the visitor typed (« Rien ne s’appelle « xyz » ici »), never an English word.
+    if (cs.length === 1 && cs[0].id === 'term') return esc(T.noName(FR && typedWords ? typedWords : term));
     cs.forEach(function(c){
       if (best) return;
       dropOne(c.id); var n = places.some(matchesPlace) ? 1 : 0; restore(JSON.parse(JSON.stringify(base))); term = t0;
@@ -17889,6 +17962,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
     // Round 11 (2026-10-20): "free" is Free to visit, but not in "sugar free", "free parking" or "free wifi".
     [/(sugar|dairy|nut|peanut|lactose|egg|smoke|scent|fragrance)[ -]?free/g, ' $1 '], [/free (parking|wifi|wi-fi|wi fi|refills?|delivery|shipping)/g, ' $1 '],
+    // Round 13 (2026-10-20): "stand-up" is comedy (not stand-up paddling); "new year's eve", "new years", "NYE" are one word.
+    [/stand[ -]?up(?![ -]?paddl)(?: comedy)?/g, ' standup '], [/(?:new[ -]?year'?s?'?(?: eve)?|\\bnye\\b)(?: party| parties)?/g, ' nye '],
     [/lake ?views?|vue sur le lac/g, ' lake '], [/close ?(by|to (me|us|here)|to)|near ?by|near (me|us|here)|nearest|closest|around here|près de moi|près d’ici|pas loin/g, ' nearme '], [/top rated|highly rated|well reviewed|best rated/g, ' top ']
   ];
   var STOP = ' a an the with for to where can we i im i\\'m grab get some that will allow allows allowed us bring on place places near me our my and or go find wonder wondering somewhere something good nice any let\\'s lets want need un une des le la les avec pour où on peut aller trouver près de moi mon ma nos et ou hour hours close by option options friendly serve serves serving has have having offer offers offering menu choice choices spot spots dish dishes now today tonight here there is are it its do does also too plus please show which what looking look stuff thing things able ok okay welcome du offre accepte acceptes acceptée acceptées accepté acceptés bienvenu bienvenus bienvenue bienvenues admis ';
@@ -18080,10 +18155,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // kinds a name that says the word counts too.
   var EVENT_KINDS = { dance: 'dance', dances: 'dance', dancing: 'dance', ballet: 'dance', nutcracker: 'dance', drag: 'drag', magic: 'magic', magician: 'magic', magicians: 'magic',
     illusionist: 'magic', musical: 'musical', musicals: 'musical', broadway: 'musical', circus: 'circus', cirque: 'circus', acrobats: 'circus', acrobatics: 'circus',
-    classical: 'classical', symphony: 'classical', orchestra: 'classical', opera: 'classical', fireworks: 'fireworks' };
+    classical: 'classical', symphony: 'classical', orchestra: 'classical', opera: 'classical', fireworks: 'fireworks',
+    // Round 13 (2026-10-20): "comedy" listed one show (the one with Comedy in its name): comedy is a kind of event, by
+    // the site search's comedy test (stand-up, improv, comedians). New Year's Eve ("nye", « réveillon ») too.
+    comedy: 'comedy', comedian: 'comedy', comedians: 'comedy', standup: 'comedy', improv: 'comedy', nye: 'new_years' };
   // Magic, musicals and classical go by kind alone: "Holiday Magic Market" and "Musical Memories" say the word but aren't.
-  var EVENT_STEMS = { dance: 'danc', drag: 'drag', circus: 'circus', fireworks: 'firework' };
-  var wantEvents = false, evTerm = '', evBySearch = false, evFilt = [], evSaid = [], evKinds = [], xmasMarket = false;
+  var EVENT_STEMS = { dance: 'danc', drag: 'drag', circus: 'circus', fireworks: 'firework', comedy: 'comed', new_years: 'new year' };
+  var wantEvents = false, evTerm = '', evBySearch = false, evFilt = [], evSaid = [], evKinds = [], xmasMarket = false, nyeAsk = false, typedWords = '';
   var XMAS_MARKET_RE = / (?:german )?(?:christmas|xmas|holiday|festive) (?:craft )?(?:markets?|fairs?|bazaars?) | christkindl\\w* /g;
   function evHit(e){
     var hay = foldFr((e.name || '') + ' ' + (e.venue || ''));
@@ -18096,7 +18174,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); }
     var before = snapshot();
     var left = [], neg = false, toks = parseWords(v), ors = toks.indexOf('or') !== -1 || toks.indexOf('ou') !== -1, sawShow = false;
-    wantEvents = false; evFilt = []; evSaid = []; xmasMarket = false;
+    wantEvents = false; evFilt = []; evSaid = []; xmasMarket = false; nyeAsk = false;
     // Round 12 (2026-10-20): "christmas market" / « marché de Noël » said "Nothing called “christmas market”": they are
     // events, so they open the Events tab (this week's markets) with a link to the Christmas markets guide.
     var tj = ' ' + toks.join(' ') + ' ';
@@ -18108,7 +18186,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (w === 'show') { sawShow = true; if (SHOW_NOT_EVENT.indexOf(' ' + (toks[i + 1] || '') + ' ') === -1) wantEvents = true; return; }
       if (NEG.indexOf(' ' + w + ' ') !== -1) { neg = true; return; }
       if (EVENT_WORDS.indexOf(' ' + w + ' ') !== -1) { wantEvents = true; return; }
-      if (EVENT_KINDS[w]) { wantEvents = true; if (evFilt.indexOf(EVENT_KINDS[w]) === -1) evFilt.push(EVENT_KINDS[w]); evSaid.push((FR && TYPO && TYPO.fr[w]) || w); return; }
+      if (EVENT_KINDS[w]) {
+        wantEvents = true; if (evFilt.indexOf(EVENT_KINDS[w]) === -1) evFilt.push(EVENT_KINDS[w]);
+        // New Year's Eve gets its own message (nyeAsk); the comedy words are all said as "comedy".
+        if (EVENT_KINDS[w] === 'new_years') nyeAsk = true;
+        else { var said = EVENT_KINDS[w] === 'comedy' ? 'comedy' : w; if (evSaid.indexOf(said) === -1) evSaid.push((FR && TYPO && TYPO.fr[said]) || said); }
+        return;
+      }
       var k = WORD_TO[w];
       if (w.charAt(0) === '#' && CONF.tg[Number(w.slice(1))]) { var tk = CONF.tg[Number(w.slice(1))].k; if (neg) notTags[tk] = true; else tags[tk] = true; }
       else if (w.charAt(0) === '@' && CONF.r[w.slice(1)]) town = w.slice(1);
@@ -18138,13 +18222,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); termTyping = true; changed(); } }, 450); });
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ typedWords = String(v || '').trim(); if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); termTyping = true; changed(); } }, 450); });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
     // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
     // Round 9 (2026-10-19): each search starts from the usual 5 km and clears the last search's message, so "Not much
     // right nearby, so this shows up to 25 km away" never stays on for a search that fits close by.
-    clearTimeout(timer); wantNear = false; radiusFixed = false; setStatus(''); readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
+    clearTimeout(timer); wantNear = false; radiusFixed = false; typedWords = String(v || '').trim(); setStatus(''); readSearch(v, false); searchEl.value = String(v || '').trim(); searchEl.blur();
     // Round 12 (2026-10-20): Enter said "Nothing called “pizz”" while typing it showed pizza places. When the words as
     // typed match nothing, the last word is read as the search word it starts; failing that, as the start of a word in
     // a place's name (as while typing). Whole words still come first: "spa" never finds Spaghetti.
@@ -18155,8 +18239,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     }
     if (me && !radiusFixed && !town) radiusKm = 5;
     if (lastFixes.length) setStatus(T.typoRead(lastFixes));
-    if (wantEvents) { evTerm = term; evKinds = evFilt.slice(); setStatus(T.eventsFor([term].concat(evSaid).join(' ').trim()), 9000); term = ''; evBySearch = true; setTab('events');
-      if (xmasMarket) setStatusHtml(T.xmasMarkets(events.filter(evHit).length, (FR ? '/fr' : '') + '${SEARCH_XMAS_MARKET_GUIDE}'), 12000); }
+    if (wantEvents) { evTerm = term; evKinds = evFilt.slice(); setStatus(T.eventsFor([term].concat(evSaid).join(' ').trim()), 9000); term = ''; evBySearch = true;
+      // Round 13 (2026-10-20): "comedy" near downtown listed the 4 shows within 1 km (the distance the places had picked)
+      // out of 8 this week; the events found pick their own distance, as the places do.
+      if (me && !radiusFixed && !town) { var er = pickEventRadius(); if (er !== radiusKm) { radiusKm = er; radiusSel.value = String(er); } }
+      setTab('events');
+      if (xmasMarket) setStatusHtml(T.xmasMarkets(events.filter(evHit).length, (FR ? '/fr' : '') + '${SEARCH_XMAS_MARKET_GUIDE}'), 12000);
+      // Round 13 (2026-10-20): "new years eve", "NYE", « réveillon », « jour de l'An » said « Rien ne s’appelle… »: the
+      // map holds the next 7 days, so they open the Events tab (any New Year's Eve events this week) and link to the
+      // site search's New Year's Eve list.
+      if (nyeAsk) setStatusHtml(T.nyeEvents(events.filter(function(e){ return e.g && evHit(e); }).length, FR ? '/fr/search?q=' + encodeURIComponent('réveillon') : '/search?q=' + encodeURIComponent('new years eve')), 12000); }
     else { evTerm = ''; evKinds = []; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
     track('map_search', { words: term ? 1 : 0, how: how || 'typed' }); changed();
     if (wantNear && !me && !watching && !town) nearBtn.click();
@@ -18263,7 +18355,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
@@ -18304,7 +18396,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
-const MAP_DATA_FORMAT = 8; // 8 (round 11): the Free to visit bit and each event's kinds
+const MAP_DATA_FORMAT = 9; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -18398,7 +18490,12 @@ const MAP_TAGS = [
   // Round 12 (2026-10-20): "hike" / « randonnée » read as every Outdoors place, so the nearest were a garden, an outdoor
   // rink and a sports centre. A hike is an outdoor place with trails, never a rink, garden, field or sports centre.
   ['hiking', 'Hiking & trails', 'Randonnée et sentiers', '🥾', MAP_HIKE_TEXT_RE, 'hike|hikes|hiking|hiking trail|hiking trails|trail|trails|randonnee|randonnée|randonnées|randonnees|rando|sentier|sentiers|sentier de randonnée', [],
-    (v, name, text) => v.type === 'outdoor' && MAP_HIKE_TEXT_RE.test(text) && !MAP_NOT_HIKE_NAME_RE.test(name)],
+    // Round 13 (2026-10-20): "hikes" near a town centre found 4 places. A place on the Hiking & Trails list
+    // (/outdoors/hiking, the activity_hiking collection, beaches with trails too) counts as well; still never a rink,
+    // garden or field. So does a regional or provincial park filed as a beach whose listing names its trails (Kalamoir,
+    // Fintry, Kalamalka Lake ...).
+    (v, name, text) => (v.hikeList || (v.type === 'outdoor' && MAP_HIKE_TEXT_RE.test(text))
+      || (v.type === 'beach' && /\b(?:regional|provincial) park\b/.test(name) && /\b(?:trails?|trailhead|hik(?:e|es|ing))\b/.test(text))) && !MAP_NOT_HIKE_NAME_RE.test(name)],
 ].map(([key, en, fr, icon, find, say, types, match]) => ({ key, en, fr, icon, find, say, types, match: match || null }));
 const MAP_DIETARY = [
   { key: 'veg', label: 'Vegetarian', icon: '\u{1F957}' }, { key: 'vegan', label: 'Vegan', icon: '\u{1F331}' }, { key: 'gf', label: 'Gluten-free', icon: '\u{1F33E}' },
@@ -18422,8 +18519,10 @@ function mapPlacesData(now = new Date()) {
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const seasons = getSeasonStates(now);
   const dogNotes = getDogPolicyNotes();
+  const hikeIds = getCollectionVenueIds('activity_hiking'), favIds = getCollectionVenueIds('local_favorite');
   return venues.map((v) => {
     const st = open.byId.get(v.id);
+    v.hikeList = hikeIds.has(v.id);
     const bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
     return [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
@@ -18436,12 +18535,15 @@ function mapPlacesData(now = new Date()) {
       // [13] 1 when the place is closed for the season today (2026-10-18), else 0.
       seasons.has(v.id) && seasons.get(v.id).kind === 'closed' ? 1 : 0,
       // [14] the dog note in French when it has a translation (French pass 6, 2026-10-19), else 0.
-      (bits & 2) && dogNotes.has(v.id) ? mapFrenchNote(dogNotes.get(v.id)) : 0];
+      (bits & 2) && dogNotes.has(v.id) ? mapFrenchNote(dogNotes.get(v.id)) : 0,
+      // [15] 1 for a Local Favourite (round 13, 2026-10-20), a popularity signal for ranking hikes, else 0.
+      favIds.has(v.id) ? 1 : 0];
   });
 }
 // Events in the next week, one entry each (its next date):
 // [name, url, region, venue name, lat, lng, startDate, startTime, endDate, endTime, allDay, hasFrenchPage].
-// lat/lng only through the event's own venue link; an event without one is listed, never pinned.
+// lat/lng through the event's venue link, a listing named by its venue text, or a known host point (map-event-pins.js);
+// an event none of them places is listed without a pin.
 function mapEventsData(now = new Date()) {
   const today = todayLocal(now);
   const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.venue_id, e.venue_name_text, o.start_date, o.end_date, o.start_time, o.end_time, o.all_day
@@ -18450,6 +18552,8 @@ function mapEventsData(now = new Date()) {
     ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, addLocalDays(today, MAP_EVENT_DAYS));
   const seen = new Set();
   const venueQ = db.prepare('SELECT name, latitude, longitude, redirect_to FROM venues WHERE id = ?');
+  const regionVenueQ = db.prepare('SELECT id, name, region, latitude, longitude, redirect_to FROM venues WHERE region = ? AND redirect_to IS NULL');
+  const regionVenues = new Map();
   // An event without a venue link is pinned only when its venue text names exactly one listed place in the same
   // town ("Cannery Brewing", or "Gray Monk Estate Winery, Lake Country"); anything else is listed without a pin.
   const byName = new Map();
@@ -18477,6 +18581,11 @@ function mapEventsData(now = new Date()) {
       const ks = topics.filter((t) => { try { return !!t.test(e); } catch (err) { return false; } }).map((t) => t.key);
       // Round 12 (2026-10-20): Christmas markets too, for the map's "christmas market" / « marché de Noël ».
       try { if (searchIsXmasMarket(e)) ks.push('xmas_market'); } catch (err) { /* not one */ }
+      // Round 13 (2026-10-20): comedy (stand-up, improv, comedians: searchShowKind, the site search's own test), so
+      // "comedy" lists every comedy show, not the one with Comedy in its name; and a night out on Dec 31 is a New
+      // Year's Eve event even when its name doesn't say so.
+      try { if (!ks.includes('comedy') && searchShowKind(e) === 'comedy') ks.push('comedy'); } catch (err) { /* not one */ }
+      if (!ks.includes('new_years') && mapIsDec31Night(e)) ks.push('new_years');
       if (ks.length) kinds.set(Number(e.id), ks);
     }
   } catch (err) { /* the map works without them */ }
@@ -18496,12 +18605,27 @@ function mapEventsData(now = new Date()) {
     }
     if (!venue && r.venue_name_text) venue = nameMatch(r.venue_name_text, r.region);
     const pin = venue && Number.isFinite(Number(venue.latitude)) && Number.isFinite(Number(venue.longitude)) && venue.latitude !== null && venue.longitude !== null && !(Number(venue.latitude) === 0 && Number(venue.longitude) === 0);
-    out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), pin ? mapRound(venue.latitude) : null, pin ? mapRound(venue.longitude) : null,
+    // Round 13 (2026-10-20): else the trip planner's own event-location resolver ("&" as "and", "Name, street
+    // address", its curated hosts such as Prospera Place) and the map's points for busy hosts with no listing
+    // (data/event-map-points.json: Kal Tire Place, Kelowna Event Centre, arenas ...). See map-event-pins.js.
+    let point = pin ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null;
+    if (!point && r.venue_name_text) {
+      if (!regionVenues.has(r.region)) regionVenues.set(r.region, regionVenueQ.all(r.region));
+      point = mapEventPin({ venue_name_text: r.venue_name_text, region: r.region }, regionVenues.get(r.region), [REGION_LABELS[r.region]]);
+    }
+    out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), point ? mapRound(point.lat) : null, point ? mapRound(point.lng) : null,
       r.start_date, r.start_time || '', r.end_date, r.end_time || '', r.all_day ? 1 : 0,
       // [11] 1 when the event has a French page (round 9, 2026-10-19), so /fr/map links to it.
       hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0, kinds.get(Number(r.id)) || 0]);
   }
   return out;
+}
+// A Dec 31 event that is a night out (nightlife, holiday, live music or a dinner), starting that day.
+const MAP_NYE_CATEGORIES = ['nightlife', 'holiday-seasonal', 'live-music', 'food-drink-events'];
+function mapIsDec31Night(e) {
+  const sd = String((e && e.startDate) || ''), ed = String((e && e.endDate) || sd);
+  if (!/-12-31$/.test(sd) || ed > `${Number(sd.slice(0, 4)) + 1}-01-01`) return false;
+  return (e.categories || []).some((c) => MAP_NYE_CATEGORIES.includes(c));
 }
 function mapLiveData(now = new Date()) {
   const version = mapDataVersion(now);
@@ -18537,6 +18661,7 @@ ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 <link rel="preconnect" href="https://a.tile.openstreetmap.org">
 <link rel="preconnect" href="https://b.tile.openstreetmap.org">
 <link rel="preconnect" href="https://c.tile.openstreetmap.org">
+<link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css"/>
@@ -18632,7 +18757,6 @@ ${renderGolfHeaderHtml()}
   </div>
   </main>
   ${renderHomeFooterHTML(true)}
-  ${GOLF_APP_SCRIPT_TAG}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 ${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.stringify(mapFrWords()).replace(/</g, '\\u003c')}</script>
@@ -18646,6 +18770,7 @@ ${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.st
   ${MAP_PAGE_SCRIPT}
 })();
 </script>
+${GOLF_APP_SCRIPT_TAG}
 </body>
 </html>`;
 }
@@ -52210,6 +52335,7 @@ module.exports = {
   BOOL_FIELDS,
   // Round 9 (2026-10-19): search, map and help bot
   searchShowKind,
+  mapIsDec31Night,
   searchEventTopicFor,
   searchTypoWord,
   searchPartyOnly,
