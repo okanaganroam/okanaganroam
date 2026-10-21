@@ -18982,12 +18982,24 @@ function favoritesPageModule() {
 // GET /links (2026-10-19): the Instagram bio link -- the day's post first, then recent posts and the main pages.
 // noindex and briefly cached, since it changes each day. See social-links.js and data/social-links.json.
 let socialLinksData = null;
+let socialLinksPressData = null;
 function socialLinksPosts() {
   if (!socialLinksData) {
-    try { socialLinksData = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'social-links.json'), 'utf8')).posts || []; }
-    catch (err) { socialLinksData = []; }
+    try {
+      const d = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'social-links.json'), 'utf8'));
+      socialLinksData = d.posts || [];
+      socialLinksPressData = d.press || [];
+    } catch (err) { socialLinksData = []; socialLinksPressData = []; }
   }
   return socialLinksData;
+}
+// Press stories about the site (2026-10-21), newest first: outside https links, opened in a new tab. Facebook and
+// Instagram block news links in Canada, so a post says "link in bio" and the story is linked from here.
+function socialLinksPress() {
+  socialLinksPosts();
+  return (socialLinksPressData || [])
+    .filter((p) => p && /^https:\/\/[^\s"<>]+$/.test(p.url || '') && typeof p.title === 'string' && p.title.trim() && /^\d{4}-\d{2}-\d{2}$/.test(p.date || ''))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 function renderSocialLinksPage(now = new Date()) {
   const today = todayLocal(now);
@@ -18995,6 +19007,7 @@ function renderSocialLinksPage(now = new Date()) {
   const dayLabel = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).replace(/\./g, '');
   const card = (p, lead) => `<li><a class="lk-card${lead ? ' lk-lead' : ''}" href="${escapeHtml(p.path)}" data-post-date="${escapeHtml(p.date)}"><span class="lk-date">${lead && p.isToday ? 'Today' : escapeHtml(dayLabel(p.date))}</span><span class="lk-title">${escapeHtml(p.title)}</span></a></li>`;
   const [first, ...rest] = posts;
+  const press = socialLinksPress();
   const main = [
     { title: 'Build My Trip', path: '/trip', note: 'Type one sentence, get a plan' },
     { title: "What's On", path: '/whats-on', note: 'Events this week' },
@@ -19035,6 +19048,7 @@ ${renderGolfHeaderHtml()}
   <h1>Okanagan Roam links</h1>
   <p class="lk-intro">The pages from our Instagram, TikTok and Facebook posts, newest first.</p>
   ${first ? `<ul>${card(first, true)}</ul>` : ''}
+  ${press.length ? `<h2>In the news</h2>\n  <ul>${press.map((p) => `<li><a class="lk-card" href="${escapeHtml(p.url)}" target="_blank" rel="noopener" data-post-date="press"><span class="lk-date">${escapeHtml(p.source || '')}${p.source ? ' · ' : ''}${escapeHtml(dayLabel(p.date))}</span><span class="lk-title">${escapeHtml(p.title.trim())}</span></a></li>`).join('')}</ul>` : ''}
   ${rest.length ? `<h2>Recent posts</h2>\n  <ul>${rest.map((p) => card(p, false)).join('')}</ul>` : ''}
   <h2>Explore</h2>
   <ul>${main.map((m) => `<li><a class="lk-card" href="${m.path}" data-post-date="main"><span class="lk-title">${escapeHtml(m.title)}</span><span class="lk-note">${escapeHtml(m.note)}</span></a></li>`).join('')}</ul>
