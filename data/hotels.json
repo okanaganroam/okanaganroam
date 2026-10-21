@@ -232,14 +232,6 @@
       "address": "888 Sparkling Place, Vernon, BC",
       "latitude": 50.198076,
       "longitude": -119.39288
-    },
-    {
-      "slug": "tiki-village-inn",
-      "name": "Tiki Village Inn & Suites",
-      "region": "vernon",
-      "address": "2408 34th Street, Vernon, BC",
-      "latitude": 50.260144,
-      "longitude": -119.276831
     }
   ]
 }
