@@ -2229,10 +2229,13 @@ const FILLER_MARGIN = 6;
 function rotateFillerPick(cands, ctx, slot) {
   const best = themePick(cands);
   if (!best || !ctx || !(ctx.rotationKey || ctx.queryText)) return best;
-  const pool = cands.filter((c) => best.score - c.score <= FILLER_MARGIN && !(c.v.rating != null && best.v.rating != null && best.v.rating - c.v.rating > 0.4)).slice(0, ROTATE_TOP);
+  // The Local Favourite / Hidden Gem bonus breaks ties for the best place but is left out when places rotate, as in
+  // rotateWithinType (La Carraia Gelateria, a Local Favourite, stayed the only choice in every Vernon plan).
+  const plain = (c) => c.score - (c.bonus || 0);
+  const pool = cands.filter((c) => plain(best) - plain(c) <= FILLER_MARGIN && !(c.v.rating != null && best.v.rating != null && best.v.rating - c.v.rating > 0.4)).slice(0, ROTATE_TOP);
   if (pool.length < 2 || rotationSlotNudge({ id: 0 }, ctx, `${slot}|keep`) < ROTATE_KEEP_BEST) return best;
   let pick = best, top = -Infinity;
-  for (const c of pool) { const t = c.score + rotationSlotNudge(c.v, ctx, slot) * FILLER_MARGIN * 1.5; if (t > top) { top = t; pick = c; } }
+  for (const c of pool) { const t = plain(c) + rotationSlotNudge(c.v, ctx, slot) * FILLER_MARGIN * 1.5; if (t > top) { top = t; pick = c; } }
   return pick;
 }
 function themePick(cands) { cands.sort((a, b) => b.score - a.score || (b.v.rating || 0) - (a.v.rating || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id); return cands[0] || null; }
@@ -3448,11 +3451,12 @@ function fillDinnerGaps(result, input, requirements) {
         if (!tripRequirements.venueAllowed(v, requirements, day.day, input.tripDate) || !fits(v)) continue;
         if (ctx.kids && !(v.features && v.features.kid_friendly) && !GAP_KIDS_RE.test(`${v.textName || ''} ${v.textDesc || ''}`)) continue;
         const km = from ? kmBetween(from, v) : 3;
-        let score = scoreVenue(v, ctx).score - (km || 0) * 1.5;
+        const sv = scoreVenue(v, ctx);
+        let score = sv.score - (km || 0) * 1.5;
         if (ctx.types.has(v.type)) score += 8;
         if (result.theme === 'wine' && v.type === 'winery') score += 10;
         if (ctx.kids && v.features && v.features.kid_friendly) score += 6;
-        cands.push({ v, score });
+        cands.push({ v, score, bonus: (sv.reasons || []).filter((r) => r.code === 'collection_bonus').reduce((n, r) => n + (r.weight || 0), 0) });
       }
       pick = rotateFillerPick(cands, dayCtx, `late|${day.day}`);
     }
