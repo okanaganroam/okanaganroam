@@ -261,7 +261,9 @@ test('Lunch: a full day with a hike, a winery and great food has a lunch stop', 
   for (const day of p.days) {
     const lunch = dayStops(day).find((x) => x.daypart === 'midday');
     assert.ok(lunch && ['restaurant', 'cafe', 'pub'].includes(lunch.fact.type), `day ${day.day}: ${dayStops(day).map((x) => x.daypart + ' ' + x.fact.name).join(', ')}`);
-    assert.deepEqual(day.stops.map((s) => s.daypart), ['morning', 'midday', 'afternoon', 'evening']);
+    // Round 15b (2026-10-20): a suggested day may also get the late-afternoon stop (or Free time card) a dated day gets.
+    assert.deepEqual(day.stops.filter((s) => s.daypart !== 'late').map((s) => s.daypart), ['morning', 'midday', 'afternoon', 'evening']);
+    for (const s of day.stops.filter((x) => x.daypart === 'late')) assert.ok(s.gapFill || s.freeTime, JSON.stringify(s.label));
   }
 });
 

@@ -3335,6 +3335,9 @@ function fillDinnerGaps(result, input, requirements) {
   const facts = input.facts || [], byId = new Map(facts.map((v) => [v.id, v]));
   const ctx = buildContext(input.intent || {}, input.labels || {}, input);
   const used = new Set(result.days.flatMap((d) => d.stops.map((s) => s.venue && s.venue.id).filter(Boolean)));
+  // Round 15b (2026-10-20): a filler is never the same place under another name (Mission Creek Greenway after Mission
+  // Creek Regional Park) and never somewhere a family trip avoids (Skaha Bluffs climbing), like the day's other stops.
+  const usedPlaces = new Set([...used].map((id) => byId.get(id)).filter(Boolean).map(placeKey).filter(Boolean));
   const caps = (requirements.items || []).filter((i) => i.kind === 'type_count' && i.strength === 'must');
   const walk = (requirements.items || []).find((i) => i.kind === 'evening_walk');
   let changed = false;
@@ -3402,6 +3405,7 @@ function fillDinnerGaps(result, input, requirements) {
       const cands = [];
       for (const v of facts) {
         if (used.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !GAP_FILL_TYPES.includes(v.type) || !hasCoords(v)) continue;
+        if ((placeKey(v) && usedPlaces.has(placeKey(v))) || (ctx.kids && familyAvoid(v))) continue;
         if (regions.length && !regions.includes(v.region)) continue;
         // Round 11 (2026-10-20): a round of golf is never a filler before dinner (a second round ran 2:54-6:54 PM, past
         // sunset), and a day has one round.
@@ -3409,6 +3413,9 @@ function fillDinnerGaps(result, input, requirements) {
         // Round 12 (2026-10-20): an outfitter, a tour or an appointment-only winery is booked ahead, never a filler
         // (Hoodoo Adventure Company filled a December afternoon in Penticton).
         if (bookedOutfitter(v) || appointmentOnly(v)) continue;
+        // Round 15b (2026-10-20): nor a balloon company, rental base or forest-road campsite (rotateBooked), and never a
+        // kids-only playground for adults.
+        if (rotateBooked(v) || (!ctx.kids && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || ''}`))) continue;
         if (GAP_ALCOHOL_TYPES.includes(v.type) && !ctx.types.has(v.type) && result.theme !== 'wine') continue;
         if (v.type === 'cafe' && ['treat'].indexOf(cafeRole(v)) === -1 && !ctx.kids) continue; // a coffee right before dinner is not a stop
         if (coldMonthIceCream(v, date || ctx.tripDate)) continue; // round 10: no gelato filler in November
@@ -3435,6 +3442,44 @@ function fillDinnerGaps(result, input, requirements) {
     day.stops.splice(k, 0, stop);
     if (pick) { used.add(pick.v.id); changed = true; }
   }
+  return changed;
+}
+// Round 15b (2026-10-20): a day that starts at 9 with a short first stop (a 45-minute lookout) and then waits two hours
+// for lunch starts later instead, when no start time was asked for. Each day's start moves to the time with the least
+// waiting before lunch, as long as every stop keeps its time and order.
+function morningWaitOf(rows) {
+  let n = 0;
+  const lunchAt = rows.findIndex((r, i) => i > 0 && Number.isFinite(r.startMinutes) && r.startMinutes >= 690 && r.startMinutes <= 840);
+  for (let i = 1; i <= lunchAt; i++) n += rows[i].waitMinutes || 0;
+  return n;
+}
+function startLaterOnMorningGaps(result, input, requirements) {
+  if (!result || !(result.days || []).length || !(result.schedule || []).length || input.swap || !requirements) return false;
+  if (requirements.startMinutes != null || requirements.windowClock || requirements.windowToday) return false;
+  const when = (input.intent && input.intent.when) || {};
+  if (when.daypart || when.preset === 'today') return false;
+  let changed = false;
+  for (const day of result.days) {
+    if (requirements.dayStartMinutes && requirements.dayStartMinutes[day.day] != null) continue;
+    const rows = result.schedule.filter((r) => r.day === day.day);
+    if (rows.length < 2 || rows.some((r) => r.eventId != null) || day.stops.some((s) => s.skiDay)) continue;
+    const first = rows[0].startMinutes, wait0 = morningWaitOf(rows);
+    if (!Number.isFinite(first) || wait0 < 60) continue;
+    const ids = rows.map((r) => r.venueId).join(','), timed = rows.filter((r) => Number.isFinite(r.startMinutes)).length;
+    let pick = null;
+    for (let m = first + 15; m <= Math.min(first + 180, 690); m += 15) {
+      const probe = JSON.parse(JSON.stringify(result));
+      scheduleTripByHours(probe, input, { ...requirements, dayStartMinutes: { ...(requirements.dayStartMinutes || {}), [day.day]: m } }, { probe: true });
+      const cand = (probe.schedule || []).filter((r) => r.day === day.day);
+      if (cand.map((r) => r.venueId).join(',') !== ids || cand.filter((r) => Number.isFinite(r.startMinutes)).length < timed) continue;
+      if (cand.some((r) => r.daylight && r.daylight.status === 'conflict')) continue;
+      const w = morningWaitOf(cand);
+      if (w <= wait0 - 30 && (!pick || w < pick.w)) pick = { m, w };
+      if (w === 0) break;
+    }
+    if (pick) { requirements.dayStartMinutes = { ...(requirements.dayStartMinutes || {}), [day.day]: pick.m }; changed = true; }
+  }
+  if (changed) scheduleTripByHours(result, input, requirements);
   return changed;
 }
 // Round 10 (2026-10-19): 90 minutes or more of nothing before dinner (a tasting ending at 3:30, dinner at 6) moves
@@ -3468,7 +3513,9 @@ function pullDinnersForward(result, input, requirements) {
   // What is still a long wait gets a Free time card before dinner.
   for (const g of dinnerGapStops(result)) {
     const hit = dinnerGapRow(result, g);
-    if (!hit) continue;
+    // Round 15b (2026-10-20): never a second late-afternoon slot (a wine day's fourth tasting and a Free time card both
+    // in "late"); the page keys each stop by day and slot.
+    if (!hit || g.stops.some((s) => s.daypart === 'late')) continue;
     const from = hit.row.startMinutes - hit.row.waitMinutes, to = hit.row.startMinutes;
     g.stops.splice(hit.k, 0, { kind: 'free', daypart: 'late', label: PLAN_DAYPART_LABELS.late, venue: null, reasons: [], why: [], caveats: [], freeTime: { minutes: Math.round((to - from) / 15) * 15, fromMinutes: from, toMinutes: to } });
     changed = true;
@@ -3575,11 +3622,19 @@ function feedDrinkCrawl(result, input, requirements) {
   const facts = input.facts || [], byId = new Map(facts.map((v) => [v.id, v]));
   const ctx = { ...buildContext(input.intent || {}, input.labels || {}, input), plannerKinds: [] };
   const rowOf = (s) => (result.schedule || []).find((x) => (s.venue && x.venueId === s.venue.id) || (s.event && x.eventId === s.event.id));
-  const k = Math.min(2, venues.length - 1), after = venues[k - 1], at = stops.indexOf(venues[k]);
+  // Round 15b (2026-10-20): a wine-tasting day starts when the wineries open, with lunch after the first tasting (three
+  // tastings from 1 PM left lunch unscheduled at 3:40 PM, after the second).
+  const wineDay = venues.every((s) => s.venue.type === 'winery') && !(requirements && Number.isFinite(requirements.startMinutes)) && !(input.intent && input.intent.when && input.intent.when.daypart);
+  if (wineDay && ['afternoon', 'late', 'midday'].includes(venues[0].daypart)) { venues[0].daypart = 'morning'; if (timed) scheduleTripByHours(result, input, requirements); }
+  // An afternoon of tastings asked for ("winery hopping in Oliver this afternoon") ends with dinner instead: the wineries
+  // close at 5, and a lunch squeezed in at 3:40 PM could not be timed.
+  const wineAfternoon = !wineDay && venues.every((s) => s.venue.type === 'winery');
+  const k = wineDay ? 1 : wineAfternoon ? venues.length : Math.min(2, venues.length - 1), after = venues[k - 1];
+  const at = wineAfternoon ? stops.indexOf(after) + 1 : stops.indexOf(venues[k]);
   const from = byId.get(after.venue.id), row = rowOf(after);
   const date = (timed && result.schedule[0].date) || input.tripDate;
   const weekday = date ? WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7] : null;
-  const part = row && Number.isFinite(row.endMinutes) && row.endMinutes >= 16 * 60 ? 'evening' : 'midday';
+  const part = wineAfternoon || (row && Number.isFinite(row.endMinutes) && row.endMinutes >= 16 * 60) ? 'evening' : 'midday';
   if (!from) return false;
   const used = new Set(stops.map((s) => s.venue && s.venue.id).filter(Boolean));
   const cands = facts.filter((v) => ['restaurant', 'pub'].includes(v.type) && !used.has(v.id) && !ctx.exclude.has(v.id) && hasCoords(v) && v.region === from.region && !fastFood(v) && !(part === 'midday' && dinnerOnly(v))
@@ -3606,7 +3661,11 @@ function crawlMealExperience(result, crawl, meal) {
   if (!noun || !crawl.every((s) => s.venue.type === crawl[0].venue.type)) return;
   const all = crawl.concat(meal), towns = [...new Set(all.map(townOf).filter(Boolean))];
   const n = all.length, family = crawl.some((s) => s.component && s.component.kids) ? ' with the family' : '';
-  const flow = `Work your way through ${COUNT_WORDS[crawl.length] || crawl.length} ${noun}, with ${meal.label === 'Dinner' ? 'dinner' : 'lunch'} at ${meal.venue.name} in between${family}.`;
+  // Round 15b (2026-10-20): dinner after the last tasting is "then dinner at", not "in between".
+  const mealLast = crawl.every((s) => (result.itinerary.stops || []).indexOf(s) < (result.itinerary.stops || []).indexOf(meal));
+  const flow = mealLast
+    ? `Work your way through ${COUNT_WORDS[crawl.length] || crawl.length} ${noun}${family}, then have ${meal.label === 'Dinner' ? 'dinner' : 'lunch'} at ${meal.venue.name}.`
+    : `Work your way through ${COUNT_WORDS[crawl.length] || crawl.length} ${noun}, with ${meal.label === 'Dinner' ? 'dinner' : 'lunch'} at ${meal.venue.name} in between${family}.`;
   const geo = towns.length === 1 ? `All ${COUNT_WORDS[n] || n} stops are in ${towns[0]}, so there’s no need to move between towns. Plan a safe ride home.` : 'Plan a safe ride home.';
   result.experience = composeExperience(result.experience.title || EXPERIENCE_TITLE, flow, '', geo, all, crawl, null);
 }
@@ -4111,7 +4170,7 @@ function addSuggestedTimes(result, input) {
     probe.days = probe.days || [];
     try { scheduleTripByHours(probe, input, { ...req, items: req.items || [], conflicts: [], startDate: date, endDate: null, ...(startMinutes != null ? { startMinutes } : {}) }, { probe: true }); } catch (e) { return null; }
     const rows = probe.schedule || [];
-    return { probe, rows, untimed: rows.filter((r) => !Number.isFinite(r.startMinutes)).length, timed: rows.filter((r) => Number.isFinite(r.startMinutes)).length };
+    return { probe, rows, date, startMinutes, untimed: rows.filter((r) => !Number.isFinite(r.startMinutes)).length, timed: rows.filter((r) => Number.isFinite(r.startMinutes)).length };
   };
   // The usual start for the plan's first stop first; then a few other starts, kept only when they time more stops
   // (an evening outing whose first stop closes at 5 PM starts earlier).
@@ -4141,11 +4200,57 @@ function addSuggestedTimes(result, input) {
     }
     if (changed) { const t = run(null); if (t && t.untimed < best.untimed) best = t; }
   }
+  // Round 15b (2026-10-20): a suggested day that starts at 9 with a 45-minute walk and then waits until lunch at noon
+  // starts later instead (the walk at 10:45, lunch at noon): the start with the least waiting between stops is kept,
+  // when every stop is still timed. Waiting for dinner is left to the late-afternoon filler below.
+  if (best && best.timed && !best.untimed && fixedStart == null && !input.swap) {
+    const firstWait = (t) => { const byDay = new Map(); for (const r of t.rows) { if (!byDay.has(r.day)) byDay.set(r.day, []); byDay.get(r.day).push(r); }
+      let n = 0; for (const rs of byDay.values()) { const lunchAt = rs.findIndex((r, i) => i > 0 && Number.isFinite(r.startMinutes) && r.startMinutes >= 690 && r.startMinutes <= 840); for (let i = 1; i <= lunchAt; i++) n += rs[i].waitMinutes || 0; } return n; };
+    const start0 = best.rows.length && Number.isFinite(best.rows[0].startMinutes) ? best.rows[0].startMinutes : null;
+    const wait0 = firstWait(best);
+    if (start0 != null && wait0 >= 60) {
+      let pick = null;
+      for (let m = start0 + 15; m <= Math.min(start0 + 180, 690); m += 15) {
+        const t = run(m);
+        if (!t || t.untimed > best.untimed || t.rows.length !== best.rows.length) continue;
+        const w = firstWait(t);
+        if (w < wait0 - 30 && (!pick || w < pick.w)) pick = { t, w };
+        if (w === 0) break;
+      }
+      if (pick) best = pick.t;
+    }
+  }
   if (!best || !best.timed) return result;
+  // Round 15b (2026-10-20): a suggested schedule's long wait before dinner (2:50 to 6 PM, shown as a 195-minute free
+  // interval) gets the same nearby stop, or "Free time" card, a dated plan gets (day plans only: a short outing
+  // keeps the stops asked for). The filled plan's stops are then the plan's stops.
+  let filled = false;
+  if (!input.swap && (best.probe.days || []).length) {
+    const reqD = { ...req, items: req.items || [], conflicts: [], startDate: best.date, endDate: null, ...(best.startMinutes != null ? { startMinutes: best.startMinutes } : {}) };
+    const fillInput = { ...input, intent: input.intent || {}, tripDate: best.date || input.tripDate };
+    const snap = (x) => JSON.stringify(x.days.map((d) => (d.stops || []).map((st) => [st.venue && st.venue.id, st.event && st.event.id, !!st.freeTime, st.dinnerFrom || null])));
+    const before = snap(best.probe);
+    try {
+      if (fillDinnerGaps(best.probe, fillInput, reqD)) scheduleTripByHours(best.probe, input, reqD, { probe: true });
+      pullDinnersForward(best.probe, fillInput, reqD);
+      scheduleTripByHours(best.probe, input, reqD, { probe: true });
+      filled = snap(best.probe) !== before;
+    } catch (e) { filled = false; }
+    if (filled) {
+      const rows = best.probe.schedule || [];
+      if (rows.some((r) => !Number.isFinite(r.startMinutes)) && rows.filter((r) => !Number.isFinite(r.startMinutes)).length > best.untimed) filled = false;
+      else best = { ...best, rows, timed: rows.filter((r) => Number.isFinite(r.startMinutes)).length, untimed: rows.filter((r) => !Number.isFinite(r.startMinutes)).length };
+    }
+  }
+  if (filled) {
+    const clean = (st) => { if (!st) return st; const { scheduleNote, ...rest } = st; return { ...rest, caveats: (rest.caveats || []).filter((c) => c !== scheduleNote && !/\b20\d\d-\d\d-\d\d\b/.test(c)) }; };
+    result.days = best.probe.days.map((d, i) => { const { date: _date, ...rest } = d; return { ...(result.days[i] || {}), ...rest, stops: (d.stops || []).map(clean) }; });
+    if (best.probe.experience) result.experience = best.probe.experience;
+  }
   // A stop the timing replaced because its hours did not fit (with its own "Used instead of" note) is replaced here too.
   const lists = (x) => ((x.days || []).length ? x.days.map((d) => d.stops || []) : [(x.itinerary && x.itinerary.stops) || (x.outing && x.outing.stops) || []]);
   const mine = lists(result), theirs = lists(best.probe);
-  mine.forEach((list, i) => list.forEach((st, j) => {
+  if (!filled) mine.forEach((list, i) => list.forEach((st, j) => {
     const o = theirs[i] && theirs[i][j];
     if (st && st.venue && o && o.venue && o.venue.id !== st.venue.id) {
       const { scheduleNote, ...rest } = o;
@@ -4165,7 +4270,23 @@ function addStory(result, input) {
   if (story) result.story = story;
   return result;
 }
-function planTrip(input) { const result = withoutRepeatedAlternates(planTripUnchecked(input)); addSuggestedTimes(result, input || {}); return addStory(result, input || {}); }
+// Round 15b (2026-10-20): a crawl's meal that starts at 2:30 PM or later (lunch between the second and third brewery at
+// 3:10 PM) is labelled a late lunch, not "Lunch".
+const LATE_LUNCH_FROM = 14 * 60 + 30;
+function labelLateLunches(result) {
+  if (!result || !(result.schedule || []).length) return result;
+  const lists = (result.days || []).length ? result.days.map((d) => ({ day: d.day, stops: d.stops || [] })) : [{ day: 1, stops: (result.itinerary && result.itinerary.stops) || (result.outing && result.outing.stops) || [] }];
+  for (const g of lists) for (const st of g.stops) {
+    if (!st.venue || st.label !== 'Lunch') continue;
+    const row = result.schedule.find((r) => (r.day == null || r.day === g.day) && r.venueId === st.venue.id);
+    if (row && Number.isFinite(row.startMinutes) && row.startMinutes >= LATE_LUNCH_FROM) {
+      st.label = 'Late lunch';
+      if (result.experience && typeof result.experience.text === 'string') result.experience.text = result.experience.text.replace(`with lunch at ${st.venue.name}`, `with a late lunch at ${st.venue.name}`);
+    }
+  }
+  return result;
+}
+function planTrip(input) { const result = withoutRepeatedAlternates(planTripUnchecked(input)); addSuggestedTimes(result, input || {}); labelLateLunches(result); return addStory(result, input || {}); }
 function planTripUnchecked(input) {
   // A dated plan with nothing else to check is still timed and dated (2026-10-18: a family weekend matched to What's On).
   // 2026-10-19: any start date or start time (the Dates & start time control) is timed too: "romantic weekend in
@@ -4301,6 +4422,7 @@ function planTripUnchecked(input) {
   if (fillItineraryGaps(result, { ...input, intent }, requirements)) scheduleTripByHours(result, input, requirements);
   feedDrinkCrawl(result, { ...input, intent }, requirements);
   pullDinnersForward(result, { ...input, intent }, requirements);
+  startLaterOnMorningGaps(result, { ...input, intent }, requirements);
   if (eveningWalk && result.days.length) {
     // 2026-10-19: the rule is applied, not only stated. A dinner reached by car after the cut-off is said, day by day.
     const late = eveningWalkLateDrives(result, eveningWalk);

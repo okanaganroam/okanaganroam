@@ -500,7 +500,9 @@ function explicitOutingComponents(trip,requirements) {
 }
 
 function expandTripComponents(trip,requirements) {
-  if (!trip?.multi || requirements.daypart || requirements.onlyRequested || requirements.items.some(i=>i.kind==='transport')) trip=explicitOutingComponents(trip,requirements);
+  // Round 15b (2026-10-20): a crawl keeps its three stops ("winery hopping in Oliver this afternoon" became one winery:
+  // the afternoon's explicit-outing rebuild merged the crawl's copies into its one "winery" item).
+  if (!(trip?.multi && trip.crawl) && (!trip?.multi || requirements.daypart || requirements.onlyRequested || requirements.items.some(i=>i.kind==='transport'))) trip=explicitOutingComponents(trip,requirements);
   if (!trip?.multi) return trip;
   const singleDay=!(requirements.planDays>1||(requirements.items||[]).some(i=>i.kind==='days'&&i.value>1||i.dayIndex>1));
   const components=trip.components.map(c=>singleDay&&requirements.daypart&&!c.meal?{...c,daypart:requirements.daypart}:c);
