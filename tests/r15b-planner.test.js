@@ -279,3 +279,38 @@ test('Galleries (round 15c): "art galleries" and "museums" are named that way, n
   assert.equal(t3FrenchText('Matches your request for art galleries'), 'Correspond à votre demande : galeries d’art');
   assert.equal(t3FrenchText('Matches your request for museums & galleries'), 'Correspond à votre demande : musées et galeries');
 });
+
+test('French headings (round 15c): an Ideas heading is French on /fr, built from its parts; unknown parts are left alone', () => {
+  const { t3FrenchText, t3FrenchHeading } = require('../trip-french-copy.js');
+  const cases = [
+    ['Wineries in Oliver on Sunday.', 'Vignobles à Oliver dimanche.'],
+    ['Indoor & rainy day spots in Kelowna on Saturday.', 'Lieux pour les jours de pluie à Kelowna samedi.'],
+    ['Art galleries and dog-friendly spots in Kelowna this weekend.', 'Galeries d’art et endroits qui acceptent les chiens à Kelowna cette fin de semaine.'],
+    ['Hiking & Trails in West Kelowna and Peachland tomorrow morning.', 'Randonnées et sentiers à West Kelowna et Peachland demain matin.'],
+    ['Breweries in the Okanagan.', 'Microbrasseries dans l’Okanagan.'],
+    ['Restaurants in Kelowna tonight for a romantic outing.', 'Restaurants à Kelowna ce soir pour une sortie romantique.'],
+    ['Ideas for Vernon this weekend for a family trip.', 'Des idées à Vernon cette fin de semaine pour une sortie en famille.'],
+    ['What’s on in Vernon.', 'À l’affiche à Vernon.'],
+  ];
+  for (const [en, fr] of cases) assert.equal(t3FrenchText(en), fr, en);
+  // Never « week-end » (Canadian French), and an unknown kind is not guessed.
+  assert.doesNotMatch(t3FrenchText('Wineries in Oliver this weekend.'), /week-end/);
+  assert.equal(t3FrenchHeading('Unicorn rides in Kelowna.'), null);
+  // The page heading of a French Ideas plan uses it.
+  const p = plan('wineries in Oliver on Sunday');
+  const f = require('../trip-french-copy.js').t3FrenchPlan(JSON.parse(JSON.stringify(p)));
+  assert.match(f.headline, /^Vignobles à Oliver/, f.headline);
+});
+
+test('Variety (round 15c): the late-afternoon filler is not always the same place across different requests', () => {
+  const texts = ['a day in Kelowna', 'a relaxed day in Kelowna', 'a packed day in Kelowna', 'one day in Kelowna', 'a day in Kelowna with good food', 'a cheap day in Kelowna',
+    'a day trip to Kelowna', 'a day in Kelowna in November', 'a weekend in Kelowna', '2 days in Kelowna'];
+  const fillers = new Map();
+  for (const q of texts) for (const d of plan(q).days || []) for (const s of d.stops) if (s.gapFill && s.venue) fillers.set(s.venue.name, (fillers.get(s.venue.name) || 0) + 1);
+  const total = [...fillers.values()].reduce((a, b) => a + b, 0);
+  assert.ok(total >= 5, `fillers ${JSON.stringify([...fillers])}`);
+  assert.ok(fillers.size >= 3, `fillers ${JSON.stringify([...fillers])}`);
+  assert.ok(Math.max(...fillers.values()) <= Math.ceil(total / 2), `fillers ${JSON.stringify([...fillers])}`);
+  // The same request always gets the same plan.
+  assert.deepEqual(names(plan('a day in Kelowna')), names(plan('a day in Kelowna')));
+});

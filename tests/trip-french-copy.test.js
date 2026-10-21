@@ -116,6 +116,8 @@ test('French planner copy runs in the browser with a season or month (2026-10-19
  assert.match(pageSrc,/var FR_SEASON_WORDS = \$\{JSON\.stringify\(FR_SEASON_WORDS\)\}/);
  // Same shape as the page: the lookups, then the functions as source text, in a fresh context.
  const src='var FR_MONTHS_BY_EN = '+JSON.stringify(fr.FR_MONTHS_BY_EN)+';\nvar FR_SEASON_WORDS = '+JSON.stringify(fr.FR_SEASON_WORDS)+';\n'
+  // Round 15c: the French Ideas heading and its lookups ship with t3FrenchText, as on the page.
+  +['FR_HEADING_NAMES','FR_HEADING_DAYS','FR_HEADING_PARTS','FR_HEADING_OCCASIONS','FR_HEADING_WHEN_RE'].map(k=>'var '+k+' = '+JSON.stringify(fr[k])+';').join('\n')+'\n'+fr.frHeadingWhen.toString()+'\n'+fr.frHeadingWhere.toString()+'\n'+fr.t3FrenchHeading.toString()+'\n'
   +fr.t3FrenchText.toString()+'\n'+fr.t3FrenchEvent.toString()+'\n'+fr.t3FrenchPlan.toString()+'\nthis.run=t3FrenchPlan;';
  const ctx={};vm.createContext(ctx);vm.runInContext(src,ctx);
  const fall=ctx.run({summary:'3 days in Kelowna',understood:{season:{label:'fall'}},itinerary:{stops:[]}});
