@@ -64,3 +64,18 @@ test('links (2026-10-19): /links lists Instagram, TikTok and Facebook so visitor
   assert.ok(body.includes('target="_blank" rel="noopener" data-post-date="social"'));
   assert.ok(body.includes('Instagram, TikTok and Facebook posts'));
 });
+
+// In the news (2026-10-21): Facebook/Instagram block news links in Canada, so press stories are linked from /links.
+test('links: press stories are https links with a date, source and title, shown under In the news in a new tab', () => {
+  const data = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'social-links.json'), 'utf8'));
+  assert.ok(Array.isArray(data.press) && data.press.length >= 1);
+  for (const p of data.press) {
+    assert.match(p.date, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(p.url, /^https:\/\/[^\s"<>]+$/, p.url);
+    assert.ok(p.title && p.title.trim() && p.source);
+  }
+  assert.ok(data.press.some((p) => p.url.startsWith('https://kelownacapnews.com/2026/10/21/')));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.ok(src.includes('<h2>In the news</h2>'));
+  assert.ok(src.includes('target="_blank" rel="noopener" data-post-date="press"'));
+});

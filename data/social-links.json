@@ -1,5 +1,9 @@
 {
-  "_note": "Posts for okanaganroam.com/links (the Instagram bio link). One entry per post: date (Pacific), a short title and the page the post points to. The page shows posts up to today, newest first.",
+  "_note": "Posts for okanaganroam.com/links (the Instagram bio link). One entry per post: date (Pacific), a short title and the page the post points to. The page shows posts up to today, newest first. \"press\": stories about the site (date, source, title, https url), shown under In the news.",
+  "press": [
+    { "date": "2026-10-21", "source": "Kelowna Capital News", "title": "Okanagan-born tour guide creates free, one-stop shop for regional attractions", "url": "https://kelownacapnews.com/2026/10/21/okanagan-born-tour-guide-creates-free-one-stop-shop-for-regional-attractions/" },
+    { "date": "2026-10-17", "source": "KelownaNow", "title": "Kelowna-raised tour guide builds free online guide to the Okanagan", "url": "https://www.kelownanow.com/watercooler/news/news/Okanagan/Kelowna_raised_tour_guide_builds_free_guide_to_the_Okanagan/" }
+  ],
   "posts": [
     { "date": "2026-10-20", "title": "Halloween in the Okanagan: 6 spooky stops", "path": "/guides/halloween-okanagan" },
     { "date": "2026-10-21", "title": "Red Rooster Winery, Naramata", "path": "/naramata/wineries/red-rooster-winery" },
