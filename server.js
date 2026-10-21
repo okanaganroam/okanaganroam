@@ -19082,6 +19082,11 @@ function hotelList() {
   }
   return hotelsData;
 }
+// A hotel's own logo on its card (2026-10-21), when it sends one: data/hotels.json "logo", a file under
+// /images/hotels/. Anything else is ignored.
+function hotelLogo(hotel) {
+  return hotel && typeof hotel.logo === 'string' && /^\/images\/hotels\/[a-z0-9-]+\.(png|jpe?g|webp)$/.test(hotel.logo) ? hotel.logo : null;
+}
 function findHotel(slug) {
   return hotelList().find((h) => h.slug === slug) || null;
 }
@@ -19092,6 +19097,7 @@ const HOTEL_PAGE_GROUPS = [
 ];
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
+const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_content=${slug}`;
 // The places for each group: live, mappable, not closed for the season or not operating; open ones first, then by
 // distance. Pure apart from the venue rows passed in, so tests can call it with fixtures.
 // opensSoon: venue id -> label ("Opens Nov 26", "Opens for the ski season") for places closed only until a date close
@@ -19236,7 +19242,7 @@ document.addEventListener('click', function(e){
 // cdnjs, which the CSP already allows), so the server needs no QR code of its own.
 function renderHotelCard(hotel) {
   const town = REGION_LABELS[hotel.region] || hotel.region;
-  const target = `https://okanaganroam.com/near/${hotel.slug}?${HOTEL_QR_UTM(hotel.slug)}`;
+  const target = `https://okanaganroam.com/q/${hotel.slug}`;
   const shown = `okanaganroam.com/near/${hotel.slug}`;
   return `<!DOCTYPE html>
 <html lang="en">
@@ -19258,26 +19264,37 @@ function renderHotelCard(hotel) {
   .hc-brand span { color: #A6782F; }
   .hc-rule { width: 44px; height: 2px; background: #A6782F; margin: 10px 0 14px; }
   .hc-h { font-family: Fraunces, Georgia, serif; font-size: 25px; line-height: 1.12; margin: 0 0 8px; }
-  .hc-sub { font-size: 12.5px; line-height: 1.4; margin: 0 0 14px; opacity: 0.85; }
-  .hc-qr { width: 2.15in; height: 2.15in; background: #fff; border-radius: 10px; }
+  .hc-h-l { font-size: 21px; }
+  .hc-h-xl { font-size: 18px; }
+  .hc-sub { font-size: 12.5px; line-height: 1.4; margin: 0 0 12px; opacity: 0.85; }
+  .hc-qr { width: 1.95in; height: 1.95in; background: #fff; border-radius: 10px; }
   .hc-qr svg { width: 100%; height: 100%; display: block; }
   .hc-scan { font-weight: 800; font-size: 14px; margin: 12px 0 2px; }
-  .hc-url { font-size: 11px; opacity: 0.75; word-break: break-all; }
-  .hc-foot { margin-top: auto; font-size: 10.5px; opacity: 0.7; }
+  .hc-url { font-size: 11px; opacity: 0.75; overflow-wrap: normal; word-break: normal; }
+  .hc-list { list-style: none; margin: 12px auto 0; padding: 0; font-size: 12px; line-height: 1.65; font-weight: 700; display: inline-block; text-align: left; }
+  .hc-list li::before { content: '\\2713'; color: #A6782F; margin-right: 6px; }
+  .hc-has-logo { padding-bottom: 0.22in; }
+  .hc-has-logo .hc-qr { width: 1.7in; height: 1.7in; }
+  .hc-has-logo .hc-list { margin-top: 8px; line-height: 1.5; }
+  .hc-has-logo .hc-scan { margin-top: 8px; }
+  .hc-foot-logo { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; padding-top: 8px; }
+  .hc-logo { display: block; max-height: 0.38in; max-width: 1.8in; object-fit: contain; }
+  .hc-foot { margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(166,120,47,0.4); width: 70%; font-family: Fraunces, Georgia, serif; font-size: 13px; font-style: italic; }
   @media print { html, body { background: #fff; } .hc-tools { display: none; } .hc-card { margin: 0; box-shadow: none; border-radius: 0; } }
 </style>
 </head>
 <body>
 <div class="hc-tools"><span>Print on 4 × 6 card stock, no margins.</span><button type="button" onclick="window.print()">Print</button></div>
-<div class="hc-card">
+<div class="hc-card${hotelLogo(hotel) ? ' hc-has-logo' : ''}">
   <div class="hc-brand">OKANAGAN <span>ROAM</span></div>
   <div class="hc-rule"></div>
-  <h1 class="hc-h">Things to do near ${escapeHtml(hotel.name)}</h1>
+  <h1 class="hc-h${hotel.name.length > 30 ? ' hc-h-xl' : hotel.name.length > 22 ? ' hc-h-l' : ''}">Things to do near ${escapeHtml(hotel.name)}</h1>
   <p class="hc-sub">Restaurants, wineries and things to do around ${escapeHtml(town)}, with what's open right now and this week's events.</p>
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera</div>
-  <div class="hc-url">${escapeHtml(shown)}</div>
-  <div class="hc-foot">Free local guide · okanaganroam.com</div>
+  <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
+  <ul class="hc-list"><li>What's open right now</li><li>Restaurants, wineries &amp; things to do</li><li>Events this week · Build My Trip</li></ul>
+  <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
@@ -48666,6 +48683,14 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': hm[2] ? 'public, max-age=3600' : 'public, max-age=300' });
         return res.end(hm[2] ? renderHotelCard(hotel) : renderHotelPage(hotel));
       }
+      // Short links (2026-10-21): /guests/<slug> in emails and /q/<slug> in the QR code forward to the page with the
+      // tracking tags added here, so the links people see stay short and the QR code stays small.
+      const sm = /^\/(guests|q)\/([a-z0-9-]+)\/?$/.exec(pathname);
+      const shortHotel = sm && method === 'GET' ? findHotel(sm[2]) : null;
+      if (shortHotel) {
+        res.writeHead(302, { Location: `/near/${shortHotel.slug}?${sm[1] === 'q' ? HOTEL_QR_UTM(shortHotel.slug) : HOTEL_EMAIL_UTM(shortHotel.slug)}`, 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
+        return res.end();
+      }
     }
     if ((pathname === '/links' || pathname === '/links/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'public, max-age=300' });
@@ -51818,7 +51843,7 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   // Hotel QR pages (2026-10-20)
-  hotelList, findHotel, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM,
+  hotelList, findHotel, hotelLogo, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,

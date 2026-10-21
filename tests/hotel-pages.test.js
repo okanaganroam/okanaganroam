@@ -83,8 +83,9 @@ test('/near/<slug>/card: the printable card carries the tracked link for the QR 
   const r = await get(`/near/${hotel.slug}/card`);
   assert.equal(r.status, 200);
   assert.equal(r.headers.get('x-robots-tag'), 'noindex');
-  assert.ok(r.text.includes(`data-target="https://okanaganroam.com/near/${hotel.slug}?utm_source=${hotel.slug}&amp;utm_medium=hotel_qr"`));
-  assert.ok(r.text.includes(`okanaganroam.com/near/${hotel.slug}</div>`));
+  assert.ok(r.text.includes(`data-target="https://okanaganroam.com/q/${hotel.slug}"`), 'the QR holds the short link');
+  assert.ok(r.text.includes(`Compliments of ${hotel.name}`));
+  assert.ok(r.text.includes(`okanaganroam.com/near/<wbr>${hotel.slug}</div>`), 'the address breaks only after /near/');
   assert.ok(r.text.includes('@page { size: 4in 6in; margin: 0; }'));
   assert.ok(r.text.includes('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'));
   assert.equal(app.HOTEL_QR_UTM('abc'), 'utm_source=abc&utm_medium=hotel_qr');
@@ -100,4 +101,26 @@ test('hotel groups (2026-10-20): a place closed only until soon is listed after 
   assert.ok(src.includes("opensSoon.set(id, 'Opens for the ski season')"), 'ski-hill places with no date yet open with the hill');
   assert.ok(src.includes('row.reopens_date <= addLocalDays(today0, HOTEL_OPENS_SOON_DAYS)'));
   assert.ok(src.includes('<span class="ht-soon">'));
+});
+
+test('short links (2026-10-21): /guests/<slug> and /q/<slug> forward to the hotel page with the email or QR tracking tags', async () => {
+  const hotel = app.hotelList()[0];
+  let r = await get(`/guests/${hotel.slug}`);
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/near/${hotel.slug}?utm_source=hotel_email&utm_medium=email&utm_content=${hotel.slug}`);
+  assert.equal(r.headers.get('cache-control'), 'no-store');
+  r = await get(`/q/${hotel.slug}`);
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `/near/${hotel.slug}?utm_source=${hotel.slug}&utm_medium=hotel_qr`);
+  assert.equal((await get('/guests/no-such-hotel')).status, 404);
+  assert.equal((await get('/q/no-such-hotel')).status, 404);
+});
+
+test('hotel logo (2026-10-21): only a file under /images/hotels/ shows on the card', () => {
+  assert.equal(app.hotelLogo({ logo: '/images/hotels/test-hotel.png' }), '/images/hotels/test-hotel.png');
+  for (const bad of ['https://example.com/logo.png', '/images/hotels/../x.png', '/images/venues/a.png', 'javascript:alert(1)', 42, null])
+    assert.equal(app.hotelLogo({ logo: bad }), null, String(bad));
+  const html = app.renderHotelCard({ ...app.hotelList()[0], logo: '/images/hotels/test-hotel.png' });
+  assert.ok(html.includes('<img class="hc-logo" src="/images/hotels/test-hotel.png"'));
+  assert.ok(!app.renderHotelCard(app.hotelList()[0]).includes('hc-logo"'));
 });
