@@ -4200,6 +4200,14 @@ function addSuggestedTimes(result, input) {
     }
     if (changed) { const t = run(null); if (t && t.untimed < best.untimed) best = t; }
   }
+  // Round 15b: a crawl whose stops cannot all be timed tries its other orders (see orderCrawlByHours).
+  if (best && best.untimed && result.kind === 'itinerary' && result.itinerary && !input.swap) {
+    const original = result.itinerary.stops;
+    const bestOf = () => { let b = run(null); for (const m of [720, 780, 840, 900]) { if (!b || !b.untimed) break; const t = run(m); if (t && t.untimed < b.untimed) b = t; } return b; };
+    const times = new Map();
+    const reordered = orderCrawlByHours(result, (order) => { result.itinerary.stops = order; const t = bestOf(); result.itinerary.stops = original; times.set(order, t); return t ? t.rows : [{}]; });
+    if (reordered && times.get(reordered) && times.get(reordered).untimed < best.untimed) { result.itinerary.stops = reordered; best = times.get(reordered); }
+  }
   // Round 15b (2026-10-20): a suggested day that starts at 9 with a 45-minute walk and then waits until lunch at noon
   // starts later instead (the walk at 10:45, lunch at noon): the start with the least waiting between stops is kept,
   // when every stop is still timed. Waiting for dinner is left to the late-afternoon filler below.
@@ -4270,6 +4278,32 @@ function addStory(result, input) {
   if (story) result.story = story;
   return result;
 }
+// Round 15b (2026-10-20): a crawl whose last stop could not be timed (Abandoned Rail closes at 7 PM, but the crawl started
+// at BNA, which opens at 4, so it came after dinner) tries its drink stops in the other orders, the meal keeping its
+// place, and keeps the order that times the most stops with the least waiting. Returns the stops to use, or null.
+const CRAWL_DRINK_TYPES = ['brewery', 'winery', 'distillery', 'cocktail', 'pub'];
+function crawlOrders(stops) {
+  const at = stops.map((s, i) => (s.venue && !s.event && CRAWL_DRINK_TYPES.includes(s.venue.type) && s.label !== 'Dinner' && s.label !== 'Lunch' && s.label !== 'Late lunch' ? i : -1)).filter((i) => i >= 0);
+  if (at.length < 2 || at.length > 4 || new Set(at.map((i) => stops[i].venue.type)).size !== 1) return [];
+  const perms = (xs) => (xs.length <= 1 ? [xs] : xs.flatMap((x, i) => perms(xs.slice(0, i).concat(xs.slice(i + 1))).map((p) => [x].concat(p))));
+  return perms(at.map((i) => stops[i])).slice(1).map((order) => { const out = stops.slice(); at.forEach((i, n) => { out[i] = order[n]; }); return out; });
+}
+function crawlScore(rows) {
+  return { untimed: rows.filter((r) => !Number.isFinite(r.startMinutes)).length, wait: rows.slice(1).reduce((n, r) => n + (r.waitMinutes || 0), 0) };
+}
+function orderCrawlByHours(result, timeIt) {
+  if (!result || result.kind !== 'itinerary' || !result.itinerary || !(result.itinerary.stops || []).length) return null;
+  const stops = result.itinerary.stops;
+  const orders = crawlOrders(stops);
+  if (!orders.length) return null;
+  let best = { stops, ...crawlScore(timeIt(stops)) };
+  if (!best.untimed) return null;
+  for (const order of orders) {
+    const sc = crawlScore(timeIt(order));
+    if (sc.untimed < best.untimed || (sc.untimed === best.untimed && sc.wait < best.wait)) best = { stops: order, ...sc };
+  }
+  return best.stops === stops ? null : best.stops;
+}
 // Round 15b (2026-10-20): a crawl's meal that starts at 2:30 PM or later (lunch between the second and third brewery at
 // 3:10 PM) is labelled a late lunch, not "Lunch".
 const LATE_LUNCH_FROM = 14 * 60 + 30;
@@ -4278,8 +4312,15 @@ function labelLateLunches(result) {
   if (!result || !(result.schedule || []).length) return result;
   const lists = (result.days || []).length ? result.days.map((d) => ({ day: d.day, stops: d.stops || [] })) : [{ day: 1, stops: (result.itinerary && result.itinerary.stops) || (result.outing && result.outing.stops) || [] }];
   for (const g of lists) for (const st of g.stops) {
-    if (!st.venue || st.label !== 'Lunch') continue;
+    // A crawl's meal (no component of its own) put before 5 PM by the crawl's order is lunch again.
+    const crawlMeal = result.kind === 'itinerary' && st.component == null && (st.reasons || []).some((r) => r.code === 'meal');
+    if (!st.venue || !(st.label === 'Lunch' || (crawlMeal && st.label === 'Dinner'))) continue;
     const row = result.schedule.find((r) => (r.day == null || r.day === g.day) && r.venueId === st.venue.id);
+    if (crawlMeal && st.label === 'Dinner' && row && Number.isFinite(row.startMinutes) && row.startMinutes < DINNER_FROM) {
+      st.label = row.startMinutes >= LATE_LUNCH_FROM ? 'Late lunch' : 'Lunch'; st.daypart = 'midday';
+      if (result.experience && typeof result.experience.text === 'string') result.experience.text = result.experience.text.replace(`with dinner at ${st.venue.name}`, `with ${st.label === 'Lunch' ? 'lunch' : 'a late lunch'} at ${st.venue.name}`);
+      continue;
+    }
     if (!row || !Number.isFinite(row.startMinutes) || row.startMinutes < LATE_LUNCH_FROM) continue;
     // From 5 PM it is dinner (a Penticton crawl that starts when BNA opens at 4 had its "Late lunch" at 6:10 PM).
     const dinner = row.startMinutes >= DINNER_FROM;
@@ -4424,6 +4465,10 @@ function planTripUnchecked(input) {
   // Round 8: a short one-day itinerary gets lunch, another stop or a Free time card in a long gap.
   if (fillItineraryGaps(result, { ...input, intent }, requirements)) scheduleTripByHours(result, input, requirements);
   feedDrinkCrawl(result, { ...input, intent }, requirements);
+  if ((result.schedule || []).length) {
+    const reordered = orderCrawlByHours(result, (order) => { const probe = JSON.parse(JSON.stringify(result)); probe.itinerary.stops = JSON.parse(JSON.stringify(order)); scheduleTripByHours(probe, input, requirements, { probe: true }); return probe.schedule || []; });
+    if (reordered) { result.itinerary.stops = reordered; scheduleTripByHours(result, input, requirements); }
+  }
   pullDinnersForward(result, { ...input, intent }, requirements);
   startLaterOnMorningGaps(result, { ...input, intent }, requirements);
   if (eveningWalk && result.days.length) {
