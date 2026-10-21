@@ -1927,8 +1927,11 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   // 2026-10-14: a "brewery crawl", "pub crawl" or "wine hop" is three stops of that kind in a row, not a list.
   // Round 14 (2026-10-20): "cafe hopping" too (a dated "cafe hopping in Kelowna" gave an Ideas list, not a plan).
   const CRAWL_TYPES = ['brewery', 'pub', 'winery', 'cocktail', 'distillery', 'cafe'];
+  // Round 15b (2026-10-20): "wine tasting in Oliver on Sunday" (or "beer tastings") is a tasting day too, not an Ideas list.
+  const TASTING_TYPES = ['winery', 'brewery', 'distillery'];
   if (parts.length === 1 && parts[0].kind === 'venue' && !parts[0].meal && parts[0].types.length && parts[0].types.every((ty) => CRAWL_TYPES.includes(ty))
-    && /\b(?:crawl|crawls|hop|hopping)\b/.test(normalized)) {
+    && (/\b(?:crawl|crawls|hop|hopping)\b/.test(normalized)
+      || (parts[0].types.every((ty) => TASTING_TYPES.includes(ty)) && /\b(?:tasting|tastings)\b/.test(normalized)))) {
     parts = [parts[0], JSON.parse(JSON.stringify(parts[0])), JSON.parse(JSON.stringify(parts[0]))];
     out.crawl = true;
   }

@@ -22,6 +22,7 @@ function action(stop, v, ctx) {
   if (stop.skiDay || (t === 'outdoor' && has(name, /\bski\b/))) return { en: ['ski at', ''], fr: ['skiez à', ''] };
   if (t === 'restaurant' || (t === 'cafe' && /\b(?:lunch|brunch|breakfast)\b/i.test(label)) || stop.wineryLunch) {
     if (/\bbrunch\b/i.test(label)) return { en: ['have brunch at', ''], fr: ['prenez le brunch à', ''] };
+    if (/\blate lunch\b/i.test(label)) return { en: ['have a late lunch at', ''], fr: ['prenez un dîner tardif à', ''] };
     if (/\bbreakfast\b/i.test(label)) return { en: ['have breakfast at', ''], fr: ['déjeunez à', ''] };
     if (evening) return { en: ['have dinner at', ''], fr: ['soupez à', ''], dinner: true };
     return { en: ['have lunch at', ''], fr: ['dînez à', ''] };
@@ -103,7 +104,7 @@ function dayPhrases(stops, byId, ctx, maxReasons, rows) {
     const town = s.venue.regionLabel || null;
     const moved = town && prevTown && town !== prevTown ? town : null;
     // One reason for a key stop: the first thing to do that isn't a meal, and dinner.
-    const mealish = /^(?:have lunch|have brunch|have breakfast|stop for coffee)/.test(a.en[0]);
+    const mealish = /^(?:have lunch|have a late lunch|have brunch|have breakfast|stop for coffee)/.test(a.en[0]);
     const key = a.dinner || (!mealish && !out.some((o) => o.keyed));
     const r = key && reasons < maxReasons ? reason(s, v, ctx, a) : null;
     if (r) reasons++;
@@ -114,9 +115,13 @@ function dayPhrases(stops, byId, ctx, maxReasons, rows) {
     const prev = out[out.length - 1];
     const same = prev && prev.verbEn === verbEn && !moved;
     const name = s.venue.name;
+    // Round 15b (2026-10-20): the repeat keeps the verb's own little word ("visit A, then B", not "then at B"; "the view
+    // from A, then from B").
+    const prepEn = / (at|from|with)$/.exec(verbEn), prepFr = / (à|de|depuis|avec)$/.exec(verbFr);
+    const thenEn = prepEn ? `then ${prepEn[1]}` : 'then', thenFr = prepFr ? `puis ${prepFr[1]}` : 'puis';
     out.push({ part: when, name, verbEn, verbFr, keyed: !!r,
-      en: `${same ? 'then at' : verbEn} ${name}${moved ? ` in ${moved}` : ''}${r ? `, ${r.en}` : ''}`,
-      fr: `${same ? 'puis à' : verbFr} ${name}${moved ? ` à ${moved}` : ''}${r ? `, ${r.fr}` : ''}`,
+      en: `${same ? thenEn : verbEn} ${name}${moved ? ` in ${moved}` : ''}${r ? `, ${r.en}` : ''}`,
+      fr: `${same ? thenFr : verbFr} ${name}${moved ? ` à ${moved}` : ''}${r ? `, ${r.fr}` : ''}`,
       fullEn: `${verbEn} ${name}${moved ? ` in ${moved}` : ''}${r ? `, ${r.en}` : ''}`,
       fullFr: `${verbFr} ${name}${moved ? ` à ${moved}` : ''}${r ? `, ${r.fr}` : ''}`,
       sameAsPrev: same });
@@ -135,8 +140,11 @@ function sentences(phrases, lang) {
   for (let i = 0; i < phrases.length; i += 2) {
     const a = phrases[i], b = phrases[i + 1];
     const textA = a.sameAsPrev ? (lang === 'en' ? a.fullEn : a.fullFr) : a[lang];
-    const lunch = /^have lunch/.test(a.verbEn || '');
-    const lead = i === 0 ? '' : lunch ? (lang === 'en' ? 'Next, ' : 'Ensuite, ') : (CONNECT[lang][a.part] || (lang === 'en' ? 'Then ' : 'Puis '));
+    const lunch = /^have (?:a late )?lunch/.test(a.verbEn || '');
+    // Round 15b (2026-10-20): no "In the afternoon" again when the sentence before was already in the afternoon (three
+    // tastings from 1 PM read "Taste wine at A, then at B. In the afternoon, taste wine at C").
+    const samePart = i > 0 && phrases[i - 1].part === a.part;
+    const lead = i === 0 ? '' : lunch || samePart ? (lang === 'en' ? 'Next, ' : 'Ensuite, ') : (CONNECT[lang][a.part] || (lang === 'en' ? 'Then ' : 'Puis '));
     let s = lead ? `${lead}${textA}` : capFirst(textA);
     if (b) s += lang === 'en' ? (b.sameAsPrev ? `, ${b.en}` : `, then ${b.en}`) : (b.sameAsPrev ? `, ${b.fr}` : `, puis ${b.fr}`);
     out.push(`${s}.`);

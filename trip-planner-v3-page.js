@@ -1702,8 +1702,11 @@ function renderScript(d) {
         if(row.mealWindow)detail.push(french?'Fenêtre conditionnelle selon les horaires indiqués; trajet et service en cuisine à confirmer. Aucun horaire de visite fixé.':'Conditional window based on listed hours; travel and kitchen service need confirmation. No visit time is scheduled.');
         if(Number.isFinite(row.transferMinutes)&&row.transferMinutes>0)detail.push((french?'Trajet estimé : ':'Estimated travel: ')+row.transferMinutes+' min');
         if(row.arrivalAllowanceMinutes>0)detail.push((french?'Marge d’arrivée : ':'Arrival allowance: ')+row.arrivalAllowanceMinutes+' min');
-        // Round 12 (2026-10-20): a gap of a few minutes is not a "free interval" ("Provisional free interval: 1 min").
-        if(row.gapMinutes>=10)detail.push((row.status==='provisional'?(french?'Intervalle libre provisoire : ':'Provisional free interval: '):(french?'Intervalle libre avant cet arrêt : ':'Free interval before this stop: '))+row.gapMinutes+' min');
+        // Round 12 (2026-10-20): a gap of a few minutes is not a "free interval" (a one-minute gap was shown).
+        // Round 15b (2026-10-20): said in plain words, with hours ("Free time before this stop: about 3 hr 15 min"), not as
+        // a provisional interval in minutes.
+        var freeTimeText=function(gm){var gh=Math.floor(gm/60),gr=gm%60;return (french?'Temps libre avant cet arrêt : ':'Free time before this stop: ')+(gh?(french?'environ '+gh+' h'+(gr?' '+String(gr).padStart(2,'0'):''):'about '+gh+' hr'+(gr?' '+gr+' min':'')):gm+' min');};
+        if(row.gapMinutes>=10)detail.push(freeTimeText(row.gapMinutes));
         if(row.shortWalkSelected)detail.push(french?'Promenade courte · durée estimée de 30 à 60 min':'Short walk · allow 30–60 min');
         if(row.daylight){
           if(Number.isFinite(row.daylight.sunriseMinutes))detail.push((french?'Lumière du jour estimée : ':'Estimated daylight: ')+clock(row.daylight.sunriseMinutes)+'–'+clock(row.daylight.sunsetMinutes));
