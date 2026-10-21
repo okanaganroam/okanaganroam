@@ -184,9 +184,10 @@ test('/map: Search with a partial last word reads it as the word it starts, and 
 test('/map: Christmas markets open the Events tab with the guide link, in French on /fr/map; musicals keep the French words', async () => {
   const en = await mapReader('en'), fr = await mapReader('fr');
   assert.equal(fr.read('marché de Noël'), 'christmas market');
-  assert.match(en.html, /xmasMarkets: function\(n, href\)\{ return \(n \? 'This week’s Christmas markets are on the Events tab\.'/);
-  assert.match(fr.html, /xmasMarkets: function\(n, href\)\{ return \(n \? 'Les marchés de Noël de la semaine sont dans l’onglet Événements\.'/);
-  assert.ok(fr.html.includes("T.xmasMarkets(events.filter(evHit).length, (FR ? '/fr' : '') + '/guides/okanagan-christmas-markets')"));
+  // Round 14 (2026-10-20): a third argument (soon) once the weeks after this one are loaded (/map/ahead.json).
+  assert.match(en.html, /xmasMarkets: function\(n, href, soon\)\{ return \(n \? \(soon \? 'Upcoming Christmas markets are on the Events tab\.' : 'This week’s Christmas markets are on the Events tab\.'\)/);
+  assert.match(fr.html, /xmasMarkets: function\(n, href, soon\)\{ return \(n \? \(soon \? 'Les marchés de Noël à venir sont dans l’onglet Événements\.' : 'Les marchés de Noël de la semaine sont dans l’onglet Événements\.'\)/);
+  assert.ok(fr.html.includes("T.xmasMarkets(all, (FR ? '/fr' : '') + '/guides/okanagan-christmas-markets', soon)"));
   // The map's events carry the Christmas-market kind.
   const data = JSON.parse(await get('/map/data.json'));
   const market = data.e.find((e) => e[0] === 'R12 German Christmas Market');

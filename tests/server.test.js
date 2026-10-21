@@ -17048,7 +17048,7 @@ test('Seasons everywhere: /map lists untimed multi-day events as "On now" only f
   const page = app.renderPlacesMapPage();
   assert.match(page, /if \(g === 'running'\) return T\.runningUntil \+ ' ' \+ dayText\(e\.ed\);/);
   assert.match(page, /running: 'Exhibitions & multi-day events', runningUntil: 'Running until'/);
-  assert.match(page, /var order = \{ now: 0, later: 1, running: 2, tomorrow: 3, week: 4 \};/);
+  assert.match(page, /var order = \{ now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 \};/);
 });
 
 test('Seasons everywhere: Recommended food lists are open now, then everything else, then closed for the season', () => {

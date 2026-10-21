@@ -172,7 +172,8 @@ test('/map: comedy words and New Year’s Eve (EN and FR) open the Events tab by
   assert.ok(!kinds('R13 Hall Supper').includes('comedy'));
   // New Year's Eve links to the search's New Year's Eve list, in French on /fr/map.
   assert.ok(en.html.includes("'/search?q=' + encodeURIComponent('new years eve')"));
-  assert.match(fr.html, /nyeEvents: function\(n, href\)\{ return \(n \? 'Les événements du réveillon de la semaine sont dans l’onglet Événements\.'/);
+  // Round 14: a third argument (soon) once the weeks ahead are loaded.
+  assert.match(fr.html, /nyeEvents: function\(n, href, soon\)\{ return \(n \? \(soon \? 'Les événements du réveillon à venir sont dans l’onglet Événements\.' : 'Les événements du réveillon de la semaine sont dans l’onglet Événements\.'\)/);
 });
 
 test('/fr/map: the no-results message and the event counts are in French, and 0 reads « Aucun événement »', async () => {
