@@ -314,3 +314,13 @@ test('Variety (round 15c): the late-afternoon filler is not always the same plac
   // The same request always gets the same plan.
   assert.deepEqual(names(plan('a day in Kelowna')), names(plan('a day in Kelowna')));
 });
+
+test('Variety (round 15c): a Local Favourite does not win every late-afternoon slot just for its badge', () => {
+  // Knoll Mountain Park is the fixture's Local Favourite park; the badge's 3 points are left out when fillers rotate.
+  const texts = ['a day in Kelowna', 'a relaxed day in Kelowna', 'a packed day in Kelowna', 'one day in Kelowna', 'a day in Kelowna with good food', 'a cheap day in Kelowna',
+    'a day trip to Kelowna', 'a day in Kelowna in November', 'a weekend in Kelowna', '2 days in Kelowna', 'a long weekend in Kelowna', '3 days in Kelowna'];
+  let fills = 0, knoll = 0;
+  for (const q of texts) for (const d of plan(q).days || []) for (const s of d.stops) if (s.gapFill && s.venue) { fills++; if (s.venue.id === PARKS[0].id) knoll++; }
+  assert.ok(fills >= 5, `${fills} fillers`);
+  assert.ok(knoll < fills / 2, `Knoll Mountain Park filled ${knoll} of ${fills}`);
+});
