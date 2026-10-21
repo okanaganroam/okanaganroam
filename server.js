@@ -5461,7 +5461,13 @@ function smartOpenNowPick(intent, now = new Date()) {
 // « spectacle » and "show" found nothing (or every exhibition and the haunted corn maze), "classical music" a curry
 // house, and "live music" places but none of the week's gigs. A show is a performance listing: comedy, theatre, a
 // concert, magic or a tribute, never a tour, exhibition, class, market, fair or maze.
-const SEARCH_COMEDY_RE = /\b(?:comed(?:y|ies|ian|ians|ic)|stand[- ]?up(?![- ]paddl)|improv(?:ised|isation)?|laughs?)\b/i;
+// Round 14 (2026-10-20): "improvised"/"improvisation" read a jazz set ("Okanagan Sax Live ... jazz improvisation") and
+// a gong concert ("improvised sound music") as comedy, and "laughs" in a description a drag brunch. Comedy is now
+// comedy, a comedian (or humorist), stand-up, or improv (the word, or improvised/improvisational comedy or theatre).
+// "laughs" and "humour" count only in a show's name (Hungry for Laughs): in a description they read talks, drag
+// brunches and plays "with humour" as comedy nights.
+const SEARCH_COMEDY_RE = /\b(?:comed(?:y|ies|ian|ians|ic)|stand[- ]?up(?![- ]paddl)|improv|improvi[sz](?:ed|ational|ation) (?:comedy|theat(?:re|er)|sketch(?:es)?)|humou?rists?)\b/i;
+const SEARCH_COMEDY_NAME_RE = /\b(?:laughs?|humou?r)\b/i;
 const SEARCH_NOT_SHOW_RE = /\b(?:tours?|exhibitions?|exhibits?|workshops?|class(?:es)?|lectures?|talks?|markets?|bazaars?|museums?|gallery|galleries|art shows?|crafts?|sales?|fairs?|maze|haunted|trails?|pumpkins?|members show)\b/i;
 const SEARCH_THEATRE_RE = /\b(?:theatre|theater|musicals?|panto(?:mime)?|ballet|opera|cabaret|playhouse|a play|the play)\b/i;
 const SEARCH_SHOW_NAME_RE = /\b(?:shows?|performances?|concerts?|tribute|magic(?:ian)?|drag|burlesque|circus|symphony|orchestra|live)\b/i;
@@ -5470,7 +5476,7 @@ const SEARCH_CLASSICAL_RE = /\b(?:symphon\w*|orchestra\w*|classical|chamber (?:m
 function searchShowKind(e) {
   const name = String(e.name || ''), desc = String(e.description || ''), cats = e.categories || [];
   // A comedy tour is a show; a comedy class is not.
-  if (SEARCH_COMEDY_RE.test(name) && !/\b(?:workshops?|class(?:es)?|lessons?)\b/i.test(name)) return 'comedy';
+  if ((SEARCH_COMEDY_RE.test(name) || SEARCH_COMEDY_NAME_RE.test(name)) && !/\b(?:workshops?|class(?:es)?|lessons?)\b/i.test(name)) return 'comedy';
   if (SEARCH_NOT_SHOW_RE.test(name)) return null;
   if (SEARCH_COMEDY_RE.test(desc.slice(0, 240))) return 'comedy';
   if (SEARCH_THEATRE_RE.test(name) || /\b(?:a play|the play|musical|stage production|on stage|playwright)\b/i.test(desc)) return 'theatre';
@@ -17105,7 +17111,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     typoRead: function(f){ return 'Nous avons lu ' + f.map(function(x){ return '« ' + x.from + ' » comme « ' + x.to + ' »'; }).join(', ') + '.'; },
     awayN: function(n){ return n === 1 ? '1 résultat hors de cette zone de la carte.' : n + ' résultats hors de cette zone de la carte.'; }, showThem: function(n){ return n === 1 ? 'L’afficher' : 'Les afficher'; },
     eventsFor: function(w){ return w ? 'Événements de la semaine avec « ' + w + ' ».' : 'Voici les événements de la semaine sur la carte.'; },
-    xmasMarkets: function(n, href){ return (n ? 'Les marchés de Noël de la semaine sont dans l’onglet Événements.' : 'Aucun marché de Noël sur la carte cette semaine.') + ' Tous les marchés et leurs dates : <a ' + hrefAttr(href) + '>notre guide des marchés de Noël</a>.'; },
+    // Round 14 (2026-10-20): an events search with nothing this week shows the weeks after it (/map/ahead.json).
+    aheadFor: function(w){ return 'Rien cette semaine : voici les événements à venir' + (w ? ' avec « ' + w + ' »' : '') + '.'; },
+    eventsSoon: function(n, r){ return (n ? n + (n === 1 ? ' événement' : ' événements') : 'Aucun événement') + (r ? ' à moins de ' + r + ' km' : '') + ' à venir'; },
+    xmasMarkets: function(n, href, soon){ return (n ? (soon ? 'Les marchés de Noël à venir sont dans l’onglet Événements.' : 'Les marchés de Noël de la semaine sont dans l’onglet Événements.') : (soon ? 'Aucun marché de Noël n’est encore annoncé sur la carte.' : 'Aucun marché de Noël sur la carte cette semaine.')) + ' Tous les marchés et leurs dates : <a ' + hrefAttr(href) + '>notre guide des marchés de Noël</a>.'; },
     widened: function(r){ return 'Peu de résultats tout près : la distance passe à ' + r + ' km.'; }, widenedAny: 'Peu de résultats tout près : toutes les distances.',
     nearMe: 'Près de moi', recenter: 'Recentrer sur moi', finding: 'Recherche…', near: 'Voici ce qui est près de vous.', stopped: 'Position désactivée.',
     sheetMore: 'Afficher plus de la liste', sheetLess: 'Afficher moins de la liste',
@@ -17121,10 +17130,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // Round 13 (2026-10-20): « 0 événements cette semaine » wrapped onto 4 lines on a 320-375 px phone; none reads « Aucun événement ».
     openSuffix: ' ouverts', eventsCount: function(n){ return n ? n + (n === 1 ? ' événement' : ' événements') + ' cette semaine' : 'Aucun événement cette semaine'; },
     moreNear: function(n, r){ return n === 1 ? '1 autre à moins de ' + r + ' km' : n + ' autres à moins de ' + r + ' km'; },
-    nyeEvents: function(n, href){ return (n ? 'Les événements du réveillon de la semaine sont dans l’onglet Événements.' : 'La carte montre les 7 prochains jours : aucun événement du réveillon d’ici là.') + ' Tous les événements du réveillon : <a ' + hrefAttr(href) + '>le réveillon dans la recherche</a>.'; },
+    nyeEvents: function(n, href, soon){ return (n ? (soon ? 'Les événements du réveillon à venir sont dans l’onglet Événements.' : 'Les événements du réveillon de la semaine sont dans l’onglet Événements.') : (soon ? 'Aucun événement du réveillon n’est encore annoncé sur la carte.' : 'La carte montre les 7 prochains jours : aucun événement du réveillon d’ici là.')) + ' Tous les événements du réveillon : <a ' + hrefAttr(href) + '>le réveillon dans la recherche</a>.'; },
     eventsNear: function(n, r){ return (n ? n + (n === 1 ? ' événement' : ' événements') : 'Aucun événement') + (r ? ' à moins de ' + r + ' km' : ' près de vous') + ' cette semaine'; },
     zoomHint: 'Touchez le bouton de position pour voir ce qui est près de vous.',
     none: 'Rien ne correspond ici. Essayez une plus grande distance ou retirez un filtre.', noEvents: 'Aucun événement cette semaine ici. Essayez une plus grande distance.',
+    // Round 14 (2026-10-20): « Essayez une plus grande distance » only when a bigger distance has some; « réveillon »
+    // (nothing in the 7 days the map holds) said it under the 7-day notice.
+    noEventsHere: 'Aucun événement cette semaine ici.', noEventsWeek: 'Aucun événement de ce genre sur la carte cette semaine.', noEventsSoon: 'Aucun événement de ce genre sur la carte dans les semaines à venir.', ahead: 'À venir',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
     today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: '🍂 Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
@@ -17138,7 +17150,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     typoRead: function(f){ return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; }).join(', ') + '.'; },
     awayN: function(n){ return n === 1 ? '1 match outside this part of the map.' : n + ' matches outside this part of the map.'; }, showThem: function(n){ return n === 1 ? 'Show it' : 'Show them'; },
     eventsFor: function(w){ return w ? 'This week’s events with “' + w + '”.' : 'Showing this week’s events on the map.'; },
-    xmasMarkets: function(n, href){ return (n ? 'This week’s Christmas markets are on the Events tab.' : 'No Christmas markets on the map this week.') + ' Every market and its dates: <a ' + hrefAttr(href) + '>our Christmas markets guide</a>.'; },
+    aheadFor: function(w){ return 'Nothing this week, so these are the events coming up' + (w ? ' with “' + w + '”' : '') + '.'; },
+    eventsSoon: function(n, r){ return (n ? n + (n === 1 ? ' event' : ' events') : 'No events') + (r ? ' within ' + r + ' km' : '') + ' coming up'; },
+    xmasMarkets: function(n, href, soon){ return (n ? (soon ? 'Upcoming Christmas markets are on the Events tab.' : 'This week’s Christmas markets are on the Events tab.') : (soon ? 'No Christmas markets are on the map yet.' : 'No Christmas markets on the map this week.')) + ' Every market and its dates: <a ' + hrefAttr(href) + '>our Christmas markets guide</a>.'; },
     widened: function(r){ return 'Not much right nearby, so this shows up to ' + r + ' km away.'; }, widenedAny: 'Not much right nearby, so this shows every distance.',
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Showing what’s near you.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
@@ -17153,10 +17167,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     clusterPlaces: function(n){ return n + ' places here, zoom in'; }, clusterEvents: function(n){ return n + ' events here, zoom in'; },
     openSuffix: ' open', eventsCount: function(n){ return n ? n + (n === 1 ? ' event' : ' events') + ' this week' : 'No events this week'; },
     moreNear: function(n, r){ return n + ' more within ' + r + ' km'; },
-    nyeEvents: function(n, href){ return (n ? 'This week’s New Year’s Eve events are on the Events tab.' : 'The map shows the next 7 days, so no New Year’s Eve events yet.') + ' Every New Year’s Eve event: <a ' + hrefAttr(href) + '>New Year’s Eve in Search</a>.'; },
+    nyeEvents: function(n, href, soon){ return (n ? (soon ? 'Upcoming New Year’s Eve events are on the Events tab.' : 'This week’s New Year’s Eve events are on the Events tab.') : (soon ? 'No New Year’s Eve events are on the map yet.' : 'The map shows the next 7 days, so no New Year’s Eve events yet.')) + ' Every New Year’s Eve event: <a ' + hrefAttr(href) + '>New Year’s Eve in Search</a>.'; },
     eventsNear: function(n, r){ return (n ? n + (n === 1 ? ' event' : ' events') : 'No events') + (r ? ' within ' + r + ' km' : ' near you') + ' this week'; },
     zoomHint: 'Tap the locate button to see what’s near you.',
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
+    noEventsHere: 'No events here this week.', noEventsWeek: 'No events like that on the map this week.', noEventsSoon: 'No events like that on the map in the coming weeks.', ahead: 'Coming up',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
     today: 'Today', until: 'until', onNow: 'On now', seasonClosed: '🍂 Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
   };
@@ -17401,14 +17416,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: coffeeOnly ? function(p){ return mapCoffeeFit(p, TAGIX); } : null, cost: tags.hiking ? mapHikeCost : null });
       countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
-      events.forEach(function(e){ e.g = eventGroup(e, today, nowMin); });
-      var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4 };
+      events.forEach(function(e){ e.g = evGroup(e, today, nowMin); });
+      var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 };
       // An event without a pin counts as near when its town centre is within the distance.
       var nearTown = function(e){ var c = CONF.c[e.region]; return c && distKm(me.lat, me.lng, c[0], c[1]) <= radiusKm; };
       items = events.filter(function(e){ return e.g && ((!evTerm && !evKinds.length) || evHit(e)) && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
         .sort(function(a, b){ return order[a.g] - order[b.g] || (a.sd < b.sd ? -1 : a.sd > b.sd ? 1 : 0) || ((a.st || '') < (b.st || '') ? -1 : (a.st || '') > (b.st || '') ? 1 : 0) || (me && a.d != null && b.d != null ? a.d - b.d : 0); });
       onMap = items.filter(function(e){ return e.lat != null; });
-      countEl.textContent = me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
+      countEl.textContent = aheadOn && aheadState === true ? T.eventsSoon(items.length, me ? radiusKm : 0) : me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
     }
     // During directions, only the destination stays on the map.
     if (typeof route !== 'undefined' && route) onMap = [route.x];
@@ -17456,7 +17471,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
           + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       }
     });
-    if (!listItems.length && (me || tab === 'events' || listOn)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(T.noEvents)) + '</li>';
+    if (!listItems.length && (me || tab === 'events' || listOn)) html = '<li class="pm-empty">' + (tab === 'places' ? relaxHtml() : esc(noEventsText())) + '</li>';
     // Round 13 (2026-10-20): a short list near the visitor ("hikes": 4 within 5 km) offers the next distance that has more.
     var wider = tab === 'places' && listItems.length && listItems.length < 8 ? widerRadius(listItems.length) : null;
     if (wider) html += '<li class="pm-group pm-wider"><button type="button" class="pm-more pm-wider-btn" data-wider="' + wider.r + '">' + esc(T.moreNear(wider.n, wider.r)) + '</button></li>';
@@ -17465,10 +17480,21 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     moreBtn.hidden = listItems.length <= limit;
     moreBtn.textContent = T.more;
   }
+  // Round 14 (2026-10-20): the events after this week (/map/ahead.json, e.ah) are listed, as "Coming up", only while a
+  // search needs them (aheadOn: New Year's Eve, Christmas markets, or an events search with nothing this week).
+  var aheadOn = false, aheadState = null;
+  function evGroup(e, today, nowMin){ return e.ah ? (aheadOn && aheadState === true && e.ed >= today ? 'ahead' : null) : eventGroup(e, today, nowMin); }
+  // The empty Events list suggests a bigger distance only when a bigger one has events; a search with nothing in
+  // the days the map holds (« réveillon » in October) says so instead.
+  function noEventsText(){
+    var today = okToday(), nowMin = okanaganClock(new Date()).minutes, searching = !!(evTerm || evKinds.length);
+    if (me && radiusKm && events.some(function(e){ return evGroup(e, today, nowMin) && (!searching || evHit(e)); })) return T.noEvents;
+    return searching ? (aheadOn && aheadState === true ? T.noEventsSoon : T.noEventsWeek) : T.noEventsHere;
+  }
   // The smallest distance with at least 8 of the events searched for (all of them when fewer) (an event without a pin by its town centre), or Any.
   function pickEventRadius(){
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
-    var hits = events.filter(function(e){ return eventGroup(e, today, nowMin) && evHit(e); });
+    var hits = events.filter(function(e){ return evGroup(e, today, nowMin) && evHit(e); });
     var d = function(e){ if (e.lat != null) return distKm(me.lat, me.lng, e.lat, e.lng); var c = CONF.c[e.region]; return c ? distKm(me.lat, me.lng, c[0], c[1]) : 999; };
     var pick = [1, 5, 10, 25].filter(function(r){ return hits.filter(function(e){ return d(e) <= r; }).length >= Math.min(8, hits.length); })[0];
     return hits.length ? (pick || 0) : radiusKm;
@@ -17862,7 +17888,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (part[0] === 'notf') delete notFeats[part[1]];
     liveBase = null; changed();
   });
-  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; evTerm = ''; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
+  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; evTerm = ''; evKinds = []; aheadOn = false; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
   function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
   // When nothing matches: the first filter worth dropping that gives results at some distance ("Try without Open at
   // 3 AM"), with a button that drops it (the distance then chooses itself). Tried one at a time on a copy of the filters.
@@ -18223,6 +18249,34 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
   searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ typedWords = String(v || '').trim(); if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); termTyping = true; changed(); } }, 450); });
+  // The message above the Events tab after an events search: this week's, or (once /map/ahead.json is in) the weeks
+  // after it. New Year's Eve and Christmas markets link to the full lists.
+  var evSaidText = '';
+  function eventNotice(){
+    var today = okToday(), nowMin = okanaganClock(new Date()).minutes, soon = aheadOn && aheadState === true;
+    var week = events.filter(function(e){ return !e.ah && eventGroup(e, today, nowMin) && evHit(e); }).length;
+    var all = soon ? events.filter(function(e){ return evGroup(e, today, nowMin) && evHit(e); }).length : week;
+    if (nyeAsk) setStatusHtml(T.nyeEvents(all, FR ? '/fr/search?q=' + encodeURIComponent('réveillon') : '/search?q=' + encodeURIComponent('new years eve'), soon), 12000);
+    else if (xmasMarket) setStatusHtml(T.xmasMarkets(all, (FR ? '/fr' : '') + '${SEARCH_XMAS_MARKET_GUIDE}', soon), 12000);
+    else if (soon && !week && all) setStatus(T.aheadFor(evSaidText), 9000);
+    else setStatus(T.eventsFor(evSaidText), 9000);
+  }
+  function addEvent(a, ah){
+    var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], tp: a[12] || [], ah: !!ah, d: null };
+    if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(pmPopup(function(){ return popupForEvent(e); }));
+    events.push(e);
+  }
+  function loadAhead(){
+    if (aheadState === true || aheadState === 'loading' || !CONF.ah) return;
+    aheadState = 'loading';
+    fetch(CONF.ah, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
+      (d.e || []).forEach(function(a){ addEvent(a, true); });
+      aheadState = true;
+      if (!aheadOn || tab !== 'events') return;
+      if (me && !radiusFixed && !town) { var er = pickEventRadius(); if (er !== radiusKm) { radiusKm = er; radiusSel.value = String(er); } }
+      eventNotice(); render(!!me || !!town);
+    }).catch(function(){ aheadState = 'failed'; });
+  }
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
     // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
@@ -18239,17 +18293,18 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     }
     if (me && !radiusFixed && !town) radiusKm = 5;
     if (lastFixes.length) setStatus(T.typoRead(lastFixes));
-    if (wantEvents) { evTerm = term; evKinds = evFilt.slice(); setStatus(T.eventsFor([term].concat(evSaid).join(' ').trim()), 9000); term = ''; evBySearch = true;
+    if (wantEvents) { evTerm = term; evKinds = evFilt.slice(); evSaidText = [term].concat(evSaid).join(' ').trim(); term = ''; evBySearch = true;
+      // Round 14 (2026-10-20): New Year's Eve, Christmas markets, and an events search with nothing this week also list
+      // the weeks after it, from /map/ahead.json (loaded once, only then).
+      var today0 = okToday(), now0 = okanaganClock(new Date()).minutes;
+      aheadOn = !!(nyeAsk || xmasMarket || ((evTerm || evKinds.length) && !events.some(function(e){ return !e.ah && eventGroup(e, today0, now0) && evHit(e); })));
+      if (aheadOn) loadAhead();
       // Round 13 (2026-10-20): "comedy" near downtown listed the 4 shows within 1 km (the distance the places had picked)
       // out of 8 this week; the events found pick their own distance, as the places do.
       if (me && !radiusFixed && !town) { var er = pickEventRadius(); if (er !== radiusKm) { radiusKm = er; radiusSel.value = String(er); } }
       setTab('events');
-      if (xmasMarket) setStatusHtml(T.xmasMarkets(events.filter(evHit).length, (FR ? '/fr' : '') + '${SEARCH_XMAS_MARKET_GUIDE}'), 12000);
-      // Round 13 (2026-10-20): "new years eve", "NYE", « réveillon », « jour de l'An » said « Rien ne s’appelle… »: the
-      // map holds the next 7 days, so they open the Events tab (any New Year's Eve events this week) and link to the
-      // site search's New Year's Eve list.
-      if (nyeAsk) setStatusHtml(T.nyeEvents(events.filter(function(e){ return e.g && evHit(e); }).length, FR ? '/fr/search?q=' + encodeURIComponent('réveillon') : '/search?q=' + encodeURIComponent('new years eve')), 12000); }
-    else { evTerm = ''; evKinds = []; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
+      eventNotice(); }
+    else { evTerm = ''; evKinds = []; aheadOn = false; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
     track('map_search', { words: term ? 1 : 0, how: how || 'typed' }); changed();
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
@@ -18294,8 +18349,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     syncChips();
     render(!!me);
   }
-  $('pmTabPlaces').addEventListener('click', function(){ evTerm = ''; evKinds = []; evBySearch = false; setTab('places'); });
-  $('pmTabEvents').addEventListener('click', function(){ evTerm = ''; evKinds = []; evBySearch = false; setTab('events'); });
+  $('pmTabPlaces').addEventListener('click', function(){ evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false; setTab('places'); });
+  $('pmTabEvents').addEventListener('click', function(){ evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false; setTab('events'); });
   // Map keyboard use (2026-10-19, review pass 5).
   // - A pin opened with Enter moves focus into its place card (the popup); Escape, or its close button, closes the card
   //   and puts focus back on the pin.
@@ -18359,11 +18414,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
-    events = []; d.e.forEach(function(a){
-      var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], tp: a[12] || [], d: null };
-      if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(pmPopup(function(){ return popupForEvent(e); }));
-      events.push(e);
-    });
+    events = []; d.e.forEach(function(a){ addEvent(a, false); });
     refreshStatus();
     // Until researched times are loaded, the chip stays "Happy hour" (places that have one).
     hhKnown = places.some(function(p){ return p.hh; });
@@ -18396,6 +18447,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
 // The places, hours and events load from /map/data.json, versioned so a
 // browser keeps it until something changes.
 const MAP_EVENT_DAYS = 7;
+// Round 14 (2026-10-20): the events after this week, up to What's On's own 90 days, in a second file the map loads
+// only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
+// the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
+const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
 const MAP_DATA_FORMAT = 9; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
@@ -18544,12 +18599,15 @@ function mapPlacesData(now = new Date()) {
 // [name, url, region, venue name, lat, lng, startDate, startTime, endDate, endTime, allDay, hasFrenchPage].
 // lat/lng through the event's venue link, a listing named by its venue text, or a known host point (map-event-pins.js);
 // an event none of them places is listed without a pin.
-function mapEventsData(now = new Date()) {
+// With { ahead: true } (round 14), the events whose next date comes after this week, up to MAP_AHEAD_DAYS: the
+// map's /map/ahead.json, never the same event as data.json.
+function mapEventsData(now = new Date(), { ahead = false } = {}) {
   const today = todayLocal(now);
+  const weekEnd = addLocalDays(today, MAP_EVENT_DAYS);
   const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.venue_id, e.venue_name_text, o.start_date, o.end_date, o.start_time, o.end_time, o.all_day
     FROM event_occurrences o JOIN events e ON e.id = o.event_id
     WHERE e.status = 'scheduled' AND o.status = 'scheduled' AND o.end_date >= ? AND o.start_date <= ?
-    ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, addLocalDays(today, MAP_EVENT_DAYS));
+    ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, ahead ? addLocalDays(today, MAP_AHEAD_DAYS) : weekEnd);
   const seen = new Set();
   const venueQ = db.prepare('SELECT name, latitude, longitude, redirect_to FROM venues WHERE id = ?');
   const regionVenueQ = db.prepare('SELECT id, name, region, latitude, longitude, redirect_to FROM venues WHERE region = ? AND redirect_to IS NULL');
@@ -18593,6 +18651,8 @@ function mapEventsData(now = new Date()) {
   for (const r of rows) {
     if (seen.has(r.id) || !REGION_LABELS[r.region] || !r.slug) continue;
     seen.add(r.id);
+    // Its next date is this week: it is in data.json already.
+    if (ahead && r.start_date <= weekEnd) continue;
     let venue = r.venue_id ? venueQ.get(r.venue_id) : null;
     if (venue && venue.redirect_to) venue = venueQ.get(venue.redirect_to);
     // Round 12 (2026-10-20): else the listing the event is linked to by name (eventAutoVenueIndex: "Cannery Brewing",
@@ -18634,6 +18694,13 @@ function mapLiveData(now = new Date()) {
   mapDataCache = { version, json };
   return mapDataCache;
 }
+let mapAheadCache = null;
+function mapAheadData(now = new Date()) {
+  const version = mapDataVersion(now);
+  if (mapAheadCache && mapAheadCache.version === version) return mapAheadCache;
+  mapAheadCache = { version, json: JSON.stringify({ e: mapEventsData(now, { ahead: true }) }) };
+  return mapAheadCache;
+}
 // The search's French words for /fr/map. Round 9 (2026-10-19): « marché » alone is the farmers' markets there, not
 // every place with Market in its name ("marché de Noël" and "marché fermier" keep their own longer phrases).
 function mapFrWords() {
@@ -18646,7 +18713,8 @@ function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const canonical = 'https://okanaganroam.com/map';
   const typeEn = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
-  const conf = JSON.stringify({ src: `/map/data.json?v=${mapDataVersion(now)}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
+  const ver = mapDataVersion(now);
+  const conf = JSON.stringify({ src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
     k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])),
     tg: MAP_TAGS.map((t) => ({ k: t.key, en: t.en, fr: t.fr, i: t.icon, s: t.say, t: t.types })),
     // Directions on our own map (2026-10-14): a public Mapbox token (pk.), locked to okanaganroam.com in Mapbox. Without
@@ -48278,6 +48346,13 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': query.v === data.version ? 'public, max-age=86400' : 'public, max-age=300' });
       return res.end(data.json);
     }
+    // GET /map/ahead.json (round 14, 2026-10-20) -- the events after this week, loaded by /map only when a search
+    // needs them. Data for the map, not a page: noindex and disallowed in robots.txt.
+    if (pathname === '/map/ahead.json' && method === 'GET') {
+      const data = mapAheadData();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': query.v === data.version ? 'public, max-age=86400' : 'public, max-age=300' });
+      return res.end(data.json);
+    }
 
     // GET /favorites (Stage 4.4): the visitor's saved places and events, from
     // this browser's storage. noindex; never cached; not in the sitemap.
@@ -48454,6 +48529,7 @@ const server = http.createServer(async (req, res) => {
         'User-agent: *',
         'Allow: /',
         'Disallow: /api/',
+        'Disallow: /map/ahead.json',
         '',
         'Sitemap: https://okanaganroam.com/sitemap.xml',
         '',
@@ -51683,6 +51759,7 @@ module.exports = {
   mapPlacesData,
   mapEventsData,
   mapLiveData,
+  mapAheadData,
   hasFrenchTwin,
   frEventPageForPath,
   frEventUntranslated,
