@@ -30,6 +30,7 @@ if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 // value only, never a real credential, and only exists in this test
 // process's environment.
 process.env.ENRICHMENT_ADMIN_TOKEN = 'test-fixture-admin-token';
+process.env.AUDIT_READ_TOKEN = 'test-fixture-audit-token';
 
 // Seasonal homepage tiles (2026-10-11): "/" swaps Beaches/Golf for Ski &
 // Snow/Indoor from November to March. Every existing homepage and mood-card
@@ -31733,4 +31734,21 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
+});
+
+// ---- Weekly enrichment audit route (2026-10-21) ----
+test('Weekly audit route: GET /admin/audit needs a token; the read-only audit token reads but cannot write', async () => {
+  assert.equal((await s4request('GET', '/admin/audit')).status, 401);
+  assert.equal((await s4request('GET', '/admin/audit', { token: 'wrong-token' })).status, 401);
+  for (const token of ['test-fixture-audit-token', 'test-fixture-admin-token']) {
+    const r = await s4request('GET', '/admin/audit', { token });
+    assert.equal(r.status, 200, token);
+    assert.match(r.json.generated_for, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(Array.isArray(r.json.summary.lines));
+    assert.ok(r.json.hours && r.json.seasons && r.json.events && Array.isArray(r.json.queues) && r.json.listing_gaps.venues > 0);
+    assert.doesNotMatch(r.text, /test-fixture-(audit|admin)-token/, 'the answer never repeats a token');
+  }
+  // The audit token opens only this read: it is refused on a write.
+  const write = await s4request('POST', '/admin/set-season', { token: 'test-fixture-audit-token', body: { id: 1, season: null } });
+  assert.equal(write.status, 401);
 });

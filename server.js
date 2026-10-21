@@ -55,6 +55,9 @@ const INDEXNOW_KEY = /^[A-Za-z0-9-]{8,128}$/.test(String(process.env.INDEXNOW_KE
 // different, unrelated value from INDEXNOW_KEY above, which is meant to be
 // public — this one must be kept secret and never committed to source.
 const ENRICHMENT_ADMIN_TOKEN = process.env.ENRICHMENT_ADMIN_TOKEN || null;
+// The weekly enrichment audit (weekly-audit.js, GET /admin/audit) reads the data that goes stale and writes nothing. It
+// has its own token so the scheduled job that runs it never holds one that can write; the admin token also opens it.
+const AUDIT_READ_TOKEN = process.env.AUDIT_READ_TOKEN || null;
 
 // Build My Trip, Stage 3: the OpenAI key for the natural-language trip
 // parser (POST /api/trip/parse below). Same fail-closed pattern as
@@ -34084,6 +34087,20 @@ function requireAdminToken(req, res) {
   return true;
 }
 
+function requireAuditToken(req, res) {
+  if (!AUDIT_READ_TOKEN && !ENRICHMENT_ADMIN_TOKEN) {
+    sendJSON(res, 503, { error: 'The audit endpoint is not configured.' });
+    return false;
+  }
+  const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+  const ok = match && ((AUDIT_READ_TOKEN && safeTokenEquals(match[1], AUDIT_READ_TOKEN)) || (ENRICHMENT_ADMIN_TOKEN && safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)));
+  if (!ok) {
+    sendJSON(res, 401, { error: 'Unauthorized.' });
+    return false;
+  }
+  return true;
+}
+
 function validateReviewer(value) {
   return typeof value === 'string' && value.trim().length >= 1 && value.trim().length <= 80 ? value.trim() : null;
 }
@@ -51255,6 +51272,19 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/contact' && method === 'POST') {
       return await handleContactMessage(req, res);
+    }
+    // GET /admin/audit (2026-10-21): the weekly enrichment audit -- stale hours, seasonal closures, events and review
+    // queues, ranked (weekly-audit.js). Read-only; AUDIT_READ_TOKEN (or the admin token) as a Bearer token.
+    if (pathname === '/admin/audit' && method === 'GET') {
+      if (!requireAuditToken(req, res)) return;
+      let audit;
+      try {
+        audit = require('./weekly-audit').buildAudit(db, { today: todayLocal() });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'The audit failed.', detail: String(err.message || err) });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(audit));
     }
     if (pathname === '/admin/event-submissions' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
