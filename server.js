@@ -24,7 +24,7 @@ function golfDetailsFor(venues) {
 // without hours.js (e.g. the isolated homepage tests) starts exactly as before.
 const hoursModule = (() => { try { return require('./hours.js'); } catch (e) { return null; } })();
 // Guarded the same way: without map-event-pins.js the map pins events by their venue link alone.
-const { mapEventPin } = (() => { try { return require('./map-event-pins'); } catch (e) { return { mapEventPin: () => null }; } })();
+const { mapEventPin, mapPlaceIsPrivate } = (() => { try { return require('./map-event-pins'); } catch (e) { return { mapEventPin: () => null, mapPlaceIsPrivate: (t) => /private\s+home/i.test(String(t || '')) }; } })();
 // Guarded like hours.js: a copy of the server without share-card.js (isolated tests) runs on, with the brand share image.
 const shareCardModule = (() => { try { return require('./share-card.js'); } catch (e) { return null; } })();
 
@@ -18610,7 +18610,7 @@ function mapEventsData(now = new Date(), { ahead = false } = {}) {
     ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, ahead ? addLocalDays(today, MAP_AHEAD_DAYS) : weekEnd);
   const seen = new Set();
   const venueQ = db.prepare('SELECT name, latitude, longitude, redirect_to FROM venues WHERE id = ?');
-  const regionVenueQ = db.prepare('SELECT id, name, region, latitude, longitude, redirect_to FROM venues WHERE region = ? AND redirect_to IS NULL');
+  const regionVenueQ = db.prepare('SELECT id, name, region, address, latitude, longitude, redirect_to FROM venues WHERE region = ? AND redirect_to IS NULL');
   const regionVenues = new Map();
   // An event without a venue link is pinned only when its venue text names exactly one listed place in the same
   // town ("Cannery Brewing", or "Gray Monk Estate Winery, Lake Country"); anything else is listed without a pin.
@@ -18657,19 +18657,24 @@ function mapEventsData(now = new Date(), { ahead = false } = {}) {
     if (venue && venue.redirect_to) venue = venueQ.get(venue.redirect_to);
     // Round 12 (2026-10-20): else the listing the event is linked to by name (eventAutoVenueIndex: "Cannery Brewing",
     // "Historic O'Keefe Ranch, 9380 Hwy 97 N, Vernon", "The Sage Pub, Osoyoos"), then the exact-name match.
-    if (!venue) {
+    // Round 15 (2026-10-20): an event at a private home ("Private home in Kelowna (address on Eventbrite)") is never
+    // pinned by its text, only by a venue link someone set on purpose.
+    const privatePlace = !venue && mapPlaceIsPrivate(r.venue_name_text);
+    if (!venue && !privatePlace) {
       const autoId = eventAutoVenueIndex().byEvent.get(r.id);
       let auto = autoId ? venueQ.get(autoId) : null;
       if (auto && auto.redirect_to) auto = venueQ.get(auto.redirect_to);
       if (auto && !auto.redirect_to) venue = auto;
     }
-    if (!venue && r.venue_name_text) venue = nameMatch(r.venue_name_text, r.region);
+    if (!venue && !privatePlace && r.venue_name_text) venue = nameMatch(r.venue_name_text, r.region);
     const pin = venue && Number.isFinite(Number(venue.latitude)) && Number.isFinite(Number(venue.longitude)) && venue.latitude !== null && venue.longitude !== null && !(Number(venue.latitude) === 0 && Number(venue.longitude) === 0);
     // Round 13 (2026-10-20): else the trip planner's own event-location resolver ("&" as "and", "Name, street
     // address", its curated hosts such as Prospera Place) and the map's points for busy hosts with no listing
     // (data/event-map-points.json: Kal Tire Place, Kelowna Event Centre, arenas ...). See map-event-pins.js.
     let point = pin ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null;
-    if (!point && r.venue_name_text) {
+    // Round 15: and a host whose listing has another name ("<Place> at <Host>", the same street address); see
+    // map-event-pins.js.
+    if (!point && !privatePlace && r.venue_name_text) {
       if (!regionVenues.has(r.region)) regionVenues.set(r.region, regionVenueQ.all(r.region));
       point = mapEventPin({ venue_name_text: r.venue_name_text, region: r.region }, regionVenues.get(r.region), [REGION_LABELS[r.region]]);
     }
