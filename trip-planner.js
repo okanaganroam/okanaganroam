@@ -986,6 +986,7 @@ const ROTATE_MAX_KM = 12;
 const ROTATE_DEFAULT_GIVE = 2.5;
 // Round 15d (2026-10-21): a quarter, down from a third (Dayton), so a town's top places repeat less across plans.
 const ROTATE_KEEP_BEST = 0.25;
+const ROTATE_SPREAD = 1.5;
 // A rental base, tour, charter or lesson is booked ahead, so it never rotates in as a walk-in stop.
 const ROTATE_BOOKED_NAME_RE = /\b(?:ballooning|balloon|sports cent(?:re|er)|watersports|water sports|marina|boat club|ski school)\b/;
 const ROTATE_BOOKED_DESC_RE = /\b(?:rental base|rentals? (?:shop|base|company|outlet)|grab a boat|balloon (?:tours?|rides?|flights?)|hot air balloon|guided (?:tours?|trips?|rides?|hikes?)|tour (?:company|operator)|adventure tour|book (?:a|your) (?:tour|trip|ride|spot|flight|seat))\b/;
@@ -1048,7 +1049,9 @@ function rotateWithinType(cands, ctx, score = (c) => c.score, opts = {}) {
   if (rotationSlotNudge({ id: 0 }, ctx, `${opts.slot || ''}|keep`) < ROTATE_KEEP_BEST) return best;
   let pick = best, top = -Infinity;
   for (const c of pool) {
-    let t = plain(c) + rotationSlotNudge(c.v, ctx, opts.slot) * ROTATE_MARGIN;
+    // Round 15d (2026-10-21): the seeded nudge spans 1.5x the pool's margin (it was 1x), so the close choices share the
+    // slot more evenly: LOCAL Public Eatery, third or fourth of about eight close Penticton dinners, won 7 of 59 plans.
+    let t = plain(c) + rotationSlotNudge(c.v, ctx, opts.slot) * ROTATE_MARGIN * ROTATE_SPREAD;
     if (c === best) t -= opts.opening || opts.lunch ? ROTATE_DEFAULT_GIVE : ROTATE_DEFAULT_GIVE / 2;
     if (t > top) { pick = c; top = t; }
   }
@@ -2237,7 +2240,7 @@ function rotateFillerPick(cands, ctx, slot) {
   const pool = cands.filter((c) => plain(best) - plain(c) <= FILLER_MARGIN && !(c.v.rating != null && best.v.rating != null && best.v.rating - c.v.rating > 0.4)).slice(0, ROTATE_TOP);
   if (pool.length < 2 || rotationSlotNudge({ id: 0 }, ctx, `${slot}|keep`) < ROTATE_KEEP_BEST) return best;
   let pick = best, top = -Infinity;
-  for (const c of pool) { const t = plain(c) + rotationSlotNudge(c.v, ctx, slot) * FILLER_MARGIN * 1.5; if (t > top) { top = t; pick = c; } }
+  for (const c of pool) { const t = plain(c) + rotationSlotNudge(c.v, ctx, slot) * FILLER_MARGIN * ROTATE_SPREAD; if (t > top) { top = t; pick = c; } }
   return pick;
 }
 function themePick(cands) { cands.sort((a, b) => b.score - a.score || (b.v.rating || 0) - (a.v.rating || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id); return cands[0] || null; }
@@ -6059,7 +6062,7 @@ module.exports = {
   // Build My Trip round 15 (2026-10-20)
   addSuggestedTimes, addStory, SUGGESTED_TIMES_NOTE,
   // Build My Trip round 14 (2026-10-20)
-  rotateWithinType, rotateBooked, withoutRepeatedAlternates, ROTATE_KEEP_BEST, appointmentKept, KIDS_ONLY_RE, BRUNCH_FOOD_RE,
+  rotateWithinType, rotateBooked, withoutRepeatedAlternates, ROTATE_KEEP_BEST, ROTATE_SPREAD, appointmentKept, KIDS_ONLY_RE, BRUNCH_FOOD_RE,
   // Build My Trip round 12 (2026-10-20)
   notAMeal, appointmentOnly, appointmentNotice, rotationNudge, daytimeEvent, swapVerb,
   // Build My Trip round 10 (2026-10-19)

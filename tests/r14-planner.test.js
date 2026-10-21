@@ -290,6 +290,7 @@ test('Rotation (round 15, 15d): a town’s top pick is kept outright a quarter o
     assert.equal(tp.rotateWithinType(cands, ctx, undefined, { slot: '1-morning', opening: true }).v.id, pick.v.id, 'same request, same pick');
   }
   assert.equal(tp.ROTATE_KEEP_BEST, 0.25);
+  assert.equal(tp.ROTATE_SPREAD, 1.5); // round 15d: close choices share the slot more evenly
   assert.ok(wins >= 75 && wins <= 150, `top pick won ${wins} of 300`);
   // Across the Kelowna requests, the top park opens at least one day.
   const texts = ['a day in Kelowna', 'a weekend in Kelowna', '3 days in Kelowna', 'one day in Kelowna', 'a day in Kelowna with good food', 'a relaxed day in Kelowna',
