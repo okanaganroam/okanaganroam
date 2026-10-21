@@ -4273,16 +4273,19 @@ function addStory(result, input) {
 // Round 15b (2026-10-20): a crawl's meal that starts at 2:30 PM or later (lunch between the second and third brewery at
 // 3:10 PM) is labelled a late lunch, not "Lunch".
 const LATE_LUNCH_FROM = 14 * 60 + 30;
+const DINNER_FROM = 17 * 60;
 function labelLateLunches(result) {
   if (!result || !(result.schedule || []).length) return result;
   const lists = (result.days || []).length ? result.days.map((d) => ({ day: d.day, stops: d.stops || [] })) : [{ day: 1, stops: (result.itinerary && result.itinerary.stops) || (result.outing && result.outing.stops) || [] }];
   for (const g of lists) for (const st of g.stops) {
     if (!st.venue || st.label !== 'Lunch') continue;
     const row = result.schedule.find((r) => (r.day == null || r.day === g.day) && r.venueId === st.venue.id);
-    if (row && Number.isFinite(row.startMinutes) && row.startMinutes >= LATE_LUNCH_FROM) {
-      st.label = 'Late lunch';
-      if (result.experience && typeof result.experience.text === 'string') result.experience.text = result.experience.text.replace(`with lunch at ${st.venue.name}`, `with a late lunch at ${st.venue.name}`);
-    }
+    if (!row || !Number.isFinite(row.startMinutes) || row.startMinutes < LATE_LUNCH_FROM) continue;
+    // From 5 PM it is dinner (a Penticton crawl that starts when BNA opens at 4 had its "Late lunch" at 6:10 PM).
+    const dinner = row.startMinutes >= DINNER_FROM;
+    st.label = dinner ? 'Dinner' : 'Late lunch';
+    if (dinner) st.daypart = 'evening';
+    if (result.experience && typeof result.experience.text === 'string') result.experience.text = result.experience.text.replace(`with lunch at ${st.venue.name}`, `with ${dinner ? 'dinner' : 'a late lunch'} at ${st.venue.name}`);
   }
   return result;
 }
