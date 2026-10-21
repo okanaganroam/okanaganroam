@@ -32224,7 +32224,7 @@ const BROWSE_HEAD_EXTRAS = [
   "@type": "WebSite",
   "name": "Okanagan Roam",
   "url": "https://okanaganroam.com/",
-  "description": "A real, review-backed directory of wineries, breweries, restaurants, cafes, and pubs across the Okanagan Valley, BC, filterable by dog-friendly, kid-friendly, vegan, and gluten-free options."
+  "description": "A free local guide to BC's Okanagan Valley: 1,700+ wineries, restaurants, breweries, cafes, beaches, trails and activities with opening hours checked against each place, this week's events, a near-me map and a free trip planner, in English and French."
 }
 </script>`,
   `<script type="application/ld+json">
@@ -32237,8 +32237,13 @@ const BROWSE_HEAD_EXTRAS = [
     "@type": "Place",
     "name": "Okanagan Valley, British Columbia, Canada"
   },
+  "email": "info@okanaganroam.com",
   "sameAs": [
-    "https://www.instagram.com/okanaganroam"
+    "https://www.instagram.com/okanaganroam",
+    "https://www.facebook.com/okanaganroam",
+    "https://www.youtube.com/@OkanaganRoam",
+    "https://www.pinterest.com/okanaganroam/",
+    "https://www.tiktok.com/@okanaganroam"
   ]
 }
 </script>`,
@@ -35325,7 +35330,7 @@ function aboutPageSchema() {
       email: INFO_CONTACT_EMAIL,
       founder: { '@type': 'Person', name: 'Dayton' },
       areaServed: { '@type': 'Place', name: 'Okanagan Valley, British Columbia, Canada' },
-      sameAs: ['https://www.instagram.com/okanaganroam', 'https://www.facebook.com/okanaganroam', 'https://www.tiktok.com/@okanaganroam'],
+      sameAs: ['https://www.instagram.com/okanaganroam', 'https://www.facebook.com/okanaganroam', 'https://www.youtube.com/@OkanaganRoam', 'https://www.pinterest.com/okanaganroam/', 'https://www.tiktok.com/@okanaganroam'],
     },
   };
 }
@@ -48455,6 +48460,19 @@ const server = http.createServer(async (req, res) => {
       ].join('\n');
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end(robots);
+    }
+
+    // llms.txt (2026-10-20): a short plain-text summary of the site and its
+    // main pages for AI answer tools, read from public/llms.txt.
+    if (pathname === '/llms.txt' && method === 'GET') {
+      try {
+        const llms = fs.readFileSync(path.join(__dirname, 'public', 'llms.txt'));
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
+        return res.end(llms);
+      } catch (e) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('Not found');
+      }
     }
 
     // sitemap.xml — the homepage, plus one URL per region+badge guide page
