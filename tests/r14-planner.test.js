@@ -279,7 +279,7 @@ test('Event pins (round 14): holiday markets at a hall or a school get a pin; th
 });
 
 // ---- 9. Round 15: the town's best place still wins sometimes ----
-test('Rotation (round 15): a town’s top pick still wins about a third of the time, steadily per request', () => {
+test('Rotation (round 15, 15d): a town’s top pick is kept outright a quarter of the time (and can still win the rotation), steadily per request', () => {
   const c = (v, score) => ({ v, score, reasons: [] });
   const cands = [c(PARKS[0], 39), c(PARKS[1], 37), c(PARKS[2], 37), c(PARKS[3], 36), c(PARKS[4], 36)];
   let wins = 0;
@@ -289,6 +289,7 @@ test('Rotation (round 15): a town’s top pick still wins about a third of the t
     if (pick.v.id === PARKS[0].id) wins++;
     assert.equal(tp.rotateWithinType(cands, ctx, undefined, { slot: '1-morning', opening: true }).v.id, pick.v.id, 'same request, same pick');
   }
+  assert.equal(tp.ROTATE_KEEP_BEST, 0.25);
   assert.ok(wins >= 75 && wins <= 150, `top pick won ${wins} of 300`);
   // Across the Kelowna requests, the top park opens at least one day.
   const texts = ['a day in Kelowna', 'a weekend in Kelowna', '3 days in Kelowna', 'one day in Kelowna', 'a day in Kelowna with good food', 'a relaxed day in Kelowna',
