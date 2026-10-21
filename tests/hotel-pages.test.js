@@ -115,3 +115,12 @@ test('short links (2026-10-21): /guests/<slug> and /q/<slug> forward to the hote
   assert.equal((await get('/guests/no-such-hotel')).status, 404);
   assert.equal((await get('/q/no-such-hotel')).status, 404);
 });
+
+test('hotel logo (2026-10-21): only a file under /images/hotels/ shows on the card', () => {
+  assert.equal(app.hotelLogo({ logo: '/images/hotels/test-hotel.png' }), '/images/hotels/test-hotel.png');
+  for (const bad of ['https://example.com/logo.png', '/images/hotels/../x.png', '/images/venues/a.png', 'javascript:alert(1)', 42, null])
+    assert.equal(app.hotelLogo({ logo: bad }), null, String(bad));
+  const html = app.renderHotelCard({ ...app.hotelList()[0], logo: '/images/hotels/test-hotel.png' });
+  assert.ok(html.includes('<img class="hc-logo" src="/images/hotels/test-hotel.png"'));
+  assert.ok(!app.renderHotelCard(app.hotelList()[0]).includes('hc-logo"'));
+});
