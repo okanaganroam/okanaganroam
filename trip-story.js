@@ -20,11 +20,14 @@ function action(stop, v, ctx) {
   const acts = (v && v.activities) || [];
   const evening = part === 'evening' || part === 'night';
   if (stop.skiDay || (t === 'outdoor' && has(name, /\bski\b/))) return { en: ['ski at', ''], fr: ['skiez à', ''] };
-  if (t === 'restaurant' || (t === 'cafe' && /\b(?:lunch|brunch|breakfast)\b/i.test(label)) || stop.wineryLunch) {
+  // Round 15b (2026-10-20): a pub (or bar, brewpub) planned as the day's dinner or lunch is that meal, not "end with a
+  // drink at Naramata Pub & Grill".
+  const mealLabel = /\b(?:dinner|supper|lunch|brunch|breakfast)\b/i.test(label);
+  if (t === 'restaurant' || (t === 'cafe' && /\b(?:lunch|brunch|breakfast)\b/i.test(label)) || stop.wineryLunch || (['pub', 'cocktail', 'brewery'].includes(t) && mealLabel)) {
     if (/\bbrunch\b/i.test(label)) return { en: ['have brunch at', ''], fr: ['prenez le brunch à', ''] };
     if (/\blate lunch\b/i.test(label)) return { en: ['have a late lunch at', ''], fr: ['prenez un dîner tardif à', ''] };
     if (/\bbreakfast\b/i.test(label)) return { en: ['have breakfast at', ''], fr: ['déjeunez à', ''] };
-    if (evening) return { en: ['have dinner at', ''], fr: ['soupez à', ''], dinner: true };
+    if (evening || /\b(?:dinner|supper)\b/i.test(label)) return { en: ['have dinner at', ''], fr: ['soupez à', ''], dinner: true };
     return { en: ['have lunch at', ''], fr: ['dînez à', ''] };
   }
   if (t === 'cafe') return has(`${name} ${(v && v.textDesc) || ''}`, /\b(?:gelato|ice cream|dessert|desserts|chocolate|bubble tea)\b/)

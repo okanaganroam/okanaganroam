@@ -84,6 +84,10 @@ add({ name: 'Penticton Gallery', region: 'penticton', type: 'indoor', rating: nu
 // West Kelowna: three breweries that open at 4 PM and two restaurants (round 15b: a crawl meal from 5 PM is dinner).
 for (let i = 0; i < 3; i++) add({ name: `West Kelowna Taproom ${i + 1}`, region: 'west-kelowna', type: 'brewery', rating: 4.6 - i * 0.05, hours: open('16:00', '22:00'), dLat: 0.003 * i });
 for (let i = 0; i < 2; i++) add({ name: `West Kelowna Table ${i + 1}`, region: 'west-kelowna', type: 'restaurant', rating: 4.5, price: 2, hours: open('11:00', '22:00'), dLat: 0.002 * i });
+// Oliver: two breweries that open at 4 PM and a lower-rated one open noon to 7 PM, and a pub that serves dinner
+// (round 15b: the crawl is ordered so every stop fits its hours; a dinner pub is dinner in the summary).
+for (let i = 0; i < 2; i++) add({ name: `Oliver Night Brewing ${i + 1}`, region: 'oliver', type: 'brewery', rating: 4.8, hours: open('16:00', '22:00'), dLat: 0.003 * i });
+const OLIVER_RAIL = add({ name: 'Oliver Rail Brewing', region: 'oliver', type: 'brewery', rating: 4.3, hours: open('12:00', '19:00'), dLat: 0.004 });
 // Big White: the hill and a lunch and dinner on it.
 const HILL = add({ name: 'Big White Ski Resort', region: 'big-white', type: 'outdoor', rating: null, activities: ['winter'], desc: 'Ski resort with 119 runs and the lifts open 8:30 to 3:30.' });
 add({ name: 'Big White Lodge Grill', region: 'big-white', type: 'restaurant', rating: 4.4, price: 2, hours: open('11:00', '21:00'), dLat: 0.002 });
@@ -223,4 +227,33 @@ test('Evening crawl (round 15b): a crawl that starts when the breweries open at 
   assert.equal(meal.label, 'Dinner');
   assert.match(p.story.text, /dinner at West Kelowna Table/);
   assert.doesNotMatch(p.story.text, /lunch/i);
+});
+
+test('Crawl order (round 15b): a brewery that closes at 7 PM is not left until after dinner; every stop has a time', () => {
+  for (const q of ['brewery crawl in Oliver', 'brewery crawl in Oliver on October 24']) {
+    const p = plan(q);
+    const stops = allStops(p).filter((s) => s.venue);
+    assert.ok(stops.some((s) => s.venue.id === OLIVER_RAIL.id), `${q}: ${names(p).join(', ')}`);
+    for (const r of p.schedule) assert.ok(Number.isFinite(r.startMinutes), `${q}: ${names(p).join(', ')} ${JSON.stringify(p.schedule)}`);
+    const rail = p.schedule.find((r) => r.venueId === OLIVER_RAIL.id);
+    assert.ok(rail.endMinutes <= 19 * 60, `${q}: Oliver Rail until ${rail.endMinutes}`);
+    // The meal's label still matches its time.
+    const meal = stops.find((s) => s.venue.type === 'restaurant'), mealRow = p.schedule.find((r) => r.venueId === meal.venue.id);
+    assert.equal(meal.label, mealRow.startMinutes >= 17 * 60 ? 'Dinner' : mealRow.startMinutes >= 14 * 60 + 30 ? 'Late lunch' : 'Lunch', q);
+  }
+});
+
+test('Pub dinner (round 15b): a pub planned as dinner reads "have dinner at", not "end with a drink at"', () => {
+  const facts = [
+    { id: 1, name: 'Hill Winery', type: 'winery', features: {}, collections: [], activities: [], plannerKinds: [] },
+    { id: 2, name: 'Naramata Pub & Grill', type: 'pub', features: {}, collections: [], activities: [], plannerKinds: [] },
+  ];
+  const stop = (id, daypart, label) => ({ kind: 'venue', daypart, label, venue: { id, name: facts[id - 1].name, type: facts[id - 1].type, regionLabel: 'Naramata' } });
+  const s = tripStory.buildStory({ kind: 'itinerary', itinerary: { stops: [stop(1, 'afternoon', 'Wineries'), stop(2, 'evening', 'Dinner')] }, schedule: [] }, facts, {});
+  assert.match(s.text, /finish with dinner at Naramata Pub & Grill/);
+  assert.doesNotMatch(s.text, /drink at Naramata Pub/);
+  assert.match(s.textFr, /terminez par un souper à Naramata Pub & Grill/);
+  // An evening pub stop that is not a meal is still a drink.
+  const d = tripStory.buildStory({ kind: 'itinerary', itinerary: { stops: [stop(1, 'afternoon', 'Wineries'), stop(2, 'evening', 'Evening')] }, schedule: [] }, facts, {});
+  assert.match(d.text, /end with a drink at Naramata Pub & Grill/);
 });
