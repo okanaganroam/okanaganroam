@@ -1,0 +1,27 @@
+{
+ "updated": "2026-10-20",
+ "note": "Map points for busy event hosts that have no listing of their own (or whose listing has another name), so their events get a pin on /map (Roam Now). Used only by the map, never by the trip planner or event pages. Each point is the building itself (OpenStreetMap, checked 2026-10-20) or, for Kal Tire Place, Wikipedia's coordinates; street-only matches were left out. names are compared after lower-casing, '&' -> 'and' and dropping punctuation, a trailing town, a ', street address' and a trailing '(...)'.",
+ "points": [
+  { "region": "vernon", "names": ["Kal Tire Place"], "lat": 50.27556, "lng": -119.27806, "address": "3445 43 Ave, Vernon", "source": "https://en.wikipedia.org/wiki/Kal_Tire_Place" },
+  { "region": "kelowna", "names": ["Kelowna Event Centre", "Kelowna Events Centre"], "lat": 49.88121, "lng": -119.44747, "address": "2041 Harvey Ave, Kelowna", "source": "https://www.openstreetmap.org/node/13435923615" },
+  { "region": "armstrong", "names": ["Caravan Farm Theatre", "Caravan Farm"], "lat": 50.4887, "lng": -119.26073, "address": "4886 Salmon River Rd, Spallumcheen", "source": "the Caravan Farm Theatre listing's own point" },
+  { "region": "kelowna", "names": ["UBCO Gymnasium", "UBC Okanagan Gymnasium", "UBC Okanagan", "UBCO", "UBC COMS 201", "UBC Okanagan Engineering, Management and Education Building"], "lat": 49.94218, "lng": -119.39903, "address": "3333 University Way, Kelowna", "source": "https://www.openstreetmap.org/way/123757617" },
+  { "region": "enderby", "names": ["John Pritchard Memorial Arena", "John Pritchard Memorial Sports Complex", "Enderby Arena"], "lat": 50.55637, "lng": -119.13461, "address": "1605 Kate St, Enderby", "source": "https://www.openstreetmap.org/node/14084410567" },
+  { "region": "summerland", "names": ["Summerland Arena"], "lat": 49.60431, "lng": -119.67495, "address": "8820 Jubilee Rd E, Summerland", "source": "https://www.openstreetmap.org/way/223593266" },
+  { "region": "osoyoos", "names": ["Gyro Bandshell", "Gyro Park"], "lat": 49.03384, "lng": -119.4622, "address": "Gyro Park, Osoyoos", "source": "https://www.openstreetmap.org/way/760838830" },
+  { "region": "osoyoos", "names": ["Osoyoos Regional Library", "Osoyoos Library", "ORL Osoyoos Branch"], "lat": 49.02937, "lng": -119.46573, "address": "8505 68 Ave, Osoyoos", "source": "https://www.openstreetmap.org/node/12811444001" },
+  { "region": "oliver", "names": ["Oliver Elks Hall", "Elks Hall", "Elks Lodge"], "lat": 49.18402, "lng": -119.55155, "address": "477 Bank Ave, Oliver", "source": "https://www.openstreetmap.org/way/1467684484" },
+  { "region": "penticton", "names": ["Our Redeemer Lutheran Church"], "lat": 49.48563, "lng": -119.57456, "address": "Duncan Ave E, Penticton", "source": "https://www.openstreetmap.org/node/4295324038" },
+  { "region": "penticton", "names": ["Princess Margaret Secondary School", "Princess Margaret Secondary"], "lat": 49.4628, "lng": -119.58356, "address": "120 Green Ave W, Penticton", "source": "https://www.openstreetmap.org/node/1426688323" },
+  { "region": "kelowna", "names": ["Kelowna Flower Farm"], "lat": 49.8504, "lng": -119.44324, "address": "3683 Bérard Rd, Kelowna", "source": "https://www.openstreetmap.org/node/5796616083" },
+  { "region": "kelowna", "names": ["Kelowna Memorial Park Cemetery"], "lat": 49.88909, "lng": -119.44527, "address": "1991 Bernard Ave, Kelowna", "source": "https://www.openstreetmap.org/node/5800944993" },
+  { "region": "kelowna", "names": ["Elysium Gardens"], "lat": 49.85144, "lng": -119.3803, "address": "2834 Belgo Rd, Kelowna", "source": "https://www.openstreetmap.org/way/612358992" },
+  { "region": "kelowna", "names": ["East Kelowna Community Hall"], "lat": 49.86002, "lng": -119.42394, "address": "2704 East Kelowna Rd, Kelowna", "source": "https://www.openstreetmap.org/node/5796621928" },
+  { "region": "kelowna", "names": ["Okanagan College Theatre", "Okanagan College", "Okanagan College Kelowna"], "lat": 49.86182, "lng": -119.48125, "address": "1000 KLO Rd, Kelowna", "source": "https://www.openstreetmap.org/way/105276517" },
+  { "region": "kelowna", "names": ["St. Michael and All Angels Cathedral", "Cathedral Church of St Michael and All Angels", "St Michael and All Angels"], "lat": 49.88016, "lng": -119.48893, "address": "608 Sutherland Ave, Kelowna", "source": "https://www.openstreetmap.org/way/222961220" },
+  { "region": "vernon", "names": ["Trinity United Church"], "lat": 50.26643, "lng": -119.2867, "address": "3300 Alexis Park Dr, Vernon", "source": "https://www.openstreetmap.org/way/704175225" },
+  { "region": "vernon", "names": ["Vernon Recreation Centre", "Creekside Conference Centre", "Halina Centre"], "lat": 50.26843, "lng": -119.27582, "address": "3310 37 Ave, Vernon", "source": "https://www.openstreetmap.org/node/13469103851" },
+  { "region": "vernon", "names": ["Justice Park"], "lat": 50.2642, "lng": -119.26724, "address": "Justice Park, Vernon", "source": "https://www.openstreetmap.org/way/698062195" },
+  { "region": "peachland", "names": ["50+ Centre", "50+ Activity Centre", "Peachland 50+ Activity Centre"], "lat": 49.77831, "lng": -119.73378, "address": "5672 Beach Ave, Peachland", "source": "https://www.openstreetmap.org/way/426481419" }
+ ]
+}
