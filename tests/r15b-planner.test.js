@@ -81,6 +81,9 @@ add({ name: 'Oliver Bakery', region: 'oliver', type: 'cafe', rating: 4.8, price:
 // Penticton: a short lookout and a gallery (round 15b).
 const LOOKOUT = add({ name: 'Penticton Lookout', region: 'penticton', type: 'outdoor', rating: null, features: { lake_view: true }, activities: ['viewpoints'], desc: 'A short walk up to a lookout over the lake.' });
 add({ name: 'Penticton Gallery', region: 'penticton', type: 'indoor', rating: null, hours: open('10:00', '17:00'), desc: 'A public art gallery.' });
+// West Kelowna: three breweries that open at 4 PM and two restaurants (round 15b: a crawl meal from 5 PM is dinner).
+for (let i = 0; i < 3; i++) add({ name: `West Kelowna Taproom ${i + 1}`, region: 'west-kelowna', type: 'brewery', rating: 4.6 - i * 0.05, hours: open('16:00', '22:00'), dLat: 0.003 * i });
+for (let i = 0; i < 2; i++) add({ name: `West Kelowna Table ${i + 1}`, region: 'west-kelowna', type: 'restaurant', rating: 4.5, price: 2, hours: open('11:00', '22:00'), dLat: 0.002 * i });
 // Big White: the hill and a lunch and dinner on it.
 const HILL = add({ name: 'Big White Ski Resort', region: 'big-white', type: 'outdoor', rating: null, activities: ['winter'], desc: 'Ski resort with 119 runs and the lifts open 8:30 to 3:30.' });
 add({ name: 'Big White Lodge Grill', region: 'big-white', type: 'restaurant', rating: 4.4, price: 2, hours: open('11:00', '21:00'), dLat: 0.002 });
@@ -209,4 +212,15 @@ test('Late lunch (round 15b): a crawl meal at 2:30 PM or later is a late lunch, 
   // A real midday lunch keeps its label.
   const wine = plan('wine tasting in Oliver');
   assert.ok(allStops(wine).some((s) => s.label === 'Lunch'), allStops(wine).map((s) => s.label).join(', '));
+});
+
+test('Evening crawl (round 15b): a crawl that starts when the breweries open at 4 PM has dinner, not a "Late lunch"', () => {
+  const p = plan('brewery crawl in West Kelowna');
+  const meal = allStops(p).find((s) => s.venue && s.venue.type === 'restaurant');
+  assert.ok(meal, names(p).join(', '));
+  const row = p.schedule.find((r) => r.venueId === meal.venue.id);
+  assert.ok(row.startMinutes >= 17 * 60, `meal at ${row.startMinutes}`);
+  assert.equal(meal.label, 'Dinner');
+  assert.match(p.story.text, /dinner at West Kelowna Table/);
+  assert.doesNotMatch(p.story.text, /lunch/i);
 });
