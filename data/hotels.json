@@ -192,6 +192,158 @@
       "address": "888 Sparkling Place, Vernon, BC",
       "latitude": 50.198076,
       "longitude": -119.39288
+    },
+    {
+      "slug": "big-white-central-reservations",
+      "name": "Big White Ski Resort",
+      "region": "big-white",
+      "address": "Mountain Check-In, 300 Happy Valley Rd, Big White, BC",
+      "latitude": 49.717917,
+      "longitude": -118.921228
+    },
+    {
+      "slug": "inn-at-big-white",
+      "name": "Inn at Big White",
+      "region": "big-white",
+      "address": "5340 Big White Rd, Big White, BC",
+      "latitude": 49.720993,
+      "longitude": -118.929193
+    },
+    {
+      "slug": "sundance-resort-big-white",
+      "name": "Sundance Resort",
+      "region": "big-white",
+      "address": "255 Feathertop Way, Big White, BC",
+      "latitude": 49.723337,
+      "longitude": -118.921213
+    },
+    {
+      "slug": "chateau-big-white",
+      "name": "Chateau Big White",
+      "region": "big-white",
+      "address": "5335 Big White Rd, Big White, BC",
+      "latitude": 49.721406,
+      "longitude": -118.928393
+    },
+    {
+      "slug": "white-crystal-inn",
+      "name": "White Crystal Inn",
+      "region": "big-white",
+      "address": "5275 Big White Rd, Big White, BC",
+      "latitude": 49.72198,
+      "longitude": -118.925375
+    },
+    {
+      "slug": "stonebridge-lodge",
+      "name": "Stonebridge Lodge",
+      "region": "big-white",
+      "address": "5257 Big White Rd, Big White, BC",
+      "latitude": 49.72198,
+      "longitude": -118.925375
+    },
+    {
+      "slug": "urban-retreat-hostel",
+      "name": "Urban Retreat Hostel",
+      "region": "big-white",
+      "address": "7470 Porcupine Rd, Big White, BC",
+      "latitude": 49.724084,
+      "longitude": -118.929544
+    },
+    {
+      "slug": "silverstar-central-reservations",
+      "name": "SilverStar Mountain Resort",
+      "region": "silverstar",
+      "address": "Snowbird Lodge, Silver Lode Lane, SilverStar Mountain, BC V1B 3M1",
+      "latitude": 50.360744,
+      "longitude": -119.058288
+    },
+    {
+      "slug": "vance-creek-hotel",
+      "name": "Vance Creek Hotel",
+      "region": "silverstar",
+      "address": "148 Silver Lode Lane, SilverStar Mountain, BC V1B 3M1",
+      "latitude": 50.360086,
+      "longitude": -119.058653
+    },
+    {
+      "slug": "pinnacles-suites",
+      "name": "The Pinnacles Suites",
+      "region": "silverstar",
+      "address": "9885 Pinnacles Road, SilverStar Mountain, BC V1B 3M1",
+      "latitude": 50.360016,
+      "longitude": -119.061649
+    },
+    {
+      "slug": "silver-star-stays",
+      "name": "Silver Star Stays",
+      "region": "silverstar",
+      "address": "SilverStar Mountain Resort village, BC",
+      "latitude": 50.360744,
+      "longitude": -119.058288
+    },
+    {
+      "slug": "castle-at-swan-lake",
+      "name": "The Castle at Swan Lake",
+      "region": "vernon",
+      "address": "7905 Greenhow Road, Vernon, BC V1B 3S2",
+      "latitude": 50.334372,
+      "longitude": -119.23891
+    },
+    {
+      "slug": "apex-mountain-lodge",
+      "name": "Apex Mountain Lodge",
+      "region": "apex",
+      "address": "360 Strayhorse Rd, Apex Mountain (Penticton), BC",
+      "latitude": 49.3927,
+      "longitude": -119.9039
+    },
+    {
+      "slug": "stay-at-apex",
+      "name": "Stay at Apex",
+      "region": "apex",
+      "address": "Apex Mountain Resort village, Penticton, BC (no office address published)",
+      "latitude": 49.3838,
+      "longitude": -119.9111
+    },
+    {
+      "slug": "tinhorn-lodge",
+      "name": "Tinhorn Lodge",
+      "region": "baldy",
+      "address": "Baldy Trail, upper village, Mount Baldy (Oliver), BC",
+      "latitude": 49.1524,
+      "longitude": -119.2365
+    },
+    {
+      "slug": "skaha-lake-motels-waterfront-inn",
+      "name": "Waterfront Inn",
+      "region": "penticton",
+      "address": "3688 Parkview St, Penticton, BC",
+      "latitude": 49.454618,
+      "longitude": -119.585964
+    },
+    {
+      "slug": "lakeside-villa-nordic-spa",
+      "name": "Lakeside Villa & Nordic Spa",
+      "region": "penticton",
+      "address": "4201 Skaha Lake Rd, Penticton, BC",
+      "latitude": 49.451335,
+      "longitude": -119.608529
+    },
+    {
+      "slug": "cactus-tree-inn",
+      "name": "Cactus Tree Inn",
+      "region": "oliver",
+      "address": "5887 Main St, Oliver, BC",
+      "latitude": 49.177422,
+      "longitude": -119.551704
+    },
+    {
+      "slug": "richter-pass-beach-resort",
+      "name": "Richter Pass Beach Resort",
+      "region": "osoyoos",
+      "address": "7506 Main St, Osoyoos, BC",
+      "latitude": 49.028619,
+      "longitude": -119.454907
     }
   ]
 }
