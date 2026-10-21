@@ -89,3 +89,15 @@ test('/near/<slug>/card: the printable card carries the tracked link for the QR 
   assert.ok(r.text.includes('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'));
   assert.equal(app.HOTEL_QR_UTM('abc'), 'utm_source=abc&utm_medium=hotel_qr');
 });
+
+test('hotel groups (2026-10-20): a place closed only until soon is listed after open ones, labelled by the page; other closed places stay out', () => {
+  const venues = [at(1, 'restaurant', 0.001), at(2, 'restaurant', 0.002), at(3, 'pub', 0.003)];
+  const closed = new Set([1, 3]);
+  const soon = new Map([[1, 'Opens Nov 26']]);
+  const groups = app.hotelPageGroups(HOTEL, venues, { openIds: new Set([2]), byId: new Map() }, closed, soon);
+  assert.deepEqual(groups[0].items.map((x) => x.v.id), [2, 1], 'open place first, then the one opening soon; the closed pub stays out');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.ok(src.includes("opensSoon.set(id, 'Opens for the ski season')"), 'ski-hill places with no date yet open with the hill');
+  assert.ok(src.includes('row.reopens_date <= addLocalDays(today0, HOTEL_OPENS_SOON_DAYS)'));
+  assert.ok(src.includes('<span class="ht-soon">'));
+});
