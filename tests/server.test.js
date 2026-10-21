@@ -11751,7 +11751,8 @@ test('Header: okanagan.html outside <header id="top"> is byte-identical to the a
   const outside = html.replace(/<header id="top">[\s\S]*?<\/header>/, '');
   const crypto = require('node:crypto');
   // SEO-2 (2026-10-02): approved description/og:/twitter: description change.
-  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), '0ee01b6fd6ec97f4f6fa45b663813998');
+  // GEO r1 (2026-10-20): JSON-LD only: new WebSite description, Organization email and every social profile in sameAs.
+  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), '0bfad428557c2c9dc8b1c4fcd909613d');
   assert.match(html, /<a href="#top" class="logo"/, 'the logo keeps its in-page #top anchor on the homepage');
 });
 
