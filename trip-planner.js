@@ -2222,6 +2222,19 @@ function tripTheme(ctx) {
 }
 
 function dayDate(ctx, d) { return ctx.tripDate ? new Date(new Date(`${ctx.tripDate}T12:00:00Z`).getTime() + (d - 1) * 86400000).toISOString().slice(0, 10) : null; }
+// Round 15c (2026-10-20): the late-afternoon filler rotated over the good choices near the day's last stop (seeded by
+// the request, so a request always gets the same plan) instead of always the top one: La Carraia Gelateria filled 7 of
+// 59 plans. The best still wins about a third of the time, and nothing more than 6 points behind it is used.
+const FILLER_MARGIN = 6;
+function rotateFillerPick(cands, ctx, slot) {
+  const best = themePick(cands);
+  if (!best || !ctx || !(ctx.rotationKey || ctx.queryText)) return best;
+  const pool = cands.filter((c) => best.score - c.score <= FILLER_MARGIN && !(c.v.rating != null && best.v.rating != null && best.v.rating - c.v.rating > 0.4)).slice(0, ROTATE_TOP);
+  if (pool.length < 2 || rotationSlotNudge({ id: 0 }, ctx, `${slot}|keep`) < ROTATE_KEEP_BEST) return best;
+  let pick = best, top = -Infinity;
+  for (const c of pool) { const t = c.score + rotationSlotNudge(c.v, ctx, slot) * FILLER_MARGIN * 1.5; if (t > top) { top = t; pick = c; } }
+  return pick;
+}
 function themePick(cands) { cands.sort((a, b) => b.score - a.score || (b.v.rating || 0) - (a.v.rating || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id); return cands[0] || null; }
 function themeStop(ctx, daypart, v, scored, fit, extraReasons, extraCaveats) {
   const s = stopFrom(v, { reasons: scored.reasons.concat(fit && fit.reasons || [], extraReasons || []), caveats: (fit && fit.caveats || []).concat(extraCaveats || []) }, regionReason(v, ctx), ctx);
@@ -3441,7 +3454,7 @@ function fillDinnerGaps(result, input, requirements) {
         if (ctx.kids && v.features && v.features.kid_friendly) score += 6;
         cands.push({ v, score });
       }
-      pick = themePick(cands);
+      pick = rotateFillerPick(cands, dayCtx, `late|${day.day}`);
     }
     const stop = pick
       ? { daypart: 'late', label: PLAN_DAYPART_LABELS.late, gapFill: true, ...(gapStarts.has(pick.v.id) ? { fillStart: gapStarts.get(pick.v.id) } : {}), ...stopFrom(pick.v, { reasons: scoreVenue(pick.v, ctx).reasons.concat({ code: 'gap', text: 'Fills the free time before dinner', weight: 2 }), caveats: [] }, regionReason(pick.v, ctx), ctx) }

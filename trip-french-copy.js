@@ -2,8 +2,50 @@
 // Display-only French copy. Stored venue names, URLs, facts and API output stay intact.
 const FR_MONTHS_BY_EN={January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'};
 const FR_SEASON_WORDS={winter:'hiver',spring:'printemps',summer:'été',fall:'automne',autumn:'automne','off-season':'hors saison'};
+// Round 15c (2026-10-20): the English heading of an Ideas list ("Wineries in Oliver on Sunday.", "Art galleries and
+// dog-friendly spots in Kelowna this weekend.", "Ideas for Penticton.", "What’s on in Vernon.") in French. Built only when
+// every part is known (the category, badge, activity and collection names, the towns, the day); otherwise null and the
+// heading is left to the usual handling.
+const FR_HEADING_NAMES={wineries:'vignobles',breweries:'microbrasseries',cafes:'cafés','cocktail lounges':'bars à cocktails',distilleries:'distilleries','golf courses':'terrains de golf','indoor & rainy day spots':'lieux pour les jours de pluie','outdoor destinations':'lieux de plein air',pubs:'pubs',restaurants:'restaurants','sports & recreation':'sports et loisirs','tours & experiences':'visites et expériences',beaches:'plages','art galleries':'galeries d’art',museums:'musées','museums & galleries':'musées et galeries',
+ 'dog-friendly spots':'endroits qui acceptent les chiens','vegan-friendly venues':'lieux avec options véganes','vegetarian-friendly venues':'lieux avec options végétariennes','venues with a patio':'lieux avec terrasse','kid-friendly spots':'endroits adaptés aux enfants','venues with gluten-free options':'lieux avec options sans gluten','venues with a lake view':'lieux avec vue sur le lac','venues with non-alcoholic options':'lieux avec options sans alcool','spots to watch the game':'endroits pour regarder le match','venues with live music':'lieux avec musique en direct','venues that are great for groups':'lieux parfaits pour les groupes','venues with happy hour':'lieux avec un 5 à 7','free things to do':'activités gratuites','arts and culture spots':'lieux d’art et de culture','spots open early for breakfast & brunch':'endroits ouverts tôt pour le déjeuner et le brunch','late-night spots':'endroits ouverts tard',
+ 'hiking & trails':'randonnées et sentiers','cycling & biking':'vélo','winter':'activités d’hiver','camping':'camping','nature & wildlife':'nature et faune','water activities':'activités nautiques','viewpoints':'points de vue','adventure':'aventure','fishing':'pêche',
+ 'hidden gems':'trésors cachés','local favourites':'coups de cœur locaux','dog-friendly beaches':'plages qui acceptent les chiens','lake time':'temps au bord du lac'};
+const FR_HEADING_DAYS={Monday:'lundi',Tuesday:'mardi',Wednesday:'mercredi',Thursday:'jeudi',Friday:'vendredi',Saturday:'samedi',Sunday:'dimanche'};
+const FR_HEADING_PARTS={morning:'matin',afternoon:'après-midi',evening:'soir'};
+function frHeadingWhen(w){
+ if(!w)return '';
+ let m;
+ if((m=/^on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: (morning|afternoon|evening))?$/.exec(w)))return ' '+FR_HEADING_DAYS[m[1]]+(m[2]?' '+FR_HEADING_PARTS[m[2]]:'');
+ if((m=/^tomorrow(?: (morning|afternoon|evening))?$/.exec(w)))return ' demain'+(m[1]?' '+FR_HEADING_PARTS[m[1]]:'');
+ return {'this weekend':' cette fin de semaine',today:' aujourd’hui',tonight:' ce soir','right now':' en ce moment','this morning':' ce matin','this afternoon':' cet après-midi','this evening':' ce soir'}[w]??null;
+}
+function frHeadingWhere(w){
+ if(w==='the Okanagan')return 'dans l’Okanagan';
+ const towns=w.split(/, | and /);
+ if(!towns.every(t=>/^[A-Z][A-Za-z’'.-]*(?: [A-Z][A-Za-z’'.-]*)*$/.test(t)))return null;
+ return 'à '+(towns.length>1?towns.slice(0,-1).join(', ')+' et '+towns[towns.length-1]:towns[0]);
+}
+const FR_HEADING_OCCASIONS={'a date night':'pour une soirée en amoureux','a romantic outing':'pour une sortie romantique','a family trip':'pour une sortie en famille','a rainy day':'pour un jour de pluie','a celebration':'pour une célébration','a group getaway':'pour une escapade en groupe','a relaxing getaway':'pour une escapade relaxante','an adventure':'pour une aventure','an adults-only trip':'pour une sortie entre adultes'};
+const FR_HEADING_WHEN_RE='(?: (on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: (?:morning|afternoon|evening))?|tomorrow(?: (?:morning|afternoon|evening))?|this weekend|today|tonight|right now|this morning|this afternoon|this evening))?';
+function t3FrenchHeading(text){
+ const s=String(text||'');
+ let m;
+ if((m=new RegExp('^What’s on in (.+?)\\.$').exec(s))){const where=frHeadingWhere(m[1]);return where?'À l’affiche '+where+'.':null;}
+ if((m=new RegExp('^Ideas for (.+?)'+FR_HEADING_WHEN_RE+'(?: for ('+Object.keys(FR_HEADING_OCCASIONS).join('|')+'))?\\.$').exec(s))){const where=frHeadingWhere(m[1]),when=frHeadingWhen(m[2]);return where&&when!==null?'Des idées '+where+when+(m[3]?' '+FR_HEADING_OCCASIONS[m[3]]:'')+'.':null;}
+ if((m=new RegExp('^(.+?) in ((?:the Okanagan)|(?:[A-Z][^.]*?))'+FR_HEADING_WHEN_RE+'(?: for ('+Object.keys(FR_HEADING_OCCASIONS).join('|')+'))?\\.$').exec(s))){
+  const items=m[1].split(/, | and /).map(x=>x.trim().toLowerCase());
+  if(!items.length||!items.every(x=>Object.prototype.hasOwnProperty.call(FR_HEADING_NAMES,x)))return null;
+  const where=frHeadingWhere(m[2]),when=frHeadingWhen(m[3]);
+  if(!where||when===null)return null;
+  const fr=items.map(x=>FR_HEADING_NAMES[x]);
+  const list=fr.length>1?fr.slice(0,-1).join(', ')+' et '+fr[fr.length-1]:fr[0];
+  return list.charAt(0).toUpperCase()+list.slice(1)+' '+where+when+(m[4]?' '+FR_HEADING_OCCASIONS[m[4]]:'')+'.';
+ }
+ return null;
+}
 function t3FrenchText(value){
  let text=String(value||'');
+ const heading=t3FrenchHeading(text);if(heading)return heading;
  const directLabels={market:'marché',festival:'festival',event:'événement',walks:'promenades','easy walk':'promenade facile','easy walks':'promenades faciles','Kid-friendly spots':'Endroits adaptés aux enfants'};
  if(Object.prototype.hasOwnProperty.call(directLabels,text))return directLabels[text];
  const accessPrefix='Access / schedule from the listing: “',accessSuffix='” Confirm access and scheduling with the operator before visiting.';
@@ -400,4 +442,4 @@ function t3FrenchPlan(plan){
  }else {p.headline=t3FrenchText(p.headline||p.summary);if(p.experience?.text)p.experience.text=t3FrenchText(p.experience.text);}
  return p;
 }
-module.exports={t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN};
+module.exports={t3FrenchText,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN};

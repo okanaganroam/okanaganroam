@@ -1,5 +1,5 @@
 'use strict';
-const {t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN}=require('./trip-french-copy');
+const {t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE}=require('./trip-french-copy');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -819,6 +819,15 @@ function renderScript(d) {
   // Fix (2026-10-19): the French helpers below read these lookups, so ship them with the functions (a season or month crashed /fr/trip).
   var FR_MONTHS_BY_EN = ${JSON.stringify(FR_MONTHS_BY_EN)};
   var FR_SEASON_WORDS = ${JSON.stringify(FR_SEASON_WORDS)};
+  // Round 15c: the French Ideas heading (t3FrenchText calls it) and its lookups.
+  var FR_HEADING_NAMES = ${JSON.stringify(FR_HEADING_NAMES)};
+  var FR_HEADING_DAYS = ${JSON.stringify(FR_HEADING_DAYS)};
+  var FR_HEADING_PARTS = ${JSON.stringify(FR_HEADING_PARTS)};
+  var FR_HEADING_OCCASIONS = ${JSON.stringify(FR_HEADING_OCCASIONS)};
+  var FR_HEADING_WHEN_RE = ${JSON.stringify(FR_HEADING_WHEN_RE)};
+  ${frHeadingWhen.toString()}
+  ${frHeadingWhere.toString()}
+  ${t3FrenchHeading.toString()}
   ${t3FrenchText.toString()}
   ${t3FrenchEvent.toString()}
   // Round 8: the written French summary and its lookup ship with t3FrenchPlan, which calls them.
