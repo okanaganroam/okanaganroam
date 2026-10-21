@@ -1,0 +1,237 @@
+{
+  "_note": "Hotel QR pages (/near/<slug>, card at /near/<slug>/card). One entry per hotel; latitude/longitude from the hotel's street address. Pages are noindex and linked from nowhere on the site, so an entry can be added before the hotel agrees and shown to them in the pitch.",
+  "hotels": [
+    {
+      "slug": "hotel-eldorado",
+      "name": "Hotel Eldorado",
+      "region": "kelowna",
+      "address": "500 Cook Rd, Kelowna, BC",
+      "latitude": 49.845622,
+      "longitude": -119.4895925
+    },
+    {
+      "slug": "penticton-lakeside-resort",
+      "name": "Penticton Lakeside Resort",
+      "region": "penticton",
+      "address": "21 Lakeshore Dr W, Penticton, BC",
+      "latitude": 49.503586,
+      "longitude": -119.5946801
+    },
+    {
+      "slug": "dilworth-inn",
+      "name": "Dilworth Inn",
+      "region": "kelowna",
+      "address": "1755 Dilworth Dr, Kelowna, BC",
+      "latitude": 49.882866,
+      "longitude": -119.436937
+    },
+    {
+      "slug": "manteo-resort",
+      "name": "Manteo Resort",
+      "region": "kelowna",
+      "address": "3762 Lakeshore Rd, Kelowna, BC",
+      "latitude": 49.847321,
+      "longitude": -119.487963
+    },
+    {
+      "slug": "oasis-inn",
+      "name": "Oasis Inn",
+      "region": "kelowna",
+      "address": "1884 Gordon Dr, Kelowna, BC",
+      "latitude": 49.880007,
+      "longitude": -119.47758
+    },
+    {
+      "slug": "okanagan-seasons-resort",
+      "name": "Okanagan Seasons Resort",
+      "region": "kelowna",
+      "address": "1580 Highway 33 West, Kelowna, BC",
+      "latitude": 49.889993,
+      "longitude": -119.41868
+    },
+    {
+      "slug": "recreation-inn-suites",
+      "name": "Recreation Inn & Suites",
+      "region": "kelowna",
+      "address": "1891 Parkinson Way, Kelowna, BC",
+      "latitude": 49.882915,
+      "longitude": -119.455121
+    },
+    {
+      "slug": "royal-anne-hotel",
+      "name": "Royal Anne Hotel",
+      "region": "kelowna",
+      "address": "348 Bernard Ave, Kelowna, BC",
+      "latitude": 49.886623,
+      "longitude": -119.495812
+    },
+    {
+      "slug": "siesta-suites",
+      "name": "Siesta Suites",
+      "region": "kelowna",
+      "address": "3152 Lakeshore Rd, Kelowna, BC",
+      "latitude": 49.860478,
+      "longitude": -119.491587
+    },
+    {
+      "slug": "soma-craft-cidery-farm-inn",
+      "name": "Soma Craft Cidery & Farm Inn",
+      "region": "kelowna",
+      "address": "4485 Sallows Rd, Kelowna, BC",
+      "latitude": 49.821099,
+      "longitude": -119.436659
+    },
+    {
+      "slug": "royal-kelowna",
+      "name": "The Royal Kelowna",
+      "region": "kelowna",
+      "address": "1288 Water St, Kelowna, BC",
+      "latitude": 49.892164,
+      "longitude": -119.498543
+    },
+    {
+      "slug": "cove-lakeside-resort",
+      "name": "The Cove Lakeside Resort",
+      "region": "west-kelowna",
+      "address": "4205 Gellatly Road, West Kelowna, BC",
+      "latitude": 49.810963,
+      "longitude": -119.624653
+    },
+    {
+      "slug": "peachland-beach-resort",
+      "name": "Peachland Beach Resort",
+      "region": "peachland",
+      "address": "3701 Beach Avenue, Peachland, BC",
+      "latitude": 49.791739,
+      "longitude": -119.702736
+    },
+    {
+      "slug": "summerland-waterfront-resort-spa",
+      "name": "Summerland Waterfront Resort & Spa",
+      "region": "summerland",
+      "address": "13011 Lakeshore Dr S, Summerland, BC",
+      "latitude": 49.601166,
+      "longitude": -119.653234
+    },
+    {
+      "slug": "golden-sands-resort",
+      "name": "Golden Sands Resort",
+      "region": "penticton",
+      "address": "1028 Lakeshore Dr W, Penticton, BC",
+      "latitude": 49.501364,
+      "longitude": -119.610367
+    },
+    {
+      "slug": "kettle-beach-resort",
+      "name": "Kettle Beach Resort",
+      "region": "penticton",
+      "address": "950 Lakeshore Dr W, Penticton, BC",
+      "latitude": 49.501256,
+      "longitude": -119.608307
+    },
+    {
+      "slug": "okanagan-lakefront-resort",
+      "name": "Okanagan Lakefront Resort",
+      "region": "penticton",
+      "address": "970 Lakeshore Dr W, Penticton, BC",
+      "latitude": 49.501279,
+      "longitude": -119.608643
+    },
+    {
+      "slug": "shoreline-resort",
+      "name": "Shoreline Resort",
+      "region": "penticton",
+      "address": "926 Lakeshore Dr W, Penticton, BC",
+      "latitude": 49.501233,
+      "longitude": -119.607779
+    },
+    {
+      "slug": "tiki-shores-inn-suites",
+      "name": "Tiki Shores Inn & Suites",
+      "region": "penticton",
+      "address": "914 Lakeshore Dr W, Penticton, BC",
+      "latitude": 49.501233,
+      "longitude": -119.607313
+    },
+    {
+      "slug": "naramata-inn",
+      "name": "Naramata Inn",
+      "region": "naramata",
+      "address": "3625 1st St, Naramata, BC",
+      "latitude": 49.597479,
+      "longitude": -119.603521
+    },
+    {
+      "slug": "sandy-beach-lodge-resort",
+      "name": "Sandy Beach Lodge & Resort",
+      "region": "naramata",
+      "address": "4275 Mill Rd, Naramata, BC",
+      "latitude": 49.606966,
+      "longitude": -119.596962
+    },
+    {
+      "slug": "burrowing-owl-guest-house",
+      "name": "The Guest House at Burrowing Owl",
+      "region": "oliver",
+      "address": "500 Burrowing Owl Pl, Oliver, BC",
+      "latitude": 49.101431,
+      "longitude": -119.53274
+    },
+    {
+      "slug": "villa-at-hester-creek",
+      "name": "The Villa at Hester Creek",
+      "region": "oliver",
+      "address": "877 Road 8, Oliver, BC",
+      "latitude": 49.143504,
+      "longitude": -119.597009
+    },
+    {
+      "slug": "sandy-beach-suites",
+      "name": "Sandy Beach Suites",
+      "region": "osoyoos",
+      "address": "6706 Ponderosa Dr, Osoyoos, BC",
+      "latitude": 49.029913,
+      "longitude": -119.450203
+    },
+    {
+      "slug": "walnut-beach-resort",
+      "name": "Walnut Beach Resort",
+      "region": "osoyoos",
+      "address": "4200 Lakeshore Dr, Osoyoos, BC",
+      "latitude": 49.017832,
+      "longitude": -119.43638
+    },
+    {
+      "slug": "watermark-beach-resort",
+      "name": "Watermark Beach Resort",
+      "region": "osoyoos",
+      "address": "15 Park Place, Osoyoos, BC",
+      "latitude": 49.032191,
+      "longitude": -119.462944
+    },
+    {
+      "slug": "castle-on-the-mountain",
+      "name": "Castle On The Mountain",
+      "region": "vernon",
+      "address": "8227 Silver Star Road, Vernon, BC",
+      "latitude": 50.301955,
+      "longitude": -119.220727
+    },
+    {
+      "slug": "predator-ridge-resort",
+      "name": "Predator Ridge Resort",
+      "region": "vernon",
+      "address": "301 Village Centre Place, Vernon, BC",
+      "latitude": 50.188449,
+      "longitude": -119.388408
+    },
+    {
+      "slug": "sparkling-hill-resort",
+      "name": "Sparkling Hill Resort",
+      "region": "vernon",
+      "address": "888 Sparkling Place, Vernon, BC",
+      "latitude": 50.198076,
+      "longitude": -119.39288
+    }
+  ]
+}

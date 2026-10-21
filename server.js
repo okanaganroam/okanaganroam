@@ -12484,7 +12484,7 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // V3 page views and its trip_plan_* events are told apart from V2's ('trip').
 // Same URL (/trip), served only while TRIP_PLANNER_V3 allows it.
 // Analytics (2026-10-19, round 8): 'info' is /about, /contact, /privacy and /terms (EN+FR); /guides itself is a 'hub'.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip', 'info']);
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip', 'info', 'hotel']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -19049,6 +19049,214 @@ document.addEventListener('click', function(e){
   var a = e.target.closest && e.target.closest('a[data-post-date]');
   if (a && window.trackEvent) window.trackEvent('bio_link_click', { post_date: a.getAttribute('data-post-date'), link_url: a.getAttribute('href') });
 });
+</script>
+</body>
+</html>`;
+}
+
+// ---------- Hotel QR pages (2026-10-20) ----------
+// GET /near/<slug>: "Things to do near <Hotel>" for a hotel's guests, reached from a QR card at the front desk or in the
+// rooms. Places to eat and drink, wineries and things to do, closest first (open ones lead), plus this week's events
+// in the town, each with Add to trip. GET /near/<slug>/card: the printable 4x6 card with the QR code, which points at
+// the page with utm_source=<slug>&utm_medium=hotel_qr so each hotel's scans show up in Analytics.
+// Hotels live in data/hotels.json. Both pages are noindex, not in the sitemap and linked from nowhere on the site.
+let hotelsData = null;
+function hotelList() {
+  if (!hotelsData) {
+    try { hotelsData = (JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'hotels.json'), 'utf8')).hotels || []).filter((h) => h && /^[a-z0-9-]+$/.test(h.slug || '') && h.name && REGION_LABELS[h.region] && Number.isFinite(h.latitude) && Number.isFinite(h.longitude)); }
+    catch (err) { hotelsData = []; }
+  }
+  return hotelsData;
+}
+function findHotel(slug) {
+  return hotelList().find((h) => h.slug === slug) || null;
+}
+const HOTEL_PAGE_GROUPS = [
+  { key: 'eat', title: 'Eat and drink nearby', types: ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery'], maxKm: 8, limit: 8 },
+  { key: 'wine', title: 'Wineries nearby', types: ['winery'], maxKm: 25, limit: 6 },
+  { key: 'do', title: 'Things to do nearby', types: ['outdoor', 'indoor', 'beach', 'tour', 'sport', 'golf'], maxKm: 20, limit: 8 },
+];
+const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
+// The places for each group: live, mappable, not closed for the season or not operating; open ones first, then by
+// distance. Pure apart from the venue rows passed in, so tests can call it with fixtures.
+function hotelPageGroups(hotel, venues, info, closedIds) {
+  const used = new Set();
+  return HOTEL_PAGE_GROUPS.map((g) => {
+    const rows = venues
+      .filter((v) => g.types.includes(v.type) && v.slug && CATEGORY_SLUGS[v.type] && !closedIds.has(v.id))
+      .map((v) => ({ v, km: venueDistanceKm(hotel, v) }))
+      .filter((x) => x.km !== null && x.km <= g.maxKm)
+      .sort((a, b) => a.km - b.km);
+    const isOpen = (x) => info.openIds.has(x.v.id);
+    const near = rows.slice(0, g.limit * 3);
+    const picked = [...near.filter(isOpen), ...near.filter((x) => !isOpen(x))].slice(0, g.limit)
+      .filter((x) => !used.has(x.v.id) && used.add(x.v.id));
+    return { ...g, items: picked };
+  }).filter((g) => g.items.length);
+}
+function hotelAwayText(km) {
+  return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
+}
+function renderHotelPage(hotel, now = new Date()) {
+  const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
+  const closedIds = advisoryNotOperatingIds();
+  for (const [id, st] of getSeasonStates(now)) if (st && (st.kind === 'closed' || st.kind === 'temp_closed')) closedIds.add(id);
+  const info = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now);
+  const groups = hotelPageGroups(hotel, venues, info, closedIds);
+  const town = REGION_LABELS[hotel.region] || hotel.region;
+  const today = todayLocal(now);
+  const weekEnd = new Date(`${today}T12:00:00Z`); weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+  const weekEndStr = weekEnd.toISOString().slice(0, 10);
+  let events = [];
+  try { events = regionEventsStillOn(listUpcomingEventsForRegion(hotel.region, { limit: 30, now }), now).filter((e) => e.nextDate && e.nextDate <= weekEndStr).slice(0, 6); } catch (err) { events = []; }
+  const photosUsed = new Set();
+  const card = (v, km) => {
+    const status = info.byId.get(v.id);
+    const open = status && status.state === 'open';
+    const typeLabel = (CATEGORY_LABELS[v.type] || {}).singular || v.type;
+    const photo = venueThumbPhoto(v, photosUsed);
+    const tripQuery = `${v.name}, ${town}, Okanagan Valley, BC`;
+    return `<li class="ht-card" data-venue-id="${v.id}">
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)} · ${escapeHtml(hotelAwayText(km))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : ''}</a>
+      <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>
+    </li>`;
+  };
+  const eventItem = (e) => {
+    const href = discoveryEventUrl(e);
+    const label = upcomingEventDateLabel(e.nextDate, e.nextEndDate, now);
+    return href ? `<li><a class="ht-event" href="${href}"><span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span></a></li>` : '';
+  };
+  const title = `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
+  const description = `Restaurants, wineries, cafés and things to do close to ${hotel.name} in ${town}, BC, with what's open now and this week's events.`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${pageHead(title, description, null, [], { golfTheme: true, noindex: true })}
+${renderAnalyticsHeadHtml('hotel')}
+<style>
+  body.hotel-page .ht-wrap { max-width: 980px; margin: 0 auto; }
+  body.hotel-page .ht-kicker { margin: 0 0 4px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
+  body.hotel-page h1 { margin: 0 0 8px; }
+  body.hotel-page .ht-intro { margin: 0 0 18px; max-width: 640px; opacity: 0.85; }
+  body.hotel-page .ht-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 8px; }
+  body.hotel-page .ht-actions a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; font-weight: 800; text-decoration: none; border: 1px solid var(--ref-navy, #1B2B3A); color: var(--ref-navy, #1B2B3A); }
+  body.hotel-page .ht-actions a.ht-primary { background: var(--ref-navy, #1B2B3A); color: #fff; }
+  body.hotel-page .ht-section { margin: 28px 0 0; }
+  body.hotel-page .ht-section h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.35rem; margin: 0 0 12px; }
+  body.hotel-page .ht-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  body.hotel-page .ht-card { display: flex; flex-direction: column; background: #fff; border: 1px solid rgba(27,43,58,0.14); border-radius: 14px; overflow: hidden; }
+  body.hotel-page .ht-link { display: flex; flex-direction: column; gap: 3px; color: var(--ref-navy, #1B2B3A); text-decoration: none; padding: 0 0 6px; flex: 1; }
+  body.hotel-page .ht-link img { width: 100%; height: 120px; object-fit: cover; display: block; margin: 0 0 8px; }
+  body.hotel-page .ht-meta { font-size: 0.78rem; font-weight: 700; opacity: 0.7; padding: 0 12px; }
+  body.hotel-page .ht-name { font-weight: 800; padding: 0 12px; overflow-wrap: anywhere; }
+  body.hotel-page .ht-open { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #e6f4ea; color: #1e6b34; font-size: 0.78rem; font-weight: 800; }
+  body.hotel-page .ht-card .trip-btn { margin: 6px 12px 12px; align-self: flex-start; }
+  body.hotel-page .ht-events { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 12px 0; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.hotel-page .ht-more { margin: 10px 0 0; }
+  @media (max-width: 860px) { body.hotel-page .ht-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } body.hotel-page .ht-events { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    body.hotel-page .ht-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; }
+    body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
+    body.hotel-page .ht-link img { height: 104px; }
+  }
+</style>
+</head>
+<body class="golf-page hotel-page" data-hotel="${escapeHtml(hotel.slug)}">
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main" id="main">
+  <div class="ht-wrap">
+  <p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p>
+  <h1>Things to do near ${escapeHtml(hotel.name)}</h1>
+  <p class="ht-intro">Places to eat and drink, wineries and things to do close to ${escapeHtml(hotel.name)}, closest first, with what's open right now. Tap Add to trip to save a place, then Build My Trip turns it into a plan.</p>
+  <div class="ht-actions">
+    <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
+    <a href="/map" data-ht-cta="map">Map of what's open</a>
+    <a href="/${hotel.region}/events" data-ht-cta="whats-on">What's On in ${escapeHtml(town)}</a>
+  </div>
+  ${groups.map((g) => `<section class="ht-section" aria-labelledby="ht-${g.key}">
+    <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>
+    <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
+  </section>`).join('\n  ')}
+  ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
+    <h2 id="ht-events">This week in ${escapeHtml(town)}</h2>
+    <ul class="ht-events">${events.map(eventItem).join('')}</ul>
+    <p class="ht-more"><a href="/${hotel.region}/events">All events in ${escapeHtml(town)}</a></p>
+  </section>` : ''}
+  </div>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+<script>
+document.addEventListener('click', function(e){
+  if (!window.trackEvent || !e.target.closest) return;
+  var hotel = document.body.getAttribute('data-hotel');
+  var a = e.target.closest('.ht-link, .ht-event, [data-ht-cta]');
+  if (!a) return;
+  var c = a.closest('.ht-card');
+  window.trackEvent('hotel_page_click', { hotel: hotel, link_url: a.getAttribute('href'), venue_id: c ? Number(c.getAttribute('data-venue-id')) : null });
+});
+</script>
+</body>
+</html>`;
+}
+// The printable card: 4 x 6 inches, one per page. The QR code is drawn in the browser by qrcode-generator (MIT, from
+// cdnjs, which the CSP already allows), so the server needs no QR code of its own.
+function renderHotelCard(hotel) {
+  const town = REGION_LABELS[hotel.region] || hotel.region;
+  const target = `https://okanaganroam.com/near/${hotel.slug}?${HOTEL_QR_UTM(hotel.slug)}`;
+  const shown = `okanaganroam.com/near/${hotel.slug}`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>QR card for ${escapeHtml(hotel.name)} | Okanagan Roam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: 4in 6in; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #e9e6df; color: #1B2B3A; font-family: Inter, system-ui, sans-serif; }
+  .hc-tools { max-width: 4in; margin: 18px auto 10px; font-size: 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  .hc-tools button { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: #1B2B3A; color: #fff; font-weight: 800; cursor: pointer; }
+  .hc-card { width: 4in; height: 6in; margin: 0 auto 24px; background: #FBF8F2; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0.38in 0.34in 0.3in; border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); }
+  .hc-brand { font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 18px; letter-spacing: 0.08em; }
+  .hc-brand span { color: #A6782F; }
+  .hc-rule { width: 44px; height: 2px; background: #A6782F; margin: 10px 0 14px; }
+  .hc-h { font-family: Fraunces, Georgia, serif; font-size: 25px; line-height: 1.12; margin: 0 0 8px; }
+  .hc-sub { font-size: 12.5px; line-height: 1.4; margin: 0 0 14px; opacity: 0.85; }
+  .hc-qr { width: 2.15in; height: 2.15in; background: #fff; border-radius: 10px; }
+  .hc-qr svg { width: 100%; height: 100%; display: block; }
+  .hc-scan { font-weight: 800; font-size: 14px; margin: 12px 0 2px; }
+  .hc-url { font-size: 11px; opacity: 0.75; word-break: break-all; }
+  .hc-foot { margin-top: auto; font-size: 10.5px; opacity: 0.7; }
+  @media print { html, body { background: #fff; } .hc-tools { display: none; } .hc-card { margin: 0; box-shadow: none; border-radius: 0; } }
+</style>
+</head>
+<body>
+<div class="hc-tools"><span>Print on 4 × 6 card stock, no margins.</span><button type="button" onclick="window.print()">Print</button></div>
+<div class="hc-card">
+  <div class="hc-brand">OKANAGAN <span>ROAM</span></div>
+  <div class="hc-rule"></div>
+  <h1 class="hc-h">Things to do near ${escapeHtml(hotel.name)}</h1>
+  <p class="hc-sub">Restaurants, wineries and things to do around ${escapeHtml(town)}, with what's open right now and this week's events.</p>
+  <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
+  <div class="hc-scan">Scan with your phone camera</div>
+  <div class="hc-url">${escapeHtml(shown)}</div>
+  <div class="hc-foot">Free local guide · okanaganroam.com</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function(){
+  var el = document.getElementById('hcQr');
+  if (!window.qrcode || !el) { if (el) el.textContent = el.getAttribute('data-target'); return; }
+  var qr = qrcode(0, 'M');
+  qr.addData(el.getAttribute('data-target'));
+  qr.make();
+  el.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
+})();
 </script>
 </body>
 </html>`;
@@ -48418,6 +48626,15 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
       return res.end(renderFavoritesPage());
     }
+    // Hotel QR pages (2026-10-20): /near/<slug> and its printable card /near/<slug>/card. noindex, not in the sitemap.
+    {
+      const hm = /^\/near\/([a-z0-9-]+)(\/card)?\/?$/.exec(pathname);
+      const hotel = hm && method === 'GET' ? findHotel(hm[1]) : null;
+      if (hotel) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': hm[2] ? 'public, max-age=3600' : 'public, max-age=300' });
+        return res.end(hm[2] ? renderHotelCard(hotel) : renderHotelPage(hotel));
+      }
+    }
     if ((pathname === '/links' || pathname === '/links/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'public, max-age=300' });
       return res.end(renderSocialLinksPage());
@@ -51568,6 +51785,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Hotel QR pages (2026-10-20)
+  hotelList, findHotel, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,

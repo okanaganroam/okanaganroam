@@ -13148,7 +13148,7 @@ const ga4Check = (html, pageType, label) => {
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
   // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip). 2026-10-05: + 'browse' (the hub-style /browse). 2026-10-16: + 'my_trip' (/my-trip, for the shared-trip events).
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hub', 'info', 'listing_form', 'my_trip', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']);
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hotel', 'hub', 'info', 'listing_form', 'my_trip', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']); // 'hotel': hotel QR pages (2026-10-20)
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
