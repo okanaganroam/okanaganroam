@@ -85,7 +85,7 @@ test('/near/<slug>/card: the printable card carries the tracked link for the QR 
   assert.equal(r.headers.get('x-robots-tag'), 'noindex');
   assert.ok(r.text.includes(`data-target="https://okanaganroam.com/q/${hotel.slug}"`), 'the QR holds the short link');
   assert.ok(r.text.includes(`Compliments of ${hotel.name}`));
-  assert.ok(r.text.includes(`okanaganroam.com/near/${hotel.slug}</div>`));
+  assert.ok(r.text.includes(`okanaganroam.com/near/<wbr>${hotel.slug}</div>`), 'the address breaks only after /near/');
   assert.ok(r.text.includes('@page { size: 4in 6in; margin: 0; }'));
   assert.ok(r.text.includes('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'));
   assert.equal(app.HOTEL_QR_UTM('abc'), 'utm_source=abc&utm_medium=hotel_qr');
