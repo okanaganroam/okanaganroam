@@ -17098,6 +17098,15 @@ const MAP_NAME_MATCH_SRC = `function mapNameKey(name){ return ' ' + String(name 
       return key.indexOf(' ' + w + ' ') !== -1 || key.indexOf(' ' + w + 's ') !== -1 || key.indexOf(' ' + w + 'es ') !== -1 || (w.length > 3 && /s$/.test(w) && key.indexOf(' ' + w.slice(0, -1) + ' ') !== -1);
     });
   }`;
+// Round 16 (2026-10-21): the words a visitor searched on the map, as counted in Google Analytics (map_search and
+// map_search_empty): trimmed, lower case, spaces collapsed, at most 60 characters. Inlined in MAP_PAGE_SCRIPT.
+function mapSearchTerm(raw) {
+  return String(raw == null ? '' : raw).trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 60).trim();
+}
+// The result count, in buckets, so the share of searches that found nothing can be worked out.
+function mapSearchBucket(n) {
+  return n <= 0 ? '0' : n <= 5 ? '1-5' : n <= 20 ? '6-20' : '21+';
+}
 const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var FR = document.documentElement.lang === 'fr';
   var T = FR ? {
@@ -18277,6 +18286,47 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       eventNotice(); render(!!me || !!town);
     }).catch(function(){ aheadState = 'failed'; });
   }
+  // ---- Round 16 (2026-10-21): what visitors search for on the map, and what finds nothing ----
+  // One map_search per finished search (Enter, the phone's Search key, a voice result, or typing that then rests for
+  // 2.5 s), with the words as typed (mapSearchTerm) and how many results, in buckets; map_search_empty as well when
+  // nothing was found: no places and no events, the "Coming up" weeks from /map/ahead.json included. Counts are
+  // valley-wide, never tied to the visitor's location: no position, pin, distance or radius is ever sent. The same words
+  // are not sent twice in a row. Without Google Analytics (blocked, or no gtag) nothing is sent, and nothing can throw.
+  ${mapSearchTerm.toString()}
+  ${mapSearchBucket.toString()}
+  var lastSentTerm = null, reportSeq = 0, pauseTimer = null;
+  function searchResultCount(){
+    var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
+    var inWeek = function(e){ return !!evGroup(e, today, nowMin); };
+    if (evBySearch) return events.filter(function(e){ return inWeek(e) && ((!evTerm && !evKinds.length) || evHit(e)); }).length;
+    var ws = String(term || '').split(' ').map(foldFr).filter(Boolean);
+    var evN = ws.length ? events.filter(function(e){ var hay = foldFr((e.name || '') + ' ' + (e.venue || '')); return inWeek(e) && ws.every(function(w){ return hay.indexOf(w) !== -1; }); }).length : 0;
+    return places.filter(matchesPlace).length + evN;
+  }
+  function reportSearch(raw, how, words){
+    try {
+      clearTimeout(pauseTimer);
+      var q = mapSearchTerm(raw);
+      if (!q || q === lastSentTerm) return;
+      var seq = ++reportSeq, tries = 0;
+      var send = function(){
+        try {
+          if (seq !== reportSeq) return;
+          // An events search waits (up to 5 s) for the "Coming up" weeks, so they count as results.
+          if (aheadOn && aheadState === 'loading' && tries++ < 20) { setTimeout(send, 250); return; }
+          if (typeof window.gtag !== 'function' || typeof window.trackEvent !== 'function') return;
+          var n = searchResultCount(), p = { search_term: q, lang: FR ? 'fr' : 'en', tab: tab === 'events' ? 'events' : 'places', how: how, results: mapSearchBucket(n), words: words ? 1 : 0 };
+          lastSentTerm = q;
+          track('map_search', p);
+          if (!n) track('map_search_empty', { search_term: q, lang: p.lang, tab: p.tab, how: how });
+        } catch (err) { /* analytics must never break the map */ }
+      };
+      send();
+    } catch (err) { /* analytics must never break the map */ }
+  }
+  searchEl.addEventListener('input', function(e){
+    try { clearTimeout(pauseTimer); var v = e.target.value; pauseTimer = setTimeout(function(){ if (searchEl.value === v) reportSearch(v, 'paused', !!term); }, 2500); } catch (err) {}
+  });
   // Enter (or the phone's Search key) reads the words as filters; "close by" or "near me" also finds the visitor.
   function runSearch(v, how){
     // The words stay in the box after searching (2026-10-19), so the visitor sees what was searched and can edit it.
@@ -18305,7 +18355,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       setTab('events');
       eventNotice(); }
     else { evTerm = ''; evKinds = []; aheadOn = false; if (evBySearch && tab === 'events') setTab('places'); evBySearch = false; }
-    track('map_search', { words: term ? 1 : 0, how: how || 'typed' }); changed();
+    var hadWords = !!term; changed(); reportSearch(v, how || 'typed', hadWords);
     if (wantNear && !me && !watching && !town) nearBtn.click();
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
   }
@@ -18793,6 +18843,7 @@ ${renderGolfHeaderHtml()}
         <noscript><p>The map needs JavaScript. <a href="/browse">Browse &amp; Search every place</a> instead.</p></noscript>
         <p class="pm-privacy">Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved. When you ask for directions, your starting point and the destination go to Mapbox to work out the route. Map tiles come from OpenStreetMap. Opening hours come from each place’s listing and can change; check before you go.</p>
         <p class="pm-privacy">If you search by voice, your browser’s own speech service turns what you say into text (in Chrome that is Google; on an iPhone, Apple). Okanagan Roam never receives the recording, only the words, the same as typing.</p>
+        <p class="pm-privacy">The words you search may be counted anonymously (with Google Analytics) to improve the map.</p>
       </div>
     </section>
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="false" aria-labelledby="pmPanelTitle">
@@ -36311,6 +36362,8 @@ function renderPrivacyPage() {
     <p>The map asks for your location only when you tap the locate button (Near me). Your browser keeps it on your device to sort what’s near you; it is never sent to Okanagan Roam, saved, or put in a link. When you ask for directions on the map, your starting point and the destination are sent to Mapbox, which works out the route. Opening a place in Google Maps or Apple Maps hands the destination to that app.</p>
     <h2>Searching by voice</h2>
     <p>The microphone on the map is used only when you tap it. Your browser’s own speech service turns what you say into text (in Chrome that is Google; on an iPhone, Apple), and the map searches those words the same way as typed ones. Okanagan Roam never receives the recording.</p>
+    <h2>What you search on the map</h2>
+    <p>When you search on the map, the words you search and how many results they found may be counted anonymously with Google Analytics, so we can see what people look for and don’t find, and add it. Your location, a dropped pin and the distance you pick are never sent with them.</p>
     <h2>What we never do</h2>
     <p>We don&rsquo;t sell, rent or trade personal information, and we don&rsquo;t use it for anything other than the reasons above.</p>
     <h2>How long we keep it, and your choices</h2>
@@ -51990,6 +52043,8 @@ module.exports = {
   dogSummaryText,
   renderDogHubPage,
   renderPlacesMapPage,
+  mapSearchTerm,
+  mapSearchBucket,
   mapPlaces,
   withNavRefresh,
   NAV_A11Y_SNIPPET,

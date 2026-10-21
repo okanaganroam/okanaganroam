@@ -24480,7 +24480,9 @@ test('Lighter pages: crawlable links: every place and event waiting for "Show mo
   const base = `http://localhost:${srv.address().port}`;
   try {
     for (let i = 0; i < 110; i++) {
-      const d = new Date(today.getTime() + (i % 20) * 86400000);
+      // Tomorrow onward (2026-10-21): a fixture show tonight at 19:00-21:00 was over after 9 pm, so it was no longer
+      // "upcoming" and the test failed every evening. Starting a day ahead keeps every show upcoming at any hour.
+      const d = new Date(today.getTime() + ((i % 20) + 1) * 86400000);
       const data = { name: `CR Fixture Show ${i}`, region: 'kelowna', description: 'A crawlable-links fixture event.', venue_name_text: `CR Hall ${i}`,
         source_type: 'official_venue', source_name: 'CR', source_url: `https://example.com/cr-${i}`, categories: ['live-music'],
         occurrences: [{ start_date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, start_time: '19:00', end_time: '21:00' }] };
