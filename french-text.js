@@ -328,6 +328,7 @@ const FR_TEXT = {
   'golf courses': 'terrains de golf', 'golf course': 'terrain de golf', 'beaches': 'plages', 'beach': 'plage',
   'outdoor destinations': 'sites de plein air', 'outdoor destination': 'site de plein air',
   'indoor & rainy day spots': 'lieux pour les jours de pluie', 'indoor & rainy day spot': 'lieu pour les jours de pluie',
+  'art galleries': 'galeries d’art', 'art gallery': 'galerie d’art', 'museums & galleries': 'musées et galeries', 'museum or gallery': 'musée ou galerie',
   'indoor attractions': 'attraits intérieurs', 'indoor attraction': 'attrait intérieur',
   'tours & experiences': 'visites et expériences', 'tour & experience': 'visite ou expérience',
   'sports & recreation spots': 'lieux de sports et loisirs', 'sports & recreation spot': 'lieu de sports et loisirs',

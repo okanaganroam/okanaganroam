@@ -6921,7 +6921,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     // plan.unsupported, V3 understood.notUsed).
     const appliedExclusions = appliedTripExclusions(plan, intent, taxonomy);
     if (appliedExclusions.length) plan.unsupported = (plan.unsupported || []).filter((u) => !appliedExclusions.includes(u));
-    const result = tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).flatMap((d) => d.regions || [d.region]) });
+    const result = tripPlannerModule().buildUnderstood(intent, trip, tripPlannerLabels(), { text: requirementsText, kind: plan.kind, days: (plan.days || []).length || null, appliedExclusions, dayRegions: (plan.days || []).flatMap((d) => d.regions || [d.region]) });
     // "No driving after 7pm" is applied by the planner (2026-10-19), so it is never listed as not used.
     if (requirements?.items.some(i=>i.kind==='evening_walk')) result.notUsed = (result.notUsed || []).filter(u=>!/\b(?:driv\w*|car)\b/i.test(String(u)));
     if (requirements?.items.some(i=>i.kind==='transport')) {

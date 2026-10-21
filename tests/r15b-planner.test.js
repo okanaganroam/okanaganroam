@@ -257,3 +257,25 @@ test('Pub dinner (round 15b): a pub planned as dinner reads "have dinner at", no
   const d = tripStory.buildStory({ kind: 'itinerary', itinerary: { stops: [stop(1, 'afternoon', 'Wineries'), stop(2, 'evening', 'Evening')] }, schedule: [] }, facts, {});
   assert.match(d.text, /end with a drink at Naramata Pub & Grill/);
 });
+
+test('Galleries (round 15c): "art galleries" and "museums" are named that way, not "indoor & rainy day spots" (EN + FR)', () => {
+  const INDOOR_LABELS = { ...LABELS, types: { ...LABELS.types, indoor: T('Indoor & Rainy Day Spot', 'Indoor & Rainy Day Spots') } };
+  const label = (q) => {
+    const b = build(q);
+    const p = tp.planTrip({ intent: b.intent, trip: b.trip.multi ? b.trip : null, requirements: b.requirements, facts: FACTS, labels: INDOOR_LABELS, text: b.text, tripDate: '2026-10-24', tripEvents: [] });
+    return { p, u: tp.buildUnderstood(b.intent, b.trip, INDOOR_LABELS, { text: b.text, kind: p.kind }) };
+  };
+  const g = label('art galleries in Penticton on Saturday');
+  assert.deepEqual(g.u.interests, ['art galleries']);
+  assert.match(g.p.summary, /^Art galleries in Penticton/);
+  assert.ok((g.p.recommendations || []).some((r) => (r.why || []).includes('Matches your request for art galleries')), JSON.stringify((g.p.recommendations || []).map((r) => r.why)));
+  assert.deepEqual(label('museums in Kelowna').u.interests, ['museums']);
+  assert.deepEqual(label('museums and galleries in Kelowna').u.interests, ['museums & galleries']);
+  // A rainy-day or indoor request keeps the type's own label.
+  const rainy = label('art galleries on a rainy day in Kelowna').u.interests;
+  assert.ok(!rainy.includes('art galleries'), JSON.stringify(rainy));
+  // French.
+  const { t3FrenchText } = require('../trip-french-copy.js');
+  assert.equal(t3FrenchText('Matches your request for art galleries'), 'Correspond à votre demande : galeries d’art');
+  assert.equal(t3FrenchText('Matches your request for museums & galleries'), 'Correspond à votre demande : musées et galeries');
+});

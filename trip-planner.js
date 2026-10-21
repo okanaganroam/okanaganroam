@@ -498,7 +498,19 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
 }
 
 
+// Round 15c (2026-10-20): an indoor request asked for as galleries or museums says so ("art galleries in Kelowna on
+// Saturday" read "Indoor & rainy day spots in Kelowna on Saturday"). A rainy-day or indoor request keeps the type's own label.
+function indoorAskedLabel(text, form) {
+  const q = String(text || '');
+  if (!q || /\b(?:rain|rainy|raining|wet|indoor|indoors|inside)\b/.test(q)) return null;
+  const gallery = /\b(?:galleries|gallery|art)\b/.test(q), museum = /\bmuseums?\b/.test(q);
+  if (gallery && museum) return form === 'singular' ? 'Museum or Gallery' : 'Museums & Galleries';
+  if (gallery) return form === 'singular' ? 'Art Gallery' : 'Art Galleries';
+  if (museum) return form === 'singular' ? 'Museum' : 'Museums';
+  return null;
+}
 function typeLabel(ctx, type, form = 'plural') {
+  if (type === 'indoor') { const asked = indoorAskedLabel(ctx.queryText, form); if (asked) return asked; }
   const l = ctx.labels.types && ctx.labels.types[type];
   return l ? l[form] : type;
 }
@@ -842,8 +854,8 @@ function unusedPlanRegions(regions, dayRegions) {
 }
 function buildUnderstood(intent, trip, labels, extras) {
   const i = intent || {};
-  const ctx = buildContext(i, labels || {}, {});
   const x = extras || {};
+  const ctx = buildContext(i, labels || {}, { text: x.text || '' });
   const party = [];
   if (ctx.kids) party.push('with kids');
   if (ctx.dog) party.push('with a dog');
