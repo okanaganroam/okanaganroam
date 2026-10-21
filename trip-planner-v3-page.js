@@ -500,6 +500,8 @@ function renderStyles() {
   .t3-warnings { background: #FFF6E6; border: 1px solid rgba(201,162,39,0.45); color: #5B4212; border-radius: 12px; padding: 12px 16px; margin: 0 0 16px; font-size: 0.9rem; }
   .t3-event-choices { display: flex; flex-wrap: wrap; gap: 8px; }
   .t3-warnings ul { margin: 0; padding-left: 18px; }
+  .t3-timeline summary { cursor: pointer; padding: 4px 0; }
+  .t3-timeline[open] summary { margin-bottom: 8px; }
   /* Round 9 (2026-10-19): "Check venue details" and the other links here take taps over 44px; the line stays put. */
   .t3-warnings li a { display: inline-block; padding: 12px 0; margin: -12px 0; }
 
@@ -703,6 +705,12 @@ function renderStyles() {
 
   @media (max-width: 900px) {
     .t3-how-grid { grid-template-columns: 1fr; }
+  }
+  /* 2026-10-21: on a phone the written plan is four lines with "Read the whole plan"; the day cards come sooner. */
+  .t3-story-more { display: none; }
+  @media (max-width: 640px) {
+    .t3-story:not(.is-open) { display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .t3-story-more { display: inline-block; margin: -4px 0 12px; padding: 8px 0; background: none; border: 0; color: inherit; font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
   }
   @media (max-width: 640px) {
     /* Phone: dates and the trip map sit side by side until one is opened. */
@@ -1678,7 +1686,7 @@ function renderScript(d) {
       + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert" aria-live="polite"><p>' + esc(lang()==='fr' ? 'Plusieurs événements correspondent à «'+p.eventAmbiguity.phrase+'». Choisissez celui que vous voulez ajouter à votre sortie :' : 'More than one listed event matches “'+p.eventAmbiguity.phrase+'”. Choose the one you want to add to your outing:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name,i){var id=p.eventAmbiguity.candidateIds&&p.eventAmbiguity.candidateIds[i];return Number.isSafeInteger(id)&&id>0?'<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="'+id+'">'+esc(name)+'</button>':'';}).join('') + '</div></section>' : '')
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
-      + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p>' : '')
+      + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect t3-story">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p><button type="button" class="t3-story-more" data-t3-story-more aria-expanded="false">' + esc(lang() === 'fr' ? 'Lire tout le plan' : 'Read the whole plan') + '</button>' : '')
       + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
       + rainHtml
       + '<div class="t3-plan-actions">'
@@ -1704,7 +1712,10 @@ function renderScript(d) {
       var french=lang()==='fr',clock=function(m){return t3LocalTimes(String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0'),lang())+(m>=1440?(french?' (+1 jour)':' (+1 day)'):'');};
       // One "Confirm times before you go" line per day (2026-10-18), not "Provisional timing" on every row.
       var confirmDays={};timeline.forEach(function(row){if(!row.notScheduledMeal&&(row.status==='provisional'||row.status==='unverified'))confirmDays[row.day]=true;});
-      html+='<section class="t3-warnings" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><h3>'+(french?'Votre horaire':'Your timeline')+'</h3><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
+      // 2026-10-21: folded by default. Each stop card already shows its time, and the full list pushed the day cards
+      // three or four screens down on a phone.
+      var stopCount=timeline.filter(function(r){return !r.notScheduledMeal;}).length;
+      html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+' arrêts, heures et trajets':stopCount+' stops, times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
         var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
         if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
         var detail=[];
@@ -1731,7 +1742,7 @@ function renderScript(d) {
         var driveLi=dayRow&&dayRow.driveIn?'<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+(Number.isFinite(row.startMinutes)&&!row.notScheduledMeal?(french?'départ vers ':'leave about ')+clock(Math.max(0,row.startMinutes-dayRow.driveIn.maxMinutes)):(french?'avant le premier arrêt':'before the first stop')))+'</strong><br>'+esc(t3DriveText(dayRow.driveIn,lang()))+'</li>':'';
         return driveLi+'<li style="margin:0 0 1rem;overflow-wrap:anywhere"><strong>'+esc((french?'Jour ':'Day ')+row.day+' · '+time)+'</strong><br>'+esc(row.notScheduledMeal?(french?'Souper non planifié':'Dinner not scheduled'):row.name)+(detail.length?'<br><small>'+esc(detail.join(' · '))+'</small>':'')+'</li>'
           +(lastOfDay&&confirmDays[row.day]?'<li class="t3-confirm-day" style="margin:0 0 1rem;list-style:none"><small>'+esc(french?'Jour '+row.day+' : confirmez les heures avant de partir.':'Day '+row.day+': Confirm times before you go.')+'</small></li>':'');
-      }).join('')+'</ol></section>';
+      }).join('')+'</ol></details>';
     }
     var schedHtml='';
     if(['itinerary','outing','multi_day','day_plan'].indexOf(p.kind)!==-1){
@@ -2169,6 +2180,13 @@ function renderScript(d) {
       syncUrl();
       var back = resultEl.querySelector('[data-t3-remove="' + uk + '"]');
       if (back) back.focus();
+      return;
+    }
+    if ((b = t.closest('[data-t3-story-more]'))) {
+      var story = b.previousElementSibling, open = !(story && story.classList.contains('is-open'));
+      if (story) story.classList.toggle('is-open', open);
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      b.textContent = open ? (lang() === 'fr' ? 'Réduire' : 'Show less') : (lang() === 'fr' ? 'Lire tout le plan' : 'Read the whole plan');
       return;
     }
     if ((b = t.closest('[data-t3-swap]'))) {

@@ -25,7 +25,7 @@ const KINDS = {
   sunset: /\b(?:sunset|sunsets)\b/,
   snow_tour: /\b(?:sleigh rides?|dog sledding|dog sled tours?)\b/,
 };
-const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience'};
+const LABELS = {bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
 const WALKING_TRANSPORT = /\b(?:no car|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 // "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
 // not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
@@ -64,6 +64,33 @@ function onceFoods(normalizedText){
   const onceTerms=[...String(normalizedText||'').matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|day|dinner|lunch|meal|time)\b|\b([a-z]{3,})\s+once\b/g)].map(m=>m[1]||m[2]).filter(w=>!/^(?:just|only|for|and|with|the|out|day|night|trip)$/.test(w));
   const onceEvening=[...String(normalizedText||'').matchAll(/\b([a-z]{3,})\s+(?:one|1)\s+(?:night|evening|dinner)\b/g)].map(m=>m[1]).filter(w=>onceTerms.includes(w));
   return {onceTerms,onceEvening};
+}
+// A walk "by the lake" (2026-10-21): "a nice lake walk", "a walk along the lake", "lakeside stroll", "waterfront walk".
+const LAKE_WALK_WORDS=/\b(?:lake|lakes|lakeside|lakeshore|lakefront|waterfront|beach|beachfront|shoreline|seawall|promenade|by the water)\b/;
+const LAKESIDE_PLACE=/\b(?:lake|lakeside|lakeshore|lakefront|waterfront|beach|beachfront|shoreline|seawall|promenade|channel|marina|okanagan lake|skaha|kalamalka|wood lake|osoyoos lake)\b/;
+function lakesidePlace(v){
+  if(v.type==='beach')return true;
+  const text=norm([v.name,v.description||v.plannerDescription,v.textName,v.textDesc].filter(Boolean).join(' '));
+  // "Views of the lake" from a mountain trail is not a walk by the lake.
+  return LAKESIDE_PLACE.test(norm(v.name))||/\b(?:along|beside|by|on|follows?|hugs?|around)\s+(?:the\s+)?(?:\w+\s+){0,2}(?:lake|lakeshore|waterfront|beach|shoreline|channel)\b/.test(text)||/\b(?:lakeshore|lakefront|waterfront|lakeside|beachfront)\s+(?:walk|walkway|path|promenade|trail|park|stroll)/.test(text);
+}
+// A walk by the lake: a lakeside walking place, or a long beach with a path along it (Okanagan Beach on Lakeshore Drive).
+// Never a rental counter, an RV park or a fenced dog beach.
+function lakeWalk(v){
+  const name=norm(v.name);
+  if(/\b(?:rentals?|water sports|rv|resort|campground|dog beach|off leash)\b/.test(name))return false;
+  if(!lakesidePlace(v))return false;
+  if((v.plannerKinds||inferPlannerKinds(v)).some(k=>k==='walk'||k==='easy_walk'))return true;
+  const text=norm([v.description||v.plannerDescription,v.textDesc].filter(Boolean).join(' '));
+  return v.type==='beach'&&/\b(?:runs|stretch|stretches|along|promenade|walkway|path|boardwalk|seawall)\b/.test(text);
+}
+// A place whose point is a hike or a trail network (not a flat lakeside walk, garden or beach).
+function hikingPlace(v){
+  if(!['outdoor','tour'].includes(v.type))return false;
+  const text=norm([v.name,v.description||v.plannerDescription,v.textName,v.textDesc].filter(Boolean).join(' '));
+  if(!/\b(?:hike|hikes|hiking|trail network|trailhead|mountain bik\w*|single ?track|summit|switchbacks?|elevation gain|climb)\b/.test(text)&&!/\btrails?\b/.test(norm(v.name)))return false;
+  if(/\b(?:garden|gardens|promenade|seawall|beach|boardwalk|lakeshore walk|waterfront walk)\b/.test(norm(v.name)))return false;
+  return true;
 }
 function inferPlannerKinds(v) {
   const text = norm([v.name,v.description,v.textName,v.textDesc].filter(Boolean).join(' '));
@@ -227,7 +254,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       }
       const m=re.exec(matchText);if(!m)continue;
       const before=c.slice(0,m.index), neg=/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(before);
-      add(neg?'excluded_kind':'venue_kind',kind,scopeText);
+      add(neg?'excluded_kind':'venue_kind',kind,scopeText,!neg&&['walk','easy_walk'].includes(kind)&&LAKE_WALK_WORDS.test(c)?{lakeside:true}:{});
     }
     for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:/\bbeach(?:es)?\b/,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/})) {
       const m=re.exec(value==='golf'&&taxonomy?.types?.includes('sport')?c.replace(/\bdisc golf\b/g,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:value==='restaurant'&&WINERY_LUNCH.test(c)?{wineryLunch:true}:{});
@@ -267,6 +294,10 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     const comedy=/\b(?:comedy|comedians?|improv|stand ?up)\b/.exec(c), show=/\b(?:a|the|some|any) (?:\w+ )?shows?\b|\bshows\b/.exec(c);
     // Round 10: "shows and live music" asks for both (the show was dropped once live music was read).
     if((comedy||show)&&!items.some(i=>i.kind==='event'&&i.sourceText===scopeText&&!['live-music','hockey','festival','market'].includes(i.eventKind))&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,(comedy||show).index))&&!/\b(?:show (?:me|us)|shows? (?:me|us))\b/.test(c))add('event','any',scopeText,comedy?{eventKind:'comedy',textTerms:['comedy']}:{eventKind:'show'});
+    // 2026-10-21: "no hiking" rules out trail networks and hikes (Three Blind Mice opened a "no hiking" Penticton plan); a
+    // flat lakeside walk, promenade, garden or beach is still fine.
+    {const h=/\b(?:hike|hikes|hiking|trails?|mountain biking)\b/.exec(c);
+      if(h&&/\b(?:no|not|without|avoid|skip|exclude|hate|don t like|dont like)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,h.index)))add('excluded_activity','hiking',scopeText);}
     for (const [activity,re] of Object.entries({skiing:/\b(?:ski|skiing)\b/,snowshoeing:/\b(?:snowshoeing|snowshoe)\b/,winter:/\b(?:ski|skiing|snowshoeing|snowshoe|winter activities?)\b/,hiking:/\b(?:hike|hiking|hikes)\b/,viewpoints:/\b(?:viewpoints?|lookouts?|sunset)\b/})) {
       const m=re.exec(c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('activity',activity,scopeText);
     }
@@ -537,10 +568,12 @@ function matches(v,i){
   if(i.wineryLunch&&i.kind==='type'&&v.type==='winery')return true;
   if(i.kind==='day_trip')return v.region===i.value;
   if(i.servesCoffee&&!coffeeEvidence(v))return false;
+  if(i.lakeside&&i.kind==='venue_kind')return lakeWalk(v);
   if(i.kind==='venue_kind'||i.kind==='excluded_kind')return (v.plannerKinds||inferPlannerKinds(v)).includes(i.value);
   if(i.kind==='venue')return v.id===i.value;
   if(i.kind==='type'||i.kind==='type_count'||i.kind==='excluded_type')return i.value==='breakfast'?['cafe','restaurant'].includes(v.type):v.type===i.value||(v.fdTypes||[]).includes(i.value)||i.value==='tour'&&(v.plannerKinds||inferPlannerKinds(v)).some(k=>['boat_tour','wine_tour','guided_hike','snow_tour','cooking'].includes(k));
   if(i.kind==='activity')return (v.activities||[]).includes(i.value);
+  if(i.kind==='excluded_activity')return i.value==='hiking'&&hikingPlace(v);
   if(i.kind==='feature')return !!(v.features||{})[i.value]||(i.value==='dog_friendly'&&(v.collections||[]).includes('dog_friendly'));
   if(i.kind==='rainy')return v.indoorEvidence==='explicit'||v.type==='indoor'||v.indoorGolf===true;
   return false;
@@ -577,7 +610,7 @@ function venueAllowed(v,requirements,day,date){
   for(const i of requirements?.items||[]){
     if(i.strength==='prefer'||!applicable(i,day,date))continue;
     if(i.servesCoffee&&(v.type==='cafe'||(v.fdTypes||[]).includes('cafe'))&&!coffeeEvidence(v))return false;
-    if((i.kind==='excluded_kind'||i.kind==='excluded_type')&&matches(v,i))return false;
+    if((i.kind==='excluded_kind'||i.kind==='excluded_type'||i.kind==='excluded_activity')&&matches(v,i))return false;
     if(i.kind==='feature'&&(i.value==='dog_friendly'||i.value==='kid_friendly'||DINING.has(v.type))&&!matches(v,i))return false;
     if(i.kind==='price_limit'&&DINING.has(v.type)&&v.price!=null&&v.price>i.value)return false;
     if(i.kind==='rainy'&&!i.activityOnly&&(v.type==='beach'||v.type==='outdoor'||v.type==='golf'&&!v.indoorGolf))return false;
@@ -908,4 +941,4 @@ function sparseDayRecovery(plan,requirements){
  const safe=last>0&&last<days.length&&!requirements?.endDate&&!(requirements?.items||[]).some(i=>i.kind==='event'||requirementDay(i,requirements.startDate)>last||i.kind==='venue'&&i.strength==='must'&&!retained.has(i.value));
  return {days:gaps.map(d=>d.day),shorterDays:safe?last:null,region:gaps.every(d=>d.region===gaps[0].region)?gaps[0].region:null};
 }
-module.exports={rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
