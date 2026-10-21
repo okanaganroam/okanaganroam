@@ -42,22 +42,6 @@
       "longitude": -119.47758
     },
     {
-      "slug": "okanagan-seasons-resort",
-      "name": "Okanagan Seasons Resort",
-      "region": "kelowna",
-      "address": "1580 Highway 33 West, Kelowna, BC",
-      "latitude": 49.889993,
-      "longitude": -119.41868
-    },
-    {
-      "slug": "recreation-inn-suites",
-      "name": "Recreation Inn & Suites",
-      "region": "kelowna",
-      "address": "1891 Parkinson Way, Kelowna, BC",
-      "latitude": 49.882915,
-      "longitude": -119.455121
-    },
-    {
       "slug": "royal-anne-hotel",
       "name": "Royal Anne Hotel",
       "region": "kelowna",
@@ -74,14 +58,6 @@
       "longitude": -119.491587
     },
     {
-      "slug": "soma-craft-cidery-farm-inn",
-      "name": "Soma Craft Cidery & Farm Inn",
-      "region": "kelowna",
-      "address": "4485 Sallows Rd, Kelowna, BC",
-      "latitude": 49.821099,
-      "longitude": -119.436659
-    },
-    {
       "slug": "royal-kelowna",
       "name": "The Royal Kelowna",
       "region": "kelowna",
@@ -96,14 +72,6 @@
       "address": "4205 Gellatly Road, West Kelowna, BC",
       "latitude": 49.810963,
       "longitude": -119.624653
-    },
-    {
-      "slug": "peachland-beach-resort",
-      "name": "Peachland Beach Resort",
-      "region": "peachland",
-      "address": "3701 Beach Avenue, Peachland, BC",
-      "latitude": 49.791739,
-      "longitude": -119.702736
     },
     {
       "slug": "summerland-waterfront-resort-spa",
@@ -208,14 +176,6 @@
       "address": "15 Park Place, Osoyoos, BC",
       "latitude": 49.032191,
       "longitude": -119.462944
-    },
-    {
-      "slug": "castle-on-the-mountain",
-      "name": "Castle On The Mountain",
-      "region": "vernon",
-      "address": "8227 Silver Star Road, Vernon, BC",
-      "latitude": 50.301955,
-      "longitude": -119.220727
     },
     {
       "slug": "predator-ridge-resort",
