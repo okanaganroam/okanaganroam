@@ -19076,14 +19076,17 @@ const HOTEL_PAGE_GROUPS = [
   { key: 'wine', title: 'Wineries nearby', types: ['winery'], maxKm: 25, limit: 6 },
   { key: 'do', title: 'Things to do nearby', types: ['outdoor', 'indoor', 'beach', 'tour', 'sport', 'golf'], maxKm: 20, limit: 8 },
 ];
+const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
 // The places for each group: live, mappable, not closed for the season or not operating; open ones first, then by
 // distance. Pure apart from the venue rows passed in, so tests can call it with fixtures.
-function hotelPageGroups(hotel, venues, info, closedIds) {
+// opensSoon: venue id -> label ("Opens Nov 26", "Opens for the ski season") for places closed only until a date close
+// enough to matter to a guest. They are listed, labelled, after the places open now.
+function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map()) {
   const used = new Set();
   return HOTEL_PAGE_GROUPS.map((g) => {
     const rows = venues
-      .filter((v) => g.types.includes(v.type) && v.slug && CATEGORY_SLUGS[v.type] && !closedIds.has(v.id))
+      .filter((v) => g.types.includes(v.type) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)))
       .map((v) => ({ v, km: venueDistanceKm(hotel, v) }))
       .filter((x) => x.km !== null && x.km <= g.maxKm)
       .sort((a, b) => a.km - b.km);
@@ -19099,10 +19102,24 @@ function hotelAwayText(km) {
 }
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
-  const closedIds = advisoryNotOperatingIds();
-  for (const [id, st] of getSeasonStates(now)) if (st && (st.kind === 'closed' || st.kind === 'temp_closed')) closedIds.add(id);
+  const notOperating = advisoryNotOperatingIds();
+  const closedIds = new Set(notOperating);
+  const today0 = todayLocal(now);
+  const seasonRows = getSeasonRows(today0);
+  const regionOf = new Map(venues.map((v) => [v.id, v.region]));
+  const opensSoon = new Map();
+  for (const [id, st] of getSeasonStates(now)) {
+    if (!st || (st.kind !== 'closed' && st.kind !== 'temp_closed')) continue;
+    closedIds.add(id);
+    // Closed for the season, back within HOTEL_OPENS_SOON_DAYS: listed as "Opens <date>". On a ski hill, a hill place
+    // closed for the season with no date yet opens with the hill: "Opens for the ski season" (hotel on that hill only).
+    const row = st.kind === 'closed' ? seasonRows.get(id) : null;
+    if (!row || notOperating.has(id)) continue;
+    if (row.reopens_date && row.reopens_date >= today0 && row.reopens_date <= addLocalDays(today0, HOTEL_OPENS_SOON_DAYS)) opensSoon.set(id, `Opens ${formatLocalDateShort(row.reopens_date, { weekday: false })}`);
+    else if (!row.reopens_date && SKI_RESORT_REGIONS.has(hotel.region) && regionOf.get(id) === hotel.region) opensSoon.set(id, 'Opens for the ski season');
+  }
   const info = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now);
-  const groups = hotelPageGroups(hotel, venues, info, closedIds);
+  const groups = hotelPageGroups(hotel, venues, info, closedIds, opensSoon);
   const town = REGION_LABELS[hotel.region] || hotel.region;
   const today = todayLocal(now);
   const weekEnd = new Date(`${today}T12:00:00Z`); weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
@@ -19117,7 +19134,7 @@ function renderHotelPage(hotel, now = new Date()) {
     const photo = venueThumbPhoto(v, photosUsed);
     const tripQuery = `${v.name}, ${town}, Okanagan Valley, BC`;
     return `<li class="ht-card" data-venue-id="${v.id}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)} · ${escapeHtml(hotelAwayText(km))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : ''}</a>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)} · ${escapeHtml(hotelAwayText(km))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : ''}</a>
       <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>
     </li>`;
   };
@@ -19150,6 +19167,7 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-meta { font-size: 0.78rem; font-weight: 700; opacity: 0.7; padding: 0 12px; }
   body.hotel-page .ht-name { font-weight: 800; padding: 0 12px; overflow-wrap: anywhere; }
   body.hotel-page .ht-open { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #e6f4ea; color: #1e6b34; font-size: 0.78rem; font-weight: 800; }
+  body.hotel-page .ht-soon { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #eef2f7; color: #1B2B3A; font-size: 0.78rem; font-weight: 800; }
   body.hotel-page .ht-card .trip-btn { margin: 6px 12px 12px; align-self: flex-start; }
   body.hotel-page .ht-events { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 12px 0; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
