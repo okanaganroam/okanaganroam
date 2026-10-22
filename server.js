@@ -29204,7 +29204,6 @@ ${VENUE_MENU_CSS}` : ''}
        a phone and come first in the tab order. Wider screens keep the description first (renderVenuePageLayoutStyles). -->${venueAdvisoryHtml}
   ${ctaButtons ? `<div class="venue-cta-row"${ctaRowAttrs}>\n  ${ctaButtons}\n</div>` : ''}${galleryHtml ? `\n  ${galleryHtml.phone(creditHtml)}` : ''}
   <p class="venue-description"${fr ? ' lang="fr"' : ''}>${editorial ? escapeHtml(editorial.intro) : fr ? escapeHtml(venue.description_fr || venue.description || '') : hasFrench ? escapeHtml(trimVenueTagline(venue.description) || '') : bilingualDescHtml(trimVenueTagline(venue.description), venue.description_fr)}</p>${editorialHtml}${golfMapHtml ? '\n  ' + golfMapHtml : ''}${golfGlanceHtml ? '\n  ' + golfGlanceHtml : ''}${golfFeesHtml ? '\n  ' + golfFeesHtml : ''}${golfValueHtml ? '\n  ' + golfValueHtml : ''}${golfEnglishNote ? '\n  ' + golfEnglishNote : ''}
-  ${nearbyStripHtml}
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
@@ -29213,7 +29212,7 @@ ${VENUE_MENU_CSS}` : ''}
   </div>` : ''}
   ${locationHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
-  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}" style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
+  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}"${venueIsClaimed(venue.id) ? ' data-claimed="1" hidden' : ''} style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
     <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
     <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Réclamer cette fiche')}</a>
     <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
@@ -29225,6 +29224,7 @@ ${VENUE_MENU_CSS}` : ''}
     var box = document.getElementById('venueOwnerCta'), mine = [];
     try { mine = JSON.parse(localStorage.getItem('okrOwnerVenues') || '[]') || []; } catch (e) { return; }
     if (!box || mine.indexOf(Number(box.getAttribute('data-venue-id'))) < 0) return;
+    box.hidden = false;
     box.innerHTML = '<p style="margin:0 0 8px;font-weight:700">${L('You manage this listing', 'Vous g\u00e9rez cette fiche')}</p><a class="venue-claim-btn" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Edit', 'Modifier')} &rarr;</a>';
     // Round 8: the address is set as a property, so the page's HTML holds no glued href text for crawlers.
     var edit = box.querySelector('a.venue-claim-btn'); if (edit) edit.href = '/owner/account/venue/' + box.getAttribute('data-venue-id');
@@ -29239,7 +29239,7 @@ ${VENUE_MENU_CSS}` : ''}
   ${guideLinks}
   </div>
   </div>
-  ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${relatedHtml}
+  ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${nearbyStripHtml ? `${nearbyStripHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
   <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
   <a class="cta secondary" href="/${venue.region}">${fr ? `Tout d\u00e9couvrir \u00e0 ${escapeHtml(regionLabel)}` : `Explore all of ${escapeHtml(regionLabel)}`}</a>
@@ -46594,6 +46594,15 @@ function ownerActivityHtml(items, lang = 'en', now = new Date()) {
 // that is live. Our own edits (research, admin tools, the review page's own
 // changes) never count, so a listing no owner has touched shows no date.
 // -> 'YYYY-MM-DD HH:MM:SS' (UTC) | null
+// Claimed (2026-10-22): a business that already manages its listing -- a login on it, an approved claim, or an owner
+// update or photo that went live. Its page stops showing visitors "Claim this listing".
+function venueIsClaimed(venueId) {
+  try {
+    return !!(db.prepare('SELECT 1 FROM owner_account_venues WHERE venue_id = ? LIMIT 1').get(venueId)
+      || db.prepare("SELECT 1 FROM venue_claims WHERE venue_id = ? AND status = 'approved' LIMIT 1").get(venueId)
+      || ownerLastUpdatedAt(venueId));
+  } catch (e) { return false; }
+}
 function ownerLastUpdatedAt(venueId) {
   const row = db.prepare(`SELECT MAX(t) AS t FROM (
     SELECT submitted_at AS t FROM owner_change_requests WHERE venue_id = ? AND status = 'approved'
