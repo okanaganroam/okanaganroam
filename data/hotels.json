@@ -464,6 +464,292 @@
       "address": "1048 Westminster Ave W, Penticton, BC",
       "latitude": 49.495314,
       "longitude": -119.61284
+    },
+    {
+      "slug": "keys-to-kelowna-kelowna",
+      "name": "Keys to Kelowna",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
+      "slug": "keys-to-kelowna-west-kelowna",
+      "name": "Keys to Kelowna",
+      "kind": "rental",
+      "region": "west-kelowna",
+      "address": "Vacation rentals around west-kelowna",
+      "latitude": 49.858578,
+      "longitude": -119.582876
+    },
+    {
+      "slug": "keys-to-kelowna-lake-country",
+      "name": "Keys to Kelowna",
+      "kind": "rental",
+      "region": "lake-country",
+      "address": "Vacation rentals around lake-country",
+      "latitude": 50.030236,
+      "longitude": -119.402331
+    },
+    {
+      "slug": "stay-locations-west-kelowna",
+      "name": "Stay Locations",
+      "kind": "rental",
+      "region": "west-kelowna",
+      "address": "Vacation rentals around west-kelowna",
+      "latitude": 49.858578,
+      "longitude": -119.582876
+    },
+    {
+      "slug": "stay-locations-kelowna",
+      "name": "Stay Locations",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
+      "slug": "stay-locations-big-white",
+      "name": "Stay Locations",
+      "kind": "rental",
+      "region": "big-white",
+      "address": "Vacation rentals around big-white",
+      "latitude": 49.717917,
+      "longitude": -118.921228
+    },
+    {
+      "slug": "stay-locations-peachland",
+      "name": "Stay Locations",
+      "kind": "rental",
+      "region": "peachland",
+      "address": "Vacation rentals around peachland",
+      "latitude": 49.766667,
+      "longitude": -119.75
+    },
+    {
+      "slug": "stay-locations-vernon",
+      "name": "Stay Locations",
+      "kind": "rental",
+      "region": "vernon",
+      "address": "Vacation rentals around vernon",
+      "latitude": 50.266867,
+      "longitude": -119.271816
+    },
+    {
+      "slug": "duval-big-white",
+      "name": "Duval Property Management",
+      "kind": "rental",
+      "region": "big-white",
+      "address": "Vacation rentals around big-white",
+      "latitude": 49.717917,
+      "longitude": -118.921228
+    },
+    {
+      "slug": "duval-kelowna",
+      "name": "Duval Property Management",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
+      "slug": "duval-west-kelowna",
+      "name": "Duval Property Management",
+      "kind": "rental",
+      "region": "west-kelowna",
+      "address": "Vacation rentals around west-kelowna",
+      "latitude": 49.858578,
+      "longitude": -119.582876
+    },
+    {
+      "slug": "duval-lake-country",
+      "name": "Duval Property Management",
+      "kind": "rental",
+      "region": "lake-country",
+      "address": "Vacation rentals around lake-country",
+      "latitude": 50.030236,
+      "longitude": -119.402331
+    },
+    {
+      "slug": "lmvr-big-white",
+      "name": "Luxury Mountain Vacation Rentals",
+      "kind": "rental",
+      "region": "big-white",
+      "address": "Vacation rentals around big-white",
+      "latitude": 49.717917,
+      "longitude": -118.921228
+    },
+    {
+      "slug": "kelowna-resort-accommodations-kelowna",
+      "name": "Kelowna Resort Accommodations",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
+      "slug": "chalets-at-big-white-big-white",
+      "name": "Chalets at Big White",
+      "kind": "rental",
+      "region": "big-white",
+      "address": "Vacation rentals around big-white",
+      "latitude": 49.717917,
+      "longitude": -118.921228
+    },
+    {
+      "slug": "lifty-life-kelowna",
+      "name": "Lifty Life",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
+      "slug": "lifty-life-big-white",
+      "name": "Lifty Life",
+      "kind": "rental",
+      "region": "big-white",
+      "address": "Vacation rentals around big-white",
+      "latitude": 49.717917,
+      "longitude": -118.921228
+    },
+    {
+      "slug": "sunsage-penticton",
+      "name": "SunSage Vacation Rentals",
+      "kind": "rental",
+      "region": "penticton",
+      "address": "Vacation rentals around penticton",
+      "latitude": 49.500327,
+      "longitude": -119.593249
+    },
+    {
+      "slug": "sunsage-summerland",
+      "name": "SunSage Vacation Rentals",
+      "kind": "rental",
+      "region": "summerland",
+      "address": "Vacation rentals around summerland",
+      "latitude": 49.6,
+      "longitude": -119.666667
+    },
+    {
+      "slug": "sunsage-naramata",
+      "name": "SunSage Vacation Rentals",
+      "kind": "rental",
+      "region": "naramata",
+      "address": "Vacation rentals around naramata",
+      "latitude": 49.598138,
+      "longitude": -119.599617
+    },
+    {
+      "slug": "sunsage-apex",
+      "name": "SunSage Vacation Rentals",
+      "kind": "rental",
+      "region": "apex",
+      "address": "Vacation rentals around apex",
+      "latitude": 49.3927,
+      "longitude": -119.9039
+    },
+    {
+      "slug": "bcvpm-osoyoos",
+      "name": "BC Vacation Property Management",
+      "kind": "rental",
+      "region": "osoyoos",
+      "address": "Vacation rentals around osoyoos",
+      "latitude": 49.033333,
+      "longitude": -119.466667
+    },
+    {
+      "slug": "bcvpm-oliver",
+      "name": "BC Vacation Property Management",
+      "kind": "rental",
+      "region": "oliver",
+      "address": "Vacation rentals around oliver",
+      "latitude": 49.183333,
+      "longitude": -119.55
+    },
+    {
+      "slug": "bcvpm-naramata",
+      "name": "BC Vacation Property Management",
+      "kind": "rental",
+      "region": "naramata",
+      "address": "Vacation rentals around naramata",
+      "latitude": 49.598138,
+      "longitude": -119.599617
+    },
+    {
+      "slug": "bcvpm-apex",
+      "name": "BC Vacation Property Management",
+      "kind": "rental",
+      "region": "apex",
+      "address": "Vacation rentals around apex",
+      "latitude": 49.3927,
+      "longitude": -119.9039
+    },
+    {
+      "slug": "bcvpm-baldy",
+      "name": "BC Vacation Property Management",
+      "kind": "rental",
+      "region": "baldy",
+      "address": "Vacation rentals around baldy",
+      "latitude": 49.1524,
+      "longitude": -119.2365
+    },
+    {
+      "slug": "ovhr-osoyoos",
+      "name": "Okanagan Vacation Home Rentals",
+      "kind": "rental",
+      "region": "osoyoos",
+      "address": "Vacation rentals around osoyoos",
+      "latitude": 49.033333,
+      "longitude": -119.466667
+    },
+    {
+      "slug": "ovhr-naramata",
+      "name": "Okanagan Vacation Home Rentals",
+      "kind": "rental",
+      "region": "naramata",
+      "address": "Vacation rentals around naramata",
+      "latitude": 49.598138,
+      "longitude": -119.599617
+    },
+    {
+      "slug": "ovhr-kelowna",
+      "name": "Okanagan Vacation Home Rentals",
+      "kind": "rental",
+      "region": "kelowna",
+      "address": "Vacation rentals around kelowna",
+      "latitude": 49.887918,
+      "longitude": -119.495902
+    },
+    {
+      "slug": "ovhr-vernon",
+      "name": "Okanagan Vacation Home Rentals",
+      "kind": "rental",
+      "region": "vernon",
+      "address": "Vacation rentals around vernon",
+      "latitude": 50.266867,
+      "longitude": -119.271816
+    },
+    {
+      "slug": "hi-kelowna",
+      "name": "HI Kelowna",
+      "region": "kelowna",
+      "address": "245 Harvey Ave, Kelowna, BC",
+      "latitude": 49.883306,
+      "longitude": -119.498206
+    },
+    {
+      "slug": "hi-penticton",
+      "name": "HI Penticton",
+      "region": "penticton",
+      "address": "464 Ellis St, Penticton, BC",
+      "latitude": 49.496405,
+      "longitude": -119.58974
     }
   ]
 }
