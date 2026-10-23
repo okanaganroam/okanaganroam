@@ -17322,12 +17322,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   // Happy hour now (2026-10-14): from the researched times; a place without times never shows as happy hour now.
   function clockText(m){ m = ((m % 1440) + 1440) % 1440; var h = Math.floor(m / 60), mm = m % 60; return FR ? (h === 0 && !mm ? 'minuit' : h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '')) : (h % 12 || 12) + (mm ? ':' + (mm < 10 ? '0' : '') + mm : '') + ' ' + (h >= 12 ? 'PM' : 'AM'); }
+  // 2026-10-23: the rules live in hours.js happyHourState(), shared with the venue page's happy hour line.
   function hhOf(p){
     if (!p.hh) return null;
     try {
-      var clock = okanaganClock(new Date()), s = statusAt(parseHours(expandFoodDrinkHours(p.hh)), clock);
-      if (s.state === 'open' && !(p.st && p.st.state === 'closed')) return { now: true, text: T.hhNow(s.closesAt ? clockText(s.closesAt.minutes) : '') };
-      if (s.state === 'closed' && s.opensAt && s.opensAt.weekday === clock.weekday) return { now: false, text: T.hhLater(clockText(s.opensAt.minutes)) };
+      var h = happyHourState(expandFoodDrinkHours(p.hh), okanaganClock(new Date()), !!(p.st && p.st.state === 'closed'));
+      if (h && h.state === 'now') return { now: true, text: T.hhNow(h.until ? clockText(h.until.minutes) : '') };
+      if (h && h.state === 'later') return { now: false, text: T.hhLater(clockText(h.from.minutes)) };
     } catch (e) {}
     return null;
   }
@@ -18933,6 +18934,7 @@ ${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.st
   ${okanaganClock.toString()}
   ${hoursModule ? hoursModule.HOURS_CLIENT_SRC : 'function parseHours(){ return null; } function statusAt(){ return null; } function hoursStatusLabel(){ return { state: "unknown", text: "" }; }'}
   ${FD_HOURS_CLIENT_SRC}
+  ${hoursModule ? hoursModule.happyHourState.toString() : 'function happyHourState(){ return null; }'}
   var CONF = ${conf};
   ${MAP_PAGE_SCRIPT}
 })();
@@ -28609,6 +28611,94 @@ function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
   const label = hoursModule.hoursStatusLabel(venueHoursStatusAt(pageHours, now), clock);
   return label.state === 'unknown' ? null : { state: label.state, text: label.text, weekday: clock.weekday };
 }
+// ---- Happy hour on venue pages (2026-10-23) ----
+// The researched or owner-supplied times (venues.happy_hour_times, written by guardedHappyHourUpdate) as a live line
+// under the name and a "Happy hour" row in Good to Know. The "is it on now" rules are hours.js happyHourState(), the
+// same function the Roam Now map runs. Never shown with a closure notice or advisory (the map ships no times then) or
+// while the place is closed for the season; never any drink prices (none are stored).
+const HH_DAYS_SHORT = { en: { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }, fr: { mon: 'lun', tue: 'mar', wed: 'mer', thu: 'jeu', fri: 'ven', sat: 'sam', sun: 'dim' } };
+const HH_DAYS_LONG = { en: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, fr: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' } };
+// Minutes (a close past midnight is > 1440) as "6 PM" / "6:30 PM"; French "18 h" / "18 h 30" / "minuit".
+function happyHourTimeText(minutes, fr) {
+  const m = ((minutes % 1440) + 1440) % 1440;
+  if (!fr) return hoursModule.formatClockMinutes(m);
+  const h = Math.floor(m / 60), mm = m % 60;
+  return h === 0 && !mm ? 'minuit' : `${h} h${mm ? ` ${String(mm).padStart(2, '0')}` : ''}`;
+}
+// "3–6 PM", "11 AM–2 PM", "9 PM–1 AM"; French "15 h–18 h".
+function happyHourRangeText(a, b, fr) {
+  const from = happyHourTimeText(a, fr), to = happyHourTimeText(b, fr);
+  if (!fr && from.slice(-3) === to.slice(-3)) return `${from.slice(0, -3)}–${to}`;
+  return `${from}–${to}`;
+}
+// The week, days with the same windows together: "Mon–Thu 3–6 PM · Sat 7–10 PM"
+// (fr: "Lun–jeu 15 h–18 h · sam 19 h–22 h"); two windows in a day are joined with ", ". '' when nothing reads.
+function happyHourWeekText(json, fr) {
+  if (!hoursModule || !json) return '';
+  const parsed = hoursModule.parseHours(json);
+  if (!parsed || !parsed.known) return '';
+  const W = hoursModule.HOURS_WEEKDAYS, names = HH_DAYS_SHORT[fr ? 'fr' : 'en'];
+  const groups = [];
+  W.forEach((d, i) => {
+    const day = parsed.days[d];
+    if (!day || day.status !== 'open') return;
+    const text = day.ranges.map(([a, b]) => happyHourRangeText(a, b, fr)).join(', ');
+    let g = groups.find((x) => x.text === text);
+    if (!g) groups.push(g = { text, days: [] });
+    g.days.push(i);
+  });
+  const out = groups.map((g) => {
+    const runs = [];
+    for (const i of g.days) {
+      const last = runs[runs.length - 1];
+      if (last && last[1] === i - 1) last[1] = i; else runs.push([i, i]);
+    }
+    return `${runs.map(([a, b]) => (a === b ? names[W[a]] : `${names[W[a]]}–${names[W[b]]}`)).join(', ')} ${g.text}`;
+  }).join(' · ');
+  return fr ? out.charAt(0).toUpperCase() + out.slice(1) : out;
+}
+// "Checked Oct 23, 2026" (fr: "Vérifié le 23 octobre 2026") from happy_hour_checked_at; '' without a real date.
+function happyHourCheckedText(checked, fr) {
+  if (!checked || !parseLocalDate(checked)) return '';
+  const y = checked.slice(0, 4), m = Number(checked.slice(5, 7)) - 1, d = Number(checked.slice(8, 10));
+  return fr ? `Vérifié le ${d === 1 ? '1er' : d} ${MONTH_NAMES.fr[m]} ${y}` : `Checked ${SEASON_TAG_MONTHS[m]} ${d}, ${y}`;
+}
+// The live line for a happyHourState() result: "Happy hour until 6 PM", "Happy hour today 3–6 PM",
+// "Next happy hour: Saturday 7 PM" (French: "Happy hour jusqu’à 18 h", "Happy hour aujourd’hui 15 h–18 h",
+// "Prochain happy hour : samedi 19 h"). '' for null.
+function happyHourLiveText(h, fr) {
+  if (!h) return '';
+  if (h.state === 'now') {
+    if (!h.until) return fr ? 'Happy hour en cours' : 'Happy hour now';
+    return fr ? `Happy hour jusqu’à ${happyHourTimeText(h.until.minutes, true)}` : `Happy hour until ${happyHourTimeText(h.until.minutes, false)}`;
+  }
+  if (h.state === 'later') {
+    const when = h.to ? happyHourRangeText(h.from.minutes, h.to.minutes, fr) : happyHourTimeText(h.from.minutes, fr);
+    return fr ? `Happy hour aujourd’hui ${when}` : `Happy hour today ${when}`;
+  }
+  const day = HH_DAYS_LONG[fr ? 'fr' : 'en'][h.from.weekday];
+  const dayText = h.nextWeek ? (fr ? `${day} prochain` : `next ${day}`) : day;
+  return fr ? `Prochain happy hour : ${dayText} ${happyHourTimeText(h.from.minutes, true)}` : `Next happy hour: ${dayText} ${happyHourTimeText(h.from.minutes, false)}`;
+}
+// What a venue page shows: { week, checked, live: { state, text } | null }, or null when the place has no stored times,
+// has an advisory/closure notice, a closure in force, or is closed for the season. `statusHours`: the hours the page's
+// open-now line reads (a place its own hours call closed now never shows happy hour as on, like the map; a place
+// closed today, a holiday say, shows no "later today").
+function venueHappyHour(venue, statusHours, fr, now = new Date()) {
+  if (!hoursModule || !venue || venue.redirect_to) return null;
+  let row = null;
+  try { row = db.prepare('SELECT happy_hour_times, happy_hour_checked_at FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
+  if (!row || !row.happy_hour_times) return null;
+  if (getAdvisoryNotes(now).has(venue.id)) return null;
+  if ((getSeasonStates(now).get(venue.id) || {}).kind === 'closed' || venueClosureInForce(venue.id, now)) return null;
+  const week = happyHourWeekText(row.happy_hour_times, fr);
+  if (!week) return null;
+  const place = statusHours ? venueHoursStatusAt(statusHours, now) : null;
+  let h = null;
+  try { h = hoursModule.happyHourState(row.happy_hour_times, okanaganClock(now), !!(place && place.state === 'closed')); } catch (e) { h = null; }
+  if (h && h.state === 'later' && place && place.closedToday) h = null;
+  return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), live: h ? { state: h.state, text: happyHourLiveText(h, fr) } : null };
+}
 function renderVenuePageLayoutStyles() {
   return `<style id="venue-page-layout">
   /* Hero photo (2026-10-14): the photo fills the hero under the same tint,
@@ -28631,6 +28721,11 @@ function renderVenuePageLayoutStyles() {
   /* Phone (2026-10-19, round 8): "See hours" takes taps over a 44px-tall area; the padding is cancelled by negative
      margins, so the line itself doesn't move. */
   body.golf-page .venue-open-status a { display: inline-block; padding: 12px 6px; margin: -12px -6px -12px -2px; }
+  /* Happy hour line (2026-10-23): straight under the open-now line (or the name); bold teal while happy hour is on,
+     quieter when it is later today or another day. */
+  body.golf-page .venue-hh-status { display: flex; align-items: baseline; gap: 6px; margin: -4px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 700; line-height: 1.35; color: rgba(42,32,25,0.78); }
+  body.golf-page .venue-hh-status[data-hh="now"] { color: var(--teal, #2A6B67); font-weight: 800; }
+  body.golf-page .venue-hh-checked { display: block; margin: 4px 0 0; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
@@ -28980,6 +29075,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // under the name, so the card keeps only what is new -- and the address
   // carries the map link, replacing the separate Location box.
   const venueLinkRow = venueLinks(venue.id);
+  const happyHour = venueHappyHour(venue, statusHours, fr, opts.now || new Date());
   const detailRows = [
     venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
@@ -28995,6 +29091,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       venueLinkRow.facebook_url ? `<a href="${escapeHtml(venueLinkRow.facebook_url)}" rel="nofollow noopener" target="_blank">Facebook</a>` : '',
     ].filter(Boolean).join(' &middot; ')] : null,
     venueShowsPrice(venue) ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
+    // Happy hour (2026-10-23): last, so it sits next to the Hours box; the times only, never drink prices.
+    happyHour ? ['Happy hour', `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>${happyHour.checked ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}`] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
@@ -29268,6 +29366,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const openStatusHtml = openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '';
+  // Happy hour line (2026-10-23), right under the open-now line; worked out on the server like it.
+  const happyHourHtml = happyHour && happyHour.live
+    ? `<p class="venue-hh-status" data-hh="${happyHour.live.state}" id="venueHappyHour">${happyHour.live.state === 'now' ? '<span aria-hidden="true">\u{1F37B}</span> ' : ''}${escapeHtml(happyHour.live.text)}</p>`
+    : '';
 
   const page = `<!DOCTYPE html>
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
@@ -29290,7 +29392,7 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    ${openStatusHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${(() => {
+    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${(() => {
       const last = ownerLastUpdatedAt(venue.id);
       return last ? `\n    <p class="venue-owner-updated" style="font-size:.84rem;margin:6px 0 0;color:#1E6B3A;font-weight:700"><span aria-hidden="true">&#10003;</span> ${L('Updated by the business', 'Mis \u00e0 jour par l\u2019entreprise')} &middot; ${escapeHtml(ownerUpdatedDate(last, fr))}</p>` : '';
     })()}
@@ -52776,6 +52878,9 @@ module.exports = {
   trimVenueTagline,
   venueDayHoursText,
   venueOpenStatus,
+  venueHappyHour,
+  happyHourWeekText,
+  happyHourLiveText,
   frStatusText,
   venueDistanceKm,
   FD_HUB_FILTER_CLIENT_PREDICATE_SRC,
