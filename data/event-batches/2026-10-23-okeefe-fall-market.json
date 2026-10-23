@@ -1,0 +1,23 @@
+{
+  "batch_id": "2026-10-23-okeefe-fall-market",
+  "reason": "Last item from the Oct 18 event research (existing-matches list): the Vernon Farmers' Market's one-day Fall Market at O'Keefe Ranch, checked on okeeferanch.ca/events on 2026-10-23. The other eight were already listed.",
+  "reviewed_by": "checked 2026-10-23 against the ranch's events page",
+  "events": [
+    {
+      "name": "Vernon Farmers' Market Fall Market at O'Keefe Ranch",
+      "region": "vernon",
+      "venue_id": 1545,
+      "description": "A one-day fall market at Historic O'Keefe Ranch with vendors from the Vernon Farmers' Market: local produce, baking and artisan goods. The ranch's corn maze, haunted mini golf, heritage buildings and animals are open the same day, and a beginner square dance lesson runs at 2:45 p.m. ($10).",
+      "categories": ["markets-fairs", "family-kids"],
+      "occurrences": [
+        { "start_date": "2026-10-25", "start_time": "10:00", "end_time": "16:00" }
+      ],
+      "source_name": "Historic O'Keefe Ranch events page",
+      "source_url": "https://okeeferanch.ca/events/",
+      "source_type": "official_venue",
+      "source_checked_at": "2026-10-23",
+      "event_confidence": "high",
+      "reviewed_duplicates": [92, 1025]
+    }
+  ]
+}
