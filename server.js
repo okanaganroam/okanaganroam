@@ -29667,9 +29667,12 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
   // subEvent as an Event, and 64% of them had no offers).
   const organizer = eventOrganizerSchema(event, hostVenue);
   const offers = eventOffersSchema(event);
+  // Search Console (2026-10-22): every subEvent also carries the series' description ("Missing field description").
+  const description = event.description || `${event.name} in ${REGION_LABELS[event.region] || 'the Okanagan'}, BC.`;
   const sub = (o) => ({
     '@type': schemaType,
     name: o.label ? `${event.name} – ${o.label}` : event.name,
+    description,
     startDate: occurrenceIsoStart(o),
     endDate: occurrenceIsoEnd(o),
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -29682,7 +29685,7 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     '@context': 'https://schema.org',
     '@type': schemaType,
     name: main.label ? `${event.name} – ${main.label}` : event.name,
-    description: event.description || `${event.name} in ${REGION_LABELS[event.region] || 'the Okanagan'}, BC.`,
+    description,
     startDate: occurrenceIsoStart(main),
     endDate: occurrenceIsoEnd(main),
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',

@@ -22770,6 +22770,8 @@ test('SEO audit 2 (2026-10-17): FR breadcrumbs, event end dates, summary ItemLis
     assert.equal(ev.subEvent.length, 1);
     assert.equal(ev.subEvent[0].eventStatus, 'https://schema.org/EventScheduled');
     assert.equal(ev.subEvent[0].eventAttendanceMode, 'https://schema.org/OfflineEventAttendanceMode');
+    assert.equal(ev.subEvent[0].description, ev.description, 'Search Console 2026-10-22: each series date carries the description');
+    assert.ok(ev.subEvent[0].description);
     assert.equal(ev.subEvent[0].endDate, '2032-05-16T21:30:00-07:00');
     const fair = ldBlocks((await s5get(`/kelowna/events/${spanning.slug}`)).text).find((b) => /Event/.test(b['@type']) && b.startDate);
     assert.equal(fair.endDate, '2032-06-02', 'a multi-day event keeps its later end date');
