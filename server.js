@@ -28653,7 +28653,11 @@ function happyHourWeekText(json, fr) {
       const last = runs[runs.length - 1];
       if (last && last[1] === i - 1) last[1] = i; else runs.push([i, i]);
     }
-    return `${runs.map(([a, b]) => (a === b ? names[W[a]] : `${names[W[a]]}–${names[W[b]]}`)).join(', ')} ${g.text}`;
+    // Phone width (2026-10-23): a day group and its times never break apart ("Sat 7–10" / "PM"); the line wraps
+    // at the " · " between groups (and, for a very long group, after a comma): non-breaking spaces, and a word
+    // joiner after each dash (browsers otherwise break after "–").
+    return `${runs.map(([a, b]) => (a === b ? names[W[a]] : `${names[W[a]]}–${names[W[b]]}`)).join(', ')} ${g.text}`
+      .replace(/ /g, ' ').replace(/, /g, ', ').replace(/–/g, '–⁠');
   }).join(' · ');
   return fr ? out.charAt(0).toUpperCase() + out.slice(1) : out;
 }
@@ -28795,7 +28799,9 @@ function renderVenuePageLayoutStyles() {
   }
   body.golf-page .venue-aside .venue-section { margin-top: 0; margin-bottom: 16px; }
   body.golf-page .venue-aside .detail-row { display: flex; gap: 12px; }
-  body.golf-page .venue-aside .detail-row .label { min-width: 76px; }
+  /* One label column (2026-10-23): a fixed 76px, so a long label ("Happy hour", « Téléphone ») wraps instead of
+     pushing its value right of the other rows' values. */
+  body.golf-page .venue-aside .detail-row .label { min-width: 76px; flex: 0 0 76px; }
   body.golf-page .venue-aside .map-link { display: inline-block; margin-top: 4px; font-weight: 800; font-size: 0.86rem; }
   body.golf-page .venue-hours h2 { margin-bottom: 6px; }
   body.golf-page .hours-list li.is-today { font-weight: 800; color: var(--ink); }

@@ -35,14 +35,19 @@ const row = (html) => (/<div class="detail-row"><span class="label">Happy hour<\
 const brewery = mk({ name: 'HH Page Brewing' });
 setTimes(brewery, { mon: [['15:00', '18:00']], tue: [['15:00', '18:00']], wed: [['15:00', '18:00']], thu: [['15:00', '18:00']], sat: [['19:00', '22:00']] });
 
+// Inside a day group the spaces are non-breaking and each dash is followed by a word joiner (a phone wraps only at
+// " · ", or after a comma in a long group).
+const nb = (s) => s.replace(/_/g, ' ').replace(/–/g, '–⁠');
 test('Happy hour row: days with the same windows grouped, then the checked date (EN + FR)', () => {
   const en = page(brewery, at(TUE, '16:00'));
-  assert.equal(row(en), '<span class="venue-hh-times">Mon–Thu 3–6 PM · Sat 7–10 PM</span><span class="venue-hours-checked venue-hh-checked">Checked Oct 23, 2026</span>');
+  assert.equal(row(en), nb('<span class="venue-hh-times">Mon–Thu_3–6_PM · Sat_7–10_PM</span><span class="venue-hours-checked venue-hh-checked">Checked Oct 23, 2026</span>'));
   const fr = page(brewery, at(TUE, '16:00'), 'fr');
-  assert.equal(row(fr), '<span class="venue-hh-times">Lun–jeu 15 h–18 h · sam 19 h–22 h</span><span class="venue-hours-checked venue-hh-checked">Vérifié le 23 octobre 2026</span>');
+  assert.equal(row(fr), nb('<span class="venue-hh-times">Lun–jeu_15_h–18_h · sam_19_h–22_h</span><span class="venue-hours-checked venue-hh-checked">Vérifié le 23 octobre 2026</span>'));
   assert.equal(app.happyHourWeekText(JSON.stringify({ mon: [['15:00', '17:30']], wed: [['15:00', '17:30']], thu: [['15:00', '17:30']], fri: [['11:30', '13:00'], ['21:00', '01:00']], sat: null }), false),
-    'Mon, Wed–Thu 3–5:30 PM · Fri 11:30 AM–1 PM, 9 PM–1 AM');
-  assert.equal(app.happyHourWeekText(JSON.stringify({ fri: [['21:00', '00:00']] }), true), 'Ven 21 h–minuit');
+    nb('Mon, Wed–Thu_3–5:30_PM · Fri_11:30_AM–1_PM, 9_PM–1_AM'));
+  assert.equal(app.happyHourWeekText(JSON.stringify({ fri: [['21:00', '00:00']] }), true), nb('Ven_21_h–minuit'));
+  // The aside's labels are one fixed column, so a wrapping "Happy hour" label keeps its value in line.
+  assert.match(en, /body\.golf-page \.venue-aside \.detail-row \.label \{ min-width: 76px; flex: 0 0 76px; \}/);
   assert.doesNotMatch(en, /\$\d/, 'never a drink price');
 });
 
