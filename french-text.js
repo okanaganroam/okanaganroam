@@ -469,6 +469,7 @@ const FR_TEXT = {
   'A winemaker pouring for two guests on a cellar tour among oak barrels': 'Une vigneronne qui sert deux visiteurs entre les barriques de chêne',
   'Friends bowling together at an indoor bowling alley': 'Des amis qui jouent aux quilles',
   'A mountain biker riding a leafy forest trail in autumn': 'Un cycliste de montagne sur un sentier forestier en automne',
+  'Camp lanterns, a stove and folding tables on display in an outdoor shop': 'Des lanternes de camping, un poêle et des tables pliantes exposés dans une boutique de plein air',
   'Three Labradors splashing through the shallows of a lake': 'Trois labradors qui s’éclaboussent dans l’eau peu profonde d’un lac',
   'Friends sharing drinks on a deck under string lights at sunset': 'Des amis qui prennent un verre sur une terrasse sous des guirlandes lumineuses au coucher du soleil',
   'A lone bench under a pine on a hilltop overlooking Kelowna and Okanagan Lake at golden hour': 'Un banc sous un pin au sommet d’une colline dominant Kelowna et le lac Okanagan à l’heure dorée',
