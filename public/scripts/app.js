@@ -3262,7 +3262,7 @@ window.__scrollToVenueCard = function(name){
     var typeLabel = t('type.' + venue.type);
     if (typeLabel && typeLabel.indexOf('type.') !== 0) metaParts.push(typeLabel);
     if (venue.rating) metaParts.push('★ ' + venue.rating);
-    if (venue.price) metaParts.push(new Array(venue.price + 1).join('$'));
+    if (venue.price && venue.type !== 'shop' && venue.type !== 'golf') metaParts.push(new Array(venue.price + 1).join('$'));
     metaParts.push(regionLabel);
     var meta = document.createElement('div');
     meta.className = 'trip-slot-meta';

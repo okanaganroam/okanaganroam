@@ -10234,7 +10234,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
   // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
-  assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede', 'public/scripts/app.js (My Trip tray by day, 2026-10-18)');
+  assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3', 'public/scripts/app.js (My Trip tray by day, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12168,7 +12168,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede');
+  assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16422,7 +16422,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede');
+  assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
 
@@ -16515,7 +16515,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -18212,6 +18212,25 @@ test('Shops & Outfitters: /shops and /:region/shops stay noindex and out of the 
       assert.ok(sitemap5.includes('<loc>https://okanaganroam.com/shops</loc>'), '5 shops: /shops in the sitemap');
       assert.ok(sitemap5.includes('<loc>https://okanaganroam.com/armstrong/shops</loc>'), '5 shops: /armstrong/shops in the sitemap');
     });
+  } finally {
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('Shops & Outfitters: a shop never shows a price (page, Good to Know, schema) even when one is stored; restaurants still do (2026-10-23)', async () => {
+  assert.ok(app.NO_PRICE_TYPES.has('shop') && app.NO_PRICE_TYPES.has('golf'));
+  const ids = [];
+  try {
+    ids.push(app.createVenue({ name: 'Price Test Shop', region: 'armstrong', type: 'shop', price: 3, slug: 'price-test-shop', description: 'Fixture outdoor gear store used to check that a stored price level never shows on a shop page, its Good to Know box or its schema data, while the value itself is kept.' }).id);
+    ids.push(app.createVenue({ name: 'Price Test Diner', region: 'armstrong', type: 'restaurant', price: 2, slug: 'price-test-diner', description: 'Fixture diner used to check that restaurants still show their price level.' }).id);
+    await withWinterServer(async (base) => {
+      const shop = (await WINTER_GET(base, '/armstrong/shops/price-test-shop')).text;
+      assert.ok(!/\$\$\$/.test(shop), 'no $$$ anywhere on the shop page');
+      assert.ok(!/"priceRange"/.test(shop), 'no priceRange in the shop schema');
+      const diner = (await WINTER_GET(base, '/armstrong/restaurants/price-test-diner')).text;
+      assert.ok(/"priceRange":"\$\$"/.test(diner), 'restaurants keep their priceRange');
+    });
+    assert.equal(db.prepare('SELECT price FROM venues WHERE id = ?').get(ids[0]).price, 3, 'the stored value is kept');
   } finally {
     for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
   }
