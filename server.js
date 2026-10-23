@@ -474,6 +474,11 @@ const EXPLICIT_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 // once slipped through and '$'.repeat('$$') silently rendered nothing.
 const PRICE_ERROR = 'price must be null, an integer 1-4, a numeric string "1"-"4", or "$"-"$$$$".';
 
+// Types whose listings never show a price (2026-10-23): golf already, and shops (the 1-4 scale is per-person
+// spend on a visit, which says nothing useful about a store). The stored value is kept.
+const NO_PRICE_TYPES = new Set(['golf', 'shop']);
+const venueShowsPrice = (v) => !!(v && v.price && !NO_PRICE_TYPES.has(v.type));
+
 function normalizePrice(price) {
   if (price === null) return null;
   if (Number.isInteger(price) && price >= 1 && price <= 4) return price;
@@ -18674,7 +18679,7 @@ function mapPlacesData(now = new Date()) {
       // [11] happy hour times (researched, compact like the hours), or 0; none while the place has a closure notice.
       v.happy_hour_times && !(st && st.reason === 'advisory') ? mapHappyHourTimes(v.happy_hour_times) : 0,
       // [12] price level 1-4 ($ to $$$$), or 0 when not listed.
-      Number(v.price) >= 1 && Number(v.price) <= 4 ? Number(v.price) : 0,
+      Number(v.price) >= 1 && Number(v.price) <= 4 && v.type !== 'shop' ? Number(v.price) : 0,
       // [13] 1 when the place is closed for the season today (2026-10-18), else 0.
       seasons.has(v.id) && seasons.get(v.id).kind === 'closed' ? 1 : 0,
       // [14] the dog note in French when it has a translation (French pass 6, 2026-10-19), else 0.
@@ -28826,7 +28831,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     sameAs: normalizeWebsiteUrl(venue.website) || undefined,
     // Golf (2026-09-26): the legacy price level is not a green fee, so it is
     // never shown on golf pages; verified green fees are shown instead.
-    priceRange: (venue.price && venue.type !== 'golf') ? '$'.repeat(venue.price) : undefined,
+    priceRange: venueShowsPrice(venue) ? '$'.repeat(venue.price) : undefined,
     servesCuisine: venue.type === 'restaurant' && venue.cuisine ? venue.cuisine : undefined,
     // No aggregateRating (2026-10-13): the stored rating and review count come from Google reviews, not from Okanagan
     // Roam, and Google's review-snippet rules don't allow marking up ratings collected on another site. The rating is
@@ -28989,7 +28994,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       venueLinkRow.instagram_url ? `<a href="${escapeHtml(venueLinkRow.instagram_url)}" rel="nofollow noopener" target="_blank">Instagram</a>` : '',
       venueLinkRow.facebook_url ? `<a href="${escapeHtml(venueLinkRow.facebook_url)}" rel="nofollow noopener" target="_blank">Facebook</a>` : '',
     ].filter(Boolean).join(' &middot; ')] : null,
-    (venue.price && venue.type !== 'golf') ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
+    venueShowsPrice(venue) ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
@@ -29059,7 +29064,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const atAGlanceParts = [
     venue.type === 'golf' ? golfKindLabel : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
-    (venue.price && venue.type !== 'golf') ? '$'.repeat(venue.price) : null,
+    venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
   ].filter(Boolean).join(' &middot; ');
 
@@ -47503,7 +47508,7 @@ ${renderGolfHeaderHtml()}
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
-      ${venue.type === 'golf' ? '' : `
+      ${NO_PRICE_TYPES.has(venue.type) ? '' : `
       <details class="op-fold op-sec" id="price"${waitingFields.has('price_range') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opPriceLabel">${L('Price range', 'Gamme de prix')}${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement')}</span></summary>
       <div class="form-row full"><div class="form-field">
@@ -52973,6 +52978,7 @@ module.exports = {
   countShopsHubVenues,
   renderShopThemeStyles,
   SHOP_INDEX_MIN,
+  NO_PRICE_TYPES,
   shopListPagesIndexable,
   countToursHubVenues,
   renderTourThemeStyles,
