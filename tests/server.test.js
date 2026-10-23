@@ -31723,6 +31723,17 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
     const strip = html.slice(html.indexOf('<section class="nearby-strip"'), html.indexOf('</section>', html.indexOf('<section class="nearby-strip"')));
     assert.ok(strip.length > 0, 'the Close by strip renders');
     assert.ok(html.indexOf('class="venue-description"') < html.indexOf('class="nearby-strip"'), 'after the description');
+    // 2026-10-22: Close by comes after the business's own information (Good to Know, hours, menu, tips), not in the middle.
+    assert.ok(html.indexOf('id="venueHours"') < html.indexOf('class="nearby-strip"'), 'after the hours');
+    assert.ok(html.indexOf('class="venue-extra"') < html.indexOf('class="nearby-strip"'), 'after the menu, tips and guides');
+    // Not claimed yet: visitors see "Claim this listing".
+    assert.match(html, /<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="\d+" style=/);
+    // Claimed (a business login on it): the box is hidden; the owner's own device still unhides it.
+    const acct = db.prepare("INSERT INTO owner_accounts (email, password_hash) VALUES ('closeby-owner@example.test', 'x')").run().lastInsertRowid;
+    db.prepare('INSERT INTO owner_account_venues (account_id, venue_id) VALUES (?, ?)').run(acct, host.id);
+    const claimed = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries/close-by-host-fixture`).then((r) => r.text());
+    assert.match(claimed, /id="venueOwnerCta" data-venue-id="\d+" data-claimed="1" hidden/);
+    assert.ok(claimed.includes('box.hidden = false;'));
     assert.match(strip, /Close By Cafe Fixture/);
     assert.match(strip, /Caf[eé] · \d+ min walk/);
     assert.match(strip, /Pub · \d+ min drive/);
