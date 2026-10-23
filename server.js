@@ -1319,6 +1319,7 @@ const VENUE_DELETE_CHILDREN = [
   // Grandchildren first: they point at child rows of this venue.
   ['venue_menu_files', 'menu_id IN (SELECT id FROM venue_menus WHERE venue_id = ?)'],
   ['visitor_contribution_photos', 'contribution_id IN (SELECT id FROM visitor_contributions WHERE venue_id = ?)'],
+  ['visitor_contribution_notes', 'contribution_id IN (SELECT id FROM visitor_contributions WHERE venue_id = ?)'],
   ['venue_seasons', 'venue_id = ?'], ['venue_owner_links', 'venue_id = ?'], ['owner_change_requests', 'venue_id = ?'],
   ['owner_photos', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
@@ -40176,6 +40177,7 @@ function listVisitorContributions(status = 'pending') {
     reviewed_by: r.reviewed_by, rejection_reason: r.rejection_reason, reported_count: r.reported_count, lang: r.lang,
     photos: visitorPhotosFor(r.id).map((p) => ({ id: p.id, width: p.width, height: p.height, preview_url: visitorPhotoPreviewPath(p.preview_key),
       public_url: r.status === 'approved' ? `/images/visitor/${p.file}` : null, is_main: r.image_url === `/images/visitor/${p.file}` })),
+    notes: visitorNotesFor(r.id).map((n) => ({ id: n.id, message: n.message, sent_by: n.sent_by, sent_at: n.sent_at, result: n.result })),
   }));
 }
 
@@ -40283,6 +40285,55 @@ async function notifyVisitorDecision(id, action, reason, edited) {
   return sendOwnerDecision(validOwnerEmail(c.email) ? [validOwnerEmail(c.email)] : [], message);
 }
 
+// A personal note to a visitor about their tip or photo (2026-10-23): Dayton writes it on /admin/review (or with the
+// token API), it goes out through the same Brevo path as the decision emails, and the visitor's address is never
+// shown or returned. At most VISITOR_NOTE_DAILY sent notes per item per day; every attempt is logged.
+const VISITOR_NOTE_MAX = 2000;
+const VISITOR_NOTE_DAILY = 3;
+const VISITOR_NOTE_STATUSES = new Set(['pending', 'approved', 'rejected', 'removed']);
+
+function visitorNoteEmail(c, venue, note) {
+  const fr = c.lang === 'fr';
+  const first = String(c.display_name).split(' ')[0];
+  const link = fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue);
+  const sign = ['Dayton', 'Okanagan Roam', 'okanaganroam.com'];
+  const hi = fr ? `Bonjour ${first},` : `Hi ${first},`;
+  const about = fr ? `Votre conseil portait sur ${venue.name} :` : `Your tip was for ${venue.name}:`;
+  const text = [hi, '', note, '', about, link, '', ...sign].join('\n');
+  const esc = (v) => escapeHtml(String(v));
+  const html = `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#2A2019">
+<p>${esc(hi)}</p>
+<p>${esc(note).replace(/\n/g, '<br>')}</p>
+<p>${esc(about)} <a href="${esc(link)}">${esc(link)}</a></p>
+<p>${sign.map(esc).join('<br>')}</p>
+</div>`;
+  return { subject: fr ? 'Un mot d\u2019Okanagan Roam au sujet de votre conseil' : 'A note from Okanagan Roam about your tip', text, html };
+}
+
+function visitorNotesFor(contributionId) {
+  return db.prepare('SELECT id, message, sent_by, sent_at, result FROM visitor_contribution_notes WHERE contribution_id = ? ORDER BY id DESC').all(contributionId);
+}
+
+// -> { status, body }; body never carries the visitor's address.
+async function sendVisitorNote(id, rawMessage, sentBy) {
+  if (typeof rawMessage !== 'string') return { status: 400, body: { error: `message is required (plain text, 1-${VISITOR_NOTE_MAX} characters).`, reason: 'bad_message' } };
+  const note = rawMessage.replace(/\r\n?/g, '\n').trim();
+  const len = Array.from(note).length;
+  if (!len || len > VISITOR_NOTE_MAX) return { status: 400, body: { error: `The note should be 1 to ${VISITOR_NOTE_MAX} characters.`, reason: 'bad_message' } };
+  const c = db.prepare('SELECT * FROM visitor_contributions WHERE id = ?').get(id);
+  if (!c) return { status: 404, body: { error: 'Not found.', reason: 'not_found' } };
+  if (!VISITOR_NOTE_STATUSES.has(c.status)) return { status: 409, body: { error: 'They have not confirmed their email yet, so no note can be sent.', reason: 'not_confirmed', status: c.status } };
+  const sentToday = db.prepare("SELECT COUNT(*) AS n FROM visitor_contribution_notes WHERE contribution_id = ? AND result = 'sent' AND sent_at > datetime('now', '-1 day')").get(id).n;
+  if (sentToday >= VISITOR_NOTE_DAILY) return { status: 429, body: { error: `${VISITOR_NOTE_DAILY} notes were already sent about this item today. Try again tomorrow.`, reason: 'rate_limited' } };
+  const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(c.venue_id);
+  const to = validOwnerEmail(c.email);
+  let result = 'no_address';
+  if (row && to) result = await sendOwnerDecision([to], visitorNoteEmail(c, rowToVenue(row), note));
+  db.prepare('INSERT INTO visitor_contribution_notes (contribution_id, message, sent_by, result) VALUES (?, ?, ?, ?)').run(id, note, sentBy, result);
+  const emailed = result === 'sent' || result === 'no_address' ? result : 'failed';
+  return { status: 200, body: { id, emailed, ...(result === 'email_off' ? { error: 'Email is off until BREVO_API_KEY is set.' } : {}) } };
+}
+
 const VISITOR_ADMIN_ERRORS = {
   not_live: 'This item is not live.', photo_not_found: 'That photo is not part of this item.',
   bad_tip: `The tip should be at most ${VISITOR_TIP_MAX} characters, and can only be empty when there are photos.`,
@@ -40327,7 +40378,21 @@ function renderAdminVisitorCard(c, mode) {
       ${tip}
       ${live ? '' : '<p class="rv-meta">You can fix the tip before approving. Approve publishes the tip and every photo.</p>'}
       ${actions}
+      ${renderAdminVisitorNoteBox(c)}
     </article>`;
+}
+
+// "Send a note" under a visitor item (2026-10-23): a short personal email to them; their address stays hidden.
+function renderAdminVisitorNoteBox(c) {
+  const short = (m) => { const a = Array.from(String(m).replace(/\s+/g, ' ')); return a.length > 80 ? `${a.slice(0, 80).join('')}…` : a.join(''); };
+  const sent = (c.notes || []).map((n) => `<li>${adminReviewEsc(adminReviewTime(n.sent_at))}: ${adminReviewEsc(short(n.message))}${n.result === 'sent' ? '' : ` <em>(${n.result === 'no_address' ? 'no address' : 'not sent'})</em>`}</li>`).join('');
+  return `<details class="rv-note"${sent ? ' open' : ''}><summary>Send a note${c.notes && c.notes.length ? ` (${c.notes.length} sent before)` : ''}</summary>
+        <p class="rv-meta">A short email to ${adminReviewEsc(c.display_name)}${c.lang === 'fr' ? ' (the greeting and sign-off will be in French)' : ''}, signed Dayton, with a link to the listing. Their email address stays hidden.</p>
+        <textarea class="rv-note-text" name="note" rows="3" maxlength="${VISITOR_NOTE_MAX}" aria-label="Note to ${adminReviewEsc(c.display_name)}"></textarea>
+        <div class="rv-actions"><button type="button" class="rv-btn rv-approve rv-note-send">Send</button></div>
+        <p class="rv-note-result" hidden></p>
+        <ul class="rv-note-list">${sent}</ul>
+      </details>`;
 }
 
 // What a signed-in owner sees on "My listings": visitor items that went live in the last 30 days.
@@ -44806,11 +44871,11 @@ function brevoApiKey() {
   return String(process.env.BREVO_API_KEY || '').trim().replace(/^(['"])(.*)\1$/, '$2').trim();
 }
 
-async function sendOwnerEmailViaBrevo({ to, subject, text, replyTo }) {
+async function sendOwnerEmailViaBrevo({ to, subject, text, html, replyTo }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': brevoApiKey(), 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text, ...(replyTo ? { replyTo: { email: replyTo } } : {}) }),
+    body: JSON.stringify({ sender: OWNER_EMAIL_SENDER, to: [{ email: to }], subject, textContent: text, ...(html ? { htmlContent: html } : {}), ...(replyTo ? { replyTo: { email: replyTo } } : {}) }),
   });
   if (!res.ok) {
     // Brevo's own reason (e.g. "Key not found"), never the key itself.
@@ -45978,7 +46043,8 @@ async function sendOwnerDecision(to, message) {
   const send = ownerDirectEmail();
   if (!send) return 'email_off';
   try {
-    for (const addr of to) await send({ to: addr, subject: message.subject, text: message.text });
+    // An HTML part only when the message has one (the visitor notes); every other email stays plain text.
+    for (const addr of to) await send({ to: addr, subject: message.subject, text: message.text, ...(message.html ? { html: message.html } : {}) });
     return 'sent';
   } catch (err) {
     console.error(`[admin-review] decision email failed: ${String((err && err.message) || err).slice(0, 300)}`);
@@ -46238,6 +46304,12 @@ const ADMIN_REVIEW_CSS = `
   .rv-opt { font-size: 0.85rem; display: inline-flex; gap: 6px; align-items: center; margin-right: 12px; }
   .rv-result { font-size: 0.86rem; font-weight: 700; margin: 8px 0 0; }
   .rv-card.rv-done { opacity: 0.55; }
+  .rv-note { margin-top: 12px; font-size: 0.86rem; }
+  .rv-note summary { cursor: pointer; font-weight: 800; }
+  .rv-note-text { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(42,32,25,0.2); background: #fff; font: inherit; font-size: 1rem; line-height: 1.45; resize: vertical; margin-top: 4px; }
+  .rv-note-result { font-weight: 700; margin: 8px 0 0; }
+  .rv-note-list { margin: 8px 0 0; padding-left: 18px; color: rgba(42,32,25,0.75); }
+  .rv-note-list:empty { display: none; }
   .rv-edit { width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid rgba(42,32,25,0.2); background: #fff; font: inherit; font-size: 0.88rem; font-weight: 600; }
   .rv-edit.rv-changed { border-color: #C98A1B; background: #FFF8E8; }
   textarea.rv-edit { resize: vertical; line-height: 1.45; }
@@ -46506,6 +46578,29 @@ function renderAdminReviewPage() {
     if (e.target.classList && e.target.classList.contains('rv-edit')) e.target.classList.toggle('rv-changed', e.target.value !== e.target.getAttribute('data-orig'));
   });
   var EMAIL = { sent: ' They were emailed.', failed: ' The email to them failed.', email_off: '', no_address: ' (No email address to tell them.)', forwarded: ' Their link went to info@okanaganroam.com to forward.', not_told: ' Nothing was sent to them.' };
+  // Send a note to a visitor (2026-10-23).
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('button.rv-note-send'); if (!btn) return;
+    var box = btn.closest('.rv-note'), card = btn.closest('.rv-card'), text = box.querySelector('textarea'), out = box.querySelector('.rv-note-result');
+    var msg = String(text.value || '').trim();
+    out.hidden = false;
+    if (!msg) { out.textContent = 'Write a note first.'; return; }
+    btn.disabled = true; out.textContent = 'Sending…';
+    fetch('/admin/review/visitor/' + card.getAttribute('data-id') + '/note', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ message: msg }) })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(x){
+        btn.disabled = false;
+        if (x.ok && x.j.emailed === 'sent') {
+          out.textContent = 'Note sent.';
+          var li = document.createElement('li'); li.textContent = 'Just now: ' + (msg.length > 80 ? msg.slice(0, 80) + '…' : msg);
+          box.querySelector('.rv-note-list').insertBefore(li, box.querySelector('.rv-note-list').firstChild);
+          text.value = ''; return;
+        }
+        out.textContent = x.ok ? (x.j.emailed === 'no_address' ? 'Not sent: there is no valid email address for them.' : (x.j.error || 'The email failed. Try again later.')) : ((x.j && x.j.error) || 'Something went wrong.');
+      })
+      .catch(function(){ btn.disabled = false; out.textContent = 'Could not reach the site. Check your connection.'; });
+  });
   document.addEventListener('click', function(e){
     var btn = e.target.closest('button[data-act]'); if (!btn) return;
     var card = btn.closest('.rv-card'), act = btn.getAttribute('data-act'), out = card.querySelector('.rv-result');
@@ -49184,6 +49279,19 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { status, contributions: listVisitorContributions(status) });
     }
     {
+      const m = /^\/admin\/visitor-contributions\/(\d+)\/note$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!requireAdminToken(req, res)) return;
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const reviewer = validateReviewer(body.reviewer);
+        if (!reviewer) return sendJSON(res, 400, { error: 'reviewer is required.' });
+        const out = await sendVisitorNote(Number(m[1]), body.message, reviewer);
+        return sendJSON(res, out.status, out.body);
+      }
+    }
+    {
       const m = /^\/admin\/visitor-contributions\/(\d+)\/(approve|reject|remove|make-main|keep)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!requireAdminToken(req, res)) return;
@@ -51280,6 +51388,18 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true });
     }
     {
+      const m = /^\/admin\/review\/visitor\/(\d+)\/note$/.exec(pathname);
+      if (m && method === 'POST') {
+        if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+        if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+        let body;
+        try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+        const out = await sendVisitorNote(Number(m[1]), body.message, ADMIN_REVIEWER);
+        return sendJSON(res, out.status, out.body);
+      }
+    }
+    {
       const m = /^\/admin\/review\/visitor\/(\d+)\/(approve|reject|remove|make-main|keep)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
@@ -52037,7 +52157,7 @@ module.exports = {
   stripJpegMetadata,
   cleanVisitorTip,
   purgeStaleVisitorContributions,
-  listVisitorContributions,
+  listVisitorContributions, sendVisitorNote, visitorNoteEmail,
   approveVisitorContribution,
   rejectVisitorContribution,
   removeVisitorContribution,

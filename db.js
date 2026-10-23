@@ -1052,6 +1052,21 @@ CREATE TABLE IF NOT EXISTS visitor_contribution_photos (
 CREATE INDEX IF NOT EXISTS idx_visitor_contribution_photos_contribution ON visitor_contribution_photos (contribution_id);
 `);
 
+// Notes Dayton sends a visitor about their tip or photo (2026-10-23), from /admin/review or the token API.
+// result is what the send returned ('sent', 'failed', 'no_address', 'email_off'); only 'sent' counts
+// towards the 3-a-day limit per item. The visitor's address is never copied here.
+db.exec(`
+CREATE TABLE IF NOT EXISTS visitor_contribution_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contribution_id INTEGER NOT NULL REFERENCES visitor_contributions(id),
+  message TEXT NOT NULL,
+  sent_by TEXT NOT NULL,
+  sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  result TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visitor_contribution_notes_contribution ON visitor_contribution_notes (contribution_id, sent_at);
+`);
+
 // Edit links survive a re-send (2026-10-18): asking /owner/link for a new link
 // no longer kills the one the owner is using. The old link's hash moves to
 // prev_token_hash and keeps working until the new link is first opened.
