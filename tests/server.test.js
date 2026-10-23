@@ -18136,7 +18136,7 @@ test('Shops & Outfitters: /shops renders with zero shop venues (coming soon, noi
       assert.match(empty.text, /class="shop-coming-soon">Shops and outfitters are coming soon/);
       assert.match(empty.text, /<body class="golf-page shop-page">/);
       assert.match(empty.text, /<meta name="robots" content="noindex/, 'nothing listed yet: noindex');
-      assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/outdoors\/activity-camping\.jpg"/);
+      assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/shops\/shops-outfitters\.jpg"/);
       assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
       assert.equal((await WINTER_GET(base, '/armstrong/shops')).status, 404, 'an empty region/shops pair 404s like any other');
       const emptySitemap = (await WINTER_GET(base, '/sitemap.xml')).text;

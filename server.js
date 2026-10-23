@@ -22794,7 +22794,7 @@ const CATEGORY_BANNER_IMAGES = Object.freeze({
   tour: { src: '/images/tours/tours.jpg', alt: 'A winemaker pouring for two guests on a cellar tour among oak barrels', pos: 25 },
   sport: { src: '/images/sports/sports.jpg', alt: 'A mountain biker riding a leafy forest trail in autumn', pos: 60 },
   // Shops & Outfitters (2026-10-23): the Outdoors camping photo for now (camping gear); a dedicated photo is to come.
-  shop: { src: '/images/outdoors/activity-camping.jpg', alt: 'A tent pitched on a grassy bluff above Okanagan Lake', pos: 55 },
+  shop: { src: '/images/shops/shops-outfitters.jpg', alt: 'Camp lanterns, a stove and folding tables on display in an outdoor shop', pos: 45 },
   indoor: { src: '/images/indoor/indoor.jpg', alt: 'Friends bowling together at an indoor bowling alley', pos: 40 },
 });
 const CATEGORY_BANNER_STYLE = `<style id="category-banner">
