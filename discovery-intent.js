@@ -130,6 +130,12 @@ const TYPE_ALIASES = {
   // (claimedPhrases, in the phrase table); while /sports lists nothing the
   // taxonomy leaves the type out, so these phrases read as before it existed.
   sport: ['sport', 'sports', 'recreation', 'sports and recreation', 'sports and rec', 'skate park', 'skate parks', 'skatepark', 'skateparks', 'skateboarding', 'pump track', 'pump tracks', 'bmx', 'bmx track', 'bmx tracks', 'bike park', 'bike parks', 'disc golf', 'disc golf course', 'disc golf courses', 'frisbee golf', 'pickleball', 'pickleball court', 'pickleball courts', 'tennis', 'tennis court', 'tennis courts', 'beach volleyball', 'volleyball', 'volleyball court', 'volleyball courts', 'basketball court', 'basketball courts'],
+  // Shops & Outfitters (2026-10-23). Only phrases no other list uses
+  // ("coffee shop" stays cafe as the longer phrase). Claimed by the shop type
+  // alone when the taxonomy has it; while /shops lists nothing the taxonomy
+  // leaves the type out, so these phrases read as before it existed. French
+  // phrases are written without accents (normalizeDiscoveryText strips them).
+  shop: ['shop', 'shops', 'store', 'stores', 'outfitter', 'outfitters', 'gear store', 'gear stores', 'gear shop', 'gear shops', 'outdoor store', 'outdoor stores', 'outdoor gear', 'hiking gear', 'camping gear', 'gift shop', 'gift shops', 'boutique', 'boutiques', 'shopping', 'magasin', 'magasins', 'equipement'],
 };
 
 const FEATURE_ALIASES = {
@@ -522,7 +528,7 @@ function uniq(list) { return Array.from(new Set(list)); }
 // [{ phrase, assign: [{ field, value }] }] -- every value checked against the
 // taxonomy, every phrase normalized the same way as the input.
 // Types whose aliases, when the taxonomy has the type, belong to it alone.
-const CLAIMING_TYPES = ['tour', 'sport'];
+const CLAIMING_TYPES = ['tour', 'sport', 'shop'];
 function buildPhraseTable(taxonomy) {
   const t = normalizeTaxonomy(taxonomy);
   const entries = new Map();
@@ -1050,7 +1056,7 @@ function emptyIntent() {
 
 // Type -> the daypart it naturally belongs to, for ordered multi-part
 // requests ("a romantic winery and dinner").
-const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', indoor: 'afternoon', tour: 'afternoon', sport: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
+const TYPE_DAYPART = { cafe: 'morning', winery: 'afternoon', golf: 'morning', beach: 'afternoon', outdoor: 'morning', indoor: 'afternoon', tour: 'afternoon', sport: 'afternoon', shop: 'afternoon', brewery: 'afternoon', distillery: 'afternoon', restaurant: 'evening', pub: 'evening', cocktail: 'evening' };
 
 function interpretDiscoveryQuery(text, taxonomy, options) {
   const opts = options || {};

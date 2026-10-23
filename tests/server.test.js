@@ -7055,7 +7055,7 @@ test('Batch 4A: the venue-shell predicate covers exactly the themed types plus t
   assert.deepEqual([...app.THEMED_VENUE_SHELL_TYPES].sort(), [...BATCH4A_FD_TYPES, 'winery'].sort());
   for (const t of [...BATCH4A_FD_TYPES, 'winery', 'golf', 'beach', 'outdoor']) assert.equal(app.usesThemedVenueShell(t), true, t);
   // The listing / card predicate is unchanged.
-  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'indoor', 'outdoor', 'sport', 'tour']); // + indoor, tour (2026-10-11), sport (2026-10-12)
+  assert.deepEqual([...app.THEMED_CATEGORY_TYPES].sort(), ['beach', 'golf', 'indoor', 'outdoor', 'shop', 'sport', 'tour']); // + indoor, tour (2026-10-11), sport (2026-10-12), shop (2026-10-23)
   for (const t of BATCH4A_FD_TYPES) assert.equal(app.usesThemedCategoryLayout(t), false, t);
 });
 
@@ -10160,7 +10160,7 @@ test('Phase 1: buildDiscoveryTaxonomy only exposes existing taxonomy and active 
   for (const r of t.regions) assert.equal(t.regionLabels[r], app.REGION_LABELS[r]);
   // Every category type, except Tours & Experiences while /tours lists nothing (2026-10-11).
   // Sports & Recreation too, while /sports lists nothing (2026-10-12).
-  assert.deepEqual(t.types, Object.keys(app.CATEGORY_SLUGS).filter((x) => (x !== 'tour' || app.countToursHubVenues() > 0) && (x !== 'sport' || app.countSportsHubVenues() > 0)));
+  assert.deepEqual(t.types, Object.keys(app.CATEGORY_SLUGS).filter((x) => (x !== 'tour' || app.countToursHubVenues() > 0) && (x !== 'sport' || app.countSportsHubVenues() > 0) && (x !== 'shop' || app.countShopsHubVenues() > 0)));
   assert.deepEqual(t.features, app.BOOL_FIELDS);
   assert.deepEqual(t.budgets, app.TRIP_VALID_BUDGETS);
   assert.deepEqual(t.paces, app.TRIP_VALID_PACES);
@@ -10234,7 +10234,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
   // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
-  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85', 'public/scripts/app.js (My Trip tray by day, 2026-10-18)');
+  assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede', 'public/scripts/app.js (My Trip tray by day, 2026-10-18)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -11416,7 +11416,7 @@ test('Hidden Gems page: Build My Trip "See everything" links follow the same rul
 // Every destination page lists the same 14 categories in one fixed order.
 // A category with results links to the page showing exactly them; an empty
 // one stays visible as a non-link, aria-disabled pill/card.
-const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'Tours & Experiences', 'Sports & Recreation', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
+const DEST_ORDER_LABELS = ['Restaurants', 'Cafes', 'Pubs', 'Wineries', 'Breweries', 'Distilleries', 'Cocktail Lounges', 'Golf Courses', 'Beaches', 'Outdoor Destinations', 'Indoor & Rainy Day Spots', 'Tours & Experiences', 'Sports & Recreation', 'Shops & Outfitters', 'What\u2019s On', 'Dog-Friendly Finds', 'Local Favourites', 'Hidden Gems'];
 function destTabs(html) {
   const nav = (html.match(/<nav class="category-region-selector region-category-tabs"[\s\S]*?<\/nav>/) || [''])[0];
   return [...nav.matchAll(/<(a|span)( href="([^"]+)")?([^>]*)>([^<]+) <span class="outdoor-activity-count">(\d+)<\/span><\/\1>/g)]
@@ -11432,7 +11432,7 @@ function destRegions() {
 test('Destination pages: every destination shows its live categories in the approved order, as tabs and as photo cards', () => {
   const regions = destRegions();
   assert.ok(regions.length > 0);
-  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'tour', 'sport', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
+  assert.deepEqual(app.DESTINATION_CATEGORY_ORDER, ['restaurant', 'cafe', 'pub', 'winery', 'brewery', 'distillery', 'cocktail', 'golf', 'beach', 'outdoor', 'indoor', 'tour', 'sport', 'shop', 'whats-on', 'dog-friendly', 'local-favourites', 'hidden-gems']);
   for (const r of regions) {
     const counts = app.getRegionCategoryCounts(r);
     const live = app.destinationCategories(r, counts).filter((c) => c.href);
@@ -11809,7 +11809,7 @@ test('List Your Venue: the page renders the form with the canonical types, regio
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app.css">/);
   for (const t of app.VENUE_SUBMISSION_TYPES) assert.match(html, new RegExp(`<option value="${t}">`));
   for (const r of app.VENUE_SUBMISSION_REGIONS) assert.match(html, new RegExp(`<option value="${r}">`));
-  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 13); // + indoor, tour (2026-10-11), sport (2026-10-12)
+  assert.equal(app.VENUE_SUBMISSION_TYPES.length, 14); // + indoor, tour (2026-10-11), sport (2026-10-12), shop (2026-10-23)
   assert.equal(app.VENUE_SUBMISSION_REGIONS.length, 20);
   for (const a of app.VENUE_SUBMISSION_AMENITIES) assert.match(html, new RegExp(`name="amenities" value="${a}"`));
   assert.match(html, /name="company_website" tabindex="-1"/, 'honeypot');
@@ -12168,7 +12168,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
+  assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -16422,7 +16422,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85');
+  assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
 
@@ -16515,7 +16515,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), 'e079ad5a3e0a9a71b3fe37994377ef85', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), '4be55ccb9190903774cc160067722ede', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -17911,7 +17911,7 @@ test('Sports & Recreation: registered as a themed, non-planner category with its
   assert.ok(app.ALL_REGIONS_CATEGORIES.includes('sport'));
   assert.ok(!app.TRIP_INTEREST_TYPES.includes('sport'), 'not a Build My Trip interest');
   assert.ok(!app.buildTripPlannerTaxonomy().types.includes('sport'), 'the planner never parses it as a type');
-  assert.deepEqual(app.BROWSE_HUB_TYPE_ORDER.slice(-2), ['tour', 'sport'], 'browse chip right after tour');
+  assert.deepEqual(app.BROWSE_HUB_TYPE_ORDER.slice(-3, -1), ['tour', 'sport'], 'browse chip right after tour');
   assert.ok(app.VENUE_SUBMISSION_TYPES.includes('sport'));
   assert.ok(app.NON_DISCOVERY_COLLECTION_KINDS.has(app.SPORTS_ALSO_COLLECTION_KIND), 'never offered as a trip discovery option');
   const col = db.prepare("SELECT slug, title FROM collections WHERE kind = 'sports_also'").get();
@@ -18104,6 +18104,147 @@ test('Sports & Recreation: discovery sends skate park, pickleball, tennis, disc 
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(skate.id);
   }
+}));
+
+// ==== Shops & Outfitters (2026-10-23): the `shop` type and /shops ==========
+
+test('Shops & Outfitters: registered as a themed, non-planner category with its labels, slug, gradient and schema type', () => {
+  assert.equal(app.CATEGORY_SLUGS.shop, 'shops');
+  assert.deepEqual(app.CATEGORY_LABELS.shop, { singular: 'Shop', plural: 'Shops & Outfitters' });
+  assert.equal(app.SCHEMA_TYPE_MAP.shop, 'Store');
+  assert.deepEqual(app.TYPE_ACCENT_GRADIENTS.shop, ['#2F5D46', '#8A6A3B']);
+  assert.ok(app.usesThemedCategoryLayout('shop'));
+  assert.ok(app.ALL_REGIONS_CATEGORIES.includes('shop'));
+  assert.ok(!app.TRIP_INTEREST_TYPES.includes('shop'), 'not a Build My Trip interest');
+  assert.ok(!app.buildTripPlannerTaxonomy().types.includes('shop'), 'the planner never parses it as a type');
+  assert.deepEqual(app.BROWSE_HUB_TYPE_ORDER.slice(-2), ['sport', 'shop'], 'browse chip right after sport');
+  assert.ok(app.VENUE_SUBMISSION_TYPES.includes('shop'));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
+  assert.match(src, /'tripv3\.type\.shop': 'Shops & Outfitters'/);
+  assert.match(src, /'tripv3\.type\.shop': 'Boutiques et \\u00e9quipement'/);
+});
+
+test('Shops & Outfitters: /shops renders with zero shop venues (coming soon, noindex, not in the sitemap), then region/venue pages, sitemap, /categories and the submission form', async () => {
+  let shop = null;
+  try {
+    await withWinterServer(async (base) => {
+      assert.equal(app.getVenuesByCategory('shop').length, 0);
+      assert.equal(app.countShopsHubVenues(), 0);
+      const empty = await WINTER_GET(base, '/shops');
+      assert.equal(empty.status, 200);
+      assert.match(empty.text, /<h1>Shops &amp; Outfitters in the Okanagan<\/h1>/);
+      assert.match(empty.text, /class="shop-coming-soon">Shops and outfitters are coming soon/);
+      assert.match(empty.text, /<body class="golf-page shop-page">/);
+      assert.match(empty.text, /<meta name="robots" content="noindex/, 'nothing listed yet: noindex');
+      assert.match(empty.text, /og:image" content="https:\/\/okanaganroam\.com\/images\/outdoors\/activity-camping\.jpg"/);
+      assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
+      assert.equal((await WINTER_GET(base, '/armstrong/shops')).status, 404, 'an empty region/shops pair 404s like any other');
+      const emptySitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+      assert.ok(!emptySitemap.includes('<loc>https://okanaganroam.com/shops</loc>'), 'a noindex hub stays out of the sitemap');
+      const emptyCats = (await WINTER_GET(base, '/categories')).text;
+      assert.match(emptyCats, /<a href="\/shops">Shops &amp; Outfitters<\/a>/, '/categories always lists /shops');
+
+      shop = app.createVenue({ name: 'Shop Test Outdoors', region: 'armstrong', type: 'shop', description: 'A fixture outdoor gear store with hiking footwear, trekking poles and camping gear.', hours: 'Mon-Sat 9:30-17:30; Sun Closed', slug: 'shop-test-outdoors' });
+      assert.equal(app.countShopsHubVenues(), 1);
+      const hub = await WINTER_GET(base, '/shops');
+      assert.equal(hub.status, 200);
+      assert.match(hub.text, /href="\/armstrong\/shops\/shop-test-outdoors"/);
+      assert.doesNotMatch(hub.text, /class="shop-coming-soon"/, 'renders normally from the first shop');
+      assert.match(hub.text, /<meta name="robots" content="noindex/, `noindex until ${app.SHOP_INDEX_MIN} shops`);
+      assert.match(hub.text, /1 verified shop across the Okanagan Valley/, 'singular for one');
+      const region = await WINTER_GET(base, '/armstrong/shops');
+      assert.equal(region.status, 200);
+      assert.match(region.text, /1 verified shop in Armstrong\./);
+      assert.match(region.text, /Shops &amp; Outfitters in Armstrong, BC/);
+      assert.match(region.text, /class="category-back-link" href="\/shops">← All Shops &amp; Outfitters</);
+      assert.match(region.text, /<body class="golf-page shop-page">/);
+      const venue = await WINTER_GET(base, '/armstrong/shops/shop-test-outdoors');
+      assert.equal(venue.status, 200);
+      assert.match(venue.text, /<title>Shop Test Outdoors — Shop in Armstrong, BC \| Okanagan Roam<\/title>/);
+      assert.match(venue.text, /"@type":"Store"/);
+      assert.match(venue.text, /shop-page/);
+      const armstrong = await WINTER_GET(base, '/armstrong');
+      assert.match(armstrong.text, /<a href="\/armstrong\/shops">Shops &amp; Outfitters<\/a>/);
+
+      assert.doesNotMatch(venue.text, /<meta name="robots" content="noindex/, 'a shop page itself is indexable');
+
+      const sitemap = (await WINTER_GET(base, '/sitemap.xml')).text;
+      assert.ok(sitemap.includes('<loc>https://okanaganroam.com/armstrong/shops/shop-test-outdoors</loc>'), 'the shop page is in the sitemap');
+      assert.ok(!sitemap.includes('<loc>https://okanaganroam.com/shops</loc>'), 'the hub waits for SHOP_INDEX_MIN shops');
+      const form = (await WINTER_GET(base, '/list-your-venue')).text;
+      assert.match(form, /<option value="shop">Shop<\/option>/);
+      // Planner output never includes a shop.
+      const plan = app.runTripPlan({ text: 'Plan a day in Armstrong' }, new Date('2026-07-15T17:00:00Z'));
+      assert.ok(!JSON.stringify(plan).includes('shop-test-outdoors'), 'shop venues never become planner stops');
+      assert.ok(!app.buildTripPlannerTaxonomy().venues.some((v) => v.type === 'shop'));
+    });
+  } finally {
+    if (shop) db.prepare('DELETE FROM venues WHERE id = ?').run(shop.id);
+  }
+});
+
+test('Shops & Outfitters: /shops and /:region/shops stay noindex and out of the sitemap until SHOP_INDEX_MIN (5) shops site-wide; 4 -> noindex, 5 -> indexable', async () => {
+  assert.equal(app.SHOP_INDEX_MIN, 5);
+  const ids = [];
+  const addShop = (i) => ids.push(app.createVenue({ name: `Threshold Test Shop ${i}`, region: 'armstrong', type: 'shop', description: `Fixture outdoor gear store number ${i} with hiking footwear, trekking poles, camping gear and friendly advice.`, hours: 'Mon-Sat 9:30-17:30; Sun Closed', slug: `threshold-test-shop-${i}` }).id);
+  try {
+    await withWinterServer(async (base) => {
+      for (let i = 1; i <= 4; i++) addShop(i);
+      assert.equal(app.countShopsHubVenues(), 4);
+      const robots = /<meta name="robots" content="noindex/;
+      const hub4 = await WINTER_GET(base, '/shops');
+      assert.equal(hub4.status, 200);
+      assert.match(hub4.text, robots, '4 shops: /shops is noindex');
+      const town4 = await WINTER_GET(base, '/armstrong/shops');
+      assert.equal(town4.status, 200);
+      assert.match(town4.text, robots, '4 shops: /armstrong/shops is noindex (above the town minimum, below the shop one)');
+      assert.doesNotMatch((await WINTER_GET(base, '/armstrong/shops/threshold-test-shop-1')).text, robots, 'shop venue pages are indexable');
+      const sitemap4 = (await WINTER_GET(base, '/sitemap.xml')).text;
+      assert.ok(!sitemap4.includes('<loc>https://okanaganroam.com/shops</loc>'), '4 shops: /shops not in the sitemap');
+      assert.ok(!sitemap4.includes('<loc>https://okanaganroam.com/armstrong/shops</loc>'), '4 shops: /armstrong/shops not in the sitemap');
+      assert.ok(sitemap4.includes('<loc>https://okanaganroam.com/armstrong/shops/threshold-test-shop-1</loc>'), 'venue pages are listed');
+
+      addShop(5);
+      assert.equal(app.countShopsHubVenues(), 5);
+      assert.doesNotMatch((await WINTER_GET(base, '/shops')).text, robots, '5 shops: /shops is indexable');
+      assert.doesNotMatch((await WINTER_GET(base, '/armstrong/shops')).text, robots, '5 shops: /armstrong/shops is indexable');
+      const sitemap5 = (await WINTER_GET(base, '/sitemap.xml')).text;
+      assert.ok(sitemap5.includes('<loc>https://okanaganroam.com/shops</loc>'), '5 shops: /shops in the sitemap');
+      assert.ok(sitemap5.includes('<loc>https://okanaganroam.com/armstrong/shops</loc>'), '5 shops: /armstrong/shops in the sitemap');
+    });
+  } finally {
+    for (const id of ids) db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+  }
+});
+
+test('Shops & Outfitters: discovery sends shop, outfitter, hiking gear and gift shop requests to the shop pages once /shops lists something (empty: the old answers)', () => withDiscoveryFlag('on', () => {
+  const route = (q) => app.resolveDiscoveryDestination(app.interpretDiscoveryText(q));
+  const SHOP_QUERIES = ['shop', 'shops', 'store', 'outfitters', 'gear store', 'outdoor store', 'hiking gear', 'camping gear', 'gift shop', 'boutiques', 'shopping', 'magasins', 'équipement'];
+  assert.equal(app.countShopsHubVenues(), 0);
+  assert.ok(!app.buildDiscoveryTaxonomy().types.includes('shop'));
+  const before = Object.fromEntries(SHOP_QUERIES.map((q) => [q, route(q).url]));
+  for (const q of SHOP_QUERIES) {
+    assert.ok(!app.interpretDiscoveryText(q).types.includes('shop'), q);
+    assert.notEqual(route(q).url, '/shops', q);
+  }
+  const shop = app.createVenue({ name: 'Shop Discovery Outfitters', region: 'armstrong', type: 'shop', description: 'Fixture.', slug: 'shop-discovery-outfitters' });
+  try {
+    assert.ok(app.buildDiscoveryTaxonomy().types.includes('shop'), 'listed once the hub has a venue');
+    for (const q of SHOP_QUERIES) {
+      assert.deepEqual(app.interpretDiscoveryText(q).types, ['shop'], q);
+      assert.equal(route(q).url, '/shops', q);
+    }
+    assert.equal(route('hiking gear in Armstrong').url, '/armstrong/shops');
+    // Existing aliases are unchanged: a coffee shop is a cafe.
+    assert.deepEqual(app.interpretDiscoveryText('coffee shop').types, ['cafe']);
+    assert.deepEqual(app.interpretDiscoveryText('parks').types, ['outdoor']);
+    // The trip planner has no shop type: its reading is unchanged.
+    const di = require('../discovery-intent.js');
+    assert.ok(!di.interpretDiscoveryQuery('gift shop', app.buildTripPlannerTaxonomy()).types.includes('shop'));
+  } finally {
+    db.prepare('DELETE FROM venues WHERE id = ?').run(shop.id);
+  }
+  for (const q of SHOP_QUERIES) assert.equal(route(q).url, before[q], `${q}: back to the old answer`);
 }));
 
 // Indoor discovery: a banner and server-rendered experience filters, hub only.
@@ -18312,7 +18453,7 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src)), `${type} image exists`);
     assert.ok(b.alt && b.alt.length > 10, `${type} has alt text`);
   }
-  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'indoor', 'outdoor', 'pub', 'restaurant', 'sport', 'tour', 'winery']);
+  assert.deepEqual(Object.keys(app.CATEGORY_BANNER_IMAGES).sort(), ['beach', 'brewery', 'cafe', 'cocktail', 'distillery', 'golf', 'indoor', 'outdoor', 'pub', 'restaurant', 'shop', 'sport', 'tour', 'winery']);
   for (const [type, b] of Object.entries(app.CATEGORY_BANNER_IMAGES)) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', b.src.replace(/\/([^/]+)$/, '/thumbs/$1'))), `${type} has a card thumbnail`);
   const golfFixture = [{ id: 990001, name: 'Banner Golf', slug: 'banner-golf', region: 'kelowna', type: 'golf', description: 'Fixture.' }];
   assert.match(app.renderCategoryPage('kelowna', 'golf', golfFixture, []), /<div class="category-banner"><img src="\/images\/golf\/golf-courses\.jpg"/, 'golf region pages open with the golf photo');
