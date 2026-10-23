@@ -301,6 +301,28 @@ function hoursStatusLabel(status, clock) {
   return { state: 'closed', text: status.opensAt ? lead + ' · Opens ' + when(status.opensAt) : (status.closedToday ? today : 'Closed now') };
 }
 
+// ---- Happy hour (2026-10-23) ----
+// The one "is happy hour on?" answer, shared by the Roam Now map (serialized into its page script, which already
+// carries the functions above) and the venue page (server-side). `hh` is the stored happy-hour week, read like
+// opening hours (windows past midnight included); `placeClosedNow` is true when the place's own hours say it is
+// closed at this moment (then a window that is "on" is not claimed).
+// -> null | { state: 'now', until: { weekday, minutes } | null }
+//         | { state: 'later', from, to }               -- a window still to come today
+//         | { state: 'next', from, to, nextWeek }      -- the next window on another day, up to a week ahead
+// `to` is when that window ends ({ weekday, minutes }, or null when it can't be read).
+function happyHourState(hh, clock, placeClosedNow) {
+  const parsed = parseHours(hh);
+  const s = statusAt(parsed, clock);
+  if (s.state === 'open') return placeClosedNow ? null : { state: 'now', until: s.closesAt };
+  if (s.state !== 'closed' || !s.opensAt) return null;
+  const from = s.opensAt;
+  const probe = statusAt(parsed, { weekday: from.weekday, minutes: from.minutes });
+  const to = probe.state === 'open' ? probe.closesAt : null;
+  // nextOpening() only returns today's weekday for a start still ahead today, or for the same day next week.
+  if (from.weekday === clock.weekday && from.minutes > clock.minutes) return { state: 'later', from, to };
+  return { state: 'next', from, to, nextWeek: from.weekday === clock.weekday };
+}
+
 // ---- Listing and structured data (Stage 2, 2026-09-29) ----
 // The venue page's weekly list and schema.org OpeningHoursSpecification both
 // read parseHours() output, so every surface agrees on what a day is.
@@ -371,6 +393,7 @@ module.exports = {
   statusAt,
   formatClockMinutes,
   hoursStatusLabel,
+  happyHourState,
   formatClock24,
   formatRange,
   dayHoursText,
