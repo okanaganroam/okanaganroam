@@ -124,3 +124,20 @@ test('hotel logo (2026-10-21): only a file under /images/hotels/ shows on the ca
   assert.ok(html.includes('<img class="hc-logo" src="/images/hotels/test-hotel.png"'));
   assert.ok(!app.renderHotelCard(app.hotelList()[0]).includes('hc-logo"'));
 });
+
+test('rental managers (2026-10-22): "Things to do around <Town>", for guests of the company, with no walk or drive times', async () => {
+  const rental = app.hotelList().find((h) => app.hotelIsRental(h));
+  assert.ok(rental, 'data has at least one rental entry');
+  const town = rental.region === 'big-white' ? 'Big White' : null;
+  assert.match(app.hotelHeadline(rental), /^around /);
+  assert.equal(app.hotelHeadline({ name: 'Hotel X', region: 'kelowna' }), 'near Hotel X');
+  const r = await get(`/near/${rental.slug}`);
+  assert.equal(r.status, 200);
+  assert.match(r.text, /<h1>Things to do around [^<]+<\/h1>/);
+  assert.ok(r.text.includes(`for guests of ${rental.name}`));
+  assert.ok(!/min walk|min drive/.test(r.text), 'no walk/drive times from one door');
+  const card = (await get(`/near/${rental.slug}/card`)).text;
+  assert.match(card, /<h1 class="hc-h[^"]*">Things to do around /);
+  assert.ok(card.includes(`Compliments of ${rental.name}`));
+  if (town) assert.ok(card.includes(town));
+});

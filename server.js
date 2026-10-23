@@ -19087,6 +19087,16 @@ function hotelList() {
 function hotelLogo(hotel) {
   return hotel && typeof hotel.logo === 'string' && /^\/images\/hotels\/[a-z0-9-]+\.(png|jpe?g|webp)$/.test(hotel.logo) ? hotel.logo : null;
 }
+// Rental managers (2026-10-22): "kind": "rental" is a vacation-rental company whose units are spread around a town, so
+// its page and card read "Things to do around <Town>" (centred on the town), compliments of the company, without walk or
+// drive times from one front door.
+function hotelIsRental(hotel) {
+  return !!(hotel && hotel.kind === 'rental');
+}
+function hotelHeadline(hotel) {
+  const town = REGION_LABELS[hotel.region] || hotel.region;
+  return hotelIsRental(hotel) ? `around ${town}` : `near ${hotel.name}`;
+}
 function findHotel(slug) {
   return hotelList().find((h) => h.slug === slug) || null;
 }
@@ -19154,7 +19164,7 @@ function renderHotelPage(hotel, now = new Date()) {
     const photo = venueThumbPhoto(v, photosUsed);
     const tripQuery = `${v.name}, ${town}, Okanagan Valley, BC`;
     return `<li class="ht-card" data-venue-id="${v.id}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)} · ${escapeHtml(hotelAwayText(km))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : ''}</a>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : ''}</a>
       <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>
     </li>`;
   };
@@ -19163,8 +19173,10 @@ function renderHotelPage(hotel, now = new Date()) {
     const label = upcomingEventDateLabel(e.nextDate, e.nextEndDate, now);
     return href ? `<li><a class="ht-event" href="${href}"><span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span></a></li>` : '';
   };
-  const title = `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
-  const description = `Restaurants, wineries, cafés and things to do close to ${hotel.name} in ${town}, BC, with what's open now and this week's events.`;
+  const title = hotelIsRental(hotel) ? `Things to Do Around ${town} for ${hotel.name} Guests | Okanagan Roam` : `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
+  const description = hotelIsRental(hotel)
+    ? `Restaurants, wineries, cafés and things to do around ${town}, BC, for guests of ${hotel.name}, with what's open now and this week's events.`
+    : `Restaurants, wineries, cafés and things to do close to ${hotel.name} in ${town}, BC, with what's open now and this week's events.`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19205,8 +19217,8 @@ ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="ht-wrap">
   <p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p>
-  <h1>Things to do near ${escapeHtml(hotel.name)}</h1>
-  <p class="ht-intro">Places to eat and drink, wineries and things to do close to ${escapeHtml(hotel.name)}, closest first, with what's open right now. Tap Add to trip to save a place, then Build My Trip turns it into a plan.</p>
+  <h1>Things to do ${escapeHtml(hotelHeadline(hotel))}</h1>
+  <p class="ht-intro">Places to eat and drink, wineries and things to do ${hotelIsRental(hotel) ? `around ${escapeHtml(town)}` : `close to ${escapeHtml(hotel.name)}, closest first`}, with what's open right now. Tap Add to trip to save a place, then Build My Trip turns it into a plan.</p>
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
     <a href="/map" data-ht-cta="map">Map of what's open</a>
@@ -19288,7 +19300,7 @@ function renderHotelCard(hotel) {
 <div class="hc-card${hotelLogo(hotel) ? ' hc-has-logo' : ''}">
   <div class="hc-brand">OKANAGAN <span>ROAM</span></div>
   <div class="hc-rule"></div>
-  <h1 class="hc-h${hotel.name.length > 30 ? ' hc-h-xl' : hotel.name.length > 22 ? ' hc-h-l' : ''}">Things to do near ${escapeHtml(hotel.name)}</h1>
+  <h1 class="hc-h${hotelHeadline(hotel).length > 35 ? ' hc-h-xl' : hotelHeadline(hotel).length > 27 ? ' hc-h-l' : ''}">Things to do ${escapeHtml(hotelHeadline(hotel))}</h1>
   <p class="hc-sub">Restaurants, wineries and things to do around ${escapeHtml(town)}, with what's open right now and this week's events.</p>
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera</div>
@@ -51852,7 +51864,7 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   // Hotel QR pages (2026-10-20)
-  hotelList, findHotel, hotelLogo, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
+  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,
