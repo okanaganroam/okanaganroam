@@ -93,6 +93,11 @@ const REGION_EXTRA_ALIASES = {
   'lake-country': ['lake country', 'winfield', 'oyama', 'okanagan centre', 'okanagan center', 'carrs landing'],
   apex: ['apex', 'apex mountain'],
   baldy: ['baldy', 'mount baldy', 'baldy mountain'],
+  // 2026-10-25: wine benches and neighbourhoods visitors name ("wine tasting on the Naramata Bench" left "bench" as
+  // not understood).
+  naramata: ['naramata bench', 'the naramata bench'],
+  oliver: ['golden mile', 'golden mile bench', 'the golden mile', 'black sage bench', 'black sage road', 'black sage'],
+  kelowna: ['east kelowna', 'lower mission', 'upper mission', 'the mission', 'rutland', 'glenmore', 'downtown kelowna'],
 };
 // Valley-wide scope: understood, and deliberately means "no region filter".
 const VALLEY_WIDE_PHRASES = ['okanagan', 'the okanagan', 'okanagan valley', 'the valley', 'anywhere', 'valley wide', 'bc', 'british columbia', 'okanagan lake'];
@@ -347,6 +352,8 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'whats wanna gonna ive id nearby close near '
   // Round 11 (2026-10-20): "road trip through the Okanagan Valley" -- "through" and "valley" were read as interests.
   + 'through thru valley '
+  // 2026-10-25: "with a designated driver" is how people get between wineries, not a kind of place.
+  + 'designated driver drivers dd '
   // French search (2026-10-19, round 7): French articles and joiners left in a French request after its words are read
   // in English ("bonhomme de neige" listed 1,650 places, every one with "de" somewhere). "a" (à) is above.
   + 'de du des la le les l d et au aux en '
