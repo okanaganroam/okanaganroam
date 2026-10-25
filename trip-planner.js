@@ -6027,7 +6027,9 @@ function planItinerary(input) {
     const when = pairWithEvent ? { daypart: 'evening' } : trip.when ? { ...trip.when, ...(daypart ? { daypart } : {}) } : daypart ? { daypart } : null;
     const ci = {
       // A walk by the lake can be a lakeside park, promenade or beach path that is listed as a walk (2026-10-14).
-      regions, types: c.lake ? [...new Set([...c.types, 'outdoor', 'beach'])] : c.types, activities: c.lake ? [] : c.activities || [], collections: c.collections || [], features: c.features || [],
+      // 2026-10-25: a lunch may be a café that serves lunch when no restaurant fits ("wine, lunch and dinner in Naramata"
+      // in late October: every Naramata lunch restaurant was closed for the season, so the lunch was dropped).
+      regions, types: c.lake ? [...new Set([...c.types, 'outdoor', 'beach'])] : c.meal === 'lunch' && !c.venueId && !(c.cuisines || []).length && c.types.includes('restaurant') ? [...new Set([...c.types, 'cafe'])] : c.types, activities: c.lake ? [] : c.activities || [], collections: c.collections || [], features: c.features || [],
       foodTerms: (c.cuisines || []).map((q) => ({ term: q, cuisine: q })), party: { dog: !!c.dog, kids: !!c.kids },
       occasion: ['dinner','supper'].includes(c.meal) ? trip.outingOccasion || null : null, when, superlative: false,
       // Stage 3.5: the request's exclusions hold for every part.
@@ -6055,7 +6057,10 @@ function planItinerary(input) {
       if (c.meal && !c.venueId && notAMeal(v) && !(c.cuisines || []).length) continue; // round 12: a dessert stand is not dinner
       // Round 14 (2026-10-20): a café hop is coffee houses and bakeries, not a sub shop, juice bar or ice-cream counter.
       if (trip.crawl && v.type === 'cafe' && !c.venueId && !['coffee', 'unclear'].includes(cafeRole(v))) continue;
+      const lunchCafe = c.meal === 'lunch' && v.type === 'cafe' && !c.types.includes('cafe');
+      if (lunchCafe && !['coffee', 'unclear'].includes(cafeRole(v))) continue; // a lunch café serves food, not just treats
       const s = scoreVenue(v, ctx);
+      if (lunchCafe) s.score -= 6; // a restaurant first when one fits
       const t = requestedTimeFit(v, ctx);
       if (t && t.skip) continue;
       if (input.requirements && anchor?.start != null && daypart && SLOT_WINDOWS[daypart]?.from < anchor.start) {
