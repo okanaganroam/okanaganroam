@@ -305,6 +305,8 @@ const PHRASES = [
   ['est', ''], ['sont', ''], ['ai', 'have'], ['avons', 'have'], ['avez', 'have'], ['suis', 'am'], ['sommes', 'are'], ['etre', ''],
   ['se', ''], ['me', ''], ['moi', 'me'], ['nous', 'us'], ['vous', 'you'], ['tout', 'all'], ['toute', 'all'], ['tous', 'all'],
   ['toutes', 'all'], ['tres', 'very'], ['bien', ''], ['peu', ''], ['un peu', ''], ['petit', ''], ['petite', ''], ['petits', ''],
+  // 2026-10-25 (last, after every longer phrase): « un brunch puis une promenade à Kelowna » kept « promenade ».
+  ['promenade', 'walk'], ['promenades', 'walks'], ['balade', 'walk'], ['balades', 'walks'], ['se promener', 'walk'],
 ];
 const PHRASE_MAP = new Map();
 for (const [fr, en] of PHRASES) if (!PHRASE_MAP.has(fr)) PHRASE_MAP.set(fr, en);

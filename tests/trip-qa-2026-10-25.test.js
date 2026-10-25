@@ -149,3 +149,11 @@ test('a floating sauna or wellness studio is a spa; a pool with a sauna is not',
   assert.ok(req.inferPlannerKinds({ type: 'indoor', name: 'Shelter Floating Sauna', description: 'A wood-fired sauna floating on Skaha Lake.' }).includes('spa'));
   assert.ok(!req.inferPlannerKinds({ type: 'indoor', name: 'Kelowna Family YMCA', description: 'Pool, gym and sauna.' }).includes('spa'));
 });
+
+test('French: « promenade » and « balade » are a walk, and « balade à vélo » is still a bike ride', () => {
+  const fr = require('../trip-planner-fr.js');
+  const tax = { regions: ['kelowna', 'penticton'], regionLabels: { kelowna: 'Kelowna', penticton: 'Penticton' } };
+  assert.match(fr.tripPlannerText('un brunch puis une promenade à Kelowna', tax), /\bwalk\b/);
+  assert.match(fr.tripPlannerText('une balade et un café à Penticton', tax), /\bwalk\b/);
+  assert.match(fr.tripPlannerText('une balade à vélo à Kelowna', tax), /bike ride/);
+});
