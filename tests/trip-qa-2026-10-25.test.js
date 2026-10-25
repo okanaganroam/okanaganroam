@@ -119,3 +119,11 @@ test('a trail named after its park is the same place as the park (one per trip)'
   assert.equal(key('Boulder Trail (Okanagan Mountain Park)'), key('Okanagan Mountain Provincial Park'));
   assert.notEqual(key('Lions Park (Oliver)'), key('Oliver Community Park'));
 });
+
+test('an outdoor place that needs a permit shows its permit sentence', () => {
+  const req = require('../trip-requirements');
+  const nkwala = { type: 'outdoor', plannerDescription: 'A former fire-lookout mountain above Penticton. The mountain is on Penticton Indian Band land, and the band requires a free paper permit from its administration office on Westhills Drive. Bears are common.' };
+  assert.equal(req.listedAccessNotes(nkwala).length, 1);
+  assert.match(req.listedAccessNotes(nkwala)[0], /free paper permit/);
+  assert.equal(req.listedAccessNotes({ type: 'outdoor', plannerDescription: 'A nice park. No permit needed for picnics.' }).length, 0);
+});

@@ -929,7 +929,14 @@ function listedAccessConflict(v,requirements,day,date) {
  return afterMinutes>=720?{source,afterMinutes,conditional:true}:null;
 }
 function listedAccessNotes(v) {
- if(!['sport','tour'].includes(v.type)||typeof v.plannerDescription!=='string')return [];
+ if(typeof v.plannerDescription!=='string')return [];
+ // 2026-10-25: an outdoor place that needs a permit says so (Mount Nkwala: a free paper permit from the Penticton
+ // Indian Band) -- only its permit sentences, nothing else from an outdoor listing.
+ if(v.type==='outdoor'){
+  const permit=/\b(?:permits? (?:is |are )?(?:required|mandatory|needed)|(?:requires?|need|needs|obtain|get) a (?:free )?(?:paper )?permit|(?:paper )?permits? (?:are |is )?mandatory|permission (?:is )?required)\b/i;
+  return [...new Set(v.plannerDescription.split(/(?<=[.!?])\s+(?=[A-Z])|[\r\n]+/).map(x=>x.trim()).filter(x=>permit.test(x)&&!/\b(?:no|not|without) (?:a )?(?:permits?|permission)\b|\bnot (?:required|needed|necessary)\b/i.test(x)))].slice(0,1).map(s=>'Access / schedule from the listing: “'+s+'” Confirm access and scheduling with the operator before visiting.');
+ }
+ if(!['sport','tour'].includes(v.type))return [];
  const sentences=v.plannerDescription.split(/(?<=[.!?])\s+(?=[A-Z])|[\r\n]+/).map(x=>x.trim()).filter(Boolean);
  const relevant=/\b(?:practice (?:and race )?nights?|race nights?|open houses?|riding season|school days?|dawn to dusk|members?(?:ship)? (?:only|required)|permit(?:s)? (?:required|needed)|(?:advance )?bookings? (?:is |are )?(?:required|essential)|reservations? (?:is |are )?(?:required|essential)|(?:book|reserve) (?:in advance|ahead)|(?:tours?|trips?|cruises?) (?:depart|run|operate)|(?:seasonal|seasonally|season dependent)|closed (?:for|during|until)|by appointment)\b/i;
  return [...new Set(sentences.filter(s=>relevant.test(s)))].slice(0,3).map(s=>'Access / schedule from the listing: “'+s+'” Confirm access and scheduling with the operator before visiting.');
