@@ -494,7 +494,9 @@ function explicitOutingComponents(trip,requirements) {
   const items=requirements.items||[],days=items.find(i=>i.kind==='days')?.value||requirements.planDays;
   if(days>1 || items.some(i=>i.dayIndex>1))return trip;
   const kinds=items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  const scoped=kinds.some(i=>SPORT_KINDS[i.value])&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
+  // 2026-10-25: "spa day and dinner in Penticton" found nothing (the spa and the dinner were one request); an activity
+  // asked for with a meal is two stops, as a game and dinner already were.
+  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
   if(!scoped)return requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip;
   const text=requirements.text||'',parts=[];
   const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor';

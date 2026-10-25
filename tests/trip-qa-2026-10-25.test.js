@@ -200,3 +200,17 @@ test('Build My Trip: clock times are not search words ("dinner at 7pm", "lunch a
   const j = d.interpretDiscoveryQuery('dinner at 7 pm in Kelowna', TAXONOMY, { tripPlanner: true });
   assert.ok(!j.textTerms.includes('pm') && !j.unsupported.includes('pm'));
 });
+
+test('a waterfall search finds a listing named "Falls" in Build My Trip matching too', () => {
+  const ds = require('../discovery-search.js');
+  const v = { id: 1, name: 'BX Creek Trail & BX Falls', textName: 'bx creek trail bx falls', textCuisine: '', textDesc: 'a creek trail to a canyon', type: 'outdoor' };
+  assert.ok(ds.foodMatch(v, { term: 'waterfall', cuisine: null }));
+  assert.ok(!ds.foodMatch(v, { term: 'pizza', cuisine: null }));
+});
+
+test('a spa (or museum, gallery...) asked for with a meal is two stops', () => {
+  const req = require('../trip-requirements');
+  const tax = { regions: ['penticton'], regionLabels: { penticton: 'Penticton' } };
+  const r = req.extractTripRequirements({ text: 'spa day and dinner in Penticton', intent: { days: null }, taxonomy: tax });
+  assert.ok(r.items.some((i) => i.kind === 'venue_kind' && i.value === 'spa'));
+});
