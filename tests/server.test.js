@@ -31911,3 +31911,17 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('New hiking trail photos (2026-10-25): every photo in the batch exists and is credited', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const credits = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photo-credits.json'), 'utf8'));
+  const batch = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data/venue-photos-trails-2026-10-25.json'), 'utf8'));
+  assert.equal(batch.venues.length, 62);
+  for (const v of batch.venues) {
+    const rel = v.set.image_url.split('?')[0];
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', rel)), `${rel} exists`);
+    assert.ok(credits[rel], `${rel} is credited`);
+    assert.ok(!/^Photo: /.test(credits[rel]), `${rel} credit has no doubled "Photo: " prefix`);
+  }
+});
