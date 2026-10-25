@@ -1864,7 +1864,10 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     // 2026-10-25: "cheap eats and a hike" -- "cheap eats" is a budget word AND a place to eat; it was read only as
     // the budget, so the food part was dropped and the plan became a list of trails.
     if (!meal && !types.length && fieldsOf(hit, 'budget').length && /\beats?\b/.test(hit.phrase)) {
-      newComp(hit, { types: ['restaurant', 'cafe'].filter((ty) => t.types.includes(ty)) });
+      // A bite in the day ("cheap eats and a hike"), unless the request is for the evening (an untimed restaurant
+      // part is planned as dinner, and many cheap spots close mid-afternoon).
+      const evening = tokens.some((w) => ['tonight', 'evening', 'night', 'dinner', 'supper', 'late'].includes(w));
+      newComp(hit, { types: ['restaurant', 'cafe'].filter((ty) => t.types.includes(ty)), ...(evening ? {} : { daypart: 'midday' }) });
       continue;
     }
     if (meal) {

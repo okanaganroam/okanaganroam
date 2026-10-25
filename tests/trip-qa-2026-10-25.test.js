@@ -77,3 +77,10 @@ test('a golf simulator nobody asked for is planned once a trip', () => {
   tp.oneSimulatorATrip(golf, { types: ['golf'] });
   assert.deepEqual(golf.days.map((x) => x.stops[0].venue.id), [1, 2]);
 });
+
+test('an outdoor rink is off season in early November too (a weekend from Oct 31 has its Sunday on Nov 1)', () => {
+  const rink = { type: 'outdoor', name: 'Stuart Park Outdoor Rink', textName: 'stuart park outdoor rink' };
+  const ctx = (tripDate) => ({ tripDate, types: new Set(), activities: new Set(), requirements: { text: '' } });
+  assert.equal(tp.offSeasonSkip(rink, ctx('2026-11-01')), true);
+  assert.equal(tp.offSeasonSkip(rink, ctx('2026-12-10')), false);
+});

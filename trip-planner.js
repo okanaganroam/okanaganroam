@@ -1517,7 +1517,10 @@ function summerOnly(v, ctx) {
 }
 function offSeasonSkip(v, ctx) {
   const month = Number((ctx.tripDate || '').slice(5, 7));
-  if (month && SKI_OFF_MONTHS.includes(month) && winterOnly(v) && (ctx.skiOffSeason || !ctx.activities.has('winter'))) return true;
+  // 2026-10-25: most of November is off too -- outdoor rinks open in December and the ski hills in late November; a
+  // weekend plan dated Oct 31 put Stuart Park's rink on its Sunday, November 1.
+  const earlyNovember = month === 11 && Number((ctx.tripDate || '').slice(8, 10)) < 25;
+  if (month && (SKI_OFF_MONTHS.includes(month) || earlyNovember) && winterOnly(v) && (ctx.skiOffSeason || !ctx.activities.has('winter'))) return true;
   if (month && SHOULDER_MONTHS.includes(month)) {
     const w = SHOULDER_CLOSED_RE.exec(v.textName || normWords(v.name));
     if (w && !normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes(w[0].split(' ')[0])) return true;
@@ -5296,6 +5299,7 @@ function componentLabel(c, ctx) {
   if (c.rainyOption) return 'indoor activity';
   if (c.lake) return 'lakeside walk';
   if (c.wineryLunch) return 'lunch at a winery';
+  if (!c.meal && /\bcheap eats?\b/.test(c.phrase || '')) return 'cheap eats';
   if (c.plannerKinds?.length) return listText(c.plannerKinds.map(k => tripRequirements.LABELS[k] || k));
   if (c.meal) return c.meal;
   if (c.generic) return c.kids ? 'family activities' : 'activities';
