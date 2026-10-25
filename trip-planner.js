@@ -4487,6 +4487,23 @@ function addSuggestedTimes(result, input) {
       else best = { ...best, rows, timed: rows.filter((r) => Number.isFinite(r.startMinutes)).length, untimed: rows.filter((r) => !Number.isFinite(r.startMinutes)).length };
     }
   }
+  // 2026-10-25: "breakfast, a winery and dinner in Kelowna" left 11 AM to 6 PM empty with no lunch: a short outing on
+  // this path gets the same lunch, extra stop or Free time card (fillItineraryGaps) as an outing with requirements.
+  if (!filled && !input.swap && result.kind === 'itinerary' && result.itinerary && best && best.timed && !best.untimed) {
+    try {
+      const reqI = { ...req, items: req.items || [], conflicts: [], startDate: best.date, endDate: null, ...(best.startMinutes != null ? { startMinutes: best.startMinutes } : {}) };
+      const probe = JSON.parse(JSON.stringify(best.probe));
+      const before = JSON.stringify(probe.itinerary.stops.map((st) => [st.venue && st.venue.id, !!st.freeTime]));
+      if (fillItineraryGaps(probe, { ...input, intent: input.intent || {}, tripDate: best.date || input.tripDate }, reqI)) {
+        scheduleTripByHours(probe, input, reqI, { probe: true });
+        const rows = probe.schedule || [];
+        if (JSON.stringify(probe.itinerary.stops.map((st) => [st.venue && st.venue.id, !!st.freeTime])) !== before && !rows.some((r) => !Number.isFinite(r.startMinutes))) {
+          result.itinerary.stops = probe.itinerary.stops;
+          best = { ...best, probe, rows, timed: rows.length, untimed: 0 };
+        }
+      }
+    } catch (e) { /* keep the plan as it was */ }
+  }
   if (filled) {
     const clean = (st) => { if (!st) return st; const { scheduleNote, ...rest } = st; return { ...rest, caveats: (rest.caveats || []).filter((c) => c !== scheduleNote && !/\b20\d\d-\d\d-\d\d\b/.test(c)) }; };
     result.days = best.probe.days.map((d, i) => { const { date: _date, ...rest } = d; return { ...(result.days[i] || {}), ...rest, stops: (d.stops || []).map(clean) }; });
