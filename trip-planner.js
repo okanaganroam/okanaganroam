@@ -483,9 +483,10 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
     const text = listedHoursText(v, null, fit.days);
     if (text) reasons.push({ code: 'hours', text, weight: 2 });
     caveats.push(`Its listed hours only fit the ${label} on ${dayListText(fit.days)} \u2014 check the day you go`);
-    // 2026-10-25: a plan with no date is timed for a weekend day, so a place that only opens on weekdays (a winery
-    // open Mon-Fri, morning of a "2 days in Penticton" plan) comes after places open on Saturday or Sunday.
-    if (!weekday && Array.isArray(fit.days) && fit.days.length && !fit.days.some((d) => ['sat', 'sun'].includes(d))) score -= 8;
+    // 2026-10-25: a plan with no date is timed from a Saturday, so a place closed that day (a winery open Mon-Fri on
+    // day 1, a Tue-Sat sushi lunch on day 2, a Sunday) comes after places that are open.
+    // Day 1 of an undated plan is a Saturday, day 2 a Sunday, and so on.
+    if (!weekday && Array.isArray(fit.days) && fit.days.length && !fit.days.includes(WEEKDAYS[(5 + (dayIndex || 0)) % 7])) score -= 8;
   } else if (HOURS_EXPECTED_TYPES.includes(v.type)) {
     score -= 2;
     caveats.push(UNKNOWN_HOURS_CAVEAT);
