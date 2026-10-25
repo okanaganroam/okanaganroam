@@ -19409,6 +19409,8 @@ test('Event schema (2026-10-13): organizer only when the source is the organizer
   assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'tourism_org' }), offer(undefined), 'a tourism listing is not a ticket link, but the price still counts');
   assert.deepEqual(app.eventOffersSchema({ ...base, source_type: 'tourism_org', website: 'https://example.com/tickets' }), offer('https://example.com/tickets'), 'the event\'s own website always counts');
   assert.equal(app.eventOffersSchema({ ...base, description: 'A steam train ride.' }), undefined, 'no stated price: no offer (2026-10-18)');
+  assert.equal(app.eventOffersSchema({ ...base, created_at: '2026-09-30 18:04:11' }).validFrom, '2026-09-30', 'validFrom is the listing date (2026-10-24)');
+  assert.equal(app.eventOffersSchema({ ...base, created_at: 'soon' }).validFrom, undefined, 'no real date: no validFrom');
   const ev = s5create({ name: 'Schema Organizer Fixture', source_type: 'official_organizer', source_name: 'Fixture Society', description: 'A fixture concert. Tickets are $20 to $30.' });
   try {
     const ld = app.eventJsonLd(app.getEventById(ev.id), app.listEventOccurrences(ev.id), ['live-music'], null, 'https://x', app.todayLocal());
@@ -19417,6 +19419,8 @@ test('Event schema (2026-10-13): organizer only when the source is the organizer
     assert.equal(ld.offers.lowPrice, '20');
     assert.equal(ld.offers.highPrice, '30');
     assert.equal(ld.offers.priceCurrency, 'CAD');
+    assert.match(ld.offers.validFrom, /^\d{4}-\d{2}-\d{2}$/, 'a stored event carries validFrom, its listing date (Search Console, 2026-10-24)');
+    assert.equal(ld.offers.validFrom, app.getEventById(ev.id).created_at.slice(0, 10));
   } finally {
     for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(ev.id);
     db.prepare('DELETE FROM events WHERE id = ?').run(ev.id);
