@@ -790,6 +790,10 @@ function occasionScore(v, ctx, add) {
     else if (v.price === 1 && v.type === 'restaurant') add('occasion_miss', -8, null);
     const word = ROMANCE_WORDS.find((w) => textHas(v.textDesc, w));
     if (word) add('occasion', 14, `Its description mentions “${word}”`);
+    // 2026-10-25: a romantic weekend's afternoon was CRAFT Beer Market (a sports-TV beer hall): screens and beer halls
+    // are not a couple's stop unless asked for.
+    if (v.features.sports_tv) add('occasion_miss', -10, null);
+    if (v.type === 'brewery' && !ctx.types.has('brewery')) add('occasion_miss', -6, null);
   } else if (o === 'family') {
     if (v.features.kid_friendly && !ctx.features.includes('kid_friendly')) add('occasion', 8, 'Has the Kid-Friendly badge');
     if (v.type === 'winery' || v.type === 'brewery') add('occasion_miss', -12, null);
