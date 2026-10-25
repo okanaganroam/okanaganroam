@@ -113,6 +113,9 @@ function inferPlannerKinds(v) {
         return /\b(?:easy|flat|paved|level|gentle)\b/.test(clause) && !/\b(?:steep|challenging|strenuous|pump tracks?|bike|cycling|riders|dirt jump)\b/.test(clause);
       });
     }
+    // 2026-10-25: "sunset spots in Penticton" found nothing -- no Penticton listing says "sunset". A lookout with the
+    // Lake View badge is a sunset spot too.
+    if (kind === 'sunset' && v.type === 'outdoor' && (v.activities || []).includes('viewpoints') && (Number(v.lake_view) === 1 || !!(v.features && v.features.lake_view))) return true;
     if (!re.test(text)) return false;
     if (SPORT_KINDS[kind]) return v.type==='sport' && re.test(name);
     if (kind === 'park') {

@@ -6468,7 +6468,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       textName: normalize(v.name || ''), textCuisine: normalize(v.cuisine || ''), textDesc: normalize(v.description || ''),
       features, collections: m.collections, activities: preparePlannerKinds ? [...new Set([...m.activities, ...requirementModule.inferPlannerActivities(v)])] : m.activities, fdTypes: m.fdTypes,
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
-      plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds(v) : [],
+      plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds({ ...v, activities: m.activities }) : [],
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
       // planner kinds prepared, Naramata Creek's 2.5 km walk had no text and got the 3-hour hiking allowance).

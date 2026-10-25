@@ -95,3 +95,9 @@ test('seasonal outdoor places: a description season ("July to September") and wi
   assert.equal(tp.offSeasonSkip(park, c('2026-10-25')), false, 'a month range that is not a season is ignored');
   assert.equal(tp.offSeasonSkip(cat, c('2026-10-25')), true);
 });
+
+test('a lookout with the Lake View badge is a sunset spot (no Penticton listing says "sunset")', () => {
+  const req = require('../trip-requirements');
+  assert.ok(req.inferPlannerKinds({ type: 'outdoor', name: 'Munson Mountain', description: 'A short climb to views over Penticton.', lake_view: 1, activities: ['viewpoints'] }).includes('sunset'));
+  assert.ok(!req.inferPlannerKinds({ type: 'outdoor', name: 'Forest Loop', description: 'A shady forest loop.', activities: ['hiking'] }).includes('sunset'));
+});
