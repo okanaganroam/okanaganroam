@@ -221,6 +221,7 @@ function t3FrenchText(value){
  text=text.replace(/; its end time isn’t listed, so about ([\d.]+) hours are allowed/,(_,h)=>'; heure de fin non indiquée, environ '+h.replace('.',',')+' h prévues');
  if(text==='Rough access road — the listing says to check your vehicle can make it')return 'Route d’accès difficile — selon la fiche, vérifiez que votre véhicule peut s’y rendre'; // 2026-10-25
  if(text==='A skating rink')return 'Une patinoire'; // 2026-10-25
+ if(text==='A dog beach or off-leash area')return 'Une plage pour chiens ou une aire sans laisse'; // 2026-10-25
  text=text.replace(/^A beach day suits (\w+)$/,(raw,m)=>FR_MONTHS_BY_EN[m]?'Une journée à la plage convient en '+FR_MONTHS_BY_EN[m]:raw); // 2026-10-25
  text=text.replace(/^The Okanagan’s ski hills usually run from December to early April, so skiing isn’t part of this (\w+) plan\.$/,(_,m)=>{const fm=FR_MONTHS_BY_EN[m]||m;return 'Les stations de ski de l’Okanagan sont en général ouvertes de décembre au début avril; le ski ne fait donc pas partie de ce plan '+(/^[aeiouâéèêîôû]/i.test(fm)?'d’':'de ')+fm+'.';});
  text=text.replace(/^Lunch at (.+), a winery that serves food\.$/,'Dîner à $1, un vignoble qui sert à manger.');

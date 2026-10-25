@@ -655,6 +655,8 @@ function scoreVenue(v, ctx) {
   // 2026-10-25: a place reached by a rough road ("needs a high-clearance vehicle", a forest service road, 4x4) is a
   // backcountry outing, not an everyday stop ("a day in Naramata" opened with the Mountain Goat Trail).
   if (v.type === 'outdoor' && roughAccess(v) && !normWords(ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '))) add('rough_access', -10, null);
+  // 2026-10-25: "dog beach in Kelowna" led with Cedar Creek Park; a dog beach or off-leash park asked for comes first.
+  if (/\b(?:dog beach|dog beaches|dog park|dog parks|off leash)\b/.test(normWords(ctx.queryText || '')) && dogOnlyPlace(v)) add('dog_place', 15, 'A dog beach or off-leash area');
   // 2026-10-25: "skating in Kelowna in December" listed hiking parks (skating is read as the Winter activity): a request
   // that says skating puts the rinks first.
   if (/\b(?:skating|skate|rink|rinks)\b/.test(normWords(ctx.queryText || '')) && /\b(?:rink|rinks|skating|skate)\b/.test(`${v.textName || ''}`)) add('skating', 20, 'A skating rink');

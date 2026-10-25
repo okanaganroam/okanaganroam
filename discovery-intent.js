@@ -146,7 +146,9 @@ const TYPE_ALIASES = {
 };
 
 const FEATURE_ALIASES = {
-  dog_friendly: ['dog friendly', 'dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pet friendly', 'pets', 'dogs allowed', 'dog welcome', 'dogs welcome', 'pup', 'puppy', 'dog beach', 'dog beaches'],
+  dog_friendly: ['dog friendly', 'dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pet friendly', 'pets', 'dogs allowed', 'dog welcome', 'dogs welcome', 'pup', 'puppy', 'dog beach', 'dog beaches',
+    // 2026-10-25: "off leash dog park in Penticton" left "off" and "leash" as not understood.
+    'off leash', 'off leash dog park', 'off leash dog parks', 'off leash park', 'off leash parks', 'off leash area', 'off leash areas', 'dog park', 'dog parks', 'leash free'],
   // 'young kids', 'little ones' (2026-10-19, round 7): "young" was searched for as a food word.
   kid_friendly: ['kid friendly', 'kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers', 'family friendly', 'young kids', 'young children', 'little kids', 'little ones', 'small kids', 'young family'],
   vegan: ['vegan', 'vegan friendly', 'vegan options', 'plant based'],
