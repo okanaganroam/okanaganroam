@@ -186,7 +186,7 @@ function isExcluded(v, plan) {
 // are not applied here. An intent with nothing to filter on matches nothing.
 // 2026-10-25: "a waterfall in Vernon" found nothing although BX Creek Trail & BX Falls is listed: a word visitors use
 // and the word the listing uses for the same thing.
-const TERM_SYNONYMS = { waterfall: ['falls'], waterfalls: ['falls'], snowshoeing: ['snowshoe', 'snowshoes'], skiing: ['ski'], skating: ['skate', 'rink'], skate: ['skating', 'rink'] };
+const TERM_SYNONYMS = { waterfall: ['falls'], waterfalls: ['falls'], boat: ['boats', 'pontoon', 'pontoons'], rental: ['rentals', 'rent'], rentals: ['rental', 'rent'], snowshoeing: ['snowshoe', 'snowshoes'], skiing: ['ski'], skating: ['skate', 'rink'], skate: ['skating', 'rink'] };
 function searchVenues(intent, venues) {
   const empty = { total: 0, items: [], exclusions: { applied: [], notApplied: [] } };
   if (!intent || intent.mode === 'events' || intent.mode === 'unknown') return empty;

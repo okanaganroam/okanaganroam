@@ -655,6 +655,9 @@ function scoreVenue(v, ctx) {
   // 2026-10-25: a place reached by a rough road ("needs a high-clearance vehicle", a forest service road, 4x4) is a
   // backcountry outing, not an everyday stop ("a day in Naramata" opened with the Mountain Goat Trail).
   if (v.type === 'outdoor' && roughAccess(v) && !normWords(ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '))) add('rough_access', -10, null);
+  // 2026-10-25: "a day on the lake in Kelowna in July" was Knox Mountain, a winery and chocolate -- the lake asked for was
+  // met by a lake view. From June to September a lake day puts the beaches and water activities first.
+  if (ctx.lake && [6, 7, 8, 9].includes(Number(String(ctx.tripDate || '').slice(5, 7))) && (v.type === 'beach' || (v.activities || []).includes('water'))) add('lake_day', 12, 'On the water');
   // 2026-10-25: "dog beach in Kelowna" led with Cedar Creek Park; a dog beach or off-leash park asked for comes first.
   if (/\b(?:dog beach|dog beaches|dog park|dog parks|off leash)\b/.test(normWords(ctx.queryText || '')) && dogOnlyPlace(v)) add('dog_place', 15, 'A dog beach or off-leash area');
   // 2026-10-25: "skating in Kelowna in December" listed hiking parks (skating is read as the Winter activity): a request

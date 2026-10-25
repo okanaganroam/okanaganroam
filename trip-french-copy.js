@@ -221,6 +221,7 @@ function t3FrenchText(value){
  text=text.replace(/; its end time isn’t listed, so about ([\d.]+) hours are allowed/,(_,h)=>'; heure de fin non indiquée, environ '+h.replace('.',',')+' h prévues');
  if(text==='Rough access road — the listing says to check your vehicle can make it')return 'Route d’accès difficile — selon la fiche, vérifiez que votre véhicule peut s’y rendre'; // 2026-10-25
  if(text==='A skating rink')return 'Une patinoire'; // 2026-10-25
+ if(text==='On the water')return 'Sur l’eau'; // 2026-10-25
  text=text.replace(/^Nothing in (.+?) itself matched, so this includes (.+) nearby\.$/,(_,a,b)=>'Rien à '+a+' même ne correspondait; ce plan inclut donc '+b.replace(/ and /g,' et ')+', tout près.'); // 2026-10-25
  if(text==='A dog beach or off-leash area')return 'Une plage pour chiens ou une aire sans laisse'; // 2026-10-25
  text=text.replace(/^A beach day suits (\w+)$/,(raw,m)=>FR_MONTHS_BY_EN[m]?'Une journée à la plage convient en '+FR_MONTHS_BY_EN[m]:raw); // 2026-10-25
