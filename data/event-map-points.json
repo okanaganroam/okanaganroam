@@ -4,7 +4,7 @@
  "points": [
   { "region": "vernon", "names": ["Kal Tire Place"], "lat": 50.27556, "lng": -119.27806, "address": "3445 43 Ave, Vernon", "source": "https://en.wikipedia.org/wiki/Kal_Tire_Place" },
   { "region": "kelowna", "names": ["Kelowna Event Centre", "Kelowna Events Centre"], "lat": 49.88121, "lng": -119.44747, "address": "2041 Harvey Ave, Kelowna", "source": "https://www.openstreetmap.org/node/13435923615" },
-  { "region": "armstrong", "names": ["Caravan Farm Theatre", "Caravan Farm"], "lat": 50.4887, "lng": -119.26073, "address": "4886 Salmon River Rd, Spallumcheen", "source": "the Caravan Farm Theatre listing's own point" },
+  { "region": "armstrong", "names": ["Caravan Farm Theatre", "Caravan Farm"], "lat": 50.49639, "lng": -119.26011, "address": "4886 Salmon River Rd, Spallumcheen", "source": "BC Geocoder civic point for 4886 Salmon River Rd (pin audit 2026-10-25; the old listing point was on a neighbouring farm)" },
   { "region": "kelowna", "names": ["UBCO Gymnasium", "UBC Okanagan Gymnasium", "UBC Okanagan", "UBCO", "UBC COMS 201", "UBC Okanagan Engineering, Management and Education Building"], "lat": 49.94218, "lng": -119.39903, "address": "3333 University Way, Kelowna", "source": "https://www.openstreetmap.org/way/123757617" },
   { "region": "enderby", "names": ["John Pritchard Memorial Arena", "John Pritchard Memorial Sports Complex", "Enderby Arena"], "lat": 50.55637, "lng": -119.13461, "address": "1605 Kate St, Enderby", "source": "https://www.openstreetmap.org/node/14084410567" },
   { "region": "summerland", "names": ["Summerland Arena"], "lat": 49.60431, "lng": -119.67495, "address": "8820 Jubilee Rd E, Summerland", "source": "https://www.openstreetmap.org/way/223593266" },
