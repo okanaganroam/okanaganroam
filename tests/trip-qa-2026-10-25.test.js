@@ -112,3 +112,10 @@ test('a week in the Okanagan visits the big towns, and its extra days go to them
   for (const town of ['kelowna', 'penticton', 'vernon']) assert.ok(week.includes(town), week.join(' > '));
   assert.equal(week.filter((r) => r === 'kelowna').length, 2, week.join(' > '));
 });
+
+test('a trail named after its park is the same place as the park (one per trip)', () => {
+  const key = (name) => tp.placeKey({ type: 'outdoor', name });
+  assert.equal(key('Gillies Creek Trails (Skaha Bluffs Provincial Park)'), key('Skaha Bluffs Provincial Park'));
+  assert.equal(key('Boulder Trail (Okanagan Mountain Park)'), key('Okanagan Mountain Provincial Park'));
+  assert.notEqual(key('Lions Park (Oliver)'), key('Oliver Community Park'));
+});

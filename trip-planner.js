@@ -1501,6 +1501,13 @@ function chooseDayRegions(facts, ctx, days, centroids) {
 const PLACE_GENERIC_WORDS = new Set(['park', 'parks', 'regional', 'provincial', 'greenway', 'trail', 'trails', 'beach', 'beaches', 'the', 'and', 'of', 'at', 'area', 'conservation', 'protected', 'ecological', 'reserve', 'city', 'municipal', 'loop', 'recreation', 'site', 'day', 'use']);
 function placeKey(v) {
   if (!v || !['outdoor', 'beach'].includes(v.type)) return null;
+  // 2026-10-25: a trail named after its park ("Gillies Creek Trails (Skaha Bluffs Provincial Park)") is that park; a
+  // dog trip had Skaha Bluffs Provincial Park in the morning and the Gillies Creek Trails in the afternoon.
+  const inPark = /\(([^)]*\b(?:park|provincial|regional|reserve|protected area)\b[^)]*)\)/i.exec(String(v.name || ''));
+  if (inPark) {
+    const pw = normWords(inPark[1]).split(' ').filter((x) => x && !PLACE_GENERIC_WORDS.has(x));
+    if (pw.length >= 2) return pw.slice(0, 2).join(' ');
+  }
   const w = normWords(v.name).split(' ').filter((x) => x && !PLACE_GENERIC_WORDS.has(x));
   return w.length >= 2 ? w.slice(0, 2).join(' ') : null;
 }
