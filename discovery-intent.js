@@ -246,7 +246,9 @@ const EVENT_CATEGORY_ALIASES = {
   'food-drink-events': ['food festival', 'food event', 'food events'],
   'arts-culture': ['art', 'arts', 'theatre', 'theater', 'gallery', 'galleries'],
   'sports-recreation': ['race', 'races', 'tournament', 'tournaments'],
-  'holiday-seasonal': ['christmas', 'halloween', 'holiday', 'holidays', 'thanksgiving', 'easter'],
+  'holiday-seasonal': ['christmas', 'halloween', 'holiday', 'holidays', 'thanksgiving', 'easter',
+    // 2026-10-25: "New Year's Eve in Kelowna" searched listings for "new", "years" and "eve".
+    'new years eve', 'new year s eve', 'new years', 'new year s', 'new year', 'nye', 'valentines day', 'valentine s day', 'valentines'],
   'workshops-classes': ['workshop', 'workshops', 'class', 'classes'],
   'community-events': ['community event', 'community events'],
 };
@@ -1348,7 +1350,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
 
   // 2026-10-14: "Halloween things to do" or "Christmas in Vernon" is about that holiday's listed events, unless a kind
   // of place or a trip length was asked for.
-  if (!flags.event && eventCats.includes('holiday-seasonal') && /\b(?:halloween|christmas|xmas)\b/.test(normalized) && !intent.types.length && !lengthMentions.length && !flags.plan) flags.event = true;
+  if (!flags.event && eventCats.includes('holiday-seasonal') && /\b(?:halloween|christmas|xmas|new years?(?: s)?(?: eve)?|nye|valentines?(?: s)?(?: day)?)\b/.test(normalized) && !intent.types.length && !lengthMentions.length && !flags.plan) flags.event = true;
   if (tokens.some((w) => COMEDY_WORDS.includes(w)) && !intent.types.length) {
     flags.event = true;
     intent.textTerms = intent.textTerms.filter((w) => !COMEDY_WORDS.includes(w) && w !== 'stand');

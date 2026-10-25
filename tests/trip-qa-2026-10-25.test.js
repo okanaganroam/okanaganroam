@@ -127,3 +127,12 @@ test('an outdoor place that needs a permit shows its permit sentence', () => {
   assert.match(req.listedAccessNotes(nkwala)[0], /free paper permit/);
   assert.equal(req.listedAccessNotes({ type: 'outdoor', plannerDescription: 'A nice park. No permit needed for picnics.' }).length, 0);
 });
+
+test("New Year's Eve and Valentine's Day are holiday events, not search words", () => {
+  const tax = { ...TAXONOMY, eventCategories: ['holiday-seasonal', 'markets-fairs'] };
+  for (const q of ["New Year's Eve in Kelowna", 'NYE in Kelowna', "Valentine's Day in Kelowna"]) {
+    const i = d.interpretDiscoveryQuery(q, tax);
+    assert.equal(i.mode, 'events', q);
+    assert.deepEqual(i.textTerms, [], q);
+  }
+});
