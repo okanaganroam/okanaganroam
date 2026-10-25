@@ -4350,6 +4350,7 @@ function searchEventRankWords(text) {
 }
 // "Comedy show" also finds a comedian's own show (2026-10-19: "Danny Bhoy Live", a Scottish comedian, was missing).
 const DISCOVERY_EVENT_TERM_SYNONYMS = { comedy: ['comedian', 'comedians', 'comedic', 'stand up', 'standup', 'improv', 'laughs'] };
+const TRIP_FARMERS_MARKET_RE = /\bfarmers?\W{0,2}s?\W* markets?\b/i;
 function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null, opts = {}) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(intent.when, now), now);
@@ -4373,6 +4374,11 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
       const otherHoliday = Object.keys(HOLIDAY_EVENT_WORDS).some((k) => k !== themeKey && discoveryTextHas(text, HOLIDAY_EVENT_WORDS[k][0]));
       return !otherHoliday || theme.slice(0, HOLIDAY_EVENT_CORE_WORDS[themeKey] || 1).some((w) => discoveryTextHas(text, w));
     });
+  }
+  // 2026-10-25: "Kelowna farmers market" listed Christmas craft fairs and "farmers market in Penticton" put the farmers'
+  // market third: a farmers' market request lists farmers' markets.
+  if (intent.eventFarmers || (opts.text && TRIP_FARMERS_MARKET_RE.test(String(opts.text).replace(/[’']/g, '')))) {
+    events = events.filter((e) => /\bfarmers?\b/i.test(String(`${e.name || ''} ${e.description || ''}`).replace(/[’']/g, '')));
   }
   // With kids, bar nights and winery events are left out unless they are also listed for families.
   const kidsAsked = !!(intent.eventKids || (intent.party && intent.party.kids));
@@ -7144,7 +7150,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     tripWindowClockNote(plan, requirements);
     return plan;
   }
-  if (intent.mode === 'events') { intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
+  if (intent.mode === 'events') { intent.eventFarmers = TRIP_FARMERS_MARKET_RE.test(String(interpretationText || '').replace(/[’']/g, '')); intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, requirements) : null;
   const plan = tripPlannerModule().planTrip({
     intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
