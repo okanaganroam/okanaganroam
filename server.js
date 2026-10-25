@@ -6885,7 +6885,8 @@ function runTripPlan(args, now = new Date()) {
   // 2026-10-25: "the Okanagan in spring" / "the Okanagan in July" came back "We couldn't work out a plan": a season or
   // month with no other ask is read as things to do then.
   try {
-    if (plan && plan.kind === 'unknown' && /\b(?:spring|summer|fall|autumn|winter|january|february|march|april|may|june|july|august|september|october|november|december|printemps|été|ete|automne|hiver)\b/i.test(String(args.text || '')) && !/^things to do\b/i.test(String(args.text || ''))) {
+    // Any other request that could not be read ("something fun", "what's good around here") gets ideas too, never a dead end.
+    if (plan && plan.kind === 'unknown' && String(args.text || '').trim() && !/^things to do\b/i.test(String(args.text || ''))) {
       const retry = runTripPlanCore({ ...args, text: `things to do ${String(args.text || '').trim()}` }, now);
       if (retry && retry.kind !== 'unknown') { retry.query = plan.query; plan = retry; }
     }
