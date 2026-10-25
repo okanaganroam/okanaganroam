@@ -182,7 +182,9 @@ const ACTIVITY_ALIASES = {
   winter: ['ski', 'skiing', 'snowshoe', 'snowshoeing', 'cross country skiing', 'skating', 'ice skating', 'tubing', 'winter activities'],
   camping: ['camp', 'camping', 'campground', 'campgrounds', 'campsite', 'campsites'],
   nature: ['nature', 'birding', 'bird watching', 'birdwatching', 'wildlife', 'wetland', 'wetlands'],
-  water: ['paddle', 'paddling', 'paddleboard', 'paddleboarding', 'paddle board', 'sup', 'kayak', 'kayaking', 'canoe', 'canoeing', 'boating', 'boat rental', 'boat rentals'],
+  water: ['paddle', 'paddling', 'paddleboard', 'paddleboarding', 'paddle board', 'sup', 'kayak', 'kayaking', 'canoe', 'canoeing', 'boating', 'boat rental', 'boat rentals',
+    // 2026-10-25: "what to do when it's hot" searched for the word "hot".
+    'when it s hot', 'when its hot', 'hot day', 'hot days', 'heat wave', 'heatwave', 'beat the heat', 'cool off', 'cool down'],
   viewpoints: ['viewpoint', 'viewpoints', 'lookout', 'lookouts', 'scenic view', 'scenic views', 'view point',
     // 2026-10-25: "photography spots in Osoyoos" found only an art gallery.
     'photography spots', 'photography spot', 'photo spots', 'photo spot', 'photo ops', 'photo op', 'instagram spots', 'instagrammable spots', 'instagrammable', 'scenic spots', 'scenic spot'],
