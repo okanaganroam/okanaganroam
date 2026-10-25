@@ -370,7 +370,7 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'mothers fathers labour labor '
   // 2026-10-25: "surprise me", "I'm bored", "help me plan a trip" searched listings for those words.
   + 'surprise surprises bored boring help helping recommend recommendations suggest suggestions '
-  + 'starting start starts '
+  + 'starting start starts users user '
   // French search (2026-10-19, round 7): French articles and joiners left in a French request after its words are read
   // in English ("bonhomme de neige" listed 1,650 places, every one with "de" somewhere). "a" (à) is above.
   + 'de du des la le les l d et au aux en '
