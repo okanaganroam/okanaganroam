@@ -14,14 +14,14 @@ const KINDS = {
   climbing: /\b(?:climbing gyms?|bouldering)\b/,
   arcade: /\b(?:arcades?|laser tag)\b/,
   theatre: /\b(?:theatres?|theaters?|cinema|performing arts)\b/,
-  spa: /\b(?:spas?|thermal spa|sauna experience)\b/,
+  spa: /\b(?:spas?|thermal spa|sauna experience|saunas?|floating sauna|massages?|wellness)\b/, // 2026-10-25: saunas and wellness studios
   wine_tour: /\b(?:wine tours?|winery tours?|vineyard tours?)\b/,
   boat_tour: /\b(?:boat tours?|lake cruises?|cruises?)\b/,
   guided_hike: /\b(?:guided hikes?|guided hiking|hiking tours?)\b/,
   cooking: /\bcooking class(?:es)?\b/,
   pottery: /\b(?:pottery|ceramics?) (?:classes?|workshops?|studio)?\b/,
   park: /\bparks?\b/,
-  horseback: /\b(?:horseback riding|horseback|horse riding|horse riding tours?)\b/,
+  horseback: /\b(?:horseback riding|horseback rides?|horseback|horse riding|horse rides?|trail rides?|horse riding tours?)\b/, // 2026-10-25: "a horseback ride"
   sunset: /\b(?:sunset|sunsets)\b/,
   snow_tour: /\b(?:sleigh rides?|dog sledding|dog sled tours?)\b/,
 };
@@ -113,12 +113,16 @@ function inferPlannerKinds(v) {
         return /\b(?:easy|flat|paved|level|gentle)\b/.test(clause) && !/\b(?:steep|challenging|strenuous|pump tracks?|bike|cycling|riders|dirt jump)\b/.test(clause);
       });
     }
+    // 2026-10-25: "sunset spots in Penticton" found nothing -- no Penticton listing says "sunset". A lookout with the
+    // Lake View badge is a sunset spot too.
+    if (kind === 'sunset' && v.type === 'outdoor' && (v.activities || []).includes('viewpoints') && (Number(v.lake_view) === 1 || !!(v.features && v.features.lake_view))) return true;
     if (!re.test(text)) return false;
     if (SPORT_KINDS[kind]) return v.type==='sport' && re.test(name);
     if (kind === 'park') {
       if (!['outdoor','beach'].includes(v.type) || /\b(?:arena|ice rink|skating rink|rv|resort|camp|campground|water park)\b/.test(name)) return false;
       return /\bparks?\b/.test(name) || /\b(?:regional|provincial|community|city|public|adventure) park\b/.test(text);
     }
+    if (kind === 'spa' && /\b(?:ymca|aquatic|community centre|community center|pool|arena|gym|fitness)\b/.test(name)) return false; // a pool's sauna is not a spa day
     if (kind === 'sunset') return v.type === 'outdoor';
     return ['indoor','tour'].includes(v.type) || kind.includes('tour') || ['cooking','guided_hike','snow_tour','horseback'].includes(kind);
   }).map(([kind])=>kind);
@@ -926,7 +930,14 @@ function listedAccessConflict(v,requirements,day,date) {
  return afterMinutes>=720?{source,afterMinutes,conditional:true}:null;
 }
 function listedAccessNotes(v) {
- if(!['sport','tour'].includes(v.type)||typeof v.plannerDescription!=='string')return [];
+ if(typeof v.plannerDescription!=='string')return [];
+ // 2026-10-25: an outdoor place that needs a permit says so (Mount Nkwala: a free paper permit from the Penticton
+ // Indian Band) -- only its permit sentences, nothing else from an outdoor listing.
+ if(v.type==='outdoor'){
+  const permit=/\b(?:permits? (?:is |are )?(?:required|mandatory|needed)|(?:requires?|need|needs|obtain|get) a (?:free )?(?:paper )?permit|(?:paper )?permits? (?:are |is )?mandatory|permission (?:is )?required)\b/i;
+  return [...new Set(v.plannerDescription.split(/(?<=[.!?])\s+(?=[A-Z])|[\r\n]+/).map(x=>x.trim()).filter(x=>permit.test(x)&&!/\b(?:no|not|without) (?:a )?(?:permits?|permission)\b|\bnot (?:required|needed|necessary)\b/i.test(x)))].slice(0,1).map(s=>'Access / schedule from the listing: “'+s+'” Confirm access and scheduling with the operator before visiting.');
+ }
+ if(!['sport','tour'].includes(v.type))return [];
  const sentences=v.plannerDescription.split(/(?<=[.!?])\s+(?=[A-Z])|[\r\n]+/).map(x=>x.trim()).filter(Boolean);
  const relevant=/\b(?:practice (?:and race )?nights?|race nights?|open houses?|riding season|school days?|dawn to dusk|members?(?:ship)? (?:only|required)|permit(?:s)? (?:required|needed)|(?:advance )?bookings? (?:is |are )?(?:required|essential)|reservations? (?:is |are )?(?:required|essential)|(?:book|reserve) (?:in advance|ahead)|(?:tours?|trips?|cruises?) (?:depart|run|operate)|(?:seasonal|seasonally|season dependent)|closed (?:for|during|until)|by appointment)\b/i;
  return [...new Set(sentences.filter(s=>relevant.test(s)))].slice(0,3).map(s=>'Access / schedule from the listing: “'+s+'” Confirm access and scheduling with the operator before visiting.');

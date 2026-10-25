@@ -184,6 +184,9 @@ function isExcluded(v, plan) {
 // (name 3, cuisine 2, description 1 per word; 2 for a stored cuisine), then
 // rating, review count, name and id. Heuristics (occasion, budget, dates)
 // are not applied here. An intent with nothing to filter on matches nothing.
+// 2026-10-25: "a waterfall in Vernon" found nothing although BX Creek Trail & BX Falls is listed: a word visitors use
+// and the word the listing uses for the same thing.
+const TERM_SYNONYMS = { waterfall: ['falls'], waterfalls: ['falls'], boat: ['boats', 'pontoon', 'pontoons'], rental: ['rentals', 'rent'], rentals: ['rental', 'rent'], snowshoeing: ['snowshoe', 'snowshoes'], skiing: ['ski'], skating: ['skate', 'rink'], skate: ['skating', 'rink'] };
 function searchVenues(intent, venues) {
   const empty = { total: 0, items: [], exclusions: { applied: [], notApplied: [] } };
   if (!intent || intent.mode === 'events' || intent.mode === 'unknown') return empty;
@@ -228,7 +231,7 @@ function searchVenues(intent, venues) {
     const matchedOn = [];
     let ok = true;
     for (const term of terms) {
-      const m = termMatch(v, term, fr);
+      const m = termMatch(v, term, fr) || (TERM_SYNONYMS[term] || []).reduce((found, w) => found || termMatch(v, w, fr), null);
       if (!m) { ok = false; break; }
       score += termWeight(m);
       matchedOn.push(`${term}:${termWhere(m)}`);

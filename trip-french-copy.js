@@ -52,6 +52,8 @@ function t3FrenchText(value){
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';
  // Round 13 (2026-10-21): a window asked for after it started (server.js tripWindowClockNote).
  const frClock12=(h,m,ap)=>{let x=Number(h)%12+(ap==='PM'?12:0);return x===0&&m==='00'?'minuit':x+' h'+(m==='00'?'':' '+m);};
+ // 2026-10-25: a ski hill between seasons is planned from the town below (server.js runTripPlan).
+ text=text.replace(/^Most places at (.+?) are closed between seasons, so this plan is based in (.+?), about (\d+) minutes away\. Check (.+?)’s own site for its opening day\.$/,(_,h,t,n)=>'La plupart des lieux de '+h+' sont fermés entre les saisons : ce plan part donc de '+t+', à environ '+n+' minutes. Consultez le site de '+h+' pour sa date d’ouverture.');
  text=text.replace(/^It’s already late, so this plan is for tomorrow evening\.$/,'Il est déjà tard; ce plan est donc pour demain soir.');
  text=text.replace(/^It’s already evening, so this plan is for tomorrow afternoon\.$/,'Il est déjà le soir; ce plan est donc pour demain après-midi.');
  text=text.replace(/^It’s already afternoon, so this plan is for tomorrow morning\.$/,'Il est déjà l’après-midi; ce plan est donc pour demain matin.');
@@ -217,6 +219,12 @@ function t3FrenchText(value){
  text=text.replace(/^(.+): Lunch here could not start until ([\d:]+) on (\S+) under its listed hours, so it does not fit a midday meal\. Choose another lunch spot nearby\.$/,'$1 : selon ses horaires indiqués, le dîner ici ne pourrait pas commencer avant $2 le $3; il ne convient donc pas pour le midi. Choisissez un autre endroit à proximité.');
  // Round 7 (2026-10-19): the event allowance, skiing out of season, lunch at a winery.
  text=text.replace(/; its end time isn’t listed, so about ([\d.]+) hours are allowed/,(_,h)=>'; heure de fin non indiquée, environ '+h.replace('.',',')+' h prévues');
+ if(text==='Rough access road — the listing says to check your vehicle can make it')return 'Route d’accès difficile — selon la fiche, vérifiez que votre véhicule peut s’y rendre'; // 2026-10-25
+ if(text==='A skating rink')return 'Une patinoire'; // 2026-10-25
+ if(text==='On the water')return 'Sur l’eau'; // 2026-10-25
+ text=text.replace(/^Nothing in (.+?) itself matched, so this includes (.+) nearby\.$/,(_,a,b)=>'Rien à '+a+' même ne correspondait; ce plan inclut donc '+b.replace(/ and /g,' et ')+', tout près.'); // 2026-10-25
+ if(text==='A dog beach or off-leash area')return 'Une plage pour chiens ou une aire sans laisse'; // 2026-10-25
+ text=text.replace(/^A beach day suits (\w+)$/,(raw,m)=>FR_MONTHS_BY_EN[m]?'Une journée à la plage convient en '+FR_MONTHS_BY_EN[m]:raw); // 2026-10-25
  text=text.replace(/^The Okanagan’s ski hills usually run from December to early April, so skiing isn’t part of this (\w+) plan\.$/,(_,m)=>{const fm=FR_MONTHS_BY_EN[m]||m;return 'Les stations de ski de l’Okanagan sont en général ouvertes de décembre au début avril; le ski ne fait donc pas partie de ce plan '+(/^[aeiouâéèêîôû]/i.test(fm)?'d’':'de ')+fm+'.';});
  text=text.replace(/^Lunch at (.+), a winery that serves food\.$/,'Dîner à $1, un vignoble qui sert à manger.');
  text=text.replace(/^Lunch at (.+), a winery’s restaurant\.$/,'Dîner à $1, le restaurant d’un vignoble.');

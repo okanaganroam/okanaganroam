@@ -93,6 +93,11 @@ const REGION_EXTRA_ALIASES = {
   'lake-country': ['lake country', 'winfield', 'oyama', 'okanagan centre', 'okanagan center', 'carrs landing'],
   apex: ['apex', 'apex mountain'],
   baldy: ['baldy', 'mount baldy', 'baldy mountain'],
+  // 2026-10-25: wine benches and neighbourhoods visitors name ("wine tasting on the Naramata Bench" left "bench" as
+  // not understood).
+  naramata: ['naramata bench', 'the naramata bench'],
+  oliver: ['golden mile', 'golden mile bench', 'the golden mile', 'black sage bench', 'black sage road', 'black sage'],
+  kelowna: ['east kelowna', 'lower mission', 'upper mission', 'the mission', 'rutland', 'glenmore', 'downtown kelowna'],
 };
 // Valley-wide scope: understood, and deliberately means "no region filter".
 const VALLEY_WIDE_PHRASES = ['okanagan', 'the okanagan', 'okanagan valley', 'the valley', 'anywhere', 'valley wide', 'bc', 'british columbia', 'okanagan lake'];
@@ -106,7 +111,9 @@ const TYPE_ALIASES = {
   cafe: ['cafe', 'cafes', 'coffee', 'coffee shop', 'coffee shops', 'espresso'],
   pub: ['pub', 'pubs', 'bar', 'bars', 'gastropub', 'apres', 'apres ski'],
   cocktail: ['cocktail', 'cocktails', 'cocktail bar', 'cocktail bars', 'cocktail lounge', 'cocktail lounges', 'lounge', 'lounges'],
-  brewery: ['brewery', 'breweries', 'beer', 'beers', 'craft beer', 'taproom', 'taprooms', 'brewpub', 'brew pub'],
+  brewery: ['brewery', 'breweries', 'beer', 'beers', 'craft beer', 'taproom', 'taprooms', 'brewpub', 'brew pub',
+    // 2026-10-25: cideries are listed with the breweries ("a cidery and a distillery" reported "cidery" as not understood).
+    'cidery', 'cideries', 'cider house', 'cider houses', 'ciders', 'craft cider'],
   distillery: ['distillery', 'distilleries', 'spirits', 'gin', 'whisky', 'whiskey', 'vodka', 'craft spirits'],
   winery: ['wine', 'wines', 'winery', 'wineries', 'vineyard', 'vineyards', 'wine tasting', 'wine tastings', 'tasting room', 'tasting rooms', 'wine tour', 'wine tours', 'wine country'],
   golf: ['golf', 'golfing', 'golf course', 'golf courses', 'tee time', 'tee times', 'driving range', 'mini golf', 'round of golf'],
@@ -139,14 +146,18 @@ const TYPE_ALIASES = {
 };
 
 const FEATURE_ALIASES = {
-  dog_friendly: ['dog friendly', 'dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pet friendly', 'pets', 'dogs allowed', 'dog welcome', 'dogs welcome', 'pup', 'puppy', 'dog beach', 'dog beaches'],
+  dog_friendly: ['dog friendly', 'dog', 'dogs', 'my dog', 'with my dog', 'with the dog', 'pet friendly', 'pets', 'dogs allowed', 'dog welcome', 'dogs welcome', 'pup', 'puppy', 'dog beach', 'dog beaches',
+    // 2026-10-25: "off leash dog park in Penticton" left "off" and "leash" as not understood.
+    'off leash', 'off leash dog park', 'off leash dog parks', 'off leash park', 'off leash parks', 'off leash area', 'off leash areas', 'dog park', 'dog parks', 'leash free'],
   // 'young kids', 'little ones' (2026-10-19, round 7): "young" was searched for as a food word.
   kid_friendly: ['kid friendly', 'kids', 'kid', 'with kids', 'with my kids', 'with the kids', 'children', 'child', 'toddler', 'toddlers', 'family friendly', 'young kids', 'young children', 'little kids', 'little ones', 'small kids', 'young family'],
   vegan: ['vegan', 'vegan friendly', 'vegan options', 'plant based'],
   vegetarian: ['vegetarian', 'vegetarian friendly', 'vegetarian options', 'veggie'],
   gluten_free: ['gluten free', 'gf', 'celiac', 'coeliac'],
   patio: ['patio', 'patios', 'outdoor seating', 'outdoor patio'],
-  lake_view: ['lake view', 'lake views', 'lakeview', 'view of the lake', 'views of the lake', 'lakeside view'],
+  lake_view: ['lake view', 'lake views', 'lakeview', 'view of the lake', 'views of the lake', 'lakeside view',
+    // 2026-10-25: "lunch with a view in Kelowna" searched descriptions for the word "view".
+    'with a view', 'with views', 'with a nice view', 'with a great view', 'with great views', 'with nice views', 'with a lake view', 'with lake views', 'a view'],
   nonalcoholic: ['non alcoholic', 'nonalcoholic', 'alcohol free', 'mocktail', 'mocktails', 'zero proof'],
   sports_tv: ['sports tv', 'watch the game', 'watch sports', 'watch the hockey', 'sports bar', 'sports bars'],
   live_music: ['live music', 'live band', 'live bands', 'live entertainment'],
@@ -171,8 +182,12 @@ const ACTIVITY_ALIASES = {
   winter: ['ski', 'skiing', 'snowshoe', 'snowshoeing', 'cross country skiing', 'skating', 'ice skating', 'tubing', 'winter activities'],
   camping: ['camp', 'camping', 'campground', 'campgrounds', 'campsite', 'campsites'],
   nature: ['nature', 'birding', 'bird watching', 'birdwatching', 'wildlife', 'wetland', 'wetlands'],
-  water: ['paddle', 'paddling', 'paddleboard', 'paddleboarding', 'paddle board', 'sup', 'kayak', 'kayaking', 'canoe', 'canoeing', 'boating', 'boat rental', 'boat rentals'],
-  viewpoints: ['viewpoint', 'viewpoints', 'lookout', 'lookouts', 'scenic view', 'scenic views', 'view point'],
+  water: ['paddle', 'paddling', 'paddleboard', 'paddleboarding', 'paddle board', 'sup', 'kayak', 'kayaking', 'canoe', 'canoeing', 'boating', 'boat rental', 'boat rentals',
+    // 2026-10-25: "what to do when it's hot" searched for the word "hot".
+    'when it s hot', 'when its hot', 'hot day', 'hot days', 'heat wave', 'heatwave', 'beat the heat', 'cool off', 'cool down'],
+  viewpoints: ['viewpoint', 'viewpoints', 'lookout', 'lookouts', 'scenic view', 'scenic views', 'view point',
+    // 2026-10-25: "photography spots in Osoyoos" found only an art gallery.
+    'photography spots', 'photography spot', 'photo spots', 'photo spot', 'photo ops', 'photo op', 'instagram spots', 'instagrammable spots', 'instagrammable', 'scenic spots', 'scenic spot'],
   adventure: ['zipline', 'ziplining', 'zip line', 'zip lining', 'adventure', 'adventures', 'ropes course'],
   fishing: ['fish', 'fishing'],
 };
@@ -239,7 +254,9 @@ const EVENT_CATEGORY_ALIASES = {
   'food-drink-events': ['food festival', 'food event', 'food events'],
   'arts-culture': ['art', 'arts', 'theatre', 'theater', 'gallery', 'galleries'],
   'sports-recreation': ['race', 'races', 'tournament', 'tournaments'],
-  'holiday-seasonal': ['christmas', 'halloween', 'holiday', 'holidays', 'thanksgiving', 'easter'],
+  'holiday-seasonal': ['christmas', 'halloween', 'holiday', 'holidays', 'thanksgiving', 'easter',
+    // 2026-10-25: "New Year's Eve in Kelowna" searched listings for "new", "years" and "eve".
+    'new years eve', 'new year s eve', 'new years', 'new year s', 'new year', 'nye', 'valentines day', 'valentine s day', 'valentines'],
   'workshops-classes': ['workshop', 'workshops', 'class', 'classes'],
   'community-events': ['community event', 'community events'],
 };
@@ -347,6 +364,13 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'whats wanna gonna ive id nearby close near '
   // Round 11 (2026-10-20): "road trip through the Okanagan Valley" -- "through" and "valley" were read as interests.
   + 'through thru valley '
+  // 2026-10-25: "with a designated driver" is how people get between wineries, not a kind of place.
+  + 'designated driver drivers dd '
+  // 2026-10-25: holiday names that are about the date, not the place ("Mother's Day brunch", "Labour Day weekend").
+  + 'mothers fathers labour labor '
+  // 2026-10-25: "surprise me", "I'm bored", "help me plan a trip" searched listings for those words.
+  + 'surprise surprises bored boring help helping recommend recommendations suggest suggestions '
+  + 'starting start starts users user '
   // French search (2026-10-19, round 7): French articles and joiners left in a French request after its words are read
   // in English ("bonhomme de neige" listed 1,650 places, every one with "de" somewhere). "a" (à) is above.
   + 'de du des la le les l d et au aux en '
@@ -1339,7 +1363,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
 
   // 2026-10-14: "Halloween things to do" or "Christmas in Vernon" is about that holiday's listed events, unless a kind
   // of place or a trip length was asked for.
-  if (!flags.event && eventCats.includes('holiday-seasonal') && /\b(?:halloween|christmas|xmas)\b/.test(normalized) && !intent.types.length && !lengthMentions.length && !flags.plan) flags.event = true;
+  if (!flags.event && eventCats.includes('holiday-seasonal') && /\b(?:halloween|christmas|xmas|new years?(?: s)?(?: eve)?|nye|valentines?(?: s)?(?: day)?)\b/.test(normalized) && !intent.types.length && !lengthMentions.length && !flags.plan) flags.event = true;
   if (tokens.some((w) => COMEDY_WORDS.includes(w)) && !intent.types.length) {
     flags.event = true;
     intent.textTerms = intent.textTerms.filter((w) => !COMEDY_WORDS.includes(w) && w !== 'stand');
@@ -1393,7 +1417,17 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // stay listed as not applied (a month exactly as before) and the lake
   // words stay the visitor's own search words.
   // Round 10 (2026-10-19): "3 days in Vernon in November with shows" is a trip too (an events request with a length).
-  const planning = intent.mode === 'plan' || intent.mode === 'recommend' || (intent.mode === 'events' && Number.isInteger(intent.days) && intent.days > 0);
+  // 2026-10-25: Build My Trip (opts.tripPlanner) always plans, so "wineries and a lake swim in Summerland in August"
+  // and "hiking in Kelowna in January" keep their month for the season rules (it was listed as not understood).
+  // 2026-10-25: in Build My Trip a clock time ("dinner at 7pm", "lunch at noon") is read from the request by the trip
+  // requirements; it is never a search word ("7pm", "pm", "noon").
+  if (opts.tripPlanner) {
+    const clockWord = (w) => /^\d{1,2}(?::?[0-5]\d)?(?:am|pm)$|^(?:am|pm|noon|midday|midnight)$/.test(String(w));
+    intent.textTerms = intent.textTerms.filter((w) => !clockWord(w));
+    intent.foodTerms = intent.foodTerms.filter((f) => f.cuisine || !clockWord(f.term));
+    intent.unsupported = intent.unsupported.filter((w) => !clockWord(w));
+  }
+  const planning = !!opts.tripPlanner || intent.mode === 'plan' || intent.mode === 'recommend' || (intent.mode === 'events' && Number.isInteger(intent.days) && intent.days > 0);
   if (planning) {
     const lakeTerms = intent.textTerms.filter((w) => LAKE_WORDS.includes(w));
     if (lakeTerms.length) {
@@ -1855,7 +1889,10 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     // 2026-10-25: "cheap eats and a hike" -- "cheap eats" is a budget word AND a place to eat; it was read only as
     // the budget, so the food part was dropped and the plan became a list of trails.
     if (!meal && !types.length && fieldsOf(hit, 'budget').length && /\beats?\b/.test(hit.phrase)) {
-      newComp(hit, { types: ['restaurant', 'cafe'].filter((ty) => t.types.includes(ty)) });
+      // A bite in the day ("cheap eats and a hike"), unless the request is for the evening (an untimed restaurant
+      // part is planned as dinner, and many cheap spots close mid-afternoon).
+      const evening = tokens.some((w) => ['tonight', 'evening', 'night', 'dinner', 'supper', 'late'].includes(w));
+      newComp(hit, { types: ['restaurant', 'cafe'].filter((ty) => t.types.includes(ty)), ...(evening ? {} : { daypart: 'midday' }) });
       continue;
     }
     if (meal) {

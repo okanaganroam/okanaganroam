@@ -4350,6 +4350,7 @@ function searchEventRankWords(text) {
 }
 // "Comedy show" also finds a comedian's own show (2026-10-19: "Danny Bhoy Live", a Scottish comedian, was missing).
 const DISCOVERY_EVENT_TERM_SYNONYMS = { comedy: ['comedian', 'comedians', 'comedic', 'stand up', 'standup', 'improv', 'laughs'] };
+const TRIP_FARMERS_MARKET_RE = /\bfarmers?\W{0,2}s?\W* markets?\b/i;
 function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(), calendar = null, opts = {}) {
   if (!intent || intent.mode !== 'events') return { total: 0, items: [], window: null };
   const win = resolveWhatsOnWindow(calendar?.startDate ? {when:'custom',from:calendar.startDate,to:calendar.endDate || calendar.startDate} : discoveryWhatsOnWindowParams(intent.when, now), now);
@@ -4373,6 +4374,11 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
       const otherHoliday = Object.keys(HOLIDAY_EVENT_WORDS).some((k) => k !== themeKey && discoveryTextHas(text, HOLIDAY_EVENT_WORDS[k][0]));
       return !otherHoliday || theme.slice(0, HOLIDAY_EVENT_CORE_WORDS[themeKey] || 1).some((w) => discoveryTextHas(text, w));
     });
+  }
+  // 2026-10-25: "Kelowna farmers market" listed Christmas craft fairs and "farmers market in Penticton" put the farmers'
+  // market third: a farmers' market request lists farmers' markets.
+  if (intent.eventFarmers || (opts.text && TRIP_FARMERS_MARKET_RE.test(String(opts.text).replace(/[’']/g, '')))) {
+    events = events.filter((e) => /\bfarmers?\b/i.test(String(`${e.name || ''} ${e.description || ''}`).replace(/[’']/g, '')));
   }
   // With kids, bar nights and winery events are left out unless they are also listed for families.
   const kidsAsked = !!(intent.eventKids || (intent.party && intent.party.kids));
@@ -6468,7 +6474,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       textName: normalize(v.name || ''), textCuisine: normalize(v.cuisine || ''), textDesc: normalize(v.description || ''),
       features, collections: m.collections, activities: preparePlannerKinds ? [...new Set([...m.activities, ...requirementModule.inferPlannerActivities(v)])] : m.activities, fdTypes: m.fdTypes,
       indoorGolf: v.type === 'golf' && isIndoorGolfVenue(v),
-      plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds(v) : [],
+      plannerKinds: preparePlannerKinds ? requirementModule.inferPlannerKinds({ ...v, activities: m.activities }) : [],
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
       // Round 12 (2026-10-20): an outdoor listing's own text, so a trail is timed by its length on every plan (with no
       // planner kinds prepared, Naramata Creek's 2.5 km walk had no text and got the 3-hour hiking allowance).
@@ -6853,7 +6859,77 @@ function buildTripPlannerTaxonomy() {
   const taxonomy = buildDiscoveryTaxonomy();
   return { ...taxonomy, types: [...new Set([...taxonomy.types, ...Object.keys(CATEGORY_SLUGS)])].filter((t) => !TRIP_PLANNER_DROPPED_TYPES.has(t)), venues: taxonomy.venues.filter((v) => !TRIP_PLANNER_DROPPED_TYPES.has(v.type)) };
 }
-function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
+// 2026-10-25: "a day in Baldy" in late October came back with every slot empty ("No suitable morning stop..."), and
+// Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
+// a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
+const TRIP_SKI_HILL_BASE = { apex: { town: 'penticton', minutes: 40 }, baldy: { town: 'oliver', minutes: 40 }, 'big-white': { town: 'kelowna', minutes: 50 }, silverstar: { town: 'vernon', minutes: 30 } };
+function runTripPlan(args, now = new Date()) {
+  const first = runTripPlanCore(args, now);
+  let plan = first;
+  try {
+    const m = /\b(?:near|around|close to|nearby)\s+([a-z .'’-]+?)(?:\s+(?:in|on|this|next|for|with)\b|[,.!?]|$)/i.exec(String(args.text || ''));
+    const town = m && Object.keys(REGION_LABELS).find((r) => REGION_LABELS[r].toLowerCase() === m[1].trim().toLowerCase());
+    if (town && TRIP_NEAR_TOWNS[town] && tripPlanEmpty(first) && !args.swap && !args.pinned) {
+      const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]);
+      const wider = runTripPlanCore({ ...args, text: String(args.text).replace(m[0].replace(/[,.!?]$/, ''), `in ${towns.slice(0, -1).join(', ')} and ${towns.slice(-1)}${m[0].match(/\s+(in|on|this|next|for|with)$/i) ? m[0].match(/\s+(in|on|this|next|for|with)$/i)[0] : ''}`) }, now);
+      if (!tripPlanEmpty(wider)) {
+        const near = towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
+        const note = `Nothing in ${REGION_LABELS[town]} itself matched, so this includes ${nearText} nearby.`;
+        wider.notes = [note].concat(wider.notes || []);
+        wider.contextNotes = [note].concat(wider.contextNotes || []);
+        wider.query = first.query;
+        plan = wider;
+      }
+    }
+  } catch (e) { plan = first; }
+  // 2026-10-25: "the Okanagan in spring" / "the Okanagan in July" came back "We couldn't work out a plan": a season or
+  // month with no other ask is read as things to do then.
+  try {
+    // Any other request that could not be read ("something fun", "what's good around here") gets ideas too, never a dead end.
+    if (plan && plan.kind === 'unknown' && String(args.text || '').trim() && !/^things to do\b/i.test(String(args.text || ''))) {
+      const retry = runTripPlanCore({ ...args, text: `things to do ${String(args.text || '').trim()}` }, now);
+      if (retry && retry.kind !== 'unknown') { retry.query = plan.query; plan = retry; }
+    }
+  } catch (e) { /* keep the plan */ }
+  return runTripPlanSkiFallback(plan, args, now);
+}
+// 2026-10-25: "cross country skiing near Vernon" found nothing because the Nordic centres are listed under SilverStar.
+// A request "near" a town that comes back empty looks in the towns right around it, and says so.
+const TRIP_NEAR_TOWNS = {
+  vernon: ['coldstream', 'silverstar', 'armstrong'], kelowna: ['west-kelowna', 'lake-country'], 'west-kelowna': ['kelowna', 'peachland'],
+  'lake-country': ['kelowna', 'vernon'], peachland: ['summerland', 'west-kelowna'], summerland: ['penticton', 'peachland'],
+  penticton: ['naramata', 'summerland', 'kaleden'], naramata: ['penticton'], kaleden: ['penticton', 'okanagan-falls'],
+  'okanagan-falls': ['kaleden', 'oliver'], oliver: ['osoyoos', 'okanagan-falls'], osoyoos: ['oliver'], coldstream: ['vernon', 'lumby'],
+  lumby: ['coldstream', 'vernon'], armstrong: ['enderby', 'vernon'], enderby: ['armstrong'], 'big-white': ['kelowna'], silverstar: ['vernon'],
+  apex: ['penticton'], baldy: ['oliver'],
+};
+function tripPlanEmpty(plan) {
+  if (!plan) return true;
+  if (plan.kind === 'discover' || plan.kind === 'recommendations') return !(plan.recommendations || []).length;
+  return false;
+}
+function runTripPlanSkiFallback(plan, args, now) {
+  try {
+    if (args.overrides?.baseRegion || args.swap || args.pinned || !plan || !['day_plan', 'multi_day'].includes(plan.kind)) return plan;
+    const hills = new Set((plan.days || []).flatMap((d) => d.regions || [d.region]).filter(Boolean));
+    const hill = hills.size === 1 ? [...hills][0] : null;
+    const base = hill && TRIP_SKI_HILL_BASE[hill];
+    if (!base) return plan;
+    const stops = (plan.days || []).flatMap((d) => d.stops || []);
+    if (!stops.length || stops.filter((s) => s.venue || s.event).length * 2 >= stops.length) return plan;
+    const moved = runTripPlanCore({ ...args, overrides: { ...(args.overrides || {}), baseRegion: base.town } }, now);
+    const moveStops = (moved.days || []).flatMap((d) => d.stops || []);
+    if (moveStops.filter((s) => s.venue || s.event).length <= stops.filter((s) => s.venue || s.event).length) return plan;
+    const hillLabel = REGION_LABELS[hill] || hill, townLabel = REGION_LABELS[base.town] || base.town;
+    const note = `Most places at ${hillLabel} are closed between seasons, so this plan is based in ${townLabel}, about ${base.minutes} minutes away. Check ${hillLabel}’s own site for its opening day.`;
+    const noteFr = `La plupart des lieux de ${hillLabel} sont fermés entre les saisons : ce plan part donc de ${townLabel}, à environ ${base.minutes} minutes. Consultez le site de ${hillLabel} pour sa date d’ouverture.`;
+    moved.notes = [note].concat(moved.notes || []);
+    moved.contextNotes = [note].concat(moved.contextNotes || []);
+    moved.skiHillFallback = { from: hill, to: base.town, note, noteFr };
+    return moved;
+  } catch (e) { return plan; }
+}
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
   // Calendar dates are handled by requirements, not mistaken for a day count.
@@ -6886,7 +6962,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     }
     namedEventAmbiguity = null;
   }
-  const intent = discoveryIntentModule().interpretDiscoveryQuery(interpretationText, taxonomy);
+  const intent = discoveryIntentModule().interpretDiscoveryQuery(interpretationText, taxonomy, { tripPlanner: true });
   // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
@@ -7118,8 +7194,20 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     tripWindowClockNote(plan, requirements);
     return plan;
   }
-  if (intent.mode === 'events') { intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
-  const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, requirements) : null;
+  if (intent.mode === 'events') { intent.eventFarmers = TRIP_FARMERS_MARKET_RE.test(String(interpretationText || '').replace(/[’']/g, '')); intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
+  // 2026-10-25: "concerts in Vernon in November" listed events from today on (an October Halloween show first): a month
+  // named in an events request, with no other date, is that month's window.
+  let eventCalendar = requirements;
+  if (intent.mode === 'events' && !requirements?.startDate && !intent.when && Number.isInteger(intent.month)) {
+    const anchor = tripRequestedMonthDate(intent, now);
+    if (anchor) {
+      const today = todayLocal(now), first = `${anchor.slice(0, 8)}01`;
+      const y = Number(anchor.slice(0, 4)), m = Number(anchor.slice(5, 7));
+      const last = `${anchor.slice(0, 8)}${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+      eventCalendar = { ...(requirements || {}), startDate: first < today ? today : first, endDate: last };
+    }
+  }
+  const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, eventCalendar) : null;
   const plan = tripPlannerModule().planTrip({
     intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
     facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now)),
