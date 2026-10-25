@@ -1393,7 +1393,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // stay listed as not applied (a month exactly as before) and the lake
   // words stay the visitor's own search words.
   // Round 10 (2026-10-19): "3 days in Vernon in November with shows" is a trip too (an events request with a length).
-  const planning = intent.mode === 'plan' || intent.mode === 'recommend' || (intent.mode === 'events' && Number.isInteger(intent.days) && intent.days > 0);
+  // 2026-10-25: Build My Trip (opts.tripPlanner) always plans, so "wineries and a lake swim in Summerland in August"
+  // and "hiking in Kelowna in January" keep their month for the season rules (it was listed as not understood).
+  const planning = !!opts.tripPlanner || intent.mode === 'plan' || intent.mode === 'recommend' || (intent.mode === 'events' && Number.isInteger(intent.days) && intent.days > 0);
   if (planning) {
     const lakeTerms = intent.textTerms.filter((w) => LAKE_WORDS.includes(w));
     if (lakeTerms.length) {

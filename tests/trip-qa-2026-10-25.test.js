@@ -59,3 +59,21 @@ test('Server: a drinks stop asked for after dinner comes after it; a stop before
   const gap = at(p, dinner.venue.id).startMinutes - at(p, winery.venue.id).endMinutes;
   assert.ok(gap <= 90, `the winery ends ${gap} minutes before dinner`);
 });
+
+test('Build My Trip keeps a month for every kind of request (search still reports it as not applied)', () => {
+  const trip = d.interpretDiscoveryQuery('wineries in Kelowna in August', TAXONOMY, { tripPlanner: true });
+  assert.equal(trip.month, 8);
+  assert.ok(!trip.unsupported.includes('august'));
+  const search = d.interpretDiscoveryQuery('wineries in Kelowna in August', TAXONOMY);
+  assert.ok(search.unsupported.includes('august'), 'site search is unchanged');
+});
+
+test('a golf simulator nobody asked for is planned once a trip', () => {
+  const stop = (id, sim) => ({ venue: { id, type: sim ? 'golf' : 'indoor', indoorGolf: sim }, alternates: [{ venue: { id: id + 100, type: 'indoor' } }] });
+  const plan = { days: [{ stops: [stop(1, true)] }, { stops: [stop(2, true)] }] };
+  tp.oneSimulatorATrip(plan, { types: [] });
+  assert.deepEqual(plan.days.map((x) => x.stops[0].venue.id), [1, 102]);
+  const golf = { days: [{ stops: [stop(1, true)] }, { stops: [stop(2, true)] }] };
+  tp.oneSimulatorATrip(golf, { types: ['golf'] });
+  assert.deepEqual(golf.days.map((x) => x.stops[0].venue.id), [1, 2]);
+});

@@ -4518,7 +4518,7 @@ function planTripUnchecked(input) {
   if (!input?.requirements?.items?.length && !input?.requirements?.conflicts?.length && !input?.requirements?.startDate && input?.requirements?.startMinutes == null) {
     const plainIntent = { ...(input?.intent || {}) };
     const plainInput = withDayPartRegions(input ? { ...input, intent: plainIntent } : input, plainIntent);
-    const plain = planTripCore(plainInput); applyItinerarySwap(plain, plainInput); applySwapPreference(plain, plainInput); holdSwapPins(plain, plainInput); ensureDinners(plain, plainInput); oneRoundADay(plain); feedDrinkCrawl(plain, plainInput, plainInput.requirements || { items: [] }); refreshPlanCounts(plain, plainInput); return plain;
+    const plain = planTripCore(plainInput); applyItinerarySwap(plain, plainInput); applySwapPreference(plain, plainInput); holdSwapPins(plain, plainInput); ensureDinners(plain, plainInput); oneRoundADay(plain); oneSimulatorATrip(plain, plainIntent); feedDrinkCrawl(plain, plainInput, plainInput.requirements || { items: [] }); refreshPlanCounts(plain, plainInput); return plain;
   }
   let requirements = input.requirements;
   // "Something indoors if it rains" (2026-10-14): the days are planned for good weather and the plan names indoor
@@ -4636,6 +4636,7 @@ function planTripUnchecked(input) {
     }
   }
   oneRoundADay(result);
+  oneSimulatorATrip(result, intent);
   scheduleTripByHours(result, input, requirements);
   result = fitTimeBudget(result, input, requirements);
   if(result.timeBudget?.selected)scheduleTripByHours(result,input,requirements);
@@ -4881,6 +4882,22 @@ function eventOnDay(e, date) {
   const d = new Date(`${date}T12:00:00Z`);
   const label = `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()]} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCDate()}`;
   return { ...e, dateLabel: label, plannedDate: date };
+}
+// 2026-10-25: "2 days in Vernon in December" had a golf simulator on both days, though golf was never asked for. Unless
+// golf is asked for, an indoor golf session is planned once a trip; a later one becomes the best other kind of place
+// offered for that slot.
+function oneSimulatorATrip(result, intent) {
+  if ((intent && (intent.types || []).includes('golf')) || !(result.days || []).length) return;
+  const inPlan = new Set((result.days || []).flatMap((d) => (d.stops || []).map((s) => s.venue && s.venue.id).filter(Boolean)));
+  const sims = (result.days || []).flatMap((d) => (d.stops || []).filter((s) => s.venue && s.venue.type === 'golf' && s.venue.indoorGolf));
+  for (const extra of sims.slice(1)) {
+    const alt = (extra.alternates || []).find((a) => a && a.venue && a.venue.type !== 'golf' && !inPlan.has(a.venue.id));
+    if (!alt) continue;
+    const keep = { daypart: extra.daypart, label: extra.label };
+    inPlan.delete(extra.venue.id);
+    Object.keys(extra).forEach((k) => { delete extra[k]; });
+    Object.assign(extra, alt, keep); extra.alternates = []; inPlan.add(alt.venue.id);
+  }
 }
 function oneRoundADay(result) {
   const inPlan = new Set((result.days || []).flatMap((d) => (d.stops || []).map((s) => s.venue && s.venue.id).filter(Boolean)));
@@ -6284,6 +6301,7 @@ module.exports = {
   OCCASION_TYPES,
   classifyPlanRequest,
   eligible,
+  oneSimulatorATrip,
   advisoryFit,
   advisoryNotOperating,
   // Round 7 (2026-10-19): server.js's legacy /api/trip/generate uses the same rule.

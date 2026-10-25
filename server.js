@@ -6886,7 +6886,7 @@ function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [],
     }
     namedEventAmbiguity = null;
   }
-  const intent = discoveryIntentModule().interpretDiscoveryQuery(interpretationText, taxonomy);
+  const intent = discoveryIntentModule().interpretDiscoveryQuery(interpretationText, taxonomy, { tripPlanner: true });
   // Multi-part requests ("cafes and beaches from Kelowna to Penticton",
   // "dinner and a hockey game") are split into parts; anything else keeps
   // the single-request path below, unchanged.
