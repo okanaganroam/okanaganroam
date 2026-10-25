@@ -54,6 +54,10 @@ function t3FrenchText(value){
  const frClock12=(h,m,ap)=>{let x=Number(h)%12+(ap==='PM'?12:0);return x===0&&m==='00'?'minuit':x+' h'+(m==='00'?'':' '+m);};
  // 2026-10-25: a ski hill between seasons is planned from the town below (server.js runTripPlan).
  text=text.replace(/^Most places at (.+?) are closed between seasons, so this plan is based in (.+?), about (\d+) minutes away\. Check (.+?)’s own site for its opening day\.$/,(_,h,t,n)=>'La plupart des lieux de '+h+' sont fermés entre les saisons : ce plan part donc de '+t+', à environ '+n+' minutes. Consultez le site de '+h+' pour sa date d’ouverture.');
+ // 2026-10-25: matches closed for the season.
+ const frSeasonWhen=(m)=>m?'en '+(FR_MONTHS_BY_EN[m]||m):'en ce moment', frReopens=(r,rm,rd)=>{if(!r)return '';const d='le '+(rd==='1'?'1er':rd)+' '+(FR_MONTHS_BY_EN[rm]||rm);return r==='It'?' Réouverture '+d+'.':' '+r+' rouvre '+d+'.';};
+ text=text.replace(/^These places match but are closed for the season (?:in (\w+)|right now): (.+?)\.(?: (.+?) reopens (\w+) (\d{1,2})\.)? Ask again with a date in their season to plan them\.$/,(_,m,names,r,rm,rd)=>'Ces lieux correspondent, mais sont fermés pour la saison '+frSeasonWhen(m)+' : '+names.replace(/ and /g,' et ')+'.'+frReopens(r,rm,rd)+' Redemandez avec une date dans leur saison pour les planifier.');
+ text=text.replace(/^(.+?) matches but is closed for the season (?:in (\w+)|right now)\.(?: (.+?) reopens (\w+) (\d{1,2})\.)? Ask again with a date in its season to plan it\.$/,(_,n,m,r,rm,rd)=>n+' correspond, mais est fermé pour la saison '+frSeasonWhen(m)+'.'+frReopens(r,rm,rd)+' Redemandez avec une date dans sa saison pour le planifier.');
  text=text.replace(/^It’s already late, so this plan is for tomorrow evening\.$/,'Il est déjà tard; ce plan est donc pour demain soir.');
  text=text.replace(/^It’s already evening, so this plan is for tomorrow afternoon\.$/,'Il est déjà le soir; ce plan est donc pour demain après-midi.');
  text=text.replace(/^It’s already afternoon, so this plan is for tomorrow morning\.$/,'Il est déjà l’après-midi; ce plan est donc pour demain matin.');
