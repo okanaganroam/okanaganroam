@@ -4423,9 +4423,16 @@ function addSuggestedTimes(result, input) {
     const wait0 = firstWait(best);
     if (start0 != null && wait0 >= 60) {
       let pick = null;
+      // 2026-10-25: a morning coffee is not pushed up against lunch (coffee at 10:45, lunch at 11:30 on a relaxed
+      // Summerland day and a Penticton girls' weekend): the two start at least two hours apart.
+      const typeOfId = new Map(stops.filter((x) => x.venue).map((x) => [x.venue.id, x.venue.type]));
+      const coffeeIntoLunch = (t) => { const byDay = new Map(); for (const r of t.rows) { if (!byDay.has(r.day)) byDay.set(r.day, []); byDay.get(r.day).push(r); }
+        for (const rs of byDay.values()) { const [a, b] = rs; if (a && b && typeOfId.get(a.venueId) === 'cafe' && ['restaurant', 'pub', 'cafe'].includes(typeOfId.get(b.venueId)) && Number.isFinite(a.startMinutes) && Number.isFinite(b.startMinutes) && b.startMinutes - a.startMinutes < 120) return true; }
+        return false; };
       for (let m = start0 + 15; m <= Math.min(start0 + 180, 690); m += 15) {
         const t = run(m);
         if (!t || t.untimed > best.untimed || t.rows.length !== best.rows.length) continue;
+        if (coffeeIntoLunch(t) && !coffeeIntoLunch(best)) continue;
         const w = firstWait(t);
         if (w < wait0 - 30 && (!pick || w < pick.w)) pick = { t, w };
         if (w === 0) break;
