@@ -4299,6 +4299,8 @@ const HOLIDAY_EVENT_WORDS = {
   valentine: ['valentine', 'valentines', 'galentine', 'galentines'],
   'new year': ['new year', 'new years', 'nye'],
 };
+// How many of each holiday's first words name the holiday itself (the rest are looser: festive, spooky, egg hunt).
+const HOLIDAY_EVENT_CORE_WORDS = { halloween: 4, christmas: 5, thanksgiving: 2, easter: 1, valentine: 4, 'new year': 3 };
 function holidayEventTheme(text) {
   const t = discoveryIntentModule().normalizeDiscoveryText(text || '');
   if (/\bhalloween\b/.test(t)) return 'halloween';
@@ -4365,7 +4367,11 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
   if (theme) {
     events = events.filter((e) => {
       const text = discoveryIntentModule().normalizeDiscoveryText(`${e.name || ''} ${e.description || ''}`);
-      return theme.some((w) => discoveryTextHas(text, w));
+      if (!theme.some((w) => discoveryTextHas(text, w))) return false;
+      // 2026-10-25: a loose word ("festive", "light up", "haunt") is not enough when the event names another holiday:
+      // "Christmas in Kelowna" listed Halloweek first for its "festive Halloween décor".
+      const otherHoliday = Object.keys(HOLIDAY_EVENT_WORDS).some((k) => k !== themeKey && discoveryTextHas(text, HOLIDAY_EVENT_WORDS[k][0]));
+      return !otherHoliday || theme.slice(0, HOLIDAY_EVENT_CORE_WORDS[themeKey] || 1).some((w) => discoveryTextHas(text, w));
     });
   }
   // With kids, bar nights and winery events are left out unless they are also listed for families.
