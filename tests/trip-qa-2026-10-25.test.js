@@ -157,3 +157,12 @@ test('French: « promenade » and « balade » are a walk, and « balade à vél
   assert.match(fr.tripPlannerText('une balade et un café à Penticton', tax), /\bwalk\b/);
   assert.match(fr.tripPlannerText('une balade à vélo à Kelowna', tax), /bike ride/);
 });
+
+test('Server: an events request naming a month is that month', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'concerts in Vernon in November' }, new Date('2026-10-25T18:00:00Z'));
+  assert.equal(p.kind, 'events');
+  assert.equal(p.eventWindow.from, '2026-11-01');
+  assert.equal(p.eventWindow.to, '2026-11-30');
+});

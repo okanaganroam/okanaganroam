@@ -7151,7 +7151,19 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     return plan;
   }
   if (intent.mode === 'events') { intent.eventFarmers = TRIP_FARMERS_MARKET_RE.test(String(interpretationText || '').replace(/[’']/g, '')); intent.eventTheme = holidayEventTheme(interpretationText); intent.eventKids = /\b(?:kids?|children|child|family|families|toddlers?)\b/i.test(interpretationText); }
-  const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, requirements) : null;
+  // 2026-10-25: "concerts in Vernon in November" listed events from today on (an October Halloween show first): a month
+  // named in an events request, with no other date, is that month's window.
+  let eventCalendar = requirements;
+  if (intent.mode === 'events' && !requirements?.startDate && !intent.when && Number.isInteger(intent.month)) {
+    const anchor = tripRequestedMonthDate(intent, now);
+    if (anchor) {
+      const today = todayLocal(now), first = `${anchor.slice(0, 8)}01`;
+      const y = Number(anchor.slice(0, 4)), m = Number(anchor.slice(5, 7));
+      const last = `${anchor.slice(0, 8)}${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+      eventCalendar = { ...(requirements || {}), startDate: first < today ? today : first, endDate: last };
+    }
+  }
+  const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, eventCalendar) : null;
   const plan = tripPlannerModule().planTrip({
     intent, requirements, text: requirementsText, budgetMode: overrides?.budgetMode,
     facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now)),
