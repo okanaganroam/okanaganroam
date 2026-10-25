@@ -14,7 +14,7 @@ const KINDS = {
   climbing: /\b(?:climbing gyms?|bouldering)\b/,
   arcade: /\b(?:arcades?|laser tag)\b/,
   theatre: /\b(?:theatres?|theaters?|cinema|performing arts)\b/,
-  spa: /\b(?:spas?|thermal spa|sauna experience)\b/,
+  spa: /\b(?:spas?|thermal spa|sauna experience|saunas?|floating sauna|massages?|wellness)\b/, // 2026-10-25: saunas and wellness studios
   wine_tour: /\b(?:wine tours?|winery tours?|vineyard tours?)\b/,
   boat_tour: /\b(?:boat tours?|lake cruises?|cruises?)\b/,
   guided_hike: /\b(?:guided hikes?|guided hiking|hiking tours?)\b/,
@@ -122,6 +122,7 @@ function inferPlannerKinds(v) {
       if (!['outdoor','beach'].includes(v.type) || /\b(?:arena|ice rink|skating rink|rv|resort|camp|campground|water park)\b/.test(name)) return false;
       return /\bparks?\b/.test(name) || /\b(?:regional|provincial|community|city|public|adventure) park\b/.test(text);
     }
+    if (kind === 'spa' && /\b(?:ymca|aquatic|community centre|community center|pool|arena|gym|fitness)\b/.test(name)) return false; // a pool's sauna is not a spa day
     if (kind === 'sunset') return v.type === 'outdoor';
     return ['indoor','tour'].includes(v.type) || kind.includes('tour') || ['cooking','guided_hike','snow_tour','horseback'].includes(kind);
   }).map(([kind])=>kind);

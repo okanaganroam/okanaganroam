@@ -143,3 +143,9 @@ test('a rough-access trail carries a road warning', () => {
   assert.ok(tp.roughAccess(trail));
   assert.ok(!tp.roughAccess({ type: 'outdoor', textDesc: 'a paved lakeside path' }));
 });
+
+test('a floating sauna or wellness studio is a spa; a pool with a sauna is not', () => {
+  const req = require('../trip-requirements');
+  assert.ok(req.inferPlannerKinds({ type: 'indoor', name: 'Shelter Floating Sauna', description: 'A wood-fired sauna floating on Skaha Lake.' }).includes('spa'));
+  assert.ok(!req.inferPlannerKinds({ type: 'indoor', name: 'Kelowna Family YMCA', description: 'Pool, gym and sauna.' }).includes('spa'));
+});
