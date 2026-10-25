@@ -5953,7 +5953,8 @@ function planItinerary(input) {
   for (const place of trip.unknownPlaces || []) result.warnings.push(`“${place}” isn’t a place Okanagan Roam covers, so it wasn’t used for the route.`);
   // Step 1 (2026-09-29): the visitor's own words that no part of the plan
   // used are named, never silently dropped ("a lake walk").
-  const leftover = (trip.leftoverTerms || []).filter((w) => !(trip.unknownPlaces || []).some((p) => p.split(' ').includes(w)));
+  // 2026-10-25: a clock time ("lunch at noon", "at 7pm") is read as the time, never reported as a leftover word.
+  const leftover = (trip.leftoverTerms || []).filter((w) => !(trip.unknownPlaces || []).some((p) => p.split(' ').includes(w)) && !/^\d{1,2}(?::?[0-5]\d)?(?:am|pm)$|^(?:am|pm|noon|midday|midnight)$/.test(String(w)));
   if (leftover.length) result.warnings.push(`Not part of this plan: ${listText(leftover.map((w) => `“${w}”`))} — Okanagan Roam couldn’t match ${leftover.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`);
   if (route && !route.from && route.to) result.notes.push(`No starting point was given, so the stops are in ${regionLabel(baseCtx, route.to)}.`);
   const whereText = route && route.from && route.to

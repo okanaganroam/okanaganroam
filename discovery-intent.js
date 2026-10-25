@@ -370,6 +370,7 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'mothers fathers labour labor '
   // 2026-10-25: "surprise me", "I'm bored", "help me plan a trip" searched listings for those words.
   + 'surprise surprises bored boring help helping recommend recommendations suggest suggestions '
+  + 'starting start starts '
   // French search (2026-10-19, round 7): French articles and joiners left in a French request after its words are read
   // in English ("bonhomme de neige" listed 1,650 places, every one with "de" somewhere). "a" (à) is above.
   + 'de du des la le les l d et au aux en '
@@ -1418,6 +1419,14 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // Round 10 (2026-10-19): "3 days in Vernon in November with shows" is a trip too (an events request with a length).
   // 2026-10-25: Build My Trip (opts.tripPlanner) always plans, so "wineries and a lake swim in Summerland in August"
   // and "hiking in Kelowna in January" keep their month for the season rules (it was listed as not understood).
+  // 2026-10-25: in Build My Trip a clock time ("dinner at 7pm", "lunch at noon") is read from the request by the trip
+  // requirements; it is never a search word ("7pm", "pm", "noon").
+  if (opts.tripPlanner) {
+    const clockWord = (w) => /^\d{1,2}(?::?[0-5]\d)?(?:am|pm)$|^(?:am|pm|noon|midday|midnight)$/.test(String(w));
+    intent.textTerms = intent.textTerms.filter((w) => !clockWord(w));
+    intent.foodTerms = intent.foodTerms.filter((f) => f.cuisine || !clockWord(f.term));
+    intent.unsupported = intent.unsupported.filter((w) => !clockWord(w));
+  }
   const planning = !!opts.tripPlanner || intent.mode === 'plan' || intent.mode === 'recommend' || (intent.mode === 'events' && Number.isInteger(intent.days) && intent.days > 0);
   if (planning) {
     const lakeTerms = intent.textTerms.filter((w) => LAKE_WORDS.includes(w));

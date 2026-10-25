@@ -193,3 +193,10 @@ test('Server: "the Okanagan in spring" gives ideas, not "couldn\'t work out a pl
   assert.notEqual(p.kind, 'unknown');
   assert.equal(p.query, 'the Okanagan in spring');
 });
+
+test('Build My Trip: clock times are not search words ("dinner at 7pm", "lunch at noon")', () => {
+  const i = d.interpretDiscoveryQuery('dinner at 7pm in Kelowna', TAXONOMY, { tripPlanner: true });
+  assert.ok(!i.textTerms.includes('7pm') && !i.unsupported.includes('7pm'), JSON.stringify(i.textTerms));
+  const j = d.interpretDiscoveryQuery('dinner at 7 pm in Kelowna', TAXONOMY, { tripPlanner: true });
+  assert.ok(!j.textTerms.includes('pm') && !j.unsupported.includes('pm'));
+});
