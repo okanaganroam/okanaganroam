@@ -177,7 +177,9 @@ const ACTIVITY_ALIASES = {
   camping: ['camp', 'camping', 'campground', 'campgrounds', 'campsite', 'campsites'],
   nature: ['nature', 'birding', 'bird watching', 'birdwatching', 'wildlife', 'wetland', 'wetlands'],
   water: ['paddle', 'paddling', 'paddleboard', 'paddleboarding', 'paddle board', 'sup', 'kayak', 'kayaking', 'canoe', 'canoeing', 'boating', 'boat rental', 'boat rentals'],
-  viewpoints: ['viewpoint', 'viewpoints', 'lookout', 'lookouts', 'scenic view', 'scenic views', 'view point'],
+  viewpoints: ['viewpoint', 'viewpoints', 'lookout', 'lookouts', 'scenic view', 'scenic views', 'view point',
+    // 2026-10-25: "photography spots in Osoyoos" found only an art gallery.
+    'photography spots', 'photography spot', 'photo spots', 'photo spot', 'photo ops', 'photo op', 'instagram spots', 'instagrammable spots', 'instagrammable', 'scenic spots', 'scenic spot'],
   adventure: ['zipline', 'ziplining', 'zip line', 'zip lining', 'adventure', 'adventures', 'ropes course'],
   fishing: ['fish', 'fishing'],
 };
