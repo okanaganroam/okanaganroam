@@ -26,7 +26,10 @@ function textHas(normalized, term) {
 
 // Where a word appears in a venue's name, cuisine and description, or null.
 // French pass 6 (2026-10-19): a search from a French page (fr) also reads the place's French description.
-function termMatch(v, term, fr = false) {
+function termMatch(v, term, fr = false, alt = true) {
+  // 2026-10-25: the visitor's word or the listing's word for the same thing ("waterfall" / "falls"); used by Build My
+  // Trip's food/text matching as well as site search.
+  if (alt) { const own = termMatch(v, term, fr, false); if (own) return own; for (const w of TERM_SYNONYMS[term] || []) { const m = termMatch(v, w, fr, false); if (m) return m; } return null; }
   const inName = textHas(v.textName, term), inCui = textHas(v.textCuisine, term), inDesc = textHas(v.textDesc, term) || (fr && textHas(v.textDescFr, term));
   return inName || inCui || inDesc ? { inName, inCui, inDesc } : null;
 }
