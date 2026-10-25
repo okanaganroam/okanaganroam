@@ -1470,13 +1470,21 @@ function chooseDayRegions(facts, ctx, days, centroids) {
       return s;
     };
     const k = days <= 2 ? 1 : Math.min(days, Math.ceil(days / 2) + 1);
+    // 2026-10-25: most towns cap out at the same strength, and the tie went alphabetically ("a week in the Okanagan"
+    // had Lake Country and Naramata but not Penticton or Vernon); a tie now goes to the town with more to do.
     regions = Object.keys(byRegion).filter((r) => centroids[r] && (byRegion[r] || []).length >= 6)
-      .sort((a, b) => strength(b) - strength(a) || a.localeCompare(b)).slice(0, k);
+      .sort((a, b) => strength(b) - strength(a) || (byRegion[b] || []).length - (byRegion[a] || []).length || a.localeCompare(b)).slice(0, k);
   }
   // North to south, so a multi-region trip never doubles back.
+  const size = (r) => (byRegion[r] || []).length;
   regions.sort((a, b) => lat(b) - lat(a) || a.localeCompare(b));
   if (!regions.length) return [];
-  return Array.from({ length: days }, (_, i) => regions[Math.floor((i * regions.length) / days)]);
+  if (ctx.regions.length || days <= regions.length) return Array.from({ length: days }, (_, i) => regions[Math.floor((i * regions.length) / days)]);
+  // The extra days of a valley trip go to the towns with the most to do, not the northernmost ones.
+  const nights = Object.fromEntries(regions.map((r) => [r, 1]));
+  const bySize = regions.slice().sort((a, b) => size(b) - size(a) || a.localeCompare(b));
+  for (let left = days - regions.length, i = 0; left > 0; left--, i++) nights[bySize[i % bySize.length]] += 1;
+  return regions.flatMap((r) => Array(nights[r]).fill(r));
 }
 
 // Review fixes (2026-10-18):

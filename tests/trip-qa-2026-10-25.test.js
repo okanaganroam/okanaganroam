@@ -101,3 +101,14 @@ test('a lookout with the Lake View badge is a sunset spot (no Penticton listing 
   assert.ok(req.inferPlannerKinds({ type: 'outdoor', name: 'Munson Mountain', description: 'A short climb to views over Penticton.', lake_view: 1, activities: ['viewpoints'] }).includes('sunset'));
   assert.ok(!req.inferPlannerKinds({ type: 'outdoor', name: 'Forest Loop', description: 'A shady forest loop.', activities: ['hiking'] }).includes('sunset'));
 });
+
+test('a week in the Okanagan visits the big towns, and its extra days go to them (not alphabetical, not northernmost)', () => {
+  const towns = { 'lake-country': [50.05, 45], kelowna: [49.88, 300], naramata: [49.59, 60], penticton: [49.49, 200], vernon: [50.26, 180], oliver: [49.18, 90], osoyoos: [49.03, 80], 'west-kelowna': [49.86, 120] };
+  const facts = []; let id = 1;
+  for (const [r, [lat, n]] of Object.entries(towns)) for (let i = 0; i < n; i++) facts.push({ id: id++, region: r, type: 'restaurant', features: {}, collections: [], activities: [], lat, lng: -119.5 });
+  const centroids = Object.fromEntries(Object.entries(towns).map(([r, [lat]]) => [r, { lat, lng: -119.5 }]));
+  const ctx = { regions: [], exclude: new Set(), exclusions: { applied: [] }, types: new Set(), activities: new Set(), features: [], plannerKinds: [], collections: [], foodTerms: [], tripDate: '2026-10-25' };
+  const week = tp.chooseDayRegions(facts, ctx, 7, centroids);
+  for (const town of ['kelowna', 'penticton', 'vernon']) assert.ok(week.includes(town), week.join(' > '));
+  assert.equal(week.filter((r) => r === 'kelowna').length, 2, week.join(' > '));
+});
