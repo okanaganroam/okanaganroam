@@ -5757,6 +5757,9 @@ function seasonFit(v, c, season, ctx) {
     if (it.water && acts.includes('water')) { out.caveats.push(SEASON_CAVEATS.water(m)); out.flags.waterOff = true; }
     if (v.type === 'beach') out.flags.beachOff = true;
   }
+  // 2026-10-25: "a day in Penticton in July" had no beach -- off-season beaches lost points but in-season ones gained
+  // none (snow places already gain in winter). In June to September a beach suits an open day.
+  if (v.type === 'beach' && season.water === 'in' && ctx && !ctx.itinerary && !(ctx.types && ctx.types.size && !ctx.types.has('beach'))) add(8, `A beach day suits ${m}`);
   if (acts.includes('winter')) {
     const snowOnly = acts.every((a) => a === 'winter');
     if (season.snow === 'in' && it.open) { add(8, `Listed for ${activityLabel(ctx, 'winter')} — in season in ${m}`); out.flags.snowIn = true; }
