@@ -21,7 +21,7 @@ const KINDS = {
   cooking: /\bcooking class(?:es)?\b/,
   pottery: /\b(?:pottery|ceramics?) (?:classes?|workshops?|studio)?\b/,
   park: /\bparks?\b/,
-  horseback: /\b(?:horseback riding|horseback|horse riding|horse riding tours?)\b/,
+  horseback: /\b(?:horseback riding|horseback rides?|horseback|horse riding|horse rides?|trail rides?|horse riding tours?)\b/, // 2026-10-25: "a horseback ride"
   sunset: /\b(?:sunset|sunsets)\b/,
   snow_tour: /\b(?:sleigh rides?|dog sledding|dog sled tours?)\b/,
 };

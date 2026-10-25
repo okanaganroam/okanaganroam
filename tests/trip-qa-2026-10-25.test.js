@@ -166,3 +166,12 @@ test('Server: an events request naming a month is that month', () => {
   assert.equal(p.eventWindow.from, '2026-11-01');
   assert.equal(p.eventWindow.to, '2026-11-30');
 });
+
+test('trail rides are horseback riding; a waterfall search finds "Falls"', () => {
+  const req = require('../trip-requirements');
+  assert.ok(req.inferPlannerKinds({ type: 'outdoor', name: 'Okanagan Stables', description: 'Guided trail rides through the hills above Lake Country.' }).includes('horseback'));
+  const ds = require('../discovery-search.js');
+  const v = { id: 1, name: 'BX Creek Trail & BX Falls', textName: 'bx creek trail bx falls', textCuisine: '', textDesc: 'a creek trail to a canyon', region: 'vernon', type: 'outdoor', collections: [], activities: [], features: {} };
+  const res = ds.searchVenues({ mode: 'find', regions: ['vernon'], types: [], features: [], collections: [], activities: [], cuisines: [], textTerms: ['waterfall'], foodTerms: [], excluded: {} }, [v]);
+  assert.equal(res.total, 1);
+});
