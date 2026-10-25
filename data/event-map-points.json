@@ -76,6 +76,8 @@
   { "region": "armstrong", "names": ["Ottercrest Farms"], "lat": 50.43256, "lng": -119.25322, "address": "4387 MacDonald Rd, Spallumcheen (Armstrong)", "source": "(address from event text)" },
   { "region": "kelowna", "names": ["The House"], "lat": 49.92469, "lng": -119.39332, "address": "240 Lougheed Rd, Kelowna", "source": "(address from event text)" },
   { "region": "oliver", "names": ["Riding 4 Life Ranch"], "lat": 49.16244, "lng": -119.54699, "address": "5621 Sawmill Rd, Oliver", "source": "(address from event text)" },
-  { "region": "silverstar", "names": ["NATC Auditorium"], "lat": 50.35886, "lng": -119.05832, "address": "118 Shortt St, SilverStar Mountain", "source": "(address from event text)" }
+  { "region": "silverstar", "names": ["NATC Auditorium"], "lat": 50.35886, "lng": -119.05832, "address": "118 Shortt St, SilverStar Mountain", "source": "(address from event text)" },
+  { "region": "kelowna", "names": ["The HOV - Hall on Valley", "The HOV", "Hall on Valley"], "lat": 49.91901, "lng": -119.43549, "address": "228 Valley Rd, Kelowna", "source": "https://www.tourismkelowna.com/event/the-dinner-theatre-live/45001/ (venue address; BC Geocoder 100 CIVIC_NUMBER)" },
+  { "region": "kaleden", "names": ["Sagebrush Stables", "Sagebrush Ranch"], "lat": 49.34502, "lng": -119.73672, "address": "726 Sheep Creek Rd, Kaleden", "source": "https://visitpenticton.com/nm_event/haunted-halloween-trail-at-sagebrush-ranch/ (venue address; BC Geocoder 100 CIVIC_NUMBER)" }
  ]
 }
