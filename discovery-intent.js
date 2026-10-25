@@ -151,7 +151,9 @@ const FEATURE_ALIASES = {
   vegetarian: ['vegetarian', 'vegetarian friendly', 'vegetarian options', 'veggie'],
   gluten_free: ['gluten free', 'gf', 'celiac', 'coeliac'],
   patio: ['patio', 'patios', 'outdoor seating', 'outdoor patio'],
-  lake_view: ['lake view', 'lake views', 'lakeview', 'view of the lake', 'views of the lake', 'lakeside view'],
+  lake_view: ['lake view', 'lake views', 'lakeview', 'view of the lake', 'views of the lake', 'lakeside view',
+    // 2026-10-25: "lunch with a view in Kelowna" searched descriptions for the word "view".
+    'with a view', 'with views', 'with a nice view', 'with a great view', 'with great views', 'with nice views', 'with a lake view', 'with lake views', 'a view'],
   nonalcoholic: ['non alcoholic', 'nonalcoholic', 'alcohol free', 'mocktail', 'mocktails', 'zero proof'],
   sports_tv: ['sports tv', 'watch the game', 'watch sports', 'watch the hockey', 'sports bar', 'sports bars'],
   live_music: ['live music', 'live band', 'live bands', 'live entertainment'],
