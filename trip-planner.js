@@ -3591,7 +3591,9 @@ function fillDinnerGaps(result, input, requirements) {
         // Round 15b (2026-10-20): nor a balloon company, rental base or forest-road campsite (rotateBooked), and never a
         // kids-only playground for adults.
         if (rotateBooked(v) || (!ctx.kids && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || ''}`))) continue;
-        if (GAP_ALCOHOL_TYPES.includes(v.type) && !ctx.types.has(v.type) && result.theme !== 'wine') continue;
+        // 2026-10-25: a group trip (bachelor/bachelorette, girls' or guys' weekend) may fill the late afternoon with a
+        // brewery or pub; a bachelor party's afternoon was a bubble-tea café.
+        if (GAP_ALCOHOL_TYPES.includes(v.type) && !ctx.types.has(v.type) && result.theme !== 'wine' && !['group_getaway', 'celebration'].includes(ctx.occasion)) continue;
         if (v.type === 'cafe' && ['treat'].indexOf(cafeRole(v)) === -1 && !ctx.kids) continue; // a coffee right before dinner is not a stop
         if (coldMonthIceCream(v, date || ctx.tripDate)) continue; // round 10: no gelato filler in November
         if (!eligible(v, dayCtx, false) || offSeasonSkip(v, dayCtx) || (date && seasonClosedOnTrip(v, { date })) || advisoryUnavailable(v.advisory && v.advisory.note)) continue;
