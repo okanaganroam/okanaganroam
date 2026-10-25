@@ -1574,6 +1574,7 @@ function offSeasonSkip(v, ctx) {
 // lunch is then a restaurant. A dinner-only kitchen is never the lunch.
 function pickLunchNear(pool, ctx, d, info, near, used, reserved, base, focuses, onceTerms, onceEvening, tripCuisines, centroids, neighbours) {
   const nextToCafe = (neighbours || []).some((st) => st && st.venue && st.venue.type === 'cafe');
+  const afterGolf = (neighbours || []).some((st) => st && st.venue && st.venue.type === 'golf' && !st.venue.indoorGolf);
   const pick = (towns, far) => {
     let cands = [];
     for (const v of pool) {
@@ -1590,6 +1591,9 @@ function pickLunchNear(pool, ctx, d, info, near, used, reserved, base, focuses, 
       if (focuses.some((f) => f.key.startsWith('food:') && f.test(v) && (onceTerms.has(f.key.slice(5)) || onceEvening.has(f.key.slice(5)) || DISH_WORDS_RE.test(f.key.slice(5))))) continue;
       const fit = slotFit(v, ctx, 'midday', d - 1, 'midday');
       if (!fit.ok) continue;
+      // 2026-10-25: after a morning round of golf (9 AM to 1 PM) lunch starts after 1, so a lunch place that closes
+      // at 2:30 (Rosalinda's in Vernon) could not be timed; it must be open 1 to 3 PM.
+      if (afterGolf && hoursFit(v, { from: 780, to: 900, need: 120, label: 'lunch' }, weekdayFor(ctx, d - 1)).status === 'closed') continue;
       const km = kmOrNull(near, v);
       let score = base.get(v.id).score + fit.score + (v.type === 'restaurant' ? 4 : 0) - (km == null ? 6 : km * 1.2 + (km > 15 ? 25 : 0));
       if (v.type === 'restaurant' && v.textCuisine && tripCuisines.has(v.textCuisine)) score -= 4;
