@@ -665,6 +665,11 @@ function scoreVenue(v, ctx) {
     if (v.price === 1) add('budget', 14, `Price level ${priceText(v.price)} fits your budget preference`);
     else if (v.price === 2) add('budget', 3, `Price level ${priceText(v.price)} fits your budget preference`);
     else add('budget_miss', -14, null);
+  } else if (ctx.budget === 'upscale' && v.price != null) {
+    // 2026-10-25: "a splurge weekend in Kelowna" lunched at a café and stopped for ice cream; a splurge leads with the
+    // pricier places, as "cheap eats" leads with the cheap ones.
+    if (v.price >= 3) add('budget', 12, `Price level ${priceText(v.price)} fits your budget preference`);
+    else if (v.price === 1) add('budget_miss', -12, null);
   } else if (fit === true) add('budget', 5, `Price level ${priceText(v.price)} fits your budget preference`);
   else if (fit === false) add('budget_miss', -6, null);
   if (v.rating != null) {
