@@ -84,3 +84,14 @@ test('an outdoor rink is off season in early November too (a weekend from Oct 31
   assert.equal(tp.offSeasonSkip(rink, ctx('2026-11-01')), true);
   assert.equal(tp.offSeasonSkip(rink, ctx('2026-12-10')), false);
 });
+
+test('seasonal outdoor places: a description season ("July to September") and winter tours (snowcats)', () => {
+  const c = (tripDate) => ({ tripDate, types: new Set(), activities: new Set(), requirements: { text: 'a day in lumby' } });
+  const trail = { type: 'outdoor', name: 'Spectrum Lake Trail', textName: 'spectrum lake trail monashees', textDesc: 'access is by a forest road high clearance vehicle july to september' };
+  const park = { type: 'outdoor', name: 'Kal Park', textName: 'kal park', textDesc: 'the beach is busiest from june to august' };
+  const cat = { type: 'tour', name: 'Monashee Powder Snowcats', textName: 'monashee powder snowcats', textDesc: '' };
+  assert.equal(tp.offSeasonSkip(trail, c('2026-10-25')), true);
+  assert.equal(tp.offSeasonSkip(trail, c('2027-08-01')), false);
+  assert.equal(tp.offSeasonSkip(park, c('2026-10-25')), false, 'a month range that is not a season is ignored');
+  assert.equal(tp.offSeasonSkip(cat, c('2026-10-25')), true);
+});

@@ -6853,7 +6853,33 @@ function buildTripPlannerTaxonomy() {
   const taxonomy = buildDiscoveryTaxonomy();
   return { ...taxonomy, types: [...new Set([...taxonomy.types, ...Object.keys(CATEGORY_SLUGS)])].filter((t) => !TRIP_PLANNER_DROPPED_TYPES.has(t)), venues: taxonomy.venues.filter((v) => !TRIP_PLANNER_DROPPED_TYPES.has(v.type)) };
 }
-function runTripPlan({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
+// 2026-10-25: "a day in Baldy" in late October came back with every slot empty ("No suitable morning stop..."), and
+// Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
+// a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
+const TRIP_SKI_HILL_BASE = { apex: { town: 'penticton', minutes: 40 }, baldy: { town: 'oliver', minutes: 40 }, 'big-white': { town: 'kelowna', minutes: 50 }, silverstar: { town: 'vernon', minutes: 30 } };
+function runTripPlan(args, now = new Date()) {
+  const plan = runTripPlanCore(args, now);
+  try {
+    if (args.overrides?.baseRegion || args.swap || args.pinned || !plan || !['day_plan', 'multi_day'].includes(plan.kind)) return plan;
+    const hills = new Set((plan.days || []).flatMap((d) => d.regions || [d.region]).filter(Boolean));
+    const hill = hills.size === 1 ? [...hills][0] : null;
+    const base = hill && TRIP_SKI_HILL_BASE[hill];
+    if (!base) return plan;
+    const stops = (plan.days || []).flatMap((d) => d.stops || []);
+    if (!stops.length || stops.filter((s) => s.venue || s.event).length * 2 >= stops.length) return plan;
+    const moved = runTripPlanCore({ ...args, overrides: { ...(args.overrides || {}), baseRegion: base.town } }, now);
+    const moveStops = (moved.days || []).flatMap((d) => d.stops || []);
+    if (moveStops.filter((s) => s.venue || s.event).length <= stops.filter((s) => s.venue || s.event).length) return plan;
+    const hillLabel = REGION_LABELS[hill] || hill, townLabel = REGION_LABELS[base.town] || base.town;
+    const note = `Most places at ${hillLabel} are closed between seasons, so this plan is based in ${townLabel}, about ${base.minutes} minutes away. Check ${hillLabel}’s own site for its opening day.`;
+    const noteFr = `La plupart des lieux de ${hillLabel} sont fermés entre les saisons : ce plan part donc de ${townLabel}, à environ ${base.minutes} minutes. Consultez le site de ${hillLabel} pour sa date d’ouverture.`;
+    moved.notes = [note].concat(moved.notes || []);
+    moved.contextNotes = [note].concat(moved.contextNotes || []);
+    moved.skiHillFallback = { from: hill, to: base.town, note, noteFr };
+    return moved;
+  } catch (e) { return plan; }
+}
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
   // Calendar dates are handled by requirements, not mistaken for a day count.

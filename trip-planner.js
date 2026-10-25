@@ -1499,7 +1499,7 @@ function familyAvoid(v) {
 }
 const OFF_SEASON_MONTHS = { beach: [10, 11, 12, 1, 2, 3, 4], golf: [10, 11, 12, 1, 2, 3] };
 // Snow-only outings (2026-10-19, round 7): a July Big White plan had snowshoe tours, dog sledding and a sleigh ride.
-const WINTER_ONLY_RE = /\b(?:snowshoe|snowshoes|snowshoeing|dog sled|dog sledding|sleigh|tube park|tubing|snowmobile|snowmobiling|snowcat|skating|rink|cross country ski|nordic|ski trails|twinkling|winter)\b/;
+const WINTER_ONLY_RE = /\b(?:snowshoe|snowshoes|snowshoeing|dog sled|dog sledding|sleigh|sleighs|tube park|tubing|snowmobiles?|snowmobiling|snowcats?|cat skiing|heli skiing|skating|rink|cross country ski|nordic|ski trails|twinkling|winter)\b/; // 2026-10-25: plurals ("Monashee Powder Snowcats" was planned in October)
 function winterOnly(v) { return ['outdoor', 'tour'].includes(v.type) && WINTER_ONLY_RE.test(v.textName || normWords(v.name)); }
 // Warm-weather outings (round 9, 2026-10-19): ice cream in January and the Speedway or a beach in November were picked.
 // From November to March they are only planned when the request names them.
@@ -1515,6 +1515,9 @@ function summerOnly(v, ctx) {
   const asked = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '');
   return !asked.includes(words[0].split(' ')[0]);
 }
+const DESC_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+const DESC_SEASON_CUE_RE = /\b(?:open|opens|opening|access|accessible|road|roads|vehicle|clearance|season|seasonal|operates|operating|run|runs|snow free|snow-free|trail is|hikeable)\b/;
+const DESC_SEASON_RE = new RegExp(`\\b(?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')}) (?:to|through|until|thru) (?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')})\\b`);
 function offSeasonSkip(v, ctx) {
   const month = Number((ctx.tripDate || '').slice(5, 7));
   // 2026-10-25: most of November is off too -- outdoor rinks open in December and the ski hills in late November; a
@@ -1524,6 +1527,18 @@ function offSeasonSkip(v, ctx) {
   if (month && SHOULDER_MONTHS.includes(month)) {
     const w = SHOULDER_CLOSED_RE.exec(v.textName || normWords(v.name));
     if (w && !normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes(w[0].split(' ')[0])) return true;
+  }
+  // 2026-10-25: an outdoor place or tour whose description gives its season ("high-clearance vehicle, July to
+  // September" for a Monashee backcountry trail) is not planned outside it unless the request names it.
+  if (month && ['outdoor', 'tour'].includes(v.type)) {
+    const desc = v.textDesc || '';
+    const w = DESC_SEASON_RE.exec(desc);
+    if (w && DESC_SEASON_CUE_RE.test(desc.slice(Math.max(0, w.index - 70), w.index + w[0].length + 25))) {
+      const a = DESC_MONTHS.indexOf(w[1]) + 1, b = DESC_MONTHS.indexOf(w[2]) + 1;
+      const inside = a <= b ? month >= a && month <= b : month >= a || month <= b;
+      const named = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '));
+      if (!inside && !named && a !== b) return true;
+    }
   }
   if (month && COLD_MONTHS.includes(month) && !v.indoorGolf && (v.indoorEvidence !== 'explicit' || ['cafe', 'restaurant'].includes(v.type)) && summerOnly(v, ctx)) return true;
   if (!month || ctx.types.has(v.type) || (v.type === 'beach' && ctx.lake) || (v.type === 'golf' && v.indoorGolf)) return false;

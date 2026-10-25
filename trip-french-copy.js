@@ -52,6 +52,8 @@ function t3FrenchText(value){
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';
  // Round 13 (2026-10-21): a window asked for after it started (server.js tripWindowClockNote).
  const frClock12=(h,m,ap)=>{let x=Number(h)%12+(ap==='PM'?12:0);return x===0&&m==='00'?'minuit':x+' h'+(m==='00'?'':' '+m);};
+ // 2026-10-25: a ski hill between seasons is planned from the town below (server.js runTripPlan).
+ text=text.replace(/^Most places at (.+?) are closed between seasons, so this plan is based in (.+?), about (\d+) minutes away\. Check (.+?)’s own site for its opening day\.$/,(_,h,t,n)=>'La plupart des lieux de '+h+' sont fermés entre les saisons : ce plan part donc de '+t+', à environ '+n+' minutes. Consultez le site de '+h+' pour sa date d’ouverture.');
  text=text.replace(/^It’s already late, so this plan is for tomorrow evening\.$/,'Il est déjà tard; ce plan est donc pour demain soir.');
  text=text.replace(/^It’s already evening, so this plan is for tomorrow afternoon\.$/,'Il est déjà le soir; ce plan est donc pour demain après-midi.');
  text=text.replace(/^It’s already afternoon, so this plan is for tomorrow morning\.$/,'Il est déjà l’après-midi; ce plan est donc pour demain matin.');
