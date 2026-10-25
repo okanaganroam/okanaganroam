@@ -1852,6 +1852,12 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
       out.leftoverTerms = out.leftoverTerms.filter(w => !nameTerms.includes(w));
       continue;
     }
+    // 2026-10-25: "cheap eats and a hike" -- "cheap eats" is a budget word AND a place to eat; it was read only as
+    // the budget, so the food part was dropped and the plan became a list of trails.
+    if (!meal && !types.length && fieldsOf(hit, 'budget').length && /\beats?\b/.test(hit.phrase)) {
+      newComp(hit, { types: ['restaurant', 'cafe'].filter((ty) => t.types.includes(ty)) });
+      continue;
+    }
     if (meal) {
       const c = newComp(hit, { types: TRIP_MEALS[meal].types.filter((ty) => t.types.includes(ty)), meal, daypart: TRIP_MEALS[meal].daypart });
       if (pendingCuisines) { for (const q of pendingCuisines) if (!c.cuisines.includes(q)) c.cuisines.push(q); pendingCuisines = null; }
