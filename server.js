@@ -4405,6 +4405,49 @@ function selectDiscoveryEvents(intent, limit = DISCOVERY_DEFAULT_LIMIT, now = ne
   return { total: events.length, items, window: { from: win.from, to: win.to, preset: win.preset } };
 }
 
+// Listed farmers' markets (2026-10-25): the Kelowna Farmers' and Crafters' Market is a place on the site (its own
+// hours and season), not a What's On event, so "farmers market in Kelowna on Saturday" listed only Christmas markets.
+// A farmers' market request also lists the markets in those towns that are open on the asked days, and says when a
+// market's season has ended.
+const LISTED_FARMERS_MARKET_RE = /\bfarmers?\W{0,2}s?\W*(?:(?:and|&)\s+crafters?\W{0,2}s?\s+)?markets?\b/i;
+function clockText12(hhmm) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, '0')}` : ''} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
+}
+function listedFarmersMarkets(regions, window, now = new Date()) {
+  const today = todayLocal(now);
+  const from = window && parseLocalDate(window.from) && window.from > today ? window.from : today;
+  let to = window && parseLocalDate(window.to) ? window.to : addLocalDays(from, 13);
+  if (to < from) to = from;
+  if (to > addLocalDays(from, 27)) to = addLocalDays(from, 27);
+  const seasons = getSeasonRows(today);
+  const open = [], ended = [];
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all()
+    .filter((v) => LISTED_FARMERS_MARKET_RE.test(String(v.name || '').replace(/[’']/g, '')) && (!regions || !regions.length || regions.includes(v.region)) && discoveryVenueUrl(v));
+  for (const v of rows) {
+    const season = seasons.get(v.id) || null;
+    const closed = seasonClosedRange(season);
+    const dates = [];
+    let time = null;
+    for (let d = from; d <= to && dates.length < 4; d = addLocalDays(d, 1)) {
+      if (closed && d >= closed.from && d <= closed.to) continue;
+      let week = null;
+      try { week = JSON.parse(weekJsonOn(v, d) || 'null'); } catch (e) { week = null; }
+      const spans = week && Array.isArray(week[localWeekdayKey(d)]) ? week[localWeekdayKey(d)] : [];
+      if (!spans.length) continue;
+      dates.push(d);
+      time = time || `${clockText12(spans[0][0])} \u2013 ${clockText12(spans[0][1])}`;
+    }
+    if (dates.length) {
+      const label = dates.map((d) => { const x = new Date(`${d}T12:00:00Z`); return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][x.getUTCDay()]} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][x.getUTCMonth()]} ${x.getUTCDate()}`; }).join(', ');
+      open.push({ id: `venue-${v.id}`, venueId: v.id, name: v.name, region: v.region, url: discoveryVenueUrl(v), valleyWide: false, categories: ['markets-fairs'], dateLabel: label, time: time || '', listedPlace: true });
+    } else if (closed && to >= closed.from) {
+      ended.push(`${v.name} is closed for the season${season.until_date ? ` (its last day was ${seasonDateText(season.until_date, today)})` : ''}${season.reopens_date ? `; it reopens ${seasonDateText(season.reopens_date, today)}` : ''}.`);
+    }
+  }
+  return { open, ended };
+}
+
 // What the request asked for that search does not apply (reported, never
 // silently dropped).
 function discoveryNotApplied(intent) {
@@ -7224,6 +7267,11 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });
+  if (plan.kind === 'events' && intent.eventFarmers && !selectedNamedEvent) {
+    const listed = listedFarmersMarkets(intent.regions, (events && events.window) || (requirements?.startDate ? { from: requirements.startDate, to: requirements.endDate || requirements.startDate } : null), now);
+    if (listed.open.length) plan.events = listed.open.concat(plan.events || []);
+    for (const n of listed.ended) if (!(plan.notes || []).includes(n)) (plan.notes = plan.notes || []).push(n);
+  }
   if (intent.mode === 'navigate' && intent.exactVenue) {
     plan.venue = { id: intent.exactVenue.id, url: discoveryVenueUrl(intent.exactVenue) };
   }
