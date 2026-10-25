@@ -175,3 +175,13 @@ test('trail rides are horseback riding; a waterfall search finds "Falls"', () =>
   const res = ds.searchVenues({ mode: 'find', regions: ['vernon'], types: [], features: [], collections: [], activities: [], cuisines: [], textTerms: ['waterfall'], foodTerms: [], excluded: {} }, [v]);
   assert.equal(res.total, 1);
 });
+
+test('Server: a "near" request that finds nothing in the town looks in the towns around it', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'breweries near Lumby' });
+  assert.ok((p.recommendations || []).length, p.summary);
+  assert.match((p.notes || [])[0] || '', /^Nothing in Lumby itself matched, so this includes Coldstream and Vernon nearby\.$/);
+  const k = app.runTripPlan({ text: 'wineries in Kelowna' });
+  assert.ok(!(k.notes || []).some((n) => /itself matched/.test(n)), 'a request with results is unchanged');
+});

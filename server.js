@@ -6864,7 +6864,42 @@ function buildTripPlannerTaxonomy() {
 // a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
 const TRIP_SKI_HILL_BASE = { apex: { town: 'penticton', minutes: 40 }, baldy: { town: 'oliver', minutes: 40 }, 'big-white': { town: 'kelowna', minutes: 50 }, silverstar: { town: 'vernon', minutes: 30 } };
 function runTripPlan(args, now = new Date()) {
-  const plan = runTripPlanCore(args, now);
+  const first = runTripPlanCore(args, now);
+  let plan = first;
+  try {
+    const m = /\b(?:near|around|close to|nearby)\s+([a-z .'’-]+?)(?:\s+(?:in|on|this|next|for|with)\b|[,.!?]|$)/i.exec(String(args.text || ''));
+    const town = m && Object.keys(REGION_LABELS).find((r) => REGION_LABELS[r].toLowerCase() === m[1].trim().toLowerCase());
+    if (town && TRIP_NEAR_TOWNS[town] && tripPlanEmpty(first) && !args.swap && !args.pinned) {
+      const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]);
+      const wider = runTripPlanCore({ ...args, text: String(args.text).replace(m[0].replace(/[,.!?]$/, ''), `in ${towns.slice(0, -1).join(', ')} and ${towns.slice(-1)}${m[0].match(/\s+(in|on|this|next|for|with)$/i) ? m[0].match(/\s+(in|on|this|next|for|with)$/i)[0] : ''}`) }, now);
+      if (!tripPlanEmpty(wider)) {
+        const near = towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
+        const note = `Nothing in ${REGION_LABELS[town]} itself matched, so this includes ${nearText} nearby.`;
+        wider.notes = [note].concat(wider.notes || []);
+        wider.contextNotes = [note].concat(wider.contextNotes || []);
+        wider.query = first.query;
+        plan = wider;
+      }
+    }
+  } catch (e) { plan = first; }
+  return runTripPlanSkiFallback(plan, args, now);
+}
+// 2026-10-25: "cross country skiing near Vernon" found nothing because the Nordic centres are listed under SilverStar.
+// A request "near" a town that comes back empty looks in the towns right around it, and says so.
+const TRIP_NEAR_TOWNS = {
+  vernon: ['coldstream', 'silverstar', 'armstrong'], kelowna: ['west-kelowna', 'lake-country'], 'west-kelowna': ['kelowna', 'peachland'],
+  'lake-country': ['kelowna', 'vernon'], peachland: ['summerland', 'west-kelowna'], summerland: ['penticton', 'peachland'],
+  penticton: ['naramata', 'summerland', 'kaleden'], naramata: ['penticton'], kaleden: ['penticton', 'okanagan-falls'],
+  'okanagan-falls': ['kaleden', 'oliver'], oliver: ['osoyoos', 'okanagan-falls'], osoyoos: ['oliver'], coldstream: ['vernon', 'lumby'],
+  lumby: ['coldstream', 'vernon'], armstrong: ['enderby', 'vernon'], enderby: ['armstrong'], 'big-white': ['kelowna'], silverstar: ['vernon'],
+  apex: ['penticton'], baldy: ['oliver'],
+};
+function tripPlanEmpty(plan) {
+  if (!plan) return true;
+  if (plan.kind === 'discover' || plan.kind === 'recommendations') return !(plan.recommendations || []).length;
+  return false;
+}
+function runTripPlanSkiFallback(plan, args, now) {
   try {
     if (args.overrides?.baseRegion || args.swap || args.pinned || !plan || !['day_plan', 'multi_day'].includes(plan.kind)) return plan;
     const hills = new Set((plan.days || []).flatMap((d) => d.regions || [d.region]).filter(Boolean));
