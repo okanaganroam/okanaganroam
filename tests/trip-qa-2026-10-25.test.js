@@ -185,3 +185,11 @@ test('Server: a "near" request that finds nothing in the town looks in the towns
   const k = app.runTripPlan({ text: 'wineries in Kelowna' });
   assert.ok(!(k.notes || []).some((n) => /itself matched/.test(n)), 'a request with results is unchanged');
 });
+
+test('Server: "the Okanagan in spring" gives ideas, not "couldn\'t work out a plan"', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const p = app.runTripPlan({ text: 'the Okanagan in spring' });
+  assert.notEqual(p.kind, 'unknown');
+  assert.equal(p.query, 'the Okanagan in spring');
+});

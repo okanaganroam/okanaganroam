@@ -364,6 +364,8 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'through thru valley '
   // 2026-10-25: "with a designated driver" is how people get between wineries, not a kind of place.
   + 'designated driver drivers dd '
+  // 2026-10-25: holiday names that are about the date, not the place ("Mother's Day brunch", "Labour Day weekend").
+  + 'mothers fathers labour labor '
   // French search (2026-10-19, round 7): French articles and joiners left in a French request after its words are read
   // in English ("bonhomme de neige" listed 1,650 places, every one with "de" somewhere). "a" (à) is above.
   + 'de du des la le les l d et au aux en '
