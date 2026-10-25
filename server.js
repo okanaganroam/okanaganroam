@@ -30091,6 +30091,10 @@ function eventOffersSchema(event) {
   if (!info) return undefined;
   const url = eventOfficialUrl(event) || undefined;
   const common = { priceCurrency: 'CAD', availability: eventIsSoldOut(event) ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock', url };
+  // Search Console (2026-10-24, "Missing field validFrom (in offers)"): the offer is valid from the day the event was
+  // listed (created_at, a UTC timestamp; its date is enough). Rows without a real date get no validFrom.
+  const listed = typeof event.created_at === 'string' && /^\d{4}-\d{2}-\d{2}/.test(event.created_at) ? event.created_at.slice(0, 10) : null;
+  if (listed) common.validFrom = listed;
   return info.price != null
     ? { '@type': 'Offer', price: info.price, ...common }
     : { '@type': 'AggregateOffer', lowPrice: info.lowPrice, highPrice: info.highPrice, ...common };
