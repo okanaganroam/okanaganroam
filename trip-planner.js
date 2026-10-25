@@ -4516,6 +4516,17 @@ function addSuggestedTimes(result, input) {
       }
     } catch (e) { /* keep the plan as it was */ }
   }
+  // 2026-10-25: a Penticton family trip said "Nothing matching “ice cream” was available" although the free time
+  // before dinner was then filled with a shake shop: a food word a filled-in stop now matches is not reported missing.
+  if (filled && Array.isArray(result.warnings)) {
+    const factsById = new Map((input.facts || []).map((v) => [v.id, v]));
+    const planned = (best.probe.days || []).flatMap((d) => (d.stops || []).map((st) => st.venue && factsById.get(st.venue.id)).filter(Boolean));
+    result.warnings = result.warnings.filter((w) => {
+      const m = /^Nothing matching “(.+?)” was available/.exec(String(w || ''));
+      const ft = m && (((input.intent && input.intent.foodTerms) || []).find((f) => normWords(f.term) === normWords(m[1])) || { term: normWords(m[1]), cuisine: null });
+      return !m || !planned.some((v) => foodMatch(v, ft));
+    });
+  }
   if (filled) {
     const clean = (st) => { if (!st) return st; const { scheduleNote, ...rest } = st; return { ...rest, caveats: (rest.caveats || []).filter((c) => c !== scheduleNote && !/\b20\d\d-\d\d-\d\d\b/.test(c)) }; };
     result.days = best.probe.days.map((d, i) => { const { date: _date, ...rest } = d; return { ...(result.days[i] || {}), ...rest, stops: (d.stops || []).map(clean) }; });
