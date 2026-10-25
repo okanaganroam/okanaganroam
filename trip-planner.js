@@ -1536,7 +1536,7 @@ function familyAvoid(v) {
 }
 const OFF_SEASON_MONTHS = { beach: [10, 11, 12, 1, 2, 3, 4], golf: [10, 11, 12, 1, 2, 3] };
 // Snow-only outings (2026-10-19, round 7): a July Big White plan had snowshoe tours, dog sledding and a sleigh ride.
-const WINTER_ONLY_RE = /\b(?:snowshoe|snowshoes|snowshoeing|dog sled|dog sledding|sleigh|sleighs|tube park|tubing|snowmobiles?|snowmobiling|snowcats?|cat skiing|heli skiing|skating|rink|cross country ski|nordic|ski trails|twinkling|winter)\b/; // 2026-10-25: plurals ("Monashee Powder Snowcats" was planned in October)
+const WINTER_ONLY_RE = /\b(?:snowshoe|snowshoes|snowshoeing|dog sled|dog sledding|sleigh|sleighs|tube park|tubing|snowmobiles?|snowmobiling|snowcats?|cat skiing|heli skiing|fat bike trails?|fat biking|skating|rink|cross country ski|nordic|ski trails|twinkling|winter)\b/; // 2026-10-25: plurals ("Monashee Powder Snowcats" was planned in October)
 function winterOnly(v) { return ['outdoor', 'tour'].includes(v.type) && WINTER_ONLY_RE.test(v.textName || normWords(v.name)); }
 // Warm-weather outings (round 9, 2026-10-19): ice cream in January and the Speedway or a beach in November were picked.
 // From November to March they are only planned when the request names them.
