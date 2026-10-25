@@ -652,6 +652,9 @@ function scoreVenue(v, ctx) {
   }
   occasionScore(v, ctx, add); // adds through `add`; must not be `score += ...` (that would drop them)
   const fit = budgetFits(ctx.budget, v.price);
+  // 2026-10-25: a place reached by a rough road ("needs a high-clearance vehicle", a forest service road, 4x4) is a
+  // backcountry outing, not an everyday stop ("a day in Naramata" opened with the Mountain Goat Trail).
+  if (v.type === 'outdoor' && roughAccess(v) && !normWords(ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '))) add('rough_access', -10, null);
   // "Cheap eats" (2026-10-18): $ places first, $$ after, pricier ones last (it once led with $$ sushi).
   if (ctx.budget === 'budget' && v.price != null) {
     if (v.price === 1) add('budget', 14, `Price level ${priceText(v.price)} fits your budget preference`);
@@ -1110,6 +1113,7 @@ function stopFrom(v, scored, extra, ctx) {
   const caveats = [...new Set([...(scored.caveats || []), ...tripRequirements.listedAccessNotes(v)])];
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
   if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
+  if (v.type === 'outdoor' && roughAccess(v) && !caveats.includes(ROUGH_ACCESS_NOTE)) caveats.push(ROUGH_ACCESS_NOTE);
   // Round 12: an appointment-only place says so in its own words (unless its advisory, shown below, already does).
   const appt = appointmentOnly(v) ? appointmentNotice(v) : null;
   if (appt && !(v.advisory && v.advisory.note && APPOINTMENT_RE.test(v.advisory.note))) { const note = `By appointment, from the listing: “${appt}” Book ahead.`; if (!caveats.includes(note)) caveats.push(note); }
@@ -1538,6 +1542,9 @@ function summerOnly(v, ctx) {
   const asked = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '');
   return !asked.includes(words[0].split(' ')[0]);
 }
+const ROUGH_ACCESS_RE = /\b(?:high clearance|4x4|four wheel drive|4wd|rough road|very rough|forest service road|fsr)\b/;
+function roughAccess(v) { return ROUGH_ACCESS_RE.test(v.textDesc || ''); }
+const ROUGH_ACCESS_NOTE = 'Rough access road — the listing says to check your vehicle can make it';
 const DESC_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 const DESC_SEASON_CUE_RE = /\b(?:open|opens|opening|access|accessible|road|roads|vehicle|clearance|season|seasonal|operates|operating|run|runs|snow free|snow-free|trail is|hikeable)\b/;
 const DESC_SEASON_RE = new RegExp(`\\b(?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')}) (?:to|through|until|thru) (?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')})\\b`);
@@ -6351,6 +6358,7 @@ module.exports = {
   classifyPlanRequest,
   eligible,
   oneSimulatorATrip,
+  roughAccess,
   advisoryFit,
   advisoryNotOperating,
   // Round 7 (2026-10-19): server.js's legacy /api/trip/generate uses the same rule.

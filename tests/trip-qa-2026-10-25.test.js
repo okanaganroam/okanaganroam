@@ -136,3 +136,10 @@ test("New Year's Eve and Valentine's Day are holiday events, not search words", 
     assert.deepEqual(i.textTerms, [], q);
   }
 });
+
+test('a rough-access trail carries a road warning', () => {
+  const ctx = { regions: [], labels: { regions: {}, types: {} } };
+  const trail = { id: 9, type: 'outdoor', region: 'naramata', name: 'Southern Viewpoint Trail', textName: 'southern viewpoint trail', textDesc: 'the 2 km access road off chute lake road needs a high clearance vehicle', features: {}, collections: [], activities: ['viewpoints'] };
+  assert.ok(tp.roughAccess(trail));
+  assert.ok(!tp.roughAccess({ type: 'outdoor', textDesc: 'a paved lakeside path' }));
+});
