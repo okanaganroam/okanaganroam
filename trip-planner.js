@@ -563,12 +563,12 @@ function eligible(v, ctx, strict) {
   // A venue closed for the season today is left out the same way (dated
   // itineraries check the trip's own date in advisoryFit instead).
   // Round 7 (2026-10-19): a trip for a named month or season ("in January") is judged on that month's date.
-  if (!ctx.itinerary && !ctx.requirements && (ctx.seasonInfo && ctx.tripDate ? seasonClosedOnTrip(v, { date: ctx.tripDate }) : v.seasonClosedToday)) return false;
+  if (!ctx.ignoreSeason && !ctx.itinerary && !ctx.requirements && (ctx.seasonInfo && ctx.tripDate ? seasonClosedOnTrip(v, { date: ctx.tripDate }) : v.seasonClosedToday)) return false;
   if (!ctx.itinerary && !ctx.requirements && v.ownerClosures && seasonClosedOnTrip({ ownerClosures: v.ownerClosures }, null)) return false;
   // 2026-10-25: the off-season rules (no outdoor rink in October, no water park in April, no beach in November unless
   // asked for) apply in every step that picks a place, not only the main day builder; a late-afternoon filler put
   // Stuart Park's skating rink (opens in December) into an October romantic weekend.
-  if (ctx.tripDate && ctx.activities && ctx.types && offSeasonSkip(v, ctx)) return false;
+  if (!ctx.ignoreSeason && ctx.tripDate && ctx.activities && ctx.types && offSeasonSkip(v, ctx)) return false;
   // Round 14 (2026-10-20): a place visited only by appointment or reservation (Martin's Lane, a $200 private tour) is
   // booked ahead, so it is never a default stop or a Swap pick unless the request names it or asks for a booked visit.
   if (appointmentOnly(v) && !appointmentKept(v, ctx)) return false;
@@ -1241,8 +1241,8 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
   const budgetFood = ctx.budget === 'budget' && [...ctx.types].every((t) => DINING_TYPES.includes(t)) && !ctx.activities.size && !ctx.plannerKinds.length;
   for (const v of facts) {
     if (budgetFood && !BUDGET_FOOD_TYPES.includes(v.type) && !(v.fdTypes || []).some((t) => BUDGET_FOOD_TYPES.includes(t)) && !ctx.types.has(v.type)) continue;
-    if (!regionOk(v, ctx) || !eligible(v, ctx, strict) || !tripRequirements.venueAllowed(v, ctx.requirements, 1, ctx.tripDate) || ctx.requirements && seasonClosedOnTrip(v, { date:ctx.tripDate })) continue;
-    if (eveningOutOfSeason(v, ctx)) continue;
+    if (!regionOk(v, ctx) || !eligible(v, ctx, strict) || !tripRequirements.venueAllowed(v, ctx.requirements, 1, ctx.tripDate) || !ctx.ignoreSeason && ctx.requirements && seasonClosedOnTrip(v, { date:ctx.tripDate })) continue;
+    if (!ctx.ignoreSeason && eveningOutOfSeason(v, ctx)) continue;
     const s = scoreVenue(v, ctx);
     const t = requestedTimeFit(v, ctx);
     if (t && t.skip) continue; // listed hours prove it is closed at the time asked for
@@ -5123,7 +5123,19 @@ function planTripCore(input) {
   result.totalMatches = rec.total;
   result.summary = buildSummary(kind, ctx, null);
   result.overview = buildOverview(kind, ctx, null);
-  if (!rec.items.length) result.warnings.push('No Okanagan Roam listings match every part of that request.');
+  // 2026-10-25: when the only matches are closed for the season ("boat rental in Penticton" in October), say so and
+  // name them, rather than "no listings match".
+  const offSeason = !rec.items.length ? buildRecommendations(facts, { ...ctx, ignoreSeason: true }, 3).items.filter((s) => s.venue) : [];
+  if (offSeason.length) {
+    const names = offSeason.map((s) => s.venue.name);
+    const reopen = offSeason.map((s) => facts.find((f) => f.id === s.venue.id)).find((f) => f && f.seasonReopens);
+    const when = ctx.tripDate ? `in ${MONTH_NAMES[Number(ctx.tripDate.slice(5, 7)) - 1]}` : 'right now';
+    const reopens = reopen ? ` ${names.length === 1 ? 'It' : reopen.name} reopens ${MONTH_NAMES[Number(reopen.seasonReopens.slice(5, 7)) - 1]} ${Number(reopen.seasonReopens.slice(8, 10))}.` : '';
+    result.warnings.push(names.length === 1
+      ? `${names[0]} matches but is closed for the season ${when}.${reopens} Ask again with a date in its season to plan it.`
+      : `These places match but are closed for the season ${when}: ${listText(names)}.${reopens} Ask again with a date in their season to plan them.`);
+    result.closedForSeason = offSeason;
+  } else if (!rec.items.length) result.warnings.push('No Okanagan Roam listings match every part of that request.');
   if (ctx.whenDaypart || ctx.startWeekday) {
     const when = whenText(ctx);
     result.notes.push(`Checked against each venue\u2019s listed hours on Okanagan Roam${when ? ` for ${when.replace(/^on /, '')}` : ''}: places whose listed hours show them closed then are left out, and places without usable hours are marked. Hours can change, so check before you go.`);
