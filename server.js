@@ -29113,7 +29113,7 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   if ((getSeasonStates(now).get(venue.id) || {}).kind === 'closed' || venueClosureInForce(venue.id, now)) return null;
   const week = happyHourWeekText(row.happy_hour_times, fr);
   if (!week && !deals) return null;
-  const dealsOut = deals ? { lines: (fr && deals.fr ? deals.fr : deals.en).map(happyHourDealLine), english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr) } : null;
+  const dealsOut = deals ? { items: (fr && deals.fr ? deals.fr : deals.en), english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr) } : null;
   if (!week) return { week: '', checked: '', live: null, deals: dealsOut };
   const place = statusHours ? venueHoursStatusAt(statusHours, now) : null;
   const clock = okanaganClock(now);
@@ -29124,12 +29124,17 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   const text = h ? (happyHourOnNowText(h, clock, fr) || happyHourLiveText(h, fr)) : '';
   return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), live: h ? { state: h.state, text } : null, deals: dealsOut };
 }
-// The deals inside the Happy hour row: a "Deals" list and its own checked date. French without French lines shows the
-// English lines, marked lang="en".
+// The deals inside the Happy hour row (2026-10-26, tidied the same day): a menu-style list, the price in its own bold
+// column and the item beside it; the first HH_DEALS_VISIBLE show, the rest behind "2 more deals". One checked date at the
+// end. French without French lines shows the English lines, marked lang="en".
+const HH_DEALS_VISIBLE = 4;
 function happyHourDealsHtml(deals, fr) {
-  if (!deals || !deals.lines.length) return '';
+  if (!deals || !deals.items.length) return '';
   const lang = deals.english ? ' lang="en"' : '';
-  return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${deals.lines.map((l) => `<span class="venue-hh-deal" role="listitem"${lang}>${escapeHtml(l)}</span>`).join('')}</span>${deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
+  const row = (d) => `<span class="venue-hh-deal" role="listitem"${lang}><span class="venue-hh-deal-price">${escapeHtml(d.price || '')}</span><span class="venue-hh-deal-text">${escapeHtml(d.text)}</span></span>`;
+  const shown = deals.items.slice(0, HH_DEALS_VISIBLE), rest = deals.items.slice(HH_DEALS_VISIBLE);
+  const more = rest.length ? `<details class="venue-hh-more"><summary>${fr ? `${rest.length} autre${rest.length > 1 ? 's' : ''} spécia${rest.length > 1 ? 'ux' : 'l'}` : `${rest.length} more deal${rest.length > 1 ? 's' : ''}`}</summary><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${rest.map(row).join('')}</span></details>` : '';
+  return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${shown.map(row).join('')}</span>${more}${deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
 }
 function renderVenuePageLayoutStyles() {
   return `<style id="venue-page-layout">
@@ -29158,12 +29163,20 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-hh-status { display: flex; align-items: baseline; gap: 6px; margin: -4px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 700; line-height: 1.35; color: rgba(42,32,25,0.78); }
   body.golf-page .venue-hh-status[data-hh="now"] { color: var(--teal, #2A6B67); font-weight: 800; }
   body.golf-page .venue-hh-checked { display: block; margin: 4px 0 0; }
-  /* Happy hour deals (2026-10-26): a short list under the times, one deal a line, with its own checked date. */
-  body.golf-page .venue-hh-deals { display: block; margin: 8px 0 0; }
-  body.golf-page .venue-hh-deals-label { display: block; font-weight: 800; }
-  body.golf-page .venue-hh-deal-list, body.golf-page .venue-hh-deal { display: block; }
-  body.golf-page .venue-hh-deal { margin: 2px 0 0; overflow-wrap: anywhere; }
-  body.golf-page .venue-hh-deals-checked { display: block; margin: 4px 0 0; }
+  /* Happy hour deals (2026-10-26, tidied the same day): a menu-style list. The price sits in its own bold column so the
+     prices line up and the item wraps beside it; a quiet "Deals" label; extra deals behind a tap. */
+  body.golf-page .venue-hh-deals { display: block; margin: 10px 0 0; }
+  body.golf-page .venue-hh-deals-label { display: block; margin: 0 0 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,32,25,0.62); }
+  body.golf-page .venue-hh-deal-list { display: block; }
+  body.golf-page .venue-hh-deal { display: grid; grid-template-columns: 3.9em 1fr; column-gap: 8px; align-items: baseline; padding: 4px 0; font-size: 0.9rem; line-height: 1.35; }
+  body.golf-page .venue-hh-deal + .venue-hh-deal { border-top: 1px solid rgba(42,32,25,0.08); }
+  body.golf-page .venue-hh-deal-price { font-weight: 800; color: var(--teal-deep, #1E4F4C); overflow-wrap: anywhere; }
+  body.golf-page .venue-hh-deal-text { color: rgba(42,32,25,0.82); overflow-wrap: anywhere; }
+  body.golf-page .venue-hh-more { display: block; }
+  body.golf-page .venue-hh-more > .venue-hh-deal-list > .venue-hh-deal:first-child { border-top: 1px solid rgba(42,32,25,0.08); }
+  body.golf-page .venue-hh-more summary { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.88rem; font-weight: 800; color: var(--teal, #2A6B67); cursor: pointer; }
+  body.golf-page .venue-hh-more[open] summary { display: none; }
+  body.golf-page .venue-hh-deals-checked { display: block; margin: 6px 0 0; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
@@ -29533,7 +29546,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venueShowsPrice(venue) ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
     // Happy hour (2026-10-23): last, so it sits next to the Hours box; the times only, never drink prices.
     // Deals (2026-10-26) under the times, with their own checked date.
-    happyHour ? ['Happy hour', `${happyHour.week ? `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>` : ''}${happyHour.checked ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHourDealsHtml(happyHour.deals, fr)}`] : null,
+    happyHour ? ['Happy hour', `${happyHour.week ? `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>` : ''}${happyHour.checked && !(happyHour.deals && happyHour.deals.checked === happyHour.checked) ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHourDealsHtml(happyHour.deals, fr)}`] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
