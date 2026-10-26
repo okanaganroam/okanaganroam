@@ -2455,11 +2455,16 @@ function rowToEvent(row) {
 
 // The published event with the same name in another town, for an unpublished event's old address (round 12). -> the
 // twin's { region, slug } or null (also when the event is published, missing, or the name matches several).
+const eventTwinName = (name) => String(name || '').trim().toLowerCase().replace(/^the\s+/, '');
 function eventMovedTwin(region, slug) {
   try {
     const row = db.prepare('SELECT id, name, status FROM events WHERE region = ? AND slug = ?').get(region, slug);
     if (!row || row.status === 'scheduled') return null;
-    const twins = db.prepare("SELECT region, slug FROM events WHERE status = 'scheduled' AND region != ? AND LOWER(TRIM(name)) = LOWER(TRIM(?))").all(region, row.name);
+    // Weekly audit (2026-10-25): a hidden duplicate in the same town 301s to the one kept, and a leading "The" is not
+    // part of the name ("The Halloween Howl at The View ..." listed twice in Kelowna, from Castanet and from the venue).
+    const key = eventTwinName(row.name);
+    const twins = db.prepare("SELECT region, slug, name FROM events WHERE status = 'scheduled' AND id != ?").all(row.id)
+      .filter((t) => eventTwinName(t.name) === key).map(({ region: r, slug: sl }) => ({ region: r, slug: sl }));
     return twins.length === 1 && REGION_LABELS[twins[0].region] && twins[0].slug ? twins[0] : null;
   } catch (e) { return null; }
 }
@@ -2954,7 +2959,9 @@ function findDuplicateEventCandidates(data, { excludeEventId = null } = {}) {
     // same date, or an explicitly requested slug that is already taken. The
     // same name on a clearly different date is NOT a duplicate (a repeat
     // show, a later edition) -- createEvent gives it the dated-suffix slug.
-    if ((typeof data.slug === 'string' && row.slug === data.slug) || (row.slug === baseSlug && (nearDate || !occDates.length))) {
+    // Weekly audit (2026-10-25): "The X" and "X" are the same name (a second Halloween Howl at The View got in).
+    const sameBase = row.slug === baseSlug || row.slug.replace(/^the-/, '') === baseSlug.replace(/^the-/, '');
+    if ((typeof data.slug === 'string' && row.slug === data.slug) || (sameBase && (nearDate || !occDates.length))) {
       hits.push({ event_id: row.id, rule: 'exact_slug', name: row.name });
       continue;
     }
@@ -10443,8 +10450,7 @@ function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
   for (const e of events) { if (chosen.length >= 4) break; if (!chosen.includes(e)) chosen.push(e); }
   if (chosen.length < 2) return '';
   let total = 0;
-  // The same count as the What's On page's own (events already over today are not counted).
-  try { total = whatsOnStillOn(getWhatsOnEvents(resolveWhatsOnWindow({}, now)), now).length; } catch (e) { total = 0; }
+  try { total = homeUpcomingEventCount(now); } catch (e) { total = 0; }
   const usedImages = new Set();
   const cards = chosen.map((e) => { const img = homeEventImage(e, usedImages); return `<a class="home-event-card" href="${escapeHtml(discoveryEventUrl(e))}">
       <span class="home-event-media"><img src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, '(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 260px')} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
@@ -10514,11 +10520,16 @@ function renderHomeTopPicksHTML({ now = homepageNow() } = {}) {
 }
 // A one-line count of what the site lists, straight from the listings and What's On; each count links to its page.
 // app.js is frozen, so these modules carry both languages and show the one matching html[lang] (as the mood swipe cue does).
+// The homepage's one upcoming-events number (weekly audit 2026-10-25: the stats strip said 495 while "See all"
+// and What's On said 483). What's On's own window, with events already over today left out.
+function homeUpcomingEventCount(now = homepageNow()) {
+  return whatsOnStillOn(getWhatsOnEvents(resolveWhatsOnWindow({}, now)), now).length;
+}
 function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   let counts = {};
   try { for (const r of db.prepare('SELECT type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY type').all()) counts[r.type] = r.n; } catch (e) { counts = {}; }
   let events = 0;
-  try { events = getWhatsOnEvents(resolveWhatsOnWindow({}, now)).length; } catch (e) { events = 0; }
+  try { events = homeUpcomingEventCount(now); } catch (e) { events = 0; }
   const n = (types) => types.reduce((t, k) => t + (counts[k] || 0), 0);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (total < 100) return '';
@@ -53099,6 +53110,7 @@ module.exports = {
   renderHomeThisWeekendHTML,
   renderHomeTopPicksHTML,
   renderHomeStatsHTML,
+  homeUpcomingEventCount,
   homeEventImage,
   tripV3MapHeaders,
   APP_JS_SRC,

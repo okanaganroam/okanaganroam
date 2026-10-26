@@ -544,7 +544,8 @@ const BUDGET_FOOD_TYPES = ['restaurant', 'cafe', 'pub'];
 // trip had six beaches in three days). A fenced dog beach or off-leash park is only for trips with a dog.
 const COOL_BEACH_MONTHS = [10, 11, 12, 1, 2, 3, 4];
 function coolBeachMonth(date) { const m = Number(String(date || '').slice(5, 7)); return !!m && COOL_BEACH_MONTHS.includes(m); }
-const DOG_ONLY_RE = /\b(?:dog beach|dog park|off[- ]?leash)\b/;
+// Weekly audit (2026-10-25): a dog swimming area too (Goodman Park Dog Swimming Area led an Osoyoos beach day with no dog).
+const DOG_ONLY_RE = /\b(?:dog beach|dog park|dog swimming|dog swim area|off[- ]?leash)\b/;
 function dogOnlyPlace(v) { return ['beach', 'outdoor'].includes(v.type) && DOG_ONLY_RE.test(normWords(v.name || '')); }
 function eligible(v, ctx, strict) {
   if (ctx.exclude.has(v.id)) return false;
@@ -659,7 +660,7 @@ function scoreVenue(v, ctx) {
   // met by a lake view. From June to September a lake day puts the beaches and water activities first.
   if (ctx.lake && [6, 7, 8, 9].includes(Number(String(ctx.tripDate || '').slice(5, 7))) && (v.type === 'beach' || (v.activities || []).includes('water'))) add('lake_day', 12, 'On the water');
   // 2026-10-25: "dog beach in Kelowna" led with Cedar Creek Park; a dog beach or off-leash park asked for comes first.
-  if (/\b(?:dog beach|dog beaches|dog park|dog parks|off leash)\b/.test(normWords(ctx.queryText || '')) && dogOnlyPlace(v)) add('dog_place', 15, 'A dog beach or off-leash area');
+  if (/\b(?:dog beach|dog beaches|dog park|dog parks|dog swimming|off leash)\b/.test(normWords(ctx.queryText || '')) && dogOnlyPlace(v)) add('dog_place', 15, 'A dog beach or off-leash area');
   // 2026-10-25: "skating in Kelowna in December" listed hiking parks (skating is read as the Winter activity): a request
   // that says skating puts the rinks first.
   if (/\b(?:skating|skate|rink|rinks)\b/.test(normWords(ctx.queryText || '')) && /\b(?:rink|rinks|skating|skate)\b/.test(`${v.textName || ''}`)) add('skating', 20, 'A skating rink');
@@ -3241,6 +3242,12 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
         // Round 14 (2026-10-20): a café that is the brunch or lunch stop is a meal (60-75 minutes), not a 40-minute coffee.
         if(candidate.type==='cafe'&&!stop.gapFill&&!stop.afterSki){if(/\b(?:brunch|breakfast)\b/i.test(stop.label||''))duration=Math.max(duration,75);else if(isLunchStop(stop))duration=Math.max(duration,60);}
+        // Weekly audit (2026-10-25): "a drink first" is about an hour, not a 90-minute pub meal (date night in Vernon: a drink
+        // 6-7:30 left no room for dinner at Gerni's, which closes at 9).
+        // Weekly audit (2026-10-25): outside summer a beach is a walk by the water, about an hour, not a two-hour beach
+        // morning (an Osoyoos beach day in late October ran 9 to 11, then waited for lunch).
+        if(candidate.type==='beach'&&!stop.gapFill&&date&&!SEASON_WINDOWS.water.in.includes(Number(date.slice(5,7))))duration=Math.min(duration,60);
+        if(/\bdrinks?\b/i.test(stop.label||'')&&['pub','cocktail','brewery','winery','distillery'].includes(candidate.type)&&!stop.gapFill&&!stop.afterSki)duration=Math.min(duration,60);
         // Round 11: before a fixed-time show, a walk or a visit leaves room for the meals between it and the show (lunch
         // before a 2 PM show was a "Timing conflict" after a three-hour morning trail).
         if(beforeEvent&&cursor!=null&&!isLunchStop(stop)&&!isDinnerStop(stop)&&SWAP_FLEX_TYPES.includes(candidate.type)){
@@ -4427,6 +4434,38 @@ function addSuggestedTimes(result, input) {
     const times = new Map();
     const reordered = orderCrawlByHours(result, (order) => { result.itinerary.stops = order; const t = bestOf(); result.itinerary.stops = original; times.set(order, t); return t ? t.rows : [{}]; });
     if (reordered && times.get(reordered) && times.get(reordered).untimed < best.untimed) { result.itinerary.stops = reordered; best = times.get(reordered); }
+  }
+  // Weekly audit (2026-10-25): a stop that still cannot fit before it closes was kept with no time, only a small
+  // "Timing conflict" tag and no warning (Origin Wines after three Naramata tastings on a Saturday). It is taken out
+  // with a note saying why, when the plan keeps at least two stops and the visitor did not name the place; otherwise
+  // the plan says so in its warnings.
+  if (best && best.untimed && !input.swap) {
+    const named = new Set((req.items || []).filter((i) => i.kind === 'venue').map((i) => i.value));
+    const factsById = new Map((input.facts || []).map((v) => [v.id, v]));
+    const listOf = (row) => (result.days || []).length ? ((result.days.find((d) => d.day === row.day) || {}).stops || null) : ((result.itinerary && result.itinerary.stops) || (result.outing && result.outing.stops) || null);
+    const closesAt = (v, date) => {
+      const day = v && date ? (v._hours || parseVenueHours(v.hours)).days[['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${date}T12:00:00Z`).getUTCDay()]] : null;
+      return day && day.status === 'open' && day.ranges.length ? clockText(Math.min(day.ranges[day.ranges.length - 1][1], 1439)) : null;
+    };
+    const warned = new Set();
+    for (let guard = 0; guard < 4 && best && best.untimed; guard++) {
+      const row = best.rows.find((r) => r.status === 'unmet' && r.venueId && !named.has(r.venueId) && !warned.has(`${r.day}|${r.venueId}`));
+      const list = row && listOf(row);
+      const at = list ? list.findIndex((st) => st.venue && st.venue.id === row.venueId) : -1;
+      if (at < 0) break;
+      const v = factsById.get(row.venueId) || list[at].venue, close = closesAt(factsById.get(row.venueId), best.date);
+      // A meal is never taken out (a ski day's dinner); it, and a two-stop outing, get the warning instead.
+      if (list.filter((st) => st.venue || st.event).length <= 2 || isDinnerStop(list[at]) || isLunchStop(list[at])) {
+        warned.add(`${row.day}|${row.venueId}`);
+        result.warnings = [...(result.warnings || []), `${v.name}: ${close ? `it closes at ${close}, so` : 'its listed hours mean'} it may not fit after the stop before it. Start earlier or swap it for another place.`];
+        continue;
+      }
+      const removed = list.splice(at, 1)[0];
+      const t = run(best.startMinutes, best.date);
+      if (!t || t.untimed >= best.untimed) { list.splice(at, 0, removed); break; }
+      best = t;
+      result.notes = [...(result.notes || []), `${v.name} was left out: ${close ? `it closes at ${close},` : 'its listed hours end'} before the plan would get there.`];
+    }
   }
   // Round 15b (2026-10-20): a suggested day that starts at 9 with a 45-minute walk and then waits until lunch at noon
   // starts later instead (the walk at 10:45, lunch at noon): the start with the least waiting between stops is kept,
@@ -5811,6 +5850,7 @@ const SEASON_CAVEATS = {
   snow: (m) => `Snow activities here run in winter — check what’s operating in ${m} before you go`,
   camping: (m) => `Many campgrounds here are seasonal — check it’s open in ${m} before you go`,
   golf: (m) => `Outdoor golf here is seasonal — check the course is open in ${m} before you go`,
+  coolWater: (m) => `The lake is usually too cold for a swim in ${m}, so this is suggested as a beach walk or lakeside stop`,
 };
 // Seasonal relevance of venue v for part c: { score, reasons, caveats, flags }.
 function seasonFit(v, c, season, ctx) {
@@ -5831,6 +5871,9 @@ function seasonFit(v, c, season, ctx) {
     if (it.water && acts.includes('water')) { out.caveats.push(SEASON_CAVEATS.water(m)); out.flags.waterOff = true; }
     if (v.type === 'beach') out.flags.beachOff = true;
   }
+  // Weekly audit (2026-10-25): a beach day asked for outside summer ("a day at the beach in Osoyoos" in late October)
+  // says the water is cold, as a swim request already did.
+  if (v.type === 'beach' && season.water !== 'in' && (c.types || []).includes('beach') && !out.flags.swimOff) { out.caveats.push(SEASON_CAVEATS.coolWater(m)); out.flags.coolWater = true; }
   // 2026-10-25: "a day in Penticton in July" had no beach -- off-season beaches lost points but in-season ones gained
   // none (snow places already gain in winter). In June to September a beach suits an open day.
   if (v.type === 'beach' && season.water === 'in' && ctx && !ctx.itinerary && !(ctx.types && ctx.types.size && !ctx.types.has('beach'))) add(8, `A beach day suits ${m}`);
