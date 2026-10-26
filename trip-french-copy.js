@@ -262,6 +262,14 @@ function t3FrenchText(value){
  text=text.replace(/^In (.+), about (\d+) minutes’ drive from (.+)$/,'À $1, à environ $2 minutes en voiture de $3');
  text=text.replace(/^Open ([\d:]+)–([\d:]+); plan on about ([\d.]+) hours there\.$/,(_,a,b,h)=>'Ouvert de '+a+' à '+b+'; prévoyez environ '+h.replace('.',',')+' heures sur place.');
  text=text.replace(/^Something after dinner is more than ([\d.]+) km from it; plan a ride, or skip it to keep the evening on foot\.$/,(_,k)=>'Une activité après le souper est à plus de '+k.replace('.',',')+' km; prévoyez un transport, ou sautez-la pour garder la soirée à pied.');
+ // Weekly audit (2026-10-25): a beach day outside summer.
+ text=text.replace(/^The lake is usually too cold for a swim in (\w+), so this is suggested as a beach walk or lakeside stop$/,(_,m)=>'Le lac est habituellement trop froid pour se baigner en '+frMon(m)+'; on le propose plutôt pour une promenade sur la plage ou un arrêt au bord de l’eau');
+ text=text.replace(/^Lake swimming here is a summer activity, so in (\w+) this is suggested as a lakeside stop$/,(_,m)=>'La baignade dans le lac est une activité d’été; en '+frMon(m)+', on le propose plutôt comme arrêt au bord de l’eau');
+ // Weekly audit (2026-10-25): a stop that cannot fit before it closes.
+ text=text.replace(/^(.+) was left out: it closes at ([\d:]+), before the plan would get there\.$/,'$1 a été retiré : il ferme à $2, avant que le programme y arrive.');
+ text=text.replace(/^(.+) was left out: its listed hours end before the plan would get there\.$/,'$1 a été retiré : ses heures indiquées se terminent avant que le programme y arrive.');
+ text=text.replace(/^(.+): it closes at ([\d:]+), so it may not fit after the stop before it\. Start earlier or swap it for another place\.$/,'$1 : il ferme à $2, alors il risque de ne pas convenir après l’arrêt précédent. Commencez plus tôt ou remplacez-le par un autre lieu.');
+ text=text.replace(/^(.+): its listed hours mean it may not fit after the stop before it\. Start earlier or swap it for another place\.$/,'$1 : selon ses heures indiquées, il risque de ne pas convenir après l’arrêt précédent. Commencez plus tôt ou remplacez-le par un autre lieu.');
  text=text.replace(/Day (\d+) has no additional matching activity available\. The optional afternoon meal was left out; dinner remains\. Consider a different activity or a shorter trip\./g,'Le jour $1 ne comporte aucune autre activité correspondante disponible. Le repas facultatif de l’après-midi a été retiré; le souper reste au programme. Envisagez une autre activité ou un voyage plus court.');
  text=text.replace(/\beasy walks?\b/gi,match=>match.toLowerCase().endsWith('s')?'promenades faciles':'promenade facile');
  text=text.replace(/^In (.+), where you asked to go$/, 'À $1, où vous souhaitez aller');

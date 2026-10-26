@@ -31925,3 +31925,39 @@ test('New hiking trail photos (2026-10-25): every photo in the batch exists and 
     assert.ok(!/^Photo: /.test(credits[rel]), `${rel} credit has no doubled "Photo: " prefix`);
   }
 });
+
+// ==== Weekly audit (2026-10-25): one events number on the homepage ==========
+test('Homepage: the upcoming-events count leaves out an event that ended earlier today (stats strip and "See all" share it)', () => {
+  const r = app.createEvent({
+    name: 'Audit Morning Market', region: 'kelowna', description: 'A fixture event.',
+    source_type: 'official_venue', source_name: 'Test', source_url: 'https://example.com/audit-morning-market',
+    venue_name_text: 'Kelowna City Park', categories: ['food-drink-events'], occurrences: [{ start_date: '2030-06-12', start_time: '08:00', end_time: '09:00' }],
+  }, { reason: 'audit fixture', batch_id: 'test-audit-2026-10-25' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const before = app.homeUpcomingEventCount(new Date('2030-06-12T07:00:00-07:00'));
+  const after = app.homeUpcomingEventCount(new Date('2030-06-12T21:30:00-07:00'));
+  assert.equal(before - after >= 1, true, `the 8-9am event counts at 7am (${before}) but not at 9:30pm (${after})`);
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  for (const fn of ['renderHomeStatsHTML', 'renderHomeThisWeekendHTML']) {
+    const body = src.slice(src.indexOf(`function ${fn}(`), src.indexOf('\nfunction ', src.indexOf(`function ${fn}(`) + 10));
+    assert.match(body, /homeUpcomingEventCount\(now\)/, `${fn} uses the shared count`);
+  }
+});
+
+// ==== Weekly audit (2026-10-25): a duplicate event named with a leading "The" ===
+test('Events: "The X" on the same day is the same event as "X", and a hidden duplicate 301s to the one kept in the same town', async () => {
+  const base = { region: 'kelowna', description: 'A fixture event.', source_type: 'official_venue', source_name: 'Test', venue_name_text: 'Fixture Howl Winery',
+    categories: ['food-drink-events'], occurrences: [{ start_date: '2030-10-31', start_time: '12:00', end_time: '16:00' }] };
+  const meta = { reason: 'audit fixture', batch_id: 'test-audit-howl' };
+  const kept = app.createEvent({ ...base, name: 'Audit Howl at Fixture Winery', source_url: 'https://example.com/audit-howl-a' }, meta);
+  assert.equal(kept.ok, true, JSON.stringify(kept));
+  const dup = app.createEvent({ ...base, name: 'The Audit Howl at Fixture Winery', source_url: 'https://example.com/audit-howl-b' }, meta);
+  assert.equal(dup.ok, false);
+  assert.equal(dup.reason || dup.error, 'duplicate_event', JSON.stringify(dup));
+  // One that got in before the gate knew this (reviewed as a possible duplicate) and was then hidden.
+  const old = app.createEvent({ ...base, name: 'The Audit Howl at Fixture Winery', source_url: 'https://example.com/audit-howl-c', occurrences: [{ start_date: '2030-11-20', start_time: '12:00', end_time: '16:00' }] }, meta);
+  assert.equal(old.ok, true, JSON.stringify(old));
+  db.prepare("UPDATE events SET status = 'cancelled' WHERE id = ?").run(old.event.id);
+  assert.deepEqual({ ...app.eventMovedTwin('kelowna', old.event.slug) }, { region: 'kelowna', slug: kept.event.slug });
+  assert.equal(app.eventMovedTwin('kelowna', kept.event.slug), null, 'the published one never redirects');
+});
