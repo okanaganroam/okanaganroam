@@ -762,6 +762,35 @@ for (const col of ['happy_hour_deals', 'happy_hour_deals_fr', 'happy_hour_deals_
   }
 }
 
+// Weekly specials (2026-10-27): the deals tied to a day of the week ("Wing Wednesday: 60¢ wings"), up to 7 per venue.
+// days: JSON list of mon..sun; title ≤ 40, deal ≤ 80, price ≤ 20 (optional); kind food | drink | both; start/end
+// optional "HH:MM" (end may be 'close'); optional French title/deal; season_from/season_to optional 'MM-DD'; source
+// the venue's own http(s) page or 'venue_owner'; checked_at the Okanagan date checked. Written only by server.js
+// guardedSpecialsUpdate() (the whole list at once, compare-and-set, logged to venue_enrichment_log). Specials checked
+// more than 120 days ago are hidden everywhere. Additive: nothing here touches the venues table.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_specials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  days TEXT NOT NULL,
+  title TEXT NOT NULL,
+  deal TEXT NOT NULL,
+  price TEXT,
+  kind TEXT NOT NULL CHECK (kind IN ('food', 'drink', 'both')),
+  start_time TEXT,
+  end_time TEXT,
+  title_fr TEXT,
+  deal_fr TEXT,
+  season_from TEXT,
+  season_to TEXT,
+  source TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_venue_specials_venue ON venue_specials(venue_id);
+`);
+
 try {
   require('./golf-data.js').initGolfData(db);
 } catch (e) {

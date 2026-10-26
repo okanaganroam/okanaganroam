@@ -634,6 +634,7 @@ function renderStyles() {
   .t3-badges li.is-collection { background: rgba(201,162,39,0.16); color: #6B5410; }
   .t3-hours { margin: 0 0 8px; font-size: 0.84rem; color: rgba(27,43,58,0.8); }
   .t3-hh { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #7C2D12; }
+  .t3-sp { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #1E4F4C; }
   .t3-why { margin: 0 0 6px; padding-left: 18px; font-size: 0.88rem; line-height: 1.5; }
   .t3-caveats { margin: 0 0 8px; padding: 8px 12px; list-style: none; background: #FFF6E6; border-radius: 10px; font-size: 0.82rem; color: #5B4212; }
   .t3-caveats li + li { margin-top: 4px; }
@@ -1364,6 +1365,8 @@ function renderScript(d) {
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (/venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
       + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour : <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
+      // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").
+      + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
