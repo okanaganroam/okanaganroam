@@ -29225,7 +29225,20 @@ function happyHourNowSummary(now = new Date()) {
   }
   const s = on ? { state: 'now', count: on, startsAt: null } : later ? { state: 'later', count: later, startsAt: laterFrom } : next ? { state: 'tomorrow', count: next, startsAt: nextFrom } : { state: 'none', count: 0, startsAt: null };
   s.label = { en: happyHourNowLabel(s, false), fr: happyHourNowLabel(s, true) };
+  s.short = { en: happyHourNowShort(s, false), fr: happyHourNowShort(s, true) };
   return s;
+}
+// The homepage counts-strip item (2026-10-26, round 2): the words after the bold count, "51 | happy hours on now",
+// "40 | happy hours from 2 PM today", "40 | happy hours tomorrow from 2 PM"; French "happy hours en cours",
+// "happy hours dès 14 h aujourd’hui", "happy hours demain dès 14 h". '' for 'none'.
+function happyHourNowShort(s, fr) {
+  if (!s || !s.count || s.state === 'none') return '';
+  const hh = s.count === 1 ? 'happy hour' : 'happy hours';
+  const t = s.startsAt == null ? '' : happyHourTimeText(s.startsAt, fr).replace(/ /g, '\u00a0');
+  if (s.state === 'now') return fr ? `${hh} en cours` : `${hh} on now`;
+  if (s.state === 'later') return fr ? `${hh} dès ${t} aujourd’hui` : `${hh} from ${t} today`;
+  if (s.state === 'tomorrow') return fr ? `${hh} demain dès ${t}` : `${hh} tomorrow from ${t}`;
+  return '';
 }
 // "Happy hour on now at 23 places" / "Happy hour starts at 2 PM at 40 places today" / "Happy hour tomorrow from 2 PM
 // at 40 places"; French "Happy hour en cours à 23 endroits" / "Happy hour dès 14 h à 40 endroits aujourd’hui" /
@@ -29242,43 +29255,39 @@ function happyHourNowLabel(s, fr) {
 }
 // Roam Now with its Happy hour now filter on (the map script reads ?show=happy-hour; the map's canonical stays /map).
 const HAPPY_HOUR_MAP_HREF = '/map?show=happy-hour';
-// The homepage line under the counts strip: one link to Roam Now, both languages (html[lang] picks one, like the strip).
-// Rendered with the page (the homepage HTML is sent without a Cache-Control header, so it is not kept) and refreshed
-// from GET /api/happy-hour-now after load, so a page restored from the back/forward cache still says what is on now.
-// Hidden when nothing is left today or tomorrow.
+// The homepage happy hour item (2026-10-26, round 2: it is now the first item of the counts strip, in the strip's own
+// style, instead of a separate pill under it): "● 51 happy hours on now", linking to Roam Now with Happy hour now on.
+// Both languages (html[lang] picks one, like the strip). Rendered with the page (the homepage HTML is not cached) and
+// refreshed from GET /api/happy-hour-now after load (HOME_HAPPY_HOUR_SCRIPT). '' when nothing is left today or tomorrow.
 function renderHomeHappyHourHTML({ now = homepageNow() } = {}) {
   let s = null;
   try { s = happyHourNowSummary(now); } catch (e) { s = null; }
-  const on = !!(s && s.state !== 'none');
-  return `<p class="home-hh" id="homeHappyHour" data-hh="${on ? s.state : 'none'}"${on ? '' : ' hidden'}><a class="home-hh-link" href="${HAPPY_HOUR_MAP_HREF}"><span class="home-hh-icon" aria-hidden="true">\u{1F37B}</span> <span class="home-en" data-hh-en>${escapeHtml(on ? s.label.en : '')}</span><span class="home-fr" lang="fr" data-hh-fr>${escapeHtml(on ? s.label.fr : '')}</span> <span class="home-hh-arrow" aria-hidden="true">→</span></a></p>
-<script>
+  if (!s || s.state === 'none' || !s.count) return '';
+  return `<li class="home-hh" id="homeHappyHour" data-hh="${s.state}"><a href="${HAPPY_HOUR_MAP_HREF}"><span class="home-hh-dot" aria-hidden="true"></span><strong data-hh-n>${s.count}</strong> <span class="home-en" data-hh-en>${escapeHtml(s.short.en)}</span><span class="home-fr" lang="fr" data-hh-fr>${escapeHtml(s.short.fr)}</span></a></li>`;
+}
+const HOME_HAPPY_HOUR_SCRIPT = `<script>
 (function(){
   var box = document.getElementById('homeHappyHour'); if (!box || !window.fetch) return;
   function load(){
     fetch('/api/happy-hour-now', { headers: { Accept: 'application/json' } }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
-      if (!d || !d.label) return;
+      if (!d || !d.short) return;
       box.setAttribute('data-hh', d.state);
-      box.querySelector('[data-hh-en]').textContent = d.label.en || '';
-      box.querySelector('[data-hh-fr]').textContent = d.label.fr || '';
-      box.hidden = d.state === 'none' || !d.label.en;
+      box.querySelector('[data-hh-n]').textContent = d.count;
+      box.querySelector('[data-hh-en]').textContent = d.short.en || '';
+      box.querySelector('[data-hh-fr]').textContent = d.short.fr || '';
+      box.hidden = d.state === 'none' || !d.short.en;
     }).catch(function(){});
   }
   load();
   window.addEventListener('pageshow', function(e){ if (e.persisted) load(); });
 })();
 </script>`;
-}
 const HOME_HAPPY_HOUR_STYLE = `<style id="home-hh">
-  /* Happy hour now (2026-10-26): one quiet link under the counts strip. 44px tall; the words carry the meaning. */
-  .home-hh { margin: 8px 0 0; }
-  .home-hh[hidden] { display: none; }
-  .home-hh-link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: #fff; color: var(--ref-navy, #1B2B3A); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 800; text-decoration: none; box-shadow: 0 8px 18px -16px rgba(74,52,40,0.55); transition: border-color 0.15s ease; }
-  .home-hh-link:hover, .home-hh-link:focus-visible { border-color: var(--ref-navy, #1B2B3A); }
-  .home-hh-link:hover .home-hh-arrow { transform: translateX(2px); }
-  .home-hh-icon { margin-right: 4px; }
-  .home-hh-arrow { display: inline-block; margin-left: 4px; transition: transform 0.15s ease; }
-  @media (max-width: 640px) { .home-hh-link { font-size: 0.84rem; padding: 8px 14px; } }
-  @media (prefers-reduced-motion: reduce) { .home-hh-arrow { transition: none; } }
+  /* Happy hour now (2026-10-26, round 2): an item of the counts strip, same type and colours; a small green dot while
+     happy hour is on (the words say it too). */
+  .home-stats .home-hh[hidden] { display: none; }
+  .home-hh-dot { display: none; width: 8px; height: 8px; border-radius: 999px; background: #2E8B57; margin: 0 7px 0 3px; vertical-align: 0.1em; box-shadow: 0 0 0 3px rgba(46,139,87,0.18); }
+  .home-hh[data-hh="now"] .home-hh-dot { display: inline-block; }
 </style>`;
 // The town Happy Hour page (/guide/<town>/happy_hour): each place's happy hour today, its first two deals and an
 // "On now · ends in 40 min" tag. -> { order(list), htmlById: Map(id -> html) }. Places with no stored times (or with
@@ -49616,14 +49625,14 @@ const server = http.createServer(async (req, res) => {
         const topPicks = /^(1|on|true|yes)$/i.test(process.env.HOME_TOP_PICKS || '') ? renderHomeTopPicksHTML({ now: homepageNow() }) : '';
         // The counts sit in a slim strip right under the hero.
         const statsHtml = renderHomeStatsHTML({ now: homepageNow() });
-        // Happy hour now (2026-10-26): one line under the strip, linking to Roam Now with its Happy hour now filter on.
+        // Happy hour now (2026-10-26): the first item of the counts strip, linking to Roam Now with its Happy hour now filter on.
         const happyHourHtml = renderHomeHappyHourHTML({ now: homepageNow() });
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${discoveryStyles}\n${statsHtml || happyHourHtml ? `${HOME_HAPPY_HOUR_STYLE}\n<div class="home-stats-wrap wrap-wide">${statsHtml}${happyHourHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${discoveryStyles}\n${statsHtml ? `<div class="home-stats-wrap wrap-wide">${happyHourHtml ? `${HOME_HAPPY_HOUR_STYLE}${statsHtml.replace(/(<ul class="home-stats"[^>]*>)/, (m) => m + happyHourHtml)}${HOME_HAPPY_HOUR_SCRIPT}` : statsHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
@@ -53746,6 +53755,7 @@ module.exports = {
   happyHourStatesFor,
   happyHourNowSummary,
   happyHourNowLabel,
+  happyHourNowShort,
   renderHomeHappyHourHTML,
   guideHappyHourInfo,
   navHappyHourTowns,

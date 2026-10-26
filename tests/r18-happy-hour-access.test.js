@@ -107,26 +107,30 @@ test('valley-wide summary: on now, later today, tomorrow, none; Okanagan time; E
   assert.equal(app.happyHourNowLabel({ state: 'none', count: 0 }, false), '');
 });
 
-test('homepage line: the label in both languages, a link to Roam Now with Happy hour now on; hidden when nothing is left', async () => {
+test('homepage: the first item of the counts strip, in both languages, linking to Roam Now with Happy hour now on', async () => {
   const on = app.renderHomeHappyHourHTML({ now: at(TUE, '17:20') });
-  assert.match(on, /<p class="home-hh" id="homeHappyHour" data-hh="now"><a class="home-hh-link" href="\/map\?show=happy-hour">/);
-  assert.match(on, /<span class="home-en" data-hh-en>Happy hour on now at 2 places<\/span><span class="home-fr" lang="fr" data-hh-fr>Happy hour en cours à 2 endroits<\/span>/);
-  assert.match(on, /aria-hidden="true">\u{1F37B}<\/span>/u, 'the emoji is decoration');
-  assert.match(on, /fetch\('\/api\/happy-hour-now'/, 'refreshed after load');
+  assert.match(on, /^<li class="home-hh" id="homeHappyHour" data-hh="now"><a href="\/map\?show=happy-hour"><span class="home-hh-dot" aria-hidden="true"><\/span><strong data-hh-n>2<\/strong> /);
+  assert.match(on, /<span class="home-en" data-hh-en>happy hours on now<\/span><span class="home-fr" lang="fr" data-hh-fr>happy hours en cours<\/span><\/a><\/li>$/);
   assert.match(app.renderHomeHappyHourHTML({ now: at(TUE, '13:00') }), /data-hh="later"/);
+  assert.equal(app.happyHourNowShort({ state: 'now', count: 1 }, false), 'happy hour on now');
+  assert.equal(app.happyHourNowShort({ state: 'later', count: 4, startsAt: 900 }, false), nb('happy hours from 3_PM today'));
+  assert.equal(app.happyHourNowShort({ state: 'later', count: 4, startsAt: 900 }, true), nb('happy hours dès 15_h aujourd’hui'));
+  assert.equal(app.happyHourNowShort({ state: 'tomorrow', count: 4, startsAt: 900 }, false), nb('happy hours tomorrow from 3_PM'));
+  assert.equal(app.happyHourNowShort({ state: 'none', count: 0 }, false), '');
   const srv = http.createServer(app.server.listeners('request')[0]);
   await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${srv.address().port}`;
   try {
     const en = await (await fetch(`${base}/`)).text();
-    assert.match(en, /<div class="home-stats-wrap wrap-wide">(?:<ul class="home-stats"[\s\S]*?<\/ul>)?<p class="home-hh" id="homeHappyHour"/, 'under the counts strip');
-    assert.match(en, /<a class="home-hh-link" href="\/map\?show=happy-hour">/);
-    if (!others) assert.match(en, new RegExp(nb('data-hh-en>Happy hour starts at 3_PM at 4 places today</span>')));
-    assert.match(en, /<style id="home-hh">/);
-    const fr = await (await fetch(`${base}/fr`)).text();
-    assert.match(fr, /<a class="home-hh-link" href="\/fr\/map\?show=happy-hour">/, 'the French homepage opens the French map');
-    if (!others) assert.match(fr, new RegExp(nb('data-hh-fr>Happy hour dès 15_h à 4 endroits aujourd’hui</span>')));
-    // The JSON the line refreshes from: tiny, a minute in a cache, noindex.
+    if (/id="homeHappyHour"/.test(en)) {
+      assert.match(en, /<ul class="home-stats"[^>]*><li class="home-hh" id="homeHappyHour"/, 'first item of the strip');
+      assert.doesNotMatch(en, /<p class="home-hh"/, 'no separate pill');
+      assert.match(en, /<style id="home-hh">/);
+      assert.match(en, /fetch\('\/api\/happy-hour-now'/, 'refreshed after load');
+      if (!others) assert.match(en, new RegExp(nb('data-hh-en>happy hours from 3_PM today</span>')));
+      const fr = await (await fetch(`${base}/fr`)).text();
+      assert.match(fr, /<li class="home-hh" id="homeHappyHour"[^>]*><a href="\/fr\/map\?show=happy-hour">/, 'the French homepage opens the French map');
+    }
     const r = await fetch(`${base}/api/happy-hour-now`);
     assert.equal(r.status, 200);
     assert.equal(r.headers.get('cache-control'), 'public, max-age=60');
@@ -134,23 +138,19 @@ test('homepage line: the label in both languages, a link to Roam Now with Happy 
     const j = await r.json();
     assert.ok(['now', 'later', 'tomorrow', 'none'].includes(j.state));
     assert.equal(typeof j.count, 'number');
-    assert.ok(j.label && typeof j.label.en === 'string' && typeof j.label.fr === 'string');
-    assert.deepEqual(Object.keys(j).sort(), ['count', 'label', 'startsAt', 'state']);
-    // /map?show=happy-hour is the map page with its canonical left as /map (no new indexable address).
+    assert.ok(j.short && typeof j.short.en === 'string' && typeof j.short.fr === 'string');
+    assert.deepEqual(Object.keys(j).sort(), ['count', 'label', 'short', 'startsAt', 'state']);
     const map = await (await fetch(`${base}/map?show=happy-hour`)).text();
     assert.match(map, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/map">/);
     assert.ok(map.includes("if (qs.get('show') === 'happy-hour') feats.happy = true;"), 'the map script switches Happy hour now on');
     const frMap = await (await fetch(`${base}/fr/map?show=happy-hour`)).text();
     assert.match(frMap, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/fr\/map">/);
-    assert.ok(frMap.includes("if (qs.get('show') === 'happy-hour') feats.happy = true;"));
   } finally { srv.close(); }
 });
 
-test('homepage line is hidden when nothing is left today or tomorrow', () => {
-  // Only H (Mondays) would remain if the others had no times: check through the label function and the markup rule.
-  assert.match(app.renderHomeHappyHourHTML({ now: at(TUE, '17:20') }), /^<p class="home-hh"[^>]*data-hh="now">/);
-  const html = app.renderHomeHappyHourHTML({ now: new Date(NaN) });
-  assert.match(html, /^<p class="home-hh" id="homeHappyHour" data-hh="none" hidden>/, 'an unreadable clock hides it rather than guessing');
+test('homepage item is left out when nothing is left today or tomorrow', () => {
+  assert.match(app.renderHomeHappyHourHTML({ now: at(TUE, '17:20') }), /^<li class="home-hh"[^>]*data-hh="now">/);
+  assert.equal(app.renderHomeHappyHourHTML({ now: new Date(NaN) }), '', 'an unreadable clock leaves it out rather than guessing');
 });
 
 test('the map reads ?show=happy-hour and turns on its Happy hour now filter', () => {
