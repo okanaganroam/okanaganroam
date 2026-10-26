@@ -9918,8 +9918,11 @@ function guideBadgeHeading(region, badge) {
   const town = REGION_LABELS[region];
   return { heading: t.h.replace('{T}', town), intro: t.i.replace(/\{T\}/g, town) };
 }
-function renderGuidePage(region, badge, venues, filter = null, now = new Date()) {
+function renderGuidePage(region, badge, venues, filter = null, now = new Date(), opts = {}) {
   const regionLabel = REGION_LABELS[region];
+  // Town Happy Hour pages (2026-10-26): today's times, deals and "On now" on each card; on now first, then later today.
+  // opts.lang 'fr' writes those lines in French (the rest of the page is turned French by the twin, as before).
+  const hh = badge === 'happy_hour' ? guideHappyHourInfo(venues, opts.lang === 'fr', now) : null;
   // Search ranking (2026-10-18): a dietary guide ranks fully vegan (vegetarian, gluten-free) places first.
   const diet = DIET_STRENGTH[badge] ? badge : null;
   if (diet) venues = sortByDietStrength(venues, diet);
@@ -9972,7 +9975,8 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date())
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
   body.guide-page .guide-more-chip { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
-</style>`,
+</style>${hh ? `\n${GUIDE_HAPPY_HOUR_STYLE}` : ''}`,
+    ...(hh ? { reorder: hh.order, cardExtraHtml: hh.htmlById } : {}),
     afterHtml,
   }, venues, filter, now);
 }
@@ -13793,6 +13797,15 @@ function frA11yLabels(html) {
   return String(html).replace('<a class="skip-link" href="#main">Skip to content</a>', '<a class="skip-link" href="#main">Aller au contenu</a>')
     .replace('<nav class="nav wrap" aria-label="Main menu">', '<nav class="nav wrap" aria-label="Menu principal">');
 }
+const NAV_HAPPY_HOUR_HREF = '/guide/kelowna/happy_hour';
+// The towns with a Happy Hour page (the same MIN_GUIDE_VENUES rule as the /guide/<town>/happy_hour route).
+function navHappyHourTowns() {
+  try {
+    return db.prepare('SELECT region FROM venues WHERE redirect_to IS NULL AND happy_hour = 1 GROUP BY region HAVING COUNT(*) >= ?').all(MIN_GUIDE_VENUES)
+      .map((r) => r.region).filter((r) => REGION_LABELS[r] && /^[a-z-]+$/.test(r)).sort();
+  } catch (e) { return []; }
+}
+const NAV_HAPPY_HOUR_SCRIPT = `<script>(function(){var a=document.querySelectorAll('a.nav-happy-hour');if(!a.length)return;var t=(a[0].getAttribute('data-towns')||'').split(','),m=/^\\/(fr\\/)?(?:guide\\/)?([a-z-]+)(?:\\/|$)/.exec(location.pathname);if(!m||t.indexOf(m[2])<0)return;for(var i=0;i<a.length;i++)a[i].setAttribute('href',(m[1]?'/fr':'')+'/guide/'+m[2]+'/happy_hour');})();</script>`;
 function withNavRefresh(headerHtml) {
   if (!headerHtml || headerHtml.includes('<style id="nav-refresh">')) return headerHtml;
   let out = withHeaderA11y(String(headerHtml));
@@ -13801,13 +13814,24 @@ function withNavRefresh(headerHtml) {
   const things = panels.find((m) => m[0].includes('href="/outdoors"'));
   if (discover) out = out.replace(discover[0], NAV_DISCOVER_PANEL);
   if (things) out = out.replace(things[0], NAV_THINGS_PANEL);
+  // Happy Hour (2026-10-26): last in Food & Drink (the computer dropdown and the phone menu are the same list). The
+  // header is the same on every page, so it links Kelowna's page (/fr pages: /fr/guide/kelowna/happy_hour); on a page
+  // inside a town that has its own Happy Hour page (/penticton/..., /guide/penticton/...), a line of script points it
+  // there instead.
+  const food = panels.find((m) => m[0].includes('href="/food-drink"'));
+  let hhScript = '';
+  if (food && !food[0].includes('class="nav-happy-hour"')) {
+    const towns = navHappyHourTowns();
+    out = out.replace(food[0], food[0].replace(/(\n\s*)<\/div>$/, `$1  <a href="${NAV_HAPPY_HOUR_HREF}" class="nav-happy-hour"${towns.length ? ` data-towns="${towns.join(',')}"` : ''}>Happy Hour</a>$1</div>`));
+    if (towns.length) hhScript = `\n${NAV_HAPPY_HOUR_SCRIPT}`;
+  }
   // Roam Now on its own, right after Discover, so it is seen on every page.
   if (!out.includes('class="nav-roam-now"')) out = out.replace(/(\n\s*)<li><a href="\/hidden-gems"/, '$1<li><a class="nav-roam-now" href="/map"><span class="live-dot" aria-hidden="true"></span>Roam Now</a></li>$1<li><a href="/hidden-gems"');
   // Phones: Business login as its own menu item, just above Favorites / the phone-only Build My Trip row (on computers it
   // stays in Discover; only one of the two shows at a time).
   if (!out.includes('class="nav-business-li"')) out = out.replace(/(\n\s*)(<li class="nav-links-(?:favorites|trip)">)/, '$1<li class="nav-business-li"><a href="/owner/login">Business login</a></li>$1$2');
   // After everything else the fragment carries (other header rules sit right after </header>).
-  return `${out}\n${NAV_REFRESH_STYLE}\n${NAV_A11Y_SNIPPET}`;
+  return `${out}\n${NAV_REFRESH_STYLE}\n${NAV_A11Y_SNIPPET}${hhScript}`;
 }
 function renderGolfHeaderHtml() {
   if (!fs.existsSync(SITE_PATH)) {
@@ -18924,6 +18948,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         else if (k.indexOf('in.') === 0 && CONF.r[k.slice(3)]) town = k.slice(3); else if (/^p\\.(cheap|afford|fancy)$/.test(k)) price = k.slice(2); else if (/^at\\.\\d+u?$/.test(k)) { atMin = parseInt(k.slice(3), 10); atUntil = /u$/.test(k); } else if (/^on\\.(\\+1|mon|tue|wed|thu|fri|sat|sun)$/.test(k)) atDay = k.slice(3); else if (k.indexOf('x.y.') === 0 && TYPES[k.slice(4)]) notTypes[k.slice(4)] = true;
         else if (k.indexOf('x.t.') === 0 && TAGIX[k.slice(4)] != null) notTags[k.slice(4)] = true; else if (k.indexOf('x.k.') === 0 && CONF.k[k.slice(4)]) notKinds[k.slice(4)] = true; else if (k.indexOf('x.f.') === 0 && CONF.f[k.slice(4)]) notFeats[k.slice(4)] = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
       if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = qs.get('q'); }
+      // 2026-10-26: the homepage's happy hour line opens the map with Happy hour now on (/map?show=happy-hour).
+      if (qs.get('show') === 'happy-hour') feats.happy = true;
     } catch (e) {}
     syncChips();
     // A town or a short search in the address opens fitted to its results (Phone map, 2026-10-19, round 7).
@@ -23170,6 +23196,16 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
     });
   }
+  // extra.cardExtraHtml (2026-10-26): Map of venue id -> ready-made HTML at the top of the card's fee slot, right under
+  // the meta / open-status lines (the town Happy Hour pages' times and deals). Inside a slot, so the two-up cards'
+  // shared rows (subgrid, one row per part) still line up.
+  if (extra.cardExtraHtml && extra.cardExtraHtml.size) {
+    cardChunks = cardChunks.map((chunk) => {
+      const add = extra.cardExtraHtml.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
+      if (!add) return chunk;
+      return chunk.replace('<div class="card-slot card-slot-fee">', () => `<div class="card-slot card-slot-fee">${add}`);
+    });
+  }
   const firstBatch = [], deferred = [];
   for (const chunk of cardChunks) {
     const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
@@ -25623,6 +25659,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   let mixed = cfg.keepOrder ? [...pinned, ...seasonClosedLast(venues.filter((v) => !pinnedIds.has(v.id)), now)] : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), now)];
   // cfg.openFirst (2026-10-18): guide pages lead with places open now, 7 am to 11 pm (guideOpenFirst).
   if (cfg.openFirst) mixed = guideOpenFirst(mixed, now, cfg.tierOf || null);
+  // cfg.reorder (2026-10-26): a last stable regrouping of that first order (town Happy Hour pages: on now first).
+  if (cfg.reorder) mixed = cfg.reorder(mixed);
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -25672,7 +25710,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, cfg.openNow ? openInfo.byId : null, {
-    cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {},
+    cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {}, cardExtraHtml: cfg.cardExtraHtml || null,
     // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
     altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
     photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
@@ -29136,6 +29174,164 @@ function happyHourDealsHtml(deals, fr) {
   const more = rest.length ? `<details class="venue-hh-more"><summary>${fr ? `${rest.length} autre${rest.length > 1 ? 's' : ''} spécia${rest.length > 1 ? 'ux' : 'l'}` : `${rest.length} more deal${rest.length > 1 ? 's' : ''}`}</summary><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${rest.map(row).join('')}</span></details>` : '';
   return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${shown.map(row).join('')}</span>${more}${deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
 }
+// ---------- Happy hour access (2026-10-26) ----------
+// One answer to "where is happy hour on now / later today", for the homepage line, GET /api/happy-hour-now and the town
+// Happy Hour pages (/guide/<town>/happy_hour). The same rules as the venue page (venueHappyHour) and Roam Now: stored
+// times only; never with an advisory, while closed for the season or during a closure in force; a place its own hours
+// call closed now is not "on"; a place closed today (a holiday) has no "later today". Always the Okanagan wall clock.
+// `venues`: rows with id, hours, happy_hour_times (redirects are skipped).
+// -> { clock, byId: Map(id -> { h: happyHourState() result | null, blocked, closedToday }) } for each venue with times.
+function happyHourStatesFor(venues, now = new Date()) {
+  const clock = okanaganClock(now);
+  const byId = new Map();
+  if (!hoursModule) return { clock, byId };
+  const advisory = getAdvisoryNotes(now), seasons = getSeasonStates(now);
+  for (const v of venues || []) {
+    if (!v || !v.happy_hour_times || v.redirect_to) continue;
+    const ss = seasons.get(v.id);
+    if (advisory.has(v.id) || (ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current)))) {
+      byId.set(v.id, { h: null, blocked: true, closedToday: false });
+      continue;
+    }
+    let place = null;
+    try { place = v.hours ? hoursModule.statusAt(hoursModule.parseHours(hoursWithExtras(v, now)), clock) : null; } catch (e) { place = null; }
+    let h = null;
+    try { h = hoursModule.happyHourState(v.happy_hour_times, clock, !!(place && place.state === 'closed')); } catch (e) { h = null; }
+    const closedToday = !!(place && place.closedToday);
+    if (h && h.state === 'later' && closedToday) h = null;
+    byId.set(v.id, { h, blocked: false, closedToday });
+  }
+  return { clock, byId };
+}
+// Valley-wide (the places Roam Now shows: a town, a listed kind of place, a map pin):
+// { state: 'now' | 'later' | 'tomorrow' | 'none', count, startsAt (minutes, or null), label: { en, fr } }.
+// now: happy hour is on at `count` places; later: none on yet, `count` places start later today, the first at startsAt;
+// tomorrow: nothing more today, `count` places have one tomorrow, the first at startsAt.
+function happyHourNowSummary(now = new Date()) {
+  let rows = [];
+  try {
+    rows = db.prepare('SELECT id, region, type, slug, latitude, longitude, hours, happy_hour_times, redirect_to FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL AND happy_hour_times IS NOT NULL').all()
+      .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
+  } catch (e) { rows = []; }
+  const { clock, byId } = happyHourStatesFor(rows, now);
+  const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const tomorrow = days[(days.indexOf(clock.weekday) + 1) % 7];
+  let on = 0, later = 0, laterFrom = null, next = 0, nextFrom = null;
+  for (const { h } of byId.values()) {
+    if (!h) continue;
+    if (h.state === 'now') on++;
+    else if (h.state === 'later') { later++; laterFrom = laterFrom == null ? h.from.minutes : Math.min(laterFrom, h.from.minutes); }
+    else if (h.state === 'next' && !h.nextWeek && h.from.weekday === tomorrow) { next++; nextFrom = nextFrom == null ? h.from.minutes : Math.min(nextFrom, h.from.minutes); }
+  }
+  const s = on ? { state: 'now', count: on, startsAt: null } : later ? { state: 'later', count: later, startsAt: laterFrom } : next ? { state: 'tomorrow', count: next, startsAt: nextFrom } : { state: 'none', count: 0, startsAt: null };
+  s.label = { en: happyHourNowLabel(s, false), fr: happyHourNowLabel(s, true) };
+  return s;
+}
+// "Happy hour on now at 23 places" / "Happy hour starts at 2 PM at 40 places today" / "Happy hour tomorrow from 2 PM
+// at 40 places"; French "Happy hour en cours à 23 endroits" / "Happy hour dès 14 h à 40 endroits aujourd’hui" /
+// "Happy hour demain dès 14 h à 40 endroits". '' for 'none'. The time never breaks across lines.
+function happyHourNowLabel(s, fr) {
+  if (!s || !s.count || s.state === 'none') return '';
+  const n = s.count;
+  const places = fr ? `${n} endroit${n > 1 ? 's' : ''}` : `${n} place${n === 1 ? '' : 's'}`;
+  const t = s.startsAt == null ? '' : happyHourTimeText(s.startsAt, fr).replace(/ /g, ' ');
+  if (s.state === 'now') return fr ? `Happy hour en cours à ${places}` : `Happy hour on now at ${places}`;
+  if (s.state === 'later') return fr ? `Happy hour dès ${t} à ${places} aujourd’hui` : `Happy hour starts at ${t} at ${places} today`;
+  if (s.state === 'tomorrow') return fr ? `Happy hour demain dès ${t} à ${places}` : `Happy hour tomorrow from ${t} at ${places}`;
+  return '';
+}
+// Roam Now with its Happy hour now filter on (the map script reads ?show=happy-hour; the map's canonical stays /map).
+const HAPPY_HOUR_MAP_HREF = '/map?show=happy-hour';
+// The homepage line under the counts strip: one link to Roam Now, both languages (html[lang] picks one, like the strip).
+// Rendered with the page (the homepage HTML is sent without a Cache-Control header, so it is not kept) and refreshed
+// from GET /api/happy-hour-now after load, so a page restored from the back/forward cache still says what is on now.
+// Hidden when nothing is left today or tomorrow.
+function renderHomeHappyHourHTML({ now = homepageNow() } = {}) {
+  let s = null;
+  try { s = happyHourNowSummary(now); } catch (e) { s = null; }
+  const on = !!(s && s.state !== 'none');
+  return `<p class="home-hh" id="homeHappyHour" data-hh="${on ? s.state : 'none'}"${on ? '' : ' hidden'}><a class="home-hh-link" href="${HAPPY_HOUR_MAP_HREF}"><span class="home-hh-icon" aria-hidden="true">\u{1F37B}</span> <span class="home-en" data-hh-en>${escapeHtml(on ? s.label.en : '')}</span><span class="home-fr" lang="fr" data-hh-fr>${escapeHtml(on ? s.label.fr : '')}</span> <span class="home-hh-arrow" aria-hidden="true">→</span></a></p>
+<script>
+(function(){
+  var box = document.getElementById('homeHappyHour'); if (!box || !window.fetch) return;
+  function load(){
+    fetch('/api/happy-hour-now', { headers: { Accept: 'application/json' } }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+      if (!d || !d.label) return;
+      box.setAttribute('data-hh', d.state);
+      box.querySelector('[data-hh-en]').textContent = d.label.en || '';
+      box.querySelector('[data-hh-fr]').textContent = d.label.fr || '';
+      box.hidden = d.state === 'none' || !d.label.en;
+    }).catch(function(){});
+  }
+  load();
+  window.addEventListener('pageshow', function(e){ if (e.persisted) load(); });
+})();
+</script>`;
+}
+const HOME_HAPPY_HOUR_STYLE = `<style id="home-hh">
+  /* Happy hour now (2026-10-26): one quiet link under the counts strip. 44px tall; the words carry the meaning. */
+  .home-hh { margin: 8px 0 0; }
+  .home-hh[hidden] { display: none; }
+  .home-hh-link { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.18); background: #fff; color: var(--ref-navy, #1B2B3A); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 800; text-decoration: none; box-shadow: 0 8px 18px -16px rgba(74,52,40,0.55); transition: border-color 0.15s ease; }
+  .home-hh-link:hover, .home-hh-link:focus-visible { border-color: var(--ref-navy, #1B2B3A); }
+  .home-hh-link:hover .home-hh-arrow { transform: translateX(2px); }
+  .home-hh-icon { margin-right: 4px; }
+  .home-hh-arrow { display: inline-block; margin-left: 4px; transition: transform 0.15s ease; }
+  @media (max-width: 640px) { .home-hh-link { font-size: 0.84rem; padding: 8px 14px; } }
+  @media (prefers-reduced-motion: reduce) { .home-hh-arrow { transition: none; } }
+</style>`;
+// The town Happy Hour page (/guide/<town>/happy_hour): each place's happy hour today, its first two deals and an
+// "On now · ends in 40 min" tag. -> { order(list), htmlById: Map(id -> html) }. Places with no stored times (or with
+// an advisory, a season closure) get no times and keep their place; places on now come first, then later today, then
+// the rest, each group in the page's own order.
+function guideHappyHourInfo(venues, fr, now = new Date()) {
+  const ids = (venues || []).map((v) => v.id).filter((id) => id != null);
+  let rows = [];
+  try { rows = ids.length ? db.prepare(`SELECT id, hours, happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at, redirect_to FROM venues WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids) : []; } catch (e) { rows = []; }
+  const { clock, byId } = happyHourStatesFor(rows, now);
+  const htmlById = new Map();
+  const rank = new Map();
+  for (const r of rows) {
+    const st = byId.get(r.id);
+    if (st && st.blocked) continue;
+    const parts = [];
+    if (st && hoursModule) {
+      const h = st.h;
+      let todayText = '';
+      try {
+        const parsed = hoursModule.parseHours(r.happy_hour_times);
+        const day = parsed && parsed.days ? parsed.days[clock.weekday] : null;
+        if (day && day.status === 'open' && day.ranges.length && !st.closedToday) todayText = `${fr ? 'Aujourd’hui' : 'Today'} ${day.ranges.map(([a, b]) => happyHourRangeText(a, b, fr)).join(', ')}`;
+      } catch (e) { todayText = ''; }
+      const week = happyHourWeekText(r.happy_hour_times, fr);
+      if (!todayText && week) todayText = `${fr ? 'Pas de happy hour aujourd’hui' : 'No happy hour today'} · ${week}`;
+      let tag = '';
+      if (h && h.state === 'now') {
+        const left = happyHourMinutesLeft(h.until, clock);
+        tag = left != null ? (fr ? `En cours · se termine dans ${happyHourLeftText(left, true)}` : `On now · ends in ${happyHourLeftText(left, false)}`) : (fr ? 'En cours' : 'On now');
+      }
+      if (todayText || tag) parts.push(`<p class="guide-hh-when">${tag ? `<span class="guide-hh-tag">${escapeHtml(tag)}</span> ` : ''}<span class="guide-hh-label">${fr ? 'Happy hour :' : 'Happy hour:'}</span> ${escapeHtml(todayText)}</p>`);
+      rank.set(r.id, h && h.state === 'now' ? 0 : h && h.state === 'later' ? 1 : 2);
+    }
+    // Deals: the first two, price first, like the happy hour guide (only with the badge and a recent check).
+    const deals = happyHourDealsShown(r, now);
+    if (deals) {
+      const english = fr && !deals.fr;
+      parts.push(`<p class="guide-hh-deals"><span class="guide-hh-label">${fr ? 'Spéciaux :' : 'Deals:'}</span> <span${english ? ' lang="en"' : ''}>${escapeHtml(happyHourDealsCompact(english ? deals.en : (fr ? deals.fr : deals.en), 2))}</span></p>`);
+    }
+    if (parts.length) htmlById.set(r.id, `<div class="guide-hh" data-hh="${rank.get(r.id) === 0 ? 'now' : rank.get(r.id) === 1 ? 'later' : 'none'}">${parts.join('')}</div>`);
+  }
+  const order = (list) => list.map((v, i) => [rank.has(v.id) ? rank.get(v.id) : 2, i, v]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
+  return { order, htmlById };
+}
+const GUIDE_HAPPY_HOUR_STYLE = `<style id="guide-hh">
+  /* Town Happy Hour pages (2026-10-26): today's times, the first two deals and an "On now" tag on each card. */
+  body.guide-page .guide-hh { margin: 2px 0 8px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.88rem; line-height: 1.45; color: var(--ink, #2A2019); }
+  body.guide-page .guide-hh p { margin: 0 0 3px; }
+  body.guide-page .guide-hh-label { font-weight: 800; }
+  body.guide-page .guide-hh-tag { display: inline-block; margin: 0 4px 2px 0; padding: 2px 9px; border-radius: 999px; background: var(--teal-deep, #1F5450); color: #fff; font-size: 0.78rem; font-weight: 800; }
+  body.guide-page .guide-hh-deals { color: var(--teal-deep, #1F5450); }
+</style>`;
 function renderVenuePageLayoutStyles() {
   return `<style id="venue-page-layout">
   /* Hero photo (2026-10-14): the photo fills the hero under the same tint,
@@ -49420,12 +49616,14 @@ const server = http.createServer(async (req, res) => {
         const topPicks = /^(1|on|true|yes)$/i.test(process.env.HOME_TOP_PICKS || '') ? renderHomeTopPicksHTML({ now: homepageNow() }) : '';
         // The counts sit in a slim strip right under the hero.
         const statsHtml = renderHomeStatsHTML({ now: homepageNow() });
+        // Happy hour now (2026-10-26): one line under the strip, linking to Roam Now with its Happy hour now filter on.
+        const happyHourHtml = renderHomeHappyHourHTML({ now: homepageNow() });
 
         const heroToWizardAnchor = '</section>\n\n<section class="filter-bar" id="directory">';
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${discoveryStyles}\n${statsHtml ? `<div class="home-stats-wrap wrap-wide">${statsHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${discoveryStyles}\n${statsHtml || happyHourHtml ? `${HOME_HAPPY_HOUR_STYLE}\n<div class="home-stats-wrap wrap-wide">${statsHtml}${happyHourHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
@@ -50101,7 +50299,7 @@ const server = http.createServer(async (req, res) => {
           .all(region);
         if (rows.length >= MIN_GUIDE_VENUES) {
           const gv = rows.map(rowToVenue);
-          const html = renderGuidePage(region, badge, gv, parseCuratedHubQuery(query, new Set(gv.map((v) => v.type)), new Set(GUIDE_FEATURES)));
+          const html = renderGuidePage(region, badge, gv, parseCuratedHubQuery(query, new Set(gv.map((v) => v.type)), new Set(GUIDE_FEATURES)), new Date(), { lang: res.twinLang === 'fr' ? 'fr' : 'en' });
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
@@ -51368,6 +51566,15 @@ const server = http.createServer(async (req, res) => {
     // GET /api/stats
     if (pathname === '/api/stats' && method === 'GET') {
       return sendPublicListJSON(res, getStats());
+    }
+    // GET /api/happy-hour-now (2026-10-26): the homepage's happy hour line, valley-wide on the Okanagan clock:
+    // { state: 'now' | 'later' | 'tomorrow' | 'none', count, startsAt, label: { en, fr } }. Kept a minute at most;
+    // data, not a page (noindex, and /api/ is disallowed in robots.txt).
+    if (pathname === '/api/happy-hour-now' && method === 'GET') {
+      let s;
+      try { s = happyHourNowSummary(new Date()); } catch (e) { s = { state: 'none', count: 0, startsAt: null, label: { en: '', fr: '' } }; }
+      res.setHeader('X-Robots-Tag', 'noindex');
+      return sendPublicListJSON(res, s);
     }
 
     // POST /api/admin/venues/:id/slug (round 12, 2026-10-20): change a listing's slug; its old English and French
@@ -53536,6 +53743,13 @@ module.exports = {
   venueOpenStatus,
   venueHappyHour,
   happyHourWeekText,
+  happyHourStatesFor,
+  happyHourNowSummary,
+  happyHourNowLabel,
+  renderHomeHappyHourHTML,
+  guideHappyHourInfo,
+  navHappyHourTowns,
+  HAPPY_HOUR_MAP_HREF,
   happyHourLiveText,
   frStatusText,
   venueDistanceKm,
