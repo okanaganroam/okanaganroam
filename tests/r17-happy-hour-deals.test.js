@@ -147,26 +147,33 @@ test('Venue page: a Deals list under the happy hour times with its checked date;
   setTimes(v, TUE_HH);
   setDeals(v, DEALS);
   const en = row(page(v, at(TUE, '12:00')));
-  assert.match(en, /^<span class="venue-hh-times">Mon–⁠Fri\u00a03–⁠6\u00a0PM<\/span><span class="venue-hours-checked venue-hh-checked">Checked [^<]+<\/span><span class="venue-hh-deals">/, 'times, their checked date, then the deals');
-  assert.match(en, /<span class="venue-hh-deals-label" id="venueHhDealsLabel">Deals<\/span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel"><span class="venue-hh-deal" role="listitem">House pints \(20 oz\) · \$6<\/span><span class="venue-hh-deal" role="listitem">Cocktails · \$10<\/span><span class="venue-hh-deal" role="listitem">Appies · half price<\/span><\/span>/);
+  assert.match(en, /^<span class="venue-hh-times">Mon–⁠Fri\u00a03–⁠6\u00a0PM<\/span><span class="venue-hh-deals">/, 'times, then the deals (one checked date, at the end, when both were checked the same day)');
+  assert.match(en, /<span class="venue-hh-deals-label" id="venueHhDealsLabel">Deals<\/span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel"><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)<\/span><\/span><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">\$10<\/span><span class="venue-hh-deal-text">Cocktails<\/span><\/span><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">half price<\/span><span class="venue-hh-deal-text">Appies<\/span><\/span><\/span>/);
+  assert.doesNotMatch(en, /venue-hh-more/, '3 deals: no "more" toggle');
   const checked = `Checked ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(today.slice(5, 7)) - 1]} ${Number(today.slice(8, 10))}, ${today.slice(0, 4)}`;
   assert.ok(en.includes(`<span class="venue-hours-checked venue-hh-deals-checked">${checked}</span>`), en);
   // French without French lines: the English lines, each marked as English.
   const fr = row(page(v, at(TUE, '12:00'), 'fr'));
   assert.match(fr, />Spéciaux</);
-  assert.match(fr, /<span class="venue-hh-deal" role="listitem" lang="en">House pints \(20 oz\) · \$6<\/span>/);
+  assert.match(fr, /<span class="venue-hh-deal" role="listitem" lang="en"><span class="venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)<\/span><\/span>/);
   assert.match(fr, /venue-hh-deals-checked">Vérifié le /);
   // With French lines: those, not marked English.
   setDeals(v, DEALS, { deals_fr: DEALS_FR });
   const fr2 = row(page(v, at(TUE, '12:00'), 'fr'));
-  assert.match(fr2, /<span class="venue-hh-deal" role="listitem">Pintes maison \(20 oz\) · 6 \$<\/span><span class="venue-hh-deal" role="listitem">Cocktails · 10 \$<\/span>/);
+  assert.match(fr2, /<span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">6 \$<\/span><span class="venue-hh-deal-text">Pintes maison \(20 oz\)<\/span><\/span><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">10 \$<\/span><span class="venue-hh-deal-text">Cocktails<\/span><\/span>/);
   assert.doesNotMatch(fr2, /lang="en"/);
   // Deals without times still get the Happy hour row (deals only).
   const only = mk({ name: 'Deals Only Pub' });
   setDeals(only, DEALS.slice(0, 1));
   const o = row(page(only, at(TUE, '12:00')));
   assert.doesNotMatch(o, /venue-hh-times/);
-  assert.match(o, /House pints \(20 oz\) · \$6/);
+  assert.match(o, /venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)</);
+  // More than 4 deals: the first 4 show, the rest behind "2 more deals".
+  const six = mk({ name: 'Deals Six Pub' });
+  setDeals(six, [1, 2, 3, 4, 5, 6].map((n) => ({ text: `Deal ${n}`, price: `$${n}` })));
+  const s6 = row(page(six, at(TUE, '12:00')));
+  assert.match(s6, /Deal 4<\/span><\/span><\/span><details class="venue-hh-more"><summary>2 more deals<\/summary><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">.*Deal 5.*Deal 6/);
+  assert.match(row(page(six, at(TUE, '12:00'), 'fr')), /<summary>2 autres spéciaux<\/summary>/);
   // Only on places with the happy_hour badge (alcohol-serving): a place without it shows no deals.
   const noBadge = mk({ name: 'Deals No Badge Pub', happy_hour: false });
   setTimes(noBadge, TUE_HH);
@@ -359,7 +366,7 @@ test('Owner portal: a Deals editor under the happy hour times; a signed-in save 
     assert.deepEqual(JSON.parse(row.happy_hour_deals_fr), next.deals_fr);
     assert.equal(row.happy_hour_deals_source, 'venue_owner');
     assert.equal(row.happy_hour_deals_checked_at, today);
-    assert.match(row ? page(v, undefined) : '', /Wings \(1 lb\) · \$9/);
+    assert.match(row ? page(v, undefined) : '', /venue-hh-deal-price">\$9<\/span><span class="venue-hh-deal-text">Wings \(1 lb\)</);
     const logged = db.prepare("SELECT field_name, source, reviewed_by FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'happy_hour_deals' ORDER BY id DESC LIMIT 1").get(v.id);
     assert.deepEqual({ ...logged }, { field_name: 'happy_hour_deals', source: 'venue_owner', reviewed_by: 'owner:deals-owner@example.com' });
     // The same deals again: nothing changed.
