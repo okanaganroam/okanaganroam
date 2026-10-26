@@ -752,6 +752,16 @@ for (const col of ['happy_hour_times', 'happy_hour_source', 'happy_hour_checked_
   }
 }
 
+// Happy hour deals (2026-10-26): what is on special, as a JSON list of up to 6 { text, price? } lines
+// ("House pints (20 oz)", "$6"), optional French lines in the same shape, the page they were read on (or
+// 'venue_owner') and the Okanagan date they were checked. Written only by server.js guardedHappyHourDealsUpdate(),
+// which logs every change. NULL means none known. Deals checked more than 120 days ago are hidden everywhere.
+for (const col of ['happy_hour_deals', 'happy_hour_deals_fr', 'happy_hour_deals_source', 'happy_hour_deals_checked_at']) {
+  if (!venueColsForHours.includes(col)) {
+    db.exec(`ALTER TABLE venues ADD COLUMN ${col} TEXT`);
+  }
+}
+
 try {
   require('./golf-data.js').initGolfData(db);
 } catch (e) {

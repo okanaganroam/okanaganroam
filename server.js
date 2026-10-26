@@ -8068,6 +8068,225 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     throw err;
   }
 }
+// ---- Happy hour deals (2026-10-26) ----
+// What is on special during happy hour: up to 6 short lines ({ text, price? }: "House pints (20 oz)" · "$6"), optional
+// French lines in the same shape, the page they were read on (or 'venue_owner') and the Okanagan date checked. Prices
+// are kept exactly as the venue writes them ("$6", "half price", "$2 off"); nothing is computed. Shown only on places
+// with the happy_hour badge, and hidden everywhere once the check is more than HH_DEALS_STALE_DAYS old (a wrong $6
+// pint is worse than none). No JSON-LD offers markup.
+const HH_DEALS_MAX = 6;
+const HH_DEAL_TEXT_MAX = 60;
+const HH_DEAL_PRICE_MAX = 20;
+const HH_DEALS_STALE_DAYS = 120;
+const HH_DEAL_URL_RE = /(?:[a-z][a-z0-9+.-]*:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|ca|net|org|info|biz|io|co|bar|pub|wine|beer|menu|app|site|online|shop|us|uk)\b)/i;
+const HH_DEAL_EMAIL_RE = /@/;
+const HH_DEAL_PHONE_RE = /(?:\+?\d[\s.()-]*){7,}/;
+const HH_DEAL_EMOJI_RE = /[\p{Extended_Pictographic}\p{Regional_Indicator}️⃣]/u;
+// One field of a deal line, trimmed and with runs of spaces folded. -> { ok, value } | { ok: false, detail }
+function happyHourDealField(raw, what, max, n) {
+  if (typeof raw !== 'string') return { ok: false, detail: `deal ${n}: ${what} must be text` };
+  const value = raw.replace(/\s+/g, ' ').trim();
+  if (value.length > max) return { ok: false, detail: `deal ${n}: ${what} is over ${max} characters` };
+  if (/[<>]/.test(value)) return { ok: false, detail: `deal ${n}: ${what} can't contain < or >` };
+  if (HH_DEAL_URL_RE.test(value)) return { ok: false, detail: `deal ${n}: ${what} can't contain a link` };
+  if (HH_DEAL_EMAIL_RE.test(value)) return { ok: false, detail: `deal ${n}: ${what} can't contain an email address or @handle` };
+  if (HH_DEAL_PHONE_RE.test(value)) return { ok: false, detail: `deal ${n}: ${what} can't contain a phone number` };
+  if (HH_DEAL_EMOJI_RE.test(value)) return { ok: false, detail: `deal ${n}: ${what} can't contain emoji` };
+  return { ok: true, value };
+}
+// Validates a list of deal lines. -> { ok, deals: [{ text, price? }] } | { ok: false, detail }. An empty list is valid
+// here (the callers decide whether "none" means clear).
+function validateHappyHourDeals(list) {
+  if (!Array.isArray(list)) return { ok: false, detail: 'deals must be a list' };
+  if (list.length > HH_DEALS_MAX) return { ok: false, detail: `at most ${HH_DEALS_MAX} deals` };
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i], n = i + 1;
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return { ok: false, detail: `deal ${n} must be { text, price }` };
+    const extra = Object.keys(d).filter((k) => k !== 'text' && k !== 'price');
+    if (extra.length) return { ok: false, detail: `deal ${n}: unexpected field(s) ${extra.join(', ')}` };
+    const text = happyHourDealField(d.text, 'text', HH_DEAL_TEXT_MAX, n);
+    if (!text.ok) return text;
+    if (!text.value) return { ok: false, detail: `deal ${n}: text is empty` };
+    const line = { text: text.value };
+    if (d.price !== undefined && d.price !== null) {
+      const price = happyHourDealField(d.price, 'price', HH_DEAL_PRICE_MAX, n);
+      if (!price.ok) return price;
+      if (price.value) line.price = price.value;
+    }
+    out.push(line);
+  }
+  return { ok: true, deals: out };
+}
+// Sets (or clears, with deals null) a venue's happy hour deals: compare-and-set on the caller's expected current
+// happy_hour_deals text (or null), reason + batch_id required, source an http(s) page or 'venue_owner', checked_at a
+// real date not in the future, and one venue_enrichment_log row per changed column in the same transaction. Clearing
+// empties all four columns. -> { ok, changedFields, ...columns } | { ok: false, reason, detail, live }
+function guardedHappyHourDealsUpdate(id, expectedCurrent, input, meta, now = new Date()) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  const v = input || {};
+  let next = { happy_hour_deals: null, happy_hour_deals_fr: null, happy_hour_deals_source: null, happy_hour_deals_checked_at: null };
+  if (v.deals !== null) {
+    const en = validateHappyHourDeals(v.deals);
+    if (!en.ok) return { ok: false, reason: 'invalid_deals', detail: en.detail };
+    if (!en.deals.length) return { ok: false, reason: 'invalid_deals', detail: 'at least one deal (use deals: null to clear)' };
+    let frJson = null;
+    if (v.deals_fr !== undefined && v.deals_fr !== null) {
+      const fr = validateHappyHourDeals(v.deals_fr);
+      if (!fr.ok) return { ok: false, reason: 'invalid_deals', detail: `French ${fr.detail}` };
+      if (fr.deals.length) frJson = JSON.stringify(fr.deals);
+    }
+    const src = v.source_url;
+    if (src !== 'venue_owner' && (typeof src !== 'string' || !/^https?:\/\/[^\s]+$/.test(src) || src.length > 500)) {
+      return { ok: false, reason: 'invalid_source', detail: "source_url must be the http(s) page the deals were read on, or 'venue_owner'" };
+    }
+    if (!parseLocalDate(v.checked_at) || v.checked_at > todayLocal(now)) {
+      return { ok: false, reason: 'invalid_checked_at', detail: 'checked_at must be a real YYYY-MM-DD date, not in the future' };
+    }
+    next = { happy_hour_deals: JSON.stringify(en.deals), happy_hour_deals_fr: frJson, happy_hour_deals_source: src, happy_hour_deals_checked_at: v.checked_at };
+  }
+  const existing = db.prepare('SELECT id, redirect_to, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE id = ?').get(id);
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  const expected = expectedCurrent === undefined ? null : expectedCurrent;
+  let txOpen = false;
+  try {
+    db.exec('BEGIN');
+    txOpen = true;
+    const info = db.prepare(`UPDATE venues SET happy_hour_deals = ?, happy_hour_deals_fr = ?, happy_hour_deals_source = ?, happy_hour_deals_checked_at = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND redirect_to IS NULL AND happy_hour_deals IS ?`).run(next.happy_hour_deals, next.happy_hour_deals_fr, next.happy_hour_deals_source, next.happy_hour_deals_checked_at, id, expected);
+    if (info.changes !== 1) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      const live = db.prepare('SELECT happy_hour_deals FROM venues WHERE id = ?').get(id);
+      return { ok: false, reason: 'mismatch', live: { happy_hour_deals: live ? live.happy_hour_deals : null } };
+    }
+    const changedFields = Object.keys(next).filter((f) => existing[f] !== next[f]);
+    const source = next.happy_hour_deals_source === 'venue_owner' || (!next.happy_hour_deals && existing.happy_hour_deals_source === 'venue_owner') ? 'venue_owner' : 'happy_hour_research';
+    const logStmt = db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, ?, ?, ?, ?, ?, 'high', ?, 0, ?)`);
+    for (const f of changedFields) logStmt.run(id, f, existing[f] === null ? null : String(existing[f]), next[f], source, m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changedFields, ...next };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
+function parseHappyHourDealsJson(json) {
+  if (!json) return null;
+  try {
+    const list = JSON.parse(json);
+    const ok = Array.isArray(list) ? list.filter((d) => d && typeof d.text === 'string' && d.text.trim()) : [];
+    return ok.length ? ok : null;
+  } catch (e) { return null; }
+}
+// Is a deals check too old to show? (more than HH_DEALS_STALE_DAYS days before today, or no real date)
+function happyHourDealsStale(checkedAt, now = new Date()) {
+  if (!parseLocalDate(checkedAt)) return true;
+  return localDaysBetween(checkedAt, todayLocal(now)) > HH_DEALS_STALE_DAYS;
+}
+// The deals a page may show for a venue row (needs happy_hour, happy_hour_deals, happy_hour_deals_fr,
+// happy_hour_deals_checked_at): { en, fr (null without French lines), checked } or null when there are none, the
+// place has no happy_hour badge, or the check is stale.
+function happyHourDealsShown(row, now = new Date()) {
+  if (!row || !Number(row.happy_hour) || !row.happy_hour_deals) return null;
+  if (happyHourDealsStale(row.happy_hour_deals_checked_at, now)) return null;
+  const en = parseHappyHourDealsJson(row.happy_hour_deals);
+  if (!en) return null;
+  return { en, fr: parseHappyHourDealsJson(row.happy_hour_deals_fr), checked: row.happy_hour_deals_checked_at };
+}
+function venueHappyHourDeals(venueId, now = new Date()) {
+  let row = null;
+  try { row = db.prepare('SELECT happy_hour, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE id = ? AND redirect_to IS NULL').get(venueId); } catch (e) { row = null; }
+  return happyHourDealsShown(row, now);
+}
+// A deal on the venue page: "House pints (20 oz) · $6".
+function happyHourDealLine(d) { return d.price ? `${d.text} · ${d.price}` : d.text; }
+// The first `n` deals in one short line, price first ("$6 House pints, $10 Cocktails", "half price Appies"): the
+// map card, the happy hour guides and Build My Trip.
+function happyHourDealsCompact(list, n = 2) {
+  return (list || []).slice(0, n).map((d) => (d.price ? `${d.price} ${d.text}` : d.text)).join(', ');
+}
+// Minutes left in a happy hour that is on now, as "1 hr 20 min" / "45 min" / "2 hr" (French "1 h 20" / "45 min" /
+// "2 h"). Self-contained: the Roam Now map script runs this same function (toString()).
+function happyHourLeftText(left, fr) {
+  var m = Math.max(1, Math.round(left)), h = Math.floor(m / 60), mm = m % 60;
+  if (!h) return mm + ' min';
+  if (fr) return h + ' h' + (mm ? ' ' + (mm < 10 ? '0' : '') + mm : '');
+  return h + ' hr' + (mm ? ' ' + mm + ' min' : '');
+}
+// Minutes from the clock to a happyHourState() `until` ({ weekday, minutes }), or null. Self-contained (map script).
+function happyHourMinutesLeft(until, clock) {
+  if (!until || !clock) return null;
+  var left = until.minutes - clock.minutes;
+  if (until.weekday !== clock.weekday) left += 1440;
+  return left > 0 && left <= 1440 ? left : null;
+}
+// "Happy hour on now · ends in 1 hr 20 min" (French "Happy hour en cours · se termine dans 1 h 20"); '' when the end
+// is not known.
+function happyHourOnNowText(h, clock, fr) {
+  const left = h && h.state === 'now' ? happyHourMinutesLeft(h.until, clock) : null;
+  if (left == null) return '';
+  return fr ? `Happy hour en cours · se termine dans ${happyHourLeftText(left, true)}` : `Happy hour on now · ends in ${happyHourLeftText(left, false)}`;
+}
+// Build My Trip (2026-10-26): a stop timed inside the venue's happy hour says what is on ("Happy hour: $6 House pints,
+// $10 Cocktails"; French « Happy hour : … », the English lines when no French was given). Text only: the planner's
+// choices and order are unchanged. Reads plan.schedule (venueId, date, startMinutes) after planning.
+function withTripHappyHourDeals(plan, now = new Date()) {
+  if (!plan || !hoursModule || !Array.isArray(plan.schedule) || !plan.schedule.length) return plan;
+  const stops = [];
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 6) return;
+    if (Array.isArray(o)) { for (const x of o) walk(x, depth + 1); return; }
+    if (o.venue && typeof o.venue === 'object' && o.venue.id != null) stops.push(o);
+    for (const k of ['days', 'stops', 'itinerary', 'outing']) if (o[k]) walk(o[k], depth + 1);
+  };
+  walk(plan, 0);
+  if (!stops.length) return plan;
+  const q = db.prepare('SELECT happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE id = ? AND redirect_to IS NULL');
+  const cache = new Map();
+  const info = (id) => {
+    if (!cache.has(id)) {
+      let row = null;
+      try { row = q.get(id); } catch (e) { row = null; }
+      const deals = row && row.happy_hour_times ? happyHourDealsShown(row, now) : null;
+      cache.set(id, deals ? { times: hoursModule.parseHours(row.happy_hour_times), deals } : null);
+    }
+    return cache.get(id);
+  };
+  for (const item of plan.schedule) {
+    if (!item || item.venueId == null || !Number.isFinite(item.startMinutes) || !parseLocalDate(item.date)) continue;
+    const x = info(item.venueId);
+    if (!x || !x.times) continue;
+    const weekday = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${item.date}T12:00:00Z`).getUTCDay()];
+    const min = item.startMinutes;
+    const clock = min >= 1440 ? { weekday: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${addLocalDays(item.date, 1)}T12:00:00Z`).getUTCDay()], minutes: min - 1440, date: addLocalDays(item.date, 1) } : { weekday, minutes: min, date: item.date };
+    let on = false;
+    try { on = hoursModule.statusAt(x.times, clock).state === 'open'; } catch (e) { on = false; }
+    if (!on) continue;
+    for (const s of stops) {
+      if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
+      s.happyHourDeals = happyHourDealsCompact(x.deals.en);
+      s.happyHourDealsFr = happyHourDealsCompact(x.deals.fr || x.deals.en);
+      s.happyHourLine = `Happy hour: ${s.happyHourDeals}`;
+      s.happyHourLineFr = `Happy hour : ${s.happyHourDealsFr}`;
+      if (!x.deals.fr) s.happyHourLineFrLang = 'en';
+    }
+  }
+  return plan;
+}
+// /admin/review (2026-10-26): places whose deals are on file but no longer shown (checked more than
+// HH_DEALS_STALE_DAYS days ago), oldest first, so they get re-checked.
+function staleHappyHourDeals(now = new Date()) {
+  const rows = db.prepare('SELECT id, name, region, type, slug, happy_hour_deals, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND happy_hour_deals IS NOT NULL ORDER BY happy_hour_deals_checked_at, name').all();
+  return rows.filter((r) => happyHourDealsStale(r.happy_hour_deals_checked_at, now));
+}
+
 // Cuisine correction (2026-10-15): a guarded, audited write of the listed
 // cuisine, for fixing a wrong label (CedarCreek showed "German"). null clears it.
 function guardedCuisineUpdate(id, expectedCurrent, cuisine, meta) {
@@ -17150,6 +17369,7 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-feat.is-on { background: rgba(22,101,52,0.12); color: #14532D; }
   body.map-page .pm-hh { display: block; margin-top: 4px; font-size: 0.84rem; font-weight: 700; color: #7C2D12; }
   body.map-page .pm-hh.is-now { color: #9D174D; font-weight: 800; }
+  body.map-page .pm-hh-deals { font-weight: 700; color: #7C2D12; }
   body.map-page .pm-dog { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.35; color: #5B3A1A; }
   body.map-page .pm-route[hidden], body.map-page .pm-count[hidden], body.map-page .pm-list[hidden] { display: none; }
   body.map-page .pm-route { background: #fff; border-radius: 16px; box-shadow: 0 1px 4px rgba(27,43,58,0.15); padding: 14px 16px; margin-bottom: 12px; }
@@ -17328,7 +17548,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
     feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
-    micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
+    micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhOnNow: function(t){ return 'Happy hour en cours · se termine dans ' + t; }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     typoRead: function(f){ return 'Nous avons lu ' + f.map(function(x){ return '« ' + x.from + ' » comme « ' + x.to + ' »'; }).join(', ') + '.'; },
     awayN: function(n){ return n === 1 ? '1 résultat hors de cette zone de la carte.' : n + ' résultats hors de cette zone de la carte.'; }, showThem: function(n){ return n === 1 ? 'L’afficher' : 'Les afficher'; },
     eventsFor: function(w){ return w ? 'Événements de la semaine avec « ' + w + ' ».' : 'Voici les événements de la semaine sur la carte.'; },
@@ -17367,7 +17587,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
     feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
-    micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
+    micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhOnNow: function(t){ return 'Happy hour on now · ends in ' + t; }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     typoRead: function(f){ return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; }).join(', ') + '.'; },
     awayN: function(n){ return n === 1 ? '1 match outside this part of the map.' : n + ' matches outside this part of the map.'; }, showThem: function(n){ return n === 1 ? 'Show it' : 'Show them'; },
     eventsFor: function(w){ return w ? 'This week’s events with “' + w + '”.' : 'Showing this week’s events on the map.'; },
@@ -17422,7 +17642,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // be tapped. From zoom 17 only pins within a pixel of each other still group; tapping that group fans them out.
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 17 ? 1 : z >= 15 ? 18 : z >= 13 ? 32 : 48; }, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
-  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', termTyping = false, radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
+  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', termTyping = false, dealQuery = '', dealWordsFor = null, dealWords = [], radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
   var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-open]')), topBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-top]')), tagHolder = document.getElementById('pmTagChips'), activeEl = $('pmActive'), searchEl = $('pmSearch');
@@ -17495,7 +17715,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function hhOf(p){
     if (!p.hh) return null;
     try {
-      var h = happyHourState(expandFoodDrinkHours(p.hh), okanaganClock(new Date()), !!(p.st && p.st.state === 'closed'));
+      var clock = okanaganClock(new Date());
+      var h = happyHourState(expandFoodDrinkHours(p.hh), clock, !!(p.st && p.st.state === 'closed'));
+      // 2026-10-26: while it is on, the countdown ("Happy hour on now · ends in 1 hr 20 min"), updated every minute.
+      var left = h && h.state === 'now' ? happyHourMinutesLeft(h.until, clock) : null;
+      if (h && h.state === 'now' && left != null) return { now: true, text: T.hhOnNow(happyHourLeftText(left, FR)) };
       if (h && h.state === 'now') return { now: true, text: T.hhNow(h.until ? clockText(h.until.minutes) : '') };
       if (h && h.state === 'later') return { now: false, text: T.hhLater(clockText(h.from.minutes)) };
     } catch (e) {}
@@ -17537,7 +17761,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
     var out = on.length ? '<span class="pm-feats">' + on.slice(0, 3).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
     if (p.dog && feats.dogs) out += '<span class="pm-dog">' + esc(T.dogRule + ' ' + p.dog) + '</span>';
-    if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">🍸 ' + esc(p.hhs.text) + '</span>';
+    // Happy hour deals (2026-10-26): the first two, after the happy hour line, while it is on now or later today.
+    if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">🍸 ' + esc(p.hhs.text) + (p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '') + '</span>';
     return out;
   }
   function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
@@ -17583,17 +17808,26 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function pmPopup(fn){ return new PmPopup().setContent(fn); }
   var TAGIX = {}; (CONF.tg || []).forEach(function(t, i){ TAGIX[t.k] = i; });
   function onTags(){ return Object.keys(tags).filter(function(k){ return tags[k]; }); }
+  // Happy hour deals in the search (2026-10-26): a word of the search found in a place's deal lines ("cheap pints",
+  // "happy hour wings", « ailes ») counts for that place, even where the words also set a kind, a tag, a price or a
+  // name to look for. The town, the features (Happy hour now included), open now and what to leave out still apply.
+  var DEAL_SKIP = ' happy hour hours heure heures deal deals special specials speciaux aubaine aubaines cheap budget pas cher chere bon marche near nearby pres moi now maintenant today tonight aujourd hui soir the and with for avec pour des les une open ouvert best good great place places spot spots bar bars pub pubs ';
+  function setDealWords(v){
+    dealWordsFor = v;
+    dealWords = mapNameKey(v).split(' ').filter(function(w){ return w.length >= 3 && DEAL_SKIP.indexOf(' ' + w + ' ') === -1; }).map(function(w){ return w.length > 3 && w.charAt(w.length - 1) === 's' ? w.slice(0, -1) : w; });
+  }
+  function dealHit(p){ if (dealWordsFor !== dealQuery) setDealWords(dealQuery); return !!(p.dk && dealWords.length && dealWords.some(function(w){ return p.dk.indexOf(' ' + w) !== -1; })); }
   function matchesPlace(p){
-    var tk = onTags();
+    var tk = onTags(), byDeal = dealHit(p);
     // What it serves: all of them (or, when no place has all, any of them).
-    if (tk.length) { var hits = tk.filter(function(k){ return p.tg.indexOf(TAGIX[k]) !== -1; }).length; if (tagAny || tagOr ? !hits : hits < tk.length) return false; }
+    if (tk.length && !byDeal) { var hits = tk.filter(function(k){ return p.tg.indexOf(TAGIX[k]) !== -1; }).length; if (tagAny || tagOr ? !hits : hits < tk.length) return false; }
     // A cocktail lounge counts for "dinner and cocktails" through the cocktail tag, even though it isn't a restaurant.
-    if (anyOn(kinds) && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; }) && !tk.some(function(k){ return CONF.tg[TAGIX[k]].t.indexOf(p.type) !== -1; })) return false;
+    if (anyOn(kinds) && !byDeal && !Object.keys(kinds).some(function(k){ return kinds[k] && CONF.k[k].indexOf(p.type) !== -1; }) && !tk.some(function(k){ return CONF.tg[TAGIX[k]].t.indexOf(p.type) !== -1; })) return false;
     if (topOnly && !(p.r >= 4.5)) return false;
     // The rest of a sentence: a town, a price, a time it must be open, and what to leave out.
     if (town && p.region !== town) return false;
-    if (price === 'cheap' && !(p.pr && p.pr <= 1)) return false;
-    if (price === 'afford' && !(p.pr && p.pr <= 2)) return false;
+    if (price === 'cheap' && !byDeal && !(p.pr && p.pr <= 1)) return false;
+    if (price === 'afford' && !byDeal && !(p.pr && p.pr <= 2)) return false;
     if (price === 'fancy' && !(p.pr >= 3)) return false;
     if ((atMin != null || atDay) && !openAt(p, atMin, atDay)) return false;
     if (notTypes[p.type]) return false;
@@ -17602,7 +17836,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     for (var nf in notFeats) if (notFeats[nf] && (p.f & CONF.f[nf])) return false;
     for (var k in feats) if (feats[k] && (k === 'happy' && hhKnown ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
-    return !term || mapNameHas(p.key, term, termTyping);
+    return !term || byDeal || mapNameHas(p.key, term, termTyping);
   }
   // Open first, then closed, then closed for the season (2026-10-18).
   var isOpen = function(p){ return p.st && p.st.state === 'open' ? 0 : p.st && p.st.season ? 2 : 1; };
@@ -18110,7 +18344,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (part[0] === 'notf') delete notFeats[part[1]];
     liveBase = null; changed();
   });
-  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; evTerm = ''; evKinds = []; aheadOn = false; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
+  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; dealQuery = ''; evTerm = ''; evKinds = []; aheadOn = false; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
   function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
   // When nothing matches: the first filter worth dropping that gives results at some distance ("Try without Open at
   // 3 AM"), with a button that drops it (the distance then chooses itself). Tried one at a time on a copy of the filters.
@@ -18417,7 +18651,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       && evKinds.every(function(k){ return (e.tp && e.tp.indexOf(k) !== -1) || (EVENT_STEMS[k] && hay.indexOf(EVENT_STEMS[k]) !== -1); });
   }
   function readSearch(v, typing){
-    var fx = fixTypos(v); v = fx.text; lastFixes = fx.fixes; termTyping = !!typing;
+    var fx = fixTypos(v); v = fx.text; lastFixes = fx.fixes; termTyping = !!typing; dealQuery = v;
     if (typing) { if (!liveBase) { undoLastSearch(); liveBase = snapshot(); } restore(JSON.parse(JSON.stringify(liveBase))); }
     else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); }
     var before = snapshot();
@@ -18470,7 +18704,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   var timer = null;
   // While typing: a name searches names; a sentence ("patio with vegetarian options and dog friendly") turns on its filters.
-  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ typedWords = String(v || '').trim(); if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); termTyping = true; changed(); } }, 450); });
+  searchEl.addEventListener('input', function(e){ clearTimeout(timer); var v = e.target.value; timer = setTimeout(function(){ typedWords = String(v || '').trim(); if (hasWords(v)) { readSearch(v, true); wantNear = false; changed(); } else { if (liveBase) { restore(JSON.parse(JSON.stringify(liveBase))); liveBase = null; } undoLastSearch(); term = v.trim().toLowerCase(); termTyping = true; dealQuery = v; changed(); } }, 450); });
   // The message above the Events tab after an events search: this week's, or (once /map/ahead.json is in) the weeks
   // after it. New Year's Eve and Christmas markets link to the full lists.
   var evSaidText = '';
@@ -18673,7 +18907,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, dl: a[16] ? (typeof a[16] === 'string' ? a[16] : FR ? a[16][1] : a[16][0]) : '', dlEn: !!(FR && typeof a[16] === 'string'), g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
+      // Deal text for the search ("cheap pints", "wings"), in both languages when there are two.
+      if (a[16]) p.dk = mapNameKey(typeof a[16] === 'string' ? a[16] : a[16].join(' '));
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
@@ -18714,7 +18950,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 9; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds
+const MAP_DATA_FORMAT = 10; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -18832,7 +19068,7 @@ function mapFrenchNote(note) {
   return fr && fr !== en ? String(fr).slice(0, 160) : 0;
 }
 function mapPlacesData(now = new Date()) {
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, free_entry, rating, cuisine, description, happy_hour_times, price FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, free_entry, rating, cuisine, description, happy_hour_times, price, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const seasons = getSeasonStates(now);
@@ -18842,7 +19078,7 @@ function mapPlacesData(now = new Date()) {
     const st = open.byId.get(v.id);
     v.hikeList = hikeIds.has(v.id);
     const bits = MAP_FEATURES.reduce((b, f) => (Number(v[f.field]) === 1 ? b | f.bit : b), 0);
-    return [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
+    const row = [mapRound(v.latitude), mapRound(v.longitude), v.name, v.type, v.region, `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, st && st.eligible ? compactFoodDrinkHours(st.hours) : 0,
       bits, (bits & 2) && dogNotes.has(v.id) ? String(dogNotes.get(v.id)).slice(0, 140) : '',
       // [9] rating x10 (0 when none); [10] what it serves or is good for, as MAP_TAGS positions.
       Number(v.rating) > 0 ? Math.round(Number(v.rating) * 10) : 0, mapPlaceTags(v),
@@ -18856,6 +19092,12 @@ function mapPlacesData(now = new Date()) {
       (bits & 2) && dogNotes.has(v.id) ? mapFrenchNote(dogNotes.get(v.id)) : 0,
       // [15] 1 for a Local Favourite (round 13, 2026-10-20), a popularity signal for ranking hikes, else 0.
       favIds.has(v.id) ? 1 : 0];
+    // [16] happy hour deals (2026-10-26): the first two lines, short ("$6 House pints, $10 Cocktails"), or
+    // [English, French] when the venue gave French lines. Only on a place that has them (not stale, happy_hour badge,
+    // no closure notice), so the other rows stay 16 long.
+    const deals = !(st && st.reason === 'advisory') ? happyHourDealsShown(v, now) : null;
+    if (deals) row.push(deals.fr ? [happyHourDealsCompact(deals.en), happyHourDealsCompact(deals.fr)] : happyHourDealsCompact(deals.en));
+    return row;
   });
 }
 // Events in the next week, one entry each (its next date):
@@ -19104,6 +19346,8 @@ ${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.st
   ${hoursModule ? hoursModule.HOURS_CLIENT_SRC : 'function parseHours(){ return null; } function statusAt(){ return null; } function hoursStatusLabel(){ return { state: "unknown", text: "" }; }'}
   ${FD_HOURS_CLIENT_SRC}
   ${hoursModule ? hoursModule.happyHourState.toString() : 'function happyHourState(){ return null; }'}
+  ${happyHourLeftText.toString()}
+  ${happyHourMinutesLeft.toString()}
   var CONF = ${conf};
   ${MAP_PAGE_SCRIPT}
 })();
@@ -28784,7 +29028,8 @@ function venueOpenStatus(pageHours, hasAdvisory, now = new Date()) {
 // The researched or owner-supplied times (venues.happy_hour_times, written by guardedHappyHourUpdate) as a live line
 // under the name and a "Happy hour" row in Good to Know. The "is it on now" rules are hours.js happyHourState(), the
 // same function the Roam Now map runs. Never shown with a closure notice or advisory (the map ships no times then) or
-// while the place is closed for the season; never any drink prices (none are stored).
+// while the place is closed for the season. Deals (2026-10-26) show in the row only with the happy_hour badge and a
+// check from the last HH_DEALS_STALE_DAYS days.
 const HH_DAYS_SHORT = { en: { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' }, fr: { mon: 'lun', tue: 'mar', wed: 'mer', thu: 'jeu', fri: 'ven', sat: 'sam', sun: 'dim' } };
 const HH_DAYS_LONG = { en: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, fr: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' } };
 // Minutes (a close past midnight is > 1440) as "6 PM" / "6:30 PM"; French "18 h" / "18 h 30" / "minuit".
@@ -28860,17 +29105,31 @@ function happyHourLiveText(h, fr) {
 function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   if (!hoursModule || !venue || venue.redirect_to) return null;
   let row = null;
-  try { row = db.prepare('SELECT happy_hour_times, happy_hour_checked_at FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
-  if (!row || !row.happy_hour_times) return null;
+  try { row = db.prepare('SELECT happy_hour, happy_hour_times, happy_hour_checked_at, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
+  // Deals (2026-10-26): only with the happy_hour badge and a check from the last HH_DEALS_STALE_DAYS days.
+  const deals = happyHourDealsShown(row, now);
+  if (!row || (!row.happy_hour_times && !deals)) return null;
   if (getAdvisoryNotes(now).has(venue.id)) return null;
   if ((getSeasonStates(now).get(venue.id) || {}).kind === 'closed' || venueClosureInForce(venue.id, now)) return null;
   const week = happyHourWeekText(row.happy_hour_times, fr);
-  if (!week) return null;
+  if (!week && !deals) return null;
+  const dealsOut = deals ? { lines: (fr && deals.fr ? deals.fr : deals.en).map(happyHourDealLine), english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr) } : null;
+  if (!week) return { week: '', checked: '', live: null, deals: dealsOut };
   const place = statusHours ? venueHoursStatusAt(statusHours, now) : null;
+  const clock = okanaganClock(now);
   let h = null;
-  try { h = hoursModule.happyHourState(row.happy_hour_times, okanaganClock(now), !!(place && place.state === 'closed')); } catch (e) { h = null; }
+  try { h = hoursModule.happyHourState(row.happy_hour_times, clock, !!(place && place.state === 'closed')); } catch (e) { h = null; }
   if (h && h.state === 'later' && place && place.closedToday) h = null;
-  return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), live: h ? { state: h.state, text: happyHourLiveText(h, fr) } : null };
+  // Countdown (2026-10-26): "Happy hour on now · ends in 1 hr 20 min" while it is on (worked out when the page is made).
+  const text = h ? (happyHourOnNowText(h, clock, fr) || happyHourLiveText(h, fr)) : '';
+  return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), live: h ? { state: h.state, text } : null, deals: dealsOut };
+}
+// The deals inside the Happy hour row: a "Deals" list and its own checked date. French without French lines shows the
+// English lines, marked lang="en".
+function happyHourDealsHtml(deals, fr) {
+  if (!deals || !deals.lines.length) return '';
+  const lang = deals.english ? ' lang="en"' : '';
+  return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${deals.lines.map((l) => `<span class="venue-hh-deal" role="listitem"${lang}>${escapeHtml(l)}</span>`).join('')}</span>${deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
 }
 function renderVenuePageLayoutStyles() {
   return `<style id="venue-page-layout">
@@ -28899,6 +29158,12 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-hh-status { display: flex; align-items: baseline; gap: 6px; margin: -4px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.9rem; font-weight: 700; line-height: 1.35; color: rgba(42,32,25,0.78); }
   body.golf-page .venue-hh-status[data-hh="now"] { color: var(--teal, #2A6B67); font-weight: 800; }
   body.golf-page .venue-hh-checked { display: block; margin: 4px 0 0; }
+  /* Happy hour deals (2026-10-26): a short list under the times, one deal a line, with its own checked date. */
+  body.golf-page .venue-hh-deals { display: block; margin: 8px 0 0; }
+  body.golf-page .venue-hh-deals-label { display: block; font-weight: 800; }
+  body.golf-page .venue-hh-deal-list, body.golf-page .venue-hh-deal { display: block; }
+  body.golf-page .venue-hh-deal { margin: 2px 0 0; overflow-wrap: anywhere; }
+  body.golf-page .venue-hh-deals-checked { display: block; margin: 4px 0 0; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
@@ -29267,7 +29532,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     ].filter(Boolean).join(' &middot; ')] : null,
     venueShowsPrice(venue) ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
     // Happy hour (2026-10-23): last, so it sits next to the Hours box; the times only, never drink prices.
-    happyHour ? ['Happy hour', `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>${happyHour.checked ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}`] : null,
+    // Deals (2026-10-26) under the times, with their own checked date.
+    happyHour ? ['Happy hour', `${happyHour.week ? `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>` : ''}${happyHour.checked ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHourDealsHtml(happyHour.deals, fr)}`] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
@@ -35025,13 +35291,17 @@ function renderEditorialGuidePage(g, path) {
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
   };
   const listed = [];
+  const hhGuide = /^\/guides\/happy-hour(?:-|$)/.test(String(path || ''));
   const itemHtml = (item) => {
     if (item.tip) return `\n          <li><strong>${escapeHtml(item.lead)}</strong> ${guideTipHtml(item.tip)}</li>`;
     const v = guideRefVenue(item.ref);
     if (!v) return '';
     listed.push({ name: item.name || v.name, url: `https://okanaganroam.com${guideVenueHref(v)}` });
     const place = item.where || (item.noPlace || g.noPlace ? '' : REGION_LABELS[v.region] || '');
-    return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${guideTipHtml(item.text)}</li>`;
+    // Happy hour guides (2026-10-26): the first two deals the venue lists (not stale, happy_hour badge only).
+    const deals = hhGuide ? venueHappyHourDeals(v.id) : null;
+    const dealsHtml = deals ? ` <span class="guide-hh-deals">Happy hour deals: ${escapeHtml(happyHourDealsCompact(deals.en))}.</span>` : '';
+    return `\n          <li><strong><a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(item.name || v.name)}</a></strong>${place ? ` (${escapeHtml(place)})` : ''}: ${guideTipHtml(item.text)}${dealsHtml}</li>`;
   };
   // Only sections (and quick-pick rows) with at least one live place render,
   // and the jump links follow what rendered, so a closed place never leaves
@@ -35060,6 +35330,7 @@ ${CATEGORY_BANNER_STYLE}
   body.ski-guide-page .ski-guide-resort { margin-top: 32px; }
   body.ski-guide-page .ski-guide-list { padding-left: 1.2em; margin: 0; }
   body.ski-guide-page .ski-guide-list li { margin: 0 0 10px; line-height: 1.55; }
+  body.ski-guide-page .guide-hh-deals { display: block; margin-top: 2px; font-weight: 700; }
   body.ski-guide-page .patio-picks { width: 100%; border-collapse: collapse; margin: 8px 0 18px; }
   body.ski-guide-page .patio-picks th, body.ski-guide-page .patio-picks td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgba(27,43,58,.12); line-height: 1.5; }
   body.ski-guide-page .patio-picks thead th { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted, #6B5D54); }
@@ -38216,7 +38487,7 @@ function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
-  'price_range', 'hours_seasons', 'closures'];
+  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals'];
 const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
 // Price range (2026-10-18): the owner picks one, per person.
 const OWNER_PRICE_SCALE = { 1: 'under $15', 2: '$15–30', 3: '$30–60', 4: 'over $60' };
@@ -38672,7 +38943,39 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     price_range: venue.price ? String(venue.price) : '',
     hours_seasons: venueHoursExtras(venue.id).seasons,
     closures: venueHoursExtras(venue.id).closures.filter((c) => (c.to || c.from) >= todayLocal()),
+    // Happy hour deals (2026-10-26): { deals, deals_fr, source, checked_at } or null. The owner sends { deals,
+    // deals_fr }; the source and date are kept here so an Undo can put the old ones back.
+    happy_hour_deals: ownerHappyHourDealsSnapshot(venue.id),
   };
+}
+// The owner's words for a deals problem (fixed sentences, so the French portal can translate them).
+const OWNER_DEALS_ERRORS = {
+  long: `Please keep each deal to ${HH_DEAL_TEXT_MAX} characters and each price to ${HH_DEAL_PRICE_MAX}.`,
+  extras: 'Please leave links, email addresses, phone numbers and emoji out of the deals.',
+  many: `Please list up to ${HH_DEALS_MAX} deals.`,
+  empty: 'Each deal needs a few words on what it is, like House pints.',
+  englishFirst: 'Add the deals in English first; French is optional.',
+  unreadable: 'The deals could not be read. Please reload the page and try again.',
+};
+function ownerDealsError(detail) {
+  const d = String(detail || '');
+  if (/over \d+ characters/.test(d)) return OWNER_DEALS_ERRORS.long;
+  if (/link|email|phone|emoji|< or >/.test(d)) return OWNER_DEALS_ERRORS.extras;
+  if (/at most/.test(d)) return OWNER_DEALS_ERRORS.many;
+  if (/text is empty/.test(d)) return OWNER_DEALS_ERRORS.empty;
+  return OWNER_DEALS_ERRORS.unreadable;
+}
+function ownerHappyHourDealsSnapshot(venueId) {
+  let row = null;
+  try { row = db.prepare('SELECT happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE id = ?').get(venueId); } catch (e) { row = null; }
+  const deals = row ? parseHappyHourDealsJson(row.happy_hour_deals) : null;
+  if (!deals) return null;
+  return { deals, deals_fr: parseHappyHourDealsJson(row.happy_hour_deals_fr) || [], source: row.happy_hour_deals_source || null, checked_at: row.happy_hour_deals_checked_at || null };
+}
+// Same deals? (the lines only, English and French; never the source or date)
+function sameHappyHourDeals(a, b) {
+  const norm = (x) => (x && Array.isArray(x.deals) && x.deals.length ? JSON.stringify([x.deals.map((d) => [d.text, d.price || '']), (x.deals_fr || []).map((d) => [d.text, d.price || ''])]) : null);
+  return norm(a) === norm(b);
 }
 
 // A week of time windows from the form: { mon: [["11:00","22:00"]], tue: [] ... }.
@@ -38808,6 +39111,28 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       else if (!sameJsonWeek(w.json, current.happy_hour)) changes.happy_hour = w.json;
     }
   }
+  // Happy hour deals (2026-10-26): { deals: [{ text, price }], deals_fr: [...] } (up to 6 each), or null to remove them.
+  if ('happy_hour_deals' in input) {
+    const x = input.happy_hour_deals;
+    if (!OWNER_HAPPY_HOUR_TYPES.has(venue.type)) {
+      errors.happy_hour_deals = 'Happy hour is only listed for places that serve alcohol.';
+    } else if (x === null) {
+      if (current.happy_hour_deals) changes.happy_hour_deals = null;
+    } else if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => k !== 'deals' && k !== 'deals_fr')) {
+      errors.happy_hour_deals = OWNER_DEALS_ERRORS.unreadable;
+    } else {
+      const en = validateHappyHourDeals(x.deals == null ? [] : x.deals);
+      const frList = validateHappyHourDeals(x.deals_fr == null ? [] : x.deals_fr);
+      const bad = !en.ok ? en : !frList.ok ? frList : null;
+      if (bad) errors.happy_hour_deals = ownerDealsError(bad.detail);
+      else if (!en.deals.length && frList.deals.length) errors.happy_hour_deals = OWNER_DEALS_ERRORS.englishFirst;
+      else if (!en.deals.length) { if (current.happy_hour_deals) changes.happy_hour_deals = null; }
+      else {
+        const next = { deals: en.deals, deals_fr: frList.deals };
+        if (!sameHappyHourDeals(next, current.happy_hour_deals)) changes.happy_hour_deals = next;
+      }
+    }
+  }
   if ('price_range' in input) {
     const raw = input.price_range == null ? '' : String(input.price_range).trim();
     if (raw && !/^[1-4]$/.test(raw)) errors.price_range = 'Please pick a price range from the list.';
@@ -38903,15 +39228,15 @@ function listOwnerChanges(status = 'pending') {
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
-  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures' };
+  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -38939,6 +39264,11 @@ function ownerValueText(field, value) {
     return Array.isArray(value) && value.length ? value.map((c) => `${hoursExtraRangeText(c.from, c.to)}${c.note ? ` (${c.note})` : ''}`).join('; ') : '(none)';
   }
   if (field === 'badges') return Object.entries(value).map(([k, on]) => `${on ? 'add' : 'remove'} ${BADGE_LABELS[k] ? BADGE_LABELS[k].title : k}`).join(', ');
+  if (field === 'happy_hour_deals') {
+    if (!value || !Array.isArray(value.deals) || !value.deals.length) return '(none)';
+    const lines = (l) => l.map(happyHourDealLine).join('; ');
+    return `${lines(value.deals)}${value.deals_fr && value.deals_fr.length ? ` | FR: ${lines(value.deals_fr)}` : ''}${value.checked_at ? ` (checked ${value.checked_at}${value.source && value.source !== 'venue_owner' ? `, ${value.source}` : value.source ? ', owner' : ''})` : ''}`;
+  }
   return value == null || value === '' ? '(none)' : String(value);
 }
 
@@ -44080,6 +44410,12 @@ const OWNER_HELP_TOPICS = [
     a: '<ol><li><strong>Search for it:</strong> type your business name in the search box at the top of any page, without \u201cLtd\u201d or \u201cInc\u201d. You can also open your town and the right category (Restaurants, Wineries, Outdoors \u2026). It may be listed under an older name.</li><li><strong>Found it?</strong> Open its page and tap <strong>Claim this listing</strong> (beside the opening hours). We check it\u2019s you and email you an edit link.</li><li><strong>Not there?</strong> <a href="/list-your-venue">List your venue</a> for free. We review it, usually within a day or two, and email you when it\u2019s live.</li></ol><p>Think it was removed by mistake? Tap <strong>Message us</strong> below.</p>',
     aFr: '<ol><li><strong>Cherchez-la :</strong> tapez le nom de votre entreprise dans la boîte de recherche en haut de chaque page, sans « Ltée » ni « Inc. ». Vous pouvez aussi ouvrir votre ville et la bonne catégorie (Restaurants, Vignobles, Plein air…). Elle est peut-être inscrite sous un ancien nom.</li><li><strong>Vous l\u2019avez trouvée?</strong> Ouvrez sa page et touchez <strong>Réclamer cette fiche</strong> (à côté des heures d\u2019ouverture). Nous vérifions que c\u2019est bien vous et vous envoyons un lien de modification par courriel.</li><li><strong>Elle n\u2019y est pas?</strong> <a href="/fr/list-your-venue">Inscrivez votre établissement</a> gratuitement. Nous la vérifions, en général d\u2019ici un jour ou deux, et vous écrivons quand elle est en ligne.</li></ol><p>Vous pensez qu\u2019elle a été retirée par erreur? Touchez <strong>Écrivez-nous</strong> ci-dessous.</p>' },
   // Help bot v2 (2026-10-18): the $ to $$$$ price range on the edit page. "$$" is read as the word 'dollarsign'.
+  // Happy hour deals (2026-10-26).
+  { id: 'hh-deals', over: ['features', 'menu-add'], q: 'How do I add my happy hour deals?', qFr: 'Comment ajouter les spéciaux de mon happy hour?', pages: ['edit'],
+    keys: ['happy hour deals', 'happy hour deal', 'happy hour specials', 'happy hour special', 'happy hour prices', 'happy hour menu', 'drink specials', 'drink deals', 'specials', 'deals', 'add deals', 'add my deals', 'pint prices', 'cheap pints', 'half price', 'apps specials', 'what is on special'],
+    keysFr: ['speciaux du happy hour', 'specials du happy hour', 'speciaux', 'special', 'aubaines', 'aubaine', 'prix du happy hour', 'menu du happy hour', 'speciaux du 5 a 7', 'speciaux du cinq a sept', 'rabais', 'moitie prix'],
+    a: '<ol><li>{ON}, open <strong>Happy hour</strong> (it shows for places that serve alcohol).</li><li>Under the times, fill in <strong>Deals</strong>: up to 6 rows, each with what it is and the price as you write it (<em>House pints (20 oz)</em> · <em>$6</em>, or <em>Appies</em> · <em>half price</em>). Tap <strong>+ Add a deal</strong> for another row.</li><li>Optional: open <strong>In French</strong> to add the same lines in French. Without them, French visitors see the English lines.</li><li>Tap {SEND}.</li></ol><p>{LIVE} They show under your happy hour times on your listing, on the map and in Build My Trip, with the date you saved them. Deals not updated for 4 months are hidden, so save them again when prices change. Clear every row to remove them. Links, phone numbers and emoji aren\u2019t accepted.</p>',
+    aFr: '<ol><li>{ON}, ouvrez <strong>Happy hour</strong> (affiché pour les endroits qui servent de l\u2019alcool).</li><li>Sous les heures, remplissez <strong>Spéciaux</strong> : jusqu\u2019à 6 lignes, chacune avec ce que c\u2019est et le prix comme vous l\u2019écrivez (<em>Pintes maison (20 oz)</em> · <em>6 $</em>, ou <em>Bouchées</em> · <em>moitié prix</em>). Touchez <strong>+ Ajouter un spécial</strong> pour une autre ligne.</li><li>Facultatif : ouvrez <strong>En français</strong> pour ajouter les mêmes lignes en français. Sinon, les visiteurs en français voient les lignes en anglais.</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Ils s\u2019affichent sous vos heures de happy hour sur votre fiche, sur la carte et dans Planifier mon voyage, avec la date de l\u2019enregistrement. Les spéciaux non mis à jour depuis 4 mois sont masqués : enregistrez-les de nouveau quand les prix changent. Videz toutes les lignes pour les retirer. Les liens, les numéros de téléphone et les émojis ne sont pas acceptés.</p>' },
   { id: 'price-range', over: ['cost', 'menu-add'], q: 'Set our price range ($ to $$$$)', qFr: 'Indiquer notre gamme de prix ($ à $$$$)', pages: ['edit'],
     keys: ['price range', 'pricerange', 'price level', 'price point', 'dollarsign', 'dollar sign', 'dollar signs', 'how expensive', 'expensive', 'cheap', 'affordable', 'budget', 'pricey', 'upscale', 'change our price', 'change the price range', 'wrong price range'],
     keysFr: ['gamme de prix', 'fourchette de prix', 'niveau de prix', 'echelle de prix', 'prix', 'cher', 'pas cher', 'abordable', 'haut de gamme', 'signe de dollar', 'signes de dollar'],
@@ -44718,6 +45054,12 @@ const OWNER_PORTAL_MESSAGES_FR = {
   'Please pick the first and last month you’re open.': 'Choisissez le premier et le dernier mois où vous êtes ouverts.',
   'The badges could not be read. Please reload the page and try again.': 'Les caractéristiques sont illisibles. Rechargez la page et réessayez.',
   'Happy hour is only listed for places that serve alcohol.': 'Le happy hour est affiché seulement pour les endroits qui servent de l’alcool.',
+  [OWNER_DEALS_ERRORS.long]: `Gardez chaque spécial à ${HH_DEAL_TEXT_MAX} caractères au plus et chaque prix à ${HH_DEAL_PRICE_MAX}.`,
+  [OWNER_DEALS_ERRORS.extras]: 'Laissez les liens, les adresses courriel, les numéros de téléphone et les émojis hors des spéciaux.',
+  [OWNER_DEALS_ERRORS.many]: `Inscrivez au plus ${HH_DEALS_MAX} spéciaux.`,
+  [OWNER_DEALS_ERRORS.empty]: 'Chaque spécial a besoin de quelques mots, comme Pintes maison.',
+  [OWNER_DEALS_ERRORS.englishFirst]: 'Ajoutez d’abord les spéciaux en anglais; le français est facultatif.',
+  [OWNER_DEALS_ERRORS.unreadable]: 'Les spéciaux sont illisibles. Rechargez la page et réessayez.',
   'Please pick a price range from the list.': 'Choisissez une gamme de prix dans la liste.',
   'The seasonal hours could not be read. Please reload the page and try again.': 'Les heures saisonnières sont illisibles. Rechargez la page et réessayez.',
   'Please pick the first and last day of your seasonal hours.': 'Choisissez le premier et le dernier jour de vos heures saisonnières.',
@@ -45928,7 +46270,7 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
         // outside it (below).
         continue;
       }
-      if (field === 'happy_hour') continue; // same reason; written below
+      if (field === 'happy_hour' || field === 'happy_hour_deals') continue; // same reason; written below
       if (OWNER_LINK_FIELDS.includes(field) || field === 'open_months') {
         const before = venueLinks(venue.id)[field];
         const next = value === '' ? null : value;
@@ -46016,6 +46358,19 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
     if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };
     applied.push('happy_hour');
   }
+  // Happy hour deals (2026-10-26): from the owner, source 'venue_owner' and today's date; an Undo puts back the old
+  // lines with their own source and date (the previous value is the full snapshot).
+  if (chosen.includes('happy_hour_deals')) {
+    const value = values.happy_hour_deals;
+    const has = value && Array.isArray(value.deals) && value.deals.length;
+    const undoOld = opts.undo && has && value.checked_at && (value.source === 'venue_owner' || /^https?:\/\//.test(String(value.source || '')));
+    const input = !has ? { deals: null }
+      : { deals: value.deals, deals_fr: value.deals_fr && value.deals_fr.length ? value.deals_fr : null, source_url: undoOld ? value.source : 'venue_owner', checked_at: undoOld ? value.checked_at : todayLocal(now) };
+    const cur = db.prepare('SELECT happy_hour_deals FROM venues WHERE id = ?').get(venue.id);
+    const r = guardedHappyHourDealsUpdate(venue.id, cur ? cur.happy_hour_deals : null, input, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer }, now);
+    if (!r.ok) return { ok: false, reason: 'happy_hour_deals_failed', detail: r.reason, applied };
+    applied.push('happy_hour_deals');
+  }
   return { ok: true, applied, listing };
 }
 
@@ -46023,7 +46378,7 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
 // A signed-in owner's own facts go live at once; a new name, address, website or link still waits for review (they
 // change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
 // fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
-const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures']);
+const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -46033,6 +46388,7 @@ function ownerInstantCountToday(venueId) {
 function ownerFieldEquals(field, a, b) {
   if (field === 'hours' || field === 'happy_hour') return sameJsonWeek(a || null, b || null);
   if (field === 'hours_seasons' || field === 'closures') return JSON.stringify(a || []) === JSON.stringify(b || []);
+  if (field === 'happy_hour_deals') return sameHappyHourDeals(a || null, b || null);
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -46660,6 +47016,18 @@ function renderAdminChangeCard(r) {
     </article>`;
 }
 
+// Stale happy hour deals (2026-10-26): hidden on the site until re-checked (POST /admin/set-happy-hour-deals with a
+// new checked_at, or the owner saves them again).
+function renderAdminStaleDealsCard(r) {
+  const deals = parseHappyHourDealsJson(r.happy_hour_deals) || [];
+  const url = CATEGORY_SLUGS[r.type] && r.slug ? `/${r.region}/${CATEGORY_SLUGS[r.type]}/${r.slug}` : null;
+  const src = r.happy_hour_deals_source === 'venue_owner' ? 'the owner' : r.happy_hour_deals_source;
+  return `<article class="rv-card" data-kind="stale-deals" data-id="${r.id}">
+      <h3>${url ? `<a href="${adminReviewEsc(url)}" target="_blank" rel="noopener">${adminReviewEsc(r.name)}</a>` : adminReviewEsc(r.name)}</h3>
+      <p class="rv-meta">Venue #${r.id} · checked ${adminReviewEsc(r.happy_hour_deals_checked_at || 'never')}${src ? ` · from ${/^https?:/.test(src) ? `<a href="${adminReviewEsc(src)}" target="_blank" rel="noopener nofollow">${adminReviewEsc(src)}</a>` : adminReviewEsc(src)}` : ''}</p>
+      <p class="rv-text">${adminReviewEsc(deals.map(happyHourDealLine).join('; '))}</p>
+    </article>`;
+}
 // A signed-in owner's change that went live straight away (2026-10-18): what it replaced, who, and Undo.
 function renderAdminInstantCard(r) {
   const rows = Object.keys(r.changes).map((f) => {
@@ -46830,6 +47198,7 @@ function renderAdminReviewPage() {
   const visitorLive = listVisitorContributions('live').filter((c) => !c.reported_count);
   const claims = listPendingClaims();
   const instant = recentInstantOwnerChanges();
+  const staleDeals = staleHappyHourDeals();
   const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
@@ -46841,7 +47210,7 @@ function renderAdminReviewPage() {
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
     ${renderAdminOwnerStats(ownerSignupStats())}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a></nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a>${staleDeals.length ? `<a href="#staledeals">Stale happy hour deals (${staleDeals.length})</a>` : ''}</nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
@@ -46855,6 +47224,7 @@ function renderAdminReviewPage() {
     ${visitorLive.length ? section('visitorlive', 'Visitor photos &amp; tips live (last 30 days)', visitorLive, (c) => renderAdminVisitorCard(c, 'live'), '') : ''}
     ${section('live', 'Photos owners published (last 14 days)', live, (p) => renderAdminPhotoCard(p, true), 'None in the last 14 days.')}
     ${section('liveupdates', 'Changes owners made live (last 14 days)', instant, renderAdminInstantCard, 'None in the last 14 days.')}
+    ${section('staledeals', `Stale happy hour deals (over ${HH_DEALS_STALE_DAYS} days)`, staleDeals, renderAdminStaleDealsCard, 'None: every happy hour deal on file was checked in the last 120 days.')}
 <script>
 (function(){
   document.getElementById('rvLogout').addEventListener('click', function(){
@@ -46980,7 +47350,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales' };
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour' };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
@@ -47451,7 +47821,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       waitingFields.add(k);
       if (k === 'badges') Object.assign(snap.badges, v);
       else if (k === 'price_range') snap.price_range = v ? String(v) : '';
-      else snap[k] = v == null ? (k === 'hours' || k === 'happy_hour' ? null : Array.isArray(live[k]) ? [] : '') : v;
+      else snap[k] = v == null ? (k === 'hours' || k === 'happy_hour' || k === 'happy_hour_deals' ? null : Array.isArray(live[k]) ? [] : '') : v;
     }
   }
   const waitChip = (...fields) => (fields.some((f) => waitingFields.has(f)) ? ` <span class="op-status op-status-wait op-wait-chip">${L('Waiting for review', 'En attente de vérification')}</span>` : '');
@@ -47465,6 +47835,19 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   // No hours on file yet: start every day blank, not ticked "Closed".
   const hoursKnown = !!parseWeek(snap.hours);
   const hh = parseWeek(snap.happy_hour) || {};
+  // Happy hour deals editor (2026-10-26): up to HH_DEALS_MAX rows of "what" + "price", the French ones optional.
+  const dealsNow = snap.happy_hour_deals && Array.isArray(snap.happy_hour_deals.deals) ? snap.happy_hour_deals : { deals: [], deals_fr: [] };
+  const dealRows = (prefix, list, fr2) => {
+    const shown = Math.min(HH_DEALS_MAX, Math.max(1, list.length + (list.length < HH_DEALS_MAX ? 1 : 0)));
+    return Array.from({ length: HH_DEALS_MAX }, (_, i) => {
+      const d = list[i] || { text: '', price: '' };
+      const n = i + 1;
+      return `<div class="op-deal" data-deal="${prefix}"${i >= shown ? ' hidden' : ''}>
+          <input type="text" class="op-deal-text" maxlength="${HH_DEAL_TEXT_MAX}" value="${escapeHtml(d.text || '')}"${fr2 ? ' lang="fr"' : ''} aria-label="${fr2 ? L(`French deal ${n}: what`, `Spécial ${n} en français : quoi`) : L(`Deal ${n}: what`, `Spécial ${n} : quoi`)}" placeholder="${i === 0 ? (fr2 ? 'Pintes maison (20 oz)' : 'House pints (20 oz)') : ''}">
+          <input type="text" class="op-deal-price" maxlength="${HH_DEAL_PRICE_MAX}" value="${escapeHtml(d.price || '')}" aria-label="${fr2 ? L(`French deal ${n}: price`, `Spécial ${n} en français : prix`) : L(`Deal ${n}: price`, `Spécial ${n} : prix`)}" placeholder="${i === 0 ? (fr2 ? '6 $' : '$6') : ''}">
+        </div>`;
+    }).join('') + `<button type="button" class="op-add op-deal-add" data-deal-add="${prefix}"${shown >= HH_DEALS_MAX ? ' hidden' : ''}>${L('+ Add a deal', '+ Ajouter un spécial')}</button>`;
+  };
   const season0 = (snap.hours_seasons || [])[0] || null;
   const dayRows = (prefix, week, emptyMeansClosed, known = hoursKnown) => OWNER_DAYS.map((d) => {
     const w = week[d] && week[d].length ? week[d] : [];
@@ -47597,6 +47980,13 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-menu-sub { display: block; font-size: 0.95rem; opacity: 0.9; margin-top: 4px; }
   body.owner-page .lyv-section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy); font-weight: 800; margin: 28px 0 10px; }
   body.owner-page .op-day { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 0; border-bottom: 1px solid rgba(42,32,25,0.08); }
+  body.owner-page .op-deals-label { margin-top: 18px; }
+  body.owner-page .op-deal { display: flex; gap: 8px; padding: 6px 0; }
+  body.owner-page .op-deal[hidden] { display: none; }
+  body.owner-page .op-deal .op-deal-text { flex: 1 1 auto; min-width: 0; min-height: 44px; }
+  body.owner-page .op-deal .op-deal-price { flex: 0 0 7.5em; min-width: 0; min-height: 44px; }
+  body.owner-page .op-deals-fr { margin: 10px 0 0; }
+  body.owner-page .op-deals-fr summary { cursor: pointer; font-weight: 700; padding: 10px 0; }
   body.owner-page .op-day-name { width: 96px; font-weight: 700; }
   body.owner-page .op-closed { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.95rem; width: 100px; min-height: 44px; cursor: pointer; }
   body.owner-page .op-times { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -47806,6 +48196,13 @@ ${renderGolfHeaderHtml()}
       <p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
       <div id="opHappy">${dayRows('happy', hh, false)}</div>
       <p class="lyv-error" id="opHappyError" hidden></p>
+      <p class="lyv-section-label op-deals-label" id="opDealsLabel">${L('Deals', 'Spéciaux')}${waitChip('happy_hour_deals')}</p>
+      <p class="op-hint">${L(`What&rsquo;s on special during happy hour, up to ${HH_DEALS_MAX}: what it is and the price, as you&rsquo;d write it (&ldquo;House pints (20 oz)&rdquo; &middot; &ldquo;$6&rdquo;, or &ldquo;Appies&rdquo; &middot; &ldquo;half price&rdquo;). We show them under your happy hour times and on the map. Leave out links, phone numbers and emoji. Clear every row to remove them.`, `Ce qui est en spécial pendant le happy hour, jusqu’à ${HH_DEALS_MAX} : ce que c’est et le prix, comme vous l’écririez (« Pintes maison (20 oz) » · « 6 $ », ou « Bouchées » · « moitié prix »). Nous les affichons sous vos heures de happy hour et sur la carte. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les lignes pour les retirer.`)}</p>
+      <div id="opDeals" role="group" aria-labelledby="opDealsLabel">${dealRows('en', dealsNow.deals || [], false)}</div>
+      <details class="op-deals-fr"${(dealsNow.deals_fr || []).length ? ' open' : ''}><summary>${L('In French (optional)', 'En français (facultatif)')}</summary>
+      <p class="op-hint">${L('Without French lines, the French page shows the English ones.', 'Sans lignes en français, la page en français affiche celles en anglais.')}</p>
+      <div id="opDealsFr">${dealRows('fr', dealsNow.deals_fr || [], true)}</div></details>
+      <p class="lyv-error" id="opDealsError" hidden></p>
       </details>` : ''}
 
       <p class="lyv-section-label">${L('Anything else?', 'Autre chose?')}</p>
@@ -48036,12 +48433,27 @@ ${ownerFooterHtml(fr)}
     out.sort(function(a, b){ return a.from < b.from ? -1 : a.from > b.from ? 1 : (a.to < b.to ? -1 : a.to > b.to ? 1 : 0); });
     return { list: out };
   }
+  function dealRowsValue(id){
+    var box = document.getElementById(id), out = [];
+    if (!box) return out;
+    Array.prototype.forEach.call(box.querySelectorAll('.op-deal'), function(r){
+      var t = r.querySelector('.op-deal-text').value.trim(), pr = r.querySelector('.op-deal-price').value.trim();
+      if (t || pr) out.push(pr ? { text: t, price: pr } : { text: t });
+    });
+    return out;
+  }
+  function dealKey(x){ var k = function(l){ return (l || []).map(function(d){ return [d.text, d.price || '']; }); }; return JSON.stringify([k(x.deals), k(x.deals_fr)]); }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-deal-add]'); if (!b) return;
+    var rows = document.querySelectorAll('.op-deal[data-deal="' + b.getAttribute('data-deal-add') + '"]');
+    for (var i = 0; i < rows.length; i++) { if (rows[i].hidden) { rows[i].hidden = false; rows[i].querySelector('.op-deal-text').focus(); if (i === rows.length - 1) b.hidden = true; break; } }
+  });
   var FIELD_NAMES = T.fields;
   function fieldList(list){ var n = (list || []).map(function(f){ return FIELD_NAMES[f] || f; }); return n.length > 1 ? n.slice(0, -1).join(', ') + T.and + n[n.length - 1] : (n[0] || ''); }
   function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
+    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', T.hoursBoth); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', T.hoursBlank.replace('{day}', dayName(h.blank))); jumpToError(form); return; }
@@ -48070,6 +48482,12 @@ ${ownerFooterHtml(fr)}
       var hh = week('opHappy');
       if (hh.bad) { show('opHappyError', T.happyBoth); jumpToError(form); return; }
       changes.happy_hour = hh.week;
+    }
+    // Happy hour deals (2026-10-26): sent only when the rows differ from what the page started with.
+    if (document.getElementById('opDeals')) {
+      var dv = { deals: dealRowsValue('opDeals'), deals_fr: dealRowsValue('opDealsFr') };
+      var d0 = initial.happy_hour_deals || { deals: [], deals_fr: [] };
+      if (dealKey(dv) !== dealKey({ deals: d0.deals || [], deals_fr: d0.deals_fr || [] })) changes.happy_hour_deals = dv.deals.length || dv.deals_fr.length ? dv : null;
     }
     // Only send what the owner actually touched.
     if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
@@ -48106,7 +48524,7 @@ ${ownerFooterHtml(fr)}
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
         show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
-        show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opEmailError', errs.contact_email);
+        show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opEmailError', errs.contact_email);
         show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
         jumpToError(form);
@@ -50416,6 +50834,49 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, venue: { happy_hour_times: result.happy_hour_times, happy_hour_source: result.happy_hour_source, happy_hour_checked_at: result.happy_hour_checked_at } });
     }
 
+    // POST /admin/set-happy-hour-deals (2026-10-26)
+    //
+    // The HTTP route for guardedHappyHourDealsUpdate(): { id, expected_current, deals: [{ text, price? }] | null,
+    // deals_fr?, source_url, checked_at, reason, batch_id }. deals null clears all four columns (source_url and
+    // checked_at may then be left out). Same bearer-token check and strict key allowlist as /admin/set-happy-hour.
+    if (pathname === '/admin/set-happy-hour-deals' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Set-happy-hour-deals endpoint is not configured.' });
+      }
+      const authHeader = req.headers['authorization'] || '';
+      const match = /^Bearer (.+)$/.exec(authHeader);
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const unexpectedKeys = Object.keys(body).filter((k) => !['id', 'expected_current', 'deals', 'deals_fr', 'source_url', 'checked_at', 'reason', 'batch_id'].includes(k));
+      if (unexpectedKeys.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (!('expected_current' in body) || (body.expected_current !== null && typeof body.expected_current !== 'string')) {
+        return sendJSON(res, 400, { error: 'expected_current is required and must be the stored deals text or null.' });
+      }
+      if (!('deals' in body)) return sendJSON(res, 400, { error: 'deals is required (null clears them).' });
+      let result;
+      try {
+        result = guardedHappyHourDealsUpdate(body.id, body.expected_current, { deals: body.deals, deals_fr: body.deals_fr, source_url: body.source_url, checked_at: body.checked_at },
+          { reason: body.reason, batch_id: body.batch_id, reviewed_by: null });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Happy hour deals update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { invalid_meta: 400, invalid_deals: 400, invalid_source: 400, invalid_checked_at: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      if (result.changedFields.length) indexNowVenueChanged(req, body.id);
+      return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, venue: { happy_hour_deals: result.happy_hour_deals, happy_hour_deals_fr: result.happy_hour_deals_fr, happy_hour_deals_source: result.happy_hour_deals_source, happy_hour_deals_checked_at: result.happy_hour_deals_checked_at } });
+    }
+
     if (pathname === '/admin/set-cuisine' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Set-cuisine endpoint is not configured.' });
@@ -51191,7 +51652,7 @@ const server = http.createServer(async (req, res) => {
       }
       const parsed = parseTripPlanBody(body);
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
-      try { return sendJSON(res, 200, withTripFrenchUrls(runTripPlan(parsed.value))); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
+      try { return sendJSON(res, 200, withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
@@ -52545,6 +53006,9 @@ module.exports = {
   validateSeason,
   guardedSeasonUpdate,
   guardedHappyHourUpdate,
+  // Happy hour deals (2026-10-26)
+  validateHappyHourDeals, guardedHappyHourDealsUpdate, happyHourDealsShown, happyHourDealsCompact, happyHourDealsStale, happyHourLeftText, happyHourOnNowText,
+  withTripHappyHourDeals, staleHappyHourDeals, ownerVenueSnapshot, HH_DEALS_STALE_DAYS, HH_DEALS_MAX,
   guardedCuisineUpdate,
   createOwnerLink,
   revokeOwnerLink,
