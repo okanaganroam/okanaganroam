@@ -633,6 +633,7 @@ function renderStyles() {
   .t3-badge-more { background: none; border: 1px dashed rgba(42,107,103,0.45); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 0.76rem; font-weight: 800; cursor: pointer; min-height: 44px; } /* round 9 (2026-10-19): 44px tap target */
   .t3-badges li.is-collection { background: rgba(201,162,39,0.16); color: #6B5410; }
   .t3-hours { margin: 0 0 8px; font-size: 0.84rem; color: rgba(27,43,58,0.8); }
+  .t3-hh { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #7C2D12; }
   .t3-why { margin: 0 0 6px; padding-left: 18px; font-size: 0.88rem; line-height: 1.5; }
   .t3-caveats { margin: 0 0 8px; padding: 8px 12px; list-style: none; background: #FFF6E6; border-radius: 10px; font-size: 0.82rem; color: #5B4212; }
   .t3-caveats li + li { margin-top: 4px; }
@@ -1361,6 +1362,8 @@ function renderScript(d) {
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (/venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
+      + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour : <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
       + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
