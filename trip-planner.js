@@ -4651,7 +4651,26 @@ function labelLateLunches(result) {
 }
 // 2026-10-21: a note added twice by a timing pass ("Because you mentioned kids ...") is shown once.
 function dedupeNotes(result) { for (const k of ['notes', 'warnings', 'contextNotes']) if (result && Array.isArray(result[k])) result[k] = result[k].filter((n, i, a) => typeof n !== 'string' || a.indexOf(n) === i); return result; }
-function planTrip(input) { const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); addSuggestedTimes(result, input || {}); labelLateLunches(result); return addStory(result, input || {}); }
+// Weekly audit follow-up (2026-10-25): the cold-water line was only added when the request named a month, so "a day at
+// the beach in Osoyoos" in late October still read like a swim. Every beach stop on a trip date outside June to
+// September says the lake is cold, whatever the request said.
+function addBeachSeasonNotes(result, input) {
+  if (!result) return result;
+  const req = input.requirements || {};
+  const date = [req.startDate, input.tripDate].find((d) => /^\d{4}-\d{2}-\d{2}$/.test(d || ''));
+  const season = date && tripSeason(date);
+  if (!season || season.water === 'in') return result;
+  const note = SEASON_CAVEATS.coolWater(season.monthName);
+  const stops = (result.days || []).flatMap((d) => d.stops || []).concat((result.itinerary && result.itinerary.stops) || [], (result.outing && result.outing.stops) || []);
+  for (const st of stops) {
+    if (!st || !st.venue || st.venue.type !== 'beach' || st.gapFill) continue;
+    const cav = st.caveats || [];
+    if (cav.some((c) => /too cold for a swim|Lake swimming here is a summer activity/.test(typeof c === 'string' ? c : (c && c.text) || ''))) continue;
+    st.caveats = [...cav, note];
+  }
+  return result;
+}
+function planTrip(input) { const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); addSuggestedTimes(result, input || {}); labelLateLunches(result); addBeachSeasonNotes(result, input || {}); return addStory(result, input || {}); }
 function planTripUnchecked(input) {
   // A dated plan with nothing else to check is still timed and dated (2026-10-18: a family weekend matched to What's On).
   // 2026-10-19: any start date or start time (the Dates & start time control) is timed too: "romantic weekend in

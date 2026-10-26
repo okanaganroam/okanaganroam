@@ -120,3 +120,15 @@ test('A late-October beach day: no dog swimming area without a dog, and the cold
   const withDog = plan('a day at the beach in Osoyoos with our dog on October 31');
   assert.ok(names(withDog).length, 'a trip with a dog still gets a plan');
 });
+
+test('Every beach stop on an off-season trip date says the lake is cold, even when no month was asked for (and not in July)', () => {
+  for (const q of ['a day at the beach in Osoyoos', 'a day at the beach in Osoyoos on Saturday']) {
+    const p = plan(q);
+    const beach = allStops(p).find((s) => s.venue && s.venue.type === 'beach');
+    assert.ok(beach, q);
+    assert.equal((beach.caveats || []).filter((c) => /too cold for a swim/.test(typeof c === 'string' ? c : c.text)).length, 1, `${q}: ${JSON.stringify(beach.caveats)}`);
+  }
+  const july = run(build('a day at the beach in Osoyoos'), { tripDate: '2027-07-17' });
+  const beach = allStops(july).find((s) => s.venue && s.venue.type === 'beach');
+  assert.ok(beach && !(beach.caveats || []).some((c) => /too cold/.test(typeof c === 'string' ? c : c.text)), JSON.stringify(beach && beach.caveats));
+});
