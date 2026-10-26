@@ -11689,7 +11689,9 @@ test('Header: the exact approved items, order, URLs and i18n keys on /, /browse,
     // /owner/login is in Discover on computers and its own item on phones; CSS shows only one.
     const hrefs = [...nav.header.matchAll(/<li[\s\S]*?<\/li>/g)].flatMap((m) => [...m[0].matchAll(/href="([^"]+)"/g)].map((x) => x[1])).filter((h) => h !== '/owner/login');
     assert.equal(new Set(hrefs).size, hrefs.length, `${name}: no duplicate navigation targets`);
-    assert.doesNotMatch(nav.header, /#hiddenGems|#exploreRegions|#moodCards|#mapPanel|\/kelowna\//, `${name}: no stale targets`);
+    // Happy Hour (2026-10-26) links Kelowna's town Happy Hour page (/guide/kelowna/happy_hour) on purpose.
+    assert.doesNotMatch(nav.header, /#hiddenGems|#exploreRegions|#moodCards|#mapPanel|(?<!\/guide)\/kelowna\//, `${name}: no stale targets`);
+    assert.match(nav.header, /<a href="\/guide\/kelowna\/happy_hour" class="nav-happy-hour"[^>]*>Happy Hour<\/a>\s*<\/div>/, `${name}: Happy Hour last in Food & Drink`);
   }
 }));
 
