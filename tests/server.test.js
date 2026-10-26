@@ -31961,3 +31961,15 @@ test('Events: "The X" on the same day is the same event as "X", and a hidden dup
   assert.deepEqual({ ...app.eventMovedTwin('kelowna', old.event.slug) }, { region: 'kelowna', slug: kept.event.slug });
   assert.equal(app.eventMovedTwin('kelowna', kept.event.slug), null, 'the published one never redirects');
 });
+
+// ==== Homepage (2026-10-25): the stats strip follows the season ===============
+test('Homepage: the stats strip shows beaches and golf in summer, Hidden Gems and indoor places in the fall, ski & snow in winter', () => {
+  const n = (types) => types.length * 10;
+  const links = (at) => app.homeSeasonalStats(new Date(at), n).map((x) => x[1]);
+  assert.deepEqual(links('2026-07-15T12:00:00-07:00'), ['/beaches', '/golf']);
+  assert.deepEqual(links('2026-10-25T12:00:00-07:00'), ['/hidden-gems', '/indoor']);
+  assert.deepEqual(links('2026-11-30T12:00:00-08:00'), ['/hidden-gems', '/indoor']);
+  assert.deepEqual(links('2027-01-10T12:00:00-08:00'), ['/ski-snow', '/indoor']);
+  assert.deepEqual(links('2027-04-20T12:00:00-07:00'), ['/golf', '/hidden-gems']);
+  for (const [, , en, fr] of app.homeSeasonalStats(new Date('2026-10-25T12:00:00-07:00'), n)) assert.ok(en && fr);
+});
