@@ -31011,7 +31011,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
     venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(String(venue.website).replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''))} \u2197</a>`] : null,
-    // Owner-supplied links (2026-10-15, venue_links): shown only once approved.
+    // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
+    // menu / booking links from POST /admin/set-venue-links show here too (same table), with no verified pill.
     venueLinkRow.menu_url ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
     venueLinkRow.booking_url ? [L('Book', 'R\u00e9server'), `<a href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book online', 'R\u00e9server en ligne')} \u2197</a>`] : null,
     (venueLinkRow.instagram_url || venueLinkRow.facebook_url) ? [L('Social', 'R\u00e9seaux'), [
@@ -40100,6 +40101,68 @@ function venueSocialLinks(venueId) {
   return venueSocialCache.map.get(venueId) || null;
 }
 function clearVenueSocialCache() { venueSocialCache = null; }
+// Researched venue links (2026-10-27): our own menu / booking links, written straight to venue_links by
+// POST /admin/set-venue-links -- never through an owner change request, so the venue is not "claimed" and gets no
+// "Verified by the venue" pill. One field at a time with compare-and-set on the live value; logged as source
+// 'research'. A link the owner set last (venue_owner in venue_enrichment_log) wins unless opts.force_owner.
+const RESEARCH_LINK_FIELDS = ['menu_url', 'booking_url'];
+const RESEARCH_LINK_MAX = 500;
+function researchLinkValid(value) {
+  if (value === null) return true;
+  if (typeof value !== 'string' || !value || value.length > RESEARCH_LINK_MAX || /\s/.test(value)) return false;
+  try {
+    const u = new URL(value);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && !!u.hostname;
+  } catch (e) { return false; }
+}
+function guardedVenueLinkUpdate(id, field, expectedCurrent, value, meta, opts = {}) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  if (!RESEARCH_LINK_FIELDS.includes(field)) return { ok: false, reason: 'invalid_field', detail: `field must be one of ${RESEARCH_LINK_FIELDS.join(', ')}` };
+  if (expectedCurrent !== null && typeof expectedCurrent !== 'string') return { ok: false, reason: 'invalid_expected', detail: 'expected_current must be the current value or null' };
+  if (!researchLinkValid(value)) return { ok: false, reason: 'invalid_value', detail: `value must be an http(s) URL of at most ${RESEARCH_LINK_MAX} characters, or null to clear` };
+  if (m.source_url != null && !researchLinkValid(m.source_url)) return { ok: false, reason: 'invalid_source_url', detail: 'source_url must be an http(s) URL' };
+  const existing = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    txOpen = true;
+    const current = venueLinks(id)[field];
+    const live = current == null ? null : current;
+    if (live !== expectedCurrent) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'mismatch', live: { [field]: live } };
+    }
+    if (live === value) {
+      db.exec('COMMIT');
+      txOpen = false;
+      return { ok: true, changedFields: [], value: live };
+    }
+    const last = db.prepare('SELECT source FROM venue_enrichment_log WHERE venue_id = ? AND field_name = ? ORDER BY id DESC LIMIT 1').get(id, field);
+    if (last && last.source === 'venue_owner' && opts.force_owner !== true) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'owner_value', detail: 'the venue owner set this link last; pass force_owner: true to replace it', live: { [field]: live } };
+    }
+    db.prepare(`INSERT INTO venue_links (venue_id, ${field}) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET ${field} = excluded.${field}, updated_at = CURRENT_TIMESTAMP`).run(id, value);
+    db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const ref = m.source_url ? `${m.reason.trim()} | ${m.source_url}` : m.reason.trim();
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, ?, ?, ?, 'research', ?, 'medium', ?, 0, 'Dayton')`).run(id, field, live, value, ref, m.batch_id.trim());
+    db.exec('COMMIT');
+    txOpen = false;
+    clearVenueSocialCache();
+    return { ok: true, changedFields: [field], value };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
 // The one "Instagram or Facebook" link a List Your Venue submission gives ->
 // { field, url } for venue_links, or null for anything else (Linktree, TikTok...).
 function socialLinkFromSubmission(value) {
@@ -52897,6 +52960,65 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, nights: result.nights ? JSON.parse(result.nights) : [], expected_current: result.nights });
     }
 
+    // GET /admin/venue-links/:id (2026-10-27) -- a venue's links for a script: { id, name, type, redirect_to, links:
+    // { menu_url, booking_url, instagram_url, facebook_url, open_months } }. The link itself is the compare-and-set
+    // value for POST /admin/set-venue-links. Same bearer token as the admin writes; never cached.
+    {
+      const vlRead = /^\/admin\/venue-links\/(\d+)$/.exec(pathname);
+      if (vlRead && method === 'GET') {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Venue links endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+        const id = Number(vlRead[1]);
+        const v = db.prepare('SELECT id, name, type, redirect_to FROM venues WHERE id = ?').get(id);
+        if (!v) return sendJSON(res, 404, { error: 'venue_not_found' });
+        const l = venueLinks(id);
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJSON(res, 200, { id, name: v.name, type: v.type, redirect_to: v.redirect_to == null ? null : v.redirect_to,
+          links: { menu_url: l.menu_url ?? null, booking_url: l.booking_url ?? null, instagram_url: l.instagram_url ?? null, facebook_url: l.facebook_url ?? null, open_months: l.open_months ?? null } });
+      }
+    }
+
+    // POST /admin/set-venue-links (2026-10-27) -- researched venue links, the HTTP route for guardedVenueLinkUpdate():
+    // { id, field: 'menu_url' | 'booking_url', expected_current, value: <http(s) URL> | null, reason, batch_id,
+    // source_url?, force_owner? }. One field per call; expected_current is the live value from GET /admin/venue-links/:id
+    // (null when unset). Logged as 'research', not 'venue_owner', so the venue does not become "Verified by the venue".
+    if (pathname === '/admin/set-venue-links' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Set-venue-links endpoint is not configured.' });
+      }
+      const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const unexpectedKeys = Object.keys(body).filter((k) => !['id', 'field', 'expected_current', 'value', 'reason', 'batch_id', 'source_url', 'force_owner'].includes(k));
+      if (unexpectedKeys.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (!('expected_current' in body)) return sendJSON(res, 400, { error: 'expected_current is required (the live value from GET /admin/venue-links/:id, or null).' });
+      if (!('value' in body)) return sendJSON(res, 400, { error: 'value is required (null clears it).' });
+      if ('force_owner' in body && typeof body.force_owner !== 'boolean') return sendJSON(res, 400, { error: 'force_owner must be true or false.' });
+      let result;
+      try {
+        result = guardedVenueLinkUpdate(body.id, body.field, body.expected_current, body.value,
+          { reason: body.reason, batch_id: body.batch_id, source_url: body.source_url }, { force_owner: body.force_owner === true });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Venue link update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { invalid_meta: 400, invalid_field: 400, invalid_expected: 400, invalid_value: 400, invalid_source_url: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409, owner_value: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      if (result.changedFields.length) indexNowVenueChanged(req, body.id);
+      return sendJSON(res, 200, { id: body.id, field: body.field, changedFields: result.changedFields, value: result.value });
+    }
+
     if (pathname === '/admin/set-cuisine' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Set-cuisine endpoint is not configured.' });
@@ -55046,6 +55168,7 @@ module.exports = {
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)
+  guardedVenueLinkUpdate, RESEARCH_LINK_FIELDS, venueLinks, ownerLastUpdatedAt,
   venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
   guardedCuisineUpdate,
   createOwnerLink,
