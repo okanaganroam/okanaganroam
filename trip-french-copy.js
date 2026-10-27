@@ -58,6 +58,14 @@ function t3FrenchText(value){
  const frSeasonWhen=(m)=>m?'en '+(FR_MONTHS_BY_EN[m]||m):'en ce moment', frReopens=(r,rm,rd)=>{if(!r)return '';const d='le '+(rd==='1'?'1er':rd)+' '+(FR_MONTHS_BY_EN[rm]||rm);return r==='It'?' Réouverture '+d+'.':' '+r+' rouvre '+d+'.';};
  text=text.replace(/^These places match but are closed for the season (?:in (\w+)|right now): (.+?)\.(?: (.+?) reopens (\w+) (\d{1,2})\.)? Ask again with a date in their season to plan them\.$/,(_,m,names,r,rm,rd)=>'Ces lieux correspondent, mais sont fermés pour la saison '+frSeasonWhen(m)+' : '+names.replace(/ and /g,' et ')+'.'+frReopens(r,rm,rd)+' Redemandez avec une date dans leur saison pour les planifier.');
  text=text.replace(/^(.+?) matches but is closed for the season (?:in (\w+)|right now)\.(?: (.+?) reopens (\w+) (\d{1,2})\.)? Ask again with a date in its season to plan it\.$/,(_,n,m,r,rm,rd)=>n+' correspond, mais est fermé pour la saison '+frSeasonWhen(m)+'.'+frReopens(r,rm,rd)+' Redemandez avec une date dans sa saison pour le planifier.');
+ // Audit fix (2026-10-27): a closed place named in the request (server.js tripNamedVenuePlan).
+ text=text.replace(/^(.+) is closed for the season until (\w+) (\d{1,2}), (\d{4}), so it isn’t in this plan\.$/,(_,n,m,d,y)=>n+' est fermé pour la saison jusqu’au '+(d==='1'?'1er':d)+' '+(FR_MONTHS_BY_EN[m]||m)+' '+y+'; il ne fait donc pas partie de ce plan.');
+ text=text.replace(/^(.+) is closed for the season and hasn’t announced when it reopens, so it isn’t in this plan\.$/,'$1 est fermé pour la saison et n’a pas encore annoncé sa réouverture; il ne fait donc pas partie de ce plan.');
+ text=text.replace(/^(.+) are closed for the season and haven’t announced when they reopen, so they aren’t in this plan\.$/,(_,n)=>n.replace(/ and (?!.* and )/,' et ')+' sont fermés pour la saison et n’ont pas encore annoncé leur réouverture; ils ne font donc pas partie de ce plan.');
+ text=text.replace(/^(.+) is closed right now, so it isn’t in this plan\.$/,'$1 est fermé en ce moment; il ne fait donc pas partie de ce plan.');
+ text=text.replace(/^(.+) are closed right now, so they aren’t in this plan\.$/,(_,n)=>n.replace(/ and (?!.* and )/,' et ')+' sont fermés en ce moment; ils ne font donc pas partie de ce plan.');
+ // Audit fix (2026-10-27): "tonight" asked after midnight is the coming evening (trip-planner.js planTrip).
+ text=text.replace(/^It’s after midnight, so this plan is for (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) evening\.$/,(_,d)=>'Il est passé minuit; ce plan est donc pour '+FR_HEADING_DAYS[d]+' soir.');
  text=text.replace(/^It’s already late, so this plan is for tomorrow evening\.$/,'Il est déjà tard; ce plan est donc pour demain soir.');
  text=text.replace(/^It’s already evening, so this plan is for tomorrow afternoon\.$/,'Il est déjà le soir; ce plan est donc pour demain après-midi.');
  text=text.replace(/^It’s already afternoon, so this plan is for tomorrow morning\.$/,'Il est déjà l’après-midi; ce plan est donc pour demain matin.');
@@ -195,6 +203,14 @@ function t3FrenchText(value){
  text=text.replace(/^Has the (.+) badge$/,(raw,b)=>FR_BADGES[b]?'Possède le badge '+FR_BADGES[b]:raw);
  text=text.replace(/^An? (.+?) suits an? (.+)$/,(raw,t,o)=>FR_TYPES[t.toLowerCase()]&&FR_OCCASIONS[o]?FR_TYPES[t.toLowerCase()]+' convient à '+FR_OCCASIONS[o]:raw);
  text=text.replace(/^Its description mentions “(.+)”$/,(_,w)=>'Sa description mentionne « '+(FR_WORDS[w]||w)+' »');
+ // Audit fix (2026-10-27): the weekly nights and specials a place lists (trip-planner.js scoreVenue), and a named place.
+ const FR_NIGHTS={trivia:'un quiz',karaoke:'un karaoké',bingo:'un bingo','open mic':'une scène ouverte',comedy:'une soirée humour','run club':'un club de course','games night':'une soirée jeux','paint night':'une soirée peinture','live music':'de la musique live'};
+ const frNightClock=(t)=>{const m=/^(\d{1,2})(?::(\d{2}))? (AM|PM)$/.exec(t||'');if(!m)return t;const h=Number(m[1])%12+(m[3]==='PM'?12:0);return h+' h'+(m[2]?' '+m[2]:'');};
+ text=text.replace(/^(Trivia|Karaoke|Bingo|Open mic|Comedy|Run club|Games night|Paint night|Live music) on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: from (\d{1,2}(?::\d{2})? [AP]M))?, from its listing$/,(_,k,d,t)=>{const fr=FR_NIGHTS[k.toLowerCase()];return fr?(fr.charAt(0).toUpperCase()+fr.slice(1))+' le '+FR_HEADING_DAYS[d]+(t?' à '+frNightClock(t):'')+', selon sa fiche':_;});
+ text=text.replace(/^Hosts (trivia|karaoke|bingo|open mic|comedy|run club|games night|paint night) on (.+), from its listing$/,(raw,k,ds)=>{const days=ds.split(/, | and /).map(x=>FR_HEADING_DAYS[x.replace(/s$/,'')]);return days.every(Boolean)?'Accueille '+FR_NIGHTS[k]+' le '+days.join(', ').replace(/, (?!.*, )/,' et ')+', selon sa fiche':raw;});
+ text=text.replace(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) special: (.+)$/,(_,d,t)=>'Spécial du '+FR_HEADING_DAYS[d]+' : '+t);
+ text=text.replace(/^Weekly special: (.+)$/,'Spécial de la semaine : $1');
+ if(text==='The place you named')return 'Le lieu que vous avez nommé';
  // Round 12 (2026-10-20): copy added in round 11 that was still English on /fr/trip.
  phrases.push(['Something to eat between the tastings','De quoi manger entre les dégustations'],['A Christmas event on your dates','Un événement de Noël à vos dates'],['A family Christmas event on your dates','Un événement familial de Noël à vos dates'],['A last drink','Un dernier verre'],['Also planned on an earlier day — few lunch spots at the hill are listed on Okanagan Roam','Déjà prévu un autre jour — peu d’endroits pour dîner à la montagne sont répertoriés sur Okanagan Roam']);
  text=text.replace(/^Its listed hours only overlap part of the (morning|midday|afternoon|late afternoon|early evening|evening) — check before you go$/,(_,part)=>'Ses horaires indiqués ne couvrent qu’une partie '+{morning:'de la matinée',midday:'du midi',afternoon:'de l’après-midi','late afternoon':'de la fin d’après-midi','early evening':'du début de soirée',evening:'de la soirée'}[part]+' — vérifiez avant de partir');
@@ -229,6 +245,8 @@ function t3FrenchText(value){
  text=text.replace(/^Nothing in (.+?) itself matched, so this includes (.+) nearby\.$/,(_,a,b)=>'Rien à '+a+' même ne correspondait; ce plan inclut donc '+b.replace(/ and /g,' et ')+', tout près.'); // 2026-10-25
  if(text==='A dog beach or off-leash area')return 'Une plage pour chiens ou une aire sans laisse'; // 2026-10-25
  text=text.replace(/^A beach day suits (\w+)$/,(raw,m)=>FR_MONTHS_BY_EN[m]?'Une journée à la plage convient en '+FR_MONTHS_BY_EN[m]:raw); // 2026-10-25
+ // Audit fix (2026-10-27): the resort's own opening day.
+ text=text.replace(/^(.+) opens for the season on (\w+) (\d{1,2}), so skiing isn’t part of this (\w+) plan\.$/,(_,n,om,od,m)=>{const fm=FR_MONTHS_BY_EN[m]||m;return n+' ouvre pour la saison le '+(od==='1'?'1er':od)+' '+(FR_MONTHS_BY_EN[om]||om)+'; le ski ne fait donc pas partie de ce plan '+(/^[aeiouâéèêîôû]/i.test(fm)?'d’':'de ')+fm+'.';});
  text=text.replace(/^The Okanagan’s ski hills usually run from December to early April, so skiing isn’t part of this (\w+) plan\.$/,(_,m)=>{const fm=FR_MONTHS_BY_EN[m]||m;return 'Les stations de ski de l’Okanagan sont en général ouvertes de décembre au début avril; le ski ne fait donc pas partie de ce plan '+(/^[aeiouâéèêîôû]/i.test(fm)?'d’':'de ')+fm+'.';});
  text=text.replace(/^Lunch at (.+), a winery that serves food\.$/,'Dîner à $1, un vignoble qui sert à manger.');
  text=text.replace(/^Lunch at (.+), a winery’s restaurant\.$/,'Dîner à $1, le restaurant d’un vignoble.');

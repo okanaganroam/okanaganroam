@@ -221,9 +221,12 @@ test('Ski trips: the resort is planned even while closed today, with a warning w
   const now = plan('ski trip Big White').p;
   assert.equal(dayStops(now.days[0])[0].fact.id, RESORT.id);
   assert.ok(now.warnings.some((w) => /closed for the season right now and opens for the season on November 26/.test(w)), now.warnings.join(' | '));
+  // Audit fix (2026-10-27): dates before the resort's own opening day are not ski days; the plan says when it opens.
   const dated = plan('ski Big White November 20 to 22, 2026').p;
-  assert.ok(dated.days.every((day) => dayStops(day)[0].fact.id === RESORT.id));
-  assert.ok(dated.warnings.some((w) => /opens for the season on November 26 — your dates are before it opens/.test(w)), dated.warnings.join(' | '));
+  assert.ok(!dated.days.some((day) => dayStops(day).some((s) => s.fact && s.fact.id === RESORT.id)));
+  assert.ok(dated.notes.includes('Big White Ski Resort opens for the season on November 26, so skiing isn’t part of this November plan.'), dated.notes.join(' | '));
+  const open = plan('ski Big White November 27 to 28, 2026').p;
+  assert.ok(open.days.every((day) => dayStops(day)[0].fact.id === RESORT.id), 'from the opening day on, it is a ski trip');
   const nov = plan('ski weekend at Big White in November').p;
   assert.ok(nov.warnings.some((w) => /November is before the season starts/.test(w)), nov.warnings.join(' | '));
   const kelowna = plan('ski trip from Kelowna for 2 days').p;

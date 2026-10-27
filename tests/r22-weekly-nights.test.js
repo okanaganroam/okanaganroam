@@ -419,8 +419,8 @@ test('Build My Trip: an evening stop on a night says "Tonight: Trivia at 7 PM" (
   const before = JSON.stringify(plan.days.map((d) => d.stops.map((s) => s.venue.id)));
   const out = app.withTripWeeklyNights(plan, at(TUE, '09:00'));
   const s = out.days[0].stops[0];
-  assert.equal(s.nightLine, 'Tonight: Trivia at 7–9 PM');
-  assert.equal(s.nightLineFr, 'Ce soir : Quiz à 19 h–21 h');
+  assert.equal(s.nightLine, 'Tonight: Trivia 7–9 PM'); // audit fix (2026-10-27): a range reads without "at"
+  assert.equal(s.nightLineFr, 'Ce soir : Quiz 19 h–21 h');
   assert.equal(s.nightLineFrLang, undefined);
   assert.equal(out.days[1].stops[0].nightLine, undefined, 'Wednesday has none');
   assert.equal(JSON.stringify(out.days.map((d) => d.stops.map((x) => x.venue.id))), before, 'order unchanged');
@@ -433,11 +433,11 @@ test('Build My Trip: an evening stop on a night says "Tonight: Trivia at 7 PM" (
   const m = mk({ name: 'Nights Trip Monthly' });
   set(m, [{ ...KARAOKE, days: ['tue'], frequency: 'monthly-1st' }]);
   const t = (date) => app.withTripWeeklyNights({ schedule: [{ day: 1, date, venueId: m.id, startMinutes: 1200 }], days: [{ day: 1, stops: [{ venue: { id: m.id } }] }] }, at(TUE, '09:00')).days[0].stops[0].nightLine;
-  assert.equal(t('2026-11-03'), 'Tonight: Karaoke at 9 PM');
+  assert.equal(t('2026-11-03'), 'Tue Nov 3: Karaoke at 9 PM', 'audit fix (2026-10-27): a week ahead is named by its date, never "Tonight"');
   assert.equal(t('2026-11-10'), undefined);
   // The planner page prints it; the trip API adds it after planning; the planner never reads it.
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.ok(v3.includes(`(stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? 'Ce soir : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')`));
+  assert.ok(v3.includes(`(stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')`));
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.ok(src.includes('withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))))'));
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /venue_weekly_nights|withTripWeeklyNights/, 'ranking unchanged');

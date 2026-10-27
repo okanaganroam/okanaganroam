@@ -320,7 +320,7 @@ test('Build My Trip: a stop timed inside happy hour says "Happy hour: …" (EN/F
   assert.equal(fr.happyHourLineFrLang, undefined);
   // The planner page prints the line on the stop's card; the trip API adds it after planning.
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.ok(v3.includes(`(stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour : <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')`));
+  assert.ok(v3.includes(`(stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour ' + (stop.happyHourWhenFr ? esc(stop.happyHourWhenFr) + ' ' : '') + ': <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')`));
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.ok(src.includes('withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))'));
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'trip-planner.js'), 'utf8'), /happy_hour_deals|happyHourDeals/, 'the planner itself never reads deals (ranking unchanged)');
