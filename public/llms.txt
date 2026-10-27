@@ -9,7 +9,6 @@ Each listing shows its address, map location, opening hours and the date those h
 - [Home](https://okanaganroam.com/): search every place, see what's open now
 - [Roam Now map](https://okanaganroam.com/map): what's open near you and this week's events on a map
 - [What's On](https://okanaganroam.com/whats-on): events across the Okanagan
-- [This weekend](https://okanaganroam.com/whats-on/this-weekend): events this weekend
 - [Build My Trip](https://okanaganroam.com/trip): free day-by-day trip planner
 - [Guides](https://okanaganroam.com/guides): seasonal and themed guides (fall, winter, brunch, patios, wineries, dog-friendly)
 - [Browse & Search](https://okanaganroam.com/browse): every place, with filters (dog-friendly, kid-friendly, vegan, gluten-free, happy hour, free entry)
@@ -30,7 +29,7 @@ Each listing shows its address, map location, opening hours and the date those h
 - [Oliver](https://okanaganroam.com/oliver)
 - [Osoyoos](https://okanaganroam.com/osoyoos)
 
-Listing pages follow the pattern https://okanaganroam.com/{town}/{category}/{place}, for example https://okanaganroam.com/kelowna/wineries.
+Listing pages follow the pattern https://okanaganroam.com/{town}/{category}/{place}, for example https://okanaganroam.com/kelowna/wineries/tantalus-vineyards.
 
 ## Français
 

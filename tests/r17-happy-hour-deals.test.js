@@ -149,13 +149,15 @@ test('Venue page: a Deals list under the happy hour times with its checked date;
   setDeals(v, DEALS);
   const en = row(page(v, at(TUE, '12:00')));
   assert.match(en, /^<span class="venue-hh-times">Mon–⁠Fri\u00a03–⁠6\u00a0PM<\/span><span class="venue-hh-deals">/, 'times, then the deals (one checked date, at the end, when both were checked the same day)');
-  assert.match(en, /<span class="venue-hh-deals-label" id="venueHhDealsLabel">Deals<\/span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel"><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)<\/span><\/span><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">\$10<\/span><span class="venue-hh-deal-text">Cocktails<\/span><\/span><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">half price<\/span><span class="venue-hh-deal-text">Appies<\/span><\/span><\/span>/);
+  // Audit fix (2026-10-27): a card with only the happy hour block has no "Deals" label under its "Happy hour deals"
+  // heading; the list is named by aria-label.
+  assert.match(en, /<span class="venue-hh-deals"><span class="venue-hh-deal-list" role="list" aria-label="Happy hour deals"><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)<\/span><\/span><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">\$10<\/span><span class="venue-hh-deal-text">Cocktails<\/span><\/span><span class="venue-hh-deal" role="listitem"><span class="venue-hh-deal-price">half price<\/span><span class="venue-hh-deal-text">Appies<\/span><\/span><\/span>/);
   assert.doesNotMatch(en, /venue-hh-more/, '3 deals: no "more" toggle');
   const checked = `Checked ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(today.slice(5, 7)) - 1]} ${Number(today.slice(8, 10))}, ${today.slice(0, 4)}`;
   assert.ok(en.includes(`<span class="venue-hours-checked venue-hh-deals-checked">${checked}</span>`), en);
   // French without French lines: the English lines, each marked as English.
   const fr = row(page(v, at(TUE, '12:00'), 'fr'));
-  assert.match(fr, />Spéciaux</);
+  assert.match(fr, /aria-label="Spéciaux du happy hour"/);
   assert.match(fr, /<span class="venue-hh-deal" role="listitem" lang="en"><span class="venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)<\/span><\/span>/);
   assert.match(fr, /venue-hh-deals-checked">Vérifié le /);
   // With French lines: those, not marked English.
@@ -167,7 +169,8 @@ test('Venue page: a Deals list under the happy hour times with its checked date;
   const only = mk({ name: 'Deals Only Pub' });
   setDeals(only, DEALS.slice(0, 1));
   const o = row(page(only, at(TUE, '12:00')));
-  assert.doesNotMatch(o, /venue-hh-times/);
+  // Audit fix (2026-10-27): no times stored -> "Times vary — check with the venue" in their place, never prices alone.
+  assert.match(o, /^<span class="venue-hh-times venue-hh-times-vary">Times vary — check with the venue<\/span>/);
   assert.match(o, /venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)</);
   // Up to 6 deals all show in the deals card: no "more" toggle (2026-10-27).
   const six = mk({ name: 'Deals Six Pub' });

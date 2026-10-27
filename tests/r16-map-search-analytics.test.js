@@ -58,7 +58,7 @@ test('/map and /fr/map carry the event code, at the finished-search points only'
     // The page-side copy of the normalizer keeps its backslashes (it is inlined from the function, not retyped).
     assert.ok(block.includes(".replace(/\\s+/g, ' ').slice(0, 60)"), `${p}: the normalizer is intact`);
     // Enter / the phone's Search key and voice go through runSearch, which reports once the results are in.
-    assert.match(page.text, /var hadWords = !!term; changed\(\); reportSearch\(v, how \|\| 'typed', hadWords\);/);
+    assert.match(page.text, /var hadWords = !!term; searchFit = true; changed\(\); reportSearch\(v, how \|\| 'typed', hadWords\);/);
     assert.match(page.text, /runSearch\(said, 'voice'\)/);
     // Typing reports only after it rests for 2.5 s, not on every key.
     assert.match(block, /pauseTimer = setTimeout\(function\(\)\{ if \(searchEl\.value === v\) reportSearch\(v, 'paused', !!term\); \}, 2500\)/);

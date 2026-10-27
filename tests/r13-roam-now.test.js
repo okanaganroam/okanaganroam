@@ -178,7 +178,8 @@ test('/map: comedy words and New Year’s Eve (EN and FR) open the Events tab by
 
 test('/fr/map: the no-results message and the event counts are in French, and 0 reads « Aucun événement »', async () => {
   const fr = await mapReader('fr'), en = await mapReader('en');
-  assert.ok(fr.html.includes('T.noName(FR && typedWords ? typedWords : term)'));
+  // Audit fix (2026-10-27): the English side names the search as read (termShown: "open mic", never "openmic").
+  assert.ok(fr.html.includes('T.noName(FR && typedWords ? typedWords : termShown(term))'));
   const fn = (html, key) => { const ctx = {}; vm.runInNewContext(`this.f = ${html.match(new RegExp(`${key}: (function\\(n(?:, r)?\\)\\{[^\\n]*?; \\})`))[1]}`, ctx); return ctx.f; };
   const frCount = fn(fr.html.slice(fr.html.indexOf('var T = FR ?')), 'eventsCount'), enCount = fn(en.html.slice(en.html.indexOf('} : {', en.html.indexOf('var T = FR ?'))), 'eventsCount');
   assert.equal(frCount(0), 'Aucun événement cette semaine');

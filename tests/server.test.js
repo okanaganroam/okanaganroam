@@ -17264,7 +17264,8 @@ test('Happy hour times: guarded write, the admin route, and Happy hour now on th
   assert.ok(row && typeof row[11] === 'string' && row[11].includes('14:00-17:00'), 'the compact times ship as [11]');
   const html = app.renderPlacesMapPage();
   assert.ok(html.includes(`data-pm-feat="happy" aria-pressed="false"><span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour now</button>`));
-  assert.match(html, /k === 'happy' && hhKnown \? !\(p\.hhs && p\.hhs\.now\)/, 'Happy hour now needs researched times that are on now');
+  // Audit fix (2026-10-27): on now, or (while no happy hour is on anywhere) later today.
+  assert.match(html, /k === 'happy' && hhKnown \? !\(p\.hhs && \(p\.hhs\.now \|\| !hhAnyNow\)\)/, 'Happy hour now needs researched times that are on now');
 });
 
 test('Seasonal notices read in French on French pages (2026-10-14)', () => {
@@ -20529,7 +20530,8 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
     [/\^until:/, 'until a time'], [/\\btomorrow\\b\|\\bdemain\\b/, 'tomorrow'], [/var NEG = ' no not without except/, 'no ...'], [/party of\|group of\|table for/, 'group size'], [/if \(ors && onTags\(\)\.length > 1\) tagOr = true;/, 'or']]) {
     assert.match(src, rx, what);
   }
-  assert.match(src, /if \(\(atMin != null \|\| atDay\) && !openAt\(p, atMin, atDay\)\) return false;/, 'open at a time uses the listed hours');
+  // Audit fix (2026-10-27): tonight's trivia (a night search) is kept even where the hours aren't listed (nightHit).
+  assert.match(src, /if \(\(atMin != null \|\| atDay\) && !nightHit\(p\) && !openAt\(p, atMin, atDay\)\) return false;/, 'open at a time uses the listed hours');
   // Search by voice: the browser's speech service, a microphone button that shows only where it works, and the privacy note.
   assert.match(html, /<button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice">/);
   assert.match(src, /var SR = window\.SpeechRecognition \|\| window\.webkitSpeechRecognition/);
@@ -24651,7 +24653,10 @@ const crawlLinks = (html) => new Set([...html.replace(/<script[\s\S]*?<\/script>
 
 test('Lighter pages: crawlable links: every place and event waiting for "Show more" is linked from its hub without JavaScript, in English and French', async () => {
   const made = [], events = [];
-  for (let i = 0; i < 120; i++) made.push(app.createVenue({ name: `CR Kitchen ${String(i).padStart(3, '0')}`, region: 'kelowna', type: 'restaurant', description: `A crawlable-links fixture kitchen number ${i}.`, slug: `cr-kitchen-${i}` }));
+  for (let i = 0; i < 120; i++) made.push(app.createVenue({ name: `CR Kitchen ${String(i).padStart(3, '0')}`, region: 'kelowna', type: 'restaurant', description: `A crawlable-links fixture kitchen number ${i}.`, slug: `cr-kitchen-${i}`,
+    // Audit fix (2026-10-27): with French text, so the French hubs link their French pages (a place without French is
+    // linked in English, since its /fr page redirects there).
+    description_fr: `Une cuisine de test numéro ${i}.` }));
   const pad = (x) => String(x).padStart(2, '0'), today = new Date();
   const srv = lpHttp.createServer(app.server.listeners('request')[0]);
   await new Promise((resolve) => srv.listen(0, resolve));
@@ -24684,7 +24689,9 @@ test('Lighter pages: crawlable links: every place and event waiting for "Show mo
       assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b, fr ? 'fr' : 'en', { sensitivity: 'base' })), `${p}: A to Z`);
       assert.doesNotMatch(list[0], /display:\s*none|hidden/, `${p}: nothing is hidden`);
       assert.ok(list[2].length / names.length < 100, `${p}: light (${Math.round(list[2].length / names.length)} bytes a link)`);
-      if (fr) assert.ok(names.length && !/href="\/kelowna\//.test(list[2]), `${p}: French addresses`);
+      // Audit fix (2026-10-27): the fixture places (with French text) at their French addresses; other places in the test
+      // database have no French, so they keep their English ones.
+      if (fr) assert.ok(names.length && !/href="\/kelowna\/restaurants\/cr-kitchen-/.test(list[2]), `${p}: French addresses`);
     }
     // Events: /whats-on keeps the soonest-first order.
     for (const p of ['/whats-on', '/fr/whats-on']) {
@@ -28554,7 +28561,8 @@ test('Map search pass 6: a new search drops the last search\'s filters, keeps ha
   assert.match(src, /else \{ if \(liveBase\) \{ restore\(JSON\.parse\(JSON\.stringify\(liveBase\)\)\); liveBase = null; \} undoLastSearch\(\); \}/);
   assert.match(src, /lastSearchSet = searchDiff\(before, snapshot\(\)\);/);
   assert.match(src, /readSearch\(v, false\); searchEl\.value = String\(v \|\| ''\)\.trim\(\);/);
-  assert.match(src, /if \(qs\.get\('q'\)\) \{ readSearch\(qs\.get\('q'\)\); searchEl\.value = qs\.get\('q'\); \}/);
+  // Audit fix (2026-10-27): a search from the address also fits the map to its results (searchFit).
+  assert.match(src, /if \(qs\.get\('q'\)\) \{ readSearch\(qs\.get\('q'\)\); searchEl\.value = qs\.get\('q'\); searchFit = true; \}/);
   assert.match(src, /lastSearchSet = null; radiusFixed = false; searchEl\.value = '';/, 'Clear forgets the last search');
   // With the location known and something within 1 km, the map shows the 1 km around the visitor.
   assert.match(src, /if \(within1\) fitTo\(L\.latLng\(me\.lat, me\.lng\)\.toBounds\(2000\), 17\);/);

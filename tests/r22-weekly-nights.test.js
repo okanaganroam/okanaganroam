@@ -356,7 +356,8 @@ test('Roam Now: tonight\'s nights ride as [19] (small), the card says "Tonight: 
   assert.equal(ctx.hit('karaoke', thu), true);
   for (const q of ['open mic', 'scène ouverte', 'drag brunch']) assert.equal(ctx.hit(q, o), true, q);
   // "open mic" is one idea (not "open now"); "weekly nights" turns the chip on.
-  assert.ok(html.includes("[/open[ -]?mics?|sc[eè]nes? ouvertes?/g, ' openmic ']"));
+  // Audit fix (2026-10-27): « scène ouverte » also after the typo fix reads « ouverte » as « ouvert ».
+  assert.ok(html.includes("[/open[ -]?mics?|sc[eè]nes? ouverte?s?/g, ' openmic ']"));
   assert.ok(html.includes("nights: 'nights',"));
   for (const s of html.split(/<script(?![^>]*\bsrc=)(?![^>]*application\/(?:ld\+)?json)[^>]*>/).slice(1).map((x) => x.split('</script>')[0])) new vm.Script(s);
 });
@@ -387,7 +388,8 @@ test('What\'s On: an "Every week" section, tonight first and open, the rest fold
   assert.ok(pg.indexOf('id="whatsOnNights"') > pg.indexOf('id="whatsOnResultsTop"'));
   assert.doesNotMatch(app.renderWhatsOnPage(null, { now: at(TUE, '12:00'), scope: { region: 'kelowna' } }), /id="whatsOnNights"/, 'only on the main page');
   // French twin and no new URLs.
-  const daily = mk({ name: 'Nights WO Daily' });
+  // Audit fix (2026-10-27): with French text, so /fr/whats-on links its French page (a place without French is linked in English: its /fr page redirects there).
+  const daily = mk({ name: 'Nights WO Daily', description_fr: 'Un pub de test pour les soirées.' });
   set(daily, [{ days: WEEK, kind: 'trivia', title: 'Daily quiz', start: '19:00' }]);
   const srv = http.createServer(app.server.listeners('request')[0]);
   await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));

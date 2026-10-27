@@ -158,7 +158,8 @@ test('the map reads ?show=happy-hour and turns on its Happy hour now filter', ()
   const i = page.indexOf("if (qs.get('show') === 'happy-hour') feats.happy = true;");
   assert.ok(i > 0);
   assert.ok(i < page.indexOf('syncChips();', i), 'before the chips are drawn');
-  assert.ok(page.includes("k === 'happy' && hhKnown ? !(p.hhs && p.hhs.now)"), 'the filter it turns on is Happy hour now');
+  // Audit fix (2026-10-27): Happy hour now, or, while none is on anywhere, the ones later today.
+  assert.ok(page.includes("k === 'happy' && hhKnown ? !(p.hhs && (p.hhs.now || !hhAnyNow))"), 'the filter it turns on is Happy hour now');
   assert.equal(app.HAPPY_HOUR_MAP_HREF, '/map?show=happy-hour');
 });
 

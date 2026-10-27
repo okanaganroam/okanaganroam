@@ -33,7 +33,12 @@ test('/llms.txt is plain text, names the site and links only to okanaganroam.com
   assert.match(r.type, /^text\/plain/);
   assert.match(r.text, /^# Okanagan Roam\n/);
   assert.match(r.text, /https:\/\/okanaganroam\.com\/map/);
-  assert.match(r.text, /https:\/\/okanaganroam\.com\/fr\b/);
+  // Audit fix (2026-10-27): the French links are listed only once the French pages are indexable; until then the
+  // summary only says French pages exist, and never links the noindex /whats-on/this-weekend.
+  if (app.FRENCH_INDEXABLE) assert.match(r.text, /https:\/\/okanaganroam\.com\/fr\b/);
+  else { assert.doesNotMatch(r.text, /## Français|okanaganroam\.com\/fr\b/); assert.match(r.text, /French pages start with \/fr\//); }
+  assert.doesNotMatch(r.text, /this-weekend/);
+  assert.match(r.text, /for example https:\/\/okanaganroam\.com\/kelowna\/wineries\/[a-z0-9-]+\./);
   for (const m of r.text.matchAll(/\]\((https?:\/\/[^)]+)\)/g)) assert.match(m[1], /^https:\/\/okanaganroam\.com\//);
 });
 
