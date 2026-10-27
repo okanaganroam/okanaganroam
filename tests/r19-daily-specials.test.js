@@ -327,7 +327,7 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: �
   assert.deepEqual(wed[17], ['wed', 'Wing Wednesday · 60¢ wings, dine-in only']);
   // The page: the chip in the quick row and the panel, read from [17], the card line, the filter.
   const html = app.renderPlacesMapPage();
-  assert.equal((html.match(/data-pm-feat="specials"[^>]*><span aria-hidden="true">🏷️<\/span> Specials today<\/button>/g) || []).length, 2);
+  assert.equal(html.split(`data-pm-feat="specials" aria-pressed="false"><span aria-hidden="true">${app.uiIcon('tag')}</span> Specials today</button>`).length - 1, 2);
   assert.ok(html.indexOf('data-pm-feat="specials"') < html.indexOf('data-pm-feat="patio"'), 'beside Happy hour now, at the front of the row');
   assert.ok(html.includes('"specials":32768'));
   assert.ok(html.includes("if (a[17] && a[17][1]) { p.spDay = a[17][0]; p.sp = FR && a[17][2] ? a[17][2] : a[17][1]; p.spEn = !!(FR && !a[17][2]);"));
@@ -340,7 +340,7 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: �
   await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
   try {
     const frHtml = await fetch(`http://127.0.0.1:${srv.address().port}/fr/map`).then((x) => x.text());
-    assert.match(frHtml, /data-pm-feat="specials"[^>]*><span aria-hidden="true">🏷️<\/span> Spéciaux du jour<\/button>/);
+    assert.ok(frHtml.includes(`data-pm-feat="specials" aria-pressed="false"><span aria-hidden="true">${app.uiIcon('tag')}</span> Spéciaux du jour</button>`));
   } finally {
     srv.closeAllConnections();
     await new Promise((resolve) => srv.close(resolve));

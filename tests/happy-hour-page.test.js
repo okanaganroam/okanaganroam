@@ -54,7 +54,7 @@ test('Happy hour row: days with the same windows grouped, then the checked date 
 
 test('Happy hour live line: on now, later today, next day, past midnight (fixed Pacific clock)', () => {
   // 2026-10-26: while it is on, the line counts down to the end ("until 6 PM" stays in the Happy hour row).
-  assert.deepEqual(line(page(brewery, at(TUE, '16:00'))), ['now', '<span aria-hidden="true">🍻</span> Happy hour on now · ends in 2 hr']);
+  assert.deepEqual(line(page(brewery, at(TUE, '16:00'))), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour on now · ends in 2 hr`]);
   assert.deepEqual(line(page(brewery, at(TUE, '12:00'))), ['later', 'Happy hour today 3–6 PM']);
   assert.deepEqual(line(page(brewery, at(TUE, '18:00'))), ['next', 'Next happy hour: Wednesday 3 PM'], 'a window ends at its closing minute');
   assert.deepEqual(line(page(brewery, at(FRI, '12:00'))), ['next', 'Next happy hour: Saturday 7 PM']);
@@ -63,7 +63,7 @@ test('Happy hour live line: on now, later today, next day, past midnight (fixed 
   // A window past midnight, and a place with happy hour on one weekday only.
   const late = mk({ name: 'HH Late Bar', hours: JSON.stringify(open('16:00', '02:00')) });
   setTimes(late, { sat: [['22:00', '01:00']], tue: [['15:00', '17:00']] });
-  assert.deepEqual(line(page(late, at(SUN, '00:30'))), ['now', '<span aria-hidden="true">🍻</span> Happy hour on now · ends in 30 min']);
+  assert.deepEqual(line(page(late, at(SUN, '00:30'))), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour on now · ends in 30 min`]);
   assert.deepEqual(line(page(late, at(TUE, '20:00'))), ['next', 'Next happy hour: Saturday 10 PM']);
   const weekly = mk({ name: 'HH Tuesday Only' });
   setTimes(weekly, { tue: [['15:00', '17:00']] });
@@ -75,7 +75,7 @@ test('Happy hour live line: on now, later today, next day, past midnight (fixed 
 });
 
 test('Happy hour live line and row in French', () => {
-  assert.deepEqual(line(page(brewery, at(TUE, '16:00'), 'fr')), ['now', '<span aria-hidden="true">🍻</span> Happy hour en cours · se termine dans 2 h']);
+  assert.deepEqual(line(page(brewery, at(TUE, '16:00'), 'fr')), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour en cours · se termine dans 2 h`]);
   assert.deepEqual(line(page(brewery, at(TUE, '12:00'), 'fr')), ['later', 'Happy hour aujourd’hui 15 h–18 h']);
   assert.deepEqual(line(page(brewery, at(FRI, '12:00'), 'fr')), ['next', 'Prochain happy hour : samedi 19 h']);
   assert.equal(app.happyHourLiveText({ state: 'next', from: { weekday: 'tue', minutes: 930 }, nextWeek: true }, true), 'Prochain happy hour : mardi prochain 15 h 30');

@@ -7966,7 +7966,48 @@ function advisoryNotOperatingIds() {
   for (const [id, note] of getCollectionNotes(ADVISORY_COLLECTION_KIND)) if (advisoryNotOperating(note)) ids.add(id);
   return ids;
 }
-const SEASON_TAG_ICON = { closed: '\u{1F342}', open_until: '\u23F3', reopening: '\u{1F331}', temp_closed: '\u{1F4C5}' };
+// UI line icons (2026-10-26, polish pass): small inline SVGs in place of the emoji that served as button, chip and
+// label icons (Add to trip, Happy hour, Roam Now's filter chips, the season tags). The same look as the homepage
+// mood-card icons: 24-unit box, thin round strokes, currentColor, about 15px, hidden from screen readers (the words
+// beside them are the accessible name, so nothing a screen reader says changes). Paths close explicitly
+// (<path></path>) so a browser's innerHTML reads back exactly what was written.
+const UI_ICON_PATHS = {
+  trip: '<rect x="5" y="7" width="14" height="13" rx="2"></rect><path d="M9 7V4.5h6V7"></path><path d="M9 11v5M15 11v5"></path>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>',
+  cocktail: '<path d="M4 4h16l-8 9z"></path><path d="M12 13v7"></path><path d="M8 20h8"></path><path d="M7 7.5h10"></path>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z"></path>',
+  beer: '<path d="M6 8h9v11a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 6 19z"></path><path d="M15 11h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2"></path><path d="M6 8a2.5 2.5 0 0 1 2.5-3 3 3 0 0 1 4.5-.5A2.5 2.5 0 0 1 15 8"></path>',
+  food: '<path d="M7 3v7a2 2 0 0 0 4 0V3"></path><path d="M9 10v11"></path><path d="M17 3c-1.5 0-2 2-2 4s.5 4 2 4 2-2 2-4-.5-4-2-4z"></path><path d="M17 11v10"></path>',
+  coffee: '<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"></path><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H15.5"></path><path d="M9 3.5v3M12.5 3.5v3"></path>',
+  wine: '<path d="M8 3h8l-1 7a3 3 0 0 1-6 0z"></path><path d="M12 13v6"></path><path d="M9 21h6"></path>',
+  beach: '<path d="M2 17c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"></path><path d="M2 21c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"></path><circle cx="16" cy="7" r="3"></circle>',
+  tree: '<path d="M12 3l6 8.5h-3.5l4 6H5.5l4-6H6z"></path><path d="M12 17.5V21"></path>',
+  golf: '<path d="M7 21V4l10 4-10 4"></path><path d="M4 21h8"></path>',
+  target: '<circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="0.8"></circle>',
+  sun: '<circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"></path>',
+  paw: '<circle cx="7" cy="8" r="1.6"></circle><circle cx="12" cy="6" r="1.6"></circle><circle cx="17" cy="8" r="1.6"></circle><circle cx="19" cy="12.5" r="1.6"></circle><path d="M8 17c-1.5-3 1-6 4-6s5.5 3 4 6c-.8 1.6-2.5 1.5-4 .7-1.5.8-3.2.9-4-.7z"></path>',
+  tag: '<path d="M3 3.5h8l10 10-7.5 7.5-10.5-10z"></path><circle cx="7.5" cy="8" r="1.4"></circle>',
+  music: '<path d="M9 18V5.5l11-2V16"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="17.5" cy="16" r="2.5"></circle>',
+  waves: '<path d="M2 9c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"></path><path d="M2 15c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"></path>',
+  child: '<circle cx="12" cy="7.5" r="3"></circle><path d="M6.5 20.5v-1.5a5.5 5.5 0 0 1 11 0v1.5"></path>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path>',
+  sunrise: '<path d="M5.5 18a6.5 6.5 0 0 1 13 0"></path><path d="M2.5 18h19"></path><path d="M12 4v4M4.9 10.4l1.4 1.4M17.7 11.8l1.4-1.4"></path><path d="M3.5 21.5h17"></path>',
+  group: '<circle cx="9" cy="8" r="3"></circle><path d="M3 20v-1a6 6 0 0 1 12 0v1"></path><path d="M16 5a3 3 0 0 1 0 6"></path><path d="M18 14a6 6 0 0 1 3 5.2V20"></path>',
+  tv: '<rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M8 21h8M9 2.5l3 3.5 3-3.5"></path>',
+  juice: '<path d="M7 8.5h10l-1.2 12H8.2z"></path><path d="M12 8.5l1.5-5.5H17"></path>',
+  ticket: '<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"></path><path d="M14.5 8v1.5M14.5 11.25v1.5M14.5 14.5V16"></path>',
+  leaf: '<path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z"></path><path d="M5 19l8-8"></path>',
+  sprout: '<path d="M12 21v-9"></path><path d="M12 12c0-4-3-6-7-6 0 4 3 6 7 6z"></path><path d="M12 10c0-3.5 2.5-5.5 7-5.5 0 3.5-2.5 5.5-7 5.5z"></path>',
+  wheat: '<path d="M12 21V7"></path><path d="M12 7c-1.8-.8-2.8-2.4-3-4.5 1.8.4 2.8 2 3 4.5zM12 7c1.8-.8 2.8-2.4 3-4.5-1.8.4-2.8 2-3 4.5z"></path><path d="M12 12c-2-.4-3.4-1.8-3.9-3.8 2 .2 3.4 1.6 3.9 3.8zM12 12c2-.4 3.4-1.8 3.9-3.8-2 .2-3.4 1.6-3.9 3.8z"></path><path d="M12 17c-2-.4-3.4-1.8-3.9-3.8 2 .2 3.4 1.6 3.9 3.8zM12 17c2-.4 3.4-1.8 3.9-3.8-2 .2-3.4 1.6-3.9 3.8z"></path>',
+  hourglass: '<path d="M6 3h12M6 21h12"></path><path d="M7.5 3v2.5c0 2.2 4.5 4.3 4.5 6.5s-4.5 4.3-4.5 6.5V21M16.5 3v2.5c0 2.2-4.5 4.3-4.5 6.5s4.5 4.3 4.5 6.5V21"></path>',
+  calendar: '<rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M4 10h16M9 3v4M15 3v4"></path>',
+};
+function uiIcon(name, size = 15) {
+  const paths = UI_ICON_PATHS[name];
+  if (!paths) return '';
+  return `<svg class="ui-icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="vertical-align:-0.15em">${paths}</svg>`;
+}
+const SEASON_TAG_ICON = { closed: uiIcon('leaf'), open_until: uiIcon('hourglass'), reopening: uiIcon('sprout'), temp_closed: uiIcon('calendar') };
 // "Open until Oct 31" (2026-10-18): the card tag's short form of "Open for the season until October 31."; the venue
 // page keeps the full sentence.
 const SEASON_TAG_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -8513,10 +8554,32 @@ function specialsTodayFor(venues, now = new Date(), byVenue = allVenueSpecials()
   }
   return { clock, byId };
 }
-// "Wing Wednesday · 60¢ wings" (French lines when given). -> { text, english }
+// Redundant deal lines (2026-10-26, polish pass): "Taco Tuesday" + "Tacos", "Wing Wednesday" + "Wings" or
+// "Margarita Monday" + "Margaritas" say the same thing twice. True when every word of the deal (case, accents,
+// punctuation and plurals aside; "a", "the", "and"... ignored) is already a word of the title, or the deal is empty.
+// A deal that adds anything ("$3 tacos", "Mac and cheese plus a beer or wine") is kept.
+const SPECIAL_FILLER_WORDS = new Set(['a', 'an', 'the', 'and', 'our', 'de', 'des', 'du', 'la', 'le', 'les', 'et']);
+function specialWordStem(w) {
+  if (w.length > 4 && w.endsWith('ies')) return `${w.slice(0, -3)}y`;
+  if (w.length > 3 && w.endsWith('es') && /(?:s|x|z|ch|sh)$/.test(w.slice(0, -2))) return w.slice(0, -2);
+  if (w.length > 2 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  return w;
+}
+function specialWords(text) {
+  return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '').split(/[^a-z0-9]+/).filter(Boolean).map(specialWordStem);
+}
+function specialDealRepeatsTitle(title, deal) {
+  const t = new Set(specialWords(title));
+  const d = specialWords(deal).filter((w) => !SPECIAL_FILLER_WORDS.has(w));
+  return d.every((w) => t.has(w));
+}
+// "Wing Wednesday · 60¢ wings" (French lines when given); just the title when the deal only repeats it
+// ("Taco Tuesday", not "Taco Tuesday · Tacos"). -> { text, english }
 function specialLine(s, fr) {
   const useFr = fr && s.title_fr && s.deal_fr;
-  return { text: `${useFr ? s.title_fr : s.title} · ${useFr ? s.deal_fr : s.deal}`, english: !!(fr && !useFr) };
+  const title = useFr ? s.title_fr : s.title, deal = useFr ? s.deal_fr : s.deal;
+  return { text: specialDealRepeatsTitle(title, deal) ? String(title) : `${title} · ${deal}`, english: !!(fr && !useFr) };
 }
 // Today's specials in one short line (up to two, "; " between): the Roam Now card and Build My Trip.
 function specialsCompact(list, fr, n = 2) {
@@ -11304,7 +11367,7 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
       <h2 data-i18n="mood.heading">What are you in the mood for?</h2>${seasonalLink ? `
-      <a class="discover-heading-link mood-season-link" href="${seasonalLink.href}">${escapeHtml(seasonalLink.label)} &rarr;</a>` : ''}
+      ${homeSeeAllLink(seasonalLink.href, escapeHtml(seasonalLink.label), escapeHtml(seasonalLink.labelFr), 'mood-season-link')}` : ''}
       ${homeSeeAllLink('/categories', 'See all categories', 'Voir toutes les catégories')}
     </div>
     <div class="mood-card-grid">${cardsHtml}${homeRowEndCard('/categories', 'See all categories', 'Voir toutes les catégories')}</div>
@@ -12568,7 +12631,7 @@ function renderHomepageDiscoveryStyles() {
     .mood-card { flex: 0 0 calc((100% + var(--mood-pad) - 2 * var(--mood-gap)) / 2.25); scroll-snap-align: start; aspect-ratio: 1.59 / 1; }
     .mood-swipe-cue { display: inline-block; margin-left: auto; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.02em; color: rgba(42,32,25,0.62); white-space: nowrap; }
     /* The seasonal guide link (2026-10-13) stacked the heading into three rows on phones; it shows from 641px up only. */
-    .mood-season-link { display: none; }
+    .discover-heading-link.home-see-all.mood-season-link { display: none; }
   }
 
   /* Reference redesign, forensic-comparison rebuild (supersedes the
@@ -13046,6 +13109,7 @@ const SEO_PAGE_CSS = `
     border-radius: 16px; overflow: hidden; margin-bottom: 24px;
     box-shadow: 0 10px 24px -16px rgba(74,52,40,0.35);
   }
+  .venue-hero-photo { position: relative; } /* the photo credit chip sits on its bottom-right corner */
   .venue-hero-photo img { width: 100%; max-height: 420px; object-fit: cover; display: block; }
   .venue-hero-fallback {
     display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
@@ -13495,7 +13559,17 @@ function golfFavTripScriptBody(type = 'golf') {
 // script runs; app.js still applies French and the pressed states.
 const APP_FAV_HEART_OUTLINE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
 const APP_FAV_LABEL_HTML = `${APP_FAV_HEART_OUTLINE} Favorite`;
-const APP_TRIP_LABEL_HTML = '\u{1F9F3} Add to trip';
+// The label's icon is the same SVG app.js's tripLabelHtml() draws for the luggage emoji in trip.addToTrip, so the
+// first syncButtons() leaves server-rendered buttons as they are.
+const APP_TRIP_LABEL_HTML = `${uiIcon('trip')} Add to trip`;
+// trip.addToTrip / trip.inTrip ('\u{1F9F3} Add to trip', '\u2713 In trip') as button HTML: the leading emoji or tick
+// drawn as a line icon (app.js tripLabelHtml() does the same in the browser).
+function appTripLabelHtml(label) {
+  const text = String(label || '');
+  const i = text.indexOf(' ');
+  if (i > 0 && /[^\x00-\x7F]/.test(text.slice(0, i))) return `${uiIcon(text.slice(0, i) === '\u2713' ? 'check' : 'trip')}${escapeHtml(text.slice(i))}`;
+  return escapeHtml(text);
+}
 // The Favorite / Add to Trip buttons themselves, shared by the listing
 // card (surface "category_card") and the venue page CTA row ("venue_page").
 // appLabels: the page loads app.js, so use its canonical labels. Pages that
@@ -18089,7 +18163,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var out = on.length ? '<span class="pm-feats">' + on.slice(0, 3).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
     if (p.dog && feats.dogs) out += '<span class="pm-dog">' + esc(T.dogRule + ' ' + p.dog) + '</span>';
     // Happy hour deals (2026-10-26): the first two, after the happy hour line, while it is on now or later today.
-    if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">🍸 ' + esc(p.hhs.text) + (p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '') + '</span>';
+    if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">${uiIcon('cocktail')} ' + esc(p.hhs.text) + (p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '') + '</span>';
     // Weekly specials (2026-10-27): "Today: Wing Wednesday · 60¢ wings" (« Aujourd’hui : … »).
     if (p.spOn) out += '<span class="pm-sp' + (feats.specials ? ' is-on' : '') + '">' + esc(T.spToday) + ' <span' + (p.spEn ? ' lang="en"' : '') + '>' + esc(p.sp) + '</span></span>';
     return out;
@@ -19316,22 +19390,22 @@ const MAP_FEATURES = [
 const MAP_SPECIALS_BIT = 32768;
 // The kinds of place a visitor picks from (any of them), by venue type.
 const MAP_KINDS = [
-  { key: 'drinks', label: 'Drinks', icon: '\u{1F37A}', types: ['pub', 'brewery', 'cocktail', 'winery', 'distillery'] },
-  { key: 'food', label: 'Food', icon: '\u{1F37D}\uFE0F', types: ['restaurant', 'pub', 'cafe'] },
-  { key: 'coffee', label: 'Coffee', icon: '\u2615', types: ['cafe'] },
-  { key: 'wine', label: 'Wineries', icon: '\u{1F377}', types: ['winery'] },
-  { key: 'beach', label: 'Beaches', icon: '\u{1F3D6}\uFE0F', types: ['beach'] },
-  { key: 'outdoor', label: 'Outdoors', icon: '\u{1F332}', types: ['outdoor'] },
-  { key: 'golf', label: 'Golf', icon: '\u26F3', types: ['golf'] },
-  { key: 'do', label: 'Things to do', icon: '\u{1F3AF}', types: ['tour', 'sport', 'indoor', 'shop'] },
+  { key: 'drinks', label: 'Drinks', icon: uiIcon('beer'), types: ['pub', 'brewery', 'cocktail', 'winery', 'distillery'] },
+  { key: 'food', label: 'Food', icon: uiIcon('food'), types: ['restaurant', 'pub', 'cafe'] },
+  { key: 'coffee', label: 'Coffee', icon: uiIcon('coffee'), types: ['cafe'] },
+  { key: 'wine', label: 'Wineries', icon: uiIcon('wine'), types: ['winery'] },
+  { key: 'beach', label: 'Beaches', icon: uiIcon('beach'), types: ['beach'] },
+  { key: 'outdoor', label: 'Outdoors', icon: uiIcon('tree'), types: ['outdoor'] },
+  { key: 'golf', label: 'Golf', icon: uiIcon('golf'), types: ['golf'] },
+  { key: 'do', label: 'Things to do', icon: uiIcon('target'), types: ['tour', 'sport', 'indoor', 'shop'] },
 ];
 const MAP_MUST_HAVES = [
-  { key: 'patio', label: 'Patio', icon: '\u2600\uFE0F' }, { key: 'dogs', label: 'Dogs OK', icon: '\u{1F415}' },
-  { key: 'happy', label: 'Happy hour now', icon: '\u{1F378}' }, { key: 'specials', label: 'Specials today', icon: '\u{1F3F7}\uFE0F' }, { key: 'music', label: 'Live music', icon: '\u{1F3B6}' },
-  { key: 'lake', label: 'Lake view', icon: '\u{1F30A}' }, { key: 'kids', label: 'Kids welcome', icon: '\u{1F9D2}' },
-  { key: 'late', label: 'Open late', icon: '\u{1F319}' }, { key: 'early', label: 'Open early', icon: '\u{1F305}' },
-  { key: 'groups', label: 'Good for groups', icon: '\u{1F465}' }, { key: 'sports', label: 'Sports on TV', icon: '\u{1F4FA}' },
-  { key: 'nonalc', label: 'Alcohol-free drinks', icon: '\u{1F9C3}' }, { key: 'free', label: 'Free to visit', icon: '\u{1F193}' },
+  { key: 'patio', label: 'Patio', icon: uiIcon('sun') }, { key: 'dogs', label: 'Dogs OK', icon: uiIcon('paw') },
+  { key: 'happy', label: 'Happy hour now', icon: uiIcon('cocktail') }, { key: 'specials', label: 'Specials today', icon: uiIcon('tag') }, { key: 'music', label: 'Live music', icon: uiIcon('music') },
+  { key: 'lake', label: 'Lake view', icon: uiIcon('waves') }, { key: 'kids', label: 'Kids welcome', icon: uiIcon('child') },
+  { key: 'late', label: 'Open late', icon: uiIcon('moon') }, { key: 'early', label: 'Open early', icon: uiIcon('sunrise') },
+  { key: 'groups', label: 'Good for groups', icon: uiIcon('group') }, { key: 'sports', label: 'Sports on TV', icon: uiIcon('tv') },
+  { key: 'nonalc', label: 'Alcohol-free drinks', icon: uiIcon('juice') }, { key: 'free', label: 'Free to visit', icon: uiIcon('ticket') },
 ];
 // What a place serves or is good for, read from its name, cuisine and description (2026-10-14), so the map's search
 // understands "great ice cream close to me" or "dinner and cocktails". Each: key, English and French chip labels, icon,
@@ -19393,7 +19467,7 @@ const MAP_TAGS = [
       || (v.type === 'beach' && /\b(?:regional|provincial) park\b/.test(name) && /\b(?:trails?|trailhead|hik(?:e|es|ing))\b/.test(text))) && !MAP_NOT_HIKE_NAME_RE.test(name)],
 ].map(([key, en, fr, icon, find, say, types, match]) => ({ key, en, fr, icon, find, say, types, match: match || null }));
 const MAP_DIETARY = [
-  { key: 'veg', label: 'Vegetarian', icon: '\u{1F957}' }, { key: 'vegan', label: 'Vegan', icon: '\u{1F331}' }, { key: 'gf', label: 'Gluten-free', icon: '\u{1F33E}' },
+  { key: 'veg', label: 'Vegetarian', icon: uiIcon('leaf') }, { key: 'vegan', label: 'Vegan', icon: uiIcon('sprout') }, { key: 'gf', label: 'Gluten-free', icon: uiIcon('wheat') },
 ];
 function mapHappyHourTimes(json) {
   try { return compactFoodDrinkHours(JSON.parse(json)) || 0; } catch (e) { return 0; }
@@ -19619,7 +19693,7 @@ ${renderGolfHeaderHtml()}
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
         <span class="pm-tagchips" id="pmTagChips"></span>
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
-        <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">⭐</span> Top rated</button>
+        <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">${uiIcon('star')}</span> Top rated</button>
         ${(() => {
           // Every filter in one row: Happy hour, Patio and Dogs OK, the dietary ones, the kinds of place, then the rest.
           const feat = (f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`;
@@ -19663,7 +19737,7 @@ ${renderGolfHeaderHtml()}
       <h3>Must have</h3>
       <div class="pm-chips" role="group" aria-label="Must have">
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
-        <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">⭐</span> Top rated</button>
+        <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">${uiIcon('star')}</span> Top rated</button>
         ${MAP_MUST_HAVES.map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n        ')}
       </div>
       <h3>Dietary</h3>
@@ -23478,7 +23552,7 @@ function cardFillActionsJs(fnName) {
     trip.type = 'button'; trip.className = 'card-action trip-btn';
     trip.setAttribute('data-trip-name', name); trip.setAttribute('data-trip-query', name + ', ' + (LABELS.regions[region] || region) + ', Okanagan Valley, BC');
     trip.setAttribute('data-trip-region', region); trip.setAttribute('data-trip-ref', 'venue:' + id); trip.setAttribute('aria-pressed', 'false'); trip.setAttribute('aria-label', 'Add ' + name + ' to trip');
-    trip.textContent = '${APP_TRIP_LABEL_HTML}';
+    trip.innerHTML = '${APP_TRIP_LABEL_HTML}';
     box.appendChild(fav); box.appendChild(trip); box.removeAttribute('data-fd-lazy');
   }`;
 }
@@ -28260,7 +28334,7 @@ function frFavTripButtons(html, venue) {
   const name = escapeHtml(venue.name);
   return html
     .replace(` Favorite</button>`, ` ${escapeHtml(APP_TRANSLATIONS.fr['card.favorite'] || 'Favori')}</button>`)
-    .replace(/(?:\u{1F9F3} Add to trip|&#65291; Add to Trip)<\/button>/u, `${escapeHtml(APP_TRANSLATIONS.fr['trip.addToTrip'] || 'Ajouter au voyage')}</button>`)
+    .replace(/(?:<svg class="ui-icon"[^>]*>(?:(?!<\/svg>)[\s\S])*<\/svg> Add to trip|&#65291; Add to Trip)<\/button>/, `${appTripLabelHtml(APP_TRANSLATIONS.fr['trip.addToTrip'] || 'Ajouter au voyage')}</button>`)
     .replace(`aria-label="Favorite ${name}"`, `aria-label="Favori : ${name}"`)
     .replace(`aria-label="Add ${name} to trip"`, `aria-label="Ajouter ${name} au voyage"`);
 }
@@ -29551,7 +29625,10 @@ function venueSpecialsHtml(sp, fr) {
   const row = ({ s, days, today, time }) => {
     const useFr = fr && s.title_fr && s.deal_fr;
     const lang = fr && !useFr ? ' lang="en"' : '';
-    return `<span class="venue-sp${today ? ' is-today' : ''}" role="listitem"><span class="venue-sp-days">${escapeHtml(days)}</span><span class="venue-sp-main"><span class="venue-sp-title"${lang}>${escapeHtml(useFr ? s.title_fr : s.title)}</span>${s.price ? ` <span class="venue-sp-price"${lang}>${escapeHtml(s.price)}</span>` : ''}${today ? ` <span class="venue-sp-today">${fr ? 'Aujourd’hui' : 'Today'}</span>` : ''}<span class="venue-sp-deal"${lang}>${escapeHtml(useFr ? s.deal_fr : s.deal)}</span>${time ? `<span class="venue-sp-time">${escapeHtml(time)}</span>` : ''}</span></span>`;
+    const title = useFr ? s.title_fr : s.title, deal = useFr ? s.deal_fr : s.deal;
+    // A deal that only repeats the title ("Taco Tuesday" / "Tacos") gets no line of its own (2026-10-26).
+    const dealHtml = specialDealRepeatsTitle(title, deal) ? '' : `<span class="venue-sp-deal"${lang}>${escapeHtml(deal)}</span>`;
+    return `<span class="venue-sp${today ? ' is-today' : ''}" role="listitem"><span class="venue-sp-days">${escapeHtml(days)}</span><span class="venue-sp-main"><span class="venue-sp-title"${lang}>${escapeHtml(title)}</span>${s.price ? ` <span class="venue-sp-price"${lang}>${escapeHtml(s.price)}</span>` : ''}${today ? ` <span class="venue-sp-today">${fr ? 'Aujourd’hui' : 'Today'}</span>` : ''}${dealHtml}${time ? `<span class="venue-sp-time">${escapeHtml(time)}</span>` : ''}</span></span>`;
   };
   return `<span class="venue-sp-list" role="list" aria-label="${fr ? 'Spéciaux de la semaine' : 'Weekly specials'}">${sp.rows.map(row).join('')}</span>${sp.checked ? `<span class="venue-hours-checked venue-sp-checked">${escapeHtml(sp.checked)}</span>` : ''}`;
 }
@@ -30076,7 +30153,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       return day && day.closure && isTemp(day.closure) ? hoursModule.dayOnDate({ ...parsedHours, closures: null }, date) : day;
     };
     const tempClosure = datedWeek ? (parsedHours.closures || []).find((c) => isTemp(c) && c.to >= clockNow.date && c.from <= hoursModule.shiftDate(clockNow.date, 6)) : null;
-    const tempClosureLine = tempClosure ? `<p class="venue-hours-temp-closed"><span aria-hidden="true">\u{1F4C5}</span> ${escapeHtml(hoursTempClosureText(tempClosure.from, tempClosure.to, fr))}</p>` : '';
+    const tempClosureLine = tempClosure ? `<p class="venue-hours-temp-closed"><span aria-hidden="true">${uiIcon('calendar')}</span> ${escapeHtml(hoursTempClosureText(tempClosure.from, tempClosure.to, fr))}</p>` : '';
     const rowsFor = (dayOf) => hoursModule.HOURS_WEEKDAYS.map((d) => {
       const day = dayOf(d);
       const text = day && day.closure ? closedWord(day.closure) : escapeHtml(venueDayHoursText(day, fr));
@@ -30084,7 +30161,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     }).join('');
     const rows = datedWeek ? rowsFor((d) => dayOnShown(dateOf(d))) : rowsFor((d) => parsedHours.days[d]);
     hoursHtml = seasonShut
-      ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
+      ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season"><span aria-hidden="true">${uiIcon('leaf')}</span> ${L('Closed for the season', 'Fermé pour la saison')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles en saison')}</summary><ul class="hours-list">${rows}</ul></details>`
       : tempShut
       ? `<h2>${L('Hours', 'Heures')}</h2><p class="venue-hours-season venue-hours-temp-shut">${L('Temporarily closed', 'Fermé temporairement')}</p><details class="venue-hours-usual"><summary>${L('Usual hours when open', 'Heures habituelles quand c’est ouvert')}</summary><ul class="hours-list">${rows}</ul></details>`
       : (() => {
@@ -30217,13 +30294,20 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     : '';
   // The owner's chosen height for the banner crop (2026-10-19), if they've moved this photo.
   const heroPosY = venue.image_url ? venuePhotoPosY(venue.id, venue.image_url) : null;
-  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}"${heroPosY === null ? '' : ` style="object-position: 50% ${heroPosY}%"`} fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}</div>` : '';
   // The credit's colour (2026-10-18): a solid #6B5E55 (5.6:1 on the cream page); the old 0.65 opacity was 3.9-4.5:1.
   // French pass 6 (2026-10-19): a credit stored as "Photo: City of Kelowna" read "Photo: Photo: …"; French has its space before the colon.
   const creditText = photoCredit ? String(photoCredit).replace(/^\s*photos?\s*:\s*/i, '') : '';
-  const creditHtml = creditText ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;color:#6B5E55;text-align:right">${L('Photo: ', 'Photo : ')}${escapeHtml(creditText)}</p>` : '';
+  // Polish pass (2026-10-26): a single photo's credit is a small chip on the photo's bottom-right corner (white on a
+  // dark 62% scrim: at least 5.3:1 over any photo, so AA), instead of a line of its own between the photo and the
+  // venue name. Still "Photo: Google Maps" / "Photo: <owner credit>"; never removed. With a gallery the "See all"
+  // button holds that corner, so the credit stays the quiet line under the photos.
+  const creditOverlay = creditText && !galleryHtml
+    ? `<p class="venue-photo-credit" style="position:absolute;right:8px;bottom:8px;margin:0;max-width:calc(100% - 16px);box-sizing:border-box;padding:2px 8px;border-radius:999px;background:rgba(20,20,20,0.62);color:#fff;font-size:0.72rem;line-height:1.5;letter-spacing:0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${L('Photo: ', 'Photo : ')}${escapeHtml(creditText)}</p>`
+    : '';
+  const heroPhotoHtml = venue.image_url ? `<div class="venue-hero venue-hero-photo"><img src="${escapeHtml(venue.image_url)}"${heroSrcset}${imgDimsAttr(venue.image_url)} alt="${escapeHtml(venue.name)}"${heroPosY === null ? '' : ` style="object-position: 50% ${heroPosY}%"`} fetchpriority="high">${galleryHtml ? `<button type="button" class="vg-all" data-vg-open="0">${L(`See all ${galleryPhotos.length} photos`, `Voir les ${galleryPhotos.length} photos`)}</button>` : ''}${creditOverlay}</div>` : '';
+  const creditHtml = creditText && galleryHtml ? `<p class="venue-photo-credit" style="margin:-18px 2px 14px;font-size:0.72rem;color:#6B5E55;text-align:right">${L('Photo: ', 'Photo : ')}${escapeHtml(creditText)}</p>` : '';
   const imageHtml = venue.image_url
-    ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : `${heroPhotoHtml}${creditHtml}`)
+    ? (galleryHtml ? `<div class="vg-mosaic">${heroPhotoHtml}${galleryHtml.strip}</div>${creditHtml}${galleryHtml.viewer}` : heroPhotoHtml)
     : themedHeroTitle
       ? `<div class="venue-hero venue-hero-fallback venue-hero-${venue.type}${heroPhoto ? ' venue-hero-has-photo' : ''}">${heroPhoto ? `
         <img class="venue-hero-img" src="${escapeHtml(heroPhoto.src)}"${heroPhoto.small ? ` srcset="${heroPhoto.small} 800w, ${heroPhoto.mid ? `${heroPhoto.mid} 1200w, ` : ''}${escapeHtml(heroPhoto.src)} 1600w" sizes="(max-width: 860px) 100vw, 1200px"` : ''}${imgDimsAttr(heroPhoto.src)} alt="${heroPhoto.example ? '' : escapeHtml(heroPhoto.alt)}" style="object-position: 50% ${heroPhoto.pos}%" fetchpriority="high">` : ''}
@@ -30449,7 +30533,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     : '';
   // Happy hour line (2026-10-23), right under the open-now line; worked out on the server like it.
   const happyHourHtml = happyHour && happyHour.live
-    ? `<p class="venue-hh-status" data-hh="${happyHour.live.state}" id="venueHappyHour">${happyHour.live.state === 'now' ? '<span aria-hidden="true">\u{1F37B}</span> ' : ''}${escapeHtml(happyHour.live.text)}</p>`
+    ? `<p class="venue-hh-status" data-hh="${happyHour.live.state}" id="venueHappyHour">${happyHour.live.state === 'now' ? `<span aria-hidden="true">${uiIcon('cocktail')}</span> ` : ''}${escapeHtml(happyHour.live.text)}</p>`
     : '';
 
   const page = `<!DOCTYPE html>
@@ -36822,8 +36906,8 @@ const GUIDE_TILE_SIZES = '(max-width: 559px) calc(100vw - 48px), (max-width: 815
 // The homepage's seasonal guide link (Sep-Mar only; nothing in summer).
 function seasonalGuideLink(now = new Date()) {
   const m = Number(todayLocal(now).slice(5, 7));
-  if (m >= 9 && m <= 11 && FILE_GUIDES['/guides/fall-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/fall-okanagan'])) return { href: '/guides/fall-okanagan', label: 'Fall in the Okanagan: our seasonal guides' };
-  if (m === 12 || m <= 3) return FILE_GUIDES['/guides/winter-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/winter-okanagan']) ? { href: '/guides/winter-okanagan', label: 'Winter in the Okanagan: our seasonal guides' } : { href: SKI_GUIDE_PATH, label: 'Winter in the Okanagan: the ski season guide' };
+  if (m >= 9 && m <= 11 && FILE_GUIDES['/guides/fall-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/fall-okanagan'])) return { href: '/guides/fall-okanagan', label: 'Fall in the Okanagan: our seasonal guides', labelFr: 'L’automne dans l’Okanagan : nos guides saisonniers' };
+  if (m === 12 || m <= 3) return FILE_GUIDES['/guides/winter-okanagan'] && !guideIsThin(FILE_GUIDES['/guides/winter-okanagan']) ? { href: '/guides/winter-okanagan', label: 'Winter in the Okanagan: our seasonal guides', labelFr: 'L’hiver dans l’Okanagan : nos guides saisonniers' } : { href: SKI_GUIDE_PATH, label: 'Winter in the Okanagan: the ski season guide', labelFr: 'L’hiver dans l’Okanagan : le guide de la saison de ski' };
   return null;
 }
 // "By town" on /guides (2026-10-14): each town's badge pages (Patios in
@@ -40891,7 +40975,7 @@ const VISITOR_REPORT_RATE_LIMIT = 20;
 // Every visitor-facing string, [English, French].
 const VC_TEXT = {
   heading: ['Visitor photos & tips', 'Photos et conseils des visiteurs'],
-  empty: ['Been here? Share a photo or a tip for other visitors.', 'Vous y êtes allé? Partagez une photo ou un conseil avec les autres visiteurs.'],
+  invite: ['Been here? Share a photo or tip', 'Vous y êtes allé? Partagez une photo ou un conseil'],
   share: ['Share a photo or tip', 'Partager une photo ou un conseil'],
   name: ['Your name', 'Votre nom'],
   nameHint: ['Shown as your first name and last initial, e.g. Sarah M.', 'Affiché avec votre prénom et l’initiale de votre nom, p. ex. Sarah M.'],
@@ -41078,7 +41162,13 @@ const VISITOR_SECTION_CSS = `
   .vc-section .vc-tip-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.55; font-size: 0.96rem; }
   .vc-section .vc-tip-meta { margin: 6px 0 0; font-size: 0.82rem; color: var(--ink, #2A2019); opacity: 0.75; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; }
   .vc-section .vc-linkbtn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
-  .vc-section .vc-empty { margin: 0 0 12px; }
+  .vc-section .vc-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .venue-section.vc-compact { margin-top: 20px; padding-top: 6px; padding-bottom: 6px; }
+  body.golf-page .venue-section.vc-compact { padding-top: 4px; padding-bottom: 4px; }
+  .vc-section .vc-open.vc-invite { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 2px; background: none; border: 0; border-radius: 6px; color: var(--plum, #1B2B3A); font-weight: 700; font-size: 0.92rem; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-align: left; }
+  .vc-section .vc-open.vc-invite:hover { background: none; text-decoration-thickness: 2px; }
+  .vc-section .vc-invite-arrow { text-decoration: none; display: inline-block; transition: transform .15s ease; }
+  .vc-section .vc-open.vc-invite:hover .vc-invite-arrow { transform: translateX(2px); }
   .vc-section .vc-open { display: inline-block; background: var(--paper, #fff); color: var(--plum, #1B2B3A); border: 1.5px solid currentColor; border-radius: 9px; padding: 10px 18px; font: inherit; font-weight: 700; font-size: 0.92rem; cursor: pointer; max-width: 100%; }
   .vc-section .vc-open:hover { background: var(--sand-deep, #EAE6D9); }
   .vc-section .vc-form { margin-top: 14px; background: var(--paper, #fff); border: 1px solid rgba(74,52,40,0.14); border-radius: 14px; padding: 18px; box-sizing: border-box; max-width: 640px; }
@@ -41115,13 +41205,19 @@ function visitorSectionHtml(venue, lang) {
       <li class="vc-tip"${i >= VISITOR_TIPS_SHOWN ? ' hidden data-vc-more' : ''}><p class="vc-tip-text">${escapeHtml(tip.tip)}</p>
         <p class="vc-tip-meta"><span>${escapeHtml(tip.display_name)}</span><span aria-hidden="true">&middot;</span><span>${escapeHtml(visitorMonthYear(tip.submitted_at, lang))}</span><span aria-hidden="true">&middot;</span><button type="button" class="vc-linkbtn" data-vc-report="${tip.id}" aria-label="${t('reportAria')}">${t('report')}</button></p></li>`).join('')}
     </ul>${tips.length > VISITOR_TIPS_SHOWN ? `<p><button type="button" class="vc-linkbtn" id="vcMore">${t('showMore')}</button></p>` : ''}`
-    : `<p class="vc-empty">${t('empty')}</p>`;
+    : '';
   const msgs = {};
   for (const k of ['send', 'sending', 'preparing', 'chars', 'reportSure', 'reported', 'errName', 'errEmail', 'errTipLong', 'errNeedOne', 'errTooMany', 'errPhoto', 'errPhotoSmall', 'errRights', 'errHonesty', 'errFix', 'errGeneric', 'errNetwork', 'errTooBig']) msgs[k] = vcText(lang, k);
-  return `<section class="venue-section vc-section" id="visitor-tips" aria-labelledby="vcHead">
-    <h2 id="vcHead">${t('heading')}</h2>
-    ${tipsHtml}
-    <button type="button" class="vc-open" id="vcOpen" aria-expanded="false" aria-controls="vcForm">${t('share')}</button>
+  // Empty state (2026-10-26, polish pass): with no approved tips the section was a heading, a sentence and a button in
+  // a big empty card. It is now one slim row, "Been here? Share a photo or tip →", the same button opening the same
+  // form; the heading stays for screen readers (and the page outline) but is not shown.
+  const head = tips.length ? `<h2 id="vcHead">${t('heading')}</h2>` : `<h2 id="vcHead" class="vc-visually-hidden">${t('heading')}</h2>`;
+  const openBtn = tips.length
+    ? `<button type="button" class="vc-open" id="vcOpen" aria-expanded="false" aria-controls="vcForm">${t('share')}</button>`
+    : `<button type="button" class="vc-open vc-invite" id="vcOpen" aria-expanded="false" aria-controls="vcForm">${t('invite')}<span class="vc-invite-arrow" aria-hidden="true">&rarr;</span></button>`;
+  return `<section class="venue-section vc-section${tips.length ? '' : ' vc-compact'}" id="visitor-tips" aria-labelledby="vcHead">
+    ${head}${tipsHtml ? `\n    ${tipsHtml}` : ''}
+    ${openBtn}
     <form class="vc-form" id="vcForm" novalidate hidden>
       <div class="vc-row">
         <div class="vc-field"><label for="vcName">${t('name')}</label><input type="text" id="vcName" maxlength="80" autocomplete="name" aria-describedby="vcNameHint"><p class="vc-hint" id="vcNameHint">${t('nameHint')}</p><p class="vc-error" id="vcNameError" hidden></p></div>
@@ -54311,6 +54407,12 @@ module.exports = {
   restLinksHtml,
   cardFillActionsJs,
   APP_TRIP_LABEL_HTML,
+  appTripLabelHtml,
+  uiIcon,
+  UI_ICON_PATHS,
+  specialDealRepeatsTitle,
+  specialLine,
+  visitorSectionHtml,
   CSP_REPORT_ONLY,
   CSP_POLICY,
   seasonOnlyStates,

@@ -4896,7 +4896,7 @@ test('Batch 4B Events: app.js loads before the inline Favorite / Add to Trip scr
     // Stage 4.3: plus the hidden occurrence identity when the event has an upcoming date.
     assert.match(row[0], /data-venue-category="whatson" data-venue-id="event-\d+" data-venue-region="kelowna" data-venue-name="[^"]+"(?: data-occurrence-id="\d+" data-occurrence-date="[^"]+"(?: data-occurrence-time="[^"]+")?)? data-surface="event_page"/, `${kind}: holder attributes unchanged`);
     assert.ok(row[1].includes(`aria-pressed="false" aria-label="Favorite `) && row[1].includes(`">${heart} Favorite</button>`), `${kind}: Favorite = app.js HEART_OUTLINE + "Favorite"`);
-    assert.ok(row[1].includes('\u{1F9F3} Add to trip</button>'), `${kind}: Add to trip = app.js label`);
+    assert.ok(row[1].includes(`${app.APP_TRIP_LABEL_HTML}</button>`), `${kind}: Add to trip = app.js label (line icon + words)`);
     assert.match(row[1], /class="card-action trip-btn" data-trip-name="[^"]+" data-trip-query="[^"]+, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="event:\d+" aria-pressed="false"/, `${kind}: trip data unchanged (Stage 5C: + the event ref)`);
     assert.doesNotMatch(row[1], /&#9825;|&#65291;/, `${kind}: no standalone labels`);
   }
@@ -7106,7 +7106,7 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.match(html, new RegExp(`<nav class="breadcrumb"[^>]*>[\\s\\S]*?<a href="/kelowna/${slug}">${label.plural}</a>[\\s\\S]*?Test Trattoria[\\s\\S]*?</nav>`), `${type}: breadcrumb nav`);
     // Content and CTAs unchanged.
     assert.match(html, /<p class="venue-description">A fixture restaurant used only by the automated test suite\.<\/p>/);
-    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*>[^<]*Add to trip</button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
+    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*><svg class="ui-icon"[^>]*>[\\s\\S]*?<\\/svg> Add to trip<\\/button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
     assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
     assert.match(html, /<h2>Good to Know<\/h2>/);
     // Favorite / Add to Trip (2026-10-14): one of each, in the CTA row.
@@ -7139,7 +7139,7 @@ test('Stage 4.1: winery venue pages render the themed shell with one hero <h1> a
   assert.match(html, /<div class="venue-hero venue-hero-fallback[^"]*">\s*(?:<img class="venue-hero-img"[^>]*>\s*)?<span class="venue-hero-type">Winery<\/span>\s*<h1>Test Winery<\/h1>/, 'the hero carries the <h1>');
   // Favorite / Add to Trip: app.js's labels, and no standalone-page stylesheet.
   assert.match(html, /<button type="button" class="card-action fav-btn" data-fav-name="Test Winery" aria-pressed="false" aria-label="Favorite Test Winery"><svg [^>]*>[\s\S]*?<\/svg> Favorite<\/button>/, 'app.js heart label, as on Golf venue pages');
-  assert.match(html, /class="card-action trip-btn" data-trip-name="Test Winery"[^>]*>\u{1F9F3} Add to trip<\/button>/u);
+  assert.ok(/class="card-action trip-btn" data-trip-name="Test Winery"[^>]*>(<svg[\s\S]*?<\/svg> Add to trip)<\/button>/.exec(html)[1] === app.APP_TRIP_LABEL_HTML);
   assert.doesNotMatch(html, /\.venue-card\[data-venue-category="winery"\] \.card-actions/, 'the engagement-only stylesheet is for unthemed pages');
   assert.match(html, /body\.golf-page \.venue-cta-row \.card-action \{/, 'the themed CTA-row button rules apply instead');
   assert.match(html, /<div class="venue-cta-row" data-venue-id="\d+" data-venue-region="kelowna" data-venue-category="winery" data-venue-name="Test Winery" data-surface="venue_page">/);
@@ -9963,7 +9963,7 @@ test('Cards: a season-only notice is a one-line tag on list cards; written advis
   const v = { id: 990002, name: 'Season Tag Fixture', region: 'apex', type: 'restaurant', slug: 'season-tag-fixture', description: 'Fixture.' };
   const st = { kind: 'closed', text: 'Closed for the season. The reopening date has not been announced yet.', note: 'Closed for the season. The reopening date has not been announced yet. https://example.com' };
   const tag = app.venueCardHtml(v, { advisoryNote: st.note, seasonTag: st });
-  assert.match(tag, /<p class="season-tag season-tag-closed"><span aria-hidden="true">\u{1F342}<\/span> Closed for the season\.<\/p>/u);
+  assert.ok(tag.includes(`<p class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> Closed for the season.</p>`));
   assert.doesNotMatch(tag, /Check before you go/);
   const reopen = app.seasonTagHtml({ kind: 'closed', text: 'Closed for the season. Reopens December 16.' });
   assert.match(reopen, /Closed for the season\. Reopens December 16\./);
@@ -10234,7 +10234,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   // Approved smarter-search change (2026-10-18): the hero search box on a /fr page submits to /fr/browse (hero submit handler only).
   // Approved French gaps change (2026-10-18): French nav label, no space before ? in French strings, trip links keep /fr.
   // Approved Build My Trip gaps change (2026-10-18): the My Trip tray groups planned stops by day with a capped route per day, "Replace my trip", and the late-afternoon / replace-or-add strings (EN and FR).
-  assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3', 'public/scripts/app.js (My Trip tray by day, 2026-10-18)');
+  assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d', 'public/scripts/app.js (Add to trip line icons, polish pass 2026-10-26)');
 });
 
 // app.js cache busting (2026-10-05): pages load /scripts/app.js?v=<12 hex of
@@ -12170,7 +12170,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
-  assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3');
+  assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
   assert.equal((await fetch(`${base}/list-your-venue`)).status, 200);
   const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
@@ -12737,7 +12737,7 @@ test('Batch 3: canonical labels equal what app.js renders, on pages that load ap
   const venue = { id: 99001, name: 'Batch Three Cafe', region: 'kelowna', type: 'cafe', slug: 'batch-three-cafe', description: 'A test cafe.', rating: 4.5 };
   const canonical = app.venueCardHtml(venue, { actions: true, themed: true, appLabels: true });
   assert.ok(canonical.includes(`aria-label="Favorite Batch Three Cafe">${heart} Favorite</button>`), 'Favorite = app.js HEART_OUTLINE + "Favorite"');
-  assert.ok(canonical.includes('aria-label="Add Batch Three Cafe to trip">\u{1F9F3} Add to trip</button>'), 'Add to trip = app.js label');
+  assert.ok(canonical.includes(`aria-label="Add Batch Three Cafe to trip">${app.APP_TRIP_LABEL_HTML}</button>`), 'Add to trip = app.js label');
   assert.doesNotMatch(canonical, /&#9825;|&#65291;/);
   // Pages without app.js (winery region / venue pages) keep the standalone labels exactly.
   const standalone = app.venueCardHtml({ ...venue, type: 'winery' }, { actions: true });
@@ -12745,7 +12745,7 @@ test('Batch 3: canonical labels equal what app.js renders, on pages that load ap
   assert.match(standalone, /aria-label="Add Batch Three Cafe to trip">&#65291; Add to Trip<\/button>/);
   // What's On cards (the page loads app.js) use the canonical labels.
   const ev = app.whatsOnEventCardHtml({ id: 7, name: 'Batch Three Market', slug: 'batch-three-market', region: 'kelowna', categories: [], dateLabel: 'Sat Oct 3', time: '9 am', description: 'x' });
-  assert.ok(ev.includes(`${heart} Favorite</button>`) && ev.includes('\u{1F9F3} Add to trip</button>'));
+  assert.ok(ev.includes(`${heart} Favorite</button>`) && ev.includes(`${app.APP_TRIP_LABEL_HTML}</button>`));
   // Accessible names and data attributes are unchanged.
   assert.match(canonical, /class="card-action fav-btn" data-fav-name="Batch Three Cafe" aria-pressed="false"/);
   assert.match(canonical, /class="card-action trip-btn" data-trip-name="Batch Three Cafe" data-trip-query="Batch Three Cafe, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false"/);
@@ -16424,7 +16424,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
-  assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3');
+  assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
 
@@ -16517,7 +16517,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
     }
     const crypto = require('node:crypto');
     const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-    assert.equal(md5('public/scripts/app.js'), '6d8290cd745b777f4033adfb7fa856f3', 'app.js is unchanged by the classic Open Now page');
+    assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d', 'app.js is unchanged by the classic Open Now page');
   }));
 }
 
@@ -16923,7 +16923,7 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         assert.ok(ids.includes(closed[t]) && ids.includes(open[t]), `${path}: both fixtures listed`);
         assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
         const card = cardOf(html, closed[t]);
-        assert.match(card, /class="season-tag season-tag-closed"><span aria-hidden="true">\u{1F342}<\/span> (Closed for the season|Fermé pour la saison)/u, `${path}: the tag`);
+        assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Fermé pour la saison)/.test(card), `${path}: the tag`);
         assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
         if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\./);
       }
@@ -16975,11 +16975,11 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
 test('Seasons everywhere: the card tag reads "Open until Oct 31" (fr "Ouvert jusqu’au 31 oct."); seasonClosedLast keeps every other place in order', () => {
   const st = app.seasonStateOn({ status: 'open_until', until_date: '2026-10-31', reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
   assert.equal(st.text, 'Open for the season until October 31.', 'the venue page keeps the sentence');
-  assert.match(app.seasonTagHtml(st), /season-tag-open_until"><span aria-hidden="true">⏳<\/span> Open until Oct 31<\/p>/u);
+  assert.ok(app.seasonTagHtml(st).endsWith(`season-tag-open_until"><span aria-hidden="true">${app.uiIcon('hourglass')}</span> Open until Oct 31</p>`));
   assert.equal(app.frText('Open until Oct 31'), 'Ouvert jusqu’au 31 oct.');
   assert.equal(app.frText('Open until Nov 1'), 'Ouvert jusqu’au 1er nov.');
   const closedSt = app.seasonStateOn({ status: 'closed', until_date: null, reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
-  assert.match(app.seasonTagHtml(closedSt), /\u{1F342}<\/span> Closed for the season\.<\/p>/u);
+  assert.ok(app.seasonTagHtml(closedSt).endsWith(`${app.uiIcon('leaf')}</span> Closed for the season.</p>`));
   const states = new Map([[2, { kind: 'closed' }], [4, { kind: 'open_until' }], [5, { kind: 'closed' }]]);
   assert.deepEqual(app.seasonClosedLast([1, 2, 3, 4, 5, 6].map((id) => ({ id })), new Date(), states).map((v) => v.id), [1, 3, 4, 6, 2, 5]);
 });
@@ -17011,7 +17011,7 @@ test('Seasons everywhere: a closed-for-season venue page folds its weekly hours 
     en = app.renderVenuePage(v, [], [], [], { now });
     assert.match(en, /Check before you go/);
     assert.match(en, /Closed for the season\. Reopens April 1, 2027\./);
-    assert.match(en, /<h2>Hours<\/h2><p class="venue-hours-season"><span aria-hidden="true">\u{1F342}<\/span> Closed for the season<\/p><details class="venue-hours-usual"><summary>Usual hours when open<\/summary><ul class="hours-list">/u);
+    assert.ok(en.includes(`<h2>Hours</h2><p class="venue-hours-season"><span aria-hidden="true">${app.uiIcon('leaf')}</span> Closed for the season</p><details class="venue-hours-usual"><summary>Usual hours when open</summary><ul class="hours-list">`));
     assert.doesNotMatch(en.split('id="venueHours"')[1] || '', /is-today/, 'no day reads as today');
     assert.doesNotMatch(en, /id="venueOpenStatus"/, 'no open status line');
     fr = app.renderVenuePage(v, [], [], [], { now, lang: 'fr' });
@@ -17262,7 +17262,7 @@ test('Happy hour times: guarded write, the admin route, and Happy hour now on th
   const row = JSON.parse(app.mapLiveData().json).p.find((p) => p[2] === placed.name);
   assert.ok(row && typeof row[11] === 'string' && row[11].includes('14:00-17:00'), 'the compact times ship as [11]');
   const html = app.renderPlacesMapPage();
-  assert.match(html, /data-pm-feat="happy" aria-pressed="false"><span aria-hidden="true">🍸<\/span> Happy hour now<\/button>/);
+  assert.ok(html.includes(`data-pm-feat="happy" aria-pressed="false"><span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour now</button>`));
   assert.match(html, /k === 'happy' && hhKnown \? !\(p\.hhs && p\.hhs\.now\)/, 'Happy hour now needs researched times that are on now');
 });
 
@@ -17494,13 +17494,13 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Sports & Recreation (Ski & S
   assert.equal(app.isWinterMoodSeason(new Date('2026-10-01T08:00:00Z')), true);
   // Every summer-tile day renders the same tiles as the default summer call;
   // Sep-Mar also adds the seasonal guide link (2026-10-13), never in summer.
-  const noSeasonLink = (h) => h.replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
+  const noSeasonLink = (h) => h.replace(/\n\s*<a class="discover-heading-link home-see-all mood-season-link"[^>]*>(?:<span[^>]*>[^<]*<\/span>)+<\/a>/, '');
   // Sep-Nov also swaps in the fall tile photos (2026-10-13); put the summer ones back to compare the rest.
   const summerSrc = { 'food-drink': 'eat.webp', wine: 'drink.webp', 'whats-on': 'whats-on.webp', outdoors: 'explore.webp' };
   const unFall = (h) => Object.entries(app.FALL_MOOD_IMAGES).reduce((acc, [k, src]) => acc.split(`src="${src}"`).join(`src="/images/mood/${summerSrc[k]}"`), h);
   assert.equal(noSeasonLink(unFall(winterMood('2026-09-30'))), app.renderMoodCardsHTML({ now: SUMMER_NOW }));
-  assert.match(winterMood('2026-09-30'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/);
-  assert.match(winterMood('2026-10-31'), /class="discover-heading-link mood-season-link" href="\/guides\/fall-okanagan"/, 'October shows the winter tiles with the fall guide link');
+  assert.match(winterMood('2026-09-30'), /class="discover-heading-link home-see-all mood-season-link" href="\/guides\/fall-okanagan"><span class="home-en">Fall in the Okanagan: our seasonal guides<\/span><span class="home-fr" lang="fr">L’automne dans l’Okanagan : nos guides saisonniers<\/span><\/a>/);
+  assert.match(winterMood('2026-10-31'), /class="discover-heading-link home-see-all mood-season-link" href="\/guides\/fall-okanagan"/, 'October shows the winter tiles with the fall guide link');
   assert.doesNotMatch(app.renderMoodCardsHTML({ now: SUMMER_NOW }), /mood-season-link/);
 });
 
@@ -17553,7 +17553,7 @@ test('Seasonal mood tiles: "/" honours OKR_TODAY_OVERRIDE (test-only), never in 
       assert.match(winter.text, /<a class="mood-card mood-card-indoor" href="\/indoor">/);
       assert.doesNotMatch(winter.text, /mood-card mood-card-beaches|mood-card mood-card-golf/);
       // Only the two swapped cards differ between the seasons.
-      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|sports|indoor)"[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link mood-season-link"[^>]*>[^<]*<\/a>/, '');
+      const strip = (h) => h.replace(/<a class="mood-card mood-card-(?:beaches|golf|sports|indoor)"[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link home-see-all mood-season-link"[^>]*>(?:<span[^>]*>[^<]*<\/span>)+<\/a>/, '');
       assert.equal(strip(winter.text), strip(summer.text));
     });
     process.env.OKR_TODAY_OVERRIDE = '2027-02-30';
@@ -19628,7 +19628,7 @@ test('Food & Drink page weight: template cards ship an empty action row that the
   assert.equal(fav.innerHTML, `${app.FD_HEART_USE} Favorite`);
   assert.equal(trip.className, 'card-action trip-btn');
   assert.deepEqual(trip.attrs, { 'data-trip-name': venue.name, 'data-trip-query': `${venue.name}, ${labels.regions[venue.region]}, Okanagan Valley, BC`, 'data-trip-region': venue.region, 'data-trip-ref': `venue:${venue.id}`, 'aria-pressed': 'false', 'aria-label': `Add ${venue.name} to trip` });
-  assert.equal(trip.textContent, '\u{1F9F3} Add to trip');
+  assert.equal(trip.innerHTML, app.APP_TRIP_LABEL_HTML);
   assert.ok(!('data-fd-lazy' in box.attrs));
 });
 
@@ -20522,7 +20522,7 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
     assert.equal(p[9], Number(v.rating) > 0 ? Math.round(Number(v.rating) * 10) : 0, `${p[2]} rating`);
   }
   assert.match(src, /top: 'great best top amazing/, '"great" and "best" mean Top rated');
-  assert.match(html, /data-pm-top aria-pressed="false"><span aria-hidden="true">⭐<\/span> Top rated/);
+  assert.ok(html.includes(`data-pm-top aria-pressed="false"><span aria-hidden="true">${app.uiIcon('star')}</span> Top rated`));
   // Complex sentences (2026-10-14): a town, a distance, a price, a time or day, "no ...", "or", a group size.
   for (const [rx, what] of [[/var TOWN_RX = Object\.keys\(CONF\.r\)/, 'towns'], [/\(\?:within\|under\|less than\|à moins de\)/, 'distance'], [/cheap eats\|/, 'price'],
     [/\^until:/, 'until a time'], [/\\btomorrow\\b\|\\bdemain\\b/, 'tomorrow'], [/var NEG = ' no not without except/, 'no ...'], [/party of\|group of\|table for/, 'group size'], [/if \(ors && onTags\(\)\.length > 1\) tagOr = true;/, 'or']]) {
@@ -23522,9 +23522,9 @@ test('Visitor contributions: submit, confirm, approve; tips are escaped; unconfi
   try {
     // Nothing yet: the one-line invitation and the form.
     const empty = (await t.get(pagePath)).text;
-    assert.match(empty, /<h2 id="vcHead">Visitor photos &amp; tips<\/h2>/);
-    assert.match(empty, /Been here\? Share a photo or a tip for other visitors\./);
-    assert.match(empty, /Share a photo or tip/);
+    // Polish pass (2026-10-26): the empty state is one slim row; the heading stays for screen readers only.
+    assert.match(empty, /<h2 id="vcHead" class="vc-visually-hidden">Visitor photos &amp; tips<\/h2>/);
+    assert.match(empty, /class="vc-open vc-invite" id="vcOpen" aria-expanded="false" aria-controls="vcForm">Been here\? Share a photo or tip<span class="vc-invite-arrow" aria-hidden="true">&rarr;<\/span><\/button>/);
     assert.match(empty, /id="vcRights"/);
     assert.match(empty, /id="vcHonesty"/);
     assert.match(empty, /class="vc-hp"/);
@@ -23618,6 +23618,9 @@ test('Visitor contributions: submit, confirm, approve; tips are escaped; unconfi
     assert.match(page, /<span>Sarah M\.<\/span>/);
     assert.match(page, /data-vc-report="\d+"/);
     assert.doesNotMatch(page, /Been here\? Share a photo/);
+    // With content the full section is back: the visible heading, the tips and the "Share a photo or tip" button.
+    assert.match(page, /<section class="venue-section vc-section" id="visitor-tips" aria-labelledby="vcHead">\s*<h2 id="vcHead">Visitor photos &amp; tips<\/h2>/);
+    assert.match(page, /<button type="button" class="vc-open" id="vcOpen" aria-expanded="false" aria-controls="vcForm">Share a photo or tip<\/button>/);
     assert.equal(page.toLowerCase().includes(EMAIL), false);
     const api = await t.get(`/api/venues/${v.id}`);
     assert.equal(api.status, 200);
@@ -27302,8 +27305,8 @@ test('Search ranking: Show more cards get the same Favorite / Add to trip button
   const fill = new Function('document', 'LABELS', 'HEART_USE', `${app.cardFillActionsJs('fill')}\n return fill;`)({ createElement: () => fake() }, { regions: { kelowna: 'Kelowna' } }, '<svg></svg>');
   fill(card);
   const [fav, trip] = box.children;
-  assert.equal(trip.textContent, app.APP_TRIP_LABEL_HTML, 'the label of the first 48 cards');
-  assert.equal(trip.textContent, '\u{1F9F3} Add to trip');
+  assert.equal(trip.innerHTML, app.APP_TRIP_LABEL_HTML, 'the label of the first 48 cards');
+  assert.equal(trip.innerHTML, app.APP_TRIP_LABEL_HTML);
   assert.equal(trip.attrs['data-trip-ref'], 'venue:7');
   assert.equal(fav.innerHTML, '<svg></svg> Favorite');
   assert.equal(box.attrs['data-fd-lazy'], undefined);
@@ -27311,10 +27314,10 @@ test('Search ranking: Show more cards get the same Favorite / Add to trip button
   await new Promise((resolve) => srv.listen(0, resolve));
   const base = `http://localhost:${srv.address().port}`;
   try {
-    for (const [p, label] of [['/food-drink', "trip.textContent = '\u{1F9F3} Add to trip';"], ['/fr/food-drink', "trip.textContent = '\u{1F9F3} Ajouter au voyage';"]]) {
+    for (const [p, label] of [['/food-drink', `trip.innerHTML = '${app.APP_TRIP_LABEL_HTML}';`], ['/fr/food-drink', `trip.innerHTML = '${app.uiIcon('trip')} Ajouter au voyage';`]]) {
       const html = await (await fetch(base + p)).text();
       assert.ok(html.includes(label), `${p}: the waiting cards' label`);
-      assert.ok(html.includes(p === '/fr/food-drink' ? '>\u{1F9F3} Ajouter au voyage</button>' : '>\u{1F9F3} Add to trip</button>'), `${p}: the same label on the first cards`);
+      assert.ok(html.includes(p === '/fr/food-drink' ? `>${app.uiIcon('trip')} Ajouter au voyage</button>` : `>${app.APP_TRIP_LABEL_HTML}</button>`), `${p}: the same label on the first cards`);
       // Show more no longer runs the older card script's sync, which wrote "＋ Add to Trip" over app.js's labels.
       const wire = html.slice(html.indexOf('window.__ogWireVenueCards = function'));
       assert.match(wire.slice(0, 1500), /if \(window\.__syncTripButtons \|\| window\.__syncFavButtons\) \{\s*if \(window\.__syncTripButtons\) window\.__syncTripButtons\(\);/);
@@ -28429,7 +28432,7 @@ test('Season end (2026-10-19): open-until venue whose last opening has passed is
     // Card tag, season-closed last, venue page hours.
     assert.equal(app.seasonClosedLast([wk, mon], sunEvening).map((v) => v.id).join(), [mon.id, wk.id].join());
     const page = app.renderVenuePage(wk, [], [], [], { now: sunEvening });
-    assert.match(page, /<p class="venue-hours-season">[^<]*<span aria-hidden="true">[^<]*<\/span> Closed for the season/);
+    assert.match(page, /<p class="venue-hours-season">[^<]*<span aria-hidden="true"><svg class="ui-icon"[^>]*>[\s\S]*?<\/svg><\/span> Closed for the season/);
     assert.doesNotMatch(app.renderVenuePage(wk, [], [], [], { now: sunNoon }), /<p class="venue-hours-season">/);
     const ld = [...page.matchAll(/<script type="application\/ld\+json">\n([\s\S]*?)\n<\/script>/g)].map((m) => JSON.parse(m[1])).find((o) => o.openingHoursSpecification);
     assert.ok(ld && ld.openingHoursSpecification.every((s) => s.validThrough), 'JSON-LD weekly hours end on the last day');
@@ -29529,7 +29532,7 @@ test('Round 7 tech: a temporary closure shows "Closed Oct 21–28, reopens Oct 2
       assert.match(frPage, /<p class="venue-advisory-text">Fermé du \d+ [^<]*réouverture le [^<]+<\/p>/);
       assert.ok(!frPage.includes(expected), 'no English notice on the French page');
       const list = await (await fetch(`${base}/kelowna/cafes`)).text();
-      assert.ok(list.includes(`<p class="season-tag season-tag-temp_closed"><span aria-hidden="true">\u{1F4C5}</span> ${expected}</p>`), 'the card tag');
+      assert.ok(list.includes(`<p class="season-tag season-tag-temp_closed"><span aria-hidden="true">${app.uiIcon('calendar')}</span> ${expected}</p>`), 'the card tag');
       const info = app.foodDrinkOpenNowInfo([app.findVenueBySlug('kelowna', 'cafe', 'round7-closure-fixture')], app.getAdvisoryNotes(), new Date(), { requireVerified: false }).byId.get(venue.id);
       assert.equal(info.state, 'closed', 'Open Now treats it as closed');
       // Taking it off again.
@@ -30373,13 +30376,13 @@ test('Round 8 temporary closures: "Temporarily closed" in the hours, not "(holid
   const hours = en.slice(en.indexOf('<ul class="hours-list"'), en.indexOf('</ul>', en.indexOf('<ul class="hours-list"')));
   // Round 10: a closure of three days or more is said once above the list; the rows keep the regular hours.
   assert.doesNotMatch(hours, /Temporarily closed/);
-  assert.match(en, /<p class="venue-hours-temp-closed"><span aria-hidden="true">[^<]*<\/span> Closed [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+, back [A-Z][a-z]{2} \d+\.<\/p>/);
+  assert.match(en, /<p class="venue-hours-temp-closed"><span aria-hidden="true"><svg class="ui-icon"[^>]*>[\s\S]*?<\/svg><\/span> Closed [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+, back [A-Z][a-z]{2} \d+\.<\/p>/);
   assert.equal((hours.match(/Closed \(holiday\)/g) || []).length, 1, 'a single day without a note is still a holiday');
   await withDiscoveryServer(async (base) => {
     const fr = await (await fetch(`${base}/fr/kelowna/cafes/${v.slug}`)).text();
     const frHours = fr.slice(fr.indexOf('<ul class="hours-list"'), fr.indexOf('</ul>', fr.indexOf('<ul class="hours-list"')));
     assert.doesNotMatch(frHours, /Fermeture temporaire/);
-    assert.match(fr, /class="venue-hours-temp-closed"><span aria-hidden="true">[^<]*<\/span> Fermé du \d+(?:er)? [a-zéû.]+ au \d+(?:er)? [a-zéû.]+, de retour le \d+(?:er)? [a-zéû]+\.?<\/p>/);
+    assert.match(fr, /class="venue-hours-temp-closed"><span aria-hidden="true"><svg class="ui-icon"[^>]*>[\s\S]*?<\/svg><\/span> Fermé du \d+(?:er)? [a-zéû.]+ au \d+(?:er)? [a-zéû.]+, de retour le \d+(?:er)? [a-zéû]+\.?<\/p>/);
     assert.doesNotMatch(fr, /\.\.<\/p>/);
     assert.equal((frHours.match(/jour férié/g) || []).length, 1);
   });
