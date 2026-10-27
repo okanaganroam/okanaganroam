@@ -249,9 +249,9 @@ test('Venue page: a "Weekly specials" row under Happy hour, week order, today ma
   assert.match(en, /^<span class="venue-sp-list" role="list" aria-label="Weekly specials">/);
   // Week order: Mon–Wed (prime rib), Tue (tacos), Wed (wings).
   assert.deepEqual([...en.matchAll(/class="venue-sp-title"[^>]*>([^<]+)</g)].map((m) => m[1]), ['Prime rib night', 'Taco Tuesday', 'Wing Wednesday']);
-  assert.ok(en.includes('<span class="venue-sp is-today" role="listitem"><span class="venue-sp-days">Mon–Wed</span><span class="venue-sp-main"><span class="venue-sp-title">Prime rib night</span> <span class="venue-sp-today">Today</span><span class="venue-sp-deal">10 oz prime rib dinner</span></span><span class="venue-sp-price">$29</span></span>'), en);
-  assert.ok(en.includes('<span class="venue-sp is-today" role="listitem"><span class="venue-sp-days">Tue</span><span class="venue-sp-main"><span class="venue-sp-title">Taco Tuesday</span> <span class="venue-sp-today">Today</span><span class="venue-sp-deal">$3 tacos</span></span><span class="venue-sp-price">$3 each</span></span>'));
-  assert.ok(en.includes('<span class="venue-sp" role="listitem"><span class="venue-sp-days">Wed</span><span class="venue-sp-main"><span class="venue-sp-title">Wing Wednesday</span><span class="venue-sp-deal">60¢ wings, dine-in only</span><span class="venue-sp-time">from 4 PM</span></span><span class="venue-sp-price">60¢ each</span></span>'), 'not today: no tag');
+  assert.ok(en.includes('<span class="venue-sp is-today" role="listitem"><span class="venue-sp-days">Mon–Wed</span><span class="venue-sp-main"><span class="venue-sp-title">Prime rib night</span> <span class="venue-sp-price">$29</span> <span class="venue-sp-today">Today</span><span class="venue-sp-deal">10 oz prime rib dinner</span></span></span>'), en);
+  assert.ok(en.includes('<span class="venue-sp is-today" role="listitem"><span class="venue-sp-days">Tue</span><span class="venue-sp-main"><span class="venue-sp-title">Taco Tuesday</span> <span class="venue-sp-price">$3 each</span> <span class="venue-sp-today">Today</span><span class="venue-sp-deal">$3 tacos</span></span></span>'));
+  assert.ok(en.includes('<span class="venue-sp" role="listitem"><span class="venue-sp-days">Wed</span><span class="venue-sp-main"><span class="venue-sp-title">Wing Wednesday</span> <span class="venue-sp-price">60¢ each</span><span class="venue-sp-deal">60¢ wings, dine-in only</span><span class="venue-sp-time">from 4 PM</span></span></span>'), 'not today: no tag');
   assert.equal((en.match(/venue-sp-today/g) || []).length, 2);
   const checked = `Checked ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(today.slice(5, 7)) - 1]} ${Number(today.slice(8, 10))}, ${today.slice(0, 4)}`;
   assert.equal((en.match(/venue-sp-checked/g) || []).length, 1, 'one checked line');
@@ -261,8 +261,8 @@ test('Venue page: a "Weekly specials" row under Happy hour, week order, today ma
   // French: French lines where given, the English ones marked lang="en" (the day and the tag stay French).
   const fr = spRow(page(v, at(TUE, '12:00'), 'fr'));
   assert.match(fr, /aria-label="Spéciaux de la semaine"/);
-  assert.ok(fr.includes('<span class="venue-sp-days">Lun–mer</span><span class="venue-sp-main"><span class="venue-sp-title">Soirée côte de bœuf</span> <span class="venue-sp-today">Aujourd’hui</span><span class="venue-sp-deal">Souper de côte de bœuf 10 oz</span></span><span class="venue-sp-price">$29</span>'), fr);
-  assert.ok(fr.includes('<span class="venue-sp-days">Mar</span><span class="venue-sp-main"><span class="venue-sp-title" lang="en">Taco Tuesday</span> <span class="venue-sp-today">Aujourd’hui</span><span class="venue-sp-deal" lang="en">$3 tacos</span></span><span class="venue-sp-price" lang="en">$3 each</span>'));
+  assert.ok(fr.includes('<span class="venue-sp-days">Lun–mer</span><span class="venue-sp-main"><span class="venue-sp-title">Soirée côte de bœuf</span> <span class="venue-sp-price">$29</span> <span class="venue-sp-today">Aujourd’hui</span><span class="venue-sp-deal">Souper de côte de bœuf 10 oz</span></span>'), fr);
+  assert.ok(fr.includes('<span class="venue-sp-days">Mar</span><span class="venue-sp-main"><span class="venue-sp-title" lang="en">Taco Tuesday</span> <span class="venue-sp-price" lang="en">$3 each</span> <span class="venue-sp-today">Aujourd’hui</span><span class="venue-sp-deal" lang="en">$3 tacos</span></span>'));
   assert.match(fr, /<span class="venue-sp-time">dès 16 h<\/span>/);
   assert.match(fr, /venue-sp-checked">Vérifié le /);
   // A place closed today shows the week but marks no row.
@@ -447,7 +447,7 @@ test('Owner portal: a Weekly specials editor; a signed-in save goes live (venue_
     const rows = app.venueSpecialsList(v.id);
     assert.deepEqual(rows.map((s) => [s.title, s.source, s.checked_at, s.kind, s.end]), [['Wing Wednesday', 'venue_owner', today, 'food', 'close'], ['Wine Tuesday', 'venue_owner', today, 'drink', null]]);
     assert.equal(rows[0].deal_fr, 'Ailes à 60 ¢');
-    assert.match(spRow(page(v, at(WED, '12:00'))), /Wing Wednesday<\/span> <span class="venue-sp-today">Today/);
+    assert.match(spRow(page(v, at(WED, '12:00'))), /Wing Wednesday<\/span> <span class="venue-sp-price">60¢ each<\/span> <span class="venue-sp-today">Today/);
     const logged = db.prepare("SELECT field_name, source, reviewed_by FROM venue_enrichment_log WHERE venue_id = ? AND field_name = 'specials' ORDER BY id DESC LIMIT 1").get(v.id);
     assert.deepEqual({ ...logged }, { field_name: 'specials', source: 'venue_owner', reviewed_by: 'owner:specials-owner@example.com' });
     // The same specials again: nothing changed.
