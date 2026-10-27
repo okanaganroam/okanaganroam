@@ -8662,6 +8662,339 @@ function staleVenueSpecials(now = new Date()) {
   return out.sort((a, b) => String(a.checked_at).localeCompare(String(b.checked_at)) || String(a.name).localeCompare(String(b.name)));
 }
 
+// ---- Weekly nights (2026-10-27) ----
+// The regular nights a place hosts: trivia on Tuesdays, karaoke on Thursdays, an open mic, a run club, bingo, a DJ
+// ("Trivia Tuesday" · Tue 7 PM · "Teams up to 6" · hosted by Dave · Free). Up to NIGHTS_MAX per venue, in db.js
+// venue_weekly_nights, written only by guardedWeeklyNightsUpdate() (the whole list at once, compare-and-set on the
+// current list). Same text rules as the specials (no links, emails, phone numbers or emoji). Only for the food and
+// drink places that host them (NIGHT_TYPES). A night runs weekly, every other week, or on set weeks of the month (the
+// 1st, the last, the 1st and 3rd, the 2nd and 4th). Hidden everywhere once checked more than NIGHTS_STALE_DAYS ago.
+// Never an event page, never a new URL.
+const NIGHTS_MAX = 7;
+const NIGHT_TITLE_MAX = 40;
+const NIGHT_DETAIL_MAX = 80;
+const NIGHT_HOST_MAX = 40;
+const NIGHT_COST_MAX = 20;
+const NIGHTS_STALE_DAYS = 120;
+const NIGHT_KINDS = ['trivia', 'karaoke', 'open_mic', 'bingo', 'comedy', 'dj', 'live_music', 'games', 'sports', 'run_club', 'paint', 'other'];
+const NIGHT_FREQUENCIES = ['weekly', 'biweekly', 'monthly-1st', 'monthly-last', 'monthly-1st-3rd', 'monthly-2nd-4th'];
+const NIGHT_TYPES = new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery']);
+// One night as stored and compared: every key, in this order, null when not given.
+const NIGHT_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr', 'source', 'checked_at'];
+const NIGHT_KIND_LABELS = {
+  en: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night', other: 'Other nights' },
+  fr: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture', other: 'Autres soirées' },
+};
+// A text field of night n: the deal rules, worded for nights. -> { ok, value (null when empty) } | { ok: false, detail }
+function nightTextField(raw, what, max, n, required) {
+  if (raw === undefined || raw === null) return required ? { ok: false, detail: `night ${n}: ${what} is empty` } : { ok: true, value: null };
+  const r = happyHourDealField(raw, what, max, n);
+  if (!r.ok) return { ok: false, detail: r.detail.replace(/^deal /, 'night ') };
+  if (!r.value) return required ? { ok: false, detail: `night ${n}: ${what} is empty` } : { ok: true, value: null };
+  return r;
+}
+// Validates a list of nights. -> { ok, nights: [canonical night] } | { ok: false, detail }. Each night:
+// { days: ['tue'], kind, title, start?, end?, detail?, host?, cost?, frequency? (weekly when left out), title_fr?,
+// detail_fr?, source?, checked_at? }; a night without its own source / checked_at takes opts.source / opts.checked_at.
+// opts.type (the venue's type), when given, must be one of NIGHT_TYPES. An empty list is valid here (the callers decide
+// whether "none" means clear).
+function validateWeeklyNights(list, opts = {}, now = new Date()) {
+  if (opts.type !== undefined && !NIGHT_TYPES.has(opts.type)) return { ok: false, detail: 'weekly nights are only listed for restaurants, cafés, pubs, breweries, cocktail bars, distilleries and wineries' };
+  if (!Array.isArray(list)) return { ok: false, detail: 'nights must be a list' };
+  if (list.length > NIGHTS_MAX) return { ok: false, detail: `at most ${NIGHTS_MAX} nights` };
+  const today = todayLocal(now);
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i], n = i + 1;
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return { ok: false, detail: `night ${n} must be an object` };
+    const extra = Object.keys(s).filter((k) => !NIGHT_KEYS.includes(k));
+    if (extra.length) return { ok: false, detail: `night ${n}: unexpected field(s) ${extra.join(', ')}` };
+    if (!Array.isArray(s.days) || !s.days.length) return { ok: false, detail: `night ${n}: pick at least one day` };
+    if (s.days.some((d) => !SPECIAL_WEEK.includes(d))) return { ok: false, detail: `night ${n}: days must be mon, tue, wed, thu, fri, sat or sun` };
+    const item = { days: SPECIAL_WEEK.filter((d) => s.days.includes(d)) };
+    if (!NIGHT_KINDS.includes(s.kind)) return { ok: false, detail: `night ${n}: kind must be one of ${NIGHT_KINDS.join(', ')}` };
+    item.kind = s.kind;
+    for (const [k, what, max, required] of [['title', 'title', NIGHT_TITLE_MAX, true], ['detail', 'detail', NIGHT_DETAIL_MAX, false], ['host', 'host', NIGHT_HOST_MAX, false], ['cost', 'cost', NIGHT_COST_MAX, false],
+      ['title_fr', 'French title', NIGHT_TITLE_MAX, false], ['detail_fr', 'French detail', NIGHT_DETAIL_MAX, false]]) {
+      const f = nightTextField(s[k], what, max, n, required);
+      if (!f.ok) return f;
+      item[k] = f.value;
+    }
+    if (item.detail_fr && !item.detail) return { ok: false, detail: `night ${n}: a French detail needs the English detail too` };
+    const start = s.start == null || s.start === '' ? null : s.start;
+    const end = s.end == null || s.end === '' ? null : s.end;
+    if (start !== null && specialMinutes(start) === null) return { ok: false, detail: `night ${n}: start must be HH:MM` };
+    if (end !== null && specialMinutes(end) === null) return { ok: false, detail: `night ${n}: end must be HH:MM` };
+    if (end !== null && start === null) return { ok: false, detail: `night ${n}: an end time needs a start time` };
+    if (start !== null && start === end) return { ok: false, detail: `night ${n}: start and end are the same time` };
+    item.start = start;
+    item.end = end;
+    const freq = s.frequency == null || s.frequency === '' ? 'weekly' : s.frequency;
+    if (!NIGHT_FREQUENCIES.includes(freq)) return { ok: false, detail: `night ${n}: frequency must be ${NIGHT_FREQUENCIES.join(', ')}` };
+    item.frequency = freq;
+    const src = s.source != null ? s.source : opts.source;
+    if (src !== 'venue_owner' && (typeof src !== 'string' || !/^https?:\/\/[^\s]+$/.test(src) || src.length > 500)) {
+      return { ok: false, detail: `night ${n}: source must be the http(s) page it was read on, or 'venue_owner'` };
+    }
+    item.source = src;
+    const checked = s.checked_at != null ? s.checked_at : opts.checked_at;
+    if (!parseLocalDate(checked) || checked > today) return { ok: false, detail: `night ${n}: checked_at must be a real YYYY-MM-DD date, not in the future` };
+    item.checked_at = checked;
+    out.push(Object.fromEntries(NIGHT_KEYS.map((k) => [k, item[k] === undefined ? null : item[k]])));
+  }
+  return { ok: true, nights: out };
+}
+// A stored row as a canonical night.
+function nightFromRow(r) {
+  let days = [];
+  try { days = JSON.parse(r.days); } catch (e) { days = []; }
+  const item = { days: Array.isArray(days) ? SPECIAL_WEEK.filter((d) => days.includes(d)) : [], kind: r.kind, title: r.title, start: r.start_time || null, end: r.end_time || null,
+    detail: r.detail || null, host: r.host || null, cost: r.cost || null, frequency: r.frequency || 'weekly', title_fr: r.title_fr || null, detail_fr: r.detail_fr || null,
+    source: r.source, checked_at: r.checked_at };
+  return Object.fromEntries(NIGHT_KEYS.map((k) => [k, item[k] === undefined ? null : item[k]]));
+}
+function venueWeeklyNightsList(venueId) {
+  try { return db.prepare('SELECT * FROM venue_weekly_nights WHERE venue_id = ? ORDER BY id').all(venueId).map(nightFromRow); } catch (e) { return []; }
+}
+// Every venue's nights: Map(venue id -> [canonical night]).
+function allVenueWeeklyNights() {
+  const map = new Map();
+  let rows = [];
+  try { rows = db.prepare('SELECT * FROM venue_weekly_nights ORDER BY venue_id, id').all(); } catch (e) { rows = []; }
+  for (const r of rows) {
+    if (!map.has(r.venue_id)) map.set(r.venue_id, []);
+    map.get(r.venue_id).push(nightFromRow(r));
+  }
+  return map;
+}
+// The compare-and-set value: the canonical JSON of a venue's current list, or null when it has none. The admin script
+// reads it from GET /admin/weekly-nights/:id (expected_current) and sends it back with POST /admin/set-weekly-nights.
+function nightsCanonicalJson(list) { return list && list.length ? JSON.stringify(list) : null; }
+function currentWeeklyNightsJson(venueId) { return nightsCanonicalJson(venueWeeklyNightsList(venueId)); }
+// Replaces (or clears, with nights null) a venue's whole list: compare-and-set on the caller's expected current list
+// (currentWeeklyNightsJson, or null), reason + batch_id required, the venue one of NIGHT_TYPES, every night valid
+// (input.source_url / checked_at fill in for nights without their own), and one venue_enrichment_log row (field
+// 'weekly_nights', old and new list) in the same transaction.
+// -> { ok, changedFields: ['weekly_nights'] | [], nights (the new canonical JSON or null) } | { ok: false, reason, detail, live }
+function guardedWeeklyNightsUpdate(id, expectedCurrent, input, meta, now = new Date()) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  const existing = db.prepare('SELECT id, type, redirect_to FROM venues WHERE id = ?').get(id);
+  const v = input || {};
+  let next = [];
+  if (v.nights !== null) {
+    const checked = validateWeeklyNights(v.nights, { source: v.source_url, checked_at: v.checked_at, ...(existing ? { type: existing.type } : {}) }, now);
+    if (!checked.ok) return { ok: false, reason: 'invalid_nights', detail: checked.detail };
+    if (!checked.nights.length) return { ok: false, reason: 'invalid_nights', detail: 'at least one night (use nights: null to clear)' };
+    next = checked.nights;
+  }
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  const expected = expectedCurrent === undefined ? null : expectedCurrent;
+  const nextJson = nightsCanonicalJson(next);
+  let txOpen = false;
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    txOpen = true;
+    const before = venueWeeklyNightsList(id);
+    const current = nightsCanonicalJson(before);
+    if (current !== expected) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'mismatch', live: { nights: current } };
+    }
+    if (current === nextJson) {
+      db.exec('COMMIT');
+      txOpen = false;
+      return { ok: true, changedFields: [], nights: nextJson };
+    }
+    db.prepare('DELETE FROM venue_weekly_nights WHERE venue_id = ?').run(id);
+    const ins = db.prepare(`INSERT INTO venue_weekly_nights (venue_id, days, kind, title, start_time, end_time, detail, host, cost, frequency, title_fr, detail_fr, source, checked_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const s of next) ins.run(id, JSON.stringify(s.days), s.kind, s.title, s.start, s.end, s.detail, s.host, s.cost, s.frequency, s.title_fr, s.detail_fr, s.source, s.checked_at);
+    // The listing changed: its updated_at moves too (the Roam Now data version and the sitemap read it).
+    db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const owner = next.length ? next.every((s) => s.source === 'venue_owner') : before.length > 0 && before.every((s) => s.source === 'venue_owner');
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'weekly_nights', ?, ?, ?, ?, 'high', ?, 0, ?)`).run(id, current, nextJson, owner ? 'venue_owner' : 'weekly_nights_research', m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changedFields: ['weekly_nights'], nights: nextJson };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
+function nightsStale(checkedAt, now = new Date()) {
+  if (!parseLocalDate(checkedAt)) return true;
+  return localDaysBetween(checkedAt, todayLocal(now)) > NIGHTS_STALE_DAYS;
+}
+// The nights a visitor may see: not stale.
+function nightsShown(list, now = new Date()) {
+  return (list || []).filter((s) => !nightsStale(s.checked_at, now));
+}
+// Is a night on this date ('YYYY-MM-DD')? Its day of the week, then its frequency: weekly and every other week always
+// (we don't know which week, so "every other week" may be tonight and says so), monthly-1st the first such day of the
+// month (1st–7th), monthly-last the last (no same weekday a week later in the month), monthly-1st-3rd the 1st–7th and
+// 15th–21st, monthly-2nd-4th the 8th–14th and 22nd–28th.
+function nightOnDate(s, date) {
+  if (!s || !parseLocalDate(date)) return false;
+  const weekday = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${date}T12:00:00Z`).getUTCDay()];
+  if (!(s.days || []).includes(weekday)) return false;
+  const dom = Number(date.slice(8, 10));
+  const week = Math.ceil(dom / 7);
+  const monthDays = new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0)).getUTCDate();
+  switch (s.frequency || 'weekly') {
+    case 'monthly-1st': return week === 1;
+    case 'monthly-last': return dom + 7 > monthDays;
+    case 'monthly-1st-3rd': return week === 1 || week === 3;
+    case 'monthly-2nd-4th': return week === 2 || week === 4;
+    default: return true;
+  }
+}
+// Week order, then the start time (a night with no time last on its day).
+function nightsSorted(list) {
+  return (list || []).map((s, i) => ({ s, i, first: SPECIAL_WEEK.indexOf(s.days[0]), t: specialMinutes(s.start) }))
+    .sort((a, b) => a.first - b.first || (a.t === null ? 1440 : a.t) - (b.t === null ? 1440 : b.t) || a.i - b.i).map((x) => x.s);
+}
+// The "today" helper (Okanagan clock), the same rules as specialsTodayFor(): nothing during an advisory, while closed
+// for the season or in a temporary closure, nor on a day the place's own hours (with its owner closures) say it is
+// closed; the frequency decides the week. `venues`: rows with id, type, hours (redirects skipped).
+// -> { clock, byId: Map(id -> { today: [night], blocked, closedToday }) } for each venue with nights.
+function weeklyNightsTodayFor(venues, now = new Date(), byVenue = allVenueWeeklyNights()) {
+  const clock = okanaganClock(now);
+  const byId = new Map();
+  if (!byVenue.size) return { clock, byId };
+  const advisory = getAdvisoryNotes(now), seasons = getSeasonStates(now);
+  for (const v of venues || []) {
+    if (!v || v.redirect_to || !byVenue.has(v.id) || (v.type && !NIGHT_TYPES.has(v.type))) continue;
+    const ss = seasons.get(v.id);
+    if (advisory.has(v.id) || (ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current)))) {
+      byId.set(v.id, { today: [], blocked: true, closedToday: false });
+      continue;
+    }
+    let place = null;
+    try { place = hoursModule && v.hours ? hoursModule.statusAt(hoursModule.parseHours(hoursWithExtras(v, now)), clock) : null; } catch (e) { place = null; }
+    const closedToday = !!(place && place.closedToday);
+    const today = closedToday ? [] : nightsSorted(nightsShown(byVenue.get(v.id), now).filter((s) => nightOnDate(s, clock.date)));
+    byId.set(v.id, { today, blocked: false, closedToday });
+  }
+  return { clock, byId };
+}
+// What a night is called in a short line: its kind ("Trivia", « Quiz »), or its own title for 'other' (the French
+// title when given). -> { text, english }
+function nightLabel(s, fr) {
+  if (s.kind !== 'other') return { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false };
+  const useFr = fr && s.title_fr;
+  return { text: useFr ? s.title_fr : s.title, english: !!(fr && !useFr) };
+}
+// "7 PM", "7–10 PM" (French "19 h", "19 h–22 h"); '' with no time.
+function nightTimeText(s, fr) {
+  const a = specialMinutes(s.start), b = specialMinutes(s.end);
+  if (!hoursModule || a === null) return '';
+  return b !== null ? happyHourRangeText(a, b, fr) : happyHourTimeText(a, fr);
+}
+// The frequency in words for the venue page and the lists: '' for weekly.
+function nightFrequencyText(s, fr) {
+  return s.frequency === 'biweekly' ? (fr ? 'une semaine sur deux' : 'every other week') : '';
+}
+// The days column: "Tue", "Mon–Wed", "Daily"; on set weeks of the month "1st Tue", "Last Fri", "1st & 3rd Tue",
+// "2nd & 4th Thu" (French « 1er mar. », « dernier ven. », « 1er et 3e mar. », « 2e et 4e jeu. »).
+const NIGHT_WEEKS_TEXT = {
+  en: { 'monthly-1st': '1st', 'monthly-last': 'Last', 'monthly-1st-3rd': '1st & 3rd', 'monthly-2nd-4th': '2nd & 4th' },
+  fr: { 'monthly-1st': '1er', 'monthly-last': 'dernier', 'monthly-1st-3rd': '1er et 3e', 'monthly-2nd-4th': '2e et 4e' },
+};
+function nightDaysText(s, fr) {
+  const weeks = NIGHT_WEEKS_TEXT[fr ? 'fr' : 'en'][s.frequency];
+  if (!weeks) return venueSpecialsDaysText(s.days, fr);
+  const names = s.days.map((d) => (fr ? `${HH_DAYS_SHORT.fr[d]}.` : HH_DAYS_SHORT.en[d])).join(', ');
+  return `${weeks} ${names}`;
+}
+// Build My Trip (2026-10-27): "Tonight: Trivia at 7 PM" (« Ce soir : Quiz à 19 h »), up to two, "; " between.
+function nightsTripText(list, fr) {
+  const shown = (list || []).slice(0, 2).map((s) => {
+    const l = nightLabel(s, fr), t = nightTimeText(s, fr);
+    return { text: `${l.text}${t ? (fr ? ` à ${t}` : ` at ${t}`) : ''}${s.frequency === 'biweekly' ? ` (${nightFrequencyText(s, fr)})` : ''}`, english: l.english };
+  });
+  return { text: shown.map((x) => x.text).join('; '), english: shown.some((x) => x.english) };
+}
+// Build My Trip (2026-10-27): an evening stop (4 PM or later) on the date of one of the venue's nights says so ("Tonight:
+// Trivia at 7 PM"; French « Ce soir : Quiz à 19 h »). A night already over when the stop starts is left out. Text only:
+// the planner's choices and order are unchanged. Reads plan.schedule (venueId, date, startMinutes) after planning,
+// like withTripSpecials().
+function withTripWeeklyNights(plan, now = new Date()) {
+  if (!plan || !Array.isArray(plan.schedule) || !plan.schedule.length) return plan;
+  const byVenue = allVenueWeeklyNights();
+  if (!byVenue.size) return plan;
+  const stops = [];
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 6) return;
+    if (Array.isArray(o)) { for (const x of o) walk(x, depth + 1); return; }
+    if (o.venue && typeof o.venue === 'object' && o.venue.id != null) stops.push(o);
+    for (const k of ['days', 'stops', 'itinerary', 'outing']) if (o[k]) walk(o[k], depth + 1);
+  };
+  walk(plan, 0);
+  if (!stops.length) return plan;
+  const q = db.prepare('SELECT id, type FROM venues WHERE id = ? AND redirect_to IS NULL');
+  const advisory = getAdvisoryNotes(now), seasons = getSeasonStates(now);
+  for (const item of plan.schedule) {
+    if (!item || item.venueId == null || !Number.isFinite(item.startMinutes) || !parseLocalDate(item.date) || !byVenue.has(item.venueId)) continue;
+    // An evening stop on its own date (a stop after midnight belongs to the next day's night, which is over).
+    if (item.startMinutes < 16 * 60 || item.startMinutes >= 1440) continue;
+    const ss = seasons.get(item.venueId);
+    if (advisory.has(item.venueId) || (ss && ss.kind === 'closed')) continue;
+    let row = null;
+    try { row = q.get(item.venueId); } catch (e) { row = null; }
+    if (!row || !NIGHT_TYPES.has(row.type)) continue;
+    const min = item.startMinutes;
+    const list = nightsSorted(nightsShown(byVenue.get(item.venueId), now).filter((s) => {
+      if (!nightOnDate(s, item.date)) return false;
+      const a = specialMinutes(s.start), b = specialMinutes(s.end);
+      if (b !== null && a !== null && b > a && min >= b) return false;
+      return !(a !== null && b === null && min >= a + 180);
+    }));
+    if (!list.length) continue;
+    const en = nightsTripText(list, false), frl = nightsTripText(list, true);
+    for (const s of stops) {
+      if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
+      s.nights = en.text;
+      s.nightsFr = frl.text;
+      s.nightLine = `Tonight: ${en.text}`;
+      s.nightLineFr = `Ce soir : ${frl.text}`;
+      if (frl.english) s.nightLineFrLang = 'en';
+    }
+  }
+  return plan;
+}
+// /admin/review: venues whose nights include one checked more than NIGHTS_STALE_DAYS ago (hidden on the site), oldest
+// first. -> [{ id, name, region, type, slug, nights: [stale ones], checked_at }]
+function staleVenueWeeklyNights(now = new Date()) {
+  const out = [];
+  for (const [venueId, list] of allVenueWeeklyNights()) {
+    const stale = list.filter((s) => nightsStale(s.checked_at, now));
+    if (!stale.length) continue;
+    const v = db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(venueId);
+    if (!v || v.redirect_to) continue;
+    out.push({ id: v.id, name: v.name, region: v.region, type: v.type, slug: v.slug, nights: stale, checked_at: stale.map((s) => s.checked_at).sort()[0] });
+  }
+  return out.sort((a, b) => String(a.checked_at).localeCompare(String(b.checked_at)) || String(a.name).localeCompare(String(b.name)));
+}
+// /admin/review: venues with a live music night on file (not stale) but no live_music badge. Badges never change by
+// themselves; this list is for a person to check.
+function weeklyNightsLiveMusicWithoutBadge(now = new Date()) {
+  const out = [];
+  for (const [venueId, list] of allVenueWeeklyNights()) {
+    const music = nightsShown(list, now).filter((s) => s.kind === 'live_music');
+    if (!music.length) continue;
+    const v = db.prepare('SELECT id, name, region, type, slug, live_music, redirect_to FROM venues WHERE id = ?').get(venueId);
+    if (!v || v.redirect_to || Number(v.live_music) === 1) continue;
+    out.push({ id: v.id, name: v.name, region: v.region, type: v.type, slug: v.slug, nights: music });
+  }
+  return out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 // Cuisine correction (2026-10-15): a guarded, audited write of the listed
 // cuisine, for fixing a wrong label (CedarCreek showed "German"). null clears it.
 function guardedCuisineUpdate(id, expectedCurrent, cuisine, meta) {
@@ -17788,6 +18121,9 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   /* Weekly specials (2026-10-27): today's, under the happy hour line. */
   body.map-page .pm-sp { display: block; margin-top: 4px; font-size: 0.84rem; font-weight: 700; color: #1E4F4C; }
   body.map-page .pm-sp.is-on { font-weight: 800; }
+  /* Weekly nights (2026-10-27): tonight's, under the specials line. */
+  body.map-page .pm-wn { display: block; margin-top: 4px; font-size: 0.84rem; font-weight: 700; color: #4B3A78; }
+  body.map-page .pm-wn.is-on { font-weight: 800; }
   body.map-page .pm-dog { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.35; color: #5B3A1A; }
   body.map-page .pm-route[hidden], body.map-page .pm-count[hidden], body.map-page .pm-list[hidden] { display: none; }
   body.map-page .pm-route { background: #fff; border-radius: 16px; box-shadow: 0 1px 4px rgba(27,43,58,0.15); padding: 14px 16px; margin-bottom: 12px; }
@@ -17966,7 +18302,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Impossible de calculer l’itinéraire pour l’instant. Ouvrez-le dans votre application de cartes.', arrived: 'Vous êtes arrivé·e!',
     openGoogle: 'Ouvrir dans Google Maps', openApple: 'Ouvrir dans Plans', voiceNote: 'si vous préférez votre application habituelle.', voiceOn: 'Guidage vocal activé', voiceOff: 'Guidage vocal coupé', rerouting: 'Nouvel itinéraire.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' mètres' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' kilomètres'; }, arrivedAt: function(n){ return 'Vous êtes arrivé·e à ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', puis dans ' + d + ', ' + b; }, inSay: function(d, b){ return 'Dans ' + d + ', ' + b; }, routeNeedsLocation: 'Partagez votre position pour obtenir l’itinéraire.',
     stepsBtn: function(t){ return 'Étapes · ' + t; }, inDist: function(d){ return 'Dans ' + d; }, followOff: 'Touchez le bouton de position pour que la carte vous suive de nouveau.',
-    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour' }, spToday: 'Aujourd’hui :',
+    feat: { patio: 'Terrasse', dogs: 'Chiens OK', happy: 'Happy hour', music: 'Musique', lake: 'Vue sur le lac', kids: 'Enfants', veg: 'Végétarien', vegan: 'Végane', gf: 'Sans gluten', late: 'Ouvert tard', early: 'Ouvert tôt', groups: 'Groupes', sports: 'Sports à la télé', nonalc: 'Sans alcool', free: 'Gratuit', specials: 'Spéciaux du jour', nights: 'Soirées ce soir' }, spToday: 'Aujourd’hui :',
+    wnTonight: 'Ce soir :', wnEow: 'une semaine sur deux', wn: { trivia: 'Quiz', karaoke: 'Karaoké', open_mic: 'Scène ouverte', bingo: 'Bingo', comedy: 'Humour', dj: 'Soirée DJ', live_music: 'Musique live', games: 'Soirée jeux', sports: 'Soirée sports', run_club: 'Club de course', paint: 'Soirée peinture' },
     dogRule: 'Chiens :', closedNow: 'Fermé ou heures non indiquées', clear: 'Effacer', without: function(l){ return 'Rien ne correspond à tout cela. Essayez sans « ' + l + ' ».'; }, dropIt: 'Le retirer', noName: function(w){ return 'Rien ne s’appelle « ' + w + ' » ici. Vérifiez l’orthographe ou essayez un autre mot.'; }, inTown: function(t){ return 'À ' + t; }, priceLbl: { cheap: 'Petit budget', afford: 'Abordable', fancy: 'Haut de gamme' }, openAt: function(t, d, u){ return 'Ouvert ' + (d ? d + ' ' : '') + (t ? (u ? 'jusqu’à ' : 'à ') + t : ''); }, tomorrowW: 'demain', days: { mon: 'lundi', tue: 'mardi', wed: 'mercredi', thu: 'jeudi', fri: 'vendredi', sat: 'samedi', sun: 'dimanche' }, notLbl: function(t){ return 'Pas de ' + t; },
     micLabel: 'Rechercher en parlant', micStop: 'Arrêter l’écoute', listening: 'Je vous écoute… dites ce que vous cherchez.', micDenied: 'Le micro est bloqué pour ce site. Activez-le dans les réglages du navigateur, ou tapez votre recherche.', micNone: 'Je n’ai rien entendu. Touchez le micro et réessayez.', micFail: 'La recherche vocale ne fonctionne pas pour l’instant. Tapez votre recherche.', hhNow: function(t){ return 'Happy hour en cours' + (t ? ' · jusqu’à ' + t : ''); }, hhOnNow: function(t){ return 'Happy hour en cours · se termine dans ' + t; }, hhLater: function(t){ return 'Happy hour aujourd’hui dès ' + t; }, anyOf: 'Aucun endroit n’a tout cela; voici ceux qui en ont au moins un.', ignored: function(w){ return 'Rien ne correspondait à « ' + w + ' », alors ce mot a été ignoré.'; }, top: 'Les mieux notés', removeTag: 'Retirer', share: 'Partager', copied: 'Lien copié',
     typoRead: function(f){ return 'Nous avons lu ' + f.map(function(x){ return '« ' + x.from + ' » comme « ' + x.to + ' »'; }).join(', ') + '.'; },
@@ -18005,7 +18342,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
     openGoogle: 'Open in Google Maps', openApple: 'Open in Apple Maps', voiceNote: 'if you prefer your usual app.', voiceOn: 'Voice directions on', voiceOff: 'Voice directions off', rerouting: 'Rerouting.', spoken: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' metres' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' kilometres'; }, arrivedAt: function(n){ return 'You have arrived at ' + n + '.'; }, thenIn: function(a, d, b){ return a + ', then in ' + d + ', ' + b; }, inSay: function(d, b){ return 'In ' + d + ', ' + b; }, routeNeedsLocation: 'Share your location to get directions.',
     stepsBtn: function(t){ return 'Steps · ' + t; }, inDist: function(d){ return 'In ' + d; }, followOff: 'Tap the locate button to have the map follow you again.',
-    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today' }, spToday: 'Today:',
+    feat: { patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour', music: 'Live music', lake: 'Lake view', kids: 'Kids welcome', veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten-free', late: 'Open late', early: 'Open early', groups: 'Groups', sports: 'Sports on TV', nonalc: 'Alcohol-free', free: 'Free to visit', specials: 'Specials today', nights: 'Weekly nights tonight' }, spToday: 'Today:',
+    wnTonight: 'Tonight:', wnEow: 'every other week', wn: { trivia: 'Trivia', karaoke: 'Karaoke', open_mic: 'Open mic', bingo: 'Bingo', comedy: 'Comedy', dj: 'DJ night', live_music: 'Live music', games: 'Games night', sports: 'Sports night', run_club: 'Run club', paint: 'Paint night' },
     dogRule: 'Dogs:', closedNow: 'Closed now or hours not listed', clear: 'Clear', without: function(l){ return 'Nothing matches all of that. Try without “' + l + '”.'; }, dropIt: 'Remove it', noName: function(w){ return 'Nothing called “' + w + '” here. Check the spelling or try another word.'; }, inTown: function(t){ return 'In ' + t; }, priceLbl: { cheap: 'Budget-friendly', afford: 'Affordable', fancy: 'Upscale' }, openAt: function(t, d, u){ return 'Open ' + (d ? d + ' ' : '') + (t ? (u ? 'until ' : 'at ') + t : ''); }, tomorrowW: 'tomorrow', days: { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' }, notLbl: function(t){ return 'No ' + t; },
     micLabel: 'Search by voice', micStop: 'Stop listening', listening: 'Listening… say what you’re looking for.', micDenied: 'The microphone is blocked for this site. Turn it on in your browser settings, or type your search.', micNone: 'Didn’t catch that. Tap the microphone and try again.', micFail: 'Voice search isn’t working right now. Type your search instead.', hhNow: function(t){ return 'Happy hour now' + (t ? ' · until ' + t : ''); }, hhOnNow: function(t){ return 'Happy hour on now · ends in ' + t; }, hhLater: function(t){ return 'Happy hour today from ' + t; }, anyOf: 'No place has all of those, so these have any of them.', ignored: function(w){ return 'Nothing matched “' + w + '”, so it was left out.'; }, top: 'Top rated', removeTag: 'Remove', share: 'Share', copied: 'Link copied',
     typoRead: function(f){ return 'We read ' + f.map(function(x){ return '“' + x.from + '” as “' + x.to + '”'; }).join(', ') + '.'; },
@@ -18147,7 +18485,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   var hhKnown = false;
   // Weekly specials (2026-10-27): today's line shows only while it is still that day on the Okanagan clock.
-  function refreshStatus(){ var wd = okanaganClock(new Date()).weekday; places.forEach(function(p){ p.st = statusOf(p); p.hhs = hhOf(p); p.spOn = !!(p.sp && p.spDay === wd); }); }
+  // Weekly nights (2026-10-27): tonight's line too, only while it is still that day.
+  function refreshStatus(){ var wd = okanaganClock(new Date()).weekday; places.forEach(function(p){ p.st = statusOf(p); p.hhs = hhOf(p); p.spOn = !!(p.sp && p.spDay === wd); p.wnOn = !!(p.wn && p.wnDay === wd); }); }
+  // "Trivia 7 PM; Karaoke 9 PM" (« Quiz 19 h »); an 'other' night by its own title (English, marked on /fr/map).
+  function wnHtml(p){ return p.wn.map(function(n){ var other = n[0] === 'other', l = other ? esc(n[3] || '') : esc(T.wn[n[0]] || ''); return (other && FR ? '<span lang="en">' + l + '</span>' : l) + (n[1] ? ' ' + esc(timeText(n[1])) : '') + (n[2] ? ' (' + esc(T.wnEow) + ')' : ''); }).join('; '); }
   // Dates on the Okanagan calendar.
   function okToday(){
     var now = new Date();
@@ -18186,6 +18527,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">${uiIcon('cocktail')} ' + esc(p.hhs.text) + (p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '') + '</span>';
     // Weekly specials (2026-10-27): "Today: Wing Wednesday · 60¢ wings" (« Aujourd’hui : … »).
     if (p.spOn) out += '<span class="pm-sp' + (feats.specials ? ' is-on' : '') + '">' + esc(T.spToday) + ' <span' + (p.spEn ? ' lang="en"' : '') + '>' + esc(p.sp) + '</span></span>';
+    // Weekly nights (2026-10-27): "Tonight: Trivia 7 PM" (« Ce soir : Quiz 19 h »).
+    if (p.wnOn) out += '<span class="pm-wn' + (feats.nights ? ' is-on' : '') + '">${uiIcon('calendar')} ' + esc(T.wnTonight) + ' ' + wnHtml(p) + '</span>';
     return out;
   }
   function anyOn(o){ return Object.keys(o).some(function(k){ return o[k]; }); }
@@ -18234,6 +18577,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // Happy hour deals in the search (2026-10-26): a word of the search found in a place's deal lines ("cheap pints",
   // "happy hour wings", « ailes ») counts for that place, even where the words also set a kind, a tag, a price or a
   // name to look for. The town, the features (Happy hour now included), open now and what to leave out still apply.
+  // Weekly nights in the search (2026-10-27): each kind's words, so "trivia", "quiz", "karaoke", "bingo", "open mic"
+  // or « scène ouverte » find the places with that night tonight (through the deal search below).
+  var WN_WORDS = { trivia: 'trivia quiz pub quiz', karaoke: 'karaoke', open_mic: 'open mic openmic scene ouverte', bingo: 'bingo', comedy: 'comedy standup humour', dj: 'dj', live_music: 'live music musique', games: 'games board games jeux', sports: 'sports game night', run_club: 'run club running course', paint: 'paint painting peinture', other: '' };
   var DEAL_SKIP = ' happy hour hours heure heures deal deals special specials speciaux aubaine aubaines cheap budget pas cher chere bon marche near nearby pres moi now maintenant today tonight aujourd hui soir the and with for avec pour des les une open ouvert best good great place places spot spots bar bars pub pubs ';
   function setDealWords(v){
     dealWordsFor = v;
@@ -18256,9 +18602,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (notTypes[p.type]) return false;
     for (var nk in notTags) if (notTags[nk] && p.tg.indexOf(TAGIX[nk]) !== -1) return false;
     for (var nn in notKinds) if (notKinds[nn] && CONF.k[nn].indexOf(p.type) !== -1) return false;
-    for (var nf in notFeats) if (notFeats[nf] && (nf === 'specials' ? p.spOn : (p.f & CONF.f[nf]))) return false;
+    for (var nf in notFeats) if (notFeats[nf] && (nf === 'specials' ? p.spOn : nf === 'nights' ? p.wnOn : (p.f & CONF.f[nf]))) return false;
     // Specials today (2026-10-27): from today's specials ([17]), not a stored feature bit.
-    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'happy' && hhKnown ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
+    // Weekly nights tonight (2026-10-27): from tonight's nights ([19]).
+    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' && hhKnown ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
     return !term || byDeal || mapNameHas(p.key, term, termTyping);
   }
@@ -18851,6 +19198,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     dogs: 'dog dogs pup pups puppy doggo pet pets chien chiens',
     happy: 'happy',
     specials: 'specials special spéciaux speciaux spécial',
+    nights: 'nights',
     music: 'music live band bands musique',
     lake: 'lake view views waterfront lac',
     kids: 'kids kid family families children enfants famille',
@@ -18866,6 +19214,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var PHRASES = [
     [/gluten[ -]?free|sans[ -]gluten|celiac|coeliac/g, ' gf '], [/alcohol[ -]?free|non[ -]?alcoholic|zero[ -]?proof|sans[ -]alcool|mocktails?/g, ' nonalc '],
     [/plant[ -]?based/g, ' vegan '], [/(dog|pet)[ -]?friendly/g, ' dogs '], [/(kid|family)[ -]?friendly/g, ' kids '], [/happy[ -]?hours?/g, ' happy '], [/ happy\\s+(?:specials?|spéciaux|speciaux|spécial|deals?)(?=\\s)/g, ' happy '], [/(?:daily|weekly|nightly|today'?s|tonight'?s|dinner|lunch|food|drink) specials?|specials? (?:today|tonight)|spéciaux du jour|speciaux du jour|plats? du jour/g, ' specials '],
+    [/open[ -]?mics?|sc[eè]nes? ouvertes?/g, ' openmic '], [/(?:weekly|tonight'?s?) nights?|soir[ée]es? de la semaine|soir[ée]es? ce soir/g, ' nights '],
     [/open late|late[ -]?night|ouvert tard/g, ' late '], [/open early|ouvert tôt/g, ' early '], [/live music|musique live|musique en direct|en direct/g, ' music '],
     // Round 11 (2026-10-20): "free" is Free to visit, but not in "sugar free", "free parking" or "free wifi".
     [/(sugar|dairy|nut|peanut|lactose|egg|smoke|scent|fragrance)[ -]?free/g, ' $1 '], [/free (parking|wifi|wi-fi|wi fi|refills?|delivery|shipping)/g, ' $1 '],
@@ -19337,6 +19686,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (a[16]) p.dk = mapNameKey(typeof a[16] === 'string' ? a[16] : a[16].join(' '));
       // Today's specials (2026-10-27): [weekday, English, French?]; their words join the deal search ("wings", "taco tuesday").
       if (a[17] && a[17][1]) { p.spDay = a[17][0]; p.sp = FR && a[17][2] ? a[17][2] : a[17][1]; p.spEn = !!(FR && !a[17][2]); p.dk = (p.dk || ' ') + mapNameKey(a[17].slice(1).join(' ')).slice(1); }
+      // Tonight's weekly nights (2026-10-27): [weekday, [[kind, time, every other week, title]]]; their kind words join the deal search.
+      if (a[19] && a[19][1]) { p.wnDay = a[19][0]; p.wn = a[19][1]; p.dk = (p.dk || ' ') + mapNameKey(p.wn.map(function(n){ return (WN_WORDS[n[0]] || '') + ' ' + (n[3] || ''); }).join(' ')).slice(1); }
       p.m = L.marker([p.lat, p.lng], { icon: iconFor(p.g), title: p.name }).bindPopup(pmPopup(function(){ return popupFor(p); }));
       places.push(p);
     });
@@ -19379,7 +19730,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 12; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]
+const MAP_DATA_FORMAT = 13; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -19388,10 +19739,13 @@ function mapDataVersion(now = new Date()) {
   // Weekly specials (2026-10-27): their own table, so their count and last change count too.
   let sp = { u: null, n: 0 };
   try { sp = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_specials').get(); } catch (err) { /* an older database */ }
+  // Weekly nights (2026-10-27): their own table too.
+  let wn = { u: null, n: 0 };
+  try { wn = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_weekly_nights').get(); } catch (err) { /* an older database */ }
   // Verified mark (2026-10-27): the claimed places too, so a new claim shows its tick without waiting for another change.
   const claimed = [...claimedVenueIds()].sort((a, b) => a - b).join(',');
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
-  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}`).digest('hex').slice(0, 12);
+  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}`).digest('hex').slice(0, 12);
 }
 const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
 // Places: [lat, lng, name, type, region, url, hours or 0, features, dog rule]. Hours ship only for a place that has
@@ -19410,6 +19764,9 @@ const MAP_FEATURES = [
 // "Specials today" (2026-10-27): a filter key like the features (?f=specials, the words "specials" / « spéciaux »), but read
 // from today's specials ([17]), never from a stored bit, so no place carries it in [7].
 const MAP_SPECIALS_BIT = 32768;
+// "Weekly nights tonight" (2026-10-27): the same kind of filter key (?f=nights, "weekly nights"), read from tonight's
+// nights ([19]).
+const MAP_NIGHTS_BIT = 65536;
 // The kinds of place a visitor picks from (any of them), by venue type.
 const MAP_KINDS = [
   { key: 'drinks', label: 'Drinks', icon: uiIcon('beer'), types: ['pub', 'brewery', 'cocktail', 'winery', 'distillery'] },
@@ -19423,8 +19780,8 @@ const MAP_KINDS = [
 ];
 const MAP_MUST_HAVES = [
   { key: 'patio', label: 'Patio', icon: uiIcon('sun') }, { key: 'dogs', label: 'Dogs OK', icon: uiIcon('paw') },
-  { key: 'happy', label: 'Happy hour now', icon: uiIcon('cocktail') }, { key: 'specials', label: 'Specials today', icon: uiIcon('tag') }, { key: 'music', label: 'Live music', icon: uiIcon('music') },
-  { key: 'lake', label: 'Lake view', icon: uiIcon('waves') }, { key: 'kids', label: 'Kids welcome', icon: uiIcon('child') },
+  { key: 'happy', label: 'Happy hour now', icon: uiIcon('cocktail') }, { key: 'specials', label: 'Specials today', icon: uiIcon('tag') }, { key: 'nights', label: 'Weekly nights tonight', icon: uiIcon('calendar') },
+  { key: 'music', label: 'Live music', icon: uiIcon('music') }, { key: 'lake', label: 'Lake view', icon: uiIcon('waves') }, { key: 'kids', label: 'Kids welcome', icon: uiIcon('child') },
   { key: 'late', label: 'Open late', icon: uiIcon('moon') }, { key: 'early', label: 'Open early', icon: uiIcon('sunrise') },
   { key: 'groups', label: 'Good for groups', icon: uiIcon('group') }, { key: 'sports', label: 'Sports on TV', icon: uiIcon('tv') },
   { key: 'nonalc', label: 'Alcohol-free drinks', icon: uiIcon('juice') }, { key: 'free', label: 'Free to visit', icon: uiIcon('ticket') },
@@ -19513,6 +19870,7 @@ function mapPlacesData(now = new Date()) {
   const hikeIds = getCollectionVenueIds('activity_hiking'), favIds = getCollectionVenueIds('local_favorite');
   const specials = specialsTodayFor(venues, now);
   const claimed = claimedVenueIds();
+  const nightsToday = weeklyNightsTodayFor(venues, now);
   return venues.map((v) => {
     const st = open.byId.get(v.id);
     v.hikeList = hikeIds.has(v.id);
@@ -19551,6 +19909,19 @@ function mapPlacesData(now = new Date()) {
     if (claimed.has(v.id)) {
       while (row.length < 18) row.push(0);
       row.push(1);
+    }
+    // [19] Weekly nights (2026-10-27): tonight's only (up to three), as [weekday, [[kind, 'HH:MM' or 0, every other
+    // week 1/0, title (an 'other' night only)], ...]]; the page words them ("Tonight: Trivia 7 PM"). Only on a place with
+    // a night tonight ([16], [17] and [18] are 0 when the place has none), so the other rows keep their length.
+    const nt = nightsToday.byId.get(v.id);
+    if (nt && nt.today.length) {
+      while (row.length < 19) row.push(0);
+      row.push([nightsToday.clock.weekday, nt.today.slice(0, 3).map((s) => {
+        const x = [s.kind, s.start || 0];
+        if (s.frequency === 'biweekly' || s.kind === 'other') x.push(s.frequency === 'biweekly' ? 1 : 0);
+        if (s.kind === 'other') x.push(s.title);
+        return x;
+      })]);
     }
     return row;
   });
@@ -19680,7 +20051,7 @@ function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
   const ver = mapDataVersion(now);
   const conf = JSON.stringify({ src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
-    k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: { ...Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])), specials: MAP_SPECIALS_BIT },
+    k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: { ...Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])), specials: MAP_SPECIALS_BIT, nights: MAP_NIGHTS_BIT },
     tg: MAP_TAGS.map((t) => ({ k: t.key, en: t.en, fr: t.fr, i: t.icon, s: t.say, t: t.types })),
     // The food types' line icons, once each (the tags carry only the icon's name).
     ic: Object.fromEntries([...new Set(MAP_TAGS.map((t) => t.icon))].map((n) => [n, uiIcon(n)])),
@@ -19729,7 +20100,7 @@ ${renderGolfHeaderHtml()}
           // Every filter in one row: Happy hour, Patio and Dogs OK, the dietary ones, the kinds of place, then the rest.
           const feat = (f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`;
           const kind = (k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`;
-          const first = ['happy', 'specials', 'patio', 'dogs'];
+          const first = ['happy', 'specials', 'nights', 'patio', 'dogs'];
           return [...first.map((key) => MAP_MUST_HAVES.find((f) => f.key === key)).map(feat), ...MAP_DIETARY.map(feat), ...MAP_KINDS.map(kind), ...MAP_MUST_HAVES.filter((f) => !first.includes(f.key)).map(feat)].join('\n        ');
         })()}
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
@@ -27947,6 +28318,82 @@ const WHATSON_LIST_SCRIPT = `<script>
   layout();
 }, true);
 </script>`;
+// What's On "Every week" (2026-10-27): the weekly nights (trivia, karaoke, open mics, bingo ...) for the next 7 days,
+// tonight first, a folded list per day and kind ("Tuesday · Trivia at 6 places") linking to each venue page. Only
+// tonight's lists start open. No new pages or URLs: it lives on /whats-on (and /fr/whats-on through the French twin,
+// each text in both languages as bilingualDescHtml pairs). Same rules as the venue page: not stale, not during an
+// advisory, a season or temporary closure, nor on a day the place's own hours call closed; the frequency decides the week.
+const WHATSON_NIGHTS_STYLE = `<style>
+  body.whatson-page .whatson-nights { margin: 8px 0 28px; }
+  body.whatson-page .whatson-nights-intro { margin: 0 0 12px; color: #5f6b73; }
+  body.whatson-page .whatson-nights-day { margin: 0 0 6px; }
+  body.whatson-page .whatson-nights-group { border-bottom: 1px solid rgba(42,32,25,0.1); }
+  body.whatson-page .whatson-nights-group summary { display: flex; align-items: center; min-height: 44px; font-weight: 800; cursor: pointer; }
+  body.whatson-page .whatson-nights-group summary .ui-icon { margin-right: 6px; flex: none; }
+  body.whatson-page .whatson-nights-group ul { list-style: none; margin: 0 0 10px; padding: 0 0 0 22px; columns: 18rem auto; column-gap: 2rem; }
+  body.whatson-page .whatson-nights-group li { break-inside: avoid; padding: 3px 0; }
+  body.whatson-page .whatson-nights-meta { color: #5f6b73; font-size: 0.9rem; }
+</style>`;
+function whatsOnWeeklyNightsHtml(now = new Date()) {
+  const byVenue = allVenueWeeklyNights();
+  if (!byVenue.size) return '';
+  const ids = [...byVenue.keys()];
+  const venues = db.prepare(`SELECT id, name, region, type, slug, hours, redirect_to FROM venues WHERE id IN (${ids.map(() => '?').join(',')}) ORDER BY name`).all(...ids)
+    .filter((v) => !v.redirect_to && v.slug && REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && NIGHT_TYPES.has(v.type));
+  if (!venues.length) return '';
+  const advisory = getAdvisoryNotes(now), seasons = getSeasonStates(now);
+  const clock = okanaganClock(now);
+  const W = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const date = addLocalDays(clock.date, i);
+    const weekday = W[new Date(`${date}T12:00:00Z`).getUTCDay()];
+    const groups = new Map();
+    for (const v of venues) {
+      const ss = seasons.get(v.id);
+      if (advisory.has(v.id) || (ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current)))) continue;
+      let closed = false;
+      try { const st = hoursModule && v.hours ? hoursModule.statusAt(hoursModule.parseHours(hoursWithExtras(v, now)), { weekday, minutes: 12 * 60, date }) : null; closed = !!(st && st.closedToday); } catch (e) { closed = false; }
+      if (closed) continue;
+      for (const s of nightsSorted(nightsShown(byVenue.get(v.id), now))) {
+        if (!nightOnDate(s, date)) continue;
+        if (!groups.has(s.kind)) groups.set(s.kind, []);
+        groups.get(s.kind).push({ v, s });
+      }
+    }
+    if (groups.size) days.push({ i, date, weekday, groups });
+  }
+  if (!days.length) return '';
+  const two = (en, fr) => bilingualDescHtml(en, fr === en ? null : fr);
+  const dayHtml = ({ i, weekday, groups }) => {
+    const dayEn = i === 0 ? 'Tonight' : HH_DAYS_LONG.en[weekday];
+    const dayFr = i === 0 ? 'Ce soir' : HH_DAYS_LONG.fr[weekday].charAt(0).toUpperCase() + HH_DAYS_LONG.fr[weekday].slice(1);
+    const kinds = [...groups.keys()].sort((a, b) => groups.get(b).length - groups.get(a).length || NIGHT_KINDS.indexOf(a) - NIGHT_KINDS.indexOf(b));
+    return `
+    <div class="whatson-nights-day" data-day="${weekday}">${kinds.map((k) => {
+      const list = groups.get(k).sort((a, b) => (specialMinutes(a.s.start) ?? 1440) - (specialMinutes(b.s.start) ?? 1440) || String(a.v.name).localeCompare(String(b.v.name)));
+      const n = list.length;
+      const en = `${dayEn} · ${NIGHT_KIND_LABELS.en[k]} at ${n} place${n === 1 ? '' : 's'}`;
+      const fr = `${dayFr} · ${NIGHT_KIND_LABELS.fr[k]} à ${n} endroit${n === 1 ? '' : 's'}`;
+      return `
+      <details class="whatson-nights-group" data-kind="${k}"${i === 0 ? ' open' : ''}><summary>${uiIcon(NIGHT_KIND_ICONS[k] || 'calendar', 15, true)}<span>${two(en, fr)}</span></summary>
+        <ul>${list.map(({ v, s }) => {
+          const showTitle = k === 'other' || !specialWords(s.title).join(' ').includes(specialWords(NIGHT_KIND_LABELS.en[k]).join(' ')) ? s.title : '';
+          const metaEn = [nightTimeText(s, false), REGION_LABELS[v.region], showTitle, nightFrequencyText(s, false)].filter(Boolean).join(' · ');
+          const metaFr = [nightTimeText(s, true), REGION_LABELS[v.region], showTitle ? (s.title_fr || s.title) : '', nightFrequencyText(s, true)].filter(Boolean).join(' · ');
+          return `
+          <li><a href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${escapeHtml(v.name)}</a> <span class="whatson-nights-meta">${two(metaEn, metaFr)}</span></li>`;
+        }).join('')}
+        </ul>
+      </details>`;
+    }).join('')}
+    </div>`;
+  };
+  return `<section class="whatson-nights" id="whatsOnNights" aria-labelledby="whatsOnNightsHeading">
+    <h2 class="category-subsection-heading" id="whatsOnNightsHeading">${two('Every week', 'Chaque semaine')}</h2>
+    <p class="whatson-nights-intro">${two('Trivia, karaoke, open mics and more at local pubs, breweries and restaurants, tonight first.', 'Quiz, karaoké, scènes ouvertes et plus dans les pubs, brasseries et restaurants, ce soir d’abord.')}</p>${days.map(dayHtml).join('')}
+  </section>`;
+}
 function renderWhatsOnPage(filter = null, opts = {}) {
   // opts.scope ({ category } or { region }) renders a scoped page (see whatsOnScopeFromPath): it pre-selects that chip unless the
   // query picks its own, and defaults to the scope's 90-day window unless the query sets dates.
@@ -28138,6 +28585,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
 ${pageHead(title, description, canonical, [breadcrumb, pageItemList].filter(Boolean), { shareImage: whatsOnBanner.src, golfTheme: true, outdoorTheme: true, noindex: !hasInventory || scopeThin, savedSidecar: true })}
 ${renderWhatsOnStyles()}
 ${WHATSON_LIST_STYLE}
+${WHATSON_NIGHTS_STYLE}
 ${CATEGORY_BANNER_STYLE}
 ${renderAnalyticsHeadHtml('hub')}
 </head>
@@ -28188,6 +28636,7 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-no-results" id="whatsOnNoResults"${hasInventory && matching.length === 0 && !(nextUp && nextUp.on) ? '' : ' hidden'}>No events match that combination yet. <a href="${basePath}" id="whatsOnNoResultsClear">Clear the filters</a> to see everything that is on.</p>
   ${cardsHtml}
   </section>
+  ${scope ? '' : whatsOnWeeklyNightsHtml(renderNow)}
   ${comingUp.length ? `<section class="whatson-coming-up" aria-labelledby="whatsOnComingUpHeading">
     <h2 class="category-subsection-heading" id="whatsOnComingUpHeading">Coming up after the weekend</h2>
     <ul class="card-grid">${comingUp.map((e) => whatsOnEventCardHtml(e)).join('')}</ul>
@@ -29684,6 +30133,50 @@ function venueSpecialsHtml(sp, fr) {
   };
   return `<span class="venue-sp-list" role="list" aria-label="${fr ? 'Spéciaux de la semaine' : 'Weekly specials'}">${sp.rows.map(row).join('')}</span>${sp.confirmed ? `<span class="venue-hours-checked venue-sp-checked">${sp.confirmed}</span>` : sp.checked ? `<span class="venue-hours-checked venue-sp-checked">${escapeHtml(sp.checked)}</span>` : ''}`;
 }
+// ---------- Weekly nights on venue pages (2026-10-27) ----------
+// The nights a venue page shows, in week order (then by time): [{ s, days, today, time, freq }] with one checked date
+// (or "Confirmed by <venue>" when every one came from the owner), or null. Same rules as the weekly specials: nothing
+// with an advisory, during a closure in force or while closed for the season; stale nights left out. Today's row is
+// marked only when the night falls on today (its frequency too) and the place's own hours don't call it closed today.
+function venueWeeklyNights(venue, statusHours, fr, now = new Date()) {
+  if (!venue || venue.redirect_to || (venue.type && !NIGHT_TYPES.has(venue.type))) return null;
+  const list = venueWeeklyNightsList(venue.id);
+  if (!list.length) return null;
+  if (getAdvisoryNotes(now).has(venue.id)) return null;
+  if ((getSeasonStates(now).get(venue.id) || {}).kind === 'closed' || venueClosureInForce(venue.id, now)) return null;
+  const shown = nightsSorted(nightsShown(list, now));
+  if (!shown.length) return null;
+  const clock = okanaganClock(now);
+  let closedToday = false;
+  try { const place = statusHours ? venueHoursStatusAt(statusHours, now) : null; closedToday = !!(place && place.closedToday); } catch (e) { closedToday = false; }
+  const rows = shown.map((s) => ({ s, days: nightDaysText(s, fr), today: !closedToday && nightOnDate(s, clock.date), time: nightTimeText(s, fr), freq: nightFrequencyText(s, fr) }));
+  const oldest = shown.map((s) => s.checked_at).sort()[0];
+  const confirmed = shown.every((s) => s.source === 'venue_owner') ? venueConfirmedHtml(venue.name, oldest, fr) : '';
+  return { rows, checked: happyHourCheckedText(oldest, fr), confirmed };
+}
+// A small line icon per kind (the existing uiIcon set; no emoji).
+const NIGHT_KIND_ICONS = { trivia: 'sparkle', karaoke: 'volume', open_mic: 'volume', bingo: 'target', comedy: 'sparkle', dj: 'music', live_music: 'music', games: 'target', sports: 'tv', run_club: 'sunrise', paint: 'palette', other: 'calendar' };
+// The "Weekly nights" card (the weekly specials' list style): the days in their own column, the title with its time
+// and a "Tonight" tag on tonight's row (words, not only colour; "Today" for a night before 4 PM), then a line with the
+// kind, the detail, the host, the cost and "every other week". French without a French title or detail shows the
+// English, marked lang="en".
+function venueWeeklyNightsHtml(wn, fr) {
+  if (!wn || !wn.rows.length) return '';
+  const row = ({ s, days, today, time, freq }) => {
+    const titleFr = fr && s.title_fr, detailFr = fr && s.detail_fr;
+    const title = titleFr ? s.title_fr : s.title, detail = detailFr ? s.detail_fr : s.detail;
+    const tl = fr && !titleFr ? ' lang="en"' : '', dl = fr && !detailFr ? ' lang="en"' : '';
+    const evening = specialMinutes(s.start) === null || specialMinutes(s.start) >= 16 * 60;
+    const tag = today ? ` <span class="venue-wn-today">${evening ? (fr ? 'Ce soir' : 'Tonight') : (fr ? 'Aujourd’hui' : 'Today')}</span>` : '';
+    const kind = s.kind !== 'other' ? NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind] : '';
+    const kindHtml = kind ? `<span class="venue-wn-kind">${uiIcon(NIGHT_KIND_ICONS[s.kind] || 'calendar', 13, true)} ${escapeHtml(kind)}</span>` : '';
+    const meta = [kindHtml, detail ? `<span${dl}>${escapeHtml(detail)}</span>` : '', s.host ? `<span>${fr ? 'Animé par' : 'Hosted by'} ${escapeHtml(s.host)}</span>` : '',
+      s.cost ? `<span${fr ? ' lang="en"' : ''}>${escapeHtml(s.cost)}</span>` : '', freq ? `<span>${escapeHtml(freq)}</span>` : ''].filter(Boolean).join(' &middot; ');
+    return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
+  };
+  const label = fr ? 'Soirées de la semaine' : 'Weekly nights';
+  return `<section class="venue-section venue-nights-card" id="venueNights" aria-labelledby="venueNightsTitle"><h2 id="venueNightsTitle">${label}</h2><span class="venue-wn-list" role="list" aria-label="${label}">${wn.rows.map(row).join('')}</span>${wn.confirmed ? `<span class="venue-hours-checked venue-wn-checked">${wn.confirmed}</span>` : wn.checked ? `<span class="venue-hours-checked venue-wn-checked">${escapeHtml(wn.checked)}</span>` : ''}</section>`;
+}
 // ---------- Happy hour access (2026-10-26) ----------
 // One answer to "where is happy hour on now / later today", for the homepage line, GET /api/happy-hour-now and the town
 // Happy Hour pages (/guide/<town>/happy_hour). The same rules as the venue page (venueHappyHour) and Roam Now: stored
@@ -29914,6 +30407,23 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-sp-deal, body.golf-page .venue-sp-time { display: block; margin-top: 1px; font-size: 0.86rem; color: rgba(42,32,25,0.78); }
   body.golf-page .venue-sp-time { font-size: 0.82rem; color: rgba(42,32,25,0.66); }
   body.golf-page .venue-sp-checked { display: block; margin: 6px 0 0; }
+  /* Weekly nights (2026-10-27): its own card after the deals card, the weekly specials' list style; the days column is
+     wider for "1st & 3rd Tue". Tonight's row on a soft background with a "Tonight" tag (words, not only colour). */
+  body.golf-page .venue-nights-card { margin: 24px 0 28px; padding: 20px 22px 16px; border: 1px solid rgba(42,32,25,0.12); border-radius: 16px; background: var(--paper, #FFFDF8); box-shadow: 0 10px 24px -22px rgba(74,52,40,0.5); }
+  body.golf-page .venue-nights-card h2 { margin: 0 0 12px; }
+  body.golf-page .venue-wn-list { display: block; }
+  body.golf-page .venue-wn { display: grid; grid-template-columns: 5.4em 1fr; column-gap: 10px; align-items: baseline; padding: 6px 0; font-size: 0.92rem; line-height: 1.35; }
+  body.golf-page .venue-wn + .venue-wn { border-top: 1px solid rgba(42,32,25,0.08); }
+  body.golf-page .venue-wn.is-today { margin: 0 -6px; padding: 6px; border-radius: 6px; background: rgba(42,107,103,0.09); }
+  body.golf-page .venue-wn-days { font-weight: 800; color: var(--teal-deep, #1E4F4C); overflow-wrap: break-word; }
+  body.golf-page .venue-wn-main { min-width: 0; overflow-wrap: break-word; }
+  body.golf-page .venue-wn-title { font-weight: 800; color: var(--ink, #2A2019); }
+  body.golf-page .venue-wn-time { margin-left: 2px; font-weight: 800; color: var(--teal-deep, #1E4F4C); white-space: nowrap; }
+  body.golf-page .venue-wn-today { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--teal-deep, #1E4F4C); color: #fff; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em; vertical-align: 1px; }
+  body.golf-page .venue-wn-meta { display: block; margin-top: 1px; font-size: 0.86rem; color: rgba(42,32,25,0.78); }
+  body.golf-page .venue-wn-kind { white-space: nowrap; }
+  body.golf-page .venue-wn-kind .ui-icon { vertical-align: -2px; }
+  body.golf-page .venue-wn-checked { display: block; margin: 6px 0 0; }
   /* The deals card (2026-10-27): its own card in the main column. Two blocks side by side when there is room. */
   body.golf-page .venue-deals-card { margin: 24px 0 28px; padding: 20px 22px 16px; border: 1px solid rgba(42,32,25,0.12); border-radius: 16px; background: var(--paper, #FFFDF8); box-shadow: 0 10px 24px -22px rgba(74,52,40,0.5); }
   body.golf-page .venue-deals-card h2 { margin: 0 0 12px; }
@@ -30299,6 +30809,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const happyHour = venueHappyHour(venue, statusHours, fr, opts.now || new Date());
   // Weekly specials (2026-10-27): their own row, under Happy hour.
   const weeklySpecials = venueSpecials(venue, statusHours, fr, opts.now || new Date());
+  // Weekly nights (2026-10-27): their own card after the deals card, before the hours.
+  const weeklyNights = venueWeeklyNights(venue, statusHours, fr, opts.now || new Date());
   // The deals card (2026-10-27): happy hour (times, its checked date, the deals) and the weekly specials, side by side on
   // wide screens and stacked on phones, in the main column under the story. Only when there are deals or specials.
   const venueDealsCardHtml = (() => {
@@ -30664,6 +31176,7 @@ ${VENUE_MENU_CSS}` : ''}
        in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
   <div class="venue-extra">
   ${venueDealsCardHtml}
+  ${venueWeeklyNightsHtml(weeklyNights, fr)}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
@@ -39297,7 +39810,7 @@ function rememberOwnerContact(venueId, email) {
   if (email) db.prepare('UPDATE venue_owner_links SET contact_email = ? WHERE venue_id = ? AND contact_email IS NULL').run(email, venueId);
 }
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'open_months',
-  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials'];
+  'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights'];
 const OWNER_NOTHING_CHANGED = 'Nothing has changed yet. Edit a field, then send it.';
 // Price range (2026-10-18): the owner picks one, per person.
 const OWNER_PRICE_SCALE = { 1: 'under $15', 2: '$15–30', 3: '$30–60', 4: 'over $60' };
@@ -39761,7 +40274,41 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     // Weekly specials (2026-10-27): the stored list (each with its source and date, so an Undo puts them back as
     // they were), [] when none. The owner sends the lines only.
     specials: venueSpecialsList(venue.id),
+    // Weekly nights (2026-10-27): the stored list the same way, [] when none.
+    weekly_nights: venueWeeklyNightsList(venue.id),
   };
+}
+// Weekly nights from the owner (2026-10-27): the keys an owner sends for each night (never a source or date).
+const OWNER_NIGHT_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr'];
+const OWNER_NIGHTS_ERRORS = {
+  type: 'Weekly nights are listed for restaurants, cafés, pubs, breweries, lounges, distilleries and wineries.',
+  long: `Please keep each name to ${NIGHT_TITLE_MAX} characters, each detail to ${NIGHT_DETAIL_MAX}, the host to ${NIGHT_HOST_MAX} and the cost to ${NIGHT_COST_MAX}.`,
+  extras: 'Please leave links, email addresses, phone numbers and emoji out of the weekly nights.',
+  many: `Please list up to ${NIGHTS_MAX} weekly nights.`,
+  days: 'Each night needs at least one day.',
+  empty: 'Each night needs a name, like Trivia Tuesday.',
+  kind: 'Please pick what kind of night it is.',
+  time: 'Please check the night’s times: a start time, and an end time after it if you add one.',
+  french: 'Add the English detail before the French one.',
+  unreadable: 'The weekly nights could not be read. Please reload the page and try again.',
+};
+function ownerNightsError(detail) {
+  const d = String(detail || '');
+  if (/only listed for/.test(d)) return OWNER_NIGHTS_ERRORS.type;
+  if (/over \d+ characters/.test(d)) return OWNER_NIGHTS_ERRORS.long;
+  if (/link|email|phone|emoji|< or >/.test(d)) return OWNER_NIGHTS_ERRORS.extras;
+  if (/at most/.test(d)) return OWNER_NIGHTS_ERRORS.many;
+  if (/French detail needs/.test(d)) return OWNER_NIGHTS_ERRORS.french;
+  if (/\bdays?\b/.test(d)) return OWNER_NIGHTS_ERRORS.days;
+  if (/is empty/.test(d)) return OWNER_NIGHTS_ERRORS.empty;
+  if (/kind must/.test(d)) return OWNER_NIGHTS_ERRORS.kind;
+  if (/start|end/.test(d)) return OWNER_NIGHTS_ERRORS.time;
+  return OWNER_NIGHTS_ERRORS.unreadable;
+}
+// Same nights? (what visitors see: never the source or date)
+function sameWeeklyNights(a, b) {
+  const norm = (x) => (Array.isArray(x) && x.length ? JSON.stringify(x.map((s) => OWNER_NIGHT_KEYS.map((k) => (k === 'days' ? (s.days || []).join(',') : k === 'frequency' ? s.frequency || 'weekly' : s[k] == null ? '' : s[k])))) : null);
+  return norm(a) === norm(b);
 }
 // Weekly specials from the owner (2026-10-27): the keys an owner sends for each special (the season comes back
 // unchanged from the page, so a researched summer special keeps it).
@@ -39998,6 +40545,25 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       }
     }
   }
+  // Weekly nights (2026-10-27): [{ days, kind, title, start, end, detail, host, cost, frequency, title_fr, detail_fr }]
+  // (up to 7), or null / [] to remove them. Only for the places that host them (NIGHT_TYPES).
+  if ('weekly_nights' in input) {
+    const x = input.weekly_nights;
+    if (!NIGHT_TYPES.has(venue.type)) {
+      errors.weekly_nights = OWNER_NIGHTS_ERRORS.type;
+    } else if (x === null || (Array.isArray(x) && !x.length)) {
+      if ((current.weekly_nights || []).length) changes.weekly_nights = null;
+    } else if (!Array.isArray(x) || x.some((s) => !s || typeof s !== 'object' || Array.isArray(s) || Object.keys(s).some((k) => !OWNER_NIGHT_KEYS.includes(k)))) {
+      errors.weekly_nights = OWNER_NIGHTS_ERRORS.unreadable;
+    } else {
+      const checked = validateWeeklyNights(x, { source: 'venue_owner', checked_at: todayLocal(), type: venue.type });
+      if (!checked.ok) errors.weekly_nights = ownerNightsError(checked.detail);
+      else {
+        const next = checked.nights.map((s) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, s[k]])));
+        if (!sameWeeklyNights(next, current.weekly_nights)) changes.weekly_nights = next;
+      }
+    }
+  }
   if ('price_range' in input) {
     const raw = input.price_range == null ? '' : String(input.price_range).trim();
     if (raw && !/^[1-4]$/.test(raw)) errors.price_range = 'Please pick a price range from the list.';
@@ -40093,15 +40659,15 @@ function listOwnerChanges(status = 'pending') {
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Season',
-  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials' };
+  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', badges: 'caractéristiques', happy_hour: 'happy hour',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du happy hour', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -40135,6 +40701,7 @@ function ownerValueText(field, value) {
     return `${lines(value.deals)}${value.deals_fr && value.deals_fr.length ? ` | FR: ${lines(value.deals_fr)}` : ''}${value.checked_at ? ` (checked ${value.checked_at}${value.source && value.source !== 'venue_owner' ? `, ${value.source}` : value.source ? ', owner' : ''})` : ''}`;
   }
   if (field === 'specials') return Array.isArray(value) && value.length ? value.map(specialAdminText).join('; ') : '(none)';
+  if (field === 'weekly_nights') return Array.isArray(value) && value.length ? value.map(nightAdminText).join('; ') : '(none)';
   return value == null || value === '' ? '(none)' : String(value);
 }
 
@@ -45300,6 +45867,12 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['speciaux de la semaine', 'special de la semaine', 'speciaux du jour', 'special du jour', 'plat du jour', 'speciaux quotidiens', 'ajouter mes speciaux', 'ajouter un special', 'mardi tacos', 'mercredi des ailes', 'soiree ailes', 'enfants mangent gratuitement', 'special du lundi', 'special du mardi', 'special du mercredi', 'special du jeudi', 'special du vendredi', 'jour de la semaine'],
     a: '<ol><li>{ON}, open <strong>Weekly specials</strong>.</li><li>For each special, tick its <strong>days</strong>, then fill in its <strong>name</strong> (<em>Wing Wednesday</em>), <strong>the deal</strong> (<em>60¢ wings, dine-in only</em>) and, if you like, a <strong>price</strong>. Places that serve alcohol also pick <strong>Food</strong>, <strong>Drinks</strong> or both. Add a time if it isn’t all day, or tick <strong>until close</strong>. Tap <strong>+ Add a special</strong> for another (up to 7).</li><li>Optional: open <strong>In French</strong> under a special to add its name and deal in French. Without them, French visitors see the English.</li><li>Tap {SEND}.</li></ol><p>{LIVE} Your listing shows the week’s specials with today’s marked, and the map and Build My Trip show today’s. Specials not updated for 4 months are hidden, so save them again when they change. Happy hour goes under <strong>Happy hour</strong>, and trivia or live music nights are events. Clear every box to remove them. Links, phone numbers and emoji aren’t accepted.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Spéciaux de la semaine</strong>.</li><li>Pour chaque spécial, cochez ses <strong>jours</strong>, puis remplissez son <strong>nom</strong> (<em>Mercredi des ailes</em>), <strong>l’offre</strong> (<em>Ailes à 60 ¢, sur place seulement</em>) et, si vous voulez, un <strong>prix</strong>. Les endroits qui servent de l’alcool choisissent aussi <strong>Nourriture</strong>, <strong>Boissons</strong> ou les deux. Ajoutez une heure si ce n’est pas toute la journée, ou cochez <strong>jusqu’à la fermeture</strong>. Touchez <strong>+ Ajouter un spécial</strong> pour un autre (jusqu’à 7).</li><li>Facultatif : ouvrez <strong>En français</strong> sous un spécial pour ajouter son nom et son offre en français. Sinon, les visiteurs en français voient l’anglais.</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Votre fiche affiche les spéciaux de la semaine, celui du jour en évidence, et la carte et Planifier mon voyage affichent ceux du jour. Les spéciaux non mis à jour depuis 4 mois sont masqués : enregistrez-les de nouveau quand ils changent. Le happy hour va sous <strong>Happy hour</strong>, et les soirées quiz ou musique sont des événements. Videz toutes les cases pour les retirer. Les liens, les numéros de téléphone et les émojis ne sont pas acceptés.</p>' },
+  // Weekly nights (2026-10-27).
+  { id: 'weekly-nights', over: ['event-add', 'specials', 'features'], q: 'How do I add my trivia or karaoke night?', qFr: 'Comment ajouter ma soirée quiz ou karaoké?', pages: ['edit'],
+    keys: ['weekly nights', 'weekly night', 'trivia', 'trivia night', 'trivia nights', 'pub quiz', 'quiz night', 'quiz', 'karaoke', 'karaoke night', 'open mic', 'open mic night', 'bingo', 'bingo night', 'comedy night', 'dj night', 'games night', 'game night', 'run club', 'running club', 'paint night', 'music night', 'live music night', 'regular night', 'add my trivia', 'add trivia', 'add karaoke', 'add a night'],
+    keysFr: ['soirees de la semaine', 'soiree de la semaine', 'soiree quiz', 'quiz', 'karaoke', 'soiree karaoke', 'scene ouverte', 'bingo', 'soiree humour', 'soiree dj', 'soiree jeux', 'club de course', 'soiree peinture', 'soiree reguliere', 'ajouter ma soiree', 'ajouter une soiree', 'ajouter mon quiz'],
+    a: '<ol><li>{ON}, open <strong>Weekly nights</strong> (it shows for restaurants, cafés, pubs, breweries, lounges, distilleries and wineries).</li><li>For each night, tick its <strong>days</strong>, pick the <strong>kind</strong> (Trivia, Karaoke, Open mic, Bingo, Live music, Run club …) and <strong>how often</strong> (every week, every other week, or set weeks of the month like the 1st &amp; 3rd), then fill in its <strong>name</strong> (<em>Trivia Tuesday</em>) and the <strong>start time</strong>. A detail, the host and the cost are optional. Tap <strong>+ Add a night</strong> for another (up to 7).</li><li>Optional: open <strong>In French</strong> to add its name and detail in French.</li><li>Tap {SEND}.</li></ol><p>{LIVE} Your listing shows your week of nights with tonight’s marked, and tonight’s shows on the map, on What’s On and in Build My Trip. Nights not updated for 4 months are hidden, so save them again now and then. A one-off show or a festival is an event instead. Clear every box to remove them. Links, phone numbers and emoji aren’t accepted.</p>',
+    aFr: '<ol><li>{ON}, ouvrez <strong>Soirées de la semaine</strong> (affiché pour les restaurants, cafés, pubs, brasseries, bars, distilleries et vignobles).</li><li>Pour chaque soirée, cochez ses <strong>jours</strong>, choisissez le <strong>genre</strong> (Quiz, Karaoké, Scène ouverte, Bingo, Musique live, Club de course…) et la <strong>fréquence</strong> (chaque semaine, une semaine sur deux, ou certaines semaines du mois comme le 1er et le 3e), puis remplissez son <strong>nom</strong> (<em>Quiz du mardi</em>) et l’<strong>heure de début</strong>. Un détail, l’animateur et le prix sont facultatifs. Touchez <strong>+ Ajouter une soirée</strong> pour une autre (jusqu’à 7).</li><li>Facultatif : ouvrez <strong>En français</strong> pour ajouter son nom et son détail en français.</li><li>Touchez {SEND}.</li></ol><p>{LIVE} Votre fiche affiche vos soirées de la semaine, celle du soir en évidence, et celle du soir s’affiche sur la carte, dans À l’affiche et dans Planifier mon voyage. Les soirées non mises à jour depuis 4 mois sont masquées : enregistrez-les de nouveau de temps en temps. Un spectacle unique ou un festival est plutôt un événement. Videz toutes les cases pour les retirer. Les liens, les numéros de téléphone et les émojis ne sont pas acceptés.</p>' },
   { id: 'price-range', over: ['cost', 'menu-add'], q: 'Set our price range ($ to $$$$)', qFr: 'Indiquer notre gamme de prix ($ à $$$$)', pages: ['edit'],
     keys: ['price range', 'pricerange', 'price level', 'price point', 'dollarsign', 'dollar sign', 'dollar signs', 'how expensive', 'expensive', 'cheap', 'affordable', 'budget', 'pricey', 'upscale', 'change our price', 'change the price range', 'wrong price range'],
     keysFr: ['gamme de prix', 'fourchette de prix', 'niveau de prix', 'echelle de prix', 'prix', 'cher', 'pas cher', 'abordable', 'haut de gamme', 'signe de dollar', 'signes de dollar'],
@@ -45954,6 +46527,16 @@ const OWNER_PORTAL_MESSAGES_FR = {
   [OWNER_SPECIALS_ERRORS.french]: 'Ajoutez le nom et l’offre en français, ou laissez les deux vides.',
   [OWNER_SPECIALS_ERRORS.drink]: 'Les spéciaux de boissons sont affichés seulement pour les endroits qui servent de l’alcool.',
   [OWNER_SPECIALS_ERRORS.unreadable]: 'Les spéciaux de la semaine sont illisibles. Rechargez la page et réessayez.',
+  [OWNER_NIGHTS_ERRORS.type]: 'Les soirées de la semaine sont affichées pour les restaurants, cafés, pubs, brasseries, bars, distilleries et vignobles.',
+  [OWNER_NIGHTS_ERRORS.long]: `Gardez chaque nom à ${NIGHT_TITLE_MAX} caractères au plus, chaque détail à ${NIGHT_DETAIL_MAX}, l’animateur à ${NIGHT_HOST_MAX} et le prix à ${NIGHT_COST_MAX}.`,
+  [OWNER_NIGHTS_ERRORS.extras]: 'Laissez les liens, les adresses courriel, les numéros de téléphone et les émojis hors des soirées de la semaine.',
+  [OWNER_NIGHTS_ERRORS.many]: `Inscrivez au plus ${NIGHTS_MAX} soirées de la semaine.`,
+  [OWNER_NIGHTS_ERRORS.days]: 'Chaque soirée a besoin d’au moins un jour.',
+  [OWNER_NIGHTS_ERRORS.empty]: 'Chaque soirée a besoin d’un nom, comme Quiz du mardi.',
+  [OWNER_NIGHTS_ERRORS.kind]: 'Choisissez le genre de soirée.',
+  [OWNER_NIGHTS_ERRORS.time]: 'Vérifiez les heures de la soirée : une heure de début, et une heure de fin après si vous en ajoutez une.',
+  [OWNER_NIGHTS_ERRORS.french]: 'Ajoutez le détail en anglais avant celui en français.',
+  [OWNER_NIGHTS_ERRORS.unreadable]: 'Les soirées de la semaine sont illisibles. Rechargez la page et réessayez.',
   'Please pick a price range from the list.': 'Choisissez une gamme de prix dans la liste.',
   'The seasonal hours could not be read. Please reload the page and try again.': 'Les heures saisonnières sont illisibles. Rechargez la page et réessayez.',
   'Please pick the first and last day of your seasonal hours.': 'Choisissez le premier et le dernier jour de vos heures saisonnières.',
@@ -47164,7 +47747,7 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
         // outside it (below).
         continue;
       }
-      if (field === 'happy_hour' || field === 'happy_hour_deals' || field === 'specials') continue; // same reason; written below
+      if (field === 'happy_hour' || field === 'happy_hour_deals' || field === 'specials' || field === 'weekly_nights') continue; // same reason; written below
       if (OWNER_LINK_FIELDS.includes(field) || field === 'open_months') {
         const before = venueLinks(venue.id)[field];
         const next = value === '' ? null : value;
@@ -47276,6 +47859,17 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
     if (!r.ok) return { ok: false, reason: 'specials_failed', detail: r.reason, applied };
     applied.push('specials');
   }
+  // Weekly nights (2026-10-27): the same way as the specials: from the owner, source 'venue_owner' and today's date;
+  // an Undo puts back the old list exactly.
+  if (chosen.includes('weekly_nights')) {
+    const value = Array.isArray(values.weekly_nights) && values.weekly_nights.length ? values.weekly_nights : null;
+    const input = !value ? { nights: null }
+      : opts.undo ? { nights: value }
+      : { nights: value.map((s) => Object.fromEntries(OWNER_NIGHT_KEYS.map((k) => [k, s[k] == null ? null : s[k]]))), source_url: 'venue_owner', checked_at: todayLocal(now) };
+    const r = guardedWeeklyNightsUpdate(venue.id, currentWeeklyNightsJson(venue.id), input, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer }, now);
+    if (!r.ok) return { ok: false, reason: 'weekly_nights_failed', detail: r.reason, applied };
+    applied.push('weekly_nights');
+  }
   return { ok: true, applied, listing };
 }
 
@@ -47283,7 +47877,7 @@ function applyOwnerFields(venue, values, chosen, meta, reviewer, now = new Date(
 // A signed-in owner's own facts go live at once; a new name, address, website or link still waits for review (they
 // change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
 // fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
-const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials']);
+const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -47295,6 +47889,7 @@ function ownerFieldEquals(field, a, b) {
   if (field === 'hours_seasons' || field === 'closures') return JSON.stringify(a || []) === JSON.stringify(b || []);
   if (field === 'happy_hour_deals') return sameHappyHourDeals(a || null, b || null);
   if (field === 'specials') return sameSpecials(a || null, b || null);
+  if (field === 'weekly_nights') return sameWeeklyNights(a || null, b || null);
   return String(a == null ? '' : a) === String(b == null ? '' : b);
 }
 // Undo one instant change from /admin/review: puts back the old value of every field that still shows what the
@@ -47930,6 +48525,35 @@ function specialAdminText(s) {
   const src = s.checked_at ? ` (checked ${s.checked_at}${s.source && s.source !== 'venue_owner' ? `, ${s.source}` : s.source ? ', owner' : ''})` : '';
   return `${days}: ${s.title} · ${s.deal}${s.price ? ` · ${s.price}` : ''}${extra ? ` (${extra})` : ''}${s.title_fr ? ` | FR: ${s.title_fr} · ${s.deal_fr}` : ''}${src}`;
 }
+// One night for /admin/review: "Tue: Trivia Tuesday (trivia, 19:00–21:00, biweekly) · Teams up to 6 · host Dave ·
+// Free | FR: … (checked 2026-10-27, https://…)".
+function nightAdminText(s) {
+  const days = (s.days || []).map((d) => HH_DAYS_SHORT.en[d] || d).join(', ');
+  const extra = [s.kind, s.start ? `${s.start}${s.end ? `–${s.end}` : ''}` : '', s.frequency && s.frequency !== 'weekly' ? s.frequency : ''].filter(Boolean).join(', ');
+  const src = s.checked_at ? ` (checked ${s.checked_at}${s.source && s.source !== 'venue_owner' ? `, ${s.source}` : s.source ? ', owner' : ''})` : '';
+  const fr = s.title_fr || s.detail_fr ? ` | FR: ${[s.title_fr, s.detail_fr].filter(Boolean).join(' · ')}` : '';
+  return `${days}: ${s.title} (${extra})${s.detail ? ` · ${s.detail}` : ''}${s.host ? ` · host ${s.host}` : ''}${s.cost ? ` · ${s.cost}` : ''}${fr}${src}`;
+}
+// Stale weekly nights (2026-10-27): hidden on the site until re-checked (POST /admin/set-weekly-nights with a new
+// checked_at, or the owner saves them again).
+function renderAdminStaleNightsCard(r) {
+  const url = CATEGORY_SLUGS[r.type] && r.slug ? `/${r.region}/${CATEGORY_SLUGS[r.type]}/${r.slug}` : null;
+  return `<article class="rv-card" data-kind="stale-nights" data-id="${r.id}">
+      <h3>${url ? `<a href="${adminReviewEsc(url)}" target="_blank" rel="noopener">${adminReviewEsc(r.name)}</a>` : adminReviewEsc(r.name)}</h3>
+      <p class="rv-meta">Venue #${r.id} · oldest check ${adminReviewEsc(r.checked_at || 'never')}</p>
+      <p class="rv-text">${adminReviewEsc(r.nights.map(nightAdminText).join('; '))}</p>
+    </article>`;
+}
+// Live music nights without the badge (2026-10-27): badges never change by themselves; a person checks the venue and
+// adds the live_music badge if it fits.
+function renderAdminNightsMusicCard(r) {
+  const url = CATEGORY_SLUGS[r.type] && r.slug ? `/${r.region}/${CATEGORY_SLUGS[r.type]}/${r.slug}` : null;
+  return `<article class="rv-card" data-kind="nights-live-music" data-id="${r.id}">
+      <h3>${url ? `<a href="${adminReviewEsc(url)}" target="_blank" rel="noopener">${adminReviewEsc(r.name)}</a>` : adminReviewEsc(r.name)}</h3>
+      <p class="rv-meta">Venue #${r.id} · no Live music badge</p>
+      <p class="rv-text">${adminReviewEsc(r.nights.map(nightAdminText).join('; '))}</p>
+    </article>`;
+}
 // Stale weekly specials (2026-10-27): hidden on the site until re-checked (POST /admin/set-specials with a new
 // checked_at, or the owner saves them again).
 function renderAdminStaleSpecialsCard(r) {
@@ -48124,6 +48748,8 @@ function renderAdminReviewPage() {
   const instant = recentInstantOwnerChanges();
   const staleDeals = staleHappyHourDeals();
   const staleSpecials = staleVenueSpecials();
+  const staleNights = staleVenueWeeklyNights();
+  const nightsMusic = weeklyNightsLiveMusicWithoutBadge();
   const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
@@ -48151,6 +48777,8 @@ function renderAdminReviewPage() {
     ${section('liveupdates', 'Changes owners made live (last 14 days)', instant, renderAdminInstantCard, 'None in the last 14 days.')}
     ${section('staledeals', `Stale happy hour deals (over ${HH_DEALS_STALE_DAYS} days)`, staleDeals, renderAdminStaleDealsCard, 'None: every happy hour deal on file was checked in the last 120 days.')}
     ${section('stalespecials', `Stale weekly specials (over ${SPECIALS_STALE_DAYS} days)`, staleSpecials, renderAdminStaleSpecialsCard, 'None: every weekly special on file was checked in the last 120 days.')}
+    ${section('stalenights', `Stale weekly nights (over ${NIGHTS_STALE_DAYS} days)`, staleNights, renderAdminStaleNightsCard, 'None: every weekly night on file was checked in the last 120 days.')}
+    ${section('nightsmusic', 'Live music nights without the Live music badge', nightsMusic, renderAdminNightsMusicCard, 'None: every place with a live music night has the badge.')}
 <script>
 (function(){
   document.getElementById('rvLogout').addEventListener('click', function(){
@@ -48276,7 +48904,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   great_groups: 'Idéal pour les groupes', happy_hour: 'Happy hour', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', badges: 'Caractéristiques', happy_hour: 'Happy hour',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine' };
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du happy hour', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine' };
 function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   const fr = lang === 'fr';
   const items = [];
@@ -48814,6 +49442,35 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
         </fieldset>`;
     }).join('') + `<button type="button" class="op-add op-sp-add" data-sp-add${shown >= SPECIALS_MAX ? ' hidden' : ''}>${L('+ Add a special', '+ Ajouter un spécial')}</button>`;
   };
+  // Weekly nights editor (2026-10-27): up to NIGHTS_MAX boxes like the specials: the days, what kind of night, its
+  // name, times, how often, and optional detail, host, cost and French.
+  const showNights = NIGHT_TYPES.has(venue.type);
+  const nightsNow = Array.isArray(snap.weekly_nights) ? snap.weekly_nights : [];
+  const nightRows = () => {
+    const shown = Math.min(NIGHTS_MAX, Math.max(1, nightsNow.length + (nightsNow.length < NIGHTS_MAX ? 1 : 0)));
+    const freqText = { weekly: L('Every week', 'Chaque semaine'), biweekly: L('Every other week', 'Une semaine sur deux'), 'monthly-1st': L('1st of the month', '1er du mois'),
+      'monthly-last': L('Last of the month', 'Dernier du mois'), 'monthly-1st-3rd': L('1st &amp; 3rd of the month', '1er et 3e du mois'), 'monthly-2nd-4th': L('2nd &amp; 4th of the month', '2e et 4e du mois') };
+    return Array.from({ length: NIGHTS_MAX }, (_, i) => {
+      const x = nightsNow[i] || { days: [], kind: 'trivia', frequency: 'weekly' };
+      const n = i + 1;
+      const days = SPECIAL_WEEK.map((d) => `<label class="op-sp-day"><input type="checkbox" class="op-wn-d" value="${d}"${(x.days || []).includes(d) ? ' checked' : ''}> ${escapeHtml(dayLabel(d).slice(0, 3))}</label>`).join('');
+      const kinds = `<select class="op-wn-kind" aria-label="${L(`Night ${n}: kind of night`, `Soirée ${n} : genre de soirée`)}">${NIGHT_KINDS.map((k) => `<option value="${k}"${x.kind === k ? ' selected' : ''}>${escapeHtml(k === 'other' ? L('Something else', 'Autre chose') : NIGHT_KIND_LABELS[lang === 'fr' ? 'fr' : 'en'][k])}</option>`).join('')}</select>`;
+      const freq = `<select class="op-wn-freq" aria-label="${L(`Night ${n}: how often`, `Soirée ${n} : à quelle fréquence`)}">${NIGHT_FREQUENCIES.map((f) => `<option value="${f}"${(x.frequency || 'weekly') === f ? ' selected' : ''}>${freqText[f]}</option>`).join('')}</select>`;
+      return `<fieldset class="op-sp op-wn" data-wn="${n}"${i >= shown ? ' hidden' : ''}>
+          <legend>${L(`Night ${n}`, `Soirée ${n}`)}</legend>
+          <div class="op-sp-days" role="group" aria-label="${L(`Night ${n}: days`, `Soirée ${n} : jours`)}">${days}</div>
+          <span class="op-sp-line">${kinds}${freq}</span>
+          <input type="text" class="op-wn-title" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title || '')}" aria-label="${L(`Night ${n}: name`, `Soirée ${n} : nom`)}" placeholder="${i === 0 ? L('Trivia Tuesday', 'Quiz du mardi') : ''}">
+          <span class="op-sp-line op-sp-times">${L('From', 'De')} <input type="time" class="op-wn-start" value="${escapeHtml(x.start || '')}" aria-label="${L(`Night ${n}: starts at (optional)`, `Soirée ${n} : commence à (facultatif)`)}"> ${L('to', 'à')} <input type="time" class="op-wn-end" value="${escapeHtml(x.end || '')}" aria-label="${L(`Night ${n}: ends at (optional)`, `Soirée ${n} : se termine à (facultatif)`)}"></span>
+          <input type="text" class="op-wn-detail" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail || '')}" aria-label="${L(`Night ${n}: detail (optional)`, `Soirée ${n} : détail (facultatif)`)}" placeholder="${i === 0 ? L('Teams up to 6, prizes for the top 3', 'Équipes de 6 au plus, prix pour les 3 premières') : ''}">
+          <span class="op-sp-line"><input type="text" class="op-wn-host" maxlength="${NIGHT_HOST_MAX}" value="${escapeHtml(x.host || '')}" aria-label="${L(`Night ${n}: host (optional)`, `Soirée ${n} : animateur (facultatif)`)}" placeholder="${i === 0 ? L('Host (optional)', 'Animateur (facultatif)') : ''}"><input type="text" class="op-wn-cost" maxlength="${NIGHT_COST_MAX}" value="${escapeHtml(x.cost || '')}" aria-label="${L(`Night ${n}: cost (optional)`, `Soirée ${n} : prix (facultatif)`)}" placeholder="${i === 0 ? L('Free', 'Gratuit') : ''}"></span>
+          <details class="op-sp-fr"${x.title_fr || x.detail_fr ? ' open' : ''}><summary>${L('In French (optional)', 'En français (facultatif)')}</summary>
+            <input type="text" class="op-wn-title-fr" lang="fr" maxlength="${NIGHT_TITLE_MAX}" value="${escapeHtml(x.title_fr || '')}" aria-label="${L(`Night ${n}: name in French`, `Soirée ${n} : nom en français`)}">
+            <input type="text" class="op-wn-detail-fr" lang="fr" maxlength="${NIGHT_DETAIL_MAX}" value="${escapeHtml(x.detail_fr || '')}" aria-label="${L(`Night ${n}: detail in French`, `Soirée ${n} : détail en français`)}">
+          </details>
+        </fieldset>`;
+    }).join('') + `<button type="button" class="op-add op-wn-add" data-wn-add${shown >= NIGHTS_MAX ? ' hidden' : ''}>${L('+ Add a night', '+ Ajouter une soirée')}</button>`;
+  };
   const season0 = (snap.hours_seasons || [])[0] || null;
   const dayRows = (prefix, week, emptyMeansClosed, known = hoursKnown) => OWNER_DAYS.map((d) => {
     const w = week[d] && week[d].length ? week[d] : [];
@@ -48957,6 +49614,9 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-sp-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 6px; }
   body.owner-page .op-sp-line .op-sp-price { flex: 1 1 8em; width: auto; margin: 0; }
   body.owner-page .op-sp-kind, body.owner-page .op-sp-times input[type="time"] { min-height: 44px; }
+  /* Weekly nights editor (2026-10-27): the specials' boxes; the kind and how often side by side, then host and cost. */
+  body.owner-page .op-wn .op-sp-line select { min-height: 44px; flex: 1 1 10em; }
+  body.owner-page .op-wn .op-sp-line input[type="text"] { flex: 1 1 9em; width: auto; margin: 0; }
   body.owner-page .op-sp-fr summary { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.88rem; font-weight: 700; cursor: pointer; }
   body.owner-page .op-deal { display: flex; gap: 8px; padding: 6px 0; }
   body.owner-page .op-deal[hidden] { display: none; }
@@ -49185,10 +49845,17 @@ ${renderGolfHeaderHtml()}
       <details class="op-fold op-sec" id="specials"${waitingFields.has('specials') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opSpecialsLabel">${L('Weekly specials', 'Spéciaux de la semaine')}${waitChip('specials')}</span> <span class="op-fold-hint">${specialsNow.length ? L(`${specialsNow.length} special${specialsNow.length === 1 ? '' : 's'}`, `${specialsNow.length} spécia${specialsNow.length === 1 ? 'l' : 'ux'}`) : L('None yet', 'Aucun pour l’instant')}</span></summary>
       <p class="op-hint">${specialsAlcohol
-        ? L(`Deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. Happy hour goes under Happy hour; trivia and live music are events. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Mercredi des ailes » · « Ailes à 60 ¢ »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Le happy hour va sous Happy hour; les quiz et la musique en direct sont des événements. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)
+        ? L(`Deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. Happy hour goes under Happy hour; trivia and karaoke go under Weekly nights. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Mercredi des ailes » · « Ailes à 60 ¢ »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Le happy hour va sous Happy hour; les quiz et le karaoké vont sous Soirées de la semaine. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)
         : L(`Food deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Soup Monday&rdquo; &middot; &ldquo;$5 soup and a roll&rdquo;, or &ldquo;Kids eat free&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres de nourriture un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Lundi soupe » · « Soupe et pain à 5 $ », ou « Les enfants mangent gratuitement »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
       <div id="opSpecials" role="group" aria-labelledby="opSpecialsLabel">${specialRows()}</div>
       <p class="lyv-error" id="opSpecialsError" hidden></p>
+      </details>` : ''}
+      ${showNights ? `
+      <details class="op-fold op-sec" id="weekly-nights"${waitingFields.has('weekly_nights') ? ' open' : ''}>
+      <summary><span class="lyv-section-label" id="opNightsLabel">${L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`) : L('None yet', 'Aucune pour l’instant')}</span></summary>
+      <p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
+      <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
+      <p class="lyv-error" id="opNightsError" hidden></p>
       </details>` : ''}
 
       <p class="lyv-section-label">${L('Anything else?', 'Autre chose?')}</p>
@@ -49448,6 +50115,28 @@ ${ownerFooterHtml(fr)}
     return out;
   }
   function specialKey(list){ return JSON.stringify((list || []).map(function(s){ return SP_KEYS.map(function(k){ return k === 'days' ? (s.days || []).join(',') : s[k] == null ? '' : s[k]; }); })); }
+  // Weekly nights (2026-10-27): each filled box as { days, kind, title, start, end, detail, host, cost, frequency,
+  // title_fr, detail_fr }; empty boxes are skipped.
+  var WN_KEYS = ['days', 'kind', 'title', 'start', 'end', 'detail', 'host', 'cost', 'frequency', 'title_fr', 'detail_fr'];
+  function nightRowsValue(){
+    var box = document.getElementById('opNights'), out = [];
+    if (!box) return out;
+    Array.prototype.forEach.call(box.querySelectorAll('.op-wn'), function(r){
+      var v = function(c){ var el = r.querySelector(c); return el ? el.value.trim() : ''; };
+      var days = Array.prototype.filter.call(r.querySelectorAll('.op-wn-d'), function(c){ return c.checked; }).map(function(c){ return c.value; });
+      var title = v('.op-wn-title'), detail = v('.op-wn-detail'), host = v('.op-wn-host'), cost = v('.op-wn-cost'), tf = v('.op-wn-title-fr'), df = v('.op-wn-detail-fr');
+      if (!title && !detail && !host && !cost && !tf && !df) return;
+      out.push({ days: days, kind: v('.op-wn-kind') || 'other', title: title, start: v('.op-wn-start') || null, end: v('.op-wn-end') || null, detail: detail || null, host: host || null,
+        cost: cost || null, frequency: v('.op-wn-freq') || 'weekly', title_fr: tf || null, detail_fr: df || null });
+    });
+    return out;
+  }
+  function nightKey(list){ return JSON.stringify((list || []).map(function(s){ return WN_KEYS.map(function(k){ return k === 'days' ? (s.days || []).join(',') : k === 'frequency' ? s.frequency || 'weekly' : s[k] == null ? '' : s[k]; }); })); }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-wn-add]'); if (!b) return;
+    var rows = document.querySelectorAll('#opNights .op-wn');
+    for (var i = 0; i < rows.length; i++) { if (rows[i].hidden) { rows[i].hidden = false; rows[i].querySelector('.op-wn-d').focus(); if (i === rows.length - 1) b.hidden = true; break; } }
+  });
   document.addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('[data-sp-add]'); if (!b) return;
     var rows = document.querySelectorAll('#opSpecials .op-sp');
@@ -49463,7 +50152,7 @@ ${ownerFooterHtml(fr)}
   function cap(t){ return t.charAt(0).toUpperCase() + t.slice(1); }
   form.addEventListener('submit', function(e){
     e.preventDefault();
-    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
+    ['opSeasonalError','opClosuresError','opPriceError','opHoursError','opPhoneError','opWebsiteError','opBizNameError','opAddressError','opMenuError','opBookingError','opInstagramError','opFacebookError','opDescriptionError','opBadgesError','opHappyError','opDealsError','opSpecialsError','opNightsError','opEmailError','opFormError'].forEach(function(id){ show(id, ''); });
     var h = week('opHours');
     if (h.bad) { show('opHoursError', T.hoursBoth); jumpToError(form); return; }
     if (h.blank) { show('opHoursError', T.hoursBlank.replace('{day}', dayName(h.blank))); jumpToError(form); return; }
@@ -49504,6 +50193,11 @@ ${ownerFooterHtml(fr)}
       var spv = specialRowsValue();
       if (specialKey(spv) !== specialKey(initial.specials || [])) changes.specials = spv.length ? spv : null;
     }
+    // Weekly nights (2026-10-27): sent only when the boxes differ from what the page started with.
+    if (document.getElementById('opNights')) {
+      var wnv = nightRowsValue();
+      if (nightKey(wnv) !== nightKey(initial.weekly_nights || [])) changes.weekly_nights = wnv.length ? wnv : null;
+    }
     // Only send what the owner actually touched.
     if (!initial.hours && Object.keys(changes.hours).every(function(d){ return !changes.hours[d].length; })) delete changes.hours;
     if (changes.phone === initial.phone) delete changes.phone;
@@ -49539,7 +50233,7 @@ ${ownerFooterHtml(fr)}
         show('opHoursError', errs.hours); show('opPhoneError', errs.phone); show('opWebsiteError', errs.website);
         show('opBizNameError', errs.name); show('opAddressError', errs.address); show('opMenuError', errs.menu_url); show('opBookingError', errs.booking_url);
         show('opInstagramError', errs.instagram_url); show('opFacebookError', errs.facebook_url);
-        show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opSpecialsError', errs.specials); show('opEmailError', errs.contact_email);
+        show('opDescriptionError', errs.description); show('opBadgesError', errs.badges); show('opHappyError', errs.happy_hour); show('opDealsError', errs.happy_hour_deals); show('opSpecialsError', errs.specials); show('opNightsError', errs.weekly_nights); show('opEmailError', errs.contact_email);
         show('opPriceError', errs.price_range); show('opSeasonalError', errs.hours_seasons); show('opClosuresError', errs.closures);
         show('opFormError', errs.form || (r.body && r.body.error) || (Object.keys(errs).length ? T.fix : T.wrong));
         jumpToError(form);
@@ -51958,6 +52652,68 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, specials: result.specials ? JSON.parse(result.specials) : [], expected_current: result.specials });
     }
 
+    // GET /admin/weekly-nights/:id (2026-10-27) -- a venue's weekly nights for a script, with the compare-and-set value:
+    // { id, name, type, redirect_to, expected_current: <canonical JSON of the current list> | null, nights: [...] }. Same
+    // bearer token as the admin writes; never cached.
+    {
+      const wnRead = /^\/admin\/weekly-nights\/(\d+)$/.exec(pathname);
+      if (wnRead && method === 'GET') {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Weekly nights endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+        const id = Number(wnRead[1]);
+        const v = db.prepare('SELECT id, name, type, redirect_to FROM venues WHERE id = ?').get(id);
+        if (!v) return sendJSON(res, 404, { error: 'venue_not_found' });
+        const list = venueWeeklyNightsList(id);
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJSON(res, 200, { id, name: v.name, type: v.type, redirect_to: v.redirect_to == null ? null : v.redirect_to, expected_current: nightsCanonicalJson(list), nights: list });
+      }
+    }
+
+    // POST /admin/set-weekly-nights (2026-10-27)
+    //
+    // The HTTP route for guardedWeeklyNightsUpdate(): { id, expected_current, nights: [{ days, kind, title, start?, end?,
+    // detail?, host?, cost?, frequency?, title_fr?, detail_fr?, source?, checked_at? }] | null, source_url?, checked_at?,
+    // reason, batch_id }. The whole list at once; expected_current is the canonical JSON from GET /admin/weekly-nights/:id
+    // (null when the venue has none). nights null clears them. source_url / checked_at fill in for nights without their
+    // own. Same bearer-token check and strict key allowlist as /admin/set-specials.
+    if (pathname === '/admin/set-weekly-nights' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) {
+        return sendJSON(res, 503, { error: 'Set-weekly-nights endpoint is not configured.' });
+      }
+      const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) {
+        return sendJSON(res, 401, { error: 'Unauthorized.' });
+      }
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (err) {
+        return sendJSON(res, 400, { error: 'Malformed JSON body.' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const unexpectedKeys = Object.keys(body).filter((k) => !['id', 'expected_current', 'nights', 'source_url', 'checked_at', 'reason', 'batch_id'].includes(k));
+      if (unexpectedKeys.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (!('expected_current' in body) || (body.expected_current !== null && typeof body.expected_current !== 'string')) {
+        return sendJSON(res, 400, { error: 'expected_current is required and must be the current list (GET /admin/weekly-nights/:id) or null.' });
+      }
+      if (!('nights' in body)) return sendJSON(res, 400, { error: 'nights is required (null clears them).' });
+      let result;
+      try {
+        result = guardedWeeklyNightsUpdate(body.id, body.expected_current, { nights: body.nights, source_url: body.source_url, checked_at: body.checked_at },
+          { reason: body.reason, batch_id: body.batch_id, reviewed_by: null });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Weekly nights update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { invalid_meta: 400, invalid_nights: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      if (result.changedFields.length) indexNowVenueChanged(req, body.id);
+      return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, nights: result.nights ? JSON.parse(result.nights) : [], expected_current: result.nights });
+    }
+
     if (pathname === '/admin/set-cuisine' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Set-cuisine endpoint is not configured.' });
@@ -52743,7 +53499,7 @@ const server = http.createServer(async (req, res) => {
       const parsed = parseTripPlanBody(body);
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
       // Weekly specials (2026-10-27): a stop on its special's day says so, added after planning like the deals.
-      try { return sendJSON(res, 200, withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value))))); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
+      try { return sendJSON(res, 200, withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))))); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
@@ -54100,6 +54856,10 @@ module.exports = {
   // Happy hour deals (2026-10-26)
   validateHappyHourDeals, guardedHappyHourDealsUpdate, happyHourDealsShown, happyHourDealsCompact, happyHourDealsStale, happyHourLeftText, happyHourOnNowText,
   withTripHappyHourDeals, staleHappyHourDeals, ownerVenueSnapshot, HH_DEALS_STALE_DAYS, HH_DEALS_MAX,
+  // Weekly nights (2026-10-27).
+  validateWeeklyNights, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
+  withTripWeeklyNights, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
+  NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)

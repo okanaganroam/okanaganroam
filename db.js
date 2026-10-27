@@ -791,6 +791,36 @@ CREATE TABLE IF NOT EXISTS venue_specials (
 CREATE INDEX IF NOT EXISTS idx_venue_specials_venue ON venue_specials(venue_id);
 `);
 
+// Weekly nights (2026-10-27): the regular nights a place hosts (trivia Tuesday, karaoke Thursday, open mic, run club),
+// up to 7 per venue, the same shape as venue_specials. days: JSON list of mon..sun; kind one of the server.js
+// NIGHT_KINDS; title ≤ 40, detail ≤ 80, host ≤ 40, cost ≤ 20 (optional); start/end optional "HH:MM"; frequency weekly |
+// biweekly | monthly-1st | monthly-last | monthly-1st-3rd | monthly-2nd-4th; optional French title/detail; source the
+// venue's own http(s) page or 'venue_owner'; checked_at the Okanagan date checked. Written only by server.js
+// guardedWeeklyNightsUpdate() (the whole list at once, compare-and-set, logged to venue_enrichment_log). Nights checked
+// more than 120 days ago are hidden everywhere. Additive: nothing here touches the venues table.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_weekly_nights (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  days TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  start_time TEXT,
+  end_time TEXT,
+  detail TEXT,
+  host TEXT,
+  cost TEXT,
+  frequency TEXT NOT NULL DEFAULT 'weekly',
+  title_fr TEXT,
+  detail_fr TEXT,
+  source TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_venue_weekly_nights_venue ON venue_weekly_nights(venue_id);
+`);
+
 try {
   require('./golf-data.js').initGolfData(db);
 } catch (e) {
