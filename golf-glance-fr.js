@@ -201,7 +201,6 @@ const VALUES = {
   'GC Hawk simulators': 'Simulateurs GC Hawk',
   'Certified PGA professional; club fitting, maintenance': 'Professionnel certifié de la PGA; ajustement et entretien des bâtons',
   'Credit-based Evo Packs, good for a year': 'Forfaits Evo Packs à crédits, valables un an',
-  'Daily into the evening; coaching and fitting mornings': 'Tous les jours jusqu’en soirée; entraînement et ajustement le matin',
   'Food and drinks': 'Nourriture et boissons',
   'Trackman 4 and Full Swing': 'Trackman 4 et Full Swing',
   'More than 400': 'Plus de 400',
@@ -239,7 +238,6 @@ const VALUES = {
   'Junior and adult camps and clinics; leagues': 'Camps et cliniques pour juniors et adultes; ligues',
   'Three, plus a four-camera training bay': 'Trois, plus une baie d’entraînement à quatre caméras',
   'Instructors connected to Summerland Golf Club': 'Instructeurs liés au Summerland Golf Club',
-  'Into the evening most days': 'Jusqu’en soirée la plupart des jours',
   'Winter scramble leagues': 'Ligues de mêlée l’hiver',
 };
 

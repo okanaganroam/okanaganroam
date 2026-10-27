@@ -17274,7 +17274,6 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Technology', 'GC Hawk simulators'],
     ['Lessons', 'Certified PGA professional; club fitting, maintenance'],
     ['Access', 'Credit-based Evo Packs, good for a year'],
-    ['Hours', 'Daily into the evening; coaching and fitting mornings'],
     ['Lounge', 'Food and drinks'],
   ],
   'kelowna/simplex-sportszone': [
@@ -17332,7 +17331,6 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Bays', 'Three, plus a four-camera training bay'],
     ['Virtual courses', 'More than 400'],
     ['Lessons', 'Instructors connected to Summerland Golf Club'],
-    ['Hours', 'Into the evening most days'],
     ['Extras', 'Winter scramble leagues'],
   ],
 };
