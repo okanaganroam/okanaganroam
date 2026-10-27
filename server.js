@@ -12530,6 +12530,7 @@ function renderHomeFooterHTML(fromBrowse) {
           <li><a href="/list-an-event">List an Event</a></li>
           <li><a href="/owner/login">Business login</a></li>
           <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
+          <li class="home-footer-sister"><a href="https://whistlerroam.com/">Whistler Roam (Sea to Sky)</a></li>
         </ul>
       </div>
       <details class="home-footer-col home-footer-col-regions home-footer-fold" open>
