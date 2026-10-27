@@ -233,7 +233,8 @@ test('Venue page: a "Weekly nights" card after the deals card and before Hours, 
   // Week order, then by time: Tue 6 PM bingo, Tue 7 PM trivia, Wed open mic, Thu karaoke.
   assert.deepEqual([...en.matchAll(/class="venue-wn-title"[^>]*>([^<]+)</g)].map((m) => m[1]), ['Bingo night', 'Trivia Tuesday', 'Open mic', 'Karaoke Thursday']);
   assert.ok(en.includes('<span class="venue-wn is-today" role="listitem"><span class="venue-wn-days">Tue</span><span class="venue-wn-main"><span class="venue-wn-title">Trivia Tuesday</span> <span class="venue-wn-time">7–9 PM</span> <span class="venue-wn-today">Tonight</span><span class="venue-wn-meta"><span class="venue-wn-kind">'), en);
-  assert.match(en, /Trivia<\/span> &middot; <span>Teams up to 6, prizes for the top 3<\/span> &middot; <span>Hosted by Dave<\/span> &middot; <span>Free<\/span><\/span>/);
+  // Card polish (2026-10-27): "Trivia Tuesday" already says trivia, so the kind label goes (the icon stays).
+  assert.match(en, /<span class="venue-wn-kind"><svg[^>]*>[\s\S]*?<\/svg><\/span> <span>Teams up to 6, prizes for the top 3<\/span> &middot; <span>Hosted by Dave<\/span> &middot; <span>Free<\/span><\/span>/);
   assert.match(en, /Bingo night<\/span> <span class="venue-wn-time">6 PM<\/span> <span class="venue-wn-today">Tonight<\/span>[\s\S]*?<span>every other week<\/span>/);
   assert.match(en, /<span class="venue-wn" role="listitem"><span class="venue-wn-days">1st &amp; 3rd Wed<\/span>/);
   assert.equal((en.match(/venue-wn-today/g) || []).length, 2, 'only tonight');
@@ -246,14 +247,15 @@ test('Venue page: a "Weekly nights" card after the deals card and before Hours, 
   const fr = card(page(v, at(TUE, '12:00'), 'fr'));
   assert.match(fr, /<h2 id="venueNightsTitle">Soirées de la semaine<\/h2>/);
   assert.match(fr, /<span class="venue-wn-days">Mar<\/span><span class="venue-wn-main"><span class="venue-wn-title" lang="en">Trivia Tuesday<\/span> <span class="venue-wn-time">19 h–21 h<\/span> <span class="venue-wn-today">Ce soir<\/span>/);
-  assert.match(fr, /Quiz<\/span> &middot; <span lang="en">Teams up to 6/);
+  assert.match(fr, /<\/svg><\/span> <span lang="en">Teams up to 6/);
   assert.match(fr, /<span>Animé par Dave<\/span>/);
   assert.match(fr, /<span class="venue-wn-days">1er et 3e mer\.<\/span><span class="venue-wn-main"><span class="venue-wn-title">Scène ouverte du mercredi<\/span>/);
   assert.match(fr, /une semaine sur deux/);
   assert.match(fr, /venue-wn-checked">Vérifié le /);
   // French kind labels.
   const kinds = mk({ name: 'Nights Kinds Pub' });
-  set(kinds, app.NIGHT_KINDS.slice(0, 7).map((k) => ({ days: ['mon'], kind: k, title: `X ${k}` })));
+  // Titles that don't name the kind (card polish 2026-10-27: a title that does drops the label).
+  set(kinds, app.NIGHT_KINDS.slice(0, 7).map((k, i) => ({ days: ['mon'], kind: k, title: `Monday ${['one', 'two', 'three', 'four', 'five', 'six', 'seven'][i]}` })));
   const frKinds = card(page(kinds, at(TUE, '12:00'), 'fr'));
   for (const w of ['Quiz', 'Karaoké', 'Scène ouverte', 'Bingo', 'Humour', 'Soirée DJ', 'Musique live']) assert.ok(frKinds.includes(` ${w}</span>`), w);
   // Owner-entered nights: "Confirmed by <venue>" (the #501 line), not the grey date.
