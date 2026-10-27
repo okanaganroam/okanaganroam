@@ -168,6 +168,8 @@ const PHRASES = [
   ['tournee des bieres', 'brewery crawl'], ['crawl de brasseries', 'brewery crawl'], ['crawl des brasseries', 'brewery crawl'],
   ['crawl de microbrasseries', 'brewery crawl'], ['crawl de bieres', 'brewery crawl'], ['route des bieres', 'brewery crawl'],
   ['route de la biere', 'brewery crawl'], ['circuit des brasseries', 'brewery crawl'], ['circuit des microbrasseries', 'brewery crawl'],
+  // Planner (2026-10-27): « tournée des bars / des pubs » is a bar or pub crawl (a timed happy hour outing, server.js).
+  ['tournee des bars', 'bar crawl'], ['tournee des pubs', 'pub crawl'], ['tournee de bars', 'bar crawl'], ['tournee de pubs', 'pub crawl'],
   ['microbrasserie', 'brewery'], ['microbrasseries', 'breweries'], ['brasserie', 'brewery'], ['brasseries', 'breweries'],
   ['biere', 'beer'], ['bieres', 'beers'], ['distillerie', 'distillery'], ['distilleries', 'distilleries'],
   ['cidrerie', 'cidery'], ['cidreries', 'cideries'],

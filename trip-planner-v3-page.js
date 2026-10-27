@@ -1477,7 +1477,11 @@ function renderScript(d) {
         if (s.freeTime && s.freeTime.minutes > 0) {
           var ftFr = lang() === 'fr', ftH = Math.round(s.freeTime.minutes / 30) / 2;
           var ftLen = ftFr ? String(ftH).replace('.', ',') + ' h' : ftH + (ftH === 1 ? ' hour' : ' hours');
-          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty t3-free"><strong>' + (ftFr ? 'Temps libre' : 'Free time') + '</strong><p>' + esc(ftFr ? 'Environ ' + ftLen + ' avant le souper pour flâner, vous reposer ou revenir à un endroit préféré.' : 'About ' + ftLen + ' before dinner to wander, rest or go back to a favourite spot.') + '</p></div></li>';
+          // Planner (2026-10-27): a card from the long-wait pass says what to do with the time (a walk at the town's
+          // waterfront or park), and "before dinner" only when dinner is next.
+          var ftNote = ftFr ? s.freeTime.noteFr : s.freeTime.note;
+          var ftText = ftNote ? String(ftNote).replace(/^(?:Free time|Temps libre)\s*:\s*/, '').replace(/^./, function(c){ return c.toUpperCase(); }) : (ftFr ? 'Environ ' + ftLen + ' avant le souper pour flâner, vous reposer ou revenir à un endroit préféré.' : 'About ' + ftLen + ' before dinner to wander, rest or go back to a favourite spot.');
+          html += '<li class="t3-stop"><div class="t3-when">' + esc(whenLabel(s)) + '</div><div class="t3-empty t3-free"><strong>' + (ftFr ? 'Temps libre' : 'Free time') + '</strong><p>' + esc(ftText) + '</p></div></li>';
           return;
         }
         if ((s.freeEvening || []).length) {

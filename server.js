@@ -6963,7 +6963,188 @@ function runTripPlan(args, now = new Date()) {
   } catch (e) { /* keep the plan */ }
   plan = runTripPlanSkiFallback(plan, args, now);
   try { plan = tripNamedVenuePlan(plan, args, now); } catch (e) { /* keep the plan */ }
+  try { plan = tripHappyHourCrawlPlan(plan, args, now); } catch (e) { /* keep the plan */ }
   return plan;
+}
+// Planner (2026-10-27): "happy hour crawl in Kelowna tonight", "happy hour and dinner in Vernon Friday", "bar crawl" /
+// "pub crawl" (« tournée des bars », « 5 à 7 ») were a plain list of places with the Happy Hour badge (or a pub crawl
+// timed from 6 PM, after every happy hour). They are now a timed outing: two or three places whose happy hours that day
+// follow one another (3:00 at one, 4:15 at the next), a short walk or drive apart in one town, each timed inside its own
+// happy hour with its window and top deals (withTripHappyHourDeals), and dinner after when it was asked for. Only places
+// that serve alcohol, are open then and are not closed for the season, an advisory or an owner closure. With fewer than
+// two that line up, the plan stays as it was; a happy hour request says why.
+const TRIP_HH_CRAWL_RE = /\bhappy hours?\s+(?:crawls?|hop|hopping|tours?|route|(?:and|then|with|plus|&)\s+(?:an?\s+)?(?:early\s+)?(?:dinner|supper))\b|\b(?:bar|pub)\s+(?:crawls?|hop|hopping)\b|\bbar\s*hop\w*\b/i;
+const TRIP_HH_CINQ_RE = /\b(?:5|cinq)\s*(?:à|a)\s*(?:7|sept)\b/i;
+const TRIP_HH_VISIT = 60;
+const TRIP_HH_DINNER_VISIT = 90;
+const TRIP_HH_TYPES = new Set(['pub', 'cocktail', 'brewery', 'restaurant', 'winery', 'distillery']);
+const TRIP_HH_WEEKDAY_NAMES = { sun: ['Sunday', 'dimanche'], mon: ['Monday', 'lundi'], tue: ['Tuesday', 'mardi'], wed: ['Wednesday', 'mercredi'], thu: ['Thursday', 'jeudi'], fri: ['Friday', 'vendredi'], sat: ['Saturday', 'samedi'] };
+function tripHappyHourAsk(text, planText) {
+  const t = `${text || ''} ${planText || ''}`;
+  const hh = /\bhappy hours?\b/i.test(t) || TRIP_HH_CINQ_RE.test(String(text || ''));
+  if (!TRIP_HH_CRAWL_RE.test(t) && !TRIP_HH_CINQ_RE.test(String(text || '')) && !/\btourn[ée]e des (?:bars|pubs)\b/i.test(String(text || ''))) return null;
+  return { happyHour: hh, dinner: /\b(?:dinner|supper|souper|d[îi]ner)\b/i.test(t) };
+}
+// The best chain of happy hour stops (and a dinner when asked for) on a date in one town, or null.
+function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, dog = false }) {
+  const planner = tripPlannerModule();
+  const weekday = localWeekdayKey(date);
+  const rows = db.prepare('SELECT id, happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND region = ? AND happy_hour_times IS NOT NULL').all(region);
+  const hh = new Map();
+  for (const row of rows) {
+    const deals = happyHourDealsShown(row, now);
+    if (!deals) continue;
+    let day = null;
+    try { day = hoursModule.parseHours(row.happy_hour_times).days[weekday]; } catch (e) { day = null; }
+    if (day && day.status === 'open' && day.ranges.length) hh.set(row.id, { ranges: day.ranges, deals });
+  }
+  const facts = buildTripPlannerFacts(false, date).filter((f) => f.region === region && Number.isFinite(f.lat) && Number.isFinite(f.lng) && !excluded.has(f.id) && (!dog || (f.features && f.features.dog_friendly))
+    && !planner.seasonClosedOnTrip(f, { date }) && !(f.advisory && planner.advisoryUnavailable(f.advisory.note)));
+  const openOn = (f) => { try { const d = planner.parseVenueHours(f.hours).days[weekday]; return d && d.status === 'open' ? d.ranges : null; } catch (e) { return null; } };
+  const covers = (ranges, a, b) => !!ranges && ranges.some(([x, y]) => x <= a && y >= b);
+  const bars = facts.filter((f) => TRIP_HH_TYPES.has(f.type) && venueServesAlcohol({ type: f.type, happy_hour: f.features && f.features.happy_hour ? 1 : 0 }) && hh.has(f.id) && openOn(f))
+    .map((f) => ({ f, hours: openOn(f), hh: hh.get(f.id), score: (f.rating || 4) + Math.min(3, hh.get(f.id).deals.en.length) * 0.15 + Math.log10(1 + (f.reviews || 0)) * 0.2 }))
+    .sort((a, b) => b.score - a.score || a.f.id - b.f.id).slice(0, 14);
+  if (bars.length < 2) return null;
+  const hops = new Map();
+  const hop = (a, b) => {
+    const key = `${a.id}|${b.id}`;
+    if (!hops.has(key)) {
+      const km = haversineKm(a.lat, a.lng, b.lat, b.lng);
+      const walk = km <= 1.2;
+      const t = require('./trip-requirements').estimateTransfer(a, b, walk);
+      hops.set(key, t ? { minutes: t.maxMinutes, km, mode: walk ? 'walk' : 'drive' } : null);
+    }
+    return hops.get(key);
+  };
+  // A happy hour stop: the visit starts inside the window with at least 45 minutes of it left, and the place is open.
+  // The first stop may start later in its window (so the outing reaches dinner without a long wait).
+  const visitsAt = (x, arrive, flexible) => {
+    const out = [];
+    for (const [a, b] of x.hh.ranges) {
+      const s0 = Math.ceil(Math.max(arrive, a) / 5) * 5;
+      if (!flexible && s0 - arrive > 45) continue;
+      for (let s = s0, k = 0; k < (flexible ? 8 : 1); s += 15, k++) {
+        if (Math.min(b, s + TRIP_HH_VISIT) - s < 45) break;
+        if (covers(x.hours, s, s + TRIP_HH_VISIT)) out.push({ start: s, end: s + TRIP_HH_VISIT, wait: flexible ? 0 : s - arrive, window: [a, b] });
+      }
+    }
+    return out;
+  };
+  const kitchens = dinner ? facts.filter((f) => ['restaurant', 'pub'].includes(f.type) && !planner.fastFood(f) && openOn(f)).map((f) => ({ f, hours: openOn(f), hh: hh.get(f.id) || null })) : [];
+  let best = null;
+  const consider = (chain, score) => { if (!best || score > best.score) best = { chain, score }; };
+  const extend = (chain, cursor, score, want) => {
+    const hhCount = chain.filter((c) => c.x.hh).length;
+    if (chain.length >= 2 && hhCount >= 2 && !dinner) consider(chain, score + (chain.length === 3 ? 1.5 : 0));
+    if (dinner && hhCount >= 1 && chain.length >= 1 && chain.length <= 2) {
+      const last = chain[chain.length - 1].x.f;
+      for (const k of kitchens) {
+        if (chain.some((c) => c.x.f.id === k.f.id)) continue;
+        const h = hop(last, k.f);
+        if (!h || h.minutes > 15) continue;
+        const s = Math.max(1050, Math.ceil((cursor + h.minutes) / 5) * 5);
+        if (s - (cursor + h.minutes) > 45 || !covers(k.hours, s, s + TRIP_HH_DINNER_VISIT)) continue;
+        const inHh = !!(k.hh && k.hh.ranges.some(([a, b]) => s >= a && s + 30 <= b));
+        if (hhCount + (inHh ? 1 : 0) < 2) continue;
+        consider(chain.concat({ x: { ...k, hh: inHh ? k.hh : null }, start: s, end: s + TRIP_HH_DINNER_VISIT, wait: s - cursor - h.minutes, hop: h, dinner: true }), score + (k.f.rating || 4) - h.km * 1.5 - (s - cursor - h.minutes) / 20 + (inHh ? 1 : 0));
+      }
+    }
+    if (chain.length >= want) return;
+    const last = chain.length ? chain[chain.length - 1].x.f : null;
+    for (const x of bars) {
+      if (chain.some((c) => c.x.f.id === x.f.id)) continue;
+      const h = last ? hop(last, x.f) : null;
+      if (last && (!h || h.minutes > 15)) continue;
+      for (const v of visitsAt(x, cursor + (h ? h.minutes : 0), !last)) extend(chain.concat({ x, ...v, hop: h }), v.end, score + x.score - (h ? h.km * 1.5 : 0) - v.wait / 20, want);
+    }
+  };
+  extend([], startFloor, 0, dinner ? 2 : 3);
+  return best ? best.chain : null;
+}
+function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
+  if (!plan || !args || args.swap || args.pinned || plan.happyHourCrawl) return plan;
+  const text = String(args.text || '');
+  let planText = text;
+  try { planText = tripPlannerFrModule().tripPlannerText(text, buildTripPlannerTaxonomy()); } catch (e) { planText = text; }
+  const ask = tripHappyHourAsk(text, planText);
+  if (!ask) return plan;
+  // Only a drinks (and dinner) request: a weekend plan that mentions a pub crawl keeps its days.
+  if (!['discover', 'recommendations', 'itinerary', 'outing'].includes(plan.kind) || (plan.days || []).length > 1) return plan;
+  const planned = ((plan.itinerary && plan.itinerary.stops) || (plan.outing && plan.outing.stops) || []).filter((s) => s.venue && !s.gapFill);
+  if (planned.some((s) => !TRIP_HH_TYPES.has(s.venue.type))) return plan;
+  const regions = (plan.intent && plan.intent.regions) || [];
+  if (regions.length !== 1 || !REGION_LABELS[regions[0]]) return plan;
+  const region = regions[0];
+  const today = todayLocal(now), clock = okanaganClock(now);
+  const date = (args.overrides && parseLocalDate(args.overrides.startDate)) || ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null) || today;
+  const when = plan.intent && plan.intent.when;
+  const tonight = !!(when && when.preset === 'today' && when.daypart === 'evening');
+  // Today: from now (after midnight, the coming afternoon); "tonight" from 3 PM at the earliest; another day from noon.
+  const nowFloor = date === today && clock.minutes >= 300 ? Math.ceil(clock.minutes / 15) * 15 : 0;
+  const startFloor = Math.max(nowFloor, tonight ? 900 : 720);
+  const excluded = new Set([...(args.excludeVenueIds || []), ...(args.avoidVenueIds || [])]);
+  // A dog-friendly crawl only goes where the dog may come in.
+  const dog = !!((plan.intent && plan.intent.party && plan.intent.party.dog) || ((plan.intent && plan.intent.features) || []).includes('dog_friendly') || (plan.trip && plan.trip.party && plan.trip.party.dog));
+  const chain = tripHappyHourChain({ date, region, startFloor, dinner: ask.dinner, excluded, now, dog });
+  const town = REGION_LABELS[region];
+  const [dayEn, dayFr] = TRIP_HH_WEEKDAY_NAMES[localWeekdayKey(date)];
+  if (!chain) {
+    // A pub or bar crawl without happy hours that line up keeps the planner's crawl; a happy hour request says why.
+    if (ask.happyHour) {
+      const note = `Fewer than two places in ${town} have happy hours on ${dayEn} that line up one after another, so here are the places with happy hour instead.`;
+      plan.notes = [note].concat((plan.notes || []).filter((n) => n !== note));
+      plan.contextNotes = [note].concat((plan.contextNotes || []).filter((n) => n !== note));
+    }
+    return plan;
+  }
+  const labels = tripPlannerLabels();
+  const planner = tripPlannerModule();
+  const ctx = { labels, queryText: planText };
+  const clock12 = (m) => happyHourTimeText(m, false), clockFr = (m) => happyHourTimeText(m, true);
+  const stops = [], schedule = [];
+  chain.forEach((c) => {
+    const f = c.x.f, w = c.window || (c.x.hh ? c.x.hh.ranges.find(([a, b]) => c.start >= a && c.start < b) : null);
+    const whenEn = w ? happyHourRangeText(w[0], w[1] % 1440, false) : null, whenFr = w ? happyHourRangeText(w[0], w[1] % 1440, true) : null;
+    const reasons = [];
+    if (w) reasons.push({ code: 'happy_hour', text: `Happy hour ${whenEn} on ${dayEn}, from its listing` });
+    if (c.dinner) reasons.push({ code: 'meal', text: 'Dinner after the happy hours' });
+    if (c.hop) reasons.push({ code: 'distance', text: c.hop.mode === 'walk' ? `About a ${Math.max(1, c.hop.minutes)}-minute walk from the stop before` : `About a ${Math.max(1, c.hop.minutes)}-minute drive from the stop before` });
+    if (f.rating) reasons.push({ code: 'rating', text: `Rated ${f.rating}${f.reviews ? ` from ${f.reviews} reviews` : ''}` });
+    const part = c.start < 1020 ? (c.start < 930 ? 'afternoon' : 'late') : c.start < 1260 ? 'evening' : 'night';
+    stops.push({ kind: 'venue', label: c.dinner ? 'Dinner' : 'Happy hour', daypart: part, component: null, venue: planner.publicVenue(f, ctx), reasons, why: reasons.slice(0, 3).map((r) => r.text), caveats: [], alternates: [],
+      ...(whenEn ? { happyHourWhen: whenEn, happyHourWhenFr: whenFr } : {}), happyHourCrawlStop: true });
+    schedule.push({ day: 1, venueId: f.id, status: 'provisional', assumedStart: true, startMinutes: c.start, endMinutes: c.end, waitMinutes: c.wait || 0, transferMinutes: c.hop ? c.hop.minutes : 0, date, suggested: true });
+  });
+  const hhStops = chain.filter((c) => !c.dinner), dinnerStop = chain.find((c) => c.dinner);
+  const flowEn = hhStops.map((c, i) => `${i ? 'then ' : 'Start at '}${c.x.f.name} at ${clock12(c.start)}`).join(', ') + (dinnerStop ? `, and have dinner at ${dinnerStop.x.f.name} from ${clock12(dinnerStop.start)}` : '') + '.';
+  const flowFr = hhStops.map((c, i) => `${i ? 'puis ' : 'Commencez à '}${c.x.f.name} à ${clockFr(c.start)}`).join(', ') + (dinnerStop ? `, et soupez à ${dinnerStop.x.f.name} dès ${clockFr(dinnerStop.start)}` : '') + '.';
+  const timedEn = dinnerStop && !dinnerStop.x.hh ? 'The drinks stops are timed inside their happy hours' : 'Each stop is timed inside its happy hour', timedFr = dinnerStop && !dinnerStop.x.hh ? 'Les arrêts pour un verre sont prévus pendant leur happy hour' : 'Chaque arrêt est prévu pendant son happy hour';
+  const geoEn = `${timedEn}, and ${chain.length === 2 ? 'both' : 'all three'} are in ${town}. Plan a safe ride home.`;
+  const geoFr = `${timedFr}, et ${chain.length === 2 ? 'les deux sont' : 'les trois sont'} à ${town}. Prévoyez un retour sécuritaire.`;
+  const whenText = date === today ? (tonight ? 'tonight' : 'today') : `on ${dayEn}`;
+  const summary = dinnerStop ? `Happy hour and dinner in ${town} ${whenText}.` : `A happy hour crawl in ${town} ${whenText}.`;
+  const out = {
+    ...plan,
+    kind: 'itinerary',
+    summary,
+    overview: null,
+    days: [],
+    recommendations: [],
+    outing: null,
+    itinerary: { stops, route: null },
+    experience: { title: 'What to expect', text: `${flowEn} ${geoEn}` },
+    story: { text: `${flowEn} ${geoEn}`, textFr: `${flowFr} ${geoFr}`, days: [{ day: 1, text: flowEn, textFr: flowFr }] },
+    schedule,
+    suggestedTimes: true,
+    happyHourCrawl: { date, region, stops: chain.length, dayFr },
+    notes: [`Each stop is timed inside its happy hour on ${dayEn}, from the times on its Okanagan Roam page. Happy hours and deals change, so check before you go.`, 'Stops are timed against each venue’s listed hours on Okanagan Roam; hours can change, so check before you go.'],
+    contextNotes: (plan.contextNotes || []).filter((n) => !/happy hour|^Checked against|^Hours were checked/i.test(n)),
+    warnings: (plan.warnings || []).filter((w) => !/\bpubs?\b.*\bmatched\b|happy hour/i.test(w)),
+    seeAll: null,
+  };
+  delete out.listDate;
+  return out;
 }
 // Audit fix (2026-10-27): a request that names a place. A closed one (closed for the season, a closed advisory, an owner
 // closure) was never planned -- right -- but the visitor was told "No selected stop meets lunch at the terrace restaurant
@@ -8494,8 +8675,9 @@ function withTripHappyHourDeals(plan, now = new Date()) {
       if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
       s.happyHourDeals = happyHourDealsCompact(x.deals.en);
       s.happyHourDealsFr = happyHourDealsCompact(x.deals.fr || x.deals.en);
-      s.happyHourLine = `Happy hour: ${s.happyHourDeals}`;
-      s.happyHourLineFr = `Happy hour : ${s.happyHourDealsFr}`;
+      // Planner (2026-10-27): a happy hour crawl's stop says its window too ("Happy hour 3–6 PM: $6 House pints").
+      s.happyHourLine = s.happyHourWhen ? `Happy hour ${s.happyHourWhen}: ${s.happyHourDeals}` : `Happy hour: ${s.happyHourDeals}`;
+      s.happyHourLineFr = s.happyHourWhenFr ? `Happy hour ${s.happyHourWhenFr} : ${s.happyHourDealsFr}` : `Happy hour : ${s.happyHourDealsFr}`;
       if (!x.deals.fr) s.happyHourLineFrLang = 'en';
     }
   }
@@ -56243,6 +56425,9 @@ module.exports = {
   tripPlannerLabels,
   parseTripPlanBody,
   runTripPlan,
+  // Planner (2026-10-27): the happy hour crawl.
+  tripHappyHourAsk,
+  tripHappyHourChain,
   tripOccurrenceEnded,
   withoutEndedEvents,
   tripStartWeekday,

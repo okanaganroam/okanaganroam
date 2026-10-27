@@ -1984,6 +1984,18 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     parts = [parts[0], JSON.parse(JSON.stringify(parts[0])), JSON.parse(JSON.stringify(parts[0]))];
     out.crawl = true;
   }
+  // Planner (2026-10-27): "wine and dinner in West Kelowna on Saturday" had one winery before dinner. Wine asked for in
+  // general ("wine", "wineries", "wine tastings") with a meal is two tastings; "a winery", "one tasting" or "a glass of
+  // wine" stays one. The second is marked extraTasting: it is left out quietly when it cannot be timed.
+  if (!out.crawl && parts.length === 2) {
+    const wi = parts.findIndex((c) => c.kind === 'venue' && !c.meal && c.types.length === 1 && c.types[0] === 'winery' && !(c.activities || []).length);
+    const meal = parts.find((c) => c.kind === 'venue' && ['dinner', 'supper', 'lunch'].includes(c.meal));
+    if (wi >= 0 && meal && /\b(?:wine|wines|wineries|vineyards|wine tastings?|tastings|winery hopping)\b/.test(normalized)
+      && !/\b(?:a|an|one|1|single)\s+(?:winery|vineyard|wine tasting|tasting|tasting room|glass of wine|glass|bottle of wine|bottle)\b|\bglass of wine\b|\bwine (?:bar|list|pairing)\b/.test(normalized)) {
+      const extra = { ...JSON.parse(JSON.stringify(parts[wi])), extraTasting: true };
+      parts = parts.slice(0, wi + 1).concat(extra, parts.slice(wi + 1));
+    }
+  }
   out.components = parts;
   out.regions = uniq(out.regions);
   if (route && (route.from || route.to)) out.route = { from: route.from, to: route.to, via: route.via };

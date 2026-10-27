@@ -3935,7 +3935,9 @@ function fillItineraryGaps(result, input, requirements) {
     const text = normWords(input.text || requirements.text || '');
     const single = (t) => stops.some((st) => st.venue && st.venue.type === t) && new RegExp(`\\b(?:a|an|one|1) ${SINGULAR_WORD[t] || t}\\b`).test(text);
     const kinds = GAP_FILL_TYPES.filter((t) => asked.has(t) || !GAP_ALCOHOL_TYPES.includes(t)).filter((t) => t !== 'cafe' && !single(t));
-    const pool = facts.filter((v) => kinds.includes(v.type) && !(ctx.kids && familyAvoid(v)) && !eveningOnlyVenue(v));
+    // Planner (2026-10-27): never a booked outfitter or tour base as a walk-in stop (Hoodoo Adventure Company sat in the
+    // middle of a Penticton pub crawl), as in fillDinnerGaps.
+    const pool = facts.filter((v) => kinds.includes(v.type) && !(ctx.kids && familyAvoid(v)) && !eveningOnlyVenue(v) && !bookedOutfitter(v) && !appointmentOnly(v) && !rotateBooked(v));
     const ranked = near(from, pool, 'afternoon').map((c) => ({ ...c, score: c.score + (asked.has(c.v.type) ? 12 : 0) })).sort((x, y) => y.score - x.score || x.v.id - y.v.id);
     for (const c of ranked.slice(0, 5)) {
       const stop = { kind: 'venue', label: PLAN_DAYPART_LABELS.afternoon, daypart: 'afternoon', component: null, gapFill: true, ...stopFrom(c.v, { reasons: scoreVenue(c.v, ctx).reasons.concat({ code: 'gap', text: 'Fills the free time in the afternoon', weight: 2 }), caveats: [] }, regionReason(c.v, ctx), ctx), alternates: [] };
@@ -3944,6 +3946,235 @@ function fillItineraryGaps(result, input, requirements) {
     if (done) continue;
     if (isDinnerStop(gap.b) || /\b(?:dinner|supper)\b/i.test(gap.b.label || '')) { stops.splice(gap.k, 0, freeCard(gap)); changed = true; }
     break;
+  }
+  return changed;
+}
+// Planner (2026-10-27): long idle gaps (drafts/site-audit/2026-10-27-trip.md, bug 13). A dated beach day in Kelowna had
+// 2 h 49 min with nothing between lunch and a late-afternoon stop, an Osoyoos beach day 110 min, golf and dinner 107 min,
+// and a Penticton pub crawl waited from 3:36 to 6 PM. After the plan is timed, any wait of more than IDLE_GAP_LIMIT
+// minutes between two stops is closed, in this order: a fitting stop nearby (open then, the trip's kind of place, never
+// one already planned, within a short hop of both stops); dinner earlier (from 5:30 PM); a short outing starting later;
+// and when nothing fits, a "Free time" card that says what to do with it (a walk at the town's waterfront or park when
+// the town has one, in daylight). Plans where the visitor named times are left as they were.
+const IDLE_GAP_LIMIT = 90;
+const IDLE_PART_ORDER = ['morning', 'midday', 'afternoon', 'late', 'evening', 'night'];
+function partAt(min) { return min < 690 ? 'morning' : min < 810 ? 'midday' : min < 930 ? 'afternoon' : min < 1020 ? 'late' : min < 1260 ? 'evening' : 'night'; }
+// Times the visitor gave ("at 4 pm", "until 3", "for 3 hours", "this afternoon", the start-time control): kept as they are.
+function userNamedTimes(requirements) {
+  const r = requirements || {};
+  return !!(r.startMinutes != null || r.windowClock || r.daypart || (r.dayStartMinutes && Object.keys(r.dayStartMinutes).length)
+    || (r.items || []).some((i) => ['duration', 'deadline'].includes(i.kind)));
+}
+function idleGapGroups(result) {
+  return (result.days || []).length ? result.days.map((d) => ({ day: d.day, date: d.date || null, stops: d.stops, days: true, regions: d.regions || (d.region ? [d.region] : []) }))
+    : [{ day: 1, date: null, stops: (result.itinerary && result.itinerary.stops) || (result.outing && result.outing.stops) || [], days: false, regions: [] }];
+}
+function idleGapAt(result, explained) {
+  for (const g of idleGapGroups(result)) {
+    if (g.stops.some((s) => s.skiDay)) continue;
+    const rowOf = (s) => (result.schedule || []).find((x) => x.day === g.day && ((s.venue && x.venueId === s.venue.id) || (s.event && x.eventId === s.event.id)));
+    const timed = g.stops.filter((s) => s.venue || s.event);
+    for (let i = 1; i < timed.length; i++) {
+      const prev = timed[i - 1], next = timed[i], pr = rowOf(prev), nr = rowOf(next);
+      if (!pr || !nr || !Number.isFinite(pr.endMinutes) || !Number.isFinite(nr.startMinutes) || next.event) continue;
+      const travel = Number.isFinite(nr.transferMinutes) ? nr.transferMinutes : 0;
+      const idle = nr.startMinutes - pr.endMinutes - travel;
+      const key = `${g.day}|${prev.venue ? prev.venue.id : 'e' + prev.event.id}|${next.venue ? next.venue.id : 'e' + next.event.id}`;
+      if (idle <= IDLE_GAP_LIMIT || explained.has(key)) continue;
+      const between = g.stops.slice(g.stops.indexOf(prev) + 1, g.stops.indexOf(next));
+      return { ...g, prev, next, pr, nr, idle, travel, key, card: between.find((s) => s.freeTime) || null };
+    }
+  }
+  return null;
+}
+// The day's slot for a new stop or card: its own time's part when free, else a free part between its neighbours (a day
+// plan's page keys each stop by day and part, so a part is never used twice there).
+function idleGapPart(g, atMinutes) {
+  if (!g.days) return partAt(atMinutes);
+  const taken = new Set(g.stops.filter((s) => s !== g.card).map((s) => s.daypart));
+  const want = partAt(atMinutes);
+  if (!taken.has(want)) return want;
+  const lo = Math.max(0, IDLE_PART_ORDER.indexOf(g.prev.daypart)), hi = IDLE_PART_ORDER.indexOf(g.next.daypart);
+  return IDLE_PART_ORDER.slice(lo + 1, hi < 0 ? IDLE_PART_ORDER.length : hi).find((p) => !taken.has(p)) || null;
+}
+function idleGapCandidates(result, input, requirements, g) {
+  const facts = input.facts || [], byId = new Map(facts.map((v) => [v.id, v]));
+  const ctx = buildContext(input.intent || {}, input.labels || {}, input);
+  const all = idleGapGroups(result).flatMap((x) => x.stops);
+  const used = new Set(all.map((s) => s.venue && s.venue.id).filter(Boolean));
+  const usedPlaces = new Set([...used].map((id) => byId.get(id)).filter(Boolean).map(placeKey).filter(Boolean));
+  const estateUsed = withSameEstates(facts, used);
+  const from = g.prev.venue ? byId.get(g.prev.venue.id) : g.prev.event && g.prev.event.location && hasCoords(g.prev.event.location) ? g.prev.event.location : null;
+  const to = g.next.venue ? byId.get(g.next.venue.id) : null;
+  const date = g.date || g.pr.date || g.nr.date || input.tripDate || null;
+  const weekday = date ? WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7] : (input.startWeekday || 'sat');
+  const dayCtx = { ...ctx, tripDate: date || ctx.tripDate };
+  const season = tripSeason(date || ctx.tripDate);
+  const dayTypes = {};
+  for (const st of g.stops) if (st.venue) dayTypes[st.venue.type] = (dayTypes[st.venue.type] || 0) + 1;
+  const caps = (requirements.items || []).filter((i) => i.kind === 'type_count' && i.strength === 'must');
+  const capped = (t) => (t === 'beach' && coolBeachMonth(date || ctx.tripDate) && (dayTypes.beach || 0) >= 1) || caps.some((i) => i.value === t && (dayTypes[t] || 0) >= i.count);
+  const regions = g.regions.length ? g.regions : [...new Set(g.stops.map((s) => s.venue && s.venue.region).filter(Boolean))];
+  // A crawl (every stop a bar, brewery, winery or distillery) is filled with one more of its own kind, never a hike.
+  const venueTypes = g.stops.filter((s) => s.venue).map((s) => s.venue.type);
+  const crawl = venueTypes.length >= 2 && venueTypes.every((t) => CRAWL_TYPES.includes(t) || t === 'pub');
+  const kinds = crawl ? [...new Set(venueTypes)] : GAP_FILL_TYPES;
+  const start0 = g.pr.endMinutes, end0 = g.nr.startMinutes;
+  const out = [];
+  for (const v of facts) {
+    if (!kinds.includes(v.type) || used.has(v.id) || estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !hasCoords(v)) continue;
+    if ((placeKey(v) && usedPlaces.has(placeKey(v))) || (ctx.kids && familyAvoid(v)) || (regions.length && !regions.includes(v.region))) continue;
+    if (capped(v.type) || (dayTypes[v.type] || 0) >= (crawl ? 4 : 2) || (eveningOnlyVenue(v) && end0 < 1020)) continue;
+    if (bookedOutfitter(v) || appointmentOnly(v) || rotateBooked(v) || (!ctx.kids && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || ''}`))) continue;
+    if (!crawl && GAP_ALCOHOL_TYPES.includes(v.type) && !ctx.types.has(v.type) && result.theme !== 'wine' && !['group_getaway', 'celebration'].includes(ctx.occasion)) continue;
+    if (v.type === 'cafe' && cafeRole(v) !== 'treat' && !ctx.kids) continue;
+    if (coldMonthIceCream(v, date || ctx.tripDate)) continue;
+    if (!eligible(v, dayCtx, false) || offSeasonSkip(v, dayCtx) || (date && seasonClosedOnTrip(v, { date })) || advisoryUnavailable(v.advisory && v.advisory.note)) continue;
+    // Out of its season (a paddling place in January, a ski run in July) it is not a filler.
+    if (season && seasonFit(v, { kind: 'venue', types: [v.type], activities: [] }, season, dayCtx).score < 0) continue;
+    if (!tripRequirements.venueAllowed(v, requirements, g.day, input.tripDate)) continue;
+    if (ctx.kids && !(v.features && v.features.kid_friendly) && !GAP_KIDS_RE.test(`${v.textName || ''} ${v.textDesc || ''}`)) continue;
+    const t1 = from ? tripRequirements.estimateTransfer(from, v) : null, t2 = to ? tripRequirements.estimateTransfer(v, to) : null;
+    if ((from && !t1) || (t1 && t1.maxMinutes > 20) || (t2 && t2.maxMinutes > 20)) continue;
+    const duration = gapFillMinutes(v);
+    const arrive = Math.ceil((start0 + (t1 ? t1.maxMinutes : 10)) / 5) * 5;
+    const back = t2 ? t2.maxMinutes : 10;
+    const latest = end0 - back - duration;
+    if (latest < arrive) continue;
+    // Late enough that the wait after it is not long, when the wait before it then is not long either; otherwise right
+    // after the stop before it (the rest of the wait is filled or named next).
+    const balanced = Math.floor((end0 - IDLE_GAP_LIMIT - duration - back) / 5) * 5;
+    let startAt = balanced > arrive && balanced <= arrive + IDLE_GAP_LIMIT ? Math.min(latest, balanced) : arrive;
+    const outside = ['outdoor', 'beach'].includes(v.type);
+    const light = outside && date ? tripRequirements.estimateDaylight(date, v) : null;
+    if (light && startAt + duration > light.sunsetMinutes - 30) startAt = Math.max(arrive, Math.floor((light.sunsetMinutes - 30 - duration) / 5) * 5);
+    if (light && startAt + duration > light.sunsetMinutes - 30) continue;
+    const hours = (v._hours || parseVenueHours(v.hours)).days[weekday];
+    if (hours && hours.status === 'closed') continue;
+    if (hours && hours.status === 'open') {
+      const r = hours.ranges.find(([a, b]) => Math.max(a, startAt) + duration <= Math.min(b, latest + duration));
+      if (!r) continue;
+      startAt = Math.max(startAt, Math.ceil(r[0] / 5) * 5);
+    } else if (!outside) continue; // no listed hours: only an outdoor place, in daylight
+    const km = from ? kmBetween(from, v) : 3;
+    const sv = scoreVenue(v, ctx);
+    let score = sv.score - (km || 0) * 1.5;
+    if (ctx.types.has(v.type)) score += 8;
+    if (result.theme === 'wine' && v.type === 'winery') score += 10;
+    if (ctx.kids && v.features && v.features.kid_friendly) score += 6;
+    out.push({ v, score, startAt });
+  }
+  return { cands: out.sort((a, b) => b.score - a.score || a.v.id - b.v.id), ctx: dayCtx };
+}
+function idleGapReschedule(result, input, requirements, opts) { scheduleTripByHours(result, input, requirements, opts.probe ? { probe: true } : {}); }
+function idleGapUntimed(result) { return (result.schedule || []).filter((r) => !Number.isFinite(r.startMinutes) || r.status === 'unmet').length; }
+// A walk for a Free time card: the closest waterfront, park or easy walk in the town, while it is light.
+const IDLE_WALK_RE = /\b(?:waterfront|boardwalk|promenade|walkway|lakeshore|lakefront|beach|park|stroll|easy walk|walking path|greenway)\b/;
+function idleGapWalk(input, g, fromMinutes) {
+  const facts = input.facts || [], byId = new Map(facts.map((v) => [v.id, v]));
+  const from = g.prev.venue ? byId.get(g.prev.venue.id) : null;
+  const date = g.date || g.pr.date || input.tripDate || null;
+  const regions = g.regions.length ? g.regions : [...new Set(g.stops.map((s) => s.venue && s.venue.region).filter(Boolean))];
+  const used = new Set(g.stops.map((s) => s.venue && s.venue.id).filter(Boolean));
+  const ctx = buildContext(input.intent || {}, input.labels || {}, input);
+  const picks = facts.filter((v) => ['outdoor', 'beach'].includes(v.type) && !used.has(v.id) && hasCoords(v) && (!regions.length || regions.includes(v.region))
+    && (IDLE_WALK_RE.test(`${v.textName || ''} ${v.textDesc || ''}`) || (v.plannerKinds || []).some((k) => ['walk', 'easy_walk', 'park'].includes(k)))
+    && !roughAccess(v) && !dogOnlyPlace(v) && !bookedOutfitter(v) && !winterOnly(v) && !SHOULDER_CLOSED_RE.test(v.textName || normWords(v.name)) && !ctx.exclude.has(v.id)
+    && !(date && seasonClosedOnTrip(v, { date })) && !advisoryUnavailable(v.advisory && v.advisory.note))
+    .map((v) => ({ v, km: from ? kmBetween(from, v) : null }))
+    .filter((x) => x.km == null || x.km <= 5)
+    .filter((x) => { const light = date ? tripRequirements.estimateDaylight(date, x.v) : null; return !light || fromMinutes + 45 <= light.sunsetMinutes; })
+    .sort((a, b) => (a.km == null ? 99 : a.km) - (b.km == null ? 99 : b.km) || (b.v.rating || 0) - (a.v.rating || 0) || a.v.id - b.v.id);
+  return picks[0] ? picks[0].v : null;
+}
+function idleGapCard(result, input, g) {
+  const from = g.pr.endMinutes, to = g.nr.startMinutes - g.travel;
+  const part = (g.card && g.card.daypart) || idleGapPart(g, from);
+  if (!part) return false;
+  const walk = idleGapWalk(input, g, from);
+  const hours = Math.round((to - from) / 30) / 2;
+  const len = `${hours} ${hours === 1 ? 'hour' : 'hours'}`, lenFr = `${String(hours).replace('.', ',')} h`;
+  const dinner = isDinnerStop(g.next);
+  const note = walk ? `Free time: about ${len}${dinner ? ' before dinner' : ''} to take a walk at ${walk.name}, or rest.` : `Free time: about ${len}${dinner ? ' before dinner' : ''} to rest or go back to a favourite spot.`;
+  const noteFr = walk ? `Temps libre : environ ${lenFr}${dinner ? ' avant le souper' : ''} pour une promenade à ${walk.name}, ou une pause.` : `Temps libre : environ ${lenFr}${dinner ? ' avant le souper' : ''} pour une pause ou un retour à un endroit préféré.`;
+  const card = g.card || { kind: 'free', daypart: part, label: g.days ? PLAN_DAYPART_LABELS[part] : 'Free time', venue: null, reasons: [], why: [], caveats: [] };
+  card.freeTime = { minutes: Math.round((to - from) / 15) * 15, fromMinutes: from, toMinutes: to, note, noteFr, ...(walk ? { walk: { id: walk.id, name: walk.name, url: walk.url } } : {}) };
+  if (!g.card) g.stops.splice(g.stops.indexOf(g.next), 0, card);
+  return true;
+}
+function closeIdleGaps(result, input, requirements, opts = {}) {
+  if (!result || !(result.schedule || []).length || input.swap || isItinerarySwap(input) || opts.userTimed) return false;
+  if (!['day_plan', 'multi_day', 'itinerary', 'outing'].includes(result.kind)) return false;
+  const explained = new Set();
+  let changed = false;
+  for (let guard = 0; guard < 8; guard++) {
+    const g = idleGapAt(result, explained);
+    if (!g) break;
+    const untimed0 = idleGapUntimed(result);
+    const snapshot = JSON.stringify({ d: (result.days || []).map((d) => d.stops), i: result.itinerary ? result.itinerary.stops : null, o: result.outing ? result.outing.stops : null, r: requirements.dayStartMinutes || null });
+    const undo = () => {
+      const s = JSON.parse(snapshot);
+      (result.days || []).forEach((d, i) => { d.stops = s.d[i]; });
+      if (result.itinerary && s.i) result.itinerary.stops = s.i;
+      if (result.outing && s.o) result.outing.stops = s.o;
+      if (s.r) requirements.dayStartMinutes = s.r; else delete requirements.dayStartMinutes;
+      idleGapReschedule(result, input, requirements, opts);
+    };
+    // A change is kept when no stop loses its time and this wait is gone or shorter.
+    const better = () => { const h = idleGapAt(result, new Set()); return idleGapUntimed(result) <= untimed0 && (!h || h.key !== g.key || h.idle < g.idle); };
+    // 1. A fitting stop nearby.
+    const { cands, ctx } = idleGapCandidates(result, input, requirements, g);    let done = false;
+    for (const c of cands.slice(0, 3)) {
+      const cur = idleGapAt(result, explained);
+      if (!cur || cur.key !== g.key) break;
+      const part = idleGapPart(cur, c.startAt);
+      if (!part) break;
+      const stop = { kind: 'venue', daypart: part, label: PLAN_DAYPART_LABELS[part], component: null, gapFill: true, fillStart: c.startAt,
+        ...stopFrom(c.v, { reasons: scoreVenue(c.v, ctx).reasons.concat({ code: 'gap', text: 'Fills the free time between stops', weight: 2 }), caveats: [] }, regionReason(c.v, ctx), ctx), alternates: [] };
+      if (cur.card) cur.stops.splice(cur.stops.indexOf(cur.card), 1);
+      cur.stops.splice(cur.stops.indexOf(cur.next), 0, stop);
+      idleGapReschedule(result, input, requirements, opts);
+      const row = (result.schedule || []).find((x) => x.day === g.day && x.venueId === c.v.id);
+      if (row && Number.isFinite(row.startMinutes) && !['unmet', 'unverified'].includes(row.status) && better()) { done = true; break; }
+      undo();
+    }
+    if (done) { changed = true; continue; }
+    const fresh = idleGapAt(result, explained);
+    if (!fresh || fresh.key !== g.key) continue;
+    // 2. Dinner earlier, from 5:30 PM.
+    if (isDinnerStop(fresh.next) && !Number.isFinite(fresh.next.keepStart) && !fresh.next.idlePulled) {
+      const target = Math.max(DINNER_EARLIEST, Math.ceil((fresh.pr.endMinutes + fresh.travel + 15) / 15) * 15);
+      if (target < fresh.nr.startMinutes) {
+        fresh.next.dinnerFrom = Math.min(Number.isFinite(fresh.next.dinnerFrom) ? fresh.next.dinnerFrom : Infinity, target);
+        fresh.next.idlePulled = true;
+        idleGapReschedule(result, input, requirements, opts);
+        if (better()) { changed = true; continue; }
+        undo();
+      }
+    }
+    // 3. A short outing (no meal or event before the wait) starts later, every stop keeping its time and order.
+    const g3 = idleGapAt(result, explained) || fresh;
+    const beforeGap = g3.stops.slice(0, g3.stops.indexOf(g3.next)).filter((s) => s.venue || s.event);
+    // (A day's morning coffee is never pushed up against lunch: the morning-wait rules above own that wait.)
+    if (!(g3.days && isLunchStop(g3.next)) && !beforeGap.some((s) => s.event || isLunchStop(s) || isDinnerStop(s) || /\b(?:brunch|breakfast|lunch)\b/i.test(s.label || '')) && !(requirements.dayStartMinutes && requirements.dayStartMinutes[g3.day] != null)) {
+      const rows = (result.schedule || []).filter((r) => r.day === g3.day);
+      const first = rows[0] && rows[0].startMinutes, ids = rows.map((r) => r.venueId).join(',');
+      let ok = false;
+      const shifts = [...new Set([g3.idle - 30, g3.idle - 60, (g3.idle - 30) / 2].map((m) => Math.floor(m / 15) * 15).filter((m) => m >= 30))];
+      for (const shift of shifts) {
+        if (!Number.isFinite(first) || ok) break;
+        requirements.dayStartMinutes = { ...(requirements.dayStartMinutes || {}), [g3.day]: first + shift };
+        idleGapReschedule(result, input, requirements, opts);
+        const cand = (result.schedule || []).filter((r) => r.day === g3.day);
+        if (cand.map((r) => r.venueId).join(',') === ids && !cand.some((r) => !Number.isFinite(r.startMinutes) || r.status === 'unmet' || (r.daylight && r.daylight.status === 'conflict')) && better()) ok = true;
+        else undo();
+      }
+      if (ok) { changed = true; continue; }
+    }
+    // 4. Nothing fits: the wait is named, with something to do in it.
+    const g4 = idleGapAt(result, explained);
+    if (g4 && idleGapCard(result, input, g4)) changed = true;
+    explained.add((g4 || g3).key);
   }
   return changed;
 }
@@ -4582,6 +4813,9 @@ function addSuggestedTimes(result, input) {
       const t = run(best.startMinutes, best.date);
       if (!t || t.untimed >= best.untimed) { list.splice(at, 0, removed); break; }
       best = t;
+      // Planner (2026-10-27): a second tasting the planner added ("wine and dinner") goes quietly.
+      const comp = typeof removed.component === 'number' ? ((input.trip && input.trip.components) || [])[removed.component] : removed.component;
+      if (comp && comp.extraTasting) continue;
       result.notes = [...(result.notes || []), `${v.name} was left out: ${close ? `it closes at ${close},` : 'its listed hours end'} before the plan would get there.`];
     }
   }
@@ -4672,6 +4906,24 @@ function addSuggestedTimes(result, input) {
         if (JSON.stringify(probe.itinerary.stops.map((st) => [st.venue && st.venue.id, !!st.freeTime])) !== before && !rows.some((r) => !Number.isFinite(r.startMinutes))) {
           result.itinerary.stops = probe.itinerary.stops;
           best = { ...best, probe, rows, timed: rows.length, untimed: 0 };
+        }
+      }
+    } catch (e) { /* keep the plan as it was */ }
+  }
+  // Planner (2026-10-27): the same long-wait pass as a dated plan (closeIdleGaps) on the suggested times: "a day at the
+  // beach in Osoyoos" waited 110 minutes after lunch, a Penticton pub crawl from 3:36 to 6 PM.
+  if (best && best.timed && !input.swap && fixedStart == null && !userNamedTimes(req)) {
+    try {
+      const reqG = { ...req, items: req.items || [], conflicts: [], startDate: best.date, endDate: null, ...(best.startMinutes != null ? { startMinutes: best.startMinutes } : {}) };
+      const probe = JSON.parse(JSON.stringify(best.probe));
+      if (closeIdleGaps(probe, { ...input, intent: input.intent || {}, tripDate: best.date || input.tripDate }, reqG, { probe: true })) {
+        const rows = probe.schedule || [];
+        const untimed = rows.filter((r) => !Number.isFinite(r.startMinutes)).length;
+        if (untimed <= best.untimed) {
+          if ((probe.days || []).length) filled = true;
+          else if (result.itinerary && probe.itinerary) result.itinerary.stops = probe.itinerary.stops;
+          else if (result.outing && probe.outing) result.outing.stops = probe.outing.stops;
+          best = { ...best, probe, rows, timed: rows.length - untimed, untimed };
         }
       }
     } catch (e) { /* keep the plan as it was */ }
@@ -4796,7 +5048,32 @@ function addBeachSeasonNotes(result, input) {
   }
   return result;
 }
-function planTripOnce(input) { const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); addSuggestedTimes(result, input || {}); labelLateLunches(result); addBeachSeasonNotes(result, input || {}); return addStory(result, input || {}); }
+function planTripOnce(input) { const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); addSuggestedTimes(result, input || {}); labelLateLunches(result); relabelDayparts(result, input || {}); addBeachSeasonNotes(result, input || {}); return addStory(result, input || {}); }
+// Planner (2026-10-27): a short outing's stop is called by the part of the day it is timed in (the audit saw Railside
+// Brewing at 7:45 PM as "afternoon", Barley Mill at 11 AM as "late" and CedarCreek at noon as "morning"). Itineraries and
+// outings only (a day plan's parts are its slots); meal stops keep theirs, and a label that was the old part's name
+// becomes the new one's.
+// A part's stops may start in this window (minutes) before they are called by another part.
+const DAYPART_START_WINDOWS = { morning: [0, 719], midday: [630, 869], afternoon: [720, 1049], late: [840, 1109], evening: [960, 1439], night: [1140, 1439] };
+function relabelDayparts(result, input = {}) {
+  if (!result || !['itinerary', 'outing'].includes(result.kind) || !(result.schedule || []).length) return result;
+  // A part of the day the visitor asked for ("this afternoon", "in the morning") is kept.
+  const req = input.requirements || {};
+  if ((input.intent && input.intent.when && input.intent.when.daypart) || req.daypart || req.timeWindow) return result;
+  const stops = (result.itinerary && result.itinerary.stops) || (result.outing && result.outing.stops) || [];
+  for (const st of stops) {
+    if (!st || !st.venue || st.event || isLunchStop(st) || /\b(?:lunch|dinner|supper|brunch|breakfast)\b/i.test(st.label || '')) continue;
+    const row = result.schedule.find((r) => r.venueId === st.venue.id && Number.isFinite(r.startMinutes));
+    if (!row) continue;
+    const start = row.startMinutes % 1440, win = DAYPART_START_WINDOWS[st.daypart];
+    if (win && start >= win[0] && start <= win[1]) continue;
+    const part = partAt(start);
+    if (part === st.daypart) continue;
+    if (st.label && st.label === PLAN_DAYPART_LABELS[st.daypart]) st.label = PLAN_DAYPART_LABELS[part];
+    st.daypart = part;
+  }
+  return result;
+}
 // Audit fix (2026-10-27): "tonight" asked between midnight and 5 AM was planned for the night that is ending ("Hours were
 // checked for Monday night, from 01:57"): every place with real hours was closed, so a date night came back with both
 // stops empty and no warning, or with the only no-hours places timed at 5 PM "Monday". A plan with stops (an outing, a
@@ -4967,6 +5244,8 @@ function planTripUnchecked(input) {
   }
   oneRoundADay(result);
   oneSimulatorATrip(result, intent);
+  // Planner (2026-10-27): times the visitor named are read before the planner moves any start below.
+  const namedTimes = userNamedTimes(requirements);
   scheduleTripByHours(result, input, requirements);
   result = fitTimeBudget(result, input, requirements);
   if(result.timeBudget?.selected)scheduleTripByHours(result,input,requirements);
@@ -4983,6 +5262,8 @@ function planTripUnchecked(input) {
   pullDinnersForward(result, { ...input, intent }, requirements);
   startLaterOnMorningGaps(result, { ...input, intent }, requirements);
   leadUpToDinner(result, { ...input, intent }, requirements);
+  // Planner (2026-10-27): no wait of more than 90 minutes between stops is left unexplained (see closeIdleGaps).
+  closeIdleGaps(result, { ...input, intent }, requirements, { userTimed: namedTimes });
   if (eveningWalk && result.days.length) {
     // 2026-10-19: the rule is applied, not only stated. A dinner reached by car after the cut-off is said, day by day.
     const late = eveningWalkLateDrives(result, eveningWalk);
@@ -6460,7 +6741,8 @@ function planItinerary(input) {
     const extra = route ? [{ code: 'route', text: `In ${regionLabel(ctx, pick.v.region)}, on the way`, weight: 1 }] : regionReason(pick.v, ctx);
     const alternates = pool.filter((s) => s !== pick && !used.has(s.v.id)).slice(0, 2);
     // A crawl's later stops are the same kind, so its alternates are not held back from them.
-    if (!walking && !trip.crawl && !(trip.explicitStops && parts.some(p => (p.c.plannerKinds || []).some(k => tripRequirements.isSportKind(k))))) for (const a of alternates) used.add(a.v.id);
+    // Planner (2026-10-27): so is a second tasting ("wine and dinner", extraTasting).
+    if (!walking && !trip.crawl && !parts.some((x) => x.c && x.c.extraTasting) && !(trip.explicitStops && parts.some(p => (p.c.plannerKinds || []).some(k => tripRequirements.isSportKind(k))))) for (const a of alternates) used.add(a.v.id);
     if (c.wineryLunch) pick.reasons = pick.reasons.concat({ code: 'meal', text: pick.v.type === 'winery' ? 'A winery that serves lunch' : 'Lunch at a winery’s restaurant', weight: 8 });
     stops.push({
       kind: 'venue', component: c, index: p.i, label: c.wineryLunch ? 'Lunch at a winery' : label.replace(/^./, (x) => x.toUpperCase()), daypart: daypart || (pick.v.type === 'cafe' && cafeRole(pick.v) === 'treat' ? 'afternoon' : ITIN_TYPE_DAYPART[pick.v.type]) || 'afternoon', timed: !!daypart, ...(c.wineryLunch ? { wineryLunch: true } : {}),
@@ -6616,6 +6898,12 @@ function scheduleNotes(result, ctx) {
 }
 
 module.exports = {
+  // Planner (2026-10-27): long idle gaps and daypart labels
+  closeIdleGaps,
+  IDLE_GAP_LIMIT,
+  userNamedTimes,
+  partAt,
+  relabelDayparts,
   // Build My Trip audit fixes (2026-10-27)
   ctxPlanDate, nightKindOfTerm, venueNight, listedMatch, specialFoodMatch, afterMidnightTonight, skiOpeningFor,
   withSameEstates,
