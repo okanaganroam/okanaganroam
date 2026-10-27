@@ -14473,7 +14473,7 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
 }
 .nav-hamburger-count[hidden] { display: none; }
 @media (min-width: 941px) { #navHamburger .nav-hamburger-count { display: none; } }
-@media (min-width: 941px) and (max-width: 1099px) { .nav-mytrip-label { display: none; } }
+.nav-links-mytrip[hidden] { display: none !important; }
 </style>
 <script>
 (function(){
@@ -14484,7 +14484,7 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
     document.documentElement.classList.add('trip-nav-on');
     var li = document.createElement('li');
     li.className = 'nav-links-mytrip';
-    li.innerHTML = '<button type="button" class="nav-mytrip-btn" aria-controls="tripTrayPanel" aria-expanded="false"><span aria-hidden="true">\u{1F9F3}</span> <span class="nav-mytrip-label"><span class="nav-mytrip-en">My Trip</span><span class="nav-mytrip-fr" lang="fr">Mon voyage</span></span> <span class="nav-mytrip-count">0</span></button>';
+    li.innerHTML = '<button type="button" class="nav-mytrip-btn" aria-controls="tripTrayPanel" aria-expanded="false"><span class="nav-mytrip-label"><span class="nav-mytrip-en">My Trip</span><span class="nav-mytrip-fr" lang="fr">Mon voyage</span></span> <span class="nav-mytrip-count">0</span></button>';
     // Right after Build My Trip: on phones that pair leads the menu.
     var tripLi = links.querySelector('.nav-links-trip');
     links.insertBefore(li, tripLi ? tripLi.nextSibling : null);
@@ -14497,6 +14497,8 @@ html[lang="fr"] .nav-mytrip-en { display: none; }
       btn.setAttribute('aria-label', (document.documentElement.lang === 'fr' ? 'Mon voyage : ' : 'My Trip: ') + n + (document.documentElement.lang === 'fr' ? (n === 1 ? ' arr\u00eat' : ' arr\u00eats') : (n === 1 ? ' stop' : ' stops')));
       btn.setAttribute('aria-expanded', panel.classList.contains('open') ? 'true' : 'false');
       if (badge) { badge.textContent = String(n); badge.hidden = n === 0; }
+      // Header tidy (2026-10-27): no suitcase emoji and no "0": My Trip only shows once a place has been added.
+      li.hidden = n === 0;
     }
     btn.addEventListener('click', function(e){
       // The tray's own outside-click rule would close it again as this click
