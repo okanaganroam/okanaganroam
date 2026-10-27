@@ -12132,6 +12132,7 @@ const LYV_FOOTER_ABOUT = `<h2 data-i18n="footer.about">About</h2>
           <li><a href="/list-an-event">List an Event</a></li>
           <li><a href="/owner/login">Business login</a></li>
           <li><a href="/contact" data-contact-open aria-haspopup="dialog" aria-controls="contactDialog" data-i18n="footer.contact">Contact</a></li>
+          <li class="home-footer-sister"><a href="https://whistlerroam.com/">Whistler Roam (Sea to Sky)</a></li>
         </ul>`;
 
 test('Footer: "List your venue" points to /list-your-venue on every footer page; the rest of the footer is unchanged', () => withDiscoveryServer(async (base) => {
@@ -12141,7 +12142,7 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     const html = await res.text();
     const footer = html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/);
     assert.ok(footer, `${page} renders the shared footer`);
-    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly About Okanagan Roam / List your venue / List an Event / Business login / Contact`);
+    assert.ok(footer[0].includes(LYV_FOOTER_ABOUT), `${page}: About column is exactly About Okanagan Roam / List your venue / List an Event / Business login / Contact / the sister site, Whistler Roam (2026-10-27)`);
     const footerLinks = footer[0].replace(/<dialog[\s\S]*?<\/dialog>|<script[\s\S]*?<\/script>/g, '');
     assert.equal((footerLinks.match(/href="\/list-your-venue"/g) || []).length, 1, page);
     assert.equal((footerLinks.match(/href="\/list-an-event"/g) || []).length, 1, `${page}: exactly one List an Event link`);
