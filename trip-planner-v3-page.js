@@ -1365,11 +1365,11 @@ function renderScript(d) {
       + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (/venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
-      + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour : <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
+      + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour ' + (stop.happyHourWhenFr ? esc(stop.happyHourWhenFr) + ' ' : '') + ': <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
-      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? 'Ce soir : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')
+      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')
       + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'

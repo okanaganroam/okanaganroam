@@ -6507,6 +6507,24 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   try { for (const r of db.prepare('SELECT venue_id, open_months FROM venue_links WHERE open_months IS NOT NULL').all()) if (!explicitSeasons.has(r.venue_id)) openMonthsById.set(r.venue_id, r.open_months); } catch (e) { /* no venue_links table */ }
   const dogNotes = getDogFriendlyNotes();
   const golfWindows = getGolfRateWindows();
+  // Audit fix (2026-10-27): each venue's shown weekly nights (trivia, karaoke, bingo, open mic...; not stale), so "trivia
+  // night in Kelowna on Tuesday" is planned from the nights a place hosts, not the word "trivia" in its description.
+  let nightsByVenue = new Map();
+  try { nightsByVenue = allVenueWeeklyNights(); } catch (e) { nightsByVenue = new Map(); }
+  const nightsFact = (v) => {
+    if (!NIGHT_TYPES.has(v.type) || !nightsByVenue.has(v.id)) return undefined;
+    const list = nightsShown(nightsByVenue.get(v.id)).map((n) => ({ kind: n.kind, title: n.title, days: n.days.slice(), frequency: n.frequency || 'weekly', start: n.start || null, end: n.end || null }));
+    return list.length ? list : undefined;
+  };
+  // The same for its weekly food specials ("Taco Tuesday · $3 tacos"), so "tacos and trivia in Osoyoos on Tuesday" finds
+  // the pub that has both that night. Food specials only; drink specials are never a food match.
+  let specialsByVenue = new Map();
+  try { specialsByVenue = allVenueSpecials(); } catch (e) { specialsByVenue = new Map(); }
+  const specialsFact = (v) => {
+    if (!specialsByVenue.has(v.id)) return undefined;
+    const list = specialsByVenue.get(v.id).filter((x) => x.kind !== 'drink' && !specialsStale(x.checked_at)).map((x) => ({ days: x.days.slice(), title: x.title, deal: x.deal || null, season_from: x.season_from || null, season_to: x.season_to || null }));
+    return list.length ? list : undefined;
+  };
   const facts = [];
   const indoorIds = new Set(getCollectionVenueIds('indoor_also'));
   const requirementModule = require('./trip-requirements');
@@ -6555,6 +6573,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       seasonReopens: seasons.has(v.id) ? (seasons.get(v.id).reopens_date || null) : undefined, // the listed reopening date; null = not announced (2026-10-18)
       dogNote: dogNotes.get(v.id) || null,
       golfSeasons: v.type === 'golf' ? (golfWindows.get(`${v.region}/${v.slug}`) || []) : [],
+      nights: nightsFact(v),
+      specials: specialsFact(v),
     });
   }
   return facts;
@@ -6941,7 +6961,146 @@ function runTripPlan(args, now = new Date()) {
       if (retry && retry.kind !== 'unknown') { retry.query = plan.query; plan = retry; }
     }
   } catch (e) { /* keep the plan */ }
-  return runTripPlanSkiFallback(plan, args, now);
+  plan = runTripPlanSkiFallback(plan, args, now);
+  try { plan = tripNamedVenuePlan(plan, args, now); } catch (e) { /* keep the plan */ }
+  return plan;
+}
+// Audit fix (2026-10-27): a request that names a place. A closed one (closed for the season, a closed advisory, an owner
+// closure) was never planned -- right -- but the visitor was told "No selected stop meets lunch at the terrace restaurant
+// at mission hill" or "Okanagan Roam couldn't match those words ('ailm', 'sperling', 'vibrant', 'vine')", and the plan
+// went to another town around words of its name ("Commonage Trail (Mission Hill)"). Now the plan says it plainly
+// ("Terrace Restaurant is closed for the season until May 1, 2027.") and is planned again without the name, in that
+// place's town. A place is named by its full listed name, or -- only among words the planner could not read -- by the
+// distinctive part of it ("Sperling" for Sperling Vineyards). An open place named for a meal heads an Ideas list.
+const TRIP_NAME_GENERIC_WORDS = new Set(['the', 'a', 'an', 'and', 'of', 'at', 'estate', 'estates', 'winery', 'wineries', 'wines', 'wine', 'vineyard', 'vineyards', 'cellars', 'family', 'co', 'company',
+  'restaurant', 'grill', 'kitchen', 'bistro', 'cafe', 'pub', 'bar', 'lounge', 'brewing', 'brewery', 'distillery', 'distilling', 'ltd', 'inc', 'okanagan', 'kelowna', 'penticton', 'vernon', 'osoyoos', 'oliver']);
+// Words too common to stand for a place on their own ("The View" is not every lake view).
+const TRIP_NAME_COMMON_WORDS = new Set(['view', 'lake', 'hill', 'hills', 'creek', 'beach', 'park', 'garden', 'gardens', 'farm', 'house', 'valley', 'mountain', 'ridge', 'vista', 'sun', 'summit', 'river', 'falls',
+  'bay', 'point', 'trail', 'trails', 'golf', 'club', 'market', 'patio', 'terrace', 'village', 'town', 'local', 'street', 'road', 'main', 'old', 'new', 'little', 'big', 'good', 'great', 'best', 'fresh', 'tasting', 'dinner', 'lunch', 'brunch', 'coffee', 'tea', 'pizza', 'sushi', 'tacos', 'wings']);
+function tripNameCore(name) {
+  const words = discoveryIntentModule().normalizeDiscoveryText(String(name || '').replace(/['’]/g, '')).split(' ').filter(Boolean);
+  const core = words.filter((w) => !TRIP_NAME_GENERIC_WORDS.has(w));
+  if (!core.length || core.every((w) => TRIP_NAME_COMMON_WORDS.has(w)) || core.join('').length < 4) return null;
+  return core;
+}
+function tripNameRegex(words, tailOk) {
+  const body = words.map((w) => w.replace(/[^a-z0-9]/g, '')).filter(Boolean).map((w) => w.split('').join("['’]?")).join("[\\s'’.,&-]*");
+  const suffix = "(?:\\s+(?:estate|estates|winery|wines|vineyards?|cellars|restaurant|grill|kitchen|bistro|cafe|café|pub|bar|lounge|brewing|brewery|distillery|family|estate winery))*";
+  return new RegExp(`(?:\\bthe\\s+)?\\b${body}${suffix}\\b${tailOk ? "(?:\\s+(at|in)\\s+((?:[a-zà-ÿ'’]+\\s*){1,3}))?" : ''}`, 'gi');
+}
+// One line per reopening date; places with none are named together ("A, B and C are closed for the season and haven't
+// announced when they reopen, so they aren't in this plan.").
+function tripClosedNamedNotes(list, date) {
+  const longDate = (iso) => { const d = new Date(`${iso}T12:00:00Z`); return `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`; };
+  const names = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+  const dated = [], undated = [], now = [];
+  for (const f of list) {
+    const closedSeason = f.seasonClosed && (date ? date >= f.seasonClosed.from && date <= f.seasonClosed.to : f.seasonClosedToday);
+    if (closedSeason && f.seasonReopens && parseLocalDate(f.seasonReopens)) dated.push(`${f.name} is closed for the season until ${longDate(f.seasonReopens)}, so it isn’t in this plan.`);
+    else if (closedSeason) undated.push(f.name);
+    else now.push(f.name);
+  }
+  const out = dated.slice();
+  if (undated.length) out.push(undated.length === 1 ? `${undated[0]} is closed for the season and hasn’t announced when it reopens, so it isn’t in this plan.` : `${names(undated)} are closed for the season and haven’t announced when they reopen, so they aren’t in this plan.`);
+  if (now.length) out.push(now.length === 1 ? `${now[0]} is closed right now, so it isn’t in this plan.` : `${names(now)} are closed right now, so they aren’t in this plan.`);
+  return out;
+}
+function tripNamedVenuePlan(plan, args, now = new Date()) {
+  if (!plan || !args || args.swap || args.pinned || args.overrides?.baseRegion || plan.namedVenueReplanned) return plan;
+  const planner = tripPlannerModule();
+  const norm = discoveryIntentModule().normalizeDiscoveryText;
+  const text = String(args.text || '');
+  const named = (plan.requirementResults || []).filter((i) => i.kind === 'venue' && Number.isInteger(i.value));
+  // The words the planner could not read: "Not part of this plan" words, unused words, unmatched food words.
+  const leftover = new Set();
+  const addWords = (s) => { for (const w of norm(String(s || '').replace(/['’]/g, '')).split(' ')) if (w) leftover.add(w); };
+  for (const w of plan.warnings || []) { const m = /^Not part of this plan: (.+?) — /.exec(String(w)); if (m) for (const q of m[1].matchAll(/“([^”]+)”/g)) addWords(q[1]); }
+  for (const u of plan.unsupported || []) addWords(u);
+  for (const u of (plan.understood && plan.understood.notUsed) || []) addWords(u);
+  for (const ft of (plan.intent && plan.intent.foodTerms) || []) if (!ft.cuisine) addWords(ft.term);
+  if (!named.length && !leftover.size) return plan;
+  // The facts are read only when a listed name could be in the request (a cheap name pass first).
+  const textWords = new Set(norm(text.replace(/['’]/g, '')).split(' '));
+  const maybe = new Set(named.map((i) => i.value));
+  for (const v of db.prepare('SELECT id, name FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all()) {
+    const core = tripNameCore(v.name);
+    if (core && core.every((w) => leftover.has(w) && textWords.has(w))) maybe.add(v.id);
+  }
+  if (!maybe.size) return plan;
+  const date = ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : todayLocal(now));
+  const facts = buildTripPlannerFacts(false, date).filter((f) => maybe.has(f.id));
+  const byId = new Map(facts.map((f) => [f.id, f]));
+  const closed = (f) => !!f && (planner.seasonClosedOnTrip(f, { date }) || (date === todayLocal(now) && f.seasonClosedToday) || !!(f.advisory && planner.advisoryUnavailable(f.advisory.note)));
+  const hits = [];
+  for (const i of named) { const f = byId.get(i.value); if (f) hits.push({ f, item: i, re: tripNameRegex(norm(String(f.name).replace(/['’]/g, ' ')).split(' '), true) }); }
+  for (const f of facts) {
+    if (hits.some((h) => h.f.id === f.id) || !closed(f)) continue;
+    const core = tripNameCore(f.name);
+    if (!core || !core.every((w) => leftover.has(w) && textWords.has(w))) continue;
+    // Only the first word of a core is looked for once; "Vibrant Vine" needs both words, in order.
+    const re = tripNameRegex(core, true);
+    re.lastIndex = 0;
+    if (!re.test(text)) continue;
+    hits.push({ f, item: null, re: tripNameRegex(core, true) });
+  }
+  if (!hits.length) return plan;
+  // Two listings with the same distinctive words (two "Sperling" places): only the closed one in a named town, or none.
+  const closedHits = hits.filter((h) => closed(h.f));
+  const open = hits.filter((h) => !closed(h.f) && h.item);
+  if (!closedHits.length) {
+    // An open place named with a meal ("lunch at Frankie We Salute You in Kelowna") heads an Ideas list.
+    if ((plan.kind === 'discover' || plan.kind === 'recommendations') && Array.isArray(plan.recommendations) && open.length === 1) {
+      const at = plan.recommendations.findIndex((s) => s.venue && s.venue.id === open[0].f.id);
+      if (at > 0) plan.recommendations.unshift(plan.recommendations.splice(at, 1)[0]);
+      if (at >= 0) plan.recommendations[0].reasons = [{ code: 'named', text: 'The place you named', weight: 100 }].concat((plan.recommendations[0].reasons || []).filter((r) => r.code !== 'named'));
+    }
+    return plan;
+  }
+  const notes = tripClosedNamedNotes(closedHits.map((h) => h.f), date);
+  // The request again without the closed places' names (and an "at Mission Hill" after a name when those words are
+  // the place's own), in their town when the request named none.
+  let rewritten = text;
+  for (const h of closedHits) {
+    const own = new Set(norm(`${h.f.name} ${h.f.textDesc || ''} ${h.f.address || ''}`).split(' '));
+    rewritten = rewritten.replace(h.re, (m, prep, tail) => {
+      if (!tail) return ' § ';
+      const tw = norm(tail).split(' ').filter(Boolean);
+      const town = Object.values(REGION_LABELS).some((l) => ` ${norm(tail)} `.includes(` ${norm(l)} `));
+      return !town && tw.every((w) => own.has(w) || leftover.has(w)) ? ' § ' : ` § ${prep} ${tail}`;
+    });
+  }
+  rewritten = rewritten.replace(/§(?:\s*(?:,|&|\band\b)\s*§)+/gi, '§').replace(/\b(?:at|to|visit(?:ing)?|try(?:ing)?)\s+(?:the\s+)?§/gi, ' ').replace(/§/g, ' ').replace(/\s+([,.!?])/g, '$1').replace(/\s+/g, ' ').trim();
+  const regions = (plan.intent && plan.intent.regions) || [];
+  const home = closedHits[0].f.region;
+  if (!regions.length && REGION_LABELS[home]) rewritten = `${rewritten} in ${REGION_LABELS[home]}`.trim();
+  if (!norm(rewritten).replace(/\b(?:in|at|on|the|and)\b/g, '').replace(new RegExp(`\\b${norm(REGION_LABELS[home] || home)}\\b`, 'g'), '').trim()) {
+    rewritten = `${(CATEGORY_LABELS[closedHits[0].f.type] || { plural: 'places' }).plural.toLowerCase()} ${rewritten}`;
+  }
+  let again = null;
+  try { again = runTripPlanCore({ ...args, text: rewritten }, now); } catch (e) { again = null; }
+  const usable = again && !tripPlanEmpty(again) && !(again.kind === 'unknown');
+  const out = usable ? again : plan;
+  out.query = plan.query || text;
+  out.namedVenueReplanned = !!usable;
+  out.closedNamedVenues = closedHits.map((h) => ({ id: h.f.id, name: h.f.name, region: h.f.region, reopens: h.f.seasonReopens || null }));
+  // Never the closed place's own words as missing, nor "No selected stop meets …" for it.
+  const gone = new Set(closedHits.flatMap((h) => [...norm(String(h.f.name).replace(/['’]/g, '')).split(' '), ...norm(String(h.f.name)).split(' '), ...norm(`${h.f.textDesc || ''}`).split(' ').filter((w) => leftover.has(w))]));
+  const nameOnly = (s) => norm(String(s).replace(/['’]/g, '')).split(' ').filter(Boolean).every((w) => gone.has(w));
+  const dropWords = (list) => (list || []).filter((u) => !nameOnly(u));
+  const listWords = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+  out.warnings = (out.warnings || []).filter((w) => !closedHits.some((h) => h.item && String(w) === `No selected stop meets ${h.item.sourceText}.`))
+    .map((w) => {
+      const m = /^Not part of this plan: (.+?) — Okanagan Roam couldn’t match (?:that word|those words) to a kind of place it lists\.$/.exec(String(w));
+      if (!m) return w;
+      const left = [...m[1].matchAll(/“([^”]+)”/g)].map((q) => q[1]).filter((q) => !nameOnly(q));
+      if (!left.length) return null;
+      return `Not part of this plan: ${listWords(left.map((q) => `“${q}”`))} — Okanagan Roam couldn’t match ${left.length > 1 ? 'those words' : 'that word'} to a kind of place it lists.`;
+    }).filter(Boolean);
+  out.warnings = notes.concat(out.warnings.filter((w) => !notes.includes(w)));
+  out.unsupported = dropWords(out.unsupported);
+  if (out.understood) out.understood.notUsed = dropWords(out.understood.notUsed);
+  for (const r of out.requirementResults || []) if (Array.isArray(r.optionalAlternatives)) r.optionalAlternatives = r.optionalAlternatives.filter((a) => !closedHits.some((h) => h.f.id === a.id));
+  return out;
 }
 // 2026-10-25: "cross country skiing near Vernon" found nothing because the Nordic centres are listed under SilverStar.
 // A request "near" a town that comes back empty looks in the towns right around it, and says so.
@@ -6966,7 +7125,9 @@ function runTripPlanSkiFallback(plan, args, now) {
     const base = hill && TRIP_SKI_HILL_BASE[hill];
     if (!base) return plan;
     const stops = (plan.days || []).flatMap((d) => d.stops || []);
-    if (!stops.length || stops.filter((s) => s.venue || s.event).length * 2 >= stops.length) return plan;
+    // Audit fix (2026-10-27): a ski day asked for before the lifts open (skiOffSeasonNote) was coffee, 7 hours of free
+    // time and dinner on the hill; it is planned from the town below too when that fills more of the day.
+    if (!stops.length || (!plan.skiOffSeasonNote && stops.filter((s) => s.venue || s.event).length * 2 >= stops.length)) return plan;
     const moved = runTripPlanCore({ ...args, overrides: { ...(args.overrides || {}), baseRegion: base.town } }, now);
     const moveStops = (moved.days || []).flatMap((d) => d.stops || []);
     if (moveStops.filter((s) => s.venue || s.event).length <= stops.filter((s) => s.venue || s.event).length) return plan;
@@ -8295,6 +8456,9 @@ function happyHourOnNowText(h, clock, fr) {
 // $10 Cocktails"; French « Happy hour : … », the English lines when no French was given). Text only: the planner's
 // choices and order are unchanged. Reads plan.schedule (venueId, date, startMinutes) after planning.
 function withTripHappyHourDeals(plan, now = new Date()) {
+  // Audit fix (2026-10-27): a happy hour Ideas list ("happy hour crawl in Kelowna", "… on Friday") showed only "Has the
+  // Happy Hour badge"; each place now says its happy hour on the list's day (today when undated) and what is on.
+  if (plan && hoursModule && Array.isArray(plan.recommendations) && plan.recommendations.length && ((plan.intent && plan.intent.features) || []).includes('happy_hour')) withTripListHappyHour(plan, now);
   if (!plan || !hoursModule || !Array.isArray(plan.schedule) || !plan.schedule.length) return plan;
   const stops = [];
   const walk = (o, depth) => {
@@ -8334,6 +8498,33 @@ function withTripHappyHourDeals(plan, now = new Date()) {
       s.happyHourLineFr = `Happy hour : ${s.happyHourDealsFr}`;
       if (!x.deals.fr) s.happyHourLineFrLang = 'en';
     }
+  }
+  return plan;
+}
+// Audit fix (2026-10-27): each listed place's happy hour on the list's day ("Happy hour 3–6 PM: $6 House pints"; French
+// « Happy hour 15 h–18 h : … »), only for places whose deals are shown (happyHourDealsShown) and open for happy hour that day.
+function withTripListHappyHour(plan, now = new Date()) {
+  const date = parseLocalDate(plan.listDate) ? plan.listDate : todayLocal(now);
+  const weekday = localWeekdayKey(date);
+  const q = db.prepare('SELECT happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE id = ? AND redirect_to IS NULL');
+  for (const s of plan.recommendations) {
+    const id = s && s.venue && s.venue.id;
+    if (id == null) continue;
+    let row = null;
+    try { row = q.get(id); } catch (e) { row = null; }
+    const deals = row && row.happy_hour_times ? happyHourDealsShown(row, now) : null;
+    if (!deals) continue;
+    let day = null;
+    try { day = hoursModule.parseHours(row.happy_hour_times).days[weekday]; } catch (e) { day = null; }
+    if (!day || day.status !== 'open' || !day.ranges.length) continue;
+    const when = (fr) => day.ranges.map(([a, b]) => happyHourRangeText(a, b % 1440, fr)).join(', ');
+    s.happyHourDeals = happyHourDealsCompact(deals.en);
+    s.happyHourDealsFr = happyHourDealsCompact(deals.fr || deals.en);
+    s.happyHourWhen = when(false);
+    s.happyHourWhenFr = when(true);
+    s.happyHourLine = `Happy hour ${s.happyHourWhen}: ${s.happyHourDeals}`;
+    s.happyHourLineFr = `Happy hour ${s.happyHourWhenFr} : ${s.happyHourDealsFr}`;
+    if (!deals.fr) s.happyHourLineFrLang = 'en';
   }
   return plan;
 }
@@ -8707,6 +8898,22 @@ function specialsCompact(list, fr, n = 2) {
   const shown = (list || []).slice(0, n);
   return { text: shown.map((s) => specialLine(s, fr).text).join('; '), english: !!(fr && shown.some((s) => specialLine(s, true).english)) };
 }
+// Audit fix (2026-10-27): the day word that starts a trip stop's specials or weekly-nights line. "Tonight" / "Today"
+// (« Ce soir » / « Aujourd’hui ») only on today's Okanagan date -- a plan for next Monday said "Tonight" a week early;
+// tomorrow is "Tomorrow night" / "Tomorrow" (« Demain soir » / « Demain »), a later day this week its name
+// ("Saturday", « Samedi »), further out the date ("Mon Nov 2", « lun. 2 nov. »). -> { en, fr }
+function tripLineDayLabel(date, now = new Date(), evening = true) {
+  const today = todayLocal(now);
+  if (!parseLocalDate(date) || date === today) return evening ? { en: 'Tonight', fr: 'Ce soir' } : { en: 'Today', fr: 'Aujourd’hui' };
+  const ahead = localDateToDayNumber(date) - localDateToDayNumber(today);
+  if (ahead === 1) return evening ? { en: 'Tomorrow night', fr: 'Demain soir' } : { en: 'Tomorrow', fr: 'Demain' };
+  const wd = localWeekdayKey(date);
+  if (ahead > 1 && ahead < 7) { const f = HH_DAYS_LONG.fr[wd]; return { en: HH_DAYS_LONG.en[wd], fr: f.charAt(0).toUpperCase() + f.slice(1) }; }
+  const m = Number(date.slice(5, 7)) - 1, dom = Number(date.slice(8, 10));
+  const en = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m];
+  const fr = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][m];
+  return { en: `${HH_DAYS_SHORT.en[wd]} ${en} ${dom}`, fr: `${HH_DAYS_SHORT.fr[wd]}. ${dom === 1 ? '1er' : dom} ${fr}` };
+}
 // Build My Trip (2026-10-27): a stop on the day of one of the venue's specials says so ("Tonight: Taco Tuesday · $3
 // tacos", "Today: …" before 4 PM; French « Ce soir : … » / « Aujourd’hui : … », the English lines marked when no French
 // was given). A special with a time window the stop's time is outside of is left out. Text only: the planner's choices
@@ -8740,15 +8947,16 @@ function withTripSpecials(plan, now = new Date()) {
     const weekday = W[new Date(`${date}T12:00:00Z`).getUTCDay()];
     const list = specialsShown(row, byVenue.get(item.venueId), now, date).filter((s) => s.days.includes(weekday) && specialTimeState(s, min) !== 'later' && specialTimeState(s, min) !== 'over');
     if (!list.length) continue;
-    const tonight = item.startMinutes >= 16 * 60;
+    // Audit fix (2026-10-27): "Tonight"/"Today" only on today's date; another day says which ("Monday: …").
+    const label = tripLineDayLabel(date, now, item.startMinutes >= 16 * 60);
     const en = specialsCompact(list, false), frl = specialsCompact(list, true);
     for (const s of stops) {
       if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
       s.specials = en.text;
       s.specialsFr = frl.text;
-      s.specialLine = `${tonight ? 'Tonight' : 'Today'}: ${en.text}`;
-      s.specialLineFr = `${tonight ? 'Ce soir' : 'Aujourd’hui'} : ${frl.text}`;
-      s.specialLineLabelFr = tonight ? 'Ce soir' : 'Aujourd’hui';
+      s.specialLine = `${label.en}: ${en.text}`;
+      s.specialLineFr = `${label.fr} : ${frl.text}`;
+      s.specialLineLabelFr = label.fr;
       if (frl.english) s.specialLineFrLang = 'en';
     }
   }
@@ -9059,7 +9267,9 @@ function nightDaysText(s, fr) {
 function nightsTripText(list, fr) {
   const shown = (list || []).slice(0, 2).map((s) => {
     const l = nightLabel(s, fr), t = nightTimeText(s, fr);
-    return { text: `${l.text}${t ? (fr ? ` à ${t}` : ` at ${t}`) : ''}${s.frequency === 'biweekly' ? ` (${nightFrequencyText(s, fr)})` : ''}`, english: l.english };
+    // Audit fix (2026-10-27): a range reads "Trivia 7:30–9:30 PM" (it was "at 7:30–9:30 PM"); a start alone keeps "at 7 PM".
+    const ranged = specialMinutes(s.end) !== null;
+    return { text: `${l.text}${t ? (ranged ? ` ${t}` : fr ? ` à ${t}` : ` at ${t}`) : ''}${s.frequency === 'biweekly' ? ` (${nightFrequencyText(s, fr)})` : ''}`, english: l.english };
   });
   return { text: shown.map((x) => x.text).join('; '), english: shown.some((x) => x.english) };
 }
@@ -9068,7 +9278,11 @@ function nightsTripText(list, fr) {
 // the planner's choices and order are unchanged. Reads plan.schedule (venueId, date, startMinutes) after planning,
 // like withTripSpecials().
 function withTripWeeklyNights(plan, now = new Date()) {
-  if (!plan || !Array.isArray(plan.schedule) || !plan.schedule.length) return plan;
+  if (!plan) return plan;
+  // Audit fix (2026-10-27): an Ideas list for a named day ("trivia night in Kelowna on Tuesday", plan.listDate) says
+  // each place's nights that day too; it had no schedule, so nothing was shown.
+  if (Array.isArray(plan.recommendations) && plan.recommendations.length && parseLocalDate(plan.listDate)) withTripListNights(plan, now);
+  if (!Array.isArray(plan.schedule) || !plan.schedule.length) return plan;
   const byVenue = allVenueWeeklyNights();
   if (!byVenue.size) return plan;
   const stops = [];
@@ -9096,18 +9310,52 @@ function withTripWeeklyNights(plan, now = new Date()) {
       if (!nightOnDate(s, item.date)) return false;
       const a = specialMinutes(s.start), b = specialMinutes(s.end);
       if (b !== null && a !== null && b > a && min >= b) return false;
+      // Audit fix (2026-10-27): a stop that ends before the night starts (18:00-19:30 with trivia at 7:30) never says
+      // "Tonight: Trivia" -- the visitor has left by then.
+      if (a !== null && Number.isFinite(item.endMinutes) && item.endMinutes < 1440 && a >= item.endMinutes - 15) return false;
       return !(a !== null && b === null && min >= a + 180);
     }));
     if (!list.length) continue;
     const en = nightsTripText(list, false), frl = nightsTripText(list, true);
+    // Audit fix (2026-10-27): "Tonight:" only on today's date; another day says which ("Sunday: …", « Dimanche : … »).
+    const label = tripLineDayLabel(item.date, now, true);
     for (const s of stops) {
       if (s.venue.id !== item.venueId || (item.day != null && s.day != null && s.day !== item.day)) continue;
       s.nights = en.text;
       s.nightsFr = frl.text;
-      s.nightLine = `Tonight: ${en.text}`;
-      s.nightLineFr = `Ce soir : ${frl.text}`;
+      s.nightLine = `${label.en}: ${en.text}`;
+      s.nightLineFr = `${label.fr} : ${frl.text}`;
+      s.nightLineLabelFr = label.fr;
       if (frl.english) s.nightLineFrLang = 'en';
     }
+  }
+  return plan;
+}
+// Audit fix (2026-10-27): the weekly nights on an Ideas list's day (plan.listDate), on each listed place: the same rules
+// as a timed stop (no advisory or season closure, only the food and drink types), with no time to compare.
+function withTripListNights(plan, now = new Date()) {
+  const byVenue = allVenueWeeklyNights();
+  if (!byVenue.size) return plan;
+  const q = db.prepare('SELECT id, type FROM venues WHERE id = ? AND redirect_to IS NULL');
+  const advisory = getAdvisoryNotes(now), seasons = getSeasonStates(now);
+  const label = tripLineDayLabel(plan.listDate, now, true);
+  for (const s of plan.recommendations) {
+    const id = s && s.venue && s.venue.id;
+    if (id == null || !byVenue.has(id) || advisory.has(id)) continue;
+    const ss = seasons.get(id);
+    if (ss && ss.kind === 'closed') continue;
+    let row = null;
+    try { row = q.get(id); } catch (e) { row = null; }
+    if (!row || !NIGHT_TYPES.has(row.type)) continue;
+    const list = nightsSorted(nightsShown(byVenue.get(id), now).filter((n) => nightOnDate(n, plan.listDate)));
+    if (!list.length) continue;
+    const en = nightsTripText(list, false), frl = nightsTripText(list, true);
+    s.nights = en.text;
+    s.nightsFr = frl.text;
+    s.nightLine = `${label.en}: ${en.text}`;
+    s.nightLineFr = `${label.fr} : ${frl.text}`;
+    s.nightLineLabelFr = label.fr;
+    if (frl.english) s.nightLineFrLang = 'en';
   }
   return plan;
 }
@@ -55157,7 +55405,7 @@ module.exports = {
   withTripHappyHourDeals, staleHappyHourDeals, ownerVenueSnapshot, HH_DEALS_STALE_DAYS, HH_DEALS_MAX,
   // Weekly nights (2026-10-27).
   validateWeeklyNights, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
-  withTripWeeklyNights, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
+  withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,

@@ -217,7 +217,20 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   const durationMinutes=duration ? Number(duration[1])*(/^h/i.test(duration[2])?60:1) : null;
   if (durationMinutes>0 && durationMinutes<=1440) items.push({id:'duration',kind:'duration',value:durationMinutes,strength:'must',sourceText:duration[0],dayIndex:null,weekday:null});
   const deadline=/\b(?:back|return|finish|finished|done|home)?\s*(?:by|before|no later than)\s+(noon|midday|(?:1[0-2]|[1-9])(?::[0-5]\d)?\s*(?:am|pm))\b/.exec(original.toLowerCase());
-  const startClock=/\b(?:starting|start|begin|leave|depart)(?:ing)?\s+(?:at\s+)?(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i.exec(original);
+  // Audit fix (2026-10-27): a bare "at 4 pm" / "from 4pm" / "around 4 pm" after the date or the town ("drinks then dinner in
+  // Penticton on October 30 at 4 pm") is the start too; it was ignored and the plan began at 11 AM. Not when it is a
+  // meal's or an event's own time ("dinner at 7 pm", "a show at 8 pm") or part of "no driving after 7 pm".
+  const bareStart=(()=>{
+    const re=/\b(?:at|from|around)\s+(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/gi;let m;
+    while((m=re.exec(original))){
+      const before=original.slice(Math.max(0,m.index-40),m.index).toLowerCase();
+      if(/\b(?:dinners?|lunch(?:es)?|breakfasts?|brunch(?:es)?|suppers?|shows?|concerts?|games?|events?|performances?|movies?|films?|tickets?|reservations?|table|booking|tee times?|sunset|happy hours?|trivia|karaoke|bingo|tour)\s*$/.test(before))continue;
+      if(/\b(?:no|not|don'?t|avoid|without)\b[^.,;]*\b(?:driv\w*|car)\b[^.,;]*$/.test(before)||/\b(?:by|before|until|till|after|no later than)\s*$/.test(before))continue;
+      return m;
+    }
+    return null;
+  })();
+  const startClock=/\b(?:starting|start|begin|leave|depart)(?:ing)?\s+(?:at\s+)?(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i.exec(original)||bareStart;
   const startMinutes=startClock?(Number(startClock[1])%12)*60+Number(startClock[2]||0)+(startClock[3].toLowerCase()==='pm'?720:0):null;
   let deadlineMinutes=null;
   if(deadline){
@@ -462,7 +475,8 @@ function consumedTerms(requirements) {
   if (requirements?.startDate) add(`starting start begins beginning ${requirements.dateSource || ''}`);
   if (requirements?.startMinutes != null) add('starting start begin leave depart at am pm');
   for (const i of requirements?.items || []) {
-    if (i.kind === 'venue') add(i.venueName || '');
+    // Audit fix (2026-10-27): "Masa's" is also read as one word ("masas"), so both spellings are the name, never a food word.
+    if (i.kind === 'venue') { add(i.venueName || ''); add(String(i.venueName || '').replace(/['’]/g, '')); }
     if (i.kind === 'transport') add('no car without a our my do not have don t driving free on foot walkable walk walking between the stops places venues we want to');
     if (i.kind === 'evening_walk') add(`no not don t do won will avoid without want to driving drive car after past once it s at in the dark night nightfall sunset dinner evening am pm ${i.phrase || ''}`);
     if (i.kind === 'deadline') add(`${i.sourceText} back return finish finished done home by before no later than noon midday am pm`);
