@@ -21707,7 +21707,8 @@ test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar an
   const base = `http://localhost:${srv.address().port}`;
   try {
     const page = await fetch(`${base}/owner/${token}`).then((r) => r.text());
-    assert.match(page, /<p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it\. Signed-in owners&rsquo; hours and details go live straight away\.<\/p>/);
+    // One rule on the link page (2026-10-27): reviewed first, or create a login to go live straight away.
+    assert.match(page, /<p class="op-reassure">Free &middot; about 5 minutes\. Want your changes to go live straight away\? <a href="#opLogin" data-open-login>Create a login<\/a> below\.<\/p>/);
     assert.match(page, /<div class="op-unsent" id="opUnsent" hidden role="status"><span>Your listing changes aren&rsquo;t sent yet\.<\/span> <button type="button" id="opUnsentSend">Send changes<\/button><\/div>/);
     assert.match(page, /<button type="button" class="op-more" id="opMore">Make more changes<\/button>/);
     assert.match(page, /window\.addEventListener\('beforeunload', function\(e\)\{/);
@@ -23080,7 +23081,7 @@ test('Menus (2026-10-17): reading, checking and publishing a menu; private links
   const menuBase = `/owner/${token}/menu`;
   try {
     // The owner page leads with the big menu button; the menu screen works.
-    assert.match(await get(`/owner/${token}`).then((r) => r.text()), /class="op-menu-card" href="\/owner\/[^"]+\/menu"[^>]*><span class="op-menu-big">&#128247; Add your menu/);
+    assert.match(await get(`/owner/${token}`).then((r) => r.text()), /class="op-menu-card" href="\/owner\/[^"]+\/menu"[^>]*><span class="op-menu-big"><svg class="ui-icon"[^>]*>[\s\S]*?<\/svg> Add your menu/);
     const page = await get(menuBase).then((r) => r.text());
     assert.match(page, /window\.MENU_CFG = /);
     assert.match(page, /Take a photo of your menu/);
@@ -25891,7 +25892,7 @@ test('Instant owner edits (2026-10-18): signed-in hours, phone, description, bad
   const linkPage = await get(`/owner/${token}`);
   assert.match(linkPage, /id="opPhone" maxlength="40" value="250-555-0199"/, 'the pending phone, not the live (empty) one');
   assert.match(linkPage, /Phone <span class="op-status op-status-wait op-wait-chip">Waiting for review<\/span>/);
-  assert.match(linkPage, /nothing changes on your page until we&rsquo;ve checked it/);
+  assert.match(linkPage, /We review every change, usually within a day/);
   // Inline scripts on the edit pages and the review page parse (regexes in template literals keep their backslashes).
   const vm = require('node:vm');
   for (const html of [page, again, linkPage, app.renderAdminReviewPage()]) {
@@ -26448,7 +26449,22 @@ test('Owner portal conveniences (2026-10-18): one-tap Add to my login, event nam
     // My listings remembers this login's listings on the device, for the venue page's owner box.
     const listings = await (await s.get('/owner/account', me.cookie)).text();
     assert.match(listings, new RegExp(`localStorage\\.setItem\\('okrOwnerVenues', JSON\\.stringify\\(\\[${[a.id, b.id].sort((x, y) => x - y).join(',')}\\]\\)\\)|localStorage\\.setItem\\('okrOwnerVenues', JSON\\.stringify\\(\\[${b.id},${a.id}\\]\\)\\)`));
-    assert.match(listings, /tap <strong>Add to my login<\/strong>/);
+    assert.match(listings, /<details class="op-login" id="opAddAnother">/);
+    assert.match(listings, /It opens with an <strong>Add to my login<\/strong> button/);
+    // Owner portal polish (2026-10-27): the Add another business script runs and reads a pasted link; Create login
+    // answers with the signed-in page, which greets the owner and names what went live; no emoji on the menu card.
+    for (const code of ownerUiInlineScripts(listings)) assert.doesNotThrow(() => new vm.Script(code), code.slice(0, 80));
+    const addRe = new Function(`return ${/var m = (\/.*?\/)\.exec\(v\)/.exec(listings)[1]}`)();
+    assert.deepEqual(addRe.exec(`https://okanaganroam.com/owner/${tokenB}`).slice(1), [undefined, tokenB]);
+    assert.deepEqual(addRe.exec(`okanaganroam.com/fr/owner/${tokenB}?x=1`).slice(1), ['fr/', tokenB]);
+    assert.equal(addRe.exec('https://okanaganroam.com/kelowna/cafes/x'), null);
+    assert.equal(me.body.href, `/owner/account/venue/${a.id}`);
+    const welcome = await (await s.get(`/owner/account/venue/${a.id}?welcome=1&live=hours,nonsense`, me.cookie)).text();
+    assert.match(welcome, /<p class="op-done show" id="opWelcome" role="status">You&rsquo;re signed in\. What you sent from your link is now live: hours\. From now on your changes go live as soon as you save them\./);
+    assert.doesNotMatch(await (await s.get(`/owner/account/venue/${a.id}`, me.cookie)).text(), /id="opWelcome"/);
+    const welcomeFr = await (await s.get(`/fr/owner/account/venue/${a.id}?welcome=1`, me.cookie)).text();
+    assert.match(welcomeFr, /id="opWelcome" role="status">Vous êtes connecté\. Désormais/);
+    assert.doesNotMatch(await (await s.get(`/owner/${tokenB}`)).text(), /&#128247;|&#128203;|📷|📋/);
     // Settings: "Tap" on touch screens, and a message once the last business is gone.
     const settings = await (await s.get('/owner/account/settings', me.cookie)).text();
     assert.match(settings, /"tap":"Tap again to remove ","click":"Click again to remove "/);
