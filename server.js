@@ -8001,11 +8001,26 @@ const UI_ICON_PATHS = {
   wheat: '<path d="M12 21V7"></path><path d="M12 7c-1.8-.8-2.8-2.4-3-4.5 1.8.4 2.8 2 3 4.5zM12 7c1.8-.8 2.8-2.4 3-4.5-1.8.4-2.8 2-3 4.5z"></path><path d="M12 12c-2-.4-3.4-1.8-3.9-3.8 2 .2 3.4 1.6 3.9 3.8zM12 12c2-.4 3.4-1.8 3.9-3.8-2 .2-3.4 1.6-3.9 3.8z"></path><path d="M12 17c-2-.4-3.4-1.8-3.9-3.8 2 .2 3.4 1.6 3.9 3.8zM12 17c2-.4 3.4-1.8 3.9-3.8-2 .2-3.4 1.6-3.9 3.8z"></path>',
   hourglass: '<path d="M6 3h12M6 21h12"></path><path d="M7.5 3v2.5c0 2.2 4.5 4.3 4.5 6.5s-4.5 4.3-4.5 6.5V21M16.5 3v2.5c0 2.2-4.5 4.3-4.5 6.5s4.5 4.3 4.5 6.5V21"></path>',
   calendar: '<rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M4 10h16M9 3v4M15 3v4"></path>',
+  // Emoji pass 2 (2026-10-26): badges, Food & Drink filters, Roam Now's food types and filter chips.
+  gem: '<path d="M7 4h10l4 5-9 11L3 9z"></path><path d="M3 9h18"></path><path d="M10 4L8.5 9 12 20l3.5-11L14 4"></path>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path>',
+  pin: '<path d="M12 21s-6.5-6.1-6.5-11.3a6.5 6.5 0 0 1 13 0C18.5 14.9 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.3"></circle>',
+  dollar: '<path d="M12 3v18"></path><path d="M16.5 7.5c-.6-1.5-2.3-2.5-4.5-2.5-2.6 0-4.5 1.4-4.5 3.4 0 4.6 9 2.6 9 7.2 0 2-2 3.4-4.5 3.4-2.3 0-4.1-1-4.7-2.6"></path>',
+  clock: '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path>',
+  ban: '<circle cx="12" cy="12" r="8.5"></circle><path d="M6 6l12 12"></path>',
+  sparkle: '<path d="M11 3.5l1.9 5.1 5.1 1.9-5.1 1.9L11 17.5l-1.9-5.1L4 10.5l5.1-1.9z"></path><path d="M18.5 15.5v5M16 18h5"></path>',
+  cake: '<path d="M6 12.5h12l-1.6 8H7.6z"></path><path d="M5 12.5a7 7 0 0 1 14 0"></path><path d="M12 5.5V3.5"></path>',
+  mountain: '<path d="M2.5 20l7-12 4.5 7.5 2.5-3.5 5 8z"></path><path d="M7.5 11.5l2 1.5 2-1.5"></path>',
+  volume: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M15.5 9a4 4 0 0 1 0 6"></path><path d="M18 6.5a7.5 7.5 0 0 1 0 11"></path>',
+  mute: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"></path><path d="M16 9.5l5 5M21 9.5l-5 5"></path>',
+  palette: '<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 2-.9 2-1.8 0-1.3-1-1.7-1-2.9 0-1 .8-1.8 1.8-1.8h2.2a3.5 3.5 0 0 0 3.5-3.5c0-3.9-3.8-7-8.5-7z"></path><circle cx="7.8" cy="11.5" r="1"></circle><circle cx="10.5" cy="7.5" r="1"></circle><circle cx="15" cy="7.8" r="1"></circle>',
 };
-function uiIcon(name, size = 15) {
+// inline (emoji pass 2): app.css draws every svg as a block, which is fine inside the flex buttons and chips but puts
+// the icon on a line of its own in an inline run of text (a badge chip, "Closed for the season", a plain button).
+function uiIcon(name, size = 15, inline = false) {
   const paths = UI_ICON_PATHS[name];
   if (!paths) return '';
-  return `<svg class="ui-icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="vertical-align:-0.15em">${paths}</svg>`;
+  return `<svg class="ui-icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="${inline ? 'display:inline-block;' : ''}vertical-align:-0.15em">${paths}</svg>`;
 }
 const SEASON_TAG_ICON = { closed: uiIcon('leaf'), open_until: uiIcon('hourglass'), reopening: uiIcon('sprout'), temp_closed: uiIcon('calendar') };
 // "Open until Oct 31" (2026-10-18): the card tag's short form of "Open for the season until October 31."; the venue
@@ -8792,7 +8807,7 @@ function guardedClosureUpdate(id, input, meta, now = new Date()) {
 // the description carries it in full.
 function dogFriendlyBadgeHtml(note) {
   const title = note && String(note).trim() ? ` title="${escapeHtml(String(note).trim())}"` : '';
-  return `<span class="chip dog-friendly-badge"${title}>\u{1F43E} Dog Friendly</span>`;
+  return `<span class="chip dog-friendly-badge"${title}>${uiIcon('paw', '1.15em', true)} Dog Friendly</span>`;
 }
 
 // Split an advisory note into its message and (optionally) the official source it
@@ -8943,13 +8958,13 @@ function renderAdvisoryStyles() {
 // convention already used by badgeChipsHtml, so no new CSS class or
 // design-system addition is needed for this sprint's minimal scope.
 function hiddenGemBadgeHtml() {
-  return '<span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem</span>';
+  return `<span class="chip hidden-gem-badge">${uiIcon('gem', '1.15em', true)} Hidden Gem</span>`;
 }
 
 // Second editorial badge (2026-09-19), same chip convention. Membership is
 // the 'local_favorite' collection kind, read via getCollectionVenueIds().
 function localFavouriteBadgeHtml() {
-  return '<span class="chip local-favourite-badge">♥ Local Favourite</span>';
+  return `<span class="chip local-favourite-badge">${uiIcon('heart', '1.15em', true)} Local Favourite</span>`;
 }
 
 // ---------- Editorial collection membership (2026-09-19) ----------
@@ -15019,9 +15034,11 @@ function withFontFallbacks(html) {
 const CHIP_TEXT_EM = {
   "Dog-Friendly": 6.3, "Vegan-Friendly": 7.3, "Vegetarian-Friendly": 9.5, "Patio": 2.5, "Kid-Friendly": 5.9,
   "Gluten-Free-Friendly": 10.05, "Lake View": 5, "Non-Alcoholic Options": 10.85, "Sports TV": 4.85, "Live Music": 5.15,
-  "Great for Groups": 8.1, "Happy Hour": 5.8, "Open Early": 5.35, "Open Late": 4.95, "\ud83d\udc3e Dog Friendly": 7.45,
-  "\ud83d\udc8e Hidden Gem": 7.25, "\u2665 Local Favourite": 8.55, "\ud83d\udc3e Chiens bienvenus": 9.9,
-  "\ud83d\udc8e Tr\u00e9sor cach\u00e9": 7.5, "\u2665 Coup de c\u0153ur local": 10.45, "Dog-friendly": 6.15,
+  "Great for Groups": 8.1, "Happy Hour": 5.8, "Open Early": 5.35, "Open Late": 4.95,
+  // Emoji pass 2 (2026-10-26): the editorial badges lead with a 1.15em line icon ("[icon]" in a key), so their width is
+  // the space and words, measured as above, plus 1.15em.
+  "[icon] Dog Friendly": 7.57, "[icon] Hidden Gem": 7.35, "[icon] Local Favourite": 8.85, "[icon] Chiens bienvenus": 10,
+  "[icon] Tr\u00e9sor cach\u00e9": 7.63, "[icon] Coup de c\u0153ur local": 10.78, "[icon] Accepte les chiens": 10.42, "Dog-friendly": 6.15,
   "Vegan-friendly": 7.15, "Vegetarian options": 9.05, "Gluten-free options": 9.4, "Kid-friendly": 5.75,
   "Lake/vineyard view": 9.15, "Non-alcoholic options": 10.55, "Sports on TV": 6.35, "Live music": 5.2,
   "Great for groups": 7.95, "Happy hour": 5.6, "Open early": 5.25, "Open late": 4.7, "Accepte les chiens": 9.05,
@@ -15033,12 +15050,13 @@ const CHIP_TEXT_EM = {
   "Wineries & Wine Events": 11.7, "Holiday & Seasonal Events": 12.85, "Workshops & Classes": 10.5,
   "Community Events": 9.1, "Options v\u00e9ganes": 8.1, "Vue sur le lac": 6.45,
 };
-const CHIP_RE = /<span class="chip([^"]*)"([^>]*)>([^<]{1,60})<\/span>/g;
+const CHIP_RE = /<span class="chip([^"]*)"([^>]*)>((?:<svg class="ui-icon"[^>]*>(?:(?!<\/svg>)[\s\S])*<\/svg>)?[^<]{1,60})<\/span>/g;
+const CHIP_ICON_RE = /^<svg class="ui-icon"[\s\S]*<\/svg>/;
 function withChipWidths(html) {
   if (typeof html !== 'string' || html.indexOf('<span class="chip') === -1) return html;
   return html.replace(CHIP_RE, (m, cls, attrs, text) => {
     if (/\sstyle=/.test(attrs)) return m;
-    const em = CHIP_TEXT_EM[text.trim().replace(/&amp;/g, '&').replace(/&#39;/g, "'")];
+    const em = CHIP_TEXT_EM[text.replace(CHIP_ICON_RE, '[icon]').trim().replace(/&amp;/g, '&').replace(/&#39;/g, "'")];
     return em ? `<span class="chip${cls}"${attrs} style="box-sizing:content-box;min-width:${em}em;text-align:center">${text}</span>` : m;
   });
 }
@@ -16727,7 +16745,7 @@ function breadcrumbNavHtml(items) {
 // one chip per true boolean amenity flag on the venue. Identical output to
 // what all three call sites built inline before this extraction.
 // skipDogFriendly (2026-10-11): a venue on the official dog-beach list already
-// shows the richer "🐾 Dog Friendly" collection badge (with its leash-rule
+// shows the richer "Dog Friendly" collection badge (with its leash-rule
 // tooltip), so the plain Dog-Friendly amenity chip is dropped beside it
 // rather than showing the same fact twice.
 // Keeps at most `max` chips on a listing card and folds the rest into one
@@ -17979,7 +17997,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // (nothing in the 7 days the map holds) said it under the 7-day notice.
     noEventsHere: 'Aucun événement cette semaine ici.', noEventsWeek: 'Aucun événement de ce genre sur la carte cette semaine.', noEventsSoon: 'Aucun événement de ce genre sur la carte dans les semaines à venir.', ahead: 'À venir',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
-    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: '🍂 Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
+    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: 'Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
     walk: 'Walk', drive: 'Drive', bike: 'Bike', to: 'To', endRoute: 'End', howGo: 'How are you getting there?', routing: 'Working out the route…',
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
@@ -18014,7 +18032,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
     noEventsHere: 'No events here this week.', noEventsWeek: 'No events like that on the map this week.', noEventsSoon: 'No events like that on the map in the coming weeks.', ahead: 'Coming up',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
-    today: 'Today', until: 'until', onNow: 'On now', seasonClosed: '🍂 Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
+    today: 'Today', until: 'until', onNow: 'On now', seasonClosed: 'Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
   };
   var TYPES = CONF.t[FR ? 'fr' : 'en'];
   var mapEl = document.getElementById('okMap');
@@ -18153,7 +18171,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (g === 'tomorrow') return T.tomorrow + (times ? ' · ' + times : '');
     return dayText(e.sd) + (times ? ' · ' + times : '');
   }
-  function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + esc(st.text) + '</span>' : ''; }
+  function statusHtml(st){ return st ? '<span class="pm-st ' + (st.state === 'open' ? 'is-open' : 'is-closed') + '"><span class="pm-dot" aria-hidden="true"></span>' + (st.season ? '${uiIcon('leaf', 15, true)} ' : '') + esc(st.text) + '</span>' : ''; }
   function placeMeta(p){ return esc((TYPES[p.type] || '') + ' · ' + (CONF.r[p.region] || '') + (p.r ? ' · ★ ' + (FR ? p.r.toFixed(1).replace('.', ',') : p.r.toFixed(1)) : '') + (me ? ' · ' + T.km(p.d) : '')); }
   // What the place offers, the visitor's must-haves first (three at most, easy to read on the move); the dog rule when dogs matter.
   var FEAT_ORDER = ['patio', 'dogs', 'veg', 'vegan', 'gf', 'happy', 'music', 'lake', 'kids', 'late', 'early', 'groups', 'sports', 'nonalc'];
@@ -18486,7 +18504,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var r = route, on = !!(r && r.data && me && !me.pin);
     stage.classList.toggle('is-nav', on); navbar.hidden = !on;
     if (!on) { navbar.innerHTML = ''; return; }
-    var end = (SAY ? '<button type="button" class="pm-nav-end pm-nav-voice" id="pmNavVoice" aria-pressed="' + voiceOn + '" aria-label="' + esc(voiceOn ? T.voiceOn : T.voiceOff) + '">' + (voiceOn ? '🔊' : '🔇') + '</button>' : '')
+    var end = (SAY ? '<button type="button" class="pm-nav-end pm-nav-voice" id="pmNavVoice" aria-pressed="' + voiceOn + '" aria-label="' + esc(voiceOn ? T.voiceOn : T.voiceOff) + '">' + (voiceOn ? '${uiIcon('volume', 20, true)}' : '${uiIcon('mute', 20, true)}') + '</button>' : '')
       + '<button type="button" class="pm-nav-end" id="pmNavEnd" aria-label="' + esc(T.endRoute) + '">✕</button>';
     voiceCheck();
     if (r.arrived) { navbar.innerHTML = '<span class="pm-nav-arrow" aria-hidden="true">⚑</span><div class="pm-nav-text"><strong>' + esc(T.arrived) + '</strong><small>' + esc(r.x.name) + '</small></div>' + end; return; }
@@ -18692,7 +18710,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var xs = extras();
     tagHolder.innerHTML = xs.map(function(x){ return '<button type="button" class="pm-chip pm-tagchip" data-pm-x="' + esc(x.id) + '" aria-pressed="true" aria-label="' + esc(T.removeTag + ' ' + x.label) + '"><span aria-hidden="true">' + x.icon + '</span> ' + esc(x.label) + ' <b aria-hidden="true">✕</b></button>'; }).join('');
     var label = function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); }, uniq = function(a){ return a.filter(function(v, i){ return a.indexOf(v) === i; }); };
-    var parts = uniq([].concat(xs.map(function(x){ return x.icon + ' ' + x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
+    var parts = uniq([].concat(xs.map(function(x){ return x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
     badge.hidden = !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
@@ -18792,19 +18810,19 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   listEl.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-relax]'); if (!b) return;
     if (b.getAttribute('data-relax') === 'fit') { var ms = places.filter(matchesPlace).slice(0, 300); if (ms.length) { fitTo(L.latLngBounds(ms.map(function(p){ return [p.lat, p.lng]; })), 15); } return; }
     dropOne(b.getAttribute('data-relax')); if (b.getAttribute('data-relax') === 'term') searchEl.value = ''; liveBase = null; changed(); });
-  function kindLabel(k){ var c = kindChips.filter(function(x){ return x.getAttribute('data-pm-kind') === k; })[0]; return c ? c.textContent.replace(/^\\s+|\\s+$/g, '').replace(/^\\S+\\s+/, '') : k; }
+  function kindLabel(k){ var c = kindChips.filter(function(x){ return x.getAttribute('data-pm-kind') === k; })[0]; return c ? c.textContent.replace(/^\\s+|\\s+$/g, '') : k; }
   function featLabel(k){ return T.feat[k] || k; }
   function tagLabel(k){ var t = CONF.tg[TAGIX[k]]; return FR ? t.fr : t.en; }
   // Chips for what a sentence asked for that has no button of its own: what it serves, a town, a price, a time, and "no ...".
   function extras(){
-    var out = onTags().map(function(k){ return { id: 'tag:' + k, icon: CONF.tg[TAGIX[k]].i, label: tagLabel(k) }; });
-    if (town) out.push({ id: 'town', icon: '📍', label: T.inTown(CONF.r[town] || town) });
-    if (price) out.push({ id: 'price', icon: price === 'fancy' ? '💎' : '💲', label: T.priceLbl[price] });
-    if (atMin != null || atDay) out.push({ id: 'at', icon: '🕘', label: T.openAt(atMin != null ? clockText(atUntil ? atMin + 1 : atMin) : '', atDay === '+1' ? T.tomorrowW : atDay ? T.days[atDay] : '', atUntil) });
-    on(notTypes).forEach(function(k){ out.push({ id: 'noty:' + k, icon: '🚫', label: T.notLbl(String(TYPES[k] || k).toLowerCase()) }); });
-    on(notTags).forEach(function(k){ out.push({ id: 'nott:' + k, icon: '🚫', label: T.notLbl(tagLabel(k).toLowerCase()) }); });
-    on(notKinds).forEach(function(k){ out.push({ id: 'notk:' + k, icon: '🚫', label: T.notLbl(kindLabel(k).toLowerCase()) }); });
-    on(notFeats).forEach(function(k){ out.push({ id: 'notf:' + k, icon: '🚫', label: T.notLbl(featLabel(k).toLowerCase()) }); });
+    var out = onTags().map(function(k){ return { id: 'tag:' + k, icon: CONF.ic[CONF.tg[TAGIX[k]].i] || '', label: tagLabel(k) }; });
+    if (town) out.push({ id: 'town', icon: '${uiIcon('pin')}', label: T.inTown(CONF.r[town] || town) });
+    if (price) out.push({ id: 'price', icon: price === 'fancy' ? '${uiIcon('gem')}' : '${uiIcon('dollar')}', label: T.priceLbl[price] });
+    if (atMin != null || atDay) out.push({ id: 'at', icon: '${uiIcon('clock')}', label: T.openAt(atMin != null ? clockText(atUntil ? atMin + 1 : atMin) : '', atDay === '+1' ? T.tomorrowW : atDay ? T.days[atDay] : '', atUntil) });
+    on(notTypes).forEach(function(k){ out.push({ id: 'noty:' + k, icon: '${uiIcon('ban')}', label: T.notLbl(String(TYPES[k] || k).toLowerCase()) }); });
+    on(notTags).forEach(function(k){ out.push({ id: 'nott:' + k, icon: '${uiIcon('ban')}', label: T.notLbl(tagLabel(k).toLowerCase()) }); });
+    on(notKinds).forEach(function(k){ out.push({ id: 'notk:' + k, icon: '${uiIcon('ban')}', label: T.notLbl(kindLabel(k).toLowerCase()) }); });
+    on(notFeats).forEach(function(k){ out.push({ id: 'notf:' + k, icon: '${uiIcon('ban')}', label: T.notLbl(featLabel(k).toLowerCase()) }); });
     return out;
   }
   quickClear.addEventListener('click', clearAll);
@@ -19413,52 +19431,52 @@ const MAP_MUST_HAVES = [
 const MAP_HIKE_TEXT_RE = /\b(trails?|trailhead|hik(?:e|es|ing|ers?)|switchbacks?|summit|lookout|canyon|ridge|bluffs?|footpaths?|loop trail|regional park|provincial park|nature (?:park|reserve|trail)|waterfalls?|walkways?|linear park|greenway)\b/;
 const MAP_NOT_HIKE_NAME_RE = /\b(rinks?|arenas?|sports? (?:cent(?:re|er)|complex|field|park)|sportsplex|gardens?|playgrounds?|skate ?parks?|dog parks?|ball ?parks?|fields?|stadium|golf|tennis|pickleball|beach|marina|pool|splash|spray park|cemetery|disc golf|bike park|pump track|tube (?:park|town)|rv|adventure park|zip ?line)\b/;
 const MAP_TAGS = [
-  ['icecream', 'Ice cream', 'Crème glacée', '🍨', /\b(ice[ -]?cream|gelato|soft[ -]serve|frozen yog(h)?urt|sorbet)/, 'ice cream|icecream|gelato|soft serve|froyo|frozen yogurt|sorbet|glace|glaces|creme glacee|crème glacée', []],
-  ['cocktail', 'Cocktails', 'Cocktails', '🍸', /\b(cocktail|mixolog|martini|negroni)/, 'cocktail|cocktails|martini|martinis|mixology|negroni|negronis|margarita|margaritas', ['cocktail']],
-  ['sushi', 'Sushi', 'Sushi', '🍣', /\b(sushi|sashimi|omakase)/, 'sushi|sashimi|omakase', []],
-  ['pizza', 'Pizza', 'Pizza', '🍕', /\bpizz/, 'pizza|pizzas|pizzeria', []],
-  ['tacos', 'Tacos & Mexican', 'Tacos et mexicain', '🌮', /\b(taco|mexican|burrito|quesadilla)/, 'taco|tacos|mexican|burrito|burritos|quesadilla|quesadillas|mexicain', []],
-  ['burger', 'Burgers', 'Burgers', '🍔', /\bburger/, 'burger|burgers|cheeseburger|cheeseburgers', []],
-  ['brunch', 'Brunch', 'Brunch', '🥞', /\b(brunch|breakfast|eggs benedict|benny|pancake)/, 'brunch|breakfast|breaky|brekkie|benny|eggs benedict|pancakes|dejeuner|déjeuner', []],
-  ['steak', 'Steak', 'Steak', '🥩', /\bsteak/, 'steak|steaks|steakhouse', []],
-  ['fishchips', 'Fish & chips', 'Fish and chips', '🐟', /\bfish (and|&|n'?) chips/, 'fish and chips|fish chips|fish n chips|fish n\'chips', []],
-  ['seafood', 'Seafood', 'Fruits de mer', '🦪', /\b(seafood|oyster|salmon|prawn|mussel|lobster|crab)/, 'seafood|oyster|oysters|salmon|prawns|mussels|lobster|crab|fruits de mer|huitres|huîtres', []],
-  ['wings', 'Wings', 'Ailes de poulet', '🍗', /\bwings\b/, 'chicken wings|wings|ailes de poulet|ailes', []],
-  ['ramen', 'Ramen & noodles', 'Ramen et nouilles', '🍜', /\b(ramen|noodle|pho|udon)\b/, 'ramen|noodles|noodle|pho|udon|nouilles', []],
-  ['thai', 'Thai', 'Thaï', '🍛', /\bthai\b/, 'thai|thaï', []],
-  ['indian', 'Indian', 'Indien', '🍛', /\b(indian|curry|curries|tandoori|butter chicken)\b/, 'indian|curry|curries|tandoori|butter chicken|indien', []],
-  ['italian', 'Italian & pasta', 'Italien et pâtes', '🍝', /\b(italian|pasta)/, 'italian|pasta|italien|pates|pâtes', []],
-  ['chinese', 'Chinese & dim sum', 'Chinois et dim sum', '🥟', /\b(chinese|dim sum|dumpling)/, 'chinese|dim sum|dumplings|dumpling|chinois', []],
-  ['korean', 'Korean', 'Coréen', '🍲', /\bkorean/, 'korean|coreen|coréen', []],
-  ['greek', 'Greek & Mediterranean', 'Grec et méditerranéen', '🥙', /\b(greek|mediterranean|lebanese|shawarma|falafel|gyro|souvlaki)/, 'greek|mediterranean|lebanese|shawarma|falafel|gyro|gyros|souvlaki|grec', []],
-  ['bbq', 'BBQ', 'BBQ', '🍖', /\b(bbq|barbecue|smokehouse|brisket)\b/, 'bbq|barbecue|smokehouse|brisket|ribs', []],
-  ['poutine', 'Poutine', 'Poutine', '🍟', /\bpoutine/, 'poutine', []],
-  ['dessert', 'Dessert', 'Dessert', '🍰', /\b(dessert|cake|cheesecake|chocolat|pastr)/, 'dessert|desserts|sweets|sweet treat|treats|cake|cakes|cheesecake|chocolate|gateau|gâteau', []],
-  ['bakery', 'Bakery', 'Boulangerie', '🥐', /\b(baker|croissant|sourdough)/, 'bakery|bakeries|bread|croissant|croissants|pastry|pastries|boulangerie|viennoiseries', []],
-  ['donut', 'Donuts', 'Beignes', '🍩', /\b(donut|doughnut)/, 'donut|donuts|doughnut|doughnuts|beigne|beignes', []],
-  ['bubbletea', 'Bubble tea', 'Thé aux perles', '🧋', /\b(bubble tea|boba)/, 'bubble tea|boba', []],
-  ['smoothie', 'Smoothies & juice', 'Smoothies et jus', '🥤', /\b(smoothie|juice|acai)/, 'smoothie|smoothies|juice|juices|acai|jus', []],
-  ['sandwich', 'Sandwiches', 'Sandwichs', '🥪', /\b(sandwich|deli)\b/, 'sandwich|sandwiches|deli', []],
-  ['tapas', 'Tapas & small plates', 'Tapas', '🫒', /\b(tapas|small plates|sharing plates|charcuterie)/, 'tapas|small plates|sharing plates|charcuterie', []],
-  ['craftbeer', 'Craft beer', 'Bière artisanale', '🍻', /\b(craft beer|taproom|on tap|ipa)\b/, 'craft beer|craft beers|taproom|ipa|ipas|on tap', ['brewery']],
+  ['icecream', 'Ice cream', 'Crème glacée', 'cake', /\b(ice[ -]?cream|gelato|soft[ -]serve|frozen yog(h)?urt|sorbet)/, 'ice cream|icecream|gelato|soft serve|froyo|frozen yogurt|sorbet|glace|glaces|creme glacee|crème glacée', []],
+  ['cocktail', 'Cocktails', 'Cocktails', 'cocktail', /\b(cocktail|mixolog|martini|negroni)/, 'cocktail|cocktails|martini|martinis|mixology|negroni|negronis|margarita|margaritas', ['cocktail']],
+  ['sushi', 'Sushi', 'Sushi', 'food', /\b(sushi|sashimi|omakase)/, 'sushi|sashimi|omakase', []],
+  ['pizza', 'Pizza', 'Pizza', 'food', /\bpizz/, 'pizza|pizzas|pizzeria', []],
+  ['tacos', 'Tacos & Mexican', 'Tacos et mexicain', 'food', /\b(taco|mexican|burrito|quesadilla)/, 'taco|tacos|mexican|burrito|burritos|quesadilla|quesadillas|mexicain', []],
+  ['burger', 'Burgers', 'Burgers', 'food', /\bburger/, 'burger|burgers|cheeseburger|cheeseburgers', []],
+  ['brunch', 'Brunch', 'Brunch', 'food', /\b(brunch|breakfast|eggs benedict|benny|pancake)/, 'brunch|breakfast|breaky|brekkie|benny|eggs benedict|pancakes|dejeuner|déjeuner', []],
+  ['steak', 'Steak', 'Steak', 'food', /\bsteak/, 'steak|steaks|steakhouse', []],
+  ['fishchips', 'Fish & chips', 'Fish and chips', 'food', /\bfish (and|&|n'?) chips/, 'fish and chips|fish chips|fish n chips|fish n\'chips', []],
+  ['seafood', 'Seafood', 'Fruits de mer', 'food', /\b(seafood|oyster|salmon|prawn|mussel|lobster|crab)/, 'seafood|oyster|oysters|salmon|prawns|mussels|lobster|crab|fruits de mer|huitres|huîtres', []],
+  ['wings', 'Wings', 'Ailes de poulet', 'food', /\bwings\b/, 'chicken wings|wings|ailes de poulet|ailes', []],
+  ['ramen', 'Ramen & noodles', 'Ramen et nouilles', 'food', /\b(ramen|noodle|pho|udon)\b/, 'ramen|noodles|noodle|pho|udon|nouilles', []],
+  ['thai', 'Thai', 'Thaï', 'food', /\bthai\b/, 'thai|thaï', []],
+  ['indian', 'Indian', 'Indien', 'food', /\b(indian|curry|curries|tandoori|butter chicken)\b/, 'indian|curry|curries|tandoori|butter chicken|indien', []],
+  ['italian', 'Italian & pasta', 'Italien et pâtes', 'food', /\b(italian|pasta)/, 'italian|pasta|italien|pates|pâtes', []],
+  ['chinese', 'Chinese & dim sum', 'Chinois et dim sum', 'food', /\b(chinese|dim sum|dumpling)/, 'chinese|dim sum|dumplings|dumpling|chinois', []],
+  ['korean', 'Korean', 'Coréen', 'food', /\bkorean/, 'korean|coreen|coréen', []],
+  ['greek', 'Greek & Mediterranean', 'Grec et méditerranéen', 'food', /\b(greek|mediterranean|lebanese|shawarma|falafel|gyro|souvlaki)/, 'greek|mediterranean|lebanese|shawarma|falafel|gyro|gyros|souvlaki|grec', []],
+  ['bbq', 'BBQ', 'BBQ', 'food', /\b(bbq|barbecue|smokehouse|brisket)\b/, 'bbq|barbecue|smokehouse|brisket|ribs', []],
+  ['poutine', 'Poutine', 'Poutine', 'food', /\bpoutine/, 'poutine', []],
+  ['dessert', 'Dessert', 'Dessert', 'cake', /\b(dessert|cake|cheesecake|chocolat|pastr)/, 'dessert|desserts|sweets|sweet treat|treats|cake|cakes|cheesecake|chocolate|gateau|gâteau', []],
+  ['bakery', 'Bakery', 'Boulangerie', 'cake', /\b(baker|croissant|sourdough)/, 'bakery|bakeries|bread|croissant|croissants|pastry|pastries|boulangerie|viennoiseries', []],
+  ['donut', 'Donuts', 'Beignes', 'cake', /\b(donut|doughnut)/, 'donut|donuts|doughnut|doughnuts|beigne|beignes', []],
+  ['bubbletea', 'Bubble tea', 'Thé aux perles', 'coffee', /\b(bubble tea|boba)/, 'bubble tea|boba', []],
+  ['smoothie', 'Smoothies & juice', 'Smoothies et jus', 'juice', /\b(smoothie|juice|acai)/, 'smoothie|smoothies|juice|juices|acai|jus', []],
+  ['sandwich', 'Sandwiches', 'Sandwichs', 'food', /\b(sandwich|deli)\b/, 'sandwich|sandwiches|deli', []],
+  ['tapas', 'Tapas & small plates', 'Tapas', 'food', /\b(tapas|small plates|sharing plates|charcuterie)/, 'tapas|small plates|sharing plates|charcuterie', []],
+  ['craftbeer', 'Craft beer', 'Bière artisanale', 'beer', /\b(craft beer|taproom|on tap|ipa)\b/, 'craft beer|craft beers|taproom|ipa|ipas|on tap', ['brewery']],
   // Map search (2026-10-19, round 8): "brewery" and "cider" each find their own places. Both read as Drinks before, so
   // either one listed the same 300 pubs, wineries and lounges. Cideries are filed as breweries, so a brewery is one
   // whose name is not a cider maker's (or any place named for brewing); a cidery is one named for cider, or a
   // brewery, winery or distillery that says it makes cider.
-  ['brewery', 'Breweries', 'Brasseries', '🍺', /\b(brewery|breweries|brewing|brewhouse|brew pub|brewpub|brew co)\b/, 'brewery|breweries|brewpub|brewpubs|brew pub|brew pubs|brasserie|brasseries|microbrasserie|microbrasseries|microbrewery|microbreweries', [],
+  ['brewery', 'Breweries', 'Brasseries', 'beer', /\b(brewery|breweries|brewing|brewhouse|brew pub|brewpub|brew co)\b/, 'brewery|breweries|brewpub|brewpubs|brew pub|brew pubs|brasserie|brasseries|microbrasserie|microbrasseries|microbrewery|microbreweries', [],
     (v, name) => (v.type === 'brewery' && !/\b(cider|cidery|ciderie|cidrerie)\b/.test(name)) || /\b(brewery|brewing|brewhouse|brew ?pub|brew co)\b/.test(name)],
-  ['cider', 'Cideries', 'Cidreries', '🍏', /\b(cider|ciders|cidery|cideries|ciderie|cidrerie)\b/, 'cider|ciders|cidery|cideries|ciderie|cidre|cidres|cidrerie|cidreries|hard cider', [],
+  ['cider', 'Cideries', 'Cidreries', 'beer', /\b(cider|ciders|cidery|cideries|ciderie|cidrerie)\b/, 'cider|ciders|cidery|cideries|ciderie|cidre|cidres|cidrerie|cidreries|hard cider', [],
     (v, name, text) => /\b(cider|cidery|ciderie|cidrerie)\b/.test(name) || (['brewery', 'winery', 'distillery'].includes(v.type) && /\b(cider|ciders|cidery)\b/.test(text))],
-  ['winebar', 'Wine bar', 'Bar à vin', '🍷', /\b(wine bar|wine list|by the glass)/, 'wine bar|wine list|bar a vin|bar à vin', []],
-  ['datenight', 'Date night', 'Soirée en amoureux', '🕯️', /\b(romantic|date night|intimate|candlelit|anniversar)/, 'date night|date|romantic|anniversary|romantique', []],
-  ['sunset', 'Sunset views', 'Coucher de soleil', '🌅', /\bsunset/, 'sunset|sunsets|coucher de soleil', []],
-  ['games', 'Games & pool', 'Jeux et billard', '🎱', /\b(arcade|pool table|billiard|board game|darts|bowling|shuffleboard|trivia|karaoke)/, 'games|arcade|pool|billiards|darts|bowling|shuffleboard|trivia|karaoke|jeux|billard', []],
-  ['salad', 'Salads & bowls', 'Salades et bols', '🥗', /\b(salad|poke|bowls?)\b/, 'salad|salads|poke|bowl|bowls|salade|salades', []],
-  ['crepes', 'Crêpes & waffles', 'Crêpes et gaufres', '🧇', /\b(cr[eê]pe|waffle)/, 'crepe|crepes|crêpe|crêpes|waffle|waffles|gaufre|gaufres', []],
-  ['specialty', 'Specialty coffee', 'Café de spécialité', '☕', /\b(roaster|pour[ -]over|specialty coffee|espresso)/, 'specialty coffee|pour over|roaster|espresso', []],
+  ['winebar', 'Wine bar', 'Bar à vin', 'wine', /\b(wine bar|wine list|by the glass)/, 'wine bar|wine list|bar a vin|bar à vin', []],
+  ['datenight', 'Date night', 'Soirée en amoureux', 'heart', /\b(romantic|date night|intimate|candlelit|anniversar)/, 'date night|date|romantic|anniversary|romantique', []],
+  ['sunset', 'Sunset views', 'Coucher de soleil', 'sunrise', /\bsunset/, 'sunset|sunsets|coucher de soleil', []],
+  ['games', 'Games & pool', 'Jeux et billard', 'target', /\b(arcade|pool table|billiard|board game|darts|bowling|shuffleboard|trivia|karaoke)/, 'games|arcade|pool|billiards|darts|bowling|shuffleboard|trivia|karaoke|jeux|billard', []],
+  ['salad', 'Salads & bowls', 'Salades et bols', 'leaf', /\b(salad|poke|bowls?)\b/, 'salad|salads|poke|bowl|bowls|salade|salades', []],
+  ['crepes', 'Crêpes & waffles', 'Crêpes et gaufres', 'cake', /\b(cr[eê]pe|waffle)/, 'crepe|crepes|crêpe|crêpes|waffle|waffles|gaufre|gaufres', []],
+  ['specialty', 'Specialty coffee', 'Café de spécialité', 'coffee', /\b(roaster|pour[ -]over|specialty coffee|espresso)/, 'specialty coffee|pour over|roaster|espresso', []],
   // Round 12 (2026-10-20): "hike" / « randonnée » read as every Outdoors place, so the nearest were a garden, an outdoor
   // rink and a sports centre. A hike is an outdoor place with trails, never a rink, garden, field or sports centre.
-  ['hiking', 'Hiking & trails', 'Randonnée et sentiers', '🥾', MAP_HIKE_TEXT_RE, 'hike|hikes|hiking|hiking trail|hiking trails|trail|trails|randonnee|randonnée|randonnées|randonnees|rando|sentier|sentiers|sentier de randonnée', [],
+  ['hiking', 'Hiking & trails', 'Randonnée et sentiers', 'mountain', MAP_HIKE_TEXT_RE, 'hike|hikes|hiking|hiking trail|hiking trails|trail|trails|randonnee|randonnée|randonnées|randonnees|rando|sentier|sentiers|sentier de randonnée', [],
     // Round 13 (2026-10-20): "hikes" near a town centre found 4 places. A place on the Hiking & Trails list
     // (/outdoors/hiking, the activity_hiking collection, beaches with trails too) counts as well; still never a rink,
     // garden or field. So does a regional or provincial park filed as a beach whose listing names its trails (Kalamoir,
@@ -19653,6 +19671,8 @@ function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const conf = JSON.stringify({ src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
     k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: { ...Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])), specials: MAP_SPECIALS_BIT },
     tg: MAP_TAGS.map((t) => ({ k: t.key, en: t.en, fr: t.fr, i: t.icon, s: t.say, t: t.types })),
+    // The food types' line icons, once each (the tags carry only the icon's name).
+    ic: Object.fromEntries([...new Set(MAP_TAGS.map((t) => t.icon))].map((n) => [n, uiIcon(n)])),
     // Directions on our own map (2026-10-14): a public Mapbox token (pk.), locked to okanaganroam.com in Mapbox. Without
     // one, Directions opens Google or Apple Maps as before.
     mb: /^pk\.[A-Za-z0-9._-]+$/.test(String(process.env.MAPBOX_TOKEN || '')) ? process.env.MAPBOX_TOKEN : '' }).replace(/</g, '\\u003c');
@@ -21593,7 +21613,7 @@ function outdoorsFilterBarHtml(venues, state = {}) {
   const nRegions = (state.selectedRegions || []).length;
   return `<div class="outdoors-controls">
     <div class="outdoors-pop">
-      <button type="button" class="outdoors-pop-btn" id="outdoorRegionsBtn" aria-expanded="false" aria-controls="outdoorRegionsPanel"><span class="outdoors-pop-icon" aria-hidden="true">&#128205;</span> Regions<span class="outdoors-pop-count" id="outdoorRegionsCount"${nRegions ? '' : ' hidden'}>${nRegions ? ` · ${nRegions}` : ''}</span></button>
+      <button type="button" class="outdoors-pop-btn" id="outdoorRegionsBtn" aria-expanded="false" aria-controls="outdoorRegionsPanel"><span class="outdoors-pop-icon" aria-hidden="true">${uiIcon('pin')}</span> Regions<span class="outdoors-pop-count" id="outdoorRegionsCount"${nRegions ? '' : ' hidden'}>${nRegions ? ` · ${nRegions}` : ''}</span></button>
       <div class="outdoors-pop-panel" id="outdoorRegionsPanel" hidden>${renderOutdoorRegionFilterChips(venues, state)}
         <div class="outdoors-pop-actions"><button type="button" class="outdoors-pop-apply" data-outdoors-apply>Show results</button></div>
       </div>
@@ -22266,23 +22286,23 @@ const FD_HUB_TYPES = [
 // Wineries are deliberately absent: they are their own section with their own
 // /wineries hub, and duplicating them here would split that directory.
 const FD_HUB_FEATURES = [
-  { key: 'patio', label: 'Patio', icon: '☀️' },
-  { key: 'dog_friendly', label: 'Dog Friendly', icon: '🐕' },
-  { key: 'kid_friendly', label: 'Kid Friendly', icon: '👶' },
-  { key: 'vegetarian', label: 'Vegetarian Options', icon: '🥗' },
-  { key: 'vegan', label: 'Vegan Options', icon: '🌱' },
-  { key: 'gluten_free', label: 'Gluten-Free Options', icon: '🌾' },
-  { key: 'live_music', label: 'Live Music', icon: '🎵' },
-  { key: 'lake_view', label: 'Lake View', icon: '🌊' },
-  { key: 'great_groups', label: 'Great for Groups', icon: '👥' },
-  { key: 'happy_hour', label: 'Happy Hour', icon: '🍸' },
-  { key: 'open_early', label: 'Open Early', icon: '🌅' },
-  { key: 'open_late', label: 'Open Late', icon: '🌙' },
-  { key: 'sports_tv', label: 'Sports on TV', icon: '📺' },
-  { key: 'nonalcoholic', label: 'Non-Alcoholic Options', icon: '🥤' },
+  { key: 'patio', label: 'Patio', icon: uiIcon('sun', 15, true) },
+  { key: 'dog_friendly', label: 'Dog Friendly', icon: uiIcon('paw', 15, true) },
+  { key: 'kid_friendly', label: 'Kid Friendly', icon: uiIcon('child', 15, true) },
+  { key: 'vegetarian', label: 'Vegetarian Options', icon: uiIcon('leaf', 15, true) },
+  { key: 'vegan', label: 'Vegan Options', icon: uiIcon('sprout', 15, true) },
+  { key: 'gluten_free', label: 'Gluten-Free Options', icon: uiIcon('wheat', 15, true) },
+  { key: 'live_music', label: 'Live Music', icon: uiIcon('music', 15, true) },
+  { key: 'lake_view', label: 'Lake View', icon: uiIcon('waves', 15, true) },
+  { key: 'great_groups', label: 'Great for Groups', icon: uiIcon('group', 15, true) },
+  { key: 'happy_hour', label: 'Happy Hour', icon: uiIcon('cocktail', 15, true) },
+  { key: 'open_early', label: 'Open Early', icon: uiIcon('sunrise', 15, true) },
+  { key: 'open_late', label: 'Open Late', icon: uiIcon('moon', 15, true) },
+  { key: 'sports_tv', label: 'Sports on TV', icon: uiIcon('tv', 15, true) },
+  { key: 'nonalcoholic', label: 'Non-Alcoholic Options', icon: uiIcon('juice', 15, true) },
   // Things-to-do badges (2026-10-19): only offered where a page asks for them (onlyKeys), never on food pages.
-  { key: 'free_entry', label: 'Free to Visit', icon: '🎟️' },
-  { key: 'arts_culture', label: 'Arts & Culture', icon: '🎨' },
+  { key: 'free_entry', label: 'Free to Visit', icon: uiIcon('ticket', 15, true) },
+  { key: 'arts_culture', label: 'Arts & Culture', icon: uiIcon('palette', 15, true) },
 ];
 const FD_HUB_FEATURE_KEYS = new Set(FD_HUB_FEATURES.map((f) => f.key));
 // How many cards are in the render tree at a time. 75 keeps the initial page
@@ -22748,7 +22768,7 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
   return { byId, openIds };
 }
 function foodDrinkOpenNowToggleHtml(on, count) {
-  return `<button type="button" class="fd-pop-btn fd-open-toggle" id="fdOpenNow" data-fd-open-now aria-pressed="${on ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">🕒</span> Open now<span class="outdoor-activity-count" id="fdOpenNowCount">${count}</span></button>`;
+  return `<button type="button" class="fd-pop-btn fd-open-toggle" id="fdOpenNow" data-fd-open-now aria-pressed="${on ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('clock')}</span> Open now<span class="outdoor-activity-count" id="fdOpenNowCount">${count}</span></button>`;
 }
 // Emitted only by the /food-drink hub, so the destination category pages
 // (which share renderFoodDrinkHubStyles) are unchanged.
@@ -22838,7 +22858,7 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null) {
     if (!scopeFeatures.length) return '';
     return `<div class="fd-controls">
     <div class="fd-pop">
-      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">✨</span> <span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span><span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
+      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('sparkle')}</span> <span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span><span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
       <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
@@ -22852,8 +22872,8 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null) {
       </div>
     </div>`;
   return `<div class="fd-controls">
-    ${pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '✨', nF || '', foodDrinkFeatureChipsHtml(state))}
-    ${pop('fdRegions', 'Regions', '📍', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
+    ${pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state))}
+    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
   </div>`;
 }
 // Removable active-filter tags, one row per group, plus Clear all.
@@ -24166,8 +24186,8 @@ function renderWineriesHubPage(venues, filter = null, now = new Date()) {
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
-    ${pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys))}
+    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
+    ${pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys))}
     ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
   </div>`;
   // The town pages, busiest first, for visitors and crawlers alike.
@@ -24386,8 +24406,8 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
   </div>`;
   const expLinks = INDOOR_EXPERIENCES.map((e) => `<a href="/indoor/${e.slug}">${escapeHtml(e.label)} <span>${counts.types[e.slug] || 0}</span></a>`).join('\n      ');
@@ -24582,8 +24602,8 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
   </div>`;
   const activityLinks = SPORT_ACTIVITIES.map((a) => `<a href="/sports/${a.slug}">${escapeHtml(a.label)} <span>${counts.types[a.slug] || 0}</span></a>`).join('\n      ');
   const townCounts = {};
@@ -24714,9 +24734,9 @@ const DOG_HUB_VENUE_TYPES = [...FOOD_DRINK_TYPES, 'winery', 'beach'];
 // selecting a feature legitimately narrows to the "bring your dog along"
 // side; the contextual counts say so rather than promising otherwise.
 const DOG_HUB_FEATURES = [
-  { key: 'patio', label: 'Patio', icon: '\u2600\uFE0F' },
-  { key: 'lake_view', label: 'Lake View', icon: '\uD83C\uDF0A' },
-  { key: 'great_groups', label: 'Great for Groups', icon: '\uD83D\uDC65' },
+  { key: 'patio', label: 'Patio', icon: uiIcon('sun', 15, true) },
+  { key: 'lake_view', label: 'Lake View', icon: uiIcon('waves', 15, true) },
+  { key: 'great_groups', label: 'Great for Groups', icon: uiIcon('group', 15, true) },
 ];
 const DOG_HUB_FEATURE_KEYS = new Set(DOG_HUB_FEATURES.map((f) => f.key));
 const DOG_HUB_LABEL_BY_TYPE = Object.fromEntries(DOG_HUB_TYPES.map((t) => [t.type, t.label]));
@@ -24861,8 +24881,8 @@ function dogFilterBarHtml(venues, state = {}) {
       </div>
     </div>`;
   return `<div class="fd-controls">
-    ${pop('dogFeatures', 'What are you looking for?', '\u2728', nF || '', dogFeatureChipsHtml(state))}
-    ${pop('dogRegions', 'Regions', '\uD83D\uDCCD', nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
+    ${pop('dogFeatures', 'What are you looking for?', uiIcon('sparkle'), nF || '', dogFeatureChipsHtml(state))}
+    ${pop('dogRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
   </div>`;
 }
 function dogSelectedTagsHtml(state = {}) {
@@ -25309,8 +25329,8 @@ function renderDogHubPage(venues, filter = null, now = new Date()) {
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
   </div>`;
   const typeLabels = Object.fromEntries(DOG_HUB_TYPES.map((t) => [t.type, t.label]));
@@ -25557,7 +25577,7 @@ function localFavouritesFilterBarHtml(venues, state = {}) {
   const nR = (state.regions || []).length;
   return `<div class="fd-controls">
     <div class="fd-pop">
-      <button type="button" class="fd-pop-btn" id="lfRegionsBtn" aria-expanded="false" aria-controls="lfRegionsPanel"><span class="fd-pop-icon" aria-hidden="true">\uD83D\uDCCD</span> Regions<span class="fd-pop-count" id="lfRegionsCount"${nR ? '' : ' hidden'}>${nR ? ` \u00b7 ${nR}` : ''}</span></button>
+      <button type="button" class="fd-pop-btn" id="lfRegionsBtn" aria-expanded="false" aria-controls="lfRegionsPanel"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('pin')}</span> Regions<span class="fd-pop-count" id="lfRegionsCount"${nR ? '' : ' hidden'}>${nR ? ` \u00b7 ${nR}` : ''}</span></button>
       <div class="fd-pop-panel" id="lfRegionsPanel" hidden>${renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts })}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-lf-apply>Show results</button></div>
       </div>
@@ -26126,8 +26146,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     </div>`;
   // A one-town page (cfg.region) has no Regions control.
   const controlsHtml = `<div class="fd-controls">
-    ${cfg.region ? '' : pop('fdRegions', 'Regions', '\u{1F4CD}', nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', '\u2728', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${cfg.region ? '' : pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${cfg.openNow ? foodDrinkOpenNowToggleHtml(openNowOn, openCount) : ''}
   </div>`;
   const typeLabels = Object.fromEntries(allTypes.map((t) => [t.type, t.label]));
@@ -27034,14 +27054,14 @@ function whatsOnFilterBarHtml(state = {}) {
       </div>
     </div>`;
   const townPop = state.town ? `<div class="whatson-pop">
-      <button type="button" class="whatson-pop-btn" id="whatsOnTownsBtn" aria-expanded="false" aria-controls="whatsOnTownsPanel"><span class="whatson-pop-icon" aria-hidden="true">&#128205;</span> ${escapeHtml(REGION_LABELS[state.town])} <span class="whatson-pop-change">· change town</span></button>
+      <button type="button" class="whatson-pop-btn" id="whatsOnTownsBtn" aria-expanded="false" aria-controls="whatsOnTownsPanel"><span class="whatson-pop-icon" aria-hidden="true">${uiIcon('pin')}</span> ${escapeHtml(REGION_LABELS[state.town])} <span class="whatson-pop-change">· change town</span></button>
       <div class="whatson-pop-panel" id="whatsOnTownsPanel" hidden>
       ${whatsOnTownLinksHtml(state.town, state.townCounts || {})}
       </div>
     </div>` : '';
   return `<div class="whatson-controls">
-    ${state.town ? townPop : pop('whatsOnRegions', 'Regions', '&#128205;', nRegions || '', whatsOnRegionChipsHtml(state))}
-    ${state.hasInventory ? pop('whatsOnDate', 'Date', '&#128197;', dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true, basePath: state.basePath })) : ''}
+    ${state.town ? townPop : pop('whatsOnRegions', 'Regions', uiIcon('pin'), nRegions || '', whatsOnRegionChipsHtml(state))}
+    ${state.hasInventory ? pop('whatsOnDate', 'Date', uiIcon('calendar'), dateActive ? '1' : '', whatsOnDateStepHtml({ window: state.window, compact: true, basePath: state.basePath })) : ''}
   </div>`;
 }
 
@@ -34068,14 +34088,14 @@ function browseFilterBarHtml(venues, cuisines, state = {}, openCount = 0) {
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-bh-apply>Show results</button></div>
       </div>
     </div>`;
-  const nearMe = `<div class="bh-near-me"><button type="button" class="outdoor-filter-chip bh-near-me-btn" id="bhNearMe">\ud83d\udccd Use my location</button><span class="bh-near-me-status" id="bhNearMeStatus" role="status" aria-live="polite" hidden></span></div>`;
+  const nearMe = `<div class="bh-near-me"><button type="button" class="outdoor-filter-chip bh-near-me-btn" id="bhNearMe">${uiIcon('pin', 15, true)} Use my location</button><span class="bh-near-me-status" id="bhNearMeStatus" role="status" aria-live="polite" hidden></span></div>`;
   return `<div class="fd-controls">
-    ${pop('bhFeatures', 'What matters to you?', '\u2728', nF || '', browseFeatureChipsHtml(state))}
-    ${pop('bhRegions', 'Regions', '\ud83d\udccd', nR || '', nearMe + renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
-    ${pop('bhMore', 'Cuisine &amp; price', '\ud83c\udf7d\ufe0f', nM || '', browseCuisinePriceHtml(cuisines, state))}
-    <button type="button" class="fd-pop-btn fd-open-toggle" id="bhOpenNow" aria-pressed="${state.openNow ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">\ud83d\udd52</span> Open now<span class="outdoor-activity-count" id="bhOpenNowCount">${openCount}</span></button>
-    <button type="button" class="fd-pop-btn bh-fav-toggle" id="bhFavOnly" aria-pressed="${state.fav ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">\u2665</span> My favourites</button>
-    <a class="fd-pop-btn bh-map-link" id="bhMapLink" href="/map"><span class="fd-pop-icon" aria-hidden="true">\ud83d\udccd</span> Roam Now</a>
+    ${pop('bhFeatures', 'What matters to you?', uiIcon('sparkle'), nF || '', browseFeatureChipsHtml(state))}
+    ${pop('bhRegions', 'Regions', uiIcon('pin'), nR || '', nearMe + renderOutdoorRegionFilterChips(venues, { selectedRegions: state.regions || [], counts: state.counts }))}
+    ${pop('bhMore', 'Cuisine &amp; price', uiIcon('food'), nM || '', browseCuisinePriceHtml(cuisines, state))}
+    <button type="button" class="fd-pop-btn fd-open-toggle" id="bhOpenNow" aria-pressed="${state.openNow ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('clock')}</span> Open now<span class="outdoor-activity-count" id="bhOpenNowCount">${openCount}</span></button>
+    <button type="button" class="fd-pop-btn bh-fav-toggle" id="bhFavOnly" aria-pressed="${state.fav ? 'true' : 'false'}"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('heart')}</span> My favourites</button>
+    <a class="fd-pop-btn bh-map-link" id="bhMapLink" href="/map"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('pin')}</span> Roam Now</a>
   </div>`;
 }
 function browseSelectedTagsHtml(state = {}) {
@@ -34553,13 +34573,13 @@ function bhStart(){
         chip.appendChild(span);
       });
       nearBtn.disabled = false;
-      nearBtn.textContent = '\\ud83d\\udccd Use my location';
+      nearBtn.innerHTML = '${uiIcon('pin', 15, true)} Use my location';
       nearSay('Closest: ' + (LABELS.regions[closest] || closest) + ' \\u2014 selected below.');
       var target = regionChips.filter(function(c){ return c.getAttribute('data-region') === closest; })[0];
       if (target && target.getAttribute('aria-pressed') !== 'true') target.click();
     }, function(err){
       nearBtn.disabled = false;
-      nearBtn.textContent = '\\ud83d\\udccd Use my location';
+      nearBtn.innerHTML = '${uiIcon('pin', 15, true)} Use my location';
       nearSay(err && err.code === 1 ? 'Location access was denied \\u2014 you can still pick a region manually.' : 'Couldn\\u2019t determine your location right now.');
     }, { timeout: 10000 });
   });
