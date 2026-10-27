@@ -50262,7 +50262,8 @@ const server = http.createServer(async (req, res) => {
         const r = m[2] === 'approve' ? approveOwnerPhoto(id, reviewer, { main: typeof body.main === 'boolean' ? body.main : undefined })
           : m[2] === 'remove' ? removeOwnerPhoto(id, reviewer, body.reason) : m[2] === 'dismiss' ? dismissOwnerPhoto(id) : rejectOwnerPhoto(id, reviewer, body.reason);
         if (!r.ok) return sendJSON(res, { not_found: 404, not_pending: 409, venue_unavailable: 409, file_missing: 410 }[r.reason] || 400, { error: r.reason, status: r.status });
-        const emailed = m[2] === 'dismiss' ? 'not_told' : await notifyReviewDecision('photo', id, m[2], { reason: body.reason });
+        // notify: false (2026-10-26): tidying our own uploads (a duplicate set) emails nobody.
+        const emailed = m[2] === 'dismiss' || body.notify === false ? 'not_told' : await notifyReviewDecision('photo', id, m[2], { reason: body.reason });
         return sendJSON(res, 200, { id, ...r, emailed });
       }
     }

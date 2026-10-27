@@ -20982,6 +20982,12 @@ test('Owner portal: signed-in owners publish photos straight away; link uploads 
     assert.equal((await fetch(`${base}/images/owner/${row.file}`)).status, 404);
     assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, null);
     assert.equal(nodeFs.existsSync(nodePath.join(app.OWNER_PHOTO_DIR, row.file)), false);
+    // notify: false (2026-10-26): removing a duplicate we uploaded ourselves emails nobody.
+    const before = sentEmails.length;
+    const quiet = await post(`/admin/owner-photos/${second.body.id}/remove`, { reviewer: 'test', reason: 'duplicate', notify: false });
+    assert.equal(quiet.status, 200, JSON.stringify(quiet.body));
+    assert.equal(quiet.body.emailed, 'not_told');
+    assert.equal(sentEmails.length, before);
   } finally {
     // Back to the suite's capturing transport (null would mean real FormSubmit email).
     app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
