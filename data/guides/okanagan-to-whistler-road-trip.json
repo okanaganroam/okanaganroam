@@ -1,0 +1,124 @@
+{
+ "heading": "The Okanagan to Whistler: the road trip via the Duffey Lake Road",
+ "title": "Okanagan to Whistler Road Trip: Stops on the Way | Okanagan Roam",
+ "description": "Drive from Kelowna to Whistler through Vernon and over the Duffey Lake Road: where to eat, stop for a view and stretch your legs, plus winter road tips.",
+ "banner": "region-coldstream",
+ "parent": {
+  "name": "Guides",
+  "href": "/guides"
+ },
+ "noPlace": true,
+ "intro": [
+  "One of the most scenic ways from the Okanagan to Whistler heads north first. Highway 97 runs up the valley past Lake Country and Kalamalka Lake to Vernon, turns west at Swan Lake toward Kamloops and Cache Creek, then Highway 99 climbs through Lillooet and over the Duffey Lake Road to Pemberton and Whistler. Without stops it is roughly six hours from Kelowna. Map apps may suggest the Okanagan Connector and Merritt instead, which skips Vernon; this guide takes the valley way.",
+  "This guide covers the Okanagan end of the drive: breakfast before you leave Kelowna, the lake views on the way north and a last coffee in Vernon. BC requires winter tires on most of this route from October 1 to April 30, and the Duffey Lake Road is narrow and steep in places, so check DriveBC before you set off. If you'd like a plan for your first days in the valley instead, the {page:/trip|trip planner} can make one for you."
+ ],
+ "sections": [
+  {
+   "id": "leaving-kelowna",
+   "jump": "Leaving Kelowna",
+   "heading": "Leaving Kelowna",
+   "items": [
+    {
+     "ref": "kelowna/bread-company",
+     "name": "Bread Company",
+     "text": "a long-running Bernard Ave bakery and breakfast spot. Grab a chocolate or pizza croissant for the road."
+    },
+    {
+     "ref": "kelowna/sprout-bread",
+     "name": "Sprout Bread",
+     "text": "excellent coffee and fresh-baked pastries, a good last stop in town before the highway north. Expect a lineup."
+    }
+   ]
+  },
+  {
+   "id": "lake-country-kalamalka",
+   "jump": "Lake Country and Kalamalka Lake",
+   "heading": "Lake Country and Kalamalka Lake",
+   "items": [
+    {
+     "ref": "lake-country/the-jammery",
+     "name": "The Jammery",
+     "text": "an all-day breakfast and brunch spot on the highway, famous for its scones with Devonshire cream. Easy to pull in, and a proper meal if you skipped breakfast."
+    },
+    {
+     "ref": "coldstream/kalamalka-lake-lookout-highway-97-rest-area",
+     "name": "Kalamalka Lake Lookout",
+     "text": "the classic drive-up view of the \"lake of many colours\", which shifts from turquoise to jade to deep blue. A free rest area with picnic tables facing the water, made for a five-minute stop."
+    },
+    {
+     "ref": "coldstream/kalamalka-lake-provincial-park-trails-rattlesnake-point",
+     "name": "Kalamalka Lake Provincial Park",
+     "text": "if you have an hour, short grassland and forest trails lead to the viewing platform at Rattlesnake Point, high above the lake. It is a short detour from Vernon."
+    }
+   ]
+  },
+  {
+   "id": "vernon",
+   "jump": "Vernon",
+   "heading": "A last stop in Vernon",
+   "items": [
+    {
+     "ref": "vernon/ratio-coffee-pastry",
+     "name": "Ratio Coffee & Pastry",
+     "text": "coffee roasted in house, served in a converted rail station. A good place to fill a travel mug before the long stretch west."
+    },
+    {
+     "ref": "vernon/two-donkeys-bakery",
+     "name": "Two Donkeys Bakery",
+     "text": "a scratch bakery best known for its sourdough, with gluten-free options. Take a loaf along for the cabin."
+    },
+    {
+     "ref": "vernon/okanagan-spirits-craft-distillery-vernon",
+     "name": "Okanagan Spirits Craft Distillery (Vernon)",
+     "text": "pick up a bottle of Okanagan gin or whisky to bring to Whistler. If you are the driver, save the tasting for another trip."
+    },
+    {
+     "lead": "After Vernon",
+     "tip": "Highway 97 leaves the valley at Swan Lake, just north of Vernon, and heads west through Falkland to Kamloops. Fill up before you go: towns are farther apart from here, and the Duffey Lake Road has no services between Lillooet and Pemberton."
+    }
+   ]
+  }
+ ],
+ "table": {
+  "id": "quick-picks",
+  "jump": "Quick picks",
+  "heading": "Quick picks",
+  "head": [
+   "If you want…",
+   "Go to"
+  ],
+  "rows": [
+   [
+    "Pastries for the road",
+    [
+     "kelowna/bread-company|Bread Company"
+    ]
+   ],
+   [
+    "A sit-down breakfast",
+    [
+     "lake-country/the-jammery|The Jammery"
+    ]
+   ],
+   [
+    "The famous lake view",
+    [
+     "coldstream/kalamalka-lake-lookout-highway-97-rest-area|Kalamalka Lake Lookout"
+    ]
+   ],
+   [
+    "A last coffee",
+    [
+     "vernon/ratio-coffee-pastry|Ratio Coffee & Pastry"
+    ]
+   ],
+   [
+    "A gift for your hosts",
+    [
+     "vernon/okanagan-spirits-craft-distillery-vernon|Okanagan Spirits Craft Distillery"
+    ]
+   ]
+  ]
+ },
+ "footerHtml": "<strong>At the other end:</strong> our sister site <a href=\"https://whistlerroam.com/\">Whistler Roam</a> covers Whistler, Squamish, Pemberton and the whole Sea to Sky: restaurants, trails, ski days and what’s open now, plus the stops through Pemberton and over the Duffey Lake Road. <strong>See more:</strong> <a href=\"/guides/vernon-silverstar-weekend\">Vernon &amp; SilverStar weekend</a>, <a href=\"/vernon\">Vernon</a>, <a href=\"/lake-country\">Lake Country</a>, <a href=\"/coldstream\">Coldstream</a>"
+}
