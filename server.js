@@ -6986,7 +6986,7 @@ function tripHappyHourAsk(text, planText) {
   return { happyHour: hh, dinner: /\b(?:dinner|supper|souper|d[îi]ner)\b/i.test(t) };
 }
 // The best chain of happy hour stops (and a dinner when asked for) on a date in one town, or null.
-function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, dog = false }) {
+function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, dog = false, lateFloor = null }) {
   const planner = tripPlannerModule();
   const weekday = localWeekdayKey(date);
   const rows = db.prepare('SELECT id, happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND region = ? AND happy_hour_times IS NOT NULL').all(region);
@@ -7032,35 +7032,74 @@ function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, d
     return out;
   };
   const kitchens = dinner ? facts.filter((f) => ['restaurant', 'pub'].includes(f.type) && !planner.fastFood(f) && openOn(f)).map((f) => ({ f, hours: openOn(f), hh: hh.get(f.id) || null })) : [];
-  let best = null;
-  const consider = (chain, score) => { if (!best || score > best.score) best = { chain, score }; };
-  const extend = (chain, cursor, score, want) => {
-    const hhCount = chain.filter((c) => c.x.hh).length;
-    if (chain.length >= 2 && hhCount >= 2 && !dinner) consider(chain, score + (chain.length === 3 ? 1.5 : 0));
-    if (dinner && hhCount >= 1 && chain.length >= 1 && chain.length <= 2) {
-      const last = chain[chain.length - 1].x.f;
+  // Planner (2026-10-27, after #508): "happy hour and dinner in Vernon Friday" chained the 8-11 PM and 9-11 PM windows
+  // with dinner after 11 PM, though both places had 2-5 / 3-5 PM happy hours. The search now runs on the day's earlier
+  // windows first (every happy hour stop starting by 7 PM, dinner from 5:30 and by 9:30 PM), and keeps the earliest
+  // good chain; the late-night windows are used only when the visitor asked for late (lateFloor) or nothing earlier
+  // fits. With late windows, dinner comes first, before them. A dinner place must be open for the whole meal.
+  const DINNER_FROM = 1050, DINNER_LATEST = 1290, EARLY_LAST_START = 1140;
+  const search = (floor, maxStart, dinnerFirst, dinnerFloor = floor) => {
+    let best = null;
+    const found = [];
+    const consider = (chain, score) => {
+      // The earliest chain wins among good ones: a point less per hour after the floor.
+      const sc = score - (chain[0].start - floor) / 60;
+      found.push({ chain, score: sc });
+      if (!best || sc > best.score) best = { chain, score: sc };
+    };
+    const extend = (chain, cursor, score, want) => {
+      const hhCount = chain.filter((c) => c.x.hh).length;
+      if (chain.length >= 2 && hhCount >= 2 && (!dinner || dinnerFirst)) consider(chain, score + (chain.length === 3 ? 1.5 : 0));
+      if (dinner && !dinnerFirst && hhCount >= 1 && chain.length >= 1 && chain.length <= 2) {
+        const last = chain[chain.length - 1].x.f;
+        for (const k of kitchens) {
+          if (chain.some((c) => c.x.f.id === k.f.id)) continue;
+          const h = hop(last, k.f);
+          if (!h || h.minutes > 15) continue;
+          const st = Math.max(DINNER_FROM, Math.ceil((cursor + h.minutes) / 5) * 5);
+          if (st > DINNER_LATEST || st - (cursor + h.minutes) > 45 || !covers(k.hours, st, st + TRIP_HH_DINNER_VISIT)) continue;
+          const inHh = !!(k.hh && k.hh.ranges.some(([a, b]) => st >= a && st + 30 <= b));
+          if (hhCount + (inHh ? 1 : 0) < 2) continue;
+          consider(chain.concat({ x: { ...k, hh: inHh ? k.hh : null }, start: st, end: st + TRIP_HH_DINNER_VISIT, wait: st - cursor - h.minutes, hop: h, dinner: true }), score + (k.f.rating || 4) - h.km * 1.5 - (st - cursor - h.minutes) / 20 + (inHh ? 1 : 0));
+        }
+      }
+      if (chain.length >= want) return;
+      const last = chain.length ? chain[chain.length - 1].x.f : null;
+      for (const x of bars) {
+        if (chain.some((c) => c.x.f.id === x.f.id)) continue;
+        const h = last ? hop(last, x.f) : null;
+        if (last && (!h || h.minutes > 15)) continue;
+        for (const v of visitsAt(x, cursor + (h ? h.minutes : 0), !last)) {
+          if (maxStart != null && v.start > maxStart) continue;
+          extend(chain.concat({ x, ...v, hop: h }), v.end, score + x.score - (h ? h.km * 1.5 : 0) - v.wait / 20, want);
+        }
+      }
+    };
+    extend([], floor, 0, dinner && !dinnerFirst ? 2 : (dinnerFirst ? 2 : 3));
+    if (!dinnerFirst) return best ? best.chain : null;
+    // Dinner first: the meal ends a short hop before the first happy hour stop, starting 5:30-9:30 PM.
+    found.sort((a, b) => b.score - a.score);
+    for (const { chain } of found.slice(0, 60)) {
+      const first = chain[0];
+      let pick = null;
       for (const k of kitchens) {
         if (chain.some((c) => c.x.f.id === k.f.id)) continue;
-        const h = hop(last, k.f);
+        const h = hop(k.f, first.x.f);
         if (!h || h.minutes > 15) continue;
-        const s = Math.max(1050, Math.ceil((cursor + h.minutes) / 5) * 5);
-        if (s - (cursor + h.minutes) > 45 || !covers(k.hours, s, s + TRIP_HH_DINNER_VISIT)) continue;
-        const inHh = !!(k.hh && k.hh.ranges.some(([a, b]) => s >= a && s + 30 <= b));
-        if (hhCount + (inHh ? 1 : 0) < 2) continue;
-        consider(chain.concat({ x: { ...k, hh: inHh ? k.hh : null }, start: s, end: s + TRIP_HH_DINNER_VISIT, wait: s - cursor - h.minutes, hop: h, dinner: true }), score + (k.f.rating || 4) - h.km * 1.5 - (s - cursor - h.minutes) / 20 + (inHh ? 1 : 0));
+        const st = Math.min(DINNER_LATEST, Math.floor((first.start - h.minutes - TRIP_HH_DINNER_VISIT) / 5) * 5);
+        const wait = first.start - h.minutes - (st + TRIP_HH_DINNER_VISIT);
+        if (st < Math.max(dinnerFloor, DINNER_FROM) || wait < 0 || wait > 45 || !covers(k.hours, st, st + TRIP_HH_DINNER_VISIT)) continue;
+        const sc = (k.f.rating || 4) - h.km * 1.5 - wait / 20;
+        if (!pick || sc > pick.sc) pick = { k, st, h, wait, sc };
       }
+      if (!pick) continue;
+      const meal = { x: { ...pick.k, hh: null }, start: pick.st, end: pick.st + TRIP_HH_DINNER_VISIT, wait: 0, hop: null, dinner: true };
+      return [meal, { ...first, hop: pick.h, wait: pick.wait }].concat(chain.slice(1));
     }
-    if (chain.length >= want) return;
-    const last = chain.length ? chain[chain.length - 1].x.f : null;
-    for (const x of bars) {
-      if (chain.some((c) => c.x.f.id === x.f.id)) continue;
-      const h = last ? hop(last, x.f) : null;
-      if (last && (!h || h.minutes > 15)) continue;
-      for (const v of visitsAt(x, cursor + (h ? h.minutes : 0), !last)) extend(chain.concat({ x, ...v, hop: h }), v.end, score + x.score - (h ? h.km * 1.5 : 0) - v.wait / 20, want);
-    }
+    return null;
   };
-  extend([], startFloor, 0, dinner ? 2 : 3);
-  return best ? best.chain : null;
+  if (lateFloor != null) return search(Math.max(startFloor, lateFloor), null, !!dinner, startFloor);
+  return search(startFloor, EARLY_LAST_START, false) || search(startFloor, null, !!dinner);
 }
 function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   if (!plan || !args || args.swap || args.pinned || plan.happyHourCrawl) return plan;
@@ -7086,7 +7125,13 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   const excluded = new Set([...(args.excludeVenueIds || []), ...(args.avoidVenueIds || [])]);
   // A dog-friendly crawl only goes where the dog may come in.
   const dog = !!((plan.intent && plan.intent.party && plan.intent.party.dog) || ((plan.intent && plan.intent.features) || []).includes('dog_friendly') || (plan.trip && plan.trip.party && plan.trip.party.dog));
-  const chain = tripHappyHourChain({ date, region, startFloor, dinner: ask.dinner, excluded, now, dog });
+  // Late-night happy hours only when asked for: "late-night happy hour", "late", "after 9", or "tonight" asked after 6 PM.
+  let lateFloor = null;
+  const after = /\bafter\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|p\.m\.)?(?=\s|[,.!?]|$)/i.exec(planText);
+  if (after && Number(after[1]) >= 1 && Number(after[1]) <= 12) lateFloor = ((Number(after[1]) % 12) + (/^a/i.test(after[3] || '') ? 0 : 12)) * 60 + Number(after[2] || 0);
+  else if (/\blate[- ]night\b|\blate\b(?![- ](?:afternoon|lunch|breakfast|brunch|morning))|\bnight ?cap\b/i.test(planText)) lateFloor = 1200;
+  else if (tonight && nowFloor >= 1080) lateFloor = nowFloor;
+  const chain = tripHappyHourChain({ date, region, startFloor, dinner: ask.dinner, excluded, now, dog, lateFloor });
   const town = REGION_LABELS[region];
   const [dayEn, dayFr] = TRIP_HH_WEEKDAY_NAMES[localWeekdayKey(date)];
   if (!chain) {
@@ -7108,17 +7153,25 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
     const whenEn = w ? happyHourRangeText(w[0], w[1] % 1440, false) : null, whenFr = w ? happyHourRangeText(w[0], w[1] % 1440, true) : null;
     const reasons = [];
     if (w) reasons.push({ code: 'happy_hour', text: `Happy hour ${whenEn} on ${dayEn}, from its listing` });
-    if (c.dinner) reasons.push({ code: 'meal', text: 'Dinner after the happy hours' });
+    if (c.dinner) reasons.push({ code: 'meal', text: chain[0] === c ? 'Dinner before the late happy hours' : 'Dinner after the happy hours' });
     if (c.hop) reasons.push({ code: 'distance', text: c.hop.mode === 'walk' ? `About a ${Math.max(1, c.hop.minutes)}-minute walk from the stop before` : `About a ${Math.max(1, c.hop.minutes)}-minute drive from the stop before` });
     if (f.rating) reasons.push({ code: 'rating', text: `Rated ${f.rating}${f.reviews ? ` from ${f.reviews} reviews` : ''}` });
     const part = c.start < 1020 ? (c.start < 930 ? 'afternoon' : 'late') : c.start < 1260 ? 'evening' : 'night';
     stops.push({ kind: 'venue', label: c.dinner ? 'Dinner' : 'Happy hour', daypart: part, component: null, venue: planner.publicVenue(f, ctx), reasons, why: reasons.slice(0, 3).map((r) => r.text), caveats: [], alternates: [],
-      ...(whenEn ? { happyHourWhen: whenEn, happyHourWhenFr: whenFr } : {}), happyHourCrawlStop: true });
+      ...(whenEn ? { happyHourWhen: whenEn, happyHourWhenFr: whenFr } : {}), happyHourCrawlStop: true,
+      // Planner (2026-10-27): the stop carries its own clock times too (the page also reads them from plan.schedule).
+      startMinutes: c.start, endMinutes: c.end, timeText: `${clock12(c.start)}–${clock12(c.end)}`, timeTextFr: `${clockFr(c.start)}–${clockFr(c.end)}` });
     schedule.push({ day: 1, venueId: f.id, status: 'provisional', assumedStart: true, startMinutes: c.start, endMinutes: c.end, waitMinutes: c.wait || 0, transferMinutes: c.hop ? c.hop.minutes : 0, date, suggested: true });
   });
   const hhStops = chain.filter((c) => !c.dinner), dinnerStop = chain.find((c) => c.dinner);
-  const flowEn = hhStops.map((c, i) => `${i ? 'then ' : 'Start at '}${c.x.f.name} at ${clock12(c.start)}`).join(', ') + (dinnerStop ? `, and have dinner at ${dinnerStop.x.f.name} from ${clock12(dinnerStop.start)}` : '') + '.';
-  const flowFr = hhStops.map((c, i) => `${i ? 'puis ' : 'Commencez à '}${c.x.f.name} à ${clockFr(c.start)}`).join(', ') + (dinnerStop ? `, et soupez à ${dinnerStop.x.f.name} dès ${clockFr(dinnerStop.start)}` : '') + '.';
+  // Dinner before late-night happy hours is said first.
+  const dinnerFirst = !!(chain[0] && chain[0].dinner);
+  const flowEn = dinnerFirst
+    ? `Have dinner at ${dinnerStop.x.f.name} from ${clock12(dinnerStop.start)}, then ` + hhStops.map((c, i) => `${i ? 'then ' : ''}${c.x.f.name} at ${clock12(c.start)}`).join(', ') + '.'
+    : hhStops.map((c, i) => `${i ? 'then ' : 'Start at '}${c.x.f.name} at ${clock12(c.start)}`).join(', ') + (dinnerStop ? `, and have dinner at ${dinnerStop.x.f.name} from ${clock12(dinnerStop.start)}` : '') + '.';
+  const flowFr = dinnerFirst
+    ? `Soupez à ${dinnerStop.x.f.name} dès ${clockFr(dinnerStop.start)}, puis ` + hhStops.map((c, i) => `${i ? 'puis ' : ''}${c.x.f.name} à ${clockFr(c.start)}`).join(', ') + '.'
+    : hhStops.map((c, i) => `${i ? 'puis ' : 'Commencez à '}${c.x.f.name} à ${clockFr(c.start)}`).join(', ') + (dinnerStop ? `, et soupez à ${dinnerStop.x.f.name} dès ${clockFr(dinnerStop.start)}` : '') + '.';
   const timedEn = dinnerStop && !dinnerStop.x.hh ? 'The drinks stops are timed inside their happy hours' : 'Each stop is timed inside its happy hour', timedFr = dinnerStop && !dinnerStop.x.hh ? 'Les arrêts pour un verre sont prévus pendant leur happy hour' : 'Chaque arrêt est prévu pendant son happy hour';
   const geoEn = `${timedEn}, and ${chain.length === 2 ? 'both' : 'all three'} are in ${town}. Plan a safe ride home.`;
   const geoFr = `${timedFr}, et ${chain.length === 2 ? 'les deux sont' : 'les trois sont'} à ${town}. Prévoyez un retour sécuritaire.`;
