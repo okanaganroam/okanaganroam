@@ -41,7 +41,8 @@ const at = (date, hhmm) => { const [h, m] = hhmm.split(':').map(Number); return 
 const TUE = '2026-10-27';
 const WED = '2026-10-28';
 const page = (v, now, lang) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { now, lang });
-const spRow = (html) => (/<div class="detail-row"><span class="label">(?:Weekly specials|Spéciaux de la semaine)<\/span><span>([\s\S]*?)<\/span><\/div>\n/.exec(html) || [])[1] || '';
+// The weekly specials live in the deals card (2026-10-27).
+const spRow = (html) => (/<div class="venue-deals-block" data-block="sp">(?:<h3>[^<]*<\/h3>)?<div class="venue-deals-body">([\s\S]*?)<\/div><\/div>/.exec(html) || [])[1] || '';
 const todayNames = (v, now) => (app.specialsTodayFor([app.getVenue(v.id)].map((x) => ({ ...x, hours: db.prepare('SELECT hours FROM venues WHERE id = ?').get(v.id).hours })), now).byId.get(v.id) || { today: [] }).today.map((s) => s.title);
 
 test('validateSpecials: canonical list, days, lengths, kinds, times, French pairs, seasons, source and date; same text rules as the deals', () => {
