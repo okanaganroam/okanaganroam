@@ -77,6 +77,7 @@ function t3FrenchText(value){
   text=text.replace(/^A happy hour crawl in (.+?) (tonight|today|on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\.$/,(_,t,w)=>'Une tournée des happy hours à '+t+(w==='tonight'?' ce soir':w==='today'?' aujourd’hui':' '+dayFr(w.slice(3)))+'.');
   text=text.replace(/^Happy hour and dinner in (.+?) (tonight|today|on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\.$/,(_,t,w)=>'Happy hour et souper à '+t+(w==='tonight'?' ce soir':w==='today'?' aujourd’hui':' '+dayFr(w.slice(3)))+'.');
   if(text==='Dinner after the happy hours')return 'Souper après les happy hours';
+  if(text==='Dinner before the late happy hours')return 'Souper avant les happy hours de fin de soirée';
   if(text==='Fills the free time between stops')return 'Occupe le temps libre entre deux arrêts';
   if(text==='Free time')return 'Temps libre';
  }
