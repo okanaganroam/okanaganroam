@@ -8266,7 +8266,8 @@ function happyHourDealLine(d) { return d.price ? `${d.text} · ${d.price}` : d.t
 // The first `n` deals in one short line, price first ("$6 House pints, $10 Cocktails", "half price Appies"): the
 // map card, the happy hour guides and Build My Trip.
 function happyHourDealsCompact(list, n = 2) {
-  return (list || []).slice(0, n).map((d) => (d.price ? `${d.price} ${d.text}` : d.text)).join(', ');
+  // Card polish (2026-10-27): price ranges with an en dash ("$4.95 – $12.95").
+  return (list || []).slice(0, n).map((d) => (d.price ? `${priceRangeText(d.price)} ${d.text}` : d.text)).join(', ');
 }
 // Minutes left in a happy hour that is on now, as "1 hr 20 min" / "45 min" / "2 hr" (French "1 h 20" / "45 min" /
 // "2 h"). Self-contained: the Roam Now map script runs this same function (toString()).
@@ -8589,12 +8590,117 @@ function specialDealRepeatsTitle(title, deal) {
   const d = specialWords(deal).filter((w) => !SPECIAL_FILLER_WORDS.has(w));
   return d.every((w) => t.has(w));
 }
+// ---- Card polish (2026-10-27): no repeated text on the deals and weekly nights cards ----
+// "Wicked Wing Wednesday" · "89¢ each" · "Wings 89 cents each from 4 pm" · "from 4 PM" said the same thing three times.
+// The rule, for every venue: take the deal (or a night's detail), strip a time phrase that matches the time already
+// shown, then drop the words the row already shows (title, price, days, the night's kind, host and cost) and filler
+// words; when nothing meaningful is left the line is hidden. A deal that adds anything ("dine-in only", "with fries",
+// "teams up to 6") stays, without the repeated time phrase or a leading repeat of the price. Words compare with
+// accents, case, punctuation and plurals aside, "89 cents" as "89¢" and "$9.99" as "9.99".
+const CARD_FILLER_WORDS = new Set([...SPECIAL_FILLER_WORDS, 'each', 'only', 'all', 'day', 'daily', 'special', 'deal', 'every', 'with', 'on', 'from',
+  'at', 'in', 'for', 'of', 'to', 'pm', 'am', 'p', 'm', 'h', 'cent', 'night', 'tonight', 'today', 'avec', 'chaque', 'tou', 'tous', 'jour', 'soir', 'au', 'en', 'sur']);
+const CARD_DAY_WORDS = new Set(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'mon', 'tue', 'tues', 'wed', 'thu', 'thur', 'thurs',
+  'fri', 'sat', 'sun', 'weekend', 'weekday', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']);
+// Words: "$9.99" -> "9.99", "89¢" -> "89 cent", "4:30pm" -> "4:30 pm", then the plural stem.
+function cardWords(text) {
+  return (String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, '').replace(/¢/g, ' cents ')
+    .match(/\d+(?:[.:]\d+)?|[a-z]+/g) || []).map((w) => (/^\d/.test(w) ? w.replace(/[.:]00$/, '') : specialWordStem(w)));
+}
+// The shown time's minutes (start, end) a phrase may name; 'close' when the row shows "from 4 PM" (end close or none).
+function cardTimeMatches(h, mm, ampm, minutes) {
+  const m = Number(mm || 0), hr = Number(h);
+  if (!Number.isFinite(hr) || hr > 24) return false;
+  const a = String(ampm || '').replace(/\./g, '').toLowerCase();
+  const cands = a === 'pm' ? [(hr % 12) + 12] : a === 'am' ? [hr % 12] : hr < 12 ? [hr, hr + 12] : [hr % 24];
+  return cands.some((c) => minutes.includes(c * 60 + m));
+}
+// "from 4 pm", "after 4pm", "4-close", "4 pm to close", "11am to 2pm", "until 3 pm", "dès 16 h", "16 h–21 h" naming the
+// time the row already shows (start/end 'HH:MM', end 'close') -> removed. A bare "4" ("4 tacos"), "up to 6" or a time
+// that differs from the one shown are kept.
+const CARD_TIME_RE = /(?:(?<![\w\u00C0-\u017F])(from|after|starting(?: at)?|starts(?: at)?|until|till|til|dès|des|à partir de|a partir de|jusqu’à|jusqu'à|jusqu’a)\s+)?(?<![$\d.,])\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|h(?:\s*(\d{2}))?)?(?![\w$%¢])(?:\s*(?:-|–|—|to|until|till|à)\s*(?:(close|closing|fermeture)\b|(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|h(?:\s*(\d{2}))?)?(?![\w$%¢])))?/gi;
+function stripShownTime(text, start, end) {
+  const a = specialMinutes(start), b = end === 'close' ? null : specialMinutes(end);
+  if (a === null && b === null) return String(text || '');
+  const shown = [a, b].filter((x) => x !== null);
+  const closeOk = end === 'close' || (a !== null && b === null);
+  return String(text || '').replace(CARD_TIME_RE, (all, prep, h1, m1, ap1, hm1, close, h2, m2, ap2, hm2) => {
+    const ampm1 = ap1 && /^h/i.test(ap1) ? '' : ap1, ampm2 = ap2 && /^h/i.test(ap2) ? '' : ap2;
+    // Only a phrase that reads as a time window ("from 4 pm", "after 2pm", "4-close", "11am to 2pm"): a bare "6pm" in
+    // "check-in at 6pm" or "doors 6 pm" says something else and stays.
+    const isTime = !!(prep || close || h2);
+    if (!isTime) return all;
+    // "4-9pm": the first hour takes the second's am/pm.
+    const t1 = cardTimeMatches(h1, m1 || hm1, ampm1 || (h2 ? ampm2 : ''), shown);
+    if (!t1) return all;
+    if (close && !closeOk) return all;
+    if (h2 && !cardTimeMatches(h2, m2 || hm2, ampm2, shown)) return all;
+    // A lone "from 4 pm" in a row that shows "4–9 PM" still repeats the start; "until 9 pm" the end.
+    return ' ';
+  });
+}
+// Tidies a deal after a phrase came out: no doubled spaces or punctuation, nothing hanging at either end.
+function cardTidy(text) {
+  return String(text || '').replace(/\(\s*\)/g, ' ').replace(/\s+([,;:.)])/g, '$1').replace(/([,;:])(?:\s*[,;:])+/g, '$1')
+    .replace(/\s{2,}/g, ' ').replace(/^[\s,;:–—-]+|[\s,;:–—-]+$/g, '').trim();
+}
+// A deal that starts with the price shown beside it ("$2 off select appetizers" next to "$2 off", "Half-price wings
+// with a drink" next to "half price") drops the repeat: "Select appetizers", "Wings with a drink". Only one simple
+// price ("$5", "$5 off", "89¢ each", "15% off", "half price"), and never when the words after it need it ("$5 for two").
+const CARD_SIMPLE_PRICE_RE = /^(?:free|all[\s-]you[\s-]can[\s-]eat|(?:from |up to )?\$?\d+(?:[.,]\d{1,2})?\s*(?:¢|cents?|%)?(?:\s*(?:off|each|ea))?|half[\s-]price|50% off|2[\s-]for[\s-]1|bogo)$/i;
+function stripLeadingPrice(deal, price) {
+  const p = String(price || '').trim(), d = String(deal || '');
+  if (!p || !CARD_SIMPLE_PRICE_RE.test(p)) return d;
+  const pat = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/(?:\\-|\s)+/g, '[\\s-]+');
+  const m = new RegExp(`^\\s*${pat}(?![\\w%¢])[\\s,:]*`, 'i').exec(d);
+  if (!m) return d;
+  const rest = d.slice(m[0].length);
+  if (!rest || /^(?:for|a|an|on|per|each|or|and|x|with|when|if|\/|off|of|to|plus|\+)\b/i.test(rest) || /^[/+&]/.test(rest)) return d;
+  // A list of prices ("$5 Fireball, $6 Jagerbombs") keeps its first one: it belongs to the first item.
+  if (/\$\s?\d|\d\s?(?:%|¢|cents?\b)/i.test(rest)) return d;
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+// What is left of a line once the row's other words come out: [meaningful words].
+function cardMeaningfulWords(text, shownWords) {
+  return cardWords(text).filter((w) => !shownWords.has(w) && !CARD_FILLER_WORDS.has(w) && !CARD_DAY_WORDS.has(w));
+}
+// A generic title ("Monday Deal", "Tuesday Special", "Weekend Deals", "Thursday Features", « Spécial du lundi »): only
+// day words and deal words. The row then leads with the deal itself.
+const CARD_GENERIC_TITLE_WORDS = new Set(['deal', 'special', 'feature', 'offer', 'promo', 'promotion', 'specialty', 'speciaux', 'specia', 'offre', 'aubaine', 'du', 'de']);
+function specialTitleIsGeneric(title) {
+  const w = cardWords(title);
+  return w.length > 0 && w.every((x) => CARD_DAY_WORDS.has(x) || CARD_GENERIC_TITLE_WORDS.has(x) || SPECIAL_FILLER_WORDS.has(x) || x === 'daily')
+    && w.some((x) => CARD_GENERIC_TITLE_WORDS.has(x));
+}
+// A special as its row shows it: { title, deal ('' when the deal only repeats the row), dealFull (the kept deal with
+// its leading price, for a line that shows no price: Roam Now, Build My Trip) }. `s` gives price, start, end;
+// title/deal the language's lines. A generic title takes the deal's place ("Monday Deal" + "Mashawi wrap" ->
+// "Mashawi wrap").
+function specialShownText(s, title, deal) {
+  const t = String(title || ''), d0 = String(deal || '');
+  if (!d0.trim()) return { title: t, deal: '', dealFull: '' };
+  const timed = cardTidy(stripShownTime(d0, s && s.start, s && s.end));
+  // Not a deal that lists its own prices ("CRAFT Mule $8; any two pizzas $30"): that reads as a list, not a name.
+  if (specialTitleIsGeneric(t) && timed && !/\$\s?\d|\d\s?(?:%|¢)/.test(timed)) return { title: timed.charAt(0).toUpperCase() + timed.slice(1), deal: '', dealFull: '' };
+  if (specialDealRepeatsTitle(t, d0)) return { title: t, deal: '', dealFull: '' };
+  const shown = new Set([...cardWords(t), ...cardWords(s && s.price), 'cent', 'price', 'off', 'all', 'night', 'day']);
+  if (!timed || !cardMeaningfulWords(timed, shown).length) return { title: t, deal: '', dealFull: '' };
+  return { title: t, deal: cardTidy(stripLeadingPrice(timed, s && s.price)), dealFull: timed };
+}
+// The deal line a special shows ('' when it only repeats the row). Card polish (2026-10-27).
+function specialDealShown(s, title, deal) { return specialShownText(s, title, deal).deal; }
+// "$4.95 - $12.95" -> "$4.95 – $12.95" (an en dash between two prices; render time only).
+function priceRangeText(price) {
+  return String(price == null ? '' : price).replace(/(\$?\d+(?:[.,]\d+)?\s*(?:¢|%)?)\s*[-–—]\s*(?=\$?\d)/g, (m, a) => `${a.trim()} – `);
+}
 // "Wing Wednesday · 60¢ wings" (French lines when given); just the title when the deal only repeats it
-// ("Taco Tuesday", not "Taco Tuesday · Tacos"). -> { text, english }
+// ("Taco Tuesday", not "Taco Tuesday · Tacos"). Card polish (2026-10-27): the same rule as the venue page (time and
+// price repeats count as repeats); when the deal is hidden the price stands in ("Wicked Wing Wednesday · 89¢ each").
+// -> { text, english }
 function specialLine(s, fr) {
   const useFr = fr && s.title_fr && s.deal_fr;
-  const title = useFr ? s.title_fr : s.title, deal = useFr ? s.deal_fr : s.deal;
-  return { text: specialDealRepeatsTitle(title, deal) ? String(title) : `${title} · ${deal}`, english: !!(fr && !useFr) };
+  const shown = specialShownText(s, useFr ? s.title_fr : s.title, useFr ? s.deal_fr : s.deal);
+  const second = shown.dealFull || (s.price ? priceRangeText(s.price) : '');
+  return { text: second ? `${shown.title} · ${second}` : String(shown.title), english: !!(fr && !useFr) };
 }
 // Today's specials in one short line (up to two, "; " between): the Roam Now card and Build My Trip.
 function specialsCompact(list, fr, n = 2) {
@@ -8889,6 +8995,43 @@ function nightLabel(s, fr) {
   if (s.kind !== 'other') return { text: NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind], english: false };
   const useFr = fr && s.title_fr;
   return { text: useFr ? s.title_fr : s.title, english: !!(fr && !useFr) };
+}
+// Card polish (2026-10-27): the words that already say a night's kind. A title with one of them ("Karaoke Madness",
+// "Open Mic Night", "Live Bands Fri & Sat", "POP QUIZ Trivia", "NFL Football Sundays") shows no kind label after it
+// (the small kind icon stays). Stems as cardWords() makes them ("bands" -> "band", "games" -> "game").
+const NIGHT_KIND_WORDS = {
+  karaoke: ['karaoke'], trivia: ['trivia', 'quiz', 'trivingo'], open_mic: ['mic', 'jam', 'scene'], bingo: ['bingo', 'singo', 'trivingo'],
+  live_music: ['music', 'band', 'jam', 'blue', 'jazz', 'musique', 'concert'], dj: ['dj', 'djs'], comedy: ['comedy', 'comedian', 'humour', 'standup'],
+  run_club: ['run', 'running', 'course'], games: ['game', 'crib', 'cribbage', 'dart', 'pool', 'jeux', 'jeu'],
+  sports: ['sport', 'nfl', 'football', 'ufc', 'hockey', 'nhl', 'cfl', 'nba', 'mlb', 'gameday'], paint: ['paint', 'painting', 'peinture'], other: [],
+};
+// The kind and night words the label itself is made of ("Games night" -> game, night).
+function nightKindWords(kind) {
+  return new Set([...(NIGHT_KIND_WORDS[kind] || []), ...cardWords(NIGHT_KIND_LABELS.en[kind]), ...cardWords(NIGHT_KIND_LABELS.fr[kind])]);
+}
+function nightTitleSaysKind(title, kind) {
+  const w = cardWords(title);
+  const words = NIGHT_KIND_WORDS[kind] || [];
+  if (w.some((x) => words.includes(x))) return true;
+  // "Game Day" for sports.
+  return kind === 'sports' && w.some((x, i) => x === 'game' && w[i + 1] === 'day');
+}
+// Frequency and filler words a night's detail may repeat ("two nights a week", "every Friday", "weekly", "local").
+const NIGHT_FILLER_WORDS = new Set(['weekly', 'week', 'every', 'two', 'three', 'four', 'night', 'nights', 'evening', 'local', 'hosted', 'host', 'by', 'semaine', 'soiree', 'hebdomadaire', 'anime', 'par']);
+// A night as its row shows it: { kind (the label, '' when the title already says it), detail ('' when it only restates
+// the title, kind, days, frequency or host) }. Strip-and-check like the specials: fewer than 2 meaningful words left
+// hides the detail ("Karaoke two nights a week", "Weekly open mic for local performers", "Live music every Friday").
+function nightShownText(s, title, detail, fr) {
+  const kind = s.kind !== 'other' ? NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind] : '';
+  const kindShown = kind && !nightTitleSaysKind(title, s.kind) && !nightTitleSaysKind(s.title, s.kind) ? kind : '';
+  let d = String(detail || '').trim();
+  if (d) {
+    const timed = cardTidy(stripShownTime(d, s.start, s.end));
+    const shown = new Set([...cardWords(title), ...cardWords(s.title), ...nightKindWords(s.kind), ...cardWords(s.host), ...cardWords(s.cost)]);
+    const left = cardMeaningfulWords(timed, shown).filter((w) => !NIGHT_FILLER_WORDS.has(w));
+    d = left.length < 2 ? '' : timed;
+  }
+  return { kind: kindShown, detail: d };
 }
 // "7 PM", "7–10 PM" (French "19 h", "19 h–22 h"); '' with no time.
 function nightTimeText(s, fr) {
@@ -30042,9 +30185,9 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   if (!week && !deals) return null;
   // Verified mark (2026-10-27): deals the owner entered (source 'venue_owner') carry `confirmed`, the "Confirmed by
   // <venue>" line that takes the place of the grey checked date.
-  const dealsOut = deals ? { items: (fr && deals.fr ? deals.fr : deals.en), english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr),
+  const dealsOut = deals ? { items: (fr && deals.fr ? deals.fr : deals.en), english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr), checkedAt: deals.checked || null,
     confirmed: row.happy_hour_deals_source === 'venue_owner' ? venueConfirmedHtml(venue.name, deals.checked, fr) : '' } : null;
-  if (!week) return { week: '', checked: '', live: null, deals: dealsOut };
+  if (!week) return { week: '', checked: '', checkedAt: null, live: null, deals: dealsOut };
   const place = statusHours ? venueHoursStatusAt(statusHours, now) : null;
   const clock = okanaganClock(now);
   let h = null;
@@ -30052,7 +30195,7 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   if (h && h.state === 'later' && place && place.closedToday) h = null;
   // Countdown (2026-10-26): "Happy hour on now · ends in 1 hr 20 min" while it is on (worked out when the page is made).
   const text = h ? (happyHourOnNowText(h, clock, fr) || happyHourLiveText(h, fr)) : '';
-  return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), live: h ? { state: h.state, text } : null, deals: dealsOut };
+  return { week, checked: happyHourCheckedText(row.happy_hour_checked_at, fr), checkedAt: row.happy_hour_checked_at || null, live: h ? { state: h.state, text } : null, deals: dealsOut };
 }
 // The deals inside the Happy hour row (2026-10-26, tidied the same day): a menu-style list, the price in its own bold
 // column and the item beside it; the first HH_DEALS_VISIBLE show, the rest behind "2 more deals". One checked date at the
@@ -30060,13 +30203,34 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
 // All deals show (2026-10-27): the list now sits in the wide deals card, where there is room for all 6 (it was 4
 // plus "2 more deals" in the narrow sidebar).
 const HH_DEALS_VISIBLE = 6;
-function happyHourDealsHtml(deals, fr) {
+// Card polish (2026-10-27): the price cell, each price on one line ("$4.95 – $12.95", "half price"); a list of prices
+// ("$6 / $9", "$12 or $29") may break between them, never inside one: the cell is nowrap and only the separators
+// (.venue-price-sep, white-space: normal) give a line a place to break.
+function happyHourPriceHtml(price) {
+  const parts = priceRangeText(price || '').split(/(\s*\/\s*|\s+or\s+)/);
+  return parts.map((p, i) => (i % 2 ? `<span class="venue-price-sep">${escapeHtml(p)}</span>` : escapeHtml(p))).join('');
+}
+// `opts.noChecked`: the caller shows one checked line for the whole happy hour block (venueHappyHourBlockHtml).
+function happyHourDealsHtml(deals, fr, opts = {}) {
   if (!deals || !deals.items.length) return '';
   const lang = deals.english ? ' lang="en"' : '';
-  const row = (d) => `<span class="venue-hh-deal" role="listitem"${lang}><span class="venue-hh-deal-price">${escapeHtml(d.price || '')}</span><span class="venue-hh-deal-text">${escapeHtml(d.text)}</span></span>`;
+  // Card polish (2026-10-27): a price range takes an en dash ("$4.95 – $12.95") and each price keeps to one line.
+  const row = (d) => `<span class="venue-hh-deal" role="listitem"${lang}><span class="venue-hh-deal-price">${happyHourPriceHtml(d.price)}</span><span class="venue-hh-deal-text">${escapeHtml(d.text)}</span></span>`;
   const shown = deals.items.slice(0, HH_DEALS_VISIBLE), rest = deals.items.slice(HH_DEALS_VISIBLE);
   const more = rest.length ? `<details class="venue-hh-more"><summary>${fr ? `${rest.length} autre${rest.length > 1 ? 's' : ''} spécia${rest.length > 1 ? 'ux' : 'l'}` : `${rest.length} more deal${rest.length > 1 ? 's' : ''}`}</summary><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${rest.map(row).join('')}</span></details>` : '';
-  return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${shown.map(row).join('')}</span>${more}${deals.confirmed ? `<span class="venue-hours-checked venue-hh-deals-checked">${deals.confirmed}</span>` : deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
+  return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${shown.map(row).join('')}</span>${more}${opts.noChecked ? '' : deals.confirmed ? `<span class="venue-hours-checked venue-hh-deals-checked">${deals.confirmed}</span>` : deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
+}
+// The happy hour block of the deals card: the times, the deals, then one line at the bottom. Card polish (2026-10-27):
+// one "Checked" date (the later of the times' and the deals' checks; it showed both, "Checked Oct 14, 2026" under the
+// times and "Checked Oct 26, 2026" under the deals), or the "Confirmed by <venue>" line once when the owner entered the
+// deals.
+function venueHappyHourBlockHtml(happyHour, fr) {
+  if (!happyHour || !happyHour.deals) return '';
+  const d = happyHour.deals;
+  const latest = [happyHour.checkedAt, d.checkedAt].filter((x) => x && parseLocalDate(x)).sort().pop();
+  const checked = latest ? happyHourCheckedText(latest, fr) : (d.checked || happyHour.checked || '');
+  const bottom = d.confirmed ? `<span class="venue-hours-checked venue-hh-deals-checked">${d.confirmed}</span>` : checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(checked)}</span>` : '';
+  return `${happyHour.week ? `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>` : ''}${happyHourDealsHtml(d, fr, { noChecked: true })}${bottom}`;
 }
 // Verified mark (2026-10-27): "✓ Confirmed by Suda · Oct 20, 2026" (fr: "Confirmé par Suda · 20 oct. 2026") for deals
 // or specials the owner entered; `checked` is the local YYYY-MM-DD date. The inner inline-flex span keeps the gap after
@@ -30126,10 +30290,14 @@ function venueSpecialsHtml(sp, fr) {
   const row = ({ s, days, today, time }) => {
     const useFr = fr && s.title_fr && s.deal_fr;
     const lang = fr && !useFr ? ' lang="en"' : '';
-    const title = useFr ? s.title_fr : s.title, deal = useFr ? s.deal_fr : s.deal;
-    // A deal that only repeats the title ("Taco Tuesday" / "Tacos") gets no line of its own (2026-10-26).
-    const dealHtml = specialDealRepeatsTitle(title, deal) ? '' : `<span class="venue-sp-deal"${lang}>${escapeHtml(deal)}</span>`;
-    return `<span class="venue-sp${today ? ' is-today' : ''}" role="listitem"><span class="venue-sp-days">${escapeHtml(days)}</span><span class="venue-sp-main"><span class="venue-sp-title"${lang}>${escapeHtml(title)}</span>${s.price ? ` <span class="venue-sp-price"${lang}>${escapeHtml(s.price)}</span>` : ''}${today ? ` <span class="venue-sp-today">${fr ? 'Aujourd’hui' : 'Today'}</span>` : ''}${dealHtml}${time ? `<span class="venue-sp-time">${escapeHtml(time)}</span>` : ''}</span></span>`;
+    // A deal that only repeats the title ("Taco Tuesday" / "Tacos") gets no line of its own (2026-10-26). Card polish
+    // (2026-10-27): nor one that only repeats the title, price and time ("Wings 89 cents each from 4 pm" beside
+    // "89¢ each" and "from 4 PM"); a kept deal loses the repeated time phrase and leading price; a generic title
+    // ("Monday Deal") gives way to the deal.
+    const shown = specialShownText(s, useFr ? s.title_fr : s.title, useFr ? s.deal_fr : s.deal);
+    const title = shown.title;
+    const dealHtml = shown.deal ? `<span class="venue-sp-deal"${lang}>${escapeHtml(shown.deal)}</span>` : '';
+    return `<span class="venue-sp${today ? ' is-today' : ''}" role="listitem"><span class="venue-sp-days">${escapeHtml(days)}</span><span class="venue-sp-main"><span class="venue-sp-title"${lang}>${escapeHtml(title)}</span>${s.price ? ` <span class="venue-sp-price"${lang}>${escapeHtml(priceRangeText(s.price))}</span>` : ''}${today ? ` <span class="venue-sp-today">${fr ? 'Aujourd’hui' : 'Today'}</span>` : ''}${dealHtml}${time ? `<span class="venue-sp-time">${escapeHtml(time)}</span>` : ''}</span></span>`;
   };
   return `<span class="venue-sp-list" role="list" aria-label="${fr ? 'Spéciaux de la semaine' : 'Weekly specials'}">${sp.rows.map(row).join('')}</span>${sp.confirmed ? `<span class="venue-hours-checked venue-sp-checked">${sp.confirmed}</span>` : sp.checked ? `<span class="venue-hours-checked venue-sp-checked">${escapeHtml(sp.checked)}</span>` : ''}`;
 }
@@ -30168,11 +30336,18 @@ function venueWeeklyNightsHtml(wn, fr) {
     const tl = fr && !titleFr ? ' lang="en"' : '', dl = fr && !detailFr ? ' lang="en"' : '';
     const evening = specialMinutes(s.start) === null || specialMinutes(s.start) >= 16 * 60;
     const tag = today ? ` <span class="venue-wn-today">${evening ? (fr ? 'Ce soir' : 'Tonight') : (fr ? 'Aujourd’hui' : 'Today')}</span>` : '';
-    const kind = s.kind !== 'other' ? NIGHT_KIND_LABELS[fr ? 'fr' : 'en'][s.kind] : '';
-    const kindHtml = kind ? `<span class="venue-wn-kind">${uiIcon(NIGHT_KIND_ICONS[s.kind] || 'calendar', 13, true)} ${escapeHtml(kind)}</span>` : '';
-    const meta = [kindHtml, detail ? `<span${dl}>${escapeHtml(detail)}</span>` : '', s.host ? `<span>${fr ? 'Animé par' : 'Hosted by'} ${escapeHtml(s.host)}</span>` : '',
+    // Card polish (2026-10-27): no kind label when the title already says it ("Karaoke Madness" · not "Karaoke"; the
+    // icon stays), no detail that only restates the row (nightShownText).
+    const shown = nightShownText(s, title, detail, fr);
+    const kindIcon = s.kind !== 'other' ? uiIcon(NIGHT_KIND_ICONS[s.kind] || 'calendar', 13, true) : '';
+    const kindHtml = kindIcon ? `<span class="venue-wn-kind">${kindIcon}${shown.kind ? ` ${escapeHtml(shown.kind)}` : ''}</span>` : '';
+    const rest = [shown.detail ? `<span${dl}>${escapeHtml(shown.detail)}</span>` : '', s.host ? `<span>${fr ? 'Animé par' : 'Hosted by'} ${escapeHtml(s.host)}</span>` : '',
       s.cost ? `<span${fr ? ' lang="en"' : ''}>${escapeHtml(s.cost)}</span>` : '', freq ? `<span>${escapeHtml(freq)}</span>` : ''].filter(Boolean).join(' &middot; ');
-    return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
+    // With the label: "♪ Live music · detail". Without it the icon leads the line ("♪ detail"), or sits after the time
+    // when the row has nothing else to say.
+    const meta = shown.kind ? [kindHtml, rest].filter(Boolean).join(' &middot; ') : rest ? `${kindHtml ? `${kindHtml} ` : ''}${rest}` : '';
+    const iconInline = !shown.kind && !rest && kindHtml ? ` ${kindHtml}` : '';
+    return `<span class="venue-wn${today ? ' is-today' : ''}" role="listitem"><span class="venue-wn-days">${escapeHtml(days)}</span><span class="venue-wn-main"><span class="venue-wn-title"${tl}>${escapeHtml(title)}</span>${time ? ` <span class="venue-wn-time">${escapeHtml(time)}</span>` : ''}${iconInline}${tag}${meta ? `<span class="venue-wn-meta">${meta}</span>` : ''}</span></span>`;
   };
   const label = fr ? 'Soirées de la semaine' : 'Weekly nights';
   return `<section class="venue-section venue-nights-card" id="venueNights" aria-labelledby="venueNightsTitle"><h2 id="venueNightsTitle">${label}</h2><span class="venue-wn-list" role="list" aria-label="${label}">${wn.rows.map(row).join('')}</span>${wn.confirmed ? `<span class="venue-hours-checked venue-wn-checked">${wn.confirmed}</span>` : wn.checked ? `<span class="venue-hours-checked venue-wn-checked">${escapeHtml(wn.checked)}</span>` : ''}</section>`;
@@ -30381,10 +30556,17 @@ function renderVenuePageLayoutStyles() {
      prices line up and the item wraps beside it; a quiet "Deals" label; extra deals behind a tap. */
   body.golf-page .venue-hh-deals { display: block; margin: 10px 0 0; }
   body.golf-page .venue-hh-deals-label { display: block; margin: 0 0 4px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,32,25,0.62); }
-  body.golf-page .venue-hh-deal-list { display: block; }
-  body.golf-page .venue-hh-deal { display: grid; grid-template-columns: 3.9em 1fr; column-gap: 8px; align-items: baseline; padding: 4px 0; font-size: 0.9rem; line-height: 1.35; }
+  /* Card polish (2026-10-27): the price column grows to fit the widest price (a range with an en dash, "half price")
+     up to 8.5em and the item column shrinks instead; a price never wraps inside itself (nowrap), a list of prices may
+     break between them (.venue-price-sep). The rows share the list's columns (subgrid) so the prices line up. */
+  body.golf-page .venue-hh-deal-list { display: grid; grid-template-columns: fit-content(8.5em) minmax(0, 1fr); column-gap: 8px; }
+  body.golf-page .venue-hh-deal { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding: 4px 0; font-size: 0.9rem; line-height: 1.35; }
+  @supports not (grid-template-columns: subgrid) {
+    body.golf-page .venue-hh-deal { grid-template-columns: fit-content(8.5em) minmax(0, 1fr); column-gap: 8px; }
+  }
+  body.golf-page .venue-price-sep { white-space: normal; }
   body.golf-page .venue-hh-deal + .venue-hh-deal { border-top: 1px solid rgba(42,32,25,0.08); }
-  body.golf-page .venue-hh-deal-price { font-weight: 800; color: var(--teal-deep, #1E4F4C); overflow-wrap: anywhere; }
+  body.golf-page .venue-hh-deal-price { min-width: 3.9em; font-weight: 800; color: var(--teal-deep, #1E4F4C); white-space: nowrap; }
   body.golf-page .venue-hh-deal-text { color: rgba(42,32,25,0.82); overflow-wrap: anywhere; }
   body.golf-page .venue-hh-more { display: block; }
   body.golf-page .venue-hh-more > .venue-hh-deal-list > .venue-hh-deal:first-child { border-top: 1px solid rgba(42,32,25,0.08); }
@@ -30815,7 +30997,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // wide screens and stacked on phones, in the main column under the story. Only when there are deals or specials.
   const venueDealsCardHtml = (() => {
     const blocks = [];
-    if (happyHour && happyHour.deals) blocks.push(['hh', 'Happy hour', `${happyHour.week ? `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>` : ''}${happyHour.checked && happyHour.deals.checked !== happyHour.checked ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHourDealsHtml(happyHour.deals, fr)}`]);
+    // Card polish (2026-10-27): one checked line at the bottom of the happy hour block (venueHappyHourBlockHtml).
+    if (happyHour && happyHour.deals) blocks.push(['hh', 'Happy hour', venueHappyHourBlockHtml(happyHour, fr)]);
     if (weeklySpecials) blocks.push(['sp', L('Weekly specials', 'Spéciaux de la semaine'), venueSpecialsHtml(weeklySpecials, fr)]);
     if (!blocks.length) return '';
     const title = blocks.length === 2 ? L('Happy hour & weekly specials', 'Happy hour et spéciaux de la semaine') : blocks[0][0] === 'hh' ? L('Happy hour deals', 'Spéciaux du happy hour') : L('Weekly specials', 'Spéciaux de la semaine');
@@ -55271,6 +55454,10 @@ module.exports = {
   UI_ICON_PATHS,
   specialDealRepeatsTitle,
   specialLine,
+  // Card polish (2026-10-27)
+  happyHourCheckedText, specialShownText, specialDealShown, stripShownTime, stripLeadingPrice, specialTitleIsGeneric, priceRangeText, happyHourPriceHtml,
+  nightShownText, nightTitleSaysKind, venueHappyHourBlockHtml, happyHourDealsHtml, specialTimeText, nightTimeText,
+  nightFrequencyText, venueSpecialsDaysText,
   visitorSectionHtml,
   CSP_REPORT_ONLY,
   CSP_POLICY,

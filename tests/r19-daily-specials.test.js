@@ -251,7 +251,7 @@ test('Venue page: a "Weekly specials" row under Happy hour, week order, today ma
   // Week order: Mon–Wed (prime rib), Tue (tacos), Wed (wings).
   assert.deepEqual([...en.matchAll(/class="venue-sp-title"[^>]*>([^<]+)</g)].map((m) => m[1]), ['Prime rib night', 'Taco Tuesday', 'Wing Wednesday']);
   assert.ok(en.includes('<span class="venue-sp is-today" role="listitem"><span class="venue-sp-days">Mon–Wed</span><span class="venue-sp-main"><span class="venue-sp-title">Prime rib night</span> <span class="venue-sp-price">$29</span> <span class="venue-sp-today">Today</span><span class="venue-sp-deal">10 oz prime rib dinner</span></span></span>'), en);
-  assert.ok(en.includes('<span class="venue-sp is-today" role="listitem"><span class="venue-sp-days">Tue</span><span class="venue-sp-main"><span class="venue-sp-title">Taco Tuesday</span> <span class="venue-sp-price">$3 each</span> <span class="venue-sp-today">Today</span><span class="venue-sp-deal">$3 tacos</span></span></span>'));
+  assert.ok(en.includes('<span class="venue-sp is-today" role="listitem"><span class="venue-sp-days">Tue</span><span class="venue-sp-main"><span class="venue-sp-title">Taco Tuesday</span> <span class="venue-sp-price">$3 each</span> <span class="venue-sp-today">Today</span></span></span>'), 'card polish (2026-10-27): "$3 tacos" only repeats the title and price');
   assert.ok(en.includes('<span class="venue-sp" role="listitem"><span class="venue-sp-days">Wed</span><span class="venue-sp-main"><span class="venue-sp-title">Wing Wednesday</span> <span class="venue-sp-price">60¢ each</span><span class="venue-sp-deal">60¢ wings, dine-in only</span><span class="venue-sp-time">from 4 PM</span></span></span>'), 'not today: no tag');
   assert.equal((en.match(/venue-sp-today/g) || []).length, 2);
   const checked = `Checked ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(today.slice(5, 7)) - 1]} ${Number(today.slice(8, 10))}, ${today.slice(0, 4)}`;
@@ -263,7 +263,7 @@ test('Venue page: a "Weekly specials" row under Happy hour, week order, today ma
   const fr = spRow(page(v, at(TUE, '12:00'), 'fr'));
   assert.match(fr, /aria-label="Spéciaux de la semaine"/);
   assert.ok(fr.includes('<span class="venue-sp-days">Lun–mer</span><span class="venue-sp-main"><span class="venue-sp-title">Soirée côte de bœuf</span> <span class="venue-sp-price">$29</span> <span class="venue-sp-today">Aujourd’hui</span><span class="venue-sp-deal">Souper de côte de bœuf 10 oz</span></span>'), fr);
-  assert.ok(fr.includes('<span class="venue-sp-days">Mar</span><span class="venue-sp-main"><span class="venue-sp-title" lang="en">Taco Tuesday</span> <span class="venue-sp-price" lang="en">$3 each</span> <span class="venue-sp-today">Aujourd’hui</span><span class="venue-sp-deal" lang="en">$3 tacos</span></span>'));
+  assert.ok(fr.includes('<span class="venue-sp-days">Mar</span><span class="venue-sp-main"><span class="venue-sp-title" lang="en">Taco Tuesday</span> <span class="venue-sp-price" lang="en">$3 each</span> <span class="venue-sp-today">Aujourd’hui</span></span>'));
   assert.match(fr, /<span class="venue-sp-time">dès 16 h<\/span>/);
   assert.match(fr, /venue-sp-checked">Vérifié le /);
   // A place closed today shows the week but marks no row.
@@ -319,7 +319,8 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: �
   const r = tue.find((p) => p[2] === 'Specials Map Pub');
   assert.equal(r.length, 18);
   assert.equal(r[16], 0, 'no deals: [16] is 0');
-  assert.deepEqual(r[17], ['tue', 'Taco Tuesday · $3 tacos'], 'today only, not the whole week');
+  // Card polish (2026-10-27): the deal only repeats the title and price, so the price stands in.
+  assert.deepEqual(r[17], ['tue', 'Taco Tuesday · $3 each'], 'today only, not the whole week');
   assert.deepEqual(tue.find((p) => p[2] === 'Specials Map Pub FR')[17], ['tue', 'Prime rib night · 10 oz prime rib dinner', 'Soirée côte de bœuf · Souper de côte de bœuf 10 oz']);
   assert.equal(tue.find((p) => p[2] === plain.name).length, 16, 'a place without specials today keeps 16 fields');
   assert.ok(JSON.stringify(r[17]).length < 60, 'one short field');
@@ -378,8 +379,8 @@ test('Build My Trip: a stop on its special\'s day says "Tonight: …" (or "Today
   const before = JSON.stringify(plan.days.map((d) => d.stops.map((s) => s.venue.id)));
   const out = app.withTripSpecials(plan, at(TUE, '09:00'));
   const [l, dinner] = out.days[0].stops;
-  assert.equal(dinner.specialLine, 'Tonight: Taco Tuesday · $3 tacos');
-  assert.equal(dinner.specialLineFr, 'Ce soir : Taco Tuesday · $3 tacos');
+  assert.equal(dinner.specialLine, 'Tonight: Taco Tuesday · $3 each');
+  assert.equal(dinner.specialLineFr, 'Ce soir : Taco Tuesday · $3 each');
   assert.equal(dinner.specialLineFrLang, 'en', 'French falls back to the English lines');
   assert.equal(l.specialLine, 'Today: Lunch bowl Tuesday · $12 rice bowls', 'before 4 PM');
   assert.equal(l.specialLineFr, 'Aujourd’hui : Lunch bowl Tuesday · $12 rice bowls');
