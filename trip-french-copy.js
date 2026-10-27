@@ -66,6 +66,20 @@ function t3FrenchText(value){
  text=text.replace(/^(.+) are closed right now, so they aren’t in this plan\.$/,(_,n)=>n.replace(/ and (?!.* and )/,' et ')+' sont fermés en ce moment; ils ne font donc pas partie de ce plan.');
  // Audit fix (2026-10-27): "tonight" asked after midnight is the coming evening (trip-planner.js planTrip).
  text=text.replace(/^It’s after midnight, so this plan is for (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) evening\.$/,(_,d)=>'Il est passé minuit; ce plan est donc pour '+FR_HEADING_DAYS[d]+' soir.');
+ // Planner (2026-10-27): the happy hour crawl (server.js tripHappyHourCrawlPlan) and the long-wait filler (trip-planner.js closeIdleGaps).
+ {
+  const dayFr=(d)=>FR_HEADING_DAYS[d]||d;
+  const frHhClock=(t)=>t.replace(/\bmidnight\b/g,'minuit').replace(/(\d{1,2})(?::(\d{2}))?–(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g,(m,h1,m1,h2,m2,ap)=>{const a=frClock12(h1,m1||'00',Number(h1)<=Number(h2)||Number(h1)===12?ap:(ap==='PM'?'AM':'PM')),b=frClock12(h2,m2||'00',ap);return a+'–'+b;}).replace(/(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g,(m,h,mm,ap)=>frClock12(h,mm||'00',ap));
+  text=text.replace(/^Each stop is timed inside its happy hour on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), from the times on its Okanagan Roam page\. Happy hours and deals change, so check before you go\.$/,(_,d)=>'Chaque arrêt est prévu pendant son happy hour le '+dayFr(d)+', selon les heures de sa fiche Okanagan Roam. Les happy hours et les offres changent; vérifiez avant de partir.');
+  text=text.replace(/^Fewer than two places in (.+?) have happy hours on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) that line up one after another, so here are the places with happy hour instead\.$/,(_,t,d)=>'Moins de deux lieux à '+t+' ont des happy hours le '+dayFr(d)+' qui se suivent; voici donc plutôt les lieux avec un happy hour.');
+  text=text.replace(/^Happy hour (.+?) on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), from its listing$/,(_,w,d)=>'Happy hour '+frHhClock(w)+' le '+dayFr(d)+', selon sa fiche');
+  text=text.replace(/^About a (\d+)-minute (walk|drive) from the stop before$/,(_,m,k)=>'À environ '+m+' minutes '+(k==='walk'?'à pied':'en voiture')+' de l’arrêt précédent');
+  text=text.replace(/^A happy hour crawl in (.+?) (tonight|today|on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\.$/,(_,t,w)=>'Une tournée des happy hours à '+t+(w==='tonight'?' ce soir':w==='today'?' aujourd’hui':' '+dayFr(w.slice(3)))+'.');
+  text=text.replace(/^Happy hour and dinner in (.+?) (tonight|today|on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))\.$/,(_,t,w)=>'Happy hour et souper à '+t+(w==='tonight'?' ce soir':w==='today'?' aujourd’hui':' '+dayFr(w.slice(3)))+'.');
+  if(text==='Dinner after the happy hours')return 'Souper après les happy hours';
+  if(text==='Fills the free time between stops')return 'Occupe le temps libre entre deux arrêts';
+  if(text==='Free time')return 'Temps libre';
+ }
  text=text.replace(/^It’s already late, so this plan is for tomorrow evening\.$/,'Il est déjà tard; ce plan est donc pour demain soir.');
  text=text.replace(/^It’s already evening, so this plan is for tomorrow afternoon\.$/,'Il est déjà le soir; ce plan est donc pour demain après-midi.');
  text=text.replace(/^It’s already afternoon, so this plan is for tomorrow morning\.$/,'Il est déjà l’après-midi; ce plan est donc pour demain matin.');

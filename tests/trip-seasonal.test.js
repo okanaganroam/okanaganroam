@@ -309,7 +309,8 @@ test('experience 9: a description names only kinds of stop that were chosen, and
     const text = plan.experience.text;
     const ss = stops(plan);
     for (const [re, ok] of KIND_WORDS) if (re.test(text.replace(/stop|Winter Carnival|Lights Festival|Family Fair/g, ''))) assert.ok(ss.some(ok), `${q}: "${re}" without such a stop: ${text}`);
-    const stopTowns = new Set(ss.map((s) => (s.venue ? s.venue.regionLabel : s.event.regionLabel)));
+    // Planner (2026-10-27): a Free time card (a long wait before dinner, named) has no place of its own.
+    const stopTowns = new Set(ss.filter((s) => s.venue || s.event).map((s) => (s.venue ? s.venue.regionLabel : s.event.regionLabel)));
     for (const t of allTowns) if (new RegExp(`\\b(in|to|from|for) ${t}\\b`).test(text) && !/drive/.test(text)) assert.ok(stopTowns.has(t), `${q}: names ${t}: ${text}`);
   }
 });
