@@ -8368,9 +8368,9 @@ function advisoryNotOperatingIds() {
 // (<path></path>) so a browser's innerHTML reads back exactly what was written.
 const UI_ICON_PATHS = {
   // Owner menu buttons (2026-10-27): the last emoji icons on the owner pages (camera, clipboard, pencil).
-  camera: '<path d="M4 8.5h3.2l1.8-2.5h6l1.8 2.5H20V19H4z"/><circle cx="12" cy="13.2" r="3.4"/>',
-  list: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6M9 10h6M9 14h6M9 18h4"/>',
-  pencil: '<path d="M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"/><path d="M13.5 7.3l3.2 3.2"/>',
+  camera: '<path d="M4 8.5h3.2l1.8-2.5h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.2" r="3.4"></circle>',
+  list: '<rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4.5h6M9 10h6M9 14h6M9 18h4"></path>',
+  pencil: '<path d="M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"></path><path d="M13.5 7.3l3.2 3.2"></path>',
   trip: '<rect x="5" y="7" width="14" height="13" rx="2"></rect><path d="M9 7V4.5h6V7"></path><path d="M9 11v5M15 11v5"></path>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>',
   cocktail: '<path d="M4 4h16l-8 9z"></path><path d="M12 13v7"></path><path d="M8 20h8"></path><path d="M7 7.5h10"></path>',
@@ -8417,10 +8417,10 @@ const UI_ICON_PATHS = {
 // inline (emoji pass 2): app.css draws every svg as a block, which is fine inside the flex buttons and chips but puts
 // the icon on a line of its own in an inline run of text (a badge chip, "Closed for the season", a plain button).
 // Menu editor buttons (2026-10-27): line icons in place of the camera and pencil emoji.
-const MENU_ICON_CAMERA = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M4 8.5h3.2l1.8-2.5h6l1.8 2.5H20V19H4z"/><circle cx="12" cy="13.2" r="3.4"/></svg>';
-const MENU_ICON_PENCIL = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"/><path d="M13.5 7.3l3.2 3.2"/></svg>';
-const MENU_ICON_LINK = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
-const MENU_ICON_KEYBOARD = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg>';
+const MENU_ICON_CAMERA = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M4 8.5h3.2l1.8-2.5h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.2" r="3.4"></circle></svg>';
+const MENU_ICON_PENCIL = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"></path><path d="M13.5 7.3l3.2 3.2"></path></svg>';
+const MENU_ICON_LINK = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>';
+const MENU_ICON_KEYBOARD = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"></path></svg>';
 function uiIcon(name, size = 15, inline = false) {
   const paths = UI_ICON_PATHS[name];
   if (!paths) return '';
