@@ -8367,6 +8367,10 @@ function advisoryNotOperatingIds() {
 // beside them are the accessible name, so nothing a screen reader says changes). Paths close explicitly
 // (<path></path>) so a browser's innerHTML reads back exactly what was written.
 const UI_ICON_PATHS = {
+  // Owner menu buttons (2026-10-27): the last emoji icons on the owner pages (camera, clipboard, pencil).
+  camera: '<path d="M4 8.5h3.2l1.8-2.5h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.2" r="3.4"></circle>',
+  list: '<rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4.5h6M9 10h6M9 14h6M9 18h4"></path>',
+  pencil: '<path d="M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"></path><path d="M13.5 7.3l3.2 3.2"></path>',
   trip: '<rect x="5" y="7" width="14" height="13" rx="2"></rect><path d="M9 7V4.5h6V7"></path><path d="M9 11v5M15 11v5"></path>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>',
   cocktail: '<path d="M4 4h16l-8 9z"></path><path d="M12 13v7"></path><path d="M8 20h8"></path><path d="M7 7.5h10"></path>',
@@ -8412,6 +8416,11 @@ const UI_ICON_PATHS = {
 };
 // inline (emoji pass 2): app.css draws every svg as a block, which is fine inside the flex buttons and chips but puts
 // the icon on a line of its own in an inline run of text (a badge chip, "Closed for the season", a plain button).
+// Menu editor buttons (2026-10-27): line icons in place of the camera and pencil emoji.
+const MENU_ICON_CAMERA = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M4 8.5h3.2l1.8-2.5h6l1.8 2.5H20V19H4z"></path><circle cx="12" cy="13.2" r="3.4"></circle></svg>';
+const MENU_ICON_PENCIL = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M4 20l1-4.2L15.6 5.2a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19z"></path><path d="M13.5 7.3l3.2 3.2"></path></svg>';
+const MENU_ICON_LINK = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>';
+const MENU_ICON_KEYBOARD = '<svg class="ui-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:-0.2em"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"></path></svg>';
 function uiIcon(name, size = 15, inline = false) {
   const paths = UI_ICON_PATHS[name];
   if (!paths) return '';
@@ -44281,17 +44290,17 @@ const MENU_APP_STRINGS = {
   en: {
     title: 'Add your menu', adminTitle: 'Menu editor',
     intro: 'Take a photo of your menu and we&rsquo;ll turn it into text on your page, so people searching for your food can find you. It takes about 2 minutes.',
-    take: '&#128247;&nbsp;Take a photo of your menu', choose: 'or choose a photo or PDF',
+    take: MENU_ICON_CAMERA + '&nbsp;Take a photo of your menu', choose: 'or choose a photo or PDF',
     tip: 'Tip: good light, phone held straight above the page, the whole page in the picture.',
-    adding: 'Adding your page&hellip;', gotIt: 'Got it! Is there another page?', addAnother: '&#128247;&nbsp;Add another page', thatsAll: 'That&rsquo;s everything',
+    adding: 'Adding your page&hellip;', gotIt: 'Got it! Is there another page?', addAnother: MENU_ICON_CAMERA + '&nbsp;Add another page', thatsAll: 'That&rsquo;s everything',
     pageN: 'Page {n}', remove: 'Remove',
-    reading: 'Reading your menu&hellip; about {s} seconds &#9749;', readingSub: 'You can stay on this page. Your menu will show up here when it&rsquo;s ready.',
+    reading: 'Reading your menu&hellip; about {s} seconds', readingSub: 'You can stay on this page. Your menu will show up here when it&rsquo;s ready.',
     blurry: 'This photo is a little hard to read. Could you try again in good light, holding the phone straight above the menu?',
     notMenu: 'Hmm, that doesn&rsquo;t look like a menu. Could you try another photo?',
     failed: 'Sorry, that didn&rsquo;t work this time. Please try again.',
     unavailable: 'Our menu reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
     busy: 'That&rsquo;s a lot of menus today! Press the button below and we&rsquo;ll finish it for you, or try again tomorrow.',
-    webButton: '&#128279;&nbsp;My menu is on my website', webTitle: 'Get your menu from your website',
+    webButton: MENU_ICON_LINK + '&nbsp;My menu is on my website', webTitle: 'Get your menu from your website',
     webIntro: 'Paste the link to your website or your menu page. We&rsquo;ll find the menu and bring it in for you to check.',
     webGo: 'Get my menu', webLooking: 'Looking at your website&hellip;', webFound: 'We brought your menu in from your website. Please check it, then publish.',
     webNothing: 'We found the page, but couldn&rsquo;t pick out a menu on it. Try a photo instead, or tap &ldquo;Can you do it for me?&rdquo;',
@@ -44299,7 +44308,7 @@ const MENU_APP_STRINGS = {
     gettingReady: 'Getting the reader ready (first time only, about 10 seconds)&hellip;', checkingPrices: 'Double-checking the prices&hellip;',
     stripHint: 'Under each line you&rsquo;ll see that bit of your photo, so you can check the name and price at a glance.',
     moveUp: 'Move up', moveDown: 'Move down', moveTo: 'Section:',
-    tryAgain: 'Try again', newPhoto: '&#128247;&nbsp;Take a new photo', startOver: 'Start over with new photos', startFresh: 'Start over',
+    tryAgain: 'Try again', newPhoto: MENU_ICON_CAMERA + '&nbsp;Take a new photo', startOver: 'Start over with new photos', startFresh: 'Start over',
     reviewTitle: 'Here&rsquo;s your menu', reviewIntro: 'This is how customers will see it. Tap any dish or price to fix it.',
     checkCount: 'Please check the {n} in yellow.', checkOne: 'Please check the one in yellow.', checkThis: 'Please check this',
     partial: 'Some parts were hard to read. Please check the yellow ones, and add anything that&rsquo;s missing.',
@@ -44309,8 +44318,8 @@ const MENU_APP_STRINGS = {
     dishName: 'Dish name', price: 'Price', description: 'Description (optional)', done: 'Done', deleteDish: 'Delete this dish',
     addDish: '+ Add a dish', sectionName: 'Section name', addSection: '+ Add a section', deleteSection: 'Delete this section',
     newDish: 'New dish', newSection: 'New section', noPrice: 'add price', emptySection: 'No dishes yet.',
-    live: '&#127881; Your menu is live!', liveSub: 'Customers can now see your menu on Okanagan Roam.', seeIt: 'See it on Okanagan Roam',
-    sent: '&#127881; Thanks! Your menu is on its way.', sentSub: 'We&rsquo;ll give it a quick check and put it live, usually within a day.',
+    live: 'Your menu is live!', liveSub: 'Customers can now see your menu on Okanagan Roam.', seeIt: 'See it on Okanagan Roam',
+    sent: 'Thanks! Your menu is on its way.', sentSub: 'We&rsquo;ll give it a quick check and put it live, usually within a day.',
     email: 'Your email (optional, so we can tell you when it&rsquo;s live)', helpEmail: 'Your email (optional)',
     back: 'Back to my listing',
     help: 'Can you do it for me?', helpTitle: 'No problem, we&rsquo;ll do it for you!',
@@ -44319,7 +44328,7 @@ const MENU_APP_STRINGS = {
     helpNote: 'Anything we should know? (optional)', helpNoteNeeded: 'Where can we find your menu?', helpPhone: 'Phone (optional)',
     helpSend: 'Send it to us', helpCancel: 'Never mind', helpDone: 'Thanks! We&rsquo;ve got it. We&rsquo;ll put your menu up and let you know.',
     haveMenu: 'Your menu is live', haveMenuSub: '{n} dishes &middot; updated {date}',
-    replace: '&#128247;&nbsp;Replace it with a new menu', change: '&#9999;&#65039;&nbsp;Make a change', takeDown: 'Take it off my page',
+    replace: MENU_ICON_CAMERA + '&nbsp;Replace it with a new menu', change: MENU_ICON_PENCIL + '&nbsp;Make a change', takeDown: 'Take it off my page',
     takeDownConfirm: 'Take your menu off Okanagan Roam? You can add it again any time.',
     waiting: 'Thanks! Your menu is waiting for a quick check. It will be live soon.',
     helpWaiting: 'Thanks! We&rsquo;re typing up your menu and will let you know when it&rsquo;s up.',
@@ -44328,7 +44337,7 @@ const MENU_APP_STRINGS = {
     network: 'No connection right now. Please check your internet and try again.',
     other: 'Fran&ccedil;ais', diet: { vegan: 'Vegan', vegetarian: 'Vegetarian', gluten_free: 'Gluten-free', dairy_free: 'Dairy-free', spicy: 'Spicy' },
     // Typing a menu in (2026-10-18) and checking every yellow line before it goes live.
-    typeButton: '&#9000;&#65039;&nbsp;Type it in myself', typeTitle: 'Type in your menu',
+    typeButton: MENU_ICON_KEYBOARD + '&nbsp;Type it in myself', typeTitle: 'Type in your menu',
     typeIntro: 'Add each dish with its price (the description is optional). Tap a section name to change it, and add sections like Starters, Mains or Drinks.',
     firstSection: 'Menu', sectionPh: 'Section name, like Starters', namePh: 'like Caesar Salad', pricePh: 'like 14 or 12.50',
     duration: 'How long (optional)', durationPh: 'like 3 hours',
@@ -44338,17 +44347,17 @@ const MENU_APP_STRINGS = {
   fr: {
     title: 'Ajoutez votre menu', adminTitle: '&Eacute;diteur de menu',
     intro: 'Prenez votre menu en photo et nous le transformons en texte sur votre page, pour que les gens qui cherchent vos plats vous trouvent. Environ 2&nbsp;minutes.',
-    take: '&#128247;&nbsp;Prendre votre menu en photo', choose: 'ou choisir une photo ou un PDF',
+    take: MENU_ICON_CAMERA + '&nbsp;Prendre votre menu en photo', choose: 'ou choisir une photo ou un PDF',
     tip: 'Astuce&nbsp;: bonne lumi&egrave;re, t&eacute;l&eacute;phone bien au-dessus de la page, toute la page dans la photo.',
-    adding: 'Ajout de votre page&hellip;', gotIt: 'C&rsquo;est not&eacute;&nbsp;! Y a-t-il une autre page&nbsp;?', addAnother: '&#128247;&nbsp;Ajouter une autre page', thatsAll: 'C&rsquo;est tout',
+    adding: 'Ajout de votre page&hellip;', gotIt: 'C&rsquo;est not&eacute;&nbsp;! Y a-t-il une autre page&nbsp;?', addAnother: MENU_ICON_CAMERA + '&nbsp;Ajouter une autre page', thatsAll: 'C&rsquo;est tout',
     pageN: 'Page {n}', remove: 'Retirer',
-    reading: 'Lecture de votre menu&hellip; environ {s}&nbsp;secondes &#9749;', readingSub: 'Restez sur cette page. Votre menu s&rsquo;affichera ici d&egrave;s qu&rsquo;il sera pr&ecirc;t.',
+    reading: 'Lecture de votre menu&hellip; environ {s}&nbsp;secondes', readingSub: 'Restez sur cette page. Votre menu s&rsquo;affichera ici d&egrave;s qu&rsquo;il sera pr&ecirc;t.',
     blurry: 'Cette photo est un peu difficile &agrave; lire. Pourriez-vous r&eacute;essayer avec une bonne lumi&egrave;re, le t&eacute;l&eacute;phone bien au-dessus du menu&nbsp;?',
     notMenu: 'Hmm, cela ne ressemble pas &agrave; un menu. Pourriez-vous essayer une autre photo&nbsp;?',
     failed: 'D&eacute;sol&eacute;, &ccedil;a n&rsquo;a pas fonctionn&eacute; cette fois. Veuillez r&eacute;essayer.',
     unavailable: 'Notre lecteur de menus fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous le taperons pour vous.',
     busy: 'Beaucoup de menus aujourd&rsquo;hui&nbsp;! Appuyez ci-dessous et nous le terminerons pour vous, ou r&eacute;essayez demain.',
-    webButton: '&#128279;&nbsp;Mon menu est sur mon site', webTitle: 'R&eacute;cup&eacute;rer votre menu depuis votre site',
+    webButton: MENU_ICON_LINK + '&nbsp;Mon menu est sur mon site', webTitle: 'R&eacute;cup&eacute;rer votre menu depuis votre site',
     webIntro: 'Collez le lien de votre site ou de votre page menu. Nous trouverons le menu et l&rsquo;importerons pour que vous le v&eacute;rifiiez.',
     webGo: 'R&eacute;cup&eacute;rer mon menu', webLooking: 'Nous regardons votre site&hellip;', webFound: 'Votre menu a &eacute;t&eacute; import&eacute; depuis votre site. V&eacute;rifiez-le, puis publiez.',
     webNothing: 'Nous avons trouv&eacute; la page, mais pas de menu dessus. Essayez plut&ocirc;t une photo, ou touchez &laquo;&nbsp;Pouvez-vous le faire pour moi&nbsp;?&nbsp;&raquo;',
@@ -44356,7 +44365,7 @@ const MENU_APP_STRINGS = {
     gettingReady: 'Pr&eacute;paration du lecteur (premi&egrave;re fois seulement, environ 10&nbsp;secondes)&hellip;', checkingPrices: 'V&eacute;rification des prix&hellip;',
     stripHint: 'Sous chaque ligne, vous verrez ce morceau de votre photo pour v&eacute;rifier le nom et le prix d&rsquo;un coup d&rsquo;&oelig;il.',
     moveUp: 'Monter', moveDown: 'Descendre', moveTo: 'Section&nbsp;:',
-    tryAgain: 'R&eacute;essayer', newPhoto: '&#128247;&nbsp;Prendre une nouvelle photo', startOver: 'Recommencer avec de nouvelles photos', startFresh: 'Recommencer',
+    tryAgain: 'R&eacute;essayer', newPhoto: MENU_ICON_CAMERA + '&nbsp;Prendre une nouvelle photo', startOver: 'Recommencer avec de nouvelles photos', startFresh: 'Recommencer',
     reviewTitle: 'Voici votre menu', reviewIntro: 'Voici ce que verront vos clients. Touchez un plat ou un prix pour le corriger.',
     checkCount: 'V&eacute;rifiez les {n} en jaune.', checkOne: 'V&eacute;rifiez celui en jaune.', checkThis: '&Agrave; v&eacute;rifier',
     partial: 'Certaines parties &eacute;taient difficiles &agrave; lire. V&eacute;rifiez celles en jaune et ajoutez ce qui manque.',
@@ -44366,8 +44375,8 @@ const MENU_APP_STRINGS = {
     dishName: 'Nom du plat', price: 'Prix', description: 'Description (facultatif)', done: 'Termin&eacute;', deleteDish: 'Supprimer ce plat',
     addDish: '+ Ajouter un plat', sectionName: 'Nom de la section', addSection: '+ Ajouter une section', deleteSection: 'Supprimer cette section',
     newDish: 'Nouveau plat', newSection: 'Nouvelle section', noPrice: 'ajouter le prix', emptySection: 'Aucun plat pour l&rsquo;instant.',
-    live: '&#127881; Votre menu est en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir votre menu sur Okanagan Roam.', seeIt: 'Le voir sur Okanagan Roam',
-    sent: '&#127881; Merci&nbsp;! Votre menu est en route.', sentSub: 'Nous le v&eacute;rifions rapidement et le mettons en ligne, g&eacute;n&eacute;ralement en moins d&rsquo;une journ&eacute;e.',
+    live: 'Votre menu est en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir votre menu sur Okanagan Roam.', seeIt: 'Le voir sur Okanagan Roam',
+    sent: 'Merci&nbsp;! Votre menu est en route.', sentSub: 'Nous le v&eacute;rifions rapidement et le mettons en ligne, g&eacute;n&eacute;ralement en moins d&rsquo;une journ&eacute;e.',
     email: 'Votre courriel (facultatif, pour vous pr&eacute;venir quand il est en ligne)', helpEmail: 'Votre courriel (facultatif)',
     back: 'Retour &agrave; ma fiche',
     help: 'Pouvez-vous le faire pour moi&nbsp;?', helpTitle: 'Pas de souci, on s&rsquo;en occupe&nbsp;!',
@@ -44376,7 +44385,7 @@ const MENU_APP_STRINGS = {
     helpNote: 'Quelque chose &agrave; nous dire&nbsp;? (facultatif)', helpNoteNeeded: 'O&ugrave; trouver votre menu&nbsp;?', helpPhone: 'T&eacute;l&eacute;phone (facultatif)',
     helpSend: 'Nous l&rsquo;envoyer', helpCancel: 'Annuler', helpDone: 'Merci&nbsp;! C&rsquo;est re&ccedil;u. Nous mettrons votre menu en ligne et vous pr&eacute;viendrons.',
     haveMenu: 'Votre menu est en ligne', haveMenuSub: '{n}&nbsp;plats &middot; mis &agrave; jour {date}',
-    replace: '&#128247;&nbsp;Le remplacer par un nouveau menu', change: '&#9999;&#65039;&nbsp;Faire une modification', takeDown: 'Le retirer de ma page',
+    replace: MENU_ICON_CAMERA + '&nbsp;Le remplacer par un nouveau menu', change: MENU_ICON_PENCIL + '&nbsp;Faire une modification', takeDown: 'Le retirer de ma page',
     takeDownConfirm: 'Retirer votre menu d&rsquo;Okanagan Roam&nbsp;? Vous pourrez le rajouter quand vous voulez.',
     waiting: 'Merci&nbsp;! Votre menu attend une v&eacute;rification rapide. Il sera bient&ocirc;t en ligne.',
     helpWaiting: 'Merci&nbsp;! Nous tapons votre menu et vous pr&eacute;viendrons quand il sera en ligne.',
@@ -44384,7 +44393,7 @@ const MENU_APP_STRINGS = {
     pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo du menu.',
     network: 'Pas de connexion pour l&rsquo;instant. V&eacute;rifiez votre internet et r&eacute;essayez.',
     other: 'English', diet: MENU_DIETARY_LABELS.fr,
-    typeButton: '&#9000;&#65039;&nbsp;Je le tape moi-m&ecirc;me', typeTitle: 'Tapez votre menu',
+    typeButton: MENU_ICON_KEYBOARD + '&nbsp;Je le tape moi-m&ecirc;me', typeTitle: 'Tapez votre menu',
     typeIntro: 'Ajoutez chaque plat avec son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer, et ajoutez des sections comme Entr&eacute;es, Plats ou Boissons.',
     firstSection: 'Menu', sectionPh: 'Nom de la section, ex. Entr\u00e9es', namePh: 'ex. Salade C\u00e9sar', pricePh: 'ex. 14 ou 12,50',
     duration: 'Dur&eacute;e (facultatif)', durationPh: 'ex. 3 heures',
@@ -44402,25 +44411,25 @@ function priceListAppStrings(kind, lang) {
     return {
       title: `Ajoutez ${f.listHtml}`, adminTitle: '&Eacute;diteur de tarifs',
       intro: `Prenez votre liste de prix ou votre brochure en photo et nous en faisons ${f.blurb} sur votre page, pour que les gens qui vous cherchent vous trouvent. Environ 2&nbsp;minutes.`,
-      take: '&#128247;&nbsp;Prendre votre liste de prix en photo',
-      reading: 'Lecture de votre liste de prix&hellip; environ {s}&nbsp;secondes &#9749;', readingSub: 'Restez sur cette page. Vos tarifs s&rsquo;afficheront ici d&egrave;s que ce sera pr&ecirc;t.',
+      take: MENU_ICON_CAMERA + '&nbsp;Prendre votre liste de prix en photo',
+      reading: 'Lecture de votre liste de prix&hellip; environ {s}&nbsp;secondes', readingSub: 'Restez sur cette page. Vos tarifs s&rsquo;afficheront ici d&egrave;s que ce sera pr&ecirc;t.',
       blurry: 'Cette photo est un peu difficile &agrave; lire. Pourriez-vous r&eacute;essayer avec une bonne lumi&egrave;re, le t&eacute;l&eacute;phone bien au-dessus de la page&nbsp;?',
       notMenu: 'Hmm, cela ne ressemble pas &agrave; une liste de prix. Pourriez-vous essayer une autre photo&nbsp;?',
       unavailable: 'Notre lecteur fait une pause. Pas de souci&nbsp;: appuyez ci-dessous et nous la taperons pour vous.',
       reviewTitle: 'Voici vos tarifs', reviewIntro: 'Voici ce que verront vos clients. Touchez une ligne ou un prix pour le corriger.',
       dishName: f.name, description: `Description&nbsp;: ${f.desc} (facultatif)`, deleteDish: 'Supprimer cette ligne',
       addDish: '+ Ajouter une ligne', newDish: 'Nouvelle ligne', emptySection: 'Rien pour l&rsquo;instant.',
-      live: '&#127881; Vos tarifs sont en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir vos prix sur Okanagan Roam.',
-      sent: '&#127881; Merci&nbsp;! Vos tarifs sont en route.',
+      live: 'Vos tarifs sont en ligne&nbsp;!', liveSub: 'Vos clients peuvent maintenant voir vos prix sur Okanagan Roam.',
+      sent: 'Merci&nbsp;! Vos tarifs sont en route.',
       helpIntro: 'Nous taperons vos prix et les mettrons sur votre page, g&eacute;n&eacute;ralement en quelques jours.',
       helpNoPages: 'Pas encore de photo&nbsp;? Dites-nous o&ugrave; trouver vos prix, par exemple un lien vers votre site.', helpNoteNeeded: 'O&ugrave; trouver vos prix&nbsp;?',
       helpDone: 'Merci&nbsp;! C&rsquo;est re&ccedil;u. Nous mettrons vos tarifs en ligne et vous pr&eacute;viendrons.',
       haveMenu: 'Vos tarifs sont en ligne', haveMenuSub: `{n}&nbsp;${f.items} &middot; mis &agrave; jour {date}`,
-      replace: '&#128247;&nbsp;Remplacer par une nouvelle liste de prix', takeDownConfirm: 'Retirer vos tarifs d&rsquo;Okanagan Roam&nbsp;? Vous pourrez les rajouter quand vous voulez.',
+      replace: MENU_ICON_CAMERA + '&nbsp;Remplacer par une nouvelle liste de prix', takeDownConfirm: 'Retirer vos tarifs d&rsquo;Okanagan Roam&nbsp;? Vous pourrez les rajouter quand vous voulez.',
       waiting: 'Merci&nbsp;! Vos tarifs attendent une v&eacute;rification rapide. Ce sera bient&ocirc;t en ligne.',
       helpWaiting: 'Merci&nbsp;! Nous tapons vos tarifs et vous pr&eacute;viendrons quand ce sera en ligne.',
       pdfBig: 'Ce PDF est trop lourd. Essayez plut&ocirc;t une photo de la liste de prix.', diet: {},
-      webButton: '&#128279;&nbsp;Mes tarifs sont sur mon site', webTitle: 'R&eacute;cup&eacute;rer vos tarifs depuis votre site',
+      webButton: MENU_ICON_LINK + '&nbsp;Mes tarifs sont sur mon site', webTitle: 'R&eacute;cup&eacute;rer vos tarifs depuis votre site',
       webIntro: 'Collez le lien de votre site ou de votre page de tarifs. Nous trouverons vos prix et les importerons pour que vous les v&eacute;rifiiez.',
       webGo: 'R&eacute;cup&eacute;rer mes tarifs', webFound: 'Vos tarifs ont &eacute;t&eacute; import&eacute;s depuis votre site. V&eacute;rifiez-les, puis publiez.',
       webNothing: 'Nous avons trouv&eacute; la page, mais pas de prix dessus. Essayez plut&ocirc;t une photo, ou touchez &laquo;&nbsp;Pouvez-vous le faire pour moi&nbsp;?&nbsp;&raquo;',
@@ -44436,25 +44445,25 @@ function priceListAppStrings(kind, lang) {
   return {
     title: `Add your ${L}`, adminTitle: kind === 'tours' ? 'Tours editor' : 'Prices editor',
     intro: `Take a photo of your price list or brochure and we&rsquo;ll turn it into ${e.blurb} on your page, so ${e.seekers} can find you. It takes about 2 minutes.`,
-    take: '&#128247;&nbsp;Take a photo of your price list',
-    reading: 'Reading your price list&hellip; about {s} seconds &#9749;', readingSub: `You can stay on this page. ${e.what.charAt(0).toUpperCase() + e.what.slice(1)} will show up here when they&rsquo;re ready.`,
+    take: MENU_ICON_CAMERA + '&nbsp;Take a photo of your price list',
+    reading: 'Reading your price list&hellip; about {s} seconds', readingSub: `You can stay on this page. ${e.what.charAt(0).toUpperCase() + e.what.slice(1)} will show up here when they&rsquo;re ready.`,
     blurry: 'This photo is a little hard to read. Could you try again in good light, holding the phone straight above the page?',
     notMenu: 'Hmm, that doesn&rsquo;t look like a price list. Could you try another photo?',
     unavailable: 'Our reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
     reviewTitle: `Here are ${e.what}`, reviewIntro: `This is how customers will see them. Tap any ${e.item} or price to fix it.`,
     dishName: e.name, description: `Description: ${e.desc} (optional)`, deleteDish: `Delete this ${e.item}`,
     addDish: `+ Add a ${e.item}`, newDish: `New ${e.item}`, emptySection: `No ${e.items} yet.`,
-    live: `&#127881; Your ${L} are live!`, liveSub: `Customers can now see ${e.what} on Okanagan Roam.`,
-    sent: `&#127881; Thanks! Your ${L} are on their way.`,
+    live: `Your ${L} are live!`, liveSub: `Customers can now see ${e.what} on Okanagan Roam.`,
+    sent: `Thanks! Your ${L} are on their way.`,
     helpIntro: `We&rsquo;ll type up ${e.what} and put them on your page, usually within a couple of days.`,
     helpNoPages: 'No photo yet? Tell us where to find your prices, like a link to them on your website.', helpNoteNeeded: 'Where can we find your prices?',
     helpDone: `Thanks! We&rsquo;ve got it. We&rsquo;ll put ${e.what} up and let you know.`,
     haveMenu: `Your ${L} are live`, haveMenuSub: `{n} ${e.items} &middot; updated {date}`,
-    replace: '&#128247;&nbsp;Replace with a new price list', takeDownConfirm: `Take ${e.what} off Okanagan Roam? You can add them again any time.`,
+    replace: MENU_ICON_CAMERA + '&nbsp;Replace with a new price list', takeDownConfirm: `Take ${e.what} off Okanagan Roam? You can add them again any time.`,
     waiting: `Thanks! Your ${L} are waiting for a quick check. They will be live soon.`,
     helpWaiting: `Thanks! We&rsquo;re typing up ${e.what} and will let you know when they&rsquo;re up.`,
     pdfBig: 'That PDF is too big. Try a photo of the price list instead.', diet: {},
-    webButton: '&#128279;&nbsp;My prices are on my website', webTitle: `Get your ${L} from your website`,
+    webButton: MENU_ICON_LINK + '&nbsp;My prices are on my website', webTitle: `Get your ${L} from your website`,
     webIntro: 'Paste the link to your website or the page with your prices. We&rsquo;ll find them and bring them in for you to check.',
     webGo: 'Get my prices', webFound: `We brought ${e.what} in from your website. Please check them, then publish.`,
     webNothing: 'We found the page, but couldn&rsquo;t pick out prices on it. Try a photo instead, or tap &ldquo;Can you do it for me?&rdquo;',
@@ -44516,7 +44525,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   function publishedScreen(){
     var p = S.published;
-    setScreen('<h1>' + T.haveMenu + ' &#9989;</h1><p class="mn-lead">' + f(T.haveMenuSub, { n: p.items, date: h(p.date) }) + '</p>'
+    setScreen('<h1>' + T.haveMenu + '</h1><p class="mn-lead">' + f(T.haveMenuSub, { n: p.items, date: h(p.date) }) + '</p>'
       + '<a class="mn-btn mn-big" href="' + h(p.url) + '" target="_blank" rel="noopener">' + T.seeIt + '</a>'
       + '<button type="button" class="mn-btn mn-plain" data-act="edit">' + T.change + '</button>'
       + '<button type="button" class="mn-btn mn-plain" data-act="replace">' + T.replace + '</button>'
@@ -44580,7 +44589,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       + '<span class="mn-line"><span class="mn-name">' + (it.name ? h(it.name) : '<em>' + T.dishName + '</em>') + '</span><span class="mn-price">' + (it.price ? h(priceText(it.price)) : '<em>' + T.noPrice + '</em>') + '</span></span>'
       + (it.duration || it.description ? '<span class="mn-desc">' + h([it.duration, it.description].filter(Boolean).join(' \u00b7 ')) + '</span>' : '') + (tags ? '<span class="mn-tags">' + tags + '</span>' : '')
       + stripHtml(it)
-      + (it.check ? '<span class="mn-flag">&#9888;&#65039; ' + T.checkThis + '</span>' : '') + '</button>';
+      + (it.check ? '<span class="mn-flag">' + T.checkThis + '</span>' : '') + '</button>';
   }
   // The dish's name and price as they look in the owner's photo, under what was read, so checking is "does it match?".
   function stripHtml(it){
@@ -46317,7 +46326,7 @@ async function handleOwnerAccountSetup(req, res, token) {
   const published = publishPendingOwnerInstant(venueId, account);
   const session = startOwnerSession(account.id);
   res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': ownerCookieHeader(req, session, OWNER_SESSION_DAYS * 86400) });
-  return res.end(JSON.stringify({ ok: true, action, ...(published ? { published: published.fields } : {}) }));
+  return res.end(JSON.stringify({ ok: true, action, href: `/owner/account/venue/${venueId}`, ...(published ? { published: published.fields } : {}) }));
 }
 
 // POST /owner/login
@@ -47680,12 +47689,19 @@ ${ownerEntryMessagesJson(fr)}<script>
 ${ownerEntryMessagesScript(fr)}
 (function(){
   var f = document.getElementById('olForm'), err = document.getElementById('olError'), btn = document.getElementById('olSubmit');
+  // The reset address in a message is a link (2026-10-27), built with DOM nodes so nothing in the message is parsed as HTML.
+  function showErr(msg){
+    err.textContent = ''; var m = /okanaganroam\\.com(\\/fr)?\\/owner\\/forgot/.exec(msg);
+    if (m) { var a = document.createElement('a'); a.href = (m[1] || '') + '/owner/forgot'; a.textContent = m[0]; err.appendChild(document.createTextNode(msg.slice(0, m.index))); err.appendChild(a); err.appendChild(document.createTextNode(msg.slice(m.index + m[0].length))); }
+    else err.textContent = msg;
+    err.hidden = false;
+  }
   f.addEventListener('submit', function(e){
     e.preventDefault(); err.hidden = true; btn.disabled = true;
     fetch('${fr ? '/fr' : ''}/owner/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin',
       body: JSON.stringify({ email: document.getElementById('olEmail').value, password: document.getElementById('olPassword').value }) })
       .then(function(r){ return r.json(); })
-      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '${fr ? '/fr' : ''}/owner/account'; return; } err.textContent = oeMsg((j && j.error) || 'Please try again.'); err.hidden = false; })
+      .then(function(j){ btn.disabled = false; if (j && j.ok) { location.href = '${fr ? '/fr' : ''}/owner/account'; return; } showErr(oeMsg((j && j.error) || 'Please try again.')); })
       .catch(function(){ btn.disabled = false; err.textContent = ${fr ? "'Connexion impossible. Vérifiez votre connexion Internet.'" : "'Could not sign in. Please check your connection.'"}; err.hidden = false; });
   });
 })();
@@ -47705,7 +47721,30 @@ function renderOwnerAccountPage(account, lang = 'en') {
       <span><a href="${P('/owner/account/settings')}">${L('Account settings', 'Paramètres du compte')}</a> &nbsp;&middot;&nbsp; <button type="button" class="op-linkbtn" id="opLogout">${L('Log out', 'Se déconnecter')}</button></span></div>
     <h1>${L('My listings', 'Mes fiches')}</h1>
     ${venues.length ? `<ul class="op-venues">${items}</ul>` : `<p>${L('No businesses are linked to this login yet.', 'Aucune entreprise n’est encore liée à ce compte.')}</p>`}
-    <p class="op-hint">${L('Manage another business? Open its private edit link on this device while you&rsquo;re signed in and tap <strong>Add to my login</strong>.', 'Vous gérez une autre entreprise? Ouvrez son lien de modification privé sur cet appareil pendant que vous êtes connecté, puis touchez <strong>Ajouter à mon compte</strong>.')}</p>
+    <details class="op-login" id="opAddAnother">
+      <summary>${L('<strong>+ Add another business</strong>', '<strong>+ Ajouter une autre entreprise</strong>')}</summary>
+      <form id="oaForm" novalidate>
+        <div class="form-field"><label for="oaLink">${L('Paste its private edit link (from our email)', 'Collez son lien de modification privé (de notre courriel)')}</label>
+          <input type="url" id="oaLink" inputmode="url" autocomplete="off" placeholder="okanaganroam.com/owner/..."><p class="lyv-error" id="oaError" hidden></p></div>
+        <button type="submit" class="venue-form-submit">${L('Open it', 'L’ouvrir')}</button>
+      </form>
+      <p class="op-hint">${L('It opens with an <strong>Add to my login</strong> button. Tap it and the business shows here with the others.', 'Il s’ouvre avec un bouton <strong>Ajouter à mon compte</strong>. Touchez-le et l’entreprise s’affiche ici avec les autres.')}</p>
+      <p class="op-hint">${L(`No link? <a href="${P('/owner/link')}">Email me a new link</a>, or find the business on Okanagan Roam and tap <strong>Claim this listing</strong> (<a href="/browse">search all places</a>). Not listed yet? <a href="/list-your-venue">List it for free</a>.`, `Pas de lien? <a href="${P('/owner/link')}">Recevoir un nouveau lien par courriel</a>, ou trouvez l’entreprise sur Okanagan Roam et touchez <strong>Réclamer cette fiche</strong> (<a href="/browse">chercher tous les lieux</a>). Pas encore inscrite? <a href="/list-your-venue">Inscrivez-la gratuitement</a>.`)}</p>
+    </details>
+<script>
+// Add another business (2026-10-27): a pasted edit link opens on this site, keeping the page's language.
+(function(){
+  var f = document.getElementById('oaForm'); if (!f) return;
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var v = document.getElementById('oaLink').value.trim(), err = document.getElementById('oaError');
+    var m = /(?:^|\\/)(fr\\/)?owner\\/([A-Za-z0-9_-]{16,})\\/?(?:[?#].*)?$/.exec(v);
+    if (!m) { err.textContent = ${JSON.stringify(L('That doesn’t look like an edit link. It looks like okanaganroam.com/owner/ followed by letters and numbers.', 'Ce n’est pas un lien de modification. Il ressemble à okanaganroam.com/owner/ suivi de lettres et de chiffres.'))}; err.hidden = false; return; }
+    err.hidden = true;
+    location.href = (m[1] || ${JSON.stringify(fr ? 'fr/' : '')} ? '/fr' : '') + '/owner/' + m[2];
+  });
+})();
+</script>
 <script>
 // This device remembers which listings are yours, so their public pages say "You manage this listing" (2026-10-18).
 try { localStorage.setItem('okrOwnerVenues', JSON.stringify(${JSON.stringify(venues.map((v) => v.id))})); } catch (e) {}
@@ -50154,7 +50193,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
         : draft ? `Vous avez commencé à ajouter ${list}. Touchez pour reprendre là où vous étiez.`
           : w ? `Prenez votre liste de prix en photo ou donnez-nous le lien de votre site Web. Nous en faisons ${frDecode(w.fr.blurb)} sur votre page en environ 2 minutes.`
             : 'Prenez votre menu en photo ou donnez-nous le lien de votre site Web. Nous le transformons en texte sur votre page en environ 2 minutes.';
-    const big = pub ? `&#128203; ${escapeHtml(cap(list))}` : `&#128247; Ajouter ${escapeHtml(list)}`;
+    const big = pub ? `${uiIcon('list', 22, true)} ${escapeHtml(cap(list))}` : `${uiIcon('camera', 22, true)} Ajouter ${escapeHtml(list)}`;
     return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
   }
   const what = w ? w.en.list : 'menu';
@@ -50163,7 +50202,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
       : draft ? `You started adding your ${what}. Tap to pick up where you left off.`
         : w ? `Snap a photo of your price list, or share the link from your website. We turn it into ${w.en.blurb} on your page in about 2 minutes.`
           : 'Snap a photo of your menu, or share the link from your website. We turn it into text on your page in about 2 minutes.';
-  const big = w ? `${pub ? '&#128203; Your' : '&#128247; Add your'} ${escapeHtml(w.en.list)}` : (pub ? '&#128203; Your menu' : '&#128247; Add your menu');
+  const big = w ? `${pub ? `${uiIcon('list', 22, true)} Your` : `${uiIcon('camera', 22, true)} Add your`} ${escapeHtml(w.en.list)}` : (pub ? `${uiIcon('list', 22, true)} Your menu` : `${uiIcon('camera', 22, true)} Add your menu`);
   return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
 }
 
@@ -50652,12 +50691,13 @@ ${renderGolfHeaderHtml()}
       <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Enregistrer les modifications</strong>. Vos heures, votre saison, votre téléphone, votre description, vos caractéristiques${showHappyHour ? ', votre happy hour' : ''} et votre gamme de prix sont mis en ligne sur <a href="${escapeHtml(listing)}">votre page</a> tout de suite. Un nouveau nom, une nouvelle adresse, un nouveau site Web ou un nouveau lien sont d’abord vérifiés, en général d’ici un jour.</p>
       <p class="op-reassure">Gratuit &middot; environ 5 minutes &middot; vous pouvez tout modifier de nouveau en tout temps.</p>`)
     : L(`<p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
-      <p class="op-reassure">Free &middot; about 5 minutes &middot; nothing changes on your page until we&rsquo;ve checked it. Signed-in owners&rsquo; hours and details go live straight away.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Envoyer les modifications</strong>. Nous vérifions chaque modification, en général d’ici un jour, puis elle est mise en ligne sur <a href="${escapeHtml(listing)}">votre page</a>.<span id="opLinkNote"> Gardez ce lien privé : toute personne qui l’a peut proposer des modifications.</span></p>
-      <p class="op-reassure">Gratuit &middot; environ 5 minutes &middot; rien ne change sur votre page avant notre vérification. Avec un compte, vos heures et vos renseignements sont mis en ligne tout de suite.</p>`)}
+      <p class="op-reassure">Free &middot; about 5 minutes. Want your changes to go live straight away? <a href="#opLogin" data-open-login>Create a login</a> below.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Envoyer les modifications</strong>. Nous vérifions chaque modification, en général d’ici un jour, puis elle est mise en ligne sur <a href="${escapeHtml(listing)}">votre page</a>.<span id="opLinkNote"> Gardez ce lien privé : toute personne qui l’a peut proposer des modifications.</span></p>
+      <p class="op-reassure">Gratuit &middot; environ 5 minutes. Pour que vos modifications soient en ligne tout de suite, <a href="#opLogin" data-open-login>créez un compte</a> ci-dessous.</p>`)}
       ${ownerMenuCardHtml(venue, token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`), lang).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}
     </div>
     <nav class="op-secnav" id="opSecNav" aria-label="${L('Parts of this page', 'Sections de cette page')}"><a href="#hours">${L('Hours', 'Heures')}</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? L('Prices', 'Prix') : 'Menu'}</a>` : ''}<a href="#events">${L('Events', 'Événements')}</a></nav>
     <div class="op-head">
+      ${found.welcome ? `<p class="op-done show" id="opWelcome" role="status">${L(`You&rsquo;re signed in.${found.welcome.live.length ? ` What you sent from your link is now live: ${escapeHtml(ownerFieldNames(found.welcome.live, 'en'))}.` : ''} From now on your changes go live as soon as you save them. Next time, sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>.`, `Vous êtes connecté.${found.welcome.live.length ? ` Ce que vous avez envoyé avec votre lien est maintenant en ligne : ${escapeHtml(ownerFieldNames(found.welcome.live, 'fr'))}.` : ''} Désormais, vos modifications sont en ligne dès que vous les enregistrez. La prochaine fois, connectez-vous à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.`)}</p>` : ''}
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</p>` : ''; })()}
       ${pendingNote}
       ${ownerActivityHtml(ownerVenueActivity(venue.id, 12, lang), lang)}
@@ -51548,6 +51588,12 @@ ${ownerFooterHtml(fr)}
       .then(function(j){
         b.disabled = false;
         if (j && j.ok) {
+          // Signed in (2026-10-27): open the signed-in page, which explains what goes live straight away, with a note
+          // naming anything sent from this link that just went live.
+          if (j.href) {
+            var go = (location.pathname.indexOf('/fr/') === 0 ? '/fr' : '') + j.href + '?welcome=1' + (j.published && j.published.length ? '&live=' + encodeURIComponent(j.published.join(',')) : '');
+            location.href = go; return;
+          }
           ls.style.display = 'none'; document.getElementById('olsDone').classList.add('show');
           ['opLinkNote', 'opDoneLogin'].forEach(function(id){ var el = document.getElementById(id); if (el) el.hidden = true; });
           return;
@@ -54870,6 +54916,8 @@ const server = http.createServer(async (req, res) => {
           if (!account) { res.writeHead(302, { Location: '/owner/login', 'Cache-Control': 'no-store' }); return res.end(); }
           const found = resolve();
           if (!found) { res.writeHead(404, headers); return res.end(renderOwnerInvalidLinkPage(res.ownerLang)); }
+          // Just signed up from the edit link (2026-10-27): a welcome note, naming what went live.
+          if (query && query.welcome === '1') found.welcome = { live: String(query.live || '').split(',').filter((f) => OWNER_FIELD_WORDS.en[f]) };
           res.writeHead(200, headers);
           return res.end(renderOwnerPage(found, null, pendingOwnerChange(found.venue.id), res.ownerLang));
         }
