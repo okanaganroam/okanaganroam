@@ -11573,6 +11573,7 @@ function renderExploreRegionsHTML({ now = homepageNow() } = {}) {
       ${exploreAllHeadingLink}
     </div>
     <div class="region-card-grid">${cards}</div>
+    <p class="sister-site-note" style="margin:1.25rem 0 0;text-align:center;font-size:0.95rem"><span class="home-en">Heading to Whistler too? Our sister site <a href="https://whistlerroam.com/">Whistler Roam</a> covers Whistler, Squamish, Pemberton and the whole Sea to Sky.</span><span class="home-fr" lang="fr">Vous allez aussi à Whistler? Notre site jumeau <a href="https://whistlerroam.com/">Whistler Roam</a> couvre Whistler, Squamish, Pemberton et tout le Sea to Sky.</span></p>
   </div>
 </section>`;
 }
@@ -35176,6 +35177,7 @@ const BROWSE_HEAD_EXTRAS = [
     "name": "Okanagan Valley, British Columbia, Canada"
   },
   "email": "info@okanaganroam.com",
+  "founder": { "@type": "Person", "name": "Dayton" },
   "sameAs": [
     "https://www.instagram.com/okanaganroam",
     "https://www.facebook.com/okanaganroam",
@@ -38050,7 +38052,7 @@ const GUIDE_GROUPS = [
   { key: 'fall', heading: 'Fall in the Okanagan', paths: ['/guides/fall-okanagan', '/guides/okanagan-in-november', '/guides/fall-farms-u-pick-okanagan', '/guides/okanagan-cideries', '/guides/okanagan-winery-restaurants', '/guides/kokanee-salmon-okanagan', '/guides/okanagan-waterfall-walks', '/guides/halloween-okanagan', '/guides/fall-events-okanagan', '/guides/okanagan-hockey-season'] },
   { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan', '/guides/okanagan-comedy-shows'] },
   { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/okanagan-in-december', '/guides/ski-season-big-white-silverstar', '/guides/okanagan-ski-season-2026-27', '/guides/big-white-restaurants-apres', '/guides/silverstar-restaurants-apres', '/guides/apex-baldy-ski-guide', '/guides/winter-in-kelowna', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-christmas-markets', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-in-january', '/guides/valentines-day-okanagan', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
-  { key: 'towns', heading: 'Towns, weekends and local food', paths: ['/guides/things-to-do-kelowna', '/guides/best-restaurants-kelowna', '/guides/weekend-in-kelowna', '/guides/kelowna-without-a-car', '/guides/best-sushi-kelowna', '/guides/best-pizza-kelowna', '/guides/vernon-silverstar-weekend', '/guides/summerland-peachland-day-trip', '/guides/penticton-naramata-wine-weekend', '/guides/oliver-osoyoos-wine-weekend', '/guides/best-restaurants-penticton', '/guides/best-restaurants-vernon', '/guides/best-restaurants-west-kelowna', '/guides/best-brunch-penticton', '/guides/best-brunch-vernon', '/guides/dog-friendly-penticton', '/guides/dog-friendly-vernon'] },
+  { key: 'towns', heading: 'Towns, weekends and local food', paths: ['/guides/things-to-do-kelowna', '/guides/best-restaurants-kelowna', '/guides/weekend-in-kelowna', '/guides/kelowna-without-a-car', '/guides/best-sushi-kelowna', '/guides/best-pizza-kelowna', '/guides/vernon-silverstar-weekend', '/guides/summerland-peachland-day-trip', '/guides/okanagan-to-whistler-road-trip', '/guides/penticton-naramata-wine-weekend', '/guides/oliver-osoyoos-wine-weekend', '/guides/best-restaurants-penticton', '/guides/best-restaurants-vernon', '/guides/best-restaurants-west-kelowna', '/guides/best-brunch-penticton', '/guides/best-brunch-vernon', '/guides/dog-friendly-penticton', '/guides/dog-friendly-vernon'] },
   { key: 'year', heading: 'Food, drink, family and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna', '/guides/happy-hour-kelowna', '/guides/date-night-kelowna', '/guides/cheap-eats-kelowna', '/guides/family-friendly-okanagan', '/guides/okanagan-breweries'] },
 ];
 // Season order for /guides (Okanagan local month): the current season leads.
@@ -38305,6 +38307,8 @@ function aboutPageSchema() {
     '@type': 'AboutPage',
     url: 'https://okanaganroam.com/about',
     name: 'About Okanagan Roam',
+    // Sister site (2026-10-27): Whistler Roam, the same founder's guide to the Sea to Sky corridor.
+    relatedLink: ['https://whistlerroam.com/'],
     mainEntity: {
       '@type': 'Organization',
       name: 'Okanagan Roam',
@@ -38332,6 +38336,7 @@ function renderAboutPage() {
     <p>Hi, I&rsquo;m Dayton.</p>
     <p>I was born and raised in Kelowna, and Okanagan Roam began with a simple love for this valley. For the people behind its caf&eacute;s, wineries and family-run businesses. For the lakes, orchards and mountains that never get old. For the quiet trails where you can still spot an osprey over the water or a bighorn sheep on the hillside.</p>
     <p>The Okanagan is truly one of the best places in the world. It deserves a guide that does it justice.</p>
+    <p>Okanagan Roam has a sister site for the Sea to Sky corridor, <a href="https://whistlerroam.com/">Whistler Roam</a>, made the same way: free listings, hours checked against each place and the same trip planner.</p>
     <h2>Why it exists</h2>
     <p>Planning a day here used to mean a dozen open tabs: one for hours, one for a patio, another for what&rsquo;s on tonight, and a map to tie it all together. Okanagan Roam brings it into one place. Find a lakeside lunch, a winery for the afternoon, a beach the kids will love and something happening tonight, then build your whole trip as you go.</p>
     <p>Whether you&rsquo;re here for a weekend or you&rsquo;ve lived here all your life, the goal is the same: make it easy to see the very best the Okanagan has to offer.</p>

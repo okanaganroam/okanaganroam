@@ -2302,7 +2302,8 @@ test('Explore All Okanagan Regions: renders exactly twice (heading copy + mobile
 
 test('Explore All Okanagan Regions: the destination-card grid contains the unchanged 6 real cards in their original order (still one aligned row at 480px+), plus the mobile-only copy of the link positioned AFTER Vernon (the last card)', () => {
   const html = app.renderExploreRegionsHTML();
-  const gridMatch = html.match(/<div class="region-card-grid">([\s\S]*?)<\/div>\s*<\/div>\s*<\/section>/);
+  // Sister sites (2026-10-27): the Whistler Roam line sits after the grid.
+  const gridMatch = html.match(/<div class="region-card-grid">([\s\S]*?)<\/div>\s*(?:<p class="sister-site-note"[\s\S]*?<\/p>\s*)?<\/div>\s*<\/section>/);
   assert.ok(gridMatch, 'expected to find the region-card-grid container');
   const gridHtml = gridMatch[1];
   const regionCardHrefs = Array.from(gridHtml.matchAll(/class="region-card" href="([^"]*)"/g)).map((m) => m[1]);
@@ -10209,7 +10210,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), 'b855e8f27191ea64b3addd1219c45ae9', 'okanagan.html (hidden trip toggle: suitcase line icon, emoji pass 2 2026-10-26)');
+  assert.equal(md5('okanagan.html'), 'd07cac212e04699157ce99e66dc50d86', 'okanagan.html (Organization founder, sister sites 2026-10-27)');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25; font fallback faces in every stack, speed/CLS PR approved 2026-10-18)');
   // Approved accessibility change (2026-10-18): one added token, --ref-gold-ink, a deeper gold for gold text on the
   // cream background (the logo's "Roam"); every existing token keeps its value.
@@ -11755,7 +11756,8 @@ test('Header: okanagan.html outside <header id="top"> is byte-identical to the a
   // SEO-2 (2026-10-02): approved description/og:/twitter: description change.
   // GEO r1 (2026-10-20): JSON-LD only: new WebSite description, Organization email and every social profile in sameAs.
   // Emoji pass 2 (2026-10-26): the hidden trip toggle's suitcase emoji is the uiIcon('trip') line icon.
-  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), 'c3c88f40febe7af5745add1b99b4dc25');
+  // Sister sites (2026-10-27): JSON-LD only: Organization founder.
+  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), '75d669983818f4cab3bef7474e72f346');
   assert.match(html, /<a href="#top" class="logo"/, 'the logo keeps its in-page #top anchor on the homepage');
 });
 
@@ -12167,7 +12169,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), 'b855e8f27191ea64b3addd1219c45ae9'); // SEO (2026-10-13): header Food & Drink links go to /restaurants, /cafes, /pubs, /breweries, /distilleries, /cocktail-lounges
+  assert.equal(md5('okanagan.html'), 'd07cac212e04699157ce99e66dc50d86'); // SEO (2026-10-13): header Food & Drink links go to /restaurants, /cafes, /pubs, /breweries, /distilleries, /cocktail-lounges
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
@@ -16424,7 +16426,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   // Frozen files are byte-identical.
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), 'b855e8f27191ea64b3addd1219c45ae9');
+  assert.equal(md5('okanagan.html'), 'd07cac212e04699157ce99e66dc50d86');
   assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
