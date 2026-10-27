@@ -29939,6 +29939,18 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-aside .detail-row .label { min-width: 76px; flex: 0 0 76px; }
   body.golf-page .venue-aside .map-link { display: inline-block; margin-top: 4px; font-weight: 800; font-size: 0.86rem; }
   body.golf-page .venue-hours h2 { margin-bottom: 6px; }
+  /* Balanced columns (2026-10-27): the hours and the "Own or manage this business?" box moved from the sidebar into
+     the main column, so a page without much text no longer has a long sidebar beside an empty left column. The
+     sidebar keeps Good to Know; the hours show as a wide card with the week in two columns where there is room. */
+  @media (min-width: 700px) {
+    body.golf-page .venue-extra .venue-hours .hours-list { column-count: 2; column-gap: 40px; }
+    body.golf-page .venue-extra .venue-hours .hours-list li { break-inside: avoid; }
+    body.golf-page .venue-extra .venue-hours .hours-list li { gap: 16px; }
+    body.golf-page .venue-extra .venue-hours .hours-list li span:last-child { text-align: right; }
+    body.golf-page .venue-extra .venue-hours .hours-list li.is-today span:first-child::after { display: block; content: "Today"; font-size: 0.8rem; }
+    html[lang="fr"] body.golf-page .venue-extra .venue-hours .hours-list li.is-today span:first-child::after { content: "Aujourd\u2019hui"; }
+    body.golf-page .venue-extra .venue-hours .hours-list li:nth-child(4):nth-last-child(4) { border-bottom: none; }
+  }
   body.golf-page .hours-list li.is-today { font-weight: 800; color: var(--ink); }
   body.golf-page .venue-hours-note, body.golf-page .venue-hours-closures { margin: 10px 0 0; font-size: 0.9rem; }
   body.golf-page .venue-hours-temp-closed { margin: 6px 0 8px; font-weight: 700; }
@@ -30574,8 +30586,16 @@ ${VENUE_MENU_CSS}` : ''}
     ${detailRows}
   </div>` : ''}
   ${locationHtml}
+  </aside>
+  <!-- Reading order (2026-10-19, round 9): the menu, visitor photos and tips, and guide links come after the facts
+       in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
+  <div class="venue-extra">
+  ${venueDealsCardHtml}
   ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
-  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}"${venueIsClaimed(venue.id) ? ' data-claimed="1" hidden' : ''} style="font-size:.88rem;margin:18px 0 0;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
+  ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
+  ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
+  ${guideLinks}
+  ${venue.redirect_to ? '' : `<div class="venue-owner-cta" id="venueOwnerCta" data-venue-id="${Number(venue.id)}"${venueIsClaimed(venue.id) ? ' data-claimed="1" hidden' : ''} style="font-size:.88rem;margin:6px 0 18px;padding:14px 16px;border:1px solid rgba(42,32,25,.14);border-radius:14px">
     <p style="margin:0 0 8px;font-weight:700">${L('Own or manage this business?', 'Vous g\u00e9rez cette entreprise?')}</p>
     <a class="venue-claim-btn" href="${claimPagePath(venue, fr ? 'fr' : 'en')}" rel="nofollow" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 18px;border-radius:999px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">${L('Claim this listing', 'Réclamer cette fiche')}</a>
     <p style="margin:8px 0 0;opacity:.85">${L('Free.', 'Gratuit.')} ${L('Already have a login?', 'D\u00e9j\u00e0 un compte?')} <a href="/owner/login" rel="nofollow">${L('Sign in to update this listing', 'Connectez-vous pour modifier cette fiche')}</a></p>
@@ -30593,14 +30613,6 @@ ${VENUE_MENU_CSS}` : ''}
     var edit = box.querySelector('a.venue-claim-btn'); if (edit) edit.href = '/owner/account/venue/' + box.getAttribute('data-venue-id');
   })();
   </script>`}
-  </aside>
-  <!-- Reading order (2026-10-19, round 9): the menu, visitor photos and tips, and guide links come after the facts
-       in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
-  <div class="venue-extra">
-  ${venueDealsCardHtml}
-  ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
-  ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
-  ${guideLinks}
   </div>
   </div>
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${nearbyStripHtml ? `${nearbyStripHtml}\n  ` : ''}${relatedHtml}
