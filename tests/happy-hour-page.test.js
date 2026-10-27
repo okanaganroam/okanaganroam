@@ -56,8 +56,8 @@ test('Happy hour live line: on now, later today, next day, past midnight (fixed 
   // 2026-10-26: while it is on, the line counts down to the end ("until 6 PM" stays in the Happy hour row).
   assert.deepEqual(line(page(brewery, at(TUE, '16:00'))), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour on now · ends in 2 hr`]);
   assert.deepEqual(line(page(brewery, at(TUE, '12:00'))), ['later', 'Happy hour today 3–6 PM']);
-  assert.deepEqual(line(page(brewery, at(TUE, '18:00'))), ['next', 'Next happy hour: Wednesday 3 PM'], 'a window ends at its closing minute');
-  assert.deepEqual(line(page(brewery, at(FRI, '12:00'))), ['next', 'Next happy hour: Saturday 7 PM']);
+  assert.deepEqual(line(page(brewery, at(TUE, '18:00'))), ['next', 'Next happy hour: tomorrow 3 PM'], 'a window ends at its closing minute (audit fix 2026-10-27: the next day is "tomorrow")');
+  assert.deepEqual(line(page(brewery, at(FRI, '12:00'))), ['next', 'Next happy hour: tomorrow 7 PM'], 'audit fix (2026-10-27): Saturday is tomorrow on a Friday');
   // It sits directly under the open-now line.
   assert.match(page(brewery, at(TUE, '16:00')), /id="venueOpenStatus">Open now · Closes 11 PM <a href="#venueHours">See hours<\/a><\/p><p class="venue-hh-status" data-hh="now"/);
   // A window past midnight, and a place with happy hour on one weekday only.
@@ -77,7 +77,7 @@ test('Happy hour live line: on now, later today, next day, past midnight (fixed 
 test('Happy hour live line and row in French', () => {
   assert.deepEqual(line(page(brewery, at(TUE, '16:00'), 'fr')), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour en cours · se termine dans 2 h`]);
   assert.deepEqual(line(page(brewery, at(TUE, '12:00'), 'fr')), ['later', 'Happy hour aujourd’hui 15 h–18 h']);
-  assert.deepEqual(line(page(brewery, at(FRI, '12:00'), 'fr')), ['next', 'Prochain happy hour : samedi 19 h']);
+  assert.deepEqual(line(page(brewery, at(FRI, '12:00'), 'fr')), ['next', 'Prochain happy hour : demain 19 h'], 'audit fix (2026-10-27): the next day is « demain »');
   assert.equal(app.happyHourLiveText({ state: 'next', from: { weekday: 'tue', minutes: 930 }, nextWeek: true }, true), 'Prochain happy hour : mardi prochain 15 h 30');
 });
 
