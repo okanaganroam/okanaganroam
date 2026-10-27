@@ -18312,8 +18312,6 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-empty { padding: 14px; border-radius: 12px; background: rgba(27,43,58,0.05); font-size: 0.92rem; }
   body.map-page .pm-more { margin: 12px auto 4px; display: block; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
   body.map-page .pm-more[hidden] { display: none; }
-  @media (max-width: 899px) { body.map-page .pm-sheet[data-state="peek"] .pm-privacy { display: none; } }
-  body.map-page .pm-privacy { margin: 16px 4px 0; font-size: 0.78rem; line-height: 1.45; opacity: 0.8; max-width: 72ch; }
   body.map-page .pm-pop a { font-weight: 800; }
   body.map-page .pm-pop small { display: block; opacity: 0.75; margin: 2px 0 4px; }
   body.map-page .pm-pop .pm-st { display: flex; margin: 0 0 6px; }
@@ -18342,7 +18340,6 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-pop a.pm-pop-dir { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 0 16px; }
   /* Desktop CLS (2026-10-19, round 8): the privacy notes sat just under the empty list and were pushed down when the
      list filled in (a 0.072 layout shift). On wide screens they wait until the list has its first rows. */
-  @media (min-width: 900px) { body.map-page .pm-list:empty ~ .pm-privacy { display: none; } }
   .pm-me { background: none; border: 0; }
   .pm-me .pm-me-arrow { position: absolute; left: -19px; top: -19px; width: 60px; height: 60px; display: none; pointer-events: none; }
   .pm-me.has-heading .pm-me-arrow { display: block; }
@@ -20267,9 +20264,6 @@ ${renderGolfHeaderHtml()}
         <ul class="pm-list" id="pmList"></ul>
         <button type="button" class="pm-more" id="pmMore" hidden>Show more</button>
         <noscript><p>The map needs JavaScript. <a href="/browse">Browse &amp; Search every place</a> instead.</p></noscript>
-        <p class="pm-privacy">Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved. When you ask for directions, your starting point and the destination go to Mapbox to work out the route. Map tiles come from OpenStreetMap. Opening hours come from each place’s listing and can change; check before you go.</p>
-        <p class="pm-privacy">If you search by voice, your browser’s own speech service turns what you say into text (in Chrome that is Google; on an iPhone, Apple). Okanagan Roam never receives the recording, only the words, the same as typing.</p>
-        <p class="pm-privacy">The words you search may be counted anonymously (with Google Analytics) to improve the map.</p>
       </div>
     </section>
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="false" aria-labelledby="pmPanelTitle">

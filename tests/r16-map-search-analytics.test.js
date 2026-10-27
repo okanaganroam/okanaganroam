@@ -119,13 +119,11 @@ test('the analytics block runs: one event per search, empty searches flagged, no
   assert.equal(sent.length, n);
 });
 
-test('privacy: the map note and /privacy say the searched words may be counted, in English and French; the location note stands', async () => {
+test('privacy: the map no longer carries the privacy notes (2026-10-27); /privacy explains location, voice and searches, in English and French', async () => {
   const en = (await get('/map')).text, fr = (await get('/fr/map')).text;
-  assert.ok(en.includes('<p class="pm-privacy">The words you search may be counted anonymously (with Google Analytics) to improve the map.</p>'));
-  assert.ok(fr.includes('<p class="pm-privacy">Les mots que vous cherchez peuvent être comptés de façon anonyme (avec Google Analytics) pour améliorer la carte.</p>'));
-  assert.ok(en.includes('Your location stays on your phone: it is used only to sort what’s near you and is never sent to Okanagan Roam or saved.'));
-  assert.ok(fr.includes('Votre position reste sur votre téléphone : elle sert seulement à trier ce qui est près de vous et n’est jamais envoyée à Okanagan Roam ni enregistrée.'));
-  const pen = await get('/privacy'), pfr = await get('/fr/privacy');
+  assert.ok(!en.includes('class="pm-privacy"') && !fr.includes('class="pm-privacy"'), 'no privacy notes under the Roam Now list');
+  assert.doesNotMatch(en, /Your location stays on your phone/);
+const pen = await get('/privacy'), pfr = await get('/fr/privacy');
   assert.equal(pen.status, 200);
   assert.equal(pfr.status, 200);
   assert.match(pen.text, /<h2>What you search on the map<\/h2>\s*<p>When you search on the map, the words you search and how many results they found may be counted anonymously with Google Analytics[^<]*Your location, a dropped pin and the distance you pick are never sent with them\.<\/p>/);

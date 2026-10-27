@@ -20421,7 +20421,7 @@ test('Near-me map: Near me, Places/Events, Open now and Directions; the location
   assert.match(html, /id="pmTabPlaces" aria-selected="true"/);
   assert.match(html, /id="pmTabEvents" aria-selected="false"/);
   assert.equal((html.match(/data-pm-open aria-pressed="false"/g) || []).length, 2, 'Open now as a quick chip and in Filters');
-  assert.match(html, /Your location stays on your phone/);
+  assert.doesNotMatch(html, /Your location stays on your phone/, 'the location note lives on /privacy (2026-10-27)');
   const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
   assert.match(src, /navigator\.geolocation\.watchPosition\(onPos, onErr/, 'location only after Near me, watched while the page is open');
   assert.match(src, /document\.addEventListener\('visibilitychange'/, 'no location updates in the background');
@@ -20534,7 +20534,7 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   assert.match(html, /<button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice">/);
   assert.match(src, /var SR = window\.SpeechRecognition \|\| window\.webkitSpeechRecognition/);
   assert.match(src, /runSearch\(said, 'voice'\)/);
-  assert.match(html, /If you search by voice, your browser’s own speech service turns what you say into text/);
+  assert.doesNotMatch(html, /If you search by voice/, 'the voice note lives on /privacy (2026-10-27)');
   assert.match(src, /history\.replaceState\(null, '', location\.pathname \+ \(q \? '\?' \+ q : ''\)/, 'filters in the address, never the location');
   assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
   const home = await (await fetch(`${base}/`)).text();
@@ -20558,7 +20558,7 @@ test('Near-me map: directions on our map through Mapbox only with a public token
     const src = html.match(/var CONF = [\s\S]*?<\/script>/)[0];
     assert.match(src, /https:\/\/api\.mapbox\.com\/directions\/v5\/mapbox\/' \+ r\.mode/);
     assert.match(src, /if \(off > 0\.075 && Date\.now\(\) - r\.at > 30000\) \{ say\(T\.rerouting\); fetchRoute\(\); \}/, 're-plans when off the route, at most every 30 s');
-    assert.match(html, /When you ask for directions, your starting point and the destination go to Mapbox/);
+    assert.doesNotMatch(html, /When you ask for directions, your starting point/, 'the Mapbox note lives on /privacy (2026-10-27)');
   } finally {
     if (saved === undefined) delete process.env.MAPBOX_TOKEN; else process.env.MAPBOX_TOKEN = saved;
   }
@@ -29932,7 +29932,6 @@ test('Round 8 phone: /map popup close and name are 44px, pins take 44px taps wit
   assert.match(html, /body\.map-page \.pm-pop > a:not\(\.pm-pop-dir\) \{ display: flex; align-items: center; min-height: 44px; \}/);
   assert.match(html, /\.leaflet-marker-icon\.pm-pin::before \{ content: ""; position: absolute; left: -10px; top: -10px; width: 44px; height: 44px;/);
   assert.match(html, /body\.map-page \.leaflet-marker-icon\.pm-pin:focus-visible \{ outline: 3px solid #1B2B3A;/);
-  assert.match(html, /@media \(min-width: 900px\) \{ body\.map-page \.pm-list:empty ~ \.pm-privacy \{ display: none; \} \}/);
   // No zoom-9 start view: the first view the map gets is the Kelowna fit.
   assert.match(html, /var map = L\.map\(mapEl, \{ zoomControl: false \}\);/);
   assert.doesNotMatch(html, /setView\(\[49\.75, -119\.5\], 9\)/);
@@ -29944,7 +29943,7 @@ test('Round 8 phone: /map popup close and name are 44px, pins take 44px taps wit
   assert.ok(html.slice(created, created + firstFit).match(/map\.(setView|fitBounds)\(/g) === null, 'nothing sets a view before the Kelowna fit');
   assert.ok(firstView >= 0);
   // The privacy notes come after the list in the markup, so the :empty ~ rule reaches them.
-  assert.ok(html.indexOf('id="pmList"') < html.indexOf('class="pm-privacy"'));
+  assert.ok(!html.includes('class="pm-privacy"'), 'the privacy notes moved to /privacy (2026-10-27)');
 });
 
 test('Round 8 phone: My Trip\'s map has French Leaflet labels on /fr/my-trip and fans out stops at the same spot', () => {
