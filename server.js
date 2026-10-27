@@ -29489,7 +29489,9 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
 // The deals inside the Happy hour row (2026-10-26, tidied the same day): a menu-style list, the price in its own bold
 // column and the item beside it; the first HH_DEALS_VISIBLE show, the rest behind "2 more deals". One checked date at the
 // end. French without French lines shows the English lines, marked lang="en".
-const HH_DEALS_VISIBLE = 4;
+// All deals show (2026-10-27): the list now sits in the wide deals card, where there is room for all 6 (it was 4
+// plus "2 more deals" in the narrow sidebar).
+const HH_DEALS_VISIBLE = 6;
 function happyHourDealsHtml(deals, fr) {
   if (!deals || !deals.items.length) return '';
   const lang = deals.english ? ' lang="en"' : '';
