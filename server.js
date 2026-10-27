@@ -29547,7 +29547,7 @@ function venueSpecialsHtml(sp, fr) {
   const row = ({ s, days, today, time }) => {
     const useFr = fr && s.title_fr && s.deal_fr;
     const lang = fr && !useFr ? ' lang="en"' : '';
-    return `<span class="venue-sp${today ? ' is-today' : ''}" role="listitem"><span class="venue-sp-days">${escapeHtml(days)}</span><span class="venue-sp-main"><span class="venue-sp-title"${lang}>${escapeHtml(useFr ? s.title_fr : s.title)}</span>${today ? ` <span class="venue-sp-today">${fr ? 'Aujourd’hui' : 'Today'}</span>` : ''}<span class="venue-sp-deal"${lang}>${escapeHtml(useFr ? s.deal_fr : s.deal)}</span>${time ? `<span class="venue-sp-time">${escapeHtml(time)}</span>` : ''}</span><span class="venue-sp-price"${lang}>${escapeHtml(s.price || '')}</span></span>`;
+    return `<span class="venue-sp${today ? ' is-today' : ''}" role="listitem"><span class="venue-sp-days">${escapeHtml(days)}</span><span class="venue-sp-main"><span class="venue-sp-title"${lang}>${escapeHtml(useFr ? s.title_fr : s.title)}</span>${s.price ? ` <span class="venue-sp-price"${lang}>${escapeHtml(s.price)}</span>` : ''}${today ? ` <span class="venue-sp-today">${fr ? 'Aujourd’hui' : 'Today'}</span>` : ''}<span class="venue-sp-deal"${lang}>${escapeHtml(useFr ? s.deal_fr : s.deal)}</span>${time ? `<span class="venue-sp-time">${escapeHtml(time)}</span>` : ''}</span></span>`;
   };
   return `<span class="venue-sp-list" role="list" aria-label="${fr ? 'Spéciaux de la semaine' : 'Weekly specials'}">${sp.rows.map(row).join('')}</span>${sp.checked ? `<span class="venue-hours-checked venue-sp-checked">${escapeHtml(sp.checked)}</span>` : ''}`;
 }
@@ -29762,16 +29762,18 @@ function renderVenuePageLayoutStyles() {
   /* Weekly specials (2026-10-27): the deals' menu-style list with the days in the first column, the name and deal
      beside them and the price at the end; today's row on a soft background with a "Today" tag (words, not only colour). */
   body.golf-page .venue-sp-list { display: block; }
-  body.golf-page .venue-sp { display: grid; grid-template-columns: 4.6em 1fr auto; column-gap: 8px; align-items: baseline; padding: 5px 0; font-size: 0.9rem; line-height: 1.35; }
+  /* Two columns (2026-10-27): the day, then the name with its price beside it and the deal underneath. The price used
+     to have its own third column, which squeezed the name in the narrow sidebar ("Sund ay"). */
+  body.golf-page .venue-sp { display: grid; grid-template-columns: 3.6em 1fr; column-gap: 8px; align-items: baseline; padding: 6px 0; font-size: 0.9rem; line-height: 1.35; }
   body.golf-page .venue-sp + .venue-sp { border-top: 1px solid rgba(42,32,25,0.08); }
-  body.golf-page .venue-sp.is-today { margin: 0 -6px; padding: 5px 6px; border-radius: 6px; background: rgba(42,107,103,0.09); }
-  body.golf-page .venue-sp-days { font-weight: 800; color: var(--teal-deep, #1E4F4C); overflow-wrap: anywhere; }
-  body.golf-page .venue-sp-main { min-width: 0; overflow-wrap: anywhere; }
+  body.golf-page .venue-sp.is-today { margin: 0 -6px; padding: 6px; border-radius: 6px; background: rgba(42,107,103,0.09); }
+  body.golf-page .venue-sp-days { font-weight: 800; color: var(--teal-deep, #1E4F4C); overflow-wrap: break-word; }
+  body.golf-page .venue-sp-main { min-width: 0; overflow-wrap: break-word; }
   body.golf-page .venue-sp-title { font-weight: 800; color: var(--ink, #2A2019); }
+  body.golf-page .venue-sp-price { margin-left: 2px; font-weight: 800; color: var(--teal-deep, #1E4F4C); white-space: nowrap; }
   body.golf-page .venue-sp-today { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--teal-deep, #1E4F4C); color: #fff; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em; vertical-align: 1px; }
-  body.golf-page .venue-sp-deal, body.golf-page .venue-sp-time { display: block; color: rgba(42,32,25,0.82); }
-  body.golf-page .venue-sp-time { font-size: 0.84rem; color: rgba(42,32,25,0.7); }
-  body.golf-page .venue-sp-price { font-weight: 800; color: var(--teal-deep, #1E4F4C); text-align: right; max-width: 7em; overflow-wrap: anywhere; }
+  body.golf-page .venue-sp-deal, body.golf-page .venue-sp-time { display: block; margin-top: 1px; font-size: 0.86rem; color: rgba(42,32,25,0.78); }
+  body.golf-page .venue-sp-time { font-size: 0.82rem; color: rgba(42,32,25,0.66); }
   body.golf-page .venue-sp-checked { display: block; margin: 6px 0 0; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
