@@ -10351,7 +10351,7 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date(),
   body.guide-page .guide-more-chip { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
 </style>${hh ? `\n${GUIDE_HAPPY_HOUR_STYLE}` : ''}`,
-    ...(hh ? { reorder: hh.order, cardExtraHtml: hh.htmlById } : {}),
+    ...(hh ? { reorder: hh.order, cardExtraHtml: hh.htmlById, cardNameMarkHtml: hh.nameMarkById } : {}),
     afterHtml,
   }, venues, filter, now);
 }
@@ -17816,6 +17816,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   body.map-page .pm-item-main { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 12px 14px 8px; border: 0; background: transparent; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
   body.map-page .pm-item-main:hover .pm-name { text-decoration: underline; }
   body.map-page .pm-name { font-weight: 800; font-size: 1rem; color: var(--ref-navy, #1B2B3A); }
+  /* Verified mark (2026-10-27): a small green tick after the name of a place the business manages. */
+  body.map-page .pm-vf { margin-left: 4px; font-size: 0.8em; font-weight: 800; color: #1E6B3A; }
   body.map-page .pm-meta { font-size: 0.86rem; opacity: 0.75; }
   body.map-page .pm-meta em { font-style: normal; opacity: 0.85; }
   body.map-page .pm-when { font-size: 0.88rem; font-weight: 800; color: #9D174D; }
@@ -17997,7 +17999,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // (nothing in the 7 days the map holds) said it under the 7-day notice.
     noEventsHere: 'Aucun événement cette semaine ici.', noEventsWeek: 'Aucun événement de ce genre sur la carte cette semaine.', noEventsSoon: 'Aucun événement de ce genre sur la carte dans les semaines à venir.', ahead: 'À venir',
     directions: 'Itinéraire', details: 'Détails', more: 'Voir plus', now: 'En cours', later: 'Plus tard aujourd’hui', tomorrow: 'Demain', week: 'Cette semaine',
-    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: 'Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
+    today: 'Aujourd’hui', until: 'jusqu’au', onNow: 'En cours', seasonClosed: 'Fermé pour la saison', running: 'Expositions et événements de plusieurs jours', runningUntil: 'Jusqu’au', noPin: 'Lieu non indiqué sur la carte', verified: 'Vérifié par l’établissement', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1).replace('.', ',') : String(Math.round(k))) + ' km'; }
   } : {
     walk: 'Walk', drive: 'Drive', bike: 'Bike', to: 'To', endRoute: 'End', howGo: 'How are you getting there?', routing: 'Working out the route…',
     routeFailed: 'Couldn’t work out a route right now. Open it in your maps app instead.', arrived: 'You’ve arrived!',
@@ -18032,7 +18034,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     none: 'Nothing matches here. Try a bigger distance or remove a filter.', noEvents: 'No events here this week. Try a bigger distance.',
     noEventsHere: 'No events here this week.', noEventsWeek: 'No events like that on the map this week.', noEventsSoon: 'No events like that on the map in the coming weeks.', ahead: 'Coming up',
     directions: 'Directions', details: 'Details', more: 'Show more', now: 'Happening now', later: 'Later today', tomorrow: 'Tomorrow', week: 'This week',
-    today: 'Today', until: 'until', onNow: 'On now', seasonClosed: 'Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
+    today: 'Today', until: 'until', onNow: 'On now', seasonClosed: 'Closed for the season', running: 'Exhibitions & multi-day events', runningUntil: 'Running until', noPin: 'Location not on the map', verified: 'Verified by the venue', km: function(k){ return k < 1 ? Math.max(10, Math.round(k * 100) * 10) + ' m' : (k < 10 ? k.toFixed(1) : String(Math.round(k))) + ' km'; }
   };
   var TYPES = CONF.t[FR ? 'fr' : 'en'];
   var mapEl = document.getElementById('okMap');
@@ -18340,7 +18342,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (tab === 'places') {
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
-        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
+        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
@@ -19330,7 +19332,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, dl: a[16] ? (typeof a[16] === 'string' ? a[16] : FR ? a[16][1] : a[16][0]) : '', dlEn: !!(FR && typeof a[16] === 'string'), g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
+      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, vf: a[18] || 0, dl: a[16] ? (typeof a[16] === 'string' ? a[16] : FR ? a[16][1] : a[16][0]) : '', dlEn: !!(FR && typeof a[16] === 'string'), g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
       // Deal text for the search ("cheap pints", "wings"), in both languages when there are two.
       if (a[16]) p.dk = mapNameKey(typeof a[16] === 'string' ? a[16] : a[16].join(' '));
       // Today's specials (2026-10-27): [weekday, English, French?]; their words join the deal search ("wings", "taco tuesday").
@@ -19377,7 +19379,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 11; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]
+const MAP_DATA_FORMAT = 12; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -19386,8 +19388,10 @@ function mapDataVersion(now = new Date()) {
   // Weekly specials (2026-10-27): their own table, so their count and last change count too.
   let sp = { u: null, n: 0 };
   try { sp = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_specials').get(); } catch (err) { /* an older database */ }
+  // Verified mark (2026-10-27): the claimed places too, so a new claim shows its tick without waiting for another change.
+  const claimed = [...claimedVenueIds()].sort((a, b) => a - b).join(',');
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
-  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}`).digest('hex').slice(0, 12);
+  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}`).digest('hex').slice(0, 12);
 }
 const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
 // Places: [lat, lng, name, type, region, url, hours or 0, features, dog rule]. Hours ship only for a place that has
@@ -19508,6 +19512,7 @@ function mapPlacesData(now = new Date()) {
   const dogNotes = getDogPolicyNotes();
   const hikeIds = getCollectionVenueIds('activity_hiking'), favIds = getCollectionVenueIds('local_favorite');
   const specials = specialsTodayFor(venues, now);
+  const claimed = claimedVenueIds();
   return venues.map((v) => {
     const st = open.byId.get(v.id);
     v.hikeList = hikeIds.has(v.id);
@@ -19540,6 +19545,12 @@ function mapPlacesData(now = new Date()) {
       const en = specialsCompact(today.today, false), fr = specialsCompact(today.today, true);
       if (row.length === 16) row.push(0);
       row.push(fr.english ? [specials.clock.weekday, en.text] : [specials.clock.weekday, en.text, fr.text]);
+    }
+    // [18] Verified mark (2026-10-27): 1 when the business manages the listing (venueIsClaimed), shown as a small tick
+    // after the name. Only on those rows ([16] and [17] are 0 when the place has none), so the others keep their length.
+    if (claimed.has(v.id)) {
+      while (row.length < 18) row.push(0);
+      row.push(1);
     }
     return row;
   });
@@ -23626,6 +23637,15 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       return chunk.replace('<div class="card-slot card-slot-fee">', () => `<div class="card-slot card-slot-fee">${add}`);
     });
   }
+  // extra.cardNameMarkHtml (2026-10-27, verified mark): Map of venue id -> a small mark at the end of the card's name
+  // heading (the town Happy Hour pages' green tick on a place the business manages).
+  if (extra.cardNameMarkHtml && extra.cardNameMarkHtml.size) {
+    cardChunks = cardChunks.map((chunk) => {
+      const add = extra.cardNameMarkHtml.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
+      if (!add) return chunk;
+      return chunk.replace('</h2>', () => `${add}</h2>`);
+    });
+  }
   const firstBatch = [], deferred = [];
   for (const chunk of cardChunks) {
     const id = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
@@ -26130,7 +26150,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, cfg.openNow ? openInfo.byId : null, {
-    cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {}, cardExtraHtml: cfg.cardExtraHtml || null,
+    cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {}, cardExtraHtml: cfg.cardExtraHtml || null, cardNameMarkHtml: cfg.cardNameMarkHtml || null,
     // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
     altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
     photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
@@ -29563,7 +29583,7 @@ function happyHourLiveText(h, fr) {
 function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   if (!hoursModule || !venue || venue.redirect_to) return null;
   let row = null;
-  try { row = db.prepare('SELECT happy_hour, happy_hour_times, happy_hour_checked_at, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
+  try { row = db.prepare('SELECT happy_hour, happy_hour_times, happy_hour_checked_at, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_source, happy_hour_deals_checked_at FROM venues WHERE id = ?').get(venue.id); } catch (e) { row = null; }
   // Deals (2026-10-26): only with the happy_hour badge and a check from the last HH_DEALS_STALE_DAYS days.
   const deals = happyHourDealsShown(row, now);
   if (!row || (!row.happy_hour_times && !deals)) return null;
@@ -29571,7 +29591,10 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   if ((getSeasonStates(now).get(venue.id) || {}).kind === 'closed' || venueClosureInForce(venue.id, now)) return null;
   const week = happyHourWeekText(row.happy_hour_times, fr);
   if (!week && !deals) return null;
-  const dealsOut = deals ? { items: (fr && deals.fr ? deals.fr : deals.en), english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr) } : null;
+  // Verified mark (2026-10-27): deals the owner entered (source 'venue_owner') carry `confirmed`, the "Confirmed by
+  // <venue>" line that takes the place of the grey checked date.
+  const dealsOut = deals ? { items: (fr && deals.fr ? deals.fr : deals.en), english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr),
+    confirmed: row.happy_hour_deals_source === 'venue_owner' ? venueConfirmedHtml(venue.name, deals.checked, fr) : '' } : null;
   if (!week) return { week: '', checked: '', live: null, deals: dealsOut };
   const place = statusHours ? venueHoursStatusAt(statusHours, now) : null;
   const clock = okanaganClock(now);
@@ -29594,7 +29617,14 @@ function happyHourDealsHtml(deals, fr) {
   const row = (d) => `<span class="venue-hh-deal" role="listitem"${lang}><span class="venue-hh-deal-price">${escapeHtml(d.price || '')}</span><span class="venue-hh-deal-text">${escapeHtml(d.text)}</span></span>`;
   const shown = deals.items.slice(0, HH_DEALS_VISIBLE), rest = deals.items.slice(HH_DEALS_VISIBLE);
   const more = rest.length ? `<details class="venue-hh-more"><summary>${fr ? `${rest.length} autre${rest.length > 1 ? 's' : ''} spécia${rest.length > 1 ? 'ux' : 'l'}` : `${rest.length} more deal${rest.length > 1 ? 's' : ''}`}</summary><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${rest.map(row).join('')}</span></details>` : '';
-  return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${shown.map(row).join('')}</span>${more}${deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
+  return `<span class="venue-hh-deals"><span class="venue-hh-deals-label" id="venueHhDealsLabel">${fr ? 'Spéciaux' : 'Deals'}</span><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">${shown.map(row).join('')}</span>${more}${deals.confirmed ? `<span class="venue-hours-checked venue-hh-deals-checked">${deals.confirmed}</span>` : deals.checked ? `<span class="venue-hours-checked venue-hh-deals-checked">${escapeHtml(deals.checked)}</span>` : ''}</span>`;
+}
+// Verified mark (2026-10-27): "✓ Confirmed by Suda · Oct 20, 2026" (fr: "Confirmé par Suda · 20 oct. 2026") for deals
+// or specials the owner entered; `checked` is the local YYYY-MM-DD date. The inner inline-flex span keeps the gap after
+// the tick (the .venue-hours-checked line around it is display: block).
+function venueConfirmedHtml(name, checked, fr) {
+  const date = checked && parseLocalDate(checked) ? ownerUpdatedDate(`${checked} 19:00:00`, fr) : '';
+  return `<span class="venue-confirmed"><span class="venue-confirmed-tick" aria-hidden="true">&#10003;</span><span>${fr ? 'Confirmé par' : 'Confirmed by'} ${escapeHtml(name || '')}${date ? ` <span class="venue-confirmed-date">&middot; ${escapeHtml(date)}</span>` : ''}</span></span>`;
 }
 // ---------- Weekly specials on venue pages (2026-10-27) ----------
 // The specials a venue page shows, in week order: [{ s, days, today, time }] with one checked date, or null. Same rules
@@ -29635,7 +29665,9 @@ function venueSpecials(venue, statusHours, fr, now = new Date()) {
     .sort((a, b) => a.first - b.first || a.i - b.i)
     .map(({ s }) => ({ s, days: venueSpecialsDaysText(s.days, fr), today: !closedToday && s.days.includes(clock.weekday), time: specialTimeText(s, fr) }));
   const oldest = shown.map((s) => s.checked_at).sort()[0];
-  return { rows, checked: happyHourCheckedText(oldest, fr) };
+  // Verified mark (2026-10-27): "Confirmed by <venue>" when every special shown came from the owner.
+  const confirmed = shown.every((s) => s.source === 'venue_owner') ? venueConfirmedHtml(venue.name, oldest, fr) : '';
+  return { rows, checked: happyHourCheckedText(oldest, fr), confirmed };
 }
 // The "Weekly specials" row (the deals' menu-style list): the days in their own column, the name (with a "Today" tag on
 // today's row: words, not only colour), the deal and its time under it, and the price at the end. French without French
@@ -29650,7 +29682,7 @@ function venueSpecialsHtml(sp, fr) {
     const dealHtml = specialDealRepeatsTitle(title, deal) ? '' : `<span class="venue-sp-deal"${lang}>${escapeHtml(deal)}</span>`;
     return `<span class="venue-sp${today ? ' is-today' : ''}" role="listitem"><span class="venue-sp-days">${escapeHtml(days)}</span><span class="venue-sp-main"><span class="venue-sp-title"${lang}>${escapeHtml(title)}</span>${s.price ? ` <span class="venue-sp-price"${lang}>${escapeHtml(s.price)}</span>` : ''}${today ? ` <span class="venue-sp-today">${fr ? 'Aujourd’hui' : 'Today'}</span>` : ''}${dealHtml}${time ? `<span class="venue-sp-time">${escapeHtml(time)}</span>` : ''}</span></span>`;
   };
-  return `<span class="venue-sp-list" role="list" aria-label="${fr ? 'Spéciaux de la semaine' : 'Weekly specials'}">${sp.rows.map(row).join('')}</span>${sp.checked ? `<span class="venue-hours-checked venue-sp-checked">${escapeHtml(sp.checked)}</span>` : ''}`;
+  return `<span class="venue-sp-list" role="list" aria-label="${fr ? 'Spéciaux de la semaine' : 'Weekly specials'}">${sp.rows.map(row).join('')}</span>${sp.confirmed ? `<span class="venue-hours-checked venue-sp-checked">${sp.confirmed}</span>` : sp.checked ? `<span class="venue-hours-checked venue-sp-checked">${escapeHtml(sp.checked)}</span>` : ''}`;
 }
 // ---------- Happy hour access (2026-10-26) ----------
 // One answer to "where is happy hour on now / later today", for the homepage line, GET /api/happy-hour-now and the town
@@ -29809,7 +29841,11 @@ function guideHappyHourInfo(venues, fr, now = new Date()) {
     if (parts.length) htmlById.set(r.id, `<div class="guide-hh" data-hh="${rank.get(r.id) === 0 ? 'now' : rank.get(r.id) === 1 ? 'later' : 'none'}">${parts.join('')}</div>`);
   }
   const order = (list) => list.map((v, i) => [rank.has(v.id) ? rank.get(v.id) : 2, i, v]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
-  return { order, htmlById };
+  // Verified mark (2026-10-27): a small green tick after the name of each place the business manages.
+  const claimed = claimedVenueIds();
+  const label = fr ? 'Vérifié par l’établissement' : 'Verified by the venue';
+  const nameMarkById = new Map(ids.filter((id) => claimed.has(id)).map((id) => [id, ` <span class="guide-hh-vf" role="img" aria-label="${label}" title="${label}">&#10003;</span>`]));
+  return { order, htmlById, nameMarkById };
 }
 const GUIDE_HAPPY_HOUR_STYLE = `<style id="guide-hh">
   /* Town Happy Hour pages (2026-10-26): today's times, the first two deals and an "On now" tag on each card. */
@@ -29818,6 +29854,8 @@ const GUIDE_HAPPY_HOUR_STYLE = `<style id="guide-hh">
   body.guide-page .guide-hh-label { font-weight: 800; }
   body.guide-page .guide-hh-tag { display: inline-block; margin: 0 4px 2px 0; padding: 2px 9px; border-radius: 999px; background: var(--teal-deep, #1F5450); color: #fff; font-size: 0.78rem; font-weight: 800; }
   body.guide-page .guide-hh-deals { color: var(--teal-deep, #1F5450); }
+  /* Verified mark (2026-10-27): the small tick after a managed place's name. */
+  body.guide-page .guide-hh-vf { font-size: 0.8em; font-weight: 800; color: #1E6B3A; }
 </style>`;
 function renderVenuePageLayoutStyles() {
   return `<style id="venue-page-layout">
@@ -29884,6 +29922,16 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-deals-body { display: block; font-size: 0.95rem; }
   body.golf-page .venue-deals-body .venue-hh-times { display: block; font-weight: 800; margin: 0 0 4px; }
   body.golf-page .venue-deals-card .venue-hh-deals { margin-top: 6px; }
+  /* Verified mark (2026-10-27): the green verified pill under the name on a listing the business manages, and
+     the "Confirmed by <venue>" line on deals and specials the owner entered. The line sits in an inner inline-flex
+     wrapper because its .venue-hours-checked parent is display: block, so the gap after the tick applies. */
+  body.golf-page .venue-verified-wrap { margin: 10px 0 0; }
+  body.golf-page .venue-verified { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 6px; border: 1px solid rgba(30,107,58,.25); border-radius: 999px; background: #E8F3EC; color: #1E6B3A; font-size: .84rem; font-weight: 700; line-height: 1.3; }
+  body.golf-page .venue-verified-tick, body.golf-page .venue-confirmed-tick { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px; border-radius: 50%; background: #1E6B3A; color: #fff; font-size: .7rem; line-height: 1; }
+  body.golf-page .venue-verified-date { font-weight: 500; opacity: .8; }
+  body.golf-page .venue-confirmed { display: inline-flex; align-items: center; gap: 6px; color: #1E6B3A; font-weight: 700; }
+  body.golf-page .venue-confirmed-tick { width: 15px; height: 15px; font-size: .62rem; }
+  body.golf-page .venue-confirmed-date { font-weight: 500; }
   body.golf-page .venue-deals-jump { display: block; width: fit-content; margin-top: 2px; padding: 11px 0; margin-bottom: -11px; font-weight: 700; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
@@ -30590,8 +30638,13 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${(() => {
+      // Verified mark (2026-10-27): a pill on every listing the business manages (venueIsClaimed: a login, an approved
+      // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
+      // the "Updated by the business" line.
+      if (!venueIsClaimed(venue.id)) return '';
       const last = ownerLastUpdatedAt(venue.id);
-      return last ? `\n    <p class="venue-owner-updated" style="font-size:.84rem;margin:6px 0 0;color:#1E6B3A;font-weight:700"><span aria-hidden="true">&#10003;</span> ${L('Updated by the business', 'Mis \u00e0 jour par l\u2019entreprise')} &middot; ${escapeHtml(ownerUpdatedDate(last, fr))}</p>` : '';
+      const date = last ? ownerUpdatedDate(last, fr) : '';
+      return `\n    <p class="venue-verified-wrap"><span class="venue-verified" title="${L('The business manages this listing on Okanagan Roam', 'L\u2019\u00e9tablissement g\u00e8re cette fiche sur Okanagan Roam')}"><span class="venue-verified-tick" aria-hidden="true">&#10003;</span>${L('Verified by the venue', 'V\u00e9rifi\u00e9 par l\u2019\u00e9tablissement')}${date ? ` <span class="venue-verified-date">&middot; ${L('updated', 'mis \u00e0 jour le')} ${escapeHtml(date)}</span>` : ''}</span></p>`;
     })()}
   </div>
   <!-- Phone layout (2026-10-19, round 10): Call, Directions, Favorite and Add to trip come straight after the name,
@@ -48320,6 +48373,18 @@ function venueIsClaimed(venueId) {
       || ownerLastUpdatedAt(venueId));
   } catch (e) { return false; }
 }
+// Verified mark (2026-10-27): every claimed venue id at once (the same three tests as venueIsClaimed), for lists that
+// show a small tick after each managed place's name (Roam Now, the town Happy Hour pages). -> Set
+function claimedVenueIds() {
+  const ids = new Set();
+  for (const sql of ['SELECT DISTINCT venue_id FROM owner_account_venues',
+    "SELECT DISTINCT venue_id FROM venue_claims WHERE status = 'approved'",
+    "SELECT DISTINCT venue_id FROM owner_change_requests WHERE status = 'approved'",
+    "SELECT DISTINCT venue_id FROM owner_photos WHERE status = 'approved'"]) {
+    try { for (const r of db.prepare(sql).all()) if (r.venue_id != null) ids.add(r.venue_id); } catch (e) { /* table not there yet */ }
+  }
+  return ids;
+}
 function ownerLastUpdatedAt(venueId) {
   const row = db.prepare(`SELECT MAX(t) AS t FROM (
     SELECT submitted_at AS t FROM owner_change_requests WHERE venue_id = ? AND status = 'approved'
@@ -54037,6 +54102,8 @@ module.exports = {
   withTripHappyHourDeals, staleHappyHourDeals, ownerVenueSnapshot, HH_DEALS_STALE_DAYS, HH_DEALS_MAX,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
+  // Verified mark (2026-10-27)
+  venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
   guardedCuisineUpdate,
   createOwnerLink,
   revokeOwnerLink,

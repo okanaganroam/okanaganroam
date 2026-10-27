@@ -21458,23 +21458,23 @@ test('Last updated (2026-10-15): only the owner\'s own changes date the listing,
   const listing = '/kelowna/cafes/last-updated-fixture';
   try {
     // Never touched by an owner: no date anywhere.
-    assert.doesNotMatch(await get(listing), /Updated by the business/);
+    assert.doesNotMatch(await get(listing), /Verified by the venue/);
     // Our own edit (admin) does not count.
     app.updateVenue(v.id, { description: 'Changed by us, not the owner. A cozy cafe in Kelowna.' });
-    assert.doesNotMatch(await get(listing), /Updated by the business/);
+    assert.doesNotMatch(await get(listing), /Verified by the venue/);
     // A rejected owner update does not count either.
     const r1 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0181' }, started_at: Date.now() - 10000 });
     await post(`/admin/owner-changes/${r1.body.id}/reject`, { reviewer: 'dayton', reason: 'x' }, { Authorization: `Bearer ${LYV_TOKEN}` });
-    assert.doesNotMatch(await get(listing), /Updated by the business/);
+    assert.doesNotMatch(await get(listing), /Verified by the venue/);
     // The owner's update that went live dates it, by when the owner sent it.
     const r2 = await post(`/owner/${token}/changes`, { changes: { phone: '250-555-0182' }, started_at: Date.now() - 10000 });
     db.prepare("UPDATE owner_change_requests SET submitted_at = '2026-09-02 18:30:00' WHERE id = ?").run(r2.body.id);
     const ok = await post(`/admin/owner-changes/${r2.body.id}/approve`, { reviewer: 'dayton' }, { Authorization: `Bearer ${LYV_TOKEN}` });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
-    assert.match(await get(listing), /<p class="venue-owner-updated"[^>]*><span aria-hidden="true">&#10003;<\/span> Updated by the business &middot; Sept 2, 2026<\/p>/);
+    assert.match(await get(listing), /<span class="venue-verified" title="The business manages this listing on Okanagan Roam"><span class="venue-verified-tick" aria-hidden="true">&#10003;<\/span>Verified by the venue <span class="venue-verified-date">&middot; updated Sept 2, 2026<\/span><\/span>/);
     // Later edits by us leave the owner's date alone.
     app.updateVenue(v.id, { description: 'Changed by us again. A cozy cafe in Kelowna with pastries.' });
-    assert.match(await get(listing), /Updated by the business &middot; Sept 2, 2026/);
+    assert.match(await get(listing), /Verified by the venue <span class="venue-verified-date">&middot; updated Sept 2, 2026/);
     // The owner sees it too.
     assert.match(await get(`/owner/${token}`), /<p class="op-last">Last updated Sept 2, 2026<\/p>/);
     const cookie = (await post(`/owner/${token}/account`, { email: 'lastupdated@example.com', password: 'a long enough password' })).cookie;
