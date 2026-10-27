@@ -335,7 +335,7 @@ test('Roam Now: today\'s specials ride as [17] (small), the card says "Today: �
   assert.ok(html.includes(`if (p.spOn) out += '<span class="pm-sp' + (feats.specials ? ' is-on' : '') + '">' + esc(T.spToday) + ' <span' + (p.spEn ? ' lang="en"' : '') + '>' + esc(p.sp) + '</span></span>';`));
   assert.ok(html.includes("k === 'specials' ? !p.spOn :"));
   assert.ok(html.includes("spToday: 'Today:'") && html.includes("spToday: 'Aujourd’hui :'"));
-  assert.ok(html.includes("specials: 'Specials today' }") && html.includes("specials: 'Spéciaux du jour' }"));
+  assert.ok(html.includes("specials: 'Specials today', ") && html.includes("specials: 'Spéciaux du jour', "));
   const srv = http.createServer(app.server.listeners('request')[0]);
   await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
   try {

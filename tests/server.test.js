@@ -21999,7 +21999,7 @@ const OHB_QUESTIONS = [
   ['how do i add photoes', 'edit', 'photo-add'], ['my pictre wont uplaod', 'edit', 'photo-small'], ['summer hours are diffrent from winter', 'edit', 'seasonal-hours'],
   ['closed for thanksgiving monday', 'edit', 'closures'], ['we’re closed new year’s day', 'edit', 'closures'], ['how long until my changes are live', 'edit', 'live-speed'],
   ['do i need approval for hour changes', 'edit', 'live-speed'], ['remove my old manager from the listing', 'account', 'access'], ['who else can edit our page', 'account', 'access'],
-  ['how do i add our trivia night every thursday', 'edit', 'event-repeat'], ['change the buisness name', 'edit', 'name-address'], ['our phone number is wrong', 'edit', 'phone'],
+  ['how do i add our trivia night every thursday', 'edit', 'weekly-nights'] /* weekly nights (2026-10-27) */, ['change the buisness name', 'edit', 'name-address'], ['our phone number is wrong', 'edit', 'phone'],
   ['how do i put my menu on', 'edit', 'menu-add'], ['can i type the menu myself', 'menu', 'menu-add'], ['where is the log out button', 'settings', 'logout'],
   ['I didnt get the password reset email', 'forgot', 'noemail'], ['can 2 people manage the listing', 'account', 'staff'], ['how much does it cost to be featured', 'edit', 'cost'],
   ['someone else claimed my busness', 'claim', 'dispute'], ['we have diffrent hours on stat holidays', 'edit', 'seasonal-hours'], ['how do i make a login', 'edit', 'login-create'],

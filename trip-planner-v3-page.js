@@ -635,6 +635,7 @@ function renderStyles() {
   .t3-hours { margin: 0 0 8px; font-size: 0.84rem; color: rgba(27,43,58,0.8); }
   .t3-hh { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #7C2D12; }
   .t3-sp { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #1E4F4C; }
+  .t3-wn { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #4B3A78; }
   .t3-why { margin: 0 0 6px; padding-left: 18px; font-size: 0.88rem; line-height: 1.5; }
   .t3-caveats { margin: 0 0 8px; padding: 8px 12px; list-style: none; background: #FFF6E6; border-radius: 10px; font-size: 0.82rem; color: #5B4212; }
   .t3-caveats li + li { margin-top: 4px; }
@@ -1367,6 +1368,8 @@ function renderScript(d) {
       + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? 'Happy hour : <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
+      // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
+      + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? 'Ce soir : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')
       + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
