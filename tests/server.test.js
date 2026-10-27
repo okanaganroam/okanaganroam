@@ -5611,7 +5611,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     assert.ok(app.getCollectionVenueIds('local_favorite').has(cmGolf.id), 'membership visible through getCollectionVenueIds');
 
     const vernonGolfHttp = await (await fetch(`${base}/vernon/golf`)).text();
-    assert.match(vernonGolfHttp, /<span class="chip local-favourite-badge"[^>]*>\u2665 Local Favourite<\/span>/, 'badge must render on the live /vernon/golf page');
+    assert.match(vernonGolfHttp, /<span class="chip local-favourite-badge"[^>]*><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span>/, 'badge must render on the live /vernon/golf page');
     const venuePageHttp = await (await fetch(`${base}/vernon/golf/test-vernon-golf-course`)).text();
     assert.match(venuePageHttp, /local-favourite-badge/, 'badge must render on the live venue page');
 
@@ -7299,20 +7299,20 @@ test('Local Favourite and Hidden Gem badges render on cards, the venue page, and
   app.guardedCollectionMembershipUpdate('hidden_gem', golf.id, 'add', null, meta);
 
   const cardOpt = app.venueCardHtml(golf, { isHiddenGem: true, isLocalFavourite: true });
-  assert.match(cardOpt, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span> <\/p>/u);
+  assert.match(cardOpt, /<p class="chips"><span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <\/p>/u);
   assert.equal(app.venueCardHtml(golf), plainCard, 'without the option flags the card is unchanged');
 
   const category = app.renderCategoryPage('kelowna', 'golf', app.getVenuesByRegionCategory('kelowna', 'golf'), []);
-  assert.match(category, /local-favourite-badge">\u2665 Local Favourite/);
-  assert.match(category, /hidden-gem-badge">\u{1F48E} Hidden Gem/u);
+  assert.match(category, /local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite/);
+  assert.match(category, /hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem/u);
   assert.notEqual(category, plainCategory);
   const all = app.renderCategoryAllRegionsPage('golf', app.getVenuesByRegionCategory('kelowna', 'golf'));
   assert.match(all, /local-favourite-badge/);
 
   const venuePage = app.renderVenuePage(golf, [], [], []);
-  assert.match(venuePage, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span> <\/p>/u);
+  assert.match(venuePage, /<p class="chips"><span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <\/p>/u);
   const otherPage = app.renderVenuePage(other, [golf], [golf], []);
-  assert.match(otherPage, /related-meta">[^<]*<span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span>/u);
+  assert.match(otherPage, /related-meta">[^<]*<span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span>/u);
 
   // Non-member regression: another golf card and a restaurant page are byte-identical.
   assert.equal(app.venueCardHtml(trattoria), plainTrattoria);
@@ -7676,7 +7676,7 @@ test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an 
     assert.match(venueBody, /"@type":"Beach"/);
     assert.match(venueBody, /<p class="venue-advisory-kicker">Check before you go<\/p>\n  <p class="venue-advisory-text">Partial closure \(rdco\.com, 2026-09-19\)\.<\/p>/);
     assert.match(venueBody, /Get Directions/);
-    assert.match(venueBody, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">\u2665 Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span> <\/p>/u, 'all three badges on the venue page, existing badges unchanged');
+    assert.match(venueBody, /<p class="chips"><span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u, 'all three badges on the venue page, existing badges unchanged');
     const beachTwoBody = await (await fetch(`${base}/vernon/beaches/homepage-beach-two`)).text();
     assert.match(beachTwoBody, /<div class="venue-header">[\s\S]*?<p class="chips"><\/p>/, 'non-member beach carries no badges in its own header (related cards may still show other venues\' badges)');
     assert.doesNotMatch(beachTwoBody, /Get Directions|Visit Website|>Call</, 'no address/coords/website/phone -> no fabricated CTA');
@@ -7735,16 +7735,16 @@ test('Dog Friendly badge: collection bootstrapped, renders on card + venue page 
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(app.getDogFriendlyNotes().get(b.id), 'Designated off-leash dog beach only');
   // badge markup = existing .chip convention (same as Hidden Gem / Local Favourite), restriction in title
-  assert.equal(app.dogFriendlyBadgeHtml('On leash only'), '<span class="chip dog-friendly-badge" title="On leash only">\u{1F43E} Dog Friendly</span>');
-  assert.equal(app.dogFriendlyBadgeHtml(''), '<span class="chip dog-friendly-badge">\u{1F43E} Dog Friendly</span>');
+  assert.equal(app.dogFriendlyBadgeHtml('On leash only'), `<span class="chip dog-friendly-badge" title="On leash only">${app.uiIcon('paw', '1.15em', true)} Dog Friendly</span>`);
+  assert.equal(app.dogFriendlyBadgeHtml(''), `<span class="chip dog-friendly-badge">${app.uiIcon('paw', '1.15em', true)} Dog Friendly</span>`);
   const category = app.renderCategoryPage('kelowna', 'beach', venues, []);
   const cardStart = category.indexOf('data-venue-name="Test Beach Park"');
   const card = category.slice(cardStart, category.indexOf('</li>', cardStart));
-  assert.match(card, /<p class="chips"><span class="chip dog-friendly-badge" title="Designated off-leash dog beach only">\u{1F43E} Dog Friendly<\/span> <\/p>/u, 'listing card shows the badge in the chips row');
+  assert.match(card, /<p class="chips"><span class="chip dog-friendly-badge" title="Designated off-leash dog beach only"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u, 'listing card shows the badge in the chips row');
   const bareStart = category.indexOf('data-venue-name="Test Bare Beach"');
   assert.doesNotMatch(category.slice(bareStart, category.indexOf('</li>', bareStart)), /dog-friendly-badge/, 'non-member card has no badge');
   const page = app.renderVenuePage(b, [], [], []);
-  assert.match(page, /<p class="chips"><span class="chip dog-friendly-badge" title="Designated off-leash dog beach only">\u{1F43E} Dog Friendly<\/span> <\/p>/u, 'venue page shows the badge');
+  assert.match(page, /<p class="chips"><span class="chip dog-friendly-badge" title="Designated off-leash dog beach only"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u, 'venue page shows the badge');
   assert.doesNotMatch(app.renderVenuePage(bare, [], [], []), /dog-friendly-badge/);
   // The badge never touches the amenity boolean (which feeds the homepage's guide-footer counts).
   assert.equal(db.prepare('SELECT dog_friendly FROM venues WHERE id = ?').get(b.id).dog_friendly, 0);
@@ -7765,9 +7765,9 @@ test('Dog Friendly badge coexists with the existing Hidden Gem / Local Favourite
     assert.equal(app.guardedCollectionMembershipUpdate(kind, b.id, 'add', note, meta).ok, true);
   }
   const page = app.renderVenuePage(b, [], [], []);
-  assert.match(page, /<p class="chips"><span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">♥ Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span> <\/p>/u);
+  assert.match(page, /<p class="chips"><span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> <\/p>/u);
   const card = app.venueCardHtml(b, { isHiddenGem: true, isLocalFavourite: true, dogFriendlyNote: 'Off-leash dog beach' });
-  assert.match(card, /<span class="chip hidden-gem-badge">\u{1F48E} Hidden Gem<\/span> <span class="chip local-favourite-badge">♥ Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach">\u{1F43E} Dog Friendly<\/span> /u);
+  assert.match(card, /<span class="chip hidden-gem-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Hidden Gem<\/span> <span class="chip local-favourite-badge"><svg class="ui-icon"[^>]*>.*?<\/svg> Local Favourite<\/span> <span class="chip dog-friendly-badge" title="Off-leash dog beach"><svg class="ui-icon"[^>]*>.*?<\/svg> Dog Friendly<\/span> /u);
   // Golf regression: golf pages unaffected by the new kind.
   const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
   assert.doesNotMatch(app.renderVenuePage(golf, [], [], []), /dog-friendly-badge/);
@@ -10209,7 +10209,7 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
   // Recorded before Phase 1 began (commit 7e62fe6). An approved homepage
   // change must update these deliberately; nothing else may.
-  assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80', 'okanagan.html (SEO-2 homepage descriptions 2026-10-02)');
+  assert.equal(md5('okanagan.html'), 'b855e8f27191ea64b3addd1219c45ae9', 'okanagan.html (hidden trip toggle: suitcase line icon, emoji pass 2 2026-10-26)');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25; font fallback faces in every stack, speed/CLS PR approved 2026-10-18)');
   // Approved accessibility change (2026-10-18): one added token, --ref-gold-ink, a deeper gold for gold text on the
   // cream background (the logo's "Roam"); every existing token keeps its value.
@@ -11754,7 +11754,8 @@ test('Header: okanagan.html outside <header id="top"> is byte-identical to the a
   const crypto = require('node:crypto');
   // SEO-2 (2026-10-02): approved description/og:/twitter: description change.
   // GEO r1 (2026-10-20): JSON-LD only: new WebSite description, Organization email and every social profile in sameAs.
-  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), '0bfad428557c2c9dc8b1c4fcd909613d');
+  // Emoji pass 2 (2026-10-26): the hidden trip toggle's suitcase emoji is the uiIcon('trip') line icon.
+  assert.equal(crypto.createHash('md5').update(outside).digest('hex'), 'c3c88f40febe7af5745add1b99b4dc25');
   assert.match(html, /<a href="#top" class="logo"/, 'the logo keeps its in-page #top anchor on the homepage');
 });
 
@@ -12166,7 +12167,7 @@ test('Footer link change: the old /browse form, protected assets, the page and t
   assert.match(appJs, /fetch\('https:\/\/formsubmit\.co\/ajax\/okanaganroam@gmail\.com'/, 'old form still posts to FormSubmit');
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80'); // SEO (2026-10-13): header Food & Drink links go to /restaurants, /cafes, /pubs, /breweries, /distilleries, /cocktail-lounges
+  assert.equal(md5('okanagan.html'), 'b855e8f27191ea64b3addd1219c45ae9'); // SEO (2026-10-13): header Food & Drink links go to /restaurants, /cafes, /pubs, /breweries, /distilleries, /cocktail-lounges
   // Batch 2 (2026-09-26): approved app.js change -- the full venue list is
   // fetched only by /browse (#venueGrid); see the Phase 1 frozen-files test.
   // Stage 5C (2026-10-01): approved Trip tray ref identity. W14: tray Undo. Stage 5E: Favorites by id. F4a: one open-status formatter. F5: sort reads ratings once. F6: Favorites rewrite only changed buttons. V3 French interface strings (2026-10-04).
@@ -16423,7 +16424,7 @@ test('Contact: a successful send leaves the venue and event submission paths, an
   // Frozen files are byte-identical.
   const crypto = require('node:crypto');
   const md5 = (rel) => crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, '..', rel))).digest('hex');
-  assert.equal(md5('okanagan.html'), '7b39c5a1a42ecf8dee86e025b6138b80');
+  assert.equal(md5('okanagan.html'), 'b855e8f27191ea64b3addd1219c45ae9');
   assert.equal(md5('public/scripts/app.js'), '8be19cf19e630d47c91d63b6f417553d');
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc'); // font fallback faces in every stack (speed/CLS, approved 2026-10-18)
 }));
@@ -16951,7 +16952,7 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
       assert.equal(row[13], 1, `${t}: flagged closed for the season on the map`);
       assert.equal(mapRows.find((r) => r[2] === `Seasons Everywhere open ${t}`)[13], 0);
     }
-    assert.match(app.renderPlacesMapPage(), /seasonClosed: '\u{1F342} Closed for the season'/u);
+    assert.match(app.renderPlacesMapPage(), /seasonClosed: 'Closed for the season'/);
     // Trip planner: a closed outdoor, golf or tour place is never a stop.
     const facts = app.buildTripPlannerFacts();
     for (const t of ['outdoor', 'golf', 'tour']) assert.equal(facts.find((f) => f.id === closed[t]).seasonClosedToday, true, t);

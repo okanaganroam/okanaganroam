@@ -53,8 +53,10 @@ const FR_TEXT = {
   'Read more': 'Lire la suite',
   'Read less': 'Réduire',
   'Favorite': 'Favori',
-  '♥ Local Favourite': '♥ Coup de cœur local',
-  '💎 Hidden Gem': '💎 Trésor caché',
+  // Emoji pass 2 (2026-10-26): the badges' icons are SVG line icons now, so the words stand alone.
+  'Local Favourite': 'Coup de cœur local',
+  'Hidden Gem': 'Trésor caché',
+  'Use my location': 'Utiliser ma position',
   'Lake View': 'Vue sur le lac',
   'Great for Groups': 'Idéal pour les groupes',
   'Open Early': 'Ouvert tôt',
@@ -1173,6 +1175,8 @@ const FR_SCRIPT = [
   ["trip.textContent = '\\u{1F9F3} Add to trip';", "trip.textContent = '\\u{1F9F3} Ajouter au voyage';"],
   // Polish pass (2026-10-26): the label is a line icon (SVG) + the words, set with innerHTML.
   ["</svg> Add to trip';", "</svg> Ajouter au voyage';"],
+  // Emoji pass 2 (2026-10-26): /browse's "Use my location" is a pin icon (SVG) + the words.
+  ["</svg> Use my location';", "</svg> Utiliser ma position';"],
   // The trip tray.
   ["close.setAttribute('aria-label', 'Close My Trip');", "close.setAttribute('aria-label', 'Fermer Mon voyage');"],
   ["full.textContent = 'Open full trip: days, map and share link \\u2192';", "full.textContent = 'Ouvrir le voyage complet : jours, carte et lien à partager \\u2192';"],
@@ -1250,7 +1254,6 @@ const FR_SCRIPT_STRINGS = {
   "Your name needs at least 2 characters.": "Votre nom doit compter au moins 2 caractères.",
   "♡ Favorite": "♡ Favori",
   "✓ In trip": "✓ Dans le voyage",
-  "📍 Use my location": "📍 Utiliser ma position",
   "🧳 Add to trip": "🧳 Ajouter au voyage",
   "＋ Add to Trip": "＋ Ajouter au voyage",
   // Data in double quotes that sits inside other script text.
