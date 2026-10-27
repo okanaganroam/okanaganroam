@@ -269,8 +269,8 @@ test('Countdown: "Happy hour on now · ends in 1 hr 20 min" on the venue page an
   assert.equal(app.happyHourOnNowText({ state: 'later', from: { weekday: 'tue', minutes: 900 } }, clock, false), '');
   const v = mk({ name: 'Deals Countdown Pub' });
   setTimes(v, TUE_HH);
-  assert.deepEqual(line(page(v, at(TUE, '16:40'))), ['now', '<span aria-hidden="true">🍻</span> Happy hour on now · ends in 1 hr 20 min']);
-  assert.deepEqual(line(page(v, at(TUE, '16:40'), 'fr')), ['now', '<span aria-hidden="true">🍻</span> Happy hour en cours · se termine dans 1 h 20']);
+  assert.deepEqual(line(page(v, at(TUE, '16:40'))), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour on now · ends in 1 hr 20 min`]);
+  assert.deepEqual(line(page(v, at(TUE, '16:40'), 'fr')), ['now', `<span aria-hidden="true">${app.uiIcon('cocktail')}</span> Happy hour en cours · se termine dans 1 h 20`]);
   assert.deepEqual(line(page(v, at(TUE, '12:00'))), ['later', 'Happy hour today 3–6 PM'], 'later today is unchanged');
   // The map runs the same countdown functions, refreshed every minute with the rest of the status.
   const en = app.renderPlacesMapPage();

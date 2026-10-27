@@ -2747,10 +2747,19 @@ window.__scrollToVenueCard = function(name){
   // Accessibility (2026-10-20, round 11): every Add to trip button says whether its stop is in the trip (aria-pressed;
   // What's On and Build My Trip cards never did), and the label's leading emoji or tick is aria-hidden, so a screen
   // reader says "Add to trip" / « Ajouter au voyage », not "luggage, Add to trip".
+  // Polish pass (2026-10-26): the leading luggage emoji / tick is drawn as a thin line icon (an aria-hidden SVG, the
+  // same markup server.js uiIcon('trip') / uiIcon('check') renders), so the label reads the same and looks built.
+  var TRIP_ICON_PATHS = {
+    trip: '<rect x="5" y="7" width="14" height="13" rx="2"></rect><path d="M9 7V4.5h6V7"></path><path d="M9 11v5M15 11v5"></path>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>'
+  };
+  function tripIconSvg(name){
+    return '<svg class="ui-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="vertical-align:-0.15em">' + TRIP_ICON_PATHS[name] + '</svg>';
+  }
   function tripLabelHtml(label){
     var esc = function(s){ return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
     var i = label.indexOf(' ');
-    if (i > 0 && /[^\x00-\x7F]/.test(label.slice(0, i))) return '<span aria-hidden="true">' + esc(label.slice(0, i)) + '</span>' + esc(label.slice(i));
+    if (i > 0 && /[^\x00-\x7F]/.test(label.slice(0, i))) return tripIconSvg(label.slice(0, i) === '✓' ? 'check' : 'trip') + esc(label.slice(i));
     return esc(label);
   }
   function syncButtons(){

@@ -124,17 +124,19 @@ function bootTray(strings, saved, buttons) {
 }
 const tripButton = (name, ref) => { const b = new El('trip-btn'); b.dataset.tripName = name; b.dataset.tripRegion = 'kelowna'; b.dataset.tripQuery = name; b.dataset.tripRef = ref; return b; };
 
-test('app.js: Add to trip buttons say whether the stop is in the trip (aria-pressed), and the emoji is aria-hidden', () => {
+// Polish pass (2026-10-26): the leading emoji / tick is drawn as an aria-hidden line icon (server.js uiIcon()).
+test('app.js: Add to trip buttons say whether the stop is in the trip (aria-pressed), and the icon is aria-hidden', () => {
   const en = { 'trip.addToTrip': '\u{1F9F3} Add to trip', 'trip.inTrip': '✓ In trip', 'trip.emptyState': 'No venues added yet.' };
   const a = tripButton('Fixture Concert', 'event:1'), b = tripButton('Fixture Market', 'event:2');
   const t = bootTray(en, [{ name: 'Fixture Market', query: 'Fixture Market', region: 'kelowna', ref: 'event:2' }], [a, b]);
   assert.equal(a.getAttribute('aria-pressed'), 'false');
   assert.equal(b.getAttribute('aria-pressed'), 'true');
-  assert.equal(a.innerHTML, '<span aria-hidden="true">\u{1F9F3}</span> Add to trip');
-  assert.equal(b.innerHTML, '<span aria-hidden="true">✓</span> In trip');
+  assert.equal(a.innerHTML, `${app.uiIcon('trip')} Add to trip`);
+  assert.equal(b.innerHTML, `${app.uiIcon('check')} In trip`);
+  assert.match(app.uiIcon('trip'), /^<svg class="ui-icon"[^>]* aria-hidden="true" focusable="false"/);
   t.click(a);
   assert.equal(a.getAttribute('aria-pressed'), 'true', 'adding presses it');
-  assert.equal(a.textContent, '✓ In trip');
+  assert.equal(a.textContent, ' In trip');
   t.click(b);
   assert.equal(b.getAttribute('aria-pressed'), 'false', 'removing releases it');
 });
@@ -144,7 +146,7 @@ test('app.js: the French labels too', () => {
   const a = tripButton('Fixture Concert', 'event:1');
   bootTray(fr, [{ name: 'Fixture Concert', query: 'x', region: 'kelowna', ref: 'event:1' }], [a]);
   assert.equal(a.getAttribute('aria-pressed'), 'true');
-  assert.equal(a.innerHTML, '<span aria-hidden="true">✓</span> Dans le voyage');
+  assert.equal(a.innerHTML, `${app.uiIcon('check')} Dans le voyage`);
 });
 
 test('Build My Trip cards: Add to trip names the place, starts unpressed, and "+N" says what it shows (EN and FR)', () => {

@@ -1171,6 +1171,8 @@ const FR_SCRIPT = [
   ["fav.innerHTML = HEART_USE + ' Favorite';", "fav.innerHTML = HEART_USE + ' Favori';"],
   ["trip.setAttribute('aria-label', 'Add ' + name + ' to trip');", "trip.setAttribute('aria-label', 'Ajouter ' + name + ' au voyage');"],
   ["trip.textContent = '\\u{1F9F3} Add to trip';", "trip.textContent = '\\u{1F9F3} Ajouter au voyage';"],
+  // Polish pass (2026-10-26): the label is a line icon (SVG) + the words, set with innerHTML.
+  ["</svg> Add to trip';", "</svg> Ajouter au voyage';"],
   // The trip tray.
   ["close.setAttribute('aria-label', 'Close My Trip');", "close.setAttribute('aria-label', 'Fermer Mon voyage');"],
   ["full.textContent = 'Open full trip: days, map and share link \\u2192';", "full.textContent = 'Ouvrir le voyage complet : jours, carte et lien à partager \\u2192';"],
