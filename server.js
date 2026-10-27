@@ -29775,6 +29775,15 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-sp-deal, body.golf-page .venue-sp-time { display: block; margin-top: 1px; font-size: 0.86rem; color: rgba(42,32,25,0.78); }
   body.golf-page .venue-sp-time { font-size: 0.82rem; color: rgba(42,32,25,0.66); }
   body.golf-page .venue-sp-checked { display: block; margin: 6px 0 0; }
+  /* The deals card (2026-10-27): its own card in the main column. Two blocks side by side when there is room. */
+  body.golf-page .venue-deals-card { margin: 24px 0 28px; padding: 20px 22px 16px; border: 1px solid rgba(42,32,25,0.12); border-radius: 16px; background: var(--paper, #FFFDF8); box-shadow: 0 10px 24px -22px rgba(74,52,40,0.5); }
+  body.golf-page .venue-deals-card h2 { margin: 0 0 12px; }
+  body.golf-page .venue-deals-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px 36px; align-items: start; }
+  body.golf-page .venue-deals-block h3 { margin: 0 0 6px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,32,25,0.62); }
+  body.golf-page .venue-deals-body { display: block; font-size: 0.95rem; }
+  body.golf-page .venue-deals-body .venue-hh-times { display: block; font-weight: 800; margin: 0 0 4px; }
+  body.golf-page .venue-deals-card .venue-hh-deals { margin-top: 6px; }
+  body.golf-page .venue-deals-jump { display: block; width: fit-content; margin-top: 2px; padding: 11px 0; margin-bottom: -11px; font-weight: 700; }
   /* Two columns on wide screens: the story and actions on the left, the
      facts (details, map link, hours) in a sidebar on the right. */
   body.golf-page .venue-layout { display: block; }
@@ -30129,6 +30138,16 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const happyHour = venueHappyHour(venue, statusHours, fr, opts.now || new Date());
   // Weekly specials (2026-10-27): their own row, under Happy hour.
   const weeklySpecials = venueSpecials(venue, statusHours, fr, opts.now || new Date());
+  // The deals card (2026-10-27): happy hour (times, its checked date, the deals) and the weekly specials, side by side on
+  // wide screens and stacked on phones, in the main column under the story. Only when there are deals or specials.
+  const venueDealsCardHtml = (() => {
+    const blocks = [];
+    if (happyHour && happyHour.deals) blocks.push(['hh', 'Happy hour', `${happyHour.week ? `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>` : ''}${happyHour.checked && happyHour.deals.checked !== happyHour.checked ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHourDealsHtml(happyHour.deals, fr)}`]);
+    if (weeklySpecials) blocks.push(['sp', L('Weekly specials', 'Spéciaux de la semaine'), venueSpecialsHtml(weeklySpecials, fr)]);
+    if (!blocks.length) return '';
+    const title = blocks.length === 2 ? L('Happy hour & weekly specials', 'Happy hour et spéciaux de la semaine') : blocks[0][0] === 'hh' ? L('Happy hour deals', 'Spéciaux du happy hour') : L('Weekly specials', 'Spéciaux de la semaine');
+    return `<section class="venue-section venue-deals-card" id="venueDeals" aria-labelledby="venueDealsTitle"><h2 id="venueDealsTitle">${title}</h2><div class="venue-deals-blocks">${blocks.map(([k, h, body]) => `<div class="venue-deals-block" data-block="${k}">${blocks.length === 2 ? `<h3>${h}</h3>` : ''}<div class="venue-deals-body">${body}</div></div>`).join('')}</div></section>`;
+  })();
   const detailRows = [
     venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
@@ -30146,8 +30165,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venueShowsPrice(venue) ? [L('Price', 'Prix'), '$'.repeat(venue.price)] : null,
     // Happy hour (2026-10-23): last, so it sits next to the Hours box; the times only, never drink prices.
     // Deals (2026-10-26) under the times, with their own checked date.
-    happyHour ? ['Happy hour', `${happyHour.week ? `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>` : ''}${happyHour.checked && !(happyHour.deals && happyHour.deals.checked === happyHour.checked) ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHourDealsHtml(happyHour.deals, fr)}`] : null,
-    weeklySpecials ? [L('Weekly specials', 'Spéciaux de la semaine'), venueSpecialsHtml(weeklySpecials, fr)] : null,
+    // Deals card (2026-10-27): the happy hour deals and the weekly specials moved out of this narrow sidebar into their
+    // own card in the main column (venueDealsCardHtml), which also fills the space beside a long sidebar. The sidebar
+    // keeps the happy hour times; with deals, a "See deals" link jumps to the card.
+    happyHour && happyHour.week ? ['Happy hour', `<span class="venue-hh-times">${escapeHtml(happyHour.week)}</span>${happyHour.checked && !happyHour.deals ? `<span class="venue-hours-checked venue-hh-checked">${escapeHtml(happyHour.checked)}</span>` : ''}${happyHour.deals || weeklySpecials ? `<a class="venue-deals-jump" href="#venueDeals">${happyHour.deals ? L('See the deals', 'Voir les spéciaux') : L('See weekly specials', 'Voir les spéciaux de la semaine')} ↓</a>` : ''}`] : null,
+    weeklySpecials && !(happyHour && happyHour.week) ? [L('Weekly specials', 'Spéciaux de la semaine'), `<a class="venue-deals-jump" href="#venueDeals">${L('See this week’s specials', 'Voir les spéciaux de la semaine')} ↓</a>`] : null,
   ].filter(Boolean)
     .map(([lbl, val]) => `<div class="detail-row"><span class="label">${escapeHtml(lbl)}</span><span>${val}</span></div>`)
     .join('\n');
@@ -30487,6 +30509,7 @@ ${VENUE_MENU_CSS}` : ''}
   <!-- Reading order (2026-10-19, round 9): the menu, visitor photos and tips, and guide links come after the facts
        in the page itself, so a keyboard or screen reader reaches the phone, website and map link first. -->
   <div class="venue-extra">
+  ${venueDealsCardHtml}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}

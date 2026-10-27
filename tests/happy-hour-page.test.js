@@ -30,7 +30,8 @@ const at = (date, hhmm) => { const [h, m] = hhmm.split(':').map(Number); return 
 const TUE = '2026-10-27', FRI = '2026-10-30', SUN = '2026-10-25';
 const page = (v, now, lang) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { now, lang });
 const line = (html) => (/<p class="venue-hh-status" data-hh="(\w+)" id="venueHappyHour">([\s\S]*?)<\/p>/.exec(html) || []).slice(1);
-const row = (html) => (/<div class="detail-row"><span class="label">Happy hour<\/span><span>([\s\S]*?)<\/span><\/div>/.exec(html) || [])[1] || '';
+// The deals card (2026-10-27) holds the happy hour times + deals; places with times only keep them in the sidebar row.
+const row = (html) => (/<div class="venue-deals-block" data-block="hh">(?:<h3>[^<]*<\/h3>)?<div class="venue-deals-body">([\s\S]*?)<\/div><\/div>/.exec(html) || [])[1] || (/<div class="detail-row"><span class="label">Happy hour<\/span><span>([\s\S]*?)<\/span><\/div>/.exec(html) || [])[1] || '';
 
 const brewery = mk({ name: 'HH Page Brewing' });
 setTimes(brewery, { mon: [['15:00', '18:00']], tue: [['15:00', '18:00']], wed: [['15:00', '18:00']], thu: [['15:00', '18:00']], sat: [['19:00', '22:00']] });
