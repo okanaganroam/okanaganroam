@@ -169,12 +169,13 @@ test('Venue page: a Deals list under the happy hour times with its checked date;
   const o = row(page(only, at(TUE, '12:00')));
   assert.doesNotMatch(o, /venue-hh-times/);
   assert.match(o, /venue-hh-deal-price">\$6<\/span><span class="venue-hh-deal-text">House pints \(20 oz\)</);
-  // More than 4 deals: the first 4 show, the rest behind "2 more deals".
+  // Up to 6 deals all show in the deals card: no "more" toggle (2026-10-27).
   const six = mk({ name: 'Deals Six Pub' });
   setDeals(six, [1, 2, 3, 4, 5, 6].map((n) => ({ text: `Deal ${n}`, price: `$${n}` })));
   const s6 = row(page(six, at(TUE, '12:00')));
-  assert.match(s6, /Deal 4<\/span><\/span><\/span><details class="venue-hh-more"><summary>2 more deals<\/summary><span class="venue-hh-deal-list" role="list" aria-labelledby="venueHhDealsLabel">.*Deal 5.*Deal 6/);
-  assert.match(row(page(six, at(TUE, '12:00'), 'fr')), /<summary>2 autres spéciaux<\/summary>/);
+  assert.match(s6, /Deal 4.*Deal 5.*Deal 6/);
+  assert.doesNotMatch(s6, /venue-hh-more/, 'no toggle');
+  assert.doesNotMatch(row(page(six, at(TUE, '12:00'), 'fr')), /venue-hh-more/);
   // Only on places with the happy_hour badge (alcohol-serving): a place without it shows no deals.
   const noBadge = mk({ name: 'Deals No Badge Pub', happy_hour: false });
   setTimes(noBadge, TUE_HH);
