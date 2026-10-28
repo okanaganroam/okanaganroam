@@ -1,5 +1,5 @@
 {
-  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 8 usable picks show; the rest are backups that step in, in order, when a pick is skipped (closed today or for the season, not operating, or without its own photo). The row always shows 8 or 4 cards, never an odd count, and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season).",
+  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 8 usable picks show; the rest are backups that step in, in order, when a pick is skipped (closed today or for the season, not operating, or without its own photo). The row always shows 8 or 4 cards, never an odd count, and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season); it must be a wide (landscape) photo with the subject in the middle, since the card shows a wide strip.",
   "updated": "2026-10-28",
   "picks": [
     {
@@ -11,7 +11,7 @@
       "id": 1413,
       "why": "Independent brewery with a full kitchen and Friday trivia",
       "why_fr": "Brasserie indépendante, cuisine complète et quiz le vendredi",
-      "photo": "/images/owner/531f2d02d624df22b54569a5.jpg"
+      "photo": "/images/owner/7be2648870550c524e73b055.jpg"
     },
     {
       "id": 289,
