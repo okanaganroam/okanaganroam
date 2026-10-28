@@ -235,3 +235,12 @@ test('Daypart labels follow the stop\'s time on short outings; "wine and dinner"
   const one = full('a winery and dinner in West Kelowna on Saturday', MON_NOON);
   assert.equal(stopsOf(one).filter((s) => s.venue && s.venue.type === 'winery').length, 1);
 });
+
+// 2026-10-28: "tomorrow" is tomorrow ("apres crawl in Whistler tomorrow" was planned for today on Whistler Roam).
+test('Happy hour crawl tomorrow: planned for tomorrow and said so (EN + FR)', () => {
+  const p = full('happy hour crawl in Kelowna tomorrow', TUE_1PM);
+  assert.equal(p.kind, 'itinerary', JSON.stringify([p.kind, p.notes]));
+  assert.ok(p.schedule.every((r) => r.date === WED), JSON.stringify(p.schedule.map((r) => r.date)));
+  assert.equal(p.summary, 'A happy hour crawl in Kelowna tomorrow.');
+  assert.equal(t3FrenchText(p.summary), 'Une tournée des happy hours à Kelowna demain.');
+});
