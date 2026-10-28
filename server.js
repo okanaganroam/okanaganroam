@@ -12206,23 +12206,6 @@ const HOME_CAROUSEL_SCRIPT = `<script>(function(){var s=document.getElementById(
 function homeUpcomingEventCount(now = homepageNow()) {
   return whatsOnStillOn(getWhatsOnEvents(resolveWhatsOnWindow({}, now)), now).length;
 }
-// The two seasonal counts in the homepage strip (2026-10-25, Dayton: beaches and golf are not what people come for in
-// the fall, and most courses are closed until spring). Summer (June to September): beaches and golf. Fall (October and
-// November): Hidden Gems and indoor & rainy-day places. Winter (December to March): ski & snow and indoor places.
-// Spring (April and May): golf (courses reopen) and Hidden Gems.
-function homeSeasonalStats(now, n) {
-  const month = Number(todayLocal(now).slice(5, 7));
-  const count = (fn) => { try { return fn(); } catch (e) { return 0; } };
-  const beaches = [n(['beach']), '/beaches', 'beaches', 'plages'];
-  const golf = [n(['golf']), '/golf', 'golf courses', 'terrains de golf'];
-  const gems = [count(() => getHiddenGemVenueIds().size), '/hidden-gems', 'Hidden Gems', 'joyaux cachés'];
-  const indoor = [n(['indoor']), '/indoor', 'indoor & rainy-day places', 'lieux intérieurs pour les jours de pluie'];
-  const snow = [count(() => getSkiSnowVenues().length), SKI_SNOW_PATH, 'ski & snow spots', 'lieux de ski et de neige'];
-  if (month >= 6 && month <= 9) return [beaches, golf];
-  if (month === 10 || month === 11) return [gems, indoor];
-  if (month === 12 || month <= 3) return [snow, indoor];
-  return [golf, gems];
-}
 function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   let counts = {};
   try { for (const r of db.prepare('SELECT type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY type').all()) counts[r.type] = r.n; } catch (e) { counts = {}; }
@@ -12234,13 +12217,14 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   const fmt = (x) => Number(x).toLocaleString('en-CA');
   // French (2026-10-18): "1 766 vrais lieux", with a no-break space, not "1,766".
   const fmtFr = (x) => fmt(x).replace(/,/g, '\u00a0');
-  // Five numbers, not nine (2026-10-28, Dayton): with the happy hour count in front, places, events, wineries and the
-  // first of the season's two counts (Hidden Gems in the fall, ski & snow in winter). Each section is still a click away.
+  // Five numbers, not nine (2026-10-28, Dayton): with the happy hour count in front, places, events, wineries and
+  // places to eat & drink (Dayton, 2026-10-28: food and drink, not Hidden Gems, belongs here). Each section is still a
+  // click away.
   const items = [
     [total, '/destinations', 'real places', 'vrais lieux'],
     [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 90 days
     [n(['winery']), '/wineries', 'wineries', 'vignobles'],
-    ...homeSeasonalStats(now, n).slice(0, 1),
+    [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), '/food-drink', 'places to eat & drink', 'endroits où manger et boire'],
   ].filter(([v]) => v > 0);
   return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v) === fmtFr(v) ? fmt(v) : `<span class="home-en">${fmt(v)}</span><span class="home-fr" lang="fr">${fmtFr(v)}</span>`}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
 }
@@ -56624,7 +56608,6 @@ module.exports = {
   homeEventDateText,
   renderHomeStatsHTML,
   homeUpcomingEventCount,
-  homeSeasonalStats,
   homeEventImage,
   tripV3MapHeaders,
   APP_JS_SRC,
