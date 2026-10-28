@@ -7137,7 +7137,13 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   if (!chain) {
     // A pub or bar crawl without happy hours that line up keeps the planner's crawl; a happy hour request says why.
     if (ask.happyHour) {
-      const note = `Fewer than two places in ${town} have happy hours on ${dayEn} that line up one after another, so here are the places with happy hour instead.`;
+      let note = `Fewer than two places in ${town} have happy hours on ${dayEn} that line up one after another, so here are the places with happy hour instead.`;
+      // 2026-10-28: asked late in the day, when an earlier crawl would have worked, say it is late and when tomorrow's starts.
+      if (date === today && nowFloor > 0 && tripHappyHourChain({ date, region, startFloor: 720, dinner: ask.dinner, excluded, now, dog })) {
+        const next = addLocalDays(date, 1);
+        const nextChain = tripHappyHourChain({ date: next, region, startFloor: 720, dinner: ask.dinner, excluded, now, dog });
+        if (nextChain) note = `It’s too late today for a happy hour crawl in ${town}: the happy hours that line up are over. Tomorrow (${TRIP_HH_WEEKDAY_NAMES[localWeekdayKey(next)][0]}) one can start at ${happyHourTimeText(nextChain[0].start, false)}. ${plan.kind === 'itinerary' ? 'Here is an evening at the pubs instead.' : 'Here are the places with happy hour instead.'}`;
+      }
       plan.notes = [note].concat((plan.notes || []).filter((n) => n !== note));
       plan.contextNotes = [note].concat((plan.contextNotes || []).filter((n) => n !== note));
     }
