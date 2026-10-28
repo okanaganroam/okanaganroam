@@ -32042,6 +32042,12 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     assert.match(html, /Why \d+ &amp; more/, 'the reason is escaped');
     assert.match(html, /lang="fr">Pourquoi \d+/);
     assert.ok(!/sponsored/i.test(html), 'never labelled or linked as sponsored');
+    // A dated closure that covers today (an owner's "closed Oct 21-28") skips the pick too.
+    const shut = add('Pick Shut This Week', 'cafe', '/images/venues/pick-shut.jpg');
+    db.prepare("INSERT INTO venue_hours_extra (venue_id, seasons, closures) VALUES (?, '[]', ?)").run(shut, JSON.stringify([{ from: app.addLocalDays(today, -1), to: app.addLocalDays(today, 2), note: '' }]));
+    app.clearHoursExtraCache();
+    const withShut = app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(shut), pick(ok[1]), pick(ok[2]), pick(ok[3])] }, now: new Date() });
+    assert.ok(!withShut.includes('Pick Shut This Week'), 'closed today: skipped');
     // Under four usable picks: no row at all.
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
@@ -32061,8 +32067,10 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
   } finally {
     for (const id of made) {
       db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venue_hours_extra WHERE venue_id = ?').run(id);
       db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
       db.prepare('DELETE FROM venues WHERE id = ?').run(id);
     }
+    app.clearHoursExtraCache();
   }
 });
