@@ -690,6 +690,11 @@ function eligible(v, ctx, strict) {
 // every text is built from the request and a verified field. Transparent
 // and deterministic; the seed only adds a small bounded jitter so
 // "Regenerate" can surface other valid options.
+// Mood words (2026-10-28): "cozy", "intimate", "quiet" describe the setting; with a meal word next to them ("a cozy
+// dinner") they describe the meal.
+const VIBE_TERM_RE = /^(?:cozy|cosy|intimate|quiet|romantic|candlelit|candle lit)$/;
+const VIBE_MEAL_RE = /\b(?:cozy|cosy|intimate|quiet|romantic|candlelit)(?: [a-z]+)? (?:dinners?|lunch(?:es)?|meals?|restaurants?|brunch|breakfast|supper|dining)\b/;
+function vibeMealAsked(ctx) { return VIBE_MEAL_RE.test(normWords(ctx.queryText || '')); }
 function scoreVenue(v, ctx) {
   const reasons = [];
   let score = 0;
@@ -733,14 +738,30 @@ function scoreVenue(v, ctx) {
     else {
       const where = [m.inName && 'name', m.inCui && 'cuisine', m.inDesc && 'description'].filter(Boolean);
       // A loose word in a restaurant's description ("desert", "quiet") counts for less than a dish it serves.
-      const loose = DINING_TYPES.includes(v.type) && !m.inName && !m.inCui && !DISH_WORDS_RE.test(ft.term) && !/^(?:brunch|breakfast)$/.test(ft.term);
+      // 2026-10-28: "a cozy dinner" is about the meal, so a cozy restaurant counts in full, not as a loose word.
+      const loose = DINING_TYPES.includes(v.type) && !m.inName && !m.inCui && !DISH_WORDS_RE.test(ft.term) && !/^(?:brunch|breakfast)$/.test(ft.term) && !(VIBE_TERM_RE.test(ft.term) && vibeMealAsked(ctx));
       add('food', (m.inName ? 15 : 0) + (m.inCui ? 10 : 0) + (m.inDesc ? (loose ? 3 : 7) : 0), `Mentions “${ft.term}” in its ${listText(where)}`);
     }
   }
+  // 2026-10-28: a cozy or intimate request is not a sports bar (Montana's and King Taps for "a cozy dinner").
+  if (v.features.sports_tv && !ctx.features.includes('sports_tv') && ctx.foodTerms.some((ft) => VIBE_TERM_RE.test(ft.term))) add('vibe_miss', -15, null);
+  if (vibeMealAsked(ctx) && v.type === 'restaurant' && ctx.foodTerms.some((ft) => VIBE_TERM_RE.test(ft.term) && foodMatch(v, ft))) add('vibe_meal', 8, null);
   occasionScore(v, ctx, add); // adds through `add`; must not be `score += ...` (that would drop them)
   const fit = budgetFits(ctx.budget, v.price);
   // 2026-10-25: a place reached by a rough road ("needs a high-clearance vehicle", a forest service road, 4x4) is a
   // backcountry outing, not an everyday stop ("a day in Naramata" opened with the Mountain Goat Trail).
+  // 2026-10-28: "a hike" on a trip with other plans is a hike of a few hours; a long day climb (Rainbow Lake, Singing
+  // Pass) takes the whole day, so it ranks below the others unless a big or full-day hike is asked for or it is named.
+  if (v.type === 'outdoor' && longDayHike(v)) {
+    if (BIG_HIKE_ASKED_RE.test(ctx.queryText || '')) add('long_hike_asked', 15, 'A full-day hike, as asked');
+    else if (!namedInRequest(v, ctx)) add('long_hike', -18, null);
+  }
+  // 2026-10-28: "a spa" puts a destination spa (hot pools, saunas, thermal baths) ahead of a treatment room or a massage
+  // studio.
+  if (SPA_ASKED_RE.test(ctx.queryText || '') && spaPlace(v)) {
+    if (SPA_DESTINATION_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('spa_destination', 12, 'A spa with hot pools, saunas and cold plunges');
+    else if (/\bmassage\b/.test(v.textName || normWords(v.name || ''))) add('spa_massage', -6, null);
+  }
   if (v.type === 'outdoor' && roughAccess(v) && !normWords(ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '))) add('rough_access', -10, null);
   // 2026-10-25: "a day on the lake in Kelowna in July" was Knox Mountain, a winery and chocolate -- the lake asked for was
   // met by a lake view. From June to September a lake day puts the beaches and water activities first.
@@ -1362,12 +1383,13 @@ function outingSteps(ctx) {
       label: s.types.map((t) => typeLabel(ctx, t, 'singular')).join(' or '), prefer: {},
     }));
   }
+  // 2026-10-28: a date night's drink is a lounge or a winery before a pub (Vernon's date night opened at 1516 Pub & Grill).
   // Default date-night shape (a heuristic): a drink in the early evening,
   // then dinner. Lounges first, then pubs and breweries, then wineries --
   // wineries stay in, but only where their listed hours reach the early
   // evening (or their hours are unknown, which is flagged, never assumed).
   return [
-    { types: ['cocktail', 'pub', 'brewery', 'winery'], daypart: 'evening', window: 'drinks', label: 'A drink first', prefer: ['romantic', 'celebration'].includes(ctx.occasion) ? { cocktail: 10, winery: 8, pub: 0, brewery: -4 } : { cocktail: 8, pub: 5, brewery: 5, winery: 4 } },
+    { types: ['cocktail', 'pub', 'brewery', 'winery'], daypart: 'evening', window: 'drinks', label: 'A drink first', prefer: ['romantic', 'celebration', 'date_night'].includes(ctx.occasion) ? { cocktail: 10, winery: 8, pub: 0, brewery: -4 } : { cocktail: 8, pub: 5, brewery: 5, winery: 4 } },
     { types: ['restaurant'], daypart: 'evening', window: 'evening', label: 'Dinner', prefer: {} },
   ];
 }
@@ -1698,10 +1720,13 @@ function offSeasonSkip(v, ctx) {
 function pickLunchNear(pool, ctx, d, info, near, used, reserved, base, focuses, onceTerms, onceEvening, tripCuisines, centroids, neighbours) {
   const nextToCafe = (neighbours || []).some((st) => st && st.venue && st.venue.type === 'cafe');
   const afterGolf = (neighbours || []).some((st) => st && st.venue && st.venue.type === 'golf' && !st.venue.indoorGolf);
+  // 2026-10-28: lunch is placed after the day's other stops, so it also skips their estates (Home Block at CedarCreek
+  // for lunch next to a CedarCreek tasting).
+  const estateTaken = withSameEstates(pool, used);
   const pick = (towns, far) => {
     let cands = [];
     for (const v of pool) {
-      if (used.has(v.id) || reserved.has(v.id)) continue;
+      if (used.has(v.id) || reserved.has(v.id) || estateTaken.has(v.id)) continue;
       if (!(v.type === 'restaurant' || v.type === 'pub' || (v.type === 'cafe' && ['coffee', 'unclear'].includes(cafeRole(v))))) continue;
       if (v.type === 'cafe' && nextToCafe) continue;
       if (dinnerOnly(v) || notAMeal(v)) continue; // round 12: not a dessert stand or concession either
@@ -1997,7 +2022,11 @@ function buildDays(facts, ctx, days, pinned) {
         const showLoc = daypart === 'evening' && anchor && eventPart === 'night' && anchor.location && hasCoords(anchor.location) ? anchor.location : null;
         const showTown = showLoc && regionList.length && !regionList.includes(anchor.region) ? anchor.region : null;
         const slotPool = showTown ? dayPool.concat(pool.filter((v) => v.region === showTown && v.type === 'restaurant' && (!ctx.requirements || !seasonClosedOnTrip(v, { date: actualDate })))) : dayPool;
+        // 2026-10-28: one estate once per trip in the main day builder too (a fall weekend had CedarCreek's tasting room
+        // in the afternoon and Home Block at CedarCreek for dinner).
+        const estateTaken = withSameEstates(facts, used);
         for (const v of slotPool) {
+          if (estateTaken.has(v.id) && !used.has(v.id)) continue;
           if (activityDay.has(v.id)&&activityDay.get(v.id)>d&&!(ctx.requirements?.items || []).some(i=>i.strength==='must'&&tripRequirements.requirementDay(i,ctx.tripDate)===d&&tripRequirements.matches(v,i)))continue;
           if (used.has(v.id) || reserved.has(v.id) || capped(v) || !tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate)) continue;
           if (!partOk(ctx, d, daypart, v)) continue; // round 8: the town asked for at this time of day
@@ -2773,16 +2802,19 @@ function buildWineDays(facts, ctx, days, pinned) {
     const lunchPin = pin('midday');
     const needMore = picks.length < tastingWant;
     let lunch = lunchPin ? { v: lunchPin, score: 0, reasons: base(lunchPin).reasons, fit: null } : wineryLunch;
+    // 2026-10-28: lunch is picked after the tastings, so it skips their estates (CedarCreek's tasting room, then lunch at
+    // Home Block at CedarCreek).
+    const lunchUsed = withSameEstates(facts, used);
     if (!lunch && (wineryLunchAsked || (needMore && want >= 3))) {
-      const wl = themePick(dayPool.filter((v) => wineryKitchen(v) && !used.has(v.id) && partOk(ctx, d, 'midday', v)).map((v) => ({ v, fit: fitOf(v, 'midday') })).filter((x) => x.fit.ok)
+      const wl = themePick(dayPool.filter((v) => wineryKitchen(v) && !lunchUsed.has(v.id) && partOk(ctx, d, 'midday', v)).map((v) => ({ v, fit: fitOf(v, 'midday') })).filter((x) => x.fit.ok)
         .map((x) => ({ ...x, score: base(x.v).score - (kmOrNull(near, x.v) || 6) * 1.2, reasons: base(x.v).reasons.concat({ code: 'meal', text: 'Lunch at a winery’s own kitchen, so it is a tasting too', weight: 4 }) })));
       if (wl) lunch = wl;
     }
     if (!lunch && wineryLunchAsked) warnings.push(`No winery with its own kitchen fits lunch on day ${d}${where}, so lunch is at a restaurant near the wineries.`);
-    if (!lunch) lunch = pickMeal(dayPool, ctx, d, 'midday', near, used, { base, wine: true, text, nearName: 'the wineries', cafeOnly: mealCap !== Infinity });
+    if (!lunch) lunch = pickMeal(dayPool, ctx, d, 'midday', near, lunchUsed, { base, wine: true, text, nearName: 'the wineries', cafeOnly: mealCap !== Infinity });
     // Nothing open in town (2026-10-18): a town about 20 minutes away.
     const nearPool = () => (regionList.length ? pool.filter((v) => townsNear(centroids, regionList, MEAL_NEARBY_MINUTES).includes(v.region) && !seasonClosedOnTrip(v, { date }) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate)) : []);
-    if (!lunch && regionList.length) { const far = pickMeal(nearPool(), ctx, d, 'midday', near, used, { base, wine: true, text, nearName: 'the wineries', cafeOnly: mealCap !== Infinity }); if (far) lunch = { ...far, caveats: (far.caveats || []).concat(nearbyTownCaveat(ctx, centroids, regionList, far.v.region, 'lunch')) }; }
+    if (!lunch && regionList.length) { const far = pickMeal(nearPool(), ctx, d, 'midday', near, lunchUsed, { base, wine: true, text, nearName: 'the wineries', cafeOnly: mealCap !== Infinity }); if (far) lunch = { ...far, caveats: (far.caveats || []).concat(nearbyTownCaveat(ctx, centroids, regionList, far.v.region, 'lunch')) }; }
     // Round 8: a winery lunch is timed as lunch (from 11:30), not as a 10 AM tasting.
     if (lunch) { used.add(lunch.v.id); stops.push({ ...themeStop(ctx, 'midday', lunch.v, { reasons: lunch.reasons }, lunch.fit, [], lunch.caveats || []), ...(lunch.v.type === 'winery' ? { wineryLunch: true } : {}) }); }
     const wineCount = picks.length + (lunch && lunch.v.type === 'winery' ? 1 : 0);
@@ -3000,13 +3032,22 @@ function nearbyFocusVenue(facts, ctx, f) {
   options.sort((a, b) => gap(a) - gap(b) || fit(b) - fit(a) || (Number(b.rating) || 0) - (Number(a.rating) || 0));
   return options[0] || null;
 }
+// How a searched word reads in a summary (2026-10-28, Dayton: 'focused on wineries and “cozy”' looked broken): its
+// label from data/vocabulary/shared.json ("cozy spots"), nothing for a word with an empty label ("south" once the
+// area is understood), otherwise the word as typed, in quotes.
+const TERM_LABELS = require('./vocabulary.js').sharedTable('termLabels');
+function termText(term) {
+  const l = TERM_LABELS[term];
+  if (l && typeof l.en === 'string') return l.en;
+  return `“${term}”`; // a dish or word the visitor typed, shown as typed
+}
 function focusText(ctx, key) {
   if (key.startsWith('kind:')) return tripRequirements.LABELS[key.slice(5)] || key.slice(5);
   const [kind, value] = key.split(':');
   if (kind === 'type') return typeLabel(ctx, value).toLowerCase();
   if (kind === 'activity') return activityLabel(ctx, value);
   if (kind === 'collection') return collectionLabel(ctx, value);
-  if (kind === 'food') return `“${value}”`;
+  if (kind === 'food') return termText(value) || value;
   if (kind === 'lake') return 'a lake-view, beach or water stop';
   return value;
 }
@@ -3018,7 +3059,7 @@ function interestsText(ctx) {
   for (const t of ctx.types) items.push(typeLabel(ctx, t).toLowerCase());
   for (const a of ctx.activities) items.push(activityLabel(ctx, a));
   for (const c of ctx.collections) items.push(collectionLabel(ctx, c));
-  for (const ft of ctx.foodTerms) items.push(`“${ft.term}”`);
+  for (const ft of ctx.foodTerms) { const t = termText(ft.term); if (t) items.push(t); }
   for (const f of ctx.features) items.push((ctx.labels.featureNouns && ctx.labels.featureNouns[f]) || featureLabel(ctx, f).toLowerCase());
   return items;
 }
@@ -3357,7 +3398,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // Round 12 (2026-10-20): any outdoor stop whose listing gives a trail length, not only those listed for hiking
         // (Naramata Creek's 2.5 km waterfall walk and Giant's Head with kids were still given 3 hours).
         const trailTime=(hiking||candidate.type==='outdoor')&&one?.visits?.[0]?.durationSource!=='listing'?trailMinutes(candidate):null;
-        let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
+        // 2026-10-28: a long day hike is timed as one (Rainbow Lake was 8-11 AM, then lunch at 11:30).
+        const longHike=!trailTime&&one?.visits?.[0]?.durationSource!=='listing'?longDayHikeMinutes(candidate):null;
+        let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||longHike||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
         // Round 14 (2026-10-20): a café that is the brunch or lunch stop is a meal (60-75 minutes), not a 40-minute coffee.
         if(candidate.type==='cafe'&&!stop.gapFill&&!stop.afterSki){if(/\b(?:brunch|breakfast)\b/i.test(stop.label||''))duration=Math.max(duration,75);else if(isLunchStop(stop))duration=Math.max(duration,60);}
         // Weekly audit (2026-10-25): "a drink first" is about an hour, not a 90-minute pub meal (date night in Vernon: a drink
@@ -4275,6 +4318,26 @@ function trailMinutes(v) {
   if (/\b(?:each way|one way)\b/i.test(text.slice(hits[0].index, hits[0].index + hits[0][0].length + 20))) km *= 2;
   return Math.max(45, Math.min(240, Math.round((km * 20 + 15) / 15) * 15));
 }
+// A hike that takes most of a day (2026-10-28, from Whistler Roam): its listing says so ("a long day hike", "a long
+// climb", "full-day"), or its stated length is about four hours or more. Timed at five hours when the listing gives no
+// length past trailMinutes' 25 km.
+const LONG_DAY_HIKE_RE = /\b(?:long day hike|full[- ]day|all[- ]day|day[- ]long|long climb|multi[- ]day|overnight)\b/i;
+const BIG_HIKE_ASKED_RE = /\b(?:long|big|full[- ]day|all[- ]day|day long|epic|challenging|strenuous|hard|difficult|serious|tough)\s+(?:day\s+)?(?:hikes?|hiking|treks?|climbs?)\b|\b(?:hike|hiking) all day\b|\bbackpacking\b/;
+const LONG_DAY_HIKE_MINUTES = 300;
+function longDayHike(v) {
+  if (!v || v.type !== 'outdoor') return false;
+  return LONG_DAY_HIKE_RE.test(String(v.trailText || v.plannerDescription || v.description || '')) || (trailMinutes(v) || 0) >= 240;
+}
+function longDayHikeMinutes(v) {
+  if (!longDayHike(v)) return null;
+  const m = /\b(\d{2}(?:\.\d)?) ?(?:km|kilometres?)(?: |-)(?:return|round[ -]trip|loop)\b/i.exec(String(v.trailText || v.plannerDescription || v.description || ''));
+  const km = m ? Number(m[1]) : 0;
+  return km > 25 ? Math.min(600, Math.round((km * 20 + 15) / 15) * 15) : LONG_DAY_HIKE_MINUTES;
+}
+// Spas (2026-10-28, from Whistler Roam): a request that says spa, and the places that are one.
+const SPA_ASKED_RE = /\b(?:spa|spas|sauna|saunas|massage|massages|wellness|hot tubs?|thermal|nordic spa)\b/;
+const SPA_DESTINATION_RE = /\b(?:nordic|thermal|hot pools?|baths|hydrotherapy|cold plunges?|hot springs|outdoor pools|mineral pools?)\b/;
+function spaPlace(v) { return !!v && v.type === 'indoor' && /\b(?:spa|spas|sauna|massage|thermal)\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`); }
 // Planning allowances (minutes) for a visit with no estimate of its own (2026-10-19).
 const VISIT_ALLOWANCE = { outdoor: 90, beach: 120, indoor: 90, tour: 120, sport: 90, golf: 240, cafe: 40, restaurant: 90, pub: 90, brewery: 60, winery: 75, distillery: 60, cocktail: 60 };
 // An evening meal (2026-10-19): a stop labelled dinner, or a restaurant or pub in the evening slot. Its time is never
@@ -6872,7 +6935,8 @@ function planItinerary(input) {
   result.overview = {
     where: route && route.from && route.to ? `${regionLabel(baseCtx, route.from)} → ${regionLabel(baseCtx, route.to)}` : regions.length ? listText(regions.map((r) => regionLabel(baseCtx, r))) : 'the Okanagan',
     regions: regions.map((r) => ({ slug: r, label: regionLabel(baseCtx, r) })),
-    days: null, pace: null, interests: partLabels, occasion: null, budget: null,
+    // 2026-10-28: a crawl's three pub stops are one interest ("pubs", not "pubs, pubs, pubs").
+    days: null, pace: null, interests: [...new Set(partLabels)], occasion: null, budget: null,
   };
   if (trip.party && trip.party.dog && stops.some((s) => s.kind === 'event')) result.notes.push('Events aren’t checked for dogs; the dog-friendly requirement applies to the places.');
   if (stops.some((s) => s.kind === 'venue')) result.notes.push('Stops are checked against each venue’s listed hours on Okanagan Roam where it has them; hours can change, so check before you go.');
@@ -6906,7 +6970,7 @@ module.exports = {
   relabelDayparts,
   // Build My Trip audit fixes (2026-10-27)
   ctxPlanDate, nightKindOfTerm, venueNight, listedMatch, specialFoodMatch, afterMidnightTonight, skiOpeningFor,
-  withSameEstates,
+  withSameEstates, longDayHike, longDayHikeMinutes,
   coolBeachMonth,
   dogOnlyPlace,
   offSeasonSkip,

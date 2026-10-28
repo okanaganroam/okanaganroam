@@ -1,0 +1,69 @@
+{
+  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 8 usable picks show; the rest are backups that step in, in order, when a pick is skipped (closed today or for the season, not operating, or without its own photo). The row always shows 8 or 4 cards, never an odd count, and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season); it must be a wide (landscape) photo with the subject in the middle, since the card shows a wide strip.",
+  "updated": "2026-10-28",
+  "picks": [
+    {
+      "id": 1038,
+      "why": "Standout gluten-free baking, from cakes to macarons",
+      "why_fr": "Une pâtisserie sans gluten remarquable, des gâteaux aux macarons"
+    },
+    {
+      "id": 1413,
+      "why": "Independent brewery with a full kitchen and Friday trivia",
+      "why_fr": "Brasserie indépendante, cuisine complète et quiz le vendredi",
+      "photo": "/images/owner/7be2648870550c524e73b055.jpg"
+    },
+    {
+      "id": 289,
+      "why": "Elegant Italian with a deep wine cellar",
+      "why_fr": "Une cuisine italienne raffinée et une belle cave à vin"
+    },
+    {
+      "id": 1497,
+      "why": "A hot-cold spa circuit for a grey fall day",
+      "why_fr": "Un circuit chaud-froid pour une journée grise d’automne"
+    },
+    {
+      "id": 616,
+      "why": "A fully vegan brunch bistro that wins over everyone",
+      "why_fr": "Un bistro de brunch 100 % végétalien qui plaît à tous"
+    },
+    {
+      "id": 717,
+      "why": "Wine and cider in a 1922 packinghouse",
+      "why_fr": "Vin et cidre dans un entrepôt fruitier de 1922",
+      "photo": "/images/owner/0716cf30fed7dc93ee0a374b.jpg"
+    },
+    {
+      "id": 854,
+      "why": "Small-batch wines on a working family farm",
+      "why_fr": "Des vins en petits lots sur une ferme familiale",
+      "photo": "/images/owner/5d6acf63c1b740e4184c8d7d.jpg"
+    },
+    {
+      "id": 1532,
+      "why": "Concerts, comedy and family shows all season",
+      "why_fr": "Concerts, humour et spectacles familiaux toute la saison"
+    },
+    {
+      "id": 326,
+      "why": "Indigenous-owned café famous for bannock tacos",
+      "why_fr": "Café autochtone réputé pour ses tacos à la bannique"
+    },
+    {
+      "id": 918,
+      "why": "All-day breakfast on West Kelowna’s Main Street",
+      "why_fr": "Déjeuners toute la journée sur la rue Main de West Kelowna"
+    },
+    {
+      "id": 992,
+      "why": "Cozy Italian deli with pasta made from scratch",
+      "why_fr": "Un petit traiteur italien aux pâtes faites maison"
+    },
+    {
+      "id": 994,
+      "why": "A Parisian-style bakery on Penticton’s Main Street",
+      "why_fr": "Une boulangerie à la parisienne sur la rue Main de Penticton"
+    }
+  ]
+}

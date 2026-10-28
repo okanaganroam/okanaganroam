@@ -117,11 +117,12 @@ test('Happy hour crawl: a timed outing through the day\'s happy hours, each stop
   assert.ok(p.notes[0].startsWith('Each stop is timed inside its happy hour on Tuesday'));
   assert.equal(t3FrenchText(p.notes[0]), 'Chaque arrêt est prévu pendant son happy hour le mardi, selon les heures de sa fiche Okanagan Roam. Les happy hours et les offres changent; vérifiez avant de partir.');
   assert.ok(p.story.textFr.startsWith('Commencez à '));
-  // The same request at 5:30 PM: only one happy hour is still ahead, so the list stays, with a note.
+  // The same request at 5:30 PM: only one happy hour is still ahead, so the list stays, with a note that says it is late
+  // and when tomorrow's crawl can start (2026-10-28: "fewer than two places line up" read as if Kelowna had none).
   const late = full('happy hour crawl in Kelowna tonight', TUE_530PM);
   assert.notEqual(late.kind, 'itinerary');
-  assert.ok(late.notes.some((x) => /^Fewer than two places in Kelowna have happy hours on Tuesday that line up/.test(x)), JSON.stringify(late.notes));
-  assert.equal(t3FrenchText(late.notes[0]), 'Moins de deux lieux à Kelowna ont des happy hours le mardi qui se suivent; voici donc plutôt les lieux avec un happy hour.');
+  assert.equal(late.notes[0], 'It’s too late today for a happy hour crawl in Kelowna: the happy hours that line up are over. Tomorrow (Wednesday) one can start at 2 PM. Here are the places with happy hour instead.');
+  assert.equal(t3FrenchText(late.notes[0]), 'Il est trop tard aujourd’hui pour une tournée des happy hours à Kelowna : les happy hours qui se suivent sont terminés. Demain (mercredi), elle peut commencer à 14 h. Voici donc plutôt les lieux avec un happy hour.');
 });
 
 test('Happy hour and dinner on Friday: happy hour stops, then dinner; a weekday is honoured', () => {
@@ -233,4 +234,13 @@ test('Daypart labels follow the stop\'s time on short outings; "wine and dinner"
   assert.ok(!(wine.notes || []).some((x) => /was left out/.test(x)));
   const one = full('a winery and dinner in West Kelowna on Saturday', MON_NOON);
   assert.equal(stopsOf(one).filter((s) => s.venue && s.venue.type === 'winery').length, 1);
+});
+
+// 2026-10-28: "tomorrow" is tomorrow ("apres crawl in Whistler tomorrow" was planned for today on Whistler Roam).
+test('Happy hour crawl tomorrow: planned for tomorrow and said so (EN + FR)', () => {
+  const p = full('happy hour crawl in Kelowna tomorrow', TUE_1PM);
+  assert.equal(p.kind, 'itinerary', JSON.stringify([p.kind, p.notes]));
+  assert.ok(p.schedule.every((r) => r.date === WED), JSON.stringify(p.schedule.map((r) => r.date)));
+  assert.equal(p.summary, 'A happy hour crawl in Kelowna tomorrow.');
+  assert.equal(t3FrenchText(p.summary), 'Une tournée des happy hours à Kelowna demain.');
 });

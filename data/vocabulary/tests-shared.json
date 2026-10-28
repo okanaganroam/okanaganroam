@@ -1,0 +1,335 @@
+{
+ "_about": "Requests every Roam site must understand (2026-10-28). Each 'expect' value must be in the parsed request (lists: these values are among the parsed ones). tests/trip-vocabulary.test.js runs these and the site's own tests in local.json.",
+ "tests": [
+  {
+   "q": "a cozy dinner",
+   "expect": {
+    "types": [
+     "restaurant"
+    ],
+    "textTerms": [
+     "cozy"
+    ]
+   }
+  },
+  {
+   "q": "spa day",
+   "expect": {
+    "types": [
+     "indoor"
+    ]
+   }
+  },
+  {
+   "q": "a hike and a spa",
+   "expect": {
+    "activities": [
+     "hiking"
+    ],
+    "types": [
+     "indoor"
+    ]
+   }
+  },
+  {
+   "q": "nordic spa and sauna",
+   "expect": {
+    "types": [
+     "indoor"
+    ]
+   }
+  },
+  {
+   "q": "apres ski drinks",
+   "expect": {
+    "types": [
+     "pub"
+    ]
+   }
+  },
+  {
+   "q": "après with friends",
+   "expect": {
+    "types": [
+     "pub"
+    ],
+    "occasion": "group_getaway"
+   }
+  },
+  {
+   "q": "rainy day with the kids",
+   "expect": {
+    "occasion": "rainy_day",
+    "features": [
+     "kid_friendly"
+    ]
+   }
+  },
+  {
+   "q": "something to do if it rains",
+   "expect": {
+    "occasion": "rainy_day"
+   }
+  },
+  {
+   "q": "date night",
+   "expect": {
+    "occasion": "date_night"
+   }
+  },
+  {
+   "q": "anniversary",
+   "expect": {
+    "occasion": "romantic"
+   }
+  },
+  {
+   "q": "babymoon",
+   "expect": {
+    "occasion": "romantic"
+   }
+  },
+  {
+   "q": "with the grandparents",
+   "expect": {
+    "pace": "relaxed"
+   }
+  },
+  {
+   "q": "seniors, not much walking",
+   "expect": {
+    "pace": "relaxed"
+   }
+  },
+  {
+   "q": "with a toddler and a stroller",
+   "expect": {
+    "features": [
+     "kid_friendly"
+    ]
+   }
+  },
+  {
+   "q": "bring the dog",
+   "expect": {
+    "features": [
+     "dog_friendly"
+    ]
+   }
+  },
+  {
+   "q": "cheap and cheerful eats",
+   "expect": {
+    "budget": "budget"
+   }
+  },
+  {
+   "q": "special occasion",
+   "expect": {
+    "budget": "upscale"
+   }
+  },
+  {
+   "q": "treat ourselves to a tasting menu",
+   "expect": {
+    "budget": "upscale"
+   }
+  },
+  {
+   "q": "wine bar",
+   "expect": {
+    "types": [
+     "cocktail"
+    ]
+   }
+  },
+  {
+   "q": "beer flight",
+   "expect": {
+    "types": [
+     "brewery"
+    ]
+   }
+  },
+  {
+   "q": "gin tasting",
+   "expect": {
+    "types": [
+     "distillery"
+    ]
+   }
+  },
+  {
+   "q": "bakery and pastries",
+   "expect": {
+    "types": [
+     "cafe"
+    ]
+   }
+  },
+  {
+   "q": "axe throwing",
+   "expect": {
+    "types": [
+     "indoor"
+    ]
+   }
+  },
+  {
+   "q": "horseback riding",
+   "expect": {
+    "types": [
+     "tour"
+    ]
+   }
+  },
+  {
+   "q": "sunset cruise",
+   "expect": {
+    "types": [
+     "tour"
+    ]
+   }
+  },
+  {
+   "q": "watch the canucks",
+   "expect": {
+    "features": [
+     "sports_tv"
+    ]
+   }
+  },
+  {
+   "q": "mocktails",
+   "expect": {
+    "features": [
+     "nonalcoholic"
+    ]
+   }
+  },
+  {
+   "q": "half price apps",
+   "expect": {
+    "features": [
+     "happy_hour"
+    ]
+   }
+  },
+  {
+   "q": "eat outside on a terrace",
+   "expect": {
+    "features": [
+     "patio"
+    ]
+   }
+  },
+  {
+   "q": "not touristy",
+   "expect": {
+    "collections": [
+     "hidden_gem"
+    ]
+   }
+  },
+  {
+   "q": "where the locals eat",
+   "expect": {
+    "collections": [
+     "local_favorite"
+    ]
+   }
+  },
+  {
+   "q": "rail trail bike ride",
+   "expect": {
+    "activities": [
+     "cycling"
+    ]
+   }
+  },
+  {
+   "q": "snowshoeing and tobogganing",
+   "expect": {
+    "activities": [
+     "winter"
+    ]
+   }
+  },
+  {
+   "q": "paddleboard",
+   "expect": {
+    "activities": [
+     "water"
+    ]
+   }
+  },
+  {
+   "q": "watch the sunset",
+   "expect": {
+    "activities": [
+     "viewpoints"
+    ]
+   }
+  },
+  {
+   "q": "rafting",
+   "expect": {
+    "activities": [
+     "adventure"
+    ]
+   }
+  },
+  {
+   "q": "fly fishing",
+   "expect": {
+    "activities": [
+     "fishing"
+    ]
+   }
+  },
+  {
+   "q": "girls night out",
+   "expect": {
+    "occasion": "group_getaway"
+   }
+  },
+  {
+   "q": "stagette",
+   "expect": {
+    "occasion": "group_getaway"
+   }
+  },
+  {
+   "q": "recharge and decompress",
+   "expect": {
+    "occasion": "relaxing"
+   }
+  },
+  {
+   "q": "see everything, non stop",
+   "expect": {
+    "pace": "packed"
+   }
+  },
+  {
+   "q": "Plan a golf weekend",
+   "expect": {
+    "types": [
+     "golf"
+    ],
+    "days": 2
+   }
+  },
+  {
+   "q": "wheelchair accessible trails",
+   "expect": {
+    "activities": [
+     "hiking"
+    ],
+    "unsupported": [
+     "wheelchair accessible"
+    ]
+   }
+  }
+ ]
+}

@@ -13954,7 +13954,7 @@ test('Stage 5H: V3 analytics -- pace on trip_plan_complete; reload / back-forwar
 
 test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in cookie; on serves everyone (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'trip-event-location.js', 'trip-french-copy.js', 'trip-story.js'];
+  const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'trip-event-location.js', 'trip-french-copy.js', 'trip-story.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -14005,7 +14005,7 @@ test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in
 // with the module's own error instead of quietly planning in English only.
 test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails clearly without it (isolated child processes)', async () => {
   const projectRoot = path.join(__dirname, '..');
-  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'trip-story.js'];
+  const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'trip-story.js'];
   const run = async (port, files, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripfr-'));
     for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
@@ -14302,7 +14302,7 @@ test('Stage 2: POST /admin/verify-hours is the guarded, audited hours write (aut
   childEnv.PORT = ISOLATED_PORT;
   childEnv.ENRICHMENT_ADMIN_TOKEN = 'verify-hours-test-token';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-verify-hours-'));
-  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
+  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
     if (fs.existsSync(path.join(__dirname, '..', f))) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
   }
   try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
@@ -32000,14 +32000,98 @@ test('Events: "The X" on the same day is the same event as "X", and a hidden dup
   assert.equal(app.eventMovedTwin('kelowna', kept.event.slug), null, 'the published one never redirects');
 });
 
-// ==== Homepage (2026-10-25): the stats strip follows the season ===============
-test('Homepage: the stats strip shows beaches and golf in summer, Hidden Gems and indoor places in the fall, ski & snow in winter', () => {
-  const n = (types) => types.length * 10;
-  const links = (at) => app.homeSeasonalStats(new Date(at), n).map((x) => x[1]);
-  assert.deepEqual(links('2026-07-15T12:00:00-07:00'), ['/beaches', '/golf']);
-  assert.deepEqual(links('2026-10-25T12:00:00-07:00'), ['/hidden-gems', '/indoor']);
-  assert.deepEqual(links('2026-11-30T12:00:00-08:00'), ['/hidden-gems', '/indoor']);
-  assert.deepEqual(links('2027-01-10T12:00:00-08:00'), ['/ski-snow', '/indoor']);
-  assert.deepEqual(links('2027-04-20T12:00:00-07:00'), ['/golf', '/hidden-gems']);
-  for (const [, , en, fr] of app.homeSeasonalStats(new Date('2026-10-25T12:00:00-07:00'), n)) assert.ok(en && fr);
+// ==== Editor's Picks (2026-10-27) ==========================================
+test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips closed, photo-less and missing picks; hides under four", async () => {
+  const today = app.todayLocal();
+  const made = [];
+  const add = (name, type, image) => {
+    const r = db.prepare('INSERT INTO venues (name, region, type, description, image_url, hours, slug) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(name, 'kelowna', type, 'Editor pick fixture.', image, SEASON_WEEK, name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    made.push(Number(r.lastInsertRowid));
+    return Number(r.lastInsertRowid);
+  };
+  try {
+    const ok = [add('Pick Winery One', 'winery', '/images/venues/pick-one.jpg'), add('Pick Cafe Two', 'cafe', '/images/owner/0123456789abcdef01234567.jpg'),
+      add('Pick Gallery Three', 'indoor', '/images/venues/pick-three.jpg'), add('Pick Bistro Four', 'restaurant', '/images/venues/pick-four.jpg')];
+    const noPhoto = add('Pick No Photo', 'cafe', null);
+    const closed = add('Pick Closed Winery', 'winery', '/images/venues/pick-closed.jpg');
+    const seasonSet = app.guardedSeasonUpdate(closed, { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: today }, { reason: 'test', batch_id: 'editors-picks' });
+    assert.equal(seasonSet.ok, true, JSON.stringify(seasonSet));
+    const pick = (id) => ({ id, why: `Why ${id} & more`, why_fr: `Pourquoi ${id}` });
+    const data = { picks: [pick(ok[0]), pick(noPhoto), pick(closed), pick(999999), pick(ok[1]), pick(ok[2]), pick(ok[3]), pick(ok[0])] };
+    const html = app.renderHomeEditorsPicksHTML({ data, now: new Date() });
+    const hrefs = [...html.matchAll(/class="home-pick-card home-editors-card" href="([^"]+)"/g)].map((m) => m[1]);
+    assert.equal(hrefs.length, 4, `the four good picks, once each: ${hrefs.join(" ")}`);
+    assert.deepEqual(hrefs, ['/kelowna/wineries/pick-winery-one', '/kelowna/cafes/pick-cafe-two', '/kelowna/indoor/pick-gallery-three', '/kelowna/restaurants/pick-bistro-four']);
+    assert.ok(!html.includes('Pick No Photo') && !html.includes('Pick Closed Winery'));
+    assert.match(html, /Editor’s Picks/);
+    assert.match(html, /Never paid for\./);
+    assert.match(html, /class="home-fr" lang="fr">Choix de la rédaction/);
+    assert.match(html, /Why \d+ &amp; more/, 'the reason is escaped');
+    assert.match(html, /lang="fr">Pourquoi \d+/);
+    assert.ok(!/sponsored/i.test(html), 'never labelled or linked as sponsored');
+    // A dated closure that covers today (an owner's "closed Oct 21-28") skips the pick too.
+    const shut = add('Pick Shut This Week', 'cafe', '/images/venues/pick-shut.jpg');
+    db.prepare("INSERT INTO venue_hours_extra (venue_id, seasons, closures) VALUES (?, '[]', ?)").run(shut, JSON.stringify([{ from: app.addLocalDays(today, -1), to: app.addLocalDays(today, 2), note: '' }]));
+    app.clearHoursExtraCache();
+    const withShut = app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(shut), pick(ok[1]), pick(ok[2]), pick(ok[3])] }, now: new Date() });
+    assert.ok(!withShut.includes('Pick Shut This Week'), 'closed today: skipped');
+    // Full rows only: five, six or seven usable picks show four (never a ragged row).
+    const five = [add('Pick Five A', 'cafe', '/images/venues/p5a.jpg'), add('Pick Five B', 'cafe', '/images/venues/p5b.jpg'), add('Pick Five C', 'cafe', '/images/venues/p5c.jpg')];
+    const sevenHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [...ok, ...five].map(pick) }, now: new Date() });
+    assert.equal((sevenHtml.match(/home-editors-card/g) || []).length, 4, 'seven usable picks show four');
+    // Eight usable with a skipped one in front: the backup steps in, and the row is a full eight.
+    const eightHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [shut, ...ok, ...five, add('Pick Backup', 'cafe', '/images/venues/pb.jpg')].map(pick) }, now: new Date() });
+    assert.equal((eightHtml.match(/home-editors-card/g) || []).length, 8, 'the backup fills the eighth card');
+    assert.ok(eightHtml.includes('Pick Backup') && !eightHtml.includes('Pick Shut This Week'));
+    // A pick can use another of its own photos; a photo outside the place's own folders is ignored.
+    const own = app.renderHomeEditorsPicksHTML({ data: { picks: [{ ...pick(ok[0]), photo: '/images/owner/abcdefabcdefabcdefabcdef.jpg' }, pick(ok[1]), pick(ok[2]), { ...pick(ok[3]), photo: 'https://example.com/x.jpg' }] }, now: new Date() });
+    assert.ok(own.includes('/images/owner/abcdefabcdefabcdefabcdef.jpg'));
+    assert.ok(!own.includes('example.com') && own.includes('/images/venues/pick-four.jpg'));
+    // Four cards: no arrows; eight: arrows to page through on a computer.
+    assert.ok(!own.includes('home-carousel-btn'));
+    assert.ok(eightHtml.includes('class="home-carousel-btn" data-dir="1"') && eightHtml.includes('<script>'));
+    // Under four usable picks: no row at all.
+    assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
+    assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
+    // The shipped list is well formed: up to eight picks, each with a reason in both languages, no repeats.
+    const shipped = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'editors-picks.json'), 'utf8'));
+    assert.ok(shipped.picks.length >= 8, 'eight picks plus backups');
+    assert.equal(new Set(shipped.picks.map((p) => p.id)).size, shipped.picks.length);
+    for (const p of shipped.picks) { assert.ok(Number.isInteger(p.id) && p.why && p.why_fr && p.why.length <= 60, JSON.stringify(p)); }
+    // On the homepage it sits right under This Weekend (when both show), above Hidden Gems.
+    await withDiscoveryServer(async (base) => {
+      const page = await (await fetch(`${base}/`)).text();
+      if (page.includes('id="editorsPicks"')) {
+        assert.ok(page.indexOf('id="editorsPicks"') > page.indexOf('id="moodCards"') && page.indexOf('id="editorsPicks"') < page.indexOf('id="hiddenGems"'));
+        if (page.includes('id="thisWeekend"')) assert.ok(page.indexOf('id="editorsPicks"') > page.indexOf('id="thisWeekend"'));
+      }
+    });
+  } finally {
+    for (const id of made) {
+      db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venue_hours_extra WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+    }
+    app.clearHoursExtraCache();
+  }
+});
+
+test('Homepage event cards: a long schedule becomes one short date line', () => {
+  const now = new Date('2026-10-27T12:00:00-07:00');
+  const long = { dateLabel: 'Daily Oct 20-23, 26-30 (9-4) and Sat Oct 24 & 31 (12-7) · Next Fri Oct 30', startDate: '2026-10-20', endDate: '2026-10-31', time: 'Times vary' };
+  assert.equal(app.homeEventDateText(long, now), 'Until Oct 31');
+  assert.equal(app.homeEventDateText({ ...long, startDate: '2026-11-02', endDate: '2026-11-08' }, now), 'Nov 2 – Nov 8');
+  assert.equal(app.homeEventDateText({ dateLabel: 'Oct 30', time: '7 PM', startDate: '2026-10-30', endDate: '2026-10-30' }, now), 'Oct 30 · 7 PM');
+  assert.equal(app.homeEventDateText({ dateLabel: 'Oct 23 – Oct 31', time: '', startDate: '2026-10-23', endDate: '2026-10-31' }, now), 'Oct 23 – Oct 31');
+});
+
+test('Homepage counts strip: four numbers after the happy hour count, ending with places to eat & drink', () => {
+  const html = app.renderHomeStatsHTML({ now: new Date('2026-10-28T12:00:00-07:00') });
+  if (!html) return;
+  const hrefs = [...html.matchAll(/<li><a href="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(hrefs.length <= 4, hrefs.join(' '));
+  assert.ok(!hrefs.includes('/outdoors') && !hrefs.includes('/hidden-gems'));
+  assert.equal(hrefs[hrefs.length - 1], '/food-drink');
 });

@@ -6989,7 +6989,13 @@ function tripHappyHourAsk(text, planText) {
   return { happyHour: hh, dinner: /\b(?:dinner|supper|souper|d[îi]ner)\b/i.test(t) };
 }
 // The best chain of happy hour stops (and a dinner when asked for) on a date in one town, or null.
-function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, dog = false, lateFloor = null }) {
+function tripHappyHourApresMiss(f) {
+  if (f.type !== 'restaurant') return 0;
+  const name = String(f.textName || f.name || '').toLowerCase(), desc = String(f.textDesc || f.description || '').toLowerCase();
+  if (/\bfamily\b|\bkids?\b|\bchildren\b/.test(desc) && !/\b(?:bar|lounge|pub)\b/.test(name)) return 3;
+  return /\b(?:bar|lounge|pub|taphouse|tap house|saloon|taps)\b/.test(name) ? 0.3 : 1.5;
+}
+function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, dog = false, lateFloor = null, apres = false }) {
   const planner = tripPlannerModule();
   const weekday = localWeekdayKey(date);
   const rows = db.prepare('SELECT id, happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND region = ? AND happy_hour_times IS NOT NULL').all(region);
@@ -7006,7 +7012,9 @@ function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, d
   const openOn = (f) => { try { const d = planner.parseVenueHours(f.hours).days[weekday]; return d && d.status === 'open' ? d.ranges : null; } catch (e) { return null; } };
   const covers = (ranges, a, b) => !!ranges && ranges.some(([x, y]) => x <= a && y >= b);
   const bars = facts.filter((f) => TRIP_HH_TYPES.has(f.type) && venueServesAlcohol({ type: f.type, happy_hour: f.features && f.features.happy_hour ? 1 : 0 }) && hh.has(f.id) && openOn(f))
-    .map((f) => ({ f, hours: openOn(f), hh: hh.get(f.id), score: (f.rating || 4) + Math.min(3, hh.get(f.id).deals.en.length) * 0.15 + Math.log10(1 + (f.reviews || 0)) * 0.2 }))
+    // 2026-10-28: an après crawl is pubs, lounges and bars first; a restaurant only when it is a bar too ("Earls Kitchen +
+    // Bar"), and never a family restaurant (The Old Spaghetti Factory was an après stop).
+    .map((f) => ({ f, hours: openOn(f), hh: hh.get(f.id), score: (f.rating || 4) + Math.min(3, hh.get(f.id).deals.en.length) * 0.15 + Math.log10(1 + (f.reviews || 0)) * 0.2 - (apres ? tripHappyHourApresMiss(f) : 0) }))
     .sort((a, b) => b.score - a.score || a.f.id - b.f.id).slice(0, 14);
   if (bars.length < 2) return null;
   const hops = new Map();
@@ -7119,7 +7127,9 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   if (regions.length !== 1 || !REGION_LABELS[regions[0]]) return plan;
   const region = regions[0];
   const today = todayLocal(now), clock = okanaganClock(now);
-  const date = (args.overrides && parseLocalDate(args.overrides.startDate)) || ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null) || today;
+  // 2026-10-28: "tomorrow" is tomorrow ("apres crawl in Whistler tomorrow" was planned for today).
+  const askedTomorrow = !!(plan.intent && plan.intent.when && plan.intent.when.relative === 'tomorrow');
+  const date = (args.overrides && parseLocalDate(args.overrides.startDate)) || (askedTomorrow ? addLocalDays(todayLocal(now), 1) : null) || ((plan.schedule || []).find((r) => parseLocalDate(r.date)) || {}).date || (parseLocalDate(plan.listDate) ? plan.listDate : null) || today;
   const when = plan.intent && plan.intent.when;
   const tonight = !!(when && when.preset === 'today' && when.daypart === 'evening');
   // Today: from now (after midnight, the coming afternoon); "tonight" from 3 PM at the earliest; another day from noon.
@@ -7134,13 +7144,19 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   if (after && Number(after[1]) >= 1 && Number(after[1]) <= 12) lateFloor = ((Number(after[1]) % 12) + (/^a/i.test(after[3] || '') ? 0 : 12)) * 60 + Number(after[2] || 0);
   else if (/\blate[- ]night\b|\blate\b(?![- ](?:afternoon|lunch|breakfast|brunch|morning))|\bnight ?cap\b/i.test(planText)) lateFloor = 1200;
   else if (tonight && nowFloor >= 1080) lateFloor = nowFloor;
-  const chain = tripHappyHourChain({ date, region, startFloor, dinner: ask.dinner, excluded, now, dog, lateFloor });
+  const chain = tripHappyHourChain({ date, region, startFloor, dinner: ask.dinner, excluded, now, dog, lateFloor, apres: !!ask.apres });
   const town = REGION_LABELS[region];
   const [dayEn, dayFr] = TRIP_HH_WEEKDAY_NAMES[localWeekdayKey(date)];
   if (!chain) {
     // A pub or bar crawl without happy hours that line up keeps the planner's crawl; a happy hour request says why.
     if (ask.happyHour) {
-      const note = `Fewer than two places in ${town} have happy hours on ${dayEn} that line up one after another, so here are the places with happy hour instead.`;
+      let note = `Fewer than two places in ${town} have happy hours on ${dayEn} that line up one after another, so here are the places with happy hour instead.`;
+      // 2026-10-28: asked late in the day, when an earlier crawl would have worked, say it is late and when tomorrow's starts.
+      if (date === today && nowFloor > 0 && tripHappyHourChain({ date, region, startFloor: 720, dinner: ask.dinner, excluded, now, dog, apres: !!ask.apres })) {
+        const next = addLocalDays(date, 1);
+        const nextChain = tripHappyHourChain({ date: next, region, startFloor: 720, dinner: ask.dinner, excluded, now, dog, apres: !!ask.apres });
+        if (nextChain) note = `It’s too late today for a happy hour crawl in ${town}: the happy hours that line up are over. Tomorrow (${TRIP_HH_WEEKDAY_NAMES[localWeekdayKey(next)][0]}) one can start at ${happyHourTimeText(nextChain[0].start, false)}. ${plan.kind === 'itinerary' ? 'Here is an evening at the pubs instead.' : 'Here are the places with happy hour instead.'}`;
+      }
       plan.notes = [note].concat((plan.notes || []).filter((n) => n !== note));
       plan.contextNotes = [note].concat((plan.contextNotes || []).filter((n) => n !== note));
     }
@@ -7178,7 +7194,7 @@ function tripHappyHourCrawlPlan(plan, args, now = new Date()) {
   const timedEn = dinnerStop && !dinnerStop.x.hh ? 'The drinks stops are timed inside their happy hours' : 'Each stop is timed inside its happy hour', timedFr = dinnerStop && !dinnerStop.x.hh ? 'Les arrêts pour un verre sont prévus pendant leur happy hour' : 'Chaque arrêt est prévu pendant son happy hour';
   const geoEn = `${timedEn}, and ${chain.length === 2 ? 'both' : 'all three'} are in ${town}. Plan a safe ride home.`;
   const geoFr = `${timedFr}, et ${chain.length === 2 ? 'les deux sont' : 'les trois sont'} à ${town}. Prévoyez un retour sécuritaire.`;
-  const whenText = date === today ? (tonight ? 'tonight' : 'today') : `on ${dayEn}`;
+  const whenText = date === today ? (tonight ? 'tonight' : 'today') : date === addLocalDays(today, 1) ? 'tomorrow' : `on ${dayEn}`;
   const summary = dinnerStop ? `Happy hour and dinner in ${town} ${whenText}.` : `A happy hour crawl in ${town} ${whenText}.`;
   const out = {
     ...plan,
@@ -12114,6 +12130,20 @@ function homeEventImage(e, used = new Set()) {
 function homeArrowSvg() {
   return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 }
+// Homepage event dates (2026-10-28, Dayton): a card shows one short line. A long schedule ("Daily Oct 20-23, 26-30
+// (9-4) and Sat Oct 24 & 31 (12-7) · Next Fri Oct 30") becomes "Until Oct 31" (or "Oct 20 – Oct 31" if it hasn't
+// started); the event page keeps the full schedule.
+function homeEventDateText(e, now = homepageNow()) {
+  const label = String(e.dateLabel || '');
+  const time = whatsOnCardTime(e);
+  const fmt = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const long = label.length > 26 || /[();]|\band\b|·/i.test(label);
+  if (!long) return time && time.length <= 16 ? `${label} · ${time}` : label;
+  const start = parseLocalDate(e.startDate) ? e.startDate : null, end = parseLocalDate(e.endDate) ? e.endDate : null;
+  if (!start) return label.split(/\s*·\s*/)[0];
+  if (!end || end === start) return fmt(start);
+  return start <= todayLocal(now) ? `Until ${fmt(end)}` : `${fmt(start)} – ${fmt(end)}`;
+}
 function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
   let events = [];
   try {
@@ -12143,7 +12173,7 @@ function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
   const cards = chosen.map((e) => { const img = homeEventImage(e, usedImages); return `<a class="home-event-card" href="${escapeHtml(discoveryEventUrl(e))}">
       <span class="home-event-media"><img src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, '(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 260px')} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
       <span class="home-event-body">
-        <span class="home-event-date">${escapeHtml(e.dateLabel || '')}${whatsOnCardTime(e) ? ` · ${escapeHtml(whatsOnCardTime(e))}` : ''}</span>
+        <span class="home-event-date">${escapeHtml(homeEventDateText(e, now))}</span>
         <span class="home-event-name">${escapeHtml(e.name)}</span>
         <span class="home-event-place">${escapeHtml(e.valleyWide ? 'Across the Okanagan' : (REGION_LABELS[e.region] || ''))}</span>
       </span>
@@ -12206,29 +12236,69 @@ function renderHomeTopPicksHTML({ now = homepageNow() } = {}) {
   </div>
 </section>`;
 }
+// Editor's Picks (2026-10-27, Dayton): up to eight places hand-picked by Okanagan Roam, never paid for, in
+// data/editors-picks.json (a paid spot would be its own row labelled Sponsored). Under This Weekend, same cards. A pick
+// that is gone, closed, not operating, or without its own photo is skipped and the next one in the list (a backup) steps
+// in; the row shows eight or four cards, and none under four.
+function loadEditorsPicks() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'editors-picks.json'), 'utf8')); } catch (e) { return { picks: [] }; }
+}
+const EDITORS_PICK_OWN_PHOTO_RE = /^\/images\/(?:owner|venues|hiking\/venues|beaches\/venues|sports\/venues)\//;
+function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPicks() } = {}) {
+  let seasons = new Map(), notOperating = new Set();
+  try { seasons = getSeasonStates(now); } catch (e) { /* no season data: show them all */ }
+  try { notOperating = advisoryNotOperatingIds(); } catch (e) { /* no advisories */ }
+  const picks = [];
+  for (const p of (data && Array.isArray(data.picks) ? data.picks : [])) {
+    if (picks.length >= 8) break;
+    let v = null;
+    try { v = getVenue(Number(p.id)); } catch (e) { v = null; }
+    if (!v || v.redirect_to || !v.slug || !CATEGORY_SLUGS[v.type] || !REGION_LABELS[v.region] || !p.why) continue;
+    // A pick can name one of the place's own photos that suits the season better (2026-10-28: no summer vines in fall).
+    const photo = p.photo && EDITORS_PICK_OWN_PHOTO_RE.test(String(p.photo)) ? String(p.photo) : v.image_url;
+    if (!EDITORS_PICK_OWN_PHOTO_RE.test(String(photo || ''))) continue;
+    const st = seasons.get(v.id);
+    // Closed for the season, or shut today by an owner's dated closure (2026-10-28: Beat Patisserie, Oct 21-28).
+    if ((st && (st.kind === 'closed' || (st.kind === 'temp_closed' && st.current))) || notOperating.has(v.id)) continue;
+    if (picks.some((x) => x.v.id === v.id)) continue;
+    picks.push({ v, photo, why: String(p.why), whyFr: String(p.why_fr || p.why) });
+  }
+  if (picks.length < 4) return '';
+  // Full rows only (2026-10-28, Dayton: a seven-card row looks unfinished): eight, or four.
+  picks.length = picks.length >= 8 ? 8 : 4;
+  const typeFr = (v) => v.type === 'outdoor' ? 'Lieu de plein air' : ((CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular);
+  const cards = picks.map(({ v, photo, why, whyFr }) => {
+    const img = photoSized(photo, 480), big = photoSized(photo, 960);
+    const srcset = big !== img ? ` srcset="${escapeHtml(img)} 480w, ${escapeHtml(big)} 960w" sizes="(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 320px"` : '';
+    return `<a class="home-pick-card home-editors-card" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${escapeHtml(v.slug)}">
+      <span class="home-event-media"><img src="${escapeHtml(img)}"${srcset} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
+      <span class="home-event-body">
+        <span class="home-event-date"><span class="home-en">${escapeHtml(CATEGORY_LABELS[v.type].singular)}</span><span class="home-fr" lang="fr">${escapeHtml(typeFr(v))}</span> · ${escapeHtml(REGION_LABELS[v.region])}</span>
+        <span class="home-event-name">${escapeHtml(v.name)}</span>
+        <span class="home-event-place"><span class="home-en">${escapeHtml(why)}</span><span class="home-fr" lang="fr">${escapeHtml(whyFr)}</span></span>
+      </span>
+    </a>`;
+  }).join('');
+  return `
+<section class="discover-section home-row home-row-carousel" id="editorsPicks">
+  <div class="wrap-wide">
+    <div class="discover-heading discover-heading-split">
+      <h2><span class="home-en">Editor’s Picks</span><span class="home-fr" lang="fr">Choix de la rédaction</span> <span class="discover-subtitle"><span class="home-en">Hand-picked by Okanagan Roam. Never paid for.</span><span class="home-fr" lang="fr">Choisis par Okanagan Roam. Jamais payés.</span></span></h2>
+    ${picks.length > 4 ? `<div class="home-carousel-nav"><button type="button" class="home-carousel-btn" data-dir="-1" aria-label="Previous picks" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><button type="button" class="home-carousel-btn" data-dir="1" aria-label="More picks"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>` : ''}
+    </div>
+    <div class="home-scroll-row">${cards}</div>
+  </div>
+</section>${picks.length > 4 ? HOME_CAROUSEL_SCRIPT : ''}`;
+}
+// Editor's Picks on a computer (2026-10-28, Dayton: two rows of eight was the heaviest thing on the page): one row of
+// four, the other four a click (or a sideways swipe) away. Phones keep the swipe row every home row uses.
+const HOME_CAROUSEL_SCRIPT = `<script>(function(){var s=document.getElementById('editorsPicks');if(!s)return;var row=s.querySelector('.home-scroll-row'),b=s.querySelectorAll('.home-carousel-btn');if(!row||!b.length)return;function upd(){var m=row.scrollWidth-row.clientWidth-2;b[0].disabled=row.scrollLeft<=2;b[1].disabled=row.scrollLeft>=m;}for(var i=0;i<b.length;i++)b[i].addEventListener('click',function(){row.scrollBy({left:Number(this.getAttribute('data-dir'))*row.clientWidth,behavior:'smooth'});});row.addEventListener('scroll',upd,{passive:true});window.addEventListener('resize',upd);upd();})();</script>`;
 // A one-line count of what the site lists, straight from the listings and What's On; each count links to its page.
 // app.js is frozen, so these modules carry both languages and show the one matching html[lang] (as the mood swipe cue does).
 // The homepage's one upcoming-events number (weekly audit 2026-10-25: the stats strip said 495 while "See all"
 // and What's On said 483). What's On's own window, with events already over today left out.
 function homeUpcomingEventCount(now = homepageNow()) {
   return whatsOnStillOn(getWhatsOnEvents(resolveWhatsOnWindow({}, now)), now).length;
-}
-// The two seasonal counts in the homepage strip (2026-10-25, Dayton: beaches and golf are not what people come for in
-// the fall, and most courses are closed until spring). Summer (June to September): beaches and golf. Fall (October and
-// November): Hidden Gems and indoor & rainy-day places. Winter (December to March): ski & snow and indoor places.
-// Spring (April and May): golf (courses reopen) and Hidden Gems.
-function homeSeasonalStats(now, n) {
-  const month = Number(todayLocal(now).slice(5, 7));
-  const count = (fn) => { try { return fn(); } catch (e) { return 0; } };
-  const beaches = [n(['beach']), '/beaches', 'beaches', 'plages'];
-  const golf = [n(['golf']), '/golf', 'golf courses', 'terrains de golf'];
-  const gems = [count(() => getHiddenGemVenueIds().size), '/hidden-gems', 'Hidden Gems', 'joyaux cachés'];
-  const indoor = [n(['indoor']), '/indoor', 'indoor & rainy-day places', 'lieux intérieurs pour les jours de pluie'];
-  const snow = [count(() => getSkiSnowVenues().length), SKI_SNOW_PATH, 'ski & snow spots', 'lieux de ski et de neige'];
-  if (month >= 6 && month <= 9) return [beaches, golf];
-  if (month === 10 || month === 11) return [gems, indoor];
-  if (month === 12 || month <= 3) return [snow, indoor];
-  return [golf, gems];
 }
 function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   let counts = {};
@@ -12241,13 +12311,14 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   const fmt = (x) => Number(x).toLocaleString('en-CA');
   // French (2026-10-18): "1 766 vrais lieux", with a no-break space, not "1,766".
   const fmtFr = (x) => fmt(x).replace(/,/g, '\u00a0');
+  // Five numbers, not nine (2026-10-28, Dayton): with the happy hour count in front, places, events, wineries and
+  // places to eat & drink (Dayton, 2026-10-28: food and drink, not Hidden Gems, belongs here). Each section is still a
+  // click away.
   const items = [
     [total, '/destinations', 'real places', 'vrais lieux'],
     [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 90 days
-    [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), '/food-drink', 'places to eat & drink', 'endroits où manger et boire'],
     [n(['winery']), '/wineries', 'wineries', 'vignobles'],
-    ...homeSeasonalStats(now, n),
-    [n(['outdoor']), '/outdoors', 'trails, parks & lookouts', 'sentiers, parcs et points de vue'],
+    [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), '/food-drink', 'places to eat & drink', 'endroits où manger et boire'],
   ].filter(([v]) => v > 0);
   return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v) === fmtFr(v) ? fmt(v) : `<span class="home-en">${fmt(v)}</span><span class="home-fr" lang="fr">${fmtFr(v)}</span>`}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
 }
@@ -13871,6 +13942,28 @@ ${renderCanonicalFooterStyles()}
   .home-event-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .home-event-place { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.82rem; color: rgba(42,32,25,0.68); }
   .home-pick-star { color: var(--ref-gold, #C9A227); }
+  /* Even cards (2026-10-28): every card keeps room for a two-line name and a two-line reason, so a row of cards ends
+     level instead of some with a gap under them. */
+  .home-editors-card .home-event-name, .home-event-card .home-event-name { min-height: 2.5em; }
+  .home-editors-card .home-event-place { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; min-height: 3em; }
+  /* Editor's Picks (2026-10-28): one row of four on a computer, scrolled sideways by the arrows; the heading keeps its
+     subtitle on its own line on phones. */
+  .home-carousel-nav { display: none; gap: 8px; }
+  .home-carousel-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.22); background: #fff; color: var(--ref-navy); cursor: pointer; }
+  .home-carousel-btn:hover:not(:disabled) { border-color: var(--ref-navy); }
+  .home-carousel-btn:disabled { opacity: 0.35; cursor: default; }
+  @media (min-width: 641px) {
+    .home-carousel-nav { display: inline-flex; }
+    #editorsPicks .home-scroll-row { display: grid; grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: calc((100% - 48px) / 4); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+    #editorsPicks .home-scroll-row::-webkit-scrollbar { display: none; }
+    #editorsPicks .home-pick-card { scroll-snap-align: start; }
+  }
+  @media (min-width: 641px) and (max-width: 900px) {
+    #editorsPicks .home-scroll-row { grid-template-columns: none; grid-auto-columns: calc((100% - 16px) / 2); }
+  }
+  @media (max-width: 640px) {
+    #editorsPicks .discover-subtitle { display: block; margin: 4px 0 0; }
+  }
   /* "See all" links look like small buttons that open a page; the row-end card shows on phone swipe rows only. */
   .discover-heading-link.home-see-all { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; background: #fff; font-size: 0.82rem; font-weight: 800; color: var(--ref-navy); text-decoration: none; white-space: nowrap; box-sizing: border-box; }
   /* Tap targets (2026-10-19, round 10): on a phone or touch screen the See all links are 44px tall. */
@@ -52172,6 +52265,8 @@ const server = http.createServer(async (req, res) => {
         // Top Picks is off for now (2026-10-14): it needs real venue photos, and it may become a paid featured spot.
         // HOME_TOP_PICKS=on shows it (for previews).
         const topPicks = /^(1|on|true|yes)$/i.test(process.env.HOME_TOP_PICKS || '') ? renderHomeTopPicksHTML({ now: homepageNow() }) : '';
+        // Editor's Picks (2026-10-27): hand-picked, never paid, right under This Weekend (data/editors-picks.json).
+        const editorsPicks = renderHomeEditorsPicksHTML({ now: homepageNow() });
         // The counts sit in a slim strip right under the hero.
         const statsHtml = renderHomeStatsHTML({ now: homepageNow() });
         // Happy hour now (2026-10-26): the first item of the counts strip, linking to Roam Now with its Happy hour now filter on.
@@ -52181,7 +52276,7 @@ const server = http.createServer(async (req, res) => {
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${discoveryStyles}\n${statsHtml ? `<div class="home-stats-wrap wrap-wide">${happyHourHtml ? `${HOME_HAPPY_HOUR_STYLE}${statsHtml.replace(/(<ul class="home-stats"[^>]*>)/, (m) => m + happyHourHtml)}${HOME_HAPPY_HOUR_SCRIPT}` : statsHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${discoveryStyles}\n${statsHtml ? `<div class="home-stats-wrap wrap-wide">${happyHourHtml ? `${HOME_HAPPY_HOUR_STYLE}${statsHtml.replace(/(<ul class="home-stats"[^>]*>)/, (m) => m + happyHourHtml)}${HOME_HAPPY_HOUR_SCRIPT}` : statsHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${editorsPicks}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
@@ -56603,9 +56698,10 @@ module.exports = {
   TRIP_V3_REGION_IMAGES,
   renderHomeThisWeekendHTML,
   renderHomeTopPicksHTML,
+  renderHomeEditorsPicksHTML,
+  homeEventDateText,
   renderHomeStatsHTML,
   homeUpcomingEventCount,
-  homeSeasonalStats,
   homeEventImage,
   tripV3MapHeaders,
   APP_JS_SRC,
