@@ -12030,6 +12030,20 @@ function homeEventImage(e, used = new Set()) {
 function homeArrowSvg() {
   return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 }
+// Homepage event dates (2026-10-28, Dayton): a card shows one short line. A long schedule ("Daily Oct 20-23, 26-30
+// (9-4) and Sat Oct 24 & 31 (12-7) · Next Fri Oct 30") becomes "Until Oct 31" (or "Oct 20 – Oct 31" if it hasn't
+// started); the event page keeps the full schedule.
+function homeEventDateText(e, now = homepageNow()) {
+  const label = String(e.dateLabel || '');
+  const time = whatsOnCardTime(e);
+  const fmt = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const long = label.length > 26 || /[();]|\band\b|·/i.test(label);
+  if (!long) return time && time.length <= 16 ? `${label} · ${time}` : label;
+  const start = parseLocalDate(e.startDate) ? e.startDate : null, end = parseLocalDate(e.endDate) ? e.endDate : null;
+  if (!start) return label.split(/\s*·\s*/)[0];
+  if (!end || end === start) return fmt(start);
+  return start <= todayLocal(now) ? `Until ${fmt(end)}` : `${fmt(start)} – ${fmt(end)}`;
+}
 function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
   let events = [];
   try {
@@ -12059,7 +12073,7 @@ function renderHomeThisWeekendHTML({ now = homepageNow() } = {}) {
   const cards = chosen.map((e) => { const img = homeEventImage(e, usedImages); return `<a class="home-event-card" href="${escapeHtml(discoveryEventUrl(e))}">
       <span class="home-event-media"><img src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, '(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 260px')} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
       <span class="home-event-body">
-        <span class="home-event-date">${escapeHtml(e.dateLabel || '')}${whatsOnCardTime(e) ? ` · ${escapeHtml(whatsOnCardTime(e))}` : ''}</span>
+        <span class="home-event-date">${escapeHtml(homeEventDateText(e, now))}</span>
         <span class="home-event-name">${escapeHtml(e.name)}</span>
         <span class="home-event-place">${escapeHtml(e.valleyWide ? 'Across the Okanagan' : (REGION_LABELS[e.region] || ''))}</span>
       </span>
@@ -12140,19 +12154,21 @@ function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPic
     let v = null;
     try { v = getVenue(Number(p.id)); } catch (e) { v = null; }
     if (!v || v.redirect_to || !v.slug || !CATEGORY_SLUGS[v.type] || !REGION_LABELS[v.region] || !p.why) continue;
-    if (!EDITORS_PICK_OWN_PHOTO_RE.test(String(v.image_url || ''))) continue;
+    // A pick can name one of the place's own photos that suits the season better (2026-10-28: no summer vines in fall).
+    const photo = p.photo && EDITORS_PICK_OWN_PHOTO_RE.test(String(p.photo)) ? String(p.photo) : v.image_url;
+    if (!EDITORS_PICK_OWN_PHOTO_RE.test(String(photo || ''))) continue;
     const st = seasons.get(v.id);
     // Closed for the season, or shut today by an owner's dated closure (2026-10-28: Beat Patisserie, Oct 21-28).
     if ((st && (st.kind === 'closed' || (st.kind === 'temp_closed' && st.current))) || notOperating.has(v.id)) continue;
     if (picks.some((x) => x.v.id === v.id)) continue;
-    picks.push({ v, why: String(p.why), whyFr: String(p.why_fr || p.why) });
+    picks.push({ v, photo, why: String(p.why), whyFr: String(p.why_fr || p.why) });
   }
   if (picks.length < 4) return '';
   // Full rows only (2026-10-28, Dayton: a seven-card row looks unfinished): eight, or four.
   picks.length = picks.length >= 8 ? 8 : 4;
   const typeFr = (v) => v.type === 'outdoor' ? 'Lieu de plein air' : ((CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular);
-  const cards = picks.map(({ v, why, whyFr }) => {
-    const img = photoSized(v.image_url, 480), big = photoSized(v.image_url, 960);
+  const cards = picks.map(({ v, photo, why, whyFr }) => {
+    const img = photoSized(photo, 480), big = photoSized(photo, 960);
     const srcset = big !== img ? ` srcset="${escapeHtml(img)} 480w, ${escapeHtml(big)} 960w" sizes="(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 320px"` : '';
     return `<a class="home-pick-card home-editors-card" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${escapeHtml(v.slug)}">
       <span class="home-event-media"><img src="${escapeHtml(img)}"${srcset} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
@@ -12164,15 +12180,19 @@ function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPic
     </a>`;
   }).join('');
   return `
-<section class="discover-section home-row" id="editorsPicks">
+<section class="discover-section home-row home-row-carousel" id="editorsPicks">
   <div class="wrap-wide">
     <div class="discover-heading discover-heading-split">
       <h2><span class="home-en">Editor’s Picks</span><span class="home-fr" lang="fr">Choix de la rédaction</span> <span class="discover-subtitle"><span class="home-en">Hand-picked by Okanagan Roam. Never paid for.</span><span class="home-fr" lang="fr">Choisis par Okanagan Roam. Jamais payés.</span></span></h2>
+    ${picks.length > 4 ? `<div class="home-carousel-nav"><button type="button" class="home-carousel-btn" data-dir="-1" aria-label="Previous picks" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><button type="button" class="home-carousel-btn" data-dir="1" aria-label="More picks"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>` : ''}
     </div>
     <div class="home-scroll-row">${cards}</div>
   </div>
-</section>`;
+</section>${picks.length > 4 ? HOME_CAROUSEL_SCRIPT : ''}`;
 }
+// Editor's Picks on a computer (2026-10-28, Dayton: two rows of eight was the heaviest thing on the page): one row of
+// four, the other four a click (or a sideways swipe) away. Phones keep the swipe row every home row uses.
+const HOME_CAROUSEL_SCRIPT = `<script>(function(){var s=document.getElementById('editorsPicks');if(!s)return;var row=s.querySelector('.home-scroll-row'),b=s.querySelectorAll('.home-carousel-btn');if(!row||!b.length)return;function upd(){var m=row.scrollWidth-row.clientWidth-2;b[0].disabled=row.scrollLeft<=2;b[1].disabled=row.scrollLeft>=m;}for(var i=0;i<b.length;i++)b[i].addEventListener('click',function(){row.scrollBy({left:Number(this.getAttribute('data-dir'))*row.clientWidth,behavior:'smooth'});});row.addEventListener('scroll',upd,{passive:true});window.addEventListener('resize',upd);upd();})();</script>`;
 // A one-line count of what the site lists, straight from the listings and What's On; each count links to its page.
 // app.js is frozen, so these modules carry both languages and show the one matching html[lang] (as the mood swipe cue does).
 // The homepage's one upcoming-events number (weekly audit 2026-10-25: the stats strip said 495 while "See all"
@@ -13838,6 +13858,24 @@ ${renderCanonicalFooterStyles()}
   .home-event-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .home-event-place { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.82rem; color: rgba(42,32,25,0.68); }
   .home-pick-star { color: var(--ref-gold, #C9A227); }
+  /* Editor's Picks (2026-10-28): one row of four on a computer, scrolled sideways by the arrows; the heading keeps its
+     subtitle on its own line on phones. */
+  .home-carousel-nav { display: none; gap: 8px; }
+  .home-carousel-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.22); background: #fff; color: var(--ref-navy); cursor: pointer; }
+  .home-carousel-btn:hover:not(:disabled) { border-color: var(--ref-navy); }
+  .home-carousel-btn:disabled { opacity: 0.35; cursor: default; }
+  @media (min-width: 641px) {
+    .home-carousel-nav { display: inline-flex; }
+    #editorsPicks .home-scroll-row { display: grid; grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: calc((100% - 48px) / 4); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+    #editorsPicks .home-scroll-row::-webkit-scrollbar { display: none; }
+    #editorsPicks .home-pick-card { scroll-snap-align: start; }
+  }
+  @media (min-width: 641px) and (max-width: 900px) {
+    #editorsPicks .home-scroll-row { grid-template-columns: none; grid-auto-columns: calc((100% - 16px) / 2); }
+  }
+  @media (max-width: 640px) {
+    #editorsPicks .discover-subtitle { display: block; margin: 4px 0 0; }
+  }
   /* "See all" links look like small buttons that open a page; the row-end card shows on phone swipe rows only. */
   .discover-heading-link.home-see-all { display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border: 1px solid rgba(27,43,58,0.22); border-radius: 999px; background: #fff; font-size: 0.82rem; font-weight: 800; color: var(--ref-navy); text-decoration: none; white-space: nowrap; box-sizing: border-box; }
   /* Tap targets (2026-10-19, round 10): on a phone or touch screen the See all links are 44px tall. */
@@ -56573,6 +56611,7 @@ module.exports = {
   renderHomeThisWeekendHTML,
   renderHomeTopPicksHTML,
   renderHomeEditorsPicksHTML,
+  homeEventDateText,
   renderHomeStatsHTML,
   homeUpcomingEventCount,
   homeSeasonalStats,

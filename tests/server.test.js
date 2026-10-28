@@ -32056,6 +32056,13 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     const eightHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [shut, ...ok, ...five, add('Pick Backup', 'cafe', '/images/venues/pb.jpg')].map(pick) }, now: new Date() });
     assert.equal((eightHtml.match(/home-editors-card/g) || []).length, 8, 'the backup fills the eighth card');
     assert.ok(eightHtml.includes('Pick Backup') && !eightHtml.includes('Pick Shut This Week'));
+    // A pick can use another of its own photos; a photo outside the place's own folders is ignored.
+    const own = app.renderHomeEditorsPicksHTML({ data: { picks: [{ ...pick(ok[0]), photo: '/images/owner/abcdefabcdefabcdefabcdef.jpg' }, pick(ok[1]), pick(ok[2]), { ...pick(ok[3]), photo: 'https://example.com/x.jpg' }] }, now: new Date() });
+    assert.ok(own.includes('/images/owner/abcdefabcdefabcdefabcdef.jpg'));
+    assert.ok(!own.includes('example.com') && own.includes('/images/venues/pick-four.jpg'));
+    // Four cards: no arrows; eight: arrows to page through on a computer.
+    assert.ok(!own.includes('home-carousel-btn'));
+    assert.ok(eightHtml.includes('class="home-carousel-btn" data-dir="1"') && eightHtml.includes('<script>'));
     // Under four usable picks: no row at all.
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
@@ -32081,4 +32088,13 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     }
     app.clearHoursExtraCache();
   }
+});
+
+test('Homepage event cards: a long schedule becomes one short date line', () => {
+  const now = new Date('2026-10-27T12:00:00-07:00');
+  const long = { dateLabel: 'Daily Oct 20-23, 26-30 (9-4) and Sat Oct 24 & 31 (12-7) · Next Fri Oct 30', startDate: '2026-10-20', endDate: '2026-10-31', time: 'Times vary' };
+  assert.equal(app.homeEventDateText(long, now), 'Until Oct 31');
+  assert.equal(app.homeEventDateText({ ...long, startDate: '2026-11-02', endDate: '2026-11-08' }, now), 'Nov 2 – Nov 8');
+  assert.equal(app.homeEventDateText({ dateLabel: 'Oct 30', time: '7 PM', startDate: '2026-10-30', endDate: '2026-10-30' }, now), 'Oct 30 · 7 PM');
+  assert.equal(app.homeEventDateText({ dateLabel: 'Oct 23 – Oct 31', time: '', startDate: '2026-10-23', endDate: '2026-10-31' }, now), 'Oct 23 – Oct 31');
 });
