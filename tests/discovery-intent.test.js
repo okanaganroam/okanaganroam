@@ -666,7 +666,7 @@ test('Stage 3.2: every correction class -- regions, types, activities, features,
   assert.deepEqual(I('okanagen').regions, [], 'the valley-wide word stays valley-wide');
 });
 
-test('Stage 3.2: region possessives ("Kelowna\'s") are exact aliases of the region -- all 47, no collisions', () => {
+test('Stage 3.2: region possessives ("Kelowna\'s") are exact aliases of the region -- all 87, no collisions', () => {
   expectIntent("Kelowna's best wineries", { regions: ['kelowna'], types: ['winery'], textTerms: [], corrections: [] });
   expectIntent('Penticton’s beaches', { regions: ['penticton'], types: ['beach'], textTerms: [] });
   expectIntent("West Kelowna's wineries", { regions: ['west-kelowna'], types: ['winery'] });
@@ -675,7 +675,7 @@ test('Stage 3.2: region possessives ("Kelowna\'s") are exact aliases of the regi
   const table = new Map(d.buildPhraseTable(TAXONOMY).map((e) => [e.phrase, e.assign]));
   const regionOnly = Array.from(table).filter(([p, a]) => a.length && a.every((x) => x.field === 'region') && !/s$/.test(p) && !table.has(p.slice(0, -1)));
   const forms = regionOnly.map(([p]) => `${p}s`);
-  assert.equal(forms.length, 47); // 2026-10-25: + wine benches and Kelowna neighbourhoods
+  assert.equal(forms.length, 87); // 2026-10-25: + wine benches and Kelowna neighbourhoods; 2026-10-28: + local.json town nicknames
   for (const [p, a] of regionOnly) assert.deepEqual(table.get(`${p}s`), a, `${p}s means exactly ${p}`);
   // Never over an existing phrase: no possessive form is also a plural, a
   // cuisine or any other meaning.

@@ -85,25 +85,16 @@ function normalizeDiscoveryText(text) {
 // the taxonomy does not contain, so this file can never introduce a value
 // the site does not have.
 
-const REGION_EXTRA_ALIASES = {
-  'west-kelowna': ['westbank', 'westside', 'the westside', 'west kelowna'],
-  'okanagan-falls': ['ok falls', 'okanagan falls'],
-  silverstar: ['silver star', 'silverstar', 'silver star mountain'],
-  'big-white': ['big white', 'big white mountain'],
-  'lake-country': ['lake country', 'winfield', 'oyama', 'okanagan centre', 'okanagan center', 'carrs landing'],
-  apex: ['apex', 'apex mountain'],
-  baldy: ['baldy', 'mount baldy', 'baldy mountain'],
-  // 2026-10-25: wine benches and neighbourhoods visitors name ("wine tasting on the Naramata Bench" left "bench" as
-  // not understood).
-  naramata: ['naramata bench', 'the naramata bench'],
-  oliver: ['golden mile', 'golden mile bench', 'the golden mile', 'black sage bench', 'black sage road', 'black sage'],
-  kelowna: ['east kelowna', 'lower mission', 'upper mission', 'the mission', 'rutland', 'glenmore', 'downtown kelowna'],
-};
+// Town nicknames, multi-town areas, "the whole region" words and places the site does not cover come from
+// data/vocabulary/local.json (2026-10-28), so the code has no place names and moves to a new Roam site as is.
+const vocabulary = require('./vocabulary.js');
+const REGION_EXTRA_ALIASES = vocabulary.localTable('regions');
+const REGION_AREAS = vocabulary.localTable('areas');
 // Valley-wide scope: understood, and deliberately means "no region filter".
-const VALLEY_WIDE_PHRASES = ['okanagan', 'the okanagan', 'okanagan valley', 'the valley', 'anywhere', 'valley wide', 'bc', 'british columbia', 'okanagan lake'];
+const VALLEY_WIDE_PHRASES = vocabulary.localList('wideScope');
 
-// Places visitors name that Okanagan Roam does not cover.
-const OUTSIDE_PLACES = Object.fromEntries(['Vancouver', 'Victoria', 'Whistler', 'Kamloops', 'Calgary', 'Edmonton', 'Seattle', 'Banff', 'Jasper', 'Revelstoke', 'Nelson', 'Tofino', 'Squamish', 'Kimberley', 'Fernie', 'Merritt', 'Keremeos', 'Toronto', 'Montreal', 'Whitehorse'].map((p) => [p.toLowerCase(), p]));
+// Places visitors name that this site does not cover.
+const OUTSIDE_PLACES = Object.fromEntries(vocabulary.localList('outsidePlaces').map((p) => [String(p).toLowerCase(), p]));
 
 const TYPE_ALIASES = {
   sport: ['sports and recreation', 'sports venues', 'recreation activities', 'skate park', 'skate parks', 'skatepark', 'skateparks', 'disc golf', 'tennis', 'pickleball', 'bmx'],
@@ -236,6 +227,19 @@ const OCCASION_EXTRAS = {
   'adventure weekend': [['length', 2]],
   'birthday dinner': [['type', 'restaurant']],
 };
+
+// Shared phrases (data/vocabulary/shared.json, 2026-10-28) add to the tables above. A key the site does not have
+// (a type, feature or activity it doesn't list) is skipped by buildPhraseTable like any other.
+for (const [base, key] of [[TYPE_ALIASES, 'types'], [FEATURE_ALIASES, 'features'], [COLLECTION_ALIASES, 'collections'], [ACTIVITY_ALIASES, 'activities'],
+  [CUISINE_SYNONYMS, 'cuisineSynonyms'], [BUDGET_ALIASES, 'budget'], [PACE_ALIASES, 'pace'], [OCCASION_ALIASES, 'occasions']]) {
+  // A phrase the site's own table already gives a meaning keeps that meaning ("night out" is pubs on one site).
+  const own = new Set(Object.values(base).flat());
+  for (const [value, phrases] of Object.entries(vocabulary.sharedTable(key))) {
+    if (value.startsWith('_') || !Array.isArray(phrases)) continue;
+    if (key === 'occasions' && !DISCOVERY_OCCASIONS.includes(value)) continue;
+    base[value] = Array.from(new Set([...(base[value] || []), ...phrases.filter((p) => !own.has(p))]));
+  }
+}
 
 // Event nouns switch the request to mode 'events'. Category words are only
 // honoured once the request is about events.
@@ -569,6 +573,8 @@ function buildPhraseTable(taxonomy) {
     if (t.regionLabels[slug]) add(t.regionLabels[slug], 'region', slug);
     for (const extra of REGION_EXTRA_ALIASES[slug] || []) add(extra, 'region', slug);
   }
+  // An area that covers several towns ("the South Okanagan") is each of them (local.json, 2026-10-28).
+  for (const [phrase, slugs] of Object.entries(REGION_AREAS)) if (Array.isArray(slugs)) for (const slug of slugs) if (t.regions.includes(slug)) add(phrase, 'region', slug);
   for (const p of VALLEY_WIDE_PHRASES) add(p, 'scope', 'valley');
   for (const [concept, phrases] of Object.entries(CONCEPT_ALIASES)) for (const p of phrases) add(p, 'concept', concept);
   // Tours & Experiences (2026-10-11): with the tour type present, its phrases

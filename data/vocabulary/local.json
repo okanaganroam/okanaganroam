@@ -1,0 +1,324 @@
+{
+ "_about": "Okanagan Roam's own words (2026-10-28). The planner code has no place names; a new Roam site writes its own version of this file. regions: extra names for a town (keyed by the town's slug). areas: one phrase that means several towns. wideScope: words for the whole region (no town filter). outsidePlaces: places the site does not cover (said back to the visitor). tests: requests that must keep working on this site.",
+ "site": "Okanagan Roam",
+ "regionWord": "the Okanagan",
+ "regions": {
+  "west-kelowna": [
+   "westbank",
+   "westside",
+   "the westside",
+   "west kelowna",
+   "west bank",
+   "westbank first nation",
+   "west kelowna wine trail"
+  ],
+  "okanagan-falls": [
+   "ok falls",
+   "okanagan falls",
+   "okfalls"
+  ],
+  "silverstar": [
+   "silver star",
+   "silverstar",
+   "silver star mountain",
+   "silver star resort"
+  ],
+  "big-white": [
+   "big white",
+   "big white mountain",
+   "big white ski resort",
+   "bigwhite"
+  ],
+  "lake-country": [
+   "lake country",
+   "winfield",
+   "oyama",
+   "okanagan centre",
+   "okanagan center",
+   "carrs landing"
+  ],
+  "apex": [
+   "apex",
+   "apex mountain",
+   "apex resort"
+  ],
+  "baldy": [
+   "baldy",
+   "mount baldy",
+   "baldy mountain"
+  ],
+  "naramata": [
+   "naramata bench",
+   "the naramata bench"
+  ],
+  "oliver": [
+   "golden mile",
+   "golden mile bench",
+   "the golden mile",
+   "black sage bench",
+   "black sage road",
+   "black sage",
+   "wine capital of canada"
+  ],
+  "kelowna": [
+   "east kelowna",
+   "lower mission",
+   "upper mission",
+   "the mission",
+   "rutland",
+   "glenmore",
+   "downtown kelowna",
+   "pandosy",
+   "pandosy village",
+   "the cultural district",
+   "cultural district",
+   "kelowna waterfront",
+   "dilworth",
+   "ylw"
+  ],
+  "penticton": [
+   "skaha",
+   "skaha lake",
+   "okanagan beach",
+   "penticton waterfront",
+   "downtown penticton"
+  ],
+  "vernon": [
+   "kal lake",
+   "kalamalka",
+   "kalamalka lake",
+   "downtown vernon"
+  ],
+  "summerland": [
+   "summerland bench",
+   "bottleneck drive",
+   "giants head"
+  ],
+  "osoyoos": [
+   "osoyoos lake",
+   "canada s warmest lake",
+   "canadas warmest lake",
+   "the desert",
+   "pocket desert"
+  ],
+  "peachland": [
+   "peachland waterfront"
+  ]
+ },
+ "areas": {
+  "south okanagan": [
+   "oliver",
+   "osoyoos",
+   "okanagan-falls",
+   "penticton",
+   "kaleden",
+   "naramata",
+   "summerland"
+  ],
+  "the south okanagan": [
+   "oliver",
+   "osoyoos",
+   "okanagan-falls",
+   "penticton",
+   "kaleden",
+   "naramata",
+   "summerland"
+  ],
+  "south okanagan valley": [
+   "oliver",
+   "osoyoos",
+   "okanagan-falls",
+   "penticton",
+   "kaleden"
+  ],
+  "north okanagan": [
+   "vernon",
+   "coldstream",
+   "armstrong",
+   "enderby",
+   "lumby",
+   "silverstar"
+  ],
+  "the north okanagan": [
+   "vernon",
+   "coldstream",
+   "armstrong",
+   "enderby",
+   "lumby",
+   "silverstar"
+  ],
+  "central okanagan": [
+   "kelowna",
+   "west-kelowna",
+   "lake-country",
+   "peachland"
+  ],
+  "the central okanagan": [
+   "kelowna",
+   "west-kelowna",
+   "lake-country",
+   "peachland"
+  ],
+  "okanagan ski hills": [
+   "big-white",
+   "silverstar",
+   "apex",
+   "baldy"
+  ],
+  "okanagan ski resorts": [
+   "big-white",
+   "silverstar",
+   "apex",
+   "baldy"
+  ]
+ },
+ "wideScope": [
+  "okanagan",
+  "the okanagan",
+  "okanagan valley",
+  "the valley",
+  "anywhere",
+  "valley wide",
+  "bc",
+  "british columbia",
+  "okanagan lake",
+  "the whole valley",
+  "all over the valley",
+  "the whole okanagan",
+  "interior bc",
+  "bc interior"
+ ],
+ "outsidePlaces": [
+  "Vancouver",
+  "Victoria",
+  "Whistler",
+  "Kamloops",
+  "Calgary",
+  "Edmonton",
+  "Seattle",
+  "Banff",
+  "Jasper",
+  "Revelstoke",
+  "Nelson",
+  "Tofino",
+  "Squamish",
+  "Kimberley",
+  "Fernie",
+  "Merritt",
+  "Keremeos",
+  "Toronto",
+  "Montreal",
+  "Whitehorse",
+  "Salmon Arm",
+  "Sun Peaks",
+  "Princeton",
+  "Hope",
+  "Kaslo",
+  "Golden"
+ ],
+ "tests": [
+  {
+   "q": "2 days in the South Okanagan, wine and good food",
+   "expect": {
+    "regions": [
+     "oliver",
+     "osoyoos",
+     "penticton"
+    ],
+    "types": [
+     "winery",
+     "restaurant"
+    ],
+    "days": 2,
+    "noTextTerms": [
+     "south"
+    ]
+   }
+  },
+  {
+   "q": "wine tasting on the Golden Mile",
+   "expect": {
+    "regions": [
+     "oliver"
+    ],
+    "types": [
+     "winery"
+    ]
+   }
+  },
+  {
+   "q": "lunch in Westbank",
+   "expect": {
+    "regions": [
+     "west-kelowna"
+    ],
+    "types": [
+     "restaurant"
+    ]
+   }
+  },
+  {
+   "q": "brunch in Pandosy",
+   "expect": {
+    "regions": [
+     "kelowna"
+    ]
+   }
+  },
+  {
+   "q": "a day at Skaha",
+   "expect": {
+    "regions": [
+     "penticton"
+    ]
+   }
+  },
+  {
+   "q": "Kal Lake swim",
+   "expect": {
+    "regions": [
+     "vernon"
+    ]
+   }
+  },
+  {
+   "q": "north okanagan breweries",
+   "expect": {
+    "regions": [
+     "vernon",
+     "armstrong"
+    ],
+    "types": [
+     "brewery"
+    ]
+   }
+  },
+  {
+   "q": "the Naramata Bench",
+   "expect": {
+    "regions": [
+     "naramata"
+    ]
+   }
+  },
+  {
+   "q": "Big White ski day",
+   "expect": {
+    "regions": [
+     "big-white"
+    ],
+    "activities": [
+     "winter"
+    ]
+   }
+  },
+  {
+   "q": "a weekend in Vancouver",
+   "expect": {
+    "unsupported": [
+     "Vancouver"
+    ]
+   }
+  }
+ ]
+}
