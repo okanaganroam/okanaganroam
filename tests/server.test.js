@@ -32000,18 +32000,6 @@ test('Events: "The X" on the same day is the same event as "X", and a hidden dup
   assert.equal(app.eventMovedTwin('kelowna', kept.event.slug), null, 'the published one never redirects');
 });
 
-// ==== Homepage (2026-10-25): the stats strip follows the season ===============
-test('Homepage: the stats strip shows beaches and golf in summer, Hidden Gems and indoor places in the fall, ski & snow in winter', () => {
-  const n = (types) => types.length * 10;
-  const links = (at) => app.homeSeasonalStats(new Date(at), n).map((x) => x[1]);
-  assert.deepEqual(links('2026-07-15T12:00:00-07:00'), ['/beaches', '/golf']);
-  assert.deepEqual(links('2026-10-25T12:00:00-07:00'), ['/hidden-gems', '/indoor']);
-  assert.deepEqual(links('2026-11-30T12:00:00-08:00'), ['/hidden-gems', '/indoor']);
-  assert.deepEqual(links('2027-01-10T12:00:00-08:00'), ['/ski-snow', '/indoor']);
-  assert.deepEqual(links('2027-04-20T12:00:00-07:00'), ['/golf', '/hidden-gems']);
-  for (const [, , en, fr] of app.homeSeasonalStats(new Date('2026-10-25T12:00:00-07:00'), n)) assert.ok(en && fr);
-});
-
 // ==== Editor's Picks (2026-10-27) ==========================================
 test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips closed, photo-less and missing picks; hides under four", async () => {
   const today = app.todayLocal();
@@ -32099,10 +32087,11 @@ test('Homepage event cards: a long schedule becomes one short date line', () => 
   assert.equal(app.homeEventDateText({ dateLabel: 'Oct 23 – Oct 31', time: '', startDate: '2026-10-23', endDate: '2026-10-31' }, now), 'Oct 23 – Oct 31');
 });
 
-test('Homepage counts strip: four numbers after the happy hour count, and the season count first', () => {
+test('Homepage counts strip: four numbers after the happy hour count, ending with places to eat & drink', () => {
   const html = app.renderHomeStatsHTML({ now: new Date('2026-10-28T12:00:00-07:00') });
   if (!html) return;
   const hrefs = [...html.matchAll(/<li><a href="([^"]+)"/g)].map((m) => m[1]);
   assert.ok(hrefs.length <= 4, hrefs.join(' '));
-  assert.ok(!hrefs.includes('/outdoors') && !hrefs.includes('/food-drink'));
+  assert.ok(!hrefs.includes('/outdoors') && !hrefs.includes('/hidden-gems'));
+  assert.equal(hrefs[hrefs.length - 1], '/food-drink');
 });
