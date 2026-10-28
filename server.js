@@ -12122,6 +12122,53 @@ function renderHomeTopPicksHTML({ now = homepageNow() } = {}) {
   </div>
 </section>`;
 }
+// Editor's Picks (2026-10-27, Dayton): up to eight places hand-picked by Okanagan Roam, never paid for, in
+// data/editors-picks.json (a paid spot would be its own row labelled Sponsored). Under This Weekend, same cards. A pick
+// that is gone, closed for the season, not operating, or without its own photo is skipped; under four, no row.
+function loadEditorsPicks() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'editors-picks.json'), 'utf8')); } catch (e) { return { picks: [] }; }
+}
+const EDITORS_PICK_OWN_PHOTO_RE = /^\/images\/(?:owner|venues|hiking\/venues|beaches\/venues|sports\/venues)\//;
+function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPicks() } = {}) {
+  let seasons = new Map(), notOperating = new Set();
+  try { seasons = getSeasonStates(now); } catch (e) { /* no season data: show them all */ }
+  try { notOperating = advisoryNotOperatingIds(); } catch (e) { /* no advisories */ }
+  const picks = [];
+  for (const p of (data && Array.isArray(data.picks) ? data.picks : [])) {
+    if (picks.length >= 8) break;
+    let v = null;
+    try { v = getVenue(Number(p.id)); } catch (e) { v = null; }
+    if (!v || v.redirect_to || !v.slug || !CATEGORY_SLUGS[v.type] || !REGION_LABELS[v.region] || !p.why) continue;
+    if (!EDITORS_PICK_OWN_PHOTO_RE.test(String(v.image_url || ''))) continue;
+    const st = seasons.get(v.id);
+    if ((st && st.kind === 'closed') || notOperating.has(v.id)) continue;
+    if (picks.some((x) => x.v.id === v.id)) continue;
+    picks.push({ v, why: String(p.why), whyFr: String(p.why_fr || p.why) });
+  }
+  if (picks.length < 4) return '';
+  const typeFr = (v) => v.type === 'outdoor' ? 'Lieu de plein air' : ((CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular);
+  const cards = picks.map(({ v, why, whyFr }) => {
+    const img = photoSized(v.image_url, 480), big = photoSized(v.image_url, 960);
+    const srcset = big !== img ? ` srcset="${escapeHtml(img)} 480w, ${escapeHtml(big)} 960w" sizes="(max-width: 640px) 72vw, (max-width: 1099px) 23vw, 320px"` : '';
+    return `<a class="home-pick-card home-editors-card" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${escapeHtml(v.slug)}">
+      <span class="home-event-media"><img src="${escapeHtml(img)}"${srcset} alt="" width="800" height="533" loading="lazy" decoding="async"></span>
+      <span class="home-event-body">
+        <span class="home-event-date"><span class="home-en">${escapeHtml(CATEGORY_LABELS[v.type].singular)}</span><span class="home-fr" lang="fr">${escapeHtml(typeFr(v))}</span> · ${escapeHtml(REGION_LABELS[v.region])}</span>
+        <span class="home-event-name">${escapeHtml(v.name)}</span>
+        <span class="home-event-place"><span class="home-en">${escapeHtml(why)}</span><span class="home-fr" lang="fr">${escapeHtml(whyFr)}</span></span>
+      </span>
+    </a>`;
+  }).join('');
+  return `
+<section class="discover-section home-row" id="editorsPicks">
+  <div class="wrap-wide">
+    <div class="discover-heading discover-heading-split">
+      <h2><span class="home-en">Editor’s Picks</span><span class="home-fr" lang="fr">Choix de la rédaction</span> <span class="discover-subtitle"><span class="home-en">Hand-picked by Okanagan Roam. Never paid for.</span><span class="home-fr" lang="fr">Choisis par Okanagan Roam. Jamais payés.</span></span></h2>
+    </div>
+    <div class="home-scroll-row">${cards}</div>
+  </div>
+</section>`;
+}
 // A one-line count of what the site lists, straight from the listings and What's On; each count links to its page.
 // app.js is frozen, so these modules carry both languages and show the one matching html[lang] (as the mood swipe cue does).
 // The homepage's one upcoming-events number (weekly audit 2026-10-25: the stats strip said 495 while "See all"
@@ -52088,6 +52135,8 @@ const server = http.createServer(async (req, res) => {
         // Top Picks is off for now (2026-10-14): it needs real venue photos, and it may become a paid featured spot.
         // HOME_TOP_PICKS=on shows it (for previews).
         const topPicks = /^(1|on|true|yes)$/i.test(process.env.HOME_TOP_PICKS || '') ? renderHomeTopPicksHTML({ now: homepageNow() }) : '';
+        // Editor's Picks (2026-10-27): hand-picked, never paid, right under This Weekend (data/editors-picks.json).
+        const editorsPicks = renderHomeEditorsPicksHTML({ now: homepageNow() });
         // The counts sit in a slim strip right under the hero.
         const statsHtml = renderHomeStatsHTML({ now: homepageNow() });
         // Happy hour now (2026-10-26): the first item of the counts strip, linking to Roam Now with its Happy hour now filter on.
@@ -52097,7 +52146,7 @@ const server = http.createServer(async (req, res) => {
         if (html.includes(heroToWizardAnchor)) {
           html = html.replace(
             heroToWizardAnchor,
-            `</section>\n${discoveryStyles}\n${statsHtml ? `<div class="home-stats-wrap wrap-wide">${happyHourHtml ? `${HOME_HAPPY_HOUR_STYLE}${statsHtml.replace(/(<ul class="home-stats"[^>]*>)/, (m) => m + happyHourHtml)}${HOME_HAPPY_HOUR_SCRIPT}` : statsHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
+            `</section>\n${discoveryStyles}\n${statsHtml ? `<div class="home-stats-wrap wrap-wide">${happyHourHtml ? `${HOME_HAPPY_HOUR_STYLE}${statsHtml.replace(/(<ul class="home-stats"[^>]*>)/, (m) => m + happyHourHtml)}${HOME_HAPPY_HOUR_SCRIPT}` : statsHtml}</div>` : ''}\n${moodCards}\n${thisWeekend}\n${editorsPicks}\n${topPicks}\n${hiddenGemsSection}\n${exploreRegions}\n${buildTripSection}\n\n<section class="filter-bar" id="directory">`
           );
         }
 
@@ -56519,6 +56568,7 @@ module.exports = {
   TRIP_V3_REGION_IMAGES,
   renderHomeThisWeekendHTML,
   renderHomeTopPicksHTML,
+  renderHomeEditorsPicksHTML,
   renderHomeStatsHTML,
   homeUpcomingEventCount,
   homeSeasonalStats,
