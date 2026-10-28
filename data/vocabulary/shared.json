@@ -1,0 +1,1436 @@
+{
+ "_about": "Phrases that mean the same thing on any Roam site (2026-10-28). Copied as is to a new site; added to the code's base tables. types/features/collections/activities/occasions/budget/pace/cuisineSynonyms: more ways to say each value. descriptionSynonyms: a word the visitor uses -> words a listing's description uses for the same thing (searched when the word is not a category). termLabels: how a searched word reads in a plan summary instead of in quotes. Keys must match the site's own values; an unknown key is ignored.",
+ "types": {
+  "restaurant": [
+   "a bite",
+   "a bite to eat",
+   "grab a bite",
+   "bite to eat",
+   "good food",
+   "great food",
+   "good eats",
+   "foodie",
+   "foodies",
+   "food scene",
+   "fine dining restaurant",
+   "steakhouses",
+   "diner",
+   "diners",
+   "family restaurant",
+   "family restaurants",
+   "sit down restaurant",
+   "grub"
+  ],
+  "cafe": [
+   "coffee spot",
+   "coffee spots",
+   "coffee place",
+   "coffee places",
+   "a coffee",
+   "grab a coffee",
+   "latte",
+   "lattes",
+   "bakery",
+   "bakeries",
+   "bake shop",
+   "pastry",
+   "pastries",
+   "patisserie",
+   "patisseries",
+   "coffee and pastries",
+   "tea room",
+   "tea house",
+   "teahouse",
+   "cafe stop"
+  ],
+  "pub": [
+   "a pint",
+   "pints",
+   "grab a beer",
+   "beer and wings",
+   "neighbourhood pub",
+   "neighborhood pub",
+   "irish pub",
+   "local pub",
+   "watering hole",
+   "dive bar",
+   "apres ski bar",
+   "apres bar",
+   "après",
+   "après ski"
+  ],
+  "cocktail": [
+   "cocktail spot",
+   "cocktail spots",
+   "wine bar",
+   "wine bars",
+   "speakeasy",
+   "speakeasies",
+   "nightcap",
+   "a nightcap",
+   "martini",
+   "martinis",
+   "rooftop bar",
+   "nightlife",
+   "bar hopping",
+   "bar crawl",
+   "night out",
+   "a night out"
+  ],
+  "brewery": [
+   "craft breweries",
+   "beer tasting",
+   "beer tastings",
+   "beer flight",
+   "beer flights",
+   "flight of beer",
+   "brew tour",
+   "ale",
+   "ales",
+   "lager",
+   "lagers",
+   "ipa",
+   "ipas",
+   "cider tasting",
+   "cider tastings",
+   "cidery tour"
+  ],
+  "distillery": [
+   "distillery tour",
+   "spirits tasting",
+   "gin tasting",
+   "whisky tasting",
+   "whiskey tasting",
+   "craft distillery",
+   "craft distilleries"
+  ],
+  "winery": [
+   "wine tasting room",
+   "winery tour",
+   "winery tours",
+   "wine trail",
+   "wine trails",
+   "wine route",
+   "sip",
+   "sipping",
+   "vino",
+   "bubbles",
+   "sparkling wine",
+   "tastings",
+   "a tasting",
+   "wine lover",
+   "wine lovers"
+  ],
+  "golf": [
+   "golf round",
+   "18 holes",
+   "nine holes",
+   "9 holes",
+   "tee off",
+   "teeing off"
+  ],
+  "beach": [
+   "lake beach",
+   "sandy beach",
+   "sandy beaches",
+   "swimming beach",
+   "swim beach",
+   "splash pad",
+   "spray park",
+   "sunbathing",
+   "tanning"
+  ],
+  "outdoor": [
+   "fresh air",
+   "nature park",
+   "nature parks",
+   "green space",
+   "picnic spot",
+   "picnic spots",
+   "picnic",
+   "picnics",
+   "waterfall",
+   "waterfalls",
+   "falls",
+   "trailhead",
+   "scenic drive",
+   "scenic drives",
+   "boardwalk",
+   "promenade",
+   "gardens",
+   "garden",
+   "botanical garden"
+  ],
+  "indoor": [
+   "spa",
+   "spas",
+   "nordic spa",
+   "hot pools",
+   "sauna",
+   "saunas",
+   "massage",
+   "massages",
+   "escape game",
+   "axe throwing",
+   "indoor climbing",
+   "trampoline park",
+   "indoor play",
+   "play centre",
+   "play center",
+   "cinema",
+   "movie theatre",
+   "movie theater",
+   "movies",
+   "a movie",
+   "aquarium",
+   "science centre",
+   "science center",
+   "casino",
+   "pottery class",
+   "art class",
+   "workshop",
+   "workshops",
+   "things to do when it rains",
+   "indoor fun",
+   "paint night",
+   "day spa"
+  ],
+  "tour": [
+   "guided tours",
+   "wine tour company",
+   "wine bus",
+   "tasting tour",
+   "sightseeing tour",
+   "helicopter tour",
+   "float plane",
+   "boat cruise",
+   "sunset cruise",
+   "jet boat",
+   "whale watching",
+   "horseback riding",
+   "horse riding",
+   "trail ride",
+   "trail rides",
+   "segway",
+   "e bike tour",
+   "ebike tour",
+   "bike tour",
+   "bike tours",
+   "food tasting tour",
+   "culinary tour",
+   "farm tour",
+   "cooking school"
+  ],
+  "sport": [
+   "climbing wall",
+   "racquet",
+   "squash",
+   "badminton",
+   "swimming pool",
+   "aquatic centre",
+   "aquatic center",
+   "rec centre",
+   "rec center",
+   "community centre",
+   "community center",
+   "skating rink",
+   "ice rink",
+   "arena",
+   "go karts",
+   "go karting",
+   "karting",
+   "mini putt",
+   "batting cage"
+  ],
+  "shop": [
+   "shopping",
+   "boutiques",
+   "souvenir",
+   "souvenirs",
+   "gift",
+   "gifts",
+   "local makers",
+   "artisan shop",
+   "artisan shops",
+   "bookstore",
+   "bookshop",
+   "gear rental",
+   "rental shop"
+  ]
+ },
+ "features": {
+  "dog_friendly": [
+   "bring the dog",
+   "bring my dog",
+   "bring our dog",
+   "with our dog",
+   "our dog",
+   "pooch",
+   "doggo",
+   "furry friend",
+   "four legged friend",
+   "dog lovers",
+   "pet",
+   "pets welcome",
+   "dog welcome patio"
+  ],
+  "kid_friendly": [
+   "with the kids",
+   "with our kids",
+   "with my children",
+   "with our children",
+   "kiddos",
+   "little ones",
+   "family fun",
+   "family friendly places",
+   "toddler friendly",
+   "baby",
+   "babies",
+   "with a baby",
+   "with a toddler",
+   "stroller",
+   "stroller friendly",
+   "grandkids",
+   "with the grandkids",
+   "school age kids"
+  ],
+  "vegan": [
+   "plant based food",
+   "plant based options",
+   "dairy free",
+   "no meat"
+  ],
+  "vegetarian": [
+   "meatless",
+   "veggie options",
+   "vegetarian food"
+  ],
+  "gluten_free": [
+   "gluten free options",
+   "no gluten",
+   "wheat free"
+  ],
+  "patio": [
+   "outdoor dining",
+   "eat outside",
+   "sit outside",
+   "terrace",
+   "rooftop",
+   "rooftop patio",
+   "deck",
+   "al fresco",
+   "alfresco"
+  ],
+  "lake_view": [
+   "waterfront dining",
+   "lakeside dining",
+   "water view",
+   "water views",
+   "sunset view",
+   "sunset views"
+  ],
+  "nonalcoholic": [
+   "mocktails",
+   "booze free",
+   "alcohol free drinks",
+   "non alcoholic drinks",
+   "zero alcohol"
+  ],
+  "sports_tv": [
+   "watch the game",
+   "watch hockey",
+   "watch football",
+   "watch the canucks",
+   "watch the oilers",
+   "watch the flames",
+   "watch nfl",
+   "watch the nfl",
+   "watch ufc",
+   "big screens",
+   "sports pub"
+  ],
+  "live_music": [
+   "live band tonight",
+   "music tonight",
+   "live musicians",
+   "acoustic",
+   "jazz",
+   "blues",
+   "jazz night"
+  ],
+  "great_groups": [
+   "big party",
+   "large party",
+   "group of 10",
+   "group of ten",
+   "party of 8",
+   "party of eight",
+   "office party",
+   "work party",
+   "stag",
+   "stagette",
+   "bachelor",
+   "bachelorette party",
+   "reunion",
+   "family reunion",
+   "birthday party"
+  ],
+  "happy_hour": [
+   "happy hour deals",
+   "drink deals",
+   "cheap drinks",
+   "drink special",
+   "apps and drinks",
+   "half price apps",
+   "half price appetizers",
+   "social hour",
+   "hoppy hour",
+   "oyster hour",
+   "apres deals",
+   "apres specials",
+   "après deals"
+  ],
+  "open_early": [
+   "early morning coffee",
+   "before work",
+   "sunrise"
+  ],
+  "open_late": [
+   "after midnight",
+   "after the show",
+   "after a concert",
+   "late night food",
+   "late night eats",
+   "night owl"
+  ]
+ },
+ "collections": {
+  "hidden_gem": [
+   "hidden gems only",
+   "not touristy",
+   "non touristy",
+   "less touristy",
+   "off the tourist trail",
+   "quiet spots",
+   "undiscovered",
+   "under the radar",
+   "secret spot",
+   "locals only spots"
+  ],
+  "local_favorite": [
+   "local favourites",
+   "where the locals eat",
+   "where locals eat",
+   "local hangout",
+   "local hangouts",
+   "locals hangout",
+   "local institution",
+   "local legend",
+   "beloved",
+   "classic spot",
+   "classic spots"
+  ]
+ },
+ "activities": {
+  "hiking": [
+   "hiking trails",
+   "easy hike",
+   "easy hikes",
+   "short hike",
+   "short hikes",
+   "long hike",
+   "big hike",
+   "nature trail",
+   "nature trails",
+   "waterfall hike",
+   "summit",
+   "summits",
+   "scramble",
+   "trek",
+   "trekking",
+   "walking trail loop",
+   "loop trail",
+   "loop trails",
+   "dog walk",
+   "dog walks"
+  ],
+  "cycling": [
+   "cycle",
+   "ride bikes",
+   "bike path",
+   "bike paths",
+   "rail trail",
+   "rail trails",
+   "kvr",
+   "kettle valley rail trail",
+   "e bike",
+   "e bikes",
+   "ebike",
+   "ebikes",
+   "electric bike",
+   "road cycling",
+   "gravel ride",
+   "mtb",
+   "singletrack"
+  ],
+  "winter": [
+   "winter fun",
+   "ski hill",
+   "ski hills",
+   "ski resort",
+   "ski resorts",
+   "snowboard",
+   "snowboarding",
+   "cross country ski",
+   "nordic skiing",
+   "fat bike",
+   "fat biking",
+   "sledding",
+   "tobogganing",
+   "snow tubing"
+  ],
+  "camping": [
+   "tent",
+   "tenting",
+   "rv",
+   "rv park",
+   "glamping",
+   "cabin",
+   "cabins",
+   "yurt",
+   "yurts"
+  ],
+  "nature": [
+   "wildlife viewing",
+   "bird watching walk",
+   "nature reserve",
+   "nature reserves",
+   "marsh",
+   "conservation area",
+   "ecology"
+  ],
+  "water": [
+   "swim in the lake",
+   "lake swim",
+   "lake swimming",
+   "water sports",
+   "watersports",
+   "wakeboard",
+   "wakeboarding",
+   "waterski",
+   "waterskiing",
+   "jet ski",
+   "jet skis",
+   "sea doo",
+   "seadoo",
+   "tube",
+   "tubing on the river",
+   "river float",
+   "float the channel",
+   "floating",
+   "channel float",
+   "pontoon",
+   "pontoon boat",
+   "sailing",
+   "sailboat",
+   "fishing charter"
+  ],
+  "viewpoints": [
+   "best views",
+   "best view",
+   "views",
+   "great views",
+   "panoramic views",
+   "sunset spot",
+   "sunset spots",
+   "watch the sunset",
+   "sunrise spot",
+   "lookout point",
+   "overlook",
+   "overlooks",
+   "viewing platform"
+  ],
+  "adventure": [
+   "adrenaline",
+   "thrill seeking",
+   "something adventurous",
+   "outdoor adventure",
+   "rock climbing",
+   "via ferrata",
+   "rappelling",
+   "paragliding",
+   "skydiving",
+   "bungee",
+   "canyoning",
+   "white water",
+   "whitewater rafting",
+   "rafting"
+  ],
+  "fishing": [
+   "fly fishing",
+   "go fishing",
+   "fishing spot",
+   "fishing spots",
+   "ice fishing"
+  ]
+ },
+ "cuisineSynonyms": {
+  "japanese": [
+   "sashimi",
+   "izakaya",
+   "udon",
+   "teriyaki",
+   "bento"
+  ],
+  "italian": [
+   "pasta",
+   "pastas",
+   "lasagna",
+   "risotto",
+   "gnocchi",
+   "trattoria",
+   "osteria"
+  ],
+  "mexican": [
+   "burrito",
+   "burritos",
+   "quesadilla",
+   "quesadillas",
+   "enchiladas",
+   "nachos",
+   "cantina"
+  ],
+  "indian": [
+   "curry",
+   "curries",
+   "butter chicken",
+   "tandoori",
+   "naan",
+   "biryani",
+   "masala",
+   "dosa"
+  ],
+  "thai": [
+   "pad thai",
+   "green curry",
+   "tom yum"
+  ],
+  "chinese": [
+   "dim sum",
+   "dumplings",
+   "hot pot",
+   "hotpot",
+   "szechuan",
+   "sichuan",
+   "cantonese"
+  ],
+  "vietnamese": [
+   "pho",
+   "banh mi",
+   "vermicelli"
+  ],
+  "greek": [
+   "souvlaki",
+   "gyro",
+   "gyros",
+   "tzatziki",
+   "spanakopita"
+  ],
+  "bbq": [
+   "smoked meat",
+   "brisket",
+   "ribs",
+   "pulled pork",
+   "smokehouse"
+  ],
+  "seafood": [
+   "oysters",
+   "oyster",
+   "lobster",
+   "crab",
+   "shrimp",
+   "prawns",
+   "salmon",
+   "fish tacos",
+   "raw bar"
+  ],
+  "dessert": [
+   "sweets",
+   "sweet treats",
+   "treats",
+   "cake",
+   "cakes",
+   "cupcakes",
+   "chocolate",
+   "chocolates",
+   "macarons",
+   "donut shop",
+   "doughnut shop"
+  ],
+  "steakhouse": [
+   "prime rib",
+   "ribeye",
+   "rib eye",
+   "filet",
+   "striploin"
+  ]
+ },
+ "budget": {
+  "budget": [
+   "cheap and cheerful",
+   "inexpensive eats",
+   "good value",
+   "great value",
+   "value",
+   "bang for the buck",
+   "bang for your buck",
+   "under 20",
+   "under twenty",
+   "under 15",
+   "without spending much",
+   "not too pricey",
+   "not pricey",
+   "wallet friendly",
+   "low key and cheap",
+   "free things",
+   "free stuff to do",
+   "no admission"
+  ],
+  "moderate": [
+   "not too fancy",
+   "casual but nice",
+   "nice but not fancy",
+   "mid priced",
+   "mid price"
+  ],
+  "upscale": [
+   "special occasion",
+   "treat ourselves",
+   "treat yourself",
+   "treat myself",
+   "high end dining",
+   "michelin",
+   "tasting menu",
+   "chef s table",
+   "chefs table",
+   "white tablecloth",
+   "dress up",
+   "five star",
+   "5 star",
+   "bougie",
+   "swanky",
+   "classy",
+   "elegant",
+   "posh",
+   "indulgent",
+   "indulge"
+  ]
+ },
+ "pace": {
+  "relaxed": [
+   "no rush",
+   "not rushed",
+   "nothing rushed",
+   "take our time",
+   "slow travel",
+   "easygoing pace",
+   "seniors",
+   "senior",
+   "older parents",
+   "elderly",
+   "grandparents",
+   "with grandparents",
+   "with my parents",
+   "limited mobility",
+   "mobility issues",
+   "bad knees",
+   "not much walking",
+   "minimal walking",
+   "not a lot of walking"
+  ],
+  "packed": [
+   "see everything",
+   "do it all",
+   "cram it in",
+   "non stop",
+   "nonstop",
+   "maximize",
+   "make the most of it"
+  ]
+ },
+ "occasions": {
+  "date_night": [
+   "date spot",
+   "date spots",
+   "first date",
+   "second date"
+  ],
+  "romantic": [
+   "babymoon",
+   "proposal",
+   "propose",
+   "valentine",
+   "valentines",
+   "candlelit"
+  ],
+  "rainy_day": [
+   "bad weather",
+   "stormy",
+   "storm",
+   "cloudy",
+   "too cold",
+   "too hot to be outside",
+   "smoky",
+   "smoke",
+   "wildfire smoke",
+   "when it rains",
+   "if it rains",
+   "in case it rains",
+   "rain plan",
+   "backup plan"
+  ],
+  "family": [
+   "family outing",
+   "family adventure",
+   "multigenerational",
+   "multi generational",
+   "three generations",
+   "the whole family",
+   "whole family"
+  ],
+  "celebration": [
+   "anniversary party",
+   "graduation",
+   "retirement",
+   "promotion",
+   "milestone",
+   "bday"
+  ],
+  "group_getaway": [
+   "stagette",
+   "stag",
+   "buck party",
+   "hen party",
+   "team building",
+   "work retreat",
+   "corporate retreat",
+   "girls night out",
+   "guys night",
+   "ladies",
+   "the ladies",
+   "the boys",
+   "the girls"
+  ],
+  "relaxing": [
+   "relax",
+   "relaxation",
+   "rest and relax",
+   "recharge",
+   "decompress",
+   "self care",
+   "pamper",
+   "pampering",
+   "pamper ourselves",
+   "peaceful",
+   "peace and quiet",
+   "slow down"
+  ],
+  "adventure": [
+   "outdoorsy",
+   "get the heart pumping",
+   "adrenaline rush"
+  ],
+  "adults": [
+   "grown ups",
+   "no kids allowed",
+   "kid free",
+   "child free",
+   "without the kids"
+  ]
+ },
+ "descriptionSynonyms": {
+  "cozy": [
+   "cosy",
+   "fireplace",
+   "fireside",
+   "intimate",
+   "warm",
+   "candlelit",
+   "candle lit",
+   "rustic",
+   "snug",
+   "hearth",
+   "inviting"
+  ],
+  "cosy": [
+   "cozy",
+   "fireplace",
+   "fireside",
+   "intimate",
+   "warm",
+   "candlelit",
+   "rustic",
+   "snug"
+  ],
+  "quiet": [
+   "peaceful",
+   "calm",
+   "tranquil",
+   "serene",
+   "secluded",
+   "relaxed"
+  ],
+  "spa": [
+   "nordic spa",
+   "day spa",
+   "sauna",
+   "saunas",
+   "thermal",
+   "hot pools",
+   "hot tub",
+   "massage",
+   "wellness",
+   "steam room",
+   "cold plunge",
+   "hydrotherapy",
+   "bathhouse"
+  ],
+  "sauna": [
+   "saunas",
+   "nordic spa",
+   "steam room",
+   "thermal",
+   "spa"
+  ],
+  "massage": [
+   "massages",
+   "spa",
+   "wellness",
+   "therapeutic"
+  ],
+  "apres": [
+   "apres ski",
+   "après",
+   "après ski",
+   "after skiing",
+   "happy hour"
+  ],
+  "fireplace": [
+   "fireside",
+   "fire pit",
+   "firepit",
+   "fire pits",
+   "hearth",
+   "wood burning",
+   "wood fired"
+  ],
+  "fire pit": [
+   "fire pits",
+   "firepit",
+   "firepits",
+   "fireside"
+  ],
+  "romantic": [
+   "intimate",
+   "candlelit",
+   "cozy",
+   "couples",
+   "date night",
+   "sunset"
+  ],
+  "sunset": [
+   "sunsets",
+   "golden hour",
+   "west facing",
+   "evening light"
+  ],
+  "healthy": [
+   "fresh",
+   "organic",
+   "salad",
+   "salads",
+   "bowls",
+   "smoothie",
+   "smoothies",
+   "plant based",
+   "vegan"
+  ],
+  "organic": [
+   "certified organic",
+   "farm to table",
+   "local ingredients",
+   "from the farm"
+  ],
+  "farm to table": [
+   "farm fresh",
+   "local ingredients",
+   "locally sourced",
+   "seasonal menu",
+   "from the farm"
+  ],
+  "wheelchair": [
+   "accessible",
+   "wheelchair accessible",
+   "barrier free",
+   "paved",
+   "step free",
+   "ramp"
+  ],
+  "accessible": [
+   "wheelchair accessible",
+   "barrier free",
+   "paved",
+   "step free",
+   "ramp"
+  ],
+  "stroller": [
+   "paved",
+   "flat",
+   "easy walking",
+   "boardwalk"
+  ],
+  "beginner": [
+   "easy",
+   "beginners",
+   "first timers",
+   "lessons",
+   "learn to"
+  ],
+  "lessons": [
+   "lesson",
+   "classes",
+   "instruction",
+   "learn to",
+   "beginners"
+  ],
+  "board games": [
+   "board game",
+   "games cafe",
+   "game cafe",
+   "tabletop"
+  ],
+  "games": [
+   "arcade",
+   "board games",
+   "bowling",
+   "axe throwing",
+   "escape room",
+   "mini golf",
+   "billiards",
+   "pool tables",
+   "darts"
+  ],
+  "arcade": [
+   "arcades",
+   "pinball",
+   "retro games",
+   "video games"
+  ],
+  "pool table": [
+   "pool tables",
+   "billiards",
+   "snooker"
+  ],
+  "trivia": [
+   "quiz",
+   "pub quiz",
+   "trivia night"
+  ],
+  "karaoke": [
+   "karaoke night",
+   "sing along"
+  ],
+  "dancing": [
+   "dance floor",
+   "dj",
+   "nightclub",
+   "club night",
+   "line dancing"
+  ],
+  "jazz": [
+   "jazz night",
+   "live jazz",
+   "blues"
+  ],
+  "mimosas": [
+   "mimosa",
+   "brunch",
+   "bubbles"
+  ],
+  "pumpkin": [
+   "pumpkins",
+   "pumpkin patch",
+   "corn maze",
+   "harvest"
+  ],
+  "pumpkin patch": [
+   "pumpkins",
+   "corn maze",
+   "harvest",
+   "u pick"
+  ],
+  "corn maze": [
+   "maze",
+   "pumpkin patch",
+   "harvest"
+  ],
+  "christmas": [
+   "holiday",
+   "festive",
+   "christmas lights",
+   "santa",
+   "winter market"
+  ],
+  "christmas lights": [
+   "light display",
+   "lights",
+   "festive lights",
+   "christmas"
+  ],
+  "hot chocolate": [
+   "cocoa",
+   "hot cocoa",
+   "cafe"
+  ],
+  "charcuterie": [
+   "cheese board",
+   "charcuterie board",
+   "platter",
+   "antipasto"
+  ],
+  "dog park": [
+   "off leash",
+   "off-leash",
+   "dog beach",
+   "dogs off leash"
+  ],
+  "waterfall": [
+   "falls",
+   "cascade",
+   "cascades"
+  ],
+  "falls": [
+   "waterfall",
+   "waterfalls",
+   "cascade"
+  ],
+  "canyon": [
+   "gorge",
+   "trestle",
+   "trestles",
+   "creek canyon"
+  ],
+  "trestles": [
+   "trestle",
+   "kvr",
+   "rail trail"
+  ],
+  "indigenous": [
+   "first nations",
+   "syilx",
+   "nk mip",
+   "cultural centre",
+   "métis",
+   "metis"
+  ],
+  "first nations": [
+   "indigenous",
+   "syilx",
+   "cultural centre"
+  ],
+  "farm": [
+   "farms",
+   "orchard",
+   "orchards",
+   "farm stand",
+   "u pick",
+   "ranch"
+  ],
+  "orchard": [
+   "orchards",
+   "u pick",
+   "fruit stand",
+   "apples",
+   "cherries",
+   "peaches"
+  ],
+  "lavender": [
+   "lavender farm",
+   "lavender fields"
+  ],
+  "cider": [
+   "cidery",
+   "ciders",
+   "craft cider"
+  ],
+  "mead": [
+   "meadery",
+   "honey wine"
+  ],
+  "gin": [
+   "distillery",
+   "spirits",
+   "craft gin"
+  ],
+  "ice wine": [
+   "icewine",
+   "dessert wine"
+  ],
+  "picnic": [
+   "picnic tables",
+   "picnic area",
+   "grassy",
+   "lawn"
+  ],
+  "skating": [
+   "rink",
+   "skate",
+   "ice skating",
+   "outdoor rink"
+  ],
+  "tobogganing": [
+   "toboggan",
+   "sledding",
+   "sledding hill",
+   "tubing"
+  ],
+  "snowshoe": [
+   "snowshoes",
+   "snowshoeing",
+   "snowshoe trails"
+  ],
+  "hot springs": [
+   "hot pools",
+   "thermal pools",
+   "mineral pools",
+   "nordic spa"
+  ],
+  "horseback": [
+   "horseback riding",
+   "trail rides",
+   "trail ride",
+   "horses",
+   "stables",
+   "ranch"
+  ],
+  "fishing": [
+   "fish",
+   "fly fishing",
+   "angling",
+   "trout"
+  ],
+  "birds": [
+   "bird watching",
+   "birding",
+   "birds",
+   "wildlife",
+   "marsh",
+   "wetland"
+  ],
+  "wildlife": [
+   "birds",
+   "bird watching",
+   "bears",
+   "deer",
+   "bighorn sheep",
+   "marsh",
+   "wetland"
+  ],
+  "photos": [
+   "photo spot",
+   "scenic",
+   "viewpoint",
+   "lookout",
+   "instagram"
+  ],
+  "instagram": [
+   "photo spot",
+   "scenic",
+   "viewpoint",
+   "lookout",
+   "murals"
+  ]
+ },
+ "termLabels": {
+  "cozy": {
+   "en": "cozy spots",
+   "fr": "endroits chaleureux"
+  },
+  "cosy": {
+   "en": "cozy spots",
+   "fr": "endroits chaleureux"
+  },
+  "quiet": {
+   "en": "quiet spots",
+   "fr": "endroits calmes"
+  },
+  "spa": {
+   "en": "spas",
+   "fr": "spas"
+  },
+  "sauna": {
+   "en": "saunas and spas",
+   "fr": "saunas et spas"
+  },
+  "massage": {
+   "en": "massage and spas",
+   "fr": "massages et spas"
+  },
+  "apres": {
+   "en": "après-ski",
+   "fr": "après-ski"
+  },
+  "fireplace": {
+   "en": "places with a fireplace",
+   "fr": "endroits avec un foyer"
+  },
+  "romantic": {
+   "en": "romantic spots",
+   "fr": "endroits romantiques"
+  },
+  "views": {
+   "en": "views",
+   "fr": "points de vue"
+  },
+  "sunset": {
+   "en": "sunset spots",
+   "fr": "couchers de soleil"
+  },
+  "healthy": {
+   "en": "healthy food",
+   "fr": "cuisine santé"
+  },
+  "brunch": {
+   "en": "brunch",
+   "fr": "brunch"
+  },
+  "breakfast": {
+   "en": "breakfast",
+   "fr": "déjeuner"
+  },
+  "pizza": {
+   "en": "pizza",
+   "fr": "pizza"
+  },
+  "burgers": {
+   "en": "burgers",
+   "fr": "burgers"
+  },
+  "wings": {
+   "en": "wings",
+   "fr": "ailes de poulet"
+  },
+  "oysters": {
+   "en": "oysters",
+   "fr": "huîtres"
+  },
+  "ice cream": {
+   "en": "ice cream",
+   "fr": "crème glacée"
+  },
+  "chocolate": {
+   "en": "chocolate",
+   "fr": "chocolat"
+  },
+  "games": {
+   "en": "games",
+   "fr": "jeux"
+  },
+  "board games": {
+   "en": "board games",
+   "fr": "jeux de société"
+  },
+  "trivia": {
+   "en": "trivia",
+   "fr": "quiz"
+  },
+  "karaoke": {
+   "en": "karaoke",
+   "fr": "karaoké"
+  },
+  "music": {
+   "en": "live music",
+   "fr": "musique live"
+  },
+  "history": {
+   "en": "history",
+   "fr": "histoire"
+  },
+  "art": {
+   "en": "art",
+   "fr": "art"
+  },
+  "indigenous": {
+   "en": "Indigenous culture",
+   "fr": "culture autochtone"
+  },
+  "farm": {
+   "en": "farms",
+   "fr": "fermes"
+  },
+  "orchard": {
+   "en": "orchards",
+   "fr": "vergers"
+  },
+  "pumpkin patch": {
+   "en": "pumpkin patches",
+   "fr": "champs de citrouilles"
+  },
+  "christmas": {
+   "en": "Christmas",
+   "fr": "Noël"
+  },
+  "christmas lights": {
+   "en": "Christmas lights",
+   "fr": "lumières de Noël"
+  },
+  "hot springs": {
+   "en": "hot springs",
+   "fr": "sources thermales"
+  },
+  "horseback": {
+   "en": "horseback riding",
+   "fr": "équitation"
+  },
+  "wheelchair": {
+   "en": "wheelchair-accessible places",
+   "fr": "endroits accessibles en fauteuil roulant"
+  },
+  "accessible": {
+   "en": "accessible places",
+   "fr": "endroits accessibles"
+  },
+  "waterfall": {
+   "en": "waterfalls",
+   "fr": "chutes"
+  },
+  "picnic": {
+   "en": "picnic spots",
+   "fr": "endroits pour pique-niquer"
+  },
+  "cider": {
+   "en": "cider",
+   "fr": "cidre"
+  },
+  "cheese": {
+   "en": "cheese",
+   "fr": "fromage"
+  },
+  "charcuterie": {
+   "en": "charcuterie",
+   "fr": "charcuterie"
+  },
+  "local": {
+   "en": "local spots",
+   "fr": "adresses locales"
+  },
+  "south": {
+   "en": "",
+   "fr": ""
+  },
+  "north": {
+   "en": "",
+   "fr": ""
+  }
+ }
+}

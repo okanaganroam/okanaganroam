@@ -3000,13 +3000,22 @@ function nearbyFocusVenue(facts, ctx, f) {
   options.sort((a, b) => gap(a) - gap(b) || fit(b) - fit(a) || (Number(b.rating) || 0) - (Number(a.rating) || 0));
   return options[0] || null;
 }
+// How a searched word reads in a summary (2026-10-28, Dayton: 'focused on wineries and “cozy”' looked broken): its
+// label from data/vocabulary/shared.json ("cozy spots"), nothing for a word with an empty label ("south" once the
+// area is understood), otherwise the word as typed, in quotes.
+const TERM_LABELS = require('./vocabulary.js').sharedTable('termLabels');
+function termText(term) {
+  const l = TERM_LABELS[term];
+  if (l && typeof l.en === 'string') return l.en;
+  return `“${term}”`; // a dish or word the visitor typed, shown as typed
+}
 function focusText(ctx, key) {
   if (key.startsWith('kind:')) return tripRequirements.LABELS[key.slice(5)] || key.slice(5);
   const [kind, value] = key.split(':');
   if (kind === 'type') return typeLabel(ctx, value).toLowerCase();
   if (kind === 'activity') return activityLabel(ctx, value);
   if (kind === 'collection') return collectionLabel(ctx, value);
-  if (kind === 'food') return `“${value}”`;
+  if (kind === 'food') return termText(value) || value;
   if (kind === 'lake') return 'a lake-view, beach or water stop';
   return value;
 }
@@ -3018,7 +3027,7 @@ function interestsText(ctx) {
   for (const t of ctx.types) items.push(typeLabel(ctx, t).toLowerCase());
   for (const a of ctx.activities) items.push(activityLabel(ctx, a));
   for (const c of ctx.collections) items.push(collectionLabel(ctx, c));
-  for (const ft of ctx.foodTerms) items.push(`“${ft.term}”`);
+  for (const ft of ctx.foodTerms) { const t = termText(ft.term); if (t) items.push(t); }
   for (const f of ctx.features) items.push((ctx.labels.featureNouns && ctx.labels.featureNouns[f]) || featureLabel(ctx, f).toLowerCase());
   return items;
 }
