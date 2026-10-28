@@ -3,11 +3,6 @@
   "updated": "2026-10-27",
   "picks": [
     {
-      "id": 863,
-      "why": "Naramata Bench views and an unhurried tasting bar",
-      "why_fr": "Vue sur le Naramata Bench et un bar de dégustation sans presse"
-    },
-    {
       "id": 1038,
       "why": "Standout gluten-free baking, from cakes to macarons",
       "why_fr": "Une pâtisserie sans gluten remarquable, des gâteaux aux macarons"
@@ -16,6 +11,11 @@
       "id": 1413,
       "why": "Independent brewery with a full kitchen and Friday trivia",
       "why_fr": "Brasserie indépendante, cuisine complète et quiz le vendredi"
+    },
+    {
+      "id": 289,
+      "why": "Elegant Italian with a deep wine cellar",
+      "why_fr": "Une cuisine italienne raffinée et une belle cave à vin"
     },
     {
       "id": 1497,
