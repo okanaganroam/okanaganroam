@@ -32011,3 +32011,58 @@ test('Homepage: the stats strip shows beaches and golf in summer, Hidden Gems an
   assert.deepEqual(links('2027-04-20T12:00:00-07:00'), ['/golf', '/hidden-gems']);
   for (const [, , en, fr] of app.homeSeasonalStats(new Date('2026-10-25T12:00:00-07:00'), n)) assert.ok(en && fr);
 });
+
+// ==== Editor's Picks (2026-10-27) ==========================================
+test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips closed, photo-less and missing picks; hides under four", async () => {
+  const today = app.todayLocal();
+  const made = [];
+  const add = (name, type, image) => {
+    const r = db.prepare('INSERT INTO venues (name, region, type, description, image_url, hours, slug) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(name, 'kelowna', type, 'Editor pick fixture.', image, SEASON_WEEK, name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    made.push(Number(r.lastInsertRowid));
+    return Number(r.lastInsertRowid);
+  };
+  try {
+    const ok = [add('Pick Winery One', 'winery', '/images/venues/pick-one.jpg'), add('Pick Cafe Two', 'cafe', '/images/owner/0123456789abcdef01234567.jpg'),
+      add('Pick Gallery Three', 'indoor', '/images/venues/pick-three.jpg'), add('Pick Bistro Four', 'restaurant', '/images/venues/pick-four.jpg')];
+    const noPhoto = add('Pick No Photo', 'cafe', null);
+    const closed = add('Pick Closed Winery', 'winery', '/images/venues/pick-closed.jpg');
+    const seasonSet = app.guardedSeasonUpdate(closed, { status: 'closed', reopens_date: '2027-05-15', source_url: SEASON_SRC, checked_at: today }, { reason: 'test', batch_id: 'editors-picks' });
+    assert.equal(seasonSet.ok, true, JSON.stringify(seasonSet));
+    const pick = (id) => ({ id, why: `Why ${id} & more`, why_fr: `Pourquoi ${id}` });
+    const data = { picks: [pick(ok[0]), pick(noPhoto), pick(closed), pick(999999), pick(ok[1]), pick(ok[2]), pick(ok[3]), pick(ok[0])] };
+    const html = app.renderHomeEditorsPicksHTML({ data, now: new Date() });
+    const hrefs = [...html.matchAll(/class="home-pick-card home-editors-card" href="([^"]+)"/g)].map((m) => m[1]);
+    assert.equal(hrefs.length, 4, `the four good picks, once each: ${hrefs.join(" ")}`);
+    assert.deepEqual(hrefs, ['/kelowna/wineries/pick-winery-one', '/kelowna/cafes/pick-cafe-two', '/kelowna/indoor/pick-gallery-three', '/kelowna/restaurants/pick-bistro-four']);
+    assert.ok(!html.includes('Pick No Photo') && !html.includes('Pick Closed Winery'));
+    assert.match(html, /Editor’s Picks/);
+    assert.match(html, /Never paid for\./);
+    assert.match(html, /class="home-fr" lang="fr">Choix de la rédaction/);
+    assert.match(html, /Why \d+ &amp; more/, 'the reason is escaped');
+    assert.match(html, /lang="fr">Pourquoi \d+/);
+    assert.ok(!/sponsored/i.test(html), 'never labelled or linked as sponsored');
+    // Under four usable picks: no row at all.
+    assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
+    assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
+    // The shipped list is well formed: up to eight picks, each with a reason in both languages, no repeats.
+    const shipped = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'editors-picks.json'), 'utf8'));
+    assert.ok(shipped.picks.length >= 4 && shipped.picks.length <= 8);
+    assert.equal(new Set(shipped.picks.map((p) => p.id)).size, shipped.picks.length);
+    for (const p of shipped.picks) { assert.ok(Number.isInteger(p.id) && p.why && p.why_fr && p.why.length <= 60, JSON.stringify(p)); }
+    // On the homepage it sits right under This Weekend (when both show), above Hidden Gems.
+    await withDiscoveryServer(async (base) => {
+      const page = await (await fetch(`${base}/`)).text();
+      if (page.includes('id="editorsPicks"')) {
+        assert.ok(page.indexOf('id="editorsPicks"') > page.indexOf('id="moodCards"') && page.indexOf('id="editorsPicks"') < page.indexOf('id="hiddenGems"'));
+        if (page.includes('id="thisWeekend"')) assert.ok(page.indexOf('id="editorsPicks"') > page.indexOf('id="thisWeekend"'));
+      }
+    });
+  } finally {
+    for (const id of made) {
+      db.prepare('DELETE FROM venue_seasons WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venue_enrichment_log WHERE venue_id = ?').run(id);
+      db.prepare('DELETE FROM venues WHERE id = ?').run(id);
+    }
+  }
+});

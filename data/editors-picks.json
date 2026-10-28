@@ -1,0 +1,46 @@
+{
+  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. Up to 8 picks, refreshed weekly; a pick closed for the season or not operating is skipped, and the row hides with fewer than 4. Each needs its own photo on the listing. 'why' is one short line (EN + FR).",
+  "updated": "2026-10-27",
+  "picks": [
+    {
+      "id": 1038,
+      "why": "Standout gluten-free baking, from cakes to macarons",
+      "why_fr": "Une pâtisserie sans gluten remarquable, des gâteaux aux macarons"
+    },
+    {
+      "id": 1413,
+      "why": "Independent brewery with a full kitchen and Friday trivia",
+      "why_fr": "Brasserie indépendante, cuisine complète et quiz le vendredi"
+    },
+    {
+      "id": 289,
+      "why": "Elegant Italian with a deep wine cellar",
+      "why_fr": "Une cuisine italienne raffinée et une belle cave à vin"
+    },
+    {
+      "id": 1497,
+      "why": "A hot-cold spa circuit for a grey fall day",
+      "why_fr": "Un circuit chaud-froid pour une journée grise d’automne"
+    },
+    {
+      "id": 994,
+      "why": "A Parisian-style bakery on Penticton’s Main Street",
+      "why_fr": "Une boulangerie à la parisienne sur la rue Main de Penticton"
+    },
+    {
+      "id": 717,
+      "why": "Wine and cider in a 1922 packinghouse",
+      "why_fr": "Vin et cidre dans un entrepôt fruitier de 1922"
+    },
+    {
+      "id": 854,
+      "why": "Small-batch wines on a working family farm",
+      "why_fr": "Des vins en petits lots sur une ferme familiale"
+    },
+    {
+      "id": 1532,
+      "why": "Concerts, comedy and family shows all season",
+      "why_fr": "Concerts, humour et spectacles familiaux toute la saison"
+    }
+  ]
+}
