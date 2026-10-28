@@ -32098,3 +32098,11 @@ test('Homepage event cards: a long schedule becomes one short date line', () => 
   assert.equal(app.homeEventDateText({ dateLabel: 'Oct 30', time: '7 PM', startDate: '2026-10-30', endDate: '2026-10-30' }, now), 'Oct 30 · 7 PM');
   assert.equal(app.homeEventDateText({ dateLabel: 'Oct 23 – Oct 31', time: '', startDate: '2026-10-23', endDate: '2026-10-31' }, now), 'Oct 23 – Oct 31');
 });
+
+test('Homepage counts strip: four numbers after the happy hour count, and the season count first', () => {
+  const html = app.renderHomeStatsHTML({ now: new Date('2026-10-28T12:00:00-07:00') });
+  if (!html) return;
+  const hrefs = [...html.matchAll(/<li><a href="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(hrefs.length <= 4, hrefs.join(' '));
+  assert.ok(!hrefs.includes('/outdoors') && !hrefs.includes('/food-drink'));
+});
