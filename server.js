@@ -12228,13 +12228,13 @@ function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   const fmt = (x) => Number(x).toLocaleString('en-CA');
   // French (2026-10-18): "1 766 vrais lieux", with a no-break space, not "1,766".
   const fmtFr = (x) => fmt(x).replace(/,/g, '\u00a0');
+  // Five numbers, not nine (2026-10-28, Dayton): with the happy hour count in front, places, events, wineries and the
+  // first of the season's two counts (Hidden Gems in the fall, ski & snow in winter). Each section is still a click away.
   const items = [
     [total, '/destinations', 'real places', 'vrais lieux'],
     [events, '/whats-on', 'upcoming events', 'événements à venir'], // What's On's own window, the next 90 days
-    [n(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery']), '/food-drink', 'places to eat & drink', 'endroits où manger et boire'],
     [n(['winery']), '/wineries', 'wineries', 'vignobles'],
-    ...homeSeasonalStats(now, n),
-    [n(['outdoor']), '/outdoors', 'trails, parks & lookouts', 'sentiers, parcs et points de vue'],
+    ...homeSeasonalStats(now, n).slice(0, 1),
   ].filter(([v]) => v > 0);
   return `<ul class="home-stats" aria-label="What Okanagan Roam lists">${items.map(([v, href, en, fr]) => `<li><a href="${href}"><strong>${fmt(v) === fmtFr(v) ? fmt(v) : `<span class="home-en">${fmt(v)}</span><span class="home-fr" lang="fr">${fmtFr(v)}</span>`}</strong> <span class="home-en">${escapeHtml(en)}</span><span class="home-fr" lang="fr">${escapeHtml(fr)}</span></a></li>`).join('')}</ul>`;
 }
@@ -13858,6 +13858,10 @@ ${renderCanonicalFooterStyles()}
   .home-event-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.02rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .home-event-place { font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.82rem; color: rgba(42,32,25,0.68); }
   .home-pick-star { color: var(--ref-gold, #C9A227); }
+  /* Even cards (2026-10-28): every card keeps room for a two-line name and a two-line reason, so a row of cards ends
+     level instead of some with a gap under them. */
+  .home-editors-card .home-event-name, .home-event-card .home-event-name { min-height: 2.5em; }
+  .home-editors-card .home-event-place { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; min-height: 3em; }
   /* Editor's Picks (2026-10-28): one row of four on a computer, scrolled sideways by the arrows; the heading keeps its
      subtitle on its own line on phones. */
   .home-carousel-nav { display: none; gap: 8px; }
