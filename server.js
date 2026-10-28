@@ -12124,7 +12124,8 @@ function renderHomeTopPicksHTML({ now = homepageNow() } = {}) {
 }
 // Editor's Picks (2026-10-27, Dayton): up to eight places hand-picked by Okanagan Roam, never paid for, in
 // data/editors-picks.json (a paid spot would be its own row labelled Sponsored). Under This Weekend, same cards. A pick
-// that is gone, closed for the season, not operating, or without its own photo is skipped; under four, no row.
+// that is gone, closed, not operating, or without its own photo is skipped and the next one in the list (a backup) steps
+// in; the row shows eight or four cards, and none under four.
 function loadEditorsPicks() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'editors-picks.json'), 'utf8')); } catch (e) { return { picks: [] }; }
 }
@@ -12147,6 +12148,8 @@ function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPic
     picks.push({ v, why: String(p.why), whyFr: String(p.why_fr || p.why) });
   }
   if (picks.length < 4) return '';
+  // Full rows only (2026-10-28, Dayton: a seven-card row looks unfinished): eight, or four.
+  picks.length = picks.length >= 8 ? 8 : 4;
   const typeFr = (v) => v.type === 'outdoor' ? 'Lieu de plein air' : ((CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular);
   const cards = picks.map(({ v, why, whyFr }) => {
     const img = photoSized(v.image_url, 480), big = photoSized(v.image_url, 960);

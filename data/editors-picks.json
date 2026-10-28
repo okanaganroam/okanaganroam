@@ -1,5 +1,5 @@
 {
-  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. Up to 8 picks, refreshed weekly; a pick closed for the season or not operating is skipped, and the row hides with fewer than 4. Each needs its own photo on the listing. 'why' is one short line (EN + FR).",
+  "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 8 usable picks show; the rest are backups that step in, in order, when a pick is skipped (closed today or for the season, not operating, or without its own photo). The row always shows 8 or 4 cards, never an odd count, and hides with fewer than 4. 'why' is one short line (EN + FR).",
   "updated": "2026-10-27",
   "picks": [
     {
@@ -41,6 +41,21 @@
       "id": 1532,
       "why": "Concerts, comedy and family shows all season",
       "why_fr": "Concerts, humour et spectacles familiaux toute la saison"
+    },
+    {
+      "id": 326,
+      "why": "Indigenous-owned café famous for bannock tacos",
+      "why_fr": "Café autochtone réputé pour ses tacos à la bannique"
+    },
+    {
+      "id": 918,
+      "why": "All-day breakfast on West Kelowna’s Main Street",
+      "why_fr": "Déjeuners toute la journée sur la rue Main de West Kelowna"
+    },
+    {
+      "id": 992,
+      "why": "Cozy Italian deli with pasta made from scratch",
+      "why_fr": "Un petit traiteur italien aux pâtes faites maison"
     }
   ]
 }
