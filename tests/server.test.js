@@ -32048,12 +32048,20 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     app.clearHoursExtraCache();
     const withShut = app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(shut), pick(ok[1]), pick(ok[2]), pick(ok[3])] }, now: new Date() });
     assert.ok(!withShut.includes('Pick Shut This Week'), 'closed today: skipped');
+    // Full rows only: five, six or seven usable picks show four (never a ragged row).
+    const five = [add('Pick Five A', 'cafe', '/images/venues/p5a.jpg'), add('Pick Five B', 'cafe', '/images/venues/p5b.jpg'), add('Pick Five C', 'cafe', '/images/venues/p5c.jpg')];
+    const sevenHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [...ok, ...five].map(pick) }, now: new Date() });
+    assert.equal((sevenHtml.match(/home-editors-card/g) || []).length, 4, 'seven usable picks show four');
+    // Eight usable with a skipped one in front: the backup steps in, and the row is a full eight.
+    const eightHtml = app.renderHomeEditorsPicksHTML({ data: { picks: [shut, ...ok, ...five, add('Pick Backup', 'cafe', '/images/venues/pb.jpg')].map(pick) }, now: new Date() });
+    assert.equal((eightHtml.match(/home-editors-card/g) || []).length, 8, 'the backup fills the eighth card');
+    assert.ok(eightHtml.includes('Pick Backup') && !eightHtml.includes('Pick Shut This Week'));
     // Under four usable picks: no row at all.
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
     // The shipped list is well formed: up to eight picks, each with a reason in both languages, no repeats.
     const shipped = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'editors-picks.json'), 'utf8'));
-    assert.ok(shipped.picks.length >= 4 && shipped.picks.length <= 8);
+    assert.ok(shipped.picks.length >= 8, 'eight picks plus backups');
     assert.equal(new Set(shipped.picks.map((p) => p.id)).size, shipped.picks.length);
     for (const p of shipped.picks) { assert.ok(Number.isInteger(p.id) && p.why && p.why_fr && p.why.length <= 60, JSON.stringify(p)); }
     // On the homepage it sits right under This Weekend (when both show), above Hidden Gems.
