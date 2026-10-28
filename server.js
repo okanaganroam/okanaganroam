@@ -11417,7 +11417,7 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date(),
   const typesPresent = types.map((t) => t.type).filter((t) => CATEGORY_SLUGS[t]);
   // Combination guides that narrow this one down (2026-10-16), first in the list.
   const narrow = listComboGuides().filter((c) => c.region === region && GUIDE_COMBO_BY_SLUG[c.slug].badges.includes(badge)).map((c) => GUIDE_COMBO_BY_SLUG[c.slug]);
-  const afterHtml = `<section class="guide-more" aria-labelledby="guideMoreHeading">
+  const afterHtml = `${mergedGuideBlockHtml(`/guide/${region}/${badge}`, regionLabel)}<section class="guide-more" aria-labelledby="guideMoreHeading">
     <h2 class="category-subsection-heading" id="guideMoreHeading">More in ${escapeHtml(regionLabel)}</h2>
     ${narrow.length ? `<p class="guide-more-row">${narrow.map((c) => `<a class="guide-more-chip" href="/guide/${region}/${c.slug}">${escapeHtml(comboGuideShortName(region, c))}</a>`).join('')}</p>` : ''}
     ${others.length ? `<p class="guide-more-row">${others.map((b) => `<a class="guide-more-chip" href="/guide/${region}/${b}">${escapeHtml(guideBadgeHeading(region, b).heading.slice(0, -(` in ${regionLabel}`).length))}</a>`).join('')}</p>` : ''}
@@ -11429,7 +11429,9 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date(),
     region,
     name: heading.replace(` in ${regionLabel}`, ''),
     crumbs: [{ name: regionLabel, href: `/${region}` }],
-    title: `${heading}, BC | Okanagan Roam`,
+    // Happy hour titles (2026-11-03): "Happy Hours in Kelowna Right Now: Times & Deals", what people search for and
+    // what the page shows (each card has today's times and "On now").
+    title: badge === 'happy_hour' ? `Happy Hours in ${regionLabel} Right Now: Times & Deals | Okanagan Roam` : `${heading}, BC | Okanagan Roam`,
     description: gi ? gi.meta : `${venues.length} ${BADGE_LABELS[badge].noun} in ${regionLabel}, BC. ${intro}`.slice(0, 300),
     introHtml: gi ? gi.html : null,
     bodyClass: 'guide-page',
@@ -11452,6 +11454,9 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date(),
   body.guide-page .guide-picks { margin: 8px 0 0; font-weight: 800; }
   body.guide-page .guide-picks a { color: var(--teal-deep, #1F5450); }
   body.guide-page .guide-more { margin: 32px 0 8px; }
+  body.guide-page .guide-merged { margin: 32px 0 8px; max-width: 760px; }
+  body.guide-page .guide-merged h3 { margin: 18px 0 4px; font-size: 1.05rem; }
+  body.guide-page .guide-merged p { margin: 4px 0 8px; line-height: 1.55; }
   body.guide-page .guide-more-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
   body.guide-page .guide-more-chip { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line, #d9e0e6); background: var(--paper); color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.86rem; text-decoration: none; }
   body.guide-page .guide-more-chip:hover { background: rgba(27,43,58,0.06); }
@@ -38460,6 +38465,31 @@ const FILE_GUIDES = (() => {
   }
   return out;
 })();
+// Merged guides (2026-11-03, Dayton: one page per search, not two competing for it). Our written Kelowna happy
+// hour guide and the live town page (/guide/kelowna/happy_hour: today's times, deals and "on now") both went after
+// "happy hour in Kelowna". The written guide now 301s to the live page, which carries its "where to go" picks; it
+// leaves the guide list, the sitemap and the guide count.
+const MERGED_GUIDES = { '/guides/happy-hour-kelowna': '/guide/kelowna/happy_hour' };
+const MERGED_GUIDE_CONTENT = {};
+for (const [from, to] of Object.entries(MERGED_GUIDES)) {
+  if (FILE_GUIDES[from]) { MERGED_GUIDE_CONTENT[to] = FILE_GUIDES[from]; delete FILE_GUIDES[from]; }
+}
+// The merged guide's picks on its new page: the first intro paragraph and each section's heading, lead and places
+// (names only: the cards above carry today's times and deals, so no time line here can go stale).
+function mergedGuideBlockHtml(path, regionLabel) {
+  const g = MERGED_GUIDE_CONTENT[path];
+  if (!g) return '';
+  const sections = (g.sections || []).map((sec) => {
+    const links = (sec.items || []).map((it) => (it.ref ? guideRefVenue(it.ref) : null)).filter(Boolean)
+      .map((v) => `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(v.name)}</a>`);
+    if (!links.length) return '';
+    return `\n    <h3>${escapeHtml(sec.heading)}</h3>${sec.lead ? `\n    <p>${guideTipHtml(sec.lead)}</p>` : ''}\n    <p class="guide-merged-places">${links.join(' · ')}</p>`;
+  }).join('');
+  if (!sections) return '';
+  return `<section class="guide-merged" aria-labelledby="guideMergedHeading">
+    <h2 class="category-subsection-heading" id="guideMergedHeading">Where to go for happy hour in ${escapeHtml(regionLabel)}</h2>${g.intro && g.intro[0] ? `\n    <p>${guideTipHtml(g.intro[0])}</p>` : ''}${sections}
+  </section>`;
+}
 function renderFileGuidePage(pathname) {
   const g = FILE_GUIDES[pathname];
   return g ? renderEditorialGuidePage(g, pathname) : null;
@@ -38473,7 +38503,7 @@ const GUIDE_GROUPS = [
   { key: 'cozy', heading: 'Cozy, rainy and cold days', paths: ['/guides/cozy-spots-okanagan', '/guides/soup-ramen-pho-okanagan', '/guides/rainy-day-okanagan', '/guides/indoor-golf-okanagan', '/guides/okanagan-comedy-shows'] },
   { key: 'winter', heading: 'Winter in the Okanagan', paths: ['/guides/winter-okanagan', '/guides/okanagan-in-december', '/guides/ski-season-big-white-silverstar', '/guides/okanagan-ski-season-2026-27', '/guides/big-white-restaurants-apres', '/guides/silverstar-restaurants-apres', '/guides/apex-baldy-ski-guide', '/guides/winter-in-kelowna', '/guides/okanagan-winter-beyond-skiing', '/guides/okanagan-nordic-snowshoe', '/guides/okanagan-skating', '/guides/okanagan-sleigh-rides-dog-sledding', '/guides/okanagan-christmas-markets', '/guides/okanagan-holiday-events', '/guides/okanagan-winter-events', '/guides/okanagan-in-january', '/guides/valentines-day-okanagan', '/guides/okanagan-saunas-spas', '/guides/okanagan-winter-wine'] },
   { key: 'towns', heading: 'Towns, weekends and local food', paths: ['/guides/things-to-do-kelowna', '/guides/best-restaurants-kelowna', '/guides/weekend-in-kelowna', '/guides/kelowna-without-a-car', '/guides/best-sushi-kelowna', '/guides/best-pizza-kelowna', '/guides/vernon-silverstar-weekend', '/guides/summerland-peachland-day-trip', '/guides/okanagan-to-whistler-road-trip', '/guides/penticton-naramata-wine-weekend', '/guides/oliver-osoyoos-wine-weekend', '/guides/best-restaurants-penticton', '/guides/best-restaurants-vernon', '/guides/best-restaurants-west-kelowna', '/guides/best-brunch-penticton', '/guides/best-brunch-vernon', '/guides/dog-friendly-penticton', '/guides/dog-friendly-vernon'] },
-  { key: 'year', heading: 'Food, drink, family and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna', '/guides/happy-hour-kelowna', '/guides/date-night-kelowna', '/guides/cheap-eats-kelowna', '/guides/family-friendly-okanagan', '/guides/okanagan-breweries'] },
+  { key: 'year', heading: 'Food, drink, family and dogs, year-round', paths: ['/guides/okanagan-wineries-first-timers', '/guides/best-brunch-kelowna', '/guides/best-patios-kelowna', '/guides/dog-friendly-kelowna', '/guides/date-night-kelowna', '/guides/cheap-eats-kelowna', '/guides/family-friendly-okanagan', '/guides/okanagan-breweries'] },
 ];
 // Season order for /guides (Okanagan local month): the current season leads.
 function guideGroupOrder(now = new Date()) {
@@ -54897,6 +54927,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderGuidesIndexPage());
     }
+    if (method === 'GET' && MERGED_GUIDES[pathname.replace(/\/$/, '')]) {
+      res.writeHead(301, { Location: `${res.twinLang === 'fr' ? '/fr' : ''}${MERGED_GUIDES[pathname.replace(/\/$/, '')]}` });
+      return res.end();
+    }
     if (method === 'GET' && FILE_GUIDES[pathname.replace(/\/$/, '')]) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderFileGuidePage(pathname.replace(/\/$/, '')));
@@ -56046,6 +56080,7 @@ module.exports = {
   RAINY_GUIDE_PATH,
   renderRainyGuidePage,
   FILE_GUIDES,
+  MERGED_GUIDES,
   GUIDE_BANNERS,
   GUIDE_PHOTOS,
   renderFileGuidePage,
