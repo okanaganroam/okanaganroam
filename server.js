@@ -12141,7 +12141,8 @@ function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPic
     if (!v || v.redirect_to || !v.slug || !CATEGORY_SLUGS[v.type] || !REGION_LABELS[v.region] || !p.why) continue;
     if (!EDITORS_PICK_OWN_PHOTO_RE.test(String(v.image_url || ''))) continue;
     const st = seasons.get(v.id);
-    if ((st && st.kind === 'closed') || notOperating.has(v.id)) continue;
+    // Closed for the season, or shut today by an owner's dated closure (2026-10-28: Beat Patisserie, Oct 21-28).
+    if ((st && (st.kind === 'closed' || (st.kind === 'temp_closed' && st.current))) || notOperating.has(v.id)) continue;
     if (picks.some((x) => x.v.id === v.id)) continue;
     picks.push({ v, why: String(p.why), whyFr: String(p.why_fr || p.why) });
   }
