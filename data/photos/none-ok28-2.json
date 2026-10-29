@@ -1,0 +1,27 @@
+[
+ {
+  "id": 713,
+  "name": "The Sandwich Company",
+  "reason": "Only 7 Google photos (6 food close-ups, 1 tilted deli-case close-up), no website or other own photos online"
+ },
+ {
+  "id": 510,
+  "name": "Pizza 64 (Penticton)",
+  "reason": "Google place (1770 Main St #102) has only pizza-in-box photos; pizza64.ca has only chain menu/deal graphics, nothing of the Penticton store"
+ },
+ {
+  "id": 1884,
+  "name": "East Hill Trail (Oyama)",
+  "reason": "No Google place for the East Hill trail (searched East Hill Trail / trailhead, Oyama); Lake Country trail map PDF has no photo of it; nothing found on the web"
+ },
+ {
+  "id": 1883,
+  "name": "Ribbleworth Trail (Oyama)",
+  "reason": "No Google place for the trail itself; the nearby Ribbleworth Falls listing is a different spot (on the Rail Trail at Oyama Rd, not the Broadwater Rd bench trail); trail map PDF has no photo"
+ },
+ {
+  "id": 1068,
+  "name": "Longshots Steak House",
+  "reason": "Google photos are all plated food, cocktails, menus and a Christmas-tree wall corner; no website (Gunbarrel site unreachable); nothing showing the room or building"
+ }
+]

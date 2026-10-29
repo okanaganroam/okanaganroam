@@ -1,0 +1,198 @@
+{
+ "reason": "Venue photos ok28-3",
+ "batch_id": "photos-ok28-3-2026-10-28",
+ "venues": [
+  {
+   "id": 814,
+   "name": "Back Door Winery",
+   "region": "summerland",
+   "slug": "back-door-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/back-door-winery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 588,
+   "name": "Sister Bodega",
+   "region": "penticton",
+   "slug": "sister-bodega",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sister-bodega-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 31,
+   "name": "Armstrong Bakery",
+   "region": "armstrong",
+   "slug": "armstrong-bakery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/armstrong-bakery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1925,
+   "name": "Kelowna Farmers' and Crafters' Market",
+   "region": "kelowna",
+   "slug": "kelowna-farmers-and-crafters-market",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kelowna-farmers-and-crafters-market-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1865,
+   "name": "Becker Park – Community Hill Trail",
+   "region": "vernon",
+   "slug": "becker-park-community-hill-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/becker-park-community-hill-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1898,
+   "name": "Comin' Round the Mountain Trail (Kalamalka Lake Park)",
+   "region": "coldstream",
+   "slug": "kal-park-comin-round-the-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kal-park-comin-round-the-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1896,
+   "name": "Ellison Nature Trail",
+   "region": "vernon",
+   "slug": "ellison-nature-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ellison-nature-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1879,
+   "name": "High Rim Trail: Beaver Lake Road to Oyama Lake Road",
+   "region": "lake-country",
+   "slug": "high-rim-trail-wrinkly-face",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/high-rim-trail-wrinkly-face-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1870,
+   "name": "Larch Hills Trails (summer hiking)",
+   "region": "enderby",
+   "slug": "larch-hills-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/larch-hills-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1908,
+   "name": "Mount Beaven Trail",
+   "region": "lumby",
+   "slug": "mount-beaven-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-beaven-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1862,
+   "name": "Penticton Channel Walk",
+   "region": "penticton",
+   "slug": "penticton-channel-walk",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/penticton-channel-walk-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1921,
+   "name": "Rim Rocks Trail",
+   "region": "coldstream",
+   "slug": "rim-rocks-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/rim-rocks-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1922,
+   "name": "Sugarloaf Mountain (Westside Road)",
+   "region": "west-kelowna",
+   "slug": "sugarloaf-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sugarloaf-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1885,
+   "name": "Trans Canada Trail: Prairie Valley (Summerland)",
+   "region": "summerland",
+   "slug": "tct-prairie-valley-summerland",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tct-prairie-valley-summerland-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1891,
+   "name": "White Lake Trail (White Lake Grasslands)",
+   "region": "okanagan-falls",
+   "slug": "white-lake-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/white-lake-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1051,
+   "name": "Moose Lounge",
+   "region": "big-white",
+   "slug": "moose-lounge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/moose-lounge-2610.jpg?v=20261028"
+   }
+  }
+ ]
+}

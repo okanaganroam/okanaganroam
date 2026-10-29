@@ -1,0 +1,222 @@
+{
+ "reason": "Venue photos ok28-6",
+ "batch_id": "photos-ok28-6-2026-10-28",
+ "venues": [
+  {
+   "id": 30,
+   "name": "Apres | Real Fruit Ice Cream & Coffee Bar",
+   "region": "penticton",
+   "slug": "apres-real-fruit-ice-cream-coffee-bar",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apres-real-fruit-ice-cream-coffee-bar-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 585,
+   "name": "Silhouette Estate Winery",
+   "region": "naramata",
+   "slug": "silhouette-estate-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/silhouette-estate-winery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 634,
+   "name": "Sushi Sai",
+   "region": "kelowna",
+   "slug": "sushi-sai",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sushi-sai-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 282,
+   "name": "Hyderabadi Biryani Lounge",
+   "region": "kelowna",
+   "slug": "hyderabadi-biryani-lounge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hyderabadi-biryani-lounge-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 338,
+   "name": "Kings Kitchen",
+   "region": "summerland",
+   "slug": "kings-kitchen",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kings-kitchen-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1899,
+   "name": "Aberdeen Columns Trail",
+   "region": "coldstream",
+   "slug": "aberdeen-columns-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/aberdeen-columns-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1910,
+   "name": "Bellevue Creek Greenway",
+   "region": "kelowna",
+   "slug": "bellevue-creek-greenway",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bellevue-creek-greenway-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1593,
+   "name": "Canadian Craft Tours (Kelowna)",
+   "region": "kelowna",
+   "slug": "canadian-craft-tours-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/canadian-craft-tours-kelowna-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1874,
+   "name": "Divide Lake Trail (from Rimrock Gate)",
+   "region": "kelowna",
+   "slug": "divide-lake-trail-north",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/divide-lake-trail-north-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1915,
+   "name": "Gallagher's Canyon – Tree of Wisdom Trail (Jean Road Trails)",
+   "region": "kelowna",
+   "slug": "gallaghers-canyon-tree-of-wisdom",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gallaghers-canyon-tree-of-wisdom-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1860,
+   "name": "KVR Trail: Penticton to the McCulloch Trestle",
+   "region": "penticton",
+   "slug": "kvr-trail-penticton-mcculloch-trestle",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kvr-trail-penticton-mcculloch-trestle-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1897,
+   "name": "Lookout Trail & The Parabola Loop (Kalamalka Lake Park)",
+   "region": "coldstream",
+   "slug": "kal-park-lookout-parabola-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kal-park-lookout-parabola-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1918,
+   "name": "Mount Law Trails",
+   "region": "west-kelowna",
+   "slug": "mount-law-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-law-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1923,
+   "name": "Terrace Mountain",
+   "region": "west-kelowna",
+   "slug": "terrace-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/terrace-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1880,
+   "name": "Pollard Pond Loop (Trethewey Park)",
+   "region": "lake-country",
+   "slug": "pollard-pond-loop-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/pollard-pond-loop-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1856,
+   "name": "Winfield Creek Wildlife Habitat Preserve",
+   "region": "lake-country",
+   "slug": "winfield-creek-wildlife-habitat-preserve",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/winfield-creek-wildlife-habitat-preserve-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1892,
+   "name": "Okanagan River Path: Okanagan Falls to Vaseux Lake",
+   "region": "okanagan-falls",
+   "slug": "okanagan-river-path-ok-falls-vaseux",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-river-path-ok-falls-vaseux-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1876,
+   "name": "UBC Okanagan Campus Trails (Pine Loop)",
+   "region": "kelowna",
+   "slug": "ubc-okanagan-campus-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ubc-okanagan-campus-trails-2610.jpg?v=20261028"
+   }
+  }
+ ]
+}

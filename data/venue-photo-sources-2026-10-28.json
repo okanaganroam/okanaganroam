@@ -1,0 +1,992 @@
+[
+ {
+  "id": 1009,
+  "name": "Straight Outta Brooklyn Pizza & Subs",
+  "file": "/images/venues/straight-outta-brooklyn-pizza-subs-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482631de2a7768d:0x82c28e58b384b987",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd0PuWoXuCiA7wq2CDYiWrAHzgOM2C-qW0oq5XbrmflJbz9XrnafnmNlE2ZtpXxBJS72giMGHOsYrppoTLeidK6whppDHoizSufzz_4MhvyqxTSmRXe3f03gAZjtNzg3CHP3I0ChO6MZdbo=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront on Front St with the black \"Pizza by the Slice\" awning and red door"
+ },
+ {
+  "id": 212,
+  "name": "Firefly Eatery",
+  "file": "/images/venues/firefly-eatery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd9627fd3fe37:0x711361502c70871e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfc0xDY5aYk0t3nxNJotE7fUuzpqKCpt7-65eJdMyn9CdAwx1BbvALEhVuJrRj-8Dd1R8xDTeflvBhqIs3m3TtLN0EYbAyGMf0brbej-3l9RYgS6Us_qjAwITq8UkblM5ugqAm_PmiyIyA=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront at 3130 29 Ave: window with the Firefly Eatery lettering, OPEN neon and address number"
+ },
+ {
+  "id": 79,
+  "name": "Bless'd Sips & Slices",
+  "file": "/images/venues/bless-d-sips-slices-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8bad3ab6db83:0x5ebd7bd064b4beec",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfMHrzv0fRNJDjJ45XJcUkwp3dCwsE3o4xR8N4UVMJz_iUZbYPqxWjl0GQJLX36B-_9_2oIjdrBf7LbjkzN1Fii_NTAk99mOAm-EAPeUVgLI-D-58kSr_fnkFfROo0MLYQhF1wRD3m3tKs=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo of the storefront at 3401 Lakeshore Rd: orange-clad building, glass front with Bless'd and PIZZA window graphics (taken before opening; website photos are all stock)"
+ },
+ {
+  "id": 376,
+  "name": "Gino's Family Kitchen",
+  "file": "/images/venues/gino-s-family-kitchen-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482eb003b84fd99:0x6b25037140e44443",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfwoGd9fvXUVElb0CBNFH2Paecfoxw5JLIQ5OBU8WmW4SWfKIf_0DU7jTz6QimLmYTkIJkyrFCBG2bRdZoKip5bAGFz7P5gr-4CHhdCHWwv2UzHHEUWJr_6EHsd_e8j10g8d7ujLMVmv2A=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo of the storefront with the blue Gino's Family Kitchen sign and Restaurant/Open neon"
+ },
+ {
+  "id": 393,
+  "name": "Pizza πr2",
+  "file": "/images/venues/marcos-pizzeria-2610.jpg",
+  "dimensions": "1792x896",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482eb29d94e6c3d:0x91b3cfe11e221213",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfnWgSB6_socEorjZFTDHnXID1ak5B6t3XOw72UUdyLkpz7DvaRe7jwLPuD4AX6a4MPvbjnTbjTJxuPYmMr6xRouCFaZKZ2pWa2QjeOkyXGvcTiRduX_l8Lco3B3sfuSS4DazdK=w2400",
+  "source_kind": "google_maps",
+  "note": "Front window at 6372 Main St with the big yellow PIZZA lettering, Pi R2 name and business hours"
+ },
+ {
+  "id": 1848,
+  "name": "Angel Springs Trail (via KLO Creek)",
+  "file": "/images/venues/angel-springs-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8f7544413977:0x93d5f2b00e2e000b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdY1Va-PNIxTbxBTp6XFDXFFr_Ng7aT8ybamcwFV0XCrVcv6x269ZvsdM30ym-Djmcj96bBqlNtoP2so65FLz1oY43eO-LvHHsgpLO0d8IxcKmBt6HDNFttpEdSfgcGCspKKYE1IfD5nD-c=w2400",
+  "source_kind": "google_maps",
+  "note": "Sunlit dirt singletrack through open pine forest on the Angel Springs Trail (Google place: Angel Springs Trailhead)"
+ },
+ {
+  "id": 1911,
+  "name": "Blue Grouse Mountain",
+  "file": "/images/venues/blue-grouse-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df16f6f85643d:0x18256798558ab83a",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf7eqMJlT9P_ctMV0-CcQEbYFe50yiAdNQS85_UjAE-MDPcvyrtEdjLZBESocYTQZJMvbuAUrsB6mbK-eFIc82a23HFVJgen7sbQHFkcO5M1sZypY_nOZOLwjRNUB2TnTLn6INV=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the rocky top of Blue Grouse Mountain over Okanagan Lake, a hiker small at left"
+ },
+ {
+  "id": 1871,
+  "name": "Cascade Falls Trail (Mabel Lake)",
+  "file": "/images/venues/cascade-falls-trail-mabel-lake-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e9c4f4995b72b:0x3fe644da992f22a6",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcbhJodzFNV1CagBLGhbRZYkpuOpK3GfPhJctjIW6mPBvB4c36Cks1k7BoFVLEbuJv321trC_qvLpc6iiaHzvT0DRWBo9_ArIcvEXvUC_98ewdIDsZVQ-NYUKTXxZGeCnnlH7Y_=w2400",
+  "source_kind": "google_maps",
+  "note": "Cascade Falls itself: water fanning down mossy slate rock at the end of the trail (Google place: Cascade Falls Trails)"
+ },
+ {
+  "id": 1849,
+  "name": "Eagle View and Quail Flume Trails",
+  "file": "/images/venues/eagle-view-quail-flume-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537ded8f13190785:0x2c5a1e71eac1e308",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdnroC3gco_kuRGVueYlmsTOEc64ohiH9oOMuQrYfX71sfTMKJMDkpWBW_T5WuyLj854z96i_rvtJH9YfOmdaW1B_IMyzV7nRHlbzDcJUlmRlZyhsO2lvbRxbNlvPwsys5m26ZN2A=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the Quail Flume Trail through ponderosa pines over green grassland and a lake to the hills (Eagle View Trail place has no photos; kelowna.ca page returned 403)"
+ },
+ {
+  "id": 1869,
+  "name": "Gardom Lake Park Trails",
+  "file": "/images/venues/gardom-lake-park-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e8a14670df599:0xb9987fd33bea6572",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfBuhuvI9NdJpy-i0zoR2J_dujeaRh05jTPC10ma1unBJGM2bqhONEzbafjygspC2GSY-YuxHrsddwW8AwY9j1NM0zzFiIivzftXH8sFYO4AU6doZaIGRevlqEgllmdqEFDWecP=w2400",
+  "source_kind": "google_maps",
+  "note": "Gardom Lake from the park shore: swim dock on calm water below forested hills (Google place: Gardom Lake Community Park)"
+ },
+ {
+  "id": 1901,
+  "name": "Grindrod Park Riverside Path",
+  "file": "/images/venues/grindrod-park-riverside-path-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e8bf395155047:0x234dd28b17b53028",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd3Tes4Feal5SctlqO9semeM5XJOXjSgMQQ4irslLNZ5CuUgxvEXmeCeRAZbFS0RPtu5PoeebvgIRzFF8B80cGd4Qa3U5W5m28SGZNJNm8hQ1F_BUkxNdhUz3njD6o7k3LFc96t=w2400",
+  "source_kind": "google_maps",
+  "note": "Shuswap River from Grindrod Park: still water reflecting the Hwy 97A bridge and snow-dusted mountains"
+ },
+ {
+  "id": 1886,
+  "name": "Lakeshore Pathway (Summerland)",
+  "file": "/images/venues/lakeshore-pathway-summerland-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482649660afdf0b:0x94529f7665b3fb2c",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLe4YE1zl4PJUsRNR-xAbCW2iOk-h1yn5RKXmw14k3fE2ANOVbECa2Xw1s2LtM04mxvTqTTeOTHOoGSNXrcLQ3tIWtAO9NMRXZDgN29Uj2mMSZDCA9K4FTAX7Tk8NCEeD4QzhS6MbQ=w2400",
+  "source_kind": "google_maps",
+  "note": "Okanagan Lake shore at the Landry Crescent (Trout Creek) end of the pathway, fall poplars and the clay cliffs below Giant's Head (Google place: Landry Trail, 2900 Landry Crescent)"
+ },
+ {
+  "id": 1917,
+  "name": "Mission Ridge Park Loop",
+  "file": "/images/venues/mission-ridge-park-loop-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8bb62ebb0517:0x8dab74055c4863c5",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLe8xM7Fu3b8J_6rVt8dMrTJTE6t5n77hy1W3rF2XjnGUmYrewgkZSfoI6CqdZJa_nDQqwLyJ0REAEOTKZR2K1B_6Alh0Kfgb6dfEII865oN2A9XLSNTCQFVlc8V0jceCEPJlO46=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the Mission Ridge Park hillside over pine forest and the Upper Mission to Okanagan Lake"
+ },
+ {
+  "id": 1919,
+  "name": "Mount Nkwala Trails",
+  "file": "/images/venues/mount-nkwala-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548263b6f2bda809:0x7361c7cd90ce298f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdh-rOytEnxdM-5hml3zOT8KHZaa-EyuwDuexQyF5lr3FmRKQw4XB0T1npbXWUC2mDi_X-pzqoIDbBI3nWXpRq-CPVCUmYADrMdlGnuekgahHNcGigZ8xLuF7Z-a7GSvjzSUkaA=w2400",
+  "source_kind": "google_maps",
+  "note": "View from Mount Nkwala over Penticton between Okanagan Lake and Skaha Lake"
+ },
+ {
+  "id": 1888,
+  "name": "Southern Viewpoint Trail (Okanagan Mountain Park)",
+  "file": "/images/venues/southern-viewpoint-trail-okanagan-mountain-2610.jpg",
+  "dimensions": "1280x640",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482712b0a1cb4ad:0xf235bc0db5a749ad",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfl8ntLI4eVMmNY6bXAOYZELcerFnUsKA7icEgRxcBI8V9bhmjW0I8D6UUiUlqsHFHtCeXqAc1YquR-75O1k9tc4py5e0A3v6DVWI2gn6Kd3o9ofWA8DMY7WLZG_8K0sGHt9iQ=w2400",
+  "source_kind": "google_maps",
+  "note": "View through ponderosa pines across Okanagan Lake from Okanagan Mountain Provincial Park (park-level Google photo; exact spot on the trail not confirmed; South Entrance place has 0 photos, BC Parks page has no photos); 1280 px source"
+ },
+ {
+  "id": 1903,
+  "name": "Vidler Ridge Trail",
+  "file": "/images/venues/vidler-ridge-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537c22ac2e0aa879:0x8049f1bdecefb395",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeoorjpaOBBilKgJ1VprSIq_e3rjY3zmQxohur5yYctfwJeUl8-fuBE1FBVzTRQd_j_IE3lJJKSRAY4_k0HprhxElDUFXgjXvaS4k6Qw2HdkL36Kmm58yVWSfGCctwnwtlpi4iSMg=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the top of the ridge (Google place: Vidler Peak) down to Sugar Lake and its islands under a passing rain shower"
+ },
+ {
+  "id": 311,
+  "name": "Jugo Juice",
+  "file": "/images/venues/jugo-juice-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df5c3005981c7:0xc8b94979cac65793",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfvPzDP-yVVdVp1LZmXB-NLFmHfuwg5rbPxM-Ukr-56RoE6Ya6X_WE2C-MfPTK3QyEexYv2nZUCm3YHGrAlgeA2iHyFhuQpwrg-OXWenQw2_Vq-H0Nu5sUVduqPbz7xU86xbYJB_w-5Lt99=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: Jugo Juice storefront on Bernard Ave with its sign, patio umbrellas and the lake behind"
+ },
+ {
+  "id": 748,
+  "name": "Tyga Sushi",
+  "file": "/images/venues/tyga-sushi-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482756d9f989381:0xb4f6d94b4400109e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcmkNNwVs75bBcBJZtcHwbqsaMz8Dz1VYhH0bpGnr8uOK9eqfgHTt15jd6vHy5gbMzOvwGkIWnWCX1mYji8zPNUOE2iJuOZoZrP0N1lV1K2eT3uxxDDhXGrgyeOwMkhYAXJEClpmuyjOo5D=w2400",
+  "source_kind": "google_maps",
+  "note": "Tyga Sushi storefront and sign at Carrington Rd plaza"
+ },
+ {
+  "id": 402,
+  "name": "Memphis Blues Barbeque House & Catering Co.",
+  "file": "/images/venues/memphis-blues-barbeque-house-catering-co-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df4a6029490bf:0x7ea992ee1a7116f0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcR6bDMxb7KjJbt6nGcYk6HAsbXafpBCw9UsG7nPC4Q-NFkU28sencdKdcEgVdNyeRYFWgAUXlo2w_EM1r_Le2YxsnNci7NIgZYuJ6PVGIl7z9Ja3-E3py2haQdx30CHargnRmyWD8gIGLs=w2400",
+  "source_kind": "google_maps",
+  "note": "Memphis Blues storefront on Bernard Ave: hanging sign and window"
+ },
+ {
+  "id": 1648,
+  "name": "Half Blind Bean Coffee",
+  "file": "/images/venues/half-blind-bean-coffee-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8b0075822813:0x424a01a703b2be03",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLed6TVlKJryWqVQGDsfAB-UHfpff15fFfvUmIEOtpYt5xMC8u5fcTTPE6adHxWJrb1TkIoMl7Ss5wcFa5o-9Jpneu76wEP3LbbNVANsUtuG9X1R_V1BCZhEfSEX3QTZSWFPv7R6zrkkoKYi=w2400",
+  "source_kind": "google_maps",
+  "note": "Inside Half Blind Bean: window counter with bar stools (weak but only non-food interior shot; site uses template stock)"
+ },
+ {
+  "id": 1890,
+  "name": "Apex Mountain Summit Trail",
+  "file": "/images/venues/apex-mountain-summit-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482f79f01bb6f07:0x51e07be420d91c07",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcSJNgk-VtDOGYHP3nKuYY8GN8NeEYXPWlUzgIWbCHyXLROSy9hUCK_LjUlXugdiQkAWQxIEnv_mMRGqmw7QEwHvi-tQcopbt3vUMjGSASkWx7aJS6GqSrzrfLtNTZCEffH0P9sgA=w2400",
+  "source_kind": "google_maps",
+  "note": "Snowy peaks seen over subalpine trees from Apex Mountain (photo on the Apex Mountain peak listing)"
+ },
+ {
+  "id": 1872,
+  "name": "Boulder Trail (Okanagan Mountain Park)",
+  "file": "/images/venues/boulder-trail-okanagan-mountain-park-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548275d7dc865f09:0x621cb322a9f7dca1",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcFui_uJcC5t2VZvhWiOofR4I65B92-w3BVc1ejLaZoqTE0sR4n3pE_iylpNpUu1mlPKWgF6VKyUklb9Cfvklptm5S2C3WTxJY4r__mf2CPEeAjAVa7kAnWVuSSJoPtuo7NglSOog=w2400",
+  "source_kind": "google_maps",
+  "note": "Okanagan Lake view from the open bluffs of Boulder Trail"
+ },
+ {
+  "id": 1912,
+  "name": "Christie Falls",
+  "file": "/images/venues/christie-falls-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dfcba87b0a031:0x8fbf9fadaac6f48e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeY55m-eHz-i5iK5bvN0Xef_9X7STCHb3v9V1dlbEJtR7M3LGZeJOxP0R2xToHvQE-1xTa9hUBWXbPKgV-gk3qn1k2U7mZN_B3e_Y4o4Mb7waWKFyNtg8-DH0DaSUZpn2mfNLnymw=w2400",
+  "source_kind": "google_maps",
+  "note": "Christie Falls dropping down the striped cliff face"
+ },
+ {
+  "id": 1853,
+  "name": "Gellatly Bay Waterfront Walkway",
+  "file": "/images/venues/gellatly-bay-waterfront-walkway-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482753c58608271:0xab3be2fc309108c6",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfrSsyygGYcwW8hcnZKCbUOzKR5hLyklMDmymDN5jn5nk54O28mIdxBrCJLaWcZOfstKcAVhJiXHeT08Aw1CvYGClG1rI2BHdu9s99drPk-3rt71glpQ0hnglojl8cjg58E2weKtg=w2400",
+  "source_kind": "google_maps",
+  "note": "The Gellatly Bay boardwalk with benches along the water (CNR Wharf section)"
+ },
+ {
+  "id": 1916,
+  "name": "Hidden Lake Parkway (Glenmore)",
+  "file": "/images/venues/hidden-lake-parkway-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df26740b3276f:0xaf1a3e4c5a6237bf",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfapFzgW0tNNXnqoeaXqSXWzuaQZI97FQ7mbW1UPQAY6-woEJ9-qwQnv9RdfVwjoOPOVjBhA1isWrGtQRmvVnNivAhm2ybX6u4yANQZa88tmZEI-dPE7bB4EO8pCbGPJor7dRJI=w2400",
+  "source_kind": "google_maps",
+  "note": "Hidden Lake with reeds, reflections and the Glenmore hillside homes"
+ },
+ {
+  "id": 1855,
+  "name": "Lakestone Trails (Benchlands Park)",
+  "file": "/images/venues/lakestone-trails-benchlands-park-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dee4f2cc61079:0xc101aaaea77ee40a",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfTd1RJAlM9DIsriCsYbWXQWWawEXkimN9I6HkfPpHAjgBXDgDRrvIPet9v5cTTmXrSXGR_EMAAZIBhg1mweT1Cffd2B8Lp_eaFxCSTTZLy8YGBU4Uy2MN_DuH_zRUtk_MOcGY=w2400",
+  "source_kind": "google_maps",
+  "note": "Lakestone gravel trail with split-rail fence and grasses below the hills (photo on the Lakestone Information Centre listing, Benchland Dr)"
+ },
+ {
+  "id": 1905,
+  "name": "Monashee Lake Trail",
+  "file": "/images/venues/monashee-lake-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537c413416de657b:0x2a30fc5cccd842b5",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdlcMFO_Ou7PtvUlpiLUz1qaS2D5aESQg1GEys2GYcu4R3o6ZdA4_GvpqHGpa0LqXbpzTPz1oIP2u9s47Hgmhhlo1EM0yRRzZIMS3PNiSXzp1u2j_aj4ODEReWvjC7X4yLbn0U=w2400",
+  "source_kind": "google_maps",
+  "note": "Turquoise Monashee Lake below the peak with anemone seedheads in front"
+ },
+ {
+  "id": 1887,
+  "name": "Mountain Goat Trail (Okanagan Mountain Park)",
+  "file": "/images/venues/mountain-goat-trail-okanagan-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482712bbc0952f1:0x2c50aec78e1eaf58",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdwVrSxFwF-z7obvl7WVxV_yhqWI72kxqeQosqFYwFI1BVceYBuR24iYz-Y5Y6uEt-8XFP_dg5CkMGDongGaHHO1KZAnjFU-zH9Nn424ymxGd5mw5uZfZ0IKMrzmHw_fGxM3gTf=w2400",
+  "source_kind": "google_maps",
+  "note": "Divide Lake, the end point of the Mountain Goat Trail, in its rocky burned-forest valley"
+ },
+ {
+  "id": 1863,
+  "name": "Peach Cliff Trail",
+  "file": "/images/venues/peach-cliff-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54828d91eb3967bb:0x28876564eb0f9294",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdcvei02UgqCNCq14o0D71zFK_DPBYc6pQJKtNDYPommRmBW3zvUt2YMIRr8Hh04InDpSXbTrbxLaGHlIdK895XSIxAlBdbqLupdAIvKhu9tcjFCZgx5FpNIcQEGn1pTWVjgQ1k=w2400",
+  "source_kind": "google_maps",
+  "note": "Skaha Lake and the pine slopes seen from the Peach Cliff trail"
+ },
+ {
+  "id": 1851,
+  "name": "Stockley Open Space Lookout Loop",
+  "file": "/images/venues/stockley-open-space-lookout-loop-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8d776e0282af:0x63f7fd3a9873cf79",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeDdvRh-82c5VGIhtYP21u0zEaNXBLxliJD1iNpdzPlgvaz7fdvK92ScDVl0ft7gbUgkzxCmavKLrZGVc4QVdcjaJ7_k-Jrq3E7C66mM3oHqRM3TrUpGB0Zzf2E5NC216t8vKwN=w2400",
+  "source_kind": "google_maps",
+  "note": "Top of the Stockley stairs looking over Black Mountain homes and the golf course to the valley"
+ },
+ {
+  "id": 1867,
+  "name": "The Ponds Interpretive Trail",
+  "file": "/images/venues/ponds-interpretive-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd75f55fe1725:0xeccc01b95e8ff09f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfD2Io3K0yOrmbiovSWNsJZFM8ZutSv_nUEZZmlfZLVhMAo1ZSev9aJYHrO6DZxBGh92xhnF6IBYUFCVMoz_MlLI8bHFM2PcON7upE5I-7BcwoWR1rs66wapG8ukhpeOPP8LQALtQ=w2400",
+  "source_kind": "google_maps",
+  "note": "The Ponds boardwalk across the lily pond with forest behind (light summer haze; a dog head just in the bottom edge)"
+ },
+ {
+  "id": 1907,
+  "name": "Vista Pass Trail",
+  "file": "/images/venues/vista-pass-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.sitesandtrailsbc.ca/resource/REC4726",
+  "image_url": "https://d1pbu4xyq5owm5.cloudfront.net/images/REC4726/dfca2661-3929-4d87-a7f8-d874f123a430/original.webp",
+  "source_kind": "website",
+  "note": "Hikers on the Vista Pass ridge with the Pinnacle Peaks behind (Recreation Sites and Trails BC photo)"
+ },
+ {
+  "id": 1608,
+  "name": "Wake the Lake Penticton",
+  "file": "/images/venues/wake-the-lake-penticton-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.wakethelakepenticton.com/",
+  "image_url": "https://static.wixstatic.com/media/6f8fe0_31ddb7a9ef12482790584aa4d35bfb2a~mv2.jpg",
+  "source_kind": "website",
+  "note": "The company Manitou pontoon boat at the dock"
+ },
+ {
+  "id": 814,
+  "name": "Back Door Winery",
+  "file": "/images/venues/back-door-winery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482651117fd6ea5:0xdc36ceb743518d44",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcBGW-USshz5geCXVBHxePpVHG1pH2Yi-mMyRk4zF2RL4b3c490eyQtgwehDk_79DtKKqOwqNNEq9gjWVjNEu1wK1ju0pTo-9fvNtaT4ZyfndJgzcFJ-EcKQZfsJ_A6rrfkEibT=w2400",
+  "source_kind": "google_maps",
+  "note": "White clapboard tasting-room building with the \"Welcome to Back Door Winery\" sign and pergola patio edge"
+ },
+ {
+  "id": 588,
+  "name": "Sister Bodega",
+  "file": "/images/venues/sister-bodega-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54826317f4e70b67:0x9e7ebaa9d0a86373",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcy3R7hHqGgAeQNIPWGZ1Tzv6aWbsKAYtGRnj36gpAb_gS-MQtt7WJuMkOHQ__ZHEdKL2-Q-yf1PlHLMn0VFgJ1BuAgeaBiukBw3zXVh4OiTnD0Nfb3CQhLjOcCAYoXImsKPEEyuIhL_TqI=w2400",
+  "source_kind": "google_maps",
+  "note": "Main St storefront at dusk: window with \"Sister Bodega\" lettering, lit counter and room inside"
+ },
+ {
+  "id": 31,
+  "name": "Armstrong Bakery",
+  "file": "/images/venues/armstrong-bakery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e7c7b5396f6d3:0x29f25d122a0e0c49",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeQTay9w1miy3OXF0TEEb3dplCdERmB7n-K0hSKofvNbljsjFv4ubtHo2jMMdKNJYd1GOH7XHYQBFbeEFMy57Q-TG6ZB8R8wnQ9Bn8BPeNgiCwyiOH7Gw5sSKcxnu68IhXOdkBVxEV4DBw=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront under the awning with the hanging \"Armstrong Bakery & Delicatessen\" sign, door and window (strip is sign-heavy)"
+ },
+ {
+  "id": 1925,
+  "name": "Kelowna Farmers' and Crafters' Market",
+  "file": "/images/venues/kelowna-farmers-and-crafters-market-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8cc6fef50a57:0xbccbc6d5dc8cd827",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeo4RJNQgfhtnA52ao8nj_6b7cfDsqRGedYkBHNTZ5p9_-81rdXVx9bUUPknKOWGLji9Ljtzkjk_XDvdEl-NjVEM2ort9PJpSANvYgxoUQ0qVK3EgEi4jwo2lNTHm6uZOccLRJAOn4qU4_j=w2400",
+  "source_kind": "google_maps",
+  "note": "Market day in the Landmark District: produce stall (Sadi's Farm Produce) under tents, shoppers along the row"
+ },
+ {
+  "id": 1865,
+  "name": "Becker Park – Community Hill Trail",
+  "file": "/images/venues/becker-park-community-hill-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537ddf34130201e5:0x3eef452a374cfe7b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfyX73GiaMdiaOKGg8s7AW2IIBwtgPp6eFR4BMs_WcAt4RtQLiFu2iSxjHc90Z1u9SPHWQfVWMyLjeoE7uGDHWwhN9h289dDJvrktxKbMd6GnAd44XJt0IFuXG-47EjVVn0CZXz=w2400",
+  "source_kind": "google_maps",
+  "note": "Becker Park hilltop trail winding down the grassy knoll with Vernon rooftops and fall colours below"
+ },
+ {
+  "id": 1898,
+  "name": "Comin' Round the Mountain Trail (Kalamalka Lake Park)",
+  "file": "/images/venues/kal-park-comin-round-the-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8e9bf375199:0x39f5e274cde84b9b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfMG_SeSwBDjQP9duViCbDU7AuawYOkVA3h9t-k-RHCk4ViSXtQGoVu-dPxKBQVTFZ7OkBKmGz31mGgL-CGVMxwN7hU4NIfcT3yC6jg0p4ciJ2A7rmALtY5_1N7zN5q_hhwpxvB=w2400",
+  "source_kind": "google_maps",
+  "note": "Kalamalka Lake Park upland: pines and grassland with Kalamalka Lake and hills beyond"
+ },
+ {
+  "id": 1896,
+  "name": "Ellison Nature Trail",
+  "file": "/images/venues/ellison-nature-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537de0d808b4b11b:0x2350eacea52042d0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfGyaEV_Rb5_CC14X6iwBmKWjj23_uAxoHKGf3bJHsbGhNmfN_pQ83N0qHPT154x4TFP5hAfJ7QWPWZaNQZux41QOwW_wv_AxsSC-pWcBEA-mUJOdhDYYD1A1iA3oB0Yn7-9tuTPw=w2400",
+  "source_kind": "google_maps",
+  "note": "Ellison Park trail through ponderosa pines opening onto the Okanagan Lake shore"
+ },
+ {
+  "id": 1879,
+  "name": "High Rim Trail: Beaver Lake Road to Oyama Lake Road",
+  "file": "/images/venues/high-rim-trail-wrinkly-face-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537de914dca65a79:0xf0c8b1634194fa0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeEGg0B18vmpguMm-U1KZgGYgkw-zMSENNC3gsnEfP-z35VtpCa79iOn_BQeCCKg5l9FxiCBQKuvedUxXK5Jbsy8n-OvU_iMNkmzQwx-Ep1yKrnCnF_rCDUVXKQRmegnFhivt6J=w2400",
+  "source_kind": "google_maps",
+  "note": "Wrinkly Face Provincial Park (High Rim Trail) meadow of blue camas/lupine flowers edged by conifers"
+ },
+ {
+  "id": 1870,
+  "name": "Larch Hills Trails (summer hiking)",
+  "file": "/images/venues/larch-hills-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://shuswaptrails.com/trails/system/14/Larch-Hills-Nordic/",
+  "image_url": "https://shuswaptrails.com/image/w2000/files/IMG_1940.jpeg",
+  "source_kind": "website",
+  "note": "Summer singletrack through cedar/fir forest in the Larch Hills trail system (Shuswap Trails Alliance page)"
+ },
+ {
+  "id": 1908,
+  "name": "Mount Beaven Trail",
+  "file": "/images/venues/mount-beaven-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537c3ecf5d2d3ea1:0xe2bc81c690362e95",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcM3Cu8xZ9bzBwItkNSfidLC_Rq4UtgFipHEmLeyumfbr_jqu0VC2-BRdXvpLjQxCIKlPtLZlBcB3grLtoJuEiWqeI13rCtXWhlQ8WuUgxcHlHaDOmM_TF9XG04n8Dfq4aslIW7=w2400",
+  "source_kind": "google_maps",
+  "note": "Mount Beaven approach: spring clearing with snow patches, spruce forest and the snowy Monashee peaks"
+ },
+ {
+  "id": 1862,
+  "name": "Penticton Channel Walk",
+  "file": "/images/venues/penticton-channel-walk-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482620eb37f7987:0x84b369499b472e4e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdYYfFp1qWSEnpxErMQWRdLbLzySsM5eWAd27N7EkJSymCqZW6gklsEnCklrDHhYOuC-jw23h2h0sOUdXIMQA-szFJ6Lda1drb63r7IvVE4t-AztJn8Bx7wRU71_EpX_4X6pPt5=w2400",
+  "source_kind": "google_maps",
+  "note": "Okanagan River Channel with the gravel walking path along the bank, bare cottonwoods (late fall/early spring)"
+ },
+ {
+  "id": 1921,
+  "name": "Rim Rocks Trail",
+  "file": "/images/venues/rim-rocks-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dda54d23e0789:0xd9e4ca39e9d19753",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf0VOkqIP0uqfzFFW6t11s9vdmkOxCa7epdgOOxsd5utACDTJGQXe4SM3x3IJh9t86I_3EjJSkIwKGfnRCWQQzzFrIiJ0K-hwABsBgqVuvpp6EutcMP-s6EDegfFfgd2rIPPcMg=w2400",
+  "source_kind": "google_maps",
+  "note": "Rim Rocks basalt spire rising out of the forest, Coldstream valley hills behind"
+ },
+ {
+  "id": 1922,
+  "name": "Sugarloaf Mountain (Westside Road)",
+  "file": "/images/venues/sugarloaf-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537de1c738f97575:0x8c287295fb11e38e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdNba6Dic2dnHj-69Wo0MU8JKumF7EFx0-AbA1QcE_kdRU1Tyyn0y0EXhq6IqNh-XNX-7Is5UOvkydoXuLz1If2FGcSA43Ykqot_yHZIHNQqYms1RvURklouElELsy7b7c5q5aN=w2400",
+  "source_kind": "google_maps",
+  "note": "View from Sugarloaf Mountain south down Okanagan Lake, pine in foreground"
+ },
+ {
+  "id": 1885,
+  "name": "Trans Canada Trail: Prairie Valley (Summerland)",
+  "file": "/images/venues/tct-prairie-valley-summerland-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548265d2c16913cb:0xbc65bf0e855f295d",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdmyDSV0K3gbFNt18CRi4qT-tsL7q09-StuDD8CMUn9EJqte3OGDiVMZNINOJ6TSzxksUbzhFTXsz3Fnqi0gssSIw8rKe4UoaaQ8VgXdLYREXsaZBu0G97bv7rEGaLHsnoieKD_HuRzN0ik=w2400",
+  "source_kind": "google_maps",
+  "note": "Trout Creek trestle (KVR / Trans Canada Trail bridge with pedestrian railing) among pines above vineyards, Summerland"
+ },
+ {
+  "id": 1891,
+  "name": "White Lake Trail (White Lake Grasslands)",
+  "file": "/images/venues/white-lake-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482f29b09941d73:0x8547cd4faeacd389",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcK6QPISzXppSKtsKV3n3Q4t7-k_8BFDtocRoLr7G4qwgHsCD7zE4kUN5UlfE806P24FFe9N88fvB9xW961I9fRwPmDepZLQyqNfLblP2m08NzYC7whx8Oyl4iFy-fgAm3l7bA=w2400",
+  "source_kind": "google_maps",
+  "note": "White Lake in its sagebrush grassland basin with forested hills and yellow wildflowers"
+ },
+ {
+  "id": 1051,
+  "name": "Moose Lounge",
+  "file": "/images/venues/moose-lounge-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d9e54e096afd5:0xe878ccf7b0294d0d",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfyzVyAjAqcdG1nwI4iI__3qDVRErWUcARg2TBJrFbbHRy3rPFnRt_yAOLlHdhuPNEz0zKVZu37X7xYflSuBjcB7r-Cx1zQmte_dmpclV6hBAJq6Wge1mI-DmAy0dsmZVB8fRKICKA2JK8=w2400",
+  "source_kind": "google_maps",
+  "note": "Happy Valley Day Lodge exterior with its name sign; Moose Lounge is the upstairs floor (windows shown)"
+ },
+ {
+  "id": 385,
+  "name": "Made in India Restaurant",
+  "file": "/images/venues/made-in-india-restaurant-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482755fb455f65b:0xc04c3a5bf21ca309",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdn5t1c_cNG1BLP37Csm5pfrlSecd7ba264IRN1fziSRQrPXQmwqZJkDjYHsMCS0EXbXIXbqfbnlEHUweJ475Q8XfAOLy2qrcN-5XWF_3juYV-lvSWwhNers8klh8BKRtSDSy6lKX5GzqdH=w2400",
+  "source_kind": "google_maps",
+  "note": "Dining room: booths along the spice-painted mural wall, front windows"
+ },
+ {
+  "id": 754,
+  "name": "Valoroso Foods West Kelowna",
+  "file": "/images/venues/valoroso-foods-west-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54827530f8c2850d:0xe43f2842b271658e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdwzqaDtbguORfcOsWLQ3MmrMxSgqVxQ6lW2LxWNhboD_P97LMjegD2SVidHhPGJrV5ibiss93XlunNdUX0TfgUytzQgiwW6WQfs7FIuCIAyZZReJ3WNVGawruyq7v-amBk21tpvg=w2400",
+  "source_kind": "google_maps",
+  "note": "Deli counter with cured meats and cheeses inside the West Kelowna shop (bright, weak-ish)"
+ },
+ {
+  "id": 162,
+  "name": "Crumbs and Roses Bakery",
+  "file": "/images/venues/crumbs-and-roses-bakery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8cd01e00718f:0x17bef95845315159",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLerkpG6yBlgD0nb2mQhrMgbr6sXiXmgBnHMkM1PMJ7nOytuTW4oeCOvSUAmYXFGuPEc9K57hzglukLGtIomqBAMZIk4fVOZuyN-3Ckz9U4eANerITtu4gleTUAFuMLQRdUTtnR3=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront with the Crumbs and Roses gluten-free bakery sign at 443 Banks Rd (Google place: Crumbs and Roses Bakery (A dedicated gluten free bakery))"
+ },
+ {
+  "id": 1909,
+  "name": "Bedford Lookout Loop (Peachland Trails)",
+  "file": "/images/venues/bedford-lookout-loop-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.hiketheokanagan.com/trails/?s=bedford-lookout-loop",
+  "image_url": "https://www.hiketheokanagan.com/attractions/photos/hiketheokanagan.com/large/394/b6718266.jpg",
+  "source_kind": "website",
+  "note": "View from the Bedford lookout over Okanagan Lake and Peachland, pines in front (Hike The Okanagan trail page)"
+ },
+ {
+  "id": 1878,
+  "name": "Burdekin Lane Beach Trail",
+  "file": "/images/venues/burdekin-lane-beach-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.peachland.ca/parks-recreation/parks-trails/burdekin-lane",
+  "image_url": "https://www.peachland.ca/sites/default/files/2026-07/Burdekin%20Lane%20Park%20July%202026.jpg",
+  "source_kind": "website",
+  "note": "The small sand beach at the foot of the trail, Okanagan Lake through willow branches, bench in front (District of Peachland, July 2026)"
+ },
+ {
+  "id": 1847,
+  "name": "Fieldnotes Market",
+  "file": "/images/venues/fieldnotes-market-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e7db45a7f0601:0x483703edc10b0a1b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcK06j7HR32WcgVkKgOqsiZU0g5ETzxAKoO8mrjd-QW3Wus7-QeqcHvGmBv8oxdJAuWxdpFR6XCjGyK58XjqtusanhM3FM47kS_Nk2C4UBu48NnF_1nEXmeVGu2BCYgXTZ8Rhc=w2400",
+  "source_kind": "google_maps",
+  "note": "Grey storefront on Okanagan St with the wooden Fieldnotes Market sign"
+ },
+ {
+  "id": 1889,
+  "name": "Gillies Creek Trails (Skaha Bluffs Provincial Park)",
+  "file": "/images/venues/gillies-creek-trails-skaha-bluffs-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482895e727196a5:0xcbcbd0b99ae56533",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLflv-b-Tjpo9sEg4OUPEeokUJhbhtYxhW3jtp5SCHogCU3sKBaiUevjLa2lhXKx2jn_HzhF7gTv73v8sGDWZ9-9MLj3w-Cqs2HPohgduWaZFY1Eszb6e5bLj-fZ-IEtzg2LwE2igA=w2400",
+  "source_kind": "google_maps",
+  "note": "Granite bluff walls above pines and brush along the Skaha Bluffs park trails (Google place: Skaha Bluffs Provincial Park)"
+ },
+ {
+  "id": 1868,
+  "name": "Jim Watt Heritage River Walk",
+  "file": "/images/venues/jim-watt-heritage-river-walk-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e8837ee2b99ed:0x3bd72cefeff2ab4e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd_LPv44Z6B4GTO4_1WNDdhD_nAd66QTOz2iSExZaQRg5_78gzqbuts4kacnIp603jiDHAf8dnHTxC8TDtfsoi0ctq0xjY60eIGGg4JSOYARfaupTJgRNtF5_sQPxFYccS77tEu=w2400",
+  "source_kind": "google_maps",
+  "note": "Shuswap River and the Cliff Ave bridge at the walk's start, fall colours reflected in the water (Google place: Belvidere Park)"
+ },
+ {
+  "id": 1875,
+  "name": "Little White Mountain (Upper Crawford Trail)",
+  "file": "/images/venues/little-white-mountain-upper-crawford-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d86578d11df0d:0xf2c975e1d38868ae",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfwQwYK7YWbzSoaTRoITR7sa5p6jdvRdXq5jiWGYC6L9l5f-3s5OCvcX6IE4WAGBz2afU3JLGp5g_6R1NVYfWslJWZr2Hb5TqH4gLRJzqDG7EH2h6BZvLDbPo8-z80UEnmfis5v=w2400",
+  "source_kind": "google_maps",
+  "note": "Granite summit bluff of Little White Mountain above forested ridges (Google place: Little White Mountain)"
+ },
+ {
+  "id": 1920,
+  "name": "Mount Drought Trails",
+  "file": "/images/venues/mount-drought-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.hiketheokanagan.com/trails/?s=mt-drought-camper-loop",
+  "image_url": "https://www.hiketheokanagan.com/attractions/photos/hiketheokanagan.com/large/369/9e9dfd14.jpg",
+  "source_kind": "website",
+  "note": "View from Mt Drought's pine slopes down to Okanagan Lake and the lakeshore town below (Hike The Okanagan trail page; Google photos were watermarked)"
+ },
+ {
+  "id": 1861,
+  "name": "Penticton Creek Walk",
+  "file": "/images/venues/penticton-creek-walk-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482627bcc764745:0xdbc975002a6dc584",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf9ynFR1B00DsD-Hv8kWwLE80pSL7gFGtbIzfBDcZTPxEEueBFqM7KPQpUFmnuajmbGU_NO5ViLUketVfKF5cLTBbGf6crQ1a9kPJO25esWdIExdgjtmOo1tuzXiRSbJmiE2E-UvMCX7s7T=w2400",
+  "source_kind": "google_maps",
+  "note": "Penticton Creek running between tree-lined banks in town, a bridge in the distance (Google place: Penticton Creek)"
+ },
+ {
+  "id": 1835,
+  "name": "Robinson Park Pickleball Courts",
+  "file": "/images/venues/robinson-park-pickleball-courts-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://pentictonpickleball.ca/",
+  "image_url": "https://img1.wsimg.com/isteam/ip/91587c9a-7593-4166-a131-685a6ad7b288/PentictonPickleball-1239-scaled%5B1%5D.jpg",
+  "source_kind": "website",
+  "note": "Doubles game on the blue Robinson Park courts (court 3), Johansen Robinson Centre roof behind (Penticton Pickleball Club, which plays at 2965 South Main)"
+ },
+ {
+  "id": 1873,
+  "name": "Wild Horse Canyon Trail to Commando Bay",
+  "file": "/images/venues/wild-horse-canyon-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548271bf6129c0d3:0xce50a0e946275551",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcAFXTF2IrF-cZUBq8shen8IL6hlbxpIz93k17xBYest23MPAmBv4Wz8PI_K2YZNFWgLn9H9nsYpg3TKABnMsgvbNxubLGGf6lCqhj2Qiw2mVX47jcywgT4wqoNwoWklTMLVuNhgcBnGSZw=w2400",
+  "source_kind": "google_maps",
+  "note": "Commando Bay at the end of the trail: pebble beach, pines and Okanagan Lake with rocky islets (Google place: Commando Bay)"
+ },
+ {
+  "id": 934,
+  "name": "14th Ave Bar & Grill",
+  "file": "/images/venues/14th-ave-bar-grill-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd919455ce0c3:0xc7bfc85fc4c71633",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfnhaQG68HIRVbl-V8r-NN2mS2e-SZcmVSQnEYzgb9VD4LZoWUtwwgWmfhET9nFpwvY2DHn_c5JNYtehvqVr14ZU9QKfmcHKNpcGz9qXSJ-iOy9mi5IUO_nKih-iqYhoDvIvdvg=w2400",
+  "source_kind": "google_maps",
+  "note": "Patio tables seen from inside the clubhouse restaurant, looking out over the Hillview course and hills (Google place: Hillview Golf Course)"
+ },
+ {
+  "id": 772,
+  "name": "Ward's Wine Country Kitchen",
+  "file": "/images/venues/ward-s-wine-country-kitchen-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482eb1f476215cb:0x6e5f440db2b4baf6",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdr3FnVmQaTfVQ_XBKKNzAqvDT08iVXjMgZu1H7D19zdqAzbB4OQwo44UuVcOfGBLug2gKk_bK_lNu2cV7awgTpooNPRTOLTGMaYR8pOpoAlsXhc5x5HuiZni43yYDHumQQpHP81I8VK_Mm=w2400",
+  "source_kind": "google_maps",
+  "note": "Patio and front of the restaurant with its W sign in the District Wine Village, Oliver"
+ },
+ {
+  "id": 1034,
+  "name": "The Sumac Ridge Restaurant & Lounge",
+  "file": "/images/venues/sumac-ridge-golf-country-club-g28-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482653e2d43561f:0xf32057234fced6e0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd1hVd-NAkXGD2y_yc8r2y8HrjGG9wM-NW04PuJsbSdEq2-CRYI8fKoyVPZFJQGYOd-8zONbu4gYWdaLYwJkoAKQcbt7MJLuB9C61rkgUWQTwb38V2107boHhrxUmq6eZ-2gA0I9w=w2400",
+  "source_kind": "google_maps",
+  "note": "The club's golf green looking over Okanagan Lake (the restaurant's setting; same view as the golf listing photo, the only interior shot is full of diners)"
+ },
+ {
+  "id": 166,
+  "name": "DCS CHICKEN",
+  "file": "/images/venues/dcs-chicken-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548289aee8b80b93:0xfa59ce181cc81bac",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeUL3xosHXWouyd7sNNIXgqdZIUOnWkmgGQ6XQ0zkRtpH5BocVKflbDi4Wf-zN0JFIHP4nNVoaHOCFEyrMoWDLawx9a1_Z6a225LQmyLrJqEIk9wm0-ieBSq71o5fJ6Yg-AmvrHJ5fuOAwy=w2400",
+  "source_kind": "google_maps",
+  "note": "DCS Chicken counter: hot case with fried chicken under the menu board (counter inside a convenience store)"
+ },
+ {
+  "id": 3,
+  "name": "1862 Social House",
+  "file": "/images/venues/1862-social-house-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e7d30005fb5c1:0x9932f9fd81272384",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdHXSAca6_UEThdJ1qcTPJqXk1c6mUYjygs73ZIvr-QoixbkLepYMtH8dbZgUuE6Q5GbqB9W2m4jzwbIeE3rwcrcxztYlp4VerLBV9gd0Gzip3Y-2X6Ucdh0O7cdjQ93ujdz_stjfB4ov9g=w2400",
+  "source_kind": "google_maps",
+  "note": "Timber-beamed dining room with stone wall and big windows (owner photo)"
+ },
+ {
+  "id": 1845,
+  "name": "BEEPS – Peachland Bat Colony & BatCam",
+  "file": "/images/venues/beeps-peachland-bat-colony-batcam-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482730417a8dadb:0x2bc6035dd0f04b19",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc1SxvohLLpLJPf8M1dah-RWFtsJ5Xk0XQIa75GYhN_mWCWPoCthGyCE-F9xMkRLNlAsKRdWM02mE-OaEHkijJidZ_VGx_3c1hylRIQD7BUzreumf6jgVWa6PobWI7PVBPC9Y8U8KP7SfFe=w2400",
+  "source_kind": "google_maps",
+  "note": "Inside the BEEPS centre: BatCam screens, bat displays and the society name on the wall (owner photo)"
+ },
+ {
+  "id": 1866,
+  "name": "BX Ranch Trail",
+  "file": "/images/venues/bx-ranch-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd9d8c6fdf4ad:0x1d1daf6727574e2b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdzdcaenelGQUPyPAyjmXOV8FVS8s1j5hK3S-Nupgh-DMyMk7N7JzcA1bWS5vAr1in2Kbwb4PRFEAE5gq03ba1N6aWsfBh4qHpVJnQNT62O-BuB0GEYY_KayjgMSdEsrJ0oHX4V4Q=w2400",
+  "source_kind": "google_maps",
+  "note": "The dirt trail along a fence through green BX ranch fields with Vernon valley and hills behind"
+ },
+ {
+  "id": 1913,
+  "name": "Cougar Canyon Trail (Kalamalka Lake Provincial Park)",
+  "file": "/images/venues/cougar-canyon-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537ddd57126f6b55:0x713bf3df3cc74435",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLe__6zsAeHpEDp4PqFt7S2Q4UbJPqbjrOB1ZMn0eagolx_UMPxKTnIRrXHCjvs7ka6p7yzyEnquKuJmWAZNK5YM1dnD6_xRU6yVpmWhcN8qs1prkdVuCGglfSIZv8VU86EhVWFJQHuTubo=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the Cougar Canyon rim over turquoise Kalamalka Lake and Rattlesnake Point area"
+ },
+ {
+  "id": 1914,
+  "name": "Fur Brigade Trail Viewpoint (Garnet Valley Trails)",
+  "file": "/images/venues/fur-brigade-trail-viewpoint-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54826d003874317f:0xef6629220503f1a7",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf2vCwNBM0z3acmUnjMHZCjDRJTzsP0CFwg9f6BxMHkKNLxo029kmdPy3I7K_yFD9hGfVlk2VzqTQtbYSPJSb82N2oa9RPYoRDK8cEubce70dgjlX919ZyI8uXD-wgMRgWTUhyJtg=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the viewpoint down to Okanagan Lake and Peachland/Trepanier shoreline with snowy hills"
+ },
+ {
+  "id": 1858,
+  "name": "Gladstone Trail",
+  "file": "/images/venues/gladstone-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548273415efd7dc7:0x429ac83035217115",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfzj2ORI8DcRmY4d2LRC8pIK2A97NLY8heTowm2TocP5C34mLRUSzLC8NrK0C-8tD4GYfDJ4xFJFyExYHQJgetpE6iEmb-y2w-O-GKIJUwZQKDHMCurYWbVCOoXU9xqPVCGfMbR=w2400",
+  "source_kind": "google_maps",
+  "note": "Gladstone summit: rocky top with snags looking over Okanagan Lake toward Peachland/Rattlesnake Island"
+ },
+ {
+  "id": 1895,
+  "name": "Jordan Nature Reserve (Swan Lake)",
+  "file": "/images/venues/jordan-nature-reserve-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e77ed9ef39371:0xb210aa00c445af8e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLec2Kw6XhItlJgZ_bEN6A3f1le06KL_VILpfKtyNa9O0KKVEGuJ9DQtEjEHNXNf_7BYpSTg-LswQofiSl_w9zYLqUKhEcUoloGUywSbn9LzBidqyZsfP7CmwZqBVDy6JYMvkPJE=w2400",
+  "source_kind": "google_maps",
+  "note": "Swan Lake from the 7710 Lochdale Rd shore (Vernon Rowing Club site inside the reserve): rowing shells on the lake, green hills behind. From the Google place Vernon Rowing and Dragon Boat Club"
+ },
+ {
+  "id": 1850,
+  "name": "Lochview Trail (to Paul's Tomb)",
+  "file": "/images/venues/lochview-trail-pauls-tomb-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df254ca253011:0x2011b4f41f3dbc4d",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf2uwQn6BJ4vM3BZvRHn_WG0UVA5A0B8ZENe95qm2uW0iaMXHoE3Lf914DZgSWfVLcS2jbuDCNIp1lcEz0cL_OYx8WxelPU9OS8AeF9MORzvUGw6AeXjtb4rz5AUuC1pYB7TJpU=w2400",
+  "source_kind": "google_maps",
+  "note": "The wide gravel Lochview trail through pines and sage above blue Okanagan Lake"
+ },
+ {
+  "id": 1864,
+  "name": "Mount Keogan (Dogtown Trail)",
+  "file": "/images/venues/mount-keogan-dogtown-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482ecd5c8e20289:0xbff72dbce0748f82",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeaPanod5jufqHPvkomZpKX_MCAsai1cQ2GSMxSrww8CwcycekbQWrXUJ3vj0WcxztkmB4P4VxLu8PIlV3Jow0o7F6pmt0s74DbNaiHjTl_quZ6AtOS9kKyB-ztNfJR3y2QvpXg-22bxOeW=w2400",
+  "source_kind": "google_maps",
+  "note": "View from Mount Keogan over pine grassland down to Vaseux Lake and the Okanagan Falls valley farms"
+ },
+ {
+  "id": 1854,
+  "name": "Okanagan Centre Beach Trail",
+  "file": "/images/venues/okanagan-centre-beach-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537def11f1f2d83f:0x5db9a12f31e01d5",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf36zm5xDAJd14msd8KZ-iXDKx4Ex0mYRHdoRSbRI0hWw0yLDPCxbNCBXqM8BHh86GEcWE9tYpODe1-C_Jcwcih8-RRJq22OssNPi5mahi1jUy6agbHPnmunP_bogCt4kf1wtvqtw=w2400",
+  "source_kind": "google_maps",
+  "note": "Pebble shoreline of the Okanagan Centre beach trail with clear lake water and the far shore"
+ },
+ {
+  "id": 1906,
+  "name": "Pinnacle Lake Trail",
+  "file": "/images/venues/pinnacle-lake-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537c4116cd7c4735:0x381f13cb7f364dfc",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfZi0ZGOZlYAGVx611dz4HU0yv-WxdvRkXQX8hy3y3Xs1laqMI4DCiiYKSqStp083N-U1rXgCuMtHiGllGnMoGKFB67cAv9ARZ_XtW_vcNoA6nOJgzkh00Q2BskuxmJZ_3MlN0y=w2400",
+  "source_kind": "google_maps",
+  "note": "Pinnacle Lake below its rocky cirque on a clear summer day (Google place Pinnacle Lake, Cherryville)"
+ },
+ {
+  "id": 1852,
+  "name": "Shorts Creek Canyon Trail (Fintry Provincial Park)",
+  "file": "/images/venues/shorts-creek-canyon-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537de54e5fa93919:0x40472bb8881fcd5d",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdAAQX7Hiz0ynB2QJjOUDiVl_ODcaPrs3bqm8SfUJ239su8CGqqGOiNxNg2x72od9D-mvIUmXV6-TCm3i0giWsrqxbTSdaOr_18hYLvDcR3ez2nSNMFEJixFkxSJBEmnq-2APio_Yqcjtqg=w2400",
+  "source_kind": "google_maps",
+  "note": "Fintry waterfall on Shorts Creek dropping through the rock canyon, framed by pines (Google place Fintry Waterfalls)"
+ },
+ {
+  "id": 1904,
+  "name": "Twin Lakes Trail (Monashees)",
+  "file": "/images/venues/twin-lakes-trail-monashee-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537c3e3eb488867d:0x39b83f84b2293a27",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc4zgj40-AG7ryV-BFCOXCloPIOwfuQm-QQiQ8t4fuZzF9quHrdP5gspZGigOCejWJ0DP1JoSb_sIuLKET4M5-CS8fbNp6s7-EHTdHqW1CIR5pULKOhxWLxoNLJW_1xuwqpTY3_sQ=w2400",
+  "source_kind": "google_maps",
+  "note": "Looking down on the two blue Twin Lakes in their subalpine basin with Monashee ridges behind (Google place Twin Lakes Hike and Camping, Cherryville)"
+ },
+ {
+  "id": 1924,
+  "name": "Wilden Ridge Trails",
+  "file": "/images/venues/wilden-ridge-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df3432fd83dd9:0x487155dadf5ca54a",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeGNCqTfXV5vIoXm84kzGGOVYJbk-zp71uQ95cejStHdVmE1s21t37OefuUz-rusXs_skhpzSLYRJ_buFAkXvGdwlmirU9a5lX7bHiPPaFZSXrWjz-O_Jb25q1uRexZqLPsQ6qA=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the Wilden ridge (McKinley Trail) over pines to Okanagan Lake and the north-end hills (Google place McKinley Trail; Hike the Okanagan calls the hike Wilden Ridge: McKinley Trail)"
+ },
+ {
+  "id": 1857,
+  "name": "Big White Summer Hiking Trails",
+  "file": "/images/venues/big-white-summer-hiking-trails-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/summer/hiking-trails",
+  "image_url": "https://www.bigwhite.com/sites/default/files/2023-08/Summer-Hiking-Sunset-Rhonda-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Hikers crossing an alpine meadow of pasqueflower seed heads above Rhonda Lake at sunset (Big White's own hiking page photo)"
+ },
+ {
+  "id": 30,
+  "name": "Apres | Real Fruit Ice Cream & Coffee Bar",
+  "file": "/images/venues/apres-real-fruit-ice-cream-coffee-bar-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548263007a64c749:0x7a54519b11720bfb",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfW7Tbr-vKohAwsnjRO4WoDqkvGFXMRnwoC_P1bfLb7EWHBXcK8egF_ExU-H2Vb4jPMntRNWMWBfmmEaWsOPnFRX-s01k88cuiW4b3CH9bzzBFIL5jAK1kOrOgFXKxQHyl8phBve3fhkthZ=w2400",
+  "source_kind": "google_maps",
+  "note": "Interior: the counter wall with the shop's menu boards and fridge (no exterior photo exists on Google; other photos are food close-ups)"
+ },
+ {
+  "id": 585,
+  "name": "Silhouette Estate Winery",
+  "file": "/images/venues/silhouette-estate-winery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://silhouettecellars.com/",
+  "image_url": "https://img1.wsimg.com/isteam/ip/808504fa-a4e9-483c-9007-dcd360670eba/vineyard%20view.jpg",
+  "source_kind": "website",
+  "note": "The estate vineyard rows looking over Okanagan Lake at sunset (winery website \"vineyard view\")"
+ },
+ {
+  "id": 634,
+  "name": "Sushi Sai",
+  "file": "/images/venues/sushi-sai-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df5b03c8adefb:0x909ad03158ecc45f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdggwNw3zpc44I-hgL5XiHNiy_UFb-J2T9agwEyGHelEgkfma8eVzZrVj3P3Y5Ma0mypgZFLssgQiq8eA1W1gZZiWJENZkXJJ1RbdU7-XQulU0CeLIMz-eEU2aoy8-FWmPQ0dhJomBjmsoQ=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront on Ellis St with the Sushi Sai sign and #1607"
+ },
+ {
+  "id": 282,
+  "name": "Hyderabadi Biryani Lounge",
+  "file": "/images/venues/hyderabadi-biryani-lounge-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df581c3f548ef:0xe807e2173bd22561",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeOfO__rTZ46rPcOhtQA76m7kxR2SArEtGOHdMg8pwDK1X7R9Sb2MuV0ynFahRW6DhoBEU5l_7GM9fx7Cv9W0vJRNwYH6WFJeYdhNGgn-0tm2lgiIYcBTF7svJoaOYnywgiiwCO6KfQj3U=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront at 575 Bernard Ave (owner photo): sign reads Twice the Dice Board Game Cafe, with a Hyderabadi Biryani poster in the door window; the restaurant operates inside this cafe"
+ },
+ {
+  "id": 338,
+  "name": "Kings Kitchen",
+  "file": "/images/venues/kings-kitchen-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482650239cd790b:0x340a6c0430bf6a55",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLejTqMBxrlPRoKk3-k0gJzsdI4gM4Opw_yCD3Npac8GbCUscyBjS98G4-Z89rRR2ew0tt0HY6AzGI_ZUc5DZmHBjD-7TJaoJlQ-bs4Zoq3voIhVghXdfqyccETE8c9ujoXIY4Q5towQ6nYD=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront on Main St with the yellow King's Kitchen sign and #9912 (owner photo, evening)"
+ },
+ {
+  "id": 1899,
+  "name": "Aberdeen Columns Trail",
+  "file": "/images/venues/aberdeen-columns-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dc57e9d3cb2cf:0xfc7af2ceb256d06c",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdHGzcmeRbz6qEHphJ6pBzziwVkfnt42pUXEtNnRuwt-5vEoHux6D3-5UHMrMsWDepWz0gFydfD8ifeHMmj-vOK88rxfbjVe7O2as0-d6WhhgZoHfkr6XZ9v9aA3Rvk_v8_nCfZfA=w2400",
+  "source_kind": "google_maps",
+  "note": "The wall of basalt columns above the talus slope"
+ },
+ {
+  "id": 1910,
+  "name": "Bellevue Creek Greenway",
+  "file": "/images/venues/bellevue-creek-greenway-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8bc2b01240a9:0x472e36e0f7279b8f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfcElImEMbYh8XKLXMJd0bhnrgWifIojN9SlilhccXPvBqTh8wjJi33KE5TOAyrGvxnYZzpeMnjZMXXJ8WljNcEkatQtksj1JYAFzzNkXQOb4rg3oHAoq2o68QhLmUPuwFQNCC0=w2400",
+  "source_kind": "google_maps",
+  "note": "Gravel greenway path beside rocky Bellevue Creek with a cyclist, green trees"
+ },
+ {
+  "id": 1593,
+  "name": "Canadian Craft Tours (Kelowna)",
+  "file": "/images/venues/canadian-craft-tours-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://canadiancrafttours.ca/products/kelowna-wine-tour",
+  "image_url": "https://www.canadiancrafttours.ca/cdn/shop/products/IMG_1063.JPG?v=1562464036",
+  "source_kind": "website",
+  "note": "From the tour company's own Kelowna wine tour page: a lakeview winery stop with pergola and vineyard over Okanagan Lake"
+ },
+ {
+  "id": 1874,
+  "name": "Divide Lake Trail (from Rimrock Gate)",
+  "file": "/images/venues/divide-lake-trail-north-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482712bbc0952f1:0x2c50aec78e1eaf58",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdwVrSxFwF-z7obvl7WVxV_yhqWI72kxqeQosqFYwFI1BVceYBuR24iYz-Y5Y6uEt-8XFP_dg5CkMGDongGaHHO1KZAnjFU-zH9Nn424ymxGd5mw5uZfZ0IKMrzmHw_fGxM3gTf=w2400",
+  "source_kind": "google_maps",
+  "note": "Divide Lake: long narrow blue lake between rocky, burn-recovering slopes"
+ },
+ {
+  "id": 1915,
+  "name": "Gallagher's Canyon – Tree of Wisdom Trail (Jean Road Trails)",
+  "file": "/images/venues/gallaghers-canyon-tree-of-wisdom-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8d92fadcb465:0x9e451264c8367e0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcULTssBTArH3Ta15HKiHCWbzWEPpwJxCuY__sacOM3To01MwpxwLbXkRbJujBiWZ1RtMtnMLxiDtBIjvOMWhfTg5vwg1Sq-6Al0ZTUd2XD1Rt6ZcjukAk96OCF_ko3pTfn6E6vCg=w2400",
+  "source_kind": "google_maps",
+  "note": "Pond on the Jean Road Trails (Google place \"Jean Road Trails\", 4075 Jean Rd) with pines and cattails"
+ },
+ {
+  "id": 1860,
+  "name": "KVR Trail: Penticton to the McCulloch Trestle",
+  "file": "/images/venues/kvr-trail-penticton-mcculloch-trestle-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548262ea8be7b03f:0xd11a9c84bfd11726",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLePqjZ69TvfZ7rfJpZdrBt4_hjbIQ6twmlfk7ymH53zlSGpOdQosY0uCTc1UNThrRGawYQaCp9oBVhpdiHsOz9vQftEzY026R-CkolP8Cavtul1HA38J6Ondaa8063Emubs4tTG=w2400",
+  "source_kind": "google_maps",
+  "note": "Cyclist on the McCulloch trestle boardwalk above vineyards, Okanagan Lake behind"
+ },
+ {
+  "id": 1897,
+  "name": "Lookout Trail & The Parabola Loop (Kalamalka Lake Park)",
+  "file": "/images/venues/kal-park-lookout-parabola-loop-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8e9bf375199:0x39f5e274cde84b9b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc5_w6AWV-65aIiOrAa351WjaIlqsDGZCA7r3b23C6hiW7kGvRYOlV9grAeK9efG59QfMujFckDF5dPSxXmpg_6YoMDTXlxByrP4xmmHt9ZLioe1Wb27zzjzIr1SQs-k4yia1SmvQ=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the high ridge down Kalamalka Lake (Kalamalka Lake Provincial Park place)"
+ },
+ {
+  "id": 1918,
+  "name": "Mount Law Trails",
+  "file": "/images/venues/mount-law-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54820ca1340271a5:0x57bfe496bfd1e74",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcHJg_Lp4nRkGNGRiG_U14LpNX77WrP7mKrQ4Lu_mz__FRPGNfcrKEGcwrf4SZuHmFihMf-B9-OxKOrlRBVUfLuKcJGQyPQaRSzU6PBzXVRRS4V1hTfBAsLyv9eLwtnjGqw5JsK=w2400",
+  "source_kind": "google_maps",
+  "note": "Summit view from Mount Law over Okanagan Lake and forested hills"
+ },
+ {
+  "id": 1923,
+  "name": "Terrace Mountain",
+  "file": "/images/venues/terrace-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dfb6f53b4a61b:0x349a46e4c2c47182",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdJShKwL6bjzJo_TX-N2THlJXnxTHYzO4Q66-A9eZza_CX6_VpU4UWuG2fF9Otc7M6crH6bfhqbiLkE9__cTq_liiVohLk7iTPCzkgdZmuV0SZNxZBkGy7_8CwonIyTl9SqDvxYlw=w2400",
+  "source_kind": "google_maps",
+  "note": "Terrace Mountain lookout road with forest and Okanagan valley view"
+ },
+ {
+  "id": 1880,
+  "name": "Pollard Pond Loop (Trethewey Park)",
+  "file": "/images/venues/pollard-pond-loop-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537def5ba35dcbe3:0x58c6b8e4dad01c4f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcRAYoboA5AnyREDz4ErH2DtS0IlB7mRdppuUEB0BG8gtlNTIZWugL-XHBuoIaL3pcgKndoCK6vRmTwPM_xmCi_ODlz9pd99P9mOT0R5InBBOvIL99aiK-Qf0GpmEF4j3ZwUFUK=w2400",
+  "source_kind": "google_maps",
+  "note": "Aerial of Pollard's Pond with its zig-zag boardwalk among The Lakes condos (Google place \"Pollard's Pond\")"
+ },
+ {
+  "id": 1856,
+  "name": "Winfield Creek Wildlife Habitat Preserve",
+  "file": "/images/venues/winfield-creek-wildlife-habitat-preserve-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537def1ee8d7cafd:0x8721ce3fa78eecba",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcrQgIv_kv2V7O-sHThqp_bOtoZxqz6PEYFuBtNb4r8C0NIeGn0aDrv-mvJaE-4KNp4hAe12-aa-Q_9mCSnOwGI9lYrF06uHzoSmlVCiDd8orZKxEthidDDiuLuWz1vd0YDG8YfcA=w2400",
+  "source_kind": "google_maps",
+  "note": "Gravel path through grasses and young pines in the preserve (Google place \"George Mitchell Wildlife Preserve\", same site: its photos include the Winfield Creek Wildlife Habitat Preserve sign)"
+ },
+ {
+  "id": 1892,
+  "name": "Okanagan River Path: Okanagan Falls to Vaseux Lake",
+  "file": "/images/venues/okanagan-river-path-ok-falls-vaseux-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548292d91f52dd41:0x81e8a400d8fa0689",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLelonByLVDEYg72tgaFkFd2XBIBLl0K6l5ocDSLfBitjEehkt2h97mHxLMwmeJFzgix9IluIDlYUt9M-bxCwJKWMfESiB-r5hyOH18TXTmS0Ri4FT6CFfrhm7Nfch6saDE8HQ_LWw=w2400",
+  "source_kind": "google_maps",
+  "note": "Grassy river path at the north end of Vaseux Lake with McIntyre Bluff behind (Google place \"Vaseux Lake\")"
+ },
+ {
+  "id": 1876,
+  "name": "UBC Okanagan Campus Trails (Pine Loop)",
+  "file": "/images/venues/ubc-okanagan-campus-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537ded6d77945187:0xc7f0fdb6fcbbeaee",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeXEjecX_BJnvwaX4scrEIR-wOBDwPWeciRY0ElGKf_WqUzaTxOTLmewiNFDyeruPgdw9rxomN3BaEUlX3UQTW8B6poKy15YathX2tx-R7EKhuS30k3aZJeoX_OryKssMVT0LGnyg=w12208",
+  "source_kind": "google_maps",
+  "note": "Panorama from the Pine Trail lookout on the UBCO campus trails over the valley (Google place \"Pine Trail Lookout\")"
+ }
+]

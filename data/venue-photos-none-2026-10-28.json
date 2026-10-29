@@ -1,0 +1,142 @@
+[
+ {
+  "id": 29,
+  "name": "Apni Rasoi Taste of India",
+  "reason": "All 13 Google Maps photos are food/takeout close-ups (no storefront or room); website (home + location pages) has only menu dish shots on white backgrounds, max 1000px, mostly stock-style"
+ },
+ {
+  "id": 1078,
+  "name": "Okanagan Vintners Exchange",
+  "reason": "No Google Maps place of its own (search matches Okanagan Estate Wine Cellar shop and Vintners liquor store, both different businesses); YLW airport place photos show only the neighbouring Ellison Field Taphouse; no website; operator SSP's press photos are ribbon-cuttings with people filling the frame; castanet page 403"
+ },
+ {
+  "id": 1882,
+  "name": "Pretty-Newene Trail",
+  "reason": "Google has only an intersection pin 'Pretty Rd & Pretty-Newene Trl' with 0 photos; searches for the trail, Newene Rd and nearby parks return other places; no web page or photo of this short neighbourhood connector found (website is the Lake Country trail-map PDF)"
+ },
+ {
+  "id": 1881,
+  "name": "The Lakes Trails (Lake Country)",
+  "reason": "Google 'The Lakes' place has 3 photos, all of the subdivision (houses, a balcony railing); 'Apex Park' nearby is a playground; no trailhead place for Upper Lakes/Lake Hill; website is the Lake Country trail-map PDF (no photos)"
+ },
+ {
+  "id": 786,
+  "name": "Winfield Chinese Restaurant",
+  "reason": "Google Maps has 4 photos: a koi-pond painting (owner) and three plates of food on tables; website shows only the same koi painting as its header; no storefront or dining-room photo"
+ },
+ {
+  "id": 1723,
+  "name": "Tiki Water Bikes (Peachland)",
+  "reason": "Google Maps has only the Penticton (Skaha Lake, 124 S Beach Dr) location; no Google place for the Peachland spot; all ~50 photos on tikiwaterbikes.ca (home + gallery) are of the Skaha Lake / Penticton location (file names say penticton/skaha), none of Peachland"
+ },
+ {
+  "id": 713,
+  "name": "The Sandwich Company",
+  "reason": "Only 7 Google photos (6 food close-ups, 1 tilted deli-case close-up), no website or other own photos online"
+ },
+ {
+  "id": 510,
+  "name": "Pizza 64 (Penticton)",
+  "reason": "Google place (1770 Main St #102) has only pizza-in-box photos; pizza64.ca has only chain menu/deal graphics, nothing of the Penticton store"
+ },
+ {
+  "id": 1884,
+  "name": "East Hill Trail (Oyama)",
+  "reason": "No Google place for the East Hill trail (searched East Hill Trail / trailhead, Oyama); Lake Country trail map PDF has no photo of it; nothing found on the web"
+ },
+ {
+  "id": 1883,
+  "name": "Ribbleworth Trail (Oyama)",
+  "reason": "No Google place for the trail itself; the nearby Ribbleworth Falls listing is a different spot (on the Rail Trail at Oyama Rd, not the Broadwater Rd bench trail); trail map PDF has no photo"
+ },
+ {
+  "id": 1068,
+  "name": "Longshots Steak House",
+  "reason": "Google photos are all plated food, cocktails, menus and a Christmas-tree wall corner; no website (Gunbarrel site unreachable); nothing showing the room or building"
+ },
+ {
+  "id": 762,
+  "name": "Villages Pizza - West Kelowna",
+  "reason": "Google Maps place (Villages Pizza - West Kelowna, 3645 Gossett Rd #216) has only 2 photos: a chain logo/pizza-box promo graphic; villagespizza.com has only chain-wide promo banners and food ads, no photo of this location."
+ },
+ {
+  "id": 766,
+  "name": "Viva Mexicana Taco Bar",
+  "reason": "Google matches 3300 30th Ave as \"Viva Mexicana Grocery Store\": 6 photos, all window film/signage close-ups and paper menus. vivamexicana.ca storefront photo is the Lake Country restaurant (Winfield Plaza), already used for that listing; no Vernon interior/exterior photo found."
+ },
+ {
+  "id": 1598,
+  "name": "Bubbles Don't Count",
+  "reason": "Mobile tour, no fixed place. Google has one photo (5 guests posing in front of the \"Bubbles Bus\", people fill the frame); bubblesdontcount.com uses Depositphotos/Unsplash stock throughout."
+ },
+ {
+  "id": 1614,
+  "name": "Ghost Tours of Vernon",
+  "reason": "No Google Maps place for the tour. ghosttoursofvernon.com photos are staged portraits of the two costumed guides (with ghost-blur effects); in the 3:1 strip the guides fill the frame with heads cut off. Justice Park/courthouse would only show the meeting point."
+ },
+ {
+  "id": 1893,
+  "name": "Nels' Leap Trail",
+  "reason": "No Google Maps place for Nels' Leap Trail (tried \"Nels Leap Trail\", \"Nel's Leap Trail\", trailhead, Alexis Park Drive/Venture Training; only other Vernon trails matched). Tourism Vernon trail data has no image for it."
+ },
+ {
+  "id": 761,
+  "name": "Villages Pizza - Lower Mission",
+  "reason": "Google listing has only a pizza-box logo shot, a food photo and a night storefront signed 'Mr Mozzarella' (different name); chain website has no photo of this location"
+ },
+ {
+  "id": 119,
+  "name": "Canadian 2 For 1 Pizza Winfield",
+  "reason": "Google listing (8 photos) is all pizza/bread close-ups plus a kids' dance party; chain website has no Winfield storefront photo"
+ },
+ {
+  "id": 1724,
+  "name": "Okanagan Folk School",
+  "reason": "Google place (and 5684 Beach Ave) has 0 photos; okfolkschool.ca only shows close-ups of finished crafts and people, nothing of the venue"
+ },
+ {
+  "id": 1894,
+  "name": "Commonage Trail (Mission Hill)",
+  "reason": "No Google place for the trail (tried Commonage Trail, trailhead, Mission Hill Trail, Mission Rd); only nearby Mission Hill Park (a mown city lawn/dog park, not the DND gravel trail); Tourism Vernon trail data has no image for it; Hike the Okanagan has no page"
+ },
+ {
+  "id": 1902,
+  "name": "Nelson Mountain Trail",
+  "reason": "Google 'Mount Nelson' (North Okanagan) has 0 photos and no trail place exists; Recreation Sites and Trails BC (REC169460) has only 3 old photos at 1024 px wide or less (below the 1200 px minimum); no Hike the Okanagan page"
+ },
+ {
+  "id": 637,
+  "name": "Sweet Emotion Ice Cream",
+  "reason": "Counter is inside Prime Time Donair & Poutine; the only photo of the Sweet Emotion counter and sign has a person in a swimsuit with a pool float filling a third of the frame; the rest are ice-cream close-ups and the Prime Time storefront (sign cut off in the 3:1 strip, different business name); no website"
+ },
+ {
+  "id": 1859,
+  "name": "Trout Creek Dike Trail",
+  "reason": "No Google place for the dike trail (tried dike trail, Trout Creek Beach, Hwy 97 bridge); the 'Trout Creek' place photos are all of the KVR trestle canyon upstream, a different spot; Summerland trail page is a 2017 PDF map; no Hike the Okanagan page"
+ },
+ {
+  "id": 512,
+  "name": "Pizza Factory (Kelowna)",
+  "reason": "Google Maps has only 4 photos, all food close-ups (wings, pizzas); the website has only food shots; no storefront or room photo anywhere"
+ },
+ {
+  "id": 1464,
+  "name": "Xperience Games Kelowna",
+  "reason": "Google Maps has 3 photos: a 360 sphere of a gym event and two groups posing with signs (people fill the frame); the website shows only AI-style room posters and night-city renders, no real photo of the Hunter Rd rooms"
+ },
+ {
+  "id": 1762,
+  "name": "Teehouse Wine Tours",
+  "reason": "Pickup tour company with no premises of its own: its 6 Google photos are a promo graphic, guests posing, Mission Hill and Quails' Gate wineries (other businesses), a bottle and a tasting menu; the website uses stock tasting/barrel shots and a Mission Hill photo. No photo of the company's own vehicle or tour"
+ },
+ {
+  "id": 1900,
+  "name": "Glenemma Trails",
+  "reason": "Google place \"Glenemma\" has 0 photos; no Google place for the Glenemma Trails/McTavish staging area (nearest \"Crown Land Kelly Mountain\" could not be confirmed as the same trails, dusk/hazy shots); shuswaptrails.com page only shows site-wide generic images (Estekwalen Mountain, a CTA background), not Glenemma"
+ },
+ {
+  "id": 1069,
+  "name": "Pit Stop Cafeteria",
+  "reason": "No Google place for the Pit Stop window (searches match only Apex Mountain Resort/Inn); apexresort.com/dining shows only a Pit Stop logo (the interior photo there belongs to The Edge Bistro)"
+ }
+]
