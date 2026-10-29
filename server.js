@@ -16095,12 +16095,21 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${CARD_V2_CARD} .desc-toggle { display: none !important; }
   ${CARD_V2_CARD} .fd-open-status[data-fd-open="closed"] { color: #9A4A3A; opacity: 1; }
   ${CARD_V2_CARD} > .chips .chip { font-size: 0.76rem; padding: 4px 10px; }
+  /* Badges as one quiet line (2026-10-28): small grey labels with a teal line icon, dot-separated, never wrapping;
+     a label that does not fit ends in "..." and the rest sit in the small "+N" pill at the end. */
+  ${CARD_V2_CARD} > .chips:not(:empty) { display: flex !important; flex-wrap: nowrap !important; align-items: center; gap: 0 !important; overflow: hidden; white-space: nowrap; }
+  ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge) { flex: 0 1 auto; min-width: 0 !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0; background: none !important; box-shadow: none !important; color: #4F5A62 !important; font-size: 0.8rem !important; font-weight: 700; letter-spacing: 0; text-align: left !important; }
+  ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge) svg { margin-right: 4px; color: var(--teal, #2A6B67); }
+  ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge, .chip-more) ~ .chip:not(.hidden-gem-badge, .local-favourite-badge, .chip-more)::before { content: "·"; margin: 0 7px; color: #9AA3A9; font-weight: 800; }
+  ${CARD_V2_CARD} > .chips > .chip.chip-more { flex: 0 0 auto; margin-left: 8px !important; padding: 2px 7px !important; border-radius: 999px; background: rgba(31, 42, 48, 0.07) !important; color: #4F5A62 !important; font-size: 0.72rem !important; }
   ${CARD_V2_CARD} > .chips > :is(.hidden-gem-badge, .local-favourite-badge):first-child { position: absolute; top: 10px; left: 10px; z-index: 2; margin: 0; background: var(--teal, #2A6B67) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 1px 4px rgba(0,0,0,0.25); white-space: nowrap; }
   ${CARD_V2_CARD} > .chips > :is(.hidden-gem-badge, .local-favourite-badge):first-child + :is(.hidden-gem-badge, .local-favourite-badge) { position: absolute; top: 44px; left: 10px; z-index: 2; margin: 0; background: var(--teal, #2A6B67) !important; color: #fff !important; border-color: transparent !important; }
   ${CARD_V2_CARD} .card-actions { justify-content: flex-end; border-top: 0 !important; padding-top: 0 !important; }
   ${CARD_V2_CARD} .card-action.trip-btn { font-size: 0.8rem; padding: 6px 12px; min-height: 36px; }
-  ${CARD_V2_CARD} .card-action.fav-btn { position: absolute !important; z-index: 3; top: 10px; right: 10px; width: 40px; height: 40px; min-height: 0; margin: 0; padding: 0 !important; border-radius: 50%; border: 0 !important; background: rgba(255,255,255,0.94) !important; box-shadow: 0 1px 5px rgba(0,0,0,0.22); display: grid; place-items: center; font-size: 0; line-height: 0; color: var(--ink); }
-  ${CARD_V2_CARD} .card-action.fav-btn svg { width: 19px; height: 19px; }
+  ${CARD_V2_CARD} .card-action.fav-btn { position: absolute !important; z-index: 3; top: 10px; right: 10px; width: 32px; height: 32px; min-height: 0; margin: 0; padding: 0 !important; border-radius: 50%; border: 0 !important; background: rgba(255,255,255,0.9) !important; box-shadow: 0 1px 3px rgba(0,0,0,0.18); display: grid; place-items: center; font-size: 0; line-height: 0; color: var(--ink); }
+  ${CARD_V2_CARD} .card-action.fav-btn svg { width: 16px; height: 16px; }
+  /* The heart stays a 44px tap target (an invisible ring around the 32px circle). */
+  ${CARD_V2_CARD} .card-action.fav-btn::after { content: ""; position: absolute; inset: -6px; }
   ${CARD_V2_CARD} .card-action.fav-btn[aria-pressed="true"] { color: #C0392B; }
   ${CARD_V2_CARD} .card-action.fav-btn[aria-pressed="true"] svg { fill: currentColor; }
   /* A plain column instead of the shared-row grid (subgrid ignores the photo's padding); the grid still makes every
@@ -17905,12 +17914,32 @@ function breadcrumbNavHtml(items) {
 // Keeps at most `max` chips on a listing card and folds the rest into one
 // "+N more" chip (its title lists them); the venue page shows every badge.
 // max 0 = no cap (unthemed cards keep their markup unchanged).
-function capChips(html, max) {
+// keep (2026-10-28): how many stay beside the "+N" (default max - 1); the cards' one-line badges keep two of any three.
+function capChips(html, max, keep = max - 1) {
   const chips = html.match(/<span class="chip[^"]*"[^>]*>.*?<\/span>/g) || [];
   if (!max || chips.length <= max) return html;
-  const kept = chips.slice(0, max - 1);
-  const rest = chips.slice(max - 1).map((c) => c.replace(/<[^>]+>/g, '').trim());
+  const kept = chips.slice(0, keep);
+  const rest = chips.slice(keep).map((c) => c.replace(/<[^>]+>/g, '').trim());
   return `${kept.join(' ')} <span class="chip chip-more" title="${escapeHtml(rest.join(', '))}" aria-label="${rest.length} more: ${escapeHtml(rest.join(', '))}">+${rest.length}</span>`;
+}
+
+// Listing-card badges (2026-10-28, Dayton: "the badges look very ugly and unorganized"): on a themed card the
+// amenity badges are one quiet line of short labels, each led by a line icon ("Vegan · Patio +4"); CARD_V2_CSS
+// keeps it to one line. The venue page keeps the full names (badgeChipsHtml).
+const CARD_BADGE_SHORT = {
+  dog_friendly: ['paw', 'Dogs welcome'], vegan: ['leaf', 'Vegan'], vegetarian: ['sprout', 'Vegetarian'], patio: ['sun', 'Patio'],
+  kid_friendly: ['child', 'Kids welcome'], gluten_free: ['wheat', 'Gluten-free'], lake_view: ['waves', 'Lake view'],
+  nonalcoholic: ['juice', 'Non-alcoholic'], sports_tv: ['tv', 'Sports TV'], live_music: ['music', 'Live music'],
+  great_groups: ['group', 'Groups'], happy_hour: ['cocktail', 'Happy hour'], free_entry: ['ticket', 'Free'],
+  arts_culture: ['palette', 'Arts & culture'], open_early: ['sunrise', 'Open early'], open_late: ['moon', 'Open late'],
+};
+function cardBadgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
+    .map((f) => {
+      const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
+      return `<span class="chip chip-feat">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
+    })
+    .join(' ');
 }
 
 function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
@@ -18036,7 +18065,7 @@ function venueCardHtml(venue, opts = {}) {
   // so it no longer counts towards the badge cap; the row under the text keeps two badges and "+N more".
   const photoTagChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
   const chipsHtml = themed
-    ? `<p class="chips">${photoTagChips}${capChips(editorialChips.slice(photoTagChips.length) + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), maxChips)}</p>`
+    ? `<p class="chips">${photoTagChips}${capChips(editorialChips.slice(photoTagChips.length) + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), maxChips - 1, maxChips - 1)}</p>`
     : `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), 0)}</p>`;
   // Themed listing cards (2026-10-12) always have the same eight parts in the
   // same order -- name, meta, fee slot, description slot, notice slot, notes

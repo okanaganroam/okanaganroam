@@ -9951,7 +9951,12 @@ test('Cards: themed listing cards cap the badge row at two badges (+N more) and 
   const card = app.venueCardHtml(v, { themed: true });
   const chips = card.match(/<p class="chips">(.*?)<\/p>/)[1];
   assert.equal((chips.match(/class="chip/g) || []).length, 3);
-  assert.match(chips, /<span class="chip chip-more" title="[^"]*Live Music, Great for Groups, Happy Hour" aria-label="5 more: [^"]*">\+5<\/span>/);
+  assert.match(chips, /<span class="chip chip-more" title="[^"]*Live music, Groups, Happy hour" aria-label="5 more: [^"]*">\+5<\/span>/);
+  // One quiet line (2026-10-28): short labels led by a line icon; the venue page keeps the full names.
+  assert.match(chips, /^<span class="chip chip-feat"><svg class="ui-icon"[^>]*>.*?<\/svg>Vegan<\/span> <span class="chip chip-feat"><svg/);
+  assert.match(app.badgeChipsHtml(v), /<span class="chip">Vegan-Friendly<\/span>/);
+  const three = app.venueCardHtml({ ...v, live_music: false, happy_hour: false, great_groups: false, gluten_free: false }, { themed: true }).match(/<p class="chips">(.*?)<\/p>/)[1];
+  assert.match(three, /Vegetarian<\/span> <span class="chip chip-more"[^>]*>\+1<\/span>$/, 'three badges are two and +1, so none is cut off');
   // Card redesign (2026-10-28): the Hidden Gem / Local Favourite badge goes on the photo and is not counted.
   const lf = app.venueCardHtml(v, { themed: true, isLocalFavourite: true }).match(/<p class="chips">(.*?)<\/p>/)[1];
   assert.match(lf, /^<span class="chip local-favourite-badge">/);
@@ -9982,9 +9987,10 @@ test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badg
   const both = app.venueCardHtml(v, { dogFriendlyNote: 'On-leash in the park; off-leash at the dog beach.' });
   assert.equal((both.match(/Dog Friendly<\/span>/g) || []).length, 1, 'the collection badge');
   assert.doesNotMatch(both, /<span class="chip">Dog-Friendly<\/span>/, 'no duplicate amenity chip');
-  assert.match(both, /<span class="chip">Lake View<\/span>/, 'other badges unchanged');
+  assert.match(both, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?(?:Lake View|Lake view)<\/span>/, 'other badges unchanged');
+  assert.doesNotMatch(both, /Dogs welcome/, 'no duplicate short amenity chip either');
   const plain = app.venueCardHtml(v, {});
-  assert.match(plain, /<span class="chip">Dog-Friendly<\/span>/, 'without the collection badge the amenity chip still shows');
+  assert.match(plain, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?(?:Dog-Friendly|Dogs welcome)<\/span>/, 'without the collection badge the amenity chip still shows');
   assert.equal(app.badgeChipsHtml(v), app.badgeChipsHtml(v, {}), 'default output unchanged');
 });
 
