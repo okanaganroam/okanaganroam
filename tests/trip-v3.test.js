@@ -252,20 +252,20 @@ test('V3 "understood": the request in visitor words, no venue named', () => {
   assert.deepEqual(tp.buildUnderstood(wi, d.interpretTripComponents(walk, T, wi), LABELS, {}).notUsed, [], 'a lake walk is a trail/park part by the lake (2026-10-14)');
 });
 
-test('V3 recommended searches are autumn-relevant in English and French', () => {
+test('V3 recommended searches are short and in season, in English and French', () => {
+  // Four shorter examples (2026-10-29, Dayton: the page was too long on a phone).
   assert.deepEqual(v3.T3_EXAMPLES, [
-    'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
-    '2 days in Penticton with the kids — museums, parks and easy food',
-    'A romantic autumn weekend in Naramata with wineries and a great dinner',
-    'A dog-friendly autumn weekend in Vernon',
-    'Coffee, an autumn hike, a winery and dinner in Kelowna',
+    '3 days in Kelowna: wineries, easy walks and great food',
+    '2 days in Penticton with the kids',
+    'A romantic weekend in Naramata',
     'What can we do around Penticton if it rains?',
   ]);
   const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
-  assert.match(app, /'tripv3\.example1': 'Plan 3 days in Kelowna this autumn/);
-  assert.match(app, /'tripv3\.example6': 'What can we do around Penticton if it rains\?'/);
-  assert.match(app, /'tripv3\.example1': 'Planifiez 3 jours à Kelowna cet automne/);
-  assert.match(app, /'tripv3\.example6': 'Que peut-on faire autour de Penticton s’il pleut\s*\?'/);
+  assert.match(app, /'tripv3\.example1': '3 days in Kelowna: wineries/);
+  assert.match(app, /'tripv3\.example4': 'What can we do around Penticton if it rains\?'/);
+  assert.match(app, /'tripv3\.example1': '3 jours à Kelowna/);
+  assert.match(app, /'tripv3\.example4': 'Que peut-on faire autour de Penticton s’il pleut\s*\?'/);
+  assert.doesNotMatch(app, /'tripv3\.example[56]'/);
   assert.doesNotMatch(app, /tripv3\.(?:placeholder|example[1-6]|how1Text).*?(?:September|septembre|golf|beaches|plages)/);
 });
 
@@ -596,4 +596,27 @@ test('Removing a preceding stop clears conditional meal windows from the display
  const p={itinerary:{stops:[{daypart:'morning',venue:{id:1,name:'First'}},{daypart:'evening',venue:{id:2,name:'Dinner'}}]},schedule:[{day:1,venueId:1,startMinutes:540,endMinutes:600},{day:1,venueId:2,status:'unverified',mealWindow:{earliestStartMinutes:1200,latestStartMinutes:1290,visitMinutes:90}}]};
  assert.ok(v3.t3TimelineRows(p)[1].mealWindow);
  assert.equal(v3.t3TimelineRows(p,{'1-morning':true})[0].mealWindow,undefined);
+});
+
+test('V3 page example card (2026-10-29): a real plan for today, EN + FR times, a button that runs it; one line when there is no plan', () => {
+  const base = { esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), title: 't', description: 'd', canonical: 'https://okanaganroam.com/trip', breadcrumbJson: '{}', headerHtml: '', tripTrayHtml: '', footerHtml: '', footerStyles: '', today: '2026-10-29' };
+  const sample = { request: 'a happy hour crawl in Penticton', date: '2026-10-29', stops: [
+    { name: 'Yellow Dog Brewing Co', url: '/penticton/breweries/yellow-dog-brewing-co', time: '2 PM', timeFr: '14 h', hh: '2–5 PM', hhFr: '14 h–17 h', deal: '$5 El Perro 16 oz draft', dealFr: null },
+    { name: 'BNA Brewing', url: '/penticton/breweries/bna-brewing', time: '4:20 PM', timeFr: '16 h 20', hh: '4–6 PM', hhFr: '16 h–18 h', deal: null, dealFr: null },
+  ] };
+  const html = v3.renderTripPlannerV3Page({ ...base, sample });
+  assert.match(html, /<div class="t3-try" aria-labelledby="t3TryTitle">/);
+  assert.match(html, /<span class="t3-try-when"><span class="t3-en">Today<\/span><span class="t3-fr" lang="fr">Aujourd’hui<\/span><\/span>/);
+  assert.match(html, /<span class="t3-try-time"><span class="t3-en">2 PM<\/span><span class="t3-fr" lang="fr">14 h<\/span><\/span><span class="t3-try-stop"><a href="\/penticton\/breweries\/yellow-dog-brewing-co">Yellow Dog Brewing Co<\/a>/);
+  assert.match(html, /<button type="button" class="t3-try-btn" data-t3-request="a happy hour crawl in Penticton">/);
+  assert.match(html, /querySelectorAll\('\[data-t3-request\]'\)/, 'the button fills the request and submits it');
+  assert.doesNotMatch(html, /class="t3-sample"/);
+  // A plan for another day says which day.
+  assert.match(v3.renderTripPlannerV3Page({ ...base, sample: { ...sample, date: '2026-10-30' } }), /<span class="t3-try-when"><span class="t3-en">Friday<\/span><span class="t3-fr" lang="fr">vendredi<\/span>/);
+  // No plan (late at night): the one-line example.
+  for (const s of [null, { ...sample, stops: sample.stops.slice(0, 1) }]) {
+    const h = v3.renderTripPlannerV3Page({ ...base, sample: s });
+    assert.match(h, /<p class="t3-sample">/);
+    assert.doesNotMatch(h, /class="t3-try"/);
+  }
 });
