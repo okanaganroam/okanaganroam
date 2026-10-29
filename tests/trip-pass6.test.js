@@ -335,8 +335,8 @@ test('Accessibility: Favorite buttons are named and pressed, the Pace select is 
   assert.ok(src.includes(`'<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>'`));
   assert.match(src, /\.t3-chip select \{[^}]*min-height: 32px;/);
   assert.ok(src.includes(`'<section class="t3-day" id="t3-day-' + d.day + '" aria-label="' + esc(tx('tripv3.day', { n: d.day }) + ' \\u00b7 ' + (d.regionLabel || tx('tripv3.theOkanagan'))) + '">'`));
-  assert.match(src, /\.t3-examples \{ min-height: 216px; \}/);
-  assert.match(src, /html\[lang="fr"\] \.t3-examples \{ min-height: 446px; \}/);
+  assert.match(src, /\.t3-examples \{ min-height: 120px; align-content: flex-start; \}/);
+  assert.match(src, /html\[lang="fr"\] \.t3-examples \{ min-height: 260px; \}/);
   assert.ok(src.includes("html += (stop.noSwap ? '' : '<button type=\"button\" class=\"t3-act\" data-t3-swap="), 'the resort has no Swap');
   const app = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
   assert.ok(app.includes("if (pressedNow != null && pressedNow !== String(isFav)) btn.setAttribute('aria-pressed', String(isFav));"));

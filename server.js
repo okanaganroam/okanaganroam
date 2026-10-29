@@ -34853,6 +34853,33 @@ function withPlanShareButton(html) {
   return at < 0 ? html : `${html.slice(0, at)}${planShareScript()}\n${html.slice(at)}`;
 }
 
+// Build My Trip example card (2026-10-29, Dayton: show what you get before you type). The page runs one real plan --
+// TRIP_SAMPLE_REQUEST, through the same planner as POST /api/trip/plan -- and shows its stops, each with its time,
+// happy hour and first deal. Cached for 30 minutes (the plan follows the clock and the day); null when the plan has
+// no stops (late at night), and the page then shows the one-line example instead.
+const TRIP_SAMPLE_REQUEST = 'a happy hour crawl in Penticton';
+let tripSampleCache = { at: 0, value: null };
+function tripSamplePlan(now = Date.now()) {
+  if (now - tripSampleCache.at < 30 * 60 * 1000) return tripSampleCache.value;
+  let value = null;
+  try {
+    const parsed = parseTripPlanBody({ text: TRIP_SAMPLE_REQUEST });
+    const plan = parsed.error ? null : withTripHappyHourDeals(runTripPlan(parsed.value));
+    const stops = ((plan && plan.itinerary && plan.itinerary.stops) || []).filter((st) => st && st.venue && st.timeText).slice(0, 3);
+    if (stops.length >= 2) {
+      const crawl = plan.happyHourCrawl || {};
+      value = {
+        request: TRIP_SAMPLE_REQUEST,
+        date: crawl.date || null,
+        stops: stops.map((st) => ({ name: st.venue.name, url: st.venue.url, time: String(st.timeText).split('\u2013')[0].trim(), timeFr: String(st.timeTextFr || st.timeText).split('\u2013')[0].trim(),
+          hh: st.happyHourWhen || null, hhFr: st.happyHourWhenFr || st.happyHourWhen || null,
+          deal: st.happyHourDeals ? String(st.happyHourDeals).split(', ')[0] : null, dealFr: st.happyHourDealsFr ? String(st.happyHourDealsFr).split(', ')[0] : null })),
+      };
+    }
+  } catch (e) { value = null; }
+  tripSampleCache = { at: now, value };
+  return value;
+}
 function renderTripPlannerV3Page({ preview = false } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
@@ -34877,6 +34904,8 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     breadcrumbJson: JSON.stringify(breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Build My Trip', url: canonical }])),
     headerHtml,
     tripTrayHtml,
+    sample: tripSamplePlan(),
+    today: todayLocal(),
     footerHtml: renderHomeFooterHTML(true),
     footerStyles: renderCanonicalFooterStyles(),
     analyticsHead: renderAnalyticsHeadHtml('trip_v3'),

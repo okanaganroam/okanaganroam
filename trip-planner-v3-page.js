@@ -377,11 +377,9 @@ function t3WhyLines(stop) {
 const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
-  'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food',
-  '2 days in Penticton with the kids — museums, parks and easy food',
-  'A romantic autumn weekend in Naramata with wineries and a great dinner',
-  'A dog-friendly autumn weekend in Vernon',
-  'Coffee, an autumn hike, a winery and dinner in Kelowna',
+  '3 days in Kelowna: wineries, easy walks and great food',
+  '2 days in Penticton with the kids',
+  'A romantic weekend in Naramata',
   'What can we do around Penticton if it rains?',
 ];
 
@@ -425,12 +423,29 @@ function renderStyles() {
   /* Example plan (2026-10-29): what a result looks like, under the example requests. */
   .t3-sample { margin: 14px 0 0; max-width: 900px; font-size: 0.86rem; line-height: 1.5; color: rgba(255,255,255,0.9); }
   .t3-sample-label { font-weight: 800; }
+  .t3-try { display: block; margin: 16px 0 0; max-width: 560px; background: rgba(255,255,255,0.96); color: var(--ref-navy); border-radius: 14px; padding: 14px 16px 12px; box-shadow: 0 14px 30px -20px rgba(0,0,0,0.6); }
+  .t3-try-title { margin: 0 0 8px; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 700; font-size: 1rem; }
+  .t3-try-when { display: inline-block; margin-right: 4px; padding: 1px 8px; border-radius: 999px; background: var(--ref-navy); color: #fff; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; vertical-align: 2px; }
+  .t3-try-stops { list-style: none; margin: 0; padding: 0; }
+  .t3-try-stops li { display: grid; grid-template-columns: 5.2em 1fr; gap: 8px; padding: 7px 0; border-top: 1px solid rgba(27,43,58,0.1); font-size: 0.86rem; line-height: 1.35; }
+  .t3-try-stops li:first-child { border-top: 0; }
+  .t3-try-time { font-weight: 800; white-space: nowrap; }
+  .t3-try-stop a { font-weight: 800; color: var(--ref-navy); text-decoration: none; }
+  .t3-try-stop a:hover { text-decoration: underline; }
+  .t3-try-hh, .t3-try-deal { display: block; font-size: 0.8rem; color: rgba(27,43,58,0.78); }
+  .t3-try-hh { color: #1F5450; font-weight: 700; }
+  .t3-try-btn { display: inline-flex; align-items: center; gap: 6px; width: auto; margin-top: 8px; background: var(--ref-navy); color: #fff; border: 0; border-radius: 999px; padding: 9px 16px; min-height: 40px; font-weight: 800; font-size: 0.86rem; cursor: pointer; }
+  .t3-try-btn:hover { background: #24384c; }
+  .t3 .t3-fr { display: none; }
+  html[lang="fr"] .t3 .t3-fr { display: inline; }
+  html[lang="fr"] .t3 .t3-en { display: none; }
+
   /* 2026-10-19: the example chips' height is reserved (measured with the final fonts), so the hero does not grow when the
      web font replaces the fallback and a chip wraps onto another line. */
-  .t3-examples { min-height: 216px; }
-  html[lang="fr"] .t3-examples { min-height: 264px; }
-  @media (max-width: 1023px) { .t3-examples { min-height: 264px; } html[lang="fr"] .t3-examples { min-height: 312px; } }
-  @media (max-width: 640px) { .t3-examples { min-height: 396px; } html[lang="fr"] .t3-examples { min-height: 446px; } }
+  /* Four shorter examples (2026-10-29): measured 120px at 900 and 1280 wide (EN and FR), 230px on a 375 phone, 258px
+     in French on a 320 phone. */
+  .t3-examples { min-height: 120px; align-content: flex-start; }
+  @media (max-width: 640px) { .t3-examples { min-height: 232px; } html[lang="fr"] .t3-examples { min-height: 260px; } }
   .t3-status { min-height: 1.4em; margin: 14px 0 0; font-weight: 700; font-size: 0.92rem; color: #fff; }
   .t3-status.is-error { color: #FFD7A8; }
   /* Phones opening a plan link (2026-10-18): the request shrinks to one "Edit request" bar so the plan is on screen
@@ -441,7 +456,7 @@ function renderStyles() {
   .t3-editbar-label { display: block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #E0A94E; }
   .t3-editbar-btn { flex: none; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 0; background: #fff; color: var(--ref-navy-deep, #101B24); font-weight: 800; font-size: 0.86rem; cursor: pointer; }
   .t3.is-compact .t3-hero-inner { padding-top: 12px; padding-bottom: 12px; }
-  .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples, .t3.is-compact .t3-sample { display: none; }
+  .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples, .t3.is-compact .t3-sample, .t3.is-compact .t3-try { display: none; }
   .t3.is-compact .t3-crumb { margin-bottom: 10px; }
   .t3.is-compact .t3-status:empty { display: none; }
   /* What we understood (the editable chips) belongs to the request, so it folds away with it until "Edit request"
@@ -759,6 +774,28 @@ function renderStyles() {
 </style>`;
 }
 
+// Example card (2026-10-29): a real plan run on the server for today (d.sample, see tripSamplePlan in server.js), so
+// visitors see what they get before they type. English and French both render; html[lang] shows one. Without a plan
+// (late at night) the one-line example stays.
+function t3SampleCardHtml(d) {
+  const esc = d.esc;
+  const x = d.sample;
+  const line = `<p class="t3-sample"><span class="t3-sample-label" data-i18n="tripv3.sampleLabel">Example plan:</span> <span data-i18n="tripv3.sampleText">ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.</span></p>`;
+  if (!x || !x.stops || x.stops.length < 2) return line;
+  const DAYS = [['Sunday', 'dimanche'], ['Monday', 'lundi'], ['Tuesday', 'mardi'], ['Wednesday', 'mercredi'], ['Thursday', 'jeudi'], ['Friday', 'vendredi'], ['Saturday', 'samedi']];
+  const day = x.date && x.date !== d.today ? DAYS[new Date(`${x.date}T12:00:00Z`).getUTCDay()] : null;
+  const two = (en, fr) => (en === fr ? esc(en) : `<span class="t3-en">${esc(en)}</span><span class="t3-fr" lang="fr">${esc(fr)}</span>`);
+  const when = day ? two(day[0], day[1]) : two('Today', 'Aujourd\u2019hui');
+  const rows = x.stops.map((st) => `
+          <li><span class="t3-try-time">${two(st.time, st.timeFr)}</span><span class="t3-try-stop"><a href="${esc(st.url)}">${esc(st.name)}</a>${st.hh ? `<span class="t3-try-hh">${two(`Happy hour ${st.hh}`, `Happy hour ${st.hhFr}`)}</span>` : ''}${st.deal ? `<span class="t3-try-deal">${two(st.deal, st.dealFr || st.deal)}</span>` : ''}</span></li>`).join('');
+  return `<div class="t3-try" aria-labelledby="t3TryTitle">
+        <p class="t3-try-title" id="t3TryTitle"><span class="t3-try-when">${when}</span> <span data-i18n="tripv3.cardTitle">A happy hour crawl in Penticton</span></p>
+        <ol class="t3-try-stops">${rows}
+        </ol>
+        <button type="button" class="t3-try-btn" data-t3-request="${esc(x.request)}"><span data-i18n="tripv3.cardButton">Plan this trip</span> <span aria-hidden="true">&rarr;</span></button>
+      </div>`;
+}
+
 function renderBody(d) {
   const esc = d.esc;
   // data-i18n: /scripts/app.js shows these in the visitor's language (the
@@ -774,7 +811,7 @@ function renderBody(d) {
       <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/" data-i18n="tripv3.crumbHome">Home</a> &rsaquo; <span data-i18n="tripv3.name">Build My Trip</span></nav>
       <p class="t3-eyebrow" data-i18n="tripv3.name">Build My Trip</p>
       <h1 class="t3-title" id="t3Title" data-i18n="tripv3.title">Tell us the trip. We&rsquo;ll map it out.</h1>
-      <p class="t3-lead" data-i18n="tripv3.lead">Describe your Okanagan trip in your own words &mdash; how long, who&rsquo;s coming, what you love. We&rsquo;ll plan it day by day from real places on Okanagan Roam, and tell you why each one fits.</p>
+      <p class="t3-lead" data-i18n="tripv3.lead">Say what you want. We&rsquo;ll plan it day by day from real places that are open, and tell you why each one fits.</p>
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
         <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food." data-i18n-placeholder="tripv3.placeholder"></textarea>
@@ -787,7 +824,7 @@ function renderBody(d) {
         <span class="t3-examples-label" id="t3ExamplesLabel" data-i18n="tripv3.examplesLabel">Or start from one of these:</span>
           ${chips}
       </div>
-      <p class="t3-sample"><span class="t3-sample-label" data-i18n="tripv3.sampleLabel">Example plan:</span> <span data-i18n="tripv3.sampleText">ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.</span></p>
+      ${t3SampleCardHtml(d)}
       <div class="t3-editbar" id="t3EditBar" hidden>
         <p class="t3-editbar-text"><span class="t3-editbar-label" id="t3EditLabel">Your request</span> <span id="t3EditText"></span></p>
         <button type="button" class="t3-editbar-btn" id="t3EditBtn" aria-controls="t3Form">Edit request</button>
@@ -2290,6 +2327,9 @@ function renderScript(d) {
   });
   input.addEventListener('keydown', function(e){
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); }
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-t3-request]'), function(btn){
+    btn.addEventListener('click', function(){ input.value = btn.getAttribute('data-t3-request'); exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip){
     chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
