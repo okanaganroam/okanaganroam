@@ -18331,10 +18331,38 @@ function regionCategoryImage(c) {
   if (c.type && CATEGORY_BANNER_IMAGES[c.type]) return categoryCardImage(CATEGORY_BANNER_IMAGES[c.type]).src;
   return REGION_DISCOVERY_IMAGES[c.key] || null;
 }
+// A ski hill's own photo for a category tile: a listing of that type on the hill (What's On: the hill itself;
+// Dog-Friendly: a dog-friendly listing; Local Favourites / Hidden Gems: one of its members), else any unused listing photo
+// from the hill. -> the 480px copy, or null (the shared category art is used).
+function skiTilePhoto(region, c, used) {
+  const rows = db.prepare("SELECT id, type, name, image_url, dog_friendly FROM venues WHERE region = ? AND redirect_to IS NULL AND image_url IS NOT NULL AND image_url <> '' ORDER BY id").all(region)
+    .filter((v) => /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(v.image_url).trim()));
+  const kind = { 'local-favourites': 'local_favorite', 'hidden-gems': 'hidden_gem' }[c.key];
+  const members = kind ? new Set(db.prepare(`SELECT ci.content_id AS id FROM collection_items ci JOIN collections k ON k.id = ci.collection_id
+      WHERE ci.content_type = 'venue' AND k.kind = ?`).all(kind).map((r) => r.id)) : null;
+  const want = c.type ? (v) => v.type === c.type
+    : c.key === 'whats-on' ? (v) => v.type === 'outdoor' && /resort/i.test(v.name)
+    : c.key === 'dog-friendly' ? (v) => Number(v.dog_friendly) === 1
+    : members ? (v) => members.has(v.id)
+    : () => false;
+  // The outdoor tiles take a winter listing's photo, even one already on the page, over a summer listing's (a hiking
+  // trail, disc golf, a bike park): it's a ski page.
+  const snow = (v) => !/summer|hiking|disc golf|mountain bike|summit trail|brent mountain|provincial park/i.test(v.name);
+  const pick = (['outdoor', 'tour', 'sport'].includes(c.type) && (rows.find((v) => want(v) && snow(v) && !used.has(v.id)) || rows.find((v) => want(v) && snow(v))
+      || rows.find((v) => ['outdoor', 'tour', 'sport'].includes(v.type) && snow(v) && !used.has(v.id))
+      || rows.find((v) => ['outdoor', 'tour', 'sport'].includes(v.type) && snow(v))))
+    || rows.find((v) => want(v) && !used.has(v.id)) || rows.find((v) => want(v)) || rows.find((v) => !used.has(v.id));
+  if (!pick) return null;
+  used.add(pick.id);
+  return photoSized(String(pick.image_url).trim(), 480);
+}
 // The categories as photo cards, grouped as before, with empty categories
 // (and a group left with none) not shown at all.
 function regionCategoryGridHtml(region, categories) {
   const label = REGION_LABELS[region];
+  // Ski hills (2026-10-29): each tile shows one of the hill's own listing photos, not the valley-wide category art
+  // (a winery tasting or a summer trestle on a ski page). A photo already used on the page isn't repeated.
+  const skiUsed = SKI_RESORT_REGIONS.has(region) ? new Set(regionStartVenues(region).map((v) => v.id)) : null;
   const byKey = new Map(categories.map((c) => [c.key, c]));
   // A small place (six categories or fewer) gets one grid, not three short rows.
   const groups = categories.filter((c) => c.href).length <= 6
@@ -18346,12 +18374,12 @@ function regionCategoryGridHtml(region, categories) {
     return `<h2 class="category-subsection-heading">${escapeHtml(g.label === 'Discovery' ? 'More ways to explore' : g.label)}</h2>
   <ul class="card-grid region-photo-grid">
     ${live.map((c) => {
-      const img = regionCategoryImage(c);
+      const img = (skiUsed && skiTilePhoto(region, c, skiUsed)) || regionCategoryImage(c);
       return `
       <li class="category-card">
         <h3><a href="${escapeHtml(c.href)}">${escapeHtml(c.label)}</a></h3>
         <p class="venue-meta">${c.count} ${escapeHtml(c.count === 1 ? c.nounOne : c.nounMany)} in ${escapeHtml(label)}</p>${img ? `
-        <div class="region-card-photo"><img src="${img}"${tileSrcsetAttrs(img, REGION_TILE_SIZES)} alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
+        <div class="region-card-photo"><img src="${escapeHtml(img)}"${tileSrcsetAttrs(img, REGION_TILE_SIZES)} alt="" width="480" height="320" loading="lazy" decoding="async"></div>` : ''}
       </li>`;
     }).join('\n')}
   </ul>`;
@@ -18408,6 +18436,94 @@ const SKI_RESORT_META = {
     description: 'Discover places to eat and things to do around Baldy Mountain Resort near Oliver and Osoyoos, BC.',
   },
 };
+// Season at a glance (2026-10-29): the 2026/27 facts a skier looks for first, each read on the hill's own site
+// (checked Oct 29 2026). `season` lines are picked by today's date; after `endBy` the season line is left out until
+// next season's dates are added. Every line is a fixed string so the French list can carry it
+// (data/french/ski-season-2026-10-29.json).
+const SKI_RESORT_SEASON = {
+  'big-white': {
+    before: 'Opens Thursday, November 26, depending on snowfall. Last day Sunday, April 4, 2027.',
+    during: 'Open for the season until Sunday, April 4, 2027.',
+    opens: '2026-11-26', closes: '2027-04-04', endBy: '2027-04-04',
+    drive: 'Under an hour from Kelowna (56 km).',
+    mountain: '119 runs, 17 lifts and 777 m (2,550 ft) of vertical.',
+    links: {
+      snow: 'https://www.bigwhite.com/mountain-conditions/daily-snow-report',
+      webcams: 'https://www.bigwhite.com/mountain-conditions/webcams',
+      tickets: 'https://www.bigwhite.com/tickets-passes/lift-tickets',
+      map: 'https://www.bigwhite.com/explore/mountain-info/maps',
+    },
+  },
+  silverstar: {
+    before: 'Opens Friday, November 27.',
+    during: 'Open for the season.',
+    opens: '2026-11-27', closes: null, endBy: '2027-04-30',
+    drive: null,
+    mountain: '133 marked runs and 760 m of vertical.',
+    links: {
+      snow: 'https://www.skisilverstar.com/the-mountain/weather-conditions/snow-report-forecast/',
+      webcams: 'https://www.skisilverstar.com/the-mountain/webcams/',
+      tickets: 'https://www.skisilverstar.com/tickets-passes/winter-tickets/',
+      map: 'https://www.skisilverstar.com/the-mountain/mountain-maps/winter-maps/',
+    },
+  },
+  apex: {
+    before: 'Opening day for the 2026/27 season hasn’t been announced yet.',
+    during: null,
+    opens: null, closes: null, endBy: '2027-04-30',
+    drive: 'About 30 minutes from Penticton.',
+    mountain: '85 runs, 4 lifts and 2,000 ft of vertical.',
+    links: {
+      snow: 'https://apexresort.com/weather/',
+      webcams: 'https://apexresort.com/weather/#live-webcams',
+      tickets: 'https://apexresort.com/lift-ticket-prices/',
+      map: null,
+    },
+  },
+  baldy: {
+    before: 'Opening day hasn’t been announced yet. The resort usually runs from early December to early April.',
+    during: null,
+    opens: null, closes: null, endBy: '2027-04-30',
+    drive: 'About 45 minutes from Oliver and an hour from Osoyoos.',
+    mountain: '35 alpine runs.',
+    links: {
+      snow: 'https://baldyresort.com/baldy-weather-cams/',
+      webcams: 'https://baldyresort.com/baldy-weather-cams/#webcams',
+      tickets: 'https://baldyresort.com/lift-tickets/',
+      map: 'https://baldyresort.com/mountain/#trail',
+    },
+  },
+};
+const SKI_RESORT_LINK_LABELS = [['snow', 'Snow report'], ['webcams', 'Webcams'], ['tickets', 'Lift tickets'], ['map', 'Trail map']];
+function skiSeasonLine(f, today) {
+  if (!f || today > f.endBy) return null;
+  if (f.opens && today >= f.opens) return f.during || null;
+  return f.before;
+}
+function skiSeasonBoxHtml(region, today = todayLocal()) {
+  const f = SKI_RESORT_SEASON[region];
+  if (!f) return '';
+  const rows = [['Season', skiSeasonLine(f, today)], ['Getting there', f.drive], ['The mountain', f.mountain]].filter((r) => r[1]);
+  const links = SKI_RESORT_LINK_LABELS.filter(([k]) => f.links[k]);
+  if (!rows.length && !links.length) return '';
+  return `<section class="ski-season" aria-labelledby="skiSeasonHeading">
+    <h2 id="skiSeasonHeading">Season at a glance</h2>
+    <dl>${rows.map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}</dl>${links.length ? `
+    <p class="ski-season-links">${links.map(([k, l]) => `<a href="${escapeHtml(f.links[k])}" target="_blank" rel="noopener">${escapeHtml(l)}</a>`).join('')}</p>` : ''}
+  </section>`;
+}
+const SKI_SEASON_STYLE = `<style id="ski-season">
+  body.region-page .ski-season { margin: 0 0 22px; padding: 16px 20px; border-radius: 14px; background: var(--paper, #fffaf2); border: 1px solid rgba(42,32,25,0.12); }
+  body.region-page .ski-season h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.1rem; margin: 0 0 8px; }
+  body.region-page .ski-season dl { margin: 0; display: grid; gap: 6px; }
+  body.region-page .ski-season dl > div { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 10px; }
+  body.region-page .ski-season dt { font-weight: 800; font-size: 0.9rem; }
+  body.region-page .ski-season dd { margin: 0; font-size: 0.95rem; }
+  body.region-page .ski-season-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+  body.region-page .ski-season-links a { display: inline-block; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.2); background: #fff; font-weight: 700; font-size: 0.88rem; color: var(--ref-navy); text-decoration: none; }
+  body.region-page .ski-season-links a:hover { border-color: var(--ref-navy); }
+  @media (max-width: 520px) { body.region-page .ski-season dl > div { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+</style>`;
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
   const totalVenues = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
@@ -18487,6 +18603,7 @@ ${renderDestinationCategoryStyles()}
 ${intro ? REGION_INTRO_STYLE : ''}
 ${CATEGORY_BANNER_STYLE}
 ${REGION_PAGE_STYLE}
+${isSkiResort ? SKI_SEASON_STYLE : ''}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head>
 <body class="golf-page outdoor-page region-page">
@@ -18501,6 +18618,7 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(regionBannerHtml(region), `<h1>${escapeHtml(regionHeading(region))}</h1>
   <p class="subtitle">${placeCount} place${placeCount === 1 ? '' : 's'} to eat, drink and explore in ${escapeHtml(regionLabel)}</p>`)}
   ${regionCategoryTabsHtml(region, categoryCounts, null, categories.filter((c) => c.href))}
+  ${isSkiResort ? skiSeasonBoxHtml(region) : ''}
   <div class="region-lead${intro && startHtml ? ' region-lead-split' : ''}">
   <div class="region-lead-text">
   ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}</div>
@@ -56160,6 +56278,9 @@ module.exports = {
   REGION_INTROS,
   REGION_INTRO_STYLE,
   SKI_RESORT_REGIONS,
+  SKI_RESORT_SEASON,
+  skiSeasonLine,
+  skiSeasonBoxHtml,
   startServer,
   importEventBatches,
   // List an Event, Phase 1
