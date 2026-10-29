@@ -9946,12 +9946,16 @@ test('Local Favourites: /local-favorites renders exactly the live collection, wi
 // /secret-spots lists the live 'hidden_gem' collection narrowed to places
 // (outdoor + beach). A Hidden Gem cafe stays a Hidden Gem but is not a
 // Secret Spot. Fixture memberships are removed again at the end.
-test('Cards: themed listing cards cap the badge row at 5 chips (+N more) and the grid uses uniform, bottom-aligned cards', () => {
+test('Cards: themed listing cards cap the badge row at two badges (+N more) and the grid uses uniform, bottom-aligned cards', () => {
   const v = { id: 990003, name: 'Chip Cap Fixture', region: 'kelowna', type: 'brewery', slug: 'chip-cap-fixture', description: 'Fixture.', vegan: true, vegetarian: true, patio: true, live_music: true, happy_hour: true, great_groups: true, gluten_free: true };
   const card = app.venueCardHtml(v, { themed: true });
   const chips = card.match(/<p class="chips">(.*?)<\/p>/)[1];
-  assert.equal((chips.match(/class="chip/g) || []).length, 5);
-  assert.match(chips, /<span class="chip chip-more" title="Live Music, Great for Groups, Happy Hour">\+3 more<\/span>/);
+  assert.equal((chips.match(/class="chip/g) || []).length, 3);
+  assert.match(chips, /<span class="chip chip-more" title="[^"]*Live Music, Great for Groups, Happy Hour">\+5 more<\/span>/);
+  // Card redesign (2026-10-28): the Hidden Gem / Local Favourite badge goes on the photo and is not counted.
+  const lf = app.venueCardHtml(v, { themed: true, isLocalFavourite: true }).match(/<p class="chips">(.*?)<\/p>/)[1];
+  assert.match(lf, /^<span class="chip local-favourite-badge">/);
+  assert.equal((lf.match(/class="chip(?! local-favourite-badge)/g) || []).length, 3, 'two badges and +N more besides the photo badge');
   assert.equal(app.capChips('<span class="chip">A</span>', 5), '<span class="chip">A</span>', 'short rows untouched');
   const plain = app.venueCardHtml(v, { themed: false });
   assert.doesNotMatch(plain, /chip-more/, 'unthemed cards keep every chip');
@@ -16130,9 +16134,10 @@ test('Browse hub: the whole card opens the venue page through one title link (no
   // Navigation is the browser's own: the page script never navigates on card clicks.
   const script = html.slice(html.lastIndexOf('<script>\n(function(){\nfunction bhStart(){\n  var LABELS'), html.lastIndexOf('</script>'));
   assert.doesNotMatch(script, /location\.(href|assign)\s*=|location\.assign\(|window\.open\(/, 'no card-click navigation script');
-  // The overlay is Browse-only: the other hubs keep their cards exactly as they were.
+  // Card redesign (2026-10-28): every list page's photo cards now open the place from anywhere on the card too
+  // (CARD_V2_CSS), with the same one-link markup.
   const fd = await (await fetch(`${base}/food-drink`)).text();
-  assert.doesNotMatch(fd, /a\.venue-card-link::after/);
+  assert.match(fd, /<style id="card-v2">[\s\S]*a\.venue-card-link::after \{ content: ""; position: absolute; inset: 0;/);
 })));
 
 test('Venue detail keeps the operational actions, data-dependent: Website / Directions / Call only when on file, never Find menu or online booking', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {

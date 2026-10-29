@@ -16069,6 +16069,57 @@ const LAZY_CARD_PHOTO_HEAD = `<style id="lazy-card-photos">html.lzp li.venue-car
   d.className += ' lzp';
 })();
 </script>`;
+// Listing cards, homepage style (Dayton, 2026-10-28): every photo card on the list pages (Food & Drink, wineries,
+// sports, tours, beaches, golf, shops, town pages, Local Favourites, Secret Spots, /browse) gets the Editor's Picks
+// look -- a 16:9 photo (2:1 on phones), the meta line as a small gold line above the name, a two-line description,
+// the Hidden Gem / Local Favourite badge on the photo, two badges then "+N more", the heart on the photo and a smaller
+// Add to trip. The whole card opens the place (the name's link is stretched over it), so "View details" goes.
+// Loaded with the lazy-photo head (only pages with photo cards); "html body" plus !important outranks the
+// per-category card rules, which come later on the page.
+const CARD_V2_CARD = 'html body.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card)';
+const CARD_V2_CSS = `<style id="card-v2">
+  ${CARD_V2_CARD} { position: relative; padding: calc(56.25% + 14px) 18px 14px !important; }
+  ${CARD_V2_CARD}::before { height: 0 !important; padding-bottom: 56.25%; border-radius: 13px 13px 0 0 !important; }
+  ${CARD_V2_CARD} > .venue-meta { order: -1; margin: 0 0 4px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ref-gold-ink, #8A6A0F); }
+  ${CARD_V2_CARD} > h2 { margin: 0 0 4px; font-size: 1.12rem; line-height: 1.22; }
+  ${CARD_V2_CARD} .venue-card-cue { display: none !important; }
+  ${CARD_V2_CARD} h2 a.venue-card-link { padding: 0 !important; color: var(--ink); }
+  ${CARD_V2_CARD} h2 a.venue-card-link::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: 14px; }
+  ${CARD_V2_CARD} h2 a.venue-card-link:focus-visible { outline: none; }
+  ${CARD_V2_CARD} h2 a.venue-card-link:focus-visible::after { outline: 2px solid var(--ref-gold, #C9A227); outline-offset: 2px; }
+  ${CARD_V2_CARD}:hover h2 a.venue-card-link .venue-card-name { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  ${CARD_V2_CARD} .card-slot a, ${CARD_V2_CARD} > .chips > .chip, ${CARD_V2_CARD} .card-action, ${CARD_V2_CARD} .golf-fee a { position: relative; z-index: 2; }
+  ${CARD_V2_CARD} > .chips { position: static !important; }
+  ${CARD_V2_CARD} .golf-desc { min-height: 0 !important; }
+  ${CARD_V2_CARD} .golf-desc p { display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical; overflow: hidden; max-height: none !important; margin: 0; font-size: 0.94rem; line-height: 1.45; }
+  ${CARD_V2_CARD} .desc-toggle { display: none !important; }
+  ${CARD_V2_CARD} .fd-open-status[data-fd-open="closed"] { color: #9A4A3A; opacity: 1; }
+  ${CARD_V2_CARD} > .chips .chip { font-size: 0.76rem; padding: 4px 10px; }
+  ${CARD_V2_CARD} > .chips > :is(.hidden-gem-badge, .local-favourite-badge):first-child { position: absolute; top: 10px; left: 10px; z-index: 2; margin: 0; background: var(--teal, #2A6B67) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 1px 4px rgba(0,0,0,0.25); white-space: nowrap; }
+  ${CARD_V2_CARD} > .chips > :is(.hidden-gem-badge, .local-favourite-badge):first-child + :is(.hidden-gem-badge, .local-favourite-badge) { position: absolute; top: 44px; left: 10px; z-index: 2; margin: 0; background: var(--teal, #2A6B67) !important; color: #fff !important; border-color: transparent !important; }
+  ${CARD_V2_CARD} .card-actions { justify-content: flex-end; border-top: 0 !important; padding-top: 0 !important; }
+  ${CARD_V2_CARD} .card-action.trip-btn { font-size: 0.8rem; padding: 6px 12px; min-height: 36px; }
+  ${CARD_V2_CARD} .card-action.fav-btn { position: absolute !important; z-index: 3; top: 10px; right: 10px; width: 40px; height: 40px; min-height: 0; margin: 0; padding: 0 !important; border-radius: 50%; border: 0 !important; background: rgba(255,255,255,0.94) !important; box-shadow: 0 1px 5px rgba(0,0,0,0.22); display: grid; place-items: center; font-size: 0; line-height: 0; color: var(--ink); }
+  ${CARD_V2_CARD} .card-action.fav-btn svg { width: 19px; height: 19px; }
+  ${CARD_V2_CARD} .card-action.fav-btn[aria-pressed="true"] { color: #C0392B; }
+  ${CARD_V2_CARD} .card-action.fav-btn[aria-pressed="true"] svg { fill: currentColor; }
+  /* A plain column instead of the shared-row grid (subgrid ignores the photo's padding); the grid still makes every
+     card in a row the same height, and the badges and Add to trip sit at the bottom. */
+  ${CARD_V2_CARD} { display: flex !important; flex-direction: column; grid-row: auto !important; margin-bottom: 0 !important; }
+  html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { row-gap: 20px !important; column-gap: 20px; }
+  ${CARD_V2_CARD} > .chips:not(:empty) { margin: auto 0 0 !important; padding: 10px 0 0 !important; border: 0 !important; }
+  ${CARD_V2_CARD} > .chips:empty { display: none !important; }
+  ${CARD_V2_CARD} > .chips:empty + .card-actions { margin-top: auto !important; }
+  ${CARD_V2_CARD} > .card-actions { margin: 8px 0 0 !important; padding: 0 !important; border: 0 !important; align-self: stretch !important; }
+  ${CARD_V2_CARD} > .card-slot:empty { display: none !important; }
+  @media (min-width: 700px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1000px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 1280px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (max-width: 640px) {
+    ${CARD_V2_CARD} { padding: calc(50% + 12px) 16px 14px !important; }
+    ${CARD_V2_CARD}::before { padding-bottom: 50%; }
+  }
+</style>`;
 function withLazyCardPhotos(html) {
   if (typeof html !== 'string' || html.indexOf(' data-lz') === -1 && html.indexOf('id="bhRest"') === -1) return html;
   let eager = 0;
@@ -16078,7 +16129,7 @@ function withLazyCardPhotos(html) {
     return m.slice(0, -' data-lz'.length);
   });
   const head = html.indexOf('</head>');
-  return head === -1 ? html : html.slice(0, head) + LAZY_CARD_PHOTO_HEAD + '\n' + html.slice(head);
+  return head === -1 ? html : html.slice(0, head) + LAZY_CARD_PHOTO_HEAD + '\n' + CARD_V2_CSS + '\n' + html.slice(head);
 }
 // /browse's first card photo, found at once (2026-10-19, round 8): /browse has no banner, so its largest paint is the
 // first card, whose photo is a CSS background (li::before) the browser only finds once every stylesheet is in and the
@@ -17895,7 +17946,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 5, hideDogBadges = false, hideHiddenGemBadge = false, hideLocalFavouriteBadge = false } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 3, hideDogBadges = false, hideHiddenGemBadge = false, hideLocalFavouriteBadge = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -17976,7 +18027,12 @@ function venueCardHtml(venue, opts = {}) {
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${seasonTag ? seasonTagHtml(seasonTag) : advisoryNoticeHtml(advisoryNote)}`
     : '';
-  const chipsHtml = `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), themed ? maxChips : 0)}</p>`;
+  // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
+  // so it no longer counts towards the badge cap; the row under the text keeps two badges and "+N more".
+  const photoTagChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
+  const chipsHtml = themed
+    ? `<p class="chips">${photoTagChips}${capChips(editorialChips.slice(photoTagChips.length) + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), maxChips)}</p>`
+    : `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), 0)}</p>`;
   // Themed listing cards (2026-10-12) always have the same eight parts in the
   // same order -- name, meta, fee slot, description slot, notice slot, notes
   // slot, badges, buttons -- with empty slots rendered as empty elements, so
