@@ -22342,6 +22342,11 @@ test('Venue photo gallery (2026-10-16): main photo plus approved owner photos op
   const slides = page.match(/<figure class="vg-slide"><img src="([^"]+)"/g).map((x) => x.match(/src="([^"]+)"/)[1]);
   assert.deepEqual(slides, ['/images/owner/galleryfixture0000000001.jpg', '/images/owner/galleryfixture0000000002.jpg', '/images/owner/galleryfixture0000000003.jpg'], 'main photo first, once; pending photos stay hidden');
   assert.match(page, /<figcaption>Photo: Gallery Cafe<\/figcaption>/);
+  // 2026-10-29: a credit that only repeats the venue's own name is left out of the viewer.
+  db.prepare("UPDATE owner_photos SET credit = 'Gallery Fixture Cafe' WHERE venue_id = ?").run(v.id);
+  const nameOnly = await fetch(`${base}/kelowna/cafes/gallery-fixture-cafe`).then((r) => r.text());
+  assert.doesNotMatch(nameOnly, /<figcaption>Photo: Gallery Fixture Cafe<\/figcaption>/);
+  db.prepare("UPDATE owner_photos SET credit = 'Gallery Cafe' WHERE venue_id = ?").run(v.id);
   // The thumbnails skip the main photo (it is already the big one) and open the viewer at photo 2.
   // Round 11 (2026-10-20): the strip is in the page twice, by the photo and after the buttons for phones (.vg-phone).
   assert.equal((page.match(/class="vg-thumb"/g) || []).length, 4);
