@@ -16138,31 +16138,12 @@ const CARD_V2_CSS = `<style id="card-v2">
   html body.curated-hub-page .card-grid > li.venue-card:has(.card-note) .golf-desc { display: none !important; }
   html body.curated-hub-page .card-grid > li.venue-card .card-note { display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; max-height: none !important; margin: 2px 0 0 !important; font-size: 0.94rem !important; line-height: 1.45 !important; color: var(--ink) !important; }
   html body.curated-hub-page .card-grid > li.venue-card .card-note-label { display: block; margin-bottom: 2px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-deep, #1F5450); }
-  /* Cards line up across a row again (Dayton, 2026-10-28): with two or more columns each card shares the row's
-     tracks (subgrid), one track per part -- town, name, open line, price, description, notice, notes, badges,
-     button -- so the same part starts at the same height on every card in the row. The fare's fine print stays on the venue page, so a priced course
-     is no longer twice as tall as its neighbours. */
+  /* Cards line up across a row, without gaps in the middle (Dayton, 2026-10-28): from two columns up the script
+     after this style block gives the town, name, open line, price and description of every card in a row the same
+     height, so those start level; the notice, notes and badges then follow each card's own text, and Add to trip
+     sits at the bottom (margin-top: auto above), so any spare space collects just above the button. The fare's fine
+     print stays on the venue page, so a priced course is no longer twice as tall as its neighbours. */
   ${CARD_V2_CARD} .golf-fee-note { display: none !important; }
-  @supports (grid-template-rows: subgrid) {
-    @media (min-width: 700px) {
-      html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { row-gap: 0 !important; }
-      ${CARD_V2_CARD} { display: grid !important; grid-template-rows: subgrid; grid-row: span 11 !important; row-gap: 0; align-content: start; padding-top: 0 !important; margin-bottom: 20px !important; content-visibility: visible; contain-intrinsic-size: none; }
-      /* A subgrid ignores the card's top padding, so the photo takes the first track itself. */
-      ${CARD_V2_CARD}::before { position: relative !important; grid-row: 1; height: auto !important; padding-bottom: 0 !important; aspect-ratio: 16 / 9; margin: 0 -18px 14px; }
-      ${CARD_V2_CARD} > .venue-meta { grid-row: 2; order: 0; }
-      ${CARD_V2_CARD} > h2 { grid-row: 3; }
-      ${CARD_V2_CARD} > .fd-open-status { grid-row: 4; }
-      ${CARD_V2_CARD} > .card-slot-fee { grid-row: 5; }
-      ${CARD_V2_CARD} > .card-slot-desc { grid-row: 6; }
-      ${CARD_V2_CARD} > .card-slot-notice { grid-row: 7; }
-      ${CARD_V2_CARD} > .card-slot-notes { grid-row: 8; }
-      ${CARD_V2_CARD} > .chips { grid-row: 9; }
-      ${CARD_V2_CARD} > .card-actions { grid-row: 10; margin: 0 !important; align-self: end !important; }
-      ${CARD_V2_CARD} > .card-links { grid-row: 11; }
-      ${CARD_V2_CARD} > .card-slot:empty, ${CARD_V2_CARD} > .chips:empty { display: block !important; margin: 0 !important; padding: 0 !important; }
-      ${CARD_V2_CARD} > .chips:not(:empty) { align-self: start !important; }
-    }
-  }
   @media (min-width: 700px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 1000px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (min-width: 1280px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -16170,7 +16151,45 @@ const CARD_V2_CSS = `<style id="card-v2">
     ${CARD_V2_CARD} { padding: calc(50% + 12px) 16px 14px !important; }
     ${CARD_V2_CARD}::before { padding-bottom: 50%; }
   }
-</style>`;
+</style>
+<script id="card-v2-rows">(function () {
+  var PARTS = ['.venue-meta', 'h2', '.fd-open-status', '.card-slot-fee', '.card-slot-desc'];
+  var CARD = 'li.venue-card[data-ph]:not(.whatson-event-card), li.venue-card[data-card-ph]:not(.whatson-event-card)';
+  var queued = false;
+  function part(card, sel) { for (var i = 0; i < card.children.length; i++) if (card.children[i].matches(sel)) return card.children[i]; return null; }
+  function align() {
+    queued = false;
+    if (!document.body || !document.body.classList.contains('golf-page')) return;
+    document.querySelectorAll('.card-grid').forEach(function (grid) {
+      var cards = Array.prototype.filter.call(grid.children, function (c) { return c.matches(CARD); });
+      cards.forEach(function (c) { PARTS.forEach(function (p) { var e = part(c, p); if (e) e.style.minHeight = ''; }); });
+      if (window.innerWidth < 700) return;
+      var rows = {};
+      cards.forEach(function (c) { if (!c.offsetParent) return; var t = Math.round(c.getBoundingClientRect().top); (rows[t] = rows[t] || []).push(c); });
+      Object.keys(rows).forEach(function (t) {
+        var row = rows[t];
+        if (row.length < 2) return;
+        PARTS.forEach(function (p) {
+          var els = row.map(function (c) { return part(c, p); }).filter(Boolean);
+          var max = 0;
+          els.forEach(function (e) { max = Math.max(max, e.getBoundingClientRect().height); });
+          if (max > 0) els.forEach(function (e) { e.style.minHeight = max + 'px'; });
+        });
+      });
+    });
+  }
+  function queue() { if (!queued) { queued = true; requestAnimationFrame(align); } }
+  function start() {
+    queue();
+    window.addEventListener('resize', queue);
+    window.addEventListener('load', queue);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(queue);
+    new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) { var t = list[i].target; if (t.classList && (t.classList.contains('card-grid') || t.matches(CARD))) { queue(); return; } }
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();</script>`;
 function withLazyCardPhotos(html) {
   if (typeof html !== 'string' || html.indexOf(' data-lz') === -1 && html.indexOf('id="bhRest"') === -1 && html.indexOf('-ph="none"') === -1) return html;
   let eager = 0;
@@ -17970,14 +17989,8 @@ const CARD_BADGE_SHORT = {
   great_groups: ['group', 'Groups'], happy_hour: ['cocktail', 'Happy hour'], free_entry: ['ticket', 'Free'],
   arts_culture: ['palette', 'Arts & culture'], open_early: ['sunrise', 'Open early'], open_late: ['moon', 'Open late'],
 };
-// Kids welcome says nothing on a beach or a free park or trail (Dayton, 2026-10-28: "beaches and parks don't need
-// kid friendly badges"), so those cards and pages leave it off; paid attractions keep it. The field itself stays,
-// so the Kids welcome filter and Build My Trip still find these places.
-function badgeShown(venue, f) {
-  return !(f === 'kid_friendly' && (venue.type === 'beach' || (venue.type === 'outdoor' && venue.free_entry)));
-}
 function cardBadgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && badgeShown(venue, f))
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
     .map((f) => {
       const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
       return `<span class="chip chip-feat">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
@@ -17986,7 +17999,7 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
 }
 
 function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && badgeShown(venue, f))
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
     .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
     .join(' ');
 }
@@ -18097,7 +18110,9 @@ function venueCardHtml(venue, opts = {}) {
   // or no entry for this venue, renders nothing, so every other card is
   // byte-identical. cardNoteLabel (2026-10-11) names the line: 'Rainy day:'
   // by default, 'Experience:' on the /tours hub's "More experiences to book".
-  const cardNote = cardNotes && cardNotes.get(venue.id) ? String(cardNotes.get(venue.id)).trim() : '';
+  // A card note that repeats the dog note (the beaches page passes the dog rule as both) shows once.
+  const cardNoteRaw = cardNotes && cardNotes.get(venue.id) ? String(cardNotes.get(venue.id)).trim() : '';
+  const cardNote = dogNoteHtml && cardNoteRaw === String(dogFriendlyNote || '').trim() ? '' : cardNoteRaw;
   const cardNoteHtml = cardNote ? `\n        <p class="card-note"><span class="card-note-label">${escapeHtml(cardNoteLabel)}</span> ${escapeHtml(cardNote)}</p>` : '';
   // hideSocial (2026-10-16): the /browse hub's discovery cards never link off the site.
   const socialHtml = (venue.redirect_to || opts.hideSocial) ? '' : cardSocialHtml(venue);
