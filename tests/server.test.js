@@ -4298,7 +4298,14 @@ test('H1 Step 3: venue pages link the next publishable events at that venue, omi
     return r.event;
   };
 
-  // 2. One event -> still no block.
+  // 1b. (2026-10-29) One event with several dates still to come (a theatre's run of a play) shows on its own.
+  const run = mk('Footlight Run', { categories: ['arts-culture'], occurrences: [{ start_date: '2033-05-13' }, { start_date: '2033-05-14' }, { start_date: '2033-05-15' }] });
+  assert.deepEqual(app.listUpcomingEventsAtVenue(venue.id).map((e) => e.slug), [run.slug], 'a single multi-date run is listed');
+  assert.deepEqual(cardsOf(html()), [`/kelowna/events/${run.slug}`], 'a single multi-date run -> one card');
+  for (const tbl of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${tbl} WHERE event_id = ?`).run(run.id);
+  db.prepare('DELETE FROM events WHERE id = ?').run(run.id);
+
+  // 2. One single-date event -> still no block.
   const a = mk('Cellarwork Nocturne', { occurrences: [{ start_date: '2033-05-02' }] });
   assert.equal(app.listUpcomingEventsAtVenue(venue.id).length, 0, 'one event is below the threshold');
   assert.doesNotMatch(html(), /Events at /, 'one event -> still no block');
@@ -12041,7 +12048,7 @@ test('List Your Venue: admin routes require the admin token', () => withDiscover
   assert.equal((await lyvAdmin(base, '/admin/venue-submissions?status=bogus')).status, 400);
 }));
 
-test('List Your Venue (2026-10-16): an approved submission\'s Instagram or Facebook link goes on the listing and its card', () => withDiscoveryServer(async (base) => {
+test('List Your Venue (2026-10-16): an approved submission\'s Instagram or Facebook link goes on the listing (not its card since 2026-10-29)', () => withDiscoveryServer(async (base) => {
   const ig = await (await lyvPost(base, lyvValid({ name: 'Social Link Test Cafe', type: 'cafe', region: 'penticton', social_url: 'https://www.instagram.com/social.link.test/?igsh=abc' }))).json();
   const fb = await (await lyvPost(base, lyvValid({ name: 'Facebook Link Test Cafe', type: 'cafe', region: 'penticton', social_url: 'facebook.com/fblinktest' }))).json();
   const other = await (await lyvPost(base, lyvValid({ name: 'Linktree Test Cafe', type: 'cafe', region: 'penticton', social_url: 'linktr.ee/linktreetest' }))).json();
@@ -12056,9 +12063,8 @@ test('List Your Venue (2026-10-16): an approved submission\'s Instagram or Faceb
   const listing = await fetch(`${base}/penticton/cafes/social-link-test-cafe`).then((r) => r.text());
   assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/social\.link\.test\/" rel="nofollow noopener" target="_blank">Instagram<\/a>/);
   const cards = await fetch(`${base}/penticton/cafes`).then((r) => r.text());
-  assert.match(cards, /aria-label="Social Link Test Cafe on Instagram"/);
-  assert.match(cards, /aria-label="Facebook Link Test Cafe on Facebook"/);
-  assert.doesNotMatch(cards, /aria-label="Linktree Test Cafe on/);
+  // Cards no longer carry the links (2026-10-29): they are on the venue page only.
+  assert.doesNotMatch(cards, /aria-label="(Social Link|Facebook Link) Test Cafe on/);
 }));
 
 test('List Your Venue: approval creates the venue exactly once through createVenue and records provenance', () => withDiscoveryServer(async (base) => {
@@ -20769,7 +20775,8 @@ test('Owner portal: photo uploads are private until approved, then can become th
     assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/owner/${row.file}`);
     const page = await fetch(`${base}/kelowna/cafes/owner-photos-fixture`).then((r) => r.text());
     assert.match(page, new RegExp(`/images/owner/${row.file}`));
-    assert.match(page, /Photo: Owner Photos Fixture/);
+    // 2026-10-29: the owner's credit defaults to the business's own name, which the page no longer repeats under the photo.
+    assert.doesNotMatch(page, /Photo: Owner Photos Fixture/);
     // Rejecting deletes the file.
     const second = await up(good);
     const row2 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(second.body.id);
@@ -21692,9 +21699,9 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
     assert.match(listing, /<a href="https:\/\/linksfixture\.ca\/menu" rel="nofollow noopener" target="_blank">See the menu/);
     assert.match(listing, /<a class="cta secondary" href="https:\/\/www\.opentable\.ca\/r\/links-fixture" rel="nofollow noopener" target="_blank" data-track="booking">Book<\/a>/);
     assert.match(listing, /<a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank">Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
-    // The listing card shows the same links (2026-10-16).
+    // Listing cards no longer show them (2026-10-29): Instagram and Facebook are on the venue page only.
     const cards = await fetch(`${base}/kelowna/cafes`).then((r) => r.text());
-    assert.match(cards, /<p class="card-social"[^>]*><a href="https:\/\/www\.instagram\.com\/links\.fixture\/" rel="nofollow noopener" target="_blank" aria-label="Links Fixture Cafe &amp; Bakery on Instagram"[^>]*>Instagram<\/a> &middot; <a href="https:\/\/facebook\.com\/linksfixture"/);
+    assert.doesNotMatch(cards, /class="card-social"/);
     const logged = db.prepare("SELECT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(v.id).map((r) => r.field_name).sort();
     assert.deepEqual(logged, ['address', 'booking_url', 'facebook_url', 'instagram_url', 'menu_url', 'name']);
     // The form now starts from the new values, and a link can be removed.
@@ -31920,6 +31927,7 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
   set.run(49.705, -119.40, null, null, app.findVenueBySlug('kelowna', 'cafe', 'close-by-cafe-fixture').id); // ~0.6 km
   set.run(49.73, -119.40, null, null, app.findVenueBySlug('kelowna', 'pub', 'close-by-pub-fixture').id); // ~3.3 km
   set.run(49.99, -119.40, null, null, app.findVenueBySlug('kelowna', 'restaurant', 'close-by-far-fixture').id); // ~32 km
+  db.prepare('INSERT OR REPLACE INTO venue_links (venue_id, menu_url, booking_url) VALUES (?, ?, ?)').run(host.id, 'http://www.host.example', 'https://host.example/');
   const srv = http.createServer(app.server.listeners('request')[0]);
   await new Promise((resolve) => srv.listen(0, resolve));
   try {
@@ -31927,6 +31935,9 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
     const row = html.slice(html.indexOf('<div class="venue-cta-row"'), html.indexOf('</div>', html.indexOf('<div class="venue-cta-row"')));
     assert.match(row, /^<div class="venue-cta-row"[^>]*>\s*<a class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions<\/a>/);
     assert.match(row, /<a class="cta secondary" href="https:\/\/host\.example\/"[^>]*target="_blank" data-track="website">Website ↗<\/a>/);
+    // 2026-10-29: a menu or booking link that is only the website itself is left out (no Book button, no Menu row).
+    assert.doesNotMatch(html, /data-track="booking"/);
+    assert.doesNotMatch(html, /See the menu/);
     const strip = html.slice(html.indexOf('<section class="nearby-strip"'), html.indexOf('</section>', html.indexOf('<section class="nearby-strip"')));
     assert.ok(strip.length > 0, 'the Close by strip renders');
     assert.ok(html.indexOf('class="venue-description"') < html.indexOf('class="nearby-strip"'), 'after the description');
@@ -31948,6 +31959,10 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
     assert.ok(strip.indexOf('Close By Cafe Fixture') < strip.indexOf('Close By Pub Fixture'), 'closest first');
     assert.match(strip, /class="card-action trip-btn" data-trip-name="Close By Cafe Fixture"[^>]*data-trip-ref="venue:\d+"/);
     assert.match(strip, /window\.trackEvent\('nearby_click'/);
+    // 2026-10-29: "More to explore near" never repeats a place already in Close by.
+    const exploreAt = html.indexOf('<h2>More to explore near');
+    const explore = exploreAt < 0 ? '' : html.slice(exploreAt, html.indexOf('</div>\n      </div>', exploreAt));
+    for (const name of ['Close By Cafe Fixture', 'Close By Pub Fixture']) assert.ok(!explore.includes(name), `${name} shows once`);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
@@ -32117,4 +32132,41 @@ test('Browse: the What matters to you list offers Free to Visit and Arts & Cultu
   assert.match(html, /data-bh-feature="free_entry"/);
   assert.match(html, /data-bh-feature="arts_culture"/);
   assert.match(html, /data-bh-feature="kid_friendly"/);
+});
+
+test('Venue page polish (2026-10-29): a theatre leads with its next show and Show dates; one top row on computers', () => {
+  const hours = JSON.stringify({ mon: null, tue: null, wed: null, thu: null, fri: [['19:30', '21:30']], sat: [['19:30', '21:29']], sun: [['14:00', '16:00']] });
+  db.prepare(`INSERT INTO venues (name, region, type, description, address, latitude, longitude, hours, slug)
+    VALUES ('Polish Fixture Theatre', 'penticton', 'indoor', 'A fixture theatre.', '1 Stage Rd, Penticton, BC', 49.49, -119.6, ?, 'polish-fixture-theatre')`).run(hours);
+  const v = app.findVenueBySlug('penticton', 'indoor', 'polish-fixture-theatre');
+  const NOW = new Date('2026-10-29T22:00:00Z'); // a Thursday, two weeks before the run
+  const page = () => app.renderVenuePage(app.findVenueBySlug('penticton', 'indoor', 'polish-fixture-theatre'), [], [], [], { now: NOW });
+  // No show coming up: the usual open-now line and Hours.
+  assert.match(page(), /id="venueOpenStatus">Closed today/);
+  assert.match(page(), /<div class="venue-section venue-hours" id="venueHours"><h2>Hours/);
+  const occurrences = [['2026-11-13', '19:30', '21:30'], ['2026-11-14', '19:30', '21:30'], ['2026-11-15', '14:00', '16:00'], ['2026-11-20', '19:30', '21:30']]
+    .map(([start_date, start_time, end_time]) => ({ start_date, start_time, end_time }));
+  const r = app.createEvent({ region: 'penticton', name: 'Footlight Follies – Polish Fixture Theatre', description: 'Fixture run.', source_type: 'official_organizer',
+    source_name: 'polish fixture', source_url: 'https://example.com/polish/footlight', venue_id: v.id, categories: ['arts-culture'], occurrences }, { reason: 'fixture', batch_id: 'test-polish' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  try {
+    const html = page();
+    assert.match(html, /<p class="venue-open-status" data-open="show" id="venueOpenStatus">Next show: Fri Nov 13, 7:30 PM <a href="#venueHours">See all 4 dates<\/a><\/p>/);
+    const box = html.slice(html.indexOf('id="venueHours"'), html.indexOf('</div>', html.indexOf('id="venueHours"')));
+    assert.match(box, /<h2>Show dates<\/h2><p class="venue-show-title"[^>]*>Footlight Follies<\/p>/, 'the repeated venue name is dropped from the title');
+    assert.match(box, /Nov 13 – Nov 20 · 4 shows/);
+    assert.match(box, /<li><span>Fridays<\/span><span>7:30 PM – 9:30 PM<\/span><\/li><li><span>Saturdays<\/span>.*<li><span>Sundays<\/span><span>2 PM – 4 PM<\/span><\/li>/);
+    assert.match(box, new RegExp(`href="/penticton/events/${r.event.slug}"`));
+    assert.doesNotMatch(html, /Closed today/);
+    // One top row on computers: the breadcrumb and the back link share .venue-topbar; the back link hides at 900px+.
+    assert.match(html, /<div class="venue-topbar"><nav class="breadcrumb"/);
+    assert.match(html, /\.venue-topbar \.venue-top-links \.category-back-link \{ display: none; \}/);
+    // A non-theatre with the same event keeps its hours.
+    db.prepare("UPDATE venues SET name = 'Polish Fixture Hall' WHERE id = ?").run(v.id);
+    assert.match(page(), /id="venueOpenStatus">Closed today/);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(r.event.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(r.event.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
 });
