@@ -9984,11 +9984,11 @@ test('Cards: a season-only notice is a one-line tag on list cards; written advis
 });
 
 test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badge, not the plain Dog-Friendly chip too', () => {
-  const v = { id: 990001, name: 'Dog Chip Fixture Beach', region: 'kelowna', type: 'beach', slug: 'dog-chip-fixture-beach', description: 'Fixture.', dog_friendly: true, lake_view: true };
+  const v = { id: 990001, name: 'Dog Chip Fixture Beach', region: 'kelowna', type: 'beach', slug: 'dog-chip-fixture-beach', description: 'Fixture.', dog_friendly: true, lake_view: true, patio: true };
   const both = app.venueCardHtml(v, { dogFriendlyNote: 'On-leash in the park; off-leash at the dog beach.' });
   assert.equal((both.match(/Dog Friendly<\/span>/g) || []).length, 1, 'the collection badge');
   assert.doesNotMatch(both, /<span class="chip">Dog-Friendly<\/span>/, 'no duplicate amenity chip');
-  assert.match(both, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?(?:Lake View|Lake view)<\/span>/, 'other badges unchanged');
+  assert.match(both, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?Patio<\/span>/, 'other badges unchanged (a beach card leaves off Lake view since 2026-10-29)');
   assert.doesNotMatch(both, /Dogs welcome/, 'no duplicate short amenity chip either');
   const plain = app.venueCardHtml(v, {});
   assert.match(plain, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?(?:Dog-Friendly|Dogs welcome)<\/span>/, 'without the collection badge the amenity chip still shows');
@@ -32093,4 +32093,17 @@ test('Homepage counts strip: four numbers after the happy hour count, ending wit
   assert.ok(hrefs.length <= 4, hrefs.join(' '));
   assert.ok(!hrefs.includes('/outdoors') && !hrefs.includes('/hidden-gems'));
   assert.equal(hrefs[hrefs.length - 1], '/food-drink');
+});
+
+test('Cards: a beach card leaves off Kids welcome, Lake view and Free; a free park leaves off Kids welcome and Free (2026-10-29)', () => {
+  const beach = { type: 'beach', kid_friendly: true, lake_view: true, free_entry: true, dog_friendly: true, patio: true };
+  const b = app.cardBadgeChipsHtml(beach);
+  assert.doesNotMatch(b, /Kids welcome|Lake view|>Free</);
+  assert.match(b, /Dogs welcome/); assert.match(b, /Patio/);
+  const park = { type: 'outdoor', kid_friendly: true, lake_view: true, free_entry: true };
+  const p = app.cardBadgeChipsHtml(park);
+  assert.doesNotMatch(p, /Kids welcome|>Free</); assert.match(p, /Lake view/);
+  const paid = { type: 'outdoor', kid_friendly: true, lake_view: true };
+  assert.match(app.cardBadgeChipsHtml(paid), /Kids welcome/, 'a paid attraction keeps Kids welcome');
+  assert.match(app.badgeChipsHtml(beach), /Lake View|Lake view/, 'the full badge list is unchanged');
 });

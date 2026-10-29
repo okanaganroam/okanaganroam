@@ -16121,8 +16121,12 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${CARD_V2_CARD} { display: flex !important; flex-direction: column; grid-row: auto !important; margin-bottom: 0 !important; }
   html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { row-gap: 20px !important; column-gap: 20px; }
   /* Badges follow the text (2026-10-28 tidy): only Add to trip sits at the bottom, so a short card keeps no gap. */
-  ${CARD_V2_CARD} > .chips:not(:empty) { margin: 10px 0 0 !important; padding: 0 !important; border: 0 !important; }
-  ${CARD_V2_CARD} > .chips:empty { display: none !important; }
+  ${CARD_V2_CARD} > .chips:not(:empty) { margin: 0 !important; padding: 10px 0 0 !important; border: 0 !important; box-sizing: border-box; }
+  ${CARD_V2_CARD} > .chips:empty { display: block !important; margin: 0 !important; padding: 0 !important; }
+  /* Badges straight under the description (Dayton, 2026-10-29): the badge line comes before the notice and notes, so
+     it lines up across a row too; a dog rule or notice follows below it. */
+  ${CARD_V2_CARD} > :is(.card-slot-notice, .card-slot-notes) { order: 2; }
+  ${CARD_V2_CARD} > .card-actions { order: 3; }
   ${CARD_V2_CARD} > .card-actions { margin: auto 0 0 !important; padding: 12px 0 0 !important; border: 0 !important; align-self: stretch !important; }
   /* A notice (golf "Check before you go", temporary closures) keeps two lines on a card; the venue page has it all. */
   ${CARD_V2_CARD} .venue-advisory { margin: 8px 0 0; padding: 10px 12px !important; }
@@ -16139,8 +16143,8 @@ const CARD_V2_CSS = `<style id="card-v2">
   html body.curated-hub-page .card-grid > li.venue-card .card-note { display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; max-height: none !important; margin: 2px 0 0 !important; font-size: 0.94rem !important; line-height: 1.45 !important; color: var(--ink) !important; }
   html body.curated-hub-page .card-grid > li.venue-card .card-note-label { display: block; margin-bottom: 2px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-deep, #1F5450); }
   /* Cards line up across a row, without gaps in the middle (Dayton, 2026-10-28): from two columns up the script
-     after this style block gives the town, name, open line, price and description of every card in a row the same
-     height, so those start level; the notice, notes and badges then follow each card's own text, and Add to trip
+     after this style block gives the town, name, open line, price, description and badge line of every card in a row
+     the same height, so those start level; the notice and notes then follow each card's own text, and Add to trip
      sits at the bottom (margin-top: auto above), so any spare space collects just above the button. The fare's fine
      print stays on the venue page, so a priced course is no longer twice as tall as its neighbours. */
   ${CARD_V2_CARD} .golf-fee-note { display: none !important; }
@@ -16153,7 +16157,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   }
 </style>
 <script id="card-v2-rows">(function () {
-  var PARTS = ['.venue-meta', 'h2', '.fd-open-status', '.card-slot-fee', '.card-slot-desc'];
+  var PARTS = ['.venue-meta', 'h2', '.fd-open-status', '.card-slot-fee', '.card-slot-desc', '.chips'];
   var CARD = 'li.venue-card[data-ph]:not(.whatson-event-card), li.venue-card[data-card-ph]:not(.whatson-event-card)';
   var queued = false;
   function part(card, sel) { for (var i = 0; i < card.children.length; i++) if (card.children[i].matches(sel)) return card.children[i]; return null; }
@@ -17989,8 +17993,17 @@ const CARD_BADGE_SHORT = {
   great_groups: ['group', 'Groups'], happy_hour: ['cocktail', 'Happy hour'], free_entry: ['ticket', 'Free'],
   arts_culture: ['palette', 'Arts & culture'], open_early: ['sunrise', 'Open early'], open_late: ['moon', 'Open late'],
 };
+// Listing cards show only the badges that set a place apart (Dayton, 2026-10-29: "most of these places are all free,
+// lake view and kid friendly"): a beach card leaves off Kids welcome, Lake view and Free, and a free park or trail
+// leaves off Kids welcome and Free. The venue page still lists every badge, and the filters still use the fields.
+const CARD_BADGES_EXPECTED = { beach: ['kid_friendly', 'lake_view', 'free_entry'], freeOutdoor: ['kid_friendly', 'free_entry'] };
+function cardBadgeExpected(venue, f) {
+  if (venue.type === 'beach') return CARD_BADGES_EXPECTED.beach.includes(f);
+  if (venue.type === 'outdoor' && venue.free_entry) return CARD_BADGES_EXPECTED.freeOutdoor.includes(f);
+  return false;
+}
 function cardBadgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && !cardBadgeExpected(venue, f))
     .map((f) => {
       const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
       return `<span class="chip chip-feat">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
@@ -55937,6 +55950,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Card badges (2026-10-29)
+  cardBadgeChipsHtml, cardBadgeExpected,
   // Hotel QR pages (2026-10-20)
   hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
