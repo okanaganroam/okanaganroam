@@ -2874,13 +2874,15 @@ test('Home footer: Regions renders as two explicit subcolumns -- Central+South, 
   assert.equal(app.FOOTER_REGION_GROUPS.reduce((n, g) => n + g.regions.length, 0), 20);
 });
 
-test('Home footer: exactly FOUR columns (Explore, About, Regions, Social Media) all live inside the same .home-footer-cols row, in that DOM order -- Regions is NOT a separate full-width band', () => {
+test('Home footer: exactly THREE columns (Explore, About, Regions) all live inside the same .home-footer-cols row, in that DOM order -- Regions is NOT a separate full-width band', () => {
   const html = app.renderHomeFooterHTML();
   const colsMatch = html.match(/<div class="home-footer-cols">([\s\S]*?)<\/div>\s*<\/div>\s*<div class="wrap-wide home-footer-bottom">/);
   assert.ok(colsMatch, 'expected to find the single .home-footer-cols row, immediately followed by the bottom/copyright row (nothing else in between)');
   const colsHtml = colsMatch[1];
   const headings = Array.from(colsHtml.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)).map((m) => m[1]);
-  assert.deepEqual(headings, ['Explore', 'About', 'Regions', 'Social Media'], 'expected exactly these 4 column headings, in this order, all inside one row');
+  // Footer polish 2 (2026-10-29): Social Media moved under the logo in .home-footer-brand.
+  assert.deepEqual(headings, ['Explore', 'About', 'Regions'], 'expected exactly these 3 column headings, in this order, all inside one row');
+  assert.match(html, /<div class="home-footer-brand">[\s\S]*<div class="home-footer-col home-footer-social">\s*<h2 data-i18n="homeFooter\.socialMedia">Social Media<\/h2>[\s\S]*<\/div>\s*<div class="home-footer-cols">/, 'Social Media sits in the brand block, before the columns');
   assert.doesNotMatch(html, /class="home-footer-regions"/, 'the old separate full-width Regions band must be gone');
   // Regions' own region-groups grid must be nested inside the 4th column, not a sibling of .home-footer-cols.
   const regionsColPos = colsHtml.indexOf('home-footer-col-regions');
@@ -12162,7 +12164,8 @@ test('Footer: "List your venue" points to /list-your-venue on every footer page;
     assert.doesNotMatch(footer[0], /browse#list-venue/, `${page}: footer no longer links to the old /browse form`);
     // Explore and Regions are <details> that fold on phones (2026-10-14).
     const cols = footer[0].match(/<(?:div|details) class="home-footer-col(?: home-footer-col-regions)?(?: home-footer-fold)?"(?: open)?>\s*(?:<summary>)?<h2 data-i18n="([^"]+)"/g).map((c) => c.match(/data-i18n="([^"]+)"/)[1]);
-    assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions', 'homeFooter.socialMedia'], `${page}: same four columns in the same order`);
+    assert.deepEqual(cols, ['homeFooter.explore', 'footer.about', 'footer.regions'], `${page}: same three columns in the same order (Social Media sits under the logo, 2026-10-29)`);
+    assert.match(footer[0], /<div class="home-footer-col home-footer-social">\s*<h2 data-i18n="homeFooter\.socialMedia">/, `${page}: Social Media under the logo`);
     // Venue pages keep the legacy minimal <header class="top">; every other page has the approved header.
     const header = html.match(/<header (?:id="top"|class="top")>[\s\S]*?<\/header>/);
     assert.ok(header, page);
