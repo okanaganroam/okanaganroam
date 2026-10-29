@@ -9951,7 +9951,7 @@ test('Cards: themed listing cards cap the badge row at two badges (+N more) and 
   const card = app.venueCardHtml(v, { themed: true });
   const chips = card.match(/<p class="chips">(.*?)<\/p>/)[1];
   assert.equal((chips.match(/class="chip/g) || []).length, 3);
-  assert.match(chips, /<span class="chip chip-more" title="[^"]*Live Music, Great for Groups, Happy Hour">\+5 more<\/span>/);
+  assert.match(chips, /<span class="chip chip-more" title="[^"]*Live Music, Great for Groups, Happy Hour" aria-label="5 more: [^"]*">\+5<\/span>/);
   // Card redesign (2026-10-28): the Hidden Gem / Local Favourite badge goes on the photo and is not counted.
   const lf = app.venueCardHtml(v, { themed: true, isLocalFavourite: true }).match(/<p class="chips">(.*?)<\/p>/)[1];
   assert.match(lf, /^<span class="chip local-favourite-badge">/);

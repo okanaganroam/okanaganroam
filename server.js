@@ -16107,10 +16107,15 @@ const CARD_V2_CSS = `<style id="card-v2">
      card in a row the same height, and the badges and Add to trip sit at the bottom. */
   ${CARD_V2_CARD} { display: flex !important; flex-direction: column; grid-row: auto !important; margin-bottom: 0 !important; }
   html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { row-gap: 20px !important; column-gap: 20px; }
-  ${CARD_V2_CARD} > .chips:not(:empty) { margin: auto 0 0 !important; padding: 10px 0 0 !important; border: 0 !important; }
+  /* Badges follow the text (2026-10-28 tidy): only Add to trip sits at the bottom, so a short card keeps no gap. */
+  ${CARD_V2_CARD} > .chips:not(:empty) { margin: 10px 0 0 !important; padding: 0 !important; border: 0 !important; }
   ${CARD_V2_CARD} > .chips:empty { display: none !important; }
-  ${CARD_V2_CARD} > .chips:empty + .card-actions { margin-top: auto !important; }
-  ${CARD_V2_CARD} > .card-actions { margin: 8px 0 0 !important; padding: 0 !important; border: 0 !important; align-self: stretch !important; }
+  ${CARD_V2_CARD} > .card-actions { margin: auto 0 0 !important; padding: 12px 0 0 !important; border: 0 !important; align-self: stretch !important; }
+  /* A notice (golf "Check before you go", temporary closures) keeps two lines on a card; the venue page has it all. */
+  ${CARD_V2_CARD} .venue-advisory { margin: 8px 0 0; padding: 10px 12px !important; }
+  ${CARD_V2_CARD} .venue-advisory-kicker { margin: 0 0 3px !important; font-size: 0.68rem !important; }
+  ${CARD_V2_CARD} .venue-advisory-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0 !important; font-size: 0.88rem !important; line-height: 1.4 !important; }
+  ${CARD_V2_CARD} .venue-advisory-source { display: none !important; }
   ${CARD_V2_CARD} > .card-slot:empty { display: none !important; }
   @media (min-width: 700px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 1000px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -17905,7 +17910,7 @@ function capChips(html, max) {
   if (!max || chips.length <= max) return html;
   const kept = chips.slice(0, max - 1);
   const rest = chips.slice(max - 1).map((c) => c.replace(/<[^>]+>/g, '').trim());
-  return `${kept.join(' ')} <span class="chip chip-more" title="${escapeHtml(rest.join(', '))}">+${rest.length} more</span>`;
+  return `${kept.join(' ')} <span class="chip chip-more" title="${escapeHtml(rest.join(', '))}" aria-label="${rest.length} more: ${escapeHtml(rest.join(', '))}">+${rest.length}</span>`;
 }
 
 function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
