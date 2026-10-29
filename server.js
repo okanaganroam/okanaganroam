@@ -3194,18 +3194,21 @@ function listUpcomingEventsAtVenue(venueId, { limit = 3, now = new Date() } = {}
   const rows = db
     .prepare(`SELECT e.*, (SELECT ec.category_key FROM event_categories ec WHERE ec.event_id = e.id ORDER BY ec.position LIMIT 1) AS primary_category,
         (SELECT MIN(o.start_date) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS next_date,
-        (SELECT o.end_date FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? ORDER BY o.start_date, o.end_date LIMIT 1) AS next_end_date
+        (SELECT o.end_date FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ? ORDER BY o.start_date, o.end_date LIMIT 1) AS next_end_date,
+        (SELECT COUNT(*) FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?) AS upcoming_dates
       FROM events e
       WHERE (e.venue_id = ? OR e.id IN (SELECT event_id FROM event_partner_venues WHERE venue_id = ?) OR e.id IN (SELECT value FROM json_each(?)))
         AND e.status = 'scheduled'
         AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled')
         AND ${ACTIVE_EVENT_DATE_SQL.replace(/\bend_datetime\b/, 'e.end_datetime').replace(/\bstart_datetime\b/, 'e.start_datetime')}
       ORDER BY COALESCE(next_date, substr(e.start_datetime, 1, 10)), e.name`)
-    .all(today, today, venueId, venueId, JSON.stringify(autoIds), today);
+    .all(today, today, today, venueId, venueId, JSON.stringify(autoIds), today);
   // One event the business posted itself still shows on its page (it expects to see it there), and so does one it
   // was tagged on as a partner (2026-10-19): the host named it, so it belongs there.
   const auto = new Set(autoIds);
-  if (rows.length < MIN_VENUE_EVENTS && !rows.some((r) => r.source_type === 'official_venue' || (r.venue_id !== venueId && !auto.has(r.id)))) return [];
+  // So does one event with several dates still to come (2026-10-29): a theatre's run of a play ("Fri Nov 13 + 11 more
+  // dates") is what a visitor to its page is looking for.
+  if (rows.length < MIN_VENUE_EVENTS && !rows.some((r) => r.source_type === 'official_venue' || (r.venue_id !== venueId && !auto.has(r.id)) || r.upcoming_dates >= 2)) return [];
   const out = rows.slice(0, limit).map((r) => ({
     ...rowToEvent(r),
     primaryCategory: r.primary_category || null,
@@ -18138,8 +18141,8 @@ function venueCardHtml(venue, opts = {}) {
   const cardNoteRaw = cardNotes && cardNotes.get(venue.id) ? String(cardNotes.get(venue.id)).trim() : '';
   const cardNote = dogNoteHtml && cardNoteRaw === String(dogFriendlyNote || '').trim() ? '' : cardNoteRaw;
   const cardNoteHtml = cardNote ? `\n        <p class="card-note"><span class="card-note-label">${escapeHtml(cardNoteLabel)}</span> ${escapeHtml(cardNote)}</p>` : '';
-  // hideSocial (2026-10-16): the /browse hub's discovery cards never link off the site.
-  const socialHtml = (venue.redirect_to || opts.hideSocial) ? '' : cardSocialHtml(venue);
+  // Cards no longer carry Instagram / Facebook links (2026-10-29): they live on the venue page only.
+  const socialHtml = '';
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
     ? `\n        ${seasonTag ? seasonTagHtml(seasonTag) : advisoryNoticeHtml(advisoryNote)}`
     : '';
@@ -32013,7 +32016,14 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // under the name, so the card keeps only what is new -- and the address
   // carries the map link, replacing the separate Location box.
   // Audit fix (2026-10-27): a redirected listing (rendered only when its target is missing) shows no menu or booking row.
-  const venueLinkRow = venue.redirect_to ? {} : venueLinks(venue.id);
+  // Venue page polish (2026-10-29): a menu or booking link that is just the venue's own website (Many Hats Theatre had
+  // all three pointing at its homepage) is left out, so Website shows once and Book only appears for a real booking page.
+  const sameAsWebsite = (url) => {
+    const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+    return !!(url && venue.website && key(url) === key(venue.website));
+  };
+  const venueLinkRow = venue.redirect_to ? {} : Object.fromEntries(Object.entries(venueLinks(venue.id) || {})
+    .map(([k, v]) => [k, (k === 'menu_url' || k === 'booking_url') && sameAsWebsite(v) ? null : v]));
   const happyHour = venueHappyHour(venue, statusHours, fr, opts.now || new Date());
   // Weekly specials (2026-10-27): their own row, under Happy hour.
   const weeklySpecials = venueSpecials(venue, statusHours, fr, opts.now || new Date());
@@ -32222,15 +32232,17 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // coordinates within 15 km; shown when there are at least two. The full "Other … in" / "More to explore" sections
   // stay at the bottom.
   const nearbyStripPhotos = new Set();
+  const nearbyStripIds = new Set();
   const nearbyStripHtml = (() => {
     if (venue.redirect_to) return '';
     const seen = new Set([venue.id]);
-    const pool = [...nearbyVenues, ...relatedVenues].map((v) => {
+    const pool = [...nearbyVenues.slice(0, 6), ...relatedVenues].map((v) => {
       const km = typeof v.distance_km === 'number' ? v.distance_km : venueDistanceKm(venue, v);
       return km === null || km === undefined ? null : { v, km };
     }).filter((x) => x && x.km <= 15 && x.v.slug && CATEGORY_SLUGS[x.v.type] && !seen.has(x.v.id) && seen.add(x.v.id))
       .sort((a, b) => a.km - b.km).slice(0, 6);
     if (pool.length < 2) return '';
+    pool.forEach(({ v }) => nearbyStripIds.add(v.id));
     const away = (km) => (km <= 1.2
       ? L(`${Math.max(1, Math.round(km * 12))} min walk`, `${Math.max(1, Math.round(km * 12))} min à pied`)
       : L(`${Math.round(km * 1.6 + 2)} min drive`, `${Math.round(km * 1.6 + 2)} min en voiture`));
@@ -32313,10 +32325,13 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       </div>`
     : '';
 
-  const nearbyHtml = nearbyVenues.length
+  // Venue page polish (2026-10-29): "More to explore near" skips the places already in Close by (both are closest
+  // first, so they were mostly the same six); the caller passes up to 12 so six different ones are left.
+  const exploreVenues = nearbyVenues.filter((v) => !nearbyStripIds.has(v.id)).slice(0, 6);
+  const nearbyHtml = exploreVenues.length
     ? `<div class="related-section">
         <h2>${fr ? `\u00c0 d\u00e9couvrir pr\u00e8s ${escapeHtml(frDe(regionLabel))}` : `More to explore near ${escapeHtml(regionLabel)}`}</h2>
-        <div class="related-grid">${nearbyVenues.map(relatedCard).join('')}</div>
+        <div class="related-grid">${exploreVenues.map(relatedCard).join('')}</div>
       </div>`
     : '';
 
@@ -36041,7 +36056,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="${cardPhotoVars('fd-ph', own)}" data-lz`;
     return ' data-ph="none"';
   };
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true, hideSocial: true })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
   let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1)
     .map((x) => ('<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, '')).replace(/\n\s+/g, '\n').split(APP_FAV_HEART_OUTLINE).join(FD_HEART_USE));
@@ -41336,15 +41351,6 @@ function socialLinkFromSubmission(value) {
   }
   const fb = normalizeFacebook(url);
   return fb ? { field: 'facebook_url', url: fb } : null;
-}
-// The small "Instagram · Facebook" line on a listing card, or '' when the
-// venue has no approved links (so those cards are unchanged).
-function cardSocialHtml(venue) {
-  const s = venueSocialLinks(venue.id);
-  if (!s) return '';
-  const link = (url, label) => `<a href="${escapeHtml(url)}" rel="nofollow noopener" target="_blank" aria-label="${escapeHtml(venue.name)} on ${label}" style="position:relative;z-index:2;color:inherit;font-weight:700;">${label}</a>`;
-  const parts = [s.instagram_url ? link(s.instagram_url, 'Instagram') : '', s.facebook_url ? link(s.facebook_url, 'Facebook') : ''].filter(Boolean);
-  return `\n        <p class="card-social" style="margin:6px 0 0;font-size:0.85rem;line-height:1.4;">${parts.join(' &middot; ')}</p>`;
 }
 // "@woodfire.bakery", "woodfire.bakery" or any instagram.com link -> https://www.instagram.com/woodfire.bakery/
 function normalizeInstagram(value) {
@@ -55724,7 +55730,7 @@ const server = http.createServer(async (req, res) => {
           return res.end();
         }
         const venueGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && venue[c.badge]);
-        const html = frPageLinks(frNativePage(renderVenuePage(venue, getRelatedVenues(venue), getNearbyVenues(venue), venueGuidePages, { lang: 'fr' })));
+        const html = frPageLinks(frNativePage(renderVenuePage(venue, getRelatedVenues(venue), getNearbyVenues(venue, 12), venueGuidePages, { lang: 'fr' })));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Language': 'fr-CA' });
         return res.end(html);
       }
@@ -55778,7 +55784,7 @@ const server = http.createServer(async (req, res) => {
             console.error(`[redirect] venue ${venue.id} has redirect_to=${venue.redirect_to} but the target is missing/chained/invalid -- rendering venue ${venue.id} normally instead of redirecting.`);
           }
           const relatedVenues = getRelatedVenues(venue);
-          const nearbyVenues = getNearbyVenues(venue);
+          const nearbyVenues = getNearbyVenues(venue, 12);
           const venueGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region && venue[c.badge]);
           const html = renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
