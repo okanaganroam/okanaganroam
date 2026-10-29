@@ -1,0 +1,12 @@
+[
+ {
+  "id": 1068,
+  "name": "Longshots Steak House",
+  "reason": "Google Maps place 'Longshots Steakhouse' (Strayhorse Rd, 31 photos) is all plated food, cocktails, menus and a diner close-up; the only non-food shot is a portrait of one wall (deer-head mount, sconces, Christmas tree), which crops to a wall detail, not the room. Apex's own dining page (apexresort.com/dining, 403 to scripts; read via web.archive.org) shows the same deer-head wall at only 720x960. No official Longshots site found; OpenTable blocked. Fallback if wanted: Google photo of the deer-head wall."
+ },
+ {
+  "id": 1069,
+  "name": "Pit Stop Cafeteria",
+  "reason": "No Google Maps place for the Pit Stop (searches for Pit Stop / Pitstop Cafeteria / Apex day lodge match other Apex businesses). Apex's dining page (via web.archive.org; live site returns 403) shows only a Pit Stop logo and describes it as a take-out window in the village. The Apex Mountain Resort Google place has village/day-lodge exteriors and an unlabeled café interior, but none can be tied to the Pit Stop window, so none used."
+ }
+]

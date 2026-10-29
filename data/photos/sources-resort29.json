@@ -1,0 +1,72 @@
+[
+ {
+  "id": 1926,
+  "name": "Alpine Express",
+  "file": "/images/venues/alpine-express-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/explore-big-white/food-dining/restaurants/happy-valley",
+  "image_url": "https://www.bigwhite.com/sites/default/files/2025-03/Winter-FB-HVDL-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Exterior of the Happy Valley Day Lodge at Big White in winter, 'Happy Valley Day Lodge' sign on the facade (the lodge whose upstairs houses Alpine Express); Big White's own page header"
+ },
+ {
+  "id": 1927,
+  "name": "Night Skiing at Big White",
+  "file": "/images/venues/night-skiing-big-white-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/events-activities/winter-activities/night-skiing",
+  "image_url": "https://www.bigwhite.com/sites/default/files/2023-01/Winter-Activities-Night-Skiing-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Big White at night from above: the lit village and floodlit night-skiing runs down the mountain; header of Big White's night skiing page"
+ },
+ {
+  "id": 1928,
+  "name": "Big White Ski & Board School",
+  "file": "/images/venues/big-white-ski-board-school-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/ski-school/beginner-lessons",
+  "image_url": "https://www.bigwhite.com/sites/default/files/2025-10/Winter-Ski-School-Beginner-NS-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Big White ski school instructor in red uniform leading beginner students on the snow by a chairlift; header of Big White's beginner lessons page"
+ },
+ {
+  "id": 1931,
+  "name": "After Dark: Kids' Night Out at Big White",
+  "file": "/images/venues/after-dark-kids-night-out-big-white-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/kids-lessons-programs/after-dark",
+  "image_url": "https://www.bigwhite.com/sites/default/files/2026-01/BW-26-RSA-028%20-%20After%20Dark_Website-Header-Desktop_2000x800.jpg",
+  "source_kind": "website",
+  "note": "Smiling child in goggles at night tubing under the lights at Big White; header of Big White's After Dark page"
+ },
+ {
+  "id": 1932,
+  "name": "Kelowna Rockets Hockey Trips from Big White",
+  "file": "/images/venues/kelowna-rockets-hockey-trips-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/events-activities/tours/kelowna-rockets-hockey",
+  "image_url": "https://www.bigwhite.com/sites/default/files/2016-08/Winter-Activities-Rockets-Hockey-2-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Big White's own page photo for this trip: Kelowna Rockets player (#16, home jersey) in a game against the Prince George Cougars, on the ice at a Rockets game"
+ },
+ {
+  "id": 1929,
+  "name": "Vernon Vipers Hockey Trips from SilverStar",
+  "file": "/images/venues/vernon-vipers-hockey-trips-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd894f90c665d:0x6b7a8e88071740e9",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfx_wP7_INAgNZ_0Sk6FlsK2PZRTpKLkSV8KAyjiLW43i2Z0hc51I7e5zo42JfA7pUvU9a4UaFQFicOAMKIixjzfD0w-0kk217nG9g6gfSc_wUgexzSmnQM3_kuVQMxZpn8RIVS=w2400",
+  "source_kind": "google_maps",
+  "note": "Pre-game line-up at Kal Tire Place, Vernon: Vernon Vipers in white jerseys (Prestige Hotel name bar, same sponsor as the Vipers' gold jerseys in the place's other photos) with a youth player, full stands behind (Google Maps photo on the 'Vernon Vipers Hockey Club' place, 3445 43rd Ave). SilverStar's own trip-page photo was only 1366x566 and a player close-up, so not used"
+ },
+ {
+  "id": 1930,
+  "name": "Baldy Cat Skiing",
+  "file": "/images/venues/baldy-cat-skiing-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://baldyresort.com/cat-skiing-baldy-mountain/",
+  "image_url": "https://baldyresort.com/wp-content/uploads/2026/05/bnr-cat-skiing-baldy.webp",
+  "source_kind": "website",
+  "note": "Baldy's snowcat ('Mountain Peacock' cabin) parked on the snowy upper mountain with mountain views; banner of Baldy's cat skiing page (linked from the winter activities page)"
+ }
+]
