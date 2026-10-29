@@ -2448,6 +2448,8 @@ function rowToEvent(row) {
     website: row.website,
     image_url: row.image_url,
     type: row.type,
+    price_kind: row.price_kind || null,
+    price_text: row.price_text || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -2746,15 +2748,16 @@ const EVENT_MAX_CATEGORIES = 3;
 const EVENT_CREATE_FIELDS = [
   'name', 'slug', 'region', 'description', 'website', 'image_url', 'type', 'status', 'event_confidence',
   'source_type', 'source_name', 'source_url', 'source_checked_at', 'venue_id', 'venue_name_text', 'valley_wide',
-  'recurrence_rule', 'categories', 'occurrences',
+  'recurrence_rule', 'price_kind', 'price_text', 'categories', 'occurrences',
 ];
 const EVENT_UPDATE_FIELDS = [
   'name', 'description', 'website', 'image_url', 'type', 'status', 'event_confidence',
   'source_type', 'source_name', 'source_url', 'source_checked_at', 'venue_id', 'venue_name_text', 'valley_wide',
-  'recurrence_rule',
+  'recurrence_rule', 'price_kind', 'price_text',
 ];
 const EVENT_OCCURRENCE_FIELDS = ['start_date', 'end_date', 'start_time', 'end_time', 'ends_next_day', 'all_day', 'status', 'label', 'source_ref'];
 const EVENT_TYPES = ['sporting', 'festival', 'concert']; // existing EVENT_SCHEMA_TYPE_MAP keys
+const EVENT_PRICE_KINDS = ['free', 'donation', 'paid'];
 const EVENT_STOPWORDS = new Set(['live', 'with', 'the', 'and', 'music', 'night', 'show', 'tour', 'kelowna', 'vernon', 'west', 'centre', 'theatre', 'winery', 'estate', 'wines', 'okanagan', 'park', 'club', 'series', 'featuring', 'presents', 'from', 'this', 'that', 'for']);
 
 function eventFail(reason, detail) {
@@ -2926,6 +2929,8 @@ function validateEventScalars(data, { partial = false } = {}) {
     if (has(f) && !isNullish(data[f]) && typeof data[f] !== 'string') return eventFail(`${f}_invalid`, `${f} must be a string or null`);
   }
   if (has('venue_id') && !isNullish(data.venue_id) && !(Number.isInteger(data.venue_id) && data.venue_id > 0)) return eventFail('venue_id_invalid', 'venue_id must be a positive integer or null');
+  if (has('price_kind') && !isNullish(data.price_kind) && !EVENT_PRICE_KINDS.includes(data.price_kind)) return eventFail('price_kind_invalid', `price_kind must be null or one of ${EVENT_PRICE_KINDS.join('|')}`);
+  if (has('price_text') && !isNullish(data.price_text) && !(typeof data.price_text === 'string' && data.price_text.trim() && data.price_text.length <= 80)) return eventFail('price_text_invalid', 'price_text must be a string of 1-80 characters or null');
   return null;
 }
 
@@ -3277,14 +3282,15 @@ function createEvent(data, meta) {
     txOpen = true;
     const info = db.prepare(`
       INSERT INTO events (name, slug, region, description, start_datetime, end_datetime, recurrence_rule, venue_id, website, image_url, type,
-        status, event_confidence, source_type, source_name, source_url, source_checked_at, venue_name_text, valley_wide)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        status, event_confidence, source_type, source_name, source_url, source_checked_at, venue_name_text, valley_wide, price_kind, price_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       input.name.trim(), slug, input.region, optionalString(input.description), firstDate, firstDate,
       optionalString(input.recurrence_rule), isNullish(input.venue_id) ? null : input.venue_id,
       optionalString(input.website), optionalString(input.image_url), isNullish(input.type) ? null : input.type,
       input.status, input.event_confidence, input.source_type, input.source_name.trim(), input.source_url.trim(),
       isNullish(input.source_checked_at) ? null : input.source_checked_at,
       optionalString(input.venue_name_text) || null, input.valley_wide,
+      isNullish(input.price_kind) ? null : input.price_kind, optionalString(input.price_text) || null,
     );
     const eventId = Number(info.lastInsertRowid);
     logEventChange(eventId, null, 'create', null, `${input.region}/${slug}`, logMeta);
@@ -3657,6 +3663,8 @@ function queryWhatsOnEvents({ from, to, regions = [], categories = [] } = {}) {
       region: event.region,
       valleyWide: event.valley_wide === 1,
       categories: getEventCategoryKeys(event.id),
+      priceKind: event.price_kind || null,
+      priceLabel: eventPriceLabel(event),
       description: event.description || '',
       image: event.image_url || null,
       startDate: occs[0].start_date,
@@ -3725,6 +3733,7 @@ function whatsOnPublicEvent(row) {
     categories: row.categories, description: row.description, image: row.image,
     startDate: row.startDate, endDate: row.endDate, dateLabel: row.dateLabel, time: row.time,
     occurrenceCount: row.occurrenceCount, venueName: row.venueName, attribution: row.attribution,
+    priceKind: row.priceKind || null, priceLabel: row.priceLabel || null,
   };
   // Stage 4.3: keep the card's occurrence (non-enumerable, as on the row) so
   // the What's On cards rendered from this shape carry it; /api/events JSON
@@ -3757,6 +3766,7 @@ function whatsOnPublicEventDetail(event, now = new Date()) {
     venueName: venue ? venue.name : (event.venue_name_text || null),
     attribution: EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) ? null : event.source_name,
     dateLabel: whatsOnDateLabel(event, labelOccs), time: whatsOnTimeLabel(labelOccs),
+    priceKind: event.price_kind || null, priceLabel: eventPriceLabel(event),
     occurrences: occs.map(whatsOnPublicOccurrence),
   };
 }
@@ -5841,7 +5851,8 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
       headingFr: `${eventsOnly ? 'Événements gratuits' : 'Activités gratuites'}${town ? ` à ${town}` : ''}`,
       guides: [],
       list: () => (eventsOnly ? [] : smartFreePick(region, F).filter((x) => !T.length || T.includes(x.row.type))),
-      events: () => searchEventsFor({ regions: R, test: (e) => SMART_FREE_EVENT_RE.test(`${e.name || ''} ${e.description || ''}`), now }),
+      // A stored price settles it (2026-10-29): free or by donation is in, paid is out; else the wording decides.
+      events: () => searchEventsFor({ regions: R, test: (e) => (e.priceKind ? eventFreeToGo(e) : SMART_FREE_EVENT_RE.test(`${e.name || ''} ${e.description || ''}`)), now }),
     };
   }
 
@@ -28384,7 +28395,9 @@ function whatsOnCategoryChipsHtml(state = {}) {
     const n = counts ? (counts[c.key] || 0) : null;
     return `<button type="button" class="outdoor-filter-chip whatson-cat-chip" data-category="${escapeHtml(c.key)}" aria-pressed="${selected.has(c.key) ? 'true' : 'false'}">${escapeHtml(c.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
-  return `<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">${allChip}${chips}</div>`;
+  // Free (2026-10-29): free and by-donation events, on top of whatever else is chosen (?free=1).
+  const free = `<button type="button" class="outdoor-filter-chip whatson-cat-chip whatson-free-chip" data-price="free" aria-pressed="${state.free ? 'true' : 'false'}">Free${state.freeCount == null ? '' : ` <span class="outdoor-activity-count">${state.freeCount}</span>`}</button>`;
+  return `<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">${allChip}${free}${chips}</div>`;
 }
 
 // The Regions / Date control row. Each popover holds the EXISTING markup for
@@ -28611,12 +28624,14 @@ function whatsOnEventCardHtml(ev, todayArg = null, now = null) {
   const today = typeof todayArg === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(todayArg) ? todayArg : null;
   const href = `/${ev.region}/events/${ev.slug}`;
   const when = [today ? whatsOnWhenText(ev, today, now instanceof Date ? now : null) : ev.dateLabel, whatsOnCardTime(ev)].filter(Boolean).join(' · ');
-  const meta = [REGION_LABELS[ev.region] ? escapeHtml(REGION_LABELS[ev.region]) : null, when ? escapeHtml(when) : null].filter(Boolean).join(' &middot; ');
+  const price = ev.priceLabel || eventPriceLabel(ev);
+  const meta = [REGION_LABELS[ev.region] ? escapeHtml(REGION_LABELS[ev.region]) : null, when ? escapeHtml(when) : null,
+    price ? `<span class="whatson-price">${escapeHtml(price)}</span>` : null].filter(Boolean).join(' &middot; ');
   const chips = (ev.categories || []).filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="badge-chip whatson-category-chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
   const descId = `golf-desc-event-${ev.id}`;
   const tripQuery = `${ev.name}, ${REGION_LABELS[ev.region] || ev.region}, Okanagan Valley, BC`;
   return `
-      <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''}${savedOccurrenceAttrs(ev.firstOccurrence)} data-surface="whatson_card">
+      <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''}${eventFreeToGo(ev) ? ' data-event-free="1"' : ''}${savedOccurrenceAttrs(ev.firstOccurrence)} data-surface="whatson_card">
         ${today ? (() => { const img = homeEventImage(ev); return `<img class="whatson-event-img whatson-event-photo" src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, WHATSON_CARD_PHOTO_SIZES)} alt="" loading="lazy" width="800" height="450">`; })() : (ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : '')}
         <h2><a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(ev.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>
         <p class="venue-meta">${meta}</p>
@@ -28671,6 +28686,7 @@ function buildWhatsOnStyles() {
   body.whatson-page .whatson-category-card-noart .outdoor-activity-card-overlay { background: linear-gradient(180deg, rgba(27,43,58,0.15) 0%, rgba(20,14,10,0.82) 100%); }
   body.whatson-page .whatson-event-img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; margin: 0 0 12px; display: block; }
   body.whatson-page .whatson-category-chip { background: rgba(42,107,103,0.1); color: var(--teal-deep, #1E4F4C); }
+  body.whatson-page .whatson-price { font-weight: 700; white-space: nowrap; }
   body.whatson-page #whatsOnResults .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
   body.whatson-page #whatsOnResults > .venue-card[hidden] { display: none; }
   body.whatson-page .whatson-empty { background: var(--paper); border: 1px solid rgba(74,52,40,0.10); border-radius: 12px; padding: 18px 20px; margin: 0 0 26px; max-width: 68ch; }
@@ -28821,7 +28837,8 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   var regionStatus = document.getElementById('whatsOnRegionStatus');
   if (!chips.length) return;
   ${renderFilterChangeClientSrc('whats_on')}
-  function activeFilterCount(){ return selected('region').length + selected('category').length; }
+  function activeFilterCount(){ return selected('region').length + selected('category').length + selected('price').length; }
+  function freeOnly(){ return selected('price').length > 0; }
   ${OUTDOOR_FILTER_CLIENT_PREDICATE_SRC}
   ${OUTDOOR_REGION_GROUP_CLIENT_SRC}
   function summaryText(shown, total, filtered){ var noun = total === 1 ? 'event' : 'events'; return filtered ? (shown + ' of ' + total + ' ' + noun) : (total + ' ' + noun); }
@@ -28840,7 +28857,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   if (groupsRoot) groupsRoot.classList.add('js');
   groups.forEach(function(block){ var t = block.querySelector('.outdoor-region-group-toggle'); if (t) t.addEventListener('click', function(){ setGroupOpen(block, t.getAttribute('aria-expanded') !== 'true'); }); });
   function selected(kind){ return chips.filter(function(c){ return c.getAttribute('data-' + kind) && c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute('data-' + kind); }); }
-  function cardData(card){ return { region: card.getAttribute('data-event-region'), cats: (card.getAttribute('data-event-categories') || '').split(',').filter(Boolean), valley: card.getAttribute('data-event-valley-wide') === '1' }; }
+  function cardData(card){ return { region: card.getAttribute('data-event-region'), cats: (card.getAttribute('data-event-categories') || '').split(',').filter(Boolean), valley: card.getAttribute('data-event-valley-wide') === '1', free: card.getAttribute('data-event-free') === '1' }; }
   // Searchable text, built once per card: event name, region label, category
   // labels and the meta/description already in the markup. No new data.
   cards.forEach(function(card){
@@ -28857,20 +28874,21 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     var text = card.__wo || '';
     return searchTerm.split(/\\s+/).filter(Boolean).every(function(w){ return text.indexOf(w) !== -1; });
   }
-  function cardMatches(d, regions, categories){ return matches(d.valley ? [] : regions, categories, d.region, d.cats); }
+  function cardMatches(d, regions, categories, anyPrice){ return matches(d.valley ? [] : regions, categories, d.region, d.cats) && (anyPrice || !freeOnly() || d.free); }
   var allRegionKeys = Object.keys(LABELS.regions);
   function updateChipCounts(regions, categories){
-    var regionCounts = {}, categoryCounts = {};
+    var regionCounts = {}, categoryCounts = {}, freeCount = 0;
     cards.forEach(function(card){
       var d = cardData(card);
       if (isEarlier(card)) return; // over today: not counted (2026-10-19)
       if (cardMatches(d, [], categories)) { (d.valley ? allRegionKeys : [d.region]).forEach(function(r){ regionCounts[r] = (regionCounts[r] || 0) + 1; }); }
       if (cardMatches(d, regions, [])) d.cats.forEach(function(c){ categoryCounts[c] = (categoryCounts[c] || 0) + 1; });
+      if (d.free && cardMatches(d, regions, categories, true)) freeCount++;
     });
     chips.forEach(function(c){
       var r = c.getAttribute('data-region'), k = c.getAttribute('data-category'), n = c.querySelector('.outdoor-activity-count');
       if (!n) return;
-      var count = r ? (regionCounts[r] || 0) : (categoryCounts[k] || 0);
+      var count = r ? (regionCounts[r] || 0) : (c.getAttribute('data-price') ? freeCount : (categoryCounts[k] || 0));
       n.textContent = String(count);
       var noun = c.querySelector('.outdoor-activity-count-noun'); if (noun) noun.textContent = count === 1 ? 'event' : 'events';
     });
@@ -28878,11 +28896,12 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   function updateStepStatus(el, n){ if (!el) return; el.textContent = n ? (n + ' selected') : ''; el.hidden = n === 0; }
   function renderSelected(regions, categories){
     if (!selectedBox) return;
-    var any = regions.length || categories.length;
+    var any = regions.length || categories.length || freeOnly();
     function tag(kind, v, label){ return '<button type="button" class="outdoor-selected-tag" data-remove-' + kind + '="' + v + '" aria-label="Remove ' + label + '">' + label + '<span class="outdoor-selected-x" aria-hidden="true">\\u00d7</span></button>'; }
     function row(label, tags){ return tags.length ? '<div class="outdoor-selected-row"><span class="outdoor-selected-label">' + label + '</span> ' + tags.join(' ') + '</div>' : ''; }
     var html = row('Regions', regions.map(function(r){ return tag('region', r, LABELS.regions[r] || r); }))
-      + row('Categories', categories.map(function(k){ return tag('category', k, LABELS.categories[k] || k); }));
+      + row('Categories', categories.map(function(k){ return tag('category', k, LABELS.categories[k] || k); }))
+      + row('Price', freeOnly() ? [tag('price', 'free', 'Free')] : []);
     if (any) html += '<button type="button" class="outdoor-selected-clear" id="whatsOnSelectedClear">Clear all</button>';
     selectedBox.innerHTML = html; selectedBox.hidden = !any;
   }
@@ -28894,6 +28913,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     var isScope = (SCOPE.region.length || SCOPE.category.length) && regions.join(',') === SCOPE.region.join(',') && categories.join(',') === SCOPE.category.join(',');
     if (!isScope && regions.length) q.push('regions=' + regions.join(','));
     if (!isScope && categories.length) q.push('categories=' + categories.join(','));
+    if (freeOnly()) q.push('free=1');
     return q.length ? '?' + q.join('&') : '';
   }
   function dateParamsOf(search){ var p = new URLSearchParams(search); return { when: p.get('when') || '', from: p.get('from') || '', to: p.get('to') || '' }; }
@@ -28902,7 +28922,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     // shown/total leave out the events already over today (folded under Earlier today), as the server's count does.
     var shown = 0, any = 0, total = 0;
     cards.forEach(function(card){ var d = cardData(card); var ok = cardMatches(d, regions, categories) && cardMatchesSearch(card); card.hidden = !ok; if (ok) any++; if (!isEarlier(card)) { total++; if (ok) shown++; } });
-    var filtered = regions.length || categories.length || !!searchTerm;
+    var filtered = regions.length || categories.length || freeOnly() || !!searchTerm;
     // "All" is pressed exactly when no category is chosen.
     if (allChip) allChip.setAttribute('aria-pressed', categories.length ? 'false' : 'true');
     if (regionsCount) { regionsCount.textContent = regions.length ? (' \u00b7 ' + regions.length) : ''; regionsCount.hidden = regions.length === 0; }
@@ -28916,7 +28936,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     if (clearBtn) clearBtn.hidden = !filtered;
     if (emptyInventory) emptyInventory.hidden = INVENTORY;
     if (empty) empty.hidden = !(INVENTORY && any === 0);
-    var nextKey = INVENTORY && shown === 0 && !searchTerm && !regions.length && categories.length <= 1 ? (categories[0] || '') : null, nextOn = false;
+    var nextKey = INVENTORY && shown === 0 && !searchTerm && !regions.length && !freeOnly() && categories.length <= 1 ? (categories[0] || '') : null, nextOn = false;
     nextBlocks.forEach(function(b){ var on = b.getAttribute('data-next-for') === nextKey; b.hidden = !on; if (on) nextOn = true; });
     if (nextUp) nextUp.hidden = !nextOn;
     if (nextOn && empty) empty.hidden = true;
@@ -28937,7 +28957,7 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
     }
   }
   function setPressed(kind, value, on){ chips.forEach(function(c){ if (c.getAttribute('data-' + kind) === value) c.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
-  chips.forEach(function(chip){ chip.addEventListener('click', function(){ var on = chip.getAttribute('aria-pressed') !== 'true'; chip.setAttribute('aria-pressed', on ? 'true' : 'false'); apply('push'); var r = chip.getAttribute('data-region'); trackFilterChange(r ? 'region' : 'category', r || chip.getAttribute('data-category'), on ? 'add' : 'remove'); }); });
+  chips.forEach(function(chip){ chip.addEventListener('click', function(){ var on = chip.getAttribute('aria-pressed') !== 'true'; chip.setAttribute('aria-pressed', on ? 'true' : 'false'); apply('push'); var r = chip.getAttribute('data-region'), pr = chip.getAttribute('data-price'); trackFilterChange(r ? 'region' : (pr ? 'price' : 'category'), r || pr || chip.getAttribute('data-category'), on ? 'add' : 'remove'); }); });
   function clearAll(){ chips.forEach(function(c){ c.setAttribute('aria-pressed', 'false'); }); searchTerm = ''; if (searchInput) searchInput.value = ''; apply('push'); }
   function clearAllByVisitor(){ var had = activeFilterCount(); clearAll(); if (had) trackFilterChange('all', 'all', 'clear_all'); }
   if (allChip) allChip.addEventListener('click', function(){
@@ -28991,8 +29011,9 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
   if (selectedBox) selectedBox.addEventListener('click', function(e){
     var t = e.target.closest ? e.target.closest('button') : null; if (!t) return;
     if (t.id === 'whatsOnSelectedClear') { clearAllByVisitor(); return; }
-    var r = t.getAttribute('data-remove-region'), k = t.getAttribute('data-remove-category');
-    if (r) { setPressed('region', r, false); apply('push'); trackFilterChange('region', r, 'remove'); }
+    var r = t.getAttribute('data-remove-region'), k = t.getAttribute('data-remove-category'), pr = t.getAttribute('data-remove-price');
+    if (pr) { setPressed('price', pr, false); apply('push'); trackFilterChange('price', pr, 'remove'); }
+    else if (r) { setPressed('region', r, false); apply('push'); trackFilterChange('region', r, 'remove'); }
     else if (k) { setPressed('category', k, false); apply('push'); trackFilterChange('category', k, 'remove'); }
   });
   if (showBtn) showBtn.addEventListener('click', function(){ var t = document.getElementById('whatsOnResultsTop'); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
@@ -29001,7 +29022,8 @@ function renderWhatsOnFilterScriptHtml(state = {}) {
       var params = new URLSearchParams(window.location.search);
       var pre = { region: (params.get('regions') || '').split(',').filter(Boolean), category: (params.get('categories') || '').split(',').filter(Boolean) };
       if (!pre.region.length && !pre.category.length) pre = { region: SCOPE.region.slice(), category: SCOPE.category.slice() };
-      chips.forEach(function(c){ ['region', 'category'].forEach(function(k){ var v = c.getAttribute('data-' + k); if (v) c.setAttribute('aria-pressed', pre[k].indexOf(v) !== -1 ? 'true' : 'false'); }); });
+      pre.price = params.get('free') === '1' ? ['free'] : [];
+      chips.forEach(function(c){ ['region', 'category', 'price'].forEach(function(k){ var v = c.getAttribute('data-' + k); if (v) c.setAttribute('aria-pressed', pre[k].indexOf(v) !== -1 ? 'true' : 'false'); }); });
     } catch (e) {}
   }
   function openGroupsForSelection(){
@@ -29412,6 +29434,7 @@ function renderWhatsOnPage(filter = null, opts = {}) {
   const counts = hasInventory ? {
     regions: Object.fromEntries(Object.keys(REGION_LABELS).map((r) => [r, filterWhatsOnEvents(liveEvents, [], selectedCategories).filter((e) => e.valleyWide || e.region === r).length])),
     categories: Object.fromEntries(WHATSON_CATEGORIES.map((c) => [c.key, filterWhatsOnEvents(liveEvents, selectedRegions, []).filter((e) => (e.categories || []).includes(c.key)).length])),
+    free: filterWhatsOnEvents(liveEvents, selectedRegions, selectedCategories).filter(eventFreeToGo).length,
   } : null;
   // A weekend page's own weekend is its default, so it adds no date parameters to the address.
   const dateState = weekendWindow ? { when: '', from: '', to: '' } : { when: window.preset === 'upcoming' ? '' : (window.preset === 'custom' ? 'custom' : window.preset), from: window.preset === 'custom' ? window.from : '', to: window.preset === 'custom' ? window.to : '' };
@@ -29600,7 +29623,7 @@ ${renderGolfHeaderHtml()}
   </script>`, `<h1>${escapeHtml(woText.heading)}</h1>
   <p class="outdoor-intro whatson-intro">${escapeHtml(woText.intro)}</p>`)}
   ${whatsOnSearchHtml()}
-  ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null })}
+  ${whatsOnCategoryChipsHtml({ selectedCategories, counts: counts ? counts.categories : null, freeCount: counts ? counts.free : null })}
   ${whatsOnFilterBarHtml({ selectedRegions, counts: counts ? counts.regions : null, window, hasInventory, basePath, town: townScope, townCounts })}
   ${townScope && hasInventory ? whatsOnTownQuickDatesHtml(townScope, scope.weekend ? 'this-weekend' : (queryDates ? window.preset : 'upcoming')) : ''}
   <span class="visually-hidden" id="whatsOnRegionStatus"${selectedRegions.length ? '' : ' hidden'}>${selectedRegions.length ? `${selectedRegions.length} selected` : ''}</span>
@@ -32853,7 +32876,9 @@ const EVENT_PRICE_CONTEXT_RE = /\b(tickets?|admission|entry|entrance|cover|cost|
 // family storytime", "Red Bird Brewing's free Mario Kart tournament", "organized free by the City".
 const EVENT_FREE_RE = /\b(?:(?:admission|entry|entrance)(?: is)? free|free (?:admission|entry|entrance|event|to attend|of charge|for (?:all|everyone)|and open)|(?:organi[sz]ed|hosted|put on|presented) free by|(?:a|this|the|[\w'’-]+['’]s) free(?:,? [\w'’-]+){0,4}? (?:event|tournament|storytime|story time|meetup|meet-up|social|jam|fair|market|show|concert|festival|workshop|walk|tour|talk|screening|night|party|celebration|drop-in|session|class|day|afternoon|evening|parade|light-up|bazaar|program|gathering|exhibit|exhibition|skate|kick-off|open house|film|performance)|admission: free|^free(?:[.!]|$))/i;
 const EVENT_PRICE_PERSON_RE = /\b(?:kids|adults?|children|child|seniors|students|youth|members)\s\$\s?\d|\$\s?\d[\d.]*\s(?:per\s)?(?:adults?|kids|children|child|seniors|students|youth|guest|per guest)\b/i;
-const EVENT_FREE_SENTENCE_RE = /^(?:(?:it['\u2019]s|it is|admission is|entry is|entrance is|the event is|this event is)\s)?free(?:[.;!]?$|[.;!,]\s|\s(?:with|to (?:attend|watch|play|join|enter)|at the|and (?:open|all-ages|aimed|family)|tickets|for (?:all|everyone|the whole family)|admission|entry)\b)|^[^.;]{0,40}, free\.?$/i;
+// Event prices (2026-10-29): "Free with a lift ticket or membership" or "Free with admission" costs the ticket, so it is
+// not free.
+const EVENT_FREE_SENTENCE_RE = /^(?:(?:it['\u2019]s|it is|admission is|entry is|entrance is|the event is|this event is)\s)?free(?:[.;!]?$|[.;!,]\s|\s(?:with(?! (?:an? |your |paid |gallery |museum |park |ranch |general )?(?:admission|lift tickets?|tickets?|memberships?|entry|passes?|day passes?)\b)|to (?:attend|watch|play|join|enter)|at the|and (?:open|all-ages|aimed|family)|tickets|for (?:all|everyone|the whole family)|admission|entry)\b)|^[^.;]{0,40}, free\.?$/i;
 function parseEventPrice(text) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   if (!t) return null;
@@ -32889,7 +32914,54 @@ function parseEventPrice(text) {
   }
   return null;
 }
+// Stored prices (2026-10-29): price_kind says whether an event is free, by donation or paid, and price_text what a paid
+// one costs. eventPriceFromText reads a price as given (an owner's "Price" box, or a description for the backfill):
+// "Free" -> free; "By donation" / "Pay what you can" -> donation; "$25 in advance, $30 at the door" -> paid, "$25–$30".
+// A description only says donation in so many words ("by donation", "suggested donation"), so "donations to the food
+// bank" is not a price. Nothing clear -> null (the card says nothing).
+const EVENT_DONATION_RE = /\b(?:by donation|suggested donation|admission is by donation|pay[- ]what[- ]you[- ](?:can|wish|want)|pwyc)\b/i;
+function eventPriceDisplay(p) {
+  if (!p) return null;
+  if (p.price != null) return p.price === '0' ? null : `$${p.price}`;
+  return `$${p.lowPrice}\u2013$${p.highPrice}`;
+}
+function eventPriceFromText(text, { priceField = false } = {}) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  if (EVENT_DONATION_RE.test(t) || (priceField && /\bdonations?\b/i.test(t) && !/\$\s?\d/.test(t))) return { price_kind: 'donation', price_text: null };
+  const p = parseEventPrice(priceField && /^\s*\d/.test(t) ? `$${t}` : t);
+  if (p && p.price === '0') return { price_kind: 'free', price_text: null };
+  if (p) return { price_kind: 'paid', price_text: eventPriceDisplay(p) };
+  if (priceField && /^free\b/i.test(t) && !/\$\s?\d/.test(t)) return { price_kind: 'free', price_text: null };
+  if (priceField && /\$\s?\d|\btickets?\b/i.test(t)) return { price_kind: 'paid', price_text: null };
+  return null;
+}
+// The short line a card or event page shows: "Free", "By donation", "$25", "$15–$40", or "Ticketed" (paid, no price
+// given). Not stated -> null.
+function eventPriceLabel(event) {
+  const kind = event && (event.price_kind || event.priceKind);
+  if (kind === 'free') return 'Free';
+  if (kind === 'donation') return 'By donation';
+  if (kind === 'paid') return (event.price_text || event.priceText || '').trim() || 'Ticketed';
+  return null;
+}
+// Free to go (What's On's Free filter, "free events" search): free, or by donation.
+function eventFreeToGo(event) {
+  const kind = event && (event.price_kind || event.priceKind);
+  return kind === 'free' || kind === 'donation';
+}
 function eventPriceInfo(event) {
+  // A stored kind settles it: free is price 0, by donation states no price, paid uses its stored price (else the
+  // description's amount, never a "free" read from it).
+  const kind = event && event.price_kind;
+  if (kind === 'free') return { price: '0' };
+  if (kind === 'donation') return null;
+  if (kind === 'paid') {
+    const own = event.price_text ? parseEventPrice(/^\s*\d/.test(event.price_text) ? `$${event.price_text.trim()}` : event.price_text) : null;
+    if (own && own.price !== '0') return own;
+    const desc = parseEventPrice(event.description);
+    return desc && desc.price !== '0' ? desc : null;
+  }
   for (const f of ['price_text', 'price']) {
     const v = event && event[f];
     if (v == null || v === '') continue;
@@ -33174,6 +33246,7 @@ ${pastOccs.map(dateItem).join('\n')}
   const chips = categories.filter((k) => WHATSON_CATEGORY_BY_KEY[k]).map((k) => `<span class="chip">${escapeHtml(WHATSON_CATEGORY_BY_KEY[k].label)}</span>`).join(' ');
   const detailRows = [
     ['When', whenHtml],
+    eventPriceLabel(full) ? ['Price', escapeHtml(eventPriceLabel(full))] : null,
     full.recurrence_rule ? ['Recurs', escapeHtml(readableRecurrence(full.recurrence_rule, (occurrences[0] || {}).start_date ? occurrences[0].start_date.slice(0, 4) : ''))] : null,
     venueHtml ? ['Where', venueHtml] : null,
     partnersHtml ? ['With', partnersHtml] : null,
@@ -40606,6 +40679,9 @@ function approveEventSubmission(id, body, now = new Date()) {
   if (venueId !== undefined) data.venue_id = venueId;
   else data.venue_name_text = sub.venue_name;
   if (body.type !== undefined) data.type = body.type;
+  // The price as the organizer gave it (2026-10-29): "Free", "By donation", "$25 in advance".
+  const price = eventPriceFromText(sub.price_text, { priceField: true });
+  if (price) Object.assign(data, price);
   const meta = {
     reason: `Approved event submission #${id}`,
     batch_id: `event-submission-${id}`,
@@ -42195,6 +42271,14 @@ function approveOwnerEventChange(id, reviewer) {
   if (d.description && d.description !== event.description) fields.description = d.description;
   const link = d.event_url || null;
   if (link !== (event.website || null)) fields.website = link;
+  // A price the owner changed (2026-10-29). A box they emptied clears it; a box that was always empty leaves the price
+  // we found for them.
+  const sentPrice = db.prepare('SELECT price_text FROM event_submissions WHERE id = ?').get(c.submission_id);
+  if (d.price_text || (sentPrice && sentPrice.price_text)) {
+    const price = eventPriceFromText(d.price_text, { priceField: true }) || { price_kind: null, price_text: null };
+    if (price.price_kind !== (event.price_kind || null)) fields.price_kind = price.price_kind;
+    if (price.price_text !== (event.price_text || null)) fields.price_text = price.price_text;
+  }
   if (Object.keys(fields).length) {
     const r = updateEvent(event.id, fields, meta);
     if (!r.ok) return { ok: false, reason: 'write_failed', detail: r.reason };
@@ -56245,6 +56329,10 @@ module.exports = {
   eventOrganizerSchema,
   eventOffersSchema,
   parseEventPrice,
+  eventPriceFromText,
+  eventPriceLabel,
+  eventFreeToGo,
+  eventPriceInfo,
   venuePostalAddress,
   absoluteSiteUrl,
   guideItemListSchema,

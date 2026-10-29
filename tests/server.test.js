@@ -3592,7 +3592,7 @@ test('S3 #22: every write is logged; updates record old/new; result rows carry t
   assert.deepEqual({ ...card, id: undefined }, {
     id: undefined, name: 'S3 Harvest Dinner', slug: 's3-harvest-dinner', region: 'kelowna', valleyWide: false,
     categories: ['food-drink-events', 'wineries-wine-events'], description: 'Updated description', image: null,
-    startDate: '2030-10-03', endDate: '2030-10-03', dateLabel: 'Thu Oct 3', time: '6:30 pm', occurrenceCount: 1,
+    startDate: '2030-10-03', endDate: '2030-10-03', dateLabel: 'Thu Oct 3', time: '6:30 pm', occurrenceCount: 1, priceKind: null, priceLabel: null,
     venueName: 'Test Trattoria', venueId: s3venue.id, sourceType: 'official_venue', sourceName: 'Test Trattoria', attribution: null, status: 'scheduled',
   });
   const series = app.queryWhatsOnEvents({ from: '2030-10-01', to: '2030-10-31' }).find((e) => e.slug === 's3-jazz-jam');
@@ -3651,7 +3651,7 @@ const s4event = (over = {}) => ({
   occurrences: [{ start_date: '2031-10-04', start_time: '19:05', label: 'vs Kamloops Blazers', source_ref: 'g1' }, { start_date: '2031-10-11', start_time: '18:05', label: 'vs Vees', source_ref: 'g2' }],
   ...s4meta, ...over,
 });
-const S4_PUBLIC_KEYS = ['id', 'name', 'slug', 'region', 'valleyWide', 'categories', 'description', 'image', 'startDate', 'endDate', 'dateLabel', 'time', 'occurrenceCount', 'venueName', 'attribution'];
+const S4_PUBLIC_KEYS = ['id', 'name', 'slug', 'region', 'valleyWide', 'categories', 'description', 'image', 'startDate', 'endDate', 'dateLabel', 'time', 'occurrenceCount', 'venueName', 'attribution', 'priceKind', 'priceLabel'];
 
 test('S4 #1/#2: event writes without a token or with a wrong token are 401 and write nothing', async () => {
   const before = db.prepare('SELECT COUNT(*) AS n FROM events').get().n;
@@ -3761,7 +3761,7 @@ test('S4 #5: public event reads need no auth and ignore a wrong bearer', async (
   const id = list.json.events[0].id;
   const one = await s4request('GET', `/api/events/${id}`);
   assert.equal(one.status, 200);
-  assert.deepEqual(Object.keys(one.json).sort(), ['attribution', 'categories', 'dateLabel', 'description', 'id', 'image', 'name', 'occurrences', 'recurrence', 'region', 'slug', 'status', 'time', 'valleyWide', 'venueName', 'website'].sort());
+  assert.deepEqual(Object.keys(one.json).sort(), ['attribution', 'categories', 'dateLabel', 'description', 'id', 'image', 'name', 'occurrences', 'priceKind', 'priceLabel', 'recurrence', 'region', 'slug', 'status', 'time', 'valleyWide', 'venueName', 'website'].sort());
   assert.equal(one.json.occurrences.length, 2, 'cancelled occurrence not exposed publicly');
   assert.deepEqual(Object.keys(one.json.occurrences[0]).sort(), ['allDay', 'endDate', 'endsNextDay', 'endTime', 'id', 'label', 'startDate', 'startTime'].sort());
   const occs = await s4request('GET', `/api/events/${id}/occurrences`);
@@ -4696,10 +4696,10 @@ test("What's On simplification: results are reachable without scrolling past a f
   assert.equal((above.match(/outdoor-activity-card/g) || []).length, 0, 'no category image tiles above the results');
   assert.equal((above.match(/<img/g) || []).length, 0, 'no images at all above the results');
 
-  // 2. Replaced by one compact chip row: All + the twelve categories.
+  // 2. Replaced by one compact chip row: All + Free (2026-10-29) + the twelve categories.
   assert.match(markup, /<div class="whatson-cat-row" role="group" aria-label="Choose categories" data-filter="category">/);
   assert.match(markup, /data-category-all="1"/, 'an All reset chip');
-  assert.equal((markup.match(/<button type="button" class="outdoor-filter-chip whatson-cat-chip/g) || []).length, app.WHATSON_CATEGORIES.length + 1, 'All + one chip per category');
+  assert.equal((markup.match(/<button type="button" class="outdoor-filter-chip whatson-cat-chip/g) || []).length, app.WHATSON_CATEGORIES.length + 2, 'All + Free + one chip per category');
 
   // 3. Search exists and is a real input, not a heading-sized block.
   assert.match(markup, /<input type="search" id="whatsOnSearch" class="whatson-search-input" placeholder="Search events\.\.\."/);

@@ -254,8 +254,12 @@ CREATE INDEX IF NOT EXISTS idx_events_venue ON events(venue_id);
 // currently filters or sorts by event type, so an index would be
 // speculative rather than justified by an actual read pattern.
 const existingEventCols = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+// Event prices (2026-10-29): price_kind is 'free', 'donation' or 'paid' (null = the listing doesn't say); price_text
+// is what a paid event costs, as shown ("$25", "$15–$40").
 const newEventColumns = [
   ['type', 'TEXT'],
+  ['price_kind', 'TEXT'],
+  ['price_text', 'TEXT'],
 ];
 for (const [col, colType] of newEventColumns) {
   if (!existingEventCols.includes(col)) {
