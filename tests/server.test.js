@@ -20772,7 +20772,8 @@ test('Owner portal: photo uploads are private until approved, then can become th
     assert.equal(db.prepare('SELECT image_url FROM venues WHERE id = ?').get(v.id).image_url, `/images/owner/${row.file}`);
     const page = await fetch(`${base}/kelowna/cafes/owner-photos-fixture`).then((r) => r.text());
     assert.match(page, new RegExp(`/images/owner/${row.file}`));
-    assert.match(page, /Photo: Owner Photos Fixture/);
+    // 2026-10-29: the owner's credit defaults to the business's own name, which the page no longer repeats under the photo.
+    assert.doesNotMatch(page, /Photo: Owner Photos Fixture/);
     // Rejecting deletes the file.
     const second = await up(good);
     const row2 = db.prepare('SELECT * FROM owner_photos WHERE id = ?').get(second.body.id);
@@ -32128,4 +32129,41 @@ test('Browse: the What matters to you list offers Free to Visit and Arts & Cultu
   assert.match(html, /data-bh-feature="free_entry"/);
   assert.match(html, /data-bh-feature="arts_culture"/);
   assert.match(html, /data-bh-feature="kid_friendly"/);
+});
+
+test('Venue page polish (2026-10-29): a theatre leads with its next show and Show dates; one top row on computers', () => {
+  const hours = JSON.stringify({ mon: null, tue: null, wed: null, thu: null, fri: [['19:30', '21:30']], sat: [['19:30', '21:29']], sun: [['14:00', '16:00']] });
+  db.prepare(`INSERT INTO venues (name, region, type, description, address, latitude, longitude, hours, slug)
+    VALUES ('Polish Fixture Theatre', 'penticton', 'indoor', 'A fixture theatre.', '1 Stage Rd, Penticton, BC', 49.49, -119.6, ?, 'polish-fixture-theatre')`).run(hours);
+  const v = app.findVenueBySlug('penticton', 'indoor', 'polish-fixture-theatre');
+  const NOW = new Date('2026-10-29T22:00:00Z'); // a Thursday, two weeks before the run
+  const page = () => app.renderVenuePage(app.findVenueBySlug('penticton', 'indoor', 'polish-fixture-theatre'), [], [], [], { now: NOW });
+  // No show coming up: the usual open-now line and Hours.
+  assert.match(page(), /id="venueOpenStatus">Closed today/);
+  assert.match(page(), /<div class="venue-section venue-hours" id="venueHours"><h2>Hours/);
+  const occurrences = [['2026-11-13', '19:30', '21:30'], ['2026-11-14', '19:30', '21:30'], ['2026-11-15', '14:00', '16:00'], ['2026-11-20', '19:30', '21:30']]
+    .map(([start_date, start_time, end_time]) => ({ start_date, start_time, end_time }));
+  const r = app.createEvent({ region: 'penticton', name: 'Footlight Follies – Polish Fixture Theatre', description: 'Fixture run.', source_type: 'official_organizer',
+    source_name: 'polish fixture', source_url: 'https://example.com/polish/footlight', venue_id: v.id, categories: ['arts-culture'], occurrences }, { reason: 'fixture', batch_id: 'test-polish' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  try {
+    const html = page();
+    assert.match(html, /<p class="venue-open-status" data-open="show" id="venueOpenStatus">Next show: Fri Nov 13, 7:30 PM <a href="#venueHours">See all 4 dates<\/a><\/p>/);
+    const box = html.slice(html.indexOf('id="venueHours"'), html.indexOf('</div>', html.indexOf('id="venueHours"')));
+    assert.match(box, /<h2>Show dates<\/h2><p class="venue-show-title"[^>]*>Footlight Follies<\/p>/, 'the repeated venue name is dropped from the title');
+    assert.match(box, /Nov 13 – Nov 20 · 4 shows/);
+    assert.match(box, /<li><span>Fridays<\/span><span>7:30 PM – 9:30 PM<\/span><\/li><li><span>Saturdays<\/span>.*<li><span>Sundays<\/span><span>2 PM – 4 PM<\/span><\/li>/);
+    assert.match(box, new RegExp(`href="/penticton/events/${r.event.slug}"`));
+    assert.doesNotMatch(html, /Closed today/);
+    // One top row on computers: the breadcrumb and the back link share .venue-topbar; the back link hides at 900px+.
+    assert.match(html, /<div class="venue-topbar"><nav class="breadcrumb"/);
+    assert.match(html, /\.venue-topbar \.venue-top-links \.category-back-link \{ display: none; \}/);
+    // A non-theatre with the same event keeps its hours.
+    db.prepare("UPDATE venues SET name = 'Polish Fixture Hall' WHERE id = ?").run(v.id);
+    assert.match(page(), /id="venueOpenStatus">Closed today/);
+  } finally {
+    for (const t of ['event_enrichment_log', 'event_categories', 'event_occurrences']) db.prepare(`DELETE FROM ${t} WHERE event_id = ?`).run(r.event.id);
+    db.prepare('DELETE FROM events WHERE id = ?').run(r.event.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
 });

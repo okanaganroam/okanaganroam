@@ -31559,7 +31559,7 @@ function renderVenuePageLayoutStyles() {
   /* Open-now line under the name. */
   body.golf-page .venue-open-status { display: flex; align-items: center; gap: 7px; margin: -2px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.92rem; font-weight: 800; color: var(--ink); }
   body.golf-page .venue-open-status::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor; flex: 0 0 auto; }
-  body.golf-page .venue-open-status[data-open="open"] { color: var(--teal, #2A6B67); }
+  body.golf-page .venue-open-status[data-open="open"], body.golf-page .venue-open-status[data-open="show"] { color: var(--teal, #2A6B67); }
   body.golf-page .venue-open-status[data-open="closed"] { color: rgba(42,32,25,0.72); }
   body.golf-page .venue-open-status[data-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
   /* Full strength (2026-10-18): at 0.85 opacity the "See hours" link was 4.27:1 next to a closed status. */
@@ -31792,6 +31792,8 @@ function renderVenuePageLayoutStyles() {
 }
 
 // GET /:region/:category/:slug — individual venue page
+// A venue whose weekly hours are show times (2026-10-29): its page leads with the next show (see showRun).
+const SHOW_VENUE_RE = /\b(theatre|theater|playhouse|opera house|cabaret)\b/i;
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
   const fr = opts.lang === 'fr';
@@ -32110,7 +32112,11 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const heroPosY = venue.image_url ? venuePhotoPosY(venue.id, venue.image_url) : null;
   // The credit's colour (2026-10-18): a solid #6B5E55 (5.6:1 on the cream page); the old 0.65 opacity was 3.9-4.5:1.
   // French pass 6 (2026-10-19): a credit stored as "Photo: City of Kelowna" read "Photo: Photo: …"; French has its space before the colon.
-  const creditText = photoCredit ? String(photoCredit).replace(/^\s*photos?\s*:\s*/i, '') : '';
+  // Venue page polish (2026-10-29): a credit that only repeats the venue's own name ("Photo: Many Hats Theatre Company
+  // (Cannery Stage)" under its own photos) says nothing new and is left out; real credits (Google Maps, a photographer,
+  // a tourism board) stay.
+  const creditRaw = photoCredit ? String(photoCredit).replace(/^\s*photos?\s*:\s*/i, '') : '';
+  const creditText = creditRaw.trim().toLowerCase() === String(venue.name || '').trim().toLowerCase() ? '' : creditRaw;
   // Polish pass (2026-10-26): a single photo's credit is a small chip on the photo's bottom-right corner (white on a
   // dark 62% scrim: at least 5.3:1 over any photo, so AA), instead of a line of its own between the photo and the
   // venue name. Still "Photo: Google Maps" / "Photo: <owner credit>"; never removed. With a gallery the "See all"
@@ -32318,6 +32324,46 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
       </div>`
     : '';
 
+  // Show venues (2026-10-29): a theatre's weekly hours are really its show times, so between runs the line under the
+  // name said "Closed today · Opens tomorrow 7:30 PM" with no show tomorrow. When a theatre has an upcoming event with
+  // dates, that line gives the next show and the Hours box becomes the run's Show dates (weekdays, times, date range).
+  const showRun = (() => {
+    if (venue.redirect_to || !SHOW_VENUE_RE.test(`${venue.name} ${venue.cuisine || ''}`)) return null;
+    const e = venueEvents.find((x) => x.nextDate);
+    if (!e) return null;
+    const occ = db.prepare("SELECT start_date, start_time, end_time FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND end_date >= ? ORDER BY start_date, start_time")
+      .all(e.id, todayLocal(opts.now || new Date()));
+    return occ.length ? { e, occ } : null;
+  })();
+  const showTime = (t) => (t ? happyHourTimeText(hoursModule.hoursTimeToMinutes(t), fr) : '');
+  const showDay = (d) => (fr ? frDateShort(d) : formatLocalDateShort(d));
+  const showStatusHtml = showRun ? (() => {
+    const next = showRun.occ[0];
+    const when = `${showDay(next.start_date)}${next.start_time ? `, ${showTime(next.start_time)}` : ''}`;
+    const more = showRun.occ.length > 1 ? L(`See all ${showRun.occ.length} dates`, `Voir les ${showRun.occ.length} dates`) : L('See show dates', 'Voir les dates');
+    return `<p class="venue-open-status" data-open="show" id="venueOpenStatus">${L('Next show: ', 'Prochain spectacle : ')}${escapeHtml(when)} <a href="#venueHours">${more}</a></p>`;
+  })() : '';
+  const showDatesHtml = showRun ? (() => {
+    const { e, occ } = showRun;
+    // "Every Christmas Story Ever Told – Many Hats Theatre" on Many Hats' own page drops the repeated venue name.
+    const title = String(e.name).replace(/\s+[–-]\s+([^–-]+)$/, (m, tail) => (venue.name.toLowerCase().startsWith(tail.trim().toLowerCase()) ? '' : m));
+    const first = occ[0].start_date, last = occ[occ.length - 1].start_date;
+    const range = first === last ? showDay(first) : `${fr ? frDateShort(first).replace(/^\S+ /, '') : formatLocalDateShort(first, { weekday: false })} – ${fr ? frDateShort(last).replace(/^\S+ /, '') : formatLocalDateShort(last, { weekday: false })}`;
+    const count = occ.length === 1 ? L('1 show', '1 représentation') : L(`${occ.length} shows`, `${occ.length} représentations`);
+    const byDay = new Map();
+    for (const o of occ) {
+      const wd = localWeekday(o.start_date);
+      const t = o.start_time ? `${showTime(o.start_time)}${o.end_time ? ` – ${showTime(o.end_time)}` : ''}` : L('Time to be announced', 'Heure à confirmer');
+      if (!byDay.has(wd)) byDay.set(wd, new Set());
+      byDay.get(wd).add(t);
+    }
+    const dayNames = fr ? ['Les dimanches', 'Les lundis', 'Les mardis', 'Les mercredis', 'Les jeudis', 'Les vendredis', 'Les samedis'] : ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+    const rows = [...byDay.keys()].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+      .map((wd) => `<li><span>${dayNames[wd]}</span><span>${escapeHtml([...byDay.get(wd)].join(', '))}</span></li>`).join('');
+    const href = `/${e.region}/events/${e.slug}`;
+    return `<h2>${L('Show dates', 'Dates des spectacles')}</h2><p class="venue-show-title" style="margin:0 0 4px;font-weight:800">${escapeHtml(title)}</p><p class="venue-show-range" style="margin:0 0 10px">${escapeHtml(range)} · ${count}</p><ul class="hours-list">${rows}</ul><p class="venue-hours-checked"><a href="${href}">${L('Show details &amp; tickets', 'Détails et billets')} &rarr;</a></p>`;
+  })() : '';
+
   const relatedHtml = relatedVenues.length
     ? `<div class="related-section">
         <h2>${fr ? `Autres ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Other ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}`}</h2>
@@ -32349,9 +32395,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // Every type (2026-10-14), not only the ALL_REGIONS_CATEGORIES ones.
   const venueBackLink = `<a class="category-back-link" href="/${venue.region}/${catSlug}">\u2190 ${fr ? `${escapeHtml(label.plural)} \u00e0 ${escapeHtml(regionLabel)}` : `${escapeHtml(regionLabel)} ${escapeHtml(ALL_REGIONS_BACK_LABEL[venue.type] || label.plural)}`}</a>`;
   const openStatus = venueOpenStatus(statusHours, venueAdvisoryNote !== undefined, opts.now || new Date());
-  const openStatusHtml = openStatus
+  const openStatusHtml = showStatusHtml || (openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${hoursHtml ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
-    : '';
+    : '');
   // Happy hour line (2026-10-23), right under the open-now line; worked out on the server like it.
   const happyHourHtml = happyHour && happyHour.live
     ? `<p class="venue-hh-status" data-hh="${happyHour.live.state}" id="venueHappyHour">${happyHour.live.state === 'now' ? `<span aria-hidden="true">${uiIcon('cocktail')}</span> ` : ''}${escapeHtml(happyHour.live.text)}</p>`
@@ -32366,13 +32412,21 @@ ${VENUE_MENU_CSS}` : ''}
 </head>
 <body${themedBodyClassAttr(venue.type, themedShell)}>
   ${themedShell ? renderGolfTripTrayHtml() + '\n<div id="floatingTooltip"></div>\n' + renderGolfHeaderHtml() + '\n  <main class="wrap-wide golf-main" id="main">' : siteHeader('https://okanaganroam.com/', 'Explore the full directory \u2192')}
-  ${breadcrumbNavHtml([
+  <div class="venue-topbar">${breadcrumbNavHtml([
     { name: L('Home', 'Accueil'), href: '/' },
     { name: regionLabel, href: `/${venue.region}` },
     { name: label.plural, href: `/${venue.region}/${catSlug}` },
     { name: venue.name },
   ])}
-  <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">${venueBackLink}${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${venuePagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${venuePagePath(venue, 'fr')}" hreflang="fr" lang="fr">Fran\u00e7ais</a>`}</p>` : ''}</div>
+  <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">${venueBackLink}${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${venuePagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${venuePagePath(venue, 'fr')}" hreflang="fr" lang="fr">Fran\u00e7ais</a>`}</p>` : ''}</div></div>
+  <style>@media (min-width: 900px) {
+    /* Venue page polish (2026-10-29): on a computer the breadcrumb already says "Penticton › Indoor & Rainy Day Spots",
+       so the back link under it is hidden and the language link sits at the end of the breadcrumb row. */
+    .venue-topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+    .venue-topbar nav.breadcrumb { margin: 0 !important; }
+    .venue-topbar .venue-top-links .category-back-link { display: none; }
+    .venue-topbar .venue-lang-switch { margin: 0 !important; white-space: nowrap; }
+  }</style>
   ${imageHtml}
   <div class="venue-layout">
   <div class="venue-main">
@@ -32406,7 +32460,7 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-extra">
   ${venueDealsCardHtml}
   ${venueWeeklyNightsHtml(weeklyNights, fr)}
-  ${hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${hoursHtml}</div>` : ''}
+  ${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
