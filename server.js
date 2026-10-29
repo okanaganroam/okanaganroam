@@ -12586,7 +12586,7 @@ function renderHomeFooterHTML(fromBrowse) {
     <div class="home-footer-cols">
       <details class="home-footer-col home-footer-fold" open>
         <summary><h2 data-i18n="homeFooter.explore">Explore</h2></summary>
-        <ul>
+        <ul class="home-footer-list-2col">
           <li><a href="/food-drink" data-i18n="mood.foodDrink.title">Food &amp; Drink</a></li>
           <li><a href="${wineHref}" data-i18n="wizard.wineries">Wineries</a></li>
           <li><a href="/beaches" data-i18n="mood.beaches.title">Beaches</a></li>
@@ -13036,32 +13036,30 @@ function renderCanonicalFooterStyles() {
      region list and taking a little back from About/Social Media, which
      never needed a full equal share to begin with. */
   .home-footer-cols {
-    display: grid; grid-template-columns: 1fr 0.9fr 2fr 1fr;
-    align-items: start; gap: 28px; flex: 1; min-width: 0;
+    display: grid; grid-template-columns: 1.7fr 1fr 1.7fr auto;
+    align-items: start; gap: 40px; flex: 1; min-width: 0;
     /* Brand|Explore divider (FOOTER.png reference, 2026-09-19): matches the
        same rule as the 3 inter-column dividers below, just applied to the
        one seam that isn't between two .home-footer-col siblings (Brand is
        its own flex item, outside this grid). */
-    border-left: 1px solid rgba(245,243,237,0.14);
-    padding-left: 20px;
+    /* Footer polish (2026-10-29): no vertical rules; the spacing alone separates the columns. */
   }
   /* Clean vertical separators between the 4 major columns (approved
      footer refinement, 2026-09-19) -- a thin, low-opacity rule on every
      column after the first, inset with padding rather than margin so the
      line sits mid-gutter instead of hugging either column's text. */
-  .home-footer-col + .home-footer-col {
-    border-left: 1px solid rgba(245,243,237,0.14);
-    padding-left: 20px;
-  }
+  .home-footer-col + .home-footer-col { border-left: none; padding-left: 0; }
   /* Accessibility (2026-10-18): the column headings are h2 (were h4, after the page's h2s); same look. */
   .home-footer-col h2 {
     font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; line-height: inherit;
-    letter-spacing: 0.07em; color: var(--ref-gold); margin: 0 0 12px; padding-bottom: 8px;
-    display: inline-block; border-bottom: 2px solid var(--ref-gold);
+    letter-spacing: 0.08em; color: var(--ref-gold); margin: 0 0 14px; padding-bottom: 0;
+    display: inline-block; border-bottom: none;
   }
   .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  /* Footer polish (2026-10-29): Explore's 15 links sit in two short columns instead of one long one. */
+  .home-footer-col ul.home-footer-list-2col { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); column-gap: 32px; row-gap: 8px; }
   .home-footer-col a, .home-footer-region-group a {
-    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.92rem; color: rgba(245,243,237,0.78);
+    font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; line-height: 1.35; color: rgba(245,243,237,0.72);
     text-decoration: none; transition: color 0.15s;
   }
   .home-footer-col a:hover, .home-footer-region-group a:hover { color: var(--ref-gold); }
@@ -13091,11 +13089,11 @@ function renderCanonicalFooterStyles() {
   .home-footer-region-group h3 {
     font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.7rem; font-weight: 800; line-height: inherit;
     text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--ref-gold); margin: 0 0 8px; padding-bottom: 5px;
-    display: inline-block; border-bottom: 1px solid var(--ref-gold);
+    color: rgba(245,243,237,0.45); margin: 0 0 8px; padding-bottom: 0;
+    display: inline-block; border-bottom: none;
   }
   .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-  .home-footer-region-group a { font-size: 0.82rem; line-height: 1.3; }
+  .home-footer-region-group a { font-size: 0.86rem; line-height: 1.35; }
   /* Tap targets (2026-10-19, review pass 5): each icon is a 44px target; a 5px clear border keeps the round badge 34px
      (and the row's visible 10px gaps) as before. */
   .home-footer-social-row { display: flex; gap: 0; }
@@ -13221,6 +13219,7 @@ function renderCanonicalFooterStyles() {
        Both removed here; the 560px single-column block below inherits
        this same removal. */
     .home-footer-col + .home-footer-col { border-left: none; padding-left: 0; }
+    .home-footer-col-regions { grid-column: 1 / -1; }
   }
 
   @media (max-width: 560px) {
@@ -13276,6 +13275,7 @@ function renderCanonicalFooterStyles() {
        the (now-centered) box itself. */
     .home-footer-brand { align-items: center; margin: 0 auto; }
     .home-footer-col ul, .home-footer-region-group ul { align-items: center; }
+    .home-footer-col ul.home-footer-list-2col { justify-content: center; justify-items: center; }
     .home-footer-social-row { justify-content: center; }
 
     /* Trip 0 button, mobile: slightly smaller still and pulled in a touch
