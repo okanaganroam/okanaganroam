@@ -2835,7 +2835,7 @@ test('Home footer: previously-untranslated pieces (tagline, Food & Drinks, Beach
 
 test('Home footer: Explore column lists the site\'s sections, in order, each with a real href (no invented routes)', () => {
   const html = app.renderHomeFooterHTML();
-  const exploreMatch = html.match(/<summary><h2 data-i18n="homeFooter\.explore">Explore<\/h2><\/summary>\s*<ul>([\s\S]*?)<\/ul>/);
+  const exploreMatch = html.match(/<summary><h2 data-i18n="homeFooter\.explore">Explore<\/h2><\/summary>\s*<ul class="home-footer-list-2col">([\s\S]*?)<\/ul>/);
   assert.ok(exploreMatch, 'expected to find the Explore column');
   const items = Array.from(exploreMatch[1].matchAll(/<a href="([^"]*)"[^>]*>([^<]*(?:&[a-z]+;[^<]*)*)<\/a>/g))
     .map((m) => ({ href: m[1], text: m[2] }));
