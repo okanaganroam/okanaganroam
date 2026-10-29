@@ -420,8 +420,11 @@ function renderStyles() {
   .t3-btn-ghost:hover { background: rgba(27,43,58,0.06); }
   .t3-examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; max-width: 900px; }
   .t3-examples-label { width: 100%; font-size: 0.8rem; color: rgba(255,255,255,0.72); margin-bottom: 2px; }
-  .t3-example { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.28); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 0.84rem; font-weight: 600; cursor: pointer; text-align: left; }
-  .t3-example:hover { background: rgba(255,255,255,0.22); }
+  .t3-example { background: rgba(27,43,58,0.58); color: #fff; border: 1px solid rgba(255,255,255,0.34); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 0.84rem; font-weight: 600; cursor: pointer; text-align: left; }
+  .t3-example:hover { background: rgba(27,43,58,0.78); }
+  /* Example plan (2026-10-29): what a result looks like, under the example requests. */
+  .t3-sample { margin: 14px 0 0; max-width: 900px; font-size: 0.86rem; line-height: 1.5; color: rgba(255,255,255,0.9); }
+  .t3-sample-label { font-weight: 800; }
   /* 2026-10-19: the example chips' height is reserved (measured with the final fonts), so the hero does not grow when the
      web font replaces the fallback and a chip wraps onto another line. */
   .t3-examples { min-height: 216px; }
@@ -438,7 +441,7 @@ function renderStyles() {
   .t3-editbar-label { display: block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #E0A94E; }
   .t3-editbar-btn { flex: none; min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 0; background: #fff; color: var(--ref-navy-deep, #101B24); font-weight: 800; font-size: 0.86rem; cursor: pointer; }
   .t3.is-compact .t3-hero-inner { padding-top: 12px; padding-bottom: 12px; }
-  .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples { display: none; }
+  .t3.is-compact .t3-hero .t3-eyebrow, .t3.is-compact .t3-title, .t3.is-compact .t3-lead, .t3.is-compact .t3-composer, .t3.is-compact .t3-examples, .t3.is-compact .t3-sample { display: none; }
   .t3.is-compact .t3-crumb { margin-bottom: 10px; }
   .t3.is-compact .t3-status:empty { display: none; }
   /* What we understood (the editable chips) belongs to the request, so it folds away with it until "Edit request"
@@ -452,7 +455,6 @@ function renderStyles() {
   .t3-how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 0; padding: 0; list-style: none; }
   .t3-how-grid li { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 10px 22px -18px rgba(27,43,58,0.45); font-size: 0.92rem; line-height: 1.5; }
   .t3-how-grid strong { display: block; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.02rem; margin-bottom: 4px; }
-  .t3-how-num { display: inline-flex; width: 26px; height: 26px; border-radius: 999px; background: var(--ref-navy); color: #fff; font-weight: 800; font-size: 0.8rem; align-items: center; justify-content: center; margin-bottom: 8px; }
 
   /* Result */
   .t3-result { padding: 26px 0 64px; }
@@ -777,7 +779,7 @@ function renderBody(d) {
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
         <textarea id="t3Input" rows="3" maxlength="500" placeholder="Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food." data-i18n-placeholder="tripv3.placeholder"></textarea>
         <div class="t3-composer-foot">
-          <span class="t3-hint" data-i18n="tripv3.hint">Real Okanagan Roam places only &mdash; no invented details.</span>
+          <span class="t3-hint" data-i18n="tripv3.hint">Checks each place&rsquo;s hours, seasons and happy hours.</span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
         </div>
       </form>
@@ -785,6 +787,7 @@ function renderBody(d) {
         <span class="t3-examples-label" id="t3ExamplesLabel" data-i18n="tripv3.examplesLabel">Or start from one of these:</span>
           ${chips}
       </div>
+      <p class="t3-sample"><span class="t3-sample-label" data-i18n="tripv3.sampleLabel">Example plan:</span> <span data-i18n="tripv3.sampleText">ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.</span></p>
       <div class="t3-editbar" id="t3EditBar" hidden>
         <p class="t3-editbar-text"><span class="t3-editbar-label" id="t3EditLabel">Your request</span> <span id="t3EditText"></span></p>
         <button type="button" class="t3-editbar-btn" id="t3EditBtn" aria-controls="t3Form">Edit request</button>
@@ -793,12 +796,12 @@ function renderBody(d) {
     </div>
   </section>
   <section class="t3-wrap t3-how" id="t3How" aria-labelledby="t3HowTitle">
-    <h2 id="t3HowTitle" data-i18n="tripv3.howTitle">How it works</h2>
-    <ol class="t3-how-grid">
-      <li><span class="t3-how-num">1</span><strong data-i18n="tripv3.how1Title">Say it your way</strong><span data-i18n="tripv3.how1Text">&ldquo;Three days, wineries and a cozy dinner, plus an autumn walk.&rdquo; Days, dates, kids, dogs and occasions all count.</span></li>
-      <li><span class="t3-how-num">2</span><strong data-i18n="tripv3.how2Title">Real places, real reasons</strong><span data-i18n="tripv3.how2Text">Every stop is a place listed on Okanagan Roam, chosen from what we actually know about it &mdash; and we tell you why.</span></li>
-      <li><span class="t3-how-num">3</span><strong data-i18n="tripv3.how3Title">Make it yours</strong><span data-i18n="tripv3.how3Text">Keep the stops you love, swap or remove the rest, regenerate a day and add it all to My Trip.</span></li>
-    </ol>
+    <h2 id="t3HowTitle" data-i18n="tripv3.howTitle">What we check for you</h2>
+    <ul class="t3-how-grid">
+      <li><strong data-i18n="tripv3.how1Title">Open, and in season</strong><span data-i18n="tripv3.how1Text">Each stop fits its opening hours. Places closed that day or out of season are left out.</span></li>
+      <li><strong data-i18n="tripv3.how2Title">Happy hours and what&rsquo;s on</strong><span data-i18n="tripv3.how2Text">Happy hour stops land inside happy hour, with the deals, weekly specials and nights like trivia or live music.</span></li>
+      <li><strong data-i18n="tripv3.how3Title">A plan you can use</strong><span data-i18n="tripv3.how3Text">Keep, swap or remove stops, see it on the map, get a Google Maps route and share it with a link.</span></li>
+    </ul>
   </section>
   <section class="t3-wrap t3-result" id="t3Result" hidden aria-labelledby="t3Headline"></section>
 </main>`;
