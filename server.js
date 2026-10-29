@@ -35702,7 +35702,9 @@ function browseTypeChipsHtml(state = {}) {
 function browseFeatureChipsHtml(state = {}) {
   const selected = new Set(state.features || []);
   const counts = state.counts && state.counts.features ? state.counts.features : null;
-  const chips = FD_HUB_FEATURES.filter((f) => !ACTIVITY_ONLY_BADGES.has(f.key)).map((f) => {
+  // Browse covers every kind of place, so it offers the things-to-do badges too (Free to Visit, Arts & Culture;
+  // Dayton, 2026-10-29), after the food and drink ones.
+  const chips = FD_HUB_FEATURES.map((f) => {
     const n = counts ? (counts[f.key] || 0) : null;
     return `<button type="button" class="outdoor-filter-chip fd-feature-chip" data-bh-feature="${f.key}" aria-pressed="${selected.has(f.key) ? 'true' : 'false'}"><span class="fd-feature-icon" aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}${n === null ? '' : ` <span class="outdoor-activity-count">${n}</span>`}</button>`;
   }).join('');
@@ -55950,6 +55952,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  browseFeatureChipsHtml,
   // Card badges (2026-10-29)
   cardBadgeChipsHtml, cardBadgeExpected,
   // Hotel QR pages (2026-10-20)

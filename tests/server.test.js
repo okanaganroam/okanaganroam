@@ -32107,3 +32107,10 @@ test('Cards: a beach card leaves off Kids welcome, Lake view and Free; a free pa
   assert.match(app.cardBadgeChipsHtml(paid), /Kids welcome/, 'a paid attraction keeps Kids welcome');
   assert.match(app.badgeChipsHtml(beach), /Lake View|Lake view/, 'the full badge list is unchanged');
 });
+
+test('Browse: the What matters to you list offers Free to Visit and Arts & Culture (2026-10-29)', () => {
+  const html = app.browseFeatureChipsHtml({});
+  assert.match(html, /data-bh-feature="free_entry"/);
+  assert.match(html, /data-bh-feature="arts_culture"/);
+  assert.match(html, /data-bh-feature="kid_friendly"/);
+});
