@@ -1,0 +1,182 @@
+[
+ {
+  "id": 30,
+  "name": "Apres | Real Fruit Ice Cream & Coffee Bar",
+  "file": "/images/venues/apres-real-fruit-ice-cream-coffee-bar-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548263007a64c749:0x7a54519b11720bfb",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfW7Tbr-vKohAwsnjRO4WoDqkvGFXMRnwoC_P1bfLb7EWHBXcK8egF_ExU-H2Vb4jPMntRNWMWBfmmEaWsOPnFRX-s01k88cuiW4b3CH9bzzBFIL5jAK1kOrOgFXKxQHyl8phBve3fhkthZ=w2400",
+  "source_kind": "google_maps",
+  "note": "Interior: the counter wall with the shop's menu boards and fridge (no exterior photo exists on Google; other photos are food close-ups)"
+ },
+ {
+  "id": 585,
+  "name": "Silhouette Estate Winery",
+  "file": "/images/venues/silhouette-estate-winery-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://silhouettecellars.com/",
+  "image_url": "https://img1.wsimg.com/isteam/ip/808504fa-a4e9-483c-9007-dcd360670eba/vineyard%20view.jpg",
+  "source_kind": "website",
+  "note": "The estate vineyard rows looking over Okanagan Lake at sunset (winery website \"vineyard view\")"
+ },
+ {
+  "id": 634,
+  "name": "Sushi Sai",
+  "file": "/images/venues/sushi-sai-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df5b03c8adefb:0x909ad03158ecc45f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdggwNw3zpc44I-hgL5XiHNiy_UFb-J2T9agwEyGHelEgkfma8eVzZrVj3P3Y5Ma0mypgZFLssgQiq8eA1W1gZZiWJENZkXJJ1RbdU7-XQulU0CeLIMz-eEU2aoy8-FWmPQ0dhJomBjmsoQ=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront on Ellis St with the Sushi Sai sign and #1607"
+ },
+ {
+  "id": 282,
+  "name": "Hyderabadi Biryani Lounge",
+  "file": "/images/venues/hyderabadi-biryani-lounge-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df581c3f548ef:0xe807e2173bd22561",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeOfO__rTZ46rPcOhtQA76m7kxR2SArEtGOHdMg8pwDK1X7R9Sb2MuV0ynFahRW6DhoBEU5l_7GM9fx7Cv9W0vJRNwYH6WFJeYdhNGgn-0tm2lgiIYcBTF7svJoaOYnywgiiwCO6KfQj3U=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront at 575 Bernard Ave (owner photo): sign reads Twice the Dice Board Game Cafe, with a Hyderabadi Biryani poster in the door window; the restaurant operates inside this cafe"
+ },
+ {
+  "id": 338,
+  "name": "Kings Kitchen",
+  "file": "/images/venues/kings-kitchen-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482650239cd790b:0x340a6c0430bf6a55",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLejTqMBxrlPRoKk3-k0gJzsdI4gM4Opw_yCD3Npac8GbCUscyBjS98G4-Z89rRR2ew0tt0HY6AzGI_ZUc5DZmHBjD-7TJaoJlQ-bs4Zoq3voIhVghXdfqyccETE8c9ujoXIY4Q5towQ6nYD=w2400",
+  "source_kind": "google_maps",
+  "note": "Storefront on Main St with the yellow King's Kitchen sign and #9912 (owner photo, evening)"
+ },
+ {
+  "id": 1899,
+  "name": "Aberdeen Columns Trail",
+  "file": "/images/venues/aberdeen-columns-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dc57e9d3cb2cf:0xfc7af2ceb256d06c",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdHGzcmeRbz6qEHphJ6pBzziwVkfnt42pUXEtNnRuwt-5vEoHux6D3-5UHMrMsWDepWz0gFydfD8ifeHMmj-vOK88rxfbjVe7O2as0-d6WhhgZoHfkr6XZ9v9aA3Rvk_v8_nCfZfA=w2400",
+  "source_kind": "google_maps",
+  "note": "The wall of basalt columns above the talus slope"
+ },
+ {
+  "id": 1910,
+  "name": "Bellevue Creek Greenway",
+  "file": "/images/venues/bellevue-creek-greenway-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8bc2b01240a9:0x472e36e0f7279b8f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfcElImEMbYh8XKLXMJd0bhnrgWifIojN9SlilhccXPvBqTh8wjJi33KE5TOAyrGvxnYZzpeMnjZMXXJ8WljNcEkatQtksj1JYAFzzNkXQOb4rg3oHAoq2o68QhLmUPuwFQNCC0=w2400",
+  "source_kind": "google_maps",
+  "note": "Gravel greenway path beside rocky Bellevue Creek with a cyclist, green trees"
+ },
+ {
+  "id": 1593,
+  "name": "Canadian Craft Tours (Kelowna)",
+  "file": "/images/venues/canadian-craft-tours-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://canadiancrafttours.ca/products/kelowna-wine-tour",
+  "image_url": "https://www.canadiancrafttours.ca/cdn/shop/products/IMG_1063.JPG?v=1562464036",
+  "source_kind": "website",
+  "note": "From the tour company's own Kelowna wine tour page: a lakeview winery stop with pergola and vineyard over Okanagan Lake"
+ },
+ {
+  "id": 1874,
+  "name": "Divide Lake Trail (from Rimrock Gate)",
+  "file": "/images/venues/divide-lake-trail-north-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482712bbc0952f1:0x2c50aec78e1eaf58",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdwVrSxFwF-z7obvl7WVxV_yhqWI72kxqeQosqFYwFI1BVceYBuR24iYz-Y5Y6uEt-8XFP_dg5CkMGDongGaHHO1KZAnjFU-zH9Nn424ymxGd5mw5uZfZ0IKMrzmHw_fGxM3gTf=w2400",
+  "source_kind": "google_maps",
+  "note": "Divide Lake: long narrow blue lake between rocky, burn-recovering slopes"
+ },
+ {
+  "id": 1915,
+  "name": "Gallagher's Canyon – Tree of Wisdom Trail (Jean Road Trails)",
+  "file": "/images/venues/gallaghers-canyon-tree-of-wisdom-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8d92fadcb465:0x9e451264c8367e0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcULTssBTArH3Ta15HKiHCWbzWEPpwJxCuY__sacOM3To01MwpxwLbXkRbJujBiWZ1RtMtnMLxiDtBIjvOMWhfTg5vwg1Sq-6Al0ZTUd2XD1Rt6ZcjukAk96OCF_ko3pTfn6E6vCg=w2400",
+  "source_kind": "google_maps",
+  "note": "Pond on the Jean Road Trails (Google place \"Jean Road Trails\", 4075 Jean Rd) with pines and cattails"
+ },
+ {
+  "id": 1860,
+  "name": "KVR Trail: Penticton to the McCulloch Trestle",
+  "file": "/images/venues/kvr-trail-penticton-mcculloch-trestle-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548262ea8be7b03f:0xd11a9c84bfd11726",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLePqjZ69TvfZ7rfJpZdrBt4_hjbIQ6twmlfk7ymH53zlSGpOdQosY0uCTc1UNThrRGawYQaCp9oBVhpdiHsOz9vQftEzY026R-CkolP8Cavtul1HA38J6Ondaa8063Emubs4tTG=w2400",
+  "source_kind": "google_maps",
+  "note": "Cyclist on the McCulloch trestle boardwalk above vineyards, Okanagan Lake behind"
+ },
+ {
+  "id": 1897,
+  "name": "Lookout Trail & The Parabola Loop (Kalamalka Lake Park)",
+  "file": "/images/venues/kal-park-lookout-parabola-loop-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8e9bf375199:0x39f5e274cde84b9b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc5_w6AWV-65aIiOrAa351WjaIlqsDGZCA7r3b23C6hiW7kGvRYOlV9grAeK9efG59QfMujFckDF5dPSxXmpg_6YoMDTXlxByrP4xmmHt9ZLioe1Wb27zzjzIr1SQs-k4yia1SmvQ=w2400",
+  "source_kind": "google_maps",
+  "note": "View from the high ridge down Kalamalka Lake (Kalamalka Lake Provincial Park place)"
+ },
+ {
+  "id": 1918,
+  "name": "Mount Law Trails",
+  "file": "/images/venues/mount-law-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54820ca1340271a5:0x57bfe496bfd1e74",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcHJg_Lp4nRkGNGRiG_U14LpNX77WrP7mKrQ4Lu_mz__FRPGNfcrKEGcwrf4SZuHmFihMf-B9-OxKOrlRBVUfLuKcJGQyPQaRSzU6PBzXVRRS4V1hTfBAsLyv9eLwtnjGqw5JsK=w2400",
+  "source_kind": "google_maps",
+  "note": "Summit view from Mount Law over Okanagan Lake and forested hills"
+ },
+ {
+  "id": 1923,
+  "name": "Terrace Mountain",
+  "file": "/images/venues/terrace-mountain-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dfb6f53b4a61b:0x349a46e4c2c47182",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdJShKwL6bjzJo_TX-N2THlJXnxTHYzO4Q66-A9eZza_CX6_VpU4UWuG2fF9Otc7M6crH6bfhqbiLkE9__cTq_liiVohLk7iTPCzkgdZmuV0SZNxZBkGy7_8CwonIyTl9SqDvxYlw=w2400",
+  "source_kind": "google_maps",
+  "note": "Terrace Mountain lookout road with forest and Okanagan valley view"
+ },
+ {
+  "id": 1880,
+  "name": "Pollard Pond Loop (Trethewey Park)",
+  "file": "/images/venues/pollard-pond-loop-trail-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537def5ba35dcbe3:0x58c6b8e4dad01c4f",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcRAYoboA5AnyREDz4ErH2DtS0IlB7mRdppuUEB0BG8gtlNTIZWugL-XHBuoIaL3pcgKndoCK6vRmTwPM_xmCi_ODlz9pd99P9mOT0R5InBBOvIL99aiK-Qf0GpmEF4j3ZwUFUK=w2400",
+  "source_kind": "google_maps",
+  "note": "Aerial of Pollard's Pond with its zig-zag boardwalk among The Lakes condos (Google place \"Pollard's Pond\")"
+ },
+ {
+  "id": 1856,
+  "name": "Winfield Creek Wildlife Habitat Preserve",
+  "file": "/images/venues/winfield-creek-wildlife-habitat-preserve-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537def1ee8d7cafd:0x8721ce3fa78eecba",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcrQgIv_kv2V7O-sHThqp_bOtoZxqz6PEYFuBtNb4r8C0NIeGn0aDrv-mvJaE-4KNp4hAe12-aa-Q_9mCSnOwGI9lYrF06uHzoSmlVCiDd8orZKxEthidDDiuLuWz1vd0YDG8YfcA=w2400",
+  "source_kind": "google_maps",
+  "note": "Gravel path through grasses and young pines in the preserve (Google place \"George Mitchell Wildlife Preserve\", same site: its photos include the Winfield Creek Wildlife Habitat Preserve sign)"
+ },
+ {
+  "id": 1892,
+  "name": "Okanagan River Path: Okanagan Falls to Vaseux Lake",
+  "file": "/images/venues/okanagan-river-path-ok-falls-vaseux-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548292d91f52dd41:0x81e8a400d8fa0689",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLelonByLVDEYg72tgaFkFd2XBIBLl0K6l5ocDSLfBitjEehkt2h97mHxLMwmeJFzgix9IluIDlYUt9M-bxCwJKWMfESiB-r5hyOH18TXTmS0Ri4FT6CFfrhm7Nfch6saDE8HQ_LWw=w2400",
+  "source_kind": "google_maps",
+  "note": "Grassy river path at the north end of Vaseux Lake with McIntyre Bluff behind (Google place \"Vaseux Lake\")"
+ },
+ {
+  "id": 1876,
+  "name": "UBC Okanagan Campus Trails (Pine Loop)",
+  "file": "/images/venues/ubc-okanagan-campus-trails-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537ded6d77945187:0xc7f0fdb6fcbbeaee",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeXEjecX_BJnvwaX4scrEIR-wOBDwPWeciRY0ElGKf_WqUzaTxOTLmewiNFDyeruPgdw9rxomN3BaEUlX3UQTW8B6poKy15YathX2tx-R7EKhuS30k3aZJeoX_OryKssMVT0LGnyg=w12208",
+  "source_kind": "google_maps",
+  "note": "Panorama from the Pine Trail lookout on the UBCO campus trails over the valley (Google place \"Pine Trail Lookout\")"
+ }
+]

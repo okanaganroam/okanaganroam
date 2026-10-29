@@ -1,0 +1,1194 @@
+{
+ "reason": "Venue photos, Oct 28, 2026 run",
+ "batch_id": "venue-photos-2026-10-28",
+ "venues": [
+  {
+   "id": 1009,
+   "name": "Straight Outta Brooklyn Pizza & Subs",
+   "region": "penticton",
+   "slug": "straight-outta-brooklyn-pizza-subs",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/straight-outta-brooklyn-pizza-subs-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 212,
+   "name": "Firefly Eatery",
+   "region": "vernon",
+   "slug": "firefly-eatery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/firefly-eatery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 79,
+   "name": "Bless'd Sips & Slices",
+   "region": "kelowna",
+   "slug": "bless-d-sips-slices",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bless-d-sips-slices-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 376,
+   "name": "Gino's Family Kitchen",
+   "region": "oliver",
+   "slug": "gino-s-family-kitchen",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gino-s-family-kitchen-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 393,
+   "name": "Pizza πr2",
+   "region": "oliver",
+   "slug": "marcos-pizzeria",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/marcos-pizzeria-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1848,
+   "name": "Angel Springs Trail (via KLO Creek)",
+   "region": "kelowna",
+   "slug": "angel-springs-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/angel-springs-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1911,
+   "name": "Blue Grouse Mountain",
+   "region": "west-kelowna",
+   "slug": "blue-grouse-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/blue-grouse-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1871,
+   "name": "Cascade Falls Trail (Mabel Lake)",
+   "region": "lumby",
+   "slug": "cascade-falls-trail-mabel-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/cascade-falls-trail-mabel-lake-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1849,
+   "name": "Eagle View and Quail Flume Trails",
+   "region": "kelowna",
+   "slug": "eagle-view-quail-flume-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/eagle-view-quail-flume-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1869,
+   "name": "Gardom Lake Park Trails",
+   "region": "enderby",
+   "slug": "gardom-lake-park-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gardom-lake-park-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1901,
+   "name": "Grindrod Park Riverside Path",
+   "region": "enderby",
+   "slug": "grindrod-park-riverside-path",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/grindrod-park-riverside-path-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1886,
+   "name": "Lakeshore Pathway (Summerland)",
+   "region": "summerland",
+   "slug": "lakeshore-pathway-summerland",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lakeshore-pathway-summerland-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1917,
+   "name": "Mission Ridge Park Loop",
+   "region": "kelowna",
+   "slug": "mission-ridge-park-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mission-ridge-park-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1919,
+   "name": "Mount Nkwala Trails",
+   "region": "penticton",
+   "slug": "mount-nkwala-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-nkwala-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1888,
+   "name": "Southern Viewpoint Trail (Okanagan Mountain Park)",
+   "region": "naramata",
+   "slug": "southern-viewpoint-trail-okanagan-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/southern-viewpoint-trail-okanagan-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1903,
+   "name": "Vidler Ridge Trail",
+   "region": "lumby",
+   "slug": "vidler-ridge-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vidler-ridge-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 311,
+   "name": "Jugo Juice",
+   "region": "kelowna",
+   "slug": "jugo-juice",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/jugo-juice-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 748,
+   "name": "Tyga Sushi",
+   "region": "west-kelowna",
+   "slug": "tyga-sushi",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tyga-sushi-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 402,
+   "name": "Memphis Blues Barbeque House & Catering Co.",
+   "region": "kelowna",
+   "slug": "memphis-blues-barbeque-house-catering-co",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/memphis-blues-barbeque-house-catering-co-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1648,
+   "name": "Half Blind Bean Coffee",
+   "region": "kelowna",
+   "slug": "half-blind-bean-coffee",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/half-blind-bean-coffee-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1890,
+   "name": "Apex Mountain Summit Trail",
+   "region": "apex",
+   "slug": "apex-mountain-summit-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apex-mountain-summit-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1872,
+   "name": "Boulder Trail (Okanagan Mountain Park)",
+   "region": "kelowna",
+   "slug": "boulder-trail-okanagan-mountain-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/boulder-trail-okanagan-mountain-park-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1912,
+   "name": "Christie Falls",
+   "region": "west-kelowna",
+   "slug": "christie-falls",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/christie-falls-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1853,
+   "name": "Gellatly Bay Waterfront Walkway",
+   "region": "west-kelowna",
+   "slug": "gellatly-bay-waterfront-walkway",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gellatly-bay-waterfront-walkway-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1916,
+   "name": "Hidden Lake Parkway (Glenmore)",
+   "region": "kelowna",
+   "slug": "hidden-lake-parkway",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hidden-lake-parkway-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1855,
+   "name": "Lakestone Trails (Benchlands Park)",
+   "region": "lake-country",
+   "slug": "lakestone-trails-benchlands-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lakestone-trails-benchlands-park-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1905,
+   "name": "Monashee Lake Trail",
+   "region": "lumby",
+   "slug": "monashee-lake-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/monashee-lake-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1887,
+   "name": "Mountain Goat Trail (Okanagan Mountain Park)",
+   "region": "naramata",
+   "slug": "mountain-goat-trail-okanagan-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mountain-goat-trail-okanagan-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1863,
+   "name": "Peach Cliff Trail",
+   "region": "okanagan-falls",
+   "slug": "peach-cliff-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/peach-cliff-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1851,
+   "name": "Stockley Open Space Lookout Loop",
+   "region": "kelowna",
+   "slug": "stockley-open-space-lookout-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/stockley-open-space-lookout-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1867,
+   "name": "The Ponds Interpretive Trail",
+   "region": "coldstream",
+   "slug": "ponds-interpretive-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ponds-interpretive-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1907,
+   "name": "Vista Pass Trail",
+   "region": "lumby",
+   "slug": "vista-pass-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vista-pass-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1608,
+   "name": "Wake the Lake Penticton",
+   "region": "penticton",
+   "slug": "wake-the-lake-penticton",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wake-the-lake-penticton-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 814,
+   "name": "Back Door Winery",
+   "region": "summerland",
+   "slug": "back-door-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/back-door-winery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 588,
+   "name": "Sister Bodega",
+   "region": "penticton",
+   "slug": "sister-bodega",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sister-bodega-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 31,
+   "name": "Armstrong Bakery",
+   "region": "armstrong",
+   "slug": "armstrong-bakery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/armstrong-bakery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1925,
+   "name": "Kelowna Farmers' and Crafters' Market",
+   "region": "kelowna",
+   "slug": "kelowna-farmers-and-crafters-market",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kelowna-farmers-and-crafters-market-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1865,
+   "name": "Becker Park – Community Hill Trail",
+   "region": "vernon",
+   "slug": "becker-park-community-hill-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/becker-park-community-hill-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1898,
+   "name": "Comin' Round the Mountain Trail (Kalamalka Lake Park)",
+   "region": "coldstream",
+   "slug": "kal-park-comin-round-the-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kal-park-comin-round-the-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1896,
+   "name": "Ellison Nature Trail",
+   "region": "vernon",
+   "slug": "ellison-nature-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ellison-nature-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1879,
+   "name": "High Rim Trail: Beaver Lake Road to Oyama Lake Road",
+   "region": "lake-country",
+   "slug": "high-rim-trail-wrinkly-face",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/high-rim-trail-wrinkly-face-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1870,
+   "name": "Larch Hills Trails (summer hiking)",
+   "region": "enderby",
+   "slug": "larch-hills-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/larch-hills-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1908,
+   "name": "Mount Beaven Trail",
+   "region": "lumby",
+   "slug": "mount-beaven-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-beaven-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1862,
+   "name": "Penticton Channel Walk",
+   "region": "penticton",
+   "slug": "penticton-channel-walk",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/penticton-channel-walk-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1921,
+   "name": "Rim Rocks Trail",
+   "region": "coldstream",
+   "slug": "rim-rocks-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/rim-rocks-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1922,
+   "name": "Sugarloaf Mountain (Westside Road)",
+   "region": "west-kelowna",
+   "slug": "sugarloaf-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sugarloaf-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1885,
+   "name": "Trans Canada Trail: Prairie Valley (Summerland)",
+   "region": "summerland",
+   "slug": "tct-prairie-valley-summerland",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tct-prairie-valley-summerland-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1891,
+   "name": "White Lake Trail (White Lake Grasslands)",
+   "region": "okanagan-falls",
+   "slug": "white-lake-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/white-lake-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1051,
+   "name": "Moose Lounge",
+   "region": "big-white",
+   "slug": "moose-lounge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/moose-lounge-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 385,
+   "name": "Made in India Restaurant",
+   "region": "west-kelowna",
+   "slug": "made-in-india-restaurant",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/made-in-india-restaurant-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 754,
+   "name": "Valoroso Foods West Kelowna",
+   "region": "west-kelowna",
+   "slug": "valoroso-foods-west-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/valoroso-foods-west-kelowna-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 162,
+   "name": "Crumbs and Roses Bakery",
+   "region": "kelowna",
+   "slug": "crumbs-and-roses-bakery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/crumbs-and-roses-bakery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1909,
+   "name": "Bedford Lookout Loop (Peachland Trails)",
+   "region": "peachland",
+   "slug": "bedford-lookout-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bedford-lookout-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1878,
+   "name": "Burdekin Lane Beach Trail",
+   "region": "peachland",
+   "slug": "burdekin-lane-beach-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/burdekin-lane-beach-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1847,
+   "name": "Fieldnotes Market",
+   "region": "armstrong",
+   "slug": "fieldnotes-market",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/fieldnotes-market-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1889,
+   "name": "Gillies Creek Trails (Skaha Bluffs Provincial Park)",
+   "region": "penticton",
+   "slug": "gillies-creek-trails-skaha-bluffs",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gillies-creek-trails-skaha-bluffs-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1868,
+   "name": "Jim Watt Heritage River Walk",
+   "region": "enderby",
+   "slug": "jim-watt-heritage-river-walk",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/jim-watt-heritage-river-walk-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1875,
+   "name": "Little White Mountain (Upper Crawford Trail)",
+   "region": "kelowna",
+   "slug": "little-white-mountain-upper-crawford",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/little-white-mountain-upper-crawford-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1920,
+   "name": "Mount Drought Trails",
+   "region": "west-kelowna",
+   "slug": "mount-drought-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-drought-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1861,
+   "name": "Penticton Creek Walk",
+   "region": "penticton",
+   "slug": "penticton-creek-walk",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/penticton-creek-walk-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1835,
+   "name": "Robinson Park Pickleball Courts",
+   "region": "penticton",
+   "slug": "robinson-park-pickleball-courts",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/robinson-park-pickleball-courts-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1873,
+   "name": "Wild Horse Canyon Trail to Commando Bay",
+   "region": "kelowna",
+   "slug": "wild-horse-canyon-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wild-horse-canyon-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 934,
+   "name": "14th Ave Bar & Grill",
+   "region": "vernon",
+   "slug": "14th-ave-bar-grill",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/14th-ave-bar-grill-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 772,
+   "name": "Ward's Wine Country Kitchen",
+   "region": "oliver",
+   "slug": "ward-s-wine-country-kitchen",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ward-s-wine-country-kitchen-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1034,
+   "name": "The Sumac Ridge Restaurant & Lounge",
+   "region": "summerland",
+   "slug": "sumac-ridge-golf-country-club",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sumac-ridge-golf-country-club-g28-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 166,
+   "name": "DCS CHICKEN",
+   "region": "penticton",
+   "slug": "dcs-chicken",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/dcs-chicken-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 3,
+   "name": "1862 Social House",
+   "region": "armstrong",
+   "slug": "1862-social-house",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/1862-social-house-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1845,
+   "name": "BEEPS – Peachland Bat Colony & BatCam",
+   "region": "peachland",
+   "slug": "beeps-peachland-bat-colony-batcam",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/beeps-peachland-bat-colony-batcam-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1866,
+   "name": "BX Ranch Trail",
+   "region": "vernon",
+   "slug": "bx-ranch-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bx-ranch-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1913,
+   "name": "Cougar Canyon Trail (Kalamalka Lake Provincial Park)",
+   "region": "coldstream",
+   "slug": "cougar-canyon-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/cougar-canyon-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1914,
+   "name": "Fur Brigade Trail Viewpoint (Garnet Valley Trails)",
+   "region": "peachland",
+   "slug": "fur-brigade-trail-viewpoint",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/fur-brigade-trail-viewpoint-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1858,
+   "name": "Gladstone Trail",
+   "region": "peachland",
+   "slug": "gladstone-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gladstone-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1895,
+   "name": "Jordan Nature Reserve (Swan Lake)",
+   "region": "vernon",
+   "slug": "jordan-nature-reserve-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/jordan-nature-reserve-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1850,
+   "name": "Lochview Trail (to Paul's Tomb)",
+   "region": "kelowna",
+   "slug": "lochview-trail-pauls-tomb",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lochview-trail-pauls-tomb-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1864,
+   "name": "Mount Keogan (Dogtown Trail)",
+   "region": "okanagan-falls",
+   "slug": "mount-keogan-dogtown-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-keogan-dogtown-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1854,
+   "name": "Okanagan Centre Beach Trail",
+   "region": "lake-country",
+   "slug": "okanagan-centre-beach-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-centre-beach-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1906,
+   "name": "Pinnacle Lake Trail",
+   "region": "lumby",
+   "slug": "pinnacle-lake-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/pinnacle-lake-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1852,
+   "name": "Shorts Creek Canyon Trail (Fintry Provincial Park)",
+   "region": "west-kelowna",
+   "slug": "shorts-creek-canyon-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/shorts-creek-canyon-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1904,
+   "name": "Twin Lakes Trail (Monashees)",
+   "region": "lumby",
+   "slug": "twin-lakes-trail-monashee",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/twin-lakes-trail-monashee-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1924,
+   "name": "Wilden Ridge Trails",
+   "region": "kelowna",
+   "slug": "wilden-ridge-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wilden-ridge-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1857,
+   "name": "Big White Summer Hiking Trails",
+   "region": "big-white",
+   "slug": "big-white-summer-hiking-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/big-white-summer-hiking-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 30,
+   "name": "Apres | Real Fruit Ice Cream & Coffee Bar",
+   "region": "penticton",
+   "slug": "apres-real-fruit-ice-cream-coffee-bar",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apres-real-fruit-ice-cream-coffee-bar-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 585,
+   "name": "Silhouette Estate Winery",
+   "region": "naramata",
+   "slug": "silhouette-estate-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/silhouette-estate-winery-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 634,
+   "name": "Sushi Sai",
+   "region": "kelowna",
+   "slug": "sushi-sai",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sushi-sai-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 282,
+   "name": "Hyderabadi Biryani Lounge",
+   "region": "kelowna",
+   "slug": "hyderabadi-biryani-lounge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hyderabadi-biryani-lounge-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 338,
+   "name": "Kings Kitchen",
+   "region": "summerland",
+   "slug": "kings-kitchen",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kings-kitchen-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1899,
+   "name": "Aberdeen Columns Trail",
+   "region": "coldstream",
+   "slug": "aberdeen-columns-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/aberdeen-columns-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1910,
+   "name": "Bellevue Creek Greenway",
+   "region": "kelowna",
+   "slug": "bellevue-creek-greenway",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bellevue-creek-greenway-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1593,
+   "name": "Canadian Craft Tours (Kelowna)",
+   "region": "kelowna",
+   "slug": "canadian-craft-tours-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/canadian-craft-tours-kelowna-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1874,
+   "name": "Divide Lake Trail (from Rimrock Gate)",
+   "region": "kelowna",
+   "slug": "divide-lake-trail-north",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/divide-lake-trail-north-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1915,
+   "name": "Gallagher's Canyon – Tree of Wisdom Trail (Jean Road Trails)",
+   "region": "kelowna",
+   "slug": "gallaghers-canyon-tree-of-wisdom",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/gallaghers-canyon-tree-of-wisdom-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1860,
+   "name": "KVR Trail: Penticton to the McCulloch Trestle",
+   "region": "penticton",
+   "slug": "kvr-trail-penticton-mcculloch-trestle",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kvr-trail-penticton-mcculloch-trestle-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1897,
+   "name": "Lookout Trail & The Parabola Loop (Kalamalka Lake Park)",
+   "region": "coldstream",
+   "slug": "kal-park-lookout-parabola-loop",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kal-park-lookout-parabola-loop-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1918,
+   "name": "Mount Law Trails",
+   "region": "west-kelowna",
+   "slug": "mount-law-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-law-trails-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1923,
+   "name": "Terrace Mountain",
+   "region": "west-kelowna",
+   "slug": "terrace-mountain",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/terrace-mountain-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1880,
+   "name": "Pollard Pond Loop (Trethewey Park)",
+   "region": "lake-country",
+   "slug": "pollard-pond-loop-trail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/pollard-pond-loop-trail-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1856,
+   "name": "Winfield Creek Wildlife Habitat Preserve",
+   "region": "lake-country",
+   "slug": "winfield-creek-wildlife-habitat-preserve",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/winfield-creek-wildlife-habitat-preserve-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1892,
+   "name": "Okanagan River Path: Okanagan Falls to Vaseux Lake",
+   "region": "okanagan-falls",
+   "slug": "okanagan-river-path-ok-falls-vaseux",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-river-path-ok-falls-vaseux-2610.jpg?v=20261028"
+   }
+  },
+  {
+   "id": 1876,
+   "name": "UBC Okanagan Campus Trails (Pine Loop)",
+   "region": "kelowna",
+   "slug": "ubc-okanagan-campus-trails",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ubc-okanagan-campus-trails-2610.jpg?v=20261028"
+   }
+  }
+ ]
+}

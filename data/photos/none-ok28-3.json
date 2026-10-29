@@ -1,0 +1,27 @@
+[
+ {
+  "id": 762,
+  "name": "Villages Pizza - West Kelowna",
+  "reason": "Google Maps place (Villages Pizza - West Kelowna, 3645 Gossett Rd #216) has only 2 photos: a chain logo/pizza-box promo graphic; villagespizza.com has only chain-wide promo banners and food ads, no photo of this location."
+ },
+ {
+  "id": 766,
+  "name": "Viva Mexicana Taco Bar",
+  "reason": "Google matches 3300 30th Ave as \"Viva Mexicana Grocery Store\": 6 photos, all window film/signage close-ups and paper menus. vivamexicana.ca storefront photo is the Lake Country restaurant (Winfield Plaza), already used for that listing; no Vernon interior/exterior photo found."
+ },
+ {
+  "id": 1598,
+  "name": "Bubbles Don't Count",
+  "reason": "Mobile tour, no fixed place. Google has one photo (5 guests posing in front of the \"Bubbles Bus\", people fill the frame); bubblesdontcount.com uses Depositphotos/Unsplash stock throughout."
+ },
+ {
+  "id": 1614,
+  "name": "Ghost Tours of Vernon",
+  "reason": "No Google Maps place for the tour. ghosttoursofvernon.com photos are staged portraits of the two costumed guides (with ghost-blur effects); in the 3:1 strip the guides fill the frame with heads cut off. Justice Park/courthouse would only show the meeting point."
+ },
+ {
+  "id": 1893,
+  "name": "Nels' Leap Trail",
+  "reason": "No Google Maps place for Nels' Leap Trail (tried \"Nels Leap Trail\", \"Nel's Leap Trail\", trailhead, Alexis Park Drive/Venture Training; only other Vernon trails matched). Tourism Vernon trail data has no image for it."
+ }
+]

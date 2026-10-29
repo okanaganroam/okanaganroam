@@ -1273,12 +1273,12 @@ test('no alcohol (more phrasings): positive alcohol requests and venue badges st
   assert.ok(allStops(withGastro).some((x) => x.venue.id === gastro.id), 'a restaurant that also serves alcohol is still recommended');
 });
 
-test('stop cards use the venue\'s own photo when it has one, the example photo otherwise (2026-10-17)', () => {
+test('stop cards use the venue\'s own photo when it has one, and no photo otherwise (real photos only, 2026-10-28)', () => {
   const own = tp.publicVenue({ id: 1, name: 'Own Photo Bistro', region: 'kelowna', type: 'restaurant', url: '/x', imageUrl: '/images/venues/own-photo-bistro-2610.jpg?v=1', features: {}, collections: [], activities: [], textName: 'own photo bistro', textDesc: '' }, null);
   assert.equal(own.photo, '/images/venues/own-photo-bistro-2610.jpg?v=1');
   assert.equal(own.ownPhoto, true);
   const none = tp.publicVenue({ id: 2, name: 'No Photo Diner', region: 'kelowna', type: 'restaurant', url: '/y', imageUrl: null, features: {}, collections: [], activities: [], textName: 'no photo diner', textDesc: '' }, null);
-  assert.match(none.photo, /^\/images\/trip-v3\/stops\/stop-restaurant-480\.jpg$/);
+  assert.equal(none.photo, null);
   assert.equal(none.ownPhoto, false);
   const bad = tp.publicVenue({ id: 3, name: 'Bad Url', region: 'kelowna', type: 'cafe', url: '/z', imageUrl: 'javascript:alert(1)', features: {}, collections: [], activities: [], textName: 'bad url', textDesc: '' }, null);
   assert.equal(bad.ownPhoto, false);

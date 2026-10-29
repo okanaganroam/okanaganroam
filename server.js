@@ -14019,8 +14019,7 @@ const SEO_PAGE_CSS = `
     position: relative;
     padding-top: 112px !important;
     background-image:
-      linear-gradient(100deg, rgba(25,53,57,0.76), rgba(25,53,57,0.18)),
-      url('/images/venue-hero-okanagan.a01552e12e24.jpg?v=a01552e12e24') !important;
+      linear-gradient(100deg, #2A6B67, #3E7F7A) !important;
     background-position: center top !important;
     background-size: 100% 92px !important;
     background-repeat: no-repeat !important;
@@ -14260,13 +14259,16 @@ const SEO_PAGE_CSS = `
      category tint on the text side so the existing ivory title stays
      readable. Real business photos use .venue-hero-photo and never see
      this artwork. */
+  /* Real photos only (Dayton, 2026-10-28): a place without its own photo gets its category colour and a faint
+     mountain line, not a landscape photo that could be taken for the place. */
   .venue-hero-fallback {
-    background-image:
-      linear-gradient(100deg, var(--hero-shade) 0%, var(--hero-wash) 58%, rgba(16,32,38,0.12) 100%),
-      url('/images/venue-hero-okanagan.a01552e12e24.jpg?v=a01552e12e24');
-    background-size: cover;
-    background-position: center 48%;
+    background-color: #1C2A2E;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M3 20 14 7l7 8 10-12 12 14 7-7 10 10' fill='none' stroke='%23FFFFFF' stroke-opacity='0.12' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"), linear-gradient(120deg, var(--hero-shade) 0%, var(--hero-shade) 45%, var(--hero-wash) 100%);
+    background-size: min(380px, 55%) auto, cover;
+    background-position: right 5% center, center;
+    background-repeat: no-repeat;
   }
+  body.golf-page .venue-hero-fallback:not(.venue-hero-has-photo) { min-height: 190px !important; }
 
   .venue-header { margin-bottom: 18px; }
   .venue-at-a-glance { color: rgba(74,52,40,0.8); font-size: 0.98rem; margin: 6px 0 12px; }
@@ -16126,6 +16128,14 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${CARD_V2_CARD} .venue-advisory-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0 !important; font-size: 0.88rem !important; line-height: 1.4 !important; }
   ${CARD_V2_CARD} .venue-advisory-source { display: none !important; }
   ${CARD_V2_CARD} > .card-slot:empty { display: none !important; }
+  /* Real photos only (Dayton, 2026-10-28): a place without its own photo gets a plain sand panel with the mountain
+     mark instead of a stock or example photo of somewhere else. */
+  ${CARD_V2_CARD}:is([data-ph="none"], [data-card-ph="none"])::before { background: #EEE8DC url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M3 20 14 7l7 8 10-12 12 14 7-7 10 10' fill='none' stroke='%23B7AB96' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 72px auto no-repeat !important; }
+  /* Hidden Gems, Secret Spots and Local Favourites: the card's reason ("Why it's a gem: ...") is the point of the
+     card, so it shows in full in place of the description, which mostly said the same thing. */
+  html body.curated-hub-page .card-grid > li.venue-card:has(.card-note) .golf-desc { display: none !important; }
+  html body.curated-hub-page .card-grid > li.venue-card .card-note { display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; max-height: none !important; margin: 2px 0 0 !important; font-size: 0.94rem !important; line-height: 1.45 !important; color: var(--ink) !important; }
+  html body.curated-hub-page .card-grid > li.venue-card .card-note-label { display: block; margin-bottom: 2px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-deep, #1F5450); }
   @media (min-width: 700px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 1000px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (min-width: 1280px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -16135,7 +16145,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   }
 </style>`;
 function withLazyCardPhotos(html) {
-  if (typeof html !== 'string' || html.indexOf(' data-lz') === -1 && html.indexOf('id="bhRest"') === -1) return html;
+  if (typeof html !== 'string' || html.indexOf(' data-lz') === -1 && html.indexOf('id="bhRest"') === -1 && html.indexOf('-ph="none"') === -1) return html;
   let eager = 0;
   html = html.replace(/<template\b[\s\S]*?<\/template>|<li class="venue-card"[^>]*? data-lz(?=[\s>])/g, (m) => {
     if (m.charCodeAt(1) === 116 /* t */ || eager >= LAZY_CARD_EAGER) return m;
@@ -18224,7 +18234,7 @@ function regionPlacesToStartHtml(region) {
     const own = String(v.image_url || '').trim();
     // Ski hills: their trails, tube parks and tours get winter photos.
     const set = SKI_RESORT_REGIONS.has(region) && ['outdoor', 'tour', 'sport', 'beach'].includes(v.type) ? 'winter' : null;
-    const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v, set));
+    const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : null;
     const type = CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : '';
     return `
       <li class="category-card region-start-card">
@@ -22091,7 +22101,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
       const src = photoById.get(Number(id)) || '';
       return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(src)
         ? `${match} data-card-ph style="${cardPhotoVars('card-ph', src)}" data-lz`
-        : match;
+        : `${match} data-card-ph="none"`;
     });
     return `<style id="${type}-card-photos">
   li.venue-card[data-card-ph]:not(.whatson-event-card) { background-image: none !important; padding-top: 112px !important; position: relative; }
@@ -22113,8 +22123,8 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   const golfPhoto = (html) => html.replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => {
     const v = venues.find((x) => x.id === Number(id));
     const own = v ? String(v.image_url || '').trim() : '';
-    const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : cardPhotoKeyUrl(curatedPhotoKey(v || { id: Number(id), type: 'golf' }, isIndoorGolfVenue(v || {}) ? null : 'golf')) || '';
-    return src ? `${m} data-card-ph style="${cardPhotoVars('card-ph', src)}" data-lz` : m;
+    const src = /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : '';
+    return src ? `${m} data-card-ph style="${cardPhotoVars('card-ph', src)}" data-lz` : `${m} data-card-ph="none"`;
   });
   const cardHtmlBase = cardHtml;
   cardHtml = (list) => golfPhoto(cardHtmlBase(list));
@@ -24887,7 +24897,9 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       const by = alts && extra.altPhotos === 'swap' ? ` data-ph-by="${escapeHtml(JSON.stringify(Object.fromEntries(Object.entries({ ...alts, '': own }).map(([k, u]) => [k, pair(u)]))))}"` : '';
       return ` data-ph="own" style="${cardPhotoVars('fd-ph', shown)}"${by} data-lz`;
     }
-    return ` data-ph="${spread(extra.photoKeyFor ? extra.photoKeyFor(v) : foodDrinkCardPhotoKey(v))}" data-lz`;
+    // Real photos only (Dayton, 2026-10-28): a place without its own photo shows the no-photo panel (CARD_V2_CSS),
+    // never a stock or example photo of another place.
+    return ' data-ph="none"';
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, keepOrder: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
@@ -30730,17 +30742,10 @@ function venuePageUsesEngagement(type) {
 // example photo of its kind of place (the category banner), labelled
 // "Example photo" so nobody takes it for this business.
 function venueHeroPhoto(venue) {
+  // Real photos only (Dayton, 2026-10-28): no example photo; a place without its own photo gets the plain title hero.
   const own = String(venue.image_url || '').trim();
   if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return { src: own, small: null, alt: venue.name, pos: 50, example: false };
-  const ex = EXAMPLE_ACTIVITY_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(venue.id) || 0]];
-  if (ex) {
-    const src = `/images/outdoors/examples/${EXAMPLE_ACTIVITY_FILES[VENUE_EXAMPLE_PHOTOS[Number(venue.id) || 0]]}-2610.jpg`;
-    return { src, small: smallBannerFor(src), mid: midBannerFor(src), alt: ex.alt, pos: ex.pos, example: true };
-  }
-  const b = CATEGORY_BANNER_IMAGES[venue.type];
-  if (!b) return null;
-  // The fallback photo lists its 1200px copy too (round 7, 2026-10-19), as the list-page banners do.
-  return { src: b.src, small: smallBannerFor(b.src), mid: midBannerFor(b.src), alt: b.alt, pos: b.pos, example: true };
+  return null;
 }
 // A small photo for a related / nearby card: its own photo, else the same
 // example photo its Food & Drink card uses, else its type's trip photo.
@@ -30748,24 +30753,9 @@ function venueHeroPhoto(venue) {
 // example photo already shown in that group is skipped for the next one in
 // the type's list, so related cards do not repeat one stock picture.
 function venueThumbPhoto(v, used) {
+  // Real photos only (Dayton, 2026-10-28): the place's own photo or none (the card shows its no-photo band).
   const own = String(v.image_url || '').trim();
-  if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return photoSized(own, 480);
-  if (VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]) return FD_CARD_PHOTOS[VENUE_EXAMPLE_PHOTOS[Number(v.id) || 0]][0];
-  if (used && FD_CARD_PHOTOS[v.type]) {
-    const first = venueThumbPhoto(v);
-    const pool = [first, ...FD_CARD_PHOTOS[v.type]];
-    const pick = pool.find((src) => src && !used.has(src)) || first;
-    used.add(pick);
-    return pick;
-  }
-  if (FD_CARD_PHOTOS[v.type]) {
-    const key = foodDrinkCardPhotoKey(v);
-    if (key === 'noodle') return '/images/trip-v3/stops/stop-restaurant-noodle-480.jpg';
-    const m = key.match(/^([a-z]+)-(dog|\d+)$/);
-    if (m) return m[2] === 'dog' ? FD_CARD_DOG_PHOTOS[m[1]] : FD_CARD_PHOTOS[m[1]][Number(m[2])];
-  }
-  const stop = `/images/trip-v3/stops/stop-${v.type}-480.jpg`;
-  return fs.existsSync(path.join(__dirname, 'public', stop)) ? stop : null;
+  return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? photoSized(own, 480) : null;
 }
 // Many stored descriptions end on a one-line tagline that restates what came
 // before ("Downtown Kelowna's decades-old soup and sandwich shop with the
@@ -31711,6 +31701,14 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
   const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);
+  // Why it's on the list (Dayton, 2026-10-28): the Hidden Gem / Local Favourite card says why the place made the cut,
+  // and the venue page it opens now says it too, in full.
+  const whyNote = (kind) => { const n = String(getPublicCollectionNotes(kind).get(venue.id) || '').trim(); return n && fr ? frTextOr(n) : n; };
+  const whyGem = isHiddenGem ? whyNote('hidden_gem') : '';
+  const whyLocal = !whyGem && isLocalFavourite ? whyNote('local_favorite') : '';
+  const venueWhyHtml = whyGem || whyLocal
+    ? `\n    <div class="venue-why" style="margin:14px 0 4px;padding:12px 16px;background:rgba(42,107,103,0.07);border-left:4px solid var(--teal, #2A6B67);border-radius:10px;max-width:720px"><p style="margin:0 0 3px;font-family:'Nunito','Nunito Fallback',sans-serif;font-size:0.74rem;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:var(--teal-deep, #1F5450)">${whyGem ? L('Why it\u2019s a Hidden Gem', 'Pourquoi c\u2019est un tr\u00e9sor cach\u00e9') : L('Why locals love it', 'Pourquoi les gens d\u2019ici l\u2019adorent')}</p><p style="margin:0;font-size:1rem;line-height:1.5">${escapeHtml(whyGem || whyLocal)}</p></div>`
+    : '';
   const hiddenGemChip = frChip((isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '') + (dogFriendlyNote !== undefined ? dogFriendlyBadgeHtml(fr && dogFriendlyNote ? frTextOr(String(dogFriendlyNote).trim()) : dogFriendlyNote) + ' ' : ''));
 
   // Stage 2 (2026-09-29): read through hours.js like Open Now and the
@@ -32163,7 +32161,7 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${(() => {
+    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${venueWhyHtml}${(() => {
       // Verified mark (2026-10-27): a pill on every listing the business manages (venueIsClaimed: a login, an approved
       // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
       // the "Updated by the business" line.
@@ -35758,7 +35756,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     if (!v) return '';
     const own = String(v.image_url || '').trim();
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="${cardPhotoVars('fd-ph', own)}" data-lz`;
-    return ` data-ph="${spread(curatedPhotoKey(v))}" data-lz`;
+    return ' data-ph="none"';
   };
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true, hideSocial: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
@@ -37726,7 +37724,7 @@ ${renderGolfHeaderHtml()}
     { name: g.heading },
   ])}
     <article class="ski-guide">
-      ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high"></div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
+      ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(banner.credit)}</div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
       ${thin ? `<p class="guide-thin-note"><strong>This guide is between seasons.</strong> Most of what it covered has finished for now. See our <a href="/guides">current guides</a>.</p>\n      ` : ''}<div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${guideTipHtml(p)}</p>`).join('')}
       </div>
       <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}
@@ -38958,7 +38956,7 @@ function tripStopsFor(refs, now = new Date(), onDates = {}) {
         // French tray and /fr/my-trip (2026-10-18): the French type label and page.
         typeFr: (CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular, urlFr: frLinkHref(`/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`),
         url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
-        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? photoSized(own, 480) : cardPhotoKeyUrl(curatedPhotoKey(v)),
+        photo: /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? photoSized(own, 480) : null,
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
