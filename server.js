@@ -12582,6 +12582,20 @@ function renderHomeFooterHTML(fromBrowse) {
         <span class="home-footer-wordmark">Okanagan<span class="home-footer-wordmark-accent"> Roam</span></span>
       </a>
       <p class="home-footer-tagline" data-i18n="homeFooter.taglineFull">Okanagan Valley, British Columbia</p>
+      <div class="home-footer-col home-footer-social">
+        <h2 data-i18n="homeFooter.socialMedia">Social Media</h2>
+        <div class="home-footer-social-row">
+          <a class="home-footer-social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram" data-i18n-aria="homeFooter.instagramAria">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
+          </a>
+          <a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 4h-2a4 4 0 0 0-4 4v3H6v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3z"/></svg>
+          </a>
+          <a class="home-footer-social-icon icon-tiktok" href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on TikTok" data-i18n-aria="homeFooter.tiktokAria">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c0 2.5 2 4.5 4.5 4.5"/></svg>
+          </a>
+        </div>
+      </div>
     </div>
     <div class="home-footer-cols">
       <details class="home-footer-col home-footer-fold" open>
@@ -12623,20 +12637,6 @@ function renderHomeFooterHTML(fromBrowse) {
         </div>
         <p class="home-footer-all-regions"><a href="/destinations">See all destinations &rarr;</a></p>
       </details>
-      <div class="home-footer-col">
-        <h2 data-i18n="homeFooter.socialMedia">Social Media</h2>
-        <div class="home-footer-social-row">
-          <a class="home-footer-social-icon icon-instagram" href="https://www.instagram.com/okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on Instagram" data-i18n-aria="homeFooter.instagramAria">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg>
-          </a>
-          <a class="home-footer-social-icon icon-facebook" href="https://www.facebook.com/profile.php?id=61595021770981" target="_blank" rel="noopener" aria-label="Okanagan Roam on Facebook" data-i18n-aria="homeFooter.facebookAria">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 4h-2a4 4 0 0 0-4 4v3H6v4h3v7h4v-7h3l1-4h-4V8a1 1 0 0 1 1-1h3z"/></svg>
-          </a>
-          <a class="home-footer-social-icon icon-tiktok" href="https://www.tiktok.com/@okanaganroam" target="_blank" rel="noopener" aria-label="Okanagan Roam on TikTok" data-i18n-aria="homeFooter.tiktokAria">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c0 2.5 2 4.5 4.5 4.5"/></svg>
-          </a>
-        </div>
-      </div>
     </div>
   </div>
   <div class="wrap-wide home-footer-bottom">
@@ -13036,7 +13036,7 @@ function renderCanonicalFooterStyles() {
      region list and taking a little back from About/Social Media, which
      never needed a full equal share to begin with. */
   .home-footer-cols {
-    display: grid; grid-template-columns: 1.7fr 1fr 1.7fr auto;
+    display: grid; grid-template-columns: 1.5fr 1fr 1.6fr;
     align-items: start; gap: 40px; flex: 1; min-width: 0;
     /* Brand|Explore divider (FOOTER.png reference, 2026-09-19): matches the
        same rule as the 3 inter-column dividers below, just applied to the
@@ -13057,7 +13057,9 @@ function renderCanonicalFooterStyles() {
   }
   .home-footer-col ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
   /* Footer polish (2026-10-29): Explore's 15 links sit in two short columns instead of one long one. */
-  .home-footer-col ul.home-footer-list-2col { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); column-gap: 32px; row-gap: 8px; }
+  .home-footer-col ul.home-footer-list-2col { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); column-gap: 32px; row-gap: 5px; }
+  /* Footer polish 2 (2026-10-29): Social Media sits under the logo instead of in its own mostly-empty column. */
+  .home-footer-brand .home-footer-social { margin-top: 18px; }
   .home-footer-col a, .home-footer-region-group a {
     font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; line-height: 1.35; color: rgba(245,243,237,0.72);
     text-decoration: none; transition: color 0.15s;
@@ -13078,7 +13080,7 @@ function renderCanonicalFooterStyles() {
      "South" -- exactly the (intentional, not a bug) slight stagger visible
      in the reference image. */
   .home-footer-region-groups { display: flex; gap: 20px; }
-  .home-footer-region-subcol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  .home-footer-region-subcol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
   /* Region subsection headings (CENTRAL/NORTH/SOUTH/SKI RESORTS): gold,
      uppercase, bold, with the same small underline treatment as the main
      column headings (h4) so they read as clear subsection headings,
@@ -13092,7 +13094,7 @@ function renderCanonicalFooterStyles() {
     color: rgba(245,243,237,0.45); margin: 0 0 8px; padding-bottom: 0;
     display: inline-block; border-bottom: none;
   }
-  .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  .home-footer-region-group ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 3px; }
   .home-footer-region-group a { font-size: 0.86rem; line-height: 1.35; }
   /* Tap targets (2026-10-19, review pass 5): each icon is a 44px target; a 5px clear border keeps the round badge 34px
      (and the row's visible 10px gaps) as before. */
