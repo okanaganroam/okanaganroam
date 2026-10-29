@@ -15388,7 +15388,9 @@ function bilingualDescHtml(en, fr) {
 function descExcerpt(text, max = 170) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   if (t.length <= max) return t;
-  const sentences = t.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [];
+  // A dot inside a number or a word ("km 78.5", "okanagan.com") is not a sentence end, so the first sentence is
+  // never skipped (Sloquet Hot Springs read "5 of the In-SHUCK-ch road..." on its card).
+  const sentences = t.match(/(?:[^.!?]|[.!?](?![\s.!?]|$))+[.!?]+(?=\s|$)/g) || [];
   let out = '';
   for (const sen of sentences) {
     const next = (out + ' ' + sen.trim()).trim();
@@ -17968,8 +17970,14 @@ const CARD_BADGE_SHORT = {
   great_groups: ['group', 'Groups'], happy_hour: ['cocktail', 'Happy hour'], free_entry: ['ticket', 'Free'],
   arts_culture: ['palette', 'Arts & culture'], open_early: ['sunrise', 'Open early'], open_late: ['moon', 'Open late'],
 };
+// Kids welcome says nothing on a beach or a free park or trail (Dayton, 2026-10-28: "beaches and parks don't need
+// kid friendly badges"), so those cards and pages leave it off; paid attractions keep it. The field itself stays,
+// so the Kids welcome filter and Build My Trip still find these places.
+function badgeShown(venue, f) {
+  return !(f === 'kid_friendly' && (venue.type === 'beach' || (venue.type === 'outdoor' && venue.free_entry)));
+}
 function cardBadgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && badgeShown(venue, f))
     .map((f) => {
       const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
       return `<span class="chip chip-feat">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
@@ -17978,7 +17986,7 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
 }
 
 function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly'))
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && badgeShown(venue, f))
     .map((f) => `<span class="chip">${escapeHtml(BADGE_LABELS[f].title)}</span>`)
     .join(' ');
 }
