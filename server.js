@@ -16136,6 +16136,31 @@ const CARD_V2_CSS = `<style id="card-v2">
   html body.curated-hub-page .card-grid > li.venue-card:has(.card-note) .golf-desc { display: none !important; }
   html body.curated-hub-page .card-grid > li.venue-card .card-note { display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; max-height: none !important; margin: 2px 0 0 !important; font-size: 0.94rem !important; line-height: 1.45 !important; color: var(--ink) !important; }
   html body.curated-hub-page .card-grid > li.venue-card .card-note-label { display: block; margin-bottom: 2px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal-deep, #1F5450); }
+  /* Cards line up across a row again (Dayton, 2026-10-28): with two or more columns each card shares the row's
+     tracks (subgrid), one track per part -- town, name, open line, price, description, notice, notes, badges,
+     button -- so the same part starts at the same height on every card in the row. The fare's fine print stays on the venue page, so a priced course
+     is no longer twice as tall as its neighbours. */
+  ${CARD_V2_CARD} .golf-fee-note { display: none !important; }
+  @supports (grid-template-rows: subgrid) {
+    @media (min-width: 700px) {
+      html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { row-gap: 0 !important; }
+      ${CARD_V2_CARD} { display: grid !important; grid-template-rows: subgrid; grid-row: span 11 !important; row-gap: 0; align-content: start; padding-top: 0 !important; margin-bottom: 20px !important; content-visibility: visible; contain-intrinsic-size: none; }
+      /* A subgrid ignores the card's top padding, so the photo takes the first track itself. */
+      ${CARD_V2_CARD}::before { position: relative !important; grid-row: 1; height: auto !important; padding-bottom: 0 !important; aspect-ratio: 16 / 9; margin: 0 -18px 14px; }
+      ${CARD_V2_CARD} > .venue-meta { grid-row: 2; order: 0; }
+      ${CARD_V2_CARD} > h2 { grid-row: 3; }
+      ${CARD_V2_CARD} > .fd-open-status { grid-row: 4; }
+      ${CARD_V2_CARD} > .card-slot-fee { grid-row: 5; }
+      ${CARD_V2_CARD} > .card-slot-desc { grid-row: 6; }
+      ${CARD_V2_CARD} > .card-slot-notice { grid-row: 7; }
+      ${CARD_V2_CARD} > .card-slot-notes { grid-row: 8; }
+      ${CARD_V2_CARD} > .chips { grid-row: 9; }
+      ${CARD_V2_CARD} > .card-actions { grid-row: 10; margin: 0 !important; align-self: end !important; }
+      ${CARD_V2_CARD} > .card-links { grid-row: 11; }
+      ${CARD_V2_CARD} > .card-slot:empty, ${CARD_V2_CARD} > .chips:empty { display: block !important; margin: 0 !important; padding: 0 !important; }
+      ${CARD_V2_CARD} > .chips:not(:empty) { align-self: start !important; }
+    }
+  }
   @media (min-width: 700px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 1000px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (min-width: 1280px) { html body.golf-page .card-grid:has(> li.venue-card:is([data-ph], [data-card-ph])) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
