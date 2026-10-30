@@ -42884,7 +42884,12 @@ function venueGalleryHtml(venue, photos, L) {
     const list = [960, 1200].filter((x) => x < w).map((x) => [photoSized(src, x), x]).filter(([u]) => u !== src);
     return list.length ? ` srcset="${list.map(([u, x]) => `${escapeHtml(u)} ${x}w`).join(', ')}, ${escapeHtml(src)} ${w}w" sizes="100vw"` : '';
   };
-  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${slideSrcset(p.src)}${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${p.credit ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(String(p.credit).replace(/^\s*photos?\s*:\s*/i, ''))}</figcaption>` : ''}</figure>`).join('');
+  // 2026-10-29: as under the hero, a credit that only repeats the venue's own name is left out of the viewer.
+  const slideCredit = (c) => {
+    const text = c ? String(c).replace(/^\s*photos?\s*:\s*/i, '') : '';
+    return text && text.trim().toLowerCase() !== String(venue.name || '').trim().toLowerCase() ? text : '';
+  };
+  const slides = photos.map((p, i) => `<figure class="vg-slide"><img src="${escapeHtml(p.src)}"${slideSrcset(p.src)}${imgDimsAttr(p.src)} alt="${name} \u2013 ${L(`photo ${i + 1} of ${n}`, `photo ${i + 1} sur ${n}`)}" loading="lazy">${slideCredit(p.credit) ? `<figcaption>${L('Photo: ', 'Photo : ')}${escapeHtml(slideCredit(p.credit))}</figcaption>` : ''}</figure>`).join('');
   return { strip: `<div class="vg-strip vg-count-${shown.length}">${thumbs}</div>`,
     phone: (credit) => `<div class="vg-phone"><div class="vg-strip vg-count-${shown.length}">${thumbsFor(true)}</div>${credit || ''}</div>${VENUE_THUMB_LOADER_SCRIPT}`,
     viewer: `
