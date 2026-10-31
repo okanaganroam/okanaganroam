@@ -9011,9 +9011,17 @@ function validateVisitInfo(input) {
     rows.push(row);
   }
   if (v.booking_url !== undefined && v.booking_url !== null && !httpUrl(v.booking_url)) return { ok: false, detail: 'booking_url must be an http(s) link or null' };
+  // booking_label (2026-10-31): the button's own words when the kind-of-place default is wrong ("Book a tour",
+  // "Book a lane", "Group bookings").
+  const bookingLabel = typeof v.booking_label === 'string' ? v.booking_label.trim().replace(/\s+/g, ' ') : null;
+  if (v.booking_label !== undefined && v.booking_label !== null && (!bookingLabel || bookingLabel.length > 24 || /[<>]/.test(bookingLabel))) {
+    return { ok: false, detail: 'booking_label: 1 to 24 characters, without < or >, or null' };
+  }
   if (!httpUrl(v.source_url)) return { ok: false, detail: 'source_url (the page the facts came from) is required' };
   if (typeof v.checked_at !== 'string' || !parseLocalDate(v.checked_at)) return { ok: false, detail: 'checked_at must be YYYY-MM-DD' };
-  return { ok: true, info: { rows, booking_url: v.booking_url ? v.booking_url.trim() : null, source_url: v.source_url.trim(), checked_at: v.checked_at } };
+  const info = { rows, booking_url: v.booking_url ? v.booking_url.trim() : null, source_url: v.source_url.trim(), checked_at: v.checked_at };
+  if (bookingLabel && info.booking_url) info.booking_label = bookingLabel;
+  return { ok: true, info };
 }
 function venueVisitInfo(venueId) {
   try {
@@ -32331,7 +32339,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.website ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
     venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
-      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${VISIT_BOOK_LABELS[venue.type] || 'Book'}</a>` : null,
+      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book')}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).

@@ -32290,4 +32290,10 @@ test('Plan your visit (2026-10-31): a brewery keeps Flights and Food open and it
   assert.doesNotMatch(box, /<details class="visit-more">/);
   assert.match(box, /visit-label">Games</);
   assert.match(page, />Book a table<\/a>/);
+  // booking_label (2026-10-31): the button's own words win over the brewery default.
+  const cur = app.currentVisitInfoJson(b.id);
+  const relabel = app.guardedVisitInfoUpdate(b.id, cur, { ...JSON.parse(cur), booking_label: 'Book a tour' }, { reason: 'fixture', batch_id: 'test-brew' });
+  assert.equal(relabel.ok, true, JSON.stringify(relabel));
+  assert.match(app.renderVenuePage(app.findVenueBySlug(b.region, 'brewery', 'visit-fixture-brewery'), [], [], []), />Book a tour<\/a>/);
+  assert.equal(app.guardedVisitInfoUpdate(b.id, relabel.info, { ...JSON.parse(relabel.info), booking_label: 'x'.repeat(30) }, { reason: 'fixture', batch_id: 'test-brew' }).reason, 'invalid_visit');
 });
