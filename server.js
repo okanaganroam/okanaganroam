@@ -8986,7 +8986,8 @@ function guardedSpecialsUpdate(id, expectedCurrent, input, meta, now = new Date(
 // what price, booking), up to two extras, a group rule, the on-site restaurant (linked to its own listing when it has
 // one) and winter hours. One row per venue in venue_visit_info (db.js). Set by research scripts through
 // POST /admin/set-visit-info (compare-and-set on GET /admin/visit-info/:id); English pages only.
-const VISIT_ROWS_MAX = 6;
+// 7 since 2026-10-31: a "Known for" line on top of the six visit rows.
+const VISIT_ROWS_MAX = 7;
 function validateVisitInfo(input) {
   const v = input || {};
   if (!Array.isArray(v.rows) || !v.rows.length || v.rows.length > VISIT_ROWS_MAX) return { ok: false, detail: `rows: 1 to ${VISIT_ROWS_MAX}` };
@@ -9073,7 +9074,8 @@ function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
 // Box polish (2026-10-31): Tastings, Restaurant and Winter always show; the other rows (extras, groups) fold under one
 // "More: wine & cheese, groups" line, so the box stays short and Hours comes up sooner on a phone. Times read
 // "daily 11 AM – 9:30 PM" (an en dash between times, "daily" lower-case mid-sentence) whatever the stored wording.
-const VISIT_ROWS_SHOWN = new Set(['Tastings', 'Restaurant', 'Winter']);
+// Known for (2026-10-31): what the winery's wines are known for, always first and always open.
+const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Restaurant', 'Winter']);
 function visitTextPolish(t) {
   return String(t)
     .replace(/(\d(?::\d\d)? ?(?:AM|PM)) ?- ?(\d)/g, '$1 \u2013 $2')
@@ -9090,7 +9092,7 @@ function visitInfoHtml(info) {
     const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">More ↗</a>` : '';
     return `<li><span class="visit-label">${escapeHtml(r.label)}</span><span>${text}${more}</span></li>`;
   };
-  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(r.label));
+  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(r.label)).sort((a, b) => (b.label === 'Known for') - (a.label === 'Known for'));
   const folded = info.rows.filter((r) => !VISIT_ROWS_SHOWN.has(r.label));
   // A box with nothing in the always-shown set shows its first row open, so it is never just a "More" line.
   if (!shown.length && folded.length) shown.push(folded.shift());

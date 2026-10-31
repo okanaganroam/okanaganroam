@@ -32227,6 +32227,13 @@ test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a t
   assert.match(box2, /<details class="visit-more"><summary>More: wine &amp; cheese, groups<\/summary>/);
   assert.match(box2, /11 AM – 1 PM/);
   assert.doesNotMatch(page2, /See the menu/, 'the Menu row goes when the box already links that page');
+  // Known for (2026-10-31): always first and open, wherever it is stored; up to 7 rows.
+  const known = { ...fuller, rows: [...fuller.rows, { label: 'Known for', text: 'Pinot Noir and Chardonnay; also the Old Vines Foch.' }] };
+  const set3 = app.guardedVisitInfoUpdate(w.id, set2.info, known, meta);
+  assert.equal(set3.ok, true, JSON.stringify(set3));
+  const page3 = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  assert.match(page3, /<ul class="visit-list"><li><span class="visit-label">Known for<\/span><span>Pinot Noir and Chardonnay; also the Old Vines Foch\.<\/span><\/li><li><span class="visit-label">Tastings</);
+  set2.info = set3.info;
   db.prepare('UPDATE venue_links SET menu_url = ? WHERE venue_id = ?').run('https://visit.example/wine-list', w.id);
   assert.match(app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []), /See the menu/, 'a different menu link stays');
   db.prepare('DELETE FROM venue_links WHERE venue_id = ?').run(w.id);
