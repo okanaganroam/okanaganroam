@@ -9070,29 +9070,51 @@ function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
 }
 // The box itself (English pages): label / text rows, a restaurant row linked to its own listing, and where the facts
 // came from. '' when the venue has none.
+// Box polish (2026-10-31): Tastings, Restaurant and Winter always show; the other rows (extras, groups) fold under one
+// "More: wine & cheese, groups" line, so the box stays short and Hours comes up sooner on a phone. Times read
+// "daily 11 AM – 9:30 PM" (an en dash between times, "daily" lower-case mid-sentence) whatever the stored wording.
+const VISIT_ROWS_SHOWN = new Set(['Tastings', 'Restaurant', 'Winter']);
+function visitTextPolish(t) {
+  return String(t)
+    .replace(/(\d(?::\d\d)? ?(?:AM|PM)) ?- ?(\d)/g, '$1 \u2013 $2')
+    .replace(/, Daily\b/g, ', daily');
+}
 function visitInfoHtml(info) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
-  const rows = info.rows.map((r) => {
+  const rowHtml = (r) => {
     const linked = r.venue_id ? db.prepare('SELECT region, type, slug, name FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id) : null;
-    let text = escapeHtml(r.text);
+    let text = escapeHtml(visitTextPolish(r.text));
     if (linked && linked.slug && CATEGORY_SLUGS[linked.type] && r.text.includes(linked.name)) {
       text = text.replace(escapeHtml(linked.name), `<a href="/${linked.region}/${CATEGORY_SLUGS[linked.type]}/${linked.slug}">${escapeHtml(linked.name)}</a>`);
     }
     const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">More ↗</a>` : '';
     return `<li><span class="visit-label">${escapeHtml(r.label)}</span><span>${text}${more}</span></li>`;
-  }).join('');
+  };
+  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(r.label));
+  const folded = info.rows.filter((r) => !VISIT_ROWS_SHOWN.has(r.label));
+  // A box with nothing in the always-shown set shows its first row open, so it is never just a "More" line.
+  if (!shown.length && folded.length) shown.push(folded.shift());
+  const rows = shown.map(rowHtml).join('');
+  const more = folded.length
+    ? `<details class="visit-more"><summary>More: ${escapeHtml(folded.map((r) => r.label.toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`
+    : '';
   let host = '';
   try { host = new URL(info.source_url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
   const when = info.checked_at && parseLocalDate(info.checked_at) ? `${formatLocalDateShort(info.checked_at, { weekday: false })}, ${info.checked_at.slice(0, 4)}` : '';
   return `<section class="venue-section venue-visit" id="venueVisit" aria-labelledby="venueVisitHead">
     <h2 id="venueVisitHead">Plan your visit</h2>
-    <ul class="visit-list">${rows}</ul>
+    <ul class="visit-list">${rows}</ul>${more}
     <p class="venue-hours-checked">${host ? `From ${escapeHtml(host)}` : 'From the venue'}${when ? `, checked ${escapeHtml(when)}` : ''}</p>
     <style>
       .venue-visit .visit-list { list-style: none; margin: 0; padding: 0; }
       .venue-visit .visit-list li { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px dotted rgba(42,32,25,0.18); line-height: 1.5; }
       .venue-visit .visit-list li:last-child { border-bottom: 0; }
       .venue-visit .visit-label { flex: 0 0 120px; font-weight: 800; }
+      .venue-visit .visit-more { border-top: 1px dotted rgba(42,32,25,0.18); }
+      .venue-visit .visit-more summary { cursor: pointer; font-weight: 800; padding: 10px 0; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; list-style: none; }
+      .venue-visit .visit-more summary::-webkit-details-marker { display: none; }
+      .venue-visit .visit-more summary::before { content: '\\25B8'; transition: transform .15s; }
+      .venue-visit .visit-more[open] summary::before { transform: rotate(90deg); }
       @media (max-width: 480px) { .venue-visit .visit-list li { flex-direction: column; gap: 2px; } .venue-visit .visit-label { flex-basis: auto; } }
     </style>
   </section>`;
@@ -32149,6 +32171,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // Plan your visit (2026-10-29): English pages only (the facts are in English, from the venue's own site).
   const visitInfo = venue.redirect_to || fr ? null : venueVisitInfo(venue.id);
   const visitHtml = visitInfoHtml(visitInfo);
+  // Box polish (2026-10-31): Good to Know drops its Menu row when the Plan your visit box already links that page
+  // (a winery's "Menu" was its restaurant's menu, also behind the Restaurant row's "More").
+  const urlKey = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+  const menuInVisitBox = !!(visitInfo && venueLinkRow.menu_url && visitInfo.rows.some((r) => r.url && urlKey(r.url) === urlKey(venueLinkRow.menu_url)));
   const happyHour = venueHappyHour(venue, statusHours, fr, opts.now || new Date());
   // Weekly specials (2026-10-27): their own row, under Happy hour.
   const weeklySpecials = venueSpecials(venue, statusHours, fr, opts.now || new Date());
@@ -32174,7 +32200,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.website ? [L('Website', 'Site Web'), `<a href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${escapeHtml(String(venue.website).replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, ''))} \u2197</a>`] : null,
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
     // menu / booking links from POST /admin/set-venue-links show here too (same table), with no verified pill.
-    venueLinkRow.menu_url ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
+    venueLinkRow.menu_url && !menuInVisitBox ? [L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
     venueLinkRow.booking_url ? [L('Book', 'R\u00e9server'), `<a href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank">${L('Book online', 'R\u00e9server en ligne')} \u2197</a>`] : null,
     (venueLinkRow.instagram_url || venueLinkRow.facebook_url) ? [L('Social', 'R\u00e9seaux'), [
       venueLinkRow.instagram_url ? `<a href="${escapeHtml(venueLinkRow.instagram_url)}" rel="nofollow noopener" target="_blank">Instagram</a>` : '',
