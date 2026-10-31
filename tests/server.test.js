@@ -32210,8 +32210,27 @@ test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a t
   assert.match(box, /From visit\.example, checked Oct 29, 2026/);
   assert.ok(page.indexOf('id="venueVisit"') < page.indexOf('id="venueHours"'), 'the box comes before the hours');
   assert.match(page, /<a class="cta secondary" href="https:\/\/visit\.example\/book" rel="nofollow noopener" target="_blank"[^>]*>Book a tasting<\/a>/);
+  // Box polish (2026-10-31): times are tidied ("on site, 11 AM – 9:30 PM").
+  assert.match(box, /on site, 11 AM – 9:30 PM\./);
   // French pages leave it out.
   assert.doesNotMatch(app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], [], { lang: 'fr' }), /venue-visit/);
+  // Box polish (2026-10-31): extras and groups fold under "More", Tastings / Restaurant / Winter stay open; the Menu row
+  // in Good to Know goes when the box links the same page, and stays when it doesn't.
+  db.prepare('INSERT OR REPLACE INTO venue_links (venue_id, menu_url) VALUES (?, ?)').run(w.id, 'https://visit.example/bistro/');
+  const fuller = { ...visit, rows: [visit.rows[0], { label: 'Wine & cheese', text: 'Pairing at 11 AM - 1 PM, $50.' }, { label: 'Groups', text: '8 or more book ahead.' }, visit.rows[1], { label: 'Winter', text: 'Open Daily, Fri - Sun.' }] };
+  const set2 = app.guardedVisitInfoUpdate(w.id, set.info, fuller, meta);
+  assert.equal(set2.ok, true, JSON.stringify(set2));
+  const page2 = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  const box2 = page2.slice(page2.indexOf('<section class="venue-section venue-visit"'), page2.indexOf('</section>', page2.indexOf('<section class="venue-section venue-visit"')));
+  const open = box2.slice(0, box2.indexOf('<details'));
+  assert.match(open, /visit-label">Tastings<.*visit-label">Restaurant<.*visit-label">Winter</s, 'the three key rows stay open, in their stored order');
+  assert.match(box2, /<details class="visit-more"><summary>More: wine &amp; cheese, groups<\/summary>/);
+  assert.match(box2, /11 AM – 1 PM/);
+  assert.doesNotMatch(page2, /See the menu/, 'the Menu row goes when the box already links that page');
+  db.prepare('UPDATE venue_links SET menu_url = ? WHERE venue_id = ?').run('https://visit.example/wine-list', w.id);
+  assert.match(app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []), /See the menu/, 'a different menu link stays');
+  db.prepare('DELETE FROM venue_links WHERE venue_id = ?').run(w.id);
+  set.info = set2.info;
   // Clearing removes the box and the button.
   assert.equal(app.guardedVisitInfoUpdate(w.id, set.info, null, meta).ok, true);
   const cleared = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
