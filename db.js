@@ -1195,6 +1195,17 @@ CREATE TABLE IF NOT EXISTS venue_hours_extra (
 );
 `);
 
+// Plan your visit (2026-10-29): what a visitor needs before driving out, from the venue's own site -- for a winery its
+// tastings (price, booking), extras, group rule, on-site restaurant and winter hours. info: canonical JSON
+// { rows: [{ label, text, venue_id?, url? }], booking_url, source_url, checked_at }; server.js guardedVisitInfoUpdate.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_visit_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 // Instant owner edits (2026-10-18): a signed-in owner's hours, season, phone, description, badges, happy hour and
 // price range go live at once. The row is still written to owner_change_requests (status 'approved', instant = 1,
 // reviewed_by 'owner:<email>') as the audit trail, with what it replaced in `previous`; undo_meta keeps the hours
