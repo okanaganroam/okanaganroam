@@ -109,6 +109,10 @@
     {
       "src": "/images/venues/play-area-kelowna-glow-room.jpg",
       "credit": "Courtesy of Play Area Kelowna"
+    },
+    {
+      "src": "/images/venues/play-area-kelowna-g1-2610.jpg",
+      "credit": "Play Area Kelowna"
     }
   ],
   "526": [
@@ -1429,6 +1433,66 @@
     {
       "src": "/images/venues/vice-virtue-brewing-co-g2-2610.jpg",
       "credit": "Vice & Virtue Brewing Co."
+    }
+  ],
+  "1467": [
+    {
+      "src": "/images/venues/alternator-centre-for-contemporary-art-g1-2610.jpg",
+      "credit": "Alternator Centre for Contemporary Art"
+    }
+  ],
+  "1501": [
+    {
+      "src": "/images/venues/geert-maas-sculpture-gardens-gallery-g2-2610.jpg",
+      "credit": "Geert Maas Sculpture Gardens & Gallery"
+    }
+  ],
+  "1481": [
+    {
+      "src": "/images/venues/johnson-bentley-memorial-aquatic-centre-g1-2610.jpg",
+      "credit": "Johnson Bentley Memorial Aquatic Centre"
+    },
+    {
+      "src": "/images/venues/johnson-bentley-memorial-aquatic-centre-g2-2610.jpg",
+      "credit": "Johnson Bentley Memorial Aquatic Centre"
+    }
+  ],
+  "1545": [
+    {
+      "src": "/images/venues/historic-o-keefe-ranch-g1-2610.jpg",
+      "credit": "Historic O'Keefe Ranch"
+    }
+  ],
+  "1517": [
+    {
+      "src": "/images/venues/okanagan-art-gallery-g1-2610.jpg",
+      "credit": "Okanagan Art Gallery"
+    }
+  ],
+  "1482": [
+    {
+      "src": "/images/venues/pearl-fern-pottery-studio-g1-2610.jpg",
+      "credit": "Pearl & Fern Pottery Studio"
+    }
+  ],
+  "1563": [
+    {
+      "src": "/images/venues/shelter-floating-sauna-g1-2610.jpg",
+      "credit": "Shelter Floating Sauna"
+    },
+    {
+      "src": "/images/venues/shelter-floating-sauna-g2-2610.jpg",
+      "credit": "Shelter Floating Sauna"
+    }
+  ],
+  "1503": [
+    {
+      "src": "/images/venues/ss-sicamous-museum-heritage-park-g1-2610.jpg",
+      "credit": "SS Sicamous Museum & Heritage Park"
+    },
+    {
+      "src": "/images/venues/ss-sicamous-museum-heritage-park-g2-2610.jpg",
+      "credit": "SS Sicamous Museum & Heritage Park"
     }
   ]
 }
