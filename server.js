@@ -9071,11 +9071,15 @@ function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
 }
 // The box itself (English pages): label / text rows, a restaurant row linked to its own listing, and where the facts
 // came from. '' when the venue has none.
+// The Book button's words by kind of place (2026-10-31).
+const VISIT_BOOK_LABELS = { winery: 'Book a tasting', brewery: 'Book a table', distillery: 'Book a tasting' };
 // Box polish (2026-10-31): Tastings, Restaurant and Winter always show; the other rows (extras, groups) fold under one
 // "More: wine & cheese, groups" line, so the box stays short and Hours comes up sooner on a phone. Times read
 // "daily 11 AM – 9:30 PM" (an en dash between times, "daily" lower-case mid-sentence) whatever the stored wording.
 // Known for (2026-10-31): what the winery's wines are known for, always first and always open.
-const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Restaurant', 'Winter']);
+// Breweries, cideries and distilleries (2026-10-31): Flights and Food stay open too (their other rows -- Tours,
+// Games, Groups, To go -- fold under More, like a winery's extras).
+const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Flights', 'Restaurant', 'Food', 'Winter']);
 function visitTextPolish(t) {
   return String(t)
     .replace(/(\d(?::\d\d)? ?(?:AM|PM)) ?- ?(\d)/g, '$1 \u2013 $2')
@@ -32324,7 +32328,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.website ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
     venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
-      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${venue.type === 'winery' ? 'Book a tasting' : 'Book'}</a>` : null,
+      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${VISIT_BOOK_LABELS[venue.type] || 'Book'}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).

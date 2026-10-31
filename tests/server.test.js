@@ -32271,3 +32271,21 @@ test('Plan your visit (2026-10-29): GET /admin/visit-info/:id and POST /admin/se
     await new Promise((resolve) => srv.close(resolve));
   }
 });
+
+test('Plan your visit (2026-10-31): a brewery keeps Flights and Food open and its button says Book a table', () => {
+  seasonInsert.run({ name: 'Visit Fixture Brewery', type: 'brewery', hours: SEASON_WEEK, slug: 'visit-fixture-brewery' });
+  const b = app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-brewery');
+  const r = app.guardedVisitInfoUpdate(b.id, null, { rows: [
+    { label: 'Games', text: 'Shuffleboard and board games.' },
+    { label: 'Flights', text: 'Four 5 oz tasters for $12.' },
+    { label: 'Food', text: 'Wood-fired pizza from noon.' },
+    { label: 'Known for', text: 'Hazy IPAs and a coffee stout.' },
+  ], booking_url: 'https://brew.example/book', source_url: 'https://brew.example/', checked_at: '2026-10-31' }, { reason: 'fixture', batch_id: 'test-brew' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const page = app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-brewery'), [], [], []);
+  const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
+  const open = box.slice(0, box.indexOf('<details'));
+  assert.match(open, /visit-label">Known for<.*visit-label">Flights<.*visit-label">Food</s);
+  assert.match(box, /<summary>More: games<\/summary>/);
+  assert.match(page, />Book a table<\/a>/);
+});
