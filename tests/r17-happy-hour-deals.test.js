@@ -283,18 +283,28 @@ test('Countdown: "Happy hour on now · ends in 1 hr 20 min" on the venue page an
   assert.match(en, /if \(h && h\.state === 'now' && left != null\) return \{ now: true, text: T\.hhOnNow\(happyHourLeftText\(left, FR\)\) \};/);
 });
 
-test('Happy hour guides: the first two deals under each venue that has them', () => {
+test('Happy hour (2026-11-03): the written Kelowna guide 301s to the live town page, which carries its picks and the "right now" title', async () => {
   let king = app.findVenueBySlug('kelowna', 'pub', 'king-taps') || app.findVenueBySlug('kelowna', 'restaurant', 'king-taps');
   if (!king) king = app.createVenue({ name: 'King Taps', slug: 'king-taps', region: 'kelowna', type: 'pub', latitude: 49.88, longitude: -119.49, happy_hour: true, description: 'A lakeside fixture used by the guide test.' });
   db.prepare('UPDATE venues SET happy_hour = 1 WHERE id = ?').run(king.id);
-  setDeals(king, DEALS);
-  const html = app.renderFileGuidePage('/guides/happy-hour-kelowna');
-  assert.ok(html, 'the guide renders');
-  assert.match(html, /King Taps<\/a><\/strong>[^\n]*<span class="guide-hh-deals">Happy hour deals: \$6 House pints \(20 oz\), \$10 Cocktails\.<\/span><\/li>/);
-  assert.doesNotMatch(html, /Appies/, 'two deals only');
-  // Other guides never show deals.
-  const other = app.renderFileGuidePage('/guides/best-patios-kelowna') || app.renderFileGuidePage('/guides/date-night-kelowna');
-  if (other) assert.doesNotMatch(other, /guide-hh-deals"/);
+  assert.equal(app.FILE_GUIDES['/guides/happy-hour-kelowna'], undefined, 'no longer a guide of its own');
+  assert.equal(app.MERGED_GUIDES['/guides/happy-hour-kelowna'], '/guide/kelowna/happy_hour');
+  assert.ok(!app.GUIDE_GROUPS.some((g) => g.paths.includes('/guides/happy-hour-kelowna')), 'not on /guides');
+  const venues = db.prepare('SELECT * FROM venues WHERE region = ? AND happy_hour = 1 AND redirect_to IS NULL').all('kelowna').map(app.rowToVenue);
+  const html = app.renderGuidePage('kelowna', 'happy_hour', venues, null, new Date('2026-11-04T16:00:00-08:00'));
+  assert.match(html, /<title>Happy Hours in Kelowna Right Now: Times &amp; Deals \| Okanagan Roam<\/title>/);
+  assert.match(html, /<h2 class="category-subsection-heading" id="guideMergedHeading">Where to go for happy hour in Kelowna<\/h2>/);
+  assert.match(html, /class="guide-merged-places">[^<]*<a href="[^"]+">King Taps<\/a>/);
+  // Other badges keep their title.
+  assert.match(app.renderGuidePage('kelowna', 'patio', venues.slice(0, 3)), /<title>[^<]*, BC \| Okanagan Roam<\/title>/);
+  assert.doesNotMatch(app.renderGuidePage('kelowna', 'patio', venues.slice(0, 3)), /guideMergedHeading/);
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  try {
+    const r = await fetch(`http://127.0.0.1:${srv.address().port}/guides/happy-hour-kelowna`, { redirect: 'manual' });
+    assert.equal(r.status, 301);
+    assert.equal(r.headers.get('location'), '/guide/kelowna/happy_hour');
+  } finally { srv.close(); }
 });
 
 test('Build My Trip: a stop timed inside happy hour says "Happy hour: …" (EN/FR), others do not; the plan itself is unchanged', () => {
