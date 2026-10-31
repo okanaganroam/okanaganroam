@@ -9100,6 +9100,9 @@ function visitInfoHtml(info) {
   const folded = info.rows.filter((r) => !VISIT_ROWS_SHOWN.has(r.label));
   // A box with nothing in the always-shown set shows its first row open, so it is never just a "More" line.
   if (!shown.length && folded.length) shown.push(folded.shift());
+  // A single folded row shows open too (2026-10-31): a "More" that hides one line only costs a tap (Geo Cider's
+  // "Cans to go" was the one thing a visitor needed).
+  if (folded.length === 1) shown.push(folded.shift());
   const rows = shown.map(rowHtml).join('');
   const more = folded.length
     ? `<details class="visit-more"><summary>More: ${escapeHtml(folded.map((r) => r.label.toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`

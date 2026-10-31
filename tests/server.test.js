@@ -32286,6 +32286,8 @@ test('Plan your visit (2026-10-31): a brewery keeps Flights and Food open and it
   const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
   const open = box.slice(0, box.indexOf('<details'));
   assert.match(open, /visit-label">Known for<.*visit-label">Flights<.*visit-label">Food</s);
-  assert.match(box, /<summary>More: games<\/summary>/);
+  // One folded row (Games) shows open instead of behind a one-item More (2026-10-31).
+  assert.doesNotMatch(box, /<details class="visit-more">/);
+  assert.match(box, /visit-label">Games</);
   assert.match(page, />Book a table<\/a>/);
 });
