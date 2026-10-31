@@ -1329,6 +1329,7 @@ const VENUE_DELETE_CHILDREN = [
   ['owner_photos', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
   ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'], ['event_partner_venues', 'venue_id = ?'],
+  ['venue_visit_info', 'venue_id = ?'],
 ];
 const VENUE_DELETE_UNLINK = [['events', 'venue_id'], ['venue_submissions', 'venue_id'], ['venues', 'redirect_to']];
 function deleteVenue(id) {
@@ -8980,6 +8981,123 @@ function guardedSpecialsUpdate(id, expectedCurrent, input, meta, now = new Date(
     throw err;
   }
 }
+// ---------- Plan your visit (2026-10-29) ----------
+// A short "Plan your visit" box on the venue page, from the venue's own site: for a winery its tastings (what, from
+// what price, booking), up to two extras, a group rule, the on-site restaurant (linked to its own listing when it has
+// one) and winter hours. One row per venue in venue_visit_info (db.js). Set by research scripts through
+// POST /admin/set-visit-info (compare-and-set on GET /admin/visit-info/:id); English pages only.
+const VISIT_ROWS_MAX = 6;
+function validateVisitInfo(input) {
+  const v = input || {};
+  if (!Array.isArray(v.rows) || !v.rows.length || v.rows.length > VISIT_ROWS_MAX) return { ok: false, detail: `rows: 1 to ${VISIT_ROWS_MAX}` };
+  const httpUrl = (u) => typeof u === 'string' && /^https?:\/\/[^\s<>"]+$/i.test(u.trim());
+  const rows = [];
+  for (const r of v.rows) {
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return { ok: false, detail: 'each row must be an object' };
+    const label = typeof r.label === 'string' ? r.label.trim().replace(/\s+/g, ' ') : '';
+    const text = typeof r.text === 'string' ? r.text.trim().replace(/\s+/g, ' ') : '';
+    if (!label || label.length > 24 || /[<>]/.test(label)) return { ok: false, detail: 'row label: 1 to 24 characters, without < or >' };
+    if (!text || text.length > 180 || /[<>]/.test(text)) return { ok: false, detail: 'row text: 1 to 180 characters, without < or >' };
+    const row = { label, text };
+    if (r.venue_id !== undefined && r.venue_id !== null) {
+      if (!Number.isInteger(r.venue_id) || !db.prepare('SELECT 1 FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id)) return { ok: false, detail: `row venue_id ${r.venue_id} is not a live listing` };
+      row.venue_id = r.venue_id;
+    }
+    if (r.url !== undefined && r.url !== null) {
+      if (!httpUrl(r.url)) return { ok: false, detail: 'row url must be an http(s) link' };
+      row.url = r.url.trim();
+    }
+    rows.push(row);
+  }
+  if (v.booking_url !== undefined && v.booking_url !== null && !httpUrl(v.booking_url)) return { ok: false, detail: 'booking_url must be an http(s) link or null' };
+  if (!httpUrl(v.source_url)) return { ok: false, detail: 'source_url (the page the facts came from) is required' };
+  if (typeof v.checked_at !== 'string' || !parseLocalDate(v.checked_at)) return { ok: false, detail: 'checked_at must be YYYY-MM-DD' };
+  return { ok: true, info: { rows, booking_url: v.booking_url ? v.booking_url.trim() : null, source_url: v.source_url.trim(), checked_at: v.checked_at } };
+}
+function venueVisitInfo(venueId) {
+  try {
+    const r = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(venueId);
+    return r ? JSON.parse(r.info) : null;
+  } catch (e) { return null; }
+}
+function currentVisitInfoJson(venueId) {
+  try { const r = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(venueId); return r ? r.info : null; } catch (e) { return null; }
+}
+// Replaces (or clears, with visit null) a venue's box: compare-and-set on expected_current (GET /admin/visit-info/:id),
+// reason + batch_id required, logged in venue_enrichment_log as 'visit_info'.
+// -> { ok, changed, info } | { ok: false, reason, detail, live }
+function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
+  const m = meta || {};
+  if (typeof m.reason !== 'string' || !m.reason.trim() || typeof m.batch_id !== 'string' || !m.batch_id.trim()) {
+    return { ok: false, reason: 'invalid_meta', detail: 'reason and batch_id are required' };
+  }
+  let nextJson = null;
+  if (visit !== null) {
+    const checked = validateVisitInfo(visit);
+    if (!checked.ok) return { ok: false, reason: 'invalid_visit', detail: checked.detail };
+    nextJson = JSON.stringify(checked.info);
+  }
+  const existing = db.prepare('SELECT id, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!existing) return { ok: false, reason: 'venue_not_found' };
+  if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
+  let txOpen = false;
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    txOpen = true;
+    const current = currentVisitInfoJson(id);
+    if (current !== (expectedCurrent === undefined ? null : expectedCurrent)) {
+      db.exec('ROLLBACK');
+      txOpen = false;
+      return { ok: false, reason: 'mismatch', live: { visit: current } };
+    }
+    if (current === nextJson) {
+      db.exec('COMMIT');
+      txOpen = false;
+      return { ok: true, changed: false, info: nextJson };
+    }
+    if (nextJson === null) db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(id);
+    else db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info, updated_at = CURRENT_TIMESTAMP').run(id, nextJson);
+    db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'visit_info', ?, ?, 'manual_research', ?, 'high', ?, 0, NULL)`).run(id, current, nextJson, m.reason.trim(), m.batch_id.trim());
+    db.exec('COMMIT');
+    txOpen = false;
+    return { ok: true, changed: true, info: nextJson };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ } }
+    throw err;
+  }
+}
+// The box itself (English pages): label / text rows, a restaurant row linked to its own listing, and where the facts
+// came from. '' when the venue has none.
+function visitInfoHtml(info) {
+  if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
+  const rows = info.rows.map((r) => {
+    const linked = r.venue_id ? db.prepare('SELECT region, type, slug, name FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id) : null;
+    let text = escapeHtml(r.text);
+    if (linked && linked.slug && CATEGORY_SLUGS[linked.type] && r.text.includes(linked.name)) {
+      text = text.replace(escapeHtml(linked.name), `<a href="/${linked.region}/${CATEGORY_SLUGS[linked.type]}/${linked.slug}">${escapeHtml(linked.name)}</a>`);
+    }
+    const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">More ↗</a>` : '';
+    return `<li><span class="visit-label">${escapeHtml(r.label)}</span><span>${text}${more}</span></li>`;
+  }).join('');
+  let host = '';
+  try { host = new URL(info.source_url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
+  const when = info.checked_at && parseLocalDate(info.checked_at) ? `${formatLocalDateShort(info.checked_at, { weekday: false })}, ${info.checked_at.slice(0, 4)}` : '';
+  return `<section class="venue-section venue-visit" id="venueVisit" aria-labelledby="venueVisitHead">
+    <h2 id="venueVisitHead">Plan your visit</h2>
+    <ul class="visit-list">${rows}</ul>
+    <p class="venue-hours-checked">${host ? `From ${escapeHtml(host)}` : 'From the venue'}${when ? `, checked ${escapeHtml(when)}` : ''}</p>
+    <style>
+      .venue-visit .visit-list { list-style: none; margin: 0; padding: 0; }
+      .venue-visit .visit-list li { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px dotted rgba(42,32,25,0.18); line-height: 1.5; }
+      .venue-visit .visit-list li:last-child { border-bottom: 0; }
+      .venue-visit .visit-label { flex: 0 0 120px; font-weight: 800; }
+      @media (max-width: 480px) { .venue-visit .visit-list li { flex-direction: column; gap: 2px; } .venue-visit .visit-label { flex-basis: auto; } }
+    </style>
+  </section>`;
+}
+
 // The alcohol rule (the owner portal's happy hour test): a place serves alcohol when it is a restaurant, pub, lounge,
 // brewery, winery, distillery or golf course (OWNER_HAPPY_HOUR_TYPES), or carries the happy_hour badge. Drink and
 // food-and-drink specials show only there; food specials anywhere (cafés, family restaurants).
@@ -32028,6 +32146,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   };
   const venueLinkRow = venue.redirect_to ? {} : Object.fromEntries(Object.entries(venueLinks(venue.id) || {})
     .map(([k, v]) => [k, (k === 'menu_url' || k === 'booking_url') && sameAsWebsite(v) ? null : v]));
+  // Plan your visit (2026-10-29): English pages only (the facts are in English, from the venue's own site).
+  const visitInfo = venue.redirect_to || fr ? null : venueVisitInfo(venue.id);
+  const visitHtml = visitInfoHtml(visitInfo);
   const happyHour = venueHappyHour(venue, statusHours, fr, opts.now || new Date());
   // Weekly specials (2026-10-27): their own row, under Happy hour.
   const weeklySpecials = venueSpecials(venue, statusHours, fr, opts.now || new Date());
@@ -32173,7 +32294,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // the main button as before.
     mapsUrl ? `<a class="cta" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('Get Directions', 'Itin\u00e9raire')}</a>` : null,
     venue.website ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
-    venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>` : null,
+    venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
+      // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
+      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${venue.type === 'winery' ? 'Book a tasting' : 'Book'}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
@@ -32462,7 +32585,7 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-extra">
   ${venueDealsCardHtml}
   ${venueWeeklyNightsHtml(weeklyNights, fr)}
-  ${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
+  ${visitHtml}${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
@@ -54119,6 +54242,52 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { id: body.id, changedFields: result.changedFields, venue: { happy_hour_deals: result.happy_hour_deals, happy_hour_deals_fr: result.happy_hour_deals_fr, happy_hour_deals_source: result.happy_hour_deals_source, happy_hour_deals_checked_at: result.happy_hour_deals_checked_at } });
     }
 
+    // GET /admin/visit-info/:id (2026-10-29) -- a venue's Plan your visit box with its compare-and-set value:
+    // { id, name, expected_current: <stored JSON> | null, visit: {...} | null }. Bearer token; never cached.
+    {
+      const viRead = /^\/admin\/visit-info\/(\d+)$/.exec(pathname);
+      if (viRead && method === 'GET') {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Visit info endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+        const id = Number(viRead[1]);
+        const v = db.prepare('SELECT id, name, redirect_to FROM venues WHERE id = ?').get(id);
+        if (!v) return sendJSON(res, 404, { error: 'venue_not_found' });
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJSON(res, 200, { id, name: v.name, redirect_to: v.redirect_to == null ? null : v.redirect_to, expected_current: currentVisitInfoJson(id), visit: venueVisitInfo(id) });
+      }
+    }
+
+    // POST /admin/set-visit-info (2026-10-29): { id, expected_current, visit: { rows, booking_url?, source_url,
+    // checked_at } | null, reason, batch_id } -> guardedVisitInfoUpdate. visit null clears the box.
+    if (pathname === '/admin/set-visit-info' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Set-visit-info endpoint is not configured.' });
+      const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const unexpectedKeys = Object.keys(body).filter((k) => !['id', 'expected_current', 'visit', 'reason', 'batch_id'].includes(k));
+      if (unexpectedKeys.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedKeys.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (!('expected_current' in body) || (body.expected_current !== null && typeof body.expected_current !== 'string')) {
+        return sendJSON(res, 400, { error: 'expected_current is required (GET /admin/visit-info/:id) or null.' });
+      }
+      if (!('visit' in body)) return sendJSON(res, 400, { error: 'visit is required (null clears it).' });
+      let result;
+      try {
+        result = guardedVisitInfoUpdate(body.id, body.expected_current, body.visit, { reason: body.reason, batch_id: body.batch_id });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Visit info update failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.ok) {
+        const statusMap = { invalid_meta: 400, invalid_visit: 400, venue_not_found: 404, venue_redirected: 409, mismatch: 409 };
+        return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
+      }
+      if (result.changed) indexNowVenueChanged(req, body.id);
+      return sendJSON(res, 200, { id: body.id, changed: result.changed, expected_current: result.info, visit: result.info ? JSON.parse(result.info) : null });
+    }
+
     // GET /admin/specials/:id (2026-10-27) -- a venue's weekly specials for a script, with the compare-and-set value:
     // { id, expected_current: <canonical JSON of the current list> | null, specials: [...] }. Same bearer token as the
     // admin writes; never cached.
@@ -56457,6 +56626,7 @@ module.exports = {
   validateWeeklyNights, guardedWeeklyNightsUpdate, currentWeeklyNightsJson, venueWeeklyNightsList, weeklyNightsTodayFor, nightOnDate, nightsStale, nightDaysText,
   withTripWeeklyNights, tripLineDayLabel, withTripListNights, withTripListHappyHour, tripNamedVenuePlan, staleVenueWeeklyNights, weeklyNightsLiveMusicWithoutBadge, venueWeeklyNights, venueWeeklyNightsHtml, whatsOnWeeklyNightsHtml,
   NIGHTS_STALE_DAYS, NIGHTS_MAX, NIGHT_KINDS, NIGHT_FREQUENCIES, NIGHT_TYPES,
+  validateVisitInfo, guardedVisitInfoUpdate, currentVisitInfoJson, venueVisitInfo,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
   specialTimeState, specialsCompact, withTripSpecials, staleVenueSpecials, venueSpecials, venueSpecialsHtml, SPECIALS_STALE_DAYS, SPECIALS_MAX,
   // Verified mark (2026-10-27)

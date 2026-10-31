@@ -32175,3 +32175,73 @@ test('Venue page polish (2026-10-29): a theatre leads with its next show and Sho
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
   }
 });
+
+test('Plan your visit (2026-10-29): a winery shows its tastings box and Book a tasting; compare-and-set; English only', async () => {
+  seasonInsert.run({ name: 'Visit Fixture Winery', type: 'winery', hours: SEASON_WEEK, slug: 'visit-fixture-winery' });
+  seasonInsert.run({ name: 'Visit Fixture Bistro', type: 'restaurant', hours: SEASON_WEEK, slug: 'visit-fixture-bistro' });
+  const w = app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery');
+  const bistro = app.findVenueBySlug('kelowna', 'restaurant', 'visit-fixture-bistro');
+  const meta = { reason: 'fixture', batch_id: 'test-visit' };
+  const visit = {
+    rows: [
+      { label: 'Tastings', text: '4 wines from $20 (Reserve $35), about 30 min. Book ahead online.' },
+      { label: 'Restaurant', text: 'Visit Fixture Bistro on site, 11 AM – 9:30 PM.', venue_id: bistro.id, url: 'https://visit.example/bistro' },
+    ],
+    booking_url: 'https://visit.example/book', source_url: 'https://www.visit.example/tastings', checked_at: '2026-10-29',
+  };
+  // Validation: a bad row, a missing source, an unknown venue.
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, { ...visit, rows: [{ label: '', text: 'x' }] }, meta).reason, 'invalid_visit');
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, { ...visit, source_url: null }, meta).reason, 'invalid_visit');
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, { ...visit, rows: [{ label: 'R', text: 'x', venue_id: 99999999 }] }, meta).reason, 'invalid_visit');
+  assert.equal(app.guardedVisitInfoUpdate(w.id, null, visit, {}).reason, 'invalid_meta');
+  const set = app.guardedVisitInfoUpdate(w.id, null, visit, meta);
+  assert.equal(set.ok, true, JSON.stringify(set));
+  assert.equal(set.changed, true);
+  // Compare-and-set: a stale expected value is refused and the live value comes back.
+  const stale = app.guardedVisitInfoUpdate(w.id, null, null, meta);
+  assert.equal(stale.reason, 'mismatch');
+  assert.equal(stale.live.visit, set.info);
+  const page = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
+  assert.match(box, /<h2 id="venueVisitHead">Plan your visit<\/h2>/);
+  assert.match(box, /<li><span class="visit-label">Tastings<\/span><span>4 wines from \$20 \(Reserve \$35\), about 30 min\. Book ahead online\.<\/span><\/li>/);
+  assert.match(box, /<a href="\/kelowna\/restaurants\/visit-fixture-bistro">Visit Fixture Bistro<\/a> on site/, 'the on-site restaurant links to its own listing');
+  assert.match(box, /<a href="https:\/\/visit\.example\/bistro" rel="nofollow noopener" target="_blank">More ↗<\/a>/);
+  assert.match(box, /From visit\.example, checked Oct 29, 2026/);
+  assert.ok(page.indexOf('id="venueVisit"') < page.indexOf('id="venueHours"'), 'the box comes before the hours');
+  assert.match(page, /<a class="cta secondary" href="https:\/\/visit\.example\/book" rel="nofollow noopener" target="_blank"[^>]*>Book a tasting<\/a>/);
+  // French pages leave it out.
+  assert.doesNotMatch(app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], [], { lang: 'fr' }), /venue-visit/);
+  // Clearing removes the box and the button.
+  assert.equal(app.guardedVisitInfoUpdate(w.id, set.info, null, meta).ok, true);
+  const cleared = app.renderVenuePage(app.findVenueBySlug('kelowna', 'winery', 'visit-fixture-winery'), [], [], []);
+  assert.doesNotMatch(cleared, /venue-visit|Book a tasting/);
+});
+
+test('Plan your visit (2026-10-29): GET /admin/visit-info/:id and POST /admin/set-visit-info', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Visit Route Winery', type: 'winery', hours: SEASON_WEEK, slug: 'visit-route-winery' });
+  const w = app.findVenueBySlug('kelowna', 'winery', 'visit-route-winery');
+  const srv = http.createServer(app.server.listeners('request')[0]);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  const auth = { Authorization: 'Bearer test-fixture-admin-token', 'Content-Type': 'application/json' };
+  try {
+    assert.equal((await fetch(`${base}/admin/visit-info/${w.id}`)).status, 401);
+    const got = await (await fetch(`${base}/admin/visit-info/${w.id}`, { headers: auth })).json();
+    assert.equal(got.expected_current, null);
+    const body = { id: w.id, expected_current: null, reason: 'fixture', batch_id: 'test-visit-route',
+      visit: { rows: [{ label: 'Tastings', text: 'Free, walk-ins welcome.' }], booking_url: null, source_url: 'https://route.example/visit', checked_at: '2026-10-29' } };
+    assert.equal((await fetch(`${base}/admin/set-visit-info`, { method: 'POST', headers: auth, body: JSON.stringify({ ...body, extra: 1 }) })).status, 400);
+    const ok = await fetch(`${base}/admin/set-visit-info`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
+    assert.equal(ok.status, 200);
+    const okBody = await ok.json();
+    assert.equal(okBody.changed, true);
+    assert.equal((await fetch(`${base}/admin/set-visit-info`, { method: 'POST', headers: auth, body: JSON.stringify(body) })).status, 409, 'stale expected_current');
+    const again = await (await fetch(`${base}/admin/visit-info/${w.id}`, { headers: auth })).json();
+    assert.equal(again.expected_current, okBody.expected_current);
+    assert.deepEqual(again.visit.rows, [{ label: 'Tastings', text: 'Free, walk-ins welcome.' }]);
+  } finally {
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
