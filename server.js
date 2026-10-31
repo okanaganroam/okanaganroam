@@ -9087,7 +9087,8 @@ const VISIT_BOOK_LABELS = { winery: 'Book a tasting', brewery: 'Book a table', d
 // Known for (2026-10-31): what the winery's wines are known for, always first and always open.
 // Breweries, cideries and distilleries (2026-10-31): Flights and Food stay open too (their other rows -- Tours,
 // Games, Groups, To go -- fold under More, like a winery's extras).
-const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Flights', 'Restaurant', 'Food', 'Winter']);
+// Indoor places (2026-10-31): Prices, Booking and Ages stay open too.
+const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Flights', 'Restaurant', 'Food', 'Prices', 'Booking', 'Ages', 'Winter']);
 function visitTextPolish(t) {
   return String(t)
     .replace(/(\d(?::\d\d)? ?(?:AM|PM)) ?- ?(\d)/g, '$1 \u2013 $2')
