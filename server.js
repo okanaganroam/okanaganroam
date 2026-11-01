@@ -18280,6 +18280,28 @@ function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
     .join(' ');
 }
 
+// Venue-page badges (2026-11-01, Dayton: "more beautiful while staying noticeable"): each badge leads with its line icon
+// and takes a soft tint by kind -- food and drink, people, setting, time -- so the row can be scanned instead of read.
+// Open early / Open late are left off (the open-now line and the hours already say it), and Happy hour is left off when
+// the happy-hour line sits right above (skipTimely).
+const VENUE_BADGE_GROUP = {
+  vegan: 'food', vegetarian: 'food', gluten_free: 'food', nonalcoholic: 'food',
+  kid_friendly: 'people', dog_friendly: 'people', great_groups: 'people', free_entry: 'people',
+  patio: 'place', lake_view: 'place', live_music: 'place', sports_tv: 'place', arts_culture: 'place',
+  happy_hour: 'time', open_early: 'time', open_late: 'time',
+};
+function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipHappyHour = false } = {}) {
+  const order = ['food', 'people', 'place', 'time'];
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && !(skipHappyHour && f === 'happy_hour') && f !== 'open_early' && f !== 'open_late')
+    .sort((x, y) => order.indexOf(VENUE_BADGE_GROUP[x] || 'place') - order.indexOf(VENUE_BADGE_GROUP[y] || 'place'))
+    .map((f) => {
+      const icon = (CARD_BADGE_SHORT[f] || [])[0];
+      const label = fr ? frBadgeLabel(f) : BADGE_LABELS[f].title;
+      return `<span class="chip chip-vb chip-vb-${VENUE_BADGE_GROUP[f] || 'place'}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
+    })
+    .join(' ');
+}
+
 // Tours & Experiences cards (2026-10-31): one layout for every card on the Tours page -- the small gold line is the
 // town and kind of experience, the summary is the place's own "Known for" line from its Plan your visit box (the card's
 // description otherwise), and the quick facts are the first price and the trip length from the same box, then the
@@ -32125,6 +32147,13 @@ function renderVenuePageLayoutStyles() {
   body.golf-page .venue-hero-fallback.venue-hero-has-photo::after { z-index: 1; }
   body.golf-page .venue-hero-has-photo h1, body.golf-page .venue-hero-has-photo .venue-hero-type { z-index: 2; text-shadow: 0 2px 14px rgba(0,0,0,0.55); }
   body.golf-page .venue-hero-has-photo .venue-hero-example { position: absolute; right: 18px; bottom: 16px; z-index: 2; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.85); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
+  /* Venue badges (2026-11-01): icon first, a soft tint by kind (food, people, setting, time), a hairline edge of the same hue. */
+  body.golf-page .chip-vb { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; padding: 6px 13px 6px 10px; border: 1px solid var(--vb-edge); background: var(--vb-bg); color: var(--vb-ink); }
+  body.golf-page .chip-vb .ui-icon { flex: 0 0 auto; width: 1.15em; height: 1.15em; }
+  body.golf-page .chip-vb-food { --vb-bg: #E6F0E2; --vb-ink: #2A5530; --vb-edge: #BFD6B8; }
+  body.golf-page .chip-vb-people { --vb-bg: #F8EBCB; --vb-ink: #67470C; --vb-edge: #E6CF93; }
+  body.golf-page .chip-vb-place { --vb-bg: #DEEDF0; --vb-ink: #1D4B58; --vb-edge: #B3D2D9; }
+  body.golf-page .chip-vb-time { --vb-bg: #F8E0D5; --vb-ink: #84371B; --vb-edge: #E6B9A6; }
   /* Open-now line under the name. */
   body.golf-page .venue-open-status { display: flex; align-items: center; gap: 7px; margin: -2px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.92rem; font-weight: 800; color: var(--ink); }
   body.golf-page .venue-open-status::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor; flex: 0 0 auto; }
@@ -32471,9 +32500,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const isHiddenGem = !venue.redirect_to && isVenueHiddenGem(venue.id);
   const isLocalFavourite = !venue.redirect_to && getCollectionVenueIds('local_favorite').has(venue.id);
   const dogFriendlyNote = venue.redirect_to ? undefined : getDogFriendlyNotes().get(venue.id);
-  const attributeChips = fr
-    ? BOOL_FIELDS.filter((f) => venue[f] && !(dogFriendlyNote !== undefined && f === 'dog_friendly')).map((f) => `<span class="chip">${escapeHtml(frBadgeLabel(f))}</span>`).join(' ')
-    : badgeChipsHtml(venue, { skipDogFriendly: dogFriendlyNote !== undefined });
+  const attributeChipsFor = (skipHappyHour) => venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour });
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
   const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);
@@ -33018,7 +33045,7 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${hikeGlanceHtml}${venueWhyHtml}${(() => {
+    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>${hikeGlanceHtml}${venueWhyHtml}${(() => {
       // Verified mark (2026-10-27): a pill on every listing the business manages (venueIsClaimed: a login, an approved
       // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
       // the "Updated by the business" line.
@@ -57190,6 +57217,7 @@ module.exports = {
   guideItemListSchema,
   buildOpeningHoursSpecification,
   badgeChipsHtml,
+  venueBadgeChipsHtml,
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,

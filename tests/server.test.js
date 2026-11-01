@@ -17451,7 +17451,8 @@ test('Derived hours badges: PUT/POST /api/venues cannot set them, and PUT re-der
     const json = await (await fetch(`${base}/api/venues/${c.id}`)).json();
     assert.equal(json.open_late, true);
     const page = await (await fetch(`${base}/summerland/restaurants/hb-posted-bistro`)).text();
-    assert.match(page, /<span class="chip"[^>]*>Open Late<\/span>/);
+    // The venue page leaves Open late to the open-now line and the hours (2026-11-01 badge look).
+    assert.doesNotMatch(page, /<span class="chip[^"]*"[^>]*>(?:<svg[^>]*>.*?<\/svg>)?Open Late<\/span>/);
   } finally {
     await new Promise((resolve) => srv.close(resolve));
   }
@@ -30688,8 +30689,8 @@ test('Free to Visit and Arts & Culture badges (2026-10-19): things-to-do badges 
     assert.equal(api.free_entry, true);
     assert.equal(api.arts_culture, true);
     const page = await fetch(`${base}/kelowna/indoor/free-arts-gallery-fixture`).then((r) => r.text());
-    assert.match(page, /<span class="chip">Free to Visit<\/span>/);
-    assert.match(page, /<span class="chip"[^>]*>Arts &amp; Culture<\/span>/);
+    assert.match(page, /<span class="chip chip-vb chip-vb-people"><svg[^>]*>.*?<\/svg>Free to Visit<\/span>/);
+    assert.match(page, /<span class="chip chip-vb chip-vb-place"><svg[^>]*>.*?<\/svg>Arts &amp; Culture<\/span>/);
     // Guide pages read the badge like any other.
     const guide = app.renderGuidePage('kelowna', 'free_entry', [app.findVenueBySlug('kelowna', 'indoor', 'free-arts-gallery-fixture')]);
     assert.match(guide, /Free Things to Do in Kelowna/);
@@ -32514,4 +32515,14 @@ test('Plan your hike (2026-11-01): a trail box leads with The hike, the page sho
   } finally {
     db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(v.id);
   }
+});
+
+test('Venue badges (2026-11-01): icon first, grouped by kind (food, people, setting, time), no Open early/late, Happy hour only when no happy-hour line', () => {
+  const v = { vegan: 1, gluten_free: 1, kid_friendly: 1, patio: 1, happy_hour: 1, open_late: 1, dog_friendly: 1 };
+  const html = app.venueBadgeChipsHtml(v, { skipDogFriendly: true });
+  assert.match(html, /chip-vb-food"><svg[^>]*>.*?<\/svg>Vegan-Friendly/);
+  assert.ok(html.indexOf('chip-vb-food') < html.indexOf('chip-vb-people') && html.indexOf('chip-vb-people') < html.indexOf('chip-vb-place') && html.indexOf('chip-vb-place') < html.indexOf('chip-vb-time'), 'grouped food, people, setting, time');
+  assert.doesNotMatch(html, /Open Late|Dog-Friendly/);
+  assert.match(html, /Happy Hour/);
+  assert.doesNotMatch(app.venueBadgeChipsHtml(v, { skipHappyHour: true }), /Happy Hour/);
 });
