@@ -32435,3 +32435,24 @@ test('Ski resort pages (2026-11-01): one full-width flow with no side column; ot
   assert.doesNotMatch(pages.ski, /<div class="region-lead region-lead-split">/);
   assert.doesNotMatch(pages.town, /ski-region">/);
 });
+
+test('Ski resort pages (2026-11-01): Plan your trip cards show stay, getting-here and kids facts with the hill’s own links, only where the hill states them', () => {
+  let shown = 0;
+  for (const r of Object.keys(app.SKI_RESORT_SEASON)) {
+    const html = app.skiPlanHtml(r);
+    const plan = app.SKI_RESORT_SEASON[r].plan;
+    if (!plan) { assert.equal(html, '', `${r}: no plan, no section`); continue; }
+    shown++;
+    assert.match(html, /<h2 id="skiPlanHeading" class="ski-plan-heading">Plan your trip<\/h2>/, r);
+    for (const [key, title] of [['stay', 'Where to stay'], ['getting', 'Getting here'], ['kids', 'With kids']]) {
+      if (plan[key] && (plan[key].facts.length || plan[key].links.length)) assert.ok(html.includes(`</svg>${title}</h3>`), `${r}: ${title}`);
+      for (const [label, url] of (plan[key] ? plan[key].links : [])) {
+        assert.match(url, /^https:\/\//, `${r}: ${label}`);
+        assert.ok(html.includes(`href="${url.replace(/&/g, '&amp;')}"`), `${r}: ${label} link`);
+      }
+      for (const fact of (plan[key] ? plan[key].facts : [])) assert.ok(fact.length <= 115, `${r}: fact too long: ${fact}`);
+    }
+    assert.doesNotMatch(html, /undefined|null/, r);
+  }
+  assert.ok(shown >= 2);
+});
