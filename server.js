@@ -9080,7 +9080,7 @@ function guardedVisitInfoUpdate(id, expectedCurrent, visit, meta) {
 // The box itself (English pages): label / text rows, a restaurant row linked to its own listing, and where the facts
 // came from. '' when the venue has none.
 // The Book button's words by kind of place (2026-10-31).
-const VISIT_BOOK_LABELS = { winery: 'Book a tasting', brewery: 'Book a table', distillery: 'Book a tasting' };
+const VISIT_BOOK_LABELS = { winery: 'Book a tasting', brewery: 'Book a table', distillery: 'Book a tasting', restaurant: 'Reserve a table', pub: 'Reserve a table', cocktail: 'Reserve a table' };
 // Box polish (2026-10-31): Tastings, Restaurant and Winter always show; the other rows (extras, groups) fold under one
 // "More: wine & cheese, groups" line, so the box stays short and Hours comes up sooner on a phone. Times read
 // "daily 11 AM – 9:30 PM" (an en dash between times, "daily" lower-case mid-sentence) whatever the stored wording.
@@ -9088,7 +9088,9 @@ const VISIT_BOOK_LABELS = { winery: 'Book a tasting', brewery: 'Book a table', d
 // Breweries, cideries and distilleries (2026-10-31): Flights and Food stay open too (their other rows -- Tours,
 // Games, Groups, To go -- fold under More, like a winery's extras).
 // Indoor places (2026-10-31): Prices, Booking and Ages stay open too.
-const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Flights', 'Restaurant', 'Food', 'Prices', 'Booking', 'Ages', 'Winter']);
+// Restaurants, cafes, pubs and lounges (2026-10-31): Reservations, Menu and Dietary stay open too; Patio, Groups,
+// Takeout and Good to know fold under More.
+const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Flights', 'Restaurant', 'Food', 'Prices', 'Booking', 'Ages', 'Winter', 'Reservations', 'Menu', 'Dietary']);
 function visitTextPolish(t) {
   return String(t)
     .replace(/(\d(?::\d\d)? ?(?:AM|PM)) ?- ?(\d)/g, '$1 \u2013 $2')
@@ -9102,6 +9104,7 @@ const VISIT_LABELS_FR = {
   'Groups': 'Groupes', 'What to bring': 'À apporter', 'Season': 'Saison', 'Good to know': 'Bon à savoir',
   'Tastings': 'Dégustations', 'Flights': 'Plateaux de dégustation', 'Restaurant': 'Restaurant', 'Food': 'Cuisine',
   'Winter': 'Hiver', 'Tours': 'Visites', 'Games': 'Jeux', 'To go': 'À emporter', 'Kids & dogs': 'Enfants et chiens',
+  'Reservations': 'Réservations', 'Menu': 'Menu', 'Dietary': 'Régimes alimentaires', 'Patio': 'Terrasse', 'Takeout': 'À emporter',
 };
 function visitLabelFr(label) { return VISIT_LABELS_FR[label] || frLookup(label) || label; }
 function visitTextFr(text) {
