@@ -6802,7 +6802,7 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   const html = app.renderVenuePage(kelownaGolf, [], [], []);
   assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
   assert.match(html, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>/);
-  assert.match(html, /class="map-link"[^>]*data-track="directions"/);
+  assert.doesNotMatch(html, /class="map-link"/, 'Get Directions is the one map link; the address does not repeat it (2026-11-01)');
   assert.match(html, new RegExp(`"venue_id":${kelownaGolf.id},"venue_name":"Test Golf Course","venue_region":"kelowna","venue_category":"golf","surface":"venue_page"`));
   assert.match(html, /track\('venue_view', ctx\(\)\)/);
   assert.match(html, /'outbound_click'/);
@@ -14714,7 +14714,7 @@ test('Map (2026-10-14): /map shows a pin per place with a map position, category
   }
   assert.match(await (await fetch(`${base}/sitemap.xml`)).text(), /<loc>https:\/\/okanaganroam\.com\/map<\/loc>/);
   const venue = await (await fetch(`${base}/kelowna/restaurants/test-trattoria`)).text();
-  assert.match(venue, /<a class="map-link" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=[^"]+" rel="nofollow noopener" target="_blank"/);
+  assert.match(venue, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=[^"]+" rel="nofollow noopener" target="_blank"/);
 }));
 
 test('Menus (2026-10-14): Things to Do is the seven sections, Discover adds Guides and Secret Spots, the search icon opens Browse, and phone menus fold', () => {
@@ -19779,7 +19779,8 @@ test('Venue page layout: details in a sidebar without repeating type, town or ra
   assert.ok(html.indexOf('<div class="venue-layout">') < html.indexOf('<div class="venue-main">'));
   assert.match(aside, /<h2>Good to Know<\/h2>/);
   assert.doesNotMatch(aside, /<span class="label">(?:Type|Region|Rating)<\/span>/);
-  assert.match(aside, /<span class="label">Address<\/span><span>[^<]+<br><a class="map-link" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.888,-119\.496"[^>]*>View on map ↗<\/a>/);
+  assert.match(aside, /<span class="label">Address<\/span><span>[^<]+<\/span>/);
+  assert.doesNotMatch(aside, /class="map-link"/, 'the address no longer repeats the map link (2026-11-01)');
   assert.doesNotMatch(html, /class="venue-section venue-location"/, 'no separate Location box when there is an address');
   assert.match(html, /<style id="venue-page-layout">/);
 });
@@ -31166,7 +31167,7 @@ test('Round 9 accessibility: on a venue page the facts (map, phone, website) com
       const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
       const aside = html.indexOf('<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = html.indexOf('<div class="venue-extra">');
       assert.ok(aside > 0 && extra > asideEnd, 'the extras follow the sidebar');
-      assert.ok(html.indexOf('class="map-link"') > aside && html.indexOf('class="map-link"') < asideEnd, 'View on map is in the sidebar');
+      assert.ok(html.indexOf('Get Directions') !== -1 || html.indexOf('Itin') !== -1, 'the map link is the Get Directions button');
       assert.ok(html.indexOf('tel:') < extra, 'the phone comes first');
       if (html.includes('id="vcOpen"')) assert.ok(html.indexOf('id="vcOpen"') > extra, 'Share a photo or tip comes after the facts');
       assert.ok(html.indexOf('<div class="venue-main">') < aside, 'the story still comes first');
@@ -32471,4 +32472,19 @@ test('Food & Drink (2026-11-01): the Sort menu offers Nearest to me, which is pi
   assert.match(pages.hub, /data-ll="-?\d+\.\d{4},-?\d+\.\d{4}"/, 'cards carry their pin');
   assert.doesNotMatch(pages.forced, /<option value="nearest" selected>/, 'the address never selects Nearest');
   assert.ok(app.FD_SORT_KEYS ? !app.FD_SORT_KEYS.has('nearest') : true);
+});
+
+test('Venue page cleanup (2026-11-01): local phone format, no second map link, and a Known for row that only repeats the description is left out', () => {
+  assert.equal(app.displayPhone('+1 250-491-2695'), '250-491-2695');
+  assert.equal(app.displayPhone('(250) 491 2695'), '250-491-2695');
+  assert.equal(app.displayPhone('1-800-663-2772'), '800-663-2772');
+  assert.equal(app.displayPhone('ext 5'), 'ext 5');
+  const desc = 'A big, all-ages bowling centre with 24 ten-pin and 6 five-pin lanes, plus cosmic bowling and lane-side food and drinks from the attached Freddy’s Brewpub.';
+  const info = { rows: [{ label: 'Known for', text: '30 lanes (24 ten-pin, 6 five-pin) with cosmic bowling, plus Freddy’s Brewpub and its own in-house brewery.' }, { label: 'Booking', text: 'Book lanes online.' }] };
+  assert.deepEqual(app.visitDropRepeatedKnownFor(info, desc).rows.map((r) => r.label), ['Booking']);
+  // New facts stay; a box with only that row keeps it; no description changes nothing.
+  assert.deepEqual(app.visitDropRepeatedKnownFor(info, 'Quiet family-run cafe on the lake road.').rows.map((r) => r.label), ['Known for', 'Booking']);
+  const only = { rows: [info.rows[0]] };
+  assert.equal(app.visitDropRepeatedKnownFor(only, desc), only);
+  assert.equal(app.visitDropRepeatedKnownFor(info, ''), info);
 });

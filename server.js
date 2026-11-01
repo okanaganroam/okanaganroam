@@ -9116,6 +9116,30 @@ function visitBookLabelFr(info, type) {
   const en = (info && info.booking_label) || VISIT_BOOK_LABELS[type] || '';
   return (en && frLookup(en)) || 'Réserver';
 }
+// Cleanup (2026-11-01): a Canadian number reads 250-491-2695, not +1 250-491-2695 (the tel: link keeps the stored number).
+function displayPhone(p) {
+  const m = /^\s*(?:\+?1[\s.-]?)?\(?(\d{3})\)?[\s.-]*(\d{3})[\s.-]*(\d{4})\s*$/.exec(String(p || ''));
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : String(p || '');
+}
+// Cleanup (2026-11-01): a "Known for" row that only says again what the description above it already says is left out
+// (the box keeps its other rows; a box with only that row keeps it).
+const VISIT_DUP_STOP = new Set(['with', 'that', 'this', 'from', 'have', 'also', 'plus', 'their', 'there', 'which', 'such', 'more', 'most', 'each', 'offers', 'offer', 'including', 'includes', 'open', 'daily', 'local', 'and', 'the', 'for', 'its', 'are', 'you']);
+function visitWordSet(t) {
+  return new Set((String(t || '').toLowerCase().match(/[a-z\u00e0-\u00ff0-9]{4,}/g) || []).filter((w) => !VISIT_DUP_STOP.has(w)).map((w) => w.replace(/(?:ing|es|s)$/, '')));
+}
+function visitDropRepeatedKnownFor(info, description) {
+  if (!info || !Array.isArray(info.rows) || info.rows.length < 2 || !description) return info;
+  const desc = visitWordSet(description);
+  const rows = info.rows.filter((r) => {
+    if (r.label !== 'Known for') return true;
+    const w = visitWordSet(r.text);
+    if (w.size < 5) return true;
+    let hit = 0;
+    for (const x of w) if (desc.has(x)) hit++;
+    return hit / w.size < 0.7;
+  });
+  return rows.length === info.rows.length ? info : { ...info, rows };
+}
 function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
   if (fr) {
@@ -14482,6 +14506,8 @@ const SEO_PAGE_CSS = `
 
   .venue-cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
   .venue-cta-row .cta { margin: 0; }
+  /* Cleanup (2026-11-01): the number is in Good to Know; the Call button is for phones, where it dials. */
+  @media (hover: hover) and (min-width: 900px) { .venue-cta-row .cta[href^="tel:"] { display: none; } }
 
   .venue-section { margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(74,52,40,0.12); }
   .venue-section h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.2rem; margin: 0 0 12px; }
@@ -32566,7 +32592,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     .map(([k, v]) => [k, (k === 'menu_url' || k === 'booking_url') && sameAsWebsite(v) ? null : v]));
   // Plan your visit (2026-10-29): English pages only (the facts are in English, from the venue's own site).
   // French pages (2026-10-31) show the translated rows from data/french/visit-boxes-*.json; none translated -> no box.
-  const visitInfoRaw = venue.redirect_to ? null : venueVisitInfo(venue.id);
+  const visitInfoRaw = venue.redirect_to ? null : visitDropRepeatedKnownFor(venueVisitInfo(venue.id), venue.description);
   const visitHtml = visitInfoHtml(visitInfoRaw, fr);
   const visitInfo = visitHtml ? visitInfoRaw : null;
   // Box polish (2026-10-31): Good to Know drops its Menu row when the Plan your visit box already links that page
@@ -32593,8 +32619,8 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.cuisine ? ['Cuisine', escapeHtml(fr ? frCuisine(venue.cuisine) : venue.cuisine)] : null,
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
     // link and the schema keep the stored English.
-    venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}${mapsUrl ? `<br><a class="map-link" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('View on map', 'Voir sur la carte')} \u2197</a>` : ''}`] : null,
-    venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(venue.phone)}</a>`] : null,
+    venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}`] : null, // the map link is the Get Directions button (cleanup, 2026-11-01)
+    venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(displayPhone(venue.phone))}</a>`] : null,
     // Website and Book are the buttons above the card (cleanup, 2026-11-01); they were repeated here.
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
     // menu / booking links from POST /admin/set-venue-links show here too (same table), with no verified pill.
@@ -56842,6 +56868,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  visitDropRepeatedKnownFor,
+  displayPhone,
   browseFeatureChipsHtml,
   // Card badges (2026-10-29)
   cardBadgeChipsHtml, cardBadgeExpected,
