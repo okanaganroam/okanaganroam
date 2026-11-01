@@ -43,6 +43,8 @@ const SUMMER_NOW = new Date('2026-07-15T19:00:00Z');
 const noImgV = (html) => String(html).replace(/(\/images\/[\w\/.-]+\.(?:jpe?g|png|webp))\?v=[0-9a-f]{10}/gi, '$1');
 
 const app = require('../server.js');
+// The verified-prices file holds real venue ids; fixtures reuse small ids, so tests start with no prices on file.
+for (const k of Object.keys(app.CARD_PRICES)) delete app.CARD_PRICES[k];
 const db = require('../db.js');
 
 // ---- seed a handful of fixture venues -------------------------------
@@ -17876,7 +17878,9 @@ test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summa
     assert.match(html, /<p class="venue-meta">Kelowna &middot; Wine tour<\/p>/);
     assert.match(html, /<div class="golf-desc"[^>]*><p>Small-group wine tours of three Kelowna wineries with pickup\.<\/p>/);
     assert.doesNotMatch(html, /A long description/);
-    assert.doesNotMatch(html, /From \$/, 'no verified price on file, so no price chip (never a guess from the box text)');
+    delete app.CARD_PRICES[String(v.id)]; // a fixture id can coincide with a real venue id in the data file
+    const htmlNoPrice = app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true });
+    assert.doesNotMatch(htmlNoPrice, /From \$/, 'no verified price on file, so no price chip (never a guess from the box text)');
     app.CARD_PRICES[String(v.id)] = { from: 169 };
     assert.match(app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true }), /<span class="chip chip-feat">[^]*?From \$169<\/span>/);
     delete app.CARD_PRICES[String(v.id)];
