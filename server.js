@@ -16281,7 +16281,7 @@ const LAZY_CARD_PHOTO_HEAD = `<style id="lazy-card-photos">html.lzp li.venue-car
 // Loaded with the lazy-photo head (only pages with photo cards); "html body" plus !important outranks the
 // per-category card rules, which come later on the page.
 const CARD_V2_CARD = 'html body.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card)';
-const TOUR_CARD = CARD_V2_CARD + '[data-tour-card]';
+const PRO_CARD = CARD_V2_CARD;
 const CARD_V2_CSS = `<style id="card-v2">
   ${CARD_V2_CARD} { position: relative; padding: calc(56.25% + 14px) 18px 14px !important; }
   ${CARD_V2_CARD}::before { height: 0 !important; padding-bottom: 56.25%; border-radius: 13px 13px 0 0 !important; }
@@ -16360,27 +16360,28 @@ const CARD_V2_CSS = `<style id="card-v2">
   /* Tours & Experiences cards (2026-10-31): one layout for every card -- 4:3 photo with the season / Local Favourite
      pill on it, town and kind in gold, a two-line name, a two-line summary, one line of quick facts (price, time,
      badges) and a footer with "View details" and Add to trip, always in the same place. */
-  ${TOUR_CARD} { padding: calc(75% + 20px) 20px 16px !important; border-radius: 16px !important; border: 1px solid rgba(74, 52, 40, 0.09) !important; box-shadow: 0 1px 2px rgba(74, 52, 40, 0.05), 0 12px 28px -18px rgba(74, 52, 40, 0.35) !important; transition: transform .18s ease, box-shadow .18s ease; }
-  ${TOUR_CARD}:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(74, 52, 40, 0.06), 0 20px 36px -18px rgba(74, 52, 40, 0.45) !important; }
-  ${TOUR_CARD}::before { padding-bottom: 75% !important; border-radius: 15px 15px 0 0 !important; }
-  ${TOUR_CARD} > .venue-meta { margin: 0 0 6px; }
-  ${TOUR_CARD} > h2 { margin: 0 0 8px; font-size: 1.28rem; line-height: 1.2; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  ${TOUR_CARD} h2 a.venue-card-link { color: var(--ref-navy, #1B2B3A); }
-  ${TOUR_CARD} > .card-slot-desc { min-height: 3em; margin: 0 0 14px; }
-  ${TOUR_CARD} .golf-desc p { color: var(--ink-muted, #6B5D54); font-size: 0.93rem !important; line-height: 1.5 !important; }
-  ${TOUR_CARD} > .chips:not(:empty), ${TOUR_CARD} > .chips:empty { min-height: 22px; margin: 0 0 16px !important; padding: 0 !important; }
-  ${TOUR_CARD} > .chips > .chip { font-size: 0.82rem; font-weight: 700; color: var(--teal-deep, #1E4F4C); }
-  ${TOUR_CARD} > .card-actions { margin: auto 0 0 !important; padding: 14px 0 0 !important; border-top: 1px solid rgba(74, 52, 40, 0.1) !important; align-items: center; justify-content: space-between !important; }
-  ${TOUR_CARD} > .card-actions::before { content: "View details \\2192"; font-weight: 800; font-size: 0.9rem; color: var(--ref-navy, #1B2B3A); }
-  ${TOUR_CARD}:lang(fr) > .card-actions::before, html[lang="fr"] ${TOUR_CARD} > .card-actions::before { content: "Voir les d\\00e9tails \\2192"; }
-  ${TOUR_CARD} .card-action.trip-btn { font-weight: 800; border-radius: 999px; border: 1.5px solid rgba(42, 107, 103, 0.45); color: var(--teal-deep, #1E4F4C); background: #fff; padding: 8px 14px; }
-  ${TOUR_CARD} .card-action.trip-btn:hover { background: var(--teal, #2A6B67); color: #fff; }
+  ${PRO_CARD} { padding: calc(75% + 20px) 20px 16px !important; border-radius: 16px !important; border: 1px solid rgba(74, 52, 40, 0.09) !important; box-shadow: 0 1px 2px rgba(74, 52, 40, 0.05), 0 12px 28px -18px rgba(74, 52, 40, 0.35) !important; transition: transform .18s ease, box-shadow .18s ease; }
+  ${PRO_CARD}:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(74, 52, 40, 0.06), 0 20px 36px -18px rgba(74, 52, 40, 0.45) !important; }
+  ${PRO_CARD}::before { padding-bottom: 75% !important; border-radius: 15px 15px 0 0 !important; }
+  ${PRO_CARD} > .venue-meta { margin: 0 0 6px; }
+  ${PRO_CARD} > .fd-open-status { margin: -2px 0 8px; font-size: 0.8rem; font-weight: 700; }
+  ${PRO_CARD} > h2 { margin: 0 0 8px; font-size: 1.28rem; line-height: 1.2; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  ${PRO_CARD} h2 a.venue-card-link { color: var(--ref-navy, #1B2B3A); }
+  ${PRO_CARD} > .card-slot-desc { min-height: 3em; margin: 0 0 14px; }
+  ${PRO_CARD} .golf-desc p { color: var(--ink-muted, #6B5D54); font-size: 0.93rem !important; line-height: 1.5 !important; }
+  ${PRO_CARD} > .chips:not(:empty), ${PRO_CARD} > .chips:empty { min-height: 22px; margin: 0 0 16px !important; padding: 0 !important; }
+  ${PRO_CARD} > .chips > .chip { font-size: 0.82rem; font-weight: 700; color: var(--teal-deep, #1E4F4C); }
+  ${PRO_CARD} > .card-actions { margin: auto 0 0 !important; padding: 14px 0 0 !important; border-top: 1px solid rgba(74, 52, 40, 0.1) !important; align-items: center; justify-content: space-between !important; }
+  ${PRO_CARD} > .card-actions::before { content: "View details \\2192"; font-weight: 800; font-size: 0.9rem; color: var(--ref-navy, #1B2B3A); }
+  ${PRO_CARD}:lang(fr) > .card-actions::before, html[lang="fr"] ${PRO_CARD} > .card-actions::before { content: "Voir les d\\00e9tails \\2192"; }
+  ${PRO_CARD} .card-action.trip-btn { font-weight: 800; border-radius: 999px; border: 1.5px solid rgba(42, 107, 103, 0.45); color: var(--teal-deep, #1E4F4C); background: #fff; padding: 8px 14px; }
+  ${PRO_CARD} .card-action.trip-btn:hover { background: var(--teal, #2A6B67); color: #fff; }
   /* The season notice rides on the photo as a pill; any other notice stays under the text. */
-  ${TOUR_CARD} > .card-slot-notice:has(> .season-tag) { position: absolute; z-index: 2; top: 12px; left: 12px; max-width: calc(100% - 70px); margin: 0 !important; padding: 0 !important; order: 0; }
-  ${TOUR_CARD} > .card-slot-notice .season-tag { margin: 0; padding: 6px 11px; border-radius: 999px; background: rgba(16, 27, 36, 0.84); color: #fff; font-size: 0.74rem; font-weight: 800; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(4px); }
-  ${TOUR_CARD} > .card-slot-notice .season-tag span { display: none; }
-  ${TOUR_CARD}:has(> .card-slot-notice .season-tag-closed)::before { filter: saturate(0.55) brightness(0.92); }
-  @media (max-width: 640px) { ${TOUR_CARD} { padding: calc(75% + 20px) 18px 16px !important; } ${TOUR_CARD}::before { padding-bottom: 75% !important; } }
+  ${PRO_CARD} > .card-slot-notice:has(> .season-tag) { position: absolute; z-index: 2; top: 12px; left: 12px; max-width: calc(100% - 70px); margin: 0 !important; padding: 0 !important; order: 0; }
+  ${PRO_CARD} > .card-slot-notice .season-tag { margin: 0; padding: 6px 11px; border-radius: 999px; background: rgba(16, 27, 36, 0.84); color: #fff; font-size: 0.74rem; font-weight: 800; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(4px); }
+  ${PRO_CARD} > .card-slot-notice .season-tag span { display: none; }
+  ${PRO_CARD}:has(> .card-slot-notice .season-tag-closed)::before { filter: saturate(0.55) brightness(0.92); }
+  @media (max-width: 640px) { ${PRO_CARD} { padding: calc(75% + 20px) 18px 16px !important; } ${PRO_CARD}::before { padding-bottom: 75% !important; } }
 </style>
 <script id="card-v2-rows">(function () {
   var PARTS = ['.venue-meta', 'h2', '.fd-open-status', '.card-slot-fee', '.card-slot-desc', '.chips'];
@@ -18248,14 +18249,14 @@ function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
 // Tours & Experiences cards (2026-10-31): one layout for every card on the Tours page -- the small gold line is the
 // town and kind of experience, the summary is the place's own "Known for" line from its Plan your visit box (the card's
 // description otherwise), and the quick facts are the first price and the trip length from the same box, then the
-// amenity badges. Everything sits in the card's existing slots (see TOUR_CARD_CSS).
+// amenity badges. Everything sits in the card's existing slots (see PRO_CARD).
 const TOUR_KIND_LABELS = { wine: 'Wine tour', lake: 'Lake & boats', bike: 'Bike & e-bike', farm: 'Farm & food', adventure: 'Adventure', winter: 'Winter', culture: 'History & culture' };
 function tourCardKind(venue) { try { return TOUR_KIND_LABELS[tourActivityOf(venue)] || ''; } catch (e) { return ''; } }
 function tourCardFacts(info) {
   const out = { price: null, time: null };
   if (!info || !Array.isArray(info.rows)) return out;
   const row = (label) => { const r = info.rows.find((x) => x.label === label); return r ? String(r.text) : ''; };
-  const p = /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Prices'));
+  const p = /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Prices')) || /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Tastings')) || /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Flights'));
   if (p) out.price = `From $${p[1].replace(/,+$/, '').replace(/\.00$/, '')}`;
   const t = /(\d+(?:\.\d+)?)\s*(?:to|-|\u2013)\s*(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed')) || /(\d+(?:\.\d+)?)()\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed'));
   if (t) { const unit = /^h/i.test(t[3]) ? 'hr' : 'min'; out.time = t[2] ? `${t[1]}\u2013${t[2]} ${unit}` : `${t[1]} ${unit}`; }
@@ -18372,15 +18373,17 @@ function venueCardHtml(venue, opts = {}) {
   const cardNote = dogNoteHtml && cardNoteRaw === String(dogFriendlyNote || '').trim() ? '' : cardNoteRaw;
   const cardNoteHtml = cardNote ? `\n        <p class="card-note"><span class="card-note-label">${escapeHtml(cardNoteLabel)}</span> ${escapeHtml(cardNote)}</p>` : '';
   // Tours cards (2026-10-31): see tourCardFacts. A tour card shows no separate Experience note: the note is its summary.
-  const isTourCard = themed && !venue.redirect_to && (venue.type === 'tour' || tourStyle);
+  // Since 2026-10-31 every themed listing card has this layout, not only tours (see PRO_CARD in CARD_V2_CSS).
+  const isTourCard = themed && !venue.redirect_to;
+  const noteIsSummary = isTourCard && (venue.type === 'tour' || tourStyle);
   let tourInfo = null;
   if (isTourCard) { try { tourInfo = venueVisitInfo(venue.id); } catch (e) { tourInfo = null; } }
   const tourKnown = tourInfo && Array.isArray(tourInfo.rows) ? tourInfo.rows.find((r) => r.label === 'Known for') : null;
   const tourSummaryHtml = isTourCard
     ? (tourKnown ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(tourKnown.text)}</p></div>`
-      : cardNoteRaw ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(cardNoteRaw)}</p></div>` : desc)
+      : noteIsSummary && cardNoteRaw ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(cardNoteRaw)}</p></div>` : desc)
     : desc;
-  const tourKind = isTourCard ? tourCardKind(venue) : '';
+  const tourKind = isTourCard && (venue.type === 'tour' || tourStyle) ? tourCardKind(venue) : '';
   // Cards no longer carry Instagram / Facebook links (2026-10-29): they live on the venue page only.
   const socialHtml = '';
   // Tours cards (2026-10-31): the season notice is a pill on the photo, so a closed place reads "Closed \u00b7 reopens May 21".
@@ -18409,13 +18412,13 @@ function venueCardHtml(venue, opts = {}) {
   // takes space when a card in that row fills it.
   if (themed) {
     return `
-      <li class="venue-card"${liAttrs}${isTourCard ? ' data-tour-card' : ''}>
+      <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
         <p class="venue-meta">${isTourCard && tourKind ? `${meta ? meta + ' &middot; ' : ''}${escapeHtml(tourKind)}`.replace(/ &middot; Tour &amp; Experience/, '') : meta}</p>
         <div class="card-slot card-slot-fee">${golfFeeHtml ? '\n        ' + golfFeeHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-desc">${tourSummaryHtml ? '\n        ' + tourSummaryHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-notice">${advisoryHtml ? advisoryHtml + '\n        ' : ''}</div>
-        <div class="card-slot card-slot-notes">${dogNoteHtml || (!isTourCard && cardNoteHtml) || socialHtml ? dogNoteHtml + (isTourCard ? '' : cardNoteHtml) + socialHtml + '\n        ' : ''}</div>
+        <div class="card-slot card-slot-notes">${dogNoteHtml || (!noteIsSummary && cardNoteHtml) || socialHtml ? dogNoteHtml + (noteIsSummary ? '' : cardNoteHtml) + socialHtml + '\n        ' : ''}</div>
         ${chipsHtml}${cardActions || '\n        <div class="card-actions card-actions-empty"></div>'}
       </li>`;
   }

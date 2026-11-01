@@ -16953,7 +16953,7 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         const card = cardOf(html, closed[t]);
         assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Closed \u00b7 reopens|Fermé pour la saison|Fermé \u00b7 réouverture)/.test(card), `${path}: the tag`);
         assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
-        if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\./);
+        if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\.|Fermé · réouverture le 15 mai/);
       }
       // /browse: last in its Recommended order (the first cards, then the rest from cards.json).
       const bh = (await (await fetch(base + '/browse')).text()) + (await (await fetch(base + '/browse/cards.json')).json()).html;
@@ -17872,15 +17872,13 @@ test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summa
     ], booking_url: null, source_url: 'https://tour.example/', checked_at: '2026-10-31' }, { reason: 'fixture', batch_id: 'test-tour-card' });
     assert.equal(r.ok, true, JSON.stringify(r));
     const html = app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true });
-    assert.match(html, /<li class="venue-card"[^>]*data-tour-card>/);
+    assert.match(html, /<li class="venue-card"[^>]*>/);
     assert.match(html, /<p class="venue-meta">Kelowna &middot; Wine tour<\/p>/);
     assert.match(html, /<div class="golf-desc"[^>]*><p>Small-group wine tours of three Kelowna wineries with pickup\.<\/p>/);
     assert.doesNotMatch(html, /A long description/);
     assert.match(html, /<span class="chip chip-feat">[^]*?From \$169<\/span>/);
     assert.match(html, /<span class="chip chip-feat">[^]*?5\u20136 hr<\/span>/);
     assert.doesNotMatch(html, /card-note/);
-    // Not a tour and not marked as one: unchanged.
-    assert.doesNotMatch(app.venueCardHtml(app.getVenue(v.id), { themed: false, showRegion: true }), /data-tour-card/);
     // Facts come only from the box: no box, no price chip.
     assert.deepEqual(app.tourCardFacts({ rows: [{ label: 'Prices', text: 'Adult $14.29 at the gate.' }] }), { price: 'From $14.29', time: null });
     assert.deepEqual(app.tourCardFacts(null), { price: null, time: null });
@@ -17909,7 +17907,7 @@ test('Tours & Experiences: other-type operators tagged tours_also get a "More ex
       assert.match(hub.text, /href="\/kelowna\/wineries\/tours-also-sleigh-farm"/, 'a winery links to its winery page');
       assert.doesNotMatch(hub.text, /noindex/);
       // The membership note is that card's summary (Tours cards, 2026-10-31): no separate "Experience:" line.
-      assert.match(hub.text, /<li class="venue-card"[^>]*data-tour-card>[^]*?<div class="card-slot card-slot-desc">\s*<div class="golf-desc"[^>]*><p>Guided ATV tours, May to October<\/p>/);
+      assert.match(hub.text, /<li class="venue-card"[^>]*>[^]*?<div class="card-slot card-slot-desc">\s*<div class="golf-desc"[^>]*><p>Guided ATV tours, May to October<\/p>/);
       assert.equal((hub.text.match(/class="card-note"/g) || []).length, 0);
       assert.doesNotMatch(hub.text, /Rainy day:/);
       // The card script wires every type on /tours (Read more clamp, Favorite / Trip), and descriptions clamp to 3 lines.
@@ -27921,7 +27919,7 @@ test('Exact names first on live data: "19 bistro" puts 19 Bistro @ Fitz first ev
       const shown = names(page);
       assert.equal(shown[0], '19 Bistro @ Fitz', `${q}: the named place first`);
       assert.ok(!shown.includes('Chaos Bistro') && shown.length < 10, `${q}: not drowned in every bistro (${shown.length})`);
-      assert.match(page, /Closed for the season/, `${q}: the season notice still shows`);
+      assert.match(page, /Closed for the season|Closed \u00b7 reopens/, `${q}: the season notice still shows`);
       assert.match(page, /search-count">1 place</);
     }
     const fr = await (await fetch(`${base}/fr/search?q=${encodeURIComponent('19 bistro')}`)).text();
