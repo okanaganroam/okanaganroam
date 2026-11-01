@@ -32493,3 +32493,25 @@ test('Venue page (2026-11-01): the Call button is hidden on laptops in the theme
   const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course') || app.getVenuesByRegionCategory('west-kelowna', 'golf')[0], [], [], []);
   assert.match(html, /@media \(hover: hover\) and \(min-width: 900px\) \{ body\.golf-page \.venue-cta-row \.cta\[href\^="tel:"\] \{ display: none; \} \}/);
 });
+
+test('Plan your hike (2026-11-01): a trail box leads with The hike, the page shows the one-line summary under the title, and the heading says hike', () => {
+  seasonInsert.run({ name: 'Hike Fixture Trail', type: 'outdoor', hours: SEASON_WEEK, slug: 'hike-fixture-trail' });
+  const v = app.findVenueBySlug('kelowna', 'outdoor', 'hike-fixture-trail');
+  try {
+    const r = app.guardedVisitInfoUpdate(v.id, null, { rows: [
+      { label: 'Dogs', text: 'Dogs are welcome on a leash.' },
+      { label: 'The hike', text: '5.2 km loop, 280 m climb, moderate, about 2 hours' },
+      { label: 'Before you go', text: 'Upper loop closed for restoration; stay on marked trails.' },
+      { label: 'Trail map', text: 'Official trail map', url: 'https://trails.example/map.pdf' },
+    ], booking_url: null, source_url: 'https://trails.example/park', checked_at: '2026-11-01' }, { reason: 'fixture', batch_id: 'test-hike' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'outdoor', 'hike-fixture-trail'), [], [], []);
+    assert.match(html, /<p class="venue-glance">5\.2 km loop, 280 m climb, moderate, about 2 hours<\/p>/);
+    assert.match(html, /<h2 id="venueVisitHead">Plan your hike<\/h2>/);
+    const box = html.slice(html.indexOf('id="venueVisit"'));
+    assert.ok(box.indexOf('visit-label">The hike') > -1 && box.indexOf('visit-label">The hike') < box.indexOf('visit-label">Dogs'), 'The hike is the first row');
+    assert.match(box, /visit-label">Trail map<\/span><span>Official trail map <a href="https:\/\/trails\.example\/map\.pdf"/);
+  } finally {
+    db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(v.id);
+  }
+});
