@@ -18727,7 +18727,13 @@ const SKI_RESORT_SEASON = {
     statusOpen: 'Open for the season', noteOpen: 'Last day Sunday, April 4, 2027.',
     opens: '2026-11-26', closes: '2027-04-04', endBy: '2027-04-04',
     stats: [{ l: 'Runs', v: '119' }, { l: 'Lifts', v: '17' }, { l: 'Vertical', v: '777 m', s: '2,550 ft' }, { l: 'Snowfall', v: '750 cm', s: '25 ft a year' }, { l: 'From Kelowna', v: '56 km', s: 'Under an hour' }],
+    plan: {"stay": {"facts": ["Book direct for rooms, lift tickets, lessons and airport transfers in one place.", "Stays booked direct include free parking, ski storage and wifi in every unit.", "Pet-friendly rooms at the Inn at Big White and Sundance Resort, among others."], "links": [["Find a place to stay", "https://www.bigwhite.com/plan-your-trip/accommodation"], ["Hot deals", "https://www.bigwhite.com/plan-your-trip/hot-deals-packages"], ["Pet-friendly stays", "https://www.bigwhite.com/stay/accommodation/pet-friendly-accommodation"], ["Staying in Kelowna", "https://www.bigwhite.com/stay/accommodation/kelowna-hotels"]]}, "getting": {"facts": ["56 km from Kelowna: under an hour by Highway 33 and Big White Road.", "Day parking is free in the Gem Lake, Ridge, Black Forest and Happy Valley lots.", "Winter tires or chains are required on the road up, and there is no fuel on the mountain.", "EV fast charging is at the Happy Valley lot (CCS1 and CHAdeMO).", "A free on-mountain shuttle runs daily, 7 am to 9 pm, every 30 minutes from November 26."], "links": [["Road conditions", "https://www.bigwhite.com/stay/get-big-white/road-conditions"], ["Parking", "https://www.bigwhite.com/explore/transport/driving-big-white-day-parking-free"], ["Shuttles and transfers", "https://www.bigwhite.com/plan-your-trip/get-big-white/airport-shuttles-transportation"], ["Maps and directions", "https://www.bigwhite.com/stay/get-big-white/maps-directions"]]}, "kids": {"facts": ["Tot Town Daycare takes ages 18 months to 5 years, from 8:30 am to 4 pm.", "Kids group lessons for ages 4 to 12, every day at 9:45 am or 1:15 pm.", "After Dark Kids’ Night Out, ages 6 to 12, Wednesdays and Fridays from January 8.", "Tots 5 and under have a free lift ticket.", "The Powderhounds adaptive program runs 7 days a week all season."], "links": [["Kids’ lessons", "https://www.bigwhite.com/learn/kids-lessons-programs"], ["Tot Town Daycare", "https://www.bigwhite.com/explore-big-white/mountain-services/tot-town-daycare"], ["After Dark", "https://www.bigwhite.com/kids-lessons-programs/after-dark"], ["Adaptive program", "https://www.bigwhite.com/adaptive-program"]]}},
     links: {
+      hours: "https://www.bigwhite.com/explore/mountain-info/winter-hours-operation",
+      grooming: "https://www.bigwhite.com/mountain-conditions/grooming-report",
+      weather: "https://www.bigwhite.com/mountain-conditions/weather-forecast",
+      deals: "https://www.bigwhite.com/plan-your-trip/hot-deals-packages",
+      safety: "https://www.bigwhite.com/explore-big-white/mountain-info/mountain-safety",
       snow: 'https://www.bigwhite.com/daily-snow-report',
       webcams: 'https://www.bigwhite.com/mountain-conditions/webcams',
       tickets: 'https://www.bigwhite.com/tickets-passes/lift-tickets',
@@ -18747,7 +18753,11 @@ const SKI_RESORT_SEASON = {
     statusOpen: 'Open for the season', noteOpen: 'Tentative last day Sunday, April 4, 2027. Night skiing until 8:30 pm.',
     opens: '2026-11-27', closes: '2027-04-04', endBy: '2027-04-30',
     stats: [{ l: 'Runs', v: '133' }, { l: 'Vertical', v: '760 m' }, { l: 'Terrain', v: '3,304 acres' }, { l: 'Snowfall', v: '700 cm', s: '23 ft a year' }, { l: 'From Vernon', v: '22 km', s: 'About 20 minutes' }],
+    plan: {"stay": {"facts": ["Ski-in, ski-out lodges, condos, studios and vacation homes in the village.", "Winter deals up to 25% off; early-season stays of two nights or more are 20% off.", "Pet-friendly rooms at Firelight, Snowbird, Chilcoot and Vance Creek.", "Group rates for bookings of 10 or more rooms."], "links": [["Places to stay", "https://www.skisilverstar.com/lodging-amenities/places-to-stay/"], ["Offers and packages", "https://www.skisilverstar.com/lodging-amenities/offers-packages/"], ["Groups", "https://www.skisilverstar.com/groups/groups-at-silverstar/"]]}, "getting": {"facts": ["22 km from Vernon, about 20 minutes; Kelowna airport is 55 minutes away.", "A free in-resort shuttle loops the village through the winter.", "An airport shuttle from Kelowna runs daily to your accommodation.", "The North Okanagan Ski Bus runs weekends and some holidays from Vernon, Armstrong, Enderby and Salmon Arm."], "links": [["Getting here", "https://www.skisilverstar.com/the-mountain/visitor-guide/getting-here/"], ["Getting around", "https://www.skisilverstar.com/the-mountain/visitor-guide/getting-around/"], ["Ski bus", "https://www.skisilverstar.com/tickets-passes/winter-passes/ski-bus/"]]}, "kids": {"facts": ["Winter kids’ programs for ages 3 to 16, on Saturdays or Sundays.", "Tube Town has multi-lane tubing; full-day tubing tickets include free skating.", "Brewer’s Pond is a 2.5-acre outdoor skating rink with a fire pit and music.", "Seasonal camps, school programs and an adaptive program are also offered."], "links": [["Kids’ programs", "https://www.skisilverstar.com/lessons-rentals/childrens-programs/"], ["Winter tickets", "https://www.skisilverstar.com/tickets-passes/winter-tickets/"]]}},
     links: {
+      hours: "https://www.skisilverstar.com/the-mountain/hours-of-operation/",
+      deals: "https://www.skisilverstar.com/lodging-amenities/offers-packages/",
+      safety: "https://www.skisilverstar.com/the-mountain/mountain-safety/",
       snow: 'https://www.skisilverstar.com/the-mountain/weather-conditions/snow-report-forecast/',
       webcams: 'https://www.skisilverstar.com/the-mountain/webcams/',
       tickets: 'https://www.skisilverstar.com/tickets-passes/winter-tickets/',
@@ -18782,7 +18792,11 @@ const SKI_RESORT_SEASON = {
     statusOpen: null, noteOpen: null,
     opens: null, closes: null, endBy: '2027-04-30',
     stats: [{ l: 'Runs', v: '35' }, { l: 'Vertical', v: '1,315 ft' }, { l: 'Snowfall', v: '25–35 ft', s: 'a year' }, { l: 'From Oliver', v: '45 minutes', s: 'About an hour from Osoyoos' }],
+    plan: {"stay": {"facts": ["No lodging on the mountain: privately owned cabins and condos stand near the lifts.", "Ski and Stay packages with partners in Oliver and Osoyoos."], "links": [["Where to stay", "https://baldyresort.com/stay-at-baldy/"], ["Ski and Stay packages", "https://baldyresort.com/stay-at-baldy/ski-stay/"]]}, "getting": {"facts": ["The access road is partly paved, partly dirt; winter tires are highly recommended.", "Drive times: Oliver 45 minutes, Osoyoos about 1 hour, Penticton about 1 hour 15.", "No EV charging and no fuel for sale at the resort.", "Overnight parking is in the overflow lot."], "links": [["Directions", "https://baldyresort.com/mountain/#directions"]]}, "kids": {"facts": ["Kids’ lessons and camps for ages 3 to 18 at the snow school.", "Tubing: one lane at the top of the Magic Carpet; a tubing ticket is required.", "Children 6 and under need an adult 19 or older with them."], "links": [["Snow school", "https://baldyresort.com/rentals-and-snow-school/"], ["Lift tickets", "https://baldyresort.com/lift-tickets/"]]}},
     links: {
+      hours: "https://baldyresort.com/mountain/#hours",
+      weather: "https://baldyresort.com/baldy-weather-cams/",
+      deals: "https://baldyresort.com/stay-at-baldy/ski-stay/",
       snow: 'https://baldyresort.com/baldy-weather-cams/',
       webcams: 'https://baldyresort.com/baldy-weather-cams/#webcams',
       tickets: 'https://baldyresort.com/lift-tickets/',
@@ -18809,10 +18823,14 @@ const SKI_HUB_TOOLS = [
 ];
 const SKI_HUB_EXTRAS = [
   ['status', 'Lift & trail status'],
+  ['hours', 'Hours of operation'],
+  ['grooming', 'Grooming report'],
+  ['weather', 'Weather forecast'],
+  ['deals', 'Hot deals'],
   ['passes', 'Season passes'],
   ['rentals', 'Rentals'],
   ['lessons', 'Lessons'],
-  ['access', 'Getting there'],
+  ['safety', 'Mountain safety'],
 ];
 const SKI_HUB_ICONS = {
   snow: '<path d="M12 2v20M4.2 7l15.6 10M4.2 17L19.8 7M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5"/>',
@@ -18857,6 +18875,39 @@ function skiSeasonBoxHtml(region, today = todayLocal()) {
     <nav class="ski-hub-tools" aria-label="Ski resort tools">${tools.map(([k, label, hint]) => `<a class="ski-hub-tool" href="${escapeHtml(f.links[k])}" target="_blank" rel="noopener">${skiHubIcon(k)}<span class="ski-hub-tool-text"><span class="ski-hub-tool-label">${escapeHtml(label)}${ext}</span><span class="ski-hub-tool-hint">${escapeHtml(hint)}</span></span><span class="ski-hub-arrow" aria-hidden="true">↗</span></a>`).join('')}</nav>` : ''}${extras.length ? `
     <p class="ski-hub-extras"><span class="ski-hub-extras-label">Also:</span> ${extras.map(([k, label]) => `<a href="${escapeHtml(f.links[k])}" target="_blank" rel="noopener">${escapeHtml(label)}${ext}</a>`).join('')}</p>` : ''}${f.checked ? `
     <p class="ski-hub-source">From the resort’s own website, checked ${escapeHtml(f.checked)}.</p>` : ''}
+  </section>`;
+}
+
+// Plan your trip (2026-11-01): three cards under the panel -- Where to stay, Getting here, With kids -- each a few facts
+// the hill states on its own site and the links to book or read more. Every line is a fixed string (French list:
+// data/french/ski-hub-2026-11-01.json); a card with no facts and no links is left out.
+const SKI_PLAN_CARDS = [['stay', 'Where to stay'], ['getting', 'Getting here'], ['kids', 'With kids']];
+const SKI_PLAN_ICONS = {
+  stay: '<path d="M3 20V9l9-5 9 5v11"/><path d="M9 20v-6h6v6"/>',
+  getting: '<path d="M5 16l1.5-5.5A2 2 0 0 1 8.4 9h7.2a2 2 0 0 1 1.9 1.5L19 16"/><path d="M3 16h18v3H3z"/><circle cx="7.5" cy="19" r="1.2"/><circle cx="16.5" cy="19" r="1.2"/>',
+  kids: '<circle cx="12" cy="7" r="3"/><path d="M6 20v-3a6 6 0 0 1 12 0v3"/>',
+};
+function skiPlanHtml(region) {
+  const f = SKI_RESORT_SEASON[region];
+  const plan = f && f.plan;
+  if (!plan) return '';
+  const ext = '<span class="ski-hub-sr"> (opens the resort\u2019s own site in a new tab)</span>';
+  const cards = SKI_PLAN_CARDS.map(([key, title]) => {
+    const c = plan[key];
+    if (!c) return '';
+    const facts = (c.facts || []).filter(Boolean);
+    const links = (c.links || []).filter((l) => l && l[0] && l[1]);
+    if (!facts.length && !links.length) return '';
+    return `<article class="ski-plan-card">
+      <h3 class="ski-plan-title"><svg class="ski-hub-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SKI_PLAN_ICONS[key]}</svg>${escapeHtml(title)}</h3>${facts.length ? `
+      <ul class="ski-plan-facts">${facts.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}${links.length ? `
+      <p class="ski-plan-links">${links.map(([label, url]) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(label)}${ext}<span aria-hidden="true"> \u2197</span></a>`).join('')}</p>` : ''}
+    </article>`;
+  }).filter(Boolean);
+  if (!cards.length) return '';
+  return `<section class="ski-plan" aria-labelledby="skiPlanHeading">
+    <h2 id="skiPlanHeading" class="ski-plan-heading">Plan your trip</h2>
+    <div class="ski-plan-grid">${cards.join('')}</div>
   </section>`;
 }
 const SKI_SEASON_STYLE = `<style id="ski-season">
@@ -18906,6 +18957,17 @@ const SKI_SEASON_STYLE = `<style id="ski-season">
     body.ski-region .region-intro-more p strong { display: block; margin-bottom: 4px; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.1rem; }
     body.ski-region .region-photo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
   }
+  body.region-page .ski-plan { margin: 0 0 28px; }
+  body.region-page .ski-plan-heading { margin: 0 0 12px; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.4rem; }
+  body.region-page .ski-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  body.region-page .ski-plan-card { display: flex; flex-direction: column; padding: 18px 20px; border-radius: 16px; background: #fff; border: 1px solid rgba(42,32,25,0.12); }
+  body.region-page .ski-plan-title { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 1.05rem; color: var(--ref-navy-deep, #16233a); }
+  body.region-page .ski-plan-facts { margin: 0 0 12px; padding: 0 0 0 1.1em; font-size: 0.95rem; line-height: 1.5; }
+  body.region-page .ski-plan-facts li { margin: 0 0 6px; }
+  body.region-page .ski-plan-links { display: flex; flex-wrap: wrap; gap: 8px; margin: auto 0 0; }
+  body.region-page .ski-plan-links a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; background: rgba(27,43,58,0.06); font-weight: 700; font-size: 0.88rem; color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.region-page .ski-plan-links a:hover { background: rgba(27,43,58,0.12); }
+  @media (max-width: 860px) { body.region-page .ski-plan-grid { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 860px) { body.region-page .ski-hub-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 520px) {
     body.region-page .ski-hub-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -19015,6 +19077,7 @@ ${renderGolfHeaderHtml()}
   <p class="subtitle">${placeCount} place${placeCount === 1 ? '' : 's'} to eat, drink and explore in ${escapeHtml(regionLabel)}</p>`)}
   ${isSkiResort ? skiSeasonBoxHtml(region) : ''}
   ${regionCategoryTabsHtml(region, categoryCounts, null, categories.filter((c) => c.href))}
+  ${isSkiResort ? skiPlanHtml(region) : ''}
   <div class="region-lead${intro && startHtml && !isSkiResort ? ' region-lead-split' : ''}">
   <div class="region-lead-text">
   ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}</div>
@@ -56827,6 +56890,7 @@ module.exports = {
   skiSeasonLine,
   skiSeasonState,
   skiSeasonBoxHtml,
+  skiPlanHtml,
   startServer,
   importEventBatches,
   // List an Event, Phase 1
