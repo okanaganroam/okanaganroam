@@ -9174,7 +9174,7 @@ function visitInfoHtml(info, fr = false) {
   const frDate = (d) => `${Number(d.slice(8, 10)) === 1 ? '1er' : Number(d.slice(8, 10))} ${FR_SHORT_MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`;
   const when = info.checked_at && parseLocalDate(info.checked_at) ? (fr ? frDate(info.checked_at) : `${formatLocalDateShort(info.checked_at, { weekday: false })}, ${info.checked_at.slice(0, 4)}`) : '';
   return `<section class="venue-section venue-visit" id="venueVisit" aria-labelledby="venueVisitHead">
-    <h2 id="venueVisitHead">${info.rows.some((r) => (fr ? r.__en : r.label) === 'The hike') ? (fr ? 'Planifiez votre randonn\u00e9e' : 'Plan your hike') : (fr ? 'Planifiez votre visite' : 'Plan your visit')}</h2>
+    <h2 id="venueVisitHead">${info.rows.some((r) => ['The hike', 'Trail map', 'Before you go'].includes(fr ? r.__en : r.label)) ? (fr ? 'Planifiez votre randonn\u00e9e' : 'Plan your hike') : (fr ? 'Planifiez votre visite' : 'Plan your visit')}</h2>
     <ul class="visit-list">${rows}</ul>${more}
     <p class="venue-hours-checked">${fr ? `${host ? `Source\u00a0: ${escapeHtml(host)}` : 'Source\u00a0: l\u2019\u00e9tablissement'}${when ? `, v\u00e9rifi\u00e9 le ${escapeHtml(when)}` : ''}` : `${host ? `From ${escapeHtml(host)}` : 'From the venue'}${when ? `, checked ${escapeHtml(when)}` : ''}`}</p>
     <style>
