@@ -18260,7 +18260,7 @@ function cardPriceFor(venueId) {
   const e = CARD_PRICES[String(venueId)];
   const n = e && Number(e.from);
   if (!Number.isFinite(n) || n <= 0) return null;
-  return `From $${Number.isInteger(n) ? n.toLocaleString('en-CA') : n.toFixed(2)}`;
+  return `From $${Number.isInteger(n) ? n.toLocaleString('en-CA') : n.toFixed(2)}${e.per ? ` / ${e.per}` : ''}`;
 }
 function tourCardFacts(info) {
   const out = { price: null, time: null };

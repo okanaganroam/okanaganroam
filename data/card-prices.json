@@ -1,1 +1,1460 @@
-{}
+{
+ "1000": {
+  "basis": "Beer flight",
+  "conf": "site",
+  "from": 10.99,
+  "source": "https://neighbourhoodbrewing.com/tasting-room/"
+ },
+ "104": {
+  "basis": "5-wine current-vintage tasting",
+  "conf": "site",
+  "from": 5,
+  "source": "https://www.burrowingowlwine.ca/visit-us/visit-the-winery/"
+ },
+ "125": {
+  "basis": "Taste of Terroir guided 5-wine tasting (lowest tasting experience)",
+  "conf": "site",
+  "from": 37,
+  "source": "https://www.cedarcreek.bc.ca/tastings-experiences/"
+ },
+ "13": {
+  "basis": "Standard wine tasting fee (waived with purchase)",
+  "conf": "site",
+  "from": 5,
+  "source": "https://adegaon45.com/"
+ },
+ "140": {
+  "basis": "Portfolio tasting of 4 premium wines",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.timewines.ca/chronos-tasting-room/"
+ },
+ "1408": {
+  "basis": "Standard tasting fee (waived with purchase)",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://foolishwine.com/visit/"
+ },
+ "1419": {
+  "basis": "Indoor tasting, waived with bottle",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.lpacider.com"
+ },
+ "1422": {
+  "basis": "Drop-in tasting (waived with purchase of regular-priced wine)",
+  "conf": "site",
+  "from": 5,
+  "source": "https://www.farmgatewinery.com/"
+ },
+ "1457": {
+  "basis": "Adult (25-64) facility drop-in",
+  "conf": "site",
+  "from": 13.35,
+  "source": "https://www.ymcasibc.ca/Locations/H2O/Drop-In"
+ },
+ "1458": {
+  "basis": "Kids Zone general admission, ages 1-14 (adults free with child)",
+  "conf": "site",
+  "from": 14.25,
+  "source": "https://www.energyplex.ca/rates"
+ },
+ "1459": {
+  "basis": "All Ages drop-in session (Early Bird $22 and skateboard-only $11.50 are restricted sessions)",
+  "conf": "box_only",
+  "from": 27.5,
+  "per": "session",
+  "source": "https://airhouse.ca/kelowna"
+ },
+ "1460": {
+  "basis": "Escape game per person, tax incl.",
+  "conf": "site",
+  "from": 35,
+  "source": "https://e-exit.ca/kelowna/portfolio-item/haunted/"
+ },
+ "1461": {
+  "basis": "Adult drop-in climbing (student $16, child $13 excluded)",
+  "conf": "site",
+  "from": 19,
+  "source": "https://www.beyondthecrux.info/"
+ },
+ "1463": {
+  "basis": "Laser tag, 1 game (12 min)",
+  "conf": "box_only",
+  "from": 9.5,
+  "source": "https://planetlazerkelowna.com/"
+ },
+ "1464": {
+  "basis": "Physical escape room per player, plus GST",
+  "conf": "site",
+  "from": 38,
+  "source": "https://xperiencegames.ca/pricing"
+ },
+ "1465": {
+  "basis": "Indoor jungle mini golf, adult",
+  "conf": "site",
+  "from": 18,
+  "source": "https://www.scandiagolfandgames.com/mini-golf/"
+ },
+ "1466": {
+  "basis": "Adult admission (individual)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://kelownaartgallery.com/about/"
+ },
+ "1468": {
+  "basis": "Adult admission",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.kelownamuseums.ca/museum/okanagan-heritage-museum/"
+ },
+ "1470": {
+  "basis": "Adult admission",
+  "conf": "box_only",
+  "from": 5,
+  "source": "https://www.kelownamuseums.ca/museum/okanagan-military-museum/"
+ },
+ "1477": {
+  "basis": "Day pass per child (up to 3 hours)",
+  "conf": "site",
+  "from": 25,
+  "per": "child",
+  "source": "https://playarea.ca/products/daypass"
+ },
+ "1478": {
+  "basis": "Drop-in play, ages 3 and up (per child)",
+  "conf": "site",
+  "from": 16.5,
+  "source": "https://wildkidz.ca/facility/"
+ },
+ "1479": {
+  "basis": "Guided museum tour",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://www.sncewips.com/"
+ },
+ "1481": {
+  "basis": "Adult public swim drop-in",
+  "conf": "site",
+  "from": 6.4,
+  "source": "https://www.westkelownacity.ca/en/parks-recreation-and-culture/johnson-bentley-aquatic-centre.aspx"
+ },
+ "1489": {
+  "basis": "60-minute all-access VR simulator pass",
+  "conf": "site",
+  "from": 40,
+  "source": "https://virtualrcades.com/"
+ },
+ "1490": {
+  "basis": "Adult day pass at OG Banks climbing gym",
+  "conf": "box_only",
+  "from": 20,
+  "source": "https://www.gneissclimbing.com/"
+ },
+ "1491": {
+  "basis": "Adult day pass",
+  "conf": "site",
+  "from": 20,
+  "source": "https://www.gneissclimbing.com/climb-1"
+ },
+ "1495": {
+  "basis": "Single 8-minute guest kart race (member price $25.99 excluded)",
+  "conf": "site",
+  "from": 29.99,
+  "source": "https://kelownakarting.com/pages/pricing"
+ },
+ "1497": {
+  "basis": "90-minute Decompress Thermal Ritual",
+  "conf": "box_only",
+  "from": 59,
+  "source": "https://www.cleopatrasrituals.com"
+ },
+ "1498": {
+  "basis": "Regular lane bowling per game, ages 13 and over",
+  "conf": "site",
+  "from": 8.5,
+  "per": "game",
+  "source": "https://okanaganbowlingclub.com/public-bowling/"
+ },
+ "1499": {
+  "basis": "One-hour cat lounge slot (seniors $12 excluded)",
+  "conf": "site",
+  "from": 16,
+  "source": "https://catelowna.com/book-a-visit"
+ },
+ "1502": {
+  "basis": "Adult admission",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.pentictonartgallery.com/planyourvisit"
+ },
+ "1503": {
+  "basis": "Adult admission (ages 13-54)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.sssicamous.ca/hours-of-operation"
+ },
+ "1505": {
+  "basis": "Adult (19-59) public swim day pass",
+  "conf": "site",
+  "from": 8,
+  "source": "https://www.penticton.ca/sites/default/files/docs/parks-and-recreation/aquatics/Rec%20guide%20fees%20for%20website%20(2).pdf"
+ },
+ "1508": {
+  "basis": "Adult bowling, one game (plus tax)",
+  "conf": "site",
+  "from": 6,
+  "per": "game",
+  "source": "https://www.rollnstonesfuncentre.ca/contact/"
+ },
+ "1514": {
+  "basis": "Standard admission",
+  "conf": "site",
+  "from": 20,
+  "source": "https://nixdorfclassiccars.com/"
+ },
+ "1521": {
+  "basis": "Lino printing on fabric workshop (cheapest class on schedule); One Night Wheel Class is $90",
+  "conf": "site",
+  "from": 50,
+  "per": "class",
+  "source": "https://donuthousestudios.com/"
+ },
+ "1526": {
+  "basis": "Adult general admission",
+  "conf": "site",
+  "from": 12,
+  "source": "https://okscience.ca/pages/booking-information"
+ },
+ "1527": {
+  "basis": "Bouldering-only day pass (adult day pass with climbing $20)",
+  "conf": "box_only",
+  "from": 18,
+  "source": "https://www.climbthegarden.com/"
+ },
+ "1528": {
+  "basis": "Escape room, 8-player rate (tax incl.); $40 pp for 2 players",
+  "conf": "site",
+  "from": 30,
+  "source": "https://beyondbelief.ca/pricing/"
+ },
+ "1531": {
+  "basis": "Adult admission / self-guided visit",
+  "conf": "site",
+  "from": 10,
+  "source": "https://caetani.org/tours"
+ },
+ "1537": {
+  "basis": "Adult bowling, per game",
+  "conf": "site",
+  "from": 7,
+  "source": "https://www.lincolnlanes.ca/?page_id=151"
+ },
+ "1540": {
+  "basis": "General admission",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://cardiffmillerartwarehouse.ca/"
+ },
+ "1551": {
+  "basis": "Child (age 5+) full-day play pass",
+  "conf": "site",
+  "from": 18.99,
+  "source": "https://funspacekids.com/"
+ },
+ "1554": {
+  "basis": "Community (shared) sauna session, 80 min",
+  "conf": "site",
+  "from": 45,
+  "source": "https://www.loylyfloatingsauna.ca/"
+ },
+ "1557": {
+  "basis": "Drop-in pickleball session",
+  "conf": "site",
+  "from": 5.5,
+  "per": "session",
+  "source": "https://www.peachland.ca/pickleball"
+ },
+ "1561": {
+  "basis": "1 headset by the hour (shared by 2)",
+  "conf": "site",
+  "from": 49.99,
+  "per": "hour",
+  "source": "https://www.inthevive.com/book-online"
+ },
+ "1563": {
+  "basis": "Social session, 70 min (private $236.25 per group of 8)",
+  "conf": "site",
+  "from": 37,
+  "source": "https://www.sheltersauna.com/services"
+ },
+ "1564": {
+  "basis": "Adult drop-in swim",
+  "conf": "box_only",
+  "from": 5.25,
+  "source": "https://www.summerland.ca/parks-recreation/schedules"
+ },
+ "1568": {
+  "basis": "Tue/Fri 60-min drop-in gym, per child",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.pentictonspringers.com/"
+ },
+ "1569": {
+  "basis": "1-hour supervised open gym drop-in",
+  "conf": "site",
+  "from": 12.5,
+  "source": "https://ethosparkour.com/pricing"
+ },
+ "1572": {
+  "basis": "\"Basically Bees\" drop-in talk (20-30 min), ages 3+",
+  "conf": "site",
+  "from": 8,
+  "source": "https://planetbee.com/pages/group-bookings-info"
+ },
+ "1573": {
+  "basis": "Adult admission",
+  "conf": "site",
+  "from": 18,
+  "source": "https://canadianwildlifemuseum.com/"
+ },
+ "1574": {
+  "basis": "Single Sunday 4-Pack league session (instruction + guided game)",
+  "conf": "box_only",
+  "from": 30,
+  "source": "https://vernoncurling.ca/"
+ },
+ "1576": {
+  "basis": "Best Value half-day public wine tour (approx 4 hrs)",
+  "conf": "site",
+  "from": 129,
+  "source": "https://www.barewinetours.com/public-wine-tours"
+ },
+ "1578": {
+  "basis": "West Kelowna half-day wine tour, tastings and pickup included",
+  "conf": "site",
+  "from": 149,
+  "source": "https://vivid.tours"
+ },
+ "1580": {
+  "basis": "Public craft beer tour (needs min riders; Mar 17-Oct 31 season)",
+  "conf": "site",
+  "from": 35,
+  "source": "https://www.smilecycletours.ca/tour/kelowna-brewery-tour/"
+ },
+ "1583": {
+  "basis": "20-minute Simply Kelowna scenic tour, whole helicopter (up to 4)",
+  "conf": "site",
+  "from": 660,
+  "per": "helicopter",
+  "source": "https://www.valhallahelicopters.com/helicopter-tours/"
+ },
+ "1584": {
+  "basis": "15-minute Kelowna flightseeing tour (plus tax)",
+  "conf": "site",
+  "from": 219,
+  "source": "https://okheli.ca/okanagan-tours/kelowna-flightseeing-tours/"
+ },
+ "1585": {
+  "basis": "Half-day (5 hr) private fishing charter, guide/boat/fuel/gear",
+  "conf": "site",
+  "from": 650,
+  "per": "boat",
+  "source": "https://www.desertsalmon.com/"
+ },
+ "1586": {
+  "basis": "Private half-day wine tour (tastings included)",
+  "conf": "site",
+  "from": 139,
+  "source": "https://beachbumtours.ca/beach-bum-wine-tour/"
+ },
+ "1587": {
+  "basis": "Half-day Kelowna wine tour, 8+ guests tier (tasting fees included)",
+  "conf": "site",
+  "from": 130,
+  "source": "https://agrapeexperience.ca/kelowna-wine-tours/"
+ },
+ "1589": {
+  "basis": "Interpretive group snowshoe tour (2 hr)",
+  "conf": "site",
+  "from": 64,
+  "source": "https://www.bigwhite.com/events-activities/tours/snowshoeing-tours"
+ },
+ "1590": {
+  "basis": "Winter fat-tire eBike tour (guide, bike, photo stops)",
+  "conf": "site",
+  "from": 89,
+  "source": "https://www.bigwhite.com/events-activities/tours/ebikes"
+ },
+ "1591": {
+  "basis": "West Kelowna half-day wine tour",
+  "conf": "site",
+  "from": 139,
+  "source": "https://wicked.tours/"
+ },
+ "1592": {
+  "basis": "Shared full-day wine tour (West Kelowna/Lake Country, tastings included)",
+  "conf": "site",
+  "from": 169,
+  "source": "https://www.uncorkedokanagan.com/wine-tours/"
+ },
+ "1593": {
+  "basis": "Kelowna Wine Tour (minibus, tastings included)",
+  "conf": "site",
+  "from": 150,
+  "source": "https://www.canadiancrafttours.ca/products/kelowna-wine-tours"
+ },
+ "1594": {
+  "basis": "5.5-hour Rock Climbing Sampler (3:1 group)",
+  "conf": "site",
+  "from": 140,
+  "source": "https://www.skaharockclimbing.com/rock-climbing/rock-climbing-sampler/"
+ },
+ "1596": {
+  "basis": "Hop-on trolley day ticket, adult (youth $14.99 excluded)",
+  "conf": "box_only",
+  "from": 49.99,
+  "source": "https://www.trolleyco.ca/reservationhub/"
+ },
+ "1598": {
+  "basis": "Sparkling wine tour experience, current price (regularly $235)",
+  "conf": "site",
+  "from": 235,
+  "source": "https://bubblesdontcount.com/"
+ },
+ "1599": {
+  "basis": "Half-day wine tour (3 wineries), Oliver/Osoyoos",
+  "conf": "site",
+  "from": 109.99,
+  "source": "https://devinowinetours.com/half-day-tours-1"
+ },
+ "160": {
+  "basis": "Family-history wine tasting",
+  "conf": "site",
+  "from": 10,
+  "source": "https://crescenthillwinery.com/pages/visit-the-winery"
+ },
+ "1600": {
+  "basis": "Scenic run adult fare",
+  "conf": "box_only",
+  "from": 35,
+  "source": "https://www.kettlevalleyrail.org/"
+ },
+ "1601": {
+  "basis": "2-hour trail bike rental",
+  "conf": "site",
+  "from": 30,
+  "per": "session",
+  "source": "https://epiccycling.ca/epic-tours/epic-ebike-rentals/"
+ },
+ "1602": {
+  "basis": "3-hour group wine tour",
+  "conf": "site",
+  "from": 85,
+  "source": "https://www.swiwsspirittours.com/rates"
+ },
+ "1603": {
+  "basis": "1-hour all-inclusive boat trip (wakesurf/wakeboard/ski, driver and coach, up to 12)",
+  "conf": "site",
+  "from": 310,
+  "per": "boat",
+  "source": "https://www.atbwatersports.com/rates"
+ },
+ "1606": {
+  "basis": "Naramata Bench 3-winery wine tour",
+  "conf": "site",
+  "from": 119.99,
+  "source": "https://www.topcattours.com/product-category/wine-tours/"
+ },
+ "1607": {
+  "basis": "Half-day private wine tour ($440 flat for 1-4 people = $110 pp at 4)",
+  "conf": "site",
+  "from": 110,
+  "source": "https://corksandcactus.com/"
+ },
+ "1608": {
+  "basis": "2-hour captained pontoon tour (private boat, priced per boat)",
+  "conf": "site",
+  "from": 450,
+  "per": "boat",
+  "source": "https://www.wakethelakepenticton.com/book-online"
+ },
+ "1611": {
+  "basis": "Private pontoon charter, 2 hr morning/sunset",
+  "conf": "box_only",
+  "from": 500,
+  "per": "boat",
+  "source": "https://okanaganboatcharters.com"
+ },
+ "1612": {
+  "basis": "Snowcat dinner tour: 3-course dinner, gondola and snowcat round trip",
+  "conf": "box_only",
+  "from": 175,
+  "source": "https://www.skisilverstar.com/events-activities/winter-activities/snow-cat-tours/"
+ },
+ "1615": {
+  "basis": "3-day shoulder-season all-inclusive catskiing package (lodging, meals, guiding)",
+  "conf": "site",
+  "from": 5063.53,
+  "source": "https://keeferlakelodge.com/winter"
+ },
+ "1616": {
+  "basis": "Mushroom tour (3 hr), adult, + GST",
+  "conf": "site",
+  "from": 65,
+  "source": "https://www.elementsadventures.com/tours/mushroom-tours/"
+ },
+ "1628": {
+  "basis": "Farm visit",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.gottagoat.com/"
+ },
+ "1634": {
+  "basis": "Adult (25-64) drop-in",
+  "conf": "site",
+  "from": 11.75,
+  "source": "https://www.ymcasibc.ca/Locations/Kelowna-Family-Y/Drop-In"
+ },
+ "1635": {
+  "basis": "Adult drop-in",
+  "conf": "box_only",
+  "from": 11.75,
+  "source": "https://www.ymcasibc.ca/locations"
+ },
+ "1636": {
+  "basis": "Kayak or paddleboard rental, 1 hour (cheapest rental; $25 for 8-10AM slot)",
+  "conf": "site",
+  "from": 30,
+  "per": "hour",
+  "source": "https://www.kelownadowntownmarina.com/boat-rentals/"
+ },
+ "1638": {
+  "basis": "Single kayak (8'6 to 10') rental, 1 hour; life jacket included",
+  "conf": "site",
+  "from": 20,
+  "per": "hour",
+  "source": "https://www.okanaganbeachrentals.com/rentals"
+ },
+ "1639": {
+  "basis": "Afternoon cruise, adult (13+)",
+  "conf": "site",
+  "from": 55,
+  "source": "https://www.kelownacruises.com/activities/lunch-and-afternoon-cruises"
+ },
+ "1640": {
+  "basis": "Public Tiki Boat tour",
+  "conf": "box_only",
+  "from": 55,
+  "source": "https://www.tikitimetours.ca/kelowna-tiki-tours"
+ },
+ "1643": {
+  "basis": "Beer flight, choose 4 to taste",
+  "conf": "site",
+  "from": 12,
+  "source": "https://shorelinebrewing.com/our-food/"
+ },
+ "1666": {
+  "basis": "Tasting fee (refunded with a bottle)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://kettlevalleywinery.com"
+ },
+ "167": {
+  "basis": "Winemaker's Selection tasting, 4 seasonal wines",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://dasilvavineyards.com/visit-us/"
+ },
+ "1673": {
+  "basis": "Single public karting race (10 min), ages 13+",
+  "conf": "site",
+  "from": 31,
+  "source": "https://www.kartplex.ca/"
+ },
+ "1697": {
+  "basis": "Beginner painting class, one 2-hour session",
+  "conf": "site",
+  "from": 65,
+  "source": "https://peggiecollinsdesign.com/pages/art-classes"
+ },
+ "1699": {
+  "basis": "Build-your-own cocktail flight, 3 mini cocktails",
+  "conf": "site",
+  "from": 18.5,
+  "per": "flight",
+  "source": "https://controlledentropy.ca/cocktail-menu/"
+ },
+ "1700": {
+  "basis": "Single sit-on-top kayak rental, 1 hour (adult size)",
+  "conf": "site",
+  "from": 20,
+  "per": "hour",
+  "source": "https://www.okanaganbeachrentals.com/rentals"
+ },
+ "171": {
+  "basis": "Tasting of Daydreamer wines",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://daydreamerwines.ca/"
+ },
+ "1711": {
+  "basis": "Adult guided tour admission",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.mackiehouse.ca/tours/"
+ },
+ "1759": {
+  "basis": "2-hour private pontoon cruise, up to 6 guests",
+  "conf": "site",
+  "from": 495,
+  "per": "boat",
+  "source": "https://lakelifepontooncruises.ca/kelowna-boat-tours/"
+ },
+ "1761": {
+  "basis": "Sea-Doo / Kawasaki Ultra rental per hour",
+  "conf": "site",
+  "from": 129,
+  "per": "hour",
+  "source": "https://okanaganexperience.ca/"
+ },
+ "1762": {
+  "basis": "Standard West Kelowna wine tour (+GST; lunch/tip extra)",
+  "conf": "site",
+  "from": 169,
+  "source": "https://teehousewinetours.com/tours/standard-wine-tours/"
+ },
+ "1763": {
+  "basis": "Private custom West Kelowna wine tour (4 tastings)",
+  "conf": "site",
+  "from": 144,
+  "source": "https://www.lust4luxurytours.com/custom-wine-tours/private-custom-west-kelowna-wine-tours/"
+ },
+ "1764": {
+  "basis": "West Kelowna half-day wine tour, 4 tastings",
+  "conf": "box_only",
+  "from": 145,
+  "source": ""
+ },
+ "1765": {
+  "basis": "Half-day public Kelowna wine tour (5-7 guests tier)",
+  "conf": "site",
+  "from": 129,
+  "source": "https://discoverokanagantours.com/kelowna-wine-tours/"
+ },
+ "1766": {
+  "basis": "Half-day private wine tour (Introductory Special), Kelowna/West Kelowna, 3+ people",
+  "conf": "site",
+  "from": 115,
+  "source": "https://carefreewinetours.com/index.php/tour/introductory-special/"
+ },
+ "1767": {
+  "basis": "Adrenaline canyoning (4 hr), guide and gear included",
+  "conf": "site",
+  "from": 177,
+  "source": "https://www.westcanyon.ca/adrenaline-canyoning-kelowna/"
+ },
+ "1768": {
+  "basis": "2-hour City Hybrid bike rental (cheapest bike)",
+  "conf": "site",
+  "from": 25,
+  "per": "session",
+  "source": "https://www.kelownabikerentals.ca/prices"
+ },
+ "1769": {
+  "basis": "Day pass at the gate",
+  "conf": "box_only",
+  "from": 14.29,
+  "source": "https://donorayfarmadventure.com/"
+ },
+ "1770": {
+  "basis": "2-hour rental, Bayliner/Four Winns-class runabout (cheapest boat; fuel and taxes extra)",
+  "conf": "site",
+  "from": 389,
+  "per": "boat",
+  "source": "https://www.okanaganlakeboatrentals.com/rentals/"
+ },
+ "1771": {
+  "basis": "Half-day wine tour (Fill the Bus / Jason Parkes), 4 hours",
+  "conf": "site",
+  "from": 129,
+  "source": "https://vine49winetours.com/book-a-tour/"
+ },
+ "1794": {
+  "basis": "Single kayak or paddleboard, 2-hour rental",
+  "conf": "box_only",
+  "from": 45,
+  "per": "session",
+  "source": "https://edskayak.ca/"
+ },
+ "1795": {
+  "basis": "1-hour Spark Trixx Sea-Doo rental, fuel included (per craft)",
+  "conf": "site",
+  "from": 159,
+  "per": "hour",
+  "source": "https://triplesplashseadoorentals.com/"
+ },
+ "1805": {
+  "basis": "Seasonal Happy Hour wine tour (Osoyoos pickup); year-round Signature tour is $79",
+  "conf": "site",
+  "from": 69,
+  "source": "https://www.winetoursgonesouth.ca/south-okanagan-wine-tours"
+ },
+ "1806": {
+  "basis": "3.5-hour wine tour (tax in); winery tasting fees extra",
+  "conf": "site",
+  "from": 78,
+  "source": "http://www.desertcountrywinetours.com/tours.html"
+ },
+ "1807": {
+  "basis": "3-hour South Okanagan wine tour package (Package One)",
+  "conf": "site",
+  "from": 85,
+  "source": "https://www.uniqueblendtours.ca/our-services"
+ },
+ "1819": {
+  "basis": "15-minute Snapshot Orchard Tour (taxes included)",
+  "conf": "site",
+  "from": 7.5,
+  "source": "https://www.payntersfruitmarket.ca/tours"
+ },
+ "1822": {
+  "basis": "Sea-Doo GTX rental, 1 hour (cheapest rental; boats are 2 hr minimum)",
+  "conf": "site",
+  "from": 125,
+  "per": "hour",
+  "source": "https://turtlebaymarina.com/okanagan-boat-rentals.php"
+ },
+ "1930": {
+  "basis": "Single cat ride to upper Baldy",
+  "conf": "site",
+  "from": 35,
+  "source": "https://baldyresort.com/cat-skiing-baldy-mountain/"
+ },
+ "1931": {
+  "basis": "Standard rate, After Dark kids evening (per child)",
+  "conf": "site",
+  "from": 74,
+  "source": "https://www.bigwhite.com/kids-lessons-programs/after-dark"
+ },
+ "1932": {
+  "basis": "Bus trip + Kelowna Rockets game ticket from Big White",
+  "conf": "site",
+  "from": 70,
+  "source": "https://www.bigwhite.com/events-activities/tours/kelowna-rockets-hockey"
+ },
+ "1933": {
+  "basis": "Tasting of 5 wines, waived with bottle purchase",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.kismetestatewinery.com/visit-us/"
+ },
+ "198": {
+  "basis": "Current Release Tasting, 4 wines",
+  "conf": "site",
+  "from": 8.7,
+  "source": "https://elephantislandwine.com/visit/"
+ },
+ "206": {
+  "basis": "3 sparkling pours tasting",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.timewines.ca/evolve-sparkling-house/"
+ },
+ "207": {
+  "basis": "Essentia seated 5-wine tasting",
+  "conf": "site",
+  "from": 18,
+  "source": "https://www.exnihilovineyards.com/visit"
+ },
+ "216": {
+  "basis": "Patio flight of 4 wines",
+  "conf": "site",
+  "from": 13,
+  "source": "https://www.fitzwine.com/Visit/Tastings-and-Tours"
+ },
+ "218": {
+  "basis": "Cider flight of 4 ciders (100 mL each)",
+  "conf": "box_only",
+  "from": 13.5,
+  "source": "https://www.folktalecider.com/"
+ },
+ "223": {
+  "basis": "Signature seated tasting, 4 wines",
+  "conf": "site",
+  "from": 20,
+  "source": "https://frenchdoorwinery.com/tasting-room/"
+ },
+ "228": {
+  "basis": "5-wine tasting",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.frindwinery.com/"
+ },
+ "243": {
+  "basis": "Walk-in sample tasting of 3-5 wines, waived with purchase",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.goldhillwinery.com/visit/tasting-room/"
+ },
+ "250": {
+  "basis": "Walk-in 4-wine Monk's Pour at the bar",
+  "conf": "box_only",
+  "from": 12,
+  "source": "https://graymonk.com/"
+ },
+ "271": {
+  "basis": "5-wine tasting (waived with 3 bottles)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://heresthethingvineyards.com/tasting/"
+ },
+ "273": {
+  "basis": "Portfolio Tasting (45 min seated)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.hillsidewinery.ca/visit-us/tasting-experiences/"
+ },
+ "290": {
+  "basis": "Tasting flight",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.xwine.ca/visit-us"
+ },
+ "291": {
+  "basis": "Flight of four wines tasting",
+  "conf": "site",
+  "from": 6,
+  "source": "https://www.intriguewines.com/"
+ },
+ "308": {
+  "basis": "Classic tasting of six wines",
+  "conf": "site",
+  "from": 15,
+  "source": "https://joiefarm.com/place/tasting-room/"
+ },
+ "32": {
+  "basis": "Bar tasting of four wines",
+  "conf": "site",
+  "from": 7,
+  "source": "https://www.arrowleafcellars.com/wine-tasting"
+ },
+ "329": {
+  "basis": "Beer flight of four 5 oz pours",
+  "conf": "box_only",
+  "from": 12,
+  "source": "https://kelownabeerinstitute.com/"
+ },
+ "350": {
+  "basis": "Bar flight of current releases (refunded with bottle each)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.lafrenzwinery.com/visit/"
+ },
+ "355": {
+  "basis": "Curated Tasting Flight",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.lakebreeze.ca/Visit-Us/The-Tasting-Room"
+ },
+ "357": {
+  "basis": "5-wine tasting incl. tax (waived with bottle)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://lakeboatwinery.com/"
+ },
+ "359": {
+  "basis": "Tasting flight of any four beers",
+  "conf": "site",
+  "from": 12,
+  "source": "https://lakesiderbrewing.com/beer-%26-other-drinks"
+ },
+ "363": {
+  "basis": "Classic flight",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://levieuxpin.ca/"
+ },
+ "366": {
+  "basis": "Tasting fee (5+ current releases)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://lightningrockwinery.com/visit/"
+ },
+ "369": {
+  "basis": "Seated tasting of 5 wines",
+  "conf": "site",
+  "from": 25,
+  "source": "https://littleenginewines.com/tasting-room/"
+ },
+ "370": {
+  "basis": "Standard tasting",
+  "conf": "site",
+  "from": 12,
+  "source": "https://littlestraw.bc.ca/tastings-experiences/"
+ },
+ "374": {
+  "basis": "Spirits tasting (straight, or three as sample cocktails)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://luckhurstfarm.com/explore/distillery/"
+ },
+ "394": {
+  "basis": "Standard tasting (waived with purchase)",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.marichel.ca/"
+ },
+ "396": {
+  "basis": "Private winery tour with Pinot Noir/Riesling flight (only offering)",
+  "conf": "site",
+  "from": 200,
+  "source": "https://www.martinslanewinery.com/visit/"
+ },
+ "401": {
+  "basis": "Mead tasting",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://meadowvista.ca/pages/faq"
+ },
+ "404": {
+  "basis": "Wine Tasting (non-refundable); with small bites $20",
+  "conf": "site",
+  "from": 10,
+  "source": "https://mfvwines.com/collections/book-a-tasting"
+ },
+ "409": {
+  "basis": "Cider tasting fee",
+  "conf": "site",
+  "from": 5,
+  "source": "https://www.millionairesrowcider.com/tasting-room"
+ },
+ "412": {
+  "basis": "Seasonal Tasting, seated, 45 min",
+  "conf": "site",
+  "from": 40,
+  "source": "https://www.missionhillwinery.com/visit/tastings-experiences"
+ },
+ "418": {
+  "basis": "Tasting at main tasting bar (waived with 1 bottle)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.mooncurser.com/visit-us/tasting-options/"
+ },
+ "428": {
+  "basis": "30-min tasting, refunded with purchase",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.mythologyvineyard.ca/"
+ },
+ "439": {
+  "basis": "30-minute tasting (waived with bottle purchase)",
+  "conf": "site",
+  "from": 5,
+  "source": "https://nighthawkvineyards.com/"
+ },
+ "441": {
+  "basis": "Flight of five wines at main tasting bar",
+  "conf": "box_only",
+  "from": 5,
+  "source": "https://www.nkmipcellars.com/"
+ },
+ "442": {
+  "basis": "Curated tasting of 5 wines (redeemed with bottle)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.nobleridge.com/visit-us/"
+ },
+ "445": {
+  "basis": "Bench Tasting and Tour (only experience listed)",
+  "conf": "box_only",
+  "from": 150,
+  "source": "https://orourkefamilyestate.com/"
+ },
+ "457": {
+  "basis": "Tasting of three spirits (waived with bottle purchase)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://okanaganspirits.com/pages/drop-in-tastings"
+ },
+ "458": {
+  "basis": "Drop-in tasting of three spirits (waived with purchase)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://okanaganspirits.com/pages/drop-in-tastings"
+ },
+ "468": {
+  "basis": "Wine flights (walk-in tasting of 5 wines is $15, waived with a bottle)",
+  "conf": "site",
+  "from": 12,
+  "source": "https://www.overthefencewinery.ca/experiences"
+ },
+ "473": {
+  "basis": "Seated tasting of 5 wines",
+  "conf": "site",
+  "from": 20,
+  "source": "https://paintedrock.ca/tasting-room/"
+ },
+ "489": {
+  "basis": "Flight of 4 wines",
+  "conf": "site",
+  "from": 18,
+  "source": "https://peakcellars.com/tasting"
+ },
+ "491": {
+  "basis": "Tasting fee, 5+ wines in season ($6 waived with purchase)",
+  "conf": "site",
+  "from": 12,
+  "source": "https://pentage.com/pages/visit-our-winery"
+ },
+ "500": {
+  "basis": "Seated tasting of 5 estate wines",
+  "conf": "site",
+  "from": 25,
+  "source": "https://phantomcreekestates.com/experiences"
+ },
+ "516": {
+  "basis": "Four 1 oz estate pours with four bread pairing samples",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.platinumbench.com/oliver-winery/wine-tasting/"
+ },
+ "521": {
+  "basis": "Benchmark tasting of 5 wines",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.poplargrove.ca/reservations/visit/"
+ },
+ "526": {
+  "basis": "Standard tasting, 5 guided pours",
+  "conf": "site",
+  "from": 15,
+  "source": "https://priestcreekwinery.com/visit"
+ },
+ "530": {
+  "basis": "Classic tasting",
+  "conf": "box_only",
+  "from": 20,
+  "source": "https://www.quailsgate.com/"
+ },
+ "539": {
+  "basis": "Four-pour tasting",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://rainmakerwines.com/tasting-bar/"
+ },
+ "54": {
+  "basis": "Flight of four 5 oz pours",
+  "conf": "site",
+  "from": 12,
+  "source": "https://www.barnowlbrewing.ca/barn-brews/"
+ },
+ "544": {
+  "basis": "\"The Ride\" guided production tour + seated tasting of 4 wines",
+  "conf": "site",
+  "from": 35,
+  "source": "https://www.redbarn.wine/visit/"
+ },
+ "550": {
+  "basis": "Taste the Terroir (4 wines)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.riverstoneestatewinery.ca/book-a-tasting-now/"
+ },
+ "554": {
+  "basis": "5-wine tasting",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://www.rollingdale.ca/"
+ },
+ "56": {
+  "basis": "Standard tasting fee (5 wines)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://bartierbros.com/reservation/experiences/"
+ },
+ "561": {
+  "basis": "Smashable tasting",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.rustwine.com/pages/visit-us"
+ },
+ "565": {
+  "basis": "Tasting of 6 organic wines (waived with bottle purchase)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.sagehillswine.com/visit"
+ },
+ "571": {
+  "basis": "Signature tasting",
+  "conf": "box_only",
+  "from": 18,
+  "source": "https://www.sandhillwines.ca/"
+ },
+ "577": {
+  "basis": "4 wine samples",
+  "conf": "box_only",
+  "from": 5,
+  "source": "https://sylranch.com/"
+ },
+ "578": {
+  "basis": "Regular tasting flight (5 wines)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.serendipitywinery.com/"
+ },
+ "606": {
+  "basis": "Guided tableside tasting of 5 wines",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.spearheadwinery.com/visit-us/"
+ },
+ "612": {
+  "basis": "Guided tasting of small-lot wines (waived with 2 bottles)",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.stagshollowwinery.com/visit/"
+ },
+ "621": {
+  "basis": "Flight of six new wines (waived with bottle)",
+  "conf": "site",
+  "from": 6,
+  "source": "https://summergate.ca/"
+ },
+ "622": {
+  "basis": "Organic wine flight",
+  "conf": "site",
+  "from": 15,
+  "source": "https://summerhill.bc.ca/tastings"
+ },
+ "65": {
+  "basis": "Four-wine tasting (waived with $25+ purchase)",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://www.bench1775.com/"
+ },
+ "654": {
+  "basis": "Flagship Tasting Experience (seated, 5 wines)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://tantalus.ca/collections/wine-tasting-experiences"
+ },
+ "659": {
+  "basis": "Taste of Terravista guided tasting",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.terravistavineyards.com/collections/tasting-experiences"
+ },
+ "689": {
+  "basis": "Guided 5-wine flight",
+  "conf": "site",
+  "from": 20,
+  "source": "https://thehatchwines.com/"
+ },
+ "72": {
+  "basis": "Precision Tasting (4 wines, 45 min)",
+  "conf": "box_only",
+  "from": 20,
+  "source": "https://www.blackhillswinery.com/"
+ },
+ "722": {
+  "basis": "Guided Three Sisters tasting",
+  "conf": "box_only",
+  "from": 8,
+  "source": "https://3sisterswinery.com/"
+ },
+ "727": {
+  "basis": "Estate flight of 3 wines",
+  "conf": "box_only",
+  "from": 17,
+  "source": "https://www.tinhorn.com/"
+ },
+ "73": {
+  "basis": "Guided tasting of 5 wines, refundable with purchase",
+  "conf": "site",
+  "from": 10,
+  "source": "https://blackmarketwine.ca/reservation/"
+ },
+ "730": {
+  "basis": "Guided tasting of 5 one-ounce pours",
+  "conf": "site",
+  "from": 15,
+  "source": "https://township7.com/reservation/type/naramata-wine-experience"
+ },
+ "734": {
+  "basis": "Signature cider flight",
+  "conf": "box_only",
+  "from": 20,
+  "source": "https://truck59ciderhouse.com/"
+ },
+ "75": {
+  "basis": "Guided tasting",
+  "conf": "site",
+  "from": 20,
+  "source": "https://blackswiftvineyards.com/pages/visit-us"
+ },
+ "751": {
+  "basis": "Stand-up bar wine & cheese tasting of 4 wines",
+  "conf": "site",
+  "from": 15,
+  "source": "https://upperbench.ca/tasting-options/"
+ },
+ "755": {
+  "basis": "Tasting in The Shed",
+  "conf": "site",
+  "from": 10,
+  "source": "https://vanwestenvineyards.com/"
+ },
+ "759": {
+  "basis": "Flight of four beers",
+  "conf": "site",
+  "from": 11,
+  "source": "https://www.viceandvirtuebrewing.ca/menu/"
+ },
+ "76": {
+  "basis": "Walk-in bar tasting",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://blastedchurch.com/"
+ },
+ "767": {
+  "basis": "Signature Wine Tasting",
+  "conf": "site",
+  "from": 10,
+  "source": "https://volcanichillswinery.com/collections/tasting-fee"
+ },
+ "784": {
+  "basis": "5-wine tasting (fees donated to Nature Trust)",
+  "conf": "site",
+  "from": 5,
+  "source": "https://wildgoosewinery.ca/about/tasting-room/"
+ },
+ "8": {
+  "basis": "Essential Tasting (5 wines, 30 min)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.50thparallel.com/reservation/"
+ },
+ "812": {
+  "basis": "Discovery Experience, 3 wines of your choosing",
+  "conf": "site",
+  "from": 15,
+  "source": "https://azhadivineyards.com/experiences/"
+ },
+ "813": {
+  "basis": "In-Studio Tasting (complimentary with a bottle per guest)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://bcwinestudio.ca/products/in-studio-tasting"
+ },
+ "820": {
+  "basis": "Tasting-room tasting",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.bonamicicellars.com/reservation/"
+ },
+ "821": {
+  "basis": "Tasting experience (waived with a bottle)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.cantercellars.com/visit-us/"
+ },
+ "823": {
+  "basis": "Wine tasting-only flight of 4-5 wines (waived with purchase)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.chainreactionwine.com/reservation/"
+ },
+ "824": {
+  "basis": "Four Moves guided seated tasting (4 Chardonnays)",
+  "conf": "site",
+  "from": 50,
+  "source": "https://www.checkmatewinery.com/visit/"
+ },
+ "826": {
+  "basis": "Tasting of 4 small-batch wines, prepaid",
+  "conf": "site",
+  "from": 20,
+  "source": "https://crownthieves.com/"
+ },
+ "827": {
+  "basis": "Seated tasting of 4 wines",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.culmina.ca/"
+ },
+ "830": {
+  "basis": "Tasting (refunded with bottle purchase)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://fourshadowsvineyard.com/aboutus/hours/"
+ },
+ "834": {
+  "basis": "Standard tasting fee (waived with purchase)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.gneisswines.com/visit/"
+ },
+ "835": {
+  "basis": "Host-guided tasting flight, 30 min",
+  "conf": "site",
+  "from": 20,
+  "source": "https://haywirewinery.com/experience/all-experiences/"
+ },
+ "837": {
+  "basis": "Four-wine tasting",
+  "conf": "site",
+  "from": 10,
+  "source": "https://hiddenvines.ca/visit"
+ },
+ "839": {
+  "basis": "Regular Tasting",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.kalala.ca/tastings-experiences/"
+ },
+ "841": {
+  "basis": "Classic flight",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://lastella.ca/visit/"
+ },
+ "843": {
+  "basis": "Tasting (waived with a bottle)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://langvineyards.ca/reservations/"
+ },
+ "845": {
+  "basis": "Seated blind tasting of six wines",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://www.laughingstock.ca/"
+ },
+ "847": {
+  "basis": "Liquid Intelligence guided seated tasting of five wines",
+  "conf": "site",
+  "from": 29,
+  "source": "https://www.liquiditywines.com/experiences"
+ },
+ "849": {
+  "basis": "Flight of 5 wines",
+  "conf": "site",
+  "from": 15,
+  "source": "https://lunessencewinery.com"
+ },
+ "850": {
+  "basis": "Estate Tasting of 5 wines",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.maverickwine.ca/reservations"
+ },
+ "851": {
+  "basis": "Portfolio tasting",
+  "conf": "site",
+  "from": 10,
+  "source": "https://mayhemwines.com/collections/book-a-tasting"
+ },
+ "852": {
+  "basis": "Standard tasting fee",
+  "conf": "site",
+  "from": 5,
+  "source": "https://www.mocojowines.com/wine-tasting"
+ },
+ "854": {
+  "basis": "Splash & Dash guided tasting of 4 wines, 30 min",
+  "conf": "site",
+  "from": 15,
+  "source": "https://nichewinecompany.com/reservation/"
+ },
+ "858": {
+  "basis": "Wine tasting, 30-60 min",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.observatorywines.ca/"
+ },
+ "859": {
+  "basis": "Traditional tasting (waived with 2 bottles/person)",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.originwines.ca/wine-tastings-faq.html"
+ },
+ "861": {
+  "basis": "Seated tasting of 8 wines",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.pipedreamswinery.com/Visit-Us"
+ },
+ "863": {
+  "basis": "Flight Club tasting",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://redroosterwinery.com/"
+ },
+ "864": {
+  "basis": "45-min tasting of 4+ current releases (refunded with wine club)",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://www.rigourandwhimsy.ca/"
+ },
+ "865": {
+  "basis": "Seasonal Selections tasting of 4 wines",
+  "conf": "site",
+  "from": 20,
+  "source": "https://www.road13vineyards.com/tastings-experiences/"
+ },
+ "867": {
+  "basis": "Guided Wine Tasting Experience",
+  "conf": "site",
+  "from": 35,
+  "source": "https://www.scorchedearthwinery.ca/"
+ },
+ "870": {
+  "basis": "Fruit and dessert wine tasting fee",
+  "conf": "site",
+  "from": 7.5,
+  "source": "https://sleepinggiantfruitwinery.ca/products/sleeping-giant-winery-wine-tasting-bookings"
+ },
+ "871": {
+  "basis": "Seated Portfolio Tasting",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://solverowines.ca/visit/"
+ },
+ "873": {
+  "basis": "Premium tasting of 5 wines",
+  "conf": "box_only",
+  "from": 15,
+  "source": "https://stoneboatvineyards.com/reservation/"
+ },
+ "876": {
+  "basis": "5-wine tasting, credited to bottle",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://www.tenderhopewinery.com/"
+ },
+ "877": {
+  "basis": "Seated tasting of 4 featured wines (+ tax); flights $18",
+  "conf": "site",
+  "from": 10,
+  "source": "https://www.thegallerywinery.com/visit/"
+ },
+ "880": {
+  "basis": "Flight of 5 wines, plus tax",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://tightropewinery.ca/"
+ },
+ "881": {
+  "basis": "Roots bar tasting, 3 wines",
+  "conf": "box_only",
+  "from": 10,
+  "source": "https://vasantiwines.com/"
+ },
+ "9": {
+  "basis": "Standard tasting: 1 cider + 5 wines, ~30 min (waived with bottle purchase)",
+  "conf": "site",
+  "from": 15,
+  "source": "https://8thgeneration.com/"
+ }
+}

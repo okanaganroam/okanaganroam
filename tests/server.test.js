@@ -17886,7 +17886,8 @@ test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summa
     assert.deepEqual(app.tourCardFacts({ rows: [{ label: 'Prices', text: 'Adult $14.29 at the gate.' }] }), { price: null, time: null });
     assert.deepEqual(app.tourCardFacts(null), { price: null, time: null });
     app.CARD_PRICES['999999'] = { from: 14.29 }; assert.equal(app.cardPriceFor(999999), 'From $14.29'); app.CARD_PRICES['999998'] = { from: 2095 }; assert.equal(app.cardPriceFor(999998), 'From $2,095');
-    delete app.CARD_PRICES['999999']; delete app.CARD_PRICES['999998'];
+    app.CARD_PRICES['999997'] = { from: 660, per: 'helicopter' }; assert.equal(app.cardPriceFor(999997), 'From $660 / helicopter');
+    delete app.CARD_PRICES['999999']; delete app.CARD_PRICES['999998']; delete app.CARD_PRICES['999997'];
   } finally {
     db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(v.id);
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);

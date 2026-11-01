@@ -29,5 +29,15 @@
  "Closed · reopens Sep {0}": "Fermé · réouverture le {0} sept.",
  "Closed · reopens Oct {0}": "Fermé · réouverture le {0} oct.",
  "Closed · reopens Nov {0}": "Fermé · réouverture le {0} nov.",
- "Closed · reopens Dec {0}": "Fermé · réouverture le {0} déc."
+ "Closed · reopens Dec {0}": "Fermé · réouverture le {0} déc.",
+ "From ${0} / boat": "À partir de {0} $ / bateau",
+ "From ${0} / group": "À partir de {0} $ / groupe",
+ "From ${0} / hour": "À partir de {0} $ / heure",
+ "From ${0} / session": "À partir de {0} $ / séance",
+ "From ${0} / class": "À partir de {0} $ / cours",
+ "From ${0} / helicopter": "À partir de {0} $ / hélicoptère",
+ "From ${0} / game": "À partir de {0} $ / partie",
+ "From ${0} / flight": "À partir de {0} $ / plateau",
+ "From ${0} / ride": "À partir de {0} $ / balade",
+ "From ${0} / child": "À partir de {0} $ / enfant"
 }
