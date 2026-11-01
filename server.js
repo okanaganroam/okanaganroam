@@ -9094,19 +9094,44 @@ function visitTextPolish(t) {
     .replace(/(\d(?::\d\d)? ?(?:AM|PM)) ?- ?(\d)/g, '$1 \u2013 $2')
     .replace(/, Daily\b/g, ', daily');
 }
-function visitInfoHtml(info) {
+// French boxes (2026-10-31): a French page shows the box row by row, each row's text read from the French list
+// (data/french/visit-boxes-*.json, keyed by the English text as the box shows it). A row the list has nothing for is
+// left out, so a page never mixes languages, and an edited English row simply drops out until it is translated.
+const VISIT_LABELS_FR = {
+  'Known for': 'Connu pour', 'Prices': 'Tarifs', 'Time needed': 'Durée', 'Booking': 'Réservation', 'Ages': 'Âges',
+  'Groups': 'Groupes', 'What to bring': 'À apporter', 'Season': 'Saison', 'Good to know': 'Bon à savoir',
+  'Tastings': 'Dégustations', 'Flights': 'Plateaux de dégustation', 'Restaurant': 'Restaurant', 'Food': 'Cuisine',
+  'Winter': 'Hiver', 'Tours': 'Visites', 'Games': 'Jeux', 'To go': 'À emporter', 'Kids & dogs': 'Enfants et chiens',
+};
+function visitLabelFr(label) { return VISIT_LABELS_FR[label] || frLookup(label) || label; }
+function visitTextFr(text) {
+  const t = frLookup(visitTextPolish(text));
+  return t == null ? null : frTidy(t);
+}
+// The Book button's words on a French page: the French of the box's own label, or plain "Réserver".
+function visitBookLabelFr(info, type) {
+  const en = (info && info.booking_label) || VISIT_BOOK_LABELS[type] || '';
+  return (en && frLookup(en)) || 'Réserver';
+}
+function visitInfoHtml(info, fr = false) {
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
+  if (fr) {
+    const rowsFr = info.rows.map((r) => ({ ...r, text: visitTextFr(r.text), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
+    if (!rowsFr.length) return '';
+    info = { ...info, rows: rowsFr };
+  }
   const rowHtml = (r) => {
     const linked = r.venue_id ? db.prepare('SELECT region, type, slug, name FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id) : null;
-    let text = escapeHtml(visitTextPolish(r.text));
+    let text = escapeHtml(fr ? r.text : visitTextPolish(r.text));
     if (linked && linked.slug && CATEGORY_SLUGS[linked.type] && r.text.includes(linked.name)) {
       text = text.replace(escapeHtml(linked.name), `<a href="/${linked.region}/${CATEGORY_SLUGS[linked.type]}/${linked.slug}">${escapeHtml(linked.name)}</a>`);
     }
-    const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">More ↗</a>` : '';
+    const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${fr ? 'Plus' : 'More'} ↗</a>` : '';
     return `<li><span class="visit-label">${escapeHtml(r.label)}</span><span>${text}${more}</span></li>`;
   };
-  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(r.label)).sort((a, b) => (b.label === 'Known for') - (a.label === 'Known for'));
-  const folded = info.rows.filter((r) => !VISIT_ROWS_SHOWN.has(r.label));
+  const enLabel = (r) => (fr ? r.__en : r.label);
+  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(enLabel(r))).sort((a, b) => (enLabel(b) === 'Known for') - (enLabel(a) === 'Known for'));
+  const folded = info.rows.filter((r) => !VISIT_ROWS_SHOWN.has(enLabel(r)));
   // A box with nothing in the always-shown set shows its first row open, so it is never just a "More" line.
   if (!shown.length && folded.length) shown.push(folded.shift());
   // A single folded row shows open too (2026-10-31): a "More" that hides one line only costs a tap (Geo Cider's
@@ -9114,15 +9139,16 @@ function visitInfoHtml(info) {
   if (folded.length === 1) shown.push(folded.shift());
   const rows = shown.map(rowHtml).join('');
   const more = folded.length
-    ? `<details class="visit-more"><summary>More: ${escapeHtml(folded.map((r) => r.label.toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`
+    ? `<details class="visit-more"><summary>${fr ? 'Plus\u00a0: ' : 'More: '}${escapeHtml(folded.map((r) => r.label.toLowerCase()).join(', '))}</summary><ul class="visit-list">${folded.map(rowHtml).join('')}</ul></details>`
     : '';
   let host = '';
   try { host = new URL(info.source_url).hostname.replace(/^www\./, ''); } catch (e) { host = ''; }
-  const when = info.checked_at && parseLocalDate(info.checked_at) ? `${formatLocalDateShort(info.checked_at, { weekday: false })}, ${info.checked_at.slice(0, 4)}` : '';
+  const frDate = (d) => `${Number(d.slice(8, 10)) === 1 ? '1er' : Number(d.slice(8, 10))} ${FR_SHORT_MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`;
+  const when = info.checked_at && parseLocalDate(info.checked_at) ? (fr ? frDate(info.checked_at) : `${formatLocalDateShort(info.checked_at, { weekday: false })}, ${info.checked_at.slice(0, 4)}`) : '';
   return `<section class="venue-section venue-visit" id="venueVisit" aria-labelledby="venueVisitHead">
-    <h2 id="venueVisitHead">Plan your visit</h2>
+    <h2 id="venueVisitHead">${fr ? 'Planifiez votre visite' : 'Plan your visit'}</h2>
     <ul class="visit-list">${rows}</ul>${more}
-    <p class="venue-hours-checked">${host ? `From ${escapeHtml(host)}` : 'From the venue'}${when ? `, checked ${escapeHtml(when)}` : ''}</p>
+    <p class="venue-hours-checked">${fr ? `${host ? `Source\u00a0: ${escapeHtml(host)}` : 'Source\u00a0: l\u2019\u00e9tablissement'}${when ? `, v\u00e9rifi\u00e9 le ${escapeHtml(when)}` : ''}` : `${host ? `From ${escapeHtml(host)}` : 'From the venue'}${when ? `, checked ${escapeHtml(when)}` : ''}`}</p>
     <style>
       .venue-visit .visit-list { list-style: none; margin: 0; padding: 0; }
       .venue-visit .visit-list li { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px dotted rgba(42,32,25,0.18); line-height: 1.5; }
@@ -32187,8 +32213,10 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const venueLinkRow = venue.redirect_to ? {} : Object.fromEntries(Object.entries(venueLinks(venue.id) || {})
     .map(([k, v]) => [k, (k === 'menu_url' || k === 'booking_url') && sameAsWebsite(v) ? null : v]));
   // Plan your visit (2026-10-29): English pages only (the facts are in English, from the venue's own site).
-  const visitInfo = venue.redirect_to || fr ? null : venueVisitInfo(venue.id);
-  const visitHtml = visitInfoHtml(visitInfo);
+  // French pages (2026-10-31) show the translated rows from data/french/visit-boxes-*.json; none translated -> no box.
+  const visitInfoRaw = venue.redirect_to ? null : venueVisitInfo(venue.id);
+  const visitHtml = visitInfoHtml(visitInfoRaw, fr);
+  const visitInfo = visitHtml ? visitInfoRaw : null;
   // Box polish (2026-10-31): Good to Know drops its Menu row when the Plan your visit box already links that page
   // (a winery's "Menu" was its restaurant's menu, also behind the Restaurant row's "More").
   const urlKey = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
@@ -32340,7 +32368,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     venue.website ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
     venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
-      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book')}</a>` : null,
+      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).

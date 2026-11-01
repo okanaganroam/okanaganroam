@@ -32297,3 +32297,31 @@ test('Plan your visit (2026-10-31): a brewery keeps Flights and Food open and it
   assert.match(app.renderVenuePage(app.findVenueBySlug(b.region, 'brewery', 'visit-fixture-brewery'), [], [], []), />Book a tour<\/a>/);
   assert.equal(app.guardedVisitInfoUpdate(b.id, relabel.info, { ...JSON.parse(relabel.info), booking_label: 'x'.repeat(30) }, { reason: 'fixture', batch_id: 'test-brew' }).reason, 'invalid_visit');
 });
+
+test('Plan your visit (2026-10-31): French pages show the translated rows, French labels, footer and button; untranslated rows are left out', () => {
+  seasonInsert.run({ name: 'Visit Fixture Cidery', type: 'brewery', hours: SEASON_WEEK, slug: 'visit-fixture-cidery' });
+  const c = app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery');
+  const r = app.guardedVisitInfoUpdate(c.id, null, { rows: [
+    { label: 'Known for', text: 'Light-handed winemaking at an urban Kelowna winery: crisp whites, rosés, reds and the Small Lots program.' },
+    { label: 'Prices', text: 'A sentence the French list has never seen.' },
+    { label: 'Tastings', text: 'Another untranslated line, $12.' },
+  ], booking_url: 'https://cider.example/book', booking_label: 'Book a tasting', source_url: 'https://cider.example/', checked_at: '2026-10-29' }, { reason: 'fixture', batch_id: 'test-visit-fr' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const fr = app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery'), [], [], [], { lang: 'fr' });
+  const box = fr.slice(fr.indexOf('<section class="venue-section venue-visit"'), fr.indexOf('</section>', fr.indexOf('<section class="venue-section venue-visit"')));
+  assert.match(box, /<h2 id="venueVisitHead">Planifiez votre visite<\/h2>/);
+  assert.match(box, /<span class="visit-label">Connu pour<\/span><span>Vinification à main légère dans un vignoble urbain de Kelowna/);
+  assert.doesNotMatch(box, /Light-handed|never seen|untranslated/, 'untranslated rows are left out, never shown in English');
+  assert.doesNotMatch(box, /visit-label">(Prices|Tarifs|Tastings|Dégustations)</);
+  assert.match(box, /Source\u00a0: cider\.example, vérifié le 29 oct\. 2026/);
+  assert.match(fr, />Réserver une dégustation<\/a>/, 'the Book button reads in French');
+  // The English page is unchanged.
+  const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery'), [], [], []);
+  assert.match(en, /<h2 id="venueVisitHead">Plan your visit<\/h2>/);
+  assert.match(en, /A sentence the French list has never seen\./);
+  // A box with nothing translated shows no French box and no French Book button.
+  const cur = app.currentVisitInfoJson(c.id);
+  const only = app.guardedVisitInfoUpdate(c.id, cur, { ...JSON.parse(cur), rows: [{ label: 'Prices', text: 'Entirely untranslated.' }] }, { reason: 'fixture', batch_id: 'test-visit-fr' });
+  assert.equal(only.ok, true, JSON.stringify(only));
+  assert.doesNotMatch(app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery'), [], [], [], { lang: 'fr' }), /venue-visit|Réserver une dégustation/);
+});
