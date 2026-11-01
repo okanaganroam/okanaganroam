@@ -27,6 +27,9 @@ const hoursModule = (() => { try { return require('./hours.js'); } catch (e) { r
 const { mapEventPin, mapPlaceIsPrivate } = (() => { try { return require('./map-event-pins'); } catch (e) { return { mapEventPin: () => null, mapPlaceIsPrivate: (t) => /private\s+home/i.test(String(t || '')) }; } })();
 // Guarded like hours.js: a copy of the server without share-card.js (isolated tests) runs on, with the brand share image.
 const shareCardModule = (() => { try { return require('./share-card.js'); } catch (e) { return null; } })();
+// Badge guide intros (2026-10-27): the data-driven opening paragraph and meta description of /guide/<town>/<badge>.
+// Guarded like hours.js: without guide-intros.js the guides keep their one-line intro per badge.
+const guideIntros = (() => { try { return require('./guide-intros.js'); } catch (e) { return null; } })();
 
 // Session replay is opt-in and disabled until an explicit host variable is set.
 const replayModule = (() => { try { return require('./session-replay'); } catch (e) { return null; } })();
@@ -11539,6 +11542,82 @@ function guideBadgeHeading(region, badge) {
   const town = REGION_LABELS[region];
   return { heading: t.h.replace('{T}', town), intro: t.i.replace(/\{T\}/g, town) };
 }
+// Badge guide intros (2026-10-27): everything guide-intros.js needs about one page's places, read from what the site
+// itself shows -- stored hours and happy hour times, fresh happy hour deals (happyHourDealsShown), weekly specials and
+// nights checked in the last 120 days, Local Favourites / Hidden Gems (and their public notes), dog rules, menu links
+// or published menus, and seasons. Each part is guarded: a missing table only drops that fact.
+function guideIntroContext(badge, venues, now = new Date()) {
+  const ids = venues.map((v) => v.id).filter((id) => id != null);
+  const ctx = { hoursModule, rows: new Map(), deals: new Map(), specials: new Map(), nights: new Map(), localFavourites: new Set(), hiddenGems: new Set(), notes: new Map(), dogPolicy: new Map(), menus: new Set(), seasonal: new Set() };
+  if (!ids.length) return ctx;
+  const inIds = `(${ids.map(() => '?').join(',')})`;
+  const idSet = new Set(ids);
+  const types = new Map(venues.map((v) => [v.id, v.type]));
+  try {
+    for (const r of db.prepare(`SELECT id, hours, happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE id IN ${inIds}`).all(...ids)) {
+      ctx.rows.set(r.id, r);
+      const d = happyHourDealsShown(r, now);
+      if (d) ctx.deals.set(r.id, d.en);
+    }
+  } catch (e) { /* older schema: no happy hour facts */ }
+  try { for (const [id, list] of allVenueSpecials()) if (idSet.has(id)) { const c = list.filter((x) => !specialsStale(x.checked_at, now)).length; if (c) ctx.specials.set(id, c); } } catch (e) { /* no specials */ }
+  try {
+    for (const [id, list] of allVenueWeeklyNights()) {
+      if (!idSet.has(id) || !NIGHT_TYPES.has(types.get(id))) continue;
+      const kinds = list.filter((x) => !nightsStale(x.checked_at, now)).map((x) => x.kind);
+      if (kinds.length) ctx.nights.set(id, kinds);
+    }
+  } catch (e) { /* no weekly nights */ }
+  try { ctx.localFavourites = getCollectionVenueIds('local_favorite'); ctx.hiddenGems = getHiddenGemVenueIds(); } catch (e) { /* no collections */ }
+  try {
+    for (const [id, note] of getPublicCollectionNotes('hidden_gem')) ctx.notes.set(id, note);
+    for (const [id, note] of getPublicCollectionNotes('local_favorite')) ctx.notes.set(id, note);
+  } catch (e) { /* no notes */ }
+  if (badge === 'dog_friendly') { try { ctx.dogPolicy = getDogPolicyNotes(); } catch (e) { /* none */ } }
+  try { for (const r of db.prepare(`SELECT venue_id FROM venue_links WHERE menu_url IS NOT NULL AND trim(menu_url) != '' AND venue_id IN ${inIds}`).all(...ids)) ctx.menus.add(r.venue_id); } catch (e) { /* no links */ }
+  try { for (const r of db.prepare(`SELECT DISTINCT venue_id FROM venue_menus WHERE status = 'published' AND venue_id IN ${inIds}`).all(...ids)) ctx.menus.add(r.venue_id); } catch (e) { /* no menus */ }
+  try { for (const id of getSeasonRows(todayLocal(now)).keys()) if (idSet.has(id)) ctx.seasonal.add(id); } catch (e) { /* no seasons */ }
+  if (DIET_STRENGTH[badge]) ctx.dietTier = (v) => dietMatchStrength(v, badge).tier;
+  const region = venues[0] && venues[0].region;
+  if (region && venues.every((v) => v.region === region)) {
+    try { const plan = guideStandoutPlan(region, ctx); if (plan.has(badge)) ctx.standoutPlan = plan.get(badge); } catch (e) { /* the page picks its own */ }
+  }
+  return ctx;
+}
+// One town's standouts, spread over its guide pages (guide-intros.js allocateStandouts): a Local Favourite or Hidden
+// Gem is the standout of one guide in town, not all of them. Kept until a venue or a collection changes.
+let guideStandoutCache = null;
+function guideStandoutPlan(region, ctx) {
+  let sig = '';
+  try {
+    const a = db.prepare('SELECT COUNT(*) AS n, MAX(updated_at) AS m FROM venues').get();
+    const b = db.prepare('SELECT COUNT(*) AS n, MAX(rowid) AS r FROM collection_items').get();
+    sig = `${a.n}|${a.m}|${b.n}|${b.r}`;
+  } catch (e) { sig = String(Math.random()); }
+  if (!guideStandoutCache || guideStandoutCache.sig !== sig) guideStandoutCache = { sig, byRegion: new Map() };
+  if (guideStandoutCache.byRegion.has(region)) return guideStandoutCache.byRegion.get(region);
+  const pages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region).map((c) => {
+    const list = db.prepare(`SELECT * FROM venues WHERE region = ? AND ${c.badge} = 1 AND redirect_to IS NULL ORDER BY reviews DESC`).all(region).map(rowToVenue);
+    return { badge: c.badge, cand: guideIntros.standoutCandidates(c.badge, list, ctx) };
+  });
+  const plan = guideIntros.allocateStandouts(pages);
+  guideStandoutCache.byRegion.set(region, plan);
+  return plan;
+}
+function guideIntroFacts(badge, venues, now = new Date()) {
+  return guideIntros ? guideIntros.computeGuideFacts(badge, venues, guideIntroContext(badge, venues, now)) : null;
+}
+// -> { text, html, meta, keys } or null (no module, or fewer than two notable facts: the one-line intro stays).
+function guideIntroFor(region, badge, venues, lang = 'en', now = new Date(), facts = null) {
+  if (!guideIntros) return null;
+  const f = facts || guideIntroFacts(badge, venues, now);
+  const out = guideIntros.renderGuideIntro(f, {
+    lang, region, town: REGION_LABELS[region], noun: BADGE_LABELS[badge] ? BADGE_LABELS[badge].noun : 'places',
+    timeText: (m, fr) => (!fr && m % 1440 === 0 ? 'midnight' : happyHourTimeText(m, fr)), rangeText: happyHourRangeText,
+    nightLabels: NIGHT_KIND_LABELS, pathFor: (v) => venuePagePath(v), escape: escapeHtml,
+  });
+  return out.keys.length >= 2 ? out : null;
+}
 function renderGuidePage(region, badge, venues, filter = null, now = new Date(), opts = {}) {
   const regionLabel = REGION_LABELS[region];
   // Town Happy Hour pages (2026-10-26): today's times, deals and "On now" on each card; on now first, then later today.
@@ -11547,7 +11626,11 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date(),
   // Search ranking (2026-10-18): a dietary guide ranks fully vegan (vegetarian, gluten-free) places first.
   const diet = DIET_STRENGTH[badge] ? badge : null;
   if (diet) venues = sortByDietStrength(venues, diet);
-  const { heading, intro } = guideBadgeHeading(region, badge);
+  const { heading, intro: staticIntro } = guideBadgeHeading(region, badge);
+  // Badge guide intros (2026-10-27): the intro and meta description come from this page's own places (guideIntroFor);
+  // the one-line badge intro stays only when the list has too little to say.
+  const gi = guideIntroFor(region, badge, venues, opts.lang === 'fr' ? 'fr' : 'en', now);
+  const intro = gi ? gi.text : staticIntro;
   const tally = {};
   for (const v of venues) tally[v.type] = (tally[v.type] || 0) + 1;
   const types = Object.keys(tally).filter((t) => CATEGORY_LABELS[t]).sort((a, b) => tally[b] - tally[a] || a.localeCompare(b))
@@ -11573,7 +11656,8 @@ function renderGuidePage(region, badge, venues, filter = null, now = new Date(),
     name: heading.replace(` in ${regionLabel}`, ''),
     crumbs: [{ name: regionLabel, href: `/${region}` }],
     title: `${heading}, BC | Okanagan Roam`,
-    description: `${venues.length} ${BADGE_LABELS[badge].noun} in ${regionLabel}, BC. ${intro}`.slice(0, 300),
+    description: gi ? gi.meta : `${venues.length} ${BADGE_LABELS[badge].noun} in ${regionLabel}, BC. ${intro}`.slice(0, 300),
+    introHtml: gi ? gi.html : null,
     bodyClass: 'guide-page',
     surface: 'guide',
     pageType: 'guide',
@@ -28266,7 +28350,7 @@ ${renderGolfHeaderHtml()}
     try { new MutationObserver(sync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] }); } catch (e) {}
   })();
   </script>`, `<h1>${escapeHtml(content.heading)}</h1>
-  ${content.intro ? `<p class="outdoor-intro fd-intro">${escapeHtml(content.intro)}</p>` : ''}${cfg.heroExtraHtml || ''}`)}
+  ${content.intro ? `<p class="outdoor-intro fd-intro">${content === cfg.categoryContent.all && cfg.introHtml ? cfg.introHtml : escapeHtml(content.intro)}</p>` : ''}${cfg.heroExtraHtml || ''}`)}
   ${cfg.leadHtml || ''}${cfg.howWePick ? `
   <section class="how-we-pick" aria-labelledby="howWePickHead"><h2 id="howWePickHead">${escapeHtml(cfg.howWePick.heading)}</h2><p>${escapeHtml(cfg.howWePick.text)}</p></section>` : ''}
   ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
@@ -57224,7 +57308,7 @@ module.exports = {
   renderCategoryPage,
   renderCategoryAllRegionsPage,
   renderRegionPage,
-  renderGuidePage,
+  renderGuidePage, guideBadgeHeading, guideIntroFor, guideIntroFacts, guideIntroContext, MIN_INDEXABLE_GUIDE_VENUES, rowToVenue,
   render404Page,
   CATEGORY_SLUGS,
   REGION_LABELS,
