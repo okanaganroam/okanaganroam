@@ -32390,3 +32390,34 @@ test('Plan your visit (2026-10-31): French pages show the translated rows, Frenc
   assert.equal(only.ok, true, JSON.stringify(only));
   assert.doesNotMatch(app.renderVenuePage(app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-cidery'), [], [], [], { lang: 'fr' }), /venue-visit|Réserver une dégustation/);
 });
+
+test('Ski resort pages (2026-11-01): the Mountain at a glance panel shows status, stats and the hill’s own links, and reads in French', async () => {
+  const REG = ['big-white', 'silverstar', 'apex', 'baldy'];
+  for (const r of REG) {
+    const f = app.SKI_RESORT_SEASON[r];
+    const soon = app.skiSeasonBoxHtml(r, '2026-11-01');
+    assert.match(soon, /<h2 id="skiHubHeading" class="ski-hub-title">Mountain at a glance<\/h2>/, r);
+    assert.match(soon, new RegExp(`ski-hub-status ski-hub-status-${f.opens ? 'soon' : 'tba'}`), r);
+    assert.match(soon, /class="ski-hub-stats"/, r);
+    for (const k of ['snow', 'webcams', 'tickets']) assert.ok(soon.includes(`href="${f.links[k]}"`), `${r} ${k} link`);
+    assert.doesNotMatch(soon, /href="null"|href="undefined"|>undefined</, r);
+    assert.equal((soon.match(/class="ski-hub-tool"/g) || []).length, ['snow', 'webcams', 'tickets', 'map'].filter((k) => f.links[k]).length, r);
+    assert.equal(app.skiSeasonBoxHtml(r, '2028-01-01').includes('ski-hub-status'), false, `${r}: no season line after the season`);
+    assert.match(app.skiSeasonBoxHtml(r, '2028-01-01'), /class="ski-hub-tools"/, `${r}: links stay`);
+  }
+  assert.match(app.skiSeasonBoxHtml('big-white', '2026-12-01'), /ski-hub-status-open[^>]*><span class="ski-hub-dot" aria-hidden="true"><\/span>Open for the season/);
+  assert.match(app.skiSeasonBoxHtml('big-white', '2026-11-01'), /Opens Thursday, November 26/);
+  // The panel sits above the category tabs, in both languages.
+  const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+  const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
+    try {
+      const base = `http://127.0.0.1:${tmp.address().port}`;
+      resolve({ en: await (await fetch(`${base}/big-white`)).text(), fr: await (await fetch(`${base}/fr/big-white`)).text() });
+    } catch (err) { reject(err); } finally { tmp.close(); }
+  }));
+  assert.ok(pages.en.indexOf('class="ski-hub"') > -1 && pages.en.indexOf('class="ski-hub"') < pages.en.indexOf('<nav class="category-region-selector region-category-tabs"'), 'panel above the tabs');
+  assert.match(pages.fr, /La montagne en un coup d’œil/);
+  assert.match(pages.fr, /Bulletin de neige/);
+  assert.match(pages.fr, /Site officiel/);
+  assert.doesNotMatch(pages.fr.slice(pages.fr.indexOf('class="ski-hub"'), pages.fr.indexOf('</section>', pages.fr.indexOf('class="ski-hub"'))), /Mountain at a glance|Snow report|Official site/);
+});

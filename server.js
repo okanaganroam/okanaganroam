@@ -18720,37 +18720,53 @@ const SKI_RESORT_META = {
 // (data/french/ski-season-2026-10-29.json).
 const SKI_RESORT_SEASON = {
   'big-white': {
+    official: 'https://www.bigwhite.com/', checked: 'November 1, 2026',
     before: 'Opens Thursday, November 26, depending on snowfall. Last day Sunday, April 4, 2027.',
     during: 'Open for the season until Sunday, April 4, 2027.',
+    statusSoon: 'Opens Thursday, November 26', noteSoon: 'Snow permitting. Last day Sunday, April 4, 2027. Night skiing starts December 18.',
+    statusOpen: 'Open for the season', noteOpen: 'Last day Sunday, April 4, 2027.',
     opens: '2026-11-26', closes: '2027-04-04', endBy: '2027-04-04',
-    drive: 'Under an hour from Kelowna (56 km).',
-    mountain: '119 runs, 17 lifts and 777 m (2,550 ft) of vertical.',
+    stats: [{ l: 'Runs', v: '119' }, { l: 'Lifts', v: '17' }, { l: 'Vertical', v: '777 m', s: '2,550 ft' }, { l: 'Snowfall', v: '750 cm', s: '25 ft a year' }, { l: 'From Kelowna', v: '56 km', s: 'Under an hour' }],
     links: {
-      snow: 'https://www.bigwhite.com/mountain-conditions/daily-snow-report',
+      snow: 'https://www.bigwhite.com/daily-snow-report',
       webcams: 'https://www.bigwhite.com/mountain-conditions/webcams',
       tickets: 'https://www.bigwhite.com/tickets-passes/lift-tickets',
       map: 'https://www.bigwhite.com/explore/mountain-info/maps',
+      status: 'https://www.bigwhite.com/lift-status-hours',
+      passes: 'https://www.bigwhite.com/season-passes',
+      rentals: 'https://www.bigwhite.com/tickets-passes/rentals',
+      lessons: 'https://www.bigwhite.com/ski-school',
+      access: 'https://www.bigwhite.com/plan-your-trip/get-big-white/maps-directions',
     },
   },
   silverstar: {
+    official: 'https://www.skisilverstar.com/', checked: 'November 1, 2026',
     before: 'Opens Friday, November 27.',
     during: 'Open for the season.',
-    opens: '2026-11-27', closes: null, endBy: '2027-04-30',
-    drive: null,
-    mountain: '133 marked runs and 760 m of vertical.',
+    statusSoon: 'Opens Friday, November 27', noteSoon: 'Tentative date. Nordic trails open November 20. Night skiing until 8:30 pm all season.',
+    statusOpen: 'Open for the season', noteOpen: 'Tentative last day Sunday, April 4, 2027. Night skiing until 8:30 pm.',
+    opens: '2026-11-27', closes: '2027-04-04', endBy: '2027-04-30',
+    stats: [{ l: 'Runs', v: '133' }, { l: 'Vertical', v: '760 m' }, { l: 'Terrain', v: '3,304 acres' }, { l: 'Snowfall', v: '700 cm', s: '23 ft a year' }, { l: 'From Vernon', v: '22 km', s: 'About 20 minutes' }],
     links: {
       snow: 'https://www.skisilverstar.com/the-mountain/weather-conditions/snow-report-forecast/',
       webcams: 'https://www.skisilverstar.com/the-mountain/webcams/',
       tickets: 'https://www.skisilverstar.com/tickets-passes/winter-tickets/',
       map: 'https://www.skisilverstar.com/the-mountain/mountain-maps/winter-maps/',
+      status: 'https://www.skisilverstar.com/the-mountain/weather-conditions/lift-trail-status/',
+      passes: 'https://www.skisilverstar.com/tickets-passes/winter-passes/',
+      rentals: 'https://www.skisilverstar.com/lessons-rentals/rentals/',
+      lessons: 'https://www.skisilverstar.com/lessons-rentals/lessons/',
+      access: 'https://www.skisilverstar.com/the-mountain/visitor-guide/getting-here/',
     },
   },
   apex: {
+    official: 'https://apexresort.com/', checked: 'October 29, 2026',
     before: 'Opening day for the 2026/27 season hasn’t been announced yet.',
     during: null,
+    statusSoon: 'Opening date to be announced', noteSoon: 'Opening day for the 2026/27 season hasn’t been announced yet.',
+    statusOpen: null, noteOpen: null,
     opens: null, closes: null, endBy: '2027-04-30',
-    drive: 'About 30 minutes from Penticton.',
-    mountain: '85 runs, 4 lifts and 2,000 ft of vertical.',
+    stats: [{ l: 'Runs', v: '85' }, { l: 'Lifts', v: '4' }, { l: 'Vertical', v: '2,000 ft' }, { l: 'From Penticton', v: 'About 30 minutes' }],
     links: {
       snow: 'https://apexresort.com/weather/',
       webcams: 'https://apexresort.com/weather/#live-webcams',
@@ -18759,48 +18775,133 @@ const SKI_RESORT_SEASON = {
     },
   },
   baldy: {
+    official: 'https://baldyresort.com/', checked: 'November 1, 2026',
     before: 'Opening day hasn’t been announced yet. The resort usually runs from early December to early April.',
     during: null,
+    statusSoon: 'Opening date to be announced', noteSoon: 'The resort usually runs from early December to early April.',
+    statusOpen: null, noteOpen: null,
     opens: null, closes: null, endBy: '2027-04-30',
-    drive: 'About 45 minutes from Oliver and an hour from Osoyoos.',
-    mountain: '35 alpine runs.',
+    stats: [{ l: 'Runs', v: '35' }, { l: 'Vertical', v: '1,315 ft' }, { l: 'Snowfall', v: '25–35 ft', s: 'a year' }, { l: 'From Oliver', v: '45 minutes', s: 'About an hour from Osoyoos' }],
     links: {
       snow: 'https://baldyresort.com/baldy-weather-cams/',
       webcams: 'https://baldyresort.com/baldy-weather-cams/#webcams',
       tickets: 'https://baldyresort.com/lift-tickets/',
       map: 'https://baldyresort.com/mountain/#trail',
+      status: 'https://baldyresort.com/baldy-weather-cams/#lifts',
+      passes: 'https://baldyresort.com/lift-tickets/season-passes/',
+      rentals: 'https://baldyresort.com/rentals-and-snow-school/ski-snowboard-rentals/',
+      lessons: 'https://baldyresort.com/rentals-and-snow-school/',
+      access: 'https://baldyresort.com/mountain/#directions',
     },
   },
 };
-const SKI_RESORT_LINK_LABELS = [['snow', 'Snow report'], ['webcams', 'Webcams'], ['tickets', 'Lift tickets'], ['map', 'Trail map']];
-function skiSeasonLine(f, today) {
+// ---- Mountain at a glance (2026-11-01): the panel at the top of every ski-hill page. ----
+// One look gives a skier the hill's status (opens / open now), the numbers that size it up, and one-tap links to the
+// hill's own snow report, webcams, lift tickets and trail map (plus lift status, passes, rentals, lessons and
+// directions where the hill publishes them). Every fact is read on the hill's own site; every line is a fixed
+// string so the French list can carry it (data/french/ski-hub-2026-11-01.json). After `endBy` the season line is
+// left out until next season's dates are added; the stats and links stay.
+const SKI_HUB_TOOLS = [
+  ['snow', 'Snow report', 'Today’s conditions'],
+  ['webcams', 'Webcams', 'Live views'],
+  ['tickets', 'Lift tickets', 'Prices and booking'],
+  ['map', 'Trail map', 'Runs and lifts'],
+];
+const SKI_HUB_EXTRAS = [
+  ['status', 'Lift & trail status'],
+  ['passes', 'Season passes'],
+  ['rentals', 'Rentals'],
+  ['lessons', 'Lessons'],
+  ['access', 'Getting there'],
+];
+const SKI_HUB_ICONS = {
+  snow: '<path d="M12 2v20M4.2 7l15.6 10M4.2 17L19.8 7M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5"/>',
+  webcams: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  tickets: '<path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M14 5v14" stroke-dasharray="2 2.5"/>',
+  map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+};
+function skiHubIcon(key) {
+  return SKI_HUB_ICONS[key] ? `<svg class="ski-hub-icon" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${SKI_HUB_ICONS[key]}</svg>` : '';
+}
+// 'soon' = opens later, 'open' = the season is on, 'tba' = no date yet.
+function skiSeasonState(f, today) {
   if (!f || today > f.endBy) return null;
-  if (f.opens && today >= f.opens) return f.during || null;
-  return f.before;
+  if (f.opens && today >= f.opens) return f.during ? 'open' : null;
+  return f.opens ? 'soon' : 'tba';
+}
+function skiSeasonLine(f, today) {
+  const st = skiSeasonState(f, today);
+  return st === 'open' ? f.during : st ? f.before : null;
 }
 function skiSeasonBoxHtml(region, today = todayLocal()) {
   const f = SKI_RESORT_SEASON[region];
   if (!f) return '';
-  const rows = [['Season', skiSeasonLine(f, today)], ['Getting there', f.drive], ['The mountain', f.mountain]].filter((r) => r[1]);
-  const links = SKI_RESORT_LINK_LABELS.filter(([k]) => f.links[k]);
-  if (!rows.length && !links.length) return '';
-  return `<section class="ski-season" aria-labelledby="skiSeasonHeading">
-    <h2 id="skiSeasonHeading">Season at a glance</h2>
-    <dl>${rows.map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}</dl>${links.length ? `
-    <p class="ski-season-links">${links.map(([k, l]) => `<a href="${escapeHtml(f.links[k])}" target="_blank" rel="noopener">${escapeHtml(l)}</a>`).join('')}</p>` : ''}
+  const state = skiSeasonState(f, today);
+  const status = state === 'open' ? f.statusOpen : state ? f.statusSoon : null;
+  const note = state === 'open' ? f.noteOpen : state ? f.noteSoon : null;
+  const stats = (f.stats || []).filter((s) => s && s.v && s.l);
+  const tools = SKI_HUB_TOOLS.filter(([k]) => f.links[k]).map(([k, label, hint]) => [k, ...((f.toolLabels && f.toolLabels[k]) || [label, hint])]);
+  const extras = SKI_HUB_EXTRAS.filter(([k]) => f.links[k]);
+  if (!status && !stats.length && !tools.length) return '';
+  const ext = '<span class="ski-hub-sr"> (opens the resort’s own site in a new tab)</span>';
+  return `<section class="ski-hub" aria-labelledby="skiHubHeading" data-ski-state="${state || 'none'}">
+    <div class="ski-hub-head">
+      <div class="ski-hub-head-text">
+        <h2 id="skiHubHeading" class="ski-hub-title">Mountain at a glance</h2>${status ? `
+        <p class="ski-hub-status ski-hub-status-${state}"><span class="ski-hub-dot" aria-hidden="true"></span>${escapeHtml(status)}</p>` : ''}${note ? `
+        <p class="ski-hub-note">${escapeHtml(note)}</p>` : ''}
+      </div>${f.official ? `
+      <a class="ski-hub-official" href="${escapeHtml(f.official)}" target="_blank" rel="noopener">Official site${ext}<span aria-hidden="true"> ↗</span></a>` : ''}
+    </div>${stats.length ? `
+    <dl class="ski-hub-stats">${stats.map((s) => `<div class="ski-hub-stat"><dt>${escapeHtml(s.l)}</dt><dd><span class="ski-hub-num">${escapeHtml(s.v)}</span>${s.s ? `<span class="ski-hub-sub">${escapeHtml(s.s)}</span>` : ''}</dd></div>`).join('')}</dl>` : ''}${tools.length ? `
+    <nav class="ski-hub-tools" aria-label="Ski resort tools">${tools.map(([k, label, hint]) => `<a class="ski-hub-tool" href="${escapeHtml(f.links[k])}" target="_blank" rel="noopener">${skiHubIcon(k)}<span class="ski-hub-tool-text"><span class="ski-hub-tool-label">${escapeHtml(label)}${ext}</span><span class="ski-hub-tool-hint">${escapeHtml(hint)}</span></span><span class="ski-hub-arrow" aria-hidden="true">↗</span></a>`).join('')}</nav>` : ''}${extras.length ? `
+    <p class="ski-hub-extras"><span class="ski-hub-extras-label">Also:</span> ${extras.map(([k, label]) => `<a href="${escapeHtml(f.links[k])}" target="_blank" rel="noopener">${escapeHtml(label)}${ext}</a>`).join('')}</p>` : ''}${f.checked ? `
+    <p class="ski-hub-source">From the resort’s own website, checked ${escapeHtml(f.checked)}.</p>` : ''}
   </section>`;
 }
 const SKI_SEASON_STYLE = `<style id="ski-season">
-  body.region-page .ski-season { margin: 0 0 22px; padding: 16px 20px; border-radius: 14px; background: var(--paper, #fffaf2); border: 1px solid rgba(42,32,25,0.12); }
-  body.region-page .ski-season h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.1rem; margin: 0 0 8px; }
-  body.region-page .ski-season dl { margin: 0; display: grid; gap: 6px; }
-  body.region-page .ski-season dl > div { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 10px; }
-  body.region-page .ski-season dt { font-weight: 800; font-size: 0.9rem; }
-  body.region-page .ski-season dd { margin: 0; font-size: 0.95rem; }
-  body.region-page .ski-season-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
-  body.region-page .ski-season-links a { display: inline-block; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.2); background: #fff; font-weight: 700; font-size: 0.88rem; color: var(--ref-navy); text-decoration: none; }
-  body.region-page .ski-season-links a:hover { border-color: var(--ref-navy); }
-  @media (max-width: 520px) { body.region-page .ski-season dl > div { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+  body.region-page .ski-hub { margin: 0 0 26px; padding: 22px 24px 18px; border-radius: 18px; background: var(--paper, #fffaf2); border: 1px solid rgba(42,32,25,0.12); box-shadow: 0 6px 22px rgba(27,43,58,0.07); }
+  body.region-page .ski-hub-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 0 0 18px; }
+  body.region-page .ski-hub-title { margin: 0 0 8px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(42,32,25,0.62); }
+  body.region-page .ski-hub-status { display: flex; align-items: center; gap: 10px; margin: 0; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.55rem; line-height: 1.2; color: var(--ref-navy-deep, #16233a); }
+  body.region-page .ski-hub-dot { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; background: #9aa4ad; box-shadow: 0 0 0 4px rgba(154,164,173,0.22); }
+  body.region-page .ski-hub-status-soon .ski-hub-dot { background: #d98a1d; box-shadow: 0 0 0 4px rgba(217,138,29,0.2); }
+  body.region-page .ski-hub-status-open .ski-hub-dot { background: #2e9b57; box-shadow: 0 0 0 4px rgba(46,155,87,0.2); }
+  body.region-page .ski-hub-note { margin: 6px 0 0 22px; font-size: 0.95rem; color: rgba(42,32,25,0.72); }
+  body.region-page .ski-hub-official { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.2); background: #fff; font-weight: 800; font-size: 0.88rem; color: var(--ref-navy, #1B2B3A); text-decoration: none; white-space: nowrap; }
+  body.region-page .ski-hub-official:hover { border-color: var(--ref-navy, #1B2B3A); }
+  body.region-page .ski-hub-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0 0 16px; padding: 0; }
+  body.region-page .ski-hub-stat { padding: 12px 14px; border-radius: 12px; background: rgba(27,43,58,0.045); }
+  body.region-page .ski-hub-stat dt { margin: 0 0 2px; font-weight: 800; font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,32,25,0.6); }
+  body.region-page .ski-hub-stat dd { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+  body.region-page .ski-hub-num { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.6rem; line-height: 1.15; color: var(--ref-navy-deep, #16233a); }
+  body.region-page .ski-hub-sub { font-size: 0.84rem; color: rgba(42,32,25,0.66); }
+  body.region-page .ski-hub-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  body.region-page .ski-hub-tool { position: relative; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 34px 12px 14px; border-radius: 14px; border: 1px solid rgba(42,32,25,0.16); background: #fff; color: var(--ref-navy, #1B2B3A); text-decoration: none; transition: border-color .15s, box-shadow .15s, transform .15s; }
+  body.region-page .ski-hub-tool:hover, body.region-page .ski-hub-tool:focus-visible { border-color: var(--ref-navy, #1B2B3A); box-shadow: 0 6px 16px rgba(27,43,58,0.12); transform: translateY(-1px); }
+  body.region-page .ski-hub-icon { flex: 0 0 auto; color: var(--ref-navy, #1B2B3A); }
+  body.region-page .ski-hub-tool-text { display: grid; gap: 1px; min-width: 0; }
+  body.region-page .ski-hub-tool-label { font-weight: 800; font-size: 1rem; }
+  body.region-page .ski-hub-tool-hint { font-size: 0.82rem; color: rgba(42,32,25,0.64); }
+  body.region-page .ski-hub-arrow { position: absolute; top: 10px; right: 12px; font-size: 0.9rem; color: rgba(42,32,25,0.45); }
+  body.region-page .ski-hub-extras { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 14px 0 0; font-size: 0.9rem; }
+  body.region-page .ski-hub-extras-label { font-weight: 800; margin-right: 2px; color: rgba(42,32,25,0.62); }
+  body.region-page .ski-hub-extras a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 999px; background: rgba(27,43,58,0.06); font-weight: 700; color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.region-page .ski-hub-extras a:hover { background: rgba(27,43,58,0.12); }
+  body.region-page .ski-hub-source { margin: 12px 0 0; font-size: 0.78rem; color: rgba(42,32,25,0.55); }
+  body.region-page .ski-hub-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  @media (max-width: 860px) { body.region-page .ski-hub-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 520px) {
+    body.region-page .ski-hub-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.region-page .ski-hub-stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    body.region-page .ski-hub { padding: 16px 14px 14px; border-radius: 16px; }
+    body.region-page .ski-hub-head { flex-direction: column; gap: 10px; }
+    body.region-page .ski-hub-status { font-size: 1.3rem; }
+    body.region-page .ski-hub-note { margin-left: 22px; }
+    body.region-page .ski-hub-num { font-size: 1.4rem; }
+    body.region-page .ski-hub-tool { padding-right: 28px; gap: 10px; }
+    body.region-page .ski-hub-tool-label { font-size: 0.95rem; }
+  }
 </style>`;
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
   const regionLabel = REGION_LABELS[region];
@@ -18895,8 +18996,8 @@ ${renderGolfHeaderHtml()}
   ])}
   ${categoryHeroHtml(regionBannerHtml(region), `<h1>${escapeHtml(regionHeading(region))}</h1>
   <p class="subtitle">${placeCount} place${placeCount === 1 ? '' : 's'} to eat, drink and explore in ${escapeHtml(regionLabel)}</p>`)}
-  ${regionCategoryTabsHtml(region, categoryCounts, null, categories.filter((c) => c.href))}
   ${isSkiResort ? skiSeasonBoxHtml(region) : ''}
+  ${regionCategoryTabsHtml(region, categoryCounts, null, categories.filter((c) => c.href))}
   <div class="region-lead${intro && startHtml ? ' region-lead-split' : ''}">
   <div class="region-lead-text">
   ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}</div>
@@ -56707,6 +56808,7 @@ module.exports = {
   SKI_RESORT_REGIONS,
   SKI_RESORT_SEASON,
   skiSeasonLine,
+  skiSeasonState,
   skiSeasonBoxHtml,
   startServer,
   importEventBatches,
