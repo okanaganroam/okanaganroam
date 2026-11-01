@@ -18266,8 +18266,19 @@ function tourCardFacts(info) {
   const out = { price: null, time: null };
   if (!info || !Array.isArray(info.rows)) return out;
   const row = (label) => { const r = info.rows.find((x) => x.label === label); return r ? String(r.text) : ''; };
-  const t = /(\d+(?:\.\d+)?)\s*(?:to|-|\u2013)\s*(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed')) || /(\d+(?:\.\d+)?)()\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed'));
-  if (t) { const unit = /^h/i.test(t[3]) ? 'hr' : 'min'; out.time = t[2] ? `${t[1]}\u2013${t[2]} ${unit}` : `${t[1]} ${unit}`; }
+  // The trip length: the first duration in the "Time needed" row that is not an arrival, check-in, drive or briefing time.
+  const timeText = row('Time needed');
+  const durRe = /(\d+(?:\.\d+)?)(?:\s*(?:to|or|-|\u2013)\s*(\d+(?:\.\d+)?))?\s*(hours?|hrs?|minutes?|mins?)\b/gi;
+  let t;
+  while ((t = durRe.exec(timeText))) {
+    const before = timeText.slice(Math.max(0, t.index - 30), t.index).split(/[.;]/).pop();
+    const after = timeText.slice(t.index + t[0].length, t.index + t[0].length + 16).split(/[.;]/)[0];
+    const around = `${before} ${after}`;
+    if (/\b(arrive|arrival|early|before|check[- ]?in|doors?|drive|orientation|briefing|wait|after)\b/i.test(around)) continue;
+    const unit = /^h/i.test(t[3]) ? 'hr' : 'min';
+    out.time = t[2] ? `${t[1]}\u2013${t[2]} ${unit}` : `${t[1]} ${unit}`;
+    break;
+  }
   return out;
 }
 // The `<li class="venue-card">` list-item used on category and guide
