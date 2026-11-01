@@ -32317,6 +32317,26 @@ test('Plan your visit (2026-10-29): GET /admin/visit-info/:id and POST /admin/se
   }
 });
 
+test('Plan your visit (2026-10-31): a restaurant keeps Reservations, Menu and Dietary open, folds Patio and Groups, and its button says Reserve a table', () => {
+  seasonInsert.run({ name: 'Visit Fixture Kitchen', type: 'restaurant', hours: SEASON_WEEK, slug: 'visit-fixture-kitchen' });
+  const k = app.findVenueBySlug('kelowna', 'restaurant', 'visit-fixture-kitchen');
+  const r = app.guardedVisitInfoUpdate(k.id, null, { rows: [
+    { label: 'Patio', text: 'Heated patio open May to October.' },
+    { label: 'Known for', text: 'Wood-fired pizza and an Okanagan wine list.' },
+    { label: 'Groups', text: 'Private room seats 24.' },
+    { label: 'Menu', text: 'Pizza and pasta, mains $22 to $38.' },
+    { label: 'Reservations', text: 'Recommended Friday and Saturday.' },
+    { label: 'Dietary', text: 'Vegan and gluten-free options.' },
+  ], booking_url: 'https://kitchen.example/reserve', source_url: 'https://kitchen.example/', checked_at: '2026-10-31' }, { reason: 'fixture', batch_id: 'test-food' });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const page = app.renderVenuePage(app.findVenueBySlug('kelowna', 'restaurant', 'visit-fixture-kitchen'), [], [], []);
+  const box = page.slice(page.indexOf('<section class="venue-section venue-visit"'), page.indexOf('</section>', page.indexOf('<section class="venue-section venue-visit"')));
+  const open = box.slice(0, box.indexOf('<details'));
+  assert.match(open, /visit-label">Known for<.*visit-label">Menu<.*visit-label">Reservations<.*visit-label">Dietary</s, 'the key rows stay open; Known for first');
+  assert.match(box, /<details class="visit-more"><summary>More: patio, groups<\/summary>/);
+  assert.match(page, />Reserve a table<\/a>/);
+});
+
 test('Plan your visit (2026-10-31): a brewery keeps Flights and Food open and its button says Book a table', () => {
   seasonInsert.run({ name: 'Visit Fixture Brewery', type: 'brewery', hours: SEASON_WEEK, slug: 'visit-fixture-brewery' });
   const b = app.findVenueBySlug('kelowna', 'brewery', 'visit-fixture-brewery');
