@@ -18252,12 +18252,20 @@ function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
 // amenity badges. Everything sits in the card's existing slots (see PRO_CARD).
 const TOUR_KIND_LABELS = { wine: 'Wine tour', lake: 'Lake & boats', bike: 'Bike & e-bike', farm: 'Farm & food', adventure: 'Adventure', winter: 'Winter', culture: 'History & culture' };
 function tourCardKind(venue) { try { return TOUR_KIND_LABELS[tourActivityOf(venue)] || ''; } catch (e) { return ''; } }
+// "From $X" on a card (2026-10-31): only a price someone checked against the operator's own price list is shown --
+// the lowest price of what the place actually sells (not a shuttle, insurance, add-on, child or gift-card price).
+// data/card-prices.json: { "<venue id>": { "from": 119, "note": "..." } }. No entry, no price chip.
+const CARD_PRICES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'card-prices.json'), 'utf8')); } catch (e) { return {}; } })();
+function cardPriceFor(venueId) {
+  const e = CARD_PRICES[String(venueId)];
+  const n = e && Number(e.from);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `From $${Number.isInteger(n) ? n.toLocaleString('en-CA') : n.toFixed(2)}${e.per ? ` / ${e.per}` : ''}`;
+}
 function tourCardFacts(info) {
   const out = { price: null, time: null };
   if (!info || !Array.isArray(info.rows)) return out;
   const row = (label) => { const r = info.rows.find((x) => x.label === label); return r ? String(r.text) : ''; };
-  const p = /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Prices')) || /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Tastings')) || /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Flights'));
-  if (p) out.price = `From $${p[1].replace(/,+$/, '').replace(/\.00$/, '')}`;
   const t = /(\d+(?:\.\d+)?)\s*(?:to|-|\u2013)\s*(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed')) || /(\d+(?:\.\d+)?)()\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed'));
   if (t) { const unit = /^h/i.test(t[3]) ? 'hr' : 'min'; out.time = t[2] ? `${t[1]}\u2013${t[2]} ${unit}` : `${t[1]} ${unit}`; }
   return out;
@@ -18396,7 +18404,7 @@ function venueCardHtml(venue, opts = {}) {
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
   // so it no longer counts towards the badge cap; the row under the text keeps two badges and "+N more".
   const photoTagChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
-  const tourFacts = isTourCard ? tourCardFacts(tourInfo) : null;
+  const tourFacts = isTourCard ? { ...tourCardFacts(tourInfo), price: cardPriceFor(venue.id) } : null;
   const tourFactChips = isTourCard
     ? [tourFacts.price ? `<span class="chip chip-feat">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price)}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
@@ -56868,6 +56876,8 @@ module.exports = {
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,
+  CARD_PRICES,
+  cardPriceFor,
   tourCardFacts,
   listVenues,
   getVenue,

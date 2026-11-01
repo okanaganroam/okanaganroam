@@ -17876,12 +17876,18 @@ test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summa
     assert.match(html, /<p class="venue-meta">Kelowna &middot; Wine tour<\/p>/);
     assert.match(html, /<div class="golf-desc"[^>]*><p>Small-group wine tours of three Kelowna wineries with pickup\.<\/p>/);
     assert.doesNotMatch(html, /A long description/);
-    assert.match(html, /<span class="chip chip-feat">[^]*?From \$169<\/span>/);
+    assert.doesNotMatch(html, /From \$/, 'no verified price on file, so no price chip (never a guess from the box text)');
+    app.CARD_PRICES[String(v.id)] = { from: 169 };
+    assert.match(app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true }), /<span class="chip chip-feat">[^]*?From \$169<\/span>/);
+    delete app.CARD_PRICES[String(v.id)];
     assert.match(html, /<span class="chip chip-feat">[^]*?5\u20136 hr<\/span>/);
     assert.doesNotMatch(html, /card-note/);
     // Facts come only from the box: no box, no price chip.
-    assert.deepEqual(app.tourCardFacts({ rows: [{ label: 'Prices', text: 'Adult $14.29 at the gate.' }] }), { price: 'From $14.29', time: null });
+    assert.deepEqual(app.tourCardFacts({ rows: [{ label: 'Prices', text: 'Adult $14.29 at the gate.' }] }), { price: null, time: null });
     assert.deepEqual(app.tourCardFacts(null), { price: null, time: null });
+    app.CARD_PRICES['999999'] = { from: 14.29 }; assert.equal(app.cardPriceFor(999999), 'From $14.29'); app.CARD_PRICES['999998'] = { from: 2095 }; assert.equal(app.cardPriceFor(999998), 'From $2,095');
+    app.CARD_PRICES['999997'] = { from: 660, per: 'helicopter' }; assert.equal(app.cardPriceFor(999997), 'From $660 / helicopter');
+    delete app.CARD_PRICES['999999']; delete app.CARD_PRICES['999998']; delete app.CARD_PRICES['999997'];
   } finally {
     db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(v.id);
     db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
