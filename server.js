@@ -17363,6 +17363,8 @@ function renderGolfThemeStyles() {
   }
   body.golf-page .venue-cta-row .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
   body.golf-page .venue-cta-row .cta.secondary { background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); }
+  /* Cleanup (2026-11-01): the number is in Good to Know; the Call button is for phones, where it dials. */
+  @media (hover: hover) and (min-width: 900px) { body.golf-page .venue-cta-row .cta[href^="tel:"] { display: none; } }
   body.golf-page .venue-cta-row .cta.secondary:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
   body.golf-page .venue-cta-row .card-action {
     display: inline-flex; align-items: center; gap: 5px; margin: 0;
