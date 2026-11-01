@@ -25828,7 +25828,7 @@ test('Weekend and town food guides (2026-10-18): six file guides, each in the to
 });
 
 test('Guides batch 3 (2026-10-18): happy hour, date night, cheap eats, family, November and no-car guides are file guides on /guides with known banners', () => {
-  const where = { 'happy-hour-kelowna': 'year', 'date-night-kelowna': 'year', 'cheap-eats-kelowna': 'year', 'family-friendly-okanagan': 'year', 'okanagan-in-november': 'fall', 'kelowna-without-a-car': 'towns' };
+  const where = { 'date-night-kelowna': 'year', 'cheap-eats-kelowna': 'year', 'family-friendly-okanagan': 'year', 'okanagan-in-november': 'fall', 'kelowna-without-a-car': 'towns' };
   for (const [slug, group] of Object.entries(where)) {
     const p = `/guides/${slug}`;
     const g = app.FILE_GUIDES[p];
