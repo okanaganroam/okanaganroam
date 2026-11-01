@@ -105,6 +105,7 @@ const FR_TEXT = {
   'Clear search': 'Effacer la recherche',
   'Mixed': 'Varié',
   'By town': 'Par ville',
+  'Nearest to me': 'Les plus proches',
   'Top rated': 'Les mieux notés',
   // Smarter search (2026-10-18): the /fr/search sort and card notes.
   'Best match': 'Meilleure correspondance',

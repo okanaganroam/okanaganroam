@@ -24272,10 +24272,12 @@ const FD_PAGE_SIZE = 48;
 // featured placement by the back door (see the featured-placements note).
 const FD_SORTS = [
   { key: 'recommended', label: 'Recommended' },
+  { key: 'nearest', label: 'Nearest to me' },
   { key: 'rating', label: 'Top rated' },
   { key: 'az', label: 'A–Z' },
 ];
-const FD_SORT_KEYS = new Set(FD_SORTS.map((s) => s.key));
+// 'nearest' is chosen in the page (it needs the visitor's location, which is never sent to us), so it is never a ?sort= value.
+const FD_SORT_KEYS = new Set(FD_SORTS.filter((s) => s.key !== 'nearest').map((s) => s.key));
 function foodDrinkRecommendedScore(v) {
   const rating = Number(v.rating) || 0;
   const reviews = Number(v.reviews) || 0;
@@ -24847,7 +24849,8 @@ function foodDrinkResultBarHtml(summary, state, sort = null, sorts = FD_SORTS) {
     <label class="fd-sort"><span class="fd-sort-label">Sort</span> <select id="fdSort" class="fd-sort-select">${sorts.map((o) => `<option value="${o.key}"${o.key === sort ? ' selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select></label>` : '';
   return `<div class="fd-resultbar">
     <p class="fd-count" id="fdResultsSummary" aria-live="polite">${escapeHtml(summary)}</p>${sortHtml}
-  </div>
+  </div>${sort ? `
+  <p class="fd-near-note" id="fdNearNote" aria-live="polite" hidden></p>` : ''}
   ${foodDrinkSelectedTagsHtml(state)}`;
 }
 
@@ -25008,6 +25011,9 @@ ${foodDrinkCardPhotoCss()}
     body.fd-page .fd-toolbar .fd-search { flex: 1 1 100%; max-width: none; }
     body.fd-page .fd-type-row { gap: 2px 16px; }
   }
+  body.fd-page .fd-near-note { margin: 0 0 8px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.86rem; font-weight: 700; color: var(--teal); }
+  body.fd-page .fd-near-note[hidden] { display: none; }
+  body.fd-page .fd-dist { font-weight: 800; color: var(--ref-navy, #1B2B3A); opacity: 1; text-transform: none; letter-spacing: 0; }
 </style>`;
 }
 
@@ -25126,11 +25132,40 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
     var d = function(c){ return DATA[c.getAttribute('data-venue-id')] || {}; };
     var name = function(c){ return (c.getAttribute('data-venue-name') || '').toLowerCase(); };
     cards.sort(function(a, b){
+      if (key === 'nearest') return ((a._away ? 1 : 0) - (b._away ? 1 : 0)) || ((a._km === undefined ? 1e9 : a._km) - (b._km === undefined ? 1e9 : b._km)) || name(a).localeCompare(name(b));
       if (key === 'az') return name(a).localeCompare(name(b));
       if (key === 'town') return String(LABELS.regions[d(a).r] || '').localeCompare(String(LABELS.regions[d(b).r] || '')) || name(a).localeCompare(name(b));
       if (key === 'rating') return ((d(b).g || 0) - (d(a).g || 0)) || ((d(b).n || 0) - (d(a).n || 0)) || name(a).localeCompare(name(b));
       return ((d(a).o === undefined ? 1e9 : d(a).o) - (d(b).o === undefined ? 1e9 : d(b).o));
     });
+  }
+
+  // Nearest to me (2026-11-01): the browser's location is used on this page only and is never sent anywhere. Distances
+  // come from each card's data-ll; a visitor far from every listing (not here yet) is told so instead of being ranked.
+  var me = null, nearNote = document.getElementById('fdNearNote');
+  var FRL = !!(document.documentElement && /^fr/.test(document.documentElement.lang));
+  var NT = FRL ? { asking: 'Recherche de votre position…', denied: 'Votre position est bloquée. Autorisez-la dans votre navigateur pour trier par distance.', unsupported: 'Ce navigateur ne peut pas donner votre position.', far: 'Vous êtes à environ {n} km de la fiche la plus proche, alors le tri par distance ne servirait à rien ici.', on: 'Trié du plus proche au plus éloigné.' } : { asking: 'Finding your location…', denied: 'Your location is blocked. Allow it in your browser to sort by distance.', unsupported: 'This browser can’t share your location.', far: 'You are about {n} km from the nearest listing here, so sorting by distance would not help.', on: 'Sorted from nearest to farthest.' };
+  function say(t){ if (nearNote) { nearNote.textContent = t || ''; nearNote.hidden = !t; } }
+  function kmBetween(a, b, c, d){ var p = Math.PI / 180, x = Math.sin((c - a) * p / 2), y = Math.sin((d - b) * p / 2), h = x * x + Math.cos(a * p) * Math.cos(c * p) * y * y; return 12742 * Math.asin(Math.sqrt(h)); }
+  function fmtKm(k){ var s = k < 1 ? (Math.round(k * 100) * 10) + ' m' : k < 10 ? k.toFixed(1) + ' km' : Math.round(k) + ' km'; return FRL ? s.replace('.', ',') : s; }
+  function setDistances(){
+    var best = 1e9;
+    cards.forEach(function(c){ c._away = !!c.querySelector('.season-tag-closed'); var ll = (c.getAttribute('data-ll') || '').split(','); if (ll.length === 2) { c._km = kmBetween(me.lat, me.lng, Number(ll[0]), Number(ll[1])); if (c._km < best) best = c._km; } else c._km = 1e9; });
+    return best;
+  }
+  function showDist(on){
+    cards.forEach(function(c){
+      var old = c.querySelector('.fd-dist'); if (old) old.parentNode.removeChild(old);
+      if (!on || c._km === undefined || c._km >= 1e9) return;
+      var m = c.querySelector('.venue-meta'); if (!m) return;
+      var s = document.createElement('span'); s.className = 'fd-dist'; s.textContent = ' · ' + fmtKm(c._km); m.appendChild(s);
+    });
+  }
+  function locate(done){
+    if (me) { done(true); return; }
+    if (!navigator.geolocation) { say(NT.unsupported); done(false); return; }
+    say(NT.asking);
+    navigator.geolocation.getCurrentPosition(function(p){ me = { lat: p.coords.latitude, lng: p.coords.longitude }; done(true); }, function(){ say(NT.denied); done(false); }, { maximumAge: 300000, timeout: 15000 });
   }
   ${renderFilterChangeClientSrc(opts.surface || 'food_drink')}
   function activeFilterCount(){ return pressed(typeChips, 'data-fd-type').length + pressed(featureChips, 'data-fd-feature').length + pressed(regionChips, 'data-region').length + (typeof openOn !== 'undefined' && openOn ? 1 : 0); }
@@ -25329,7 +25364,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     if (features.length) q.push('features=' + features.join(','));
     if (regions.length) q.push('regions=' + regions.join(','));${O(`
     if (openOn) q.push('open=now');`)}
-    if (sortKey && sortKey !== 'recommended') q.push('sort=' + sortKey);
+    if (sortKey && sortKey !== 'recommended' && sortKey !== 'nearest') q.push('sort=' + sortKey);
     return q.length ? '?' + q.join('&') : '';
   }
   function apply(historyMode){
@@ -25375,7 +25410,21 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
   }
   function toggle(chip){ chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); page = 1; apply('push'); }
   if (showMore) showMore.addEventListener('click', function(){ page += 1; apply('none'); });
-  if (sortSel) sortSel.addEventListener('change', function(){ sortKey = sortSel.value; sortCards(sortKey); page = 1; apply('replace'); trackFilterChange('sort', sortKey, 'add'); });
+  if (sortSel) sortSel.addEventListener('change', function(){
+    var want = sortSel.value;
+    if (want === 'nearest') {
+      var prev = sortKey && sortKey !== 'nearest' ? sortKey : 'recommended';
+      locate(function(ok){
+        if (!ok) { sortSel.value = prev; return; }
+        var best = setDistances();
+        if (best > 150) { say(NT.far.replace('{n}', String(Math.round(best)))); sortSel.value = prev; return; }
+        sortKey = 'nearest'; sortCards('nearest'); showDist(true); say(NT.on); page = 1; apply('replace'); trackFilterChange('sort', 'nearest', 'add');
+      });
+      return;
+    }
+    showDist(false); say('');
+    sortKey = want; sortCards(sortKey); page = 1; apply('replace'); trackFilterChange('sort', sortKey, 'add');
+  });
   [typeChips, featureChips, regionChips].forEach(function(list){ list.forEach(function(c){ c.addEventListener('click', function(){
     var on = c.getAttribute('aria-pressed') !== 'true';
     toggle(c);
@@ -25453,7 +25502,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
         searchInput.value = uq; searchTerm = uq.trim().toLowerCase();
         searchPlan = searchTerm ? fdPlan(searchTerm) : { groups: [], corrected: null };
       }
-      if (sortSel) { var sk = params.get('sort') || 'recommended'; if (sk !== sortKey && sortSel.querySelector('option[value="' + sk + '"]')) { sortSel.value = sk; sortKey = sk; sortCards(sk); } }${O(`
+      if (sortSel) { var sk = params.get('sort') || 'recommended'; if (sk !== sortKey && sk !== 'nearest' && sortSel.querySelector('option[value="' + sk + '"]')) { sortSel.value = sk; sortKey = sk; showDist(false); say(''); sortCards(sk); } }${O(`
       openOn = params.get('open') === 'now';`)}
     } catch (e) {}
   }
@@ -25577,8 +25626,11 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     // never a stock or example photo of another place.
     return ' data-ph="none"';
   };
+  // Nearest to me (2026-11-01): each card carries its pin, so the page can sort by distance in the browser.
+  const llById = new Map(venues.filter((v) => Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && Number(v.latitude) && Number(v.longitude)).map((v) => [v.id, `${Number(v.latitude).toFixed(4)},${Number(v.longitude).toFixed(4)}`]));
+  const llAttr = (id) => (llById.has(Number(id)) ? ` data-ll="${llById.get(Number(id))}"` : '');
   const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion, themed: true, appLabels: true, excerpt: true, keepOrder: true, ...(extra.cardNotes ? { cardNotes: extra.cardNotes, cardNoteLabel: extra.cardNoteLabel || 'Play:' } : {}), ...(extra.cardOpts || {}) })
-    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
+    .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-fd-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}${llAttr(id)}`);
   // Page weight (2026-10-14): the card markup is the same, minus its source
   // indentation, and the Favorite heart points at one shared <symbol>
   // (FD_HEART_SYMBOL) instead of repeating its path in all 934 cards.

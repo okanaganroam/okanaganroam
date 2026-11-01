@@ -9045,7 +9045,7 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.match(markup, /<h2 class="visually-hidden" id="fdResultsTop">Results<\/h2>/, 'the Results heading is screen-reader only');
   // Sort (2026-10-14): the one dropdown is the native Sort select in the result bar.
   assert.equal((markup.replace(/<dialog[\s\S]*?<\/dialog>/g, '').match(/<select/g) || []).length, 1, 'one dropdown control (the footer Contact dialog has its own topic select)');
-  assert.match(markup, /<div class="fd-resultbar">[\s\S]*?<select id="fdSort" class="fd-sort-select"><option value="recommended" selected>Recommended<\/option><option value="rating">Top rated<\/option><option value="az">A\u2013Z<\/option><\/select>/, 'the Sort control sits in the result bar');
+  assert.match(markup, /<div class="fd-resultbar">[\s\S]*?<select id="fdSort" class="fd-sort-select"><option value="recommended" selected>Recommended<\/option><option value="nearest">Nearest to me<\/option><option value="rating">Top rated<\/option><option value="az">A\u2013Z<\/option><\/select>/, 'the Sort control sits in the result bar');
 
   // Venue types: All + the five, with counts, and NO wineries.
   assert.deepEqual([...markup.matchAll(/data-fd-type="([a-z]+)"/g)].map((m) => m[1]), app.FD_HUB_TYPES.map((t) => t.type));
@@ -19606,7 +19606,7 @@ test('Food & Drink sort: Recommended weighs rating by review count, ignores edit
   assert.deepEqual(app.sortFoodDrinkVenues(list, 'az').map((v) => v.name), ['14th Ave', 'Few Reviews', 'Proven', 'Unrated']);
   // Local Favourite / Hidden Gem never change the score: no featured placement by the back door.
   assert.equal(app.foodDrinkRecommendedScore(mk(5, 'A', 4.5, 100)), app.foodDrinkRecommendedScore(mk(5, 'A', 4.5, 100, { local_favorite: 1, hidden_gem: 1 })));
-  assert.deepEqual(app.FD_SORTS.map((s) => s.key), ['recommended', 'rating', 'az']);
+  assert.deepEqual(app.FD_SORTS.map((s) => s.key), ['recommended', 'nearest', 'rating', 'az']);
 });
 
 test('Food & Drink hub: ?sort= picks the order, the page script can re-sort, and unknown values fall back to Recommended', async () => {
@@ -32455,4 +32455,19 @@ test('Ski resort pages (2026-11-01): Plan your trip cards show stay, getting-her
     assert.doesNotMatch(html, /undefined|null/, r);
   }
   assert.ok(shown >= 2);
+});
+
+test('Food & Drink (2026-11-01): the Sort menu offers Nearest to me, which is picked in the page, never from the address', async () => {
+  const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+  const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
+    try {
+      const base = `http://127.0.0.1:${tmp.address().port}`;
+      resolve({ hub: await (await fetch(`${base}/food-drink`)).text(), forced: await (await fetch(`${base}/food-drink?sort=nearest`)).text() });
+    } catch (err) { reject(err); } finally { tmp.close(); }
+  }));
+  assert.match(pages.hub, /<option value="nearest">Nearest to me<\/option>/);
+  assert.match(pages.hub, /<p class="fd-near-note" id="fdNearNote" aria-live="polite" hidden><\/p>/);
+  assert.match(pages.hub, /data-ll="-?\d+\.\d{4},-?\d+\.\d{4}"/, 'cards carry their pin');
+  assert.doesNotMatch(pages.forced, /<option value="nearest" selected>/, 'the address never selects Nearest');
+  assert.ok(app.FD_SORT_KEYS ? !app.FD_SORT_KEYS.has('nearest') : true);
 });
