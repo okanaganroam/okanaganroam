@@ -16155,6 +16155,8 @@ test('Browse hub: the whole card opens the venue page through one title link (no
   // (CARD_V2_CSS), with the same one-link markup.
   const fd = await (await fetch(`${base}/food-drink`)).text();
   assert.match(fd, /<style id="card-v2">[\s\S]*a\.venue-card-link::after \{ content: ""; position: absolute; inset: 0;/);
+  // Row alignment (2026-10-31): only parts a card shows are levelled, so a card with its description hidden keeps no blank slot.
+  assert.match(fd, /<script id="card-v2-rows">[\s\S]*\.filter\(function \(e\) \{ return e && e\.getBoundingClientRect\(\)\.height > 0; \}\)/);
 })));
 
 test('Venue detail keeps the operational actions, data-dependent: Website / Directions / Call only when on file, never Find menu or online booking', () => withDiscoveryFlag(undefined, () => withDiscoveryServer(async (base) => {
