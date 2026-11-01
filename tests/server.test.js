@@ -16951,7 +16951,7 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         assert.ok(ids.includes(closed[t]) && ids.includes(open[t]), `${path}: both fixtures listed`);
         assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
         const card = cardOf(html, closed[t]);
-        assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Fermé pour la saison)/.test(card), `${path}: the tag`);
+        assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Closed \u00b7 reopens|Fermé pour la saison|Fermé \u00b7 réouverture)/.test(card), `${path}: the tag`);
         assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
         if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\./);
       }
@@ -17862,6 +17862,34 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
   }
 });
 
+test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summary, first price and trip length, then badges', () => {
+  const v = app.createVenue({ name: 'Tour Card Fixture Wine Tours', region: 'kelowna', type: 'tour', description: 'A long description that the card does not need when the place has a Known for line.', slug: 'tour-card-fixture-wine-tours', kid_friendly: 1, great_groups: 1 });
+  try {
+    const r = app.guardedVisitInfoUpdate(v.id, null, { rows: [
+      { label: 'Known for', text: 'Small-group wine tours of three Kelowna wineries with pickup.' },
+      { label: 'Prices', text: 'Full day $169, half day $145; tastings included.' },
+      { label: 'Time needed', text: 'The tour runs about 5 to 6 hours including pickup.' },
+    ], booking_url: null, source_url: 'https://tour.example/', checked_at: '2026-10-31' }, { reason: 'fixture', batch_id: 'test-tour-card' });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const html = app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true });
+    assert.match(html, /<li class="venue-card"[^>]*data-tour-card>/);
+    assert.match(html, /<p class="venue-meta">Kelowna &middot; Wine tour<\/p>/);
+    assert.match(html, /<div class="golf-desc"[^>]*><p>Small-group wine tours of three Kelowna wineries with pickup\.<\/p>/);
+    assert.doesNotMatch(html, /A long description/);
+    assert.match(html, /<span class="chip chip-feat">[^]*?From \$169<\/span>/);
+    assert.match(html, /<span class="chip chip-feat">[^]*?5\u20136 hr<\/span>/);
+    assert.doesNotMatch(html, /card-note/);
+    // Not a tour and not marked as one: unchanged.
+    assert.doesNotMatch(app.venueCardHtml(app.getVenue(v.id), { themed: false, showRegion: true }), /data-tour-card/);
+    // Facts come only from the box: no box, no price chip.
+    assert.deepEqual(app.tourCardFacts({ rows: [{ label: 'Prices', text: 'Adult $14.29 at the gate.' }] }), { price: 'From $14.29', time: null });
+    assert.deepEqual(app.tourCardFacts(null), { price: null, time: null });
+  } finally {
+    db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ?').run(v.id);
+    db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+});
+
 test('Tours & Experiences: other-type operators tagged tours_also get a "More experiences to book" section on /tours, with notes, linking to their own pages', async () => {
   const atv = app.createVenue({ name: 'Tours Also ATV Outfitter', region: 'vernon', type: 'outdoor', description: 'Guided ATV tours through the hills above the lake, with long trail descriptions that run on and on (fixture).', slug: 'tours-also-atv-outfitter' });
   const sleigh = app.createVenue({ name: 'Tours Also Sleigh Farm', region: 'kelowna', type: 'winery', description: 'A winery with winter sleigh rides (fixture).', slug: 'tours-also-sleigh-farm' });
@@ -17880,9 +17908,9 @@ test('Tours & Experiences: other-type operators tagged tours_also get a "More ex
       assert.match(hub.text, /href="\/vernon\/outdoors\/tours-also-atv-outfitter"/, 'an outdoor operator links to its outdoors page');
       assert.match(hub.text, /href="\/kelowna\/wineries\/tours-also-sleigh-farm"/, 'a winery links to its winery page');
       assert.doesNotMatch(hub.text, /noindex/);
-      // The membership note is shown on that card only, labelled "Experience:".
-      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Experience:<\/span> Guided ATV tours, May to October<\/p>/);
-      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 1);
+      // The membership note is that card's summary (Tours cards, 2026-10-31): no separate "Experience:" line.
+      assert.match(hub.text, /<li class="venue-card"[^>]*data-tour-card>[^]*?<div class="card-slot card-slot-desc">\s*<div class="golf-desc"[^>]*><p>Guided ATV tours, May to October<\/p>/);
+      assert.equal((hub.text.match(/class="card-note"/g) || []).length, 0);
       assert.doesNotMatch(hub.text, /Rainy day:/);
       // The card script wires every type on /tours (Read more clamp, Favorite / Trip), and descriptions clamp to 3 lines.
       // Shared engine (2026-10-14): the tours_also cards sit in the one list.
