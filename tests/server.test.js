@@ -4097,6 +4097,8 @@ test('SEO-1: Event location always has an address; same-name same-region events 
     assert.deepEqual(ld.location, { '@type': 'Place', name: 'Laurel Packinghouse', address: { ...locality('Kelowna'), streetAddress: '1304 Ellis St', postalCode: 'V1Y 1Z8' } });
     assert.equal(ld.subEvent.length, 2);
     for (const s of ld.subEvent) assert.deepEqual(s.location, ld.location);
+    // Search Console (2026-10-29): every date carries the series' photo too.
+    for (const s of ld.subEvent) assert.deepEqual(s.image, ld.image);
     // Host-venue event: the venue's stored address when present, else its region.
     const hosted = s5create({ name: 'SEO1 Hosted Night' });
     const hostedLd = s5jsonLd((await s5get(`/kelowna/events/${hosted.slug}`)).text).find((b) => b['@type'] !== 'BreadcrumbList');

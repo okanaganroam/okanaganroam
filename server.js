@@ -33489,10 +33489,13 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
   const offers = eventOffersSchema(event);
   // Search Console (2026-10-22): every subEvent also carries the series' description ("Missing field description").
   const description = event.description || `${event.name} in ${REGION_LABELS[event.region] || 'the Okanagan'}, BC.`;
+  // Search Console (2026-10-29): every subEvent also carries the series' photo ("Missing field image", 20 items).
+  const image = [eventImageUrl(event, categories)];
   const sub = (o) => ({
     '@type': schemaType,
     name: o.label ? `${event.name} – ${o.label}` : event.name,
     description,
+    image,
     startDate: occurrenceIsoStart(o),
     endDate: occurrenceIsoEnd(o),
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -33511,7 +33514,7 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     eventStatus: 'https://schema.org/EventScheduled',
     url: canonical,
-    image: [eventImageUrl(event, categories)],
+    image,
     location,
     organizer,
     offers,
