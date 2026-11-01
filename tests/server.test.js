@@ -9035,12 +9035,12 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.match(markup, /<div class="fd-pop-panel" id="fdFeaturesPanel" hidden>/, 'features popover starts closed');
   assert.match(markup, /<div class="fd-pop-panel" id="fdRegionsPanel" hidden>/, 'regions popover starts closed');
   assert.match(markup, /<p class="fd-count" id="fdResultsSummary" aria-live="polite">/, 'compact result bar');
-  const order = ['class="outdoor-intro fd-intro"', 'id="fdSearch"', 'class="fd-type-row"', 'class="fd-controls"', 'id="fdFeaturesBtn"', 'id="fdRegionsBtn"', 'id="fdResultsSummary"', 'id="fdSelected"', 'id="fdNoResults"', 'id="fdResults"'];
+  const order = ['class="outdoor-intro fd-intro"', 'id="fdSearch"', 'class="fd-controls"', 'id="fdFeaturesBtn"', 'id="fdRegionsBtn"', 'class="fd-type-row"', 'id="fdResultsSummary"', 'id="fdSelected"', 'id="fdNoResults"', 'id="fdResults"'];
   let pos = -1; for (const m of order) { const i = markup.indexOf(m); assert.ok(i > pos, `order: ${m}`); pos = i; }
 
   // None of the old oversized directory treatment.
   // The one exception (2026-10-12): the category banner, hidden unless a single type is chosen.
-  assert.equal((markup.replace(/<div class="category-banner" id="fdBanner"[^>]*><img [^>]*><\/div>/, '').match(/<img/g) || []).length, 0, 'no images above or among the controls besides the category banner');
+  assert.equal((markup.replace(/<div class="category-banner" id="fdBanner"[^>]*><img [^>]*>(?:<span class="fd-banner-credit"[^>]*>[^<]*<\/span>)?<\/div>/, '').match(/<img/g) || []).length, 0, 'no images above or among the controls besides the category banner');
   assert.doesNotMatch(markup.slice(0, markup.indexOf('<li class="venue-card"')), /<h2[^>]*class="category-subsection-heading"/, 'no visible step headings above the results');
   assert.match(markup, /<h2 class="visually-hidden" id="fdResultsTop">Results<\/h2>/, 'the Results heading is screen-reader only');
   // Sort (2026-10-14): the one dropdown is the native Sort select in the result bar.
@@ -29760,7 +29760,7 @@ test('Banner speed (round 7): food list pages preload a phone-sized banner first
     // Hero-ready signal right after the charset, ahead of the GA4 snippet that waits for it.
     assert.ok(head.indexOf('window.roamAfterHero = ') !== -1 && head.indexOf('window.roamAfterHero = ') < head.indexOf("gtag('js'"), `${p}: hero-ready signal before GA4`);
     assert.match(head, /<style id="hero-first-cards">html\.hf li\.venue-card::before\{background-image:none!important\}/);
-    const m = /<div class="category-banner"[^>]*><picture class="banner-pic"><source media="\(max-width: 640px\)" srcset="([^" ]+) 800w" sizes="100vw"><img src="([^"]+)" srcset="([^"]+)" sizes="([^"]+)"[^>]*fetchpriority="high"><\/picture><\/div>/.exec(html);
+    const m = /<div class="category-banner"[^>]*><picture class="banner-pic"><source media="\(max-width: 640px\)" srcset="([^" ]+) 800w" sizes="100vw"><img src="([^"]+)" srcset="([^"]+)" sizes="([^"]+)"[^>]*fetchpriority="high"><\/picture>(?:<span class="fd-banner-credit"[^>]*>[^<]*<\/span>)?<\/div>/.exec(html);
     assert.ok(m, `${p}: the banner has a phone <source>`);
     assert.match(m[1], /-800\.jpg\?v=[0-9a-f]{10}$/);
     assert.match(m[3], /-800\.jpg\?v=[0-9a-f]{10} 800w, .*-1200\.jpg\?v=[0-9a-f]{10} 1200w, .*\?v=[0-9a-f]{10} 1600w$/);

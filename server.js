@@ -24987,6 +24987,27 @@ ${foodDrinkCardPhotoCss()}
     body.fd-page .card-grid > li.venue-card[data-ph] > .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     body.fd-page .card-grid > li.venue-card[data-ph] > .chips > * { flex: 0 0 auto; white-space: nowrap; }
   }
+  /* Food & Drink hub polish (2026-11-01): a lower banner so the list starts higher, one toolbar row (search, Open now, filters),
+     the categories as one clean row of tabs, and a plain selected state (no double ring). */
+  @media (min-width: 900px) { body.fd-page .category-banner { aspect-ratio: 6 / 1; max-height: 210px; } }
+  body.fd-page .fd-intro { max-width: 110ch; font-size: 1.02rem; line-height: 1.5; margin: 0 0 14px; }
+  body.fd-page .fd-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 0 0 14px; }
+  body.fd-page .fd-toolbar .fd-search { flex: 1 1 300px; max-width: 460px; margin: 0; }
+  body.fd-page .fd-toolbar .fd-controls { flex: 0 1 auto; margin: 0; align-items: center; }
+  body.fd-page .fd-toolbar .fd-pop-btn { min-height: 44px; }
+  body.fd-page .fd-toolbar .fd-open-toggle { order: -1; }
+  body.fd-page .fd-type-row { gap: 2px 22px; padding: 0; margin: 0 0 16px; border-bottom: 1px solid rgba(42,32,25,0.14); }
+  body.fd-page .fd-type-row .outdoor-filter-chip { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; box-shadow: none; padding: 10px 2px 9px; min-height: 44px; font-weight: 800; color: rgba(42,32,25,0.68); }
+  body.fd-page .fd-type-row .outdoor-filter-chip:hover { color: var(--ref-navy-deep, #16233a); background: none; }
+  body.fd-page .fd-type-row .outdoor-filter-chip[aria-pressed="true"] { background: none; color: var(--ref-navy-deep, #16233a); border-bottom-color: var(--ref-gold, #b8892b); box-shadow: none; }
+  body.fd-page .fd-type-row .outdoor-filter-chip[aria-pressed="true"]::before { content: none; }
+  body.fd-page .fd-type-row .outdoor-filter-chip:focus-visible { outline: 2px solid var(--ref-gold, #b8892b); outline-offset: -2px; border-radius: 6px; }
+  body.fd-page .fd-type-row .outdoor-activity-count { margin-left: 4px; font-weight: 700; opacity: 0.6; background: none; padding: 0; }
+  @media (max-width: 640px) {
+    body.fd-page .fd-toolbar { gap: 8px; }
+    body.fd-page .fd-toolbar .fd-search { flex: 1 1 100%; max-width: none; }
+    body.fd-page .fd-type-row { gap: 2px 16px; }
+  }
 </style>`;
 }
 
@@ -25740,7 +25761,7 @@ function categoryHeroHtml(bannerHtml, textHtml) {
 // gets its own ("Cocktail Lounges in the Okanagan"), anything else the
 // general Food & Drink text.
 const FD_HUB_HEADINGS = Object.freeze({
-  all: { heading: 'Food & Drink in the Okanagan', intro: 'Patio lunches on the lake, third-wave coffee, brewery taprooms and the valley\u2019s best dining rooms \u2014 every restaurant, caf\u00e9, pub, cocktail lounge and brewery Okanagan Roam has verified.' },
+  all: { heading: 'Food & Drink in the Okanagan', intro: 'Every restaurant, caf\u00e9, pub, cocktail lounge and brewery in the Okanagan that Okanagan Roam has verified.' },
   restaurant: { heading: 'Restaurants in the Okanagan', intro: 'Lakeside patios, farm-to-table dining rooms and easygoing local favourites \u2014 every restaurant across the Okanagan that Okanagan Roam has verified.' },
   cafe: { heading: 'Caf\u00e9s in the Okanagan', intro: 'Third-wave coffee, fresh baking and cozy corners for a slow morning \u2014 every caf\u00e9 across the Okanagan that Okanagan Roam has verified.' },
   pub: { heading: 'Pubs & Bars in the Okanagan', intro: 'Neighbourhood pubs, sports bars and patios for a pint and a bite \u2014 every pub and bar across the Okanagan that Okanagan Roam has verified.' },
@@ -26056,9 +26077,11 @@ ${renderGolfHeaderHtml()}
   <p class="outdoor-intro fd-intro" id="fdIntro">${escapeHtml(hubText.intro)}</p>
   <p class="fd-type-page-link"><a href="${PATIO_GUIDE_PATH}">Guide: the best patios in Kelowna &rarr;</a></p>
   <p class="fd-type-page-link" id="fdTypePageLink"${f.types.length === 1 ? '' : ' hidden'}><a href="${f.types.length === 1 ? `/${CATEGORY_SLUGS[f.types[0]]}` : '#'}">See the ${escapeHtml(f.types.length === 1 ? CATEGORY_LABELS[f.types[0]].plural.toLowerCase() : '')} page &rarr;</a></p>`)}
+  <div class="fd-toolbar">
   ${foodDrinkSearchHtml()}
-  ${foodDrinkTypeChipsHtml(state)}
   ${foodDrinkFilterBarHtml(venues, state).replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
+  </div>
+  ${foodDrinkTypeChipsHtml(state)}
   <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
