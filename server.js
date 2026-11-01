@@ -9090,7 +9090,7 @@ const VISIT_BOOK_LABELS = { winery: 'Book a tasting', brewery: 'Book a table', d
 // Indoor places (2026-10-31): Prices, Booking and Ages stay open too.
 // Restaurants, cafes, pubs and lounges (2026-10-31): Reservations, Menu and Dietary stay open too; Patio, Groups,
 // Takeout and Good to know fold under More.
-const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Flights', 'Restaurant', 'Food', 'Prices', 'Booking', 'Ages', 'Winter', 'Reservations', 'Menu', 'Dietary']);
+const VISIT_ROWS_SHOWN = new Set(['Known for', 'Tastings', 'Flights', 'Restaurant', 'Food', 'Prices', 'Booking', 'Ages', 'Winter', 'Reservations', 'Menu', 'Dietary', 'The hike', 'Dogs', 'Parking', 'Best season', 'Before you go', 'Trail map']);
 function visitTextPolish(t) {
   return String(t)
     .replace(/(\d(?::\d\d)? ?(?:AM|PM)) ?- ?(\d)/g, '$1 \u2013 $2')
@@ -9105,6 +9105,7 @@ const VISIT_LABELS_FR = {
   'Tastings': 'Dégustations', 'Flights': 'Plateaux de dégustation', 'Restaurant': 'Restaurant', 'Food': 'Cuisine',
   'Winter': 'Hiver', 'Tours': 'Visites', 'Games': 'Jeux', 'To go': 'À emporter', 'Kids & dogs': 'Enfants et chiens',
   'Reservations': 'Réservations', 'Menu': 'Menu', 'Dietary': 'Régimes alimentaires', 'Patio': 'Terrasse', 'Takeout': 'À emporter',
+  'The hike': 'La randonnée', 'Dogs': 'Chiens', 'Parking': 'Stationnement', 'Best season': 'Meilleure saison', 'Before you go': 'Avant de partir', 'Trail map': 'Carte du sentier',
 };
 function visitLabelFr(label) { return VISIT_LABELS_FR[label] || frLookup(label) || label; }
 function visitTextFr(text) {
@@ -9157,7 +9158,7 @@ function visitInfoHtml(info, fr = false) {
     return `<li><span class="visit-label">${escapeHtml(r.label)}</span><span>${text}${more}</span></li>`;
   };
   const enLabel = (r) => (fr ? r.__en : r.label);
-  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(enLabel(r))).sort((a, b) => (enLabel(b) === 'Known for') - (enLabel(a) === 'Known for'));
+  const shown = info.rows.filter((r) => VISIT_ROWS_SHOWN.has(enLabel(r))).sort((a, b) => (enLabel(b) === 'The hike') * 2 + (enLabel(b) === 'Known for') - ((enLabel(a) === 'The hike') * 2 + (enLabel(a) === 'Known for')));
   const folded = info.rows.filter((r) => !VISIT_ROWS_SHOWN.has(enLabel(r)));
   // A box with nothing in the always-shown set shows its first row open, so it is never just a "More" line.
   if (!shown.length && folded.length) shown.push(folded.shift());
@@ -9173,7 +9174,7 @@ function visitInfoHtml(info, fr = false) {
   const frDate = (d) => `${Number(d.slice(8, 10)) === 1 ? '1er' : Number(d.slice(8, 10))} ${FR_SHORT_MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`;
   const when = info.checked_at && parseLocalDate(info.checked_at) ? (fr ? frDate(info.checked_at) : `${formatLocalDateShort(info.checked_at, { weekday: false })}, ${info.checked_at.slice(0, 4)}`) : '';
   return `<section class="venue-section venue-visit" id="venueVisit" aria-labelledby="venueVisitHead">
-    <h2 id="venueVisitHead">${fr ? 'Planifiez votre visite' : 'Plan your visit'}</h2>
+    <h2 id="venueVisitHead">${info.rows.some((r) => (fr ? r.__en : r.label) === 'The hike') ? (fr ? 'Planifiez votre randonn\u00e9e' : 'Plan your hike') : (fr ? 'Planifiez votre visite' : 'Plan your visit')}</h2>
     <ul class="visit-list">${rows}</ul>${more}
     <p class="venue-hours-checked">${fr ? `${host ? `Source\u00a0: ${escapeHtml(host)}` : 'Source\u00a0: l\u2019\u00e9tablissement'}${when ? `, v\u00e9rifi\u00e9 le ${escapeHtml(when)}` : ''}` : `${host ? `From ${escapeHtml(host)}` : 'From the venue'}${when ? `, checked ${escapeHtml(when)}` : ''}`}</p>
     <style>
@@ -14506,6 +14507,7 @@ const SEO_PAGE_CSS = `
 
   .venue-cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
   .venue-cta-row .cta { margin: 0; }
+  .venue-glance { margin: -2px 0 12px; font-weight: 800; font-size: 1.04rem; color: var(--ref-navy, #1B2B3A); }
   /* Cleanup (2026-11-01): the number is in Good to Know; the Call button is for phones, where it dials. */
   @media (hover: hover) and (min-width: 900px) { .venue-cta-row .cta[href^="tel:"] { display: none; } }
 
@@ -17363,6 +17365,7 @@ function renderGolfThemeStyles() {
   }
   body.golf-page .venue-cta-row .cta:hover { background: var(--ref-navy-deep); color: var(--ref-white); }
   body.golf-page .venue-cta-row .cta.secondary { background: transparent; color: var(--ref-navy); border: 1px solid rgba(27,43,58,0.2); }
+  body.golf-page .venue-glance { margin: -2px 0 12px; font-weight: 800; font-size: 1.04rem; color: var(--ref-navy, #1B2B3A); }
   /* Cleanup (2026-11-01): the number is in Good to Know; the Call button is for phones, where it dials. */
   @media (hover: hover) and (min-width: 900px) { body.golf-page .venue-cta-row .cta[href^="tel:"] { display: none; } }
   body.golf-page .venue-cta-row .cta.secondary:hover { background: rgba(27,43,58,0.06); color: var(--ref-navy); }
@@ -32595,6 +32598,13 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   // Plan your visit (2026-10-29): English pages only (the facts are in English, from the venue's own site).
   // French pages (2026-10-31) show the translated rows from data/french/visit-boxes-*.json; none translated -> no box.
   const visitInfoRaw = venue.redirect_to ? null : visitDropRepeatedKnownFor(venueVisitInfo(venue.id), venue.description);
+  // Hiking (2026-11-01): the box's "The hike" row also shows as one line under the title (distance, climb, difficulty, time).
+  const hikeGlanceHtml = (() => {
+    const row = visitInfoRaw && Array.isArray(visitInfoRaw.rows) ? visitInfoRaw.rows.find((r) => r.label === 'The hike') : null;
+    if (!row) return '';
+    const text = fr ? visitTextFr(row.text) : visitTextPolish(row.text);
+    return text ? `<p class="venue-glance">${escapeHtml(text)}</p>` : '';
+  })();
   const visitHtml = visitInfoHtml(visitInfoRaw, fr);
   const visitInfo = visitHtml ? visitInfoRaw : null;
   // Box polish (2026-10-31): Good to Know drops its Menu row when the Plan your visit box already links that page
@@ -33008,7 +33018,7 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-main">
   <div class="venue-header">
     ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
-    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${venueWhyHtml}${(() => {
+    ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChips}</p>${hikeGlanceHtml}${venueWhyHtml}${(() => {
       // Verified mark (2026-10-27): a pill on every listing the business manages (venueIsClaimed: a login, an approved
       // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
       // the "Updated by the business" line.
