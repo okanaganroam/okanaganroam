@@ -18890,6 +18890,22 @@ const SKI_SEASON_STYLE = `<style id="ski-season">
   body.region-page .ski-hub-extras a:hover { background: rgba(27,43,58,0.12); }
   body.region-page .ski-hub-source { margin: 12px 0 0; font-size: 0.78rem; color: rgba(42,32,25,0.55); }
   body.region-page .ski-hub-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  /* The rest of a ski page (2026-11-01): one full-width flow, no side column. The guide reads as a lead paragraph and
+     two tidy cards; Places to start is a three-across photo grid under it, so nothing sits beside a blank space. */
+  body.ski-region .region-lead { display: block; }
+  body.ski-region .region-intro { max-width: none; }
+  body.ski-region .region-intro > p:first-child { max-width: 52rem; margin: 0 0 18px; font-size: 1.08rem; line-height: 1.65; }
+  body.ski-region .region-lead-text > .subtitle a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(42,32,25,0.2); background: #fff; font-weight: 800; font-size: 0.92rem; color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.ski-region .region-lead-text > .subtitle a:hover { border-color: var(--ref-navy, #1B2B3A); }
+  body.ski-region .region-start { margin: 30px 0 10px; }
+  body.ski-region .region-start .category-subsection-heading { margin-top: 0; }
+  body.ski-region .region-lead-text > .subtitle { margin: 18px 0 0; }
+  @media (min-width: 760px) {
+    body.ski-region .region-intro-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    body.ski-region .region-intro-more p { margin: 0; padding: 18px 20px; border-radius: 14px; background: #fff; border: 1px solid rgba(42,32,25,0.12); line-height: 1.55; }
+    body.ski-region .region-intro-more p strong { display: block; margin-bottom: 4px; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.1rem; }
+    body.ski-region .region-photo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  }
   @media (max-width: 860px) { body.region-page .ski-hub-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 520px) {
     body.region-page .ski-hub-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -18899,8 +18915,9 @@ const SKI_SEASON_STYLE = `<style id="ski-season">
     body.region-page .ski-hub-status { font-size: 1.3rem; }
     body.region-page .ski-hub-note { margin-left: 22px; }
     body.region-page .ski-hub-num { font-size: 1.4rem; }
-    body.region-page .ski-hub-tool { padding-right: 28px; gap: 10px; }
-    body.region-page .ski-hub-tool-label { font-size: 0.95rem; }
+    body.region-page .ski-hub-tool { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 96px; padding: 14px 12px; }
+    body.region-page .ski-hub-tool-label { font-size: 0.98rem; }
+    body.ski-region .region-lead-text > .subtitle a { border-radius: 16px; padding: 10px 16px; line-height: 1.3; }
   }
 </style>`;
 function renderRegionPage(region, categoryCounts, regionGuidePages) {
@@ -18985,7 +19002,7 @@ ${REGION_PAGE_STYLE}
 ${isSkiResort ? SKI_SEASON_STYLE : ''}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head>
-<body class="golf-page outdoor-page region-page">
+<body class="golf-page outdoor-page region-page${isSkiResort ? ' ski-region' : ''}">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
@@ -18998,7 +19015,7 @@ ${renderGolfHeaderHtml()}
   <p class="subtitle">${placeCount} place${placeCount === 1 ? '' : 's'} to eat, drink and explore in ${escapeHtml(regionLabel)}</p>`)}
   ${isSkiResort ? skiSeasonBoxHtml(region) : ''}
   ${regionCategoryTabsHtml(region, categoryCounts, null, categories.filter((c) => c.href))}
-  <div class="region-lead${intro && startHtml ? ' region-lead-split' : ''}">
+  <div class="region-lead${intro && startHtml && !isSkiResort ? ' region-lead-split' : ''}">
   <div class="region-lead-text">
   ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}</div>
   ${startHtml}

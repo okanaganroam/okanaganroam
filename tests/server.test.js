@@ -10119,7 +10119,7 @@ test('Destination pages: every linked category tab has an active venue, and food
     const activePubs = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE region = 'apex' AND type = 'pub' AND redirect_to IS NULL").get().n;
     assert.equal(counts.pub || 0, activePubs, 'redirected venues are not counted');
     const region = s6markup(app.renderRegionPage('apex', counts, []));
-    assert.match(region, /class="golf-page outdoor-page region-page"/, 'themed shell');
+    assert.match(region, /class="golf-page outdoor-page region-page(?: ski-region)?"/, 'themed shell');
     assert.match(region, /id="tripTray"/);
     const tabs = [...region.matchAll(/<a href="\/apex\/([a-z-]+)">[^<]* <span class="outdoor-activity-count">(\d+)<\/span>/g)];
     assert.ok(tabs.length > 0);
@@ -32420,4 +32420,18 @@ test('Ski resort pages (2026-11-01): the Mountain at a glance panel shows status
   assert.match(pages.fr, /Bulletin de neige/);
   assert.match(pages.fr, /Site officiel/);
   assert.doesNotMatch(pages.fr.slice(pages.fr.indexOf('class="ski-hub"'), pages.fr.indexOf('</section>', pages.fr.indexOf('class="ski-hub"'))), /Mountain at a glance|Snow report|Official site/);
+});
+
+test('Ski resort pages (2026-11-01): one full-width flow with no side column; other towns keep the split layout', async () => {
+  const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
+  const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
+    try {
+      const base = `http://127.0.0.1:${tmp.address().port}`;
+      resolve({ ski: await (await fetch(`${base}/big-white`)).text(), town: await (await fetch(`${base}/kelowna`)).text() });
+    } catch (err) { reject(err); } finally { tmp.close(); }
+  }));
+  assert.match(pages.ski, /<body class="golf-page outdoor-page region-page ski-region">/);
+  assert.match(pages.ski, /<div class="region-lead">/);
+  assert.doesNotMatch(pages.ski, /<div class="region-lead region-lead-split">/);
+  assert.doesNotMatch(pages.town, /ski-region">/);
 });
