@@ -32488,3 +32488,8 @@ test('Venue page cleanup (2026-11-01): local phone format, no second map link, a
   assert.equal(app.visitDropRepeatedKnownFor(only, desc), only);
   assert.equal(app.visitDropRepeatedKnownFor(info, ''), info);
 });
+
+test('Venue page (2026-11-01): the Call button is hidden on laptops in the themed shell too, and stays on phones', () => {
+  const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course') || app.getVenuesByRegionCategory('west-kelowna', 'golf')[0], [], [], []);
+  assert.match(html, /@media \(hover: hover\) and \(min-width: 900px\) \{ body\.golf-page \.venue-cta-row \.cta\[href\^="tel:"\] \{ display: none; \} \}/);
+});
