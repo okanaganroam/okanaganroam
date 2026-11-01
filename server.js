@@ -16374,7 +16374,9 @@ const CARD_V2_CSS = `<style id="card-v2">
         var row = rows[t];
         if (row.length < 2) return;
         PARTS.forEach(function (p) {
-          var els = row.map(function (c) { return part(c, p); }).filter(Boolean);
+          // Only parts a card actually shows (2026-10-31): a card whose description is hidden (its Experience note takes
+          // its place) keeps no blank slot under the name just because a neighbour has a two-line description.
+          var els = row.map(function (c) { return part(c, p); }).filter(function (e) { return e && e.getBoundingClientRect().height > 0; });
           var max = 0;
           els.forEach(function (e) { max = Math.max(max, e.getBoundingClientRect().height); });
           if (max > 0) els.forEach(function (e) { e.style.minHeight = max + 'px'; });
