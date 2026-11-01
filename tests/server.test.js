@@ -17885,6 +17885,13 @@ test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summa
     // Facts come only from the box: no box, no price chip.
     assert.deepEqual(app.tourCardFacts({ rows: [{ label: 'Prices', text: 'Adult $14.29 at the gate.' }] }), { price: null, time: null });
     assert.deepEqual(app.tourCardFacts(null), { price: null, time: null });
+    // The trip length skips arrival, check-in, drive and briefing times (2026-10-31).
+    const tm = (text) => app.tourCardFacts({ rows: [{ label: 'Time needed', text }] }).time;
+    assert.equal(tm('Tours are 2 or 3 hours; arrive 15 minutes early. Callaghan base is about a 15-25 minute drive south of the village.'), '2\u20133 hr');
+    assert.equal(tm('14 minutes in the air. Check in 15 minutes before departure.'), '14 min');
+    assert.equal(tm('Each race is about 10 minutes. Arrive 30 minutes early for check-in and the driver briefing.'), '10 min');
+    assert.equal(tm('1 hour, daily at 1:00pm, plus a 5-10 minute bike orientation.'), '1 hr');
+    assert.equal(tm('The tour runs about 5 to 6 hours including pickup.'), '5\u20136 hr');
     app.CARD_PRICES['999999'] = { from: 14.29 }; assert.equal(app.cardPriceFor(999999), 'From $14.29'); app.CARD_PRICES['999998'] = { from: 2095 }; assert.equal(app.cardPriceFor(999998), 'From $2,095');
     app.CARD_PRICES['999997'] = { from: 660, per: 'helicopter' }; assert.equal(app.cardPriceFor(999997), 'From $660 / helicopter');
     delete app.CARD_PRICES['999999']; delete app.CARD_PRICES['999998']; delete app.CARD_PRICES['999997'];
