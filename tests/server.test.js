@@ -6817,7 +6817,7 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   const wk = app.getVenuesByRegionCategory('west-kelowna', 'golf')[0];
   const wkHtml = app.renderVenuePage(wk, [], [], []);
   assert.match(wkHtml, /<a class="cta" href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">Visit Website<\/a>/);
-  assert.match(wkHtml, /<a href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">/);
+  assert.doesNotMatch(wkHtml, /<a href="https:\/\/[^"]+" rel="nofollow noopener" target="_blank" data-track="website">/, 'the website is only the button, not repeated in Good to Know (2026-11-01)');
 });
 
 test('Golf venue page shows all five actions: Website, Get Directions, Call, Favorite, Add to Trip', () => {
@@ -26601,7 +26601,8 @@ test('Venue page layout (2026-10-18): same hours every day read as one line, the
     db.prepare("UPDATE venues SET website = 'https://www.example-cafe.ca/' WHERE id = ?").run(v.id);
     const en = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'layout-fixture-cafe'), [], [], [], { now: new Date('2026-10-18T19:00:00Z') });
     assert.match(en, /<p class="venue-hours-daily"><span>Every day<\/span> <span>9:30 AM – 5:30 PM<\/span><\/p><details class="venue-hours-days"><summary>Each day<\/summary><ul class="hours-list"/);
-    assert.match(en, />example-cafe\.ca ↗<\/a>/, 'the website row shows the address, not the raw URL');
+    assert.doesNotMatch(en, />example-cafe\.ca ↗<\/a>/, 'the website is the button above, not repeated as a sidebar row (2026-11-01)');
+    assert.match(en, /href="https:\/\/www\.example-cafe\.ca\/"[^>]*>(?:Website ↗|Visit Website)<\/a>/, 'the Website button');
     assert.match(en, /<div class="venue-extra">/);
     // Round 9 (2026-10-19): the extras follow the sidebar in the page itself, so no CSS order is needed.
     assert.ok(en.indexOf('</aside>') < en.indexOf('<div class="venue-extra">'));
