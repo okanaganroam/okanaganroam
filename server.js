@@ -16281,6 +16281,7 @@ const LAZY_CARD_PHOTO_HEAD = `<style id="lazy-card-photos">html.lzp li.venue-car
 // Loaded with the lazy-photo head (only pages with photo cards); "html body" plus !important outranks the
 // per-category card rules, which come later on the page.
 const CARD_V2_CARD = 'html body.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card)';
+const TOUR_CARD = CARD_V2_CARD + '[data-tour-card]';
 const CARD_V2_CSS = `<style id="card-v2">
   ${CARD_V2_CARD} { position: relative; padding: calc(56.25% + 14px) 18px 14px !important; }
   ${CARD_V2_CARD}::before { height: 0 !important; padding-bottom: 56.25%; border-radius: 13px 13px 0 0 !important; }
@@ -16355,6 +16356,31 @@ const CARD_V2_CSS = `<style id="card-v2">
     ${CARD_V2_CARD} { padding: calc(50% + 12px) 16px 14px !important; }
     ${CARD_V2_CARD}::before { padding-bottom: 50%; }
   }
+
+  /* Tours & Experiences cards (2026-10-31): one layout for every card -- 4:3 photo with the season / Local Favourite
+     pill on it, town and kind in gold, a two-line name, a two-line summary, one line of quick facts (price, time,
+     badges) and a footer with "View details" and Add to trip, always in the same place. */
+  ${TOUR_CARD} { padding: calc(75% + 20px) 20px 16px !important; border-radius: 16px !important; border: 1px solid rgba(74, 52, 40, 0.09) !important; box-shadow: 0 1px 2px rgba(74, 52, 40, 0.05), 0 12px 28px -18px rgba(74, 52, 40, 0.35) !important; transition: transform .18s ease, box-shadow .18s ease; }
+  ${TOUR_CARD}:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(74, 52, 40, 0.06), 0 20px 36px -18px rgba(74, 52, 40, 0.45) !important; }
+  ${TOUR_CARD}::before { padding-bottom: 75% !important; border-radius: 15px 15px 0 0 !important; }
+  ${TOUR_CARD} > .venue-meta { margin: 0 0 6px; }
+  ${TOUR_CARD} > h2 { margin: 0 0 8px; font-size: 1.28rem; line-height: 1.2; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  ${TOUR_CARD} h2 a.venue-card-link { color: var(--ref-navy, #1B2B3A); }
+  ${TOUR_CARD} > .card-slot-desc { min-height: 3em; margin: 0 0 14px; }
+  ${TOUR_CARD} .golf-desc p { color: var(--ink-muted, #6B5D54); font-size: 0.93rem !important; line-height: 1.5 !important; }
+  ${TOUR_CARD} > .chips:not(:empty), ${TOUR_CARD} > .chips:empty { min-height: 22px; margin: 0 0 16px !important; padding: 0 !important; }
+  ${TOUR_CARD} > .chips > .chip { font-size: 0.82rem; font-weight: 700; color: var(--teal-deep, #1E4F4C); }
+  ${TOUR_CARD} > .card-actions { margin: auto 0 0 !important; padding: 14px 0 0 !important; border-top: 1px solid rgba(74, 52, 40, 0.1) !important; align-items: center; justify-content: space-between !important; }
+  ${TOUR_CARD} > .card-actions::before { content: "View details \\2192"; font-weight: 800; font-size: 0.9rem; color: var(--ref-navy, #1B2B3A); }
+  ${TOUR_CARD}:lang(fr) > .card-actions::before, html[lang="fr"] ${TOUR_CARD} > .card-actions::before { content: "Voir les d\\00e9tails \\2192"; }
+  ${TOUR_CARD} .card-action.trip-btn { font-weight: 800; border-radius: 999px; border: 1.5px solid rgba(42, 107, 103, 0.45); color: var(--teal-deep, #1E4F4C); background: #fff; padding: 8px 14px; }
+  ${TOUR_CARD} .card-action.trip-btn:hover { background: var(--teal, #2A6B67); color: #fff; }
+  /* The season notice rides on the photo as a pill; any other notice stays under the text. */
+  ${TOUR_CARD} > .card-slot-notice:has(> .season-tag) { position: absolute; z-index: 2; top: 12px; left: 12px; max-width: calc(100% - 70px); margin: 0 !important; padding: 0 !important; order: 0; }
+  ${TOUR_CARD} > .card-slot-notice .season-tag { margin: 0; padding: 6px 11px; border-radius: 999px; background: rgba(16, 27, 36, 0.84); color: #fff; font-size: 0.74rem; font-weight: 800; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(4px); }
+  ${TOUR_CARD} > .card-slot-notice .season-tag span { display: none; }
+  ${TOUR_CARD}:has(> .card-slot-notice .season-tag-closed)::before { filter: saturate(0.55) brightness(0.92); }
+  @media (max-width: 640px) { ${TOUR_CARD} { padding: calc(75% + 20px) 18px 16px !important; } ${TOUR_CARD}::before { padding-bottom: 75% !important; } }
 </style>
 <script id="card-v2-rows">(function () {
   var PARTS = ['.venue-meta', 'h2', '.fd-open-status', '.card-slot-fee', '.card-slot-desc', '.chips'];
@@ -18219,6 +18245,22 @@ function badgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
     .join(' ');
 }
 
+// Tours & Experiences cards (2026-10-31): one layout for every card on the Tours page -- the small gold line is the
+// town and kind of experience, the summary is the place's own "Known for" line from its Plan your visit box (the card's
+// description otherwise), and the quick facts are the first price and the trip length from the same box, then the
+// amenity badges. Everything sits in the card's existing slots (see TOUR_CARD_CSS).
+const TOUR_KIND_LABELS = { wine: 'Wine tour', lake: 'Lake & boats', bike: 'Bike & e-bike', farm: 'Farm & food', adventure: 'Adventure', winter: 'Winter', culture: 'History & culture' };
+function tourCardKind(venue) { try { return TOUR_KIND_LABELS[tourActivityOf(venue)] || ''; } catch (e) { return ''; } }
+function tourCardFacts(info) {
+  const out = { price: null, time: null };
+  if (!info || !Array.isArray(info.rows)) return out;
+  const row = (label) => { const r = info.rows.find((x) => x.label === label); return r ? String(r.text) : ''; };
+  const p = /\$\s?(\d[\d,]*(?:\.\d{2})?)/.exec(row('Prices'));
+  if (p) out.price = `From $${p[1].replace(/,+$/, '').replace(/\.00$/, '')}`;
+  const t = /(\d+(?:\.\d+)?)\s*(?:to|-|\u2013)\s*(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed')) || /(\d+(?:\.\d+)?)()\s*(hours?|hrs?|minutes?|mins?)/i.exec(row('Time needed'));
+  if (t) { const unit = /^h/i.test(t[3]) ? 'hr' : 'min'; out.time = t[2] ? `${t[1]}\u2013${t[2]} ${unit}` : `${t[1]} ${unit}`; }
+  return out;
+}
 // The `<li class="venue-card">` list-item used on category and guide
 // pages. The two previous call sites differed only in whether the venue
 // type itself appears in the meta line (guide pages, which mix
@@ -18251,7 +18293,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 3, hideDogBadges = false, hideHiddenGemBadge = false, hideLocalFavouriteBadge = false } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 3, hideDogBadges = false, hideHiddenGemBadge = false, hideLocalFavouriteBadge = false, tourStyle = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -18329,15 +18371,35 @@ function venueCardHtml(venue, opts = {}) {
   const cardNoteRaw = cardNotes && cardNotes.get(venue.id) ? String(cardNotes.get(venue.id)).trim() : '';
   const cardNote = dogNoteHtml && cardNoteRaw === String(dogFriendlyNote || '').trim() ? '' : cardNoteRaw;
   const cardNoteHtml = cardNote ? `\n        <p class="card-note"><span class="card-note-label">${escapeHtml(cardNoteLabel)}</span> ${escapeHtml(cardNote)}</p>` : '';
+  // Tours cards (2026-10-31): see tourCardFacts. A tour card shows no separate Experience note: the note is its summary.
+  const isTourCard = themed && !venue.redirect_to && (venue.type === 'tour' || tourStyle);
+  let tourInfo = null;
+  if (isTourCard) { try { tourInfo = venueVisitInfo(venue.id); } catch (e) { tourInfo = null; } }
+  const tourKnown = tourInfo && Array.isArray(tourInfo.rows) ? tourInfo.rows.find((r) => r.label === 'Known for') : null;
+  const tourSummaryHtml = isTourCard
+    ? (tourKnown ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(tourKnown.text)}</p></div>`
+      : cardNoteRaw ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(cardNoteRaw)}</p></div>` : desc)
+    : desc;
+  const tourKind = isTourCard ? tourCardKind(venue) : '';
   // Cards no longer carry Instagram / Facebook links (2026-10-29): they live on the venue page only.
   const socialHtml = '';
+  // Tours cards (2026-10-31): the season notice is a pill on the photo, so a closed place reads "Closed \u00b7 reopens May 21".
+  const cardSeasonTag = isTourCard && seasonTag && seasonTag.kind === 'closed'
+    ? { ...seasonTag, text: String(seasonTag.text).replace(/^Closed for the season\. Reopens ([A-Za-z]+ \d+)(?:, \d{4})?\.$/, 'Closed \u00b7 reopens $1') }
+    : seasonTag;
   const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to)
-    ? `\n        ${seasonTag ? seasonTagHtml(seasonTag) : advisoryNoticeHtml(advisoryNote)}`
+    ? `\n        ${cardSeasonTag ? seasonTagHtml(cardSeasonTag) : advisoryNoticeHtml(advisoryNote)}`
     : '';
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
   // so it no longer counts towards the badge cap; the row under the text keeps two badges and "+N more".
   const photoTagChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
-  const chipsHtml = themed
+  const tourFacts = isTourCard ? tourCardFacts(tourInfo) : null;
+  const tourFactChips = isTourCard
+    ? [tourFacts.price ? `<span class="chip chip-feat">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price)}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
+    : '';
+  const chipsHtml = isTourCard
+    ? `<p class="chips">${photoTagChips}${capChips([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges })].filter(Boolean).join(' '), 2, 2)}</p>`
+    : themed
     ? `<p class="chips">${photoTagChips}${capChips(editorialChips.slice(photoTagChips.length) + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), maxChips - 1, maxChips - 1)}</p>`
     : `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), 0)}</p>`;
   // Themed listing cards (2026-10-12) always have the same eight parts in the
@@ -18347,13 +18409,13 @@ function venueCardHtml(venue, opts = {}) {
   // takes space when a card in that row fills it.
   if (themed) {
     return `
-      <li class="venue-card"${liAttrs}>
+      <li class="venue-card"${liAttrs}${isTourCard ? ' data-tour-card' : ''}>
         <h2>${nameHtml}</h2>
-        <p class="venue-meta">${meta}</p>
+        <p class="venue-meta">${isTourCard && tourKind ? `${meta ? meta + ' &middot; ' : ''}${escapeHtml(tourKind)}`.replace(/ &middot; Tour &amp; Experience/, '') : meta}</p>
         <div class="card-slot card-slot-fee">${golfFeeHtml ? '\n        ' + golfFeeHtml + '\n        ' : ''}</div>
-        <div class="card-slot card-slot-desc">${desc ? '\n        ' + desc + '\n        ' : ''}</div>
+        <div class="card-slot card-slot-desc">${tourSummaryHtml ? '\n        ' + tourSummaryHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-notice">${advisoryHtml ? advisoryHtml + '\n        ' : ''}</div>
-        <div class="card-slot card-slot-notes">${dogNoteHtml || cardNoteHtml || socialHtml ? dogNoteHtml + cardNoteHtml + socialHtml + '\n        ' : ''}</div>
+        <div class="card-slot card-slot-notes">${dogNoteHtml || (!isTourCard && cardNoteHtml) || socialHtml ? dogNoteHtml + (isTourCard ? '' : cardNoteHtml) + socialHtml + '\n        ' : ''}</div>
         ${chipsHtml}${cardActions || '\n        <div class="card-actions card-actions-empty"></div>'}
       </li>`;
   }
@@ -23872,7 +23934,7 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
     ? `${venues.length ? '' : '<p class="tour-coming-soon">More tours and experiences are coming soon &mdash; wine tours, lake cruises, guided hikes, cooking classes and sleigh rides across the valley.</p>\n  '}${toursAlso.length ? `<section class="tour-also-section" aria-labelledby="toursAlsoHeading">
   <h2 class="category-subsection-heading" id="toursAlsoHeading">More experiences to book</h2>
   <p class="tour-also-lead">ATV and snowmobile tours, dog sledding, sleigh rides, sailing charters, ziplines and more, listed with their own categories.</p>
-  ${renderCategoryCardsHtml('tour', toursAlso, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true, cardNotes: getToursAlsoNotes(), cardNoteLabel: 'Experience:' })}
+  ${renderCategoryCardsHtml('tour', toursAlso, hiddenGemIds, '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, themed: true, appLabels: true, cardNotes: getToursAlsoNotes(), cardNoteLabel: 'Experience:', tourStyle: true })}
   </section>` : ''}`
     : '';
   const sportsHubHtml = isSportsHub
@@ -28157,6 +28219,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
     photoKeyFor: (v) => { const a = tourActivityOf(v); return curatedPhotoKey(v, a ? `tour${a}` : 'tour'); },
     cardNotes: getToursAlsoNotes(),
     cardNoteLabel: 'Experience:',
+    cardOpts: { tourStyle: true },
     features: ['arts_culture', 'kid_friendly', 'dog_friendly', 'great_groups'],
     openNow: false,
     search: { label: 'Search tours and experiences', placeholder: 'Search by name, town or activity...' },
@@ -56802,6 +56865,7 @@ module.exports = {
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,
+  tourCardFacts,
   listVenues,
   getVenue,
   getVenuesByRegionCategory,
