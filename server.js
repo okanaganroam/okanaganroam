@@ -16398,7 +16398,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${PRO_CARD} > .fd-open-status { margin: -2px 0 8px; font-size: 0.8rem; font-weight: 700; }
   ${PRO_CARD} > .fd-open-status { display: flex; align-items: center; gap: 7px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; line-height: 1.3; color: var(--ink); }
   ${PRO_CARD} > .fd-open-status::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
-  ${PRO_CARD} > .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
+  ${PRO_CARD} > .fd-open-status:is([data-fd-open="open"], [data-fd-open="public"]) { color: var(--teal, #2A6B67); font-weight: 800; }
   ${PRO_CARD} > .fd-open-status[data-fd-open="closed"] { opacity: 0.78; }
   ${PRO_CARD} > .fd-open-status:is([data-fd-open="closed"], [data-fd-open="seasonal"], [data-fd-open="appointment"])::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
   ${PRO_CARD} > .fd-open-status[data-fd-open="unknown"] { color: #6B5D54; font-weight: 700; }
@@ -22842,7 +22842,7 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   if (!keepOrder && type !== 'golf') venues = seasonClosedLast(venues);
   // Every card says where the place stands (2026-11-02): golf, tours, sports and indoor cards get the same open /
   // closed / by appointment line the Food & Drink cards have. (Food & Drink pages add theirs after rendering.)
-  const statusInfo = cardOpts.statusLine === false || !['golf', 'tour', 'sport', 'indoor'].includes(type) || !(cardOpts.themed === undefined ? usesThemedCategoryLayout(type) : cardOpts.themed)
+  const statusInfo = cardOpts.statusLine === false || !['golf', 'tour', 'sport', 'indoor', 'outdoor', 'beach'].includes(type) || !(cardOpts.themed === undefined ? usesThemedCategoryLayout(type) : cardOpts.themed)
     ? null : foodDrinkOpenNowInfo(venues, getAdvisoryNotes(), new Date(), { requireVerified: false }).byId;
   let cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, statusLine: statusInfo ? cardStatusFor(statusInfo.get(v.id), v) : null, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
 
@@ -24817,6 +24817,15 @@ function blockedStatusLine(venueId, noticeText, seasonState, today) {
 // Every card says where the place stands (2026-11-02, Dayton: that space cannot be empty). Live open/closed when the
 // hours are trusted, the notice line when blocked, "By appointment" when the place's own words say so, and otherwise an
 // honest "Hours not confirmed" line rather than a blank.
+// Public places with no opening hours (2026-11-02): beaches, free parks and trails, skate parks, disc golf courses and
+// public courts. Arenas, pools and sports centres have real hours, so they are not in this list.
+function isPublicAccessPlace(v) {
+  if (!v) return false;
+  if (v.type === 'beach') return true;
+  if (!v.free_entry) return false;
+  if (v.type === 'outdoor') return true;
+  return v.type === 'sport' && /skate ?park|skatepark|disc golf|pickleball|tennis|basketball|\bcourts?\b|bike trails?|mountain bike/i.test(v.name || '');
+}
 function cardStatusFor(st, v) {
   if (st && st.eligible && st.text) return { state: st.state, text: st.text };
   if (st && st.note) return st.note;
@@ -24826,6 +24835,7 @@ function cardStatusFor(st, v) {
   if (/by appointment|appointment[- ](?:only|style|based)|by reservation|reservations? (?:only|required)|booking (?:is )?required|tastings? (?:are )?(?:available )?by (?:reservation|booking)/i.test(own)) {
     return { state: 'appointment', text: 'By appointment \u00b7 call ahead' };
   }
+  if (isPublicAccessPlace(v)) return { state: 'public', text: 'Open to the public \u00b7 no set hours' };
   return { state: 'unknown', text: 'Hours not confirmed \u00b7 call ahead' };
 }
 // opts.requireVerified (default true) gates on recorded hours verification.
@@ -24906,7 +24916,7 @@ function renderFoodDrinkOpenNowStyles() {
   @supports (grid-template-rows: subgrid) { @media (min-width: 900px) { body.golf-page .card-grid > .venue-card > .fd-open-status { grid-row: 3; } } }
   body.fd-page .venue-card .fd-open-status { display: flex; align-items: center; gap: 7px; margin: -6px 0 10px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.84rem; font-weight: 700; line-height: 1.3; color: var(--ink); opacity: 1; }
   body.fd-page .venue-card .fd-open-status::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
-  body.fd-page .venue-card .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
+  body.fd-page .venue-card .fd-open-status:is([data-fd-open="open"], [data-fd-open="public"]) { color: var(--teal, #2A6B67); font-weight: 800; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="closed"] { opacity: 0.78; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"] { color: #6B5D54; opacity: 1; font-weight: 700; }
@@ -28577,6 +28587,7 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
     cardNoteLabel: 'Dogs:',
     features: ['free_entry', 'arts_culture', 'dog_friendly', 'kid_friendly', 'lake_view'],
     openNow: false,
+    cardStatus: true,
     search: { label: 'Search outdoor destinations', placeholder: 'Search by name, town, trail or lake...' },
     searchLabels: { hiking: 'hike trail walk', viewpoints: 'lookout view summit', nature: 'wildlife birds park', cycling: 'bike', winter: 'ski snow', water: 'paddle swim boat lake' },
     tryLinks: [['/outdoors/hiking', 'hiking'], ['/outdoors/viewpoints', 'viewpoints'], ['/outdoors/cycling', 'cycling']],
@@ -28617,6 +28628,7 @@ function renderBeachesHubPage(venues, filter = null, opts = {}, now = new Date()
     cardOpts: { dogNoteInline: true, hideDogBadges: true },
     features: ['kid_friendly', 'dog_friendly', 'lake_view', 'great_groups'],
     openNow: false,
+    cardStatus: true,
     search: { label: 'Search beaches', placeholder: 'Search by name, town or lake...' },
     searchLabels: { dog: 'dog off-leash', quiet: 'quiet hidden secret' },
     tryLinks: [['/beaches?types=dog', 'dog beaches'], ['/beaches?features=kid_friendly', 'family beaches']],
@@ -57319,6 +57331,7 @@ module.exports = {
   appointmentLineFor,
   blockedStatusLine,
   cardStatusFor,
+  isPublicAccessPlace,
   BOOKING_ONLY_IDS,
   capChips,
   breadcrumbNavHtml,
