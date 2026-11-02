@@ -26790,7 +26790,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   };
   const payload = {};
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { cardNotes, cardNoteLabel: 'Play:', photoKeyFor });
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { photoKeyFor });
   const selected = new Set(f.types);
   const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
@@ -26827,6 +26827,8 @@ ${golfEngagementHeadHtml('sport', true, 'hub')}
   body.sports-hub-page .hub-links a:hover { background: rgba(27,43,58,0.06); }
   body.sports-hub-page .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
   body.sports-hub-page .card-note-label { font-weight: 800; }
+  /* Compact cards (2026-11-02, Dayton): photo, town, name, status, top badges + the rest. No description or "Play:" line, so cards with and without them no longer leave blank gaps. */
+  body.sports-hub-page .card-grid > .venue-card > .card-slot-desc, body.sports-hub-page .card-grid > .venue-card > .card-slot-notes { display: none !important; }
 </style>
 </head>
 <body class="golf-page outdoor-page fd-page sport-page sports-hub-page">
