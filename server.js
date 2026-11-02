@@ -24769,19 +24769,13 @@ const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered
 // render-time status here is the no-script / first-paint value.
 const BROWSE_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
 const FD_OPEN_NOTE = 'Open Now is based on each place\u2019s listed hours. Hours can change for holidays, seasons or special closures \u2014 check with the venue before you go.';
-// A place with a notice (winter by appointment, a closure) gets no live open/closed claim, but its card still says
-// when it is usually open (2026-11-02): "Usually 12-5 PM . check before you go"; null when the days differ.
-function usualHoursNote(hoursRaw) {
-  let h;
-  try { h = JSON.parse(hoursRaw); } catch (e) { return null; }
-  const wins = Object.values(h || {}).filter((d) => Array.isArray(d) && d.length).map((d) => JSON.stringify(d));
-  if (!wins.length || new Set(wins).size !== 1) return 'Hours vary \u00b7 check before you go';
-  const w = JSON.parse(wins[0]);
-  if (w.length !== 1) return 'Hours vary \u00b7 check before you go';
-  const t = (x) => { const [hh, mm] = x.split(':').map(Number); const h12 = ((hh + 11) % 12) + 1; return `${h12}${mm ? ':' + String(mm).padStart(2, '0') : ''}`; };
-  const ap = (x) => (Number(x.split(':')[0]) % 24 >= 12 ? 'PM' : 'AM');
-  const [a, b] = w[0];
-  return `Usually ${t(a)}${ap(a) === ap(b) ? '' : ' ' + ap(a)}\u2013${t(b)} ${ap(b)} \u00b7 check before you go`;
+// A place with a notice gets no live open/closed claim and never any times on its card (2026-11-02, Dayton: never send
+// people to, or have them call, a place that is closed). Only where the notice or the Plan your visit box says visits
+// are by appointment does the card say so; otherwise the line is left out and the page has the details.
+function appointmentLineFor(venueId, noticeText) {
+  const rows = (venueVisitInfo(venueId) || {}).rows || [];
+  const winter = rows.filter((r) => r.label === 'Winter' || r.label === 'Tastings').map((r) => r.text).join(' ');
+  return /appointment/i.test(`${noticeText || ''} ${winter}`) ? 'By appointment \u00b7 call ahead' : null;
 }
 // opts.requireVerified (default true) gates on recorded hours verification.
 // /food-drink and /browse both pass false: stored hours and the Okanagan clock
@@ -24796,15 +24790,18 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
   // A season note that does not say the venue is closed today ("open until",
   // "reopening") is shown on the card but leaves its Open Now status alone.
   const seasonOk = seasonNonBlockingIds(now);
+  // A place the business manages (login, approved claim) confirmed its own hours, winter and seasonal ones included
+  // (2026-11-02): a notice on its listing no longer hides its open/closed line.
+  const claimed = claimedVenueIds();
   for (const v of venues) {
-    const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id);
+    const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id) && !claimed.has(v.id);
     const e = requireVerified
       ? openNowEligibility(v, provenance.get(v.id), { policy: 'food_drink', now, hasAdvisory })
       // Audit fix (2026-10-27): the notice first. A place with a season or closure notice and no listed hours read
       // 'no_hours', so the map kept its happy hour times and deals ("Closed for the season / Happy hour today from 3 PM").
       : hasAdvisory ? { eligible: false, reason: 'advisory' } : !v.hours ? { eligible: false, reason: 'no_hours' } : { eligible: true, reason: 'ok' };
     if (!e.eligible || !hoursModule) {
-      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null, note: e.reason === 'advisory' ? usualHoursNote(v.hours) : null });
+      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null, note: e.reason === 'advisory' ? appointmentLineFor(v.id, advisoryNotes.get(v.id)) : null });
       continue;
     }
     // Seasonal hours and special closures ride along (2026-10-18), so the cards' and the map's live status apply them too.
@@ -57261,7 +57258,7 @@ module.exports = {
   buildOpeningHoursSpecification,
   badgeChipsHtml,
   venueBadgeChipsHtml,
-  usualHoursNote,
+  appointmentLineFor,
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,

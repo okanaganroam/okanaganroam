@@ -32535,3 +32535,9 @@ test('French guide card (2026-11-01): the Okanagan-to-Whistler road trip descrip
   assert.ok(fr[g.description], 'the guide description has a French line');
   assert.match(fr[g.description], /^De Kelowna à Whistler/);
 });
+
+test('A card for a place with a notice never shows times: it says by appointment only when the notice says so', () => {
+  assert.equal(app.appointmentLineFor(-1, 'In winter, visits are by appointment only unless the winery posts otherwise.'), 'By appointment \u00b7 call ahead');
+  assert.equal(app.appointmentLineFor(-1, 'Open Thursday to Saturday, 10 am to 4 pm.'), null);
+  assert.equal(app.appointmentLineFor(-1, null), null);
+});
