@@ -24830,12 +24830,12 @@ function cardStatusFor(st, v) {
   if (st && st.eligible && st.text) return { state: st.state, text: st.text };
   if (st && st.note) return st.note;
   if (v && BOOKING_ONLY_IDS.has(v.id)) return { state: 'appointment', text: 'Book ahead \u00b7 tours by reservation' };
+  if (isPublicAccessPlace(v)) return { state: 'public', text: 'Open to the public \u00b7 no set hours' };
   const rows = ((v && venueVisitInfo(v.id)) || {}).rows || [];
   const own = `${(v && v.description) || ''} ${rows.map((r) => r.text).join(' ')}`;
   if (/by appointment|appointment[- ](?:only|style|based)|by reservation|reservations? (?:only|required)|booking (?:is )?required|tastings? (?:are )?(?:available )?by (?:reservation|booking)/i.test(own)) {
     return { state: 'appointment', text: 'By appointment \u00b7 call ahead' };
   }
-  if (isPublicAccessPlace(v)) return { state: 'public', text: 'Open to the public \u00b7 no set hours' };
   return { state: 'unknown', text: 'Hours not confirmed \u00b7 call ahead' };
 }
 // opts.requireVerified (default true) gates on recorded hours verification.

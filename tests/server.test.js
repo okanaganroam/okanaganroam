@@ -32578,6 +32578,10 @@ test('Public places with no hours say Open to the public; arenas and tours do no
   assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'B' }), { state: 'public', text: 'Open to the public \u00b7 no set hours' });
 });
 
+test('A public place that mentions booking (campsites) still says Open to the public, not By appointment', () => {
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'Bear Creek', description: 'Campsite reservations required in summer.' }), { state: 'public', text: 'Open to the public \u00b7 no set hours' });
+});
+
 test('French: card status lines for places with a notice', () => {
   assert.equal(app.frText('By appointment \u00b7 call ahead'), 'Sur rendez-vous \u00b7 appelez avant');
   assert.equal(app.frText('Closed for the season \u00b7 Reopens May 1, 2027'), 'Ferm\u00e9 pour la saison \u00b7 R\u00e9ouverture le 1er mai 2027');
