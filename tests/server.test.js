@@ -7478,8 +7478,8 @@ test('Advisories: the collection is bootstrapped, memberships render a "Check be
   const beforeCard = app.venueCardHtml(b);
   const beforeCategory = app.renderCategoryPage('kelowna', 'beach', venues, []);
   const beforePage = app.renderVenuePage(b, [], [], []);
-  assert.doesNotMatch(beforePage, /venue-advisory/);
-  assert.doesNotMatch(beforeCategory, /venue-advisory/);
+  assert.doesNotMatch(beforePage, /<aside class="venue-advisory"/);
+  assert.doesNotMatch(beforeCategory, /<aside class="venue-advisory"/);
 
   const note = 'Swimming advisory in effect. Check the official source for the latest update. https://www.kelowna.ca/parks-recreation/parks-beaches/water-quality-beaches (checked 2026-09-19)';
   const meta = { reason: 'test advisory', batch_id: 'test-advisories' };
@@ -16954,7 +16954,8 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
         const card = cardOf(html, closed[t]);
         assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Closed \u00b7 reopens|Fermé pour la saison|Fermé \u00b7 réouverture)/.test(card), `${path}: the tag`);
-        if (path === '/indoor') assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season \u00b7 Reopens May 15, 2027</, `${path}: the status line says closed for the season and when it reopens`);
+        if (['golf', 'tour', 'sport', 'indoor'].includes(t) && !path.startsWith('/fr/')) assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season \u00b7 Reopens May 15, 2027</, `${path}: the status line says closed for the season and when it reopens`);
+        else if (['golf', 'tour', 'sport', 'indoor'].includes(t)) assert.match(card, /fd-open-status" data-fd-open="seasonal">/, `${path}: a status line in French too`);
         else assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
         if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\.|Fermé · réouverture le 15 mai/);
       }
@@ -25559,7 +25560,8 @@ test('Search gaps: a /search card for a place closed for the season shows the se
     for (const [where, card] of [['/search', search], ['/kelowna/wineries', list]]) {
       assert.ok(card, `${where}: the card is there`);
       assert.match(card, /season-tag season-tag-closed/, `${where}: the season tag`);
-      assert.doesNotMatch(card, /fd-open-status/, `${where}: no "Closed · Opens" line`);
+      assert.doesNotMatch(card, /fd-open-status" data-fd-open="(?:open|closed)"/, `${where}: no live "Closed · Opens" line`);
+      assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season/, `${where}: the card says closed for the season`);
     }
     const data = (html) => JSON.parse((/<script type="application\/json" id="fdVenueData">([\s\S]*?)<\/script>/.exec(html) || [])[1] || '{}');
     assert.equal((data(await (await fetch(`${base}/search?q=${encodeURIComponent('sg season winery')}`)).text())[String(v.id)] || {}).h, undefined, 'no hours shipped for the live status');
@@ -32566,4 +32568,17 @@ test('French: card status lines for places with a notice', () => {
   assert.equal(app.frText('By appointment \u00b7 call ahead'), 'Sur rendez-vous \u00b7 appelez avant');
   assert.equal(app.frText('Closed for the season \u00b7 Reopens May 1, 2027'), 'Ferm\u00e9 pour la saison \u00b7 R\u00e9ouverture le 1er mai 2027');
   assert.equal(app.frText('Temporarily closed \u00b7 Reopens Nov 10'), 'Ferm\u00e9 temporairement \u00b7 R\u00e9ouverture le 10 nov.');
+});
+
+test('Golf, tours, sports and indoor cards carry a status line like Food & Drink cards (no empty space)', () => {
+  golfFixtures();
+  const venues = app.getVenuesByRegionCategory('penticton', 'golf');
+  const html = app.renderCategoryPage('penticton', 'golf', venues, [], { today: '2026-11-02' });
+  const cards = html.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
+  assert.ok(cards.length >= 3);
+  for (const c of cards) assert.match(c, /<p class="fd-open-status" data-fd-open="[a-z]+">[^<]+<\/p>/, 'every golf card has a status line');
+  const all = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf'));
+  const allCards = all.match(/<li class="venue-card"[\s\S]*?<\/li>/g) || [];
+  assert.ok(allCards.length >= 3);
+  for (const c of allCards) assert.match(c, /fd-open-status/, 'every card on /golf has a status line');
 });
