@@ -16954,7 +16954,8 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
         const card = cardOf(html, closed[t]);
         assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Closed \u00b7 reopens|Fermé pour la saison|Fermé \u00b7 réouverture)/.test(card), `${path}: the tag`);
-        assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
+        if (path === '/indoor') assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season \u00b7 Reopens May 15, 2027</, `${path}: the status line says closed for the season and when it reopens`);
+        else assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
         if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\.|Fermé · réouverture le 15 mai/);
       }
       // /browse: last in its Recommended order (the first cards, then the rest from cards.json).
@@ -32540,4 +32541,20 @@ test('A card for a place with a notice never shows times: it says by appointment
   assert.equal(app.appointmentLineFor(-1, 'In winter, visits are by appointment only unless the winery posts otherwise.'), 'By appointment \u00b7 call ahead');
   assert.equal(app.appointmentLineFor(-1, 'Open Thursday to Saturday, 10 am to 4 pm.'), null);
   assert.equal(app.appointmentLineFor(-1, null), null);
+});
+
+test('Card status line for a place with a notice: closed for the season / temporarily closed (with the reopening date) / by appointment', () => {
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'closed', reopens: '2027-05-01' }, '2026-11-01'), { state: 'seasonal', text: 'Closed for the season \u00b7 Reopens May 1, 2027' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'closed', reopens: '2026-12-26' }, '2026-11-01'), { state: 'seasonal', text: 'Closed for the season \u00b7 Reopens Dec 26' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'closed', reopens: null }, '2026-11-01'), { state: 'seasonal', text: 'Closed for the season' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'x', { kind: 'temp_closed', current: true, to: '2026-11-09' }, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed \u00b7 Reopens Nov 10' });
+  assert.equal(app.blockedStatusLine(-1, 'x', { kind: 'temp_closed', current: false, to: '2026-11-09' }, '2026-11-01'), null, 'a closure that has not started says nothing');
+  assert.deepEqual(app.blockedStatusLine(-1, 'Visits are by appointment only.', null, '2026-11-01'), { state: 'appointment', text: 'By appointment \u00b7 call ahead' });
+  assert.equal(app.blockedStatusLine(-1, 'Tastings at noon.', null, '2026-11-01'), null);
+});
+
+test('French: card status lines for places with a notice', () => {
+  assert.equal(app.frText('By appointment \u00b7 call ahead'), 'Sur rendez-vous \u00b7 appelez avant');
+  assert.equal(app.frText('Closed for the season \u00b7 Reopens May 1, 2027'), 'Ferm\u00e9 pour la saison \u00b7 R\u00e9ouverture le 1er mai 2027');
+  assert.equal(app.frText('Temporarily closed \u00b7 Reopens Nov 10'), 'Ferm\u00e9 temporairement \u00b7 R\u00e9ouverture le 10 nov.');
 });

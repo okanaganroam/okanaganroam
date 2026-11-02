@@ -1089,6 +1089,11 @@ const FR_PATTERNS = [
     return m[3] ? `Fermé du ${day(m[2])} ${MONTHS[m[1]]} au ${day(m[4])} ${MONTHS[m[3]]}, réouverture le ${back}.`
       : `Fermé du ${day(m[2])} au ${day(m[4])} ${MONTHS[m[1]]}, réouverture le ${back}.`;
   }],
+  // Card status lines for places with a notice (2026-11-02).
+  [/^By appointment \u00b7 call ahead$/, () => 'Sur rendez-vous \u00b7 appelez avant'],
+  [/^Closed for the season$/, () => 'Ferm\u00e9 pour la saison'],
+  [/^(Closed for the season|Temporarily closed) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `${m[1] === 'Temporarily closed' ? 'Ferm\u00e9 temporairement' : 'Ferm\u00e9 pour la saison'} \u00b7 R\u00e9ouverture le ${m[3] === '1' ? '1er' : m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
+  [/^Temporarily closed$/, () => 'Ferm\u00e9 temporairement'],
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
   [/^(?:Open until|Closes) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => /^Closes/.test(m.input) ? `Ferme le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}` : `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
