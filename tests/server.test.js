@@ -32564,6 +32564,12 @@ test('Every card has a status line: live, notice, by appointment from the place\
   assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, description: 'Pinot Noir and Chardonnay.' }), { state: 'unknown', text: 'Hours not confirmed \u00b7 call ahead' });
 });
 
+test('Book-ahead tours and reservation-only notices read as such on the card', () => {
+  const id = [...app.BOOKING_ONLY_IDS][0];
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id, description: 'A tour.' }), { state: 'appointment', text: 'Book ahead \u00b7 tours by reservation' });
+  assert.equal(app.appointmentLineFor(-1, 'Tastings are by reservation only (checked October 19, 2026).'), 'By appointment \u00b7 call ahead');
+});
+
 test('French: card status lines for places with a notice', () => {
   assert.equal(app.frText('By appointment \u00b7 call ahead'), 'Sur rendez-vous \u00b7 appelez avant');
   assert.equal(app.frText('Closed for the season \u00b7 Reopens May 1, 2027'), 'Ferm\u00e9 pour la saison \u00b7 R\u00e9ouverture le 1er mai 2027');
