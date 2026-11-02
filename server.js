@@ -24769,29 +24769,13 @@ const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered
 // render-time status here is the no-script / first-paint value.
 const BROWSE_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
 const FD_OPEN_NOTE = 'Open Now is based on each place\u2019s listed hours. Hours can change for holidays, seasons or special closures \u2014 check with the venue before you go.';
-// A place with a notice (winter by appointment, a closure) gets no live open/closed claim, but its card still lists the
-// days and times on its page (2026-11-02): "Thu\u2013Sat 10 AM\u20134 PM \u00b7 check before you go". Nothing when it lists no
-// hours or is closed every day; "Hours vary" when its open days have different times.
-function usualHoursNote(hoursRaw) {
-  let h;
-  try { h = JSON.parse(hoursRaw); } catch (e) { return null; }
-  const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'], NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  if (!h || typeof h !== 'object') return null;
-  const open = DAYS.map((d, i) => [i, Array.isArray(h[d]) && h[d].length ? JSON.stringify(h[d]) : null]).filter((x) => x[1]);
-  if (!open.length) return null;
-  const tail = ' \u00b7 check before you go';
-  if (new Set(open.map((x) => x[1])).size !== 1) return 'Hours vary' + tail;
-  const w = JSON.parse(open[0][1]);
-  if (w.length !== 1) return 'Hours vary' + tail;
-  const t = (x) => { const [hh, mm] = x.split(':').map(Number); return `${((hh + 11) % 12) + 1}${mm ? ':' + String(mm).padStart(2, '0') : ''}`; };
-  const ap = (x) => (Number(x.split(':')[0]) % 24 >= 12 ? 'PM' : 'AM');
-  const [a, b] = w[0];
-  const times = `${t(a)}${ap(a) === ap(b) ? '' : ' ' + ap(a)}\u2013${t(b)} ${ap(b)}`;
-  const idx = open.map((x) => x[0]);
-  const runs = [];
-  idx.forEach((i) => { const r = runs[runs.length - 1]; if (r && r[1] === i - 1) r[1] = i; else runs.push([i, i]); });
-  const days = idx.length === 7 ? 'Daily' : runs.map(([x, y]) => (x === y ? NAMES[x] : y === x + 1 ? `${NAMES[x]}, ${NAMES[y]}` : `${NAMES[x]}\u2013${NAMES[y]}`)).join(', ');
-  return `${days} ${times}${tail}`;
+// A place with a notice gets no live open/closed claim and never any times on its card (2026-11-02, Dayton: never send
+// people to, or have them call, a place that is closed). Only where the notice or the Plan your visit box says visits
+// are by appointment does the card say so; otherwise the line is left out and the page has the details.
+function appointmentLineFor(venueId, noticeText) {
+  const rows = (venueVisitInfo(venueId) || {}).rows || [];
+  const winter = rows.filter((r) => r.label === 'Winter' || r.label === 'Tastings').map((r) => r.text).join(' ');
+  return /appointment/i.test(`${noticeText || ''} ${winter}`) ? 'By appointment \u00b7 call ahead' : null;
 }
 // opts.requireVerified (default true) gates on recorded hours verification.
 // /food-drink and /browse both pass false: stored hours and the Okanagan clock
@@ -24817,7 +24801,7 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
       // 'no_hours', so the map kept its happy hour times and deals ("Closed for the season / Happy hour today from 3 PM").
       : hasAdvisory ? { eligible: false, reason: 'advisory' } : !v.hours ? { eligible: false, reason: 'no_hours' } : { eligible: true, reason: 'ok' };
     if (!e.eligible || !hoursModule) {
-      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null, note: e.reason === 'advisory' ? usualHoursNote(v.hours) : null });
+      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null, note: e.reason === 'advisory' ? appointmentLineFor(v.id, advisoryNotes.get(v.id)) : null });
       continue;
     }
     // Seasonal hours and special closures ride along (2026-10-18), so the cards' and the map's live status apply them too.
@@ -57274,7 +57258,7 @@ module.exports = {
   buildOpeningHoursSpecification,
   badgeChipsHtml,
   venueBadgeChipsHtml,
-  usualHoursNote,
+  appointmentLineFor,
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,
