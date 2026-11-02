@@ -26830,6 +26830,8 @@ ${golfEngagementHeadHtml('sport', true, 'hub')}
   body.sports-hub-page .card-note-label { font-weight: 800; }
   /* Compact cards (2026-11-02, Dayton): photo, town, name, status, top badges + the rest. No description or "Play:" line, so cards with and without them no longer leave blank gaps. */
   body.sports-hub-page .card-grid > .venue-card > .card-slot-desc, body.sports-hub-page .card-grid > .venue-card > .card-slot-notes { display: none !important; }
+  /* Trail and park cards inherit the Golf rule that hides the badge row; on this page every card shows its badges (top two + N). */
+  html body.sports-hub-page.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:not(:empty) { display: flex !important; }
 </style>
 </head>
 <body class="golf-page outdoor-page fd-page sport-page sports-hub-page">

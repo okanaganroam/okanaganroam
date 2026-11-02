@@ -19900,6 +19900,7 @@ test('Sports hub: a free park keeps its own badges on the card (top two + N), ot
   const park = { id: 9101, name: 'Fixture Bike Park', region: 'vernon', type: 'outdoor', slug: 'fixture-bike-park', description: 'A bike park.', free_entry: 1, kid_friendly: 1, dog_friendly: 1 };
   const hub = app.renderSportsHubPage([], [park], new Map(), { types: [], features: [], regions: [] });
   assert.match(hub, /Dogs welcome<\/span> <span class="chip chip-feat">[^]*?Kids welcome<\/span> <span class="chip chip chip-more|Dogs welcome[^]*Kids welcome[^]*\+1/, 'dogs, kids and +1 (Free)');
+  assert.match(hub, /body\.sports-hub-page\.golf-page \.card-grid > li\.venue-card[^{]*> \.chips:not\(:empty\) \{ display: flex !important; \}/, 'badge row shown on trail and park cards too');
   assert.doesNotMatch(app.cardBadgeChipsHtml(park), /Kids welcome|Free/);
   assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Kids welcome[^]*Free/);
 });
