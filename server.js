@@ -8463,7 +8463,7 @@ const SEASON_TAG_ICON = { closed: uiIcon('leaf'), open_until: uiIcon('hourglass'
 const SEASON_TAG_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function seasonTagShortText(st) {
   if (st.kind === 'open_until' && st.until && parseLocalDate(st.until)) {
-    return `Open until ${SEASON_TAG_MONTHS[Number(st.until.slice(5, 7)) - 1]} ${Number(st.until.slice(8, 10))}`;
+    return `Closes ${SEASON_TAG_MONTHS[Number(st.until.slice(5, 7)) - 1]} ${Number(st.until.slice(8, 10))}`;
   }
   return st.text.replace(' The reopening date has not been announced yet.', '').replace(/ Check current hours.*$/, '');
 }
@@ -16396,7 +16396,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${PRO_CARD}::before { padding-bottom: 75% !important; border-radius: 15px 15px 0 0 !important; }
   ${PRO_CARD} > .venue-meta { margin: 0 0 6px; }
   ${PRO_CARD} > .fd-open-status { margin: -2px 0 8px; font-size: 0.8rem; font-weight: 700; }
-  ${PRO_CARD} > h2 { margin: 0 0 8px; font-size: 1.28rem; line-height: 1.2; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  ${PRO_CARD} > h2 { margin: 0 0 8px; font-size: 1.28rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   ${PRO_CARD} h2 a.venue-card-link { color: var(--ref-navy, #1B2B3A); }
   ${PRO_CARD} > .card-slot-desc { margin: 0 0 14px; }
   ${PRO_CARD} .golf-desc p { color: var(--ink-muted, #6B5D54); font-size: 0.93rem !important; line-height: 1.5 !important; }
@@ -16408,7 +16408,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${PRO_CARD} .card-action.trip-btn { font-weight: 800; border-radius: 999px; border: 1.5px solid rgba(42, 107, 103, 0.45); color: var(--teal-deep, #1E4F4C); background: #fff; padding: 8px 14px; }
   ${PRO_CARD} .card-action.trip-btn:hover { background: var(--teal, #2A6B67); color: #fff; }
   /* The season notice rides on the photo as a pill; any other notice stays under the text. */
-  ${PRO_CARD} > .card-slot-notice:has(> .season-tag) { position: absolute; z-index: 2; top: 12px; left: 12px; max-width: calc(100% - 70px); margin: 0 !important; padding: 0 !important; order: 0; }
+  ${PRO_CARD} > .card-slot-notice:has(> .season-tag) { position: absolute; z-index: 2; top: 12px; right: 52px; left: auto; max-width: calc(100% - 70px); margin: 0 !important; padding: 0 !important; order: 0; }
   ${PRO_CARD} > .card-slot-notice .season-tag { margin: 0; padding: 6px 11px; border-radius: 999px; background: rgba(16, 27, 36, 0.84); color: #fff; font-size: 0.74rem; font-weight: 800; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; backdrop-filter: blur(4px); }
   ${PRO_CARD} > .card-slot-notice .season-tag span { display: none; }
   ${PRO_CARD}:has(> .card-slot-notice .season-tag-closed)::before { filter: saturate(0.55) brightness(0.92); }
@@ -16417,7 +16417,7 @@ const CARD_V2_CSS = `<style id="card-v2">
 <script id="card-v2-rows">(function () {
   // Rows line up (2026-11-01): the name, price line and badges match across a row. The description, value score and
   // notice no longer sit on the card, so no neighbour's long text leaves a blank wall in it.
-  var PARTS = ['h2', '.card-slot-fee', '.chips'];
+  var PARTS = ['h2', '.fd-open-status', '.card-slot-fee', '.card-slot-desc', '.chips'];
   var CARD = 'li.venue-card[data-ph]:not(.whatson-event-card), li.venue-card[data-card-ph]:not(.whatson-event-card)';
   var queued = false;
   function part(card, sel) { for (var i = 0; i < card.children.length; i++) if (card.children[i].matches(sel)) return card.children[i]; return null; }
@@ -16426,7 +16426,7 @@ const CARD_V2_CSS = `<style id="card-v2">
     if (!document.body || !document.body.classList.contains('golf-page')) return;
     document.querySelectorAll('.card-grid').forEach(function (grid) {
       var cards = Array.prototype.filter.call(grid.children, function (c) { return c.matches(CARD); });
-      cards.forEach(function (c) { PARTS.forEach(function (p) { var e = part(c, p); if (e) e.style.minHeight = ''; }); });
+      cards.forEach(function (c) { PARTS.forEach(function (p) { var e = part(c, p); if (e) e.style.minHeight = ''; }); var d = part(c, '.card-slot-desc'); if (d) d.style.marginTop = ''; });
       if (window.innerWidth < 700) return;
       var rows = {};
       cards.forEach(function (c) { if (!c.offsetParent) return; var t = Math.round(c.getBoundingClientRect().top); (rows[t] = rows[t] || []).push(c); });
@@ -16440,6 +16440,8 @@ const CARD_V2_CSS = `<style id="card-v2">
           var max = 0;
           els.forEach(function (e) { max = Math.max(max, e.getBoundingClientRect().height); });
           if (max > 0) els.forEach(function (e) { e.style.minHeight = max + 'px'; });
+          // A card with no open line (no hours) keeps that line's space, so its description starts level with its neighbours'.
+          if (p === '.fd-open-status' && max > 0) row.forEach(function (c) { var d = part(c, '.card-slot-desc'); if (!part(c, p) && d) d.style.marginTop = (max + 6) + 'px'; });
         });
       });
     });

@@ -1090,7 +1090,7 @@ const FR_PATTERNS = [
       : `Fermé du ${day(m[2])} au ${day(m[4])} ${MONTHS[m[1]]}, réouverture le ${back}.`;
   }],
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
-  [/^Open until (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
+  [/^(?:Open until|Closes) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => /^Closes/.test(m.input) ? `Ferme le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}` : `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
   // The "Check before you go" box on list cards (2026-10-18): its source link ("Official source: example.com ↗").
   [/^Official source(?:: (.+?))? ↗$/, (m) => `Source officielle${m[1] ? ` : ${m[1]}` : ''} ↗`],

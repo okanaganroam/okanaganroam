@@ -17002,10 +17002,11 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
   }
 });
 
-test('Seasons everywhere: the card tag reads "Open until Oct 31" (fr "Ouvert jusqu’au 31 oct."); seasonClosedLast keeps every other place in order', () => {
+test('Seasons everywhere: the card tag reads "Closes Oct 31" (fr "Ferme le 31 oct."); seasonClosedLast keeps every other place in order', () => {
   const st = app.seasonStateOn({ status: 'open_until', until_date: '2026-10-31', reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
   assert.equal(st.text, 'Open for the season until October 31.', 'the venue page keeps the sentence');
-  assert.ok(app.seasonTagHtml(st).endsWith(`season-tag-open_until"><span aria-hidden="true">${app.uiIcon('hourglass')}</span> Open until Oct 31</p>`));
+  assert.ok(app.seasonTagHtml(st).endsWith(`season-tag-open_until"><span aria-hidden="true">${app.uiIcon('hourglass')}</span> Closes Oct 31</p>`));
+  assert.equal(app.frText('Closes Oct 31'), 'Ferme le 31 oct.');
   assert.equal(app.frText('Open until Oct 31'), 'Ouvert jusqu’au 31 oct.');
   assert.equal(app.frText('Open until Nov 1'), 'Ouvert jusqu’au 1er nov.');
   const closedSt = app.seasonStateOn({ status: 'closed', until_date: null, reopens_date: null, source_url: SEASON_SRC, checked_at: '2026-10-11' }, '2026-10-18');
