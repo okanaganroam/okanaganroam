@@ -8768,7 +8768,7 @@ test('Outdoors explorer: no filter = every destination; one/many regions (OR); o
     assert.deepEqual(app.listLiveOutdoorActivities().map((a) => a.slug).sort(), ['camping', 'hiking']);
 
     // 10. Favorite / Add to trip, View details, region line and description survive on every landing card; no phone/website on list cards; compact clamp shipped.
-    assert.match(pm, new RegExp(`<li class="venue-card" data-venue-id="${kelA}" data-venue-region="kelowna" data-venue-category="outdoor" data-venue-name="Explorer Kelowna Trail" data-surface="category_card">\\s*<h2><a class="venue-card-link" href="/kelowna/outdoors/explorer-kelowna-trail"><span class="venue-card-name">Explorer Kelowna Trail</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>\\s*<p class="venue-meta">Kelowna</p>\\s*<div class="card-slot card-slot-fee"></div>\\s*<div class="card-slot card-slot-desc">\\s*<div class="golf-desc" id="golf-desc-${kelA}"><p>Explorer Kelowna Trail is a fixture[^<]*</p></div>\\s*<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-${kelA}" hidden>Read more &rarr;</button>[\\s\\S]*?<button type="button" class="card-action fav-btn" data-fav-name="Explorer Kelowna Trail"[\\s\\S]*?<button type="button" class="card-action trip-btn" data-trip-name="Explorer Kelowna Trail"`));
+    assert.match(pm, new RegExp(`<li class="venue-card" data-venue-id="${kelA}" data-venue-region="kelowna" data-venue-category="outdoor" data-venue-name="Explorer Kelowna Trail" data-surface="category_card">\\s*<h2><a class="venue-card-link" href="/kelowna/outdoors/explorer-kelowna-trail"><span class="venue-card-name">Explorer Kelowna Trail</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>\\s*<p class="venue-meta">Kelowna</p>(?:\\s*<p class="fd-open-status"[^>]*>[^<]*</p>)?\\s*<div class="card-slot card-slot-fee"></div>\\s*<div class="card-slot card-slot-desc">\\s*<div class="golf-desc" id="golf-desc-${kelA}"><p>Explorer Kelowna Trail is a fixture[^<]*</p></div>\\s*<button type="button" class="desc-toggle" aria-expanded="false" aria-controls="golf-desc-${kelA}" hidden>Read more &rarr;</button>[\\s\\S]*?<button type="button" class="card-action fav-btn" data-fav-name="Explorer Kelowna Trail"[\\s\\S]*?<button type="button" class="card-action trip-btn" data-trip-name="Explorer Kelowna Trail"`));
     assert.doesNotMatch(pm.slice(pm.indexOf('id="outdoorResults"')), /card-action-website|card-action-phone|tel:/);
     assert.ok(plain.includes('body.outdoor-page #outdoorResults .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }'), 'landing cards clamp to about three lines');
     assert.ok(!app.renderOutdoorActivityPage(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking, app.getOutdoorActivityVenues(app.OUTDOOR_ACTIVITY_BY_SLUG.hiking)).includes('id="outdoorResults"'), 'activity pages keep the four-line clamp (no #outdoorResults there)');
@@ -16954,9 +16954,8 @@ test('Seasons everywhere: closed-for-season outdoor, golf, tour and other listin
         assert.ok(ids.indexOf(closed[t]) > ids.indexOf(open[t]), `${path}: the closed-for-season place is after the open one`);
         const card = cardOf(html, closed[t]);
         assert.ok(card.includes(`class="season-tag season-tag-closed"><span aria-hidden="true">${app.uiIcon('leaf')}</span> `) && /(Closed for the season|Closed \u00b7 reopens|Fermé pour la saison|Fermé \u00b7 réouverture)/.test(card), `${path}: the tag`);
-        if (['golf', 'tour', 'sport', 'indoor'].includes(t) && !path.startsWith('/fr/')) assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season \u00b7 Reopens May 15, 2027</, `${path}: the status line says closed for the season and when it reopens`);
-        else if (['golf', 'tour', 'sport', 'indoor'].includes(t)) assert.match(card, /fd-open-status" data-fd-open="seasonal">/, `${path}: a status line in French too`);
-        else assert.doesNotMatch(card, /fd-open-status/, `${path}: no open/closed status line`);
+        if (['golf', 'tour', 'sport', 'indoor', 'outdoor', 'beach'].includes(t) && !path.startsWith('/fr/')) assert.match(card, /fd-open-status" data-fd-open="seasonal">Closed for the season \u00b7 Reopens May 15, 2027</, `${path}: the status line says closed for the season and when it reopens`);
+        else assert.match(card, /fd-open-status" data-fd-open="seasonal">/, `${path}: a status line in French too`);
         if (path.startsWith('/fr/')) assert.match(card, /Fermé pour la saison\. Réouverture le 15 mai 2027\.|Fermé · réouverture le 15 mai/);
       }
       // /browse: last in its Recommended order (the first cards, then the rest from cards.json).
@@ -32568,6 +32567,15 @@ test('Book-ahead tours and reservation-only notices read as such on the card', (
   const id = [...app.BOOKING_ONLY_IDS][0];
   assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id, description: 'A tour.' }), { state: 'appointment', text: 'Book ahead \u00b7 tours by reservation' });
   assert.equal(app.appointmentLineFor(-1, 'Tastings are by reservation only (checked October 19, 2026).'), 'By appointment \u00b7 call ahead');
+});
+
+test('Public places with no hours say Open to the public; arenas and tours do not', () => {
+  assert.equal(app.isPublicAccessPlace({ type: 'beach', name: 'Any Beach' }), true);
+  assert.equal(app.isPublicAccessPlace({ type: 'outdoor', free_entry: 1, name: 'A Trail' }), true);
+  assert.equal(app.isPublicAccessPlace({ type: 'outdoor', free_entry: 0, name: 'Paid Park' }), false);
+  assert.equal(app.isPublicAccessPlace({ type: 'sport', free_entry: 1, name: 'Lumby Skate Park' }), true);
+  assert.equal(app.isPublicAccessPlace({ type: 'sport', free_entry: 1, name: 'Enderby Arena' }), false);
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'B' }), { state: 'public', text: 'Open to the public \u00b7 no set hours' });
 });
 
 test('French: card status lines for places with a notice', () => {
