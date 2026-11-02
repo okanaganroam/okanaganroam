@@ -22807,6 +22807,9 @@ function shopListPagesIndexable() {
 let GOLF_CARD_PRICES = {};
 try { GOLF_CARD_PRICES = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'golf-card-prices.json'), 'utf8')); } catch (e) { /* cards just show no price */ }
 delete GOLF_CARD_PRICES._note;
+// Tours that only run booked departures (2026-11-02): their cards say "Book ahead" instead of an empty status.
+let BOOKING_ONLY_IDS = new Set();
+try { BOOKING_ONLY_IDS = new Set(JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'booking-only-ids.json'), 'utf8')).ids || []); } catch (e) { /* no list: those cards fall back to the unconfirmed line */ }
 
 // Renders a category's venues as either one flat grid (every category
 // except golf) or two labeled subsections (golf only: Golf Courses, then
@@ -24790,7 +24793,7 @@ const FD_OPEN_NOTE = 'Open Now is based on each place\u2019s listed hours. Hours
 function appointmentLineFor(venueId, noticeText) {
   const rows = (venueVisitInfo(venueId) || {}).rows || [];
   const winter = rows.filter((r) => r.label === 'Winter' || r.label === 'Tastings').map((r) => r.text).join(' ');
-  return /appointment/i.test(`${noticeText || ''} ${winter}`) ? 'By appointment \u00b7 call ahead' : null;
+  return /appointment|by reservation|reservations? (?:only|(?:are |is )?required)/i.test(`${noticeText || ''} ${winter}`) ? 'By appointment \u00b7 call ahead' : null;
 }
 function shortReopenDate(iso, today) {
   if (!iso || !parseLocalDate(iso)) return '';
@@ -24817,6 +24820,7 @@ function blockedStatusLine(venueId, noticeText, seasonState, today) {
 function cardStatusFor(st, v) {
   if (st && st.eligible && st.text) return { state: st.state, text: st.text };
   if (st && st.note) return st.note;
+  if (v && BOOKING_ONLY_IDS.has(v.id)) return { state: 'appointment', text: 'Book ahead \u00b7 tours by reservation' };
   const rows = ((v && venueVisitInfo(v.id)) || {}).rows || [];
   const own = `${(v && v.description) || ''} ${rows.map((r) => r.text).join(' ')}`;
   if (/by appointment|appointment[- ](?:only|style|based)|by reservation|reservations? (?:only|required)|booking (?:is )?required|tastings? (?:are )?(?:available )?by (?:reservation|booking)/i.test(own)) {
@@ -57315,6 +57319,7 @@ module.exports = {
   appointmentLineFor,
   blockedStatusLine,
   cardStatusFor,
+  BOOKING_ONLY_IDS,
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,
