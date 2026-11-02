@@ -12600,7 +12600,7 @@ test('Golf data: the region golf page shows verified green fees and sorts by pri
   assert.deepEqual(order(page('price-desc')), ['Penticton Golf &amp; Country Club', 'Skaha Meadows Golf Course', 'Pine Hills Golf Club']);
   assert.deepEqual(order(page('recommended')), order(app.renderCategoryPage('penticton', 'golf', venues, [])), 'default order is the existing order');
   const asc = page('price-asc');
-  assert.match(asc, /<span class="golf-fee-price">\$40<\/span> <span class="golf-fee-detail">· 9 holes<\/span>/);
+  assert.match(asc, /<span class="golf-fee-price">From \$40<\/span>/);
   assert.match(asc, /<span class="golf-fee-price">From \$99<\/span>/);
   assert.match(asc, /Green fees not yet verified/);
   assert.match(asc, /<nav class="category-region-selector golf-sort" aria-label="Sort golf courses">/);

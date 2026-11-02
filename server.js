@@ -17263,7 +17263,7 @@ function renderGolfThemeStyles() {
   html body.golf-page .card-grid > li.venue-card[data-venue-category="golf"]:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .card-slot-notes { display: none !important; }
   /* Golf card order (2026-11-01, Dayton): photo, location, name, starting price, then View details and Add to trip. */
   body.golf-page .card-grid > li.venue-card[data-venue-category="golf"] > .card-slot-fee { margin: 0 0 14px; }
-  body.golf-page .card-grid > li.venue-card[data-venue-category="golf"] .card-slot-fee .golf-fee { margin: 0; font-size: 1.02rem; font-weight: 800; color: var(--ref-navy, #1B2B3A); }
+  body.golf-page .card-grid > li.venue-card[data-venue-category="golf"] > .card-slot-fee > p:first-child { margin: 0; font-size: 1.02rem; font-weight: 800; color: var(--ref-navy, #1B2B3A); }
   body.golf-page .venue-card {
     margin: 0; background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
     padding: 18px 20px; box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
