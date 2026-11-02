@@ -18082,8 +18082,7 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       assert.match(hub.text, /href="\/vernon\/golf\/sports-also-disc-golf-club"/, 'a golf course links to its golf page');
       assert.doesNotMatch(hub.text, /noindex/);
       // The membership note is that card's "Play:" line; a card without one names its activities.
-      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Play:<\/span> Skate park and four tennis courts<\/p>/);
-      assert.match(hub.text, /<p class="card-note"><span class="card-note-label">Play:<\/span> Disc Golf<\/p>/);
+      assert.doesNotMatch(hub.text, /<span class="card-note-label">Play:<\/span>/, 'compact sports cards: no Play line on the hub (2026-11-02)');
       assert.doesNotMatch(hub.text, /Rainy day:|Experience:<\/span>/);
       // The card script wires every type on /sports, and descriptions clamp to 3 lines.
       assert.match(hub.text, /querySelectorAll\('\.venue-card:is\([^)]*\[data-venue-category="golf"\][^)]*\[data-venue-category="outdoor"\]/);
@@ -19906,8 +19905,8 @@ test('Sports hub: one list, activity chips, Biggest first from the stated size, 
   const html = app.renderSportsHubPage([own], [big], notes, { types: [], features: [], regions: [] });
   assert.match(html, /id="fdResultsSummary" aria-live="polite">2 places to play</);
   assert.ok(html.indexOf('data-venue-name="Fixture Trail Network"') < html.indexOf('data-venue-name="Fixture Skate Park"'), 'biggest first');
-  assert.match(html, /<span class="card-note-label">Play:<\/span> MTB network: 60 trails, 70 km singletrack/);
-  assert.match(html, /<span class="card-note-label">Play:<\/span> Skate Parks &amp; BMX/);
+  assert.doesNotMatch(html, /<span class="card-note-label">Play:<\/span>/, 'compact sports cards: no Play line on the hub (2026-11-02)');
+  assert.match(html, /Skate Parks &amp; BMX/);
   assert.match(html, /data-venue-id="9002"[^>]*data-ph="none"/);
   assert.match(html, /data-venue-id="9001"[^>]*data-ph="none"/);
   for (const k of ['skate', 'bike', 'disc', 'courts']) for (const src of app.FD_CARD_PHOTOS[k]) assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', src)), src);
