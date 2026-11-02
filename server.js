@@ -234,7 +234,7 @@ const RESEARCHED_BOOL_FIELDS = [
   'gluten_free', 'lake_view', 'nonalcoholic', 'sports_tv', 'live_music',
   'great_groups', 'happy_hour', 'free_entry', 'arts_culture',
 ];
-const ACTIVITY_ONLY_BADGES = new Set(['free_entry', 'arts_culture']);
+const ACTIVITY_ONLY_BADGES = new Set(['free_entry', 'arts_culture', 'beginner', 'lit', 'covered', 'rentals']);
 const ACTIVITY_BADGE_TYPES = new Set(['outdoor', 'indoor', 'beach', 'tour', 'sport']);
 
 // Derived badges (2026-10-11): computed ONLY from the venue's stored hours
@@ -8421,6 +8421,8 @@ const UI_ICON_PATHS = {
   waves: '<path d="M2 9c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"></path><path d="M2 15c1.5 1.5 3 1.5 4.5 0s3-1.5 4.5 0 3 1.5 4.5 0 3-1.5 4.5 0"></path>',
   child: '<circle cx="12" cy="7.5" r="3"></circle><path d="M6.5 20.5v-1.5a5.5 5.5 0 0 1 11 0v1.5"></path>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path>',
+  bulb: '<path d="M9 18h6M10 21h4"></path><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"></path>',
+  roof: '<path d="M3 11l9-7 9 7"></path><path d="M5.5 9.5V20h13V9.5"></path>',
   sunrise: '<path d="M5.5 18a6.5 6.5 0 0 1 13 0"></path><path d="M2.5 18h19"></path><path d="M12 4v4M4.9 10.4l1.4 1.4M17.7 11.8l1.4-1.4"></path><path d="M3.5 21.5h17"></path>',
   group: '<circle cx="9" cy="8" r="3"></circle><path d="M3 20v-1a6 6 0 0 1 12 0v1"></path><path d="M16 5a3 3 0 0 1 0 6"></path><path d="M18 14a6 6 0 0 1 3 5.2V20"></path>',
   tv: '<rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M8 21h8M9 2.5l3 3.5 3-3.5"></path>',
@@ -18282,6 +18284,7 @@ const CARD_BADGE_SHORT = {
   nonalcoholic: ['juice', 'Non-alcoholic'], sports_tv: ['tv', 'Sports TV'], live_music: ['music', 'Live music'],
   great_groups: ['group', 'Groups'], happy_hour: ['cocktail', 'Happy hour'], free_entry: ['ticket', 'Free'],
   arts_culture: ['palette', 'Arts & culture'], open_early: ['sunrise', 'Open early'], open_late: ['moon', 'Open late'],
+  beginner: ['sprout', 'Beginner friendly'], lit: ['bulb', 'Lit at night'], covered: ['roof', 'Covered'], rentals: ['tag', 'Rentals'],
 };
 // Listing cards show only the badges that set a place apart (Dayton, 2026-10-29: "most of these places are all free,
 // lake view and kid friendly"): a beach card leaves off Kids welcome, Lake view and Free, and a free park or trail
@@ -18295,7 +18298,7 @@ function cardBadgeExpected(venue, f) {
 // allBadges (Sports hub): every place shows its own top badges, so no card is left without a row.
 function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false } = {}) {
   // Free goes first (Dayton, 2026-11-02: "people want to know the prices of stuff first").
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && (allBadges || !cardBadgeExpected(venue, f)))
+  return [...BOOL_FIELDS, ...(allBadges ? SPORT_ATTR_FIELDS : [])].filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && (allBadges || !cardBadgeExpected(venue, f)))
     .sort((a, b) => (b === 'free_entry') - (a === 'free_entry'))
     .map((f) => {
       const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
@@ -24354,6 +24357,11 @@ const FD_HUB_FEATURES = [
   // Things-to-do badges (2026-10-19): only offered where a page asks for them (onlyKeys), never on food pages.
   { key: 'free_entry', label: 'Free to Visit', icon: uiIcon('ticket', 15, true) },
   { key: 'arts_culture', label: 'Arts & Culture', icon: uiIcon('palette', 15, true) },
+  // Sports & Recreation only (2026-11-02): not database columns; sportVenueWithAttrs() sets them from data/sports-attributes.json and the place type.
+  { key: 'beginner', label: 'Beginner Friendly', icon: uiIcon('sprout', 15, true) },
+  { key: 'lit', label: 'Lit at Night', icon: uiIcon('bulb', 15, true) },
+  { key: 'covered', label: 'Covered / Indoor', icon: uiIcon('roof', 15, true) },
+  { key: 'rentals', label: 'Rentals', icon: uiIcon('tag', 15, true) },
 ];
 const FD_HUB_FEATURE_KEYS = new Set(FD_HUB_FEATURES.map((f) => f.key));
 // How many cards are in the render tree at a time. 75 keeps the initial page
@@ -26724,7 +26732,22 @@ function sportScaleScore(v, note) {
   if (/\blit\b|lights/.test(play || text)) score += 0.5;
   return score + Math.min(String(v.description || '').length, 1200) / 1200;
 }
+// Sports & Recreation attributes (2026-11-02): Beginner friendly, Lit at night, Rentals come from data/sports-attributes.json
+// ({ "<venue id>": ["beginner", "lit", "rentals"] }, each checked against the place's own page); Covered / Indoor is read from
+// the place itself (an arena, recreation centre or sports centre). They are not database columns and only the Sports page uses them.
+const SPORT_ATTR_FIELDS = ['beginner', 'lit', 'covered', 'rentals'];
+let SPORT_ATTRS = {};
+try { SPORT_ATTRS = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'sports-attributes.json'), 'utf8')) || {}; } catch (e) { /* none yet: the Sports page just has no extra badges */ }
+function sportVenueWithAttrs(v) {
+  const own = SPORT_ATTRS[String(v.id)] || [];
+  const out = { ...v };
+  for (const f of SPORT_ATTR_FIELDS) if (own.includes(f)) out[f] = 1;
+  if (v.type === 'sport' && /\barena\b|recreation (?:centre|complex)|sports centre/i.test(v.name || '')) out.covered = 1;
+  return out;
+}
 function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
+  sportVenues = sportVenues.map(sportVenueWithAttrs);
+  alsoVenues = alsoVenues.map(sportVenueWithAttrs);
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   const sort = SPORTS_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
   const all = [...sportVenues, ...alsoVenues.filter((v) => !sportVenues.some((s) => s.id === v.id))];
@@ -57752,7 +57775,7 @@ module.exports = {
   renderFoodDrinkHubPage,
   renderFoodDrinkHubScriptHtml,
   renderWineriesHubPage,
-  renderSportsHubPage,
+  renderSportsHubPage, sportVenueWithAttrs,
   renderIndoorHubPage,
   indoorExperiencesOf,
   INDOOR_HUB_EXPERIENCES,

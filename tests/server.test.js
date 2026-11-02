@@ -19905,6 +19905,16 @@ test('Sports hub: a free park keeps its own badges on the card (top two + N), ot
   assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Free[^]*Dogs welcome[^]*Kids welcome/, 'Free is the first badge');
 });
 
+test('Sports hub: Covered / Indoor is read from the place and shows as a filter and a card badge', () => {
+  const arenas = [1, 2, 3].map((n) => ({ id: 9200 + n, name: `Fixture Arena ${n}`, region: 'vernon', type: 'sport', slug: `fixture-arena-${n}`, description: 'An ice arena.', kid_friendly: 1 }));
+  const html = app.renderSportsHubPage(arenas, [], new Map(), { types: [], features: [], regions: [] });
+  assert.match(html, /data-fd-feature="covered"/, 'filter offered');
+  assert.doesNotMatch(html, /data-fd-feature="lit"/, 'no filter for an attribute nobody has');
+  assert.match(html, /Covered<\/span>|Kids welcome[^]*Covered/, 'badge on the card');
+  assert.equal(app.sportVenueWithAttrs({ id: 1, name: 'Fixture Skate Park', type: 'sport' }).covered, undefined);
+  assert.equal(app.sportVenueWithAttrs({ id: 1, name: 'Fixture Arena', type: 'sport' }).covered, 1);
+});
+
 test('Sports hub: one list, activity chips, Biggest first from the stated size, a Play line and activity photo on every card', () => {
   assert.ok(app.sportScaleScore({ name: 'A', description: '' }, 'MTB network: 107 trails, 150+ km singletrack') > app.sportScaleScore({ name: 'B', description: 'A small skate park.' }, 'Skate park'));
   assert.ok(app.sportScaleScore({ name: 'Resort', description: 'A short 30-minute drive, 33 km from town, with 80 runs.' }, '9-hole disc golf course') < app.sportScaleScore({ name: 'X', description: '' }, 'Freeride MTB network: 65 trails, 68+ km'), 'a drive or ski runs are not trail');
