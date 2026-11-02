@@ -19902,7 +19902,7 @@ test('Sports hub: a free park keeps its own badges on the card (top two + N), ot
   assert.match(hub, /Dogs welcome<\/span> <span class="chip chip-feat">[^]*?Kids welcome<\/span> <span class="chip chip chip-more|Dogs welcome[^]*Kids welcome[^]*\+1/, 'dogs, kids and +1 (Free)');
   assert.match(hub, /body\.sports-hub-page\.golf-page \.card-grid > li\.venue-card[^{]*> \.chips:not\(:empty\) \{ display: flex !important; \}/, 'badge row shown on trail and park cards too');
   assert.doesNotMatch(app.cardBadgeChipsHtml(park), /Kids welcome|Free/);
-  assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Kids welcome[^]*Free/);
+  assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Free[^]*Dogs welcome[^]*Kids welcome/, 'Free is the first badge');
 });
 
 test('Sports hub: one list, activity chips, Biggest first from the stated size, a Play line and activity photo on every card', () => {
