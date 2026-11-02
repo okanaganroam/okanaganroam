@@ -1,0 +1,3813 @@
+{
+ "1212": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be on a leash in the Myra Canyon area",
+  "extras": [
+   {
+    "label": "Road to lot",
+    "text": "Forest road is gravel and can be rough"
+   },
+   {
+    "label": "Trestles",
+    "text": "Walk bikes across the trestles"
+   }
+  ],
+  "parking": "Gravel lots, about 75 spots in total, at the end of an 8 km forest road",
+  "season": "Open year-round; services mid-April to November 15",
+  "source_url": "https://bcparks.ca/myra-bellevue-park/",
+  "washrooms": "Pit toilets at the main lot; one is wheelchair-accessible"
+ },
+ "1213": {
+  "accessibility": "Trails only; no public roads in the park",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be on a leash; not suited to backcountry",
+  "extras": [
+   {
+    "label": "Water",
+    "text": "Little surface water away from the lakes; carry plenty"
+   },
+   {
+    "label": "No lifeguards",
+    "text": "Swimming along the shoreline; no lifeguards in BC Parks"
+   }
+  ],
+  "parking": "North lot is 15 km up Lakeshore Rd; south lot via Chute Lake Rd, rough",
+  "source_url": "https://bcparks.ca/okanagan-mountain-park/",
+  "time_needed": "Boulder Loop is 5 km, about 3 hours"
+ },
+ "1214": {
+  "accessibility": "Access trails steep and rocky with cliff drop-offs; not easy walking",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be leashed at all times in the park",
+  "extras": [
+   {
+    "label": "Drinking water",
+    "text": "No drinking water in the park; bring your own"
+   },
+   {
+    "label": "Break-ins",
+    "text": "Recent vehicle break-ins at the lots; lock up and hide valuables"
+   }
+  ],
+  "parking": "Overflow parking at bottom of Smythe Rd; no parking on the single-lane road",
+  "season": "Access road gate closed mid-Nov to mid-March and daily dusk to dawn",
+  "source_url": "https://bcparks.ca/skaha-bluffs-park/"
+ },
+ "1215": {
+  "accessibility": "Moderate to strenuous climb; hiking only",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash at all times; not allowed in beach areas or park buildings",
+  "extras": [
+   {
+    "label": "Rockfall",
+    "text": "Falling rock from the cliff face is very common; stay on trail"
+   },
+   {
+    "label": "Hiking only",
+    "text": "No horses, motorized vehicles or mountain bikes"
+   }
+  ],
+  "parking": "Parking lot at the trailhead, after 1.6 km of unpaved road",
+  "source_url": "https://bcparks.ca/tplaqin-enderby-cliffs-park/",
+  "time_needed": "1.5 to 2.5 hours each way"
+ },
+ "1216": {
+  "accessibility": "Flat and wide from the lake; stairs and gains through Scenic Canyon",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Bike speed limit",
+    "text": "Cyclists must stay under 15 km/h and use a bell or voice"
+   },
+   {
+    "label": "Day-use only",
+    "text": "Camping, fires and overnight parking are not permitted"
+   }
+  ],
+  "parking": "Lots at many access points, e.g. Truswell, Casorso, Ziprick, Hollywood Rd",
+  "season": "Open year-round; some access points get less upkeep Nov to Mar",
+  "source_url": "https://storymaps.arcgis.com/stories/7d3308509202423fb9dd0e3377877361",
+  "washrooms": "Washrooms listed for the park"
+ },
+ "1217": {
+  "accessibility": "Easy trails, washrooms, picnic shelter and playground are accessible",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Nature centre",
+    "text": "EECO open Tue to Sun, 10 a.m. to 3 p.m.; closed Mondays"
+   },
+   {
+    "label": "Picnic shelter",
+    "text": "Picnic shelter can be booked"
+   }
+  ],
+  "parking": "Main lot at 2363 Springfield Rd (Durnin/Leckie); second lot at Ziprick Rd",
+  "season": "Open 6 a.m. to 6 p.m. from Oct 15 to Dec 31; hours change seasonally",
+  "source_url": "https://storymaps.arcgis.com/stories/2c6bc9536e2044cea9baae199fe47f02",
+  "washrooms": "Washrooms listed for the park"
+ },
+ "1218": {
+  "accessibility": "Easy to moderate Greenway sections with stairs and bridges",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Day-use only",
+    "text": "Camping, fires and overnight parking are not permitted"
+   }
+  ],
+  "parking": "Lots at the end of Field Rd, off Hollywood Rd South and off McCulloch Rd",
+  "season": "Field Rd and McCulloch Rd car entrances closed Nov to Mar",
+  "source_url": "https://storymaps.arcgis.com/stories/b54dfffc016a4a11afebb9f46f7c4728",
+  "washrooms": "Washrooms listed for the park"
+ },
+ "1219": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Day-use only",
+    "text": "Camping, fires and overnight parking are not permitted"
+   }
+  ],
+  "parking": "Lots off Swainson Rd and Joe Rich Rd; street parking on Tower Ranch Dr",
+  "season": "Open year-round; less upkeep of parking and facilities Nov to Mar",
+  "source_url": "https://storymaps.arcgis.com/stories/5d743c8e245f45ed9f031470dac8076c"
+ },
+ "1220": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Winter upkeep",
+    "text": "Reduced maintenance of parking and facilities Nov 1 to Apr 1"
+   },
+   {
+    "label": "Closed areas",
+    "text": "Some sections closed for wildlife conservation"
+   }
+  ],
+  "parking": "Lot off Chute Lake Road, under 1 km along the gravel road",
+  "season": "Open daily; hours shift by season (6am to 6pm Oct 15-Feb)",
+  "source_url": "https://storymaps.arcgis.com/stories/dfaa60e43e9c4dfda3dd8b2fa85b25aa",
+  "washrooms": "Washroom at the park"
+ },
+ "1221": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs allowed",
+  "extras": [
+   {
+    "label": "Weather closures",
+    "text": "Park may close without notice in high winds or heavy snow"
+   },
+   {
+    "label": "Day-use only",
+    "text": "Camping, fires and overnight parking are not permitted"
+   }
+  ],
+  "parking": "Lot off Raymer Road",
+  "season": "Less upkeep of parking and facilities Nov 1 to Apr 1; weather closures",
+  "source_url": "https://storymaps.arcgis.com/stories/de6aaef7cb5c4d958a47b50cc4e73595",
+  "washrooms": "Washrooms listed for the park"
+ },
+ "1222": {
+  "accessibility": "Flat, easy trail",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Winter upkeep",
+    "text": "Reduced parking and facility upkeep Nov to Mar"
+   },
+   {
+    "label": "Waterfall",
+    "text": "Shaded creek trail leads to waterfalls"
+   }
+  ],
+  "parking": "Street parking east of Spencer Rd; lot on the west side",
+  "season": "Open daily by season hours (6am to 6pm Oct 15-Feb)",
+  "source_url": "https://storymaps.arcgis.com/stories/f9feb20bbf8843e4b21a0e9c4bc819eb",
+  "washrooms": "Washrooms on site"
+ },
+ "1223": {
+  "accessibility": "Easy creekside walks to challenging stairs and rough terrain",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Waterfall",
+    "text": "24 m waterfall on Powers Creek"
+   },
+   {
+    "label": "Park map",
+    "text": "GPS-enabled PDF park map for phone use"
+   }
+  ],
+  "parking": "Lots off Gellatly Rd S, Brown Rd and Smith Creek Rd; limited street parking on Aberdeen Rd",
+  "season": "Open year-round; Brown Rd entrance closed Nov 1 to Apr 1; hours 6am to 6pm from Oct 15",
+  "source_url": "https://storymaps.arcgis.com/stories/2d4825f73bcb47ac848dcec3571143ac"
+ },
+ "1224": {
+  "accessibility": "Rocky trail, then a challenging climb up through open woodland",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Salmon habitat",
+    "text": "Waterfront areas protect shore-spawning salmon"
+   }
+  ],
+  "parking": "Lot off Seclusion Bay Rd near the Hwy 97/97C exits; limited street parking on Whitworth Rd",
+  "season": "Open year-round; reduced parking and facility upkeep Nov 1 to Apr 1",
+  "source_url": "https://storymaps.arcgis.com/stories/c0af4aee5a11462cbd0c37c4df5ef200"
+ },
+ "1225": {
+  "accessibility": "Easy, flat trail and washrooms are accessible",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Winter upkeep",
+    "text": "Reduced maintenance of parking and facilities Nov to March"
+   },
+   {
+    "label": "Trail",
+    "text": "Owl Trail is easy and 0.45 km"
+   }
+  ],
+  "parking": "Parking lot off Hardy Street",
+  "season": "Open 6 am to 6 pm from Oct 15 to Dec 31; later hours in summer",
+  "source_url": "https://storymaps.arcgis.com/stories/8e8ebab8d35841e8a2725323386ba5ba",
+  "washrooms": "Washrooms on site"
+ },
+ "1227": {
+  "accessibility": "Road paved to the upper lot, then 500 m unpaved to the summit",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash year-round (named in district dog list)",
+  "extras": [
+   {
+    "label": "Two paths up",
+    "text": "Steep Confederation Trail or gradual Centennial Trail"
+   }
+  ],
+  "parking": "Park at the iron gates or drive up to the lot 1 km below the summit",
+  "season": "Apr 15 to Oct 30: park road open to cars noon-9 pm, closed Sundays",
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails",
+  "washrooms": "Washrooms at the picnic area up the park road"
+ },
+ "1228": {
+  "accessibility": "Short trail, both paved and gravel; suits all ages",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash in most City parks",
+  "extras": [
+   {
+    "label": "Pen-Henge",
+    "text": "Stone sunset markers for solstices and equinoxes"
+   },
+   {
+    "label": "Lookout",
+    "text": "Benches, scenic lookout and gazebo at the top"
+   }
+  ],
+  "parking": "Lot at the base of the mountain, off Munson Mountain Road",
+  "source_url": "https://www.penticton.ca/parks-recreation/parks/find-parks-and-gardens/munson-mountain"
+ },
+ "1229": {
+  "accessibility": "Several bridge crossings and steep stairs at BX Falls",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Longer hike",
+    "text": "Optional 6 km round-trip trail from the Tillicum lot"
+   },
+   {
+    "label": "Easier access",
+    "text": "Deleenheer Rd access is easier for limited mobility"
+   }
+  ],
+  "parking": "Lots at 7025 Tillicum Rd and 6100 Star Rd; Tillicum is a short walk to the falls",
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/bx-creek-trail"
+ },
+ "1230": {
+  "accessibility": "Turtle Mtn Blvd to Davison Rd section is flat gravel, stroller and wheelchair OK",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on all sections, on leash",
+  "parking": "Separate lots per section (e.g. 6100 Star Rd); list on RDNO page",
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/grey-canal-trail"
+ },
+ "1231": {
+  "accessibility": "Some very steep trail; loose gravel is slippery",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed",
+  "extras": [
+   {
+    "label": "Water",
+    "text": "Bring water"
+   },
+   {
+    "label": "Trail status",
+    "text": "Unmaintained Crown Land trail with pink ribbon and red sign markers"
+   }
+  ],
+  "season": "Spring: trail hard to see under patchy snow; icy or muddy",
+  "source_url": "https://www.peachland.ca/parks-recreation/parks-trails/pincushion-mountain-trail",
+  "time_needed": "40 to 60 minutes to walk up (1.8 km)"
+ },
+ "1232": {
+  "accessibility": "Wide, flat, paved 6.8 km path; wheelchair accessible",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash on the trail",
+  "extras": [
+   {
+    "label": "Dog park",
+    "text": "Off-leash, water-accessible dog park near the south end"
+   },
+   {
+    "label": "Fishing dock",
+    "text": "Accessible fishing dock and kayak launch at the south end"
+   }
+  ],
+  "parking": "Parking area at the lake access park on the south end",
+  "source_url": "https://www.lakecountry.bc.ca/government/news/accessible-dock-and-kayak-launch-installed-wood-lake-thanks-funding-collaboration"
+ },
+ "1233": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "EV charging",
+    "text": "Fast chargers in the Happy Valley lot, open 24 hours"
+   },
+   {
+    "label": "Free gondola",
+    "text": "Free Lara's Gondola ride from Happy Valley lot to the Village"
+   }
+  ],
+  "parking": "Day parking is free but limited; overnight parking by permit only",
+  "source_url": "https://www.bigwhite.com/explore/transport/driving-big-white-day-parking-free"
+ },
+ "1235": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Snowshoe rental",
+    "text": "Snowshoe rentals $20 a day at the rental shop"
+   },
+   {
+    "label": "Tubing",
+    "text": "One tube lane via the magic carpet; tubing lift ticket needed"
+   }
+  ],
+  "parking": "Overnight parking in the overflow lot; may be asked to move for snow clearing",
+  "source_url": "https://baldyresort.com/mountain/"
+ },
+ "1236": {
+  "alerts": "Trail network closed; please stay off until official opening",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Pre-season $15 + tax a day or $50 unlimited, until official opening",
+  "dogs": "Leash only; dogs allowed on Wylie's Loop and Montezuma trails only",
+  "extras": [
+   {
+    "label": "Pre-season skiing",
+    "text": "Ganzeveldt snowmobile trail, 8 km return, from Oct 31"
+   },
+   {
+    "label": "Dog parking",
+    "text": "Dog owners must use the lower parking lot"
+   }
+  ],
+  "season": "Closed, preparing for the 2026/27 season (checked Nov 2, 2026)",
+  "source_url": "https://sovereignlake.com/"
+ },
+ "1237": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Day pass adult $23.50, youth $13.50, snowshoe $13.50; under 6 free",
+  "dogs": "K-9 loop always open to dogs ($13 pass); other trails Thu and Sun after 1 PM",
+  "extras": [
+   {
+    "label": "Trails",
+    "text": "45 km groomed ski trails and 25 km marked snowshoe trails"
+   },
+   {
+    "label": "Road access",
+    "text": "Located on Hedley/Nickel Plate Road, an all-weather road"
+   }
+  ],
+  "source_url": "https://nickelplatenordic.org/day-pass/"
+ },
+ "1238": {
+  "accessibility": "Handicapped parking spots at the lodge",
+  "alerts": "A 275 m section of Lit Rabbit trail has no night lights this season",
+  "checked_at": "Nov 2, 2026",
+  "cost": "2026-27 day pass (proposed): adult $22, youth $11, age 5 and under free",
+  "dogs": "Dogs only on the designated dog trail; leashed until across the road",
+  "extras": [
+   {
+    "label": "Off-season use",
+    "text": "Trails free for non-motorized use in spring, summer and fall"
+   },
+   {
+    "label": "Night skiing",
+    "text": "3.5 km of lit trails, lights on dusk to 9pm in season"
+   }
+  ],
+  "parking": "Lot is 3 km before Crystal Mountain; club says it is stretched past capacity",
+  "season": "Ski season opens mid Nov to late Dec by snow; trails free for walking till then",
+  "source_url": "https://telemarknordic.com/hours-of-operation/"
+ },
+ "1239": {
+  "accessibility": "Interpretive building and boardwalk are wheelchair accessible",
+  "alerts": "Closed for the 2026 season; reopens in 2027",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Adults $12; seniors and youth $10; family $30; under 6 free",
+  "dogs": "Not on the boardwalk; shaded doggy deck with water while you tour",
+  "extras": [
+   {
+    "label": "Strollers, bikes",
+    "text": "Strollers are allowed on the boardwalk; bikes are not"
+   },
+   {
+    "label": "What to bring",
+    "text": "Water, hats and comfortable footwear"
+   }
+  ],
+  "parking": "Ample parking for vehicles of all sizes, with a turn-around loop",
+  "season": "Open May to early October; closed October to April",
+  "source_url": "https://www.desert.org/frequently-asked-questions",
+  "time_needed": "About 2 to 3 hours on average",
+  "washrooms": "Washrooms on site"
+ },
+ "1240": {
+  "alerts": "Resort closed now, preparing for winter (checked Nov 2, 2026)",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Lift hours",
+    "text": "Lifts 9 am to 4 pm from opening to Jan 31 (tentative)"
+   },
+   {
+    "label": "Ski bus",
+    "text": "North Okanagan Ski Bus runs weekends and some holidays"
+   }
+  ],
+  "season": "Tentative: Nordic Nov 20, alpine Nov 27, 2026 to Apr 4, 2027",
+  "source_url": "https://www.skisilverstar.com/the-mountain/hours-of-operation/mountain-hours/"
+ },
+ "1241": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Ski day pass $22 adult, $10 youth; snowshoe $10 adult, $5 youth",
+  "dogs": "Dogs on all snowshoe trails and 23 km of ski trails",
+  "extras": [
+   {
+    "label": "Pay at trailhead",
+    "text": "Cash boxes at all trailheads; online payment also works"
+   },
+   {
+    "label": "Trail length",
+    "text": "75 km ski trails, 80 km snowshoe trails"
+   }
+  ],
+  "parking": "Three lots: Kallis, Summit and Main (McCulloch Rd)",
+  "source_url": "https://www.kelownanordic.ca/facilities",
+  "washrooms": "Outhouses at all three lots; main cabin"
+ },
+ "1242": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Weight limits",
+    "text": "Solo riders 70 to 275 lb; lighter kids ride tandem"
+   },
+   {
+    "label": "Booking",
+    "text": "Reserve ahead; walk-ins subject to capacity"
+   }
+  ],
+  "season": "Closed for 2026; booking 2027",
+  "source_url": "https://zipzone.ca/faq/"
+ },
+ "1243": {
+  "accessibility": "Guided tour: riders 50 to 270 lbs",
+  "alerts": "Closed for the season as of Nov 2, 2026",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Guided zip tour from CA$79.18",
+  "season": "Closed for the season; reopens next season",
+  "source_url": "https://oyamazipline.com/",
+  "time_needed": "Guided zip tour about 3 hours"
+ },
+ "1244": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Walk-ins",
+    "text": "Walk-ins welcome; booking ahead guarantees your time"
+   },
+   {
+    "label": "Footwear",
+    "text": "Closed-toe, proper-fitting shoes required"
+   }
+  ],
+  "parking": "On-site parking",
+  "season": "Open from spring until the end of October",
+  "source_url": "https://okanaganadventurepark.com/faq"
+ },
+ "1245": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On a leash at all times; backcountry not suitable for dogs",
+  "extras": [
+   {
+    "label": "No water",
+    "text": "Bring plenty of water; none in the protected area"
+   },
+   {
+    "label": "No camping",
+    "text": "Camping and campfires are not allowed"
+   }
+  ],
+  "parking": "Parking area at the summit; gravel road, maintained infrequently",
+  "source_url": "https://bcparks.ca/south-okanagan-grasslands-protected-area/"
+ },
+ "1246": {
+  "alerts": "Since May 2026 only partly reopened after wildfire; obey barricades and signage",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Wildfire recovery",
+    "text": "RDCO lists Rose Valley: some trails open"
+   }
+  ],
+  "parking": "Lots off Westlake Rd near the pond and school, and at Starlight Cres",
+  "season": "Open with some areas closed; reduced upkeep of parking and facilities Nov to Mar",
+  "source_url": "https://storymaps.arcgis.com/stories/417f72ae7c32418cbe8b4006a9c539dd"
+ },
+ "1247": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash",
+  "extras": [
+   {
+    "label": "Winter",
+    "text": "Reduced maintenance of parking and facilities November to March"
+   },
+   {
+    "label": "Spring runoff",
+    "text": "Stay back from creek banks; they can be slippery"
+   }
+  ],
+  "parking": "Lot off the Trepanier off-ramp from Hwy 97C; street parking on Clements Cres",
+  "season": "Oct 15 to Dec 31: open 6 am to 6 pm; hours shift by season",
+  "source_url": "https://storymaps.arcgis.com/stories/7dd4d3a543934c9c95fea02e1bf6852c",
+  "washrooms": "Washroom at the parking area"
+ },
+ "1248": {
+  "accessibility": "Coyote Loop is easy; Otter Lookout trail is short but steep",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs on the trails (ecological reserve)",
+  "extras": [
+   {
+    "label": "Poison ivy",
+    "text": "Alternate trail avoids poison ivy near the Coyote Loop west fence"
+   }
+  ],
+  "source_url": "https://www.astrailssociety.com/projects/thomas-hayes-park/",
+  "washrooms": "Outhouse at the Thomas Hayes parking area"
+ },
+ "1250": {
+  "accessibility": "Continuous, minimal-grade corridor; gravel surface",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash only",
+  "extras": [
+   {
+    "label": "Trail length",
+    "text": "About 50 km from Kelowna to Coldstream; 16 km in Lake Country"
+   }
+  ],
+  "parking": "Parking at 8203 Westkal Road, Kekuli Bay Provincial Park and College Way",
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/okanagan-rail-trail",
+  "washrooms": "Washrooms at Westkal Road and Kekuli Bay Provincial Park access points"
+ },
+ "1252": {
+  "accessibility": "Flat; wheelchair, pram and bike friendly",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Leashed pets welcome; waste bags are provided",
+  "extras": [
+   {
+    "label": "Guided tours",
+    "text": "Free guided Salmon Trail tours, June to August"
+   },
+   {
+    "label": "Trails passport",
+    "text": "Get a trails passport and kids' activity guide at the Visitor Centre"
+   }
+  ],
+  "season": "Open all year",
+  "source_url": "https://lumby.ca/parks-recreation/"
+ },
+ "1253": {
+  "accessibility": "Backcountry hiking trail, 2 km",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash; backcountry not suitable for dogs (bears)",
+  "extras": [
+   {
+    "label": "Trail managers",
+    "text": "Trail run by Vernon Outdoors Club, BC Parks and Sites and Trails BC"
+   },
+   {
+    "label": "Fishing",
+    "text": "Fishing licence required"
+   }
+  ],
+  "parking": "Access is a 2 km hike from Bonneau Lake Forest Service Road",
+  "source_url": "https://bcparks.ca/denison-bonneau-park/"
+ },
+ "1254": {
+  "accessibility": "Over 3 km of gravel trails designed for accessibility",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs welcome on leash",
+  "parking": "Lot at the end of a 1 km access road off Stepping Stones Rd",
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/goose-lake-range-park"
+ },
+ "1255": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs are not permitted",
+  "extras": [
+   {
+    "label": "Observation tower",
+    "text": "3-storey wildlife observation tower on the 1.8 km trail"
+   },
+   {
+    "label": "Wildlife",
+    "text": "Mostly undeveloped marsh; bring binoculars"
+   }
+  ],
+  "parking": "Parking area at the trailhead, 0.7 km up a gravel road",
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/swan-lake-nature-reserve-trail"
+ },
+ "1256": {
+  "accessibility": "Steep stairs up to the summit",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be on leash",
+  "extras": [
+   {
+    "label": "Summit loops",
+    "text": "Three loop trails at the summit with 360 degree views"
+   },
+   {
+    "label": "Benches and signs",
+    "text": "Benches and interpretive signs along the trails"
+   }
+  ],
+  "parking": "Lot at Middleton Mountain Park, Mt Ida Dr; on-street near the stairs",
+  "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1257": {
+  "accessibility": "Steep inclines, boulders, switchbacks on the Crystal Waters Rd spur",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Road section",
+    "text": "Part of the route is on road with a steep climb to the lookout"
+   }
+  ],
+  "parking": "Several lots, incl. Greater Vernon Athletics Park, Kekuli Bay Park, Bailey Rd",
+  "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1259": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Trail",
+    "text": "Creek-side trail, 1.8 km"
+   }
+  ],
+  "parking": "Lot off McCulloch Road at the KLO Creek switchback",
+  "season": "Open daily; hours shift by season (6am to 6pm Oct 15-Feb)",
+  "source_url": "https://storymaps.arcgis.com/stories/5a67213a36d04211809b9e57734c79ac"
+ },
+ "1262": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash (district trail rule)",
+  "extras": [
+   {
+    "label": "Pack it out",
+    "text": "Pack out what you packed in"
+   },
+   {
+    "label": "Private land",
+    "text": "420 acres on the southwest side are private; respect signs"
+   }
+  ],
+  "parking": "Parking at the trailheads",
+  "source_url": "https://www.lakecountry.bc.ca/parks-recreation-culture/beaches-lakes-parks-trails/trails"
+ },
+ "1263": {
+  "accessibility": "Trail has an accessible viewpoint over Okanagan Lake",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Trail length",
+    "text": "3.14 km round trip trail network"
+   },
+   {
+    "label": "Mountain biking",
+    "text": "Downhill bike trails rated more difficult in the southeast"
+   }
+  ],
+  "parking": "Designated parking area",
+  "season": "Open daily 6 am to 11 pm",
+  "source_url": "https://www.lakecountry.bc.ca/parks-recreation-culture/parks-facilities-directory/jack-seaton-park",
+  "washrooms": "Washroom in the park"
+ },
+ "1264": {
+  "accessibility": "First half easy grade on an old road; second half has steep sections",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail upkeep",
+    "text": "Trail is not maintained regularly"
+   },
+   {
+    "label": "Hunting",
+    "text": "Hunting is permitted in the park in season"
+   }
+  ],
+  "parking": "Unmarked trailhead at road end; rough road, 4WD highly recommended",
+  "source_url": "https://bcparks.ca/trepanier-park/",
+  "time_needed": "5 to 7 hours round trip"
+ },
+ "1265": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Views",
+    "text": "360 degree views of Okanagan Lake and the Central Okanagan"
+   }
+  ],
+  "season": "Walking and hiking trails open year round",
+  "source_url": "https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-BD56DBEF-3568-4EDD-95FA-80D2AD020F5B"
+ },
+ "1266": {
+  "accessibility": "Adra south trail has roots and rocks; not accessible for all users",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Tunnel conditions",
+    "text": "No cell service or light inside Adra Tunnel; bring a real light"
+   },
+   {
+    "label": "Tunnel open",
+    "text": "Adra Tunnel fully open after upgrades (May 26, 2026 notice)"
+   }
+  ],
+  "parking": "Past Smethurst lot the road is rough; high clearance needed (Adra south entrance)",
+  "source_url": "https://rdosregionalconnections.ca/adra-tunnel",
+  "washrooms": "Pit toilet at the Adra Tunnel north lot"
+ },
+ "1269": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Off-leash dawn to 9 am on the stretch south of Fairview Rd, west side of river",
+  "source_url": "https://www.oliver.ca/town-services/recreation/parks-and-amenities"
+ },
+ "1270": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "No camping",
+    "text": "No fires or overnight camping at the lot"
+   }
+  ],
+  "parking": "Garnet Fire site lot; more parking 4 km up Ellis FSR",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC4534",
+  "washrooms": "Outhouse at the main parking lot"
+ },
+ "1271": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Must be on leash at all times; backcountry not suitable for dogs (bears)",
+  "extras": [
+   {
+    "label": "Drinking water",
+    "text": "No potable water in the park; treat stream water"
+   },
+   {
+    "label": "Logging traffic",
+    "text": "Active logging area; watch for logging trucks on the access road"
+   }
+  ],
+  "parking": "Road ends at the Brent Mountain parking area; high-clearance vehicle recommended",
+  "source_url": "https://bcparks.ca/brent-mountain-protected-area/",
+  "time_needed": "Brent Mountain Trail: 4 to 5 hours return (about 5 km)"
+ },
+ "1272": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "No camping",
+    "text": "No fires or overnight camping at the lot"
+   }
+  ],
+  "parking": "Main lot at Garnet Fire site; more parking 4 km up Ellis FSR",
+  "season": "Winter: nordic skiing and snowshoeing",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC4534",
+  "washrooms": "Outhouse at the main parking lot"
+ },
+ "1273": {
+  "accessibility": "Hardpacked 3 ft tread with boardwalks and bridges; easy; no mountain bikes",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs are not permitted in the park (caribou habitat)",
+  "extras": [
+   {
+    "label": "Logging trucks",
+    "text": "Active logging on Spectrum Creek and Sugar Lake FSRs; expect trucks"
+   },
+   {
+    "label": "Fires",
+    "text": "No fires outside Spectrum Lake campground"
+   }
+  ],
+  "parking": "Spectrum Creek lot at the end of 16 km Spectrum Creek Road",
+  "source_url": "https://bcparks.ca/monashee-park/",
+  "time_needed": "2 hours one way, 6 km",
+  "washrooms": "Pit toilet at the Spectrum Creek trailhead"
+ },
+ "1274": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail count",
+    "text": "More than 80 trails, beginner to expert"
+   }
+  ],
+  "source_url": "https://www.penticton.ca/parks-recreation/trails"
+ },
+ "1275": {
+  "accessibility": "Includes an adaptive mountain bike trail",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Leashed dogs OK, but not on bike trails or in jump, skills, drop or pump zones",
+  "extras": [
+   {
+    "label": "Helmets",
+    "text": "Helmets mandatory; park is unsupervised"
+   },
+   {
+    "label": "Winter closures",
+    "text": "Obey park closures in winter and extreme weather"
+   }
+  ],
+  "season": "Open daily dusk to dawn, March to November (weather dependent)",
+  "source_url": "https://www.lakecountry.bc.ca/parks-recreation-culture/lake-country-bike-park"
+ },
+ "1276": {
+  "accessibility": "Steep sections and uneven dirt, gravel and rock trails",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Listed as a dog park; dogs on leash",
+  "extras": [
+   {
+    "label": "What is here",
+    "text": "Three pump tracks, a climbing trail and a flow trail"
+   }
+  ],
+  "parking": "Vernon Curling Club lot, 3500 39th Ave",
+  "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1278": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs under control; on leash in Myra Canyon area",
+  "extras": [
+   {
+    "label": "Hazards",
+    "text": "Steep drop-offs at Crawford Falls and Devil's Elbow, plus falling rock"
+   },
+   {
+    "label": "Bike trails",
+    "text": "Stunt features not endorsed by BC Parks"
+   }
+  ],
+  "parking": "Stewart Road East trailhead has a parking lot",
+  "season": "Open year-round; services mid-April to Nov 15",
+  "source_url": "https://bcparks.ca/myra-bellevue-park/",
+  "washrooms": "Two pit toilets at the Stewart Road East lot"
+ },
+ "1279": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail use",
+    "text": "Mountain biking and hiking trails for all levels"
+   },
+   {
+    "label": "Managed by",
+    "text": "Run with the West Kelowna Trail Crew Society"
+   }
+  ],
+  "parking": "Gravel lot, tripled in size in the 2022 upgrade",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC257673",
+  "washrooms": "New toilet facilities at the parking area"
+ },
+ "1280": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Public access",
+    "text": "Biking trails are open to guests, homeowners and the public"
+   },
+   {
+    "label": "Bike Hub",
+    "text": "Bike Hub (rentals) closed for the season"
+   }
+  ],
+  "season": "Biking trails close in winter; Bike Hub closed, back spring 2027",
+  "source_url": "https://www.predatorridge.com/activities/biking/"
+ },
+ "1281": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Difficulty",
+    "text": "Trails are mostly intermediate to advanced"
+   }
+  ],
+  "parking": "Trailhead lot about 4 km up Gillard Forest Service Road, past the gravel pit",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC204662"
+ },
+ "1283": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On a leash at all times; backcountry not suitable for dogs",
+  "extras": [
+   {
+    "label": "Mountain biking",
+    "text": "Biking on designated roadways only; no e-bikes on trails"
+   },
+   {
+    "label": "No water",
+    "text": "Bring plenty of water; none in the protected area"
+   }
+  ],
+  "parking": "Parking space is limited",
+  "source_url": "https://bcparks.ca/south-okanagan-grasslands-protected-area/"
+ },
+ "1284": {
+  "alerts": "Aug 21, 2026: Conkle open; Cartwright Mtn and trail east of Rodeo Grounds closed",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash; off leash allowed Oct 1 to May 1 (sports areas excepted)",
+  "extras": [
+   {
+    "label": "Cell service",
+    "text": "Phone coverage may not be available on trails"
+   }
+  ],
+  "parking": "Lot next to the KVSR station and Rodeo Grounds on Bathville Rd",
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails",
+  "washrooms": "Pit toilets at the Rodeo Grounds trailhead"
+ },
+ "1285": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Pioneer Park",
+    "text": "Sandy beach, picnic area and BBQ area at Kaleden"
+   }
+  ],
+  "source_url": "https://www.rdos.bc.ca/community-services/parks-trails/pioneer-park/",
+  "washrooms": "Public washrooms at Pioneer Park, Kaleden (mid-route)"
+ },
+ "1286": {
+  "accessibility": "Finished surface is compacted aggregate, planned for universal mobility access",
+  "alerts": "Mara Lake section weekends only from Sept 14 into December; Enderby-Grindrod open",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash are welcome",
+  "extras": [
+   {
+    "label": "Open length",
+    "text": "Open from Sicamous km 0.5 to km 40.5 just south of Enderby (Aug 26, 2026)"
+   },
+   {
+    "label": "Rules",
+    "text": "No motorized or horses; cyclists 30 km/h or less, yield to walkers"
+   }
+  ],
+  "source_url": "https://shuswapnorthokanaganrailtrail.ca/frequently-asked-questions/"
+ },
+ "1287": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Smoke-free",
+    "text": "All town parks, playgrounds and trails are smoke-free"
+   }
+  ],
+  "source_url": "https://www.osoyoos.ca/parks-recreation/parks-and-trails"
+ },
+ "1288": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Tube and bus combo $20",
+  "extras": [
+   {
+    "label": "Safety",
+    "text": "No lifeguards; enter and exit at your own risk"
+   },
+   {
+    "label": "Start time",
+    "text": "Be in the water by 3 pm to float to the end"
+   }
+  ],
+  "season": "2026 season opened June 27",
+  "source_url": "https://coyotecruises.com/faq",
+  "time_needed": "About 1.25 hours to midpoint, 3.5 to the end (2026 flow)"
+ },
+ "1290": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Day pass $34; evening pass $24",
+  "extras": [
+   {
+    "label": "Ages",
+    "text": "Ages 5 and up; ages 5-7 need an adult 19+"
+   },
+   {
+    "label": "Life jackets",
+    "text": "Required for all; must swim 20 m in a life jacket"
+   }
+  ],
+  "source_url": "https://okanaganwibit.com/product/kelowna-wibit/"
+ },
+ "1291": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Day pass $34, evening pass $24 (ages 5 and up)",
+  "extras": [
+   {
+    "label": "Ages",
+    "text": "Ages 5+; ages 5-7 need an adult chaperone (19+)"
+   },
+   {
+    "label": "Swim skill",
+    "text": "Must swim 20 m in a life jacket; life jackets provided"
+   }
+  ],
+  "season": "Daily hours 11 am to 7 pm; season dates not stated on page",
+  "source_url": "https://okanaganwibit.com/product/penticton-wibit/"
+ },
+ "1292": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Day pass $30 (11 am to 7 pm); evening pass $20",
+  "extras": [
+   {
+    "label": "Ages and safety",
+    "text": "Ages 5 and up; life jackets provided and mandatory"
+   },
+   {
+    "label": "Swim test",
+    "text": "Must swim 20 m in a life jacket without help"
+   }
+  ],
+  "season": "Hours 11 am to 7 pm",
+  "source_url": "https://okanaganwibit.com/product/peachland-wibit/"
+ },
+ "1293": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Damage deposit",
+    "text": "Mandatory $1000 minimum damage deposit per machine (Sea-Doo)"
+   }
+  ],
+  "source_url": "https://www.pierwatersports.com/faq"
+ },
+ "1294": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs can paddle along with you",
+  "season": "Shop open mid-April through September",
+  "source_url": "https://sunnsup.com/"
+ },
+ "1297": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Single bikes $20 the first hour, then $10 an hour",
+  "extras": [
+   {
+    "label": "SUP and kayak",
+    "text": "Paddleboards and single kayaks $25 for the first hour"
+   },
+   {
+    "label": "Deposit",
+    "text": "$500 deposit on extended rentals"
+   }
+  ],
+  "season": "Seasonal; the 2026 season opened June 1",
+  "source_url": "https://peachlandrentals.com/"
+ },
+ "1298": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Motorized boat example: $390 for 2 hours (2026 price list)",
+  "extras": [
+   {
+    "label": "Hours",
+    "text": "Open Thursday to Monday, 9 am to 3 pm (season hours)"
+   },
+   {
+    "label": "Minimum age",
+    "text": "21 to rent motorized equipment; under 18 need guardian sign-off"
+   }
+  ],
+  "season": "Closed for the 2026 season on Sept 21",
+  "source_url": "https://summerlandresorthotel.com/the-resort/tour-the-resort/boat-rentals/"
+ },
+ "1299": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Age",
+    "text": "No age limit on paddle craft; boat or Sea-Doo renters need a licence"
+   },
+   {
+    "label": "Book early",
+    "text": "Mornings are calmer; July and August sell out"
+   }
+  ],
+  "source_url": "https://wakepilot.com/faq/"
+ },
+ "1300": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Tandem jump $399 each (1 to 3 people), $379 each for 4 or more",
+  "extras": [
+   {
+    "label": "Age",
+    "text": "18 or older, or 16 with a parent present and photo ID"
+   },
+   {
+    "label": "Weight limit",
+    "text": "Tandem jumpers must be under 250 pounds"
+   }
+  ],
+  "source_url": "https://okanaganskydive.com/tandem.html"
+ },
+ "1302": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Tandem flight from $250",
+  "extras": [
+   {
+    "label": "Weight range",
+    "text": "Passengers 60 to 240 lbs, ages 5 to 85 and up"
+   },
+   {
+    "label": "Ride included",
+    "text": "Ride to the launch is included in the tandem"
+   }
+  ],
+  "season": "Tandems in fall when weather allows; school and tandems April to October",
+  "source_url": "https://paraglidecanada.com/collections/courses/products/tandem-paragliding-flight",
+  "time_needed": "60 to 90 minutes in total; the flight itself 15 to 30 minutes"
+ },
+ "1303": {
+  "accessibility": "Wheelchair users can ride as passengers in a side-by-side",
+  "checked_at": "Nov 2, 2026",
+  "cost": "2-hour tour: $184 driver, $138 passenger, $92 child",
+  "extras": [
+   {
+    "label": "Gear",
+    "text": "Helmets, goggles and gloves provided"
+   },
+   {
+    "label": "Licence",
+    "text": "Drivers need a valid driver’s licence"
+   }
+  ],
+  "season": "Tours run rain or shine, except lightning",
+  "source_url": "https://okanaganatvtours.com/faq",
+  "time_needed": "2-hour tour: 1.5 hours riding plus 30 min orientation"
+ },
+ "1305": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "1.5-hour ride $130 plus GST per rider",
+  "extras": [
+   {
+    "label": "Minimum age",
+    "text": "Riders must be at least 8 years old"
+   },
+   {
+    "label": "Weight limit",
+    "text": "Maximum rider weight 230 lbs (104 kg)"
+   }
+  ],
+  "season": "Open mid-March to early November; rides at noon",
+  "source_url": "https://sunhillsriding.ca/trail-ride-schedule.html",
+  "time_needed": "1.5-hour ride (a 1-hour ride is also offered)"
+ },
+ "1307": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Weight limit",
+    "text": "Maximum rider weight 220 lbs (100 kg)"
+   },
+   {
+    "label": "Booking",
+    "text": "Book online or by phone ahead of your ride"
+   }
+  ],
+  "season": "Open May 1 to Sep 30 (2026 season posted)",
+  "source_url": "https://okanaganstables.com/"
+ },
+ "1308": {
+  "accessibility": "Strollers allowed on the mini golf course",
+  "checked_at": "Nov 2, 2026",
+  "cost": "No entry fee; pay per attraction, or a $44 value pack",
+  "extras": [
+   {
+    "label": "Height rules",
+    "text": "Go-kart: 58 in to drive, 40 in to ride along"
+   }
+  ],
+  "season": "Open daily May 15 to Sept 7, 2026",
+  "source_url": "https://www.locolanding.com/faqs/"
+ },
+ "1310": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Swimming",
+    "text": "Swimming beach on site"
+   },
+   {
+    "label": "Wildlife",
+    "text": "Deer, coyotes and sometimes bears or cougars seen"
+   }
+  ],
+  "source_url": "https://beaverlakeresort.com/"
+ },
+ "1312": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs welcome on a leash; kennel them if left in rooms",
+  "extras": [
+   {
+    "label": "Gravel road",
+    "text": "Final 8 km of Chute Lake Road is gravel"
+   },
+   {
+    "label": "Cell service",
+    "text": "Cell service is spotty"
+   }
+  ],
+  "season": "Restaurant closed Mon to Thu until April 1, 2027; cabins book 7 days",
+  "source_url": "https://chutelakelodge.ca/faq/"
+ },
+ "1313": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Off-grid",
+    "text": "Off-grid lodge with cabins, glamping tents and camping"
+   },
+   {
+    "label": "Lake",
+    "text": "27 islands to explore by boat or canoe"
+   }
+  ],
+  "source_url": "https://oyamalake.com/"
+ },
+ "1314": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Welcome if kept on a leash at all times (not at the playground)",
+  "extras": [
+   {
+    "label": "Boat rentals",
+    "text": "Boats and motors for rent by the hour or day"
+   },
+   {
+    "label": "Bring water",
+    "text": "Bring your own drinking water"
+   }
+  ],
+  "source_url": "https://headwatersbc.com/about-us/things-to-know/",
+  "washrooms": "Outdoor toilets; hot showers are seasonal"
+ },
+ "1315": {
+  "accessibility": "Accessible fishing dock and kayak launch",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Use",
+    "text": "Fishing, kayaking or enjoying the view"
+   }
+  ],
+  "parking": "Lake access park parking area at south end of Pelmewash Parkway",
+  "source_url": "https://www.lakecountry.bc.ca/government/news/accessible-dock-and-kayak-launch-installed-wood-lake-thanks-funding-collaboration"
+ },
+ "1316": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Half day $500, full day $800 per boat (not per person); GST extra",
+  "extras": [
+   {
+    "label": "Fishing licence",
+    "text": "Not included; anglers 16 and over need a BC licence"
+   },
+   {
+    "label": "Deposit",
+    "text": "25% non-refundable deposit; 72 hours notice to cancel"
+   }
+  ],
+  "season": "Trophy rainbow season is October to April",
+  "source_url": "https://okanaganbucktailco.ca/rates/",
+  "time_needed": "Half day is 4 hours; full day is 8 hours"
+ },
+ "1329": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free",
+  "extras": [
+   {
+    "label": "Skates (BYO)",
+    "text": "No skate rentals at the rink; bring skates and helmets"
+   },
+   {
+    "label": "Family skating only",
+    "text": "No hockey, sticks or pucks allowed"
+   }
+  ],
+  "season": "Closed for the season now; daily 9 am to 9 pm when open",
+  "source_url": "https://www.penticton.ca/parks-recreation/facility-hours-rates-bookings/ice-skating",
+  "washrooms": "Washrooms at the rink year-round, 8 am to 5 pm Oct-Apr, 8 pm May-Sept"
+ },
+ "1331": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Ice safety",
+    "text": "Stay off the ice when daytime temperatures are above zero"
+   },
+   {
+    "label": "Flooding",
+    "text": "Volunteers flood the rink nightly at 9 pm in good conditions"
+   }
+  ],
+  "season": "Seasonal; open daily 7 am to 9 pm as ice conditions permit",
+  "source_url": "https://www.peachland.ca/parks-recreation/parks-trails/ice-rink"
+ },
+ "1332": {
+  "accessibility": "No footwear or strollers allowed on the ice",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Public skate",
+    "text": "No sticks or pucks 4-5 pm daily; 9-10 am Sat and Sun"
+   },
+   {
+    "label": "First come",
+    "text": "Cannot be booked or rented; first come, first served"
+   }
+  ],
+  "season": "Weather dependent; may close without notice; no phone line to check",
+  "source_url": "https://www.lavingtoncommunity.ca/jeffers-park-skating-rink.html"
+ },
+ "1333": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Day pass $30, valid only for the date bought, non-refundable",
+  "extras": [
+   {
+    "label": "BCSF discount",
+    "text": "$5 off the day pass with proof of BCSF membership"
+   }
+  ],
+  "source_url": "https://kelownasnowmobileclub.com/day-pass"
+ },
+ "1334": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Trail pass $20 per machine",
+  "extras": [
+   {
+    "label": "Warm-up shelters",
+    "text": "Silver Star Chalet and Armstrong Cabin (emergency shelters)"
+   },
+   {
+    "label": "Shared trails",
+    "text": "Shared with skiers and snowshoers: obey stop signs, stay on motorized trails"
+   }
+  ],
+  "parking": "Provincial park lot shared with snowshoers, ski tourers and dog walkers",
+  "source_url": "https://sledvernon.ca/",
+  "washrooms": "Outhouse at the Silver Star Chalet, about 3 km from the lot"
+ },
+ "1335": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "1-hour tour $199 single, $279 with passenger; longer tours cost more",
+  "extras": [
+   {
+    "label": "Included",
+    "text": "Prices include safety gear and an orientation"
+   },
+   {
+    "label": "Booking rule",
+    "text": "Page says 3 or more sleds must be booked ahead; confirm with them"
+   }
+  ],
+  "season": "Winter tours at Silver Star; 1-hour tours depart 10 am and noon daily",
+  "source_url": "https://www.okanaganrecrentals.com/snowmobile-tours/",
+  "time_needed": "Tours run 1, 2 or 3 hours"
+ },
+ "1336": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Full day $900 for 1-2 guests, $1,000 for 3-4; price is per boat",
+  "extras": [
+   {
+    "label": "Included",
+    "text": "Fire, hot lunch of smokies, snacks and hot chocolate"
+   },
+   {
+    "label": "Fishing licence",
+    "text": "Not included; buy online before your trip"
+   }
+  ],
+  "season": "Ice fishing runs about mid December to late March",
+  "source_url": "https://kelownafishing.com/ice-fishing-charters-with-rodneys-reel-outdoors/",
+  "time_needed": "Meet in West Kelowna at 8 am, back by 5 pm"
+ },
+ "1337": {
+  "accessibility": "Gravel, dirt and grass paths; not all mobility scooters manage",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Adults $20-30, ages 5-15 and 65+ $10-15, under 5 free (low/high season)",
+  "dogs": "Leashed dogs in picnic area only; none in animal enclosures",
+  "extras": [
+   {
+    "label": "Payment",
+    "text": "Debit, cash, Visa and Mastercard"
+   },
+   {
+    "label": "Traffic",
+    "text": "Do not turn left onto Hwy 97 from Old Vernon Rd"
+   }
+  ],
+  "season": "Closed for the season; reopens spring. Closes at 3 pm daily",
+  "source_url": "https://kangaroocreekfarm.com/"
+ },
+ "1338": {
+  "accessibility": "Main trail is wheelchair accessible from the south lot",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Admission by donation",
+  "dogs": "No dogs or other pets anywhere on the grounds",
+  "extras": [
+   {
+    "label": "No smoking",
+    "text": "Non-smoking and non-vaping site at all times (wildfire risk)"
+   }
+  ],
+  "parking": "Accessible lot on site",
+  "season": "April to October; 9 am to 3:30 pm Tuesday to Saturday (closed for winter)",
+  "source_url": "https://www.abnc.ca/plan-your-visit/",
+  "time_needed": "1 to 2 hours"
+ },
+ "1339": {
+  "accessibility": "Building fully wheelchair accessible; steeper upper trail rough for scooters",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Adult $19, seniors and students $17, under 18 $14, family $43",
+  "dogs": "Pets are not permitted on the trail",
+  "extras": [
+   {
+    "label": "Golf cart tour",
+    "text": "Mobility help: ask for a golf cart tour if available"
+   },
+   {
+    "label": "What to bring",
+    "text": "Water, hats and comfortable footwear"
+   }
+  ],
+  "season": "Open 7 days a week, 9 am to 4 pm",
+  "source_url": "https://www.nkmipdesert.com/hours-rates-accessibility",
+  "time_needed": "1.5 to 2 hours recommended"
+ },
+ "1340": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Facilities",
+    "text": "Boardwalk, information kiosk and wildlife viewing tower"
+   },
+   {
+    "label": "No staff on site",
+    "text": "Staff are not always on site"
+   }
+  ],
+  "parking": "Small parking lot near the north end of the lake",
+  "season": "Open to the public for day use only",
+  "source_url": "https://www.canada.ca/en/environment-climate-change/services/migratory-bird-sanctuaries/locations/vaseux-lake.html",
+  "time_needed": "2 to 4 hours recommended (Vaseux-Bighorn area)"
+ },
+ "1341": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Self-guided nature walk is by donation",
+  "dogs": "Pets allowed; keep under control and pick up after them",
+  "extras": [
+   {
+    "label": "Drinking water",
+    "text": "Washroom water is not suitable for drinking"
+   },
+   {
+    "label": "Nature walk",
+    "text": "Self-guided forest walk is 0.5 km"
+   }
+  ],
+  "parking": "Use the upper lot; no overnight parking",
+  "season": "Grounds open daylight hours; buildings closed to the public Sept and Oct",
+  "source_url": "https://www.kingfishercentre.org/rules.html",
+  "washrooms": "Two outhouses in the upper lot; not maintained in fall"
+ },
+ "1346": {
+  "accessibility": "Deleenheer Rd access suits limited mobility",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash only (Deleenheer Rd section)",
+  "extras": [
+   {
+    "label": "Surface",
+    "text": "Easy walk on crushed stone, boardwalks and bridges"
+   }
+  ],
+  "parking": "Deleenheer Rd and Heron Glen Park (1800 53 Ave)",
+  "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1353": {
+  "accessibility": "Level paved roads; one flush toilet is wheelchair accessible",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $36.50 a night in summer, $25 off season",
+  "dogs": "Dogs on leash at all times; not allowed on beach areas",
+  "extras": [
+   {
+    "label": "Water taps",
+    "text": "Cold water taps; shut off in the off-season"
+   },
+   {
+    "label": "Reservations",
+    "text": "Campsite reservations accepted; walk-ins as available"
+   }
+  ],
+  "season": "Park closes the third weekend of September for the Salmon Feast",
+  "source_url": "https://bcparks.api.gov.bc.ca/api/protected-areas?filters[orcs][$eq]=73&populate=*",
+  "washrooms": "Two flush toilets and two pit toilets"
+ },
+ "1354": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night; non-resident fee $20 per stay",
+  "dogs": "Dogs on leash at all times; not allowed on beach areas",
+  "extras": [
+   {
+    "label": "First come",
+    "text": "Seven small sites, first come first served"
+   },
+   {
+    "label": "Poison ivy",
+    "text": "Poison ivy is common in the park"
+   }
+  ],
+  "source_url": "https://bcparks.api.gov.bc.ca/api/protected-areas?filters[orcs][$eq]=64&populate=*",
+  "washrooms": "Two pit toilets, no flush toilets"
+ },
+ "1355": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "From $37 a night, water-only sites (2026 rates)",
+  "dogs": "Leash at all times, even at your site; max 2 dogs per site",
+  "extras": [
+   {
+    "label": "Gate hours",
+    "text": "Gates closed 11 pm to 7 am"
+   },
+   {
+    "label": "Check-in",
+    "text": "2 pm to 11 pm; check-out by 11 am"
+   }
+  ],
+  "season": "2026 season ran May 11 to mid-Sept; 2027 dates not posted",
+  "source_url": "https://www.summerland.ca/docs/default-source/parks---recreation/campground/peach-orchard-campground---2026-rules-and-regulations.pdf",
+  "washrooms": "Clean washrooms; coin-operated showers (loonies only)"
+ },
+ "1356": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night, May 1 to Sep 30; no day-use fee listed",
+  "dogs": "Dogs must be under control at all times",
+  "extras": [
+   {
+    "label": "No reservations",
+    "text": "No reservations; 14-day stay maximum"
+   },
+   {
+    "label": "No drinking water",
+    "text": "No potable water; no garbage service, pack out your trash"
+   }
+  ],
+  "season": "Closed for winter; reopens spring 2027",
+  "source_url": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC1596",
+  "washrooms": "Toilet on site"
+ },
+ "1357": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night, May 1 to Sept 30 (2026 season); no reservations",
+  "dogs": "Dogs must be under control at all times",
+  "extras": [
+   {
+    "label": "Swimming",
+    "text": "Sandy beaches; swimming is good"
+   },
+   {
+    "label": "Road",
+    "text": "Active industrial forest road; two-way radio advised"
+   }
+  ],
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC1750",
+  "time_needed": "Creek trail is about a 45 minute walk",
+  "washrooms": "Toilet and tables on site"
+ },
+ "1358": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Fee-for-service camping $18 a night May 1 to Sep 30, 2027 (feed)",
+  "dogs": "Dogs allowed; must be under control",
+  "extras": [
+   {
+    "label": "Beach",
+    "text": "Sandy beach for swimming and boating"
+   },
+   {
+    "label": "Boat launch",
+    "text": "Launch best with all-wheel or 4-wheel vehicles"
+   }
+  ],
+  "source_url": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC1970",
+  "washrooms": "Toilets on site"
+ },
+ "1359": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night, May 1 to Sept 30 (2027 season dates); no reservations",
+  "dogs": "Dogs must be under control at all times",
+  "extras": [
+   {
+    "label": "No towing",
+    "text": "No towing on the lake"
+   },
+   {
+    "label": "Access",
+    "text": "Off Trinity Valley Road, 13 km up Hidden Lake Road"
+   }
+  ],
+  "parking": "Parking lot at the boat launch (km 13) for boaters and day users",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC1742",
+  "washrooms": "Toilet and tables on site"
+ },
+ "1360": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night, fees May 1 to Oct 15",
+  "dogs": "Dogs allowed; must be under control at all times",
+  "extras": [
+   {
+    "label": "Reservations",
+    "text": "No reservations; first come, first served"
+   },
+   {
+    "label": "Boating",
+    "text": "Cartop launch; boat motors limited to 7.5 kW (10 hp)"
+   }
+  ],
+  "season": "Camping fees in effect until October 15",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC4619",
+  "washrooms": "Toilet on site"
+ },
+ "1361": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night, May 1 to Oct 15",
+  "dogs": "Dogs allowed; must be under control at all times",
+  "extras": [
+   {
+    "label": "Reservations",
+    "text": "No reservations; first come, first served"
+   },
+   {
+    "label": "Boating",
+    "text": "Cartop launch; boat motors limited to 7.5 kW (10 hp)"
+   }
+  ],
+  "season": "Camping fees apply May 1 to Oct 15; site listed as open",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC1672",
+  "washrooms": "Toilet on site"
+ },
+ "1362": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Fee-for-service campsite; $18 a night May 1 to Sep 30, 2027",
+  "dogs": "Dogs allowed; must be under control at all times",
+  "extras": [
+   {
+    "label": "No reservations",
+    "text": "No reservations; sites are first come, first served"
+   },
+   {
+    "label": "Rules",
+    "text": "Generators off 9-11am and 6-8pm; quiet hours 11pm-7am"
+   }
+  ],
+  "source_url": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC1685",
+  "washrooms": "Toilets on site"
+ },
+ "1363": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Campsites",
+    "text": "14 campsites; fishing and hiking"
+   }
+  ],
+  "source_url": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC1664",
+  "washrooms": "Toilets on site"
+ },
+ "1364": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night, May 1 to Sep 30, 2026",
+  "dogs": "Dogs must be under control at all times",
+  "extras": [
+   {
+    "label": "No reservations",
+    "text": "Sites are first come; no reservations"
+   },
+   {
+    "label": "Quiet hours",
+    "text": "Quiet hours 11pm to 7am; generators limited"
+   }
+  ],
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC1502",
+  "washrooms": "Toilet on site"
+ },
+ "1365": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Fishing rules",
+    "text": "Bait ban, electric motors only, no ice fishing; trout limit 1"
+   },
+   {
+    "label": "Stay limit",
+    "text": "Must leave for 14 days before returning"
+   }
+  ],
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC1979"
+ },
+ "1366": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping fee $18 a night, May 1 to Oct 15, 2027",
+  "dogs": "Dogs must be under control at all times",
+  "extras": [
+   {
+    "label": "Boats",
+    "text": "Electric motors only on this lake"
+   },
+   {
+    "label": "Reservations",
+    "text": "No reservations; do not hold campsites"
+   }
+  ],
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC1665",
+  "washrooms": "Toilet on site"
+ },
+ "1367": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Camping $18 a night, May 1 to Sept 30 (2026 season); no reservations",
+  "dogs": "Dogs must be under control at all times",
+  "extras": [
+   {
+    "label": "Salmon run",
+    "text": "Autumn salmon run is an added attraction"
+   },
+   {
+    "label": "Access",
+    "text": "Via Cooke Creek Forest Service Road, about 25.8 km from Hwy 97"
+   }
+  ],
+  "season": "Camping fee period May 1 to Sept 30; status shows Open",
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC1743",
+  "washrooms": "Toilet and tables on site"
+ },
+ "1369": {
+  "accessibility": "Wheelchair accessible facilities",
+  "alerts": "Campground not open this winter (notice on site Nov 2, 2026)",
+  "checked_at": "Nov 2, 2026",
+  "cost": "From $63 a night, water-only site, 2026/27 regular season (June 26 to Sept 7)",
+  "dogs": "Pets only in sites 95-198 and 220-281, on leash; none at the waterfront",
+  "extras": [
+   {
+    "label": "No lifeguards",
+    "text": "No lifeguards at the waterfront or pool; swim at own risk"
+   },
+   {
+    "label": "Pool hours",
+    "text": "9 am to 9 pm or dusk"
+   }
+  ],
+  "parking": "Gates closed 11 pm to 7 am; use night parking for late arrivals",
+  "season": "Closes Oct 15 and reopens in early March",
+  "source_url": "http://wrightsbeachcamp.com/policies",
+  "washrooms": "Clean washrooms with coin-operated showers"
+ },
+ "1370": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "From $63 a night in the 2026/27 regular season (June 26 to Sept 7)",
+  "dogs": "Pets must be on a leash at all times",
+  "extras": [
+   {
+    "label": "Pet fee",
+    "text": "Pets cost $5 each per night"
+   },
+   {
+    "label": "Quiet hours",
+    "text": "11 pm to 7 am"
+   }
+  ],
+  "parking": "Gates closed 11 pm to 7 am; use night parking for late arrivals",
+  "source_url": "http://southbeachgardens.com/policies",
+  "washrooms": "Clean washrooms with coin-operated showers"
+ },
+ "1371": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dog-friendly with an off-leash area",
+  "source_url": "https://www.barefootresortbc.com/"
+ },
+ "1372": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On a leash at all times; two pets per site",
+  "extras": [
+   {
+    "label": "No pets on beach",
+    "text": "Pets are not allowed on the beach"
+   },
+   {
+    "label": "Fire pits",
+    "text": "Propane fire pits only; rentable at the office"
+   }
+  ],
+  "season": "Open year-round",
+  "source_url": "https://campingosoyoos.com/things-to-know/"
+ },
+ "1374": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Boat launch",
+    "text": "Boat launch on site for the Shuswap River"
+   }
+  ],
+  "source_url": "https://enderbycamping.com/",
+  "washrooms": "Full-service washroom on site"
+ },
+ "1375": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Pets welcome at Eastside and Southside; Creekside is pet free",
+  "extras": [
+   {
+    "label": "Beach nearby",
+    "text": "Short walk to Manitou Park and the beach"
+   },
+   {
+    "label": "Power",
+    "text": "15 and 30 amp power at Eastside"
+   }
+  ],
+  "season": "Campgrounds close Oct 15, reopen March or April",
+  "source_url": "https://www.naramatacentresociety.org/accommodations"
+ },
+ "1376": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Public park-and-launch $20 off-peak (Apr 1-Jun 27, Sep 2-Oct 31), parking included",
+  "extras": [
+   {
+    "label": "Peak season",
+    "text": "Peak-season launch is for guests only (Jun 28-Sep 1)"
+   }
+  ],
+  "season": "Full services April to mid-October",
+  "source_url": "https://woodlakerv.com/",
+  "washrooms": "Two washroom/shower buildings open 24 hours (guests)"
+ },
+ "1377": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Enclosed dog runs on site",
+  "extras": [
+   {
+    "label": "Wi-Fi",
+    "text": "Free wireless Wi-Fi"
+   }
+  ],
+  "season": "Open year-round",
+  "source_url": "https://peachlandrv.ca/",
+  "washrooms": "Tent sites can book a private shower, toilet and sink unit"
+ },
+ "1378": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Cabin from $85 a night plus taxes (campsite rates not on page)",
+  "dogs": "Pets can camp here but are not allowed in the cabin",
+  "extras": [
+   {
+    "label": "BX Falls trail",
+    "text": "BX Falls trailhead lot is about 100 yards from the exit"
+   },
+   {
+    "label": "Cabin minimum",
+    "text": "Cabin needs a three-night minimum stay"
+   }
+  ],
+  "source_url": "https://www.cedarfalls.ca/",
+  "washrooms": "Washroom facilities on site"
+ },
+ "1379": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Full service $65, half service $50 a night, plus 5% tax",
+  "dogs": "Pets welcome, max two per site, no fee; leash at all times",
+  "extras": [
+   {
+    "label": "Check-in",
+    "text": "Check-in 1 to 6 pm; check-out 11 am"
+   },
+   {
+    "label": "Showers and pool",
+    "text": "Free hot showers, pool, coin laundry and a dog run"
+   }
+  ],
+  "parking": "One vehicle per site; extra vehicles $10 a day in overflow",
+  "source_url": "https://lakefrontrvpark.com/terms-and-conditions",
+  "washrooms": "Washrooms on site"
+ },
+ "1380": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No pets allowed",
+  "extras": [
+   {
+    "label": "Booking opens",
+    "text": "Individual 2027 bookings open Feb 1"
+   }
+  ],
+  "season": "Closed for the off season; reopens May 2027",
+  "source_url": "https://okanaganglamping.com/",
+  "washrooms": "Flush toilets and hot outdoor showers"
+ },
+ "1381": {
+  "alerts": "Water shut off for the 2026 season (checked Nov 2, 2026); fall and winter discounts",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Dump station",
+    "text": "Free for campers, $10 for others"
+   },
+   {
+    "label": "Cell service",
+    "text": "Telus reception good on most of the property"
+   }
+  ],
+  "season": "Water and septic typically May long weekend to Thanksgiving",
+  "source_url": "https://campgoldpanner.com/",
+  "washrooms": "Small wash house with flush toilets and coin showers, seasonal"
+ },
+ "1383": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On a leash at all times; not allowed in store, restrooms, beach or playground",
+  "extras": [
+   {
+    "label": "Dog beaches",
+    "text": "Dogs allowed on beaches either side of the private beach"
+   },
+   {
+    "label": "No lifeguards",
+    "text": "Beach and boat launch used at your own risk"
+   }
+  ],
+  "source_url": "https://islandviewrvresort.com/resort-facilities-and-amenities/",
+  "washrooms": "Lower washroom block year-round; 4th row block seasonal; coin showers"
+ },
+ "1384": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Minimum age",
+    "text": "Children must be at least 3 years old to tube"
+   },
+   {
+    "label": "Under 42 inches",
+    "text": "Kids 3+ under 42 in need a paying adult with them"
+   }
+  ],
+  "source_url": "https://www.skisilverstar.com/events-activities/winter-activities/winter-tubing"
+ },
+ "1385": {
+  "alerts": "Page says pond is closed for the season (checked Nov 2, 2026)",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Skating ticket $9.20 online; skate rental $13.90",
+  "extras": [
+   {
+    "label": "Skate rentals",
+    "text": "Rentals at Brewer's Base; skates required on the ice"
+   },
+   {
+    "label": "No shoes on ice",
+    "text": "All guests, tots included, must wear skates"
+   }
+  ],
+  "season": "Opening depends on ice and weather; staff hockey from early January",
+  "source_url": "https://www.skisilverstar.com/events-activities/winter-activities/ice-skating"
+ },
+ "1386": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Valid XC pass or ticket must be visible on the trails",
+  "dogs": "Some trails are dog-friendly; site does not give details on this page",
+  "extras": [
+   {
+    "label": "Night loop",
+    "text": "Lit night loop for evening cross-country skiing"
+   },
+   {
+    "label": "Warming huts",
+    "text": "Warming huts along SilverStar and Sovereign Lake trails"
+   }
+  ],
+  "season": "Nordic opening day Nov 20, 2026 (tentative)",
+  "source_url": "https://www.skisilverstar.com/events-activities/winter-activities/cross-country-skiing"
+ },
+ "1387": {
+  "accessibility": "Trails vary in difficulty; marked with signs and reflective markers",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Trail ticket or My1 Pass required",
+  "dogs": "Dogs allowed on all snowshoe trails; must stay on leash",
+  "extras": [
+   {
+    "label": "Trailheads",
+    "text": "Two: SilverStar Village and the Adventure Park"
+   }
+  ],
+  "source_url": "https://www.skisilverstar.com/events-activities/winter-activities/snowshoeing"
+ },
+ "1388": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Trail ticket or My1 Pass required; buy at the in-resort Ticket Office",
+  "extras": [
+   {
+    "label": "Helmets",
+    "text": "Helmets required at all times on the trails"
+   },
+   {
+    "label": "Temperature limit",
+    "text": "No fat biking above 0 C to protect the trails"
+   }
+  ],
+  "source_url": "https://www.skisilverstar.com/events-activities/winter-activities/fat-biking"
+ },
+ "1389": {
+  "accessibility": "2 km snowshoe each way; walking 2 km is enough fitness",
+  "checked_at": "Nov 2, 2026",
+  "cost": "$140 plus tax and gratuity, same price for all ages",
+  "extras": [
+   {
+    "label": "Meeting point",
+    "text": "Village in front of Bugaboos, 5:00-5:15 pm for 5:30 pm departure"
+   },
+   {
+    "label": "Included",
+    "text": "Snowshoes, headlamps, multi-course raclette dinner"
+   }
+  ],
+  "source_url": "https://www.skisilverstar.com/events-activities/winter-activities/ravenwood/",
+  "time_needed": "About 4.5 hours start to finish"
+ },
+ "1390": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Welcome in the Adventure Park on leash; not on magic carpets or tubes",
+  "extras": [
+   {
+    "label": "Height rule",
+    "text": "Kids need to be 42 in (106 cm) to tube on their own"
+   },
+   {
+    "label": "Book ahead",
+    "text": "Book online in advance; online price is 10% less than window"
+   }
+  ],
+  "season": "Page shows closed for the season; last season ended April 5, 2026",
+  "source_url": "https://www.bigwhite.com/events-activities/winter-activities/tubing",
+  "time_needed": "Tickets are for a 2-hour time slot"
+ },
+ "1391": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Skates required",
+    "text": "No walking on the rink; everyone on it needs skates"
+   },
+   {
+    "label": "Rental return",
+    "text": "Rental skates, sticks and helmets due back by 8:30 pm"
+   }
+  ],
+  "season": "Closed now; opening winter 2026/2027",
+  "source_url": "https://www.bigwhite.com/events-activities/adventure-activities/ice-skating"
+ },
+ "1392": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Included with lift ticket or season pass; otherwise buy a trail pass",
+  "dogs": "Allowed on the Wilderness Trails; in control and on leash",
+  "extras": [
+   {
+    "label": "Trail length",
+    "text": "25 km of combined Nordic and Wilderness trails"
+   },
+   {
+    "label": "Snowshoes",
+    "text": "Snowshoe on the Wilderness Trails only"
+   }
+  ],
+  "parking": "Park in the Happy Valley lot, cross the bridge to the Adventure Centre",
+  "source_url": "https://www.bigwhite.com/events-activities/winter-activities/nordic-trails",
+  "washrooms": "Heated washrooms in the Happy Valley Day Lodge"
+ },
+ "1393": {
+  "accessibility": "Illuminated walking path for all ages; no special skills needed",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Trail pass needed; included with lift ticket, season pass or Powder Card",
+  "extras": [
+   {
+    "label": "Twinkling Thursdays",
+    "text": "Weekly lantern craft and walk, Jan 7 to Mar 25, 2027"
+   }
+  ],
+  "season": "Open Dec 12, dusk to dawn daily, until April 3, 2027",
+  "source_url": "https://www.bigwhite.com/events-activities/winter-activities/twinkling-trail"
+ },
+ "1394": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Minimum age",
+    "text": "Riders must be 3 or older; helmets required ages 3 to 10"
+   },
+   {
+    "label": "Arrival",
+    "text": "Arrive no more than 5 minutes early at the dog sled hut"
+   }
+  ],
+  "parking": "Park in Happy Valley lot, walk across the bridge to the Adventure Park",
+  "source_url": "https://www.bigwhite.com/events-activities/tours/dog-sled-tours",
+  "time_needed": "6 km trail, about half an hour",
+  "washrooms": "Washroom cabin next to the dog sled cabin"
+ },
+ "1395": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "$12 per person land use fee on all tours, plus tour price and tax",
+  "extras": [
+   {
+    "label": "Check-in",
+    "text": "Check in at the snowmobile hut 30 minutes before departure"
+   },
+   {
+    "label": "Deposit",
+    "text": "$1,000 credit card deposit per group for every tour"
+   }
+  ],
+  "source_url": "https://www.bigwhite.com/events-activities/tours/snowmobile-tours",
+  "time_needed": "1 hour and 2 hour tours listed"
+ },
+ "1396": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Group tour adults $38 (half hour) or $48 (one hour), plus tax; private $365",
+  "dogs": "Dogs are not permitted on any sleigh tour",
+  "extras": [
+   {
+    "label": "Booking",
+    "text": "Buy online or at the Activities Desk in the Village Centre Mall"
+   },
+   {
+    "label": "Refunds",
+    "text": "No refunds or reschedules for poor weather or visibility"
+   }
+  ],
+  "season": "Tours run Dec 14, 2026 to Mar 30, 2027",
+  "source_url": "https://www.bigwhite.com/events-activities/tours/sleigh-rides-group-or-private",
+  "time_needed": "Half-hour or one-hour tours; may vary with snow and trails"
+ },
+ "1399": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail length",
+    "text": "13 km of snowshoe trails for varying abilities"
+   },
+   {
+    "label": "Snowshoe rental",
+    "text": "Rentals $20 a day at the rental shop"
+   }
+  ],
+  "source_url": "https://baldyresort.com/mountain/"
+ },
+ "1400": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "No membership fee; donations requested at the trailhead",
+  "extras": [
+   {
+    "label": "Trails",
+    "text": "About 95 km of marked snowshoe trails"
+   },
+   {
+    "label": "No ski grooming",
+    "text": "Ski trails are not currently groomed"
+   }
+  ],
+  "source_url": "https://www.mckinneynordicskiclub.com/trailfees"
+ },
+ "1401": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs allowed",
+  "extras": [
+   {
+    "label": "Viewing platform",
+    "text": "Viewing platform over the pond"
+   },
+   {
+    "label": "Wildlife",
+    "text": "Many species of birds and turtles"
+   }
+  ],
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/cools-pond-park"
+ },
+ "1402": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Admission by donation, suggested $5 per person",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Bears",
+    "text": "Bears regularly pass through the gardens"
+   },
+   {
+    "label": "Lock your car",
+    "text": "Keep vehicles locked"
+   }
+  ],
+  "parking": "Multiple parking areas",
+  "season": "Winter hours 8 am to 4 pm, Nov to mid-March, weather permitting",
+  "source_url": "https://summerlandgardens.org/"
+ },
+ "1403": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash at all times; backcountry not suitable for dogs",
+  "extras": [
+   {
+    "label": "No water",
+    "text": "No drinking water in the park; bring plenty"
+   },
+   {
+    "label": "Unmarked trails",
+    "text": "Trails are unmarked; map and compass skills needed"
+   }
+  ],
+  "parking": "Gravel pullout off Fairview-White Lake Rd with limited spaces",
+  "source_url": "https://bcparks.ca/white-lake-grasslands-protected-area/"
+ },
+ "1404": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Public boat launch for a fee, during store hours",
+  "dogs": "Dogs and cats allowed; dogs on leash at all times",
+  "extras": [
+   {
+    "label": "No lifeguard",
+    "text": "No lifeguard on duty at the swim dock"
+   },
+   {
+    "label": "Motor limit",
+    "text": "Boat motors 10 hp or less"
+   }
+  ],
+  "season": "Open May 1 to October 10 each year; store 8:30-5 daily",
+  "source_url": "https://echolakeresort.ca/",
+  "washrooms": "Wash house with flush toilets (guests)"
+ },
+ "1405": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Booking",
+    "text": "Online and phone bookings open"
+   }
+  ],
+  "season": "Open all year; winter camping Oct 1 to May 1 by request",
+  "source_url": "https://www.dutchscampground.com/"
+ },
+ "1406": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Small pets allowed, with restrictions",
+  "extras": [
+   {
+    "label": "Sites",
+    "text": "68 full-service sites with 30-amp power"
+   },
+   {
+    "label": "Wi-Fi",
+    "text": "Free Wi-Fi"
+   }
+  ],
+  "source_url": "https://www.oxbowrvresort.com/",
+  "washrooms": "Washrooms with coin showers and coin laundry"
+ },
+ "1410": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "From $89 a person; 2 parasailers minimum",
+  "extras": [
+   {
+    "label": "Ages",
+    "text": "Ages 4 and up; under 19 need a signed waiver"
+   },
+   {
+    "label": "Book ahead",
+    "text": "Advance booking recommended, 2 to 5 days out"
+   }
+  ],
+  "parking": "Paid street and lot parking downtown; arrive 30 minutes early",
+  "source_url": "https://www.okanaganparasail.com/faqs",
+  "time_needed": "About an hour on the water, 10 minutes in the air"
+ },
+ "1435": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Best time to visit",
+    "text": "Best in April or May when the flowering plants bloom"
+   }
+  ],
+  "source_url": "https://www.penticton.ca/parks-recreation/parks/find-parks-and-gardens/ikeda-japanese-garden"
+ },
+ "1437": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Last exit",
+    "text": "Exit at Tuey Park; dangerous rapids start immediately downstream"
+   },
+   {
+    "label": "Life jackets",
+    "text": "Life jackets are required"
+   }
+  ],
+  "parking": "Parking at Belvidere Park, the launch point",
+  "source_url": "https://destinationenderby.ca/nature",
+  "time_needed": "1 to 2 hours for the 2.5 km Belvidere to Tuey Park float"
+ },
+ "1439": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Go Fish program",
+    "text": "Kids learn-to-fish program in May and June"
+   },
+   {
+    "label": "Dock",
+    "text": "Floating dock and picnic area"
+   }
+  ],
+  "parking": "Lot on Swite Road",
+  "season": "Open year-round; reduced upkeep of parking and facilities Nov to Mar",
+  "source_url": "https://storymaps.arcgis.com/stories/846f1f976f574d388105292f3acf1e36"
+ },
+ "1442": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Kayak or paddleboard rental from $30 for 1 hour",
+  "extras": [
+   {
+    "label": "Beginner-friendly",
+    "text": "Stable kayaks and boards suited to first-timers"
+   }
+  ],
+  "source_url": "https://www.lakefrontsports.com/kayak-paddleboard-rentals-osoyoos"
+ },
+ "1443": {
+  "accessibility": "Adaptive bikes for disabled riders brought to Myra Station lot (via People in Motion)",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "No water on trail",
+    "text": "No water at the lot or on the trail; bring your own"
+   },
+   {
+    "label": "Trail length",
+    "text": "Flat, 12 km one way between Myra Station and Ruth Station"
+   }
+  ],
+  "parking": "Rental sits in the Myra Station lot at the trail entrance",
+  "season": "Closed for winter; reopens May 7, 2027",
+  "source_url": "https://www.myracanyonrental.com/"
+ },
+ "1444": {
+  "alerts": "Online booking paused; book by phone (as of Nov 2 2026)",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Winter",
+    "text": "Snowshoe rentals, daily and weekly"
+   }
+  ],
+  "season": "Fall: limited shop hours for bike rentals and shuttles",
+  "source_url": "https://hoodooadventures.ca/"
+ },
+ "1445": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Fuel and taxes extra; damage deposits required",
+  "extras": [
+   {
+    "label": "WaveRunner age",
+    "text": "Renter must be 25; operator 21"
+   }
+  ],
+  "season": "May to September, 8 am to 8 pm",
+  "source_url": "https://www.pentictonboatrentals.com/"
+ },
+ "1446": {
+  "checked_at": "Nov 2, 2026",
+  "source_url": "https://holydoodlesailingcharters.com/",
+  "time_needed": "2 hour private sail"
+ },
+ "1448": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Every person needs a ticket; kids under 36 inches free with a paid adult",
+  "dogs": "No pets or animals allowed, and none left in parked vehicles",
+  "extras": [
+   {
+    "label": "Life jackets",
+    "text": "Free life jackets at the rental booth"
+   },
+   {
+    "label": "Lockers",
+    "text": "Locker rental $5 plus a $10 deposit"
+   }
+  ],
+  "parking": "Plenty of parking on site",
+  "season": "Closed for the 2026 season; 2027 details posted in spring",
+  "source_url": "https://splashdown.ca/faq/",
+  "washrooms": "Large washroom and change rooms inside the park"
+ },
+ "1450": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Beach",
+    "text": "Private sandy beach on the lake"
+   },
+   {
+    "label": "Showers",
+    "text": "Shower facilities on site"
+   }
+  ],
+  "season": "Resort is open year-round",
+  "source_url": "https://www.parkbridge.com/en/resort/resort-detail/gallagher-lake",
+  "washrooms": "Public washrooms and showers"
+ },
+ "1451": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Standard flight from CA$450",
+  "extras": [
+   {
+    "label": "Group size",
+    "text": "Up to 5 people per flight"
+   }
+  ],
+  "source_url": "https://okballooning.com/",
+  "time_needed": "Standard flight is 3 hours"
+ },
+ "1619": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free to visit; fee only for orchard tours and U-Pick",
+  "dogs": "Leashed dogs OK outdoors; not in the market, cafe patio or buildings",
+  "extras": [
+   {
+    "label": "No outside food",
+    "text": "Outside food and drinks not allowed (exceptions for dietary needs)"
+   }
+  ],
+  "season": "Closed for the season; reopens spring 2027 (late Apr or May 1 to Oct 31)",
+  "source_url": "https://davisonorchards.ca/faq",
+  "time_needed": "2 to 3 hours"
+ },
+ "1622": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Calm, well-behaved dogs welcome on a short leash",
+  "extras": [
+   {
+    "label": "Holiday Market",
+    "text": "Indoor Holiday Market Nov 22, 2026, 10am to 3pm"
+   },
+   {
+    "label": "Bus",
+    "text": "Number 3 bus stops at Kal Tire Place"
+   }
+  ],
+  "season": "Mondays and Thursdays 8am to 1pm, April to the end of October",
+  "source_url": "https://www.vernonfarmersmarket.ca/"
+ },
+ "1623": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Listed as a dog park; dogs on leash",
+  "season": "Open sunrise to sunset; sport bookings available",
+  "source_url": "https://www.vernon.ca/parks-recreation/parks-fields-beaches/marshall-field"
+ },
+ "1624": {
+  "accessibility": "Moderate: some level sections but steep climbs",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Pets welcome (pick up after your dog)",
+  "extras": [
+   {
+    "label": "Drinking water",
+    "text": "No drinkable water on the trails; bring your own"
+   },
+   {
+    "label": "Bear country",
+    "text": "Carry bear spray; cell reception is inconsistent"
+   }
+  ],
+  "parking": "Trailhead parking off Chamberlain Road; do not park at the road's end",
+  "source_url": "https://www.astrailssociety.com/trails/",
+  "time_needed": "Plan at least 3 hours to hike all the main trails"
+ },
+ "1625": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Bike valet",
+    "text": "Free bike valet at Gyro Park on market Saturdays (2026)"
+   }
+  ],
+  "season": "Saturdays 8:30 am to 1 pm, April 18 to October 31",
+  "source_url": "https://www.pentictonfarmersmarket.org/"
+ },
+ "1632": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Voluntary admission, $5 a person",
+  "parking": "Free parking next to the fence",
+  "season": "Grounds open daily in daylight; building interiors 8am-4pm, Mar 15 to Oct 15",
+  "source_url": "https://www.fatherpandosy.com/"
+ },
+ "1662": {
+  "alerts": "Splash park closed for the season; reopens spring 2027, as of Nov 2, 2026",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash Oct 1 to Mar 31; no dogs Apr 1 to Sep 30",
+  "extras": [
+   {
+    "label": "Address",
+    "text": "10090 Bottom Wood Lake Road"
+   }
+  ],
+  "season": "Park open daily 6 am to 11 pm",
+  "source_url": "https://www.lakecountry.bc.ca/parks-recreation-culture/parks-facilities-directory/swalwell-park-trethewey-splash-park",
+  "washrooms": "Washroom in the park"
+ },
+ "1663": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash at all times; not allowed in beach areas or park buildings",
+  "extras": [
+   {
+    "label": "Swimming",
+    "text": "Swimming allowed; no lifeguards on duty"
+   },
+   {
+    "label": "E-bikes",
+    "text": "E-bikes not allowed on park trails; roads only"
+   }
+  ],
+  "parking": "Access road to the camping area is four-wheel-drive vehicles only",
+  "source_url": "https://bcparks.ca/nickel-plate-park/"
+ },
+ "1670": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Pets allowed on a leash at all times",
+  "extras": [
+   {
+    "label": "Drinking water",
+    "text": "Drinking water on site"
+   },
+   {
+    "label": "Spillway danger",
+    "text": "Stay behind fences; never enter the spillway channel"
+   }
+  ],
+  "parking": "40-car parking lot",
+  "season": "Day use only; no overnight camping or overnight parking",
+  "source_url": "https://www.bchydro.com/community/recreation_areas/southern/shuswap-river.html",
+  "washrooms": "Two toilets"
+ },
+ "1671": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash; not allowed on beach areas",
+  "extras": [
+   {
+    "label": "Swimming",
+    "text": "Swimming allowed; no lifeguards"
+   },
+   {
+    "label": "Camping",
+    "text": "No provincial camping; private camping at Echo Lake Resort"
+   }
+  ],
+  "parking": "Gravel road for 20 km off Highway 6 southeast of Lumby",
+  "source_url": "https://bcparks.ca/echo-lake-park/"
+ },
+ "1676": {
+  "accessibility": "850 m paved pathway, wheelchair accessible; accessible playground",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Disc golf course is free to play",
+  "dogs": "Off-leash hours dawn to 9 am, year-round",
+  "extras": [
+   {
+    "label": "Disc golf",
+    "text": "Nine holes, open year-round"
+   }
+  ],
+  "season": "Tennis and pickleball nets are down November to April",
+  "source_url": "https://www.oliver.ca/town-services/recreation/parks-and-amenities",
+  "washrooms": "Year-round washrooms at concession building; playground ones closed Oct to Apr"
+ },
+ "1677": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Playground",
+    "text": "Playground for ages 2 to 12; supervision recommended"
+   }
+  ],
+  "season": "Spray water shut off for winter on Sept 22, 2026",
+  "source_url": "https://www.oliver.ca/town-services/recreation/parks-and-amenities",
+  "washrooms": "Seasonal; use Community Park washrooms by the basketball court when closed"
+ },
+ "1678": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Fenced off-leash dog area, open year-round",
+  "extras": [
+   {
+    "label": "Showers",
+    "text": "Showers take a loonie or token: 4 minutes each"
+   },
+   {
+    "label": "Pump track",
+    "text": "Pump track open 8 am to 10 pm; helmets required"
+   }
+  ],
+  "source_url": "https://www.oliver.ca/town-services/recreation/parks-and-amenities",
+  "washrooms": "Winter (Oct to Apr) washrooms 8 am to 3 pm; showers 8 am to 2 pm"
+ },
+ "1679": {
+  "accessibility": "600 m accessible path; with the Ditch Trail about 1.8 km",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Length",
+    "text": "About 1.8 km with the Ditch Trail added"
+   },
+   {
+    "label": "Picnic tables",
+    "text": "Picnic tables at Fairview Park on the route"
+   }
+  ],
+  "source_url": "https://www.oliver.ca/town-services/recreation/parks-and-amenities"
+ },
+ "1680": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Open to hikers",
+    "text": "Reserve is open to hiking; no camping, fishing or foraging"
+   },
+   {
+    "label": "No motor vehicles",
+    "text": "Motorized vehicles are not allowed"
+   }
+  ],
+  "source_url": "https://bcparks.ca/mahoney-lake-ecological-reserve/"
+ },
+ "1681": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Town says leashed dogs are welcome in most parks",
+  "extras": [
+   {
+    "label": "Smoke-free",
+    "text": "All town parks, playgrounds and trails are smoke-free"
+   }
+  ],
+  "source_url": "https://www.osoyoos.ca/parks-recreation/parks-and-trails",
+  "washrooms": "Winter: accessible porta potty open 7 am to 7 pm"
+ },
+ "1682": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Smoke-free",
+    "text": "All town parks, playgrounds and trails are smoke-free"
+   }
+  ],
+  "source_url": "https://www.osoyoos.ca/parks-recreation/parks-and-trails"
+ },
+ "1689": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Recruits course from $25",
+  "extras": [
+   {
+    "label": "Kids course",
+    "text": "Commando Kids course from $15"
+   },
+   {
+    "label": "Ages",
+    "text": "Recruits course for ages 10 and up"
+   }
+  ],
+  "parking": "Free parking on site",
+  "source_url": "https://okanaganwarriors.ca",
+  "time_needed": "1 to 2 hours per course (500 m)"
+ },
+ "1692": {
+  "accessibility": "Disabled parking area; drop-off at gate with no stairs; lawn-chair seating",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Seating",
+    "text": "General admission; no assigned seating, first come first served"
+   },
+   {
+    "label": "Food",
+    "text": "Food trucks at every event, plus snacks and drinks"
+   }
+  ],
+  "parking": "Five lots hold 400+ vehicles per event; lots open just before gates",
+  "season": "Events run April to October",
+  "source_url": "https://www.pentictonspeedway.com/facility"
+ },
+ "1693": {
+  "accessibility": "Wheelchair ramp from walkway to the beach path just west of the park",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs not allowed near children's playgrounds",
+  "extras": [
+   {
+    "label": "Playground",
+    "text": "Fenced playground for ages 5 to 12"
+   }
+  ],
+  "parking": "Pay parking, $1 an hour",
+  "season": "Spray features 10 am to 8 pm daily, May long weekend to late Sept",
+  "source_url": "https://www.penticton.ca/parks-recreation/parks/find-parks-and-gardens/lakawanna-park",
+  "washrooms": "Washrooms on site"
+ },
+ "1701": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash year-round",
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails",
+  "washrooms": "Washrooms in the park"
+ },
+ "1703": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Train safety",
+    "text": "Use extreme caution when the train is nearby"
+   },
+   {
+    "label": "South end",
+    "text": "South end (Ornamental Gardens) is reached from Highway 97"
+   }
+  ],
+  "parking": "Drive to the north end off Canyon View Rd; there is a rest area",
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails"
+ },
+ "1704": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash or under control on Summerland trails (general trail rule)",
+  "extras": [
+   {
+    "label": "Cell service",
+    "text": "Phone coverage may not be available on trails"
+   }
+  ],
+  "parking": "Priest Camp lot 1 km past the dam; Garnet Valley Rd turns to gravel",
+  "season": "Trail open May through October",
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails",
+  "washrooms": "Restrooms at Garnett Valley Dam (Priest Camp), where the trail starts"
+ },
+ "1705": {
+  "accessibility": "Mix of unpaved and paved sections, 4.5 km",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash or under control on Summerland trails (general trail rule)",
+  "extras": [
+   {
+    "label": "Hill climb",
+    "text": "A grassy hillside climb up to Bristow Road"
+   },
+   {
+    "label": "Cell service",
+    "text": "Phone coverage may not be available on trails"
+   }
+  ],
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails"
+ },
+ "1706": {
+  "accessibility": "6 km loop, mix of unpaved and paved sections",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash or under control on Summerland trails (general trail rule)",
+  "extras": [
+   {
+    "label": "Steep road section",
+    "text": "Switchback Road has a steep decline on the return leg"
+   }
+  ],
+  "parking": "Parking next to Peach Orchard Beach Park (trailhead)",
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails",
+  "washrooms": "Washrooms at Peach Orchard Beach Park, where the loop starts"
+ },
+ "1709": {
+  "accessibility": "Wheelchair-accessible playground; flat park trails",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Features",
+    "text": "Tennis, walking track, picnic shelter, playground, skate park"
+   }
+  ],
+  "parking": "Parking spots throughout the park",
+  "source_url": "https://www.tourismvernon.com/trail-data/geojson",
+  "washrooms": "Washrooms in the park"
+ },
+ "1715": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs not permitted",
+  "extras": [
+   {
+    "label": "Music in the Park",
+    "text": "Free concerts most Friday nights in summer"
+   },
+   {
+    "label": "Skatepark",
+    "text": "West Kelowna Skatepark and a playground on site"
+   }
+  ],
+  "source_url": "https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-F6FB2817-2C1D-4F2A-BD84-DD6AABC153B6",
+  "washrooms": "Washrooms on site"
+ },
+ "1716": {
+  "accessibility": "Ground-level play equipment, fenced, paved path to the entrance gate",
+  "alerts": "Kids Care Spray/Water Park is closed for the season",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Off-leash dog park in the northwest corner of the park",
+  "extras": [
+   {
+    "label": "Hours",
+    "text": "Spray park open dawn to dusk when in season"
+   },
+   {
+    "label": "Community garden",
+    "text": "Plots rented via Central Okanagan Community Garden Assoc."
+   }
+  ],
+  "parking": "On-site parking with two accessible stalls at the Julia's Junction entrance",
+  "season": "Spray park open from about May long weekend to early September",
+  "source_url": "https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-99664498-6711-4289-913D-051A688C8BCF",
+  "washrooms": "Flush toilets while spray park runs; portable washrooms when closed for season"
+ },
+ "1717": {
+  "accessibility": "Paved path loops around the cemetery and heritage buildings",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Self-guided tour",
+    "text": "Self-guided tour on the Gellatly family history"
+   }
+  ],
+  "parking": "Lot off Gellatly Road South; accessible parking",
+  "season": "Open year-round; hours 6am to 6pm Oct 15 to Dec 31, until 11pm in summer",
+  "source_url": "https://storymaps.arcgis.com/stories/c14f97487dcd412a8d19ef7ebf03e4ea",
+  "washrooms": "Washrooms on site and a picnic area"
+ },
+ "1718": {
+  "accessibility": "Mostly paved and stroller friendly; gravel near Quails' Gate and The Hatch",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Length",
+    "text": "4.8 km shared route for cyclists and walkers"
+   },
+   {
+    "label": "Steep section",
+    "text": "Steep paved stretch between Anders Rd and Douglas Rd"
+   }
+  ],
+  "source_url": "https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-350593D9-C8F9-4CF7-AA60-A3F0AE18E0B3"
+ },
+ "1719": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Park features",
+    "text": "Pavilion, picnic area, playground, splash pad, bat interpretive trail"
+   }
+  ],
+  "source_url": "https://www.peachland.ca/parks-recreation/parks-trails/heritage-park",
+  "washrooms": "Washrooms are across the street"
+ },
+ "1722": {
+  "accessibility": "Stairs only: 158 steps to the top",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail status",
+    "text": "Leads to unmaintained Crown Land trails"
+   },
+   {
+    "label": "Neighbours",
+    "text": "Access runs between houses; keep noise down"
+   }
+  ],
+  "source_url": "https://www.peachland.ca/parks-recreation/parks-trails/stairway-heaven"
+ },
+ "1774": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs must be on a leash",
+  "source_url": "https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-6A25D1CE-2A69-4C15-BBC7-F23AEEB57FBB"
+ },
+ "1775": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Trail",
+    "text": "2.3 km trail, 450 m climb to the Crags"
+   }
+  ],
+  "parking": "Lot off Lakeshore Drive; another at the end of South Perimeter Way",
+  "season": "Open daily by season hours; Lakeshore Rd vehicle entrance closed Nov 1 to Apr 1",
+  "source_url": "https://storymaps.arcgis.com/stories/9d6363a8723f4a25bc491ce740a4a5e0"
+ },
+ "1779": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash",
+  "extras": [
+   {
+    "label": "Other access",
+    "text": "Easier access by parking near Goats Peak Park on Seclusion Bay Rd"
+   },
+   {
+    "label": "Route",
+    "text": "Off-street paths plus a neighbourhood bikeway on Drought Road"
+   }
+  ],
+  "parking": "Limited; park on Beach Ave and walk or bike in",
+  "source_url": "https://www.peachland.ca/westsidetrail"
+ },
+ "1804": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Day pass $32; evening pass (5 to 7 pm) $22",
+  "extras": [
+   {
+    "label": "Ages",
+    "text": "Ages 5+; ages 5 to 7 need an adult (19+) with them"
+   },
+   {
+    "label": "Life jackets",
+    "text": "Life jackets are required and provided"
+   }
+  ],
+  "season": "Operating hours 11 am to 7 pm in season",
+  "source_url": "https://okanaganwibit.com/product/osoyoos-wibit/"
+ },
+ "1814": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Pets allowed but must be looked after at all times",
+  "extras": [
+   {
+    "label": "Power",
+    "text": "30-amp power at 10 sites; all sites have water and a fire pit"
+   },
+   {
+    "label": "No sani-dump",
+    "text": "No sani-dump at the campsite; nearest is in Trout Creek"
+   }
+  ],
+  "season": "U-pick cherries in July each year",
+  "source_url": "https://dickinsonfamilyfarm.com",
+  "washrooms": "Clean outhouse and paid showers at the campsite"
+ },
+ "1820": {
+  "alerts": "Closed to the public: wildfire hazards from the 2023 Grouse Complex fire (Nov 2, 2026)",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash (park currently closed)",
+  "parking": "Lot is off Glenmore Road (park is closed)",
+  "source_url": "https://storymaps.arcgis.com/stories/0f13728cd51d494fb554b29e2c73710e"
+ },
+ "1825": {
+  "accessibility": "Juniper Trail is paved to the twin bays, then gravel to Rattlesnake Point",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash; 3 pet beaches: Cosens Bay east, off Crest Trail, Jade Bay west",
+  "extras": [
+   {
+    "label": "Rattlesnakes",
+    "text": "Rattlesnakes and bears live here; wear boots, avoid long grass"
+   },
+   {
+    "label": "Swimming",
+    "text": "Swim buoys in 3 main bays only; no lifeguards"
+   }
+  ],
+  "parking": "Cosens Bay Trail: the only parking is at Cosens Bay Gate",
+  "source_url": "https://bcparks.ca/kalamalka-lake-park/"
+ },
+ "1848": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be kept under control; backcountry not suited to dogs",
+  "extras": [
+   {
+    "label": "Angel Springs",
+    "text": "Mineral pools, steps, sinkholes and small caves"
+   },
+   {
+    "label": "Wildfire hazards",
+    "text": "2003 fire left unstable trees and loose rock; stay on main trails"
+   }
+  ],
+  "season": "Open year-round; services mid-April to Nov 15",
+  "source_url": "https://bcparks.ca/myra-bellevue-park/"
+ },
+ "1852": {
+  "accessibility": "Milled-lumber staircase with handrails up a steep canyon side",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash at all times; not on beaches except the designated pet beach",
+  "extras": [
+   {
+    "label": "Children",
+    "text": "Children must be accompanied by an adult"
+   },
+   {
+    "label": "Swimming",
+    "text": "Sand beach in the park; no lifeguards on duty"
+   }
+  ],
+  "parking": "Gravel pullout for 6 or 7 vehicles just past the octagonal dairy barn",
+  "source_url": "https://bcparks.ca/fintry-park/"
+ },
+ "1853": {
+  "accessibility": "Paved, lit paths; accessible parking at Marina Park and CNR Wharf",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs on leash; off-leash dog beach along the route",
+  "extras": [
+   {
+    "label": "Path surfaces",
+    "text": "1.5 km paved cycling, 1 km paved multi-use, 1 km gravel walking, all lit"
+   },
+   {
+    "label": "Swimming",
+    "text": "Swimming beach access at various points along the trail"
+   }
+  ],
+  "parking": "Paved stalls along the corridor and at Marina and CNR Wharf parks",
+  "source_url": "https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-B096440D-C9B6-4E8B-8DE3-DAEB6FC957B3",
+  "washrooms": "Seasonal at Marina Beach and CNR Wharf (portable in winter); year-round at Willow Beach"
+ },
+ "1854": {
+  "accessibility": "4th Street Beach Park to Lake Country Museum section is wheelchair and stroller friendly",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Trail length",
+    "text": "2.6 km easy trail along stony beaches"
+   }
+  ],
+  "parking": "Main parking on 5th Street at Okanagan Centre Park; limited at 4th Street and trail ends",
+  "source_url": "https://www.lakecountry.bc.ca/media/file/dlc-trail-map-2025"
+ },
+ "1855": {
+  "accessibility": "Natural surface with steep climbs; Grind Trail is walkers only",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Trails",
+    "text": "Benchlands 1.5 km, Highlands 670 m, Long 675 m, Wetland Loop 670 m"
+   }
+  ],
+  "parking": "Main parking at Benchlands Park; otherwise limited street parking",
+  "source_url": "https://www.lakecountry.bc.ca/media/file/dlc-trail-map-2025"
+ },
+ "1856": {
+  "accessibility": "Easy trails, 860 m total",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs strictly prohibited",
+  "extras": [
+   {
+    "label": "Owner",
+    "text": "Owned by Oceola Fish and Game Club; kiosk info at trailhead"
+   },
+   {
+    "label": "Kokanee",
+    "text": "Habitat is vital for kokanee spawning"
+   }
+  ],
+  "source_url": "https://www.lakecountry.bc.ca/media/file/dlc-trail-map-2025"
+ },
+ "1857": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Welcome, including on the chairlift; leash required on trails",
+  "extras": [
+   {
+    "label": "Trail closures",
+    "text": "Trails may close at any time due to weather"
+   },
+   {
+    "label": "Bullet chair",
+    "text": "Last chair tickets 4 pm Thu, Sat, Sun and holiday Mondays"
+   }
+  ],
+  "season": "Page says summer hiking runs until Labour Day (season over for 2026)",
+  "source_url": "https://www.bigwhite.com/summer/hiking-trails",
+  "time_needed": "Rhonda Lake Trail: about 1 hour one way"
+ },
+ "1858": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed",
+  "extras": [
+   {
+    "label": "Trail upkeep",
+    "text": "Unmaintained Crown Land trail"
+   },
+   {
+    "label": "Climb",
+    "text": "Elevation gain about 250 m"
+   }
+  ],
+  "source_url": "https://www.peachland.ca/parks-recreation/parks-trails/gladstone-trail",
+  "time_needed": "About 90 minutes to walk up"
+ },
+ "1859": {
+  "accessibility": "Wide gravel path, unpaved, slight elevation change",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Shorter option",
+    "text": "Walk part of it and return the same way; full loop is 5 km"
+   },
+   {
+    "label": "Provincial park",
+    "text": "Part of the trail is inside a provincial park"
+   }
+  ],
+  "source_url": "https://www.summerland.ca/docs/default-source/parks---recreation/parks---trails/hiking-and-biking-trails-in-summerland-2017.pdf"
+ },
+ "1861": {
+  "accessibility": "1.8 km pathway is Rick Hansen accessibility certified",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash on the creek path until the off-leash area",
+  "season": "Open year-round",
+  "source_url": "https://www.penticton.ca/our-community/living-here/accessible-city"
+ },
+ "1864": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash at all times; backcountry not suitable for dogs",
+  "extras": [
+   {
+    "label": "No water",
+    "text": "No drinking water in the park; bring plenty"
+   },
+   {
+    "label": "Unmarked trails",
+    "text": "Trails are unmarked; map and compass skills needed"
+   }
+  ],
+  "source_url": "https://bcparks.ca/white-lake-grasslands-protected-area/"
+ },
+ "1865": {
+  "accessibility": "Short but steep trail up Community Hill",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs welcome; waste bags at the trail entrance",
+  "parking": "Curling Rink lot, 3500 39th Ave",
+  "source_url": "https://www.vernon.ca/node/198"
+ },
+ "1866": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed, on leash only",
+  "extras": [
+   {
+    "label": "Length",
+    "text": "2.25 km multi-use trail past two dog parks"
+   }
+  ],
+  "parking": "Park at East Vernon Rd, Mutrie Dog Park or BX Ranch Dog Park",
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/bx-ranch-trail"
+ },
+ "1867": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Access",
+    "text": "Forest road: Coldstream FSR then 1 km down Ponds FSR"
+   },
+   {
+    "label": "Trail",
+    "text": "Trail loops a small lake, with a boardwalk and interpretive kiosk"
+   }
+  ],
+  "source_url": "https://www.sitesandtrailsbc.ca/resource/REC267115"
+ },
+ "1868": {
+  "accessibility": "Paved, easy, 1.5 km one way along the river",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Link",
+    "text": "Connects Belvidere Park with Riverside Park"
+   }
+  ],
+  "parking": "Park at the Visitor Centre by the Shuswap River bridge",
+  "source_url": "https://shuswaptrails.com/trails/system/70/",
+  "time_needed": "About half an hour"
+ },
+ "1869": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No pets allowed",
+  "extras": [
+   {
+    "label": "Trails",
+    "text": "Trails on two lake islands, along the shore and across the road"
+   },
+   {
+    "label": "Swimming",
+    "text": "A place to picnic and swim"
+   }
+  ],
+  "parking": "Parking area at the park entrance; extra lot at the hand launch on Musgrave Rd",
+  "source_url": "https://shuswaptrails.com/trails/system/92/Gardom-Lake-Trails/"
+ },
+ "1870": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Watch for",
+    "text": "Logging vehicles in non-winter months; many trails are multi-use"
+   },
+   {
+    "label": "Cell service",
+    "text": "Some areas have no cell coverage; use offline maps"
+   }
+  ],
+  "parking": "Main parking is the Larch Hills ski area lot at the chalet",
+  "season": "Hiking and biking spring through fall; ski and snowshoe in winter",
+  "source_url": "https://shuswaptrails.com/trails/system/14/Larch-Hills-Nordic/",
+  "time_needed": "30 minutes to 3+ hours, depending on route"
+ },
+ "1871": {
+  "accessibility": "Very rugged, along a stream; take care",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail sign",
+    "text": "Sign at about km 15.5 on Mabel Lake Road, on the right"
+   }
+  ],
+  "parking": "Very limited parking; trailhead off a busy industrial road",
+  "season": "Trail condition changes with season and water flow",
+  "source_url": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC263000",
+  "washrooms": "None"
+ },
+ "1872": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash at all times; backcountry not suited to dogs",
+  "extras": [
+   {
+    "label": "Water",
+    "text": "Little surface water away from the lake; carry plenty of drinking water"
+   },
+   {
+    "label": "Burn hazards",
+    "text": "Past wildfires left hazards; stay on the main trail network"
+   }
+  ],
+  "parking": "North lot is 15 km along Lakeshore Road from Kelowna",
+  "source_url": "https://bcparks.ca/okanagan-mountain-park/",
+  "time_needed": "BC Parks lists the Boulder Trail section as 3 km, 2 hrs",
+  "washrooms": "Outhouses provided; toilet paper not always supplied"
+ },
+ "1873": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be on a leash; not suited to backcountry",
+  "extras": [
+   {
+    "label": "Water",
+    "text": "Little surface water away from the lakes; carry plenty"
+   }
+  ],
+  "parking": "South lot via Naramata and Chute Lake Rd: 6 km gravel, 1.5 km very rough",
+  "source_url": "https://bcparks.ca/okanagan-mountain-park/",
+  "time_needed": "Last stretch to Commando Bay is 1.8 km, about 1 hour"
+ },
+ "1874": {
+  "accessibility": "Restricted-access road to Divide Lake, listed as easy",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash at all times; backcountry not suited to dogs",
+  "extras": [
+   {
+    "label": "Water",
+    "text": "Little surface water away from the lake; carry plenty of drinking water"
+   },
+   {
+    "label": "Burn hazards",
+    "text": "Past wildfires left hazards; stay on the main trail network"
+   }
+  ],
+  "source_url": "https://bcparks.ca/okanagan-mountain-park/",
+  "time_needed": "BC Parks lists Rimrock Gate to Divide Lake as 8 km, 3.5 hrs"
+ },
+ "1875": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be controlled; on leash in the Myra Canyon area",
+  "extras": [
+   {
+    "label": "Trail closure",
+    "text": "Little White Trail (Pooley Creek to Upper Crawford) not maintained, closed"
+   },
+   {
+    "label": "Burn hazards",
+    "text": "2003 fire left unstable trees, holes and loose rock"
+   }
+  ],
+  "season": "Open year-round; services mid-April to Nov 15",
+  "source_url": "https://bcparks.ca/myra-bellevue-park/",
+  "washrooms": "Pit toilets at the Myra and June Springs parking lots"
+ },
+ "1876": {
+  "accessibility": "Snowberry Loop is paved",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail heads",
+    "text": "Find trailheads on the UBC campus map"
+   }
+  ],
+  "source_url": "https://campusplanning.ok.ubc.ca/transportation/travel-options/walking/",
+  "time_needed": "Pine Trail takes about 20 minutes to walk"
+ },
+ "1877": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free parking",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Route",
+    "text": "Runs through three Smith Creek parks to Rainbow Rd"
+   },
+   {
+    "label": "Playground",
+    "text": "Playground and picnic tables along the way"
+   }
+  ],
+  "source_url": "https://www.westkelownacity.ca/parks-and-facilities/parks-facilities-details-page/?facilityId=TNT-COW-00000407-58B944A0-1A4A-423C-8BE9-E921D8F60796"
+ },
+ "1878": {
+  "accessibility": "Long, winding, mostly gravel path with some stairs",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Stay on trail",
+    "text": "Stonewater Development next to the trail is private property"
+   },
+   {
+    "label": "Swimming",
+    "text": "Small swimming area and a bench at the beach"
+   }
+  ],
+  "parking": "Park on Buchanan Road at the Stonewater Development",
+  "source_url": "https://www.peachland.ca/parks-recreation/parks-trails/burdekin-lane"
+ },
+ "1879": {
+  "accessibility": "Unmaintained backcountry trail; use at your own risk",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Cell service",
+    "text": "No or limited cell service; carry water"
+   },
+   {
+    "label": "Park rules",
+    "text": "No campfires or motorized vehicles in the park"
+   }
+  ],
+  "parking": "Trailhead kiosks with limited parking off Beaver Lake and Oyama Lake roads",
+  "source_url": "https://www.lakecountry.bc.ca/media/file/dlc-trail-map-2025",
+  "time_needed": "About 1 hour to hike from the trailhead to the park"
+ },
+ "1880": {
+  "accessibility": "Pond bridge and parts of the pond trail are accessible",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Trail length",
+    "text": "Easy 545 m loop around the pond with viewing platform"
+   }
+  ],
+  "parking": "No designated lot; limited on-street parking",
+  "season": "Park open daily 6 am to 11 pm",
+  "source_url": "https://www.lakecountry.bc.ca/parks-recreation-culture/parks-facilities-directory/trethewey-park"
+ },
+ "1881": {
+  "accessibility": "Shared-use trails from easy to most difficult",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash (district trail rule)",
+  "extras": [
+   {
+    "label": "Trail links",
+    "text": "Trails link to Spion Kop and nearby streets"
+   }
+  ],
+  "source_url": "https://www.lakecountry.bc.ca/media/file/dlc-trail-map-2025"
+ },
+ "1882": {
+  "accessibility": "Easy 800 m path with a steady incline",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Viewpoint",
+    "text": "Old homestead site with valley and Wood Lake views"
+   }
+  ],
+  "parking": "Limited parking at both trailheads",
+  "source_url": "https://www.lakecountry.bc.ca/media/file/dlc-trail-map-2025"
+ },
+ "1883": {
+  "accessibility": "Easy trail through field and forest",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Trail length",
+    "text": "About 2 km between Broadwater and Ribbleworth roads"
+   }
+  ],
+  "parking": "No designated lot; limited on-street parking",
+  "source_url": "https://lakecountry.bc.ca/parks-recreation-culture/parks-facilities-directory?page=2"
+ },
+ "1885": {
+  "accessibility": "Portions are wheelchair and stroller friendly",
+  "alerts": "Closed east of the Rodeo Grounds toward Faulder (wildfire notice, Aug 21 2026)",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Open section",
+    "text": "Fenwick Rd to the Rodeo Grounds is open (District notice Aug 21 2026)"
+   }
+  ],
+  "parking": "Parking area at the Rodeo Grounds trailhead (a lot on Fenwick Rd too)",
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails",
+  "washrooms": "Pit toilets at the Rodeo Grounds trailhead"
+ },
+ "1886": {
+  "accessibility": "Paved path for walking and biking, about 1 km",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash or under control on Summerland trails (general trail rule)",
+  "extras": [
+   {
+    "label": "Dog bags",
+    "text": "Pet-waste bag dispensers at most trailheads"
+   }
+  ],
+  "source_url": "https://www.summerland.ca/parks-recreation/parks-trails"
+ },
+ "1887": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be on a leash at all times",
+  "extras": [
+   {
+    "label": "Bring water",
+    "text": "Little surface water away from the lakes; carry plenty"
+   },
+   {
+    "label": "Burn hazards",
+    "text": "Stay on main trails: unstable trees and loose rock after wildfires"
+   }
+  ],
+  "parking": "South lot via Chute Lake Rd: 6 km gravel then 1.5 km very rough",
+  "source_url": "https://bcparks.ca/okanagan-mountain-park/",
+  "time_needed": "BC Parks: 5 km to Divide Lake, 3 hours, difficult",
+  "washrooms": "Park has pit toilets only, no flush toilets"
+ },
+ "1888": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be on a leash at all times",
+  "extras": [
+   {
+    "label": "Bring water",
+    "text": "Little surface water away from the lakes; carry plenty"
+   },
+   {
+    "label": "Burn hazards",
+    "text": "Stay on main trails: unstable trees and loose rock after wildfires"
+   }
+  ],
+  "parking": "South lot via Chute Lake Rd: 6 km gravel then 1.5 km very rough",
+  "source_url": "https://bcparks.ca/okanagan-mountain-park/",
+  "time_needed": "500 m, 30 minutes, easy",
+  "washrooms": "Park has pit toilets only, no flush toilets"
+ },
+ "1889": {
+  "accessibility": "Access trails may be steep and rocky with drop-offs",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs must be leashed at all times",
+  "extras": [
+   {
+    "label": "Water",
+    "text": "No drinking water in the park"
+   },
+   {
+    "label": "Break-ins",
+    "text": "Vehicle break-ins at the lots; hide valuables"
+   }
+  ],
+  "parking": "Overflow parking at the bottom of Smythe Road; no overnight parking",
+  "season": "Parking gate closed mid-Nov to mid-March, and dusk to dawn daily",
+  "source_url": "https://bcparks.ca/skaha-bluffs-park/"
+ },
+ "1891": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs on leash at all times; backcountry not suitable for dogs",
+  "extras": [
+   {
+    "label": "No water",
+    "text": "No drinking water in the park; bring plenty"
+   },
+   {
+    "label": "Unmarked trails",
+    "text": "Trails are unmarked; map and compass skills needed"
+   }
+  ],
+  "parking": "Gravel pullout off Fairview-White Lake Rd with limited spaces",
+  "source_url": "https://bcparks.ca/white-lake-grasslands-protected-area/",
+  "time_needed": "About 2 hours to the gate at north end of Mahoney Lake"
+ },
+ "1893": {
+  "accessibility": "Steep, winding one-way trail",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Signs",
+    "text": "Several interpretive signs along the path"
+   },
+   {
+    "label": "Connects",
+    "text": "Links to the Grey Canal Turtle Mountain Trail"
+   }
+  ],
+  "parking": "Parking next to the trailhead (43rd Ave and Alexis Park Dr)",
+  "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1894": {
+  "accessibility": "Steep climb with switchbacks at the Okanagan Ave end; level on top",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Trail",
+    "text": "2.4 km gravel trail for walking and cycling"
+   },
+   {
+    "label": "Road crossing",
+    "text": "Use the pedestrian light to cross Mission Rd"
+   }
+  ],
+  "parking": "Roadside on Fulton Rd, South Vernon Dr, Okanagan Ave; ball fields at Mission Rd",
+  "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1895": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs welcome on the trail and picnic area, on leash",
+  "extras": [
+   {
+    "label": "Trail",
+    "text": "500 m multi-use trail between Crane Rd and Lochdale Rd"
+   },
+   {
+    "label": "Hand launch",
+    "text": "Hand launch for non-motorized boats"
+   }
+  ],
+  "parking": "30-stall parking area",
+  "source_url": "https://www.rdno.ca/parks-rec-culture/parks/jordan-nature-reserve-park",
+  "washrooms": "Pit toilet"
+ },
+ "1896": {
+  "accessibility": "Easy trails with some steep sections; headland trails harder",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Pets on leash at all times; only Sandy Beach allows pets",
+  "extras": [
+   {
+    "label": "Headland trails",
+    "text": "Trails along the rocky headland tops are more difficult"
+   },
+   {
+    "label": "No lifeguards",
+    "text": "No lifeguards at the beaches"
+   }
+  ],
+  "season": "Best spring through fall",
+  "source_url": "https://bcparks.ca/ellison-park/",
+  "washrooms": "Flush and pit toilets in the park (no hot water)"
+ },
+ "1897": {
+  "accessibility": "Lookout Trail turns steep and rocky; good footwear essential",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash; 3 pet beaches: Cosens Bay east, off Crest Trail, Jade Bay west",
+  "extras": [
+   {
+    "label": "Loop length",
+    "text": "Loop 2 is 5.7 km via The Parabola or 7.5 km via The Wall"
+   },
+   {
+    "label": "Rattlesnakes",
+    "text": "Rattlesnakes and bears live here; wear boots, avoid long grass"
+   }
+  ],
+  "parking": "Starts at the Red Gate Parking Lot",
+  "source_url": "https://nrs.objectstore.gov.bc.ca/kuwyyf/kalamalka_brochure_fa2564d226.pdf"
+ },
+ "1898": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash at all times except at three designated pet beaches",
+  "extras": [
+   {
+    "label": "Rattlesnakes",
+    "text": "Rattlesnake habitat; stay on trail and watch where you step"
+   },
+   {
+    "label": "Bears",
+    "text": "Bears inhabit the park"
+   }
+  ],
+  "source_url": "https://bcparks.ca/kalamalka-lake-park/"
+ },
+ "1900": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Shared trailhead",
+    "text": "Multi-use trailhead shared with ORV riders; loops south are non-motorized"
+   }
+  ],
+  "source_url": "https://shuswaptrails.com/trails/system/111/Glenemma-Trails/"
+ },
+ "1901": {
+  "accessibility": "Gravel-surfaced path, rated easy",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Entrance",
+    "text": "Park entrance is on the north side of Hwy 97A, next to the bridge"
+   },
+   {
+    "label": "Nearby food",
+    "text": "Path under the bridge links to restaurant, pub and grocery"
+   }
+  ],
+  "source_url": "https://shuswaptrails.com/trails/system/110/Grindrod-Park/",
+  "time_needed": "About 30 minutes (720 m)"
+ },
+ "1902": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Active logging",
+    "text": "The access roads are active logging roads"
+   },
+   {
+    "label": "Distance",
+    "text": "About 11.4 km one way from parking to Mount Nelson"
+   }
+  ],
+  "parking": "Park at road end, then walk an old logging road about 3 km to the trail",
+  "source_url": "https://www.sitesandtrailsbc.ca/search/search-result.aspx?type=Site&site=REC169460"
+ },
+ "1903": {
+  "accessibility": "Steep climb for about the first kilometre",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Drive from Vernon",
+    "text": "About 2 hours' drive from Vernon"
+   }
+  ],
+  "parking": "Trailhead at end of Outlet Creek Rd, a rough, narrow, switchback road",
+  "source_url": "https://www.sitesandtrailsbc.ca/search/search-result.aspx?type=Site&site=REC4727",
+  "time_needed": "About 6 hours, 11 km"
+ },
+ "1904": {
+  "accessibility": "First kilometre is very steep",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Industrial use",
+    "text": "Roads are in active industrial use"
+   },
+   {
+    "label": "Beyond the lakes",
+    "text": "Trails past Twin Lakes get much harder"
+   }
+  ],
+  "parking": "Lot 14 km up North Fork FSR; high-clearance vehicle needed",
+  "source_url": "https://www.sitesandtrailsbc.ca/search/search-result.aspx?type=Site&site=REC4531",
+  "time_needed": "About 5 hours, 7.6 km"
+ },
+ "1905": {
+  "accessibility": "Very steep from the rock ramparts on",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "User-maintained",
+    "text": "No facilities beyond the parking lot; be self-reliant"
+   },
+   {
+    "label": "Industrial road",
+    "text": "South Fork FSR is a busy industrial road"
+   }
+  ],
+  "parking": "Trailhead lot up South Fork FSR; cars with good clearance can make it",
+  "source_url": "https://www.sitesandtrailsbc.ca/search/search-result.aspx?type=Site&site=REC4724",
+  "time_needed": "About 5 hours, 9.5 km"
+ },
+ "1906": {
+  "accessibility": "First 3 km fairly level but very marshy",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Industrial road",
+    "text": "South Fork FSR is a busy industrial road"
+   },
+   {
+    "label": "Early-summer falls",
+    "text": "Waterfalls run into the lake in early summer"
+   }
+  ],
+  "parking": "Park in the log landing area at the end of South Fork FSR",
+  "source_url": "https://www.sitesandtrailsbc.ca/search/search-result.aspx?type=Site&site=REC4725",
+  "time_needed": "About 5 hours, 6.2 km"
+ },
+ "1907": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "No facilities",
+    "text": "Nothing beyond the parking lot; user-maintained trail"
+   },
+   {
+    "label": "Industrial road",
+    "text": "South Fork FSR is a busy industrial road"
+   }
+  ],
+  "parking": "Trailhead 23 km up South Fork FSR; vehicles with good clearance",
+  "source_url": "https://www.sitesandtrailsbc.ca/search/search-result.aspx?type=Site&site=REC4726",
+  "time_needed": "About 5 hours, 9.5 km"
+ },
+ "1908": {
+  "accessibility": "Final 300 m of climbing is very steep",
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Industrial road",
+    "text": "South Fork FSR is a busy industrial road"
+   },
+   {
+    "label": "Non-motorized",
+    "text": "Non-motorized trail"
+   }
+  ],
+  "parking": "Parking area at end of South Fork FSR; good-clearance car recommended",
+  "source_url": "https://www.sitesandtrailsbc.ca/search/search-result.aspx?type=Site&site=REC98066",
+  "time_needed": "5 to 6 hours, 7 km"
+ },
+ "1913": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash at all times except at three designated pet beaches",
+  "extras": [
+   {
+    "label": "Rattlesnakes",
+    "text": "Rattlesnake habitat; stay on trail and watch where you step"
+   },
+   {
+    "label": "Bears",
+    "text": "Bears inhabit the park"
+   }
+  ],
+  "source_url": "https://bcparks.ca/kalamalka-lake-park/"
+ },
+ "1925": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Winter market",
+    "text": "Winter and satellite markets closed for the season"
+   }
+  ],
+  "season": "Outdoor market Apr 4 to Oct 31; Saturdays and Wednesdays 8am-1pm",
+  "source_url": "https://www.kelownafarmersandcraftersmarket.com"
+ }
+}

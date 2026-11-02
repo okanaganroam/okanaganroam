@@ -26752,7 +26752,9 @@ const OUTDOOR_FACT_ROWS = [['alerts', 'Heads up'], ['cost', 'Cost'], ['parking',
 function outdoorFactRows(venue) {
   const f = venue && venue.type === 'outdoor' ? OUTDOOR_FACTS[String(venue.id)] : null;
   if (!f) return [];
-  const rows = OUTDOOR_FACT_ROWS.filter(([k]) => f[k]).map(([k, label]) => [label, escapeHtml(f[k])]);
+  // No researched cost but the listing is marked free: the row says so (the Free to Visit badge already does on the page).
+  const facts = !f.cost && venue.free_entry ? { ...f, cost: 'Free to visit' } : f;
+  const rows = OUTDOOR_FACT_ROWS.filter(([k]) => facts[k]).map(([k, label]) => [label, escapeHtml(facts[k])]);
   for (const x of f.extras || []) if (x && x.label && x.text) rows.push([x.label, escapeHtml(x.text)]);
   if (rows.length && f.source_url && f.checked_at) {
     let host = '';
