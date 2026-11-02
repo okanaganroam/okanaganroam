@@ -53,12 +53,26 @@
   "per": "ticket",
   "source": "https://baldyresort.com/lift-tickets/"
  },
+ "1236": {
+  "basis": "Adult snowshoe season pass, in-season (Nov-Apr)",
+  "conf": "site",
+  "from": 269,
+  "per": "season",
+  "source": "https://sovereignlake.com/rates/day-tickets/ski-day-tickets/"
+ },
  "1237": {
   "basis": "Adult single day pass",
   "conf": "site",
   "from": 23.5,
   "per": "day",
   "source": "https://nickelplatenordic.org/product/day-pass/"
+ },
+ "1238": {
+  "basis": "Adult 1 Day/Night Snowshoe Pass (ski day pass $22)",
+  "conf": "site",
+  "from": 11,
+  "per": "day",
+  "source": "https://telemarknordic.com/day-passes/"
  },
  "1239": {
   "basis": "Adult admission (youth/senior $10, under 6 free)",
@@ -87,6 +101,12 @@
   "from": 52.43,
   "per": "person",
   "source": "https://oyamazipline.com/attractions/aerial-park/"
+ },
+ "1244": {
+  "basis": "Lower Course ticket",
+  "conf": "site",
+  "from": 29.99,
+  "source": "https://okanaganadventurepark.com/adventurecourses"
  },
  "125": {
   "basis": "Taste of Terroir guided 5-wine tasting (lowest tasting experience)",
@@ -459,6 +479,13 @@
   "per": "night",
   "source": "https://www.barefootresortbc.com/yurt-rentals"
  },
+ "1372": {
+  "basis": "30/50 amp full service site, off-season (2025 rate sheet)",
+  "conf": "site",
+  "from": 40,
+  "per": "night",
+  "source": "https://campingosoyoos.com/wp-content/uploads/2025/05/Price-Sheet-2025-1-1.pdf"
+ },
  "1374": {
   "basis": "Unserviced campsite",
   "conf": "site",
@@ -709,6 +736,13 @@
   "from": 70,
   "per": "person",
   "source": "https://bridlewoodriding.com/fun-rides"
+ },
+ "1450": {
+  "basis": "28-day stay special (only price published)",
+  "conf": "site",
+  "from": 750,
+  "per": "month",
+  "source": "https://www.parkbridge.com/en/resort/resort-detail/gallagher-lake"
  },
  "1451": {
   "basis": "Standard balloon flight (group up to 5)",
@@ -1907,6 +1941,13 @@
   "conf": "site",
   "from": 10,
   "source": "https://www.mooncurser.com/visit-us/tasting-options/"
+ },
+ "422": {
+  "basis": "Tasting (prepaid, not waived with purchase)",
+  "conf": "site",
+  "from": 15,
+  "per": "tasting",
+  "source": "https://www.exploretock.com/mtboucherieestatewinery"
  },
  "428": {
   "basis": "30-min tasting, refunded with purchase",
