@@ -32553,6 +32553,13 @@ test('Card status line for a place with a notice: closed for the season / tempor
   assert.equal(app.blockedStatusLine(-1, 'Tastings at noon.', null, '2026-11-01'), null);
 });
 
+test('Every card has a status line: live, notice, by appointment from the place\'s own words, or hours not confirmed', () => {
+  assert.deepEqual(app.cardStatusFor({ eligible: true, state: 'open', text: 'Open \u00b7 Closes 5 PM' }, { id: -1 }), { state: 'open', text: 'Open \u00b7 Closes 5 PM' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: { state: 'seasonal', text: 'Closed for the season' } }, { id: -1 }), { state: 'seasonal', text: 'Closed for the season' });
+  assert.deepEqual(app.cardStatusFor(undefined, { id: -1, description: 'A small, appointment-style winery.' }), { state: 'appointment', text: 'By appointment \u00b7 call ahead' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, description: 'Pinot Noir and Chardonnay.' }), { state: 'unknown', text: 'Hours not confirmed \u00b7 call ahead' });
+});
+
 test('French: card status lines for places with a notice', () => {
   assert.equal(app.frText('By appointment \u00b7 call ahead'), 'Sur rendez-vous \u00b7 appelez avant');
   assert.equal(app.frText('Closed for the season \u00b7 Reopens May 1, 2027'), 'Ferm\u00e9 pour la saison \u00b7 R\u00e9ouverture le 1er mai 2027');
