@@ -26742,6 +26742,25 @@ function sportScaleScore(v, note) {
   if (/\blit\b|lights/.test(play || text)) score += 0.5;
   return score + Math.min(String(v.description || '').length, 1200) / 1200;
 }
+// Outdoor quick facts (2026-11-02): Good to Know on an Outdoors place -- cost, parking, dogs, washrooms, access, season,
+// time needed, alerts -- each from the operator's own pages (data/outdoor-facts.json: {id: {cost, parking, washrooms, dogs,
+// accessibility, season, time_needed, alerts, extras: [{label, text}], source_url, checked_at}}). English pages only.
+let OUTDOOR_FACTS = {};
+try { OUTDOOR_FACTS = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'outdoor-facts.json'), 'utf8')) || {}; } catch (e) { /* none yet: Good to Know keeps its address row */ }
+const OUTDOOR_FACT_ROWS = [['alerts', 'Heads up'], ['cost', 'Cost'], ['parking', 'Parking'], ['dogs', 'Dogs'], ['washrooms', 'Washrooms'], ['accessibility', 'Access'], ['season', 'Season'], ['time_needed', 'Time needed']];
+// -> [[label, html]]: the rows for this place, plus a "Checked" line naming where the facts came from.
+function outdoorFactRows(venue) {
+  const f = venue && venue.type === 'outdoor' ? OUTDOOR_FACTS[String(venue.id)] : null;
+  if (!f) return [];
+  const rows = OUTDOOR_FACT_ROWS.filter(([k]) => f[k]).map(([k, label]) => [label, escapeHtml(f[k])]);
+  for (const x of f.extras || []) if (x && x.label && x.text) rows.push([x.label, escapeHtml(x.text)]);
+  if (rows.length && f.source_url && f.checked_at) {
+    let host = '';
+    try { host = new URL(f.source_url).hostname.replace(/^www\./, ''); } catch (e) { /* no host */ }
+    rows.push(['Checked', `<a href="${escapeHtml(f.source_url)}" rel="nofollow noopener" target="_blank">${escapeHtml(host || 'source')}</a>, ${escapeHtml(f.checked_at)}`]);
+  }
+  return rows;
+}
 // Sports & Recreation attributes (2026-11-02): Beginner friendly, Lit at night, Rentals come from data/sports-attributes.json
 // ({ "<venue id>": ["beginner", "lit", "rentals"] }, each checked against the place's own page); Covered / Indoor is read from
 // the place itself (an arena, recreation centre or sports centre). They are not database columns and only the Sports page uses them.
@@ -32774,7 +32793,14 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     .map(([k, v]) => [k, (k === 'menu_url' || k === 'booking_url') && sameAsWebsite(v) ? null : v]));
   // Plan your visit (2026-10-29): English pages only (the facts are in English, from the venue's own site).
   // French pages (2026-10-31) show the translated rows from data/french/visit-boxes-*.json; none translated -> no box.
-  const visitInfoRaw = venue.redirect_to ? null : visitDropRepeatedKnownFor(venueVisitInfo(venue.id), venue.description);
+  const visitInfoRaw = venue.redirect_to ? null : (() => {
+    const info = visitDropRepeatedKnownFor(venueVisitInfo(venue.id), venue.description);
+    // Outdoor quick facts (2026-11-02): Dogs, Parking and Best season now sit in Good to Know, so the hike box drops them.
+    const shown = new Set(outdoorFactRows(venue).map((r) => r[0]));
+    if (!info || !shown.size || fr) return info;
+    const rows = info.rows.filter((r) => !((r.label === 'Dogs' && shown.has('Dogs')) || (r.label === 'Parking' && shown.has('Parking')) || (r.label === 'Best season' && shown.has('Season'))));
+    return rows.length ? { ...info, rows } : null;
+  })();
   // Hiking (2026-11-01): the box's "The hike" row also shows as one line under the title (distance, climb, difficulty, time).
   const hikeGlanceHtml = (() => {
     const row = visitInfoRaw && Array.isArray(visitInfoRaw.rows) ? visitInfoRaw.rows.find((r) => r.label === 'The hike') : null;
@@ -32809,6 +32835,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
     // link and the schema keep the stored English.
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}`] : null, // the map link is the Get Directions button (cleanup, 2026-11-01)
+    ...(fr ? [] : outdoorFactRows(venue)),
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(displayPhone(venue.phone))}</a>`] : null,
     // Website and Book are the buttons above the card (cleanup, 2026-11-01); they were repeated here.
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
@@ -57785,7 +57812,7 @@ module.exports = {
   renderFoodDrinkHubPage,
   renderFoodDrinkHubScriptHtml,
   renderWineriesHubPage,
-  renderSportsHubPage, sportVenueWithAttrs, freeChipFirst,
+  renderSportsHubPage, sportVenueWithAttrs, freeChipFirst, outdoorFactRows, OUTDOOR_FACTS,
   renderIndoorHubPage,
   indoorExperiencesOf,
   INDOOR_HUB_EXPERIENCES,

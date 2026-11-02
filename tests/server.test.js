@@ -32625,3 +32625,14 @@ test('Golf, tours, sports and indoor cards carry a status line like Food & Drink
   assert.ok(allCards.length >= 3);
   for (const c of allCards) assert.match(c, /fd-open-status/, 'every card on /golf has a status line');
 });
+
+test('Outdoors Good to Know: quick facts show in a fixed order with a Checked line; other types and empty places show none', () => {
+  app.OUTDOOR_FACTS['99991'] = { cost: 'Free', parking: 'Small lot', dogs: 'On a leash', alerts: 'Trail closed to Dec 1', extras: [{ label: 'Water', text: 'None on trail' }], source_url: 'https://www.bcparks.ca/x/', checked_at: 'Nov 2, 2026' };
+  try {
+    const rows = app.outdoorFactRows({ id: 99991, type: 'outdoor' });
+    assert.deepEqual(rows.map((r) => r[0]), ['Heads up', 'Cost', 'Parking', 'Dogs', 'Water', 'Checked']);
+    assert.match(rows[5][1], /bcparks\.ca<\/a>, Nov 2, 2026/);
+    assert.deepEqual(app.outdoorFactRows({ id: 99991, type: 'beach' }), []);
+    assert.deepEqual(app.outdoorFactRows({ id: 99992, type: 'outdoor' }), []);
+  } finally { delete app.OUTDOOR_FACTS['99991']; }
+});
