@@ -24857,6 +24857,9 @@ function renderFoodDrinkOpenNowStyles() {
   body.fd-page .venue-card .fd-open-status[data-fd-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"] { opacity: 0.6; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"]::before { display: none; }
+  /* "By appointment" reads as a status like Open / Closed, not as part of the description (2026-11-02). */
+  body.fd-page .venue-card .fd-open-status[data-fd-open="appointment"] { color: #8A5A12; opacity: 1; font-weight: 800; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="appointment"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
 </style>`;
 }
 
@@ -25731,7 +25734,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
-      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="unknown">${escapeHtml(st.note)}</p>`);
+      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="appointment">${escapeHtml(st.note)}</p>`);
       if (!st || !st.eligible) return chunk;
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
     });
@@ -36769,7 +36772,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
-      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="unknown">${escapeHtml(st.note)}</p>`);
+      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="appointment">${escapeHtml(st.note)}</p>`);
       if (!st || !st.eligible) return chunk;
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
     });
