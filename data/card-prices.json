@@ -11,11 +11,155 @@
   "from": 5,
   "source": "https://www.burrowingowlwine.ca/visit-us/visit-the-winery/"
  },
+ "1096": {
+  "basis": "9 holes green fee",
+  "conf": "site",
+  "from": 16,
+  "per": "round",
+  "source": "https://coldstreamgolfcourse.com/services-and-fees/"
+ },
+ "1115": {
+  "basis": "Twilight after 4PM green fee",
+  "conf": "site",
+  "from": 51,
+  "per": "round",
+  "source": "https://nkmipcanyon.ca/rates/"
+ },
+ "1121": {
+  "basis": "9-hole early-morning rate (open-7:30AM, walking)",
+  "conf": "site",
+  "from": 25,
+  "per": "round",
+  "source": "https://spallumcheengolf.com/rates/"
+ },
+ "1233": {
+  "basis": "Day Nordic trail pass (cheapest item sold)",
+  "conf": "site",
+  "from": 15,
+  "per": "day",
+  "source": "https://www.bigwhite.com/events-activities/winter-activities/nordic-trails"
+ },
+ "1234": {
+  "basis": "Skate Pass adult (13+), cheapest adult item (also Friday Night Special)",
+  "conf": "site",
+  "from": 15,
+  "per": "person",
+  "source": "https://apexresort.com/lift-ticket-prices/"
+ },
+ "1235": {
+  "basis": "Magic Carpet half-day lift ticket (adult)",
+  "conf": "site",
+  "from": 15,
+  "per": "ticket",
+  "source": "https://baldyresort.com/lift-tickets/"
+ },
+ "1237": {
+  "basis": "Adult single day pass",
+  "conf": "site",
+  "from": 23.5,
+  "per": "day",
+  "source": "https://nickelplatenordic.org/product/day-pass/"
+ },
+ "1239": {
+  "basis": "Adult admission (youth/senior $10, under 6 free)",
+  "conf": "site",
+  "from": 12,
+  "per": "person",
+  "source": "https://www.desert.org/visit-us"
+ },
+ "1241": {
+  "basis": "Adult snowshoe day pass (adult ski day pass $22)",
+  "conf": "site",
+  "from": 10,
+  "per": "day",
+  "source": "https://www.kelownanordic.ca/day-passes"
+ },
+ "1242": {
+  "basis": "Kestrel Two Line Tour, adult 19+ (plus GST)",
+  "conf": "site",
+  "from": 89,
+  "per": "person",
+  "source": "https://zipzone.ca/adventures/six-lines/"
+ },
+ "1243": {
+  "basis": "Aerial Obstacle Park, adult 18+ (incl. taxes)",
+  "conf": "site",
+  "from": 52.43,
+  "per": "person",
+  "source": "https://oyamazipline.com/attractions/aerial-park/"
+ },
  "125": {
   "basis": "Taste of Terroir guided 5-wine tasting (lowest tasting experience)",
   "conf": "site",
   "from": 37,
   "source": "https://www.cedarcreek.bc.ca/tastings-experiences/"
+ },
+ "1288": {
+  "basis": "Single Tube & Bus Combo",
+  "conf": "site",
+  "from": 20,
+  "per": "person",
+  "source": "https://coyotecruises.com/tube-and-bus-combo"
+ },
+ "1289": {
+  "basis": "SUP or solo kayak rental, up to 2 hours",
+  "conf": "site",
+  "from": 40,
+  "source": "https://kelownapaddlecentre.ca/sup-rentals/"
+ },
+ "1290": {
+  "basis": "Evening Pass, 5-7 PM",
+  "conf": "site",
+  "from": 24,
+  "per": "person",
+  "source": "https://okanaganwibit.com/product/kelowna-wibit/"
+ },
+ "1291": {
+  "basis": "Evening Pass (5-7 PM), adult",
+  "conf": "site",
+  "from": 24,
+  "per": "person",
+  "source": "https://okanaganwibit.com/product/penticton-wibit/"
+ },
+ "1292": {
+  "basis": "Evening Pass (5-7 PM), cheapest option",
+  "conf": "site",
+  "from": 20,
+  "per": "person",
+  "source": "https://okanaganwibit.com/product/peachland-wibit/"
+ },
+ "1293": {
+  "basis": "Single kayak or stand-up paddleboard, 1 hour",
+  "conf": "site",
+  "from": 29,
+  "per": "hour",
+  "source": "https://pierwatersports.com/rentals"
+ },
+ "1294": {
+  "basis": "SUP daily rental 10am-4pm (24 hrs also $75)",
+  "conf": "site",
+  "from": 75,
+  "per": "day",
+  "source": "https://www.sunnsup.com/rentals/"
+ },
+ "1296": {
+  "basis": "Paddleboard rental, half day (3 hours)",
+  "conf": "site",
+  "from": 50,
+  "source": "https://oyamageneral.com/paddleboard-kayak-rentals/"
+ },
+ "1297": {
+  "basis": "Single bike, first hour (SUP/kayak 1 hr $25)",
+  "conf": "site",
+  "from": 20,
+  "per": "hour",
+  "source": "https://peachlandrentals.com/"
+ },
+ "1298": {
+  "basis": "Stand-up paddleboard, half hour",
+  "conf": "site",
+  "from": 10,
+  "source": "https://summerlandresorthotel.com/the-resort/tour-the-resort/boat-rentals/"
  },
  "13": {
   "basis": "Standard wine tasting fee (waived with purchase)",
@@ -23,17 +167,483 @@
   "from": 5,
   "source": "https://adegaon45.com/"
  },
+ "1300": {
+  "basis": "Tandem skydive from 10,000 ft (regular rate)",
+  "conf": "site",
+  "from": 399,
+  "per": "person",
+  "source": "https://okanaganskydive.com/pricing.html"
+ },
+ "1301": {
+  "basis": "Hang gliding training hill intro lesson",
+  "conf": "site",
+  "from": 200,
+  "per": "class",
+  "source": "https://freedomflightschool.com/hang-gliding-lessons.html"
+ },
+ "1302": {
+  "basis": "Tandem paragliding flight",
+  "conf": "site",
+  "from": 250,
+  "per": "person",
+  "source": "https://paraglidecanada.com/collections/courses/products/tandem-paragliding-flight"
+ },
+ "1303": {
+  "basis": "Passenger on 1.5-hr ATV tour (driver $184)",
+  "conf": "site",
+  "from": 138,
+  "per": "person",
+  "source": "https://okanaganatvtours.com/"
+ },
+ "1304": {
+  "basis": "2-hr U-drive buggy adventure, per 2-seater buggy",
+  "conf": "site",
+  "from": 350,
+  "source": "https://fullcyrcleadv.ca/atv-adventures/family-off-road-4x4-buggy-adventure/"
+ },
+ "1305": {
+  "basis": "1-hour trail ride (+GST)",
+  "conf": "site",
+  "from": 100,
+  "per": "person",
+  "source": "https://sunhillsriding.ca/prices.html"
+ },
+ "1306": {
+  "basis": "Okanagan Vista Walk, 1-hour trail ride",
+  "conf": "site",
+  "from": 125,
+  "per": "person",
+  "source": "https://www.inspiretrails.ca/"
+ },
+ "1307": {
+  "basis": "Mini Intro Programme (plus tax)",
+  "conf": "site",
+  "from": 85,
+  "per": "person",
+  "source": "https://www.okanaganstables.com/rides-and-rates.php"
+ },
+ "1308": {
+  "basis": "Per attraction (Bumper Boats, Monkey Motion, Climbing Wall)",
+  "conf": "site",
+  "from": 7.5,
+  "per": "person",
+  "source": "https://locolanding.com/"
+ },
+ "1309": {
+  "basis": "Day-use fee for resort facilities",
+  "conf": "site",
+  "from": 10,
+  "per": "person",
+  "source": "https://postilllake.com/lodging/"
+ },
+ "1310": {
+  "basis": "Paddle boat rental, half hour",
+  "conf": "site",
+  "from": 15,
+  "source": "https://www.beaverlakeresort.com/activities/"
+ },
+ "1314": {
+  "basis": "Tent/camper campsite Mon-Thu (2 people)",
+  "conf": "site",
+  "from": 28,
+  "per": "night",
+  "source": "https://headwatersbc.com/rates/"
+ },
+ "1316": {
+  "basis": "Half-day (4 hr) charter, per boat",
+  "conf": "site",
+  "from": 500,
+  "source": "https://okanaganbucktailco.ca/"
+ },
+ "1317": {
+  "basis": "Kalamalka & Wood Lake 2-hour tour (per charter)",
+  "conf": "site",
+  "from": 225,
+  "source": "https://www.al-waysfishingcharters.com/charters"
+ },
+ "1318": {
+  "basis": "General admission public skate",
+  "conf": "site",
+  "from": 5,
+  "per": "person",
+  "source": "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/public-skating-schedules"
+ },
+ "1319": {
+  "basis": "General admission public skate",
+  "conf": "site",
+  "from": 5,
+  "per": "person",
+  "source": "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/public-skating-schedules"
+ },
+ "1320": {
+  "basis": "Leisure Rink public skate",
+  "conf": "site",
+  "from": 5,
+  "per": "person",
+  "source": "https://mnpplace.com/programs/"
+ },
+ "1322": {
+  "basis": "Adult 19+ public skate",
+  "conf": "site",
+  "from": 5.85,
+  "source": "https://www.westkelownacity.ca/en/parks-recreation-and-culture/public-skate-schedule.aspx"
+ },
+ "1323": {
+  "basis": "Public skate (some sessions free)",
+  "conf": "site",
+  "from": 4,
+  "per": "person",
+  "source": "https://www.lakecountry.bc.ca/arena"
+ },
+ "1324": {
+  "basis": "Indoor adult drop-in",
+  "conf": "site",
+  "from": 17.2,
+  "per": "person",
+  "source": "https://www.vernon.ca/parks-recreation/programs-schedules/skating-schedule-rates"
+ },
+ "1325": {
+  "basis": "Adult 19+/Senior drop-in skating (Sunbelt Arena)",
+  "conf": "site",
+  "from": 2.0,
+  "source": "https://asprd.com/drop-in-programs/"
+ },
+ "1328": {
+  "basis": "Adult (19-59) single public skate",
+  "conf": "site",
+  "from": 5.5,
+  "source": "https://www.penticton.ca/parks-recreation/facility-hours-rates-bookings/ice-skating"
+ },
+ "1333": {
+  "basis": "Day pass for Graystokes/Kelowna trails",
+  "conf": "site",
+  "from": 30,
+  "per": "day",
+  "source": "https://kelownasnowmobileclub.com/day-pass"
+ },
+ "1334": {
+  "basis": "Daily trail pass per machine",
+  "conf": "site",
+  "from": 20,
+  "per": "day",
+  "source": "https://sledvernon.ca/trail-pass/"
+ },
+ "1335": {
+  "basis": "1-hour scenic tour, single rider",
+  "conf": "site",
+  "from": 199,
+  "per": "person",
+  "source": "https://www.okanaganrecrentals.com/snowmobile-tours/"
+ },
+ "1336": {
+  "basis": "Half-day guided charter, 1-2 guests, per boat",
+  "conf": "site",
+  "from": 650,
+  "source": "https://www.kelownafishing.com/guided-fishing-trips-charter-rates/"
+ },
+ "1337": {
+  "basis": "Adult admission, low season (high season $30)",
+  "conf": "site",
+  "from": 20,
+  "per": "person",
+  "source": "https://kangaroocreekfarm.com/"
+ },
+ "1339": {
+  "basis": "Adult admission (youth $14, seniors/students $17)",
+  "conf": "site",
+  "from": 19,
+  "per": "person",
+  "source": "https://www.nkmipdesert.com/hours-rates-accessibility"
+ },
+ "1353": {
+  "basis": "Frontcountry camping, off-season (peak $36.50)",
+  "conf": "site",
+  "from": 25,
+  "per": "night",
+  "source": "https://nrs.objectstore.gov.bc.ca/kuwyyf/recreation_user_fee_schedule_503f64b014.pdf"
+ },
+ "1354": {
+  "basis": "Frontcountry camping per party (peak and off-season)",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://nrs.objectstore.gov.bc.ca/kuwyyf/recreation_user_fee_schedule_503f64b014.pdf"
+ },
+ "1355": {
+  "basis": "Water-only campsite (family of four)",
+  "conf": "site",
+  "from": 37,
+  "per": "night",
+  "source": "https://www.summerland.ca/docs/default-source/parks---recreation/campground/peach-orchard-campground---2026-reservations-rates-fees-policies-v2.pdf"
+ },
+ "1356": {
+  "basis": "Camping fee May 1-Sep 30 (seasonal)",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://www.sitesandtrailsbc.ca/resource/REC1596"
+ },
+ "1358": {
+  "basis": "Overnight camping fee, May 1 to Sep 30 2027",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC1970"
+ },
+ "1359": {
+  "basis": "Campsite fee, per Recreation Sites and Trails BC",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://www.sitesandtrailsbc.ca/resource/REC1742"
+ },
+ "1360": {
+  "basis": "Overnight camping fee, May 1 to Oct 15",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC4619"
+ },
+ "1361": {
+  "basis": "Campsite fee, per Recreation Sites and Trails BC",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://www.sitesandtrailsbc.ca/resource/REC1672"
+ },
+ "1362": {
+  "basis": "Overnight camping fee, May 1 to Sep 30 2027",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://dj2qs6gf0wkg3.cloudfront.net/api/v1/recreation-resource/REC1685"
+ },
+ "1366": {
+  "basis": "Camping fee May 1-Oct 15, 2027",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://www.sitesandtrailsbc.ca/resource/REC1665"
+ },
+ "1367": {
+  "basis": "Campsite fee, per Recreation Sites and Trails BC",
+  "conf": "site",
+  "from": 18,
+  "per": "night",
+  "source": "https://www.sitesandtrailsbc.ca/resource/REC1743"
+ },
+ "1369": {
+  "basis": "Water-only site, off-season (May 15 - Jun 25, Sep 8-30)",
+  "conf": "site",
+  "from": 40,
+  "per": "night",
+  "source": "http://wrightsbeachcamp.com/rates"
+ },
+ "1370": {
+  "basis": "Water-only site, off-season (May 15 - Jun 25, Sep 8-30)",
+  "conf": "site",
+  "from": 40,
+  "per": "night",
+  "source": "http://southbeachgardens.com/rates"
+ },
+ "1371": {
+  "basis": "Studio yurt (sleeps 2)",
+  "conf": "site",
+  "from": 145,
+  "per": "night",
+  "source": "https://www.barefootresortbc.com/yurt-rentals"
+ },
+ "1374": {
+  "basis": "Unserviced campsite",
+  "conf": "site",
+  "from": 35,
+  "per": "night",
+  "source": "https://enderbycamping.com/sites/"
+ },
+ "1375": {
+  "basis": "Tent site (trailer/RV from $65)",
+  "conf": "site",
+  "from": 45,
+  "per": "night",
+  "source": "https://www.naramatacentresociety.org/camping"
+ },
+ "1376": {
+  "basis": "Park & Launch shoulder-season day rate (incl. GST)",
+  "conf": "site",
+  "from": 20,
+  "source": "https://woodlakerv.com/"
+ },
+ "1377": {
+  "basis": "Standard RV site single night Oct-Apr (May-Sept $64)",
+  "conf": "site",
+  "from": 49,
+  "per": "night",
+  "source": "https://peachlandrv.ca/rates/"
+ },
+ "1378": {
+  "basis": "Cabin, 2 adults + 2 kids (3-night min)",
+  "conf": "site",
+  "from": 85,
+  "per": "night",
+  "source": "https://cedarfalls.ca/"
+ },
+ "1379": {
+  "basis": "Half-service site (30AMP + water)",
+  "conf": "site",
+  "from": 50,
+  "per": "night",
+  "source": "https://lakefrontrvpark.com/rates/"
+ },
+ "1380": {
+  "basis": "Canvas tent, from-price",
+  "conf": "site",
+  "from": 149,
+  "per": "night",
+  "source": "https://okanaganglamping.com/en/tent-1-okanagan-glamping-co"
+ },
+ "1382": {
+  "basis": "RV/campsite, off-season nightly rate",
+  "conf": "site",
+  "from": 65,
+  "per": "night",
+  "source": "https://mabellakeresort.com/accommodations/campground-rates/"
+ },
+ "1383": {
+  "basis": "Winter package nightly Oct-Apr and May (RV site)",
+  "conf": "site",
+  "from": 60,
+  "per": "night",
+  "source": "https://islandviewrvresort.com/rates/"
+ },
+ "1385": {
+  "basis": "Skating ticket (online price)",
+  "conf": "site",
+  "from": 9.2,
+  "per": "person",
+  "source": "https://www.skisilverstar.com/events-activities/winter-activities/ice-skating"
+ },
+ "1389": {
+  "basis": "Snowshoe multi-course raclette dinner tour",
+  "conf": "site",
+  "from": 140,
+  "per": "person",
+  "source": "https://www.skisilverstar.com/events-activities/winter-activities/ravenwood/"
+ },
+ "1390": {
+  "basis": "2-hour tubing ticket, all ages (window rate)",
+  "conf": "site",
+  "from": 25,
+  "per": "person",
+  "source": "https://www.bigwhite.com/events-activities/winter-activities/tubing"
+ },
+ "1392": {
+  "basis": "Day trail pass",
+  "conf": "site",
+  "from": 15,
+  "per": "day",
+  "source": "https://www.bigwhite.com/events-activities/winter-activities/nordic-trails"
+ },
+ "1393": {
+  "basis": "Day Trail Pass (2026/27)",
+  "conf": "site",
+  "from": 15,
+  "per": "day",
+  "source": "https://www.bigwhite.com/events-activities/winter-activities/twinkling-trail"
+ },
+ "1394": {
+  "basis": "Dog sled tour, up to 2 riders (per sled)",
+  "conf": "site",
+  "from": 399,
+  "source": "https://www.bigwhite.com/events-activities/tours/dog-sled-tours"
+ },
+ "1395": {
+  "basis": "1 hour snowmobile tour, single rider",
+  "conf": "site",
+  "from": 179,
+  "per": "person",
+  "source": "https://www.bigwhite.com/events-activities/tours/snowmobile-tours"
+ },
+ "1396": {
+  "basis": "Half-hour group sleigh tour (adult), +tax",
+  "conf": "site",
+  "from": 38,
+  "per": "person",
+  "source": "https://www.bigwhite.com/events-activities/tours/sleigh-rides-group-or-private"
+ },
+ "1397": {
+  "basis": "Skate Pass (13+) for the Adventure Loop / Shinny Pond",
+  "conf": "site",
+  "from": 15,
+  "per": "person",
+  "source": "https://apexresort.com/adventure-skating-loop/"
+ },
+ "1398": {
+  "basis": "Tubing 2-hour ticket, adult (19-64)",
+  "conf": "site",
+  "from": 27,
+  "per": "person",
+  "source": "https://apexresort.com/tim-hortons-tube-park/"
+ },
  "140": {
   "basis": "Portfolio tasting of 4 premium wines",
   "conf": "site",
   "from": 10,
   "source": "https://www.timewines.ca/chronos-tasting-room/"
  },
+ "1404": {
+  "basis": "Forest back-in RV site, 6 person occupancy",
+  "conf": "site",
+  "from": 50,
+  "per": "night",
+  "source": "https://echolakeresort.ca/campgrounds/"
+ },
+ "1405": {
+  "basis": "Unserviced RV site, spring rate",
+  "conf": "site",
+  "from": 30,
+  "per": "night",
+  "source": "https://www.dutchscampground.com/new-page"
+ },
+ "1406": {
+  "basis": "Tent site, fall rate (Sep 8 - Oct 5 2027)",
+  "conf": "site",
+  "from": 50,
+  "per": "night",
+  "source": "https://www.oxbowrvresort.com/rates/"
+ },
  "1408": {
   "basis": "Standard tasting fee (waived with purchase)",
   "conf": "box_only",
   "from": 10,
   "source": "https://foolishwine.com/visit/"
+ },
+ "1409": {
+  "basis": "Beer flight (4oz sample $3.00)",
+  "conf": "site",
+  "from": 10.99,
+  "per": "tasting",
+  "source": "https://neighbourhoodbrewing.com/tasting-room/"
+ },
+ "1410": {
+  "basis": "Parasail flight 9-11am, 2 or more parasailers",
+  "conf": "site",
+  "from": 89,
+  "per": "person",
+  "source": "https://www.okanaganparasail.com/"
+ },
+ "1412": {
+  "basis": "Flight of 4 beers (cheapest tasting item)",
+  "conf": "site",
+  "from": 11,
+  "per": "tasting",
+  "source": "https://www.redbirdbrewing.com/menu/"
+ },
+ "1418": {
+  "basis": "Beer School 2-hour brewery tour + flight",
+  "conf": "site",
+  "from": 75,
+  "per": "person",
+  "source": "https://www.tinwhistlebrewery.com/beer-school"
  },
  "1419": {
   "basis": "Indoor tasting, waived with bottle",
@@ -46,6 +656,59 @@
   "conf": "site",
   "from": 5,
   "source": "https://www.farmgatewinery.com/"
+ },
+ "1440": {
+  "basis": "Winter bucket of 68 range balls",
+  "conf": "site",
+  "from": 16,
+  "source": "https://www.kelownadrivingrange.com/"
+ },
+ "1441": {
+  "basis": "Water bike rental, 30 minutes",
+  "conf": "site",
+  "from": 30,
+  "source": "https://www.lakefrontsports.com/kayak-paddleboard-rentals"
+ },
+ "1442": {
+  "basis": "Single kayak or paddleboard, 1 hour",
+  "conf": "site",
+  "from": 30,
+  "per": "hour",
+  "source": "https://www.lakefrontsports.com/kayak-paddleboard-rentals-osoyoos"
+ },
+ "1443": {
+  "basis": "Adult bike rental, half day (plus tax)",
+  "conf": "site",
+  "from": 48,
+  "per": "day",
+  "source": "https://www.myracanyonrental.com/rentals/"
+ },
+ "1444": {
+  "basis": "Giant ATX mountain bike rental",
+  "conf": "site",
+  "from": 55,
+  "per": "day",
+  "source": "https://hoodooadventures.ca/rentals"
+ },
+ "1447": {
+  "basis": "Private boat tour, 1 hour (priced for 6 people)",
+  "conf": "site",
+  "from": 310,
+  "per": "hour",
+  "source": "https://luxurylaketours.com/boat-tours/"
+ },
+ "1449": {
+  "basis": "Family Fun Ride, 45 minutes (incl. tax)",
+  "conf": "site",
+  "from": 70,
+  "per": "person",
+  "source": "https://bridlewoodriding.com/fun-rides"
+ },
+ "1451": {
+  "basis": "Standard balloon flight (group up to 5)",
+  "conf": "site",
+  "from": 450,
+  "source": "https://okballooning.com/"
  },
  "1457": {
   "basis": "Adult (25-64) facility drop-in",
@@ -139,6 +802,20 @@
   "from": 6.4,
   "source": "https://www.westkelownacity.ca/en/parks-recreation-and-culture/johnson-bentley-aquatic-centre.aspx"
  },
+ "1482": {
+  "basis": "Clay, Cabernet & Christmas workshop (lowest posted)",
+  "conf": "site",
+  "from": 125,
+  "per": "person",
+  "source": "https://pearlandfern.ca/clay-cabernet-christmas"
+ },
+ "1485": {
+  "basis": "Cheapest regular adult ticket seen (daysormay, 66 Years)",
+  "conf": "site",
+  "from": 39,
+  "per": "person",
+  "source": "https://www.ticketseller.ca/tickets/event/daysormay"
+ },
  "1489": {
   "basis": "60-minute all-access VR simulator pass",
   "conf": "site",
@@ -162,6 +839,13 @@
   "conf": "site",
   "from": 29.99,
   "source": "https://kelownakarting.com/pages/pricing"
+ },
+ "1496": {
+  "basis": "Drop-in admission ($10 per family)",
+  "conf": "site",
+  "from": 5,
+  "per": "person",
+  "source": "https://kfcentre.ca/"
  },
  "1497": {
   "basis": "90-minute Decompress Thermal Ritual",
@@ -207,11 +891,25 @@
   "per": "game",
   "source": "https://www.rollnstonesfuncentre.ca/contact/"
  },
+ "1511": {
+  "basis": "Cheapest show ticket tier (Unfiltered, $25-$45)",
+  "conf": "site",
+  "from": 25,
+  "per": "ticket",
+  "source": "https://tempest.ca/unfiltered-2026/"
+ },
  "1514": {
   "basis": "Standard admission",
   "conf": "site",
   "from": 20,
   "source": "https://nixdorfclassiccars.com/"
+ },
+ "1519": {
+  "basis": "Family Showtime Series ticket (cheapest)",
+  "conf": "site",
+  "from": 10,
+  "per": "person",
+  "source": "https://www.venablestheatre.ca/"
  },
  "1521": {
   "basis": "Lino printing on fabric workshop (cheapest class on schedule); One Night Wheel Class is $90",
@@ -238,11 +936,25 @@
   "from": 30,
   "source": "https://beyondbelief.ca/pricing/"
  },
+ "1529": {
+  "basis": "VR games, Monday-Thursday (Fri-Sun $35)",
+  "conf": "site",
+  "from": 30,
+  "per": "person",
+  "source": "https://vernon.another-world.com/"
+ },
  "1531": {
   "basis": "Adult admission / self-guided visit",
   "conf": "site",
   "from": 10,
   "source": "https://caetani.org/tours"
+ },
+ "1532": {
+  "basis": "Student RUSH ticket (only price published on site)",
+  "conf": "site",
+  "from": 15,
+  "per": "ticket",
+  "source": "https://vdpac.ca/"
  },
  "1537": {
   "basis": "Adult bowling, per game",
@@ -256,17 +968,45 @@
   "from": 10,
   "source": "https://cardiffmillerartwarehouse.ca/"
  },
+ "1549": {
+  "basis": "Try Curling one-hour session with instructor and equipment",
+  "conf": "site",
+  "from": 25,
+  "per": "person",
+  "source": "https://www.kelownacurling.com/sheets/index/try_curling/"
+ },
+ "1550": {
+  "basis": "Comedy night ticket (Sick & Twisted, Nov 14)",
+  "conf": "site",
+  "from": 21.63,
+  "per": "ticket",
+  "source": "https://www.showpass.com/sick-twisted-comedy-night-28/"
+ },
  "1551": {
   "basis": "Child (age 5+) full-day play pass",
   "conf": "site",
   "from": 18.99,
   "source": "https://funspacekids.com/"
  },
+ "1553": {
+  "basis": "Single entry adult (19-64) drop-in",
+  "conf": "site",
+  "from": 9,
+  "per": "person",
+  "source": "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/parkinson-recreation-centre"
+ },
  "1554": {
   "basis": "Community (shared) sauna session, 80 min",
   "conf": "site",
   "from": 45,
   "source": "https://www.loylyfloatingsauna.ca/"
+ },
+ "1556": {
+  "basis": "Escape game, 3-4 people at $120 per group",
+  "conf": "site",
+  "from": 30,
+  "per": "person",
+  "source": "https://kelownaescapebyo.resova.us/items/view/12"
  },
  "1557": {
   "basis": "Drop-in pickleball session",
@@ -293,6 +1033,20 @@
   "conf": "box_only",
   "from": 5.25,
   "source": "https://www.summerland.ca/parks-recreation/schedules"
+ },
+ "1565": {
+  "basis": "Adult drop-in",
+  "conf": "site",
+  "from": 7.5,
+  "per": "person",
+  "source": "https://www.osoyoos.v2.civikit.com/sonora"
+ },
+ "1567": {
+  "basis": "Adult WHL game ticket (+GST)",
+  "conf": "site",
+  "from": 27,
+  "per": "person",
+  "source": "https://soec.ca/event/vs_regina_pats_nov20/"
  },
  "1568": {
   "basis": "Tue/Fri 60-min drop-in gym, per child",
@@ -330,17 +1084,45 @@
   "from": 129,
   "source": "https://www.barewinetours.com/public-wine-tours"
  },
+ "1577": {
+  "basis": "West/East Kelowna & Lake Country wine tour",
+  "conf": "site",
+  "from": 119,
+  "per": "person",
+  "source": "https://www.toasttheokanagan.com/"
+ },
  "1578": {
   "basis": "West Kelowna half-day wine tour, tastings and pickup included",
   "conf": "site",
   "from": 149,
   "source": "https://vivid.tours"
  },
+ "1579": {
+  "basis": "Public tour",
+  "conf": "site",
+  "from": 149,
+  "per": "person",
+  "source": "https://cheersokanagantours.com/kelowna-wine-tour-modest/"
+ },
  "1580": {
   "basis": "Public craft beer tour (needs min riders; Mar 17-Oct 31 season)",
   "conf": "site",
   "from": 35,
   "source": "https://www.smilecycletours.ca/tour/kelowna-brewery-tour/"
+ },
+ "1581": {
+  "basis": "Hop-on hop-off wine shuttle day pass",
+  "conf": "site",
+  "from": 55,
+  "per": "person",
+  "source": "https://signatureconnections.ca/wine-tour/west-kelowna-wine-tours/"
+ },
+ "1582": {
+  "basis": "Public tour",
+  "conf": "site",
+  "from": 120.84,
+  "per": "person",
+  "source": "https://fareharbor.com/embeds/book/atasteofkelownafoodtours/items/?full-items=yes"
  },
  "1583": {
   "basis": "20-minute Simply Kelowna scenic tour, whole helicopter (up to 4)",
@@ -373,6 +1155,13 @@
   "conf": "site",
   "from": 130,
   "source": "https://agrapeexperience.ca/kelowna-wine-tours/"
+ },
+ "1588": {
+  "basis": "Two-hour e-bike rental (cheapest item)",
+  "conf": "site",
+  "from": 47.7,
+  "per": "person",
+  "source": "https://fareharbor.com/embeds/book/lakesideecosports/items/?full-items=yes&flow=1071354"
  },
  "1589": {
   "basis": "Interpretive group snowshoe tour (2 hr)",
@@ -415,6 +1204,13 @@
   "conf": "box_only",
   "from": 49.99,
   "source": "https://www.trolleyco.ca/reservationhub/"
+ },
+ "1597": {
+  "basis": "Simply Sipping Naramata wine tour, all-inclusive (+GST)",
+  "conf": "site",
+  "from": 169,
+  "per": "person",
+  "source": "https://grapeescapes.ca/naramata-wine-tours/"
  },
  "1598": {
   "basis": "Sparkling wine tour experience, current price (regularly $235)",
@@ -460,6 +1256,13 @@
   "per": "boat",
   "source": "https://www.atbwatersports.com/rates"
  },
+ "1604": {
+  "basis": "Private charter, SUV 1-7 passengers",
+  "conf": "site",
+  "from": 99,
+  "per": "hour",
+  "source": "https://www.southokanagantours.ca/shuttletransportation-services"
+ },
  "1606": {
   "basis": "Naramata Bench 3-winery wine tour",
   "conf": "site",
@@ -491,6 +1294,13 @@
   "conf": "box_only",
   "from": 175,
   "source": "https://www.skisilverstar.com/events-activities/winter-activities/snow-cat-tours/"
+ },
+ "1614": {
+  "basis": "Downtown Lower East Hill tour, adult ticket",
+  "conf": "site",
+  "from": 20,
+  "per": "person",
+  "source": "https://www.ghosttoursofvernon.com/about-1"
  },
  "1615": {
   "basis": "3-day shoulder-season all-inclusive catskiing package (lodging, meals, guiding)",
@@ -529,6 +1339,13 @@
   "per": "hour",
   "source": "https://www.kelownadowntownmarina.com/boat-rentals/"
  },
+ "1637": {
+  "basis": "Adult kayak or paddleboard, 1 hour",
+  "conf": "site",
+  "from": 25,
+  "per": "hour",
+  "source": "https://eldoradoyachtclub.ca/rentals"
+ },
  "1638": {
   "basis": "Single kayak (8'6 to 10') rental, 1 hour; life jacket included",
   "conf": "site",
@@ -548,6 +1365,13 @@
   "from": 55,
   "source": "https://www.tikitimetours.ca/kelowna-tiki-tours"
  },
+ "1641": {
+  "basis": "Yamaha WaveRunner / Sea-Doo, 1 hour",
+  "conf": "site",
+  "from": 179,
+  "per": "hour",
+  "source": "https://www.sunwaveboatrentals.com/ratesM2.php"
+ },
  "1643": {
   "basis": "Beer flight, choose 4 to taste",
   "conf": "site",
@@ -560,6 +1384,12 @@
   "from": 10,
   "source": "https://kettlevalleywinery.com"
  },
+ "1669": {
+  "basis": "Adult (19+) single public swim admission",
+  "conf": "site",
+  "from": 5.5,
+  "source": "https://www.enderbyrecreation.com/pool"
+ },
  "167": {
   "basis": "Winemaker's Selection tasting, 4 seasonal wines",
   "conf": "box_only",
@@ -571,6 +1401,26 @@
   "conf": "site",
   "from": 31,
   "source": "https://www.kartplex.ca/"
+ },
+ "1675": {
+  "basis": "Adult (19-59) single public swim admission",
+  "conf": "site",
+  "from": 6.3,
+  "source": "https://www.oliver.ca/sites/3/files/2026-03/rates.png"
+ },
+ "1689": {
+  "basis": "Commando Kids course (ages 5-9, adults can join)",
+  "conf": "site",
+  "from": 15,
+  "per": "person",
+  "source": "https://okanaganwarriors.ca"
+ },
+ "1690": {
+  "basis": "Solo water bike, 30 minutes",
+  "conf": "site",
+  "from": 29,
+  "per": "30 min",
+  "source": "https://tikiwaterbikes.ca/rentals-and-pricing"
  },
  "1697": {
   "basis": "Beginner painting class, one 2-hour session",
@@ -592,6 +1442,13 @@
   "per": "hour",
   "source": "https://www.okanaganbeachrentals.com/rentals"
  },
+ "1707": {
+  "basis": "Golf simulator bay rate",
+  "conf": "site",
+  "from": 70,
+  "per": "hour",
+  "source": "https://theriseresort.ca/dantes-golf-lounge/"
+ },
  "171": {
   "basis": "Tasting of Daydreamer wines",
   "conf": "box_only",
@@ -604,12 +1461,26 @@
   "from": 15,
   "source": "https://www.mackiehouse.ca/tours/"
  },
+ "1723": {
+  "basis": "Solo water bike, 30 minutes",
+  "conf": "site",
+  "from": 29,
+  "per": "30 min",
+  "source": "https://tikiwaterbikes.ca/rentals-and-pricing"
+ },
  "1759": {
   "basis": "2-hour private pontoon cruise, up to 6 guests",
   "conf": "site",
   "from": 495,
   "per": "boat",
   "source": "https://lakelifepontooncruises.ca/kelowna-boat-tours/"
+ },
+ "1760": {
+  "basis": "Single kayak or SUP rental, 1 hour",
+  "conf": "site",
+  "from": 35,
+  "per": "hour",
+  "source": "https://lakesurf.ca/rentals/"
  },
  "1761": {
   "basis": "Sea-Doo / Kawasaki Ultra rental per hour",
@@ -680,6 +1551,26 @@
   "from": 129,
   "source": "https://vine49winetours.com/book-a-tour/"
  },
+ "179": {
+  "basis": "Tasting of 5 pre-selected wines (cheapest option)",
+  "conf": "site",
+  "from": 6,
+  "per": "person",
+  "source": "https://www.dirtylaundry.ca/visit/tasting-room/"
+ },
+ "1792": {
+  "basis": "U-pick sweet cherries, apricots, peaches, plums per lb",
+  "conf": "site",
+  "from": 3,
+  "source": "https://petersupick.com/u-pick-info.html"
+ },
+ "1793": {
+  "basis": "2-hour e-bike rental (per e-bike)",
+  "conf": "site",
+  "from": 55,
+  "per": "person",
+  "source": "https://book.singenuity.com/996/catalog/activities"
+ },
  "1794": {
   "basis": "Single kayak or paddleboard, 2-hour rental",
   "conf": "box_only",
@@ -693,6 +1584,20 @@
   "from": 159,
   "per": "hour",
   "source": "https://triplesplashseadoorentals.com/"
+ },
+ "1801": {
+  "basis": "Kayak, canoe or SUP rental, per hour",
+  "conf": "site",
+  "from": 25,
+  "per": "hour",
+  "source": "https://www.spiritbeachwatersports.com/rates-osoyoos-boat-rentals"
+ },
+ "1804": {
+  "basis": "Evening pass 5-7 PM (day pass $32)",
+  "conf": "site",
+  "from": 22,
+  "per": "person",
+  "source": "https://okanaganwibit.com/product/osoyoos-wibit/"
  },
  "1805": {
   "basis": "Seasonal Happy Hour wine tour (Osoyoos pickup); year-round Signature tour is $79",
@@ -724,6 +1629,27 @@
   "from": 125,
   "per": "hour",
   "source": "https://turtlebaymarina.com/okanagan-boat-rentals.php"
+ },
+ "1927": {
+  "basis": "Night lift ticket, adult 19-64, online price",
+  "conf": "site",
+  "from": 30,
+  "per": "day",
+  "source": "https://www.bigwhite.com/events-activities/winter-activities/night-skiing"
+ },
+ "1928": {
+  "basis": "Discover Half Day lesson, adult 13+ (lesson+lift+rental)",
+  "conf": "site",
+  "from": 149,
+  "per": "person",
+  "source": "https://www.bigwhite.com/ski-school/beginner-lessons"
+ },
+ "1929": {
+  "basis": "Ticket and bus trip combo to Vipers game",
+  "conf": "site",
+  "from": 49.99,
+  "per": "person",
+  "source": "https://www.skisilverstar.com/events-activities/winter-activities/hockey-games/"
  },
  "1930": {
   "basis": "Single cat ride to upper Baldy",
@@ -802,6 +1728,20 @@
   "conf": "box_only",
   "from": 12,
   "source": "https://graymonk.com/"
+ },
+ "253": {
+  "basis": "Winery tasting experience (prepaid, parties 1-15)",
+  "conf": "site",
+  "from": 20,
+  "per": "tasting",
+  "source": "https://www.exploretock.com/grizzliwinery"
+ },
+ "269": {
+  "basis": "Tasting, waived with wine purchase",
+  "conf": "site",
+  "from": 10,
+  "per": "tasting",
+  "source": "https://heavensgatewinery.com/reservation/type/tasting"
  },
  "271": {
   "basis": "5-wine tasting (waived with 3 bottles)",
@@ -899,6 +1839,13 @@
   "from": 15,
   "source": "https://luckhurstfarm.com/explore/distillery/"
  },
+ "39": {
+  "basis": "Bowling lane Sun-Thu (up to 6 people; Fri-Sat $55)",
+  "conf": "site",
+  "from": 45,
+  "per": "hour",
+  "source": "https://www.bnabrewing.com/bna-bowl"
+ },
  "394": {
   "basis": "Standard tasting (waived with purchase)",
   "conf": "box_only",
@@ -910,6 +1857,13 @@
   "conf": "site",
   "from": 200,
   "source": "https://www.martinslanewinery.com/visit/"
+ },
+ "40": {
+  "basis": "Duckpin lane rental, Sun-Thu",
+  "conf": "site",
+  "from": 35,
+  "per": "hour",
+  "source": "https://www.bnabrewing.com/bna-bowl-vernon"
  },
  "401": {
   "basis": "Mead tasting",
@@ -1199,11 +2153,25 @@
   "from": 15,
   "source": "https://upperbench.ca/tasting-options/"
  },
+ "753": {
+  "basis": "Tasting flight of six (FareHarbor)",
+  "conf": "site",
+  "from": 15.9,
+  "per": "tasting",
+  "source": "https://fareharbor.com/embeds/book/urban-distilleries/items/458374/calendar/?full-items=yes"
+ },
  "755": {
   "basis": "Tasting in The Shed",
   "conf": "site",
   "from": 10,
   "source": "https://vanwestenvineyards.com/"
+ },
+ "757": {
+  "basis": "Full Wine Tasting / Barrel Tasting (cheapest)",
+  "conf": "site",
+  "from": 9,
+  "per": "person",
+  "source": "https://www.veohlayacres.com/tastings-experiences/"
  },
  "759": {
   "basis": "Flight of four beers",
@@ -1270,6 +2238,13 @@
   "conf": "site",
   "from": 50,
   "source": "https://www.checkmatewinery.com/visit/"
+ },
+ "825": {
+  "basis": "Clone Collection Vineyard Tour & Tasting (1 guest)",
+  "conf": "site",
+  "from": 15,
+  "per": "person",
+  "source": "https://codewines.ca/products/clone-collection-vineyard-tour-tasting"
  },
  "826": {
   "basis": "Tasting of 4 small-batch wines, prepaid",
@@ -1367,6 +2342,13 @@
   "from": 15,
   "source": "https://nichewinecompany.com/reservation/"
  },
+ "855": {
+  "basis": "Signature tasting",
+  "conf": "site",
+  "from": 10,
+  "per": "person",
+  "source": "https://nicholvineyard.com/reservation/"
+ },
  "858": {
   "basis": "Wine tasting, 30-60 min",
   "conf": "site",
@@ -1403,6 +2385,13 @@
   "from": 20,
   "source": "https://www.road13vineyards.com/tastings-experiences/"
  },
+ "866": {
+  "basis": "\"Savoir-Faire\" tasting (30 min, 4-5 wines)",
+  "conf": "site",
+  "from": 10,
+  "per": "tasting",
+  "source": "https://rterroir.ca/visit"
+ },
  "867": {
   "basis": "Guided Wine Tasting Experience",
   "conf": "site",
@@ -1427,6 +2416,13 @@
   "from": 15,
   "source": "https://stoneboatvineyards.com/reservation/"
  },
+ "875": {
+  "basis": "Vineyard Tour & Tasting",
+  "conf": "site",
+  "from": 25,
+  "per": "person",
+  "source": "https://www.synchromeshwines.ca/collections/synchromesh-experiences"
+ },
  "876": {
   "basis": "5-wine tasting, credited to bottle",
   "conf": "box_only",
@@ -1450,6 +2446,13 @@
   "conf": "box_only",
   "from": 10,
   "source": "https://vasantiwines.com/"
+ },
+ "882": {
+  "basis": "Self-guided four-wine tasting flight",
+  "conf": "site",
+  "from": 10,
+  "per": "tasting",
+  "source": "https://vowsandvinesvineyard.com/wine/"
  },
  "9": {
   "basis": "Standard tasting: 1 cider + 5 wines, ~30 min (waived with bottle purchase)",
