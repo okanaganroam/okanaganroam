@@ -17252,10 +17252,11 @@ function renderGolfThemeStyles() {
     }
   }
   body.golf-page .card-grid .card-slot-fee > [class*="fee-none"] { display: none; }
-  /* Golf cards keep the photo, name, town, price and badges (2026-11-01, Dayton: "people don't read it, it can live inside
+  /* Golf cards keep the photo, name, town and price (2026-11-01, Dayton: "people don't read it, it can live inside
      the card"): our own value score, and the long description are on the course page; the footer keeps "View details" and Add to trip. */
   body.golf-page .card-grid > .venue-card[data-venue-category="golf"] :is(.card-slot-fee > [class$="-value"], .venue-card-cue) { display: none !important; }
   body.golf-page .card-grid > .venue-card[data-venue-category="golf"] > .card-slot-desc { display: none !important; }
+  html body.golf-page .card-grid > li.venue-card[data-venue-category="golf"]:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:is(:empty, :not(:empty)) { display: none !important; }
   body.golf-page .venue-card {
     margin: 0; background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
     padding: 18px 20px; box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
