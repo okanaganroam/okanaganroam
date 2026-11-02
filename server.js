@@ -24792,6 +24792,8 @@ function blockedStatusLine(venueId, noticeText, seasonState, today) {
     const back = shortReopenDate(addLocalDays(seasonState.to, 1), today);
     return { state: 'seasonal', text: back ? `Temporarily closed \u00b7 Reopens ${back}` : 'Temporarily closed' };
   }
+  // A written notice that opens with "Temporarily closed" (no reopening date known) reads the same on the card.
+  if (/^\s*Temporarily closed\b/i.test(noticeText || '')) return { state: 'seasonal', text: 'Temporarily closed' };
   const appt = appointmentLineFor(venueId, noticeText);
   return appt ? { state: 'appointment', text: appt } : null;
 }
