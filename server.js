@@ -16398,7 +16398,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${PRO_CARD} > .fd-open-status { margin: -2px 0 8px; font-size: 0.8rem; font-weight: 700; }
   ${PRO_CARD} > h2 { margin: 0 0 8px; font-size: 1.28rem; line-height: 1.2; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   ${PRO_CARD} h2 a.venue-card-link { color: var(--ref-navy, #1B2B3A); }
-  ${PRO_CARD} > .card-slot-desc { min-height: 3em; margin: 0 0 14px; }
+  ${PRO_CARD} > .card-slot-desc { margin: 0 0 14px; }
   ${PRO_CARD} .golf-desc p { color: var(--ink-muted, #6B5D54); font-size: 0.93rem !important; line-height: 1.5 !important; }
   ${PRO_CARD} > .chips:not(:empty), ${PRO_CARD} > .chips:empty { min-height: 22px; margin: 0 0 16px !important; padding: 0 !important; }
   ${PRO_CARD} > .chips > .chip { font-size: 0.82rem; font-weight: 700; color: var(--teal-deep, #1E4F4C); }
@@ -16415,7 +16415,9 @@ const CARD_V2_CSS = `<style id="card-v2">
   @media (max-width: 640px) { ${PRO_CARD} { padding: calc(75% + 20px) 18px 16px !important; } ${PRO_CARD}::before { padding-bottom: 75% !important; } }
 </style>
 <script id="card-v2-rows">(function () {
-  var PARTS = ['.venue-meta', 'h2', '.fd-open-status', '.card-slot-fee', '.card-slot-desc', '.chips'];
+  // Rows line up (2026-11-01): the name, price line and badges match across a row. The description, value score and
+  // notice no longer sit on the card, so no neighbour's long text leaves a blank wall in it.
+  var PARTS = ['h2', '.card-slot-fee', '.chips'];
   var CARD = 'li.venue-card[data-ph]:not(.whatson-event-card), li.venue-card[data-card-ph]:not(.whatson-event-card)';
   var queued = false;
   function part(card, sel) { for (var i = 0; i < card.children.length; i++) if (card.children[i].matches(sel)) return card.children[i]; return null; }
@@ -17206,7 +17208,7 @@ function renderGolfThemeStyles() {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   body.golf-page .card-grid > .venue-card > .venue-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  body.golf-page .card-grid > .venue-card .golf-desc { min-height: calc(3 * 1.45em); }
+  body.golf-page .card-grid > .venue-card .golf-desc { min-height: 0; }
   body.golf-page .card-grid > .venue-card .golf-desc.is-clamped p { -webkit-line-clamp: 3; max-height: calc(3 * 1.45em); }
   body.golf-page .card-grid > .venue-card .desc-toggle[hidden] { display: block; visibility: hidden; }
   body.golf-page .card-grid > .venue-card .card-note,
@@ -17249,6 +17251,12 @@ function renderGolfThemeStyles() {
       body.golf-page .card-grid > .venue-card > .card-actions { margin: 10px 0 0 !important; padding: 10px 0 0 !important; border: 0 !important; border-top: 1px solid rgba(74,52,40,0.10) !important; align-self: end !important; }
     }
   }
+  body.golf-page .card-grid .card-slot-fee > [class*="fee-none"] { display: none; }
+  /* Golf cards keep the photo, name, town and price (2026-11-01, Dayton: "people don't read it, it can live inside
+     the card"): our own value score, and the long description are on the course page; the footer keeps "View details" and Add to trip. */
+  body.golf-page .card-grid > .venue-card[data-venue-category="golf"] :is(.card-slot-fee > [class$="-value"], .venue-card-cue) { display: none !important; }
+  body.golf-page .card-grid > .venue-card[data-venue-category="golf"] > .card-slot-desc { display: none !important; }
+  html body.golf-page .card-grid > li.venue-card[data-venue-category="golf"]:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:is(:empty, :not(:empty)) { display: none !important; }
   body.golf-page .venue-card {
     margin: 0; background: var(--paper); border: 1px solid rgba(74,52,40,0.08); border-radius: 14px;
     padding: 18px 20px; box-shadow: 0 10px 22px -16px rgba(74,52,40,0.35);
