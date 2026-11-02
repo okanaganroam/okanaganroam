@@ -11252,7 +11252,7 @@ test('Open Now on /browse follows stored hours + the Okanagan clock with no prov
     const html = app.renderBrowseHubPage(venues, app.parseBrowseHubQuery({}, app.browseCuisines(venues)), now);
     const card = (id) => (html.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${id}"[\\s\\S]*?</li>`)) || [''])[0];
     for (const id of [A, B, C]) assert.match(card(id), /<p class="fd-open-status" data-fd-open="open">/, `card ${id} shows Open now`);
-    assert.ok(!card(D).includes('fd-open-status'), 'no hours: no status line');
+    assert.match(card(D), /<p class="fd-open-status" data-fd-open="(?:unknown|appointment)">/, 'no hours: an honest status line, never a blank (and never Open now)');
     const data = JSON.parse(html.match(/<script type="application\/json" id="[^"]*">([\s\S]*?)<\/script>/)[1]);
     assert.ok(data[String(A)].h && !data[String(D)].h);
     const onHtml = app.renderBrowseHubPage(venues, { ...app.parseBrowseHubQuery({}, app.browseCuisines(venues)), openNow: true }, now);
