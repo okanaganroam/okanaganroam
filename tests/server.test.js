@@ -12602,7 +12602,7 @@ test('Golf data: the region golf page shows verified green fees and sorts by pri
   const asc = page('price-asc');
   assert.match(asc, /<span class="golf-fee-price">From \$40<\/span>/);
   assert.match(asc, /<span class="golf-fee-price">From \$99<\/span>/);
-  assert.match(asc, /Green fees not yet verified/);
+  assert.match(asc, /<span class="golf-fee-price">From \$24<\/span>/, 'a course without a verified fee set starts from the lowest rate in its box (data/golf-card-prices.json)');
   assert.match(asc, /<nav class="category-region-selector golf-sort" aria-label="Sort golf courses">/);
   assert.match(asc, /<a href="\/penticton\/golf\?sort=price-desc" rel="nofollow">Price: high to low<\/a>/);
   assert.match(asc, /Golf data \(2026-09-26\)/, 'golf data styles loaded on golf pages');
