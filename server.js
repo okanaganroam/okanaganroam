@@ -16396,6 +16396,16 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${PRO_CARD}::before { padding-bottom: 75% !important; border-radius: 15px 15px 0 0 !important; }
   ${PRO_CARD} > .venue-meta { margin: 0 0 6px; }
   ${PRO_CARD} > .fd-open-status { margin: -2px 0 8px; font-size: 0.8rem; font-weight: 700; }
+  ${PRO_CARD} > .fd-open-status { display: flex; align-items: center; gap: 7px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; line-height: 1.3; color: var(--ink); }
+  ${PRO_CARD} > .fd-open-status::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+  ${PRO_CARD} > .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
+  ${PRO_CARD} > .fd-open-status[data-fd-open="closed"] { opacity: 0.78; }
+  ${PRO_CARD} > .fd-open-status:is([data-fd-open="closed"], [data-fd-open="seasonal"], [data-fd-open="appointment"])::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+  ${PRO_CARD} > .fd-open-status[data-fd-open="unknown"] { color: #6B5D54; font-weight: 700; }
+  ${PRO_CARD} > .fd-open-status[data-fd-open="unknown"]::before { display: none; }
+  ${PRO_CARD} > .fd-open-status[data-fd-open="appointment"] { color: #8A5A12; font-weight: 800; }
+  ${PRO_CARD} > .fd-open-status[data-fd-open="seasonal"] { color: #6B5D54; font-weight: 800; }
+  @supports (grid-template-rows: subgrid) { @media (min-width: 900px) { body.golf-page .card-grid > .venue-card > .fd-open-status { grid-row: 3; } } }
   ${PRO_CARD} > h2 { margin: 0 0 8px; font-size: 1.28rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   ${PRO_CARD} h2 a.venue-card-link { color: var(--ref-navy, #1B2B3A); }
   ${PRO_CARD} > .card-slot-desc { margin: 0 0 14px; }
@@ -18506,7 +18516,7 @@ function venueCardHtml(venue, opts = {}) {
     return `
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
-        <p class="venue-meta">${isTourCard && tourKind ? `${meta ? meta + ' &middot; ' : ''}${escapeHtml(tourKind)}`.replace(/ &middot; Tour &amp; Experience/, '') : meta}</p>
+        <p class="venue-meta">${isTourCard && tourKind ? `${meta ? meta + ' &middot; ' : ''}${escapeHtml(tourKind)}`.replace(/ &middot; Tour &amp; Experience/, '') : meta}</p>${opts.statusLine ? `\n        <p class="fd-open-status" data-fd-open="${opts.statusLine.state}">${escapeHtml(opts.statusLine.text)}</p>` : ''}
         <div class="card-slot card-slot-fee">${golfFeeHtml ? '\n        ' + golfFeeHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-desc">${tourSummaryHtml ? '\n        ' + tourSummaryHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-notice">${advisoryHtml ? advisoryHtml + '\n        ' : ''}</div>
@@ -22827,7 +22837,11 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   // has its own order (the Food & Drink style hubs, which rank and page the cards themselves).
   const keepOrder = !!cardOpts.keepOrder;
   if (!keepOrder && type !== 'golf') venues = seasonClosedLast(venues);
-  let cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
+  // Every card says where the place stands (2026-11-02): golf, tours, sports and indoor cards get the same open /
+  // closed / by appointment line the Food & Drink cards have. (Food & Drink pages add theirs after rendering.)
+  const statusInfo = cardOpts.statusLine === false || !['golf', 'tour', 'sport', 'indoor'].includes(type) || !(cardOpts.themed === undefined ? usesThemedCategoryLayout(type) : cardOpts.themed)
+    ? null : foodDrinkOpenNowInfo(venues, getAdvisoryNotes(), new Date(), { requireVerified: false }).byId;
+  let cardHtml = (list) => list.map((v) => venueCardHtml(v, { ...cardOpts, statusLine: statusInfo ? cardStatusFor(statusInfo.get(v.id), v) : null, seasonTag: seasonTags.get(v.id) || null, isHiddenGem: hiddenGemIds.has(v.id), isLocalFavourite: localFavouriteIds.has(v.id), advisoryNote: advisoryNotes.has(v.id) ? advisoryNotes.get(v.id) : null, dogFriendlyNote: dogFriendlyNotes.has(v.id) ? dogFriendlyNotes.get(v.id) : null, golfFeeHtml: golfFee(v) })).join('\n');
 
   // Shops & Outfitters (2026-10-23): each shop's own photo too, like sports.
   if (type === 'sport' || type === 'shop') {
@@ -26762,7 +26776,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   };
   const payload = {};
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, null, { cardNotes, cardNoteLabel: 'Play:', photoKeyFor });
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { cardNotes, cardNoteLabel: 'Play:', photoKeyFor });
   const selected = new Set(f.types);
   const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
@@ -28300,7 +28314,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     if (cfg.openNow && st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
     if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
   }
-  const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, cfg.openNow ? openInfo.byId : null, {
+  const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, (cfg.openNow || cfg.cardStatus) ? openInfo.byId : null, {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {}, cardExtraHtml: cfg.cardExtraHtml || null, cardNameMarkHtml: cfg.cardNameMarkHtml || null,
     // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
     altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
@@ -28641,6 +28655,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
     cardOpts: { tourStyle: true },
     features: ['arts_culture', 'kid_friendly', 'dog_friendly', 'great_groups'],
     openNow: false,
+    cardStatus: true,
     search: { label: 'Search tours and experiences', placeholder: 'Search by name, town or activity...' },
     tryLinks: [['/tours?types=wine', 'wine tours'], ['/tours?types=lake', 'boats'], ['/tours?types=bike', 'bike tours']],
     categoryContent: content,
