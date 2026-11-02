@@ -17271,6 +17271,8 @@ function renderGolfThemeStyles() {
   body.golf-page .card-grid > .venue-card[data-venue-category="golf"] :is(.card-slot-fee > [class$="-value"], .venue-card-cue) { display: none !important; }
   body.golf-page .card-grid > .venue-card[data-venue-category="golf"] > .card-slot-desc { display: none !important; }
   html body.golf-page .card-grid > li.venue-card[data-venue-category="golf"]:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:is(:empty, :not(:empty)) { display: none !important; }
+  /* The rule above is Golf's own (its price is the quick fact); trail, park, beach and sports cards inherit a copy of it, so they get their badge row back. */
+  html body.golf-page .card-grid > li.venue-card.venue-card.venue-card:is([data-venue-category="outdoor"], [data-venue-category="beach"], [data-venue-category="sport"]):is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:not(:empty) { display: flex !important; }
   /* "Check before you go" notices live on the place's own page, never on a list card (2026-11-01, Dayton): on a card they
      stretched every card in the row. What matters at a glance is the tag on the photo (Open until Dec 19 / Reopens ...). */
   html body.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .card-slot-notice:has(.venue-advisory) { display: none !important; }
@@ -18267,6 +18269,14 @@ function breadcrumbNavHtml(items) {
 // "+N more" chip (its title lists them); the venue page shows every badge.
 // max 0 = no cap (unthemed cards keep their markup unchanged).
 // keep (2026-10-28): how many stay beside the "+N" (default max - 1); the cards' one-line badges keep two of any three.
+// Free goes first in the badge row (Dayton, 2026-11-02: "anything that has a free badge needs to be the first badge"), ahead of the
+// Dog Friendly collection badge and every price or amenity chip.
+function freeChipFirst(html) {
+  const chips = html.match(/<span class="chip[^"]*"[^>]*>.*?<\/span>/g) || [];
+  const i = chips.findIndex((c) => c.replace(/<[^>]+>/g, '').trim() === 'Free');
+  if (i <= 0) return html;
+  return [chips[i], ...chips.slice(0, i), ...chips.slice(i + 1)].join(' ');
+}
 function capChips(html, max, keep = max - 1) {
   const chips = html.match(/<span class="chip[^"]*"[^>]*>.*?<\/span>/g) || [];
   if (!max || chips.length <= max) return html;
@@ -18509,9 +18519,9 @@ function venueCardHtml(venue, opts = {}) {
     ? [tourFacts.price ? `<span class="chip chip-feat">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price)}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
   const chipsHtml = isTourCard
-    ? `<p class="chips">${photoTagChips}${capChips([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' '), 2, 2)}</p>`
+    ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' ')), 2, 2)}</p>`
     : themed
-    ? `<p class="chips">${photoTagChips}${capChips(editorialChips.slice(photoTagChips.length) + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges }), maxChips - 1, maxChips - 1)}</p>`
+    ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst(editorialChips.slice(photoTagChips.length) + ' ' + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })), maxChips - 1, maxChips - 1)}</p>`
     : `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), 0)}</p>`;
   // Themed listing cards (2026-10-12) always have the same eight parts in the
   // same order -- name, meta, fee slot, description slot, notice slot, notes
@@ -57775,7 +57785,7 @@ module.exports = {
   renderFoodDrinkHubPage,
   renderFoodDrinkHubScriptHtml,
   renderWineriesHubPage,
-  renderSportsHubPage, sportVenueWithAttrs,
+  renderSportsHubPage, sportVenueWithAttrs, freeChipFirst,
   renderIndoorHubPage,
   indoorExperiencesOf,
   INDOOR_HUB_EXPERIENCES,

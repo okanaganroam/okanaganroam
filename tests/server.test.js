@@ -19896,6 +19896,13 @@ test('Description rewrites: every entry is complete, rating-free and guarded by 
 });
 
 // ---------- Sports & Recreation hub (2026-10-14) ----------
+test('Cards: Free is the first badge, ahead of the Dog Friendly collection badge', () => {
+  assert.equal(app.freeChipFirst('<span class="chip">Dog Friendly</span> <span class="chip chip-feat">Free</span> <span class="chip">Lake view</span>'),
+    '<span class="chip chip-feat">Free</span> <span class="chip">Dog Friendly</span> <span class="chip">Lake view</span>');
+  const noFree = '<span class="chip">Dog Friendly</span> <span class="chip">Lake view</span>';
+  assert.equal(app.freeChipFirst(noFree), noFree);
+});
+
 test('Sports hub: a free park keeps its own badges on the card (top two + N), other pages still leave the expected ones off', () => {
   const park = { id: 9101, name: 'Fixture Bike Park', region: 'vernon', type: 'outdoor', slug: 'fixture-bike-park', description: 'A bike park.', free_entry: 1, kid_friendly: 1, dog_friendly: 1 };
   const hub = app.renderSportsHubPage([], [park], new Map(), { types: [], features: [], regions: [] });
