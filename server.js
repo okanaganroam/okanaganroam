@@ -24769,6 +24769,20 @@ const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered
 // render-time status here is the no-script / first-paint value.
 const BROWSE_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
 const FD_OPEN_NOTE = 'Open Now is based on each place\u2019s listed hours. Hours can change for holidays, seasons or special closures \u2014 check with the venue before you go.';
+// A place with a notice (winter by appointment, a closure) gets no live open/closed claim, but its card still says
+// when it is usually open (2026-11-02): "Usually 12-5 PM . check before you go"; null when the days differ.
+function usualHoursNote(hoursRaw) {
+  let h;
+  try { h = JSON.parse(hoursRaw); } catch (e) { return null; }
+  const wins = Object.values(h || {}).filter((d) => Array.isArray(d) && d.length).map((d) => JSON.stringify(d));
+  if (!wins.length || new Set(wins).size !== 1) return 'Hours vary \u00b7 check before you go';
+  const w = JSON.parse(wins[0]);
+  if (w.length !== 1) return 'Hours vary \u00b7 check before you go';
+  const t = (x) => { const [hh, mm] = x.split(':').map(Number); const h12 = ((hh + 11) % 12) + 1; return `${h12}${mm ? ':' + String(mm).padStart(2, '0') : ''}`; };
+  const ap = (x) => (Number(x.split(':')[0]) % 24 >= 12 ? 'PM' : 'AM');
+  const [a, b] = w[0];
+  return `Usually ${t(a)}${ap(a) === ap(b) ? '' : ' ' + ap(a)}\u2013${t(b)} ${ap(b)} \u00b7 check before you go`;
+}
 // opts.requireVerified (default true) gates on recorded hours verification.
 // /food-drink and /browse both pass false: stored hours and the Okanagan clock
 // decide, so only a venue with no hours, or with a temporary-closure advisory,
@@ -24790,7 +24804,7 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
       // 'no_hours', so the map kept its happy hour times and deals ("Closed for the season / Happy hour today from 3 PM").
       : hasAdvisory ? { eligible: false, reason: 'advisory' } : !v.hours ? { eligible: false, reason: 'no_hours' } : { eligible: true, reason: 'ok' };
     if (!e.eligible || !hoursModule) {
-      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null });
+      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null, note: e.reason === 'advisory' ? usualHoursNote(v.hours) : null });
       continue;
     }
     // Seasonal hours and special closures ride along (2026-10-18), so the cards' and the map's live status apply them too.
@@ -25720,6 +25734,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
+      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="unknown">${escapeHtml(st.note)}</p>`);
       if (!st || !st.eligible) return chunk;
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
     });
@@ -36757,6 +36772,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
+      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="unknown">${escapeHtml(st.note)}</p>`);
       if (!st || !st.eligible) return chunk;
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
     });
@@ -57245,6 +57261,7 @@ module.exports = {
   buildOpeningHoursSpecification,
   badgeChipsHtml,
   venueBadgeChipsHtml,
+  usualHoursNote,
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,
