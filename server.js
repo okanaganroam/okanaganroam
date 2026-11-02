@@ -8155,7 +8155,7 @@ function seasonStateOn(s, today) {
     text = `Reopening for the season ${seasonDateText(s.reopens_date, today)}. Check current hours with the venue before you go.`;
   }
   if (!kind) return null;
-  return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text, until: kind !== 'reopening' && s.status === 'open_until' ? s.until_date : null };
+  return { kind, text, note: s.source_url ? `${text} ${s.source_url}` : text, until: kind !== 'reopening' && s.status === 'open_until' ? s.until_date : null, reopens: s.reopens_date || null };
 }
 
 // Season end (2026-10-19): an "open for the season until" venue whose listed hours have no opening left on or before
@@ -24770,12 +24770,30 @@ const FD_HUB_SUMMARY_CLIENT_SRC = `function fdSummaryText(shown, total, filtered
 const BROWSE_OPEN_NOTE = 'Open Now uses recently verified hours. Hours can change for holidays, seasons or special closures.';
 const FD_OPEN_NOTE = 'Open Now is based on each place\u2019s listed hours. Hours can change for holidays, seasons or special closures \u2014 check with the venue before you go.';
 // A place with a notice gets no live open/closed claim and never any times on its card (2026-11-02, Dayton: never send
-// people to, or have them call, a place that is closed). Only where the notice or the Plan your visit box says visits
-// are by appointment does the card say so; otherwise the line is left out and the page has the details.
+// people to, or have them call, a place that is closed). Its card still says where it stands: closed for the season
+// (with when it reopens), temporarily closed (with when it reopens), or by appointment where the notice or the Plan
+// your visit box says so; otherwise the line is left out and the page has the details.
 function appointmentLineFor(venueId, noticeText) {
   const rows = (venueVisitInfo(venueId) || {}).rows || [];
   const winter = rows.filter((r) => r.label === 'Winter' || r.label === 'Tastings').map((r) => r.text).join(' ');
   return /appointment/i.test(`${noticeText || ''} ${winter}`) ? 'By appointment \u00b7 call ahead' : null;
+}
+function shortReopenDate(iso, today) {
+  if (!iso || !parseLocalDate(iso)) return '';
+  const md = `${SEASON_TAG_MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
+  return iso.slice(0, 4) === today.slice(0, 4) ? md : `${md}, ${iso.slice(0, 4)}`;
+}
+// -> { state, text } | null
+function blockedStatusLine(venueId, noticeText, seasonState, today) {
+  if (seasonState && seasonState.kind === 'closed') {
+    return { state: 'seasonal', text: seasonState.reopens ? `Closed for the season \u00b7 Reopens ${shortReopenDate(seasonState.reopens, today)}` : 'Closed for the season' };
+  }
+  if (seasonState && seasonState.kind === 'temp_closed' && seasonState.current) {
+    const back = shortReopenDate(addLocalDays(seasonState.to, 1), today);
+    return { state: 'seasonal', text: back ? `Temporarily closed \u00b7 Reopens ${back}` : 'Temporarily closed' };
+  }
+  const appt = appointmentLineFor(venueId, noticeText);
+  return appt ? { state: 'appointment', text: appt } : null;
 }
 // opts.requireVerified (default true) gates on recorded hours verification.
 // /food-drink and /browse both pass false: stored hours and the Okanagan clock
@@ -24793,15 +24811,18 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
   // A place the business manages (login, approved claim) confirmed its own hours, winter and seasonal ones included
   // (2026-11-02): a notice on its listing no longer hides its open/closed line.
   const claimed = claimedVenueIds();
+  const seasons = getSeasonStates(now);
+  const todayIso = todayLocal(now);
+  const shut = (id) => { const ss = seasons.get(id); return !!ss && (ss.kind === 'closed' || (ss.kind === 'temp_closed' && ss.current)); };
   for (const v of venues) {
-    const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id) && !claimed.has(v.id);
+    const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id) && !(claimed.has(v.id) && !shut(v.id));
     const e = requireVerified
       ? openNowEligibility(v, provenance.get(v.id), { policy: 'food_drink', now, hasAdvisory })
       // Audit fix (2026-10-27): the notice first. A place with a season or closure notice and no listed hours read
       // 'no_hours', so the map kept its happy hour times and deals ("Closed for the season / Happy hour today from 3 PM").
       : hasAdvisory ? { eligible: false, reason: 'advisory' } : !v.hours ? { eligible: false, reason: 'no_hours' } : { eligible: true, reason: 'ok' };
     if (!e.eligible || !hoursModule) {
-      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null, note: e.reason === 'advisory' ? appointmentLineFor(v.id, advisoryNotes.get(v.id)) : null });
+      byId.set(v.id, { eligible: false, reason: e.reason, state: null, text: null, hours: null, note: e.reason === 'advisory' ? blockedStatusLine(v.id, advisoryNotes.get(v.id), seasons.get(v.id), todayIso) : null });
       continue;
     }
     // Seasonal hours and special closures ride along (2026-10-18), so the cards' and the map's live status apply them too.
@@ -24859,6 +24880,8 @@ function renderFoodDrinkOpenNowStyles() {
   body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"]::before { display: none; }
   /* "By appointment" reads as a status like Open / Closed, not as part of the description (2026-11-02). */
   body.fd-page .venue-card .fd-open-status[data-fd-open="appointment"] { color: #8A5A12; opacity: 1; font-weight: 800; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="seasonal"] { color: #6B5D54; opacity: 1; font-weight: 800; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="seasonal"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="appointment"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
 </style>`;
 }
@@ -25734,7 +25757,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
-      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="appointment">${escapeHtml(st.note)}</p>`);
+      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.note.state}">${escapeHtml(st.note.text)}</p>`);
       if (!st || !st.eligible) return chunk;
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
     });
@@ -36772,7 +36795,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
       const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
-      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="appointment">${escapeHtml(st.note)}</p>`);
+      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.note.state}">${escapeHtml(st.note.text)}</p>`);
       if (!st || !st.eligible) return chunk;
       return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
     });
@@ -57262,6 +57285,7 @@ module.exports = {
   badgeChipsHtml,
   venueBadgeChipsHtml,
   appointmentLineFor,
+  blockedStatusLine,
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,
