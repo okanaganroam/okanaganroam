@@ -243,6 +243,20 @@
   "source_url": "https://storymaps.arcgis.com/stories/8e8ebab8d35841e8a2725323386ba5ba",
   "washrooms": "Washrooms on site"
  },
+ "1226": {
+  "alerts": "Knox Mountain Drive winter closure from Oct 26 until spring 2027",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash, except the designated off-leash area",
+  "extras": [
+   {
+    "label": "Vehicles",
+    "text": "Cars to first lookout 12-8 pm in frost-free season"
+   }
+  ],
+  "parking": "Extra parking at the west base off Poplar Point Drive",
+  "season": "Park open 6 am to 10 pm daily",
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/knox-mountain-park"
+ },
  "1227": {
   "accessibility": "Road paved to the upper lot, then 500 m unpaved to the summit",
   "checked_at": "Nov 2, 2026",
@@ -348,6 +362,22 @@
   ],
   "parking": "Day parking is free but limited; overnight parking by permit only",
   "source_url": "https://www.bigwhite.com/explore/transport/driving-big-white-day-parking-free"
+ },
+ "1234": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Road",
+    "text": "Paved mountain road up to the resort"
+   },
+   {
+    "label": "Drive time",
+    "text": "About 90 minutes from Kelowna airport"
+   }
+  ],
+  "parking": "Main parking lot in the village; turn left at the Y",
+  "season": "Ticket window open 7 days a week during the ski season",
+  "source_url": "https://www.apexresort.com/"
  },
  "1235": {
   "checked_at": "Nov 2, 2026",
@@ -676,6 +706,17 @@
   "parking": "Several lots, incl. Greater Vernon Athletics Park, Kekuli Bay Park, Bailey Rd",
   "source_url": "https://www.tourismvernon.com/trail-data/geojson"
  },
+ "1258": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash",
+  "extras": [
+   {
+    "label": "Wildlife",
+    "text": "Be aware of bears and coyotes"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/mckinley-mountain-park"
+ },
  "1259": {
   "checked_at": "Nov 2, 2026",
   "dogs": "Dogs allowed on leash",
@@ -688,6 +729,30 @@
   "parking": "Lot off McCulloch Road at the KLO Creek switchback",
   "season": "Open daily; hours shift by season (6am to 6pm Oct 15-Feb)",
   "source_url": "https://storymaps.arcgis.com/stories/5a67213a36d04211809b9e57734c79ac"
+ },
+ "1260": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash only",
+  "extras": [
+   {
+    "label": "Steepness",
+    "text": "Some sections are steep enough to raise your heart rate"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/kuipers-peak-mountain-park",
+  "time_needed": "5 to 10 minute hike to the top"
+ },
+ "1261": {
+  "accessibility": "Flat, paved trail; wheelchair and scooter accessible",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "Dogs allowed on leash",
+  "extras": [
+   {
+    "label": "Playground",
+    "text": "Playground overlooks the city"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/ponds-community-park"
  },
  "1262": {
   "checked_at": "Nov 2, 2026",
@@ -876,6 +941,18 @@
   ],
   "parking": "Vernon Curling Club lot, 3500 39th Ave",
   "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1277": {
+  "accessibility": "Reached by bike or foot via the Mission Creek Greenway",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash",
+  "extras": [
+   {
+    "label": "Features",
+    "text": "Pump track and four dirt jump lanes, beginner to expert"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/mission-creek-mountain-bike-skills-park"
  },
  "1278": {
   "checked_at": "Nov 2, 2026",
@@ -1085,6 +1162,18 @@
   "season": "Shop open mid-April through September",
   "source_url": "https://sunnsup.com/"
  },
+ "1296": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Paddleboards from $50 and kayaks from $59 for a half day",
+  "extras": [
+   {
+    "label": "Gear included",
+    "text": "Life jackets and paddles are provided"
+   }
+  ],
+  "season": "Open daily 9 AM to 5 PM, April to October",
+  "source_url": "https://oyamageneral.com/paddleboard-kayak-rentals/"
+ },
  "1297": {
   "checked_at": "Nov 2, 2026",
   "cost": "Single bikes $20 the first hour, then $10 an hour",
@@ -1226,6 +1315,24 @@
   "season": "Open daily May 15 to Sept 7, 2026",
   "source_url": "https://www.locolanding.com/faqs/"
  },
+ "1309": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Campsites $40 a night; double site $60 a night",
+  "dogs": "Pet-friendly",
+  "extras": [
+   {
+    "label": "Swimming",
+    "text": "Swim in the lake; no sandy beach, grass to relax on"
+   },
+   {
+    "label": "Quiet time",
+    "text": "Quiet time is 11 PM"
+   }
+  ],
+  "parking": "One vehicle parking pass per campsite; extra passes from the office",
+  "source_url": "https://postilllake.com/camping/",
+  "washrooms": "Central toilets and showers at the lodge; outhouses at cabins"
+ },
  "1310": {
   "checked_at": "Nov 2, 2026",
   "extras": [
@@ -1314,6 +1421,12 @@
   "season": "Trophy rainbow season is October to April",
   "source_url": "https://okanaganbucktailco.ca/rates/",
   "time_needed": "Half day is 4 hours; full day is 8 hours"
+ },
+ "1321": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "Free public skating",
+  "season": "Daily 6 am to 11 pm once open; season starts early December",
+  "source_url": "https://www.kelowna.ca/parks-recreation/recreation-facilities-fields/recreation-facilities/public-skating-schedules"
  },
  "1329": {
   "checked_at": "Nov 2, 2026",
@@ -1514,6 +1627,27 @@
   "source_url": "https://www.kingfishercentre.org/rules.html",
   "washrooms": "Two outhouses in the upper lot; not maintained in fall"
  },
+ "1342": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs allowed (sensitive habitat)",
+  "extras": [
+   {
+    "label": "Birdwatching",
+    "text": "Valued for bird watching and waterfowl habitat"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/munson-pond-park"
+ },
+ "1343": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs",
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/maude-roxby-wetland"
+ },
+ "1344": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs",
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/rotary-marsh-park"
+ },
  "1346": {
   "accessibility": "Deleenheer Rd access suits limited mobility",
   "checked_at": "Nov 2, 2026",
@@ -1526,6 +1660,29 @@
   ],
   "parking": "Deleenheer Rd and Heron Glen Park (1800 53 Ave)",
   "source_url": "https://www.tourismvernon.com/trail-data/geojson"
+ },
+ "1347": {
+  "accessibility": "Path circles a central pond",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash only",
+  "extras": [
+   {
+    "label": "Wildlife",
+    "text": "Painted turtles; breeding and migratory birds"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/chichester-wetland-park"
+ },
+ "1351": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash",
+  "extras": [
+   {
+    "label": "Playground",
+    "text": "Small playground for kids"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/dilworth-mountain-park"
  },
  "1353": {
   "accessibility": "Level paved roads; one flush toilet is wheelchair accessible",
@@ -2183,6 +2340,34 @@
   "source_url": "https://www.bigwhite.com/events-activities/tours/sleigh-rides-group-or-private",
   "time_needed": "Half-hour or one-hour tours; may vary with snow and trails"
  },
+ "1397": {
+  "accessibility": "Strollers not permitted on the rink",
+  "checked_at": "Nov 2, 2026",
+  "cost": "Skate pass $15 (13+), $7.50 (12 and under); skate rental $15",
+  "extras": [
+   {
+    "label": "Skate Shack",
+    "text": "Skate Shack open Fri and Sat 12 to 8, Sun 12 to 6"
+   },
+   {
+    "label": "Rules",
+    "text": "Helmets recommended; no hockey sticks on the loop"
+   }
+  ],
+  "source_url": "https://apexresort.com/adventure-skating-loop/"
+ },
+ "1398": {
+  "checked_at": "Nov 2, 2026",
+  "cost": "2-hour tube ticket: adult $27, child 7 and under $15; extra hours $5",
+  "extras": [
+   {
+    "label": "Height rule",
+    "text": "Kids under 42 inches ride a shared tube or are held by an adult"
+   }
+  ],
+  "season": "Hours change over the holidays; check Apex hours page",
+  "source_url": "https://apexresort.com/tim-hortons-tube-park/"
+ },
  "1399": {
   "checked_at": "Nov 2, 2026",
   "extras": [
@@ -2322,6 +2507,13 @@
   "parking": "Paid street and lot parking downtown; arrive 30 minutes early",
   "source_url": "https://www.okanaganparasail.com/faqs",
   "time_needed": "About an hour on the water, 10 minutes in the air"
+ },
+ "1434": {
+  "alerts": "Closed for the season since Oct 18; reopens March 17",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs",
+  "season": "Open 9-5 mid-March to Oct 18; 9-8 from Victoria Day to Labour Day",
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/kasugai-gardens"
  },
  "1435": {
   "checked_at": "Nov 2, 2026",
@@ -2535,6 +2727,23 @@
   ],
   "season": "Saturdays 8:30 am to 1 pm, April 18 to October 31",
   "source_url": "https://www.pentictonfarmersmarket.org/"
+ },
+ "1630": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash",
+  "season": "Waterpark open May long weekend to early September",
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/ben-lee-park"
+ },
+ "1631": {
+  "checked_at": "Nov 2, 2026",
+  "dogs": "No dogs",
+  "extras": [
+   {
+    "label": "Gardens",
+    "text": "Lush flower beds and Edwardian gardens"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/guisachan-heritage-park"
  },
  "1632": {
   "checked_at": "Nov 2, 2026",
@@ -3030,6 +3239,35 @@
   ],
   "season": "Open year-round; services mid-April to Nov 15",
   "source_url": "https://bcparks.ca/myra-bellevue-park/"
+ },
+ "1849": {
+  "checked_at": "Nov 2, 2026",
+  "extras": [
+   {
+    "label": "Horses",
+    "text": "One of two designated equestrian trails in Kelowna"
+   }
+  ],
+  "parking": "Park at the end of Quail Crescent (north trailhead)",
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/kelowna-parks-listing/hidden-gems/eagle-view-and-quail-flume-trails"
+ },
+ "1850": {
+  "accessibility": "Rated difficult: steep terrain and stairs",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash only",
+  "extras": [
+   {
+    "label": "Length",
+    "text": "1.5 km total, about 95 m climb"
+   }
+  ],
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/lochview-road-beach-access"
+ },
+ "1851": {
+  "accessibility": "Long staircase on the lower trail",
+  "checked_at": "Nov 2, 2026",
+  "dogs": "On leash",
+  "source_url": "https://www.kelowna.ca/parks-recreation/parks-beaches/parks-beaches-listing/stockley-open-space"
  },
  "1852": {
   "accessibility": "Milled-lumber staircase with handrails up a steep canyon side",
