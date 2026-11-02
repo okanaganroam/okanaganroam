@@ -22792,6 +22792,10 @@ function shopListPagesIndexable() {
   return countShopsHubVenues() >= SHOP_INDEX_MIN;
 }
 
+let GOLF_CARD_PRICES = {};
+try { GOLF_CARD_PRICES = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'golf-card-prices.json'), 'utf8')); } catch (e) { /* cards just show no price */ }
+delete GOLF_CARD_PRICES._note;
+
 // Renders a category's venues as either one flat grid (every category
 // except golf) or two labeled subsections (golf only: Golf Courses, then
 // Indoor Golf & Simulators). `headingPrefix` is the region name for a
@@ -22806,8 +22810,14 @@ function renderCategoryCardsHtml(type, venues, hiddenGemIds, headingPrefix, loca
   const golfDetails = golfOpts.details || new Map();
   const golfFee = (v) => {
     if (!golfData || type !== 'golf') return '';
-    const d = golfDetails.get(`${v.region}/${v.slug}`);
-    return [golfData.golfCardFeeHtml(d, golfOpts.today), golfData.golfCardValueHtml(d, golfOpts.today)].filter(Boolean).join('\n        ');
+    const key = `${v.region}/${v.slug}`;
+    const d = golfDetails.get(key);
+    let feeHtml = golfData.golfCardFeeHtml(d, golfOpts.today);
+    // No verified fee set: start from the lowest adult rate in the course's own Plan your visit box (2026-11-01).
+    if ((!feeHtml || feeHtml.includes('golf-fee-none')) && GOLF_CARD_PRICES[key]) {
+      feeHtml = `<p class="golf-fee"><span class="golf-fee-price">${escapeHtml(GOLF_CARD_PRICES[key])}</span></p>`;
+    }
+    return [feeHtml, golfData.golfCardValueHtml(d, golfOpts.today)].filter(Boolean).join('\n        ');
   };
   // Season-only notices render as a compact tag on list cards (2026-10-11).
   const seasonTags = seasonOnlyStates();
