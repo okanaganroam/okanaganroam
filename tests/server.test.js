@@ -32551,6 +32551,8 @@ test('Card status line for a place with a notice: closed for the season / tempor
   assert.equal(app.blockedStatusLine(-1, 'x', { kind: 'temp_closed', current: false, to: '2026-11-09' }, '2026-11-01'), null, 'a closure that has not started says nothing');
   assert.deepEqual(app.blockedStatusLine(-1, 'Visits are by appointment only.', null, '2026-11-01'), { state: 'appointment', text: 'By appointment \u00b7 call ahead' });
   assert.equal(app.blockedStatusLine(-1, 'Tastings at noon.', null, '2026-11-01'), null);
+  assert.deepEqual(app.blockedStatusLine(-1, 'Temporarily closed. No reopening date is posted.', null, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed' });
+  assert.deepEqual(app.blockedStatusLine(-1, 'Open for the season until October 31. Temporarily closed. The tasting room has no reopening date.', null, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed' }, 'a season sentence before the notice does not hide it');
 });
 
 test('French: card status lines for places with a notice', () => {
