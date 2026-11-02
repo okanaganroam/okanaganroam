@@ -161,6 +161,12 @@
   "from": 10,
   "source": "https://summerlandresorthotel.com/the-resort/tour-the-resort/boat-rentals/"
  },
+ "1299": {
+  "basis": "Single kayak rental (Spirit Ridge / Walnut Beach)",
+  "conf": "site",
+  "from": 20,
+  "source": "https://wakepilot.checkfront.com/reserve/"
+ },
  "13": {
   "basis": "Standard wine tasting fee (waived with purchase)",
   "conf": "site",
@@ -955,6 +961,13 @@
   "from": 15,
   "per": "ticket",
   "source": "https://vdpac.ca/"
+ },
+ "1534": {
+  "basis": "Monday at the Arts non-member admission (regular movies priced per listing)",
+  "conf": "site",
+  "from": 12,
+  "per": "ticket",
+  "source": "https://www.thetowne.ca/prices"
  },
  "1537": {
   "basis": "Adult bowling, per game",
@@ -2105,6 +2118,13 @@
   "from": 20,
   "source": "https://thehatchwines.com/"
  },
+ "717": {
+  "basis": "Flight of 5 wines/ciders, fee waived with $25 purchase",
+  "conf": "site",
+  "from": 10,
+  "per": "tasting",
+  "source": "https://theviewwinery.com/events-2/"
+ },
  "72": {
   "basis": "Precision Tasting (4 wines, 45 min)",
   "conf": "box_only",
@@ -2191,6 +2211,13 @@
   "from": 10,
   "source": "https://volcanichillswinery.com/collections/tasting-fee"
  },
+ "778": {
+  "basis": "Individual tasting (group tasting is $5)",
+  "conf": "site",
+  "from": 10,
+  "per": "tasting",
+  "source": "https://book.squareup.com/appointments/ranehq9nr1cizn/location/1YTWHPWAY7MRK/services"
+ },
  "784": {
   "basis": "5-wine tasting (fees donated to Nature Trust)",
   "conf": "site",
@@ -2264,6 +2291,13 @@
   "from": 10,
   "source": "https://fourshadowsvineyard.com/aboutus/hours/"
  },
+ "832": {
+  "basis": "Tasting reservation (5 wines), per guest",
+  "conf": "site",
+  "from": 20,
+  "per": "tasting",
+  "source": "https://calendly.com/foxtrot-experiences/min"
+ },
  "834": {
   "basis": "Standard tasting fee (waived with purchase)",
   "conf": "site",
@@ -2335,6 +2369,13 @@
   "conf": "site",
   "from": 5,
   "source": "https://www.mocojowines.com/wine-tasting"
+ },
+ "853": {
+  "basis": "Tasting (MODPODS or tasting room), per person",
+  "conf": "site",
+  "from": 15,
+  "per": "tasting",
+  "source": "https://www.modestawinery.ca/book"
  },
  "854": {
   "basis": "Splash & Dash guided tasting of 4 wines, 30 min",
