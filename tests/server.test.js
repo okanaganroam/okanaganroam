@@ -32535,3 +32535,16 @@ test('French guide card (2026-11-01): the Okanagan-to-Whistler road trip descrip
   assert.ok(fr[g.description], 'the guide description has a French line');
   assert.match(fr[g.description], /^De Kelowna à Whistler/);
 });
+
+test('A card for a place with a notice still lists its days and times, never a live open/closed claim', () => {
+  const day = '[["12:00","17:00"]]';
+  assert.equal(app.usualHoursNote(`{"mon":${day},"tue":${day},"wed":${day},"thu":${day},"fri":${day},"sat":${day},"sun":${day}}`), 'Daily 12\u20135 PM \u00b7 check before you go');
+  assert.equal(app.usualHoursNote(`{"mon":null,"tue":null,"wed":null,"thu":${day},"fri":${day},"sat":${day},"sun":null}`), 'Thu\u2013Sat 12\u20135 PM \u00b7 check before you go');
+  assert.equal(app.usualHoursNote(`{"mon":${day},"tue":null,"wed":null,"thu":${day},"fri":${day},"sat":${day},"sun":${day}}`), 'Mon, Thu\u2013Sun 12\u20135 PM \u00b7 check before you go');
+  assert.equal(app.usualHoursNote(`{"sat":${day},"sun":${day}}`), 'Sat, Sun 12\u20135 PM \u00b7 check before you go');
+  assert.equal(app.usualHoursNote('{"mon":[["09:30","17:00"]],"tue":[["10:00","17:00"]]}'), 'Hours vary \u00b7 check before you go');
+  assert.equal(app.usualHoursNote('{"mon":[["10:00","23:00"]]}'), 'Mon 10 AM\u201311 PM \u00b7 check before you go');
+  assert.equal(app.usualHoursNote('{"mon":null,"tue":[]}'), null, 'closed every day: no line');
+  assert.equal(app.usualHoursNote(null), null);
+  assert.equal(app.usualHoursNote('not json'), null);
+});
