@@ -32526,3 +32526,11 @@ test('Venue badges (2026-11-01): icon first, grouped by kind (food, people, sett
   assert.match(html, /Happy Hour/);
   assert.doesNotMatch(app.venueBadgeChipsHtml(v, { skipHappyHour: true }), /Happy Hour/);
 });
+
+test('French guide card (2026-11-01): the Okanagan-to-Whistler road trip description is French on /fr/guides', () => {
+  const fs2 = require('node:fs');
+  const g = JSON.parse(fs2.readFileSync(require('node:path').join(__dirname, '..', 'data', 'guides', 'okanagan-to-whistler-road-trip.json'), 'utf8'));
+  const fr = JSON.parse(fs2.readFileSync(require('node:path').join(__dirname, '..', 'data', 'french', 'guide-desc-okanagan-whistler-2026-11-01.json'), 'utf8'));
+  assert.ok(fr[g.description], 'the guide description has a French line');
+  assert.match(fr[g.description], /^De Kelowna à Whistler/);
+});
