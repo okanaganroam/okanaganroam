@@ -24796,8 +24796,11 @@ function foodDrinkOpenNowInfo(venues, advisoryNotes, now = new Date(), opts = {}
   // A season note that does not say the venue is closed today ("open until",
   // "reopening") is shown on the card but leaves its Open Now status alone.
   const seasonOk = seasonNonBlockingIds(now);
+  // A place the business manages (login, approved claim) confirmed its own hours, winter and seasonal ones included
+  // (2026-11-02): a notice on its listing no longer hides its open/closed line.
+  const claimed = claimedVenueIds();
   for (const v of venues) {
-    const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id);
+    const hasAdvisory = advisoryNotes.has(v.id) && !seasonOk.has(v.id) && !claimed.has(v.id);
     const e = requireVerified
       ? openNowEligibility(v, provenance.get(v.id), { policy: 'food_drink', now, hasAdvisory })
       // Audit fix (2026-10-27): the notice first. A place with a season or closure notice and no listed hours read
