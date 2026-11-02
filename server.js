@@ -18292,8 +18292,9 @@ function cardBadgeExpected(venue, f) {
   if (venue.type === 'outdoor' && venue.free_entry) return CARD_BADGES_EXPECTED.freeOutdoor.includes(f);
   return false;
 }
-function cardBadgeChipsHtml(venue, { skipDogFriendly = false } = {}) {
-  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && !cardBadgeExpected(venue, f))
+// allBadges (Sports hub): every place shows its own top badges, so no card is left without a row.
+function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false } = {}) {
+  return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && (allBadges || !cardBadgeExpected(venue, f)))
     .map((f) => {
       const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
       return `<span class="chip chip-feat">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
@@ -18396,7 +18397,7 @@ function venueCardHtml(venue, opts = {}) {
   // type in one list, so its cards name the category ("Restaurant",
   // "Outdoor Destination") in the meta line. Off by default, so every other
   // surface's card markup is unchanged.
-  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 3, hideDogBadges = false, hideHiddenGemBadge = false, hideLocalFavouriteBadge = false, tourStyle = false } = opts;
+  const { showType = false, showTypeLabel = false, isHiddenGem = false, isLocalFavourite = false, advisoryNote = null, dogFriendlyNote = null, dogNoteInline = false, showRegion = false, themed = usesThemedCategoryLayout(venue.type), actions = themed, golfFeeHtml = '', appLabels = false, savedId = false, cardNotes = null, cardNoteLabel = 'Rainy day:', seasonTag = null, maxChips = 3, hideDogBadges = false, hideHiddenGemBadge = false, hideLocalFavouriteBadge = false, tourStyle = false, allBadges = false } = opts;
   const catSlug = CATEGORY_SLUGS[venue.type];
   const href = (venue.slug && catSlug) ? `/${venue.region}/${catSlug}/${venue.slug}` : null;
   // Golf-only: the name stays the single link to the venue page, but it
@@ -18503,9 +18504,9 @@ function venueCardHtml(venue, opts = {}) {
     ? [tourFacts.price ? `<span class="chip chip-feat">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price)}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
   const chipsHtml = isTourCard
-    ? `<p class="chips">${photoTagChips}${capChips([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges })].filter(Boolean).join(' '), 2, 2)}</p>`
+    ? `<p class="chips">${photoTagChips}${capChips([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' '), 2, 2)}</p>`
     : themed
-    ? `<p class="chips">${photoTagChips}${capChips(editorialChips.slice(photoTagChips.length) + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), maxChips - 1, maxChips - 1)}</p>`
+    ? `<p class="chips">${photoTagChips}${capChips(editorialChips.slice(photoTagChips.length) + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges }), maxChips - 1, maxChips - 1)}</p>`
     : `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), 0)}</p>`;
   // Themed listing cards (2026-10-12) always have the same eight parts in the
   // same order -- name, meta, fee slot, description slot, notice slot, notes
@@ -26790,7 +26791,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   };
   const payload = {};
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
-  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { photoKeyFor });
+  const cardsHtml = foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, true, foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId, { photoKeyFor, cardOpts: { allBadges: true } });
   const selected = new Set(f.types);
   const chips = `<div class="fd-type-row" role="group" aria-label="Choose an activity" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${SPORT_ACTIVITIES.map((a) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${a.slug}" aria-pressed="${selected.has(a.slug) ? 'true' : 'false'}">${escapeHtml(a.label)} <span class="outdoor-activity-count">${counts.types[a.slug] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;

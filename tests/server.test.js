@@ -19896,6 +19896,14 @@ test('Description rewrites: every entry is complete, rating-free and guarded by 
 });
 
 // ---------- Sports & Recreation hub (2026-10-14) ----------
+test('Sports hub: a free park keeps its own badges on the card (top two + N), other pages still leave the expected ones off', () => {
+  const park = { id: 9101, name: 'Fixture Bike Park', region: 'vernon', type: 'outdoor', slug: 'fixture-bike-park', description: 'A bike park.', free_entry: 1, kid_friendly: 1, dog_friendly: 1 };
+  const hub = app.renderSportsHubPage([], [park], new Map(), { types: [], features: [], regions: [] });
+  assert.match(hub, /Dogs welcome<\/span> <span class="chip chip-feat">[^]*?Kids welcome<\/span> <span class="chip chip chip-more|Dogs welcome[^]*Kids welcome[^]*\+1/, 'dogs, kids and +1 (Free)');
+  assert.doesNotMatch(app.cardBadgeChipsHtml(park), /Kids welcome|Free/);
+  assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Kids welcome[^]*Free/);
+});
+
 test('Sports hub: one list, activity chips, Biggest first from the stated size, a Play line and activity photo on every card', () => {
   assert.ok(app.sportScaleScore({ name: 'A', description: '' }, 'MTB network: 107 trails, 150+ km singletrack') > app.sportScaleScore({ name: 'B', description: 'A small skate park.' }, 'Skate park'));
   assert.ok(app.sportScaleScore({ name: 'Resort', description: 'A short 30-minute drive, 33 km from town, with 80 runs.' }, '9-hole disc golf course') < app.sportScaleScore({ name: 'X', description: '' }, 'Freeride MTB network: 65 trails, 68+ km'), 'a drive or ski runs are not trail');
