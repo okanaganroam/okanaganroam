@@ -1091,6 +1091,7 @@ const FR_PATTERNS = [
   }],
   // Card status lines for places with a notice (2026-11-02).
   [/^By appointment \u00b7 call ahead$/, () => 'Sur rendez-vous \u00b7 appelez avant'],
+  [/^Hours not confirmed \u00b7 call ahead$/, () => 'Heures non confirm\u00e9es \u00b7 appelez avant'],
   [/^Closed for the season$/, () => 'Ferm\u00e9 pour la saison'],
   [/^(Closed for the season|Temporarily closed) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?$/, (m) => `${m[1] === 'Temporarily closed' ? 'Ferm\u00e9 temporairement' : 'Ferm\u00e9 pour la saison'} \u00b7 R\u00e9ouverture le ${m[3] === '1' ? '1er' : m[3]} ${MONTHS[m[2]]}${m[4] ? ` ${m[4]}` : ''}`],
   [/^Temporarily closed$/, () => 'Ferm\u00e9 temporairement'],

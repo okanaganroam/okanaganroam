@@ -11252,7 +11252,7 @@ test('Open Now on /browse follows stored hours + the Okanagan clock with no prov
     const html = app.renderBrowseHubPage(venues, app.parseBrowseHubQuery({}, app.browseCuisines(venues)), now);
     const card = (id) => (html.match(new RegExp(`<li class="venue-card"[^>]*data-venue-id="${id}"[\\s\\S]*?</li>`)) || [''])[0];
     for (const id of [A, B, C]) assert.match(card(id), /<p class="fd-open-status" data-fd-open="open">/, `card ${id} shows Open now`);
-    assert.ok(!card(D).includes('fd-open-status'), 'no hours: no status line');
+    assert.match(card(D), /<p class="fd-open-status" data-fd-open="(?:unknown|appointment)">/, 'no hours: an honest status line, never a blank (and never Open now)');
     const data = JSON.parse(html.match(/<script type="application\/json" id="[^"]*">([\s\S]*?)<\/script>/)[1]);
     assert.ok(data[String(A)].h && !data[String(D)].h);
     const onHtml = app.renderBrowseHubPage(venues, { ...app.parseBrowseHubQuery({}, app.browseCuisines(venues)), openNow: true }, now);
@@ -32553,6 +32553,13 @@ test('Card status line for a place with a notice: closed for the season / tempor
   assert.equal(app.blockedStatusLine(-1, 'Tastings at noon.', null, '2026-11-01'), null);
   assert.deepEqual(app.blockedStatusLine(-1, 'Temporarily closed. No reopening date is posted.', null, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed' });
   assert.deepEqual(app.blockedStatusLine(-1, 'Open for the season until October 31. Temporarily closed. The tasting room has no reopening date.', null, '2026-11-01'), { state: 'seasonal', text: 'Temporarily closed' }, 'a season sentence before the notice does not hide it');
+});
+
+test('Every card has a status line: live, notice, by appointment from the place\'s own words, or hours not confirmed', () => {
+  assert.deepEqual(app.cardStatusFor({ eligible: true, state: 'open', text: 'Open \u00b7 Closes 5 PM' }, { id: -1 }), { state: 'open', text: 'Open \u00b7 Closes 5 PM' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: { state: 'seasonal', text: 'Closed for the season' } }, { id: -1 }), { state: 'seasonal', text: 'Closed for the season' });
+  assert.deepEqual(app.cardStatusFor(undefined, { id: -1, description: 'A small, appointment-style winery.' }), { state: 'appointment', text: 'By appointment \u00b7 call ahead' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, description: 'Pinot Noir and Chardonnay.' }), { state: 'unknown', text: 'Hours not confirmed \u00b7 call ahead' });
 });
 
 test('French: card status lines for places with a notice', () => {

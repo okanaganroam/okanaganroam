@@ -24797,6 +24797,19 @@ function blockedStatusLine(venueId, noticeText, seasonState, today) {
   const appt = appointmentLineFor(venueId, noticeText);
   return appt ? { state: 'appointment', text: appt } : null;
 }
+// Every card says where the place stands (2026-11-02, Dayton: that space cannot be empty). Live open/closed when the
+// hours are trusted, the notice line when blocked, "By appointment" when the place's own words say so, and otherwise an
+// honest "Hours not confirmed" line rather than a blank.
+function cardStatusFor(st, v) {
+  if (st && st.eligible && st.text) return { state: st.state, text: st.text };
+  if (st && st.note) return st.note;
+  const rows = ((v && venueVisitInfo(v.id)) || {}).rows || [];
+  const own = `${(v && v.description) || ''} ${rows.map((r) => r.text).join(' ')}`;
+  if (/by appointment|appointment[- ](?:only|style|based)|by reservation|reservations? (?:only|required)|booking (?:is )?required|tastings? (?:are )?(?:available )?by (?:reservation|booking)/i.test(own)) {
+    return { state: 'appointment', text: 'By appointment \u00b7 call ahead' };
+  }
+  return { state: 'unknown', text: 'Hours not confirmed \u00b7 call ahead' };
+}
 // opts.requireVerified (default true) gates on recorded hours verification.
 // /food-drink and /browse both pass false: stored hours and the Okanagan clock
 // decide, so only a venue with no hours, or with a temporary-closure advisory,
@@ -24878,7 +24891,7 @@ function renderFoodDrinkOpenNowStyles() {
   body.fd-page .venue-card .fd-open-status[data-fd-open="open"] { color: var(--teal, #2A6B67); font-weight: 800; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="closed"] { opacity: 0.78; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="closed"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
-  body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"] { opacity: 0.6; }
+  body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"] { color: #6B5D54; opacity: 1; font-weight: 700; }
   body.fd-page .venue-card .fd-open-status[data-fd-open="unknown"]::before { display: none; }
   /* "By appointment" reads as a status like Open / Closed, not as part of the description (2026-11-02). */
   body.fd-page .venue-card .fd-open-status[data-fd-open="appointment"] { color: #8A5A12; opacity: 1; font-weight: 800; }
@@ -25758,10 +25771,9 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
   // Open Now (hub only): one status line directly under each card's meta line.
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
-      const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
-      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.note.state}">${escapeHtml(st.note.text)}</p>`);
-      if (!st || !st.eligible) return chunk;
-      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
+      const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
+      const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
+      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
   }
   // extra.cardExtraHtml (2026-10-26): Map of venue id -> ready-made HTML at the top of the card's fee slot, right under
@@ -36796,10 +36808,9 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     .map((x) => ('<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, '')).replace(/\n\s+/g, '\n').split(APP_FAV_HEART_OUTLINE).join(FD_HEART_USE));
   if (openStatusById) {
     cardChunks = cardChunks.map((chunk) => {
-      const st = openStatusById.get(Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]));
-      if (st && !st.eligible && st.note) return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.note.state}">${escapeHtml(st.note.text)}</p>`);
-      if (!st || !st.eligible) return chunk;
-      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${st.state}">${escapeHtml(st.text)}</p>`);
+      const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
+      const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
+      return chunk.replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
     });
   }
   const firstBatch = [], deferred = [];
@@ -57288,6 +57299,7 @@ module.exports = {
   venueBadgeChipsHtml,
   appointmentLineFor,
   blockedStatusLine,
+  cardStatusFor,
   capChips,
   breadcrumbNavHtml,
   venueCardHtml,
