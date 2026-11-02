@@ -18294,7 +18294,9 @@ function cardBadgeExpected(venue, f) {
 }
 // allBadges (Sports hub): every place shows its own top badges, so no card is left without a row.
 function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false } = {}) {
+  // Free goes first (Dayton, 2026-11-02: "people want to know the prices of stuff first").
   return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && (allBadges || !cardBadgeExpected(venue, f)))
+    .sort((a, b) => (b === 'free_entry') - (a === 'free_entry'))
     .map((f) => {
       const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
       return `<span class="chip chip-feat">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
