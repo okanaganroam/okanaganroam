@@ -18,6 +18,13 @@
   "per": "round",
   "source": "https://coldstreamgolfcourse.com/services-and-fees/"
  },
+ "1114": {
+  "basis": "18-hole 'Beat The Heat Twilight' green fee (4 PM-close), cart extra",
+  "conf": "site",
+  "from": 55,
+  "per": "round",
+  "source": "https://fairviewmountain.com/rates"
+ },
  "1115": {
   "basis": "Twilight after 4PM green fee",
   "conf": "site",
@@ -31,6 +38,68 @@
   "from": 25,
   "per": "round",
   "source": "https://spallumcheengolf.com/rates/"
+ },
+ "1123": {
+  "basis": "Sim Play/Practice = 1 Golf Evolution credit ($30); 2 credits $60",
+  "conf": "site",
+  "from": 30,
+  "source": "https://golfevolutionkelowna.ca/book/membership"
+ },
+ "1124": {
+  "basis": "Trackman Golf Studio Mon-Thu, 1-4 people",
+  "conf": "site",
+  "from": 36.75,
+  "per": "hour",
+  "source": "https://simplexsports.com/book/"
+ },
+ "1125": {
+  "basis": "Sim bay time from the 5-hour pack ($225)",
+  "conf": "site",
+  "from": 45,
+  "per": "hour",
+  "source": "https://anytimesim.golf/gift-cards"
+ },
+ "1126": {
+  "basis": "Sim bay Mon-Fri before 5:30 PM, by the bay (1-8 people)",
+  "conf": "site",
+  "from": 45,
+  "per": "hour",
+  "source": "https://ovgkelowna.com/rates"
+ },
+ "1127": {
+  "basis": "1 Hour Simulator Session",
+  "conf": "site",
+  "from": 55,
+  "per": "hour",
+  "source": "https://jsquaredgolf.com/sim-booking/"
+ },
+ "1128": {
+  "basis": "Sim bay hourly rates $40-$80",
+  "conf": "site",
+  "from": 40,
+  "per": "hour",
+  "source": "https://golfthefringe.com/"
+ },
+ "1129": {
+  "basis": "Golf sim bay, nighttime rate 11 PM-6 AM (up to 4 golfers); daytime 6 AM-3 PM $50/hr",
+  "conf": "site",
+  "from": 35,
+  "per": "hour",
+  "source": "https://www.golfbox.ca/simulator-bays/rates-info"
+ },
+ "1130": {
+  "basis": "Callaway SIM Lounge simulator rental, up to 4 players",
+  "conf": "site",
+  "from": 60,
+  "per": "hour",
+  "source": "https://www.predatorridge.com/activities/golf-simulators/"
+ },
+ "1131": {
+  "basis": "Tee time on a sim bay, 'starting at C$70/hour'",
+  "conf": "site",
+  "from": 70,
+  "per": "hour",
+  "source": "https://backninegolf.ca/local/vernonbc/"
  },
  "1233": {
   "basis": "Day Nordic trail pass (cheapest item sold)",
@@ -331,7 +400,7 @@
  "1325": {
   "basis": "Adult 19+/Senior drop-in skating (Sunbelt Arena)",
   "conf": "site",
-  "from": 2.0,
+  "from": 2,
   "source": "https://asprd.com/drop-in-programs/"
  },
  "1328": {
@@ -781,6 +850,13 @@
   "from": 19,
   "source": "https://www.beyondthecrux.info/"
  },
+ "1462": {
+  "basis": "Bowling lane per hour, incl. shoes & taxes, up to 6 people",
+  "conf": "site",
+  "from": 45,
+  "per": "hour",
+  "source": "https://www.mccurdybowl.com/bowling"
+ },
  "1463": {
   "basis": "Laser tag, 1 game (12 min)",
   "conf": "box_only",
@@ -816,6 +892,32 @@
   "conf": "box_only",
   "from": 5,
   "source": "https://www.kelownamuseums.ca/museum/okanagan-military-museum/"
+ },
+ "1471": {
+  "basis": "General admission, Ken's Kings Night (Black Box, Nov 27 2026), incl. fees & GST",
+  "conf": "site",
+  "from": 30,
+  "per": "ticket",
+  "source": "https://theatre.kelowna.ca/upcoming-events/kens-kings-night-2nd-anniversary-showcase"
+ },
+ "1473": {
+  "basis": "Comedy Cabaret show ticket ($50 a show); mainstage musicals from $60",
+  "conf": "site",
+  "from": 50,
+  "per": "ticket",
+  "source": "https://kelownaactorsstudio.com/event/comedy-cabaret-derek-seguin"
+ },
+ "1474": {
+  "basis": "Reel Deal Tuesday ticket (EXTRAS Insider, free sign-up)",
+  "conf": "site",
+  "from": 8.75,
+  "source": "https://www.landmarkcinemas.com/showtimes/kelowna-grand-10"
+ },
+ "1476": {
+  "basis": "Reel Deal Tuesday ticket (EXTRAS Insider, free sign-up)",
+  "conf": "site",
+  "from": 8.75,
+  "source": "https://www.landmarkcinemas.com/showtimes/west-kelowna-xtreme"
  },
  "1477": {
   "basis": "Day pass per child (up to 3 hours)",
@@ -924,6 +1026,19 @@
   "from": 8,
   "source": "https://www.penticton.ca/sites/default/files/docs/parks-and-recreation/aquatics/Rec%20guide%20fees%20for%20website%20(2).pdf"
  },
+ "1506": {
+  "basis": "Reel Deal Tuesday ticket (EXTRAS Insider, free sign-up)",
+  "conf": "site",
+  "from": 8.5,
+  "source": "https://www.landmarkcinemas.com/showtimes/penticton"
+ },
+ "1507": {
+  "basis": "The Comic Strippers, Nov 7 2026 (19+), $49 + fees",
+  "conf": "listing",
+  "from": 49,
+  "per": "ticket",
+  "source": "https://www.songkick.com/concerts/43326743-comic-strippers-at-cleland-community-theatre"
+ },
  "1508": {
   "basis": "Adult bowling, one game (plus tax)",
   "conf": "site",
@@ -937,6 +1052,13 @@
   "from": 25,
   "per": "ticket",
   "source": "https://tempest.ca/unfiltered-2026/"
+ },
+ "1512": {
+  "basis": "Adult ticket, 'Every Christmas Story Ever Told' (Nov 13-Dec 6 2026)",
+  "conf": "site",
+  "from": 35,
+  "per": "ticket",
+  "source": "https://app.ticketowl.io/o/ZTGr5it7a40Fzrmy/event/as-FAiT_L4XQ1RNx"
  },
  "1514": {
   "basis": "Standard admission",
@@ -996,6 +1118,13 @@
   "per": "ticket",
   "source": "https://vdpac.ca/"
  },
+ "1533": {
+  "basis": "Adult single ticket, 'A 1940s Radio Christmas Carol' (Nov 19-29 2026), incl. fees",
+  "conf": "site",
+  "from": 41.25,
+  "per": "ticket",
+  "source": "https://purchase.ticketseller.ca/EventAvailability?EventId=64201&scroll=timeAndDates"
+ },
  "1534": {
   "basis": "Monday at the Arts non-member admission (regular movies priced per listing)",
   "conf": "site",
@@ -1008,6 +1137,13 @@
   "conf": "site",
   "from": 7,
   "source": "https://www.lincolnlanes.ca/?page_id=151"
+ },
+ "1538": {
+  "basis": "Show ticket (Nov 5/14/28, Dec 12 2026 shows all $45)",
+  "conf": "site",
+  "from": 45,
+  "per": "ticket",
+  "source": "https://www.vernonjazz.com/jazz-shows/wild-blue-herons-november-14-2026/"
  },
  "1540": {
   "basis": "General admission",
@@ -1062,6 +1198,13 @@
   "per": "session",
   "source": "https://www.peachland.ca/pickleball"
  },
+ "1560": {
+  "basis": "Curling ice rental per sheet per hour, GST extra",
+  "conf": "site",
+  "from": 45,
+  "per": "hour",
+  "source": "https://odedi201913.mywhc.ca/~osoyoosc/images/files/Rental_Agreement.pdf"
+ },
  "1561": {
   "basis": "1 headset by the hour (shared by 2)",
   "conf": "site",
@@ -1106,6 +1249,13 @@
   "conf": "site",
   "from": 12.5,
   "source": "https://ethosparkour.com/pricing"
+ },
+ "1571": {
+  "basis": "Curling ice rental per sheet per hour (2-hr minimum)",
+  "conf": "site",
+  "from": 90,
+  "per": "hour",
+  "source": "https://olivercurlingclub.org/images/2026-2027/Forms/OCC_Facility_Rental_Form_-_October_26_Rev_13.pdf"
  },
  "1572": {
   "basis": "\"Basically Bees\" drop-in talk (20-30 min), ages 3+",

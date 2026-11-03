@@ -1,0 +1,53 @@
+{
+  "note": "Casinos: free admission (19+ for gaming). Free chip on cards.",
+  "venues": [
+    {
+      "id": 1548,
+      "name": "Chances Casino Kelowna",
+      "region": "kelowna",
+      "slug": "chances-casino-kelowna",
+      "expect": {
+        "free_entry": false
+      },
+      "set": {
+        "free_entry": true
+      }
+    },
+    {
+      "id": 1555,
+      "name": "Playtime Casino Kelowna",
+      "region": "kelowna",
+      "slug": "playtime-casino-kelowna",
+      "expect": {
+        "free_entry": false
+      },
+      "set": {
+        "free_entry": true
+      }
+    },
+    {
+      "id": 1558,
+      "name": "Cascades Casino Penticton",
+      "region": "penticton",
+      "slug": "cascades-casino-penticton",
+      "expect": {
+        "free_entry": false
+      },
+      "set": {
+        "free_entry": true
+      }
+    },
+    {
+      "id": 1575,
+      "name": "Lake City Casino Vernon",
+      "region": "vernon",
+      "slug": "lake-city-casino-vernon",
+      "expect": {
+        "free_entry": false
+      },
+      "set": {
+        "free_entry": true
+      }
+    }
+  ]
+}
