@@ -157,6 +157,13 @@
   "per": "person",
   "source": "https://www.desert.org/visit-us"
  },
+ "1240": {
+  "basis": "adult 19-64 My1 full-day alpine lift ticket, online, 2026-27",
+  "conf": "site",
+  "from": 104,
+  "per": "day",
+  "source": "https://shop.skisilverstar.com/l/lift-tickets/alpine-lift-tickets/c/my1-alpine-day-tickets"
+ },
  "1241": {
   "basis": "Adult snowshoe day pass (adult ski day pass $22)",
   "conf": "site",
@@ -237,6 +244,13 @@
   "from": 75,
   "per": "day",
   "source": "https://www.sunnsup.com/rentals/"
+ },
+ "1295": {
+  "basis": "1-hour SUP rental",
+  "conf": "listing",
+  "from": 41.3,
+  "per": "hour",
+  "source": "https://app.advcollective.com/local-experts/water-activities-kalavida-surf-shop-stand-up-paddleboard"
  },
  "1296": {
   "basis": "Paddleboard rental, half day (3 hours)",
@@ -343,6 +357,13 @@
   "conf": "site",
   "from": 15,
   "source": "https://www.beaverlakeresort.com/activities/"
+ },
+ "1313": {
+  "basis": "canoe / single kayak / paddle board / pedal boat rental, 4-hour, 'Starting from CA $55.00'",
+  "conf": "site",
+  "from": 55,
+  "per": "session",
+  "source": "https://oyamalake.com/rentals/"
  },
  "1314": {
   "basis": "Tent/camper campsite Mon-Thu (2 people)",
@@ -610,6 +631,13 @@
   "per": "night",
   "source": "https://okanaganglamping.com/en/tent-1-okanagan-glamping-co"
  },
+ "1381": {
+  "basis": "tent dry-camping site 'Starting at $24.00/night' on own Campspot booking page",
+  "conf": "site",
+  "from": 24,
+  "per": "night",
+  "source": "https://www.campspot.com/park/gold-panner-campground-cherryville-bc"
+ },
  "1382": {
   "basis": "RV/campsite, off-season nightly rate",
   "conf": "site",
@@ -624,12 +652,40 @@
   "per": "night",
   "source": "https://islandviewrvresort.com/rates/"
  },
+ "1384": {
+  "basis": "adult 2-hour tubing ticket, online, 2026-27",
+  "conf": "site",
+  "from": 22,
+  "per": "session",
+  "source": "https://shop.skisilverstar.com/l/lift-tickets/tube-town/c/tubing-only-2-hours"
+ },
  "1385": {
   "basis": "Skating ticket (online price)",
   "conf": "site",
   "from": 9.2,
   "per": "person",
   "source": "https://www.skisilverstar.com/events-activities/winter-activities/ice-skating"
+ },
+ "1386": {
+  "basis": "adult 19-64 Nordic day ticket, online, 2026-27",
+  "conf": "site",
+  "from": 28,
+  "per": "day",
+  "source": "https://shop.skisilverstar.com/l/lift-tickets/trail-tickets/c/cross-country-ticket"
+ },
+ "1387": {
+  "basis": "snowshoe day ticket (all ages), online, 2026-27",
+  "conf": "site",
+  "from": 15,
+  "per": "day",
+  "source": "https://shop.skisilverstar.com/l/lift-tickets/trail-tickets/c/snowshoe"
+ },
+ "1388": {
+  "basis": "Snowshoe & Fat Biking day ticket, online, 2026-27",
+  "conf": "site",
+  "from": 15,
+  "per": "day",
+  "source": "https://shop.skisilverstar.com/l/lift-tickets/trail-tickets/c/snowshoe"
  },
  "1389": {
   "basis": "Snowshoe multi-course raclette dinner tour",
@@ -798,6 +854,20 @@
   "from": 55,
   "per": "day",
   "source": "https://hoodooadventures.ca/rentals"
+ },
+ "1445": {
+  "basis": "Stand Up Paddleboard or single kayak, 1 hr - $30 (Skaha Marina)",
+  "conf": "site",
+  "from": 30,
+  "per": "hour",
+  "source": "https://skaha.pentictonboatrentals.com/details/9"
+ },
+ "1446": {
+  "basis": "2-hour private sailing cruise, per adult (reseller)",
+  "conf": "listing",
+  "from": 165,
+  "per": "person",
+  "source": "https://www.travelocity.com/things-to-do/private-kelowna-sailing-cruise-on-okanagan-lake.a1385545.activity-details"
  },
  "1447": {
   "basis": "Private boat tour, 1 hour (priced for 6 people)",
@@ -1685,6 +1755,13 @@
   "from": 29,
   "per": "30 min",
   "source": "https://tikiwaterbikes.ca/rentals-and-pricing"
+ },
+ "1692": {
+  "basis": "Adult General Admission (18+) CA$20.00",
+  "conf": "listing",
+  "from": 20,
+  "per": "ticket",
+  "source": "https://visitpenticton.com/listing/penticton-speedwaytop-gear-racing-centre/"
  },
  "1697": {
   "basis": "Beginner painting class, one 2-hour session",
