@@ -33277,7 +33277,7 @@ ${VENUE_MENU_CSS}` : ''}
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
-    <h2>${venue.type === 'outdoor' || venue.type === 'sport' ? L('The basics', 'L\u2019essentiel') : L('Good to Know', 'Bon \u00e0 savoir')}</h2>
+    <h2>${venue.type === 'outdoor' || venue.type === 'sport' || venue.type === 'indoor' ? L('The basics', 'L\u2019essentiel') : L('Good to Know', 'Bon \u00e0 savoir')}</h2>
     ${detailRows}
   </div>` : ''}
   ${locationHtml}
