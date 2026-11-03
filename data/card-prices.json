@@ -1219,6 +1219,12 @@
   "from": 18.99,
   "source": "https://funspacekids.com/"
  },
+ "1552": {
+  "basis": "Concert tickets change show to show (GA typically $20-$49)",
+  "conf": "listing",
+  "label": "Ticket prices vary",
+  "source": "https://www.vividseats.com/revelry-food-and-music-hub-tickets/venue/35511"
+ },
  "1553": {
   "basis": "Single entry adult (19-64) drop-in",
   "conf": "site",
