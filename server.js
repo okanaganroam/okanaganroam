@@ -16346,6 +16346,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge) { flex: 0 1 auto; min-width: 0 !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0; background: none !important; box-shadow: none !important; color: #4F5A62 !important; font-size: 0.8rem !important; font-weight: 700; letter-spacing: 0; text-align: left !important; }
   ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge) svg { margin-right: 4px; color: var(--teal, #2A6B67); }
   ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge, .chip-more) ~ .chip:not(.hidden-gem-badge, .local-favourite-badge, .chip-more)::before { content: "·"; margin: 0 7px; color: #9AA3A9; font-weight: 800; }
+  ${CARD_V2_CARD} > .chips > .chip:first-of-type:not(.hidden-gem-badge, .local-favourite-badge) { flex-shrink: 0; }
   ${CARD_V2_CARD} > .chips > .chip.chip-more { flex: 0 0 auto; margin-left: 8px !important; padding: 2px 7px !important; border-radius: 999px; background: rgba(31, 42, 48, 0.07) !important; color: #4F5A62 !important; font-size: 0.72rem !important; }
   ${CARD_V2_CARD} > .chips > :is(.hidden-gem-badge, .local-favourite-badge):first-child { position: absolute; top: 10px; left: 10px; z-index: 2; margin: 0; background: var(--teal, #2A6B67) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 1px 4px rgba(0,0,0,0.25); white-space: nowrap; }
   ${CARD_V2_CARD} > .chips > :is(.hidden-gem-badge, .local-favourite-badge):first-child + :is(.hidden-gem-badge, .local-favourite-badge) { position: absolute; top: 44px; left: 10px; z-index: 2; margin: 0; background: var(--teal, #2A6B67) !important; color: #fff !important; border-color: transparent !important; }
@@ -18296,8 +18297,8 @@ function capChips(html, max, keep = max - 1) {
 // amenity badges are one quiet line of short labels, each led by a line icon ("Vegan · Patio +4"); CARD_V2_CSS
 // keeps it to one line. The venue page keeps the full names (badgeChipsHtml).
 const CARD_BADGE_SHORT = {
-  dog_friendly: ['paw', 'Dogs welcome'], vegan: ['leaf', 'Vegan'], vegetarian: ['sprout', 'Vegetarian'], patio: ['sun', 'Patio'],
-  kid_friendly: ['child', 'Kids welcome'], gluten_free: ['wheat', 'Gluten-free'], lake_view: ['waves', 'Lake view'],
+  dog_friendly: ['paw', 'Dogs OK'], vegan: ['leaf', 'Vegan'], vegetarian: ['sprout', 'Vegetarian'], patio: ['sun', 'Patio'],
+  kid_friendly: ['child', 'Kids OK'], gluten_free: ['wheat', 'Gluten-free'], lake_view: ['waves', 'Lake view'],
   nonalcoholic: ['juice', 'Non-alcoholic'], sports_tv: ['tv', 'Sports TV'], live_music: ['music', 'Live music'],
   great_groups: ['group', 'Groups'], happy_hour: ['cocktail', 'Happy hour'], free_entry: ['ticket', 'Free'],
   arts_culture: ['palette', 'Arts & culture'], open_early: ['sunrise', 'Open early'], open_late: ['moon', 'Open late'],
@@ -18528,7 +18529,7 @@ function venueCardHtml(venue, opts = {}) {
   const chipsHtml = isTourCard
     ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' ')), 2, 2)}</p>`
     : themed
-    ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst(editorialChips.slice(photoTagChips.length) + ' ' + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })), maxChips - 1, maxChips - 1)}</p>`
+    ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst(editorialChips.slice(photoTagChips.length) + ' ' + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })), maxChips - 1, maxChips - 1).replace(/( \/ person)(<\/span>)/g, '$2')}</p>`
     : `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), 0)}</p>`;
   // Themed listing cards (2026-10-12) always have the same eight parts in the
   // same order -- name, meta, fee slot, description slot, notice slot, notes
@@ -24858,7 +24859,10 @@ function cardStatusFor(st, v) {
   if (st && st.eligible && st.text) return { state: st.state, text: st.text };
   if (st && st.note) return st.note;
   if (v && BOOKING_ONLY_IDS.has(v.id)) return { state: 'appointment', text: 'Book ahead \u00b7 tours by reservation' };
-  if (isPublicAccessPlace(v)) return { state: 'public', text: 'Open to the public \u00b7 no set hours' };
+  if (isPublicAccessPlace(v)) {
+    const f = v && v.type === 'outdoor' ? OUTDOOR_FACTS[String(v.id)] : null;
+    return { state: 'public', text: f && /^open year-round/i.test(f.season || '') ? 'Open year-round' : 'Open to the public' };
+  }
   const rows = ((v && venueVisitInfo(v.id)) || {}).rows || [];
   const own = `${(v && v.description) || ''} ${rows.map((r) => r.text).join(' ')}`;
   if (/by appointment|appointment[- ](?:only|style|based)|by reservation|reservations? (?:only|required)|booking (?:is )?required|tastings? (?:are )?(?:available )?by (?:reservation|booking)/i.test(own)) {

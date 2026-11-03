@@ -10002,7 +10002,7 @@ test('Cards: a venue on the dog-beach list shows only the 🐾 Dog Friendly badg
   assert.match(both, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?Patio<\/span>/, 'other badges unchanged (a beach card leaves off Lake view since 2026-10-29)');
   assert.doesNotMatch(both, /Dogs welcome/, 'no duplicate short amenity chip either');
   const plain = app.venueCardHtml(v, {});
-  assert.match(plain, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?(?:Dog-Friendly|Dogs welcome)<\/span>/, 'without the collection badge the amenity chip still shows');
+  assert.match(plain, /<span class="chip(?: chip-feat)?">(?:<svg[^>]*>.*?<\/svg>)?(?:Dog-Friendly|Dogs OK)<\/span>/, 'without the collection badge the amenity chip still shows');
   assert.equal(app.badgeChipsHtml(v), app.badgeChipsHtml(v, {}), 'default output unchanged');
 });
 
@@ -19906,10 +19906,10 @@ test('Cards: Free is the first badge, ahead of the Dog Friendly collection badge
 test('Sports hub: a free park keeps its own badges on the card (top two + N), other pages still leave the expected ones off', () => {
   const park = { id: 9101, name: 'Fixture Bike Park', region: 'vernon', type: 'outdoor', slug: 'fixture-bike-park', description: 'A bike park.', free_entry: 1, kid_friendly: 1, dog_friendly: 1 };
   const hub = app.renderSportsHubPage([], [park], new Map(), { types: [], features: [], regions: [] });
-  assert.match(hub, /Dogs welcome<\/span> <span class="chip chip-feat">[^]*?Kids welcome<\/span> <span class="chip chip chip-more|Dogs welcome[^]*Kids welcome[^]*\+1/, 'dogs, kids and +1 (Free)');
+  assert.match(hub, /Dogs OK<\/span> <span class="chip chip-feat">[^]*?Kids OK<\/span> <span class="chip chip chip-more|Dogs OK[^]*Kids OK[^]*\+1/, 'dogs, kids and +1 (Free)');
   assert.match(hub, /body\.sports-hub-page\.golf-page \.card-grid > li\.venue-card[^{]*> \.chips:not\(:empty\) \{ display: flex !important; \}/, 'badge row shown on trail and park cards too');
-  assert.doesNotMatch(app.cardBadgeChipsHtml(park), /Kids welcome|Free/);
-  assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Free[^]*Dogs welcome[^]*Kids welcome/, 'Free is the first badge');
+  assert.doesNotMatch(app.cardBadgeChipsHtml(park), /Kids OK|Free/);
+  assert.match(app.cardBadgeChipsHtml(park, { allBadges: true }), /Free[^]*Dogs OK[^]*Kids OK/, 'Free is the first badge');
 });
 
 test('Sports hub: Covered / Indoor is read from the place and shows as a filter and a card badge', () => {
@@ -19917,7 +19917,7 @@ test('Sports hub: Covered / Indoor is read from the place and shows as a filter 
   const html = app.renderSportsHubPage(arenas, [], new Map(), { types: [], features: [], regions: [] });
   assert.match(html, /data-fd-feature="covered"/, 'filter offered');
   assert.doesNotMatch(html, /data-fd-feature="lit"/, 'no filter for an attribute nobody has');
-  assert.match(html, /Covered<\/span>|Kids welcome[^]*Covered/, 'badge on the card');
+  assert.match(html, /Covered<\/span>|Kids OK[^]*Covered/, 'badge on the card');
   assert.equal(app.sportVenueWithAttrs({ id: 1, name: 'Fixture Skate Park', type: 'sport' }).covered, undefined);
   assert.equal(app.sportVenueWithAttrs({ id: 1, name: 'Fixture Arena', type: 'sport' }).covered, 1);
 });
@@ -32206,13 +32206,13 @@ test('Homepage counts strip: four numbers after the happy hour count, ending wit
 test('Cards: a beach card leaves off Kids welcome, Lake view and Free; a free park leaves off Kids welcome and Free (2026-10-29)', () => {
   const beach = { type: 'beach', kid_friendly: true, lake_view: true, free_entry: true, dog_friendly: true, patio: true };
   const b = app.cardBadgeChipsHtml(beach);
-  assert.doesNotMatch(b, /Kids welcome|Lake view|>Free</);
-  assert.match(b, /Dogs welcome/); assert.match(b, /Patio/);
+  assert.doesNotMatch(b, /Kids OK|Lake view|>Free</);
+  assert.match(b, /Dogs OK/); assert.match(b, /Patio/);
   const park = { type: 'outdoor', kid_friendly: true, lake_view: true, free_entry: true };
   const p = app.cardBadgeChipsHtml(park);
-  assert.doesNotMatch(p, /Kids welcome|>Free</); assert.match(p, /Lake view/);
+  assert.doesNotMatch(p, /Kids OK|>Free</); assert.match(p, /Lake view/);
   const paid = { type: 'outdoor', kid_friendly: true, lake_view: true };
-  assert.match(app.cardBadgeChipsHtml(paid), /Kids welcome/, 'a paid attraction keeps Kids welcome');
+  assert.match(app.cardBadgeChipsHtml(paid), /Kids OK/, 'a paid attraction keeps Kids OK');
   assert.match(app.badgeChipsHtml(beach), /Lake View|Lake view/, 'the full badge list is unchanged');
 });
 
@@ -32608,11 +32608,11 @@ test('Public places with no hours say Open to the public; arenas and tours do no
   assert.equal(app.isPublicAccessPlace({ type: 'outdoor', free_entry: 0, name: 'Paid Park' }), false);
   assert.equal(app.isPublicAccessPlace({ type: 'sport', free_entry: 1, name: 'Lumby Skate Park' }), true);
   assert.equal(app.isPublicAccessPlace({ type: 'sport', free_entry: 1, name: 'Enderby Arena' }), false);
-  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'B' }), { state: 'public', text: 'Open to the public \u00b7 no set hours' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'B' }), { state: 'public', text: 'Open to the public' });
 });
 
 test('A public place that mentions booking (campsites) still says Open to the public, not By appointment', () => {
-  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'Bear Creek', description: 'Campsite reservations required in summer.' }), { state: 'public', text: 'Open to the public \u00b7 no set hours' });
+  assert.deepEqual(app.cardStatusFor({ eligible: false, note: null }, { id: -1, type: 'beach', name: 'Bear Creek', description: 'Campsite reservations required in summer.' }), { state: 'public', text: 'Open to the public' });
 });
 
 test('French: card status lines for places with a notice', () => {
