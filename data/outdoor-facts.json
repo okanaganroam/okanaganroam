@@ -1471,6 +1471,10 @@
    {
     "label": "First come",
     "text": "Cannot be booked or rented; first come, first served"
+   },
+   {
+    "label": "Weather",
+    "text": "Weather-dependent; can close without notice in a thaw"
    }
   ],
   "season": "Weather dependent; may close without notice; no phone line to check",
@@ -3207,6 +3211,9 @@
   "parking": "Lot is off Glenmore Road (park is closed)",
   "source_url": "https://storymaps.arcgis.com/stories/0f13728cd51d494fb554b29e2c73710e"
  },
+ "1821": {
+  "alerts": "Trail down to the falls closed for slope stability; check the City of Kelowna's notice"
+ },
  "1825": {
   "accessibility": "Juniper Trail is paved to the twin bays, then gravel to Rattlesnake Point",
   "checked_at": "Nov 2, 2026",
@@ -3401,6 +3408,9 @@
   "dogs": "Dogs on leash on the creek path until the off-leash area",
   "season": "Open year-round",
   "source_url": "https://www.penticton.ca/our-community/living-here/accessible-city"
+ },
+ "1863": {
+  "alerts": "Rattlesnakes and loose rock near the top"
  },
  "1864": {
   "checked_at": "Nov 2, 2026",
@@ -3762,6 +3772,10 @@
    {
     "label": "Break-ins",
     "text": "Vehicle break-ins at the lots; hide valuables"
+   },
+   {
+    "label": "Access road",
+    "text": "Gate closed mid-November to mid-March and from dusk to dawn"
    }
   ],
   "parking": "Overflow parking at the bottom of Smythe Road; no overnight parking",
@@ -4033,6 +4047,10 @@
    {
     "label": "Bears",
     "text": "Bears inhabit the park"
+   },
+   {
+    "label": "Ecological reserve",
+    "text": "The neighbouring reserve is closed without a permit"
    }
   ],
   "source_url": "https://bcparks.ca/kalamalka-lake-park/"

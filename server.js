@@ -26770,6 +26770,31 @@ function outdoorFactRows(venue) {
   }
   return rows;
 }
+// Outdoor / Sports page layout (2026-11-03): the right-hand box keeps only the basics (address, phone); the researched quick
+// facts are their own "Good to Know" section under the description, laid out two columns wide, with no row that only
+// repeats a badge ("Free to visit" under the Free to Visit badge). English only, like the facts.
+function outdoorGoodToKnowHtml(venue) {
+  const f = venue && venue.type === 'outdoor' ? OUTDOOR_FACTS[String(venue.id)] : null;
+  const rows = outdoorFactRows(venue).filter(([label, html]) => label !== 'Checked'
+    && !(label === 'Cost' && venue.free_entry && /^free( to visit)?\.?$/i.test(String(html).trim())));
+  if (!f || !rows.length) return '';
+  let host = '';
+  try { host = new URL(f.source_url).hostname.replace(/^www\./, ''); } catch (e) { /* no host */ }
+  const checked = f.checked_at ? `<p class="venue-hours-checked">${host ? `From ${escapeHtml(host)}, ` : ''}checked ${escapeHtml(f.checked_at)}</p>` : '';
+  const item = ([label, html]) => `<div class="gtk-item${label === 'Heads up' ? ' gtk-alert' : ''}"><dt>${escapeHtml(label)}</dt><dd>${html}</dd></div>`;
+  return `<section class="venue-section venue-gtk" id="venueGoodToKnow" aria-labelledby="venueGtkHead">
+    <h2 id="venueGtkHead">Good to Know</h2>
+    <dl class="gtk-grid">${rows.map(item).join('')}</dl>${checked}
+    <style>
+      .venue-gtk .gtk-grid { margin: 0; display: grid; grid-template-columns: 1fr; gap: 0 36px; }
+      .venue-gtk .gtk-item { padding: 10px 0; border-bottom: 1px dotted rgba(42,32,25,0.18); line-height: 1.5; min-width: 0; }
+      .venue-gtk dt { font-size: .78rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .7; margin: 0 0 2px; }
+      .venue-gtk dd { margin: 0; overflow-wrap: anywhere; }
+      .venue-gtk .gtk-alert { grid-column: 1 / -1; background: rgba(176,112,24,.1); border-radius: 10px; border-bottom: 0; padding: 10px 14px; margin-bottom: 6px; }
+      @media (min-width: 760px) { .venue-gtk .gtk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    </style>
+  </section>`;
+}
 // Sports & Recreation attributes (2026-11-02): Beginner friendly, Lit at night, Rentals come from data/sports-attributes.json
 // ({ "<venue id>": ["beginner", "lit", "rentals"] }, each checked against the place's own page); Covered / Indoor is read from
 // the place itself (an arena, recreation centre or sports centre). They are not database columns and only the Sports page uses them.
@@ -32844,7 +32869,6 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
     // link and the schema keep the stored English.
     venue.address ? [L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}`] : null, // the map link is the Get Directions button (cleanup, 2026-11-01)
-    ...(fr ? [] : outdoorFactRows(venue)),
     venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(displayPhone(venue.phone))}</a>`] : null,
     // Website and Book are the buttons above the card (cleanup, 2026-11-01); they were repeated here.
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
@@ -33249,7 +33273,7 @@ ${VENUE_MENU_CSS}` : ''}
   </div>
   <aside class="venue-aside">
   ${detailRows ? `<div class="venue-section venue-key-info">
-    <h2>${L('Good to Know', 'Bon \u00e0 savoir')}</h2>
+    <h2>${venue.type === 'outdoor' || venue.type === 'sport' ? L('The basics', 'L\u2019essentiel') : L('Good to Know', 'Bon \u00e0 savoir')}</h2>
     ${detailRows}
   </div>` : ''}
   ${locationHtml}
@@ -33259,7 +33283,7 @@ ${VENUE_MENU_CSS}` : ''}
   <div class="venue-extra">
   ${venueDealsCardHtml}
   ${venueWeeklyNightsHtml(weeklyNights, fr)}
-  ${visitHtml}${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
+  ${fr ? '' : outdoorGoodToKnowHtml(venue)}${visitHtml}${showDatesHtml || hoursHtml ? `<div class="venue-section venue-hours" id="venueHours">${showDatesHtml || hoursHtml}</div>` : ''}
   ${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}
   ${venue.redirect_to ? '' : visitorSectionHtml(venue, fr ? 'fr' : 'en')}
   ${guideLinks}
@@ -57821,7 +57845,7 @@ module.exports = {
   renderFoodDrinkHubPage,
   renderFoodDrinkHubScriptHtml,
   renderWineriesHubPage,
-  renderSportsHubPage, sportVenueWithAttrs, freeChipFirst, outdoorFactRows, OUTDOOR_FACTS,
+  renderSportsHubPage, sportVenueWithAttrs, freeChipFirst, outdoorFactRows, outdoorGoodToKnowHtml, OUTDOOR_FACTS,
   renderIndoorHubPage,
   indoorExperiencesOf,
   INDOOR_HUB_EXPERIENCES,
