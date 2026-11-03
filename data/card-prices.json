@@ -1100,6 +1100,13 @@
   "per": "class",
   "source": "https://donuthousestudios.com/"
  },
+ "1522": {
+  "basis": "Open bowling, 2-hour session incl. shoes ($10 per lane reservation fee)",
+  "conf": "listing",
+  "from": 15,
+  "per": "person",
+  "source": "https://www.facebook.com/kobaulanes/"
+ },
  "1523": {
   "basis": "Movie ticket (about $10-$15 by age and showtime; cash only)",
   "conf": "listing",
