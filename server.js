@@ -18353,9 +18353,10 @@ const CARD_BADGE_SHORT = {
   beginner: ['sprout', 'Beginner friendly'], lit: ['bulb', 'Lit at night'], covered: ['roof', 'Covered'], rentals: ['tag', 'Rentals'],
 };
 // Listing cards show only the badges that set a place apart (Dayton, 2026-10-29: "most of these places are all free,
-// lake view and kid friendly"): a beach card leaves off Kids welcome, Lake view and Free, and a free park or trail
-// leaves off Kids welcome and Free. The venue page still lists every badge, and the filters still use the fields.
-const CARD_BADGES_EXPECTED = { beach: ['kid_friendly', 'lake_view', 'free_entry'], freeOutdoor: ['kid_friendly', 'free_entry'] };
+// lake view and kid friendly"): a beach card leaves off Kids welcome and Lake view, and a free park or trail leaves
+// off Kids welcome. Free stays (Dayton, 2026-11-03: every card starts with Free or its lowest price). The venue page
+// still lists every badge, and the filters still use the fields.
+const CARD_BADGES_EXPECTED = { beach: ['kid_friendly', 'lake_view'], freeOutdoor: ['kid_friendly'] };
 function cardBadgeExpected(venue, f) {
   if (venue.type === 'beach') return CARD_BADGES_EXPECTED.beach.includes(f);
   if (venue.type === 'outdoor' && venue.free_entry) return CARD_BADGES_EXPECTED.freeOutdoor.includes(f);

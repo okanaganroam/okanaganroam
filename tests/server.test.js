@@ -32203,14 +32203,15 @@ test('Homepage counts strip: four numbers after the happy hour count, ending wit
   assert.equal(hrefs[hrefs.length - 1], '/food-drink');
 });
 
-test('Cards: a beach card leaves off Kids welcome, Lake view and Free; a free park leaves off Kids welcome and Free (2026-10-29)', () => {
+test('Cards: a beach card leaves off Kids welcome and Lake view; a free park leaves off Kids welcome; Free stays first (2026-11-03)', () => {
   const beach = { type: 'beach', kid_friendly: true, lake_view: true, free_entry: true, dog_friendly: true, patio: true };
   const b = app.cardBadgeChipsHtml(beach);
-  assert.doesNotMatch(b, /Kids OK|Lake view|>Free</);
+  assert.doesNotMatch(b, /Kids OK|Lake view/);
+  assert.match(b, /^<span class="chip chip-feat">[^]*?Free<\/span>/, 'Free is the first chip');
   assert.match(b, /Dogs OK/); assert.match(b, /Patio/);
   const park = { type: 'outdoor', kid_friendly: true, lake_view: true, free_entry: true };
   const p = app.cardBadgeChipsHtml(park);
-  assert.doesNotMatch(p, /Kids OK|>Free</); assert.match(p, /Lake view/);
+  assert.doesNotMatch(p, /Kids OK/); assert.match(p, />Free</); assert.match(p, /Lake view/);
   const paid = { type: 'outdoor', kid_friendly: true, lake_view: true };
   assert.match(app.cardBadgeChipsHtml(paid), /Kids OK/, 'a paid attraction keeps Kids OK');
   assert.match(app.badgeChipsHtml(beach), /Lake View|Lake view/, 'the full badge list is unchanged');
