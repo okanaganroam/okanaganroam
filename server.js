@@ -18524,7 +18524,7 @@ function venueCardHtml(venue, opts = {}) {
   const photoTagChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
   const tourFacts = isTourCard ? { ...tourCardFacts(tourInfo), price: cardPriceFor(venue.id) } : null;
   const tourFactChips = isTourCard
-    ? [tourFacts.price ? `<span class="chip chip-feat">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price)}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
+    ? [tourFacts.price ? `<span class="chip chip-feat">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price.replace(/ \/ person$/, ''))}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
   const chipsHtml = isTourCard
     ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' ')), 2, 2)}</p>`
