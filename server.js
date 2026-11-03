@@ -16342,11 +16342,17 @@ const CARD_V2_CSS = `<style id="card-v2">
      Free or From price + next badge + "+N", then View details and Add to trip. Each slot has a fixed height so a row
      lines up. The repeated classes outrank the golf-card rules that hide the description and badges on indoor golf. */
   html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > :is(.card-slot-fee, .card-slot-notice, .card-slot-notes, .card-links) { display: none !important; }
-  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > h2 { min-height: 2.75em !important; margin-bottom: 6px !important; }
+  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > h2 { min-height: 0 !important; line-height: 22.32px !important; margin-bottom: 6px !important; display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .fd-open-status { min-height: 1.5em; margin: 0 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .card-slot-desc { display: block !important; order: 2 !important; margin: 0 0 10px !important; min-height: 3em; }
+  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .card-slot-desc { display: block !important; order: 2 !important; margin: 0 0 10px !important; }
+  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid[data-name-fit] > li.venue-card.venue-card.venue-card > .card-slot-desc { min-height: calc(2 * 22.32px) !important; }
+  /* No blank gap under one-line names: the name and description share the space, so a one-line name gets a
+     three-line description (data-name-lines is set by the small script on the Indoor hub). Name and description
+     lines are the same height, so every card in a row stays the same height and the badges and buttons line up. */
+  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid[data-name-fit] > li.venue-card.venue-card.venue-card[data-name-lines="1"] > .card-slot-desc { min-height: calc(3 * 22.32px) !important; }
+  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid[data-name-fit] > li.venue-card.venue-card.venue-card[data-name-lines="1"] > .card-slot-desc p { -webkit-line-clamp: 3 !important; line-clamp: 3; }
   html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .card-slot-desc :is(p, .golf-desc) { margin: 0 !important; }
-  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .card-slot-desc p { display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2 !important; line-clamp: 2; overflow: hidden !important; max-height: none !important; }
+  html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .card-slot-desc p { line-height: 22.32px !important; display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 2 !important; line-clamp: 2; overflow: hidden !important; max-height: none !important; }
   html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .chips { display: flex !important; order: 2 !important; flex-wrap: nowrap !important; overflow: hidden; min-height: 1.6rem; margin: 0 0 12px !important; }
   html body.indoor-hub-page.indoor-hub-page.indoor-hub-page.indoor-hub-page .card-grid > li.venue-card.venue-card.venue-card > .card-actions { margin-top: auto !important; }
   ${CARD_V2_CARD} .desc-toggle { display: none !important; }
@@ -26722,6 +26728,30 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
+  <script>
+(function(){
+  // Indoor cards: mark one-line names so the description takes the spare line (CSS above). Only when cards sit
+  // side by side; a single column (phone) has no row to line up, so its cards stay as short as their text.
+  var grid = document.querySelector('body.indoor-hub-page .card-grid');
+  if (!grid) return;
+  function fit(){
+    var cards = grid.querySelectorAll(':scope > li.venue-card');
+    var multi = getComputedStyle(grid).gridTemplateColumns.split(' ').length > 1;
+    if (multi) grid.setAttribute('data-name-fit', ''); else grid.removeAttribute('data-name-fit');
+    for (var i = 0; i < cards.length; i++) {
+      var h = cards[i].querySelector(':scope > h2');
+      if (!h) continue;
+      var one = multi && h.getBoundingClientRect().height < parseFloat(getComputedStyle(h).lineHeight) * 1.5;
+      if (one) cards[i].setAttribute('data-name-lines', '1'); else cards[i].removeAttribute('data-name-lines');
+    }
+  }
+  fit();
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(grid);
+  window.addEventListener('resize', fit);
+  new MutationObserver(fit).observe(grid, { childList: true });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+})();
+</script>
   ${golfCardEngagementScriptHtml('indoor', true)}
   ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'indoor', typeLabels: expLabel, searchLabels: { arts: 'museum gallery', family: 'family kids', games: 'games', spas: 'spa', theatre: 'theatre cinema', golf: 'indoor golf simulator' } })}
 </body>
