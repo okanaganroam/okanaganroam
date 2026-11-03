@@ -1,0 +1,17 @@
+{
+  "note": "Lumby & District Museum: free / by donation (Dayton, Nov 3 2026).",
+  "venues": [
+    {
+      "id": 1542,
+      "name": "Lumby & District Museum",
+      "region": "lumby",
+      "slug": "lumby-district-museum",
+      "expect": {
+        "free_entry": false
+      },
+      "set": {
+        "free_entry": true
+      }
+    }
+  ]
+}

@@ -101,6 +101,13 @@
   "per": "hour",
   "source": "https://backninegolf.ca/local/vernonbc/"
  },
+ "1132": {
+  "basis": "Sim bay Mon-Fri before 5 PM, per bay (up to 6 players); evenings/weekends $60",
+  "conf": "listing",
+  "from": 40,
+  "per": "hour",
+  "source": "https://www.pentictonherald.ca/business_news/article_b9bb42b0-90a3-11ee-b0c5-7f7641a00d04.html"
+ },
  "1233": {
   "basis": "Day Nordic trail pass (cheapest item sold)",
   "conf": "site",
@@ -913,6 +920,13 @@
   "from": 8.75,
   "source": "https://www.landmarkcinemas.com/showtimes/kelowna-grand-10"
  },
+ "1475": {
+  "basis": "Tuesday discount-day ticket (general admission $12.50)",
+  "conf": "listing",
+  "from": 7.5,
+  "note": "Google search summary (Nov 3 2026)",
+  "source": "https://www.cineplex.com/theatre/cineplex-cinemas-orchard-plaza"
+ },
  "1476": {
   "basis": "Reel Deal Tuesday ticket (EXTRAS Insider, free sign-up)",
   "conf": "site",
@@ -957,6 +971,12 @@
   "from": 39,
   "per": "person",
   "source": "https://www.ticketseller.ca/tickets/event/daysormay"
+ },
+ "1488": {
+  "basis": "Single drop-in community session, 75 min (sauna, cold plunges), + GST",
+  "conf": "listing",
+  "from": 45,
+  "source": "https://www.talitywellness.ca/locations/kelowna"
  },
  "1489": {
   "basis": "60-minute all-access VR simulator pass",
@@ -1080,6 +1100,14 @@
   "per": "class",
   "source": "https://donuthousestudios.com/"
  },
+ "1523": {
+  "basis": "Movie ticket (about $10-$15 by age and showtime; cash only)",
+  "conf": "listing",
+  "from": 10,
+  "per": "ticket",
+  "note": "Google search summary (Nov 3 2026)",
+  "source": "https://olivertheatre.ca/"
+ },
  "1526": {
   "basis": "Adult general admission",
   "conf": "site",
@@ -1131,6 +1159,13 @@
   "from": 12,
   "per": "ticket",
   "source": "https://www.thetowne.ca/prices"
+ },
+ "1535": {
+  "basis": "Tuesday discount-day ticket (general admission $10.99)",
+  "conf": "listing",
+  "from": 6.99,
+  "note": "Google search summary (Nov 3 2026)",
+  "source": "https://www.cineplex.com/theatre/galaxy-cinemas-vernon"
  },
  "1537": {
   "basis": "Adult bowling, per game",
@@ -1198,6 +1233,13 @@
   "per": "session",
   "source": "https://www.peachland.ca/pickleball"
  },
+ "1559": {
+  "basis": "Learn to Curl session, equipment and instruction included",
+  "conf": "site",
+  "from": 30,
+  "per": "session",
+  "source": "https://curlpenticton.com/index.php/curling/membership-information"
+ },
  "1560": {
   "basis": "Curling ice rental per sheet per hour, GST extra",
   "conf": "site",
@@ -1211,6 +1253,12 @@
   "from": 49.99,
   "per": "hour",
   "source": "https://www.inthevive.com/book-online"
+ },
+ "1562": {
+  "basis": "Ticket prices change event to event",
+  "conf": "site",
+  "label": "Ticket prices vary",
+  "source": "https://dreamsociety.ca/events/"
  },
  "1563": {
   "basis": "Social session, 70 min (private $236.25 per group of 8)",
