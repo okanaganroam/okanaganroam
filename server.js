@@ -16337,6 +16337,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${CARD_V2_CARD} > .chips { position: static !important; }
   ${CARD_V2_CARD} .golf-desc { min-height: 0 !important; }
   ${CARD_V2_CARD} .golf-desc p { display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical; overflow: hidden; max-height: none !important; margin: 0; font-size: 0.94rem; line-height: 1.45; }
+  ${CARD_V2_CARD}:is([data-venue-category="indoor"], [data-venue-category="sport"], [data-venue-category="outdoor"]) .golf-desc p { -webkit-line-clamp: 3 !important; }
   ${CARD_V2_CARD} .desc-toggle { display: none !important; }
   ${CARD_V2_CARD} .fd-open-status[data-fd-open="closed"] { color: #9A4A3A; opacity: 1; }
   ${CARD_V2_CARD} > .chips .chip { font-size: 0.76rem; padding: 4px 10px; }
