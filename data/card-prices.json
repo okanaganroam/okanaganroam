@@ -1028,6 +1028,12 @@
   "from": 16,
   "source": "https://catelowna.com/book-a-visit"
  },
+ "1500": {
+  "basis": "Paint-your-own pottery piece, paints and kiln firing included (pieces $8 to $50+, most $20-$30)",
+  "conf": "listing",
+  "from": 8,
+  "source": "https://www.workofartpotterystudio.ca/"
+ },
  "1502": {
   "basis": "Adult admission",
   "conf": "site",
