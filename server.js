@@ -18448,8 +18448,10 @@ function venueCardHtml(venue, opts = {}) {
   // 2026-09-19, Beaches (THEMED_CATEGORY_TYPES). Golf output is unchanged.
   const isGolf = themed;
   const descId = `golf-desc-${venue.id}`;
-  const descEn = opts.excerpt ? descExcerpt(venue.description) : venue.description;
-  const descFr = frElideOkanagan(opts.excerpt && venue.description_fr ? descExcerpt(venue.description_fr) : venue.description_fr);
+  // Indoor, Sports and Outdoor cards show whole sentences too (Dayton, 2026-11-03: descriptions cut off mid-phrase).
+  const cardExcerpt = opts.excerpt || (themed && ['indoor', 'sport', 'outdoor'].includes(venue.type));
+  const descEn = cardExcerpt ? descExcerpt(venue.description) : venue.description;
+  const descFr = frElideOkanagan(cardExcerpt && venue.description_fr ? descExcerpt(venue.description_fr) : venue.description_fr);
   const desc = !venue.description ? '' : isGolf
     ? `<div class="golf-desc" id="${descId}"><p>${bilingualDescHtml(descEn, descFr)}</p></div>
         <button type="button" class="desc-toggle" aria-expanded="false" aria-controls="${descId}" hidden>Read more &rarr;</button>`
