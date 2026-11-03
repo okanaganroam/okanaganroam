@@ -18383,6 +18383,8 @@ function tourCardKind(venue) { try { return TOUR_KIND_LABELS[tourActivityOf(venu
 const CARD_PRICES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'card-prices.json'), 'utf8')); } catch (e) { return {}; } })();
 function cardPriceFor(venueId) {
   const e = CARD_PRICES[String(venueId)];
+  // A place whose prices change show to show (no one starting price) carries { "label": "Ticket prices vary" } instead.
+  if (e && e.label && !e.from) return String(e.label);
   const n = e && Number(e.from);
   if (!Number.isFinite(n) || n <= 0) return null;
   return `From $${Number.isInteger(n) ? n.toLocaleString('en-CA') : n.toFixed(2)}${e.per ? ` / ${e.per}` : ''}`;
