@@ -1028,6 +1028,12 @@
   "from": 16,
   "source": "https://catelowna.com/book-a-visit"
  },
+ "1500": {
+  "basis": "Paint-your-own pottery piece, paints and kiln firing included (pieces $8 to $50+, most $20-$30)",
+  "conf": "listing",
+  "from": 8,
+  "source": "https://www.workofartpotterystudio.ca/"
+ },
  "1502": {
   "basis": "Adult admission",
   "conf": "site",
@@ -1099,6 +1105,13 @@
   "from": 50,
   "per": "class",
   "source": "https://donuthousestudios.com/"
+ },
+ "1522": {
+  "basis": "Open bowling, 2-hour session incl. shoes ($10 per lane reservation fee)",
+  "conf": "listing",
+  "from": 15,
+  "per": "person",
+  "source": "https://www.facebook.com/kobaulanes/"
  },
  "1523": {
   "basis": "Movie ticket (about $10-$15 by age and showtime; cash only)",
@@ -1205,6 +1218,12 @@
   "conf": "site",
   "from": 18.99,
   "source": "https://funspacekids.com/"
+ },
+ "1552": {
+  "basis": "Concert tickets change show to show (GA typically $20-$49)",
+  "conf": "listing",
+  "label": "Ticket prices vary",
+  "source": "https://www.vividseats.com/revelry-food-and-music-hub-tickets/venue/35511"
  },
  "1553": {
   "basis": "Single entry adult (19-64) drop-in",
@@ -1926,6 +1945,13 @@
   "from": 8.7,
   "source": "https://elephantislandwine.com/visit/"
  },
+ "200": {
+  "basis": "Drop-in play, first child (two adults free; extra child $14)",
+  "conf": "site",
+  "from": 16,
+  "per": "child",
+  "source": "https://elodiesplayhouse.ca/"
+ },
  "206": {
   "basis": "3 sparkling pours tasting",
   "conf": "site",
@@ -2351,6 +2377,13 @@
   "from": 15,
   "source": "https://www.terravistavineyards.com/collections/tasting-experiences"
  },
+ "669": {
+  "basis": "Flat fee to play the board games, no time limit",
+  "conf": "listing",
+  "from": 5,
+  "per": "person",
+  "source": "https://www.kelownacapnews.com/news/owner-of-vernons-first-board-game-caf-a-lifelong-gamer/"
+ },
  "689": {
   "basis": "Guided 5-wine flight",
   "conf": "site",
@@ -2399,6 +2432,13 @@
   "conf": "box_only",
   "from": 20,
   "source": "https://truck59ciderhouse.com/"
+ },
+ "742": {
+  "basis": "Stay & Play board games, adults 13+, no time limit (kids 5-12 $4)",
+  "conf": "site",
+  "from": 7,
+  "per": "person",
+  "source": "https://twicethedice.com/"
  },
  "75": {
   "basis": "Guided tasting",
@@ -2739,5 +2779,26 @@
   "conf": "site",
   "from": 15,
   "source": "https://8thgeneration.com/"
+ },
+ "927": {
+  "basis": "Half-price bowling per lane, Mon-Fri before 3 PM, shoes and taxes included (general $60)",
+  "conf": "site",
+  "from": 30,
+  "per": "hour",
+  "source": "https://www.wjpinsandpints.com/bowling-birthdays"
+ },
+ "981": {
+  "basis": "Pool or snooker table, pro-rated to the minute",
+  "conf": "site",
+  "from": 20,
+  "per": "hour",
+  "source": "https://cuesgameroom.ca/"
+ },
+ "989": {
+  "basis": "Bowling lane rental, Sun-Thu (Fri-Sat $55)",
+  "conf": "site",
+  "from": 45,
+  "per": "hour",
+  "source": "https://www.bnabrewing.com/bna-bowl-penticton"
  }
 }
