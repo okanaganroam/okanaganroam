@@ -12388,7 +12388,13 @@ function loadEditorsPicks() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'editors-picks.json'), 'utf8')); } catch (e) { return { picks: [] }; }
 }
 const EDITORS_PICK_OWN_PHOTO_RE = /^\/images\/(?:owner|venues|hiking\/venues|beaches\/venues|sports\/venues)\//;
-function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPicks() } = {}) {
+// Daily rotation (2026-11-02, Dayton): the row shifts by one place each day (Pacific date), so every pick takes a turn
+// on the first slide. Chosen after the usable picks are found, so a backup stepping in still lands in the rotation.
+function editorsPicksDayIndex(now) {
+  const ymd = new Date(now).toLocaleDateString('en-CA', { timeZone: 'America/Vancouver' }).split('-').map(Number);
+  return Math.floor(Date.UTC(ymd[0], ymd[1] - 1, ymd[2]) / 86400000);
+}
+function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPicks(), rotate = true } = {}) {
   let seasons = new Map(), notOperating = new Set();
   try { seasons = getSeasonStates(now); } catch (e) { /* no season data: show them all */ }
   try { notOperating = advisoryNotOperatingIds(); } catch (e) { /* no advisories */ }
@@ -12410,6 +12416,7 @@ function renderHomeEditorsPicksHTML({ now = homepageNow(), data = loadEditorsPic
   if (picks.length < 4) return '';
   // Full rows only (2026-10-28, Dayton: a seven-card row looks unfinished): eight, or four.
   picks.length = picks.length >= 8 ? 8 : 4;
+  if (rotate && picks.length > 1) { const k = editorsPicksDayIndex(now) % picks.length; picks.push(...picks.splice(0, k)); }
   const typeFr = (v) => v.type === 'outdoor' ? 'Lieu de plein air' : ((CATEGORY_LABELS_FR[v.type] || CATEGORY_LABELS[v.type]).singular);
   const cards = picks.map(({ v, photo, why, whyFr }) => {
     const img = photoSized(photo, 480), big = photoSized(photo, 960);
@@ -57924,6 +57931,7 @@ module.exports = {
   renderHomeThisWeekendHTML,
   renderHomeTopPicksHTML,
   renderHomeEditorsPicksHTML,
+  editorsPicksDayIndex,
   homeEventDateText,
   renderHomeStatsHTML,
   homeUpcomingEventCount,

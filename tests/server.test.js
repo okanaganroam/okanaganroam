@@ -32118,7 +32118,7 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     assert.equal(seasonSet.ok, true, JSON.stringify(seasonSet));
     const pick = (id) => ({ id, why: `Why ${id} & more`, why_fr: `Pourquoi ${id}` });
     const data = { picks: [pick(ok[0]), pick(noPhoto), pick(closed), pick(999999), pick(ok[1]), pick(ok[2]), pick(ok[3]), pick(ok[0])] };
-    const html = app.renderHomeEditorsPicksHTML({ data, now: new Date() });
+    const html = app.renderHomeEditorsPicksHTML({ data, now: new Date(), rotate: false });
     const hrefs = [...html.matchAll(/class="home-pick-card home-editors-card" href="([^"]+)"/g)].map((m) => m[1]);
     assert.equal(hrefs.length, 4, `the four good picks, once each: ${hrefs.join(" ")}`);
     assert.deepEqual(hrefs, ['/kelowna/wineries/pick-winery-one', '/kelowna/cafes/pick-cafe-two', '/kelowna/indoor/pick-gallery-three', '/kelowna/restaurants/pick-bistro-four']);
@@ -32150,6 +32150,14 @@ test("Homepage Editor's Picks: hand-picked cards under This Weekend; skips close
     // Four cards: no arrows; eight: arrows to page through on a computer.
     assert.ok(!own.includes('home-carousel-btn'));
     assert.ok(eightHtml.includes('class="home-carousel-btn" data-dir="1"') && eightHtml.includes('<script>'));
+    // Daily rotation: the row shifts one place a day, so every pick takes a turn first; the same day is stable.
+    const rotIds = [...ok, ...five, add('Pick Rot', 'cafe', '/images/venues/prot.jpg')].slice(0, 8);
+    const rot = (d) => [...app.renderHomeEditorsPicksHTML({ data: { picks: rotIds.map(pick) }, now: new Date(`${d}T12:00:00-08:00`) }).matchAll(/home-editors-card" href="([^"]+)"/g)].map((m) => m[1]);
+    const day1 = rot('2026-11-10'), day2 = rot('2026-11-11'), day9 = rot('2026-11-18');
+    assert.equal(day1.length, 8);
+    assert.deepEqual(day2, [...day1.slice(1), day1[0]], 'one place along the next day');
+    assert.deepEqual(day9, day1, 'a full cycle of eight days is back to the start');
+    assert.deepEqual(rot('2026-11-10'), day1, 'stable within a day');
     // Under four usable picks: no row at all.
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [pick(ok[0]), pick(ok[1]), pick(closed)] }, now: new Date() }), '');
     assert.equal(app.renderHomeEditorsPicksHTML({ data: { picks: [] } }), '');
