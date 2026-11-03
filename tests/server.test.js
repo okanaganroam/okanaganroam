@@ -32634,6 +32634,19 @@ test('Golf, tours, sports and indoor cards carry a status line like Food & Drink
   for (const c of allCards) assert.match(c, /fd-open-status/, 'every card on /golf has a status line');
 });
 
+test('Outdoor pages: the quick facts are their own Good to Know section (no Checked row, no "Free to visit" repeat)', () => {
+  app.OUTDOOR_FACTS['99993'] = { cost: 'Free to visit', parking: 'Small lot', dogs: 'On a leash', alerts: 'Trail closed to Dec 1', source_url: 'https://www.bcparks.ca/x/', checked_at: 'Nov 2, 2026' };
+  try {
+    const html = app.outdoorGoodToKnowHtml({ id: 99993, type: 'outdoor', free_entry: 1 });
+    assert.match(html, /<h2 id="venueGtkHead">Good to Know<\/h2>/);
+    assert.deepEqual([...html.matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1]), ['Heads up', 'Parking', 'Dogs'], 'Free to visit repeats the badge, Checked is a footer line');
+    assert.match(html, /From bcparks\.ca, checked Nov 2, 2026/);
+    assert.match(app.outdoorGoodToKnowHtml({ id: 99993, type: 'outdoor', free_entry: 0 }), /<dt>Cost<\/dt><dd>Free to visit<\/dd>/, 'with no badge the cost row stays');
+    assert.equal(app.outdoorGoodToKnowHtml({ id: 99994, type: 'outdoor' }), '');
+    assert.equal(app.outdoorGoodToKnowHtml({ id: 99993, type: 'beach' }), '');
+  } finally { delete app.OUTDOOR_FACTS['99993']; }
+});
+
 test('Outdoors Good to Know: quick facts show in a fixed order with a Checked line; other types and empty places show none', () => {
   app.OUTDOOR_FACTS['99991'] = { cost: 'Free', parking: 'Small lot', dogs: 'On a leash', alerts: 'Trail closed to Dec 1', extras: [{ label: 'Water', text: 'None on trail' }], source_url: 'https://www.bcparks.ca/x/', checked_at: 'Nov 2, 2026' };
   try {
