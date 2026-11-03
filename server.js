@@ -16341,7 +16341,7 @@ const CARD_V2_CSS = `<style id="card-v2">
   /* Indoor cards (Dayton, 2026-11-03): every card reads location, name, open/closed and when it opens, Free or From price,
      other badges, then View details and Add to trip -- no description, one fixed slot each, so a row lines up. */
   html body.indoor-hub-page .card-grid > li.venue-card .card-slot-desc, html body.indoor-hub-page .card-grid > li.venue-card .card-slot-fee:empty, html body.indoor-hub-page .card-grid > li.venue-card .card-slot-notice:empty, html body.indoor-hub-page .card-grid > li.venue-card .card-slot-notes:empty { display: none !important; }
-  html body.indoor-hub-page .card-grid > li.venue-card > h2 { min-height: calc(2 * 1.22 * 1.12rem); }
+  html body.indoor-hub-page .card-grid > li.venue-card > h2 { min-height: 2.75em; }
   html body.indoor-hub-page .card-grid > li.venue-card .fd-open-status { min-height: 1.5em; margin: 0 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   html body.indoor-hub-page .card-grid > li.venue-card > .chips { min-height: 2.2rem; }
   html body.indoor-hub-page .card-grid > li.venue-card > .card-actions { margin-top: auto; }
