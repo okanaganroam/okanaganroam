@@ -32668,3 +32668,29 @@ test('Guides: a file guide names its author and real dates, on the page and in i
   assert.match(html, /<time datetime="2026-11-03">Updated Nov 3, 2026<\/time>/);
   assert.doesNotMatch(app.guideBylineHtml(null), /Updated/);
 });
+
+test("What's On cards: an event at a place with its own photo shows that photo; no place, no photo or a redirected place keep the kind photo (2026-11-04)", () => {
+  const base = { id: 9001, name: 'Host Photo Fixture Market', slug: 'host-photo-fixture-market', region: 'kelowna', categories: ['markets-fairs'], dateLabel: 'Sat Nov 7', description: 'A fixture event.' };
+  const withPhoto = app.createVenue({ name: 'Host Photo Fixture Hall', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-photo-fixture-hall', image_url: '/images/venues/host-photo-fixture-hall.jpg' });
+  const noPhoto = app.createVenue({ name: 'Host Photo Fixture Barn', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-photo-fixture-barn' });
+  const day = '2026-11-04';
+  const own = app.whatsOnEventCardHtml({ ...base, venueId: withPhoto.id }, day);
+  assert.match(own, /<img class="whatson-event-img whatson-event-photo" src="\/images\/venues\/host-photo-fixture-hall\.jpg"[^>]*data-photo="venue"/);
+  for (const ev of [{ ...base }, { ...base, venueId: noPhoto.id }, { ...base, venueId: 99999999 }]) {
+    const card = app.whatsOnEventCardHtml(ev, day);
+    assert.doesNotMatch(card, /data-photo="venue"/, 'no host photo: the kind photo stays');
+    assert.match(card, /<img class="whatson-event-img whatson-event-photo" src="\/images\//);
+  }
+  // The event's own picture (a /path in image_url) still wins, and the page-level image helpers are untouched.
+  assert.match(app.whatsOnEventCardHtml({ ...base, venueId: withPhoto.id, image: '/images/events/own-test.jpg' }, day), /src="\/images\/events\/own-test\.jpg"/);
+  assert.doesNotMatch(app.eventImagePath({ id: 9001, name: base.name, description: base.description, image_url: null }, ['markets-fairs']), /host-photo-fixture/);
+});
+
+test("What's On cards: a busy place's photo shows on at most two cards per page; the rest keep the kind photo (2026-11-04)", () => {
+  const v = app.createVenue({ name: 'Host Cap Fixture Theatre', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-cap-fixture-theatre', image_url: '/images/venues/host-cap-fixture-theatre.jpg' });
+  const used = new Map();
+  const claim = (id) => { const n = used.get(id) || 0; if (n >= 2) return false; used.set(id, n + 1); return true; };
+  const cards = [1, 2, 3, 4].map((i) => app.whatsOnEventCardHtml({ id: 9100 + i, name: `Cap Fixture Show ${i}`, slug: `cap-fixture-show-${i}`, region: 'kelowna', categories: ['live-music'], dateLabel: 'Sat Nov 7', description: 'x', venueId: v.id }, '2026-11-04', null, claim));
+  assert.deepEqual(cards.map((c) => /data-photo="venue"/.test(c)), [true, true, false, false]);
+  assert.match(cards[2], /<img class="whatson-event-img whatson-event-photo" src="\/images\/events\//);
+});
