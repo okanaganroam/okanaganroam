@@ -5,18 +5,18 @@ const styles = require('./big-white-page').styles
   .replace('id="big-white-layout"', 'id="kelowna-layout"')
   .replace("/images/regions/photos/big-white-2610.jpg", '/images/guides/kelowna-dusk-aerial-1200.jpg');
 const tiles = [
- ['/food-drink?regions=kelowna','/images/venues/bna-brewing-kelowna-g1-2610-w480.jpg','Eat & Drink','From coffee to dinner'],
- ['/beaches?regions=kelowna','/images/beaches/venues/kelowna-boyce-gyro-beach-park-w480.jpg','Beaches & Lake','Find your lakeside escape'],
- ['/outdoors?regions=kelowna','/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update-w480.jpg','Outdoor Adventures','Trails, views and fresh air'],
+ ['/food-drink?regions=kelowna','/images/venues/bts-cocktail-bar-kitchen-2610-w480.jpg','Eat & Drink','From coffee to dinner'],
+ ['/beaches?regions=kelowna','/images/beaches/venues/kelowna-waterfront-park-tugboat-bay-beach-w480.jpg','Beaches & Lake','Find your lakeside escape'],
+ ['/outdoors?regions=kelowna','/images/hiking/venues/mission-creek-regional-park-20261017-full-w480.jpg','Outdoor Adventures','Trails, views and fresh air'],
  ['/kelowna/events','/images/guides/thumbs/kelowna-night-w480.jpg','What’s On','Make a day or night of it'],
- ['/guide/kelowna/kid_friendly','/images/beaches/venues/kelowna-bertram-creek-regional-park-w480.jpg','With Kids','Little adventurers welcome'],
+ ['/guide/kelowna/kid_friendly','/images/beaches/venues/kelowna-boyce-gyro-beach-park-w480.jpg','With Kids','Little adventurers welcome'],
  ['/dog-friendly?regions=kelowna','/images/beaches/venues/kelowna-downtown-sails-dog-beach-w480.jpg','Dog-Friendly','Bring the whole crew'],
 ];
 const featured = [
- ['knox-mountain-park','/kelowna/outdoors/knox-mountain-park','/images/hiking/venues/knox-mountain-park-20261016-viewpoint-update-w480.jpg','Fresh air & lake views','Knox Mountain Park','Head uphill for a fresh perspective on Kelowna.'],
- ['bna-brewing-kelowna','/kelowna/breweries/bna-brewing-kelowna','/images/venues/bna-brewing-kelowna-g1-2610-w480.jpg','Food, beer & good company','BNA Brewing','Gather your crew for a downtown favourite.'],
+ ['myra-canyon-myra-bellevue-provincial-park','/kelowna/outdoors/myra-canyon-myra-bellevue-provincial-park','/images/hiking/venues/myra-canyon-myra-bellevue-provincial-park-20261016-cycling-w480.jpg','Fresh air & lake views','Myra Canyon','Cycle or walk across the historic railway trestles.'],
+ ['craft-beer-market-kelowna','/kelowna/breweries/craft-beer-market-kelowna','/images/venues/craft-beer-market-kelowna-2610-w480.jpg','Food, beer & good company','Craft Beer Market','Gather your crew for a downtown favourite.'],
  ['kasugai-garden','/kelowna/outdoors/kasugai-garden','/images/hiking/venues/kasugai-garden-20261016-nature-w480.jpg','A quiet little escape','Kasugai Garden','Slow down in this peaceful downtown garden.'],
- ['sprout-bread','/kelowna/cafes/sprout-bread','/images/venues/sprout-bread-2610-w480.jpg','Coffee & something baked','Sprout Bread','Make room for a coffee and a bakery stop.'],
+ ['analog-coffee-one-water','/kelowna/cafes/analog-coffee-one-water','/images/venues/analog-coffee-one-water-2610-w480.jpg','Coffee & a patio seat','Analog Coffee','Settle in with a coffee and a seat outside.'],
 ];
 function renderBody({count,activeSlugs}) {
  const active=new Set(activeSlugs);
