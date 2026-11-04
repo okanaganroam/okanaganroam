@@ -16470,7 +16470,9 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${HUB_CARD_GRID} > li.venue-card.venue-card.venue-card > .chips { display: flex !important; order: 2 !important; flex-wrap: nowrap !important; overflow: hidden; min-height: 1.6rem; margin: 0 0 12px !important; }
   ${HUB_CARD_GRID} > li.venue-card.venue-card.venue-card > .card-actions { margin-top: auto !important; }
   ${CARD_V2_CARD} .desc-toggle { display: none !important; }
-  ${CARD_V2_CARD} .fd-open-status[data-fd-open="closed"] { color: #9A4A3A; opacity: 1; }
+  /* Closed stays at full strength (the shared 78% fade made it hard to read), and the price or Free badge reads first. */
+  ${CARD_V2_CARD} .fd-open-status[data-fd-open="closed"] { color: #9A4A3A; opacity: 1 !important; }
+  ${CARD_V2_CARD} > .chips > .chip.chip-price:not(.hidden-gem-badge, .local-favourite-badge) { color: var(--ink, #2A2019) !important; font-weight: 800; }
   ${CARD_V2_CARD} > .chips .chip { font-size: 0.76rem; padding: 4px 10px; }
   /* Badges as one quiet line (2026-10-28): small grey labels with a teal line icon, dot-separated, never wrapping;
      a label that does not fit ends in "..." and the rest sit in the small "+N" pill at the end. */
@@ -18453,7 +18455,7 @@ function cardBadgeChipsHtml(venue, { skipDogFriendly = false, allBadges = false 
     .sort((a, b) => (b === 'free_entry') - (a === 'free_entry'))
     .map((f) => {
       const [icon, label] = CARD_BADGE_SHORT[f] || [null, BADGE_LABELS[f].title];
-      return `<span class="chip chip-feat">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
+      return `<span class="chip chip-feat${f === 'free_entry' ? ' chip-price' : ''}">${icon ? uiIcon(icon, '1.1em', true) : ''}${escapeHtml(label)}</span>`;
     })
     .join(' ');
 }
@@ -18661,7 +18663,7 @@ function venueCardHtml(venue, opts = {}) {
   const photoTagChips = (showBadge ? hiddenGemBadgeHtml() + ' ' : '') + (showLocalFavourite ? localFavouriteBadgeHtml() + ' ' : '');
   const tourFacts = isTourCard ? { ...tourCardFacts(tourInfo), price: cardPriceFor(venue.id) } : null;
   const tourFactChips = isTourCard
-    ? [tourFacts.price ? `<span class="chip chip-feat">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price.replace(/ \/ person$/, ''))}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
+    ? [tourFacts.price ? `<span class="chip chip-feat chip-price">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price.replace(/ \/ person$/, ''))}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
   const chipsHtml = isTourCard
     ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' ')), 2, 2)}</p>`
