@@ -37047,6 +37047,9 @@ function renderBrowseHubStyles() {
   body.browse-page #bhResults > .venue-card .card-actions,
   body.browse-page #bhResults > .venue-card .desc-toggle,
   body.browse-page #bhResults > .venue-card .venue-advisory-source { position: relative; z-index: 1; }
+  /* Photo cards: the heart is positioned against the card (top right of the photo), so the action row must not be
+     a positioned box or the heart lands on top of Add to trip. Each button is already raised on its own there. */
+  body.browse-page #bhResults > .venue-card:is([data-ph], [data-card-ph]) .card-actions { position: static; }
   /* Keyboard focus shows on the whole card, not just the name. */
   body.browse-page #bhResults > .venue-card h2 a.venue-card-link:focus-visible { outline: none; }
   body.browse-page #bhResults > .venue-card h2 a.venue-card-link:focus-visible::after { outline: 3px solid var(--teal); outline-offset: -3px; }
