@@ -446,6 +446,8 @@ const FR_TEXT = {
   'Big White and SilverStar: lifts, passes, where to stay and how to get there.': 'Big White et SilverStar : remontées, laissez-passer, hébergement et comment s’y rendre.',
   'Winter outdoors →': 'Plein air en hiver →',
   'Snowshoe trails, Nordic centres and winter walks across the valley.': 'Sentiers de raquette, centres nordiques et promenades d’hiver partout dans la vallée.',
+  'Official visitor information:': 'Information touristique officielle :',
+  'events calendar': 'calendrier des événements',
   'Read our ski season guide: where to eat, drink and play this winter →': 'Lisez notre guide de la saison de ski : où manger, boire et s’amuser cet hiver →',
   'Big White, SilverStar, Apex and Baldy — four ski hills, each with its own feel, from the valley’s biggest village to a small, uncrowded local favourite.': 'Big White, SilverStar, Apex et Baldy : quatre stations de ski, chacune avec son caractère, du plus grand village de la vallée à une petite station locale peu achalandée.',
   'Museums, galleries, theatres, escape rooms, bowling, climbing gyms and more — the Okanagan’s best ideas for grey, wet or cold days.': 'Musées, galeries, théâtres, jeux d’évasion, quilles, centres d’escalade et plus encore : les meilleures idées de l’Okanagan pour les jours gris, pluvieux ou froids.',

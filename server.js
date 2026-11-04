@@ -2079,6 +2079,16 @@ ${rest.map((p) => `      ${para(p)}`).join('\n')}
     <label for="region-intro-toggle" class="region-intro-readmore">Read more about ${escapeHtml(REGION_LABELS[region])}</label>
   </div>`;
 }
+// Official visitor links (Tourism Vernon asked what we'd link to; we offered to send people to them for
+// official information). Kept outside .region-intro, whose links are on-site only.
+const REGION_OFFICIAL_LINKS = {
+  vernon: { label: 'Tourism Vernon', url: 'https://www.tourismvernon.com/', events: 'https://www.tourismvernon.com/things-to-do/events' },
+};
+function regionOfficialLinkHtml(region) {
+  const o = REGION_OFFICIAL_LINKS[region];
+  if (!o) return '';
+  return `<p class="subtitle region-official">Official visitor information: <a href="${o.url}" rel="noopener">${escapeHtml(o.label)}</a> &middot; <a href="${o.events}" rel="noopener">events calendar</a></p>\n  `;
+}
 const REGION_INTRO_STYLE = `<style>
 /* Layout shift (2026-10-19, review pass 5): em, not ch -- a ch is the width of the font's "0", which is 6% wider in
    Nunito than in its Arial fallback, so the column changed width when the web font arrived. 40.8em = 68ch in Nunito. */
@@ -19353,7 +19363,7 @@ ${renderGolfHeaderHtml()}
   ${isSkiResort ? skiPlanHtml(region) : ''}
   <div class="region-lead${intro && startHtml && !isSkiResort ? ' region-lead-split' : ''}">
   <div class="region-lead-text">
-  ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}</div>
+  ${intro ? `${regionIntroHtml(region)}\n  ` : ''}${regionOfficialLinkHtml(region)}${SKI_GUIDE.resorts.some((r) => r.region === region) ? `<p class="subtitle"><a href="${SKI_GUIDE_PATH}#${region}">Read our ski season guide: where to eat, drink and play this winter &rarr;</a></p>\n  ` : ''}</div>
   ${startHtml}
   </div>
   ${categorySections}
