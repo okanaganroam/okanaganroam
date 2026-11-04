@@ -35,6 +35,8 @@ const guideIntros = (() => { try { return require('./guide-intros.js'); } catch 
 const replayModule = (() => { try { return require('./session-replay'); } catch (e) { return null; } })();
 function replayHead() { return replayModule ? replayModule.renderSessionReplayHead(process.env.CLARITY_PROJECT_ID) : ''; }
 
+const bigWhitePage = (() => { try { return require('./big-white-page'); } catch (e) { return null; } })();
+
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
 
@@ -19329,6 +19331,23 @@ ${upcomingEvents.map((e) => {
       </div>`
     : '';
   const comboLinksHtml = comboGuideLinksSection(region);
+
+  // Owner-approved compact Big White layout. Other destinations retain the shared template.
+  if (region === 'big-white' && bigWhitePage) {
+    const season = SKI_RESORT_SEASON[region];
+    const state = skiSeasonState(season, todayLocal());
+    const status = state === 'open' ? season.statusOpen : state ? season.statusSoon : null;
+    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL").all(region).map(v => v.slug);
+    return `<!DOCTYPE html><html lang="en"><head>
+${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
+${renderOutdoorThemeStyles()}
+${bigWhitePage.styles}
+${golfEngagementHeadHtml('fd', true, 'region')}
+</head><body class="golf-page outdoor-page big-white-page">
+${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
+${bigWhitePage.renderBody({ count: placeCount, status, activeSlugs })}
+${GOLF_APP_SCRIPT_TAG}</body></html>`;
+  }
 
   // Destination mini-directory (2026-09-25): the same themed shell as
   // /food-drink and /local-favorites (homepage header, Trip tray, footer),
