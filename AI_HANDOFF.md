@@ -18,6 +18,15 @@ Owner approved matching the mobile/desktop mockups and publishing. Big White alo
 
 Validation: renderer tests 2/2; server/module syntax and diff checks; actual 1440px/390px browser checks, French mobile no horizontal overflow, working accordion and coffee search restricted to Big White. Ten category/featured links returned 200 locally using a temporary 37-venue public-API fixture; all referenced images exist. Kelowna and Apex HTML matched the pre-change renderer byte for byte. Local fixture DB is excluded/restored before commit. Publication via main auto-deploy; live verification follows deployment.
 
+
+## Kelowna compact landing - 2026-11-04
+
+Owner requested the approved Big White layout for Kelowna, including live publication. Added kelowna-page.js, reusing Big White geometry under a Kelowna-only body scope, with local photos, six category tiles, four active featured listings and three collapsed planning sections. City exploration links replace ski status. Canonical/schema, live count, header/trip tray and French twin retained. No production data or shared assets changed.
+
+Validation: tests RED (missing renderer) then GREEN 4/4 across Kelowna/Big White; syntax and diff checks; local browser 1440px desktop and 390px English/French mobile with no horizontal overflow, loaded images, scoped coffee search and accordion toggle. All ten category/featured links returned 200. Big White, Vernon and Apex rendered byte-identical HTML against origin/main. Independent final review clean. Temporary local DB fixture restored before commit. Live deployment verification will be recorded on this change's PR.
+
+Big White follow-up: PR #632 deployed successfully after a slow 1.7 GB image upload. Verified live desktop/mobile, French, scoped coffee search and health. Evidence recorded in PR #632's production-verification comment.
+
 ## Current Status
 
 * **Current status (2026-10-05): read "Stage 0–4 Program" below first, then the "Stage 5" sections and "V3 French support".** The Stage 0–4 section holds the current production status, the frozen files and the standing rules (updated for the V3 French launch); the later sections record what changed since. PRs #19–#30 (Stage 5F–5H, SEO-1/SEO-2, the `/browse` performance and Directory redesign work) are not described in this file beyond the frozen-file notes. The dated baselines in this list are kept as history.
