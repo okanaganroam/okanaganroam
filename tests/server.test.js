@@ -17885,7 +17885,7 @@ test('Tours cards (2026-10-31): one layout -- town and kind, the Known for summa
     const htmlNoPrice = app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true });
     assert.doesNotMatch(htmlNoPrice, /From \$/, 'no verified price on file, so no price chip (never a guess from the box text)');
     app.CARD_PRICES[String(v.id)] = { from: 169 };
-    assert.match(app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true }), /<span class="chip chip-feat">[^]*?From \$169<\/span>/);
+    assert.match(app.venueCardHtml(app.getVenue(v.id), { themed: true, showRegion: true, appLabels: true }), /<span class="chip chip-feat chip-price">[^]*?From \$169<\/span>/);
     delete app.CARD_PRICES[String(v.id)];
     assert.match(html, /<span class="chip chip-feat">[^]*?5\u20136 hr<\/span>/);
     assert.doesNotMatch(html, /card-note/);
@@ -32207,7 +32207,7 @@ test('Cards: a beach card leaves off Kids welcome and Lake view; a free park lea
   const beach = { type: 'beach', kid_friendly: true, lake_view: true, free_entry: true, dog_friendly: true, patio: true };
   const b = app.cardBadgeChipsHtml(beach);
   assert.doesNotMatch(b, /Kids OK|Lake view/);
-  assert.match(b, /^<span class="chip chip-feat">[^]*?Free<\/span>/, 'Free is the first chip');
+  assert.match(b, /^<span class="chip chip-feat chip-price">[^]*?Free<\/span>/, 'Free is the first chip');
   assert.match(b, /Dogs OK/); assert.match(b, /Patio/);
   const park = { type: 'outdoor', kid_friendly: true, lake_view: true, free_entry: true };
   const p = app.cardBadgeChipsHtml(park);
