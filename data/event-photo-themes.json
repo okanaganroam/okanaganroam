@@ -725,7 +725,10 @@
   "1022": "haunted",
   "1023": "cookingclass",
   "1024": "halloweenparty",
-  "1025": "cornmaze"
+  "1025": "cornmaze",
+  "1052": "xmasmarket",
+  "1059": "charcuterie",
+  "1061": "rock"
  },
  "names": {
   "1": "Kelowna Rockets Home Games 2026–27",
@@ -1452,6 +1455,9 @@
   "1022": "Fire Hall 34 Haunted House",
   "1023": "Mission Hill Culinary Classes: Fall & Holiday Series",
   "1024": "Halloween Howler at The Hub on Martin",
-  "1025": "Fall Weekends at O'Keefe Ranch: Corn Maze, Kids Haunted House & Haunted Mini Golf"
+  "1025": "Fall Weekends at O'Keefe Ranch: Corn Maze, Kids Haunted House & Haunted Mini Golf",
+  "1052": "Armstrong Farmers' Market Annual Christmas Market",
+  "1059": "Dine Thompson Okanagan 2027",
+  "1061": "Dropkick Murphys: St. Patrick's Day Tour"
  }
 }
