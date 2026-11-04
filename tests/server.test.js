@@ -32668,3 +32668,20 @@ test('Guides: a file guide names its author and real dates, on the page and in i
   assert.match(html, /<time datetime="2026-11-03">Updated Nov 3, 2026<\/time>/);
   assert.doesNotMatch(app.guideBylineHtml(null), /Updated/);
 });
+
+test("What's On cards: an event at a place with its own photo shows that photo; no place, no photo or a redirected place keep the kind photo (2026-11-04)", () => {
+  const base = { id: 9001, name: 'Host Photo Fixture Market', slug: 'host-photo-fixture-market', region: 'kelowna', categories: ['markets-fairs'], dateLabel: 'Sat Nov 7', description: 'A fixture event.' };
+  const withPhoto = app.createVenue({ name: 'Host Photo Fixture Hall', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-photo-fixture-hall', image_url: '/images/venues/host-photo-fixture-hall.jpg' });
+  const noPhoto = app.createVenue({ name: 'Host Photo Fixture Barn', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-photo-fixture-barn' });
+  const day = '2026-11-04';
+  const own = app.whatsOnEventCardHtml({ ...base, venueId: withPhoto.id }, day);
+  assert.match(own, /<img class="whatson-event-img whatson-event-photo" src="\/images\/venues\/host-photo-fixture-hall\.jpg"[^>]*data-photo="venue"/);
+  for (const ev of [{ ...base }, { ...base, venueId: noPhoto.id }, { ...base, venueId: 99999999 }]) {
+    const card = app.whatsOnEventCardHtml(ev, day);
+    assert.doesNotMatch(card, /data-photo="venue"/, 'no host photo: the kind photo stays');
+    assert.match(card, /<img class="whatson-event-img whatson-event-photo" src="\/images\//);
+  }
+  // The event's own picture (a /path in image_url) still wins, and the page-level image helpers are untouched.
+  assert.match(app.whatsOnEventCardHtml({ ...base, venueId: withPhoto.id, image: '/images/events/own-test.jpg' }, day), /src="\/images\/events\/own-test\.jpg"/);
+  assert.doesNotMatch(app.eventImagePath({ id: 9001, name: base.name, description: base.description, image_url: null }, ['markets-fairs']), /host-photo-fixture/);
+});

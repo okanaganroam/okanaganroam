@@ -12340,6 +12340,26 @@ function eventCardSrcsetAttrs(src, sizes) {
   const small = eventCardSmallCache.get(src);
   return small ? ` srcset="${escapeHtml(small)} 480w, ${escapeHtml(src)} 800w" sizes="${sizes}"` : '';
 }
+// What's On card photo (Dayton, 2026-11-04: "the event cards all look the same"): an event held at a place we list shows
+// that place's own photo (venues.image_url, the real photo of where it happens) instead of a stock photo of its kind
+// of event. No host place, a redirected place or no photo of its own: the kind photo as before. Cards only -- the event
+// page, og:image and the Event schema keep the kind photo until the photo credit line is added (after Nov 17).
+function eventHostVenuePhoto(e) {
+  const id = Number(e && e.venueId);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  let row;
+  try { row = db.prepare('SELECT image_url, redirect_to FROM venues WHERE id = ?').get(id); } catch (err) { return null; }
+  if (!row || row.redirect_to !== null) return null;
+  const own = String(row.image_url || '').trim();
+  return /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own) ? own : null;
+}
+function eventCardPhotoImgHtml(ev) {
+  const own = ev.image && /^\/(?!\/)/.test(ev.image) ? null : eventHostVenuePhoto(ev);
+  if (!own) { const img = homeEventImage(ev); return `<img class="whatson-event-img whatson-event-photo" src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, WHATSON_CARD_PHOTO_SIZES)} alt="" loading="lazy" width="800" height="450">`; }
+  const small = photoSized(own, 480), big = photoSized(own, 960);
+  const srcset = small !== big ? ` srcset="${escapeHtml(small)} 480w, ${escapeHtml(big)} 960w" sizes="${WHATSON_CARD_PHOTO_SIZES}"` : '';
+  return `<img class="whatson-event-img whatson-event-photo" src="${escapeHtml(small)}"${srcset} alt="" loading="lazy" width="800" height="450" data-photo="venue">`;
+}
 function homeEventImage(e, used = new Set()) {
   if (e.image && /^\/(?!\/)/.test(e.image)) return e.image;
   const kind = eventKindPhoto(e);
@@ -29693,7 +29713,7 @@ function whatsOnEventCardHtml(ev, todayArg = null, now = null) {
   const tripQuery = `${ev.name}, ${REGION_LABELS[ev.region] || ev.region}, Okanagan Valley, BC`;
   return `
       <li class="venue-card whatson-event-card" data-venue-id="event-${ev.id}" data-venue-region="${escapeHtml(ev.region)}" data-venue-category="whatson" data-venue-name="${escapeHtml(ev.name)}" data-event-region="${escapeHtml(ev.region)}" data-event-categories="${escapeHtml((ev.categories || []).join(','))}"${ev.valleyWide ? ' data-event-valley-wide="1"' : ''}${eventFreeToGo(ev) ? ' data-event-free="1"' : ''}${savedOccurrenceAttrs(ev.firstOccurrence)} data-surface="whatson_card">
-        ${today ? (() => { const img = homeEventImage(ev); return `<img class="whatson-event-img whatson-event-photo" src="${escapeHtml(img)}"${eventCardSrcsetAttrs(img, WHATSON_CARD_PHOTO_SIZES)} alt="" loading="lazy" width="800" height="450">`; })() : (ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : '')}
+        ${today ? eventCardPhotoImgHtml(ev) : (ev.image ? `<img class="whatson-event-img" src="${escapeHtml(ev.image)}" alt="" loading="lazy">` : '')}
         <h2><a class="venue-card-link" href="${href}"><span class="venue-card-name">${escapeHtml(ev.name)}</span><span class="venue-card-cue" aria-hidden="true">View details &rarr;</span></a></h2>
         <p class="venue-meta">${meta}</p>
         ${today ? (() => { const sum = whatsOnCardSummary(ev); return `${sum.text ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(sum.text)}</p></div>` : ''}${sum.source ? `\n        <p class="whatson-source">${escapeHtml(sum.source)}</p>` : ''}`; })() : (ev.description ? `<div class="golf-desc" id="${descId}"><p>${escapeHtml(ev.description)}</p></div>
