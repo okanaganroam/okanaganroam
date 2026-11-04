@@ -38,6 +38,7 @@ function replayHead() { return replayModule ? replayModule.renderSessionReplayHe
 const bigWhitePage = (() => { try { return require('./big-white-page'); } catch (e) { return null; } })();
 
 const kelownaPage = require('./kelowna-page');
+const skiResortPages = require('./ski-resort-pages');
 
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
@@ -19345,6 +19346,23 @@ ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page kelowna-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
 ${kelownaPage.renderBody({ count: placeCount, activeSlugs })}
+${GOLF_APP_SCRIPT_TAG}</body></html>`;
+  }
+
+  // SilverStar, Apex and Baldy follow the same compact layout as Big White, with their own photos, places and links.
+  if (skiResortPages.has(region)) {
+    const season = SKI_RESORT_SEASON[region];
+    const state = skiSeasonState(season, todayLocal());
+    const status = state === 'open' ? season.statusOpen : state ? season.statusSoon : null;
+    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL").all(region).map(v => v.slug);
+    return `<!DOCTYPE html><html lang="en"><head>
+${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
+${renderOutdoorThemeStyles()}
+${skiResortPages.styles(region)}
+${golfEngagementHeadHtml('fd', true, 'region')}
+</head><body class="golf-page outdoor-page ski-resort-page">
+${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
+${skiResortPages.renderBody(region, { count: placeCount, status, activeSlugs, season })}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
