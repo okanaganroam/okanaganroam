@@ -11,6 +11,13 @@ This file is the shared coordination point for AI assistants working on this rep
 5. For production/data changes, verify before and after and record the result here.
 6. If an action is blocked, document the exact blocker rather than using an unsafe workaround.
 
+
+## Big White compact landing — 2026-11-04
+
+Owner approved matching the mobile/desktop mockups and publishing. Big White alone uses `big-white-page.js`: short photo hero, scoped GET `/browse` search, six photo categories, date-aware mountain essentials, four active featured listings, collapsed planning accordions and compact footer. Existing header, trip tray, canonical/schema and French twin retained. New French copy is in `data/french/big-white-layout-2026-11-04.json`. No production data or shared assets changed.
+
+Validation: renderer tests 2/2; server/module syntax and diff checks; actual 1440px/390px browser checks, French mobile no horizontal overflow, working accordion and coffee search restricted to Big White. Ten category/featured links returned 200 locally using a temporary 37-venue public-API fixture; all referenced images exist. Kelowna and Apex HTML matched the pre-change renderer byte for byte. Local fixture DB is excluded/restored before commit. Publication via main auto-deploy; live verification follows deployment.
+
 ## Current Status
 
 * **Current status (2026-10-05): read "Stage 0–4 Program" below first, then the "Stage 5" sections and "V3 French support".** The Stage 0–4 section holds the current production status, the frozen files and the standing rules (updated for the V3 French launch); the later sections record what changed since. PRs #19–#30 (Stage 5F–5H, SEO-1/SEO-2, the `/browse` performance and Directory redesign work) are not described in this file beyond the frozen-file notes. The dated baselines in this list are kept as history.
