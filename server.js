@@ -38882,10 +38882,23 @@ function guideTipHtml(text) {
   }).join('');
 }
 function renderWineGuidePage() { return renderEditorialGuidePage(WINE_GUIDE, WINE_GUIDE_PATH); }
+// Who wrote a guide and when (2026-11-03, SEO + GEO plan): data/guide-dates.json comes from git history
+// (scripts/guide-dates.js); a guide with no entry shows neither its date nor Article dates.
+const GUIDE_DATES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'guide-dates.json'), 'utf8')); } catch (e) { return {}; } })();
+function guideDatesFor(guidePath) {
+  return GUIDE_DATES[String(guidePath || '').split('/').pop()] || null;
+}
+function guideBylineHtml(dates) {
+  const d = dates ? new Date(`${dates.modified}T12:00:00Z`) : null;
+  const when = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+  return `<p class="guide-byline"><a href="/about">By Dayton</a>${dates ? ` · <time datetime="${escapeHtml(dates.modified)}">Updated ${escapeHtml(when)}</time>` : ''}</p>`;
+}
+
 // Shared page for the region/slug-based editorial guides (wine, dog-friendly).
 function renderEditorialGuidePage(g, path) {
   const banner = g.banner();
   const thin = guideIsThin(g);
+  const guideDates = guideDatesFor(path);
   const canonical = `https://okanaganroam.com${path}`;
   const breadcrumb = breadcrumbListSchema([
     { name: 'Home', url: 'https://okanaganroam.com/' },
@@ -38899,7 +38912,9 @@ function renderEditorialGuidePage(g, path) {
     description: g.description,
     image: `https://okanaganroam.com${banner.src}`,
     mainEntityOfPage: canonical,
+    author: { '@type': 'Person', name: 'Dayton', url: 'https://okanaganroam.com/about' },
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
+    ...(guideDates ? { datePublished: guideDates.published, dateModified: guideDates.modified } : {}),
   };
   const listed = [];
   const hhGuide = /^\/guides\/happy-hour(?:-|$)/.test(String(path || ''));
@@ -38936,6 +38951,8 @@ ${CATEGORY_BANNER_STYLE}
 <style>
   body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
   body.ski-guide-page .ski-guide-intro p { font-size: 1.05rem; line-height: 1.6; }
+  body.ski-guide-page .guide-byline { margin: 0 0 14px; font-size: 0.9rem; color: var(--ink-soft, #5a6570); }
+  body.ski-guide-page .guide-byline a { color: inherit; }
   body.ski-guide-page .ski-guide-jump { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
   body.ski-guide-page .ski-guide-jump a { background: var(--paper); border-radius: 999px; padding: 8px 16px; font-weight: 700; text-decoration: none; }
   body.ski-guide-page .ski-guide-resort { margin-top: 32px; }
@@ -38960,6 +38977,7 @@ ${renderGolfHeaderHtml()}
   ])}
     <article class="ski-guide">
       ${categoryHeroHtml(`<div class="category-banner"><img src="${banner.src}" alt="${escapeHtml(banner.alt)}" width="1600" height="1067" style="object-position: 50% ${banner.pos}%" fetchpriority="high">${regionPhotoCreditHtml(banner.credit)}</div>`, `<h1>${escapeHtml(g.heading)}</h1>`)}
+      ${guideBylineHtml(guideDates)}
       ${thin ? `<p class="guide-thin-note"><strong>This guide is between seasons.</strong> Most of what it covered has finished for now. See our <a href="/guides">current guides</a>.</p>\n      ` : ''}<div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${guideTipHtml(p)}</p>`).join('')}
       </div>
       <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}
@@ -57181,7 +57199,7 @@ module.exports = {
   displayPhone,
   browseFeatureChipsHtml,
   // Card badges (2026-10-29)
-  cardBadgeChipsHtml, cardBadgeExpected,
+  cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
   hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)

@@ -32658,3 +32658,13 @@ test('Outdoors Good to Know: quick facts show in a fixed order with a Checked li
     assert.deepEqual(app.outdoorFactRows({ id: 99992, type: 'outdoor' }), []);
   } finally { delete app.OUTDOOR_FACTS['99991']; }
 });
+
+test('Guides: a file guide names its author and real dates, on the page and in its Article data (2026-11-03)', () => {
+  const dates = app.guideDatesFor('/guides/winter-in-kelowna');
+  assert.match(dates.published, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(dates.modified, /^\d{4}-\d{2}-\d{2}$/);
+  const html = app.guideBylineHtml({ published: '2026-10-18', modified: '2026-11-03' });
+  assert.match(html, /<a href="\/about">By Dayton<\/a>/);
+  assert.match(html, /<time datetime="2026-11-03">Updated Nov 3, 2026<\/time>/);
+  assert.doesNotMatch(app.guideBylineHtml(null), /Updated/);
+});

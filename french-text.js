@@ -1095,6 +1095,8 @@ const FR_PATTERNS = [
   [/^Open to the public \u00b7 no set hours$/, () => 'Ouvert au public \u00b7 sans horaire fixe'],
   [/^Open to the public$/, () => 'Ouvert au public'],
   [/^Open year-round$/, () => 'Ouvert toute l\u2019ann\u00e9e'],
+  [/^By Dayton$/, () => 'Par Dayton'],
+  [/^Updated (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}), (\d{4})$/, (m) => `Mis \u00e0 jour le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]} ${m[3]}`],
   [/^Ticket prices vary$/, () => 'Prix des billets variables'],
   [/^Hours not confirmed \u00b7 call ahead$/, () => 'Heures non confirm\u00e9es \u00b7 appelez avant'],
   [/^Closed for the season$/, () => 'Ferm\u00e9 pour la saison'],
