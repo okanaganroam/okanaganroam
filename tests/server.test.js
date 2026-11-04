@@ -32685,3 +32685,12 @@ test("What's On cards: an event at a place with its own photo shows that photo; 
   assert.match(app.whatsOnEventCardHtml({ ...base, venueId: withPhoto.id, image: '/images/events/own-test.jpg' }, day), /src="\/images\/events\/own-test\.jpg"/);
   assert.doesNotMatch(app.eventImagePath({ id: 9001, name: base.name, description: base.description, image_url: null }, ['markets-fairs']), /host-photo-fixture/);
 });
+
+test("What's On cards: a busy place's photo shows on at most two cards per page; the rest keep the kind photo (2026-11-04)", () => {
+  const v = app.createVenue({ name: 'Host Cap Fixture Theatre', region: 'kelowna', type: 'indoor', description: 'fixture', slug: 'host-cap-fixture-theatre', image_url: '/images/venues/host-cap-fixture-theatre.jpg' });
+  const used = new Map();
+  const claim = (id) => { const n = used.get(id) || 0; if (n >= 2) return false; used.set(id, n + 1); return true; };
+  const cards = [1, 2, 3, 4].map((i) => app.whatsOnEventCardHtml({ id: 9100 + i, name: `Cap Fixture Show ${i}`, slug: `cap-fixture-show-${i}`, region: 'kelowna', categories: ['live-music'], dateLabel: 'Sat Nov 7', description: 'x', venueId: v.id }, '2026-11-04', null, claim));
+  assert.deepEqual(cards.map((c) => /data-photo="venue"/.test(c)), [true, true, false, false]);
+  assert.match(cards[2], /<img class="whatson-event-img whatson-event-photo" src="\/images\/events\//);
+});
