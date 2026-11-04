@@ -1,0 +1,100 @@
+{
+ "town": "armstrong",
+ "name": "Armstrong",
+ "hero": "/images/venues/sparrowgrass-field-flower-2610.jpg",
+ "category": "country",
+ "sub": "Farm-fresh food, flowers and small-town charm.",
+ "placeholder": "Search Armstrong… cafes, farms, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=armstrong",
+   "img": "/images/venues/the-clove-restaurant-2610-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=armstrong",
+   "img": "/images/hiking/venues/thomas-hayes-ecological-reserve-trails-20261016-b5-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/armstrong/events",
+   "img": "/images/sports/venues/armstrong-nor-val-sports-centre-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/armstrong/kid_friendly",
+   "img": "/images/venues/armstrong-spallumcheen-outdoor-pool-2610-w480.jpg"
+  },
+  {
+   "title": "Golf",
+   "sub": "Tee up in Armstrong",
+   "href": "/golf?regions=armstrong",
+   "img": "/images/venues/overlander-golf-event-centre-2610-w480.jpg"
+  },
+  {
+   "title": "Cafés",
+   "sub": "Your coffee stop",
+   "href": "/cafes?regions=armstrong",
+   "img": "/images/venues/wild-oak-cafe-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "edge-of-the-earth-vineyards",
+   "name": "Edge of the Earth",
+   "tag": "Honest, down-to-earth wine",
+   "copy": "Taste with an owner-vintner who tells it straight.",
+   "href": "/armstrong/wineries/edge-of-the-earth-vineyards",
+   "img": "/images/venues/edge-of-the-earth-vineyards-2610-w480.jpg"
+  },
+  {
+   "slug": "haru-sushi-grill",
+   "name": "Haru Sushi & Grill",
+   "tag": "A sushi find in town",
+   "copy": "Generous sashimi and rolls tucked in a mall corner.",
+   "href": "/armstrong/restaurants/haru-sushi-grill",
+   "img": "/images/venues/haru-sushi-grill-2610-w480.jpg"
+  },
+  {
+   "slug": "fieldnotes-market",
+   "name": "Fieldnotes Market",
+   "tag": "Local goods & vintage finds",
+   "copy": "A curated shop of Canadian-made treasures downtown.",
+   "href": "/armstrong/shops/fieldnotes-market",
+   "img": "/images/venues/fieldnotes-market-2610-w480.jpg"
+  },
+  {
+   "slug": "armstrong-spallumcheen-museum-art-gallery",
+   "name": "Museum & Art Gallery",
+   "tag": "Local history, local art",
+   "copy": "Local history plus rotating exhibitions by regional artists.",
+   "href": "/armstrong/indoor/armstrong-spallumcheen-museum-art-gallery",
+   "img": "/images/venues/armstrong-museum-exhibit-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Open the map to see what is near you, and check hours before you head out.",
+   "href": "/map",
+   "label": "Open the map"
+  },
+  {
+   "title": "Farms, trails & country stops",
+   "copy": "Plan around seasonal farm hours and check access before you go.",
+   "href": "/outdoors?regions=armstrong",
+   "label": "Outdoor adventures"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each place for kid and dog rules before you go, since they vary.",
+   "href": "/guide/armstrong/kid_friendly",
+   "label": "Kid-friendly picks"
+  }
+ ]
+}

@@ -1,0 +1,100 @@
+{
+ "town": "naramata",
+ "name": "Naramata",
+ "hero": "/images/regions/photos/naramata-2610-1200.jpg",
+ "category": "wine",
+ "sub": "Bench-top wineries, lake views and slow, sunny days.",
+ "placeholder": "Search Naramata… wineries, patios, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=naramata",
+   "img": "/images/venues/bench-patio-bistro-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=naramata",
+   "img": "/images/venues/lang-vineyards-2610-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=naramata",
+   "img": "/images/hiking/venues/kvr-trail-naramata-bench-little-tunnel-adra-tunnel-20261015-b3-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/naramata/events",
+   "img": "/images/venues/the-patio-at-lake-breeze-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=naramata",
+   "img": "/images/venues/deep-roots-winery-2610-w480.jpg"
+  },
+  {
+   "title": "Breweries & Pubs",
+   "sub": "Pour yourself a pint",
+   "href": "/pubs?regions=naramata",
+   "img": "/images/venues/naramata-pub-grill-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "evolve-sparkling-house",
+   "name": "Evolve Sparkling House",
+   "tag": "Bubbles with a view",
+   "copy": "Sparkling-only wines and a lower deck with a lake view.",
+   "href": "/naramata/wineries/evolve-sparkling-house",
+   "img": "/images/venues/evolve-sparkling-house-2610-w480.jpg"
+  },
+  {
+   "slug": "the-bistro-at-hillside-winery",
+   "name": "Bistro at Hillside",
+   "tag": "Sunset over the vines",
+   "copy": "Outdoor seating that catches the sun setting over the lake.",
+   "href": "/naramata/restaurants/the-bistro-at-hillside-winery",
+   "img": "/images/venues/the-bistro-at-hillside-winery-2610-w480.jpg"
+  },
+  {
+   "slug": "sun-n-sup",
+   "name": "Sun n Sup",
+   "tag": "Paddle the village bays",
+   "copy": "Rent a board and paddle two protected bays.",
+   "href": "/naramata/outdoors/sun-n-sup",
+   "img": "/images/venues/sun-n-sup-20261017-w480.jpg"
+  },
+  {
+   "slug": "terroir-kitchen",
+   "name": "Terroir Kitchen",
+   "tag": "Slow farm-to-table dining",
+   "copy": "A quiet farm-to-table meal with local ingredients.",
+   "href": "/naramata/restaurants/terroir-kitchen",
+   "img": "/images/venues/terroir-kitchen-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Wineries are spread along the Naramata Bench, so plan your route, book tastings where needed and arrange a designated driver or tour.",
+   "href": "/wineries?regions=naramata",
+   "label": "Find Naramata wineries"
+  },
+  {
+   "title": "Wine tasting tips",
+   "copy": "Check hours, seasonal opening and whether reservations are needed before you go, and pace your tastings with food stops along the way.",
+   "href": "/food-drink?regions=naramata",
+   "label": "Find a bite to eat"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Many patios and wineries welcome kids and dogs. Check each listing for details and confirm current policies with the venue.",
+   "href": "/guide/naramata/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}

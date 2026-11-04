@@ -1,0 +1,100 @@
+{
+ "town": "vernon",
+ "name": "Vernon",
+ "hero": "/images/hiking/venues/kal-crystal-waters-trail-20261015-b4.jpg",
+ "category": "city",
+ "sub": "Three lakes, farm stops and plenty of fresh air.",
+ "placeholder": "Search Vernon… cafés, beaches, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=vernon",
+   "img": "/images/venues/rustlers-table-2610-w480.jpg"
+  },
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=vernon",
+   "img": "/images/beaches/venues/vernon-paddlewheel-park-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=vernon",
+   "img": "/images/hiking/venues/grey-canal-trail-20261016-b6-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/vernon/events",
+   "img": "/images/venues/vernon-farmers-market-2610-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/vernon/kid_friendly",
+   "img": "/images/venues/splashdown-vernon-2610-w480.jpg"
+  },
+  {
+   "title": "Golf",
+   "sub": "Tee up in Vernon",
+   "href": "/golf?regions=vernon",
+   "img": "/images/venues/predator-ridge-predator-course-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "davison-orchards",
+   "name": "Davison Orchards",
+   "tag": "A family farm day out",
+   "copy": "Animal barn, orchard tours and farm market.",
+   "href": "/vernon/outdoors/davison-orchards",
+   "img": "/images/venues/davison-orchards-2610-w480.jpg"
+  },
+  {
+   "slug": "ratio-coffee-pastry",
+   "name": "Ratio Coffee & Pastry",
+   "tag": "Coffee in a rail station",
+   "copy": "Beans roasted in house, in a converted station.",
+   "href": "/vernon/cafes/ratio-coffee-pastry",
+   "img": "/images/venues/ratio-coffee-pastry-2610-w480.jpg"
+  },
+  {
+   "slug": "bx-creek-trail-bx-falls",
+   "name": "BX Creek Trail & Falls",
+   "tag": "Waterfall walk",
+   "copy": "Follow the creek down to BX Falls.",
+   "href": "/vernon/outdoors/bx-creek-trail-bx-falls",
+   "img": "/images/hiking/venues/bx-creek-trail-bx-falls-20261016-linked-w480.jpg"
+  },
+  {
+   "slug": "historic-o-keefe-ranch",
+   "name": "Historic O’Keefe Ranch",
+   "tag": "Step back in time",
+   "copy": "Tour the 1860s mansion, general store and church.",
+   "href": "/vernon/indoor/historic-o-keefe-ranch",
+   "img": "/images/venues/historic-o-keefe-ranch-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Plan your stops, check parking signs and leave time to explore. Roam Now shows places near you.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Beaches, trails & lake days",
+   "copy": "Check local conditions, seasonal access and posted rules before you head out.",
+   "href": "/beaches?regions=vernon",
+   "label": "Find beaches"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each listing for family and dog-friendly details, and confirm current policies with the venue.",
+   "href": "/guide/vernon/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}

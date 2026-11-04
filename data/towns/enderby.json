@@ -1,0 +1,100 @@
+{
+ "town": "enderby",
+ "name": "Enderby",
+ "hero": "/images/regions/photos/enderby-2610-1200.jpg",
+ "category": "country",
+ "sub": "River days, the Enderby Cliffs and small-town charm.",
+ "placeholder": "Search Enderby… cafes, river, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=enderby",
+   "img": "/images/venues/kaze-japanese-restaurant-2610-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=enderby",
+   "img": "/images/hiking/venues/tplaqin-enderby-cliffs-provincial-park-20261015-b3-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/enderby/events",
+   "img": "/images/venues/shuswap-river-float-2610-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/enderby/kid_friendly",
+   "img": "/images/venues/enderby-outdoor-pool-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=enderby",
+   "img": "/images/venues/hidden-lake-recreation-site-2610-w480.jpg"
+  },
+  {
+   "title": "Golf",
+   "sub": "Tee up in Enderby",
+   "href": "/golf?regions=enderby",
+   "img": "/images/venues/mabel-lake-golf-country-club-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "shuswap-cider-company",
+   "name": "Shuswap Cider Company",
+   "tag": "Cider by the river",
+   "copy": "Small craft cidery beside the Shuswap River.",
+   "href": "/enderby/breweries/shuswap-cider-company",
+   "img": "/images/venues/shuswap-cider-company-2610-w480.jpg"
+  },
+  {
+   "slug": "baccata-ridge-winery",
+   "name": "Baccata Ridge Winery",
+   "tag": "Fruit wines with a view",
+   "copy": "Honey and blueberry wines on a beautiful patio.",
+   "href": "/enderby/wineries/baccata-ridge-winery",
+   "img": "/images/venues/baccata-ridge-winery-2610-w480.jpg"
+  },
+  {
+   "slug": "enderbeans-cafe",
+   "name": "Enderbeans Cafe",
+   "tag": "House-roasted coffee",
+   "copy": "Cozy cafe roasting its own beans, with a patio.",
+   "href": "/enderby/cafes/enderbeans-cafe",
+   "img": "/images/venues/enderbeans-cafe-2610-w480.jpg"
+  },
+  {
+   "slug": "mabel-lake-resort-marina",
+   "name": "Mabel Lake Resort",
+   "tag": "Lakeside camping & marina",
+   "copy": "RV sites near the beach, plus a marina and store.",
+   "href": "/enderby/outdoors/mabel-lake-resort-marina",
+   "img": "/images/venues/mabel-lake-resort-marina-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Open the map to see what is near you, and check hours before you head out.",
+   "href": "/map",
+   "label": "Open the map"
+  },
+  {
+   "title": "River, lake & trail days",
+   "copy": "Float and recreation-site access varies by season, so check before you go.",
+   "href": "/outdoors?regions=enderby",
+   "label": "Outdoor adventures"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each place for kid and dog rules before you go, since they vary.",
+   "href": "/guide/enderby/kid_friendly",
+   "label": "Kid-friendly picks"
+  }
+ ]
+}

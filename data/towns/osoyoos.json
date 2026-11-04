@@ -1,0 +1,100 @@
+{
+ "town": "osoyoos",
+ "name": "Osoyoos",
+ "hero": "/images/regions/photos/osoyoos-2610-1200.jpg",
+ "category": "lake",
+ "sub": "Canada’s warmest lake, desert scenery and wine country.",
+ "placeholder": "Search Osoyoos… beaches, patios, wineries",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=osoyoos",
+   "img": "/images/venues/greenside-bar-grill-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=osoyoos",
+   "img": "/images/venues/adega-on-45th-estate-winery-2610-w480.jpg"
+  },
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=osoyoos",
+   "img": "/images/beaches/venues/osoyoos-legion-beach-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=osoyoos",
+   "img": "/images/hiking/venues/kruger-mountain-blue-lake-kilpoola-trails-20261016-cycling-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/osoyoos/kid_friendly",
+   "img": "/images/venues/jack-shaw-splash-park-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=osoyoos",
+   "img": "/images/beaches/venues/osoyoos-goodman-park-dog-swimming-area-destination-osoyoos-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "spotted-lake-klilxw-viewpoint",
+   "name": "Spotted Lake",
+   "tag": "A one-of-a-kind sight",
+   "copy": "Mineral pools ringed in white, viewed from a pullout.",
+   "href": "/osoyoos/outdoors/spotted-lake-klilxw-viewpoint",
+   "img": "/images/hiking/venues/spotted-lake-klilxw-viewpoint-20261016-viewpoint-w480.jpg"
+  },
+  {
+   "slug": "spirit-beach-cantina",
+   "name": "Spirit Beach Cantina",
+   "tag": "Lakeside tacos & music",
+   "copy": "A lakeside Mexican spot with live music events.",
+   "href": "/osoyoos/restaurants/spirit-beach-cantina",
+   "img": "/images/venues/spirit-beach-cantina-2610-w480.jpg"
+  },
+  {
+   "slug": "nk-mip-cellars",
+   "name": "Nk’Mip Cellars",
+   "tag": "Wine with a view",
+   "copy": "North America’s first Indigenous-owned winery.",
+   "href": "/osoyoos/wineries/nk-mip-cellars",
+   "img": "/images/venues/nk-mip-cellars-2610-w480.jpg"
+  },
+  {
+   "slug": "sun-hills-riding-centre",
+   "name": "Sun Hills Riding",
+   "tag": "Ride through the desert",
+   "copy": "Guided trail rides through antelope-brush country.",
+   "href": "/osoyoos/outdoors/sun-hills-riding-centre",
+   "img": "/images/venues/sun-hills-riding-centre-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Plan your stops, check parking signs near the lake and leave time to explore on foot. Use Roam Now to discover places nearby.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Beaches, trails & lake days",
+   "copy": "Find a lakeside spot or a desert trail. Check local conditions, seasonal access and posted rules before you go.",
+   "href": "/beaches?regions=osoyoos",
+   "label": "Find beaches"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Find places that suit your whole crew. Check each listing for family- and dog-friendly details and confirm current policies with the venue.",
+   "href": "/guide/osoyoos/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}
