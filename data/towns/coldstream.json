@@ -1,0 +1,100 @@
+{
+ "town": "coldstream",
+ "name": "Coldstream",
+ "hero": "/images/regions/photos/coldstream-2610-1200.jpg",
+ "category": "lake",
+ "sub": "Turquoise Kalamalka Lake, scenic trails and orchard stops.",
+ "placeholder": "Search Coldstream… beaches, trails, cideries",
+ "tiles": [
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=coldstream",
+   "img": "/images/beaches/venues/coldstream-kal-beach-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=coldstream",
+   "img": "/images/venues/cougar-canyon-trail-2610-w480.jpg"
+  },
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=coldstream",
+   "img": "/images/venues/friesen-s-countrytyme-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=coldstream",
+   "img": "/images/venues/ponds-interpretive-trail-2610-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/coldstream/kid_friendly",
+   "img": "/images/beaches/venues/coldstream-sovereign-park-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/coldstream/events",
+   "img": "/images/venues/ed-s-mobile-kayak-rental-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "tonys-craft-cidery",
+   "name": "Tony’s Craft Cidery",
+   "tag": "Cider in the orchard",
+   "copy": "Small-batch ciders on a cozy porch among apple trees.",
+   "href": "/coldstream/breweries/tonys-craft-cidery",
+   "img": "/images/venues/tonys-craft-cidery-2610-w480.jpg"
+  },
+  {
+   "slug": "kalamalka-lake-provincial-park-trails-rattlesnake-point",
+   "name": "Rattlesnake Point",
+   "tag": "Lake views on foot",
+   "copy": "Short park trails lead to a lakeside viewing platform.",
+   "href": "/coldstream/outdoors/kalamalka-lake-provincial-park-trails-rattlesnake-point",
+   "img": "/images/sports/venues/coldstream-kalamalka-lake-provincial-park-trails-rattlesnake-point-w480.jpg"
+  },
+  {
+   "slug": "mackie-lake-house",
+   "name": "Mackie Lake House",
+   "tag": "Historic lakeshore home",
+   "copy": "A 1910 home beside Sovereign Park with guided tours.",
+   "href": "/coldstream/indoor/mackie-lake-house",
+   "img": "/images/venues/mackie-lake-house-2610-w480.jpg"
+  },
+  {
+   "slug": "bluenose-mountain-bistro",
+   "name": "Bluenose Mountain Bistro",
+   "tag": "Worth the drive to Lavington",
+   "copy": "Homemade bread and a signature truffle mushroom melt.",
+   "href": "/coldstream/restaurants/bluenose-mountain-bistro",
+   "img": "/images/venues/bluenose-mountain-bistro-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Open the map to see what is near you, and check hours before you head out.",
+   "href": "/map",
+   "label": "Open the map"
+  },
+  {
+   "title": "Beaches, trails & lake days",
+   "copy": "Kalamalka Lake spots vary by access and season, so check before you go.",
+   "href": "/beaches?regions=coldstream",
+   "label": "Beaches & lake"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each place for kid and dog rules before you go, since they vary.",
+   "href": "/guide/coldstream/kid_friendly",
+   "label": "Kid-friendly picks"
+  }
+ ]
+}

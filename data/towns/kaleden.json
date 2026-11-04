@@ -1,0 +1,92 @@
+{
+ "town": "kaleden",
+ "name": "Kaleden",
+ "hero": "/images/regions/photos/kaleden-2610-1200.jpg",
+ "category": "wine",
+ "sub": "Quiet lakeside wineries, golf and Skaha views.",
+ "placeholder": "Search Kaleden… wineries, golf, cafes",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=kaleden",
+   "img": "/images/venues/painted-turtle-bistro-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=kaleden",
+   "img": "/images/venues/farm-gate-winery-fruit-stand-2610-w480.jpg"
+  },
+  {
+   "title": "Golf",
+   "sub": "Tee up in Kaleden",
+   "href": "/golf?regions=kaleden",
+   "img": "/images/venues/twin-lakes-golf-course-2610-w480.jpg"
+  },
+  {
+   "title": "Cafés",
+   "sub": "Your coffee stop",
+   "href": "/cafes?regions=kaleden",
+   "img": "/images/venues/linden-gardens-2610-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=kaleden",
+   "img": "/images/beaches/venues/kaleden-pioneer-park-w480.jpg"
+  },
+  {
+   "title": "Hidden Gems",
+   "sub": "Local secrets worth finding",
+   "href": "/hidden-gems?regions=kaleden",
+   "img": "/images/venues/kaleden-hotel-park-2610-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "black-market-wine-co",
+   "name": "Black Market Wine Co.",
+   "tag": "Wine with a view",
+   "copy": "Taste on a Kaleden patio with lake views.",
+   "href": "/kaleden/wineries/black-market-wine-co",
+   "img": "/images/venues/black-market-wine-co-2610-w480.jpg"
+  },
+  {
+   "slug": "st-andrews-by-the-lake-golf-resort",
+   "name": "St. Andrews by the Lake",
+   "tag": "A pastoral 9 holes",
+   "copy": "Willow-lined fairways wrapped around a small lake.",
+   "href": "/kaleden/golf/st-andrews-by-the-lake-golf-resort",
+   "img": "/images/venues/st-andrews-by-the-lake-golf-resort-2610-w480.jpg"
+  },
+  {
+   "slug": "dominion-radio-astrophysical-observatory-drao",
+   "name": "DRAO Observatory",
+   "tag": "Space science up close",
+   "copy": "Guided tours of giant radio telescope dishes.",
+   "href": "/kaleden/indoor/dominion-radio-astrophysical-observatory-drao",
+   "img": "/images/venues/dominion-radio-astrophysical-observatory-drao-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Open the map to see what is near you, and check hours before you head out.",
+   "href": "/map",
+   "label": "Open the map"
+  },
+  {
+   "title": "Wine tasting tips",
+   "copy": "Confirm tasting hours and book ahead where needed before you visit.",
+   "href": "/wineries?regions=kaleden",
+   "label": "Kaleden wineries"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each place for kid and dog rules before you go, since they vary.",
+   "href": "/dog-friendly?regions=kaleden",
+   "label": "Dog-friendly spots"
+  }
+ ]
+}

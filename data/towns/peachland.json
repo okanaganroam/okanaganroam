@@ -1,0 +1,100 @@
+{
+ "town": "peachland",
+ "name": "Peachland",
+ "hero": "/images/venues/peachland-heritage-park-2610.jpg",
+ "category": "lake",
+ "sub": "Lakeside charm, vineyard views and easy days out.",
+ "placeholder": "Search Peachland… beaches, trails, patios",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=peachland",
+   "img": "/images/venues/peachland-sushi-2610-w480.jpg"
+  },
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=peachland",
+   "img": "/images/beaches/venues/peachland-cove-beach-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=peachland",
+   "img": "/images/venues/fur-brigade-trail-viewpoint-2610-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/peachland/events",
+   "img": "/images/venues/gasthaus-on-the-lake-2610-w480.jpg"
+  },
+  {
+   "title": "With Kids",
+   "sub": "Little adventurers welcome",
+   "href": "/guide/peachland/kid_friendly",
+   "img": "/images/venues/splash-bc-floating-water-park-peachland-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=peachland",
+   "img": "/images/beaches/venues/peachland-13th-street-viewpoint-centennial-way-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "19-bistro-fitz",
+   "name": "19 Bistro at Fitz",
+   "tag": "Lunch with a lake view",
+   "copy": "Fish tacos and local wine on a vineyard patio.",
+   "href": "/peachland/restaurants/19-bistro-fitz",
+   "img": "/images/venues/19-bistro-fitz-2610-w480.jpg"
+  },
+  {
+   "slug": "hardy-falls-regional-park",
+   "name": "Hardy Falls",
+   "tag": "An easy waterfall walk",
+   "copy": "A flat, shaded trail to a waterfall viewing platform.",
+   "href": "/peachland/outdoors/hardy-falls-regional-park",
+   "img": "/images/hiking/venues/hardy-falls-regional-park-20261015-b3-w480.jpg"
+  },
+  {
+   "slug": "zipzone-peachland",
+   "name": "ZipZone Peachland",
+   "tag": "Soar over the gorge",
+   "copy": "Guided ziplines across the Deep Creek gorge.",
+   "href": "/peachland/outdoors/zipzone-peachland",
+   "img": "/images/venues/zipzone-peachland-2610-w480.jpg"
+  },
+  {
+   "slug": "hainle-vineyards-estate-winery",
+   "name": "Hainle Vineyards",
+   "tag": "Wine with a lake view",
+   "copy": "A balcony tasting room overlooking the lake.",
+   "href": "/peachland/wineries/hainle-vineyards-estate-winery",
+   "img": "/images/venues/hainle-vineyards-estate-winery-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Plan your stops, check parking signs and leave time to explore. Roam Now shows places near you.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Beaches, trails & lake days",
+   "copy": "Check local conditions, seasonal access and posted rules before you head out.",
+   "href": "/beaches?regions=peachland",
+   "label": "Find beaches"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each listing for family and dog-friendly details, and confirm current policies with the venue.",
+   "href": "/guide/peachland/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}

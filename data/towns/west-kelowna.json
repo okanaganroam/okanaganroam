@@ -1,0 +1,100 @@
+{
+ "town": "west-kelowna",
+ "name": "West Kelowna",
+ "hero": "/images/regions/photos/west-kelowna-2610-1200.jpg",
+ "category": "wine",
+ "sub": "Lakeside wineries, beaches and big Okanagan views.",
+ "placeholder": "Search West Kelowna… wineries, beaches, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=west-kelowna",
+   "img": "/images/venues/annie-s-beach-cafe-lounge-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=west-kelowna",
+   "img": "/images/venues/black-swift-vineyards-2610-w480.jpg"
+  },
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=west-kelowna",
+   "img": "/images/beaches/venues/west-kelowna-pritchard-park-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=west-kelowna",
+   "img": "/images/hiking/venues/goats-peak-regional-park-20261016-linked-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/west-kelowna/events",
+   "img": "/images/venues/memorial-park-annette-beaudreau-amphitheatre-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=west-kelowna",
+   "img": "/images/beaches/venues/west-kelowna-gellatly-dog-beach-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "the-landing-kitchen-bar",
+   "name": "The Landing Kitchen + Bar",
+   "tag": "Resort dining by the lake",
+   "copy": "Known for its tender Saturday prime rib special.",
+   "href": "/west-kelowna/restaurants/the-landing-kitchen-bar",
+   "img": "/images/venues/the-landing-kitchen-bar-2610-w480.jpg"
+  },
+  {
+   "slug": "mission-hill-family-estate-winery",
+   "name": "Mission Hill Winery",
+   "tag": "An iconic estate",
+   "copy": "Architectural tours and a terrace with valley views.",
+   "href": "/west-kelowna/wineries/mission-hill-family-estate-winery",
+   "img": "/images/venues/mission-hill-family-estate-winery-2610-w480.jpg"
+  },
+  {
+   "slug": "christie-falls",
+   "name": "Christie Falls",
+   "tag": "A waterfall you can walk behind",
+   "copy": "A short, steep trail to a tall waterfall.",
+   "href": "/west-kelowna/outdoors/christie-falls",
+   "img": "/images/venues/christie-falls-2610-w480.jpg"
+  },
+  {
+   "slug": "shannon-lake-regional-park",
+   "name": "Shannon Lake Regional Park",
+   "tag": "A peaceful lakeside park",
+   "copy": "A floating dock, shoreline trails and picnic tables.",
+   "href": "/west-kelowna/outdoors/shannon-lake-regional-park",
+   "img": "/images/hiking/venues/shannon-lake-regional-park-20261016-nature-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Plan your stops, check parking signs and leave time to explore. Roam Now shows places near you.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Wine tasting tips",
+   "copy": "Check tasting room hours and booking details, and plan a safe ride before you go.",
+   "href": "/wineries?regions=west-kelowna",
+   "label": "Browse wineries"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each listing for family and dog-friendly details, and confirm current policies with the venue.",
+   "href": "/guide/west-kelowna/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}

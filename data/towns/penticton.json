@@ -1,0 +1,100 @@
+{
+ "town": "penticton",
+ "name": "Penticton",
+ "hero": "/images/venues/mount-nkwala-trails-2610.jpg",
+ "category": "lake",
+ "sub": "Two lakes, Naramata Bench wines and endless sunshine.",
+ "placeholder": "Search Penticton… beaches, wineries, trails",
+ "tiles": [
+  {
+   "title": "Eat & Drink",
+   "sub": "From coffee to dinner",
+   "href": "/food-drink?regions=penticton",
+   "img": "/images/venues/local-public-eatery-penticton-2610-w480.jpg"
+  },
+  {
+   "title": "Wine & Tastings",
+   "sub": "Sip your way through",
+   "href": "/wineries?regions=penticton",
+   "img": "/images/venues/la-frenz-winery-2610-w480.jpg"
+  },
+  {
+   "title": "Beaches & Lake",
+   "sub": "Find your lakeside escape",
+   "href": "/beaches?regions=penticton",
+   "img": "/images/beaches/venues/penticton-skaha-beach-w480.jpg"
+  },
+  {
+   "title": "Outdoor Adventures",
+   "sub": "Trails, views and fresh air",
+   "href": "/outdoors?regions=penticton",
+   "img": "/images/hiking/venues/skaha-bluffs-provincial-park-20261016-linked-w480.jpg"
+  },
+  {
+   "title": "What’s On",
+   "sub": "Make a day or night of it",
+   "href": "/penticton/events",
+   "img": "/images/venues/penticton-farmers-market-2610-w480.jpg"
+  },
+  {
+   "title": "Dog-Friendly",
+   "sub": "Bring the whole crew",
+   "href": "/dog-friendly?regions=penticton",
+   "img": "/images/beaches/venues/penticton-skaha-lake-dog-beach-w480.jpg"
+  }
+ ],
+ "picks": [
+  {
+   "slug": "abandoned-rail-brewing-co",
+   "name": "Abandoned Rail Brewing",
+   "tag": "Lagers by the rail trail",
+   "copy": "Family-run taproom with dog-friendly patios.",
+   "href": "/penticton/breweries/abandoned-rail-brewing-co",
+   "img": "/images/venues/abandoned-rail-brewing-co-2610-w480.jpg"
+  },
+  {
+   "slug": "kvr-trail-penticton-mcculloch-trestle",
+   "name": "KVR Trail & McCulloch Trestle",
+   "tag": "Easy ride, big views",
+   "copy": "A flat rail-trail past vineyards to a wooden trestle.",
+   "href": "/penticton/outdoors/kvr-trail-penticton-mcculloch-trestle",
+   "img": "/images/venues/kvr-trail-penticton-mcculloch-trestle-2610-w480.jpg"
+  },
+  {
+   "slug": "poplar-grove-winery",
+   "name": "Poplar Grove Winery",
+   "tag": "Wine with a view",
+   "copy": "A Naramata Bench patio with a standout view.",
+   "href": "/penticton/wineries/poplar-grove-winery",
+   "img": "/images/venues/poplar-grove-winery-2610-w480.jpg"
+  },
+  {
+   "slug": "locolanding-adventure-park",
+   "name": "LocoLanding",
+   "tag": "Family adventure day",
+   "copy": "Ropes course, go-karts, bumper boats and mini-golf.",
+   "href": "/penticton/outdoors/locolanding-adventure-park",
+   "img": "/images/venues/locolanding-adventure-park-2610-w480.jpg"
+  }
+ ],
+ "plan": [
+  {
+   "title": "Getting around & parking",
+   "copy": "Plan your stops, check parking signs and leave time to explore. Roam Now shows places near you.",
+   "href": "/map",
+   "label": "Explore the map"
+  },
+  {
+   "title": "Beaches, trails & lake days",
+   "copy": "Check local conditions, seasonal access and posted rules before you head out.",
+   "href": "/beaches?regions=penticton",
+   "label": "Find beaches"
+  },
+  {
+   "title": "Visiting with kids or dogs",
+   "copy": "Check each listing for family and dog-friendly details, and confirm current policies with the venue.",
+   "href": "/guide/penticton/kid_friendly",
+   "label": "Family-friendly places"
+  }
+ ]
+}
