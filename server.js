@@ -45154,9 +45154,21 @@ function menuPriceLabel(price, lang = 'en') {
     const t = p.replace('$', '');
     return lang === 'fr' ? `${t.replace(/,/g, ' ').replace('.', ',')} $` : `$${t}`;
   }
+  // A size range ("5 - 8", "11-16") gets a sign on both ends: "$5 - $8" (French "5 - 8 $").
+  const range = /^\$?(\d{1,4}(?:[.,]\d{1,2})?)\s*[-–]\s*\$?(\d{1,4}(?:[.,]\d{1,2})?)$/.exec(p);
+  if (range) {
+    const [a, b] = [range[1], range[2]].map((x) => menuPriceAmount(x, lang));
+    return lang === 'fr' ? `${a} - ${b} $` : `$${a} - $${b}`;
+  }
   if (!/^\$?\d{1,5}(?:[.,]\d{1,2})?$/.test(p)) return menuPriceWithWords(p, lang);
-  const n = p.replace('$', '');
-  return lang === 'fr' ? `${n.replace('.', ',')} $` : `$${n.replace(',', '.')}`;
+  const n = menuPriceAmount(p.replace('$', ''), lang);
+  return lang === 'fr' ? `${n} $` : `$${n}`;
+}
+// One decimal digit is padded to cents ("2.5" -> "2.50"); whole numbers stay whole.
+function menuPriceAmount(n, lang = 'en') {
+  const s = String(n).replace(',', '.');
+  const out = /\.\d$/.test(s) ? `${s}0` : s;
+  return lang === 'fr' ? out.replace('.', ',') : out;
 }
 
 // Tour prices (2026-10-18): a number with words and no currency sign gets one, so "129 per person" goes live as

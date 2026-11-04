@@ -23361,6 +23361,13 @@ test('Menus: the Claude request (model, refusal fallback, structured output) and
   assert.equal(app.menuPriceLabel('18'), '$18');
   assert.equal(app.menuPriceLabel('18.50', 'fr'), '18,50 $');
   assert.equal(app.menuPriceLabel('12 / 16'), '12 / 16');
+  // A decimal pads to cents and a size range gets a sign on both ends (Cue's Game Room, 2026-11-04).
+  assert.equal(app.menuPriceLabel('2.5'), '$2.50');
+  assert.equal(app.menuPriceLabel('9.5'), '$9.50');
+  assert.equal(app.menuPriceLabel('5 - 8'), '$5 - $8');
+  assert.equal(app.menuPriceLabel('11-16'), '$11 - $16');
+  assert.equal(app.menuPriceLabel('7 \u2013 11.5'), '$7 - $11.50');
+  assert.equal(app.menuPriceLabel('5 - 8', 'fr'), '5 - 8\u00a0$');
   assert.equal(app.menuPriceNumber('$18.50'), 18.5);
   assert.equal(app.menuPriceNumber('MP'), null);
   assert.deepEqual(app.normalizeMenuData({ sections: [{ name: 'Empty', items: [] }, { name: 'X', items: [{ name: '  ' }, { name: 'Tea', price: 3 }] }] }),
