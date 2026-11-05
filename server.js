@@ -20287,7 +20287,14 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var returnContext=null;
   try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
   document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
+  function dismissTownLocationHelp(){
+    if(!town||pendingRoute)return false;
+    cancelPendingLocation();
+    var help=$('rnLocationHelp');if(!help.hidden){help.hidden=true;floatGap();}
+    return true;
+  }
   function showLocationHelp(text){
+    if(dismissTownLocationHelp())return;
     var reason=text===T.denied?'blocked':text===T.failed?'failed':text===T.outside?'outside':text===T.unsupported?'unsupported':'needed';
     $('rnLocationHelp').hidden=false;
     $('rnLocationMessage').textContent=pendingRoute?roamRouteLocationMessage(reason,pendingRoute.name,FR?'fr':'en'):text;
@@ -20564,6 +20571,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // the map" while 3 matched).
   var searchFit = false, hhNoteShown = false;
   function render(fit){
+    dismissTownLocationHelp();
     $('rnLocationText').textContent=roamLocationLabel();
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
     var items, onMap, sf = searchFit; searchFit = false;
