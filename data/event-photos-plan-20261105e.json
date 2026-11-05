@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-05",
+  "reason": "Recurring-event photos",
+  "batch_id": "event-photos-2026-11-05e",
+  "update": [
+    {
+      "id": 2,
+      "expect": {
+        "image_url": null
+      },
+      "set": {
+        "image_url": "/images/events/west-kelowna-warriors-2611.jpg"
+      },
+      "why": "Real photo of the host place (Royal LePage Place, West Kelowna Warriors)"
+    }
+  ]
+}
