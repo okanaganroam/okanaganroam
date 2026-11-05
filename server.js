@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
 const dashboardData = require('./dashboard-data');
+const gaReport = require('./ga-report');
 const siteEvents = require('./site-events');
 const siteEventCounter = siteEvents.createCounter(db);
 const { renderDashboardPage } = require('./dashboard-page');
@@ -57246,7 +57247,9 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/admin/dashboard-data' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
       res.setHeader('Cache-Control', 'no-store');
-      return sendJSON(res, 200, dashboardData.collect(db, { site: 'okanagan', days: query.days }));
+      const dd = dashboardData.collect(db, { site: 'okanagan', days: query.days });
+      dd.traffic = await gaReport.report(query.days);
+      return sendJSON(res, 200, dd);
     }
     if ((pathname === '/admin/dashboard' || pathname === '/admin/dashboard/') && (method === 'GET' || method === 'HEAD')) {
       const signedIn = adminSessionValid(req);
@@ -57257,13 +57260,13 @@ const server = http.createServer(async (req, res) => {
       const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
       const site = ['okanagan', 'whistler'].includes(query.site) ? query.site : 'both';
       const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
-      try { sites[0].data = dashboardData.collect(db, { site: 'okanagan', days }); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
+      try { sites[0].data = dashboardData.collect(db, { site: 'okanagan', days }); sites[0].data.traffic = await gaReport.report(days); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
       if (site !== 'okanagan') {
         const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
         if (!wToken) sites[1].error = 'Not connected yet: add the Whistler Roam admin key to this site as WHISTLER_ADMIN_TOKEN.';
         else {
           try {
-            const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/dashboard-data?days=${days}`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(6000) });
+            const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/dashboard-data?days=${days}`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(12000) });
             if (r.status === 200) sites[1].data = await r.json();
             else sites[1].error = r.status === 401 ? 'Whistler Roam rejected the admin key.' : r.status === 404 ? 'Whistler Roam doesn’t have the dashboard yet.' : `Whistler Roam answered ${r.status}.`;
           } catch (e) { sites[1].error = 'Couldn’t reach Whistler Roam right now.'; }
