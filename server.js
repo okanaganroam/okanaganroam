@@ -11,8 +11,11 @@ const venueActivity = require('./venue-activity');
 const clickLabels = require('./click-labels');
 const venueActivityCounter = venueActivity.createCounter(db);
 const { renderBusinessPage } = require('./venue-activity-page');
+const { renderPortalPage } = require('./portal-activity-page');
 const siteEvents = require('./site-events');
 const siteEventCounter = siteEvents.createCounter(db);
+const portalActivity = require('./portal-activity');
+const portalCounter = portalActivity.createPortalCounter(db);
 const { renderDashboardPage } = require('./dashboard-page');
 const tripDemand = require('./trip-demand');
 const tripDemandLog = tripDemand.createLogger(db);
@@ -14887,6 +14890,20 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       var size = count ? parseInt(count.textContent, 10) || 0 : 0;
       window.trackEvent('open_my_trip', { trip_size: size, open_source: 'tray_button' });
     } catch (err) { /* analytics must never break the site */ }
+  }, true);
+  // Business portal (2026-11-05): a click on a Business login or Claim this listing link anywhere outside the portal,
+  // counted by where the link sits. Counts only; see portal-activity.js.
+  document.addEventListener('click', function(e){
+    try {
+      if (!e.isTrusted || /^\\/(?:fr\\/)?(?:owner|claim)(?:\\/|$)/.test(location.pathname)) return;
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var h = (a.getAttribute('href') || '').split(/[?#]/)[0].replace(/\\/$/, '');
+      if (/^(?:\\/fr)?\\/claim\\//.test(h)) { roamCount('portal_claim_click'); return; }
+      if (!/^(?:\\/fr)?\\/owner\\/login$/.test(h)) return;
+      var spot = a.closest('footer') ? 'footer' : a.closest('header, nav, .nav-menu') ? 'menu' : a.closest('main, #venueOwnerCta') ? 'venue_page' : 'other';
+      roamCount('portal_login_click_' + spot);
+    } catch (err) { /* counting must never break the site */ }
   }, true);
 </script>${replayHead()}`;
 }
@@ -41277,7 +41294,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, as plain daily totals with nothing that identifies you.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, and how often steps in the business portal (such as signing in) are used, as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -56993,6 +57010,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(infoPage());
     }
+    // Business portal activity (2026-11-05): count each step as it is answered (see portal-activity.js).
+    if (/^(?:\/fr)?\/(?:owner|claim)(?:\/|$)|^\/api\/claims$/.test(pathname)) portalCounter.watch(req, res, method, pathname, requestClientIp(req));
     // Claim this listing (2026-10-18): see renderClaimPage.
     {
       const cm = method === 'GET' ? /^(\/fr)?\/claim\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)\/?$/.exec(pathname) : null;
@@ -57340,6 +57359,32 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Cache-Control', 'no-store');
       if (query.id) return sendJSON(res, 200, { detail: query.kind === 'event' ? venueActivityCounter.detailEvent(query.id, query.days) : venueActivityCounter.detail(query.id, query.days) });
       return sendJSON(res, 200, { matches: [...venueActivityCounter.search(query.q), ...venueActivityCounter.searchEvents(query.q)] });
+    }
+    // Business portal activity (2026-11-05). GET /api/admin/portal-activity?days=30 -> this site's portal steps. Admin token.
+    if (pathname === '/api/admin/portal-activity' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, portalCounter.report(query.days));
+    }
+    // The page: /admin/dashboard/portal (both sites side by side).
+    if ((pathname === '/admin/dashboard/portal' || pathname === '/admin/dashboard/portal/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Business portal', '<h1>Business portal</h1><p>The admin key is not set up on this server.</p>'));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
+      const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+      let whistler;
+      if (!wToken) whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.' };
+      else {
+        try {
+          const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/portal-activity?days=${days}`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(8000) });
+          whistler = r.status === 200 ? { key: 'whistler', name: 'Whistler Roam', data: await r.json() }
+            : { key: 'whistler', name: 'Whistler Roam', error: r.status === 404 ? 'Whistler Roam doesn’t have the portal report yet.' : `Whistler Roam answered ${r.status}.` };
+        } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
+      }
+      return res.end(renderPortalPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: portalCounter.report(days) }, whistler] }));
     }
     // The page: /admin/dashboard/business?q=name (search both sites) and &site=okanagan|whistler&id=123 (one business).
     if ((pathname === '/admin/dashboard/business' || pathname === '/admin/dashboard/business/') && (method === 'GET' || method === 'HEAD')) {

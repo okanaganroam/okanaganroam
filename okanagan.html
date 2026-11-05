@@ -73,7 +73,7 @@
   // break the actual site.
   // Site event counts (2026-11-05): a per-day count of fixed-list feature events on our own server (no visitor id, nothing
   // typed), the same list and endpoint as the shared analytics head in server.js; plus the Build My Trip demand beacon.
-  var ROAM_EV = ["open_map", "map_near_me", "map_filter", "map_search", "map_search_empty", "map_voice_search", "map_pin", "map_directions", "map_share", "map_arrived", "map_outside", "nearby_click", "build_my_trip_click", "trip_plan_start", "trip_plan_complete", "trip_plan_regenerate", "trip_share", "add_whole_trip", "open_my_trip", "add_to_trip", "remove_from_trip", "shared_trip_view", "shared_trip_save", "shared_trip_cta_click", "hotel_page_click", "bio_link_click", "listing_submit", "outbound_click", "search"];
+  var ROAM_EV = ["open_map", "map_near_me", "map_filter", "map_search", "map_search_empty", "map_voice_search", "map_pin", "map_directions", "map_share", "map_arrived", "map_outside", "nearby_click", "build_my_trip_click", "trip_plan_start", "trip_plan_complete", "trip_plan_regenerate", "trip_share", "add_whole_trip", "open_my_trip", "add_to_trip", "remove_from_trip", "shared_trip_view", "shared_trip_save", "shared_trip_cta_click", "hotel_page_click", "bio_link_click", "listing_submit", "outbound_click", "search", "portal_login_click_menu", "portal_login_click_venue_page", "portal_login_click_footer", "portal_login_click_other", "portal_claim_click"];
   function roamBeacon(url, obj){
     try {
       if (!navigator.sendBeacon || /(?:^|;\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
@@ -95,6 +95,19 @@
       }
     } catch (e) { /* analytics must never break the site */ }
   };
+  // Business portal (2026-11-05): a click on Business login or Claim this listing, counted by where the link sits.
+  document.addEventListener('click', function(e){
+    try {
+      if (!e.isTrusted) return;
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var h = (a.getAttribute('href') || '').split(/[?#]/)[0].replace(/\/$/, '');
+      if (/^(?:\/fr)?\/claim\//.test(h)) { roamBeacon('/api/site-event', { name: 'portal_claim_click' }); return; }
+      if (!/^(?:\/fr)?\/owner\/login$/.test(h)) return;
+      var spot = a.closest('footer') ? 'footer' : a.closest('header, nav, .nav-menu') ? 'menu' : a.closest('main, #venueOwnerCta') ? 'venue_page' : 'other';
+      roamBeacon('/api/site-event', { name: 'portal_login_click_' + spot });
+    } catch (err) { /* counting must never break the site */ }
+  }, true);
 </script>
 </head>
 <body class="wizard-active">
