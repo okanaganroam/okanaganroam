@@ -29894,7 +29894,16 @@ function whatsOnSummaryText(shown, total, filtered) {
 function whatsOnOnlySelectors(cssText) {
   const noComments = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
   return noComments.replace(/([^{}]+)\{([^{}]*)\}/g, (m, selectors, body) => {
-    const kept = selectors.split(',').map((x) => x.trim()).filter((x) => x.includes('[data-venue-category="whatson"]'));
+    // Split on top-level commas only: `:is(a, b)` must stay whole (an unclosed :is( made the browser drop the
+    // rest of this stylesheet, so the search box, Regions and Date buttons lost their styling, 2026-11-05).
+    // The Golf quick-scan rules (#582: card-slot rows, cue, placeholders) belong to Golf cards only.
+    const parts = []; let depth = 0; let cur = '';
+    for (const ch of selectors) {
+      if (ch === '(' || ch === '[') depth += 1; else if (ch === ')' || ch === ']') depth -= 1;
+      if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; } else cur += ch;
+    }
+    parts.push(cur);
+    const kept = parts.map((x) => x.trim()).filter((x) => x.includes('[data-venue-category="whatson"]') && !/card-slot-|venue-card-cue|\[data-ph/.test(x));
     return kept.length ? `\n  ${kept.join(', ')} {${body}}` : '';
   }).replace(/\n\s*\n/g, '\n');
 }
