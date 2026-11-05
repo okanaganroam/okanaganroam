@@ -161,6 +161,51 @@
       "event_ids": [
         1023
       ]
+    },
+    {
+      "file": "public/images/events/summerland-jets-2611.jpg",
+      "credit": "Vernon Morning Star (Black Press)",
+      "source_page": "https://vernonmorningstar.com/2025/06/27/summer-ice-installed-at-summerland-arena/",
+      "licence": "News photo found via Google Images; credit outlet; no licence stated",
+      "event_ids": [
+        639
+      ]
+    },
+    {
+      "file": "public/images/events/enderby-icemen-2611.jpg",
+      "credit": "Kelowna Capital News / Vernon Morning Star (Black Press)",
+      "source_page": "https://kelownacapnews.com/2026/09/12/enderby-icemens-first-ever-game-an-8-0-preseason-drubbing-of-sicamous-rivals/",
+      "licence": "News photo found via Google Images; credit outlet; no licence stated",
+      "event_ids": [
+        695
+      ]
+    },
+    {
+      "file": "public/images/events/kelowna-actors-studio-2611.jpg",
+      "credit": "Kelowna Actors Studio",
+      "source_page": "https://kelownaactorsstudio.com/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        539
+      ]
+    },
+    {
+      "file": "public/images/events/riding-4-life-2611.jpg",
+      "credit": "Riding 4 Life Equine Enterprises",
+      "source_page": "https://www.riding4lifeequineenterprises.com/copy-of-services-programs",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        849
+      ]
+    },
+    {
+      "file": "public/images/events/penticton-farmers-market-2611.jpg",
+      "credit": "Penticton Farmers' Market",
+      "source_page": "https://pentictonfarmersmarket.org/",
+      "licence": "Market own-site photo; no licence stated",
+      "event_ids": [
+        238
+      ]
     }
   ]
 }
