@@ -44,3 +44,10 @@ test('map payload ships own venue photos separately without changing compact ven
   const row=data.p.find(p=>p[2]==='Roam photo fixture');assert.ok(row);assert.equal(row.length,16);
  }finally{const del=db.prepare('DELETE FROM venues WHERE id=?');for(const id of ids)del.run(id)}
 });
+
+test('explicit town remains visible when GPS is also available',()=>{
+ const fn=src.match(/function roamLocationLabel\(\)\{[^\n]+/)[0];
+ const ctx={town:'vernon',CONF:{r:{vernon:'Vernon'}},me:{pin:false},radiusKm:5,FR:false};
+ vm.createContext(ctx);vm.runInContext(fn+';result=roamLocationLabel()',ctx);assert.equal(ctx.result,'Vernon · Change');
+ ctx.town='';vm.runInContext('result=roamLocationLabel()',ctx);assert.equal(ctx.result,'Near your location · 5 km');
+});
