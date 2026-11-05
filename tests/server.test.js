@@ -20,6 +20,24 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
 
+// Isolated child-process tests start a copy of the server in a temp folder. The server now needs most of the
+// project's top-level modules and its data folder (a child that cannot load them exits at once, and the old
+// copy-three-files setup left those tests failing or hanging), so stage everything except the databases:
+// top-level files are copied, data/ is copied (the server may write there) and public/ is linked (read-only, 1.5 GB).
+function stageProject(tempDir) {
+  const projectRoot = path.join(__dirname, '..');
+  for (const entry of fs.readdirSync(projectRoot, { withFileTypes: true })) {
+    const n = entry.name;
+    if (n.startsWith('.') || /\.db(-wal|-shm)?$/.test(n) || n.startsWith('venue-updates-backup') || n.endsWith('.zip')) continue;
+    if (entry.isDirectory()) {
+      if (n === 'data') fs.cpSync(path.join(projectRoot, n), path.join(tempDir, n), { recursive: true });
+      else if (n === 'public') fs.symlinkSync(path.join(projectRoot, n), path.join(tempDir, n), 'dir');
+    } else {
+      fs.copyFileSync(path.join(projectRoot, n), path.join(tempDir, n));
+    }
+  }
+}
+
 const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 // Guarantee a clean slate every run.
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
@@ -2048,7 +2066,7 @@ test('render404Page: mobile viewport, themed site shell, landmarks, search box, 
   assert.doesNotMatch(html, /og:url/);
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/, 'the approved homepage stylesheet');
   assert.match(html, /<body class="golf-page not-found-page">/);
-  assert.match(html, /<main class="wrap-wide golf-main not-found-main" id="main">/);
+  assert.match(html, /<main class="wrap-wide golf-main not-found-main" id="main" tabindex="-1">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'exactly one H1');
   assert.match(html, /<h1>We couldn\u2019t find that page<\/h1>/);
   // 2026-10-14: a search box to /browse, prefilled from the address.
@@ -3000,10 +3018,13 @@ test('getRegionCategoryCounts includes golf once a golf venue exists in the regi
 });
 
 test('renderRegionPage lists the golf category card for a region with a golf venue', () => {
-  const counts = app.getRegionCategoryCounts('kelowna');
-  const html = app.renderRegionPage('kelowna', counts, []);
-  assert.match(html, /href="\/kelowna\/golf"/);
-  assert.match(html, /Golf Courses/);
+  // The towns use the compact town layout now, so check the category tile data the region pages are built from. A
+  // category page is only linked once the region has enough venues of that type (MIN_CATEGORY_VENUES, the thin-page
+  // rule): a one-course fixture region gets no golf link, a region with enough courses does.
+  const golf = (counts) => app.destinationCategories('kelowna', counts).find((c) => c.key === 'golf');
+  assert.equal(golf({ ...app.getRegionCategoryCounts('kelowna'), golf: 99 }).href, '/kelowna/golf');
+  assert.equal(golf({ golf: 99 }).label, 'Golf Courses');
+  assert.equal(golf({ golf: 0 }).href, null, 'no courses -> no link');
 });
 
 test('venueCardHtml links correctly for a golf venue', () => {
@@ -3721,11 +3742,7 @@ test('S4 #3: a valid token reaches the guarded writer -- create, update, categor
 test('S4 #4: with ENRICHMENT_ADMIN_TOKEN unset the event write API fails closed with 503 while public reads still work (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-events-503-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
-  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
-  fs.mkdirSync(path.join(tempDir, 'data'));
-  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3097';
   const childEnv = { ...process.env };
   delete childEnv.ENRICHMENT_ADMIN_TOKEN;
@@ -3785,15 +3802,15 @@ test('sports listings show a matched local photo on the valley hub, region categ
     const api = await s4request('GET', '/api/venues?region=kelowna&type=sport');
     assert.equal(api.status, 200);
     const venue = api.json.venues.find((item) => item.id === Number(result.lastInsertRowid));
-    assert.equal(venue?.image_url, '/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-1');
+    assert.equal(venue?.image_url, '/images/sports/venues/kelowna-crawford-trails-myra-bellevue-provincial-park.jpg?v=sports-photo-2');
 
     const hub = await s4request('GET', '/sports');
     assert.equal(hub.status, 200);
-    assert.match(hub.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-1'\)"/);
+    assert.match(hub.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-2'\)"/);
 
     const region = await s4request('GET', '/kelowna/sports');
     assert.equal(region.status, 200);
-    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-1'\)"/);
+    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-2'\)"/);
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(Number(result.lastInsertRowid));
   }
@@ -3946,11 +3963,11 @@ function s5create(over) {
   assert.equal(r.ok, true, JSON.stringify(r));
   return r.event;
 }
-async function s5get(urlPath) {
+async function s5get(urlPath, opts) {
   return new Promise((resolve, reject) => {
     const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
     tmp.listen(0, '127.0.0.1', async () => {
-      try { const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`); resolve({ status: res.status, text: await res.text() }); }
+      try { const res = await fetch(`http://127.0.0.1:${tmp.address().port}${urlPath}`, opts); resolve({ status: res.status, text: await res.text(), location: res.headers.get('location') }); }
       catch (err) { reject(err); } finally { tmp.close(); }
     });
   });
@@ -3971,7 +3988,10 @@ test('S5 #1-#4: canonical detail URL renders a valid event; missing slug, wrong 
   assert.equal((await s5get('/kelowna/events/does-not-exist')).status, 404);
   assert.equal((await s5get('/vernon/events/s5-patio-concert')).status, 404, 'valid slug under the wrong region');
   assert.equal((await s5get('/shuswap/events/s5-patio-concert')).status, 404, 'unknown region');
-  assert.equal((await s5get('/kelowna/events/S5-Patio-Concert')).status, 404, 'slugs are exact');
+  // A differently-cased slug is not a second page: it 301s to the lowercase address (case-canonical redirect).
+  const upper = await s5get('/kelowna/events/S5-Patio-Concert', { redirect: 'manual' });
+  assert.equal(upper.status, 301, 'upper-case slug redirects');
+  assert.match(upper.location || '', /\/kelowna\/events\/s5-patio-concert$/, 'to the lowercase slug');
   assert.equal(ev.region, 'kelowna');
 });
 
@@ -4368,68 +4388,37 @@ test('H1 Step 3: venue pages link the next publishable events at that venue, omi
   assert.doesNotMatch(html(), /Events at /, 'page back to its original shape');
 });
 
-test('H1 Step 2: region pages link the next publishable events, omit the block below the threshold, and never link an unpublishable event', () => {
-  const counts = app.getRegionCategoryCounts('kelowna');
-  const regionHtml = (region) => app.renderRegionPage(region, app.getRegionCategoryCounts(region) || counts, []);
-  const eventLinksOf = (html) => {
-    const m = html.match(/<h2>Upcoming events in [^<]*<\/h2>[\s\S]*?<\/div>\s*<p>/);
-    return m ? [...m[0].matchAll(/<a href="(\/[a-z-]+\/events\/[a-z0-9-]+)">/g)].map((x) => x[1]) : [];
-  };
-
-  // 1. A region with plenty of publishable events links exactly 3, all direct
-  //    canonical event-detail URLs in that region (never a /whats-on?... URL).
-  const kelowna = regionHtml('kelowna');
-  const kelownaLinks = eventLinksOf(kelowna);
-  assert.equal(kelownaLinks.length, 3, 'a well-stocked region links exactly 3 events');
-  for (const href of kelownaLinks) assert.match(href, /^\/kelowna\/events\/[a-z0-9-]+$/, `canonical event URL: ${href}`);
-  assert.match(kelowna, /<h2>Upcoming events in Kelowna<\/h2>/);
-  // 6. The secondary link exists alongside the block, and only as a secondary link.
-  assert.match(kelowna, /<a href="\/kelowna\/events">See what&rsquo;s on in Kelowna &rarr;<\/a>/);
-  assert.equal(kelownaLinks.filter((h) => h.includes('whats-on')).length, 0, 'no filtered URL is used as a primary event link');
-
-  // 7. The pre-existing region page is otherwise intact.
-  assert.match(kelowna, /<h1>Kelowna, BC<\/h1>/);
-  assert.match(kelowna, /<ul class="card-grid region-photo-grid">/);
-  assert.match(kelowna, /<link rel="canonical" href="https:\/\/okanaganroam\.com\/kelowna">/);
-  assert.doesNotMatch(kelowna, /<meta name="robots"/, 'region pages stay indexable');
-  assert.equal(app.listUpcomingEventsForRegion('kelowna', { limit: 3 }).length, 3);
-
-  // 2/3/4. Threshold behaviour, driven by real fixture data rather than counts.
-  const twoRegion = 'peachland';
-  const before = app.listUpcomingEventsForRegion(twoRegion).length;
-  assert.equal(before, 0, 'fixture DB starts with no peachland events');
-  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'zero publishable events -> no block');
-  const pvenue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
-  const mk = (name, over) => {
+test('H1 Step 2: the regions\' next publishable events (the list region pages link from) need the threshold, are ordered by next occurrence, and never include an unpublishable event', () => {
+  // Every region page now uses a compact layout without the old "Upcoming events in {Region}" block (towns, Kelowna and the ski
+  // hills all have their own), so this checks the data helper that block was built from, which the rest of the site still uses.
+  const mk = (region, name, over) => {
     const r = app.createEvent({
-      region: twoRegion, name, description: 'H1 Step 2 fixture.', source_type: 'official_organizer', source_name: `H1S2 ${name}`,
+      region, name, description: 'H1 Step 2 fixture.', source_type: 'official_organizer', source_name: `H1S2 ${name}`,
       source_url: `https://example.com/h1s2/${app.slugify(name)}`, venue_name_text: `H1S2 Hall ${name}`, categories: ['community-events'],
       occurrences: [{ start_date: '2032-08-01' }], ...over,
     }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
     assert.equal(r.ok, true, JSON.stringify(r));
     return r.event;
   };
-  const one = mk('H1S2 Lantern Walk', { occurrences: [{ start_date: '2032-08-01' }] });
-  assert.equal(app.listUpcomingEventsForRegion(twoRegion).length, 0, 'one publishable event is below the threshold');
-  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'one event -> still no block');
+  const region = 'baldy';
+  assert.equal(app.listUpcomingEventsForRegion(region).length, 0, 'fixture DB starts with no baldy events');
+  const one = mk(region, 'H1S2 Lantern Walk', { occurrences: [{ start_date: '2032-08-01' }] });
+  assert.equal(app.listUpcomingEventsForRegion(region).length, 0, 'one publishable event is below the threshold');
 
-  const two = mk('H1S2 Harbour Recital', { categories: ['live-music'], occurrences: [{ start_date: '2032-08-08' }] });
-  const twoHtml = regionHtml(twoRegion);
-  const twoLinks = eventLinksOf(twoHtml);
-  assert.equal(twoLinks.length, 2, 'a two-event region links exactly 2');
-  assert.deepEqual(twoLinks, [`/${twoRegion}/events/${one.slug}`, `/${twoRegion}/events/${two.slug}`], 'ordered by next scheduled occurrence');
-  assert.match(twoHtml, /<h2>Upcoming events in Peachland<\/h2>/);
+  const two = mk(region, 'H1S2 Harbour Recital', { categories: ['live-music'], occurrences: [{ start_date: '2032-08-08' }] });
+  const links = app.listUpcomingEventsForRegion(region).map((e) => `/${e.region}/events/${e.slug}`);
+  assert.deepEqual(links, [`/${region}/events/${one.slug}`, `/${region}/events/${two.slug}`], 'two events link as direct canonical URLs, ordered by next scheduled occurrence');
 
-  // 5. Cancelled, postponed and expired events are never linked.
-  const cancelled = mk('H1S2 Toolshare Meetup', { categories: ['workshops-classes'], occurrences: [{ start_date: '2032-07-01' }] });
+  // Cancelled, postponed and expired events are never listed.
+  const cancelled = mk(region, 'H1S2 Toolshare Meetup', { categories: ['workshops-classes'], occurrences: [{ start_date: '2032-07-01' }] });
   app.updateEvent(cancelled.id, { status: 'cancelled' }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
-  const postponed = mk('H1S2 Almanac Reading', { categories: ['arts-culture'], occurrences: [{ start_date: '2032-07-02' }] });
+  const postponed = mk(region, 'H1S2 Almanac Reading', { categories: ['arts-culture'], occurrences: [{ start_date: '2032-07-02' }] });
   app.updateEvent(postponed.id, { status: 'postponed' }, { reason: 'H1 Step 2 fixture', batch_id: 'test-h1s2' });
-  const expired = mk('H1S2 Bellows Social', { categories: ['nightlife'], occurrences: [{ start_date: '2020-07-03' }] });
-  const slugs = app.listUpcomingEventsForRegion(twoRegion, { limit: 20 }).map((e) => e.slug);
-  assert.ok(!slugs.includes(cancelled.slug), 'cancelled event never linked');
-  assert.ok(!slugs.includes(postponed.slug), 'postponed event never linked');
-  assert.ok(!slugs.includes(expired.slug), 'expired event never linked');
+  const expired = mk(region, 'H1S2 Bellows Social', { categories: ['nightlife'], occurrences: [{ start_date: '2020-07-03' }] });
+  const slugs = app.listUpcomingEventsForRegion(region, { limit: 20 }).map((e) => e.slug);
+  assert.ok(!slugs.includes(cancelled.slug), 'cancelled event never listed');
+  assert.ok(!slugs.includes(postponed.slug), 'postponed event never listed');
+  assert.ok(!slugs.includes(expired.slug), 'expired event never listed');
   assert.deepEqual(slugs, [one.slug, two.slug], 'only the publishable pair remains');
 
   // Cleanup: leave the shared fixture DB exactly as this test found it.
@@ -4439,18 +4428,13 @@ test('H1 Step 2: region pages link the next publishable events, omit the block b
     db.prepare('DELETE FROM event_occurrences WHERE event_id = ?').run(e.id);
     db.prepare('DELETE FROM events WHERE id = ?').run(e.id);
   }
-  assert.equal(app.listUpcomingEventsForRegion(twoRegion).length, 0, 'fixture rows removed');
-  assert.doesNotMatch(regionHtml(twoRegion), /Upcoming events in/, 'page back to its original shape');
+  assert.equal(app.listUpcomingEventsForRegion(region).length, 0, 'fixture rows removed');
 });
 
 test('S5 #24: with zero events the sitemap carries no event URLs and is unaffected by the event tables (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-sitemap-zero-events-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
-  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
-  fs.mkdirSync(path.join(tempDir, 'data'));
-  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3096';
   const childEnv = { ...process.env, PORT: ISOLATED_PORT };
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -4517,11 +4501,7 @@ test('S6 #1/#20/#22: with zero publishable inventory /whats-on renders the appro
   assert.equal(app.whatsOnInventoryExists(new Date('2200-01-01T00:00:00Z')), false, 'evaluated after every fixture has ended -> no inventory');
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-whatson-zero-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
-  fs.copyFileSync(path.join(projectRoot, 'beach-photo-fallbacks.js'), path.join(tempDir, 'beach-photo-fallbacks.js'));
-  fs.mkdirSync(path.join(tempDir, 'data'));
-  fs.copyFileSync(path.join(projectRoot, 'data', 'beach-photo-manifest.json'), path.join(tempDir, 'data', 'beach-photo-manifest.json'));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3095';
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: { ...process.env, PORT: ISOLATED_PORT }, stdio: ['ignore', 'pipe', 'pipe'] });
   let text;
@@ -4640,7 +4620,7 @@ test('S6 #9-#11/#21: region/category multi-select and no-match state over the re
   const both = s6markup((await s6get('/whats-on?regions=kelowna,vernon&categories=live-music,markets-fairs')).text);
   assert.match(both, /data-region="kelowna" aria-pressed="true"/); assert.match(both, /data-region="vernon" aria-pressed="true"/);
   assert.match(both, /data-category="live-music" aria-pressed="true"/); assert.match(both, /data-category="markets-fairs" aria-pressed="true"/);
-  assert.match(both, /aria-live="polite">2 of 4 events<\/p>/, 'regions OR, categories OR, AND between');
+  assert.match(both, /aria-live="polite">2 of 4 events<\/p>/, 'regions OR, categories OR, AND between ' + (both.match(/aria-live="polite">[^<]*/g) || []).join('|'));
   assert.match(both, /id="whatsOnResultsSummary" aria-live="polite">2 of \d+ events</, 'the compact count reports the filtered total');
   assert.match(both, /id="whatsOnSelectedClear">Clear all</, 'Clear all now lives with the removable filter chips');
   const regionOnly = s6markup((await s6get('/whats-on?regions=peachland')).text);
@@ -4671,7 +4651,7 @@ test('S6 #12/#13/#19: the client script keeps the date window on chip pushState,
     "cardMatches(d, regions, categories)",
     "(d.valley ? allRegionKeys : [d.region])",
     "emptyInventory.hidden = INVENTORY;",
-    "empty.hidden = !(INVENTORY && shown === 0);",
+    "empty.hidden = !(INVENTORY && any === 0);",
     app.OUTDOOR_FILTER_CLIENT_PREDICATE_SRC,
   ]) assert.ok(script.includes(needle), `script contains ${needle}`);
   const page = app.renderWhatsOnPage(app.parseWhatsOnPageQuery({ when: 'this-week' }));
@@ -6681,8 +6661,7 @@ test('POST/PUT /api/venues normalize price to an integer 1-4 and reject anything
 test('/admin/correct-phone and /admin/correct-amenities return 503 when ENRICHMENT_ADMIN_TOKEN is unset (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-503-isolation-test-'));
   const projectRoot = path.join(__dirname, '..');
-  fs.copyFileSync(path.join(projectRoot, 'server.js'), path.join(tempDir, 'server.js'));
-  fs.copyFileSync(path.join(projectRoot, 'db.js'), path.join(tempDir, 'db.js'));
+  stageProject(tempDir);
 
   const ISOLATED_PORT = '3098';
   const childEnv = { ...process.env };
@@ -7616,9 +7595,7 @@ test('Beach theme CSS is derived from the Golf rules: every derived rule is keye
 test('FROZEN HOMEPAGE: "/" is byte-identical before and after beach venues + an advisory exist; sitemap, /beaches routes and trip API behave (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-beaches-homepage-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) {
-    fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
-  }
+  stageProject(tempDir);
   const ISOLATED_PORT = '3097';
   const TOKEN = 'beaches-homepage-test-token';
   const childEnv = { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN };
@@ -7975,9 +7952,7 @@ test('REGRESSION (Outdoors): Golf and Beach pages carry no outdoor theme or mark
 test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and after outdoor venues exist; /beaches and /golf unchanged; routes, sitemap and trip API behave (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-outdoors-homepage-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) {
-    fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
-  }
+  stageProject(tempDir);
   const ISOLATED_PORT = '3096';
   const TOKEN = 'outdoors-homepage-test-token';
   const childEnv = { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN };
@@ -8282,7 +8257,7 @@ test('REGRESSION (Outdoors Phase 2): Golf/Beach wide pages keep their heading an
 test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a live activity page change nothing on "/", /beaches, /golf, /browse, /trip; activity route, sitemap and 404s behave (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-outdoors-activity-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   const ISOLATED_PORT = '3095';
   const TOKEN = 'outdoors-activity-test-token';
   const child = spawn(process.execPath, ['--no-warnings', path.join(tempDir, 'server.js')], { cwd: tempDir, env: { ...process.env, PORT: ISOLATED_PORT, ENRICHMENT_ADMIN_TOKEN: TOKEN }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -8549,7 +8524,7 @@ test('/outdoors?regions=..&activities=.. over HTTP renders pre-filtered; the bar
   childEnv.PORT = ISOLATED_PORT;
   childEnv.ENRICHMENT_ADMIN_TOKEN = 'prefilter-http-test-token';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-prefilter-'));
-  for (const f of ['server.js', 'db.js']) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
+  stageProject(dir);
   try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
   const child = spawn(process.execPath, ['--no-warnings', path.join(dir, 'server.js')], { cwd: dir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderrOutput = '';
@@ -9163,7 +9138,7 @@ test('Food & Drink hub: types OR, features AND, regions OR, AND between groups; 
 test('Food & Drink hub: the /food-drink route serves it, and /browse, the Wine hub, the F&D category/region/venue routes and the other directories are untouched (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-fd-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   const port = 3599;
   const child = require('node:child_process').spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
@@ -12672,7 +12647,8 @@ test('Golf data: /golf and /penticton/golf honour ?sort= over HTTP, unknown valu
   golfFixtures();
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-golf-data-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'golf-data.js', 'okanagan.html', 'okanagan.db']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
+  fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   fs.mkdirSync(path.join(tempDir, 'data'));
   fs.copyFileSync(path.join(projectRoot, 'data', 'golf-course-data.json'), path.join(tempDir, 'data', 'golf-course-data.json'));
   const port = 3611;
@@ -13213,7 +13189,7 @@ test('Measurement Phase A: the analytics block never carries visitor-supplied va
 test('Measurement Phase A (+ Analytics Cleanup C1): the homepage and /browse serve okanagan.html\'s own GA4 snippet with ONLY the loader tag and gtag(config) swapped for the shared internal-traffic IIFE, with no page_type (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4a-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   const port = 3597;
   const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
@@ -13342,7 +13318,7 @@ test('Measurement Phase B: gtag.js is never fetched off the live hostname (local
 test('Measurement Phase B (+ Analytics Cleanup C1): the server ignores ?roam_internal (identical HTML) on every page incl. / and /browse; okanagan.html on disk does not know about it, the served homepage does (isolated child process)', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-ga4b-'));
   const projectRoot = path.join(__dirname, '..');
-  for (const f of ['server.js', 'db.js', 'okanagan.html']) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+  stageProject(tempDir);
   fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
   const port = 3596;
   const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore' });
@@ -13980,7 +13956,7 @@ test('Build My Trip V3: routes -- off ignores ?trip_v3; preview needs the opt-in
   const files = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'trip-planner-fr.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'trip-event-location.js', 'trip-french-copy.js', 'trip-story.js'];
   const run = async (port, env, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripv3-'));
-    for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+    stageProject(tempDir);
     fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
     const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore', env: { ...process.env, TRIP_PLANNER_V2: 'on', ...env } });
     try {
@@ -14031,7 +14007,7 @@ test('Build My Trip French: /api/trip/plan uses trip-planner-fr.js, and fails cl
   const base = ['server.js', 'db.js', 'okanagan.html', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'trip-story.js'];
   const run = async (port, files, fn) => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'okanagan-tripfr-'));
-    for (const f of files) fs.copyFileSync(path.join(projectRoot, f), path.join(tempDir, f));
+    stageProject(tempDir);
     fs.copyFileSync(path.join(projectRoot, 'okanagan.db'), path.join(tempDir, 'okanagan.db'));
     const child = spawn(process.execPath, ['-e', `process.env.PORT='${port}'; require('./server.js').startServer();`], { cwd: tempDir, stdio: 'ignore', env: { ...process.env, TRIP_PLANNER_V2: 'on', TRIP_PLANNER_V3: 'on' } });
     try {
@@ -14325,9 +14301,7 @@ test('Stage 2: POST /admin/verify-hours is the guarded, audited hours write (aut
   childEnv.PORT = ISOLATED_PORT;
   childEnv.ENRICHMENT_ADMIN_TOKEN = 'verify-hours-test-token';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'okroam-verify-hours-'));
-  for (const f of ['server.js', 'db.js', 'hours.js', 'trip-planner.js', 'trip-requirements.js', 'discovery-intent.js', 'discovery-search.js', 'vocabulary.js', 'trip-planner-v3-page.js', 'golf-data.js']) {
-    if (fs.existsSync(path.join(__dirname, '..', f))) fs.copyFileSync(path.join(__dirname, '..', f), path.join(dir, f));
-  }
+  stageProject(dir);
   try { fs.symlinkSync(path.join(__dirname, '..', 'node_modules'), path.join(dir, 'node_modules')); } catch (_) {}
   const child = spawn(process.execPath, ['--no-warnings', path.join(dir, 'server.js')], { cwd: dir, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderrOutput = '';
@@ -29530,7 +29504,7 @@ test('Round 7 tech: a ?v= image is immutable only when it is the file\'s own has
   assert.equal(app.imageVersionMatches(file, md5.slice(0, 10)), true);
   assert.equal(app.imageVersionMatches(file, md5.slice(0, 12)), true);
   assert.equal(app.imageVersionMatches(file, sha.slice(0, 12)), true, 'the hashed hero names use sha256');
-  for (const bad of ['20261016', 'sports-photo-1', 'abc123', md5.slice(0, 6), '0000000000', undefined, ['x']]) assert.equal(app.imageVersionMatches(file, bad), false, String(bad));
+  for (const bad of ['20261016', 'sports-photo-2', 'abc123', md5.slice(0, 6), '0000000000', undefined, ['x']]) assert.equal(app.imageVersionMatches(file, bad), false, String(bad));
   assert.equal(app.imageVersionMatches('/images/nope/missing.jpg', md5.slice(0, 10)), false);
   await withDiscoveryServer(async (base) => {
     const cc = async (u) => (await fetch(base + u)).headers.get('cache-control');
