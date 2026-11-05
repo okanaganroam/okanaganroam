@@ -97,6 +97,43 @@
       "event_ids": [
         830
       ]
+    },
+    {
+      "file": "public/images/events/bigwhite-fireworks-2611.jpg",
+      "credit": "Big White Ski Resort",
+      "source_page": "https://www.bigwhite.com/resort-photos?page=13",
+      "licence": "Resort photo library; credit Big White Ski Resort required",
+      "event_ids": [
+        1037
+      ]
+    },
+    {
+      "file": "public/images/events/kvsr-christmas-express-2611.jpg",
+      "credit": "Kettle Valley Steam Railway (photographer not stated)",
+      "source_page": "https://www.kettlevalleyrail.org/experiences/christmas-express/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        670
+      ]
+    },
+    {
+      "file": "public/images/events/rotary-centre-2611.jpg",
+      "credit": "Rotary Centre for the Arts",
+      "source_page": "https://rotarycentreforthearts.com/facility-rentals/south-atrium/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        3
+      ]
+    },
+    {
+      "file": "public/images/events/see-ya-later-ranch-2611.jpg",
+      "credit": "See Ya Later Ranch",
+      "source_page": "https://sylranch.com/the-ranch/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        822,
+        827
+      ]
     }
   ]
 }
