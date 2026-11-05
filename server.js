@@ -20741,9 +20741,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       drawRoute();
       if(me.pin)setStatus(FR?'Aperçu de l’itinéraire depuis votre point de départ.':'Route preview from your chosen starting point.');
       // With the visitor's real location: zoom in on them and follow as they go. From a pin: show the whole route.
-      if (first) { map.stop(); if (!me.pin) startNav(); else fitTo(r.line.getBounds(), 17); }
+      if (first) { if (!me.pin) {map.stop();startNav();} else fitRoutePreview(r); }
       track('map_directions', { kind: 'route', mode: r.mode, on_site: true });
     }).catch(function(){ if (route !== r) return; r.loading = false; r.error = true; drawRoute(); });
+  }
+  function fitRoutePreview(r){
+    map.stop();map.invalidateSize({pan:false});fitTo(r.line.getBounds(),17);
   }
   function drawRoute(){
     var r = route;
@@ -20997,7 +21000,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     setStatus(pendingRoute?(FR?'Point de départ choisi. Calcul de l’itinéraire…':'Starting point selected. Calculating your route…'):T.pinned); limit = 25;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
     track('map_pin', { radius_km: radiusKm });
-    syncChips();render(fit);if(pendingRoute){var destination=pendingRoute;pendingRoute=null;startRoute(destination);}
+    syncChips();render(pendingRoute?false:fit);if(pendingRoute){var destination=pendingRoute;pendingRoute=null;startRoute(destination);}
   }
   pinBtn.addEventListener('click', function(){
     if (pinMarker) { stopLocation(); setStatus(T.pinRemoved); return; }
