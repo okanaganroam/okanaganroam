@@ -52575,7 +52575,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-secnav a { display: inline-flex; align-items: center; min-height: 40px; padding: 4px 14px; border-radius: 999px; background: var(--sand-deep, #EFE6D6); color: var(--ref-navy, #1F3A5F); font-weight: 800; font-size: 0.9rem; text-decoration: none; }
   body.owner-page .op-why { font-size: 0.82rem; color: #9C2F22; }
   /* Simple view (2026-11-04): a short list of what an owner can do; picking one shows only that part of the page. */
-  body.owner-page .op-off { display: none !important; }
+  body.owner-page .op-hide { display: none !important; }
   body.owner-page .op-tasks { margin: 18px 0 8px; }
   body.owner-page .op-tasks[hidden], body.owner-page .op-taskbar[hidden], body.owner-page .op-helpme[hidden] { display: none; }
   body.owner-page .op-tasks h2 { font-size: 1.5rem; margin: 0 0 6px; }
@@ -52959,7 +52959,7 @@ ${ownerFooterHtml(fr)}
   }
   function show(id, msg){
     var el = document.getElementById(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg;
-    if (msg && el.closest('.op-off') && typeof setTask === 'function') setTask('all');
+    if (msg && el.closest('.op-hide') && typeof setTask === 'function') setTask('all');
     // Tie a field's message to its box, so a screen reader reads both when the box gets focus.
     var f = el.closest('.form-field'), input = f && f.querySelector('input:not([type=checkbox]), textarea, select');
     if (!input) return;
@@ -52988,11 +52988,11 @@ ${ownerFooterHtml(fr)}
     Array.prototype.forEach.call(document.querySelectorAll('[data-task]'), function(el){
       var tokens = ' ' + el.getAttribute('data-task') + ' ';
       var showIt = t === 'all' ? !(tokens.indexOf(' home ') >= 0 && tokens.indexOf(' all ') < 0) : tokens.indexOf(' ' + (t || 'home') + ' ') >= 0;
-      el.classList.toggle('op-off', !showIt);
+      el.classList.toggle('op-hide', !showIt);
       if (el.hasAttribute('hidden') && showIt && /^op(Tasks|TaskBar|HelpMe)$/.test(el.id)) el.hidden = false;
     });
     var bar = document.getElementById('opTaskBar'); if (bar) bar.hidden = !(t && t !== 'all');
-    if (fm && (t === 'photos' || t === 'video' || t === 'events')) fm.classList.add('op-off'); else if (fm) fm.classList.remove('op-off');
+    if (fm && (t === 'photos' || t === 'video' || t === 'events')) fm.classList.add('op-hide'); else if (fm) fm.classList.remove('op-hide');
     if (t && t !== 'all') Array.prototype.forEach.call(document.querySelectorAll('details[data-task~="' + t + '"]'), function(d){ d.open = true; });
     if (!t || t === 'all') window.scrollTo(0, 0);
     else { var h = document.getElementById('opTaskBar'); if (h) h.scrollIntoView({ block: 'start' }); }
