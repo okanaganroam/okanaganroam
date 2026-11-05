@@ -20693,11 +20693,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   }
   function drawList(){
     var html = '', lastGroup = null, openSeen = false, dividerDone = false;
-    listItems.slice(0, limit).forEach(function(x, i){
+    listItems.slice(0, limit).forEach(function(x){
       if (tab === 'places') {
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
-        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '">' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
+        html += '<li class="pm-item"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '>' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</a>'
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
@@ -20706,7 +20706,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         else if (FR && price === 'By donation') price = 'Contribution volontaire';
         else if (FR && price === 'Ticketed') price = 'Billets requis';
         var where = [x.venue, CONF.r[x.region], x.d != null && me ? T.km(x.d) : ''].filter(Boolean).join(' · ');
-        html += '<li class="pm-item pm-event"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span>' + (price ? '<span class="pm-event-price">' + esc(price) + '</span>' : '') + '<span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></button>'
+        html += '<li class="pm-item pm-event"><a class="pm-item-main" ' + hrefAttr(x.fu || x.url) + '><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span>' + (price ? '<span class="pm-event-price">' + esc(price) + '</span>' : '') + '<span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></a>'
           + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       }
     });
@@ -20750,17 +20750,6 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   listEl.addEventListener('click', function(e){
     var w = e.target.closest && e.target.closest('[data-wider]'); if (!w) return;
     radiusKm = Number(w.getAttribute('data-wider')); radiusFixed = true; radiusSel.value = String(radiusKm); limit = 25; render(true);
-  });
-  function focusItem(x){
-    roamView('map');
-    if (x.lat == null || !x.m) return;
-    setSheet('peek');
-    if (cluster.zoomToShowLayer) cluster.zoomToShowLayer(x.m, function(){ x.m.openPopup(); });
-    else { map.setView([x.lat, x.lng], Math.max(map.getZoom(), 15)); x.m.openPopup(); }
-  }
-  listEl.addEventListener('click', function(e){
-    var b = e.target.closest('.pm-item-main');
-    if (b) { focusItem(listItems[Number(b.getAttribute('data-i'))]); return; }
   });
   document.addEventListener('click', function(e){
     var d = e.target.closest && e.target.closest('[data-dir]');
@@ -22206,7 +22195,7 @@ ${renderGolfHeaderHtml()}
       <div class="pm-sheet-head">
         <h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;</h2>
       </div>
-      <div class="pm-sheet-body" id="pmSheetBody">
+      <div class="pm-sheet-body" id="pmSheetBody" tabindex="0" role="region" aria-labelledby="pmCount">
         <section class="pm-route" id="pmRoute" hidden aria-live="polite"></section>
         <ul class="pm-list" id="pmList"></ul>
         <button type="button" class="pm-more" id="pmMore" hidden>Show more</button>
@@ -22245,7 +22234,6 @@ ${renderGolfHeaderHtml()}
     </div>
   </div>
   </main>
-  ${renderHomeFooterHTML(true)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 ${opts.lang === 'fr' ? `<script type="application/json" id="pmFrWords">${JSON.stringify(mapFrWords()).replace(/</g, '\\u003c')}</script>
