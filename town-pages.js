@@ -26,7 +26,8 @@ function styles(town) {
   return bigWhite.styles
     .replaceAll('body.big-white-page', 'body.town-page')
     .replace('id="big-white-layout"', 'id="town-layout"')
-    .replace('/images/regions/photos/big-white-2610.jpg', TOWNS[town].hero);
+    .replace('/images/regions/photos/big-white-2610.jpg', TOWNS[town].hero)
+    .replace('</style>', 'body.town-page .bw-footer{flex-wrap:wrap}body.town-page .bw-footer .bw-credit{flex:0 0 100%;margin:0;font-size:10px;opacity:.75}</style>');
 }
 
 function renderBody(town, { count, activeSlugs }) {
@@ -47,7 +48,7 @@ ${tiles}
 <div class="bw-essentials"><div class="bw-status"><small>Explore your way</small><b>A little inspiration. A great day out.</b></div><div class="bw-tools"><a href="/map">Roam Now ↗</a><a href="/${town}/events">What’s On ↗</a><a href="/browse?regions=${town}">All places ↗</a></div></div>
 <section class="bw-section" id="picks"><div class="bw-heading"><h2>A few places to start</h2><a class="bw-small-link" href="/browse?regions=${town}">Explore all ${n} ↗</a></div><div class="bw-picks">${picks}</div></section>
 <section class="bw-plan" id="plan"><div class="bw-plan-layout"><div class="bw-plan-intro"><h2>A little planning. More exploring.</h2><p>The essentials, ready when you need them.</p><a href="/trip">Build my ${c.name} trip ↗</a></div><div class="bw-accordion">${plan}</div></div></section></div></main>
-<footer class="bw-footer"><a class="bw-brand" href="/">OKANAGAN <span>ROAM</span></a><div><a href="/destinations">All destinations</a><a href="/about">About</a><a href="/contact">Contact</a></div><p>Built for the whole crew, dog included.</p></footer>`;
+<footer class="bw-footer"><a class="bw-brand" href="/">OKANAGAN <span>ROAM</span></a><div><a href="/destinations">All destinations</a><a href="/about">About</a><a href="/contact">Contact</a></div><p>Built for the whole crew, dog included.</p>${(c.credits || []).map((t) => `<p class="bw-credit">${t}</p>`).join('')}</footer>`;
 }
 
 module.exports = { TOWNS, has, styles, renderBody };
