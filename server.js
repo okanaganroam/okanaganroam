@@ -41,6 +41,8 @@ const kelownaPage = require('./kelowna-page');
 const skiResortPages = require('./ski-resort-pages');
 const townPages = require('./town-pages');
 
+const homeSimple = require('./home-simple');
+
 const PORT = process.env.PORT || 3001;
 const SITE_PATH = path.join(__dirname, 'okanagan.html');
 
@@ -53902,6 +53904,9 @@ const server = http.createServer(async (req, res) => {
         // Accessibility (2026-10-18): the homepage's sections, hero to Build My Trip, sit in one <main id="main"> (the skip
         // link's target), so the page has a main landmark like every other page. English and French (the /fr twin).
         html = wrapHomeMain(html);
+        // Owner-approved simpler photo-led homepage, preserving the existing live content providers.
+        html = homeSimple.apply(html, { mood: moodCards, editors: editorsPicks, events: thisWeekend,
+          gems: hiddenGemsSection, destinations: exploreRegions, stats: statsHtml, trip: buildTripSection });
         // Homepage weight (2026-10-18): smaller card photos, and the sideways rows' off-screen cards wait (see withHomeCardPhotos).
         html = withHomeCardPhotos(html);
         // Hero first (2026-10-19): no Leaflet on the homepage, and the hero-ready signal first in <head> (see withHomeHeroFirst).

@@ -27,6 +27,13 @@ Validation: tests RED (missing renderer) then GREEN 4/4 across Kelowna/Big White
 
 Big White follow-up: PR #632 deployed successfully after a slow 1.7 GB image upload. Verified live desktop/mobile, French, scoped coffee search and health. Evidence recorded in PR #632's production-verification comment.
 
+
+## Simpler photo-led homepage - 2026-11-04
+
+Owner approved the restored simpler desktop/mobile preview (without town filter or extra venue-card details) and authorized publishing. home-simple.js receives the existing seasonal/live homepage provider output, preserving active Editor's Picks selection/rotation, event dates/images, categories, destination photos, counters and footer links/dialogs. Scoped home-simple-styles.js applies the approved hero/search, prominent Roam Now and Happy Hour Now, two-column mobile photo grids, Editor's Picks before This Weekend, photo Hidden Gems/destinations and trip banner. More picks uses native details; all three footer groups start collapsed on mobile. Shared navigation/trip tray, metadata, language routes and frozen files retained. Homepage-only language button handler fixes switching when indexable alternate links are disabled.
+
+Validation: tests RED/GREEN, focused homepage and Big White/Kelowna regressions 8/8; syntax/diff checks; independent final review clean. Local public-API fixture checked at 1440px desktop and 390px English/French mobile: no horizontal overflow; responsive hero/photo grids, native more picks, footer collapse, search and language navigation. Four destination renderers byte-identical against origin/main. Temporary fixture DB restored/excluded before commit. Production verification to be recorded on this change's PR.
+
 ## Current Status
 
 * **Current status (2026-10-05): read "Stage 0–4 Program" below first, then the "Stage 5" sections and "V3 French support".** The Stage 0–4 section holds the current production status, the frozen files and the standing rules (updated for the V3 French launch); the later sections record what changed since. PRs #19–#30 (Stage 5F–5H, SEO-1/SEO-2, the `/browse` performance and Directory redesign work) are not described in this file beyond the frozen-file notes. The dated baselines in this list are kept as history.
