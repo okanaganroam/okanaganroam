@@ -24212,7 +24212,7 @@ test('New business (2026-10-17): approval emails the owner their private edit li
     assert.match(approved.text, /tours & prices/);
     const page = await fetch(`${base}${link[1]}`).then((r) => r.text());
     assert.match(page, /Add your tours &amp; prices/);
-    assert.match(page, /<details class="op-fold" id="opLinksBox" open>/, 'booking link up front for a tour');
+    assert.match(page, /<details class="op-fold" id="opLinksBox"[^>]* open>/, 'booking link up front for a tour');
     const v = app.findVenueBySlug('kelowna', 'tour', 'ridge-test-tours');
     assert.equal(db.prepare('SELECT contact_email FROM venue_owner_links WHERE venue_id = ?').get(v.id).contact_email, 'ridge@example.com');
 
@@ -24259,15 +24259,22 @@ test('Owner season (2026-10-17): an owner sets "open May to October"; out of sea
     assert.match(page, /id="opSeasonMode"/);
     assert.match(page, /Create a login<\/strong> \(30 seconds\): your photos and prices then go live straight away/);
     assert.equal((await post(`/owner/${token}/changes`, { changes: { open_months: '6-6' }, started_at: Date.now() - 10000 })).status, 400);
-    const ch = await post(`/owner/${token}/changes`, { changes: { open_months: '11-4' }, started_at: Date.now() - 10000 });
+    // A two-month season that starts two months from today, so the venue is out of season whatever day the suite runs.
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const todayIso = app.todayLocal(); const curMonth = Number(todayIso.slice(5, 7));
+    const startM = ((curMonth + 1) % 12) + 1; const endM = (startM % 12) + 1;
+    const reopenYear = Number(todayIso.slice(0, 4)) + (startM > curMonth ? 0 : 1);
+    const seasonLabel = `${MONTHS[startM - 1]} – ${MONTHS[endM - 1]}`;
+    const reopenText = `${MONTHS[startM - 1]} 1${reopenYear === Number(todayIso.slice(0, 4)) ? '' : `, ${reopenYear}`}`;
+    const ch = await post(`/owner/${token}/changes`, { changes: { open_months: `${startM}-${endM}` }, started_at: Date.now() - 10000 });
     assert.equal(ch.status, 201, JSON.stringify(ch.body));
     const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
-    assert.match(await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text()), /November – April/);
+    assert.match(await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } }).then((r) => r.text()), new RegExp(seasonLabel));
     assert.equal((await post(`/admin/review/change/${ch.body.id}/approve`, {}, cookie)).status, 200);
-    // The test day is in July: a November-to-April business is out of season.
+    // The season starts two months from today: the business is out of season.
     const html = await fetch(`${base}/kelowna/tours/season-fixture-sleigh`).then((r) => r.text());
-    assert.match(html, /Open November – April each year/);
-    assert.match(html, /Closed for the season\. Reopens November 1/);
+    assert.match(html, new RegExp(`Open ${seasonLabel} each year`));
+    assert.match(html, new RegExp(`Closed for the season\\. Reopens ${reopenText}`));
     assert.doesNotMatch(html, /id="venueOpenStatus"/, "no Open now for her out of season");
   } finally {
     app.setVenueSubmissionTransport(async (payload) => { lyvSent.push(payload); });
@@ -24887,7 +24894,7 @@ test('Accessibility: home and /fr home have one main#main, skip link and labelle
       assert.equal((html.match(/<\/main>/g) || []).length, 1, `${p}: one </main>`);
       const main = html.slice(html.indexOf('<main id="main" tabindex="-1">'), html.indexOf('</main>'));
       assert.ok(main.includes('id="heroScenic"'), `${p}: hero inside main`);
-      assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="home-footer">'), `${p}: footer after main`);
+      assert.ok(html.indexOf('</main>') < html.indexOf('<footer class="footer">'), `${p}: footer after main`);
       assert.match(html, new RegExp(`<a class="skip-link" href="#main"[^>]*>${skip}</a>`), `${p}: skip link`);
       assert.match(html, new RegExp(`<nav class="nav wrap" aria-label="${menu}"`), `${p}: menu label`);
       assert.doesNotMatch(html, /<h4 data-i18n="(?:homeFooter|footer)\./, `${p}: footer headings are not h4`);
@@ -25112,7 +25119,7 @@ test('Accessibility pass 3: contrast, target-size and small markup fixes', async
   try {
     for (const p of ['/', '/fr']) {
       const html = await (await fetch(base + p)).text();
-      assert.match(html, /<input type="search" id="heroSearchInput" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocomplete="off"/, `${p}: hero search field`);
+      assert.match(html, /<input type="search" id="heroSearchInput" name="q" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocomplete="off"/, `${p}: hero search field`);
     }
   } finally {
     await new Promise((resolve) => srv.close(resolve));
@@ -25897,7 +25904,7 @@ test('Instant owner edits (2026-10-18): signed-in hours, phone, description, bad
   const cookie = made.cookie;
   const page = await get(`/owner/account/venue/${v.id}`, cookie);
   assert.match(page, /go live on <a href="[^"]+">your page<\/a> straight away/);
-  assert.match(page, /id="opSubmit">Save changes</);
+  assert.match(page, /id="opSubmit"[^>]*>Save changes</);
   assert.match(page, /\$\$ &mdash; \$15–30 per person/, 'price range selector with its scale');
   // Portal polish (2026-10-18): the scale shows once, in the choices; the hint no longer repeats it.
   const priceSec = page.slice(page.indexOf('id="price"'), page.indexOf('</details>', page.indexOf('id="price"')));
@@ -26136,11 +26143,11 @@ test('Owner portal phone pass (2026-10-18): checkboxes never shrink, 16px/44px f
     assert.doesNotMatch(html, /\.op-hint \{[^}]*rgba\(42,32,25,0\.62\)/);
     assert.match(html, /\.op-act-date \{ font-size: 0\.8rem; color: rgba\(42,32,25,0\.8\); \}/);
     // Hours and Photos open; Badges, Events folded; one section bar.
-    assert.match(html, /<details class="op-fold op-sec" id="hours" open>/);
-    assert.match(html, /<details class="op-fold op-sec" id="photos" open>/);
-    assert.match(html, /<details class="op-fold op-sec" id="badges">/);
-    assert.match(html, /<details class="op-fold op-sec" id="events">[\s\S]*id="oeHead">Add an event</);
-    assert.match(html, /<nav class="op-secnav" id="opSecNav" aria-label="Parts of this page"><a href="#hours">Hours<\/a><a href="#photos">Photos<\/a><a href="#opMenuCard">Menu<\/a><a href="#events">Events<\/a><\/nav>/);
+    assert.match(html, /<details class="op-fold op-sec" id="hours"[^>]* open>/);
+    assert.match(html, /<details class="op-fold op-sec" id="photos"[^>]* open>/);
+    assert.match(html, /<details class="op-fold op-sec" id="badges"[^>]*>/);
+    assert.match(html, /<details class="op-fold op-sec" id="events"[^>]*>[\s\S]*id="oeHead">Add an event</);
+    assert.match(html, /<nav class="op-secnav" id="opSecNav"[^>]* aria-label="Parts of this page"><a href="#hours">Hours<\/a><a href="#photos">Photos<\/a><a href="#opMenuCard">Menu<\/a><a href="#events">Events<\/a><\/nav>/);
     assert.match(html, /id="opMenuCard"/);
     assert.match(html, /position: sticky; top: 0; z-index: 30;/);
     // Footer with privacy, terms and info@ on the edit page and the simple pages.
@@ -26539,7 +26546,12 @@ test('Owner portal conveniences (2026-10-18): one-tap Add to my login, event nam
     assert.doesNotMatch(await (await s.get(`/owner/account/venue/${a.id}`, me.cookie)).text(), /id="opWelcome"/);
     const welcomeFr = await (await s.get(`/fr/owner/account/venue/${a.id}?welcome=1`, me.cookie)).text();
     assert.match(welcomeFr, /id="opWelcome" role="status">Vous êtes connecté\. Désormais/);
-    assert.doesNotMatch(await (await s.get(`/owner/${tokenB}`)).text(), /&#128247;|&#128203;|📷|📋/);
+    // (The "What would you like to do today?" start tiles added 2026-11-04 carry their own aria-hidden emoji icons; the menu card does not.)
+    const linkPage = await (await s.get(`/owner/${tokenB}`)).text();
+    const menuCard = /<a class="op-menu-card"[\s\S]*?<\/a>/.exec(linkPage);
+    assert.ok(menuCard, 'the menu card is on the page');
+    assert.doesNotMatch(menuCard[0], /&#128247;|&#128203;|📷|📋/);
+    assert.match(menuCard[0], /<svg class="ui-icon"/);
     // Settings: "Tap" on touch screens, and a message once the last business is gone.
     const settings = await (await s.get('/owner/account/settings', me.cookie)).text();
     assert.match(settings, /"tap":"Tap again to remove ","click":"Click again to remove "/);
@@ -26713,7 +26725,7 @@ test('French portal (2026-10-18): every signed-in page has a French address with
     assert.match(html, /"lang":"fr"/, `${p}: the help bot is French`);
   }
   const edit = await (await get(pages.edit, cookie)).text();
-  assert.match(edit, /id="opSubmit">Enregistrer les modifications</);
+  assert.match(edit, /id="opSubmit"[^>]*>Enregistrer les modifications</);
   assert.match(edit, /<span class="lyv-section-label">Heures d’ouverture/);
   assert.match(edit, /<span class="op-status op-status-wait op-wait-chip">En attente de vérification<\/span>/, 'the waiting chip on the website field');
   assert.match(edit, /Vos mises à jour[\s\S]*Mise à jour de la fiche : Site web/i);
@@ -26732,7 +26744,7 @@ test('French portal (2026-10-18): every signed-in page has a French address with
   assert.match(account, /href="\/fr\/owner\/account\/venue\/\d+">Modifier la fiche/);
   const link = await (await get(pages.link)).text();
   assert.match(link, /<strong>Créer un compte<\/strong> \(30 secondes\)/);
-  assert.match(link, /id="opSubmit">Envoyer les modifications</);
+  assert.match(link, /id="opSubmit"[^>]*>Envoyer les modifications</);
   const add = await (await get(pages.addToLogin, cookie)).text();
   assert.match(add, /id="olsAdd">Ajouter à mon compte \(portail@example\.com\)</);
   // An invalid link and an expired reset link are French too.
@@ -26864,7 +26876,7 @@ test('French portal (2026-10-18): the EN / FR switch round-trips, remembers the 
     assert.doesNotMatch(pfrVisible(en), /Enregistrer les modifications|Mes fiches|Paramètres du compte|Connecté en tant que/, enPath);
   }
   const en = await (await get(`/owner/account/venue/${v.id}`, cookie)).text();
-  assert.match(en, /id="opSubmit">Save changes</);
+  assert.match(en, /id="opSubmit"[^>]*>Save changes</);
   assert.match(en, /<span class="lyv-section-label">Opening hours/);
   assert.match(en, /"liveNow":"Live now: \{fields\}\. Your page shows it straight away\. "/);
   assert.match(en, /<footer class="op-footer"><a href="\/privacy">Privacy<\/a>/);
@@ -27389,7 +27401,9 @@ test('Search ranking: the desktop /map lists the places in view, open first then
   const html = app.renderPlacesMapPage();
   assert.ok(html.includes('function mapPlaceList(onMap, o)'));
   assert.match(html, /items = mapPlaceList\(onMap, \{ me: !!me, town: town, wide: WIDE\.matches/);
-  assert.match(html, /map\.on\('moveend', function\(\)\{ if \(me \|\| tab !== 'places'\) return;/);
+  // (Roam Now redesign, #647: panning offers a "Search this area" button instead of silently redrawing; it redraws after a fit.)
+  assert.match(html, /map\.on\('moveend',function\(\)\{if\(me\|\|tab!=='places'\)return;/);
+  assert.match(html, /if\(fitRefresh\)\{fitRefresh=false;moveTimer=setTimeout\(function\(\)\{render\(false\)\},150\)\}else \$\('rnSearchArea'\)\.hidden=false;/);
   assert.match(html, /var filtering = !!\(anyOn\(kinds\) \|\| anyOn\(feats\) \|\| openOnly/);
 });
 
@@ -28212,16 +28226,17 @@ test('Speed pass 6 (2026-10-19): every 800px tile has 360px and 480px copies, an
 });
 
 test('Speed pass 6 (2026-10-19): town pages load the banner first; tiles carry 360/480px copies and wait for it', () => withDiscoveryServer(async (base) => {
+  // Compact town pages (#633/#636, Nov 2026) have no tile grid that waits for a banner: their photos are small native
+  // lazy-loaded 480px copies, so nothing competes with the page's first paint. The hero-ready signal (roamAfterHero)
+  // still exists for the homepage and guides, and GA4 falls straight through to loading when a page has none.
   const raw = app.renderRegionPage('kelowna', app.getRegionCategoryCounts('kelowna') || { restaurant: 3, winery: 2 }, []);
-  assert.ok(raw.indexOf('window.roamAfterHero = function') > raw.indexOf('<meta charset="UTF-8">'), 'the hero signal is in <head>');
-  assert.ok(raw.indexOf('window.roamAfterHero = function') < raw.indexOf("googletagmanager.com/gtag/js"), 'before the GA4 snippet (gtag.js waits for it)');
-  assert.doesNotMatch(raw, /<div class="region-card-photo"><img src=/, 'no tile photo loads before the banner');
-  const tiles = raw.match(/<div class="region-card-photo"><img data-src="[^"]+"[^>]* data-home-hero><noscript><img src="[^"]+" alt="" width="\d+" height="\d+"><\/noscript><\/div>/g) || [];
-  assert.ok(tiles.length >= 2, `${tiles.length} tiles wait for the banner, each with a no-JS copy`);
-  assert.ok(tiles.some((t) => /data-srcset="\/images\/[\w-]+\/thumbs\/[\w-]+-w360\.jpg 360w, [^"]+-w480\.jpg 480w, [^"]+ 800w" sizes="\(max-width: 899px\) calc\(50vw - 31px\)/.test(t)), 'category tiles offer the small copies');
-  assert.ok(raw.includes("window.roamAfterHero(start)") && raw.indexOf('id="home-card-lz"') < raw.indexOf('</main>'), 'the loader is on the page');
-  // The banner (fetchpriority="high") is what releases them.
-  const js = raw.match(/<script>\n\(function\(\)\{\n  var q = \[\], done = false;[\s\S]*?<\/script>/)[0].replace(/^<script>|<\/script>$/g, '');
+  assert.doesNotMatch(raw, /<div class="region-card-photo"><img src=/, 'no big tile photo loads before the banner');
+  const lazy = raw.match(/<img loading="lazy" decoding="async" src="\/images\/[^"]+-w480\.jpg[^"]*" alt="">/g) || [];
+  assert.ok(lazy.length >= 2, `${lazy.length} town photos are lazy 480px copies`);
+  // The banner (fetchpriority="high") is what releases the waiting images on pages that have the signal.
+  const head = app.withHomeHeroFirst('<!DOCTYPE html><html><head><meta charset="UTF-8">\n</head><body></body></html>');
+  assert.ok(head.indexOf('window.roamAfterHero = function') > head.indexOf('<meta charset="UTF-8">'), 'the hero signal is in <head>');
+  const js = head.match(/<script>\n\(function\(\)\{\n  var q = \[\], done = false;[\s\S]*?<\/script>/)[0].replace(/^<script>|<\/script>$/g, '');
   const vm = require('node:vm');
   const docL = {}; const ctx = { document: { addEventListener: (t, fn) => { docL[t] = fn; } }, addEventListener() {}, setTimeout() {} };
   ctx.window = ctx; vm.createContext(ctx); vm.runInContext(js, ctx);
@@ -28233,8 +28248,9 @@ test('Speed pass 6 (2026-10-19): town pages load the banner first; tiles carry 3
   // Served, English and French.
   for (const p of ['/kelowna', '/fr/kelowna']) {
     const html = await (await fetch(base + p)).text();
-    if (!/region-card-photo/.test(html)) continue;
-    assert.ok(html.includes('window.roamAfterHero = function') && !/<div class="region-card-photo"><img src=/.test(html), `${p}: hero first`);
+    assert.ok(!/<div class="region-card-photo"><img src=/.test(html), `${p}: no early big tile photos`);
+    assert.ok(/<img loading="lazy" decoding="async" src="\/images\/[^"]+-w480\.jpg/.test(html), `${p}: lazy 480px copies`);
+    assert.ok(html.includes("if (typeof window.roamAfterHero === 'function') window.roamAfterHero(load); else load();"), `${p}: GA4 loads at once when there is no hero signal`);
   }
 }));
 
@@ -28654,7 +28670,7 @@ test('Map search pass 6: a new search drops the last search\'s filters, keeps ha
   assert.match(src, /lastSearchSet = searchDiff\(before, snapshot\(\)\);/);
   assert.match(src, /readSearch\(v, false\); searchEl\.value = String\(v \|\| ''\)\.trim\(\);/);
   // Audit fix (2026-10-27): a search from the address also fits the map to its results (searchFit).
-  assert.match(src, /if \(qs\.get\('q'\)\) \{ readSearch\(qs\.get\('q'\)\); searchEl\.value = qs\.get\('q'\); searchFit = true; \}/);
+  assert.match(src, /if \(qs\.get\('q'\)\) \{ readSearch\(qs\.get\('q'\)\); searchEl\.value = qs\.get\('q'\); searchFit = true;/);
   assert.match(src, /lastSearchSet = null; radiusFixed = false; searchEl\.value = '';/, 'Clear forgets the last search');
   // With the location known and something within 1 km, the map shows the 1 km around the visitor.
   assert.match(src, /if \(within1\) fitTo\(L\.latLng\(me\.lat, me\.lng\)\.toBounds\(2000\), 17\);/);
@@ -29161,10 +29177,11 @@ test('A11y pass 5: muted text is one solid token at 4.6:1 or better, never opaci
 
 test('A11y pass 5: region intro checkbox leaves the tab order on desktop; /kelowna columns in em, not ch', () => withPass4Server(async (get) => {
   const region = await withPass5Css(get, '/kelowna');
-  assert.match(region, /@media \(min-width: 641px\) \{\s*body\.region-page \.region-intro-toggle \{ display: none; \}/);
-  assert.match(region, /\.region-lead-split \{ display: grid; grid-template-columns: minmax\(0, 38\.4em\) minmax\(0, 1fr\);/);
-  assert.match(region, /body\.region-page \.region-intro \{ max-width: 40\.8em;/);
+  // The compact /kelowna layout (#633) has no "Read more" intro checkbox at all, so nothing hidden sits in the tab order;
+  // its columns are in em (or fractions), never ch.
+  assert.doesNotMatch(region, /<input type="checkbox"[^>]*region-intro-toggle/);
   assert.doesNotMatch(region, /minmax\(0, 64ch\)/);
+  assert.doesNotMatch(region, /grid-template-columns:[^;}]*\d(?:\.\d+)?ch\b/, 'grid columns are not in ch');
   assert.match(region, /@media \(min-width: 941px\) \{ \.nav \.logo-wordmark \{ display: inline-block; min-width: 9\.95em; \} \}/);
 }));
 
@@ -29291,18 +29308,19 @@ test('Round 7 phone: /map popups pan clear of the search bar and chips, a phone 
 }));
 
 test('Round 7 phone: town event cards are tappable across the whole card with one link each', () => withPass4Server(async (get) => {
+  // The compact town pages (#633/#636) no longer list individual upcoming events; the What's On entry is a tile that is
+  // itself the one link, so the whole card is tappable and nothing nests a second link inside it.
   const counts = app.getRegionCategoryCounts('kelowna');
   const html = app.renderRegionPage('kelowna', counts, []);
-  const block = (html.match(/<h2>Upcoming events in [^<]*<\/h2>[\s\S]*?<\/div>\s*<p>/) || [''])[0];
-  const cards = [...block.matchAll(/<div class="related-card related-card-event">([\s\S]*?)<\/div>/g)];
-  assert.ok(cards.length > 0, 'the fixture region shows event cards');
-  for (const c of cards) assert.equal((c[1].match(/<a /g) || []).length, 1, 'one link per card');
+  const tiles = [...html.matchAll(/<a class="bw-tile" href="([^"]+)">([\s\S]*?)<\/a>/g)];
+  assert.ok(tiles.length >= 4, 'the town page shows its tiles');
+  const events = tiles.find((t) => t[1] === '/kelowna/events');
+  assert.ok(events, 'a What’s On tile for the town');
+  assert.match(events[2], /What’s On/);
+  for (const t of tiles) assert.doesNotMatch(t[2], /<a /, `${t[1]}: one link per tile`);
   const page = (await get('/kelowna')).text;
-  const hrefs = [...page.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
-  const css = page + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
-  assert.match(css, /\.related-card-event \{ position: relative; \}/);
-  assert.match(css, /\.related-card-event > a::after \{ content: ""; position: absolute; inset: 0;/);
-  assert.match(css, /\.related-card-event > a:focus-visible::after \{ outline: 3px solid/);
+  assert.match(page, /<a class="bw-tile" href="\/kelowna\/events">/, 'served too');
+  assert.match(page, /\.bw-tile ?\{[^}]*display: ?(?:block|grid|flex)/, 'the tile link fills the card');
 }));
 
 test('Round 7 phone: the open phone menu leaves a dimmed strip to tap, and a tap there closes it', () => withPass4Server(async (get) => {
@@ -31162,7 +31180,10 @@ test('Round 9 phone: 44px tap targets on venue, town, category, map, home and pl
   for (const p of ['/map', '/fr/map']) assert.match(await r8PageWithCss(get, p), /body\.map-page \.pm-dir, body\.map-page \.pm-link \{ display: inline-flex; align-items: center; min-height: 44px;/);
   for (const p of ['/', '/fr']) {
     const home = await r8PageWithCss(get, p);
-    assert.match(home, /\.hero-search-box \{ padding: 2px 2px 2px 16px; \}\n\s*\.hero-search-field input \{ min-height: 44px; padding: 0; \}\n\s*\.hero-search-box button \{ height: 44px; \}/);
+    // The simpler homepage (#642) has one flex search row: the field stretches to the button, which is 12px + 12px of
+    // padding around a 14px/1.5 line on a phone (45px) and 48px-ish on desktop.
+    assert.match(home, /#homeSimple \.quick-search\{display:flex;/);
+    assert.match(home, /#homeSimple \.quick-search button\{padding:12px 17px;font-size:14px\}/);
   }
   // The planner's CSS (trip-planner-v3-page.js): "+N more" and the "Before you go" links.
   const planner = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
@@ -31179,7 +31200,8 @@ test('Round 9 accessibility: on a venue page the facts (map, phone, website) com
       const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
       const aside = html.indexOf('<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = html.indexOf('<div class="venue-extra">');
       assert.ok(aside > 0 && extra > asideEnd, 'the extras follow the sidebar');
-      assert.ok(html.indexOf('Get Directions') !== -1 || html.indexOf('Itin') !== -1, 'the map link is the Get Directions button');
+      // (#572: one map link, the Directions button; a place with no coordinates for the built-in directions gets the Google Maps button.)
+      assert.match(html, /<a class="cta" href="[^"]+"[^>]*data-track="directions">(?:Get Directions|Itinéraire|Open in Google Maps|Ouvrir dans Google Maps)<\/a>/, 'the map link is the Directions button');
       assert.ok(html.indexOf('tel:') < extra, 'the phone comes first');
       if (html.includes('id="vcOpen"')) assert.ok(html.indexOf('id="vcOpen"') > extra, 'Share a photo or tip comes after the facts');
       assert.ok(html.indexOf('<div class="venue-main">') < aside, 'the story still comes first');
@@ -31997,7 +32019,7 @@ test('Phone visitors (2026-10-20): Directions leads, Website is secondary, and a
   try {
     const html = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries/close-by-host-fixture`).then((r) => r.text());
     const row = html.slice(html.indexOf('<div class="venue-cta-row"'), html.indexOf('</div>', html.indexOf('<div class="venue-cta-row"')));
-    assert.match(row, /^<div class="venue-cta-row"[^>]*>\s*<a class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions<\/a>/);
+    assert.match(row, /^<div class="venue-cta-row"[^>]*>\s*<a class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">(?:Get Directions|Open in Google Maps)<\/a>/); // Google Maps when the built-in directions have no route data for the fixture
     assert.match(row, /<a class="cta secondary" href="https:\/\/host\.example\/"[^>]*target="_blank" data-track="website">Website ↗<\/a>/);
     // 2026-10-29: a menu or booking link that is only the website itself is left out (no Book button, no Menu row).
     assert.doesNotMatch(html, /data-track="booking"/);
@@ -32430,33 +32452,48 @@ test('Ski resort pages (2026-11-01): the Mountain at a glance panel shows status
   }
   assert.match(app.skiSeasonBoxHtml('big-white', '2026-12-01'), /ski-hub-status-open[^>]*><span class="ski-hub-dot" aria-hidden="true"><\/span>Open for the season/);
   assert.match(app.skiSeasonBoxHtml('big-white', '2026-11-01'), /Opens Thursday, November 26/);
+  // The resort pages 404 without a listing, so the test brings its own.
+  const fixture = db.prepare("INSERT INTO venues (name, region, type, description, hours, slug) VALUES ('Ski Glance Fixture Pub', 'big-white', 'pub', 'A fixture.', ?, 'ski-glance-fixture-pub')").run(SEASON_WEEK).lastInsertRowid;
   // The panel sits above the category tabs, in both languages.
   const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
   const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
     try {
       const base = `http://127.0.0.1:${tmp.address().port}`;
       resolve({ en: await (await fetch(`${base}/big-white`)).text(), fr: await (await fetch(`${base}/fr/big-white`)).text() });
-    } catch (err) { reject(err); } finally { tmp.close(); }
+    } catch (err) { reject(err); } finally { tmp.close(); db.prepare('DELETE FROM venues WHERE id = ?').run(fixture); }
   }));
-  assert.ok(pages.en.indexOf('class="ski-hub"') > -1 && pages.en.indexOf('class="ski-hub"') < pages.en.indexOf('<nav class="category-region-selector region-category-tabs"'), 'panel above the tabs');
-  assert.match(pages.fr, /La montagne en un coup d’œil/);
-  assert.match(pages.fr, /Bulletin de neige/);
-  assert.match(pages.fr, /Site officiel/);
-  assert.doesNotMatch(pages.fr.slice(pages.fr.indexOf('class="ski-hub"'), pages.fr.indexOf('</section>', pages.fr.indexOf('class="ski-hub"'))), /Mountain at a glance|Snow report|Official site/);
+  // On the compact resort page (#634) the same facts sit in the "Mountain essentials" strip right under the tiles:
+  // the date-aware status and the hill's own snow report, webcams and tickets links, in both languages.
+  const essentials = (h) => h.slice(h.indexOf('<aside class="bw-essentials">'), h.indexOf('</aside>', h.indexOf('<aside class="bw-essentials">')));
+  const en = essentials(pages.en), fr = essentials(pages.fr);
+  assert.ok(en.length > 0 && pages.en.indexOf('<aside class="bw-essentials">') < pages.en.indexOf('<section class="bw-section" id="picks">'), 'the strip is above the picks');
+  assert.match(en, /Mountain essentials/);
+  assert.match(en, /Opens Thursday, November 26|Open for the season|Check resort status/);
+  for (const k of ['webcams', 'tickets']) assert.ok(en.includes(`href="${app.SKI_RESORT_SEASON['big-white'].links[k]}"`), `${k} link`);
+  assert.match(en, /href="https:\/\/www\.bigwhite\.com\/(?:mountain-conditions\/)?daily-snow-report"[^>]*>[^<]*Snow report/); // big-white-page.js keeps its own copy of the snow link
+  assert.match(fr, /L’essentiel en montagne/);
+  assert.match(fr, /Conditions de neige/);
+  assert.match(fr, /Infos sur la montagne/);
+  assert.doesNotMatch(fr, /Mountain essentials|Snow report|More mountain info/);
 });
 
 test('Ski resort pages (2026-11-01): one full-width flow with no side column; other towns keep the split layout', async () => {
+  // Since #633-#636 every town and resort uses the compact layout (no region-lead / split intro at all); the resort pages
+  // are one full-width flow (hero, tiles, essentials, picks, plan) and the towns have their own body class.
+  // The resort pages 404 without a listing, so the test brings its own.
+  const fixture = db.prepare("INSERT INTO venues (name, region, type, description, hours, slug) VALUES ('Ski Flow Fixture Pub', 'big-white', 'pub', 'A fixture.', ?, 'ski-flow-fixture-pub')").run(SEASON_WEEK).lastInsertRowid;
   const tmp = require('node:http').createServer((req, res) => app.server.emit('request', req, res));
   const pages = await new Promise((resolve, reject) => tmp.listen(0, '127.0.0.1', async () => {
     try {
       const base = `http://127.0.0.1:${tmp.address().port}`;
       resolve({ ski: await (await fetch(`${base}/big-white`)).text(), town: await (await fetch(`${base}/kelowna`)).text() });
-    } catch (err) { reject(err); } finally { tmp.close(); }
+    } catch (err) { reject(err); } finally { tmp.close(); db.prepare('DELETE FROM venues WHERE id = ?').run(fixture); }
   }));
-  assert.match(pages.ski, /<body class="golf-page outdoor-page region-page ski-region">/);
-  assert.match(pages.ski, /<div class="region-lead">/);
-  assert.doesNotMatch(pages.ski, /<div class="region-lead region-lead-split">/);
-  assert.doesNotMatch(pages.town, /ski-region">/);
+  assert.match(pages.ski, /<body class="golf-page outdoor-page big-white-page">/);
+  assert.match(pages.ski, /<main id="main" class="bw-landing"[^>]*>/);
+  assert.doesNotMatch(pages.ski, /region-lead|<aside class="venue-aside"/, 'no side column or split intro');
+  assert.match(pages.town, /<body class="golf-page outdoor-page kelowna-page">/);
+  assert.doesNotMatch(pages.town, /ski-region">|big-white-page/);
 });
 
 test('Ski resort pages (2026-11-01): Plan your trip cards show stay, getting-here and kids facts with the hill’s own links, only where the hill states them', () => {
