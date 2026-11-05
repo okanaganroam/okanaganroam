@@ -11,6 +11,7 @@ const EVENTS = new Set([
   'build_my_trip_click', 'trip_plan_start', 'trip_plan_complete', 'trip_plan_regenerate', 'trip_share', 'add_whole_trip',
   'open_my_trip', 'add_to_trip', 'remove_from_trip', 'shared_trip_view', 'shared_trip_save', 'shared_trip_cta_click',
   'hotel_page_click', 'bio_link_click', 'listing_submit', 'outbound_click', 'search',
+  'portal_login_click_menu', 'portal_login_click_venue_page', 'portal_login_click_footer', 'portal_login_click_other', 'portal_claim_click',
   'page_view:home', 'page_view:map', 'page_view:trip', 'page_view:whats_on', 'page_view:browse', 'page_view:hidden_gems',
 ]);
 
