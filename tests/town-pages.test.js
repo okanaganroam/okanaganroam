@@ -34,3 +34,15 @@ for (const [town, c] of Object.entries(TOWNS)) {
     for (const k of keys) assert.ok(french[k], `no French for: ${k}`);
   });
 }
+
+test('every town page opens Roam Now and the trip planner on its own town, and can show an official visitor link', () => {
+  for (const [town, c] of Object.entries(TOWNS)) {
+    const html = renderBody(town, { count: 5, activeSlugs: c.picks.map(p => p.slug) });
+    assert.ok(html.includes(`href="/map?f=in.${town}"`), `${town}: Roam Now link`);
+    assert.ok(html.includes(`href="/trip?region=${town}"`), `${town}: trip link`);
+    assert.doesNotMatch(html, /href="\/map"|href="\/trip"/, `${town}: no unscoped map or trip link`);
+  }
+  const official = '<p class="subtitle region-official">Official visitor information: <a href="https://www.tourismvernon.com/">Tourism Vernon</a></p>';
+  assert.ok(renderBody('vernon', { count: 5, activeSlugs: [], officialHtml: official }).includes('https://www.tourismvernon.com/'));
+  assert.ok(!renderBody('vernon', { count: 5, activeSlugs: [] }).includes('tourismvernon'));
+});

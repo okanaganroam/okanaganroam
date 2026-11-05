@@ -19364,7 +19364,7 @@ ${townPages.styles(region)}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page town-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
-${townPages.renderBody(region, { count: placeCount, activeSlugs })}
+${townPages.renderBody(region, { count: placeCount, activeSlugs, officialHtml: regionOfficialLinkHtml(region).trim() })}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
