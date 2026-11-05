@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const dashboardData = require('./dashboard-data');
+const { renderDashboardPage } = require('./dashboard-page');
 const tripDemand = require('./trip-demand');
 const tripDemandLog = tripDemand.createLogger(db);
 const r2 = require('./r2');
@@ -57209,6 +57211,37 @@ const server = http.createServer(async (req, res) => {
       try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
       if (!body || !Number.isInteger(body.venue_id)) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
       return sendJSON(res, 200, { venue_id: body.venue_id, revoked: revokeOwnerLink(body.venue_id) });
+    }
+    // Owner dashboard, Phase 1 (2026-11-05). GET /api/admin/dashboard-data?days=30 -- this site's own numbers (admin token).
+    // GET /admin/dashboard?site=both|okanagan|whistler&days=30 -- the page: this site's numbers plus Whistler Roam's,
+    // fetched server to server with WHISTLER_ADMIN_TOKEN (optional; without it the Whistler column says it isn't connected).
+    if (pathname === '/api/admin/dashboard-data' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, dashboardData.collect(db, { site: 'okanagan', days: query.days }));
+    }
+    if ((pathname === '/admin/dashboard' || pathname === '/admin/dashboard/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Dashboard', '<h1>Dashboard</h1><p>The admin key is not set up on this server.</p>'));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const days = [7, 30, 90].includes(parseInt(query.days, 10)) ? parseInt(query.days, 10) : 30;
+      const site = ['okanagan', 'whistler'].includes(query.site) ? query.site : 'both';
+      const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
+      try { sites[0].data = dashboardData.collect(db, { site: 'okanagan', days }); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
+      if (site !== 'okanagan') {
+        const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+        if (!wToken) sites[1].error = 'Not connected yet: add the Whistler Roam admin key to this site as WHISTLER_ADMIN_TOKEN.';
+        else {
+          try {
+            const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/dashboard-data?days=${days}`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(6000) });
+            if (r.status === 200) sites[1].data = await r.json();
+            else sites[1].error = r.status === 401 ? 'Whistler Roam rejected the admin key.' : r.status === 404 ? 'Whistler Roam doesn’t have the dashboard yet.' : `Whistler Roam answered ${r.status}.`;
+          } catch (e) { sites[1].error = 'Couldn’t reach Whistler Roam right now.'; }
+        }
+      }
+      return res.end(renderDashboardPage({ sites, days, site, clarityId: process.env.CLARITY_PROJECT_ID || '' }));
     }
     // Review page (2026-10-15): see renderAdminReviewPage.
     if ((pathname === '/admin/review' || pathname === '/admin/review/') && (method === 'GET' || method === 'HEAD')) {
