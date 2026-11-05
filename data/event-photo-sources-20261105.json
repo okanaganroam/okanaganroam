@@ -81,24 +81,22 @@
       ]
     },
     {
-      "file": "ottercrest-sleigh-2611.jpg",
-      "events": [
-        676
-      ],
-      "subject": "Horse Drawn Okanagan sleigh at sunset (rides run at Ottercrest Farms)",
+      "file": "public/images/events/ottercrest-sleigh-2611.jpg",
       "credit": "Horse Drawn Okanagan",
       "source_page": "https://www.horsedrawnokanagan.com",
-      "licence": "none stated; operator own-site photo, cropped to 16:9"
+      "licence": "none stated; operator own-site photo, cropped to 16:9",
+      "event_ids": [
+        676
+      ]
     },
     {
-      "file": "miradoro-2611.jpg",
-      "events": [
-        830
-      ],
-      "subject": "Miradoro at Tinhorn Creek exterior at dusk",
+      "file": "public/images/events/miradoro-2611.jpg",
       "credit": "Miradoro at Tinhorn Creek (photographer not stated)",
       "source_page": "https://miradoro.ca",
-      "licence": "none stated; venue own-site photo, cropped to 16:9"
+      "licence": "none stated; venue own-site photo, cropped to 16:9",
+      "event_ids": [
+        830
+      ]
     }
   ]
 }
