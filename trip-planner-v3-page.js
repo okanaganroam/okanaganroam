@@ -2334,6 +2334,27 @@ function renderScript(d) {
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip){
     chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
+  // /trip?region=<town> (the town pages' "Build my <town> trip" buttons): the placeholder and the four example requests
+  // name that town instead of Kelowna / Penticton / Naramata. Nothing is submitted; an unknown town changes nothing.
+  (function(){
+    try {
+      var slug = new URLSearchParams(location.search).get('region');
+      var town = slug && REGIONS.filter(function(r){ return r.slug === slug; })[0];
+      if (!town || !town.label) return;
+      var n = town.label, fr = lang() === 'fr';
+      var texts = fr
+        ? ['3 jours \u00e0 ' + n + '\u00a0: vignobles, promenades faciles et bonne bouffe', '2 jours \u00e0 ' + n + ' avec les enfants', 'Une fin de semaine romantique \u00e0 ' + n, 'Que peut-on faire autour de ' + n + ' s\u2019il pleut?']
+        : ['3 days in ' + n + ': wineries, easy walks and great food', '2 days in ' + n + ' with the kids', 'A romantic weekend in ' + n, 'What can we do around ' + n + ' if it rains?'];
+      Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip, i){
+        if (!texts[i]) return;
+        chip.removeAttribute('data-i18n'); chip.textContent = texts[i];
+      });
+      input.removeAttribute('data-i18n-placeholder');
+      input.setAttribute('placeholder', fr
+        ? 'Planifiez 3 jours \u00e0 ' + n + ' cet automne avec des vignobles, des promenades faciles et de la bonne bouffe.'
+        : 'Plan 3 days in ' + n + ' this autumn with some vineyards, some easy walks and some great food.');
+    } catch (e) { /* cosmetic only */ }
+  })();
   // A shared link (/trip?q=...) restores the same plan: it replays the
   // sender's plan request (pin / avoid; an older link without them pins its
   // kept stops, as before), then removes the stops the sender removed. A link
