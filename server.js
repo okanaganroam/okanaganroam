@@ -4105,7 +4105,8 @@ function resolveDiscoveryDestination(intent) {
   // Dog-friendly -> Dog Friendly Finds, which has its own type/feature chips.
   if (F.includes('dog_friendly') && !Q.length) {
     const others = F.filter((f) => f !== 'dog_friendly');
-    if (subset(others, [...DOG_HUB_FEATURE_KEYS]) && subset(T, [...DOG_HUB_TYPE_KEYS].filter((t) => t !== DOG_BEACH_TYPE_KEY))) {
+    // Never offered while /dog-friendly would 404 (it needs MIN_CATEGORY_VENUES places).
+    if (subset(others, [...DOG_HUB_FEATURE_KEYS]) && subset(T, [...DOG_HUB_TYPE_KEYS].filter((t) => t !== DOG_BEACH_TYPE_KEY)) && getDogFriendlyHubVenues().length >= MIN_CATEGORY_VENUES) {
       return { url: `/dog-friendly${discoveryQueryString({ types: T, features: others, regions: R })}`, kind: 'dog-friendly', reason: 'feature' };
     }
   }

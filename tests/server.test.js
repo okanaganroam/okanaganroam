@@ -3806,11 +3806,12 @@ test('sports listings show a matched local photo on the valley hub, region categ
 
     const hub = await s4request('GET', '/sports');
     assert.equal(hub.status, 200);
-    assert.match(hub.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-2'\)"/);
+    // (Nov 2026) cards carry resized 480/960 px copies of the photo, each cache-busted by a content hash.
+    assert.match(hub.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)(?:;--fd-ph-2x:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w960\.jpg\?v=[0-9a-f]{10}'\))?"/);
 
     const region = await s4request('GET', '/kelowna/sports');
     assert.equal(region.status, 200);
-    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park\.jpg\?v=sports-photo-2'\)"/);
+    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)/);
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(Number(result.lastInsertRowid));
   }
@@ -4631,8 +4632,14 @@ test('S6 #9-#11/#21: region/category multi-select and no-match state over the re
   assert.match(noMatch, /<p class="outdoor-no-results" id="whatsOnNoResults">No events match that combination yet\./, 'no-match state, not the empty-inventory state');
   assert.match(noMatch, /<div class="whatson-empty" id="whatsOnEmptyInventory" hidden>/);
   assert.match(noMatch, /<ul class="card-grid" id="whatsOnResults" hidden>/);
-  assert.equal((noMatch.match(/<li class="venue-card whatson-event-card" hidden/g) || []).length, 4, 'all four window cards are rendered hidden, so unselecting a chip can reveal them client-side');
+  // (Oct 2026, rest links) cards that are not shown are not rendered as hidden cards: they ride in the "rest" template and
+  // the crawlable "More upcoming events" list, and the client builds the card when a chip reveals it.
+  const restLinks = (html) => (html.match(/<li hidden><a data-href="[^"]+">/g) || []).length;
+  const shownCards = (html) => (html.match(/<li class="venue-card whatson-event-card"(?![^>]*hidden)/g) || []).length;
+  assert.equal(shownCards(noMatch), 0, 'no card is shown');
+  assert.equal(restLinks(noMatch), 4, 'all four window events are kept as rest entries, so unselecting a chip can reveal them client-side');
   assert.equal((both.match(/<li class="venue-card whatson-event-card" hidden/g) || []).length, 2, 'pre-filtered render: 2 shown, 2 hidden');
+  assert.equal(shownCards(both), 2, 'pre-filtered render: 2 shown');
 });
 
 test('S6 #12/#13/#19: the client script keeps the date window on chip pushState, reloads on Back/Forward date changes, clears all, and keeps Favorite/Add to Trip wiring', () => {
@@ -5099,7 +5106,7 @@ test('Batch 4B Guides: winery venue and region pages keep their own presentation
   assert.match(venue, /<body class="golf-page winery-page">/);
   assert.doesNotMatch(venue, /guide-page/);
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
-  assert.doesNotMatch(region, /guide-page|golf-page|<script src="\/scripts\/app\.js[?"]/);
+  assert.doesNotMatch(region, /<body class="[^"]*(?:guide|golf)-page|<script src="\/scripts\/app\.js[?"]/); // (shared inline CSS names the page classes)
 });
 
 // ---- /events index (2026-09-17, replaces the homepage's Happening Soon) --
@@ -5182,8 +5189,10 @@ test('Canonical footer: venue/category/region/guide/event/events-index pages all
     ['venue', venueHtml], ['category', categoryHtml], ['region', regionHtml],
     ['guide', guideHtml], ['event', eventHtml], ['events index', eventsIndexHtml],
   ]) {
-    assert.match(html, /<footer class="home-footer">/, `${label} page must render the approved home-footer`);
     assert.doesNotMatch(html, /class="site-footer"/, `${label} page must NOT render the old siteFooter() one-liner`);
+    // The compact Kelowna city page (kelowna-page.js, Nov 2026) has its own small footer instead of the full home-footer.
+    if (label === 'region') { assert.match(html, /<footer class="bw-footer">/, 'region page renders the compact city-page footer'); continue; }
+    assert.match(html, /<footer class="home-footer">/, `${label} page must render the approved home-footer`);
     assert.match(html, /home-footer-region-subcol/, `${label} page's footer must include the two Regions subcolumns`);
     // The markup alone rendering isn't enough (this was exactly /trip's old
     // bug) -- the page's own CSS must actually include the shared ruleset,
@@ -5349,8 +5358,13 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   assert.equal(restaurantsAllRegionsPage.status, 200, '/restaurants is the dedicated valley-wide Food & Drink page');
   assert.match(await restaurantsAllRegionsPage.text(), /<h1>Restaurants in the Okanagan<\/h1>/);
 
-  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/, 'golf category must appear in the sitemap');
-  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/, 'golf venue must appear in the sitemap');
+  // SEO (2026-10-20): a town category page with fewer than 3 places is noindex and left out of the sitemap.
+  const kelownaGolfCount = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE region = 'kelowna' AND type = 'golf' AND redirect_to IS NULL").get().n;
+  assert.equal(/<loc>https:\/\/okanaganroam\.com\/kelowna\/golf<\/loc>/.test(sitemapBody), kelownaGolfCount >= 3, 'golf category is in the sitemap exactly when it has enough places to be indexable');
+  assert.match(sitemapBody, /<loc>https:\/\/okanaganroam\.com\/golf<\/loc>/, 'the valley-wide golf page is in the sitemap');
+  // SEO r13 (2026-10-20): a thin place page (no hours, short description) is noindex and left out of the sitemap.
+  const golfFixture = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
+  assert.equal(/<loc>https:\/\/okanaganroam\.com\/kelowna\/golf\/test-golf-course<\/loc>/.test(sitemapBody), !app.venuePageIsThin(golfFixture), 'golf venue is in the sitemap exactly when its page is indexable');
 
   const tokensCss = await fetch(`${base}/styles/tokens.css`);
   assert.equal(tokensCss.status, 200, 'shared tokens.css must be served');
@@ -5393,7 +5407,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Milestone 1 (approved homepage redesign) — the old "Worth the Drive"
   // carousel is intentionally replaced by a scenic hero + a new "What are
   // you in the mood for?" section, both ahead of the wizard.
-  assert.match(homepageBody, /class="hero-scenic(?:\s|\")/, 'New scenic hero (Milestone 1) must render');
+  // (Nov 2026) the homepage is the simplified home-simple.js page: <div id="homeSimple"> with a scenic hero.
+  assert.match(homepageBody, /<div id="homeSimple"><main id="main"[^>]*><section class="hero" id="heroScenic">/, 'scenic hero must render');
   assert.match(homepageBody, /id="moodCards"/, 'Mood cards section (Milestone 1) must render');
   assert.doesNotMatch(homepageBody, /class="hero">/, 'Old "Worth the Drive" hero carousel must be gone');
 
@@ -5404,7 +5419,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // dictionary on load, so both had to change or the new copy would have
   // been clobbered at runtime).
   assert.match(homepageBody, /<h1 class="hero-title" data-i18n="hero\.headline">Explore the Okanagan<\/h1>/, 'hero heading must be unchanged');
-  assert.match(homepageBody, /<p class="hero-lead hero-lead-full" data-i18n="hero\.lead">Okanagan Roam is your guide to the Okanagan Valley from Enderby to Osoyoos &mdash; including ski resorts, wineries, food, golf, beaches, events, adventures, and hidden gems, all in one place\.<\/p>/, 'hero subtitle must be the new elevator pitch');
+  assert.match(homepageBody, /<span class="home-en">Great food\. Beautiful places\. Something new to discover\.<br>Your local guide to the whole valley\.<\/span>/, 'hero subtitle (home-simple.js)');
   assert.doesNotMatch(homepageBody, /Find the places worth discovering/, 'old hero subtitle copy must be gone');
 
   // Reference redesign: rebuilt header (decisions #4/#5) — new logo,
@@ -5443,12 +5458,12 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // Gems -> Explore -> Build Trip -> footer. The old Browse/Search wizard
   // no longer renders on this page at all (verified above and via the
   // dedicated /browse checks below).
-  assert.match(homepageBody, /id="buildTrip"/, 'Build Your Perfect Okanagan Trip section (Milestone 3) must render');
-  const heroPos = homepageBody.indexOf('class="hero-scenic"');
+  assert.match(homepageBody, /<section class="trip-banner"[^>]*>[\s\S]*?<a class="pill" href="\/trip">/, 'Build Your Okanagan adventure banner must render');
+  const heroPos = homepageBody.indexOf('id="heroScenic"');
   const moodPos = homepageBody.indexOf('id="moodCards"');
   const gemsPos = homepageBody.indexOf('id="hiddenGems"');
   const explorePos = homepageBody.indexOf('id="exploreRegions"');
-  const tripPos = homepageBody.indexOf('id="buildTrip"');
+  const tripPos = homepageBody.indexOf('class="trip-banner"');
   assert.ok(
     heroPos < moodPos && moodPos < gemsPos && gemsPos < explorePos && explorePos < tripPos,
     `expected Hero < Mood < Hidden Gems < Explore < Build Trip in page order, got positions ${JSON.stringify({ heroPos, moodPos, gemsPos, explorePos, tripPos })}`
@@ -5457,8 +5472,8 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // home-footer (2026-09-17 redesign, class="home-footer" -- distinct
   // from /browse's still-original plain <footer>, checked separately
   // below) -- nothing from the old directory stack follows it.
-  const footerPos = homepageBody.indexOf('<footer class="home-footer">');
-  assert.ok(footerPos !== -1, 'expected the new home-footer to render on the homepage');
+  const footerPos = homepageBody.indexOf('<footer class="footer">'); // home-simple.js footer (Nov 2026)
+  assert.ok(footerPos !== -1, 'expected the home footer to render on the homepage');
   assert.ok(tripPos < footerPos, 'the footer must immediately follow Build My Trip, with nothing old in between');
 
   // Build My Trip, Stage 2 (2026-09-18): GET /trip serves the real planner
@@ -5474,7 +5489,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     // The homepage's own CTA copy (frozen, checked above via id="buildTrip")
     // must still say exactly what it always has -- confirms the /trip route
     // addition didn't touch renderBuildTripCTAHTML() in any way.
-    assert.match(homepageBody, /Tell us what you&rsquo;re looking for\. We&rsquo;ll help build your adventure\./);
+    assert.match(homepageBody, /Tell us what you enjoy\. Build My Trip helps bring your food stops, activities and discoveries together\./);
   }
 
   // "Browse Okanagan Roam by guide" SEO crawl-links block (2026-09-17
@@ -5507,11 +5522,11 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // single venue type, straight to that category page -- see the Golf/
   // Wine mood-card tests above). No dangling in-page anchors left behind.
   assert.doesNotMatch(homepageBody, /href="#directory"/, 'no homepage link should still point at the removed #directory anchor');
-  const homepageGemLinks = [...homepageBody.matchAll(/class="hidden-gem-card" href="([^"]+)"/g)].map((m) => m[1]);
+  const homepageGemLinks = [...homepageBody.match(/<section class="section" id="hiddenGems">[\s\S]*?<\/section>/)[0].matchAll(/<a class="photo" href="([^"]+)"/g)].map((m) => m[1]);
   assert.equal(homepageGemLinks.length, 3, 'the three Hidden Gems editorial cards render');
   assert.deepEqual(homepageGemLinks, ['/dog-friendly', '/local-favorites', '/secret-spots'], 'each card links to its dedicated Hidden Gems destination');
-  assert.match(homepageBody, /home-see-all" href="\/hidden-gems"><span class="home-en">See all hidden gems/, '"See all hidden gems" must link to the dedicated \/hidden-gems page');
-  assert.match(homepageBody, /home-see-all" href="\/categories"><span class="home-en">See all categories/, '"See all categories" must link to the dedicated \/categories page');
+  assert.match(homepageBody, /<a class="view" href="\/hidden-gems"><span class="home-en">Explore more/, 'the Hidden Gems "Explore more" link must go to the dedicated \/hidden-gems page');
+  assert.match(homepageBody, /<a class="view" href="\/categories"><span class="home-en">All categories/, 'the "All categories" link must go to the dedicated \/categories page');
   assert.match(homepageBody, /Browse &amp; Search<\/a>/, 'header dropdown "Browse & Search" label must still read the same');
   const headerBrowseLink = homepageBody.match(/<a href="([^"]*)"[^>]*>Browse &amp; Search<\/a>/);
   assert.ok(headerBrowseLink && headerBrowseLink[1] === '/browse', 'header "Browse & Search" link must point at /browse now that the wizard lives there');
@@ -5549,7 +5564,7 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
   // ---- /events: the standalone events index (2026-09-17), replacing the
   // homepage's own removed Happening Soon strip. The What's On mood card
   // must link here instead of the old #happeningSoon anchor.
-  assert.match(homepageBody, /class="mood-card mood-card-whats-on" href="\/whats-on">/, 'What\'s On mood card must link to its current /whats-on destination');
+  assert.match(homepageBody, /<a class="photo" href="\/whats-on"><img class="mood-card-img"/, 'What\'s On mood card must link to its current /whats-on destination');
   const eventsLegacy = await fetch(`${base}/events`, { redirect: 'manual' });
   assert.equal(eventsLegacy.status, 301, '/events redirects to its current canonical page');
   assert.equal(eventsLegacy.headers.get('location'), '/whats-on');
@@ -6780,7 +6795,7 @@ test('Golf venue page tags website/directions/phone links with data-track and sh
   const kelownaGolf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
   const html = app.renderVenuePage(kelownaGolf, [], [], []);
   assert.match(html, /googletagmanager\.com\/gtag\/js\?id=G-J312FGJPSC/);
-  assert.match(html, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions<\/a>/);
+  assert.match(html, /<a class="cta" href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.89,-119\.49" rel="nofollow noopener" target="_blank" data-track="directions">Open in Google Maps<\/a>/); // without a MAPBOX_TOKEN the built-in "Get Directions" is off (2026-11-04)
   assert.doesNotMatch(html, /class="map-link"/, 'Get Directions is the one map link; the address does not repeat it (2026-11-01)');
   assert.match(html, new RegExp(`"venue_id":${kelownaGolf.id},"venue_name":"Test Golf Course","venue_region":"kelowna","venue_category":"golf","surface":"venue_page"`));
   assert.match(html, /track\('venue_view', ctx\(\)\)/);
@@ -6808,7 +6823,7 @@ test('Golf venue page shows all five actions: Website, Get Directions, Call, Fav
   assert.match(row[1], /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
   const body = row[2];
   assert.match(body, /class="cta secondary" href="https:\/\/example-golf\.test\/"[^>]*data-track="website">Website ↗</);
-  assert.match(body, /class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Get Directions</);
+  assert.match(body, /class="cta" href="https:\/\/www\.google\.com\/maps[^"]*"[^>]*data-track="directions">Open in Google Maps</);
   assert.match(body, /class="cta secondary" href="tel:\+1 250-555-0100" data-track="phone">Call</);
   assert.match(body, /class="card-action fav-btn" data-fav-name="Test Golf Course" aria-pressed="false"/);
   assert.match(body, /class="card-action trip-btn" data-trip-name="Test Golf Course" data-trip-query="Test Golf Course, Kelowna, Okanagan Valley, BC" data-trip-region="kelowna" data-trip-ref="venue:\d+" aria-pressed="false"/);
@@ -6846,7 +6861,8 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     // My Trip (2026-10-14) reads the menu button to place its count badge, but
     // only app.js listens to it.
     const navScripts = html.split(/<script[^>]*>/).filter((part) => part.includes("getElementById('navHamburger')"));
-    assert.ok(navScripts.every((part) => !/(?:hamburger|burger|getElementById\('navHamburger'\))\.addEventListener/.test(part.split('</script>')[0])), 'no duplicate nav handlers alongside app.js');
+    // (2026-10-18) the header's own fallback handlers only run when the page has no app.js (guarded in the script).
+    assert.ok(navScripts.every((part) => { const js = part.split('</script>')[0]; return !/(?:hamburger|burger|getElementById\('navHamburger'\))\.addEventListener/.test(js) || js.includes(`!document.querySelector('script[src*="/scripts/app.js"]')`); }), 'no duplicate nav handlers alongside app.js');
   }
   // Batch 4A (2026-09-27): Food & Drink VENUE pages now use the themed shell
   // (see the Batch 4A tests); their listings do not. Stage 4.1: nor do winery
@@ -6854,7 +6870,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
   const restaurants = app.renderCategoryPage('kelowna', 'restaurant', app.getVenuesByRegionCategory('kelowna', 'restaurant'), []);
   const wineryRegion = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   for (const html of [restaurants, wineryRegion]) {
-    assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js(\?v=[0-9a-f]{12})?"><\/script>/);
+    assert.doesNotMatch(html, /<link rel="stylesheet" href="\/styles\/app\.css">|<body class="golf-page|<header id="top">|golf-main|id="tripTray"|scripts\/app\.js(\?v=[0-9a-f]{12})?"><\/script>/); // (the shared inline CSS names body.golf-page on every page)
     assert.match(html, /<header class="top">/);
     assert.match(html, /<body>/);
   }
@@ -7099,7 +7115,7 @@ test('Batch 4A: Food & Drink venue pages keep their SEO head, content and CTAs; 
     assert.match(html, new RegExp(`<nav class="breadcrumb"[^>]*>[\\s\\S]*?<a href="/kelowna/${slug}">${label.plural}</a>[\\s\\S]*?Test Trattoria[\\s\\S]*?</nav>`), `${type}: breadcrumb nav`);
     // Content and CTAs unchanged.
     assert.match(html, /<p class="venue-description">A fixture restaurant used only by the automated test suite\.<\/p>/);
-    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Get Directions</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*><svg class="ui-icon"[^>]*>[\\s\\S]*?<\\/svg> Add to trip<\\/button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
+    assert.match(html, new RegExp(`<div class="venue-cta-row" data-venue-id="\\d+" data-venue-region="kelowna" data-venue-category="${type}" data-venue-name="Test Trattoria" data-surface="venue_page">\\s*<a class="cta" href="https://www\\.google\\.com/maps/search/\\?api=1&query=49\\.888,-119\\.496" rel="nofollow noopener" target="_blank" data-track="directions">Open in Google Maps</a>\\s*<a class="cta secondary" href="tel:\\+1 250-555-0100" data-track="phone">Call</a>\\s*<button type="button" class="card-action fav-btn"[^>]*>[\\s\\S]*?Favorite</button>\\s*<button type="button" class="card-action trip-btn"[^>]*><svg class="ui-icon"[^>]*>[\\s\\S]*?<\\/svg> Add to trip<\\/button>\\s*</div>`), `${type}: CTA row with Favorite / Add to trip`);
     assert.match(html, new RegExp(`<a class="cta secondary" href="/kelowna/${slug}">Back to ${label.plural} in Kelowna</a>\\s*<a class="cta secondary" href="/kelowna">Explore all of Kelowna</a>`));
     assert.match(html, /<h2>Good to Know<\/h2>/);
     // Favorite / Add to Trip (2026-10-14): one of each, in the CTA row.
@@ -7158,7 +7174,7 @@ test('Stage 4.1: the winery venue page keeps its SEO head; winery region pages k
   const region = app.renderCategoryPage('kelowna', 'winery', app.getVenuesByRegionCategory('kelowna', 'winery'), []);
   assert.match(region, /<body>/);
   assert.match(region, /<header class="top">/);
-  assert.doesNotMatch(region, /golf-page|id="tripTray"|<main |<script src="\/scripts\/app\.js[?"]/);
+  assert.doesNotMatch(region, /<body class="golf-page|id="tripTray"|<main |<script src="\/scripts\/app\.js[?"]/); // (shared inline CSS names body.golf-page)
   assert.match(region, /class="card-action fav-btn"/);
   assert.match(region, /\.venue-card\[data-venue-category="winery"\] \.card-action/, 'region cards keep the engagement-only stylesheet');
   assert.match(region, /var HOLDER = '\[data-venue-category="winery"\]'/);
@@ -7419,8 +7435,8 @@ test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when p
   assert.ok(cta, 'CTA row must render');
   assert.match(cta[1], /data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="venue_page"/);
   // Batch 3: themed venue pages render the canonical app.js labels ("Favorite", "Add to trip").
-  const order = ['Get Directions', 'Website ↗', 'Favorite', 'Add to trip'].map((t) => cta[2].indexOf(t));
-  assert.ok(order.every((i) => i >= 0), 'Get Directions, Website, Favorite, Add to trip all present');
+  const order = ['Open in Google Maps', 'Website ↗', 'Favorite', 'Add to trip'].map((t) => cta[2].indexOf(t));
+  assert.ok(order.every((i) => i >= 0), 'Directions, Website, Favorite, Add to trip all present');
   assert.deepEqual([...order].sort((a, c) => a - c), order, 'CTA order (2026-10-20): Get Directions, Website, Favorite, Add to Trip');
   assert.doesNotMatch(cta[2], />Call</, 'no Call button when phone is null');
   assert.match(cta[2], /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=49\.86,-119\.49"/, 'Get Directions uses the verified coordinates');
@@ -7435,7 +7451,7 @@ test('Beach venue page with no address, coordinates, website or phone: Get Direc
   const html = app.renderVenuePage(b, [], [], []);
   const cta = html.match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/);
   assert.ok(cta);
-  assert.doesNotMatch(cta[1], /Get Directions|Visit Website|>Call<|google\.com\/maps|tel:/);
+  assert.doesNotMatch(cta[1], /Get Directions|Open in Google Maps|Visit Website|>Call<|google\.com\/maps|tel:/);
   assert.match(cta[1], /Favorite/);
   assert.match(cta[1], /Add to trip/); // Batch 3: canonical app.js label on themed venue pages
   assert.doesNotMatch(html, /"geo":/);
@@ -7443,7 +7459,7 @@ test('Beach venue page with no address, coordinates, website or phone: Get Direc
   // Vernon fixture: coordinates but no address -> Get Directions from coordinates only, no address row.
   const v = app.findVenueBySlug('vernon', 'beach', 'test-vernon-beach');
   const vh = app.renderVenuePage(v, [], [], []);
-  assert.match(vh, /Get Directions/);
+  assert.match(vh, /Open in Google Maps/); // the built-in Get Directions needs a MAPBOX_TOKEN (not set in tests)
   assert.match(vh, /query=50\.26,-119\.35/);
   assert.doesNotMatch(vh, /<p class="venue-address">/);
 });
@@ -7525,7 +7541,7 @@ test('Golf regression: Golf listing and venue pages are unchanged by the Beaches
   const golfVenues = app.getVenuesByRegionCategory('kelowna', 'golf');
   const category = app.renderCategoryPage('kelowna', 'golf', golfVenues, []);
   assert.match(category, /<body class="golf-page">/, 'Golf body class must remain exactly golf-page');
-  assert.doesNotMatch(category, /beach-page|data-venue-category="beach"|Beach page theme|Test Beach Park/);
+  assert.doesNotMatch(category, /beach-page|(?<!\[)data-venue-category="beach"|Beach page theme|Test Beach Park/);
   assert.match(category, /data-venue-category="golf"/);
   assert.match(category, /var HOLDER = '\[data-venue-category="golf"\]';/);
   assert.match(category, /venue_category: 'golf',/);
@@ -7537,7 +7553,7 @@ test('Golf regression: Golf listing and venue pages are unchanged by the Beaches
   assert.match(page, /"@type":"GolfCourse"/);
   assert.match(page, /"venue_category":"golf","surface":"venue_page"/);
   assert.match(page, /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
-  assert.doesNotMatch(page, /beach-page|data-venue-category="beach"|class="venue-hero venue-hero-fallback venue-hero-beach"|Beach page theme|<aside class="venue-advisory"/);
+  assert.doesNotMatch(page, /beach-page|(?<!\[)data-venue-category="beach"|class="venue-hero venue-hero-fallback venue-hero-beach"|Beach page theme|<aside class="venue-advisory"/);
   const wide = app.renderCategoryAllRegionsPage('golf', app.getVenuesByCategory('golf'));
   assert.match(wide, /<body class="golf-page">/);
   assert.doesNotMatch(wide, /Test Beach Park|beach-page/);
@@ -7567,8 +7583,8 @@ test('Non-themed category regression: restaurant card and pages carry no theme, 
 test('Region hub page lists a Beaches category card once a region has beaches', () => {
   const counts = app.getRegionCategoryCounts('kelowna');
   const html = app.renderRegionPage('kelowna', counts, []);
-  assert.match(html, /<h3><a href="\/kelowna\/beaches">Beaches<\/a><\/h3>/);
-  assert.match(html, /2 beaches in Kelowna/);
+  // The compact Kelowna city page (Nov 2026) has mood tiles instead of per-category cards with counts.
+  assert.match(html, /<a class="bw-tile" href="\/beaches\?regions=kelowna">[\s\S]*?<b>Beaches &amp; Lake<\/b>|<a class="bw-tile" href="\/beaches\?regions=kelowna">[\s\S]*?<b>Beaches & Lake<\/b>/);
 });
 
 test('Beach theme CSS is derived from the Golf rules: every derived rule is keyed to beach, and the Golf theme text is unchanged', () => {
@@ -7582,7 +7598,9 @@ test('Beach theme CSS is derived from the Golf rules: every derived rule is keye
   assert.match(beachCss, /body\.golf-page \.venue-card\[data-venue-category="beach"\] \.trip-btn\.in-trip,/);
   // Derivation is mechanical: a synthetic Golf rule maps 1:1.
   assert.equal(app.deriveBeachRulesFromGolfCss('.x[data-venue-category="golf"] .y { color: red; }\n.z { c: d }'), '.x[data-venue-category="beach"] .y { color: red; }');
-  if (golfCss) assert.doesNotMatch(golfCss, /beach/);
+  // (2026-11-01, #603) the Golf theme carries one deliberate shared rule that gives outdoor, beach and sport cards
+  // their badge row back; nothing else in it may name beach.
+  if (golfCss) assert.doesNotMatch(golfCss.replace(/^.*(?:\[data-venue-category="beach"\]|park, beach and sports cards).*$/gm, ''), /beach/);
 });
 
 // ---- FROZEN HOMEPAGE: byte-identity before/after beach data (isolated child) ----
@@ -7769,13 +7787,13 @@ test('Beach venue CTA rules: Get Directions from coordinates OR a verified addre
   const base = { id: 999901, name: 'CTA Rule Beach', region: 'kelowna', type: 'beach', slug: 'cta-rule-beach', description: 'x', redirect_to: null };
   const ctaOf = (v) => { const m = app.renderVenuePage(v, [], [], []).match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/); return m ? m[1] : ''; };
   const addrOnly = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: null, longitude: null, website: null, phone: null });
-  assert.match(addrOnly, /Get Directions/);
+  assert.match(addrOnly, /Open in Google Maps/); // the built-in "Get Directions" needs a MAPBOX_TOKEN (not set in tests)
   assert.match(addrOnly, /query=12%20Sample%20Beach%20Rd%2C%20Kelowna%2C%20BC/, 'address-only venues get directions via the address query, same pattern as every other venue');
   assert.doesNotMatch(addrOnly, /Visit Website|>Call</);
   const coordsOnly = ctaOf({ ...base, address: null, latitude: 49.9, longitude: -119.5, website: null, phone: null });
   assert.match(coordsOnly, /query=49\.9,-119\.5/);
   const nothing = ctaOf({ ...base, address: null, latitude: null, longitude: null, website: null, phone: null });
-  assert.doesNotMatch(nothing, /Get Directions|Visit Website|>Call</);
+  assert.doesNotMatch(nothing, /Get Directions|Open in Google Maps|Visit Website|>Call</);
   assert.match(nothing, /Favorite/); assert.match(nothing, /Add to trip/); // Batch 3: canonical app.js label
   const full = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: 49.9, longitude: -119.5, website: 'https://storymaps.arcgis.com/stories/ae662360d11c44c6a8edb3bf2eb315d3', phone: '+1 250-555-0199' });
   assert.match(full, /href="https:\/\/storymaps\.arcgis\.com\/stories\/ae662360d11c44c6a8edb3bf2eb315d3" rel="nofollow noopener" target="_blank" data-track="website">Website ↗</);
@@ -7916,11 +7934,11 @@ test('Outdoor venue page: hero carries the H1 (exactly one), themed CTA row, can
   assert.match(html, /body\.golf-page \.venue-hero-fallback\.venue-hero-outdoor \{ box-shadow/);
   assert.match(html, /<a class="category-back-link" href="\/kelowna\/outdoors">← Kelowna Outdoors<\/a>/);
   assert.match(html, /data-venue-category="outdoor" data-venue-name="Test Canyon Regional Park" data-surface="venue_page"/);
-  assert.match(html, /Website ↗/); assert.match(html, /Get Directions/); assert.match(html, /Favorite/); assert.match(html, /Add to Trip/);
+  assert.match(html, /Website ↗/); assert.match(html, /Open in Google Maps/); /* no MAPBOX_TOKEN in tests */ assert.match(html, /Favorite/); assert.match(html, /Add to Trip/);
   assert.doesNotMatch(html, /<span class="label">Type<\/span>/, 'type is in the hero, not repeated in Good to Know (2026-10-14)');
   assert.doesNotMatch(outdoorMarkupOnly(html), /golf-glance|Indoor Golf|beach-page/);
   const bare = app.renderVenuePage(app.findVenueBySlug('vernon', 'outdoor', 'test-nordic-centre'), [], [], []);
-  assert.doesNotMatch(bare, /Get Directions|Visit Website|>Call</, 'no address/coords/website/phone -> no fabricated CTA');
+  assert.doesNotMatch(bare, /Get Directions|Open in Google Maps|Visit Website|>Call</, 'no address/coords/website/phone -> no fabricated CTA');
   assert.equal((bare.match(/<h1[\s>]/g) || []).length, 1);
 });
 
@@ -8000,10 +8018,12 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.equal(tag.status, 200, await tag.text());
 
     const homeAfter = await (await fetch(`${base}/`)).text();
-    assert.equal(homeAfter, homeBefore.replace('class="mood-card mood-card-outdoors" href="#exploreRegions">', 'class="mood-card mood-card-outdoors" href="/outdoors">').replace('<li><a href="#exploreRegions" data-i18n="mood.outdoors.title">Outdoors</a></li>', '<li><a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a></li>'), 'outdoor data changes exactly two hrefs on "/": the Outdoors mood card and the footer Outdoors link (2026-09-20, same pattern as Beaches)');
-    assert.match(homeAfter, /class="mood-card mood-card-outdoors" href="\/outdoors">/, 'the Outdoors mood card now points at the Okanagan-wide /outdoors listing');
-    assert.match(homeAfter, /<li><a href="\/outdoors" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'the footer Outdoors link now points at /outdoors like the mood card');
-    assert.match(homeBefore, /<li><a href="#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, 'with no outdoor data the footer link keeps its in-page anchor');
+    // The simplified homepage (home-simple.js, Nov 2026) has no footer Outdoors link: outdoor data changes exactly one href on "/",
+    // the Outdoors mood card (in-page anchor before, the Okanagan-wide /outdoors listing after).
+    const outdoorsCardBefore = '<a class="photo" href="#exploreRegions"><img class="mood-card-img" data-src="/images/mood/explore.';
+    assert.ok(homeBefore.includes(outdoorsCardBefore), 'with no outdoor data the mood card keeps its in-page anchor');
+    assert.equal(homeAfter, homeBefore.replace(outdoorsCardBefore, outdoorsCardBefore.replace('href="#exploreRegions"', 'href="/outdoors"')), 'outdoor data changes exactly one href on "/": the Outdoors mood card');
+    assert.match(homeAfter, /<a class="photo" href="\/outdoors"><img class="mood-card-img" data-src="\/images\/mood\/explore\./, 'the Outdoors mood card now points at the Okanagan-wide /outdoors listing');
     assert.doesNotMatch(homeAfter, /href="\/kelowna\/outdoors"|Fixture Canyon Park|outdoor-page/);
     // The shared footer is on these pages too, so its Outdoors link (and only that) may change with outdoor data.
     const withFooterOutdoors = (html) => html.replace(/<li><a href="\/?#exploreRegions" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/, '<li><a href="/outdoors" data-i18n="mood.outdoors.title">Outdoors</a></li>');
@@ -8036,13 +8056,16 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.equal((await fetch(`${base}/kelowna/outdoors/does-not-exist`)).status, 404);
     assert.equal((await fetch(`${base}/osoyoos/outdoors`)).status, 404, 'region with zero outdoor venues is a 404');
     const sitemapAfter = await (await fetch(`${base}/sitemap.xml`)).text();
-    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors<\/loc>/);
-    assert.match(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors\/fixture-canyon-park<\/loc>/);
+    // SEO (2026-10-20): the fixture town page has one place (under 3) and the fixture venue page has no hours and a
+    // three-word description, so both are noindex and left out of the sitemap.
+    assert.doesNotMatch(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors<\/loc>/, 'a thin town category page is not in the sitemap');
+    assert.doesNotMatch(sitemapAfter, /<loc>https:\/\/okanaganroam\.com\/kelowna\/outdoors\/fixture-canyon-park<\/loc>/, 'a thin venue page is not in the sitemap');
+    assert.match(await (await fetch(`${base}/kelowna/outdoors/fixture-canyon-park`)).text(), /name="robots" content="noindex/, 'and the page itself is noindex');
     // No outdoor *category or venue* URLs before the data exists. (The static
     // valley-wide /outdoors hub is always listed, so match region-scoped URLs.)
     assert.doesNotMatch(sitemapBefore, /okanaganroam\.com\/(?!fr\/)[a-z-]+\/outdoors/);
     const hub = await (await fetch(`${base}/kelowna`)).text();
-    assert.match(hub, /<h3><a href="\/kelowna\/outdoors">Outdoor Destinations<\/a><\/h3>/, 'region hub gains the category card, exactly as Beaches did');
+    assert.match(hub, /<a class="bw-tile" href="\/outdoors\?regions=kelowna">/, 'the compact Kelowna page has an Outdoor Adventures tile');
     // Phase 2: an activity page appears only once the activity has MIN_ACTIVITY_VENUES destinations.
     assert.equal((await fetch(`${base}/outdoors/hiking`)).status, 404, 'one member is below the activity threshold -> 404, never a thin page');
     assert.equal((await fetch(`${base}/outdoors/not-an-activity`)).status, 404);
@@ -8289,8 +8312,8 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     assert.equal(r2.status, 200);
     const after = await snap();
     for (const p of Object.keys(before)) assert.equal(after[p], before[p], `${p} must be byte-identical after activity memberships exist`);
-    assert.match(after['/'], /class="mood-card mood-card-outdoors" href="\/outdoors">/);
-    assert.match(after['/'], /<li><a href="\/outdoors" data-i18n="mood\.outdoors\.title">Outdoors<\/a><\/li>/);
+    // (Nov 2026) home-simple.js: the Outdoors mood card is the only Outdoors link on "/" (no footer link).
+    assert.match(after['/'], /<a class="photo" href="\/outdoors"><img class="mood-card-img" data-src="\/images\/mood\/explore\./);
     assert.doesNotMatch(withoutSiteHeader(after['/']), /\/outdoors\/hiking|outdoor-activity/);
 
     const act = await fetch(`${base}/outdoors/hiking`);
@@ -9030,10 +9053,13 @@ test('Food & Drink hub: compact surface at /food-drink -- search, venue-type chi
   assert.ok(venues.every((v) => v.type !== 'winery'), 'the hub universe excludes wineries entirely');
 
   // Features: every chip is a real BOOL_FIELDS column, never an invented one.
-  assert.equal(app.FD_HUB_FEATURES.length, 16, 'the fourteen researched badges plus Open Early / Open Late');
+  // The fourteen researched badges, the two things-to-do badges, and (2026-11-02) four Sports & Recreation-only
+  // attributes that are not columns (sportVenueWithAttrs() sets them from data/sports-attributes.json).
+  const SPORTS_ONLY = ['beginner', 'lit', 'covered', 'rentals'];
+  assert.equal(app.FD_HUB_FEATURES.length, 20, 'the fourteen food badges, two things-to-do badges and four sports-only attributes');
   assert.doesNotMatch(markup, /data-fd-feature="free_entry"|data-fd-feature="arts_culture"/, 'the things-to-do badges are not Food & Drink filters');
-  for (const f of app.FD_HUB_FEATURES) assert.ok(app.BOOL_FIELDS.includes(f.key), `${f.key} is a real venue column`);
-  assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key).filter((k) => k !== 'free_entry' && k !== 'arts_culture'));
+  for (const f of app.FD_HUB_FEATURES.filter((x) => !SPORTS_ONLY.includes(x.key))) assert.ok(app.BOOL_FIELDS.includes(f.key), `${f.key} is a real venue column`);
+  assert.deepEqual([...markup.matchAll(/data-fd-feature="([a-z_]+)"/g)].map((m) => m[1]), app.FD_HUB_FEATURES.map((f) => f.key).filter((k) => k !== 'free_entry' && k !== 'arts_culture' && !SPORTS_ONLY.includes(k)));
 
   // Regions: the canonical list, from the SAME renderer the other directories use.
   for (const r of Object.keys(app.REGION_LABELS)) assert.match(markup, new RegExp(`data-region="${r}"`), `canonical region chip for ${r}`);
@@ -10094,12 +10120,18 @@ test('Destination pages: every linked category tab has an active venue, and food
     const activePubs = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE region = 'apex' AND type = 'pub' AND redirect_to IS NULL").get().n;
     assert.equal(counts.pub || 0, activePubs, 'redirected venues are not counted');
     const region = s6markup(app.renderRegionPage('apex', counts, []));
-    assert.match(region, /class="golf-page outdoor-page region-page(?: ski-region)?"/, 'themed shell');
+    // Apex is a ski resort: since Nov 2026 it renders the compact ski-resort page (ski-resort-pages.js), whose
+    // category tiles replace the old per-category tabs with counts.
+    assert.match(region, /class="golf-page outdoor-page ski-resort-page"/, 'themed shell');
     assert.match(region, /id="tripTray"/);
-    const tabs = [...region.matchAll(/<a href="\/apex\/([a-z-]+)">[^<]* <span class="outdoor-activity-count">(\d+)<\/span>/g)];
-    assert.ok(tabs.length > 0);
-    for (const [, slug, n] of tabs) assert.ok(Number(n) >= 1, `${slug} tab has an active venue`);
-    assert.match(region, /href="\/apex\/cafes">/);
+    const tiles = [...region.matchAll(/<a class="bw-tile" href="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(tiles.length > 0);
+    assert.ok(tiles.includes('/food-drink?regions=apex'), 'Eat & Drink tile opens the scoped directory');
+    for (const href of tiles) {
+      const m = /^\/apex\/([a-z-]+)$/.exec(href);
+      if (m && m[1] !== 'events') assert.ok(Object.values(app.CATEGORY_SLUGS).includes(m[1]), `${href} is a real category page`);
+    }
+    assert.doesNotMatch(region, /href="\/apex\/pubs"/, 'a category with only redirected venues is not linked');
 
     // Scoped food & drink page: only this region + primary type.
     const venues = app.getVenuesByRegionCategory('apex', 'cafe');
@@ -10211,7 +10243,8 @@ test('Phase 1: the frozen homepage source files are unchanged', () => {
   assert.equal(md5('public/styles/app.css'), '0c52c1173a0f2643df718ef87719f8bc', 'public/styles/app.css (+2 mobile Build My Trip rules 2026-09-25; font fallback faces in every stack, speed/CLS PR approved 2026-10-18)');
   // Approved accessibility change (2026-10-18): one added token, --ref-gold-ink, a deeper gold for gold text on the
   // cream background (the logo's "Roam"); every existing token keeps its value.
-  assert.equal(md5('public/styles/tokens.css'), 'c155b965403a835bfdeba76f9fb58e8f', 'public/styles/tokens.css (+ --ref-gold-ink 2026-10-18)');
+  // Approved accessibility passes (2026-11, aac810fb and 8c4d04da): token colours deepened for contrast.
+  assert.equal(md5('public/styles/tokens.css'), '7f666aa7162ca3921181a0780ab8af3d', 'public/styles/tokens.css (+ --ref-gold-ink 2026-10-18; contrast passes 2026-11)');
   // Approved homepage-source change (Batch 2, 2026-09-26): app.js no longer
   // fetches the full venue list (/api/venues?limit=5000, ~2 MB) on pages
   // without the /browse #venueGrid -- including the homepage, which never used
@@ -10516,8 +10549,9 @@ test('Phase 2: /api/discover over HTTP, and /browse?q redirects only when safe',
   assert.equal(events.headers.get('location'), '/whats-on?when=this-weekend');
   // Not routable. Stage 3.4 (D2): several words no page can show go to the
   // /search results page, in the visitor's own words -- never a dead end.
-  // Smarter search (2026-10-18): "date night in Kelowna" now goes to Kelowna's restaurants and cocktail lounges.
-  assert.equal((await fetch(`${base}/browse?q=${encodeURIComponent('date night in Kelowna')}`, { redirect: 'manual' })).headers.get('location'), '/food-drink?types=restaurant,cocktail&regions=kelowna');
+  // Search ranking (2026-10-18): "date night in Kelowna" is a ranked list on the /search page (restaurants and cocktail
+  // lounges ordered by the planner's romance scoring), no longer /food-drink's generic list.
+  assert.equal((await fetch(`${base}/browse?q=${encodeURIComponent('date night in Kelowna')}`, { redirect: 'manual' })).headers.get('location'), `/search?q=${encodeURIComponent('date night in Kelowna')}`);
   for (const q of ['asdkjfh qwepoiu zxcvb', 'Rotary Beach Park']) {
     const res = await fetch(`${base}/browse?q=${encodeURIComponent(q)}`, { redirect: 'manual' });
     assert.equal(res.status, 302, q);
