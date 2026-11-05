@@ -20,5 +20,24 @@ body.map-page .pm-stage.is-route{min-height:800px}body.map-page .pm-stage.is-nav
 @media(max-width:899px){body.map-page .pm-quick [data-pm-kind]{flex:0 0 calc(25% - 6px);justify-content:center;padding:0 3px;font-size:12px}body.map-page .pm-quick [data-pm-kind] svg{display:none}body.map-page .rn-location b{font-size:14px}body.map-page .pm-map-view{height:calc(100dvh - var(--pm-top,72px));min-height:610px}body.map-page .pm-map-view .rn-intro{display:none}body.map-page .pm-map-view .pm-quick [data-pm-kind]:not([aria-pressed=true]){display:none}body.map-page .pm-map-view .rn-needs-title{display:none}body.map-page .pm-map-view .pm-sheet,body.map-page .pm-map-view .pm-sheet[data-state]{height:200px}body.map-page .pm-map-view.is-route .pm-sheet,body.map-page .pm-map-view.is-route .pm-sheet[data-state]{height:280px}}
 body.map-page .rn-search-area{position:absolute;z-index:660;top:calc(var(--pm-float-h,240px) + 16px);left:calc(54% + 14px);box-shadow:0 2px 8px #10252c20}body.map-page .rn-search-area[hidden]{display:none}@media(max-width:899px){body.map-page .rn-search-area{left:28px;top:calc(var(--pm-float-h,240px) + 16px)}body.map-page .pm-list-view .rn-search-area{display:none}}
 @media(max-width:899px){body.map-page .pm-stage.is-route{height:calc(100dvh - var(--pm-top,72px));min-height:620px}body.map-page .pm-stage.is-route .rn-views{display:none}}
+body.map-page .rn-location-help{background:#edf0e8;border:1px solid #ccd5c6;border-radius:12px;padding:12px 14px;margin-top:12px;font-size:13px;color:#1b303c}body.map-page .rn-location-help[hidden]{display:none}body.map-page .rn-location-help p{margin:0 0 8px}body.map-page .rn-location-help>div{display:flex;flex-wrap:wrap;gap:8px}body.map-page .rn-location-help button{min-height:44px;padding:0 12px;border:1px solid #c5cfc3;border-radius:22px;background:#fffdf8;font:inherit;font-weight:700;cursor:pointer}body.map-page .pm-panel #rnPanelPin{margin-top:8px}
+@media(max-width:899px){body.map-page .pm-stage{padding:12px 16px}body.map-page .rn-intro{margin-bottom:10px}body.map-page .rn-intro h1{font-size:23px;margin-bottom:3px}body.map-page .rn-intro p{font-size:12px;line-height:1.4}body.map-page .rn-location{margin-top:9px;min-height:44px;padding:8px 12px}body.map-page .rn-location small{display:none}body.map-page .rn-location b{font-size:13px}body.map-page .pm-searchbar{height:46px}body.map-page .pm-quick{margin-top:9px;gap:6px 8px}body.map-page .pm-quick [data-pm-kind]{min-width:0;font-size:11.5px;white-space:normal;text-align:center;line-height:1.15}body.map-page .rn-needs-title{display:none}body.map-page .pm-quick .pm-quick-clear:not([hidden]){display:none}body.map-page .rn-views{margin-top:10px}body.map-page .pm-float{margin-bottom:12px}body.map-page .pm-sheet-head{padding-bottom:10px}body.map-page .rn-location-help{font-size:12px;padding:10px;margin-top:10px}body.map-page .rn-location-help p{margin-bottom:6px}body.map-page .rn-location-help button{padding:0 10px;font-size:12px}body.map-page .pm-map-view.is-route .pm-sheet-head{display:none}body.map-page .pm-map-view.is-route .pm-sheet-body{height:100%}body.map-page .pm-map-view.is-route .pm-route{margin-bottom:0}body.map-page .pm-map-view.is-route .pm-route-head h2{font-size:17px}}
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups};
+
+function roamDirectionsHref(path,lang='en'){
+  if(!/^\/(?:fr\/)?[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+$/.test(String(path)))return null;
+  return (lang==='fr'?'/fr/map':'/map')+'?directions='+encodeURIComponent(path.replace(/^\/fr\//,'/'))+'#near-me';
+}
+// Only a visitor arriving from a Roam Now detail link sees this return action.
+// The context is per tab and contains filters/scroll position, never GPS coordinates.
+const ROAM_RETURN_SCRIPT=`<script>(function(){try{
+ var c=JSON.parse(sessionStorage.getItem('roamReturn')||'null');
+ if(!c||c.target!==location.pathname||!/^\\/(?:fr\\/)?map(?:[?#]|$)/.test(c.url))return;
+ var main=document.querySelector('main');if(!main)return;
+ var a=document.createElement('a');a.id='rnBackToResults';a.href=c.url;a.textContent=document.documentElement.lang==='fr'?'← Retour à vos résultats':'← Back to your results';
+ a.style.cssText='display:inline-flex;align-items:center;min-height:44px;margin:10px 16px;padding:0 16px;border:1px solid #cbd3ce;border-radius:24px;color:#1b303c;background:#fffdf8;font-weight:800;text-decoration:none';main.insertBefore(a,main.firstChild);
+ document.querySelectorAll('[data-roam-directions]').forEach(function(link){var u=new URL(link.href,location.href),back=new URL(c.url,location.origin);['f','q','r'].forEach(function(k){if(back.searchParams.has(k))u.searchParams.set(k,back.searchParams.get(k))});u.hash=back.hash==='#events'?'#events':'#near-me';link.href=u.pathname+u.search+u.hash});
+}catch(e){}})();</script>`;
+module.exports.roamDirectionsHref=roamDirectionsHref;
+module.exports.ROAM_RETURN_SCRIPT=ROAM_RETURN_SCRIPT;

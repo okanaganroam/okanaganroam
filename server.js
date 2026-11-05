@@ -1,4 +1,4 @@
-const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups } = require('./roam-now-layout.js');
+const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT } = require('./roam-now-layout.js');
 const http = require('http');
 const url = require('url');
 const fs = require('fs');
@@ -20232,7 +20232,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     pinBtn: 'Drop a pin', pinRemove: 'Remove the pin', pinRemoved: 'Pin removed.', stopLocTxt: 'Turn off my location',
     tapToPin: 'Tap the map where you want to look around.', pinned: 'Showing what’s around your pin. Drag it to move it.',
     pinOutside: 'Drop the pin inside the Okanagan.', outside: 'You’re outside the Okanagan, so Near me can’t help yet. Tap the map to drop a pin where you’ll be.',
-    denied: 'Location is turned off for this site. Drop a pin on the map instead (the red button), or turn location on in your browser settings.',
+    denied: 'Location is blocked. Choose a town or a starting point on the map, or enable location in your browser settings.',
     failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or drop a pin on the map.', unsupported: 'This browser can’t share your location.',
     loading: 'Loading the map…', loadFailed: 'The map couldn’t load. Reload the page to try again.',
     placesNear: function(n, r){ return n + (n === 1 ? ' place' : ' places') + (r ? ' within ' + r + ' km' : ' near you'); },
@@ -20282,6 +20282,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
   function roamLocationLabel(){return town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location')}
+  var returnContext=null;
+  try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
+  document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
+  function showLocationHelp(text){$('rnLocationHelp').hidden=false;$('rnLocationMessage').textContent=(pendingRoute?T.to+' '+pendingRoute.name+'. ':'')+text;$('rnChooseTown').hidden=!!pendingRoute;$('rnChoosePin').textContent=pendingRoute?(FR?'Choisir le départ sur la carte':'Choose a start on map'):(FR?'Choisir sur la carte':'Choose on map');floatGap();}
+  function cancelPendingLocation(){if(!me){watching=false;stopWatch();nearBtn.classList.remove('is-finding');nearBtn.setAttribute('aria-pressed','false');nearLabel.textContent=T.nearMe;}}
+  function chooseMapPoint(){cancelPendingLocation();closePanel();$('rnLocationHelp').hidden=true;roamView('map');setPinMode(true);}
   function roamView(view){
     if (typeof route !== 'undefined' && route && view === 'list') return;
     stage.classList.toggle('pm-list-view',view === 'list');stage.classList.toggle('pm-map-view',view === 'map');
@@ -20293,6 +20299,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   $('rnLocation').addEventListener('click',function(){openPanel();$('pmTown').focus()});
   $('rnClear').addEventListener('click',clearAll);
   $('rnUseLocation').addEventListener('click',function(){town='';syncChips();closePanel();nearBtn.click()});
+  $('rnRetryLocation').addEventListener('click',function(){nearBtn.click()});
+  $('rnChooseTown').addEventListener('click',function(){openPanel();$('pmTown').focus()});
+  $('rnChoosePin').addEventListener('click',chooseMapPoint);
+  $('rnPanelPin').addEventListener('click',chooseMapPoint);
   // The map fills the screen below the header.
   function fitStage(){ var top = stage.getBoundingClientRect().top + (window.scrollY || 0); document.documentElement.style.setProperty('--pm-top', Math.max(0, Math.round(top)) + 'px'); }
   fitStage(); map.invalidateSize(); okLimits(); window.addEventListener('resize', function(){ fitStage(); map.invalidateSize(); okLimits(); });
@@ -20570,10 +20580,11 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 };
       // An event without a pin counts as near when its town centre is within the distance.
       var nearTown = function(e){ var c = CONF.c[e.region]; return c && distKm(me.lat, me.lng, c[0], c[1]) <= radiusKm; };
-      items = events.filter(function(e){ return e.g && ((!evTerm && !evKinds.length) || evHit(e)) && (!me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
+      items = events.filter(function(e){ return e.g && (!town || e.region === town) && ((!evTerm && !evKinds.length) || evHit(e)) && (town || !me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
         .sort(function(a, b){ return order[a.g] - order[b.g] || (a.sd < b.sd ? -1 : a.sd > b.sd ? 1 : 0) || ((a.st || '') < (b.st || '') ? -1 : (a.st || '') > (b.st || '') ? 1 : 0) || (me && a.d != null && b.d != null ? a.d - b.d : 0); });
       onMap = items.filter(function(e){ return e.lat != null; });
-      countEl.textContent = aheadOn && aheadState === true ? T.eventsSoon(items.length, me ? radiusKm : 0) : me ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
+      countEl.textContent = aheadOn && aheadState === true ? T.eventsSoon(items.length, me && !town ? radiusKm : 0) : me && !town ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
+      if(town)countEl.textContent+=(FR?' · À ':' · In ')+CONF.r[town];
     }
     // During directions, only the destination stays on the map.
     if (typeof route !== 'undefined' && route) onMap = [route.x];
@@ -20691,10 +20702,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function durText(sec){ var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
   function startRoute(x){
     if (!MB) return false;
-    roamView('map');
+    roamView('map');$('pmSheetBody').scrollTop=0;
     // Asked for during the tap itself (iPhone only allows the compass prompt then).
     if (!me || !me.pin) { startCompass(); unlockVoice(); }
-    if (!me) { pendingRoute = x; if (!watching) nearBtn.click(); setStatus(T.routeNeedsLocation); return true; }
+    if (!me) { pendingRoute = x; showLocationHelp(T.routeNeedsLocation);if (!watching) nearBtn.click();return true; }
     if (route && route.line) map.removeLayer(route.line);
     route = { x: x, mode: distKm(me.lat, me.lng, x.lat, x.lng) < 1.5 ? 'walking' : 'driving', step: 0, at: 0 };
     map.closePopup();
@@ -20897,9 +20908,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function onPos(pos){
     if (!me || me.pin) {
       if (!OK_BOUNDS.pad(0.1).contains([pos.coords.latitude, pos.coords.longitude])) {
-        watching = false; stopWatch(); pendingRoute = null; nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe;
-        if (!pinMarker) setPinMode(true);
-        setStatus(T.outside, 15000); track('map_outside', {}); return;
+        watching = false; stopWatch(); nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe;
+        showLocationHelp(T.outside);
+        setStatus(''); track('map_outside', {}); return;
       }
       if (pinMarker) { map.removeLayer(pinMarker); pinMarker = null; pinBtn.setAttribute('aria-pressed', 'false'); me = null; }
     }
@@ -20917,16 +20928,18 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     } else if (!lastRender || distKm(lastRender.lat, lastRender.lng, me.lat, me.lng) > 0.15) render(false);
   }
   function located(){
+    $('rnLocationHelp').hidden=true;
     radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.stopLocTxt;
     nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.recenter; setStatus(T.near);
   }
   function onErr(err){
+    if(!watching)return;
     watching = false; stopWatch(); nearBtn.classList.remove('is-finding');
     if (!me) { nearBtn.setAttribute('aria-pressed', 'false'); nearLabel.textContent = T.nearMe; }
-    setStatus(err && err.code === 1 ? T.denied : T.failed);
+    setStatus('');showLocationHelp(err && err.code === 1 ? T.denied : T.failed);
   }
   function startWatch(){
-    if (!navigator.geolocation) { setStatus(T.unsupported); return; }
+    if (!navigator.geolocation) { showLocationHelp(T.unsupported); return; }
     watching = true;
     watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
   }
@@ -20955,7 +20968,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function setPinMode(on){ pinMode = on; stage.classList.toggle('is-pinning', on); pinBtn.setAttribute('aria-pressed', on || pinMarker ? 'true' : 'false'); if (on) setStatus(T.tapToPin, 15000); }
   function dropPin(ll, fit){
     if (!OK_BOUNDS.contains(ll)) { setStatus(T.pinOutside); return; }
+    // A new browsing location replaces the town; a route start keeps the original search.
+    if(!pendingRoute)town='';
     if (watching || (me && !me.pin)) stopLocation(true);
+    $('rnLocationHelp').hidden=true;
     me = { lat: ll.lat, lng: ll.lng, acc: 0, pin: true };
     if (!pinMarker) {
       pinMarker = L.marker(ll, { icon: PIN_ICON, draggable: true, zIndexOffset: 1000, keyboard: false, title: T.pinBtn }).addTo(map);
@@ -20968,7 +20984,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     setStatus(T.pinned); limit = 25;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
     track('map_pin', { radius_km: radiusKm });
-    render(fit);
+    syncChips();render(fit);if(pendingRoute){var destination=pendingRoute;pendingRoute=null;startRoute(destination);}
   }
   pinBtn.addEventListener('click', function(){
     if (pinMarker) { stopLocation(); setStatus(T.pinRemoved); return; }
@@ -20979,7 +20995,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   map.on('contextmenu', function(e){ dropPin(e.latlng, true); });
   // No location updates while the page is in the background.
   document.addEventListener('visibilitychange', function(){ if (!watching) return; if (document.hidden) stopWatch(); else if (watchId == null) startWatch(); });
-  radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); radiusFixed = true; limit = 25; render(true); });
+  radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); radiusFixed = true; limit = 25; syncChips();render(true); });
   function syncChips(){
     $('pmTown').value=town||'';
     kindChips.forEach(function(c){ c.setAttribute('aria-pressed', kinds[c.getAttribute('data-pm-kind')] ? 'true' : 'false'); });
@@ -20997,9 +21013,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     badge.hidden = !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
     // Keep the quick chips that are on in view.
-    var row = $('pmPlaceFilters'), ons = row.querySelectorAll('[aria-pressed="true"]'), on = ons[ons.length - 1];
-    if (false && on && on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = on.offsetLeft + on.offsetWidth - row.clientWidth + 10;
-    else if (!on) row.scrollLeft = 0;
+    var row = $('pmPlaceFilters'), ons = row.querySelectorAll('[aria-pressed="true"]'), activeChip = ons[ons.length - 1];
+    if (false && activeChip && activeChip.offsetLeft + activeChip.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = activeChip.offsetLeft + activeChip.offsetWidth - row.clientWidth + 10;
+    else if (!activeChip) row.scrollLeft = 0;
     if (term) parts.push('“' + termShown(term) + '”');
     activeEl.hidden = !parts.length;
     activeEl.innerHTML = parts.length ? esc(parts.join(' · ')) + ' <button type="button" class="pm-clear" id="pmClear">' + esc(T.clear) + '</button>' + (navigator.share || (navigator.clipboard && navigator.clipboard.writeText) ? ' <button type="button" class="pm-share" id="pmShare">' + esc(T.share) + '</button>' : '') : '';
@@ -21008,7 +21024,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var f = [].concat(Object.keys(kinds).filter(function(k){ return kinds[k]; }), Object.keys(feats).filter(function(k){ return feats[k]; }), openOnly ? ['open'] : [], topOnly ? ['top'] : [], tk.map(function(k){ return 't.' + k; }),
         town ? ['in.' + town] : [], price ? ['p.' + price] : [], atMin != null ? ['at.' + atMin + (atUntil ? 'u' : '')] : [], atDay ? ['on.' + atDay] : [], tagOr ? ['or'] : [], on(notTypes).map(function(k){ return 'x.y.' + k; }),
         on(notTags).map(function(k){ return 'x.t.' + k; }), on(notKinds).map(function(k){ return 'x.k.' + k; }), on(notFeats).map(function(k){ return 'x.f.' + k; }));
-      var q = (f.length ? 'f=' + f.join(',') : '') + (term ? (f.length ? '&' : '') + 'q=' + encodeURIComponent(term) : '');
+      var rawSearch=searchEl.value.trim();
+      var q = (f.length ? 'f=' + f.join(',') : '') + (rawSearch ? (f.length ? '&' : '') + 'q=' + encodeURIComponent(rawSearch) : '')+(radiusFixed?'&r='+radiusKm:'');
+      q=q.replace(/^&/,'');
       history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + (tab === 'events' ? '#events' : ''));
     } catch (e) {}
   }
@@ -21545,7 +21563,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       } catch (err) { stopMic(); setStatus(T.micFail); }
     });
   }
-  $('pmTown').addEventListener('change', function(e){ town=e.target.value; var c=CONF.c[town]; if(c)map.setView(c,13); changed(); });
+  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); });
   function setTab(t){
     tab = t; limit = 25;
     $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
@@ -21636,16 +21654,26 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k === 'or') tagOr = true;
         else if (k.indexOf('in.') === 0 && CONF.r[k.slice(3)]) town = k.slice(3); else if (/^p\\.(cheap|afford|fancy)$/.test(k)) price = k.slice(2); else if (/^at\\.\\d+u?$/.test(k)) { atMin = parseInt(k.slice(3), 10); atUntil = /u$/.test(k); } else if (/^on\\.(\\+1|mon|tue|wed|thu|fri|sat|sun)$/.test(k)) atDay = k.slice(3); else if (k.indexOf('x.y.') === 0 && TYPES[k.slice(4)]) notTypes[k.slice(4)] = true;
         else if (k.indexOf('x.t.') === 0 && TAGIX[k.slice(4)] != null) notTags[k.slice(4)] = true; else if (k.indexOf('x.k.') === 0 && CONF.k[k.slice(4)]) notKinds[k.slice(4)] = true; else if (k.indexOf('x.f.') === 0 && CONF.f[k.slice(4)]) notFeats[k.slice(4)] = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
-      if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = qs.get('q'); searchFit = true; }
+      if (['0','1','5','10','25'].indexOf(qs.get('r'))!==-1){radiusKm=Number(qs.get('r'));radiusFixed=true;radiusSel.value=String(radiusKm);}
+      if (qs.get('q')) { readSearch(qs.get('q')); searchEl.value = qs.get('q'); searchFit = true;
+        // Rebuild the event side of a saved search as well as its place filters.
+        if(wantEvents){evTerm=term;evKinds=evFilt.slice();evSaidText=[term].concat(evSaid).join(' ').trim();term='';evBySearch=true;tab='events';var restoreToday=okToday(),restoreMin=okanaganClock(new Date()).minutes;aheadOn=!!(nyeAsk||xmasMarket||((evTerm||evKinds.length)&&!events.some(function(e){return !e.ah&&eventGroup(e,restoreToday,restoreMin)&&evHit(e)})));if(aheadOn)loadAhead();}
+      }
       // 2026-10-26: the homepage's happy hour line opens the map with Happy hour now on (/map?show=happy-hour).
       if (qs.get('show') === 'happy-hour') feats.happy = true;
     } catch (e) {}
+    var initialHash = location.hash;
+    if (initialHash === '#events'||(CONF.dest&&CONF.dest.url.indexOf('/events/')!==-1)) tab = 'events';
     syncChips();
     // A town or a short search in the address opens fitted to its results (Phone map, 2026-10-19, round 7).
-    if (location.hash === '#events') setTab('events'); else render(true);
+    if (tab === 'events') setTab('events'); else render(true);
+    if(returnContext){limit=Math.max(25,Math.min(500,Number(returnContext.limit)||25));drawList();}
     // Near me starts by itself when asked for (#near-me, the home-screen shortcut) or when this browser already allows it.
-    if (location.hash === '#near-me') nearBtn.click();
+    if(CONF.dest){var dest=places.concat(events).filter(function(x){return x.url===CONF.dest.url})[0];if(!dest){dest=CONF.dest;dest.m=L.marker([dest.lat,dest.lng],{icon:iconFor('event'),title:dest.name});}if(!startRoute(dest))setStatusHtml(esc(T.routeFailed)+' <a '+hrefAttr(dirUrl(dest.lat,dest.lng,dest.venue||dest.name))+' target="_blank" rel="noopener">'+esc(IOS?T.openApple:T.openGoogle)+'</a>',15000);}
+    else if(CONF.directionRequested){showLocationHelp(FR?'Ce lieu n’a pas de point de navigation. Choisissez un autre lieu.':'This place has no navigation point. Choose another place.');}
+    else if (initialHash === '#near-me') nearBtn.click();
     else if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'geolocation' }).then(function(st){ if (st.state === 'granted' && !me && !watching) nearBtn.click(); }).catch(function(){});
+    if(returnContext&&!CONF.dest){roamView(returnContext.view==='map'?'map':'list');requestAnimationFrame(function(){requestAnimationFrame(function(){$('pmSheetBody').scrollTop=Math.max(0,Number(returnContext.listY)||0);window.scrollTo(0,Math.max(0,Number(returnContext.y)||0));})});}
   }).catch(function(){ countEl.textContent = T.loadFailed; });
   // Opening times move on: refresh every minute.
   setInterval(function(){ refreshStatus(); if (!document.hidden) { var y = window.scrollY; render(false); window.scrollTo(0, y); } }, 60000);
@@ -21986,6 +22014,14 @@ function mapAheadData(now = new Date()) {
 function mapFrWords() {
   return { ...Object.fromEntries(FR_SEARCH_SYNONYM_MAP), marche: 'farmers market', marches: 'farmers market' };
 }
+function mapDirectionsAvailable(){return /^pk\.[A-Za-z0-9._-]+$/.test(String(process.env.MAPBOX_TOKEN||''));}
+function mapDestination(path,now=new Date()){
+  if(typeof path!=='string'||!/^\/(?:fr\/)?[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+$/.test(path))return null;
+  const key=path.replace(/^\/fr\//,'/'),data=JSON.parse(mapLiveData(now).json);
+  const p=data.p.find(p=>p[5]===key);if(p)return {lat:p[0],lng:p[1],name:p[2],region:p[4],url:p[5]};
+  const e=data.e.concat(JSON.parse(mapAheadData(now).json).e).find(e=>e[1]===key);
+  return e&&e[4]!=null&&e[5]!=null?{lat:e[4],lng:e[5],name:e[0],region:e[2],url:e[1],venue:e[3]}:null;
+}
 function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const R=(en,fr)=>opts.lang==='fr'?fr:en;
   const count = placeCount == null ? mapPlaces().length : placeCount;
@@ -21995,7 +22031,7 @@ function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
   const typeEn = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, CATEGORY_LABELS[t].singular]));
   const typeFr = Object.fromEntries(Object.keys(CATEGORY_LABELS).map((t) => [t, (CATEGORY_LABELS_FR[t] || CATEGORY_LABELS[t]).singular]));
   const ver = mapDataVersion(now);
-  const conf = JSON.stringify({ src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
+  const conf = JSON.stringify({ dest: mapDestination(opts.directions,now),directionRequested:!!opts.directions,src: `/map/data.json?v=${ver}`, ah: `/map/ahead.json?v=${ver}`, g: MAP_GROUP_BY_TYPE, t: { en: typeEn, fr: typeFr }, r: REGION_LABELS, c: MAP_AREA_CENTERS,
     k: Object.fromEntries(MAP_KINDS.map((k) => [k.key, k.types])), f: { ...Object.fromEntries(MAP_FEATURES.map((f) => [f.key, f.bit])), specials: MAP_SPECIALS_BIT, nights: MAP_NIGHTS_BIT },
     tg: MAP_TAGS.map((t) => ({ k: t.key, en: t.en, fr: t.fr, i: t.icon, s: t.say, t: t.types })),
     // The food types' line icons, once each (the tags carry only the icon's name).
@@ -22031,7 +22067,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1>${R('Find your kind of nearby.','Trouvez votre prochaine découverte.')}</h1><p>${R('Choose what you want. Add your needs. Find a place and go.','Choisissez vos envies et vos besoins. Trouvez un lieu et partez.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('EXPLORING AROUND','EXPLORER AUTOUR DE')}</small><b id="rnLocationText">${R('Kelowna map area · Change location','Zone de Kelowna · Changer')}</b></span></button></div>
+      <div class="rn-intro"><div><h1>${R('Find your kind of nearby.','Trouvez votre prochaine découverte.')}</h1><p>${R('Find places that fit your needs.','Trouvez des lieux qui vous correspondent.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('EXPLORING AROUND','EXPLORER AUTOUR DE')}</small><b id="rnLocationText">${R('Kelowna map area · Change location','Zone de Kelowna · Changer')}</b></span></button></div>
       <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
@@ -22052,6 +22088,7 @@ ${renderGolfHeaderHtml()}
         })()}
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
       </div>
+      <div class="rn-location-help" id="rnLocationHelp" hidden><p id="rnLocationMessage" role="status"></p><div><button type="button" id="rnRetryLocation">${R('Try my location','Réessayer ma position')}</button><button type="button" id="rnChooseTown">${R('Choose a town','Choisir une ville')}</button><button type="button" id="rnChoosePin">${R('Choose on map','Choisir sur la carte')}</button></div></div>
       <div class="rn-views" role="group" aria-label="Results view"><button type="button" id="rnList" aria-pressed="true">${R('List','Liste')}</button><button type="button" id="rnMap" aria-pressed="false">${R('Map','Carte')}</button></div>
       <div class="pm-navbar" id="pmNavbar" hidden aria-live="polite"></div>
       <p class="pm-toast" id="pmStatus" role="status" aria-live="polite"></p>
@@ -22085,7 +22122,7 @@ ${renderGolfHeaderHtml()}
       </div>
       </details>
       ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}
-      <h3>${R('Where would you like to explore?','Où souhaitez-vous explorer?')}</h3><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button>
+      <h3>${R('Where would you like to explore?','Où souhaitez-vous explorer?')}</h3><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
       <div class="pm-panel-row">
         <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
           <select id="pmRadius" class="pm-select pm-radius" disabled>
@@ -33099,6 +33136,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   const mapsUrl = (venue.latitude && venue.longitude)
     ? `https://www.google.com/maps/search/?api=1&query=${venue.latitude},${venue.longitude}`
     : (venue.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue.address)}` : null);
+  const builtInDirections = mapDirectionsAvailable()&&mapDestination(venuePagePath(venue),new Date()) ? roamDirectionsHref(venuePagePath(venue),fr?'fr':'en') : null;
   // Good to Know (2026-10-14): type, town and rating are already in the line
   // under the name, so the card keeps only what is new -- and the address
   // carries the map link, replacing the separate Location box.
@@ -33276,7 +33314,7 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
     // Phone visitors (2026-10-20): Directions is the main button (what someone on the move wants, and it keeps them
     // with us afterwards), and Website is a plain button marked as opening elsewhere. With no address, Website stays
     // the main button as before.
-    mapsUrl ? `<a class="cta" href="${mapsUrl}" rel="nofollow noopener" target="_blank"${trackAttr('directions')}>${L('Get Directions', 'Itin\u00e9raire')}</a>` : null,
+    mapsUrl ? `<a class="cta" href="${builtInDirections || mapsUrl}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}${trackAttr('directions')}>${builtInDirections ? L('Get Directions', 'Itin\u00e9raire') : L('Open in Google Maps','Ouvrir dans Google Maps')}</a>` : null,
     venue.website ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
     venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
@@ -33602,6 +33640,7 @@ ${VENUE_MENU_CSS}` : ''}
   ${renderHomeFooterHTML(true)}
   ${themedShell ? GOLF_APP_SCRIPT_TAG : ''}
   ${golfVenueEngagementScriptHtml(venue)}
+${ROAM_RETURN_SCRIPT}
 </body>
 </html>`;
   let withPreload = heroPreload ? page.replace(/<meta name="viewport"[^>]*>\n?/i, (v) => `${v}${v.endsWith('\n') ? '' : '\n'}${heroPreload}\n`) : page;
@@ -34569,11 +34608,12 @@ ${pastOccs.map(dateItem).join('\n')}
   const placeQuery = hostVenue && hostVenue.latitude && hostVenue.longitude ? `${hostVenue.latitude},${hostVenue.longitude}`
     : hostVenue && hostVenue.address ? hostVenue.address
       : full.venue_name_text ? `${full.venue_name_text}, ${regionLabel}, BC` : null;
+  const builtInDirections = mapDirectionsAvailable()&&!expired&&mapDestination('/'+full.region+'/events/'+full.slug,now)?roamDirectionsHref('/'+full.region+'/events/'+full.slug,opts.lang==='fr'?'fr':'en'):null;
   const directionsUrl = placeQuery && full.valley_wide !== 1 ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeQuery)}` : null;
   const ctaHtml = expired ? '' : `
   <div class="event-cta-row">
     ${full.website ? `<a class="cta event-cta-primary" href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">Tickets &amp; info &#8599;</a>` : ''}
-    ${directionsUrl ? `<a class="cta secondary" href="${escapeHtml(directionsUrl)}" rel="nofollow noopener" target="_blank">Get directions</a>` : ''}
+    ${directionsUrl ? `<a class="cta secondary" href="${escapeHtml(builtInDirections || directionsUrl)}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}>${builtInDirections ? 'Get directions' : 'Open in Google Maps'}</a>` : ''}
     ${next ? `<a class="cta secondary" href="/${full.region}/events/${full.slug}/calendar.ics" download>Add to calendar</a>` : ''}
     ${next ? `<a class="cta secondary" data-gcal href="${escapeHtml(googleCalendarUrl(full, next, eventCalendarLocation(full, hostVenue), canonical))}" rel="nofollow noopener" target="_blank">Add to Google Calendar</a>` : ''}
   </div>`;
@@ -34725,6 +34765,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${actionsScript}
+${ROAM_RETURN_SCRIPT}
 </body>
 </html>`;
 }
@@ -54259,7 +54300,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/map' || pathname === '/map/') && method === 'GET') {
       // A real map of every place (2026-10-14), so it is indexable now.
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(renderPlacesMapPage(null, new Date(), { lang: res.twinLang === 'fr' ? 'fr' : 'en' }));
+      return res.end(renderPlacesMapPage(null, new Date(), { lang: res.twinLang === 'fr' ? 'fr' : 'en',directions:query.directions }));
     }
     // GET /map/data.json -- the places, their hours and this week's events for /map, versioned by ?v=.
     if (pathname === '/map/data.json' && method === 'GET') {
@@ -58058,6 +58099,7 @@ module.exports = {
   mapPlacesData,
   mapEventsData,
   mapLiveData,
+  mapDestination,
   mapAheadData,
   hasFrenchTwin,
   frEventPageForPath,
