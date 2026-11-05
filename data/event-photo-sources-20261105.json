@@ -1,84 +1,102 @@
 {
- "date": "2026-11-05",
- "note": "Real photos of the host place for recurring events. Permission to confirm where no licence is stated.",
- "photos": [
-  {
-   "file": "public/images/events/prospera-place-2611.jpg",
-   "credit": "Prospera Place",
-   "source_page": "https://www.prosperaplace.com/",
-   "licence": "Venue's own website photo; no licence stated",
-   "event_ids": [
-    1
-   ]
-  },
-  {
-   "file": "public/images/events/soec-penticton-2611.jpg",
-   "credit": "Darren Kirby / Wikimedia Commons",
-   "source_page": "https://commons.wikimedia.org/",
-   "licence": "CC BY-SA 2.0 (credit required); verify author on Commons page",
-   "event_ids": [
-    11
-   ]
-  },
-  {
-   "file": "public/images/events/kal-tire-place-2611.jpg",
-   "credit": "Vernon Vipers",
-   "source_page": "https://www.vernonvipers.com/",
-   "licence": "Team's own website photo; no licence stated",
-   "event_ids": [
-    12
-   ]
-  },
-  {
-   "file": "public/images/events/sun-bowl-arena-2611.jpg",
-   "credit": "Town of Osoyoos",
-   "source_page": "https://www.osoyoos.ca/",
-   "licence": "Town's own website photo; no licence stated",
-   "event_ids": [
-    627
-   ]
-  },
-  {
-   "file": "public/images/events/caravan-farm-winter-2611.jpg",
-   "credit": "Caravan Farm Theatre",
-   "source_page": "https://www.caravanfarmtheatre.com/",
-   "licence": "Theatre's own website photo; no licence stated",
-   "event_ids": [
-    546
-   ]
-  },
-  {
-   "file": "public/images/events/ubco-gymnasium-2611.jpg",
-   "credit": "UBC Okanagan Campus Recreation",
-   "source_page": "https://recreation.ok.ubc.ca/facilities/gymnasium/",
-   "licence": "Own website photo; no licence stated",
-   "event_ids": [
-    13,
-    17,
-    18,
-    21
-   ]
-  },
-  {
-   "file": "public/images/events/rca-mary-irwin-theatre-2611.jpg",
-   "credit": "Rotary Centre for the Arts",
-   "source_page": "https://www.rotarycentreforthearts.com/facility-rentals/",
-   "licence": "Own website photo; no licence stated",
-   "event_ids": [
-    541,
-    765
-   ]
-  },
-  {
-   "file": "public/images/events/powerhouse-theatre-2611.jpg",
-   "credit": "Powerhouse Theatre",
-   "source_page": "https://powerhousetheatre.net/about-us",
-   "licence": "Theatre's own website photo; no licence stated",
-   "event_ids": [
-    678,
-    955,
-    958
-   ]
-  }
- ]
+  "date": "2026-11-05",
+  "note": "Real photos of the host place for recurring events. Permission to confirm where no licence is stated.",
+  "photos": [
+    {
+      "file": "public/images/events/prospera-place-2611.jpg",
+      "credit": "Prospera Place",
+      "source_page": "https://www.prosperaplace.com/",
+      "licence": "Venue's own website photo; no licence stated",
+      "event_ids": [
+        1
+      ]
+    },
+    {
+      "file": "public/images/events/soec-penticton-2611.jpg",
+      "credit": "Darren Kirby / Wikimedia Commons",
+      "source_page": "https://commons.wikimedia.org/",
+      "licence": "CC BY-SA 2.0 (credit required); verify author on Commons page",
+      "event_ids": [
+        11
+      ]
+    },
+    {
+      "file": "public/images/events/kal-tire-place-2611.jpg",
+      "credit": "Vernon Vipers",
+      "source_page": "https://www.vernonvipers.com/",
+      "licence": "Team's own website photo; no licence stated",
+      "event_ids": [
+        12
+      ]
+    },
+    {
+      "file": "public/images/events/sun-bowl-arena-2611.jpg",
+      "credit": "Town of Osoyoos",
+      "source_page": "https://www.osoyoos.ca/",
+      "licence": "Town's own website photo; no licence stated",
+      "event_ids": [
+        627
+      ]
+    },
+    {
+      "file": "public/images/events/caravan-farm-winter-2611.jpg",
+      "credit": "Caravan Farm Theatre",
+      "source_page": "https://www.caravanfarmtheatre.com/",
+      "licence": "Theatre's own website photo; no licence stated",
+      "event_ids": [
+        546
+      ]
+    },
+    {
+      "file": "public/images/events/ubco-gymnasium-2611.jpg",
+      "credit": "UBC Okanagan Campus Recreation",
+      "source_page": "https://recreation.ok.ubc.ca/facilities/gymnasium/",
+      "licence": "Own website photo; no licence stated",
+      "event_ids": [
+        13,
+        17,
+        18,
+        21
+      ]
+    },
+    {
+      "file": "public/images/events/rca-mary-irwin-theatre-2611.jpg",
+      "credit": "Rotary Centre for the Arts",
+      "source_page": "https://www.rotarycentreforthearts.com/facility-rentals/",
+      "licence": "Own website photo; no licence stated",
+      "event_ids": [
+        541,
+        765
+      ]
+    },
+    {
+      "file": "public/images/events/powerhouse-theatre-2611.jpg",
+      "credit": "Powerhouse Theatre",
+      "source_page": "https://powerhousetheatre.net/about-us",
+      "licence": "Theatre's own website photo; no licence stated",
+      "event_ids": [
+        678,
+        955,
+        958
+      ]
+    },
+    {
+      "file": "public/images/events/ottercrest-sleigh-2611.jpg",
+      "credit": "Horse Drawn Okanagan",
+      "source_page": "https://www.horsedrawnokanagan.com",
+      "licence": "none stated; operator own-site photo, cropped to 16:9",
+      "event_ids": [
+        676
+      ]
+    },
+    {
+      "file": "public/images/events/miradoro-2611.jpg",
+      "credit": "Miradoro at Tinhorn Creek (photographer not stated)",
+      "source_page": "https://miradoro.ca",
+      "licence": "none stated; venue own-site photo, cropped to 16:9",
+      "event_ids": [
+        830
+      ]
+    }
+  ]
 }
