@@ -44,6 +44,21 @@ function siteColumn(s, days) {
     parts.push('<div class="card"><h3>Build My Trip demand</h3><p class="empty">The demand log isn’t on this site yet.</p></div>');
   }
 
+  if (d.events) {
+    const e = d.events;
+    parts.push(`<div class="card"><h3>Roam Now (the map)</h3>
+      <div class="stats">${stat(e.roam_now.opens, 'opens')}${stat(e.roam_now.near_me, 'Near me taps')}${stat(e.roam_now.searches, 'searches', `${num(e.roam_now.empty_searches)} found nothing`)}${stat(e.roam_now.directions, 'directions')}</div>
+      ${bars(e.roam_now_per_day, 'Opens per day')}
+      <div class="stats" style="margin-top:10px">${stat(e.roam_now.filters, 'filter changes')}${stat(e.roam_now.pins, 'pins tapped')}${stat(e.roam_now.voice, 'voice searches')}${stat(e.roam_now.shares, 'shares')}</div></div>
+      <div class="card"><h3>Build My Trip activity</h3>
+      <div class="stats">${stat(e.trip.page_views, 'page views')}${stat(e.trip.plans_started, 'plans started')}${stat(e.trip.plans_completed, 'plans finished')}${stat(e.trip.shared, 'shared')}</div>
+      ${bars(e.trip_per_day, 'Page views per day')}
+      <div class="stats" style="margin-top:10px">${stat(e.trip.adds, 'adds to My Trip')}${stat(e.trip.removes, 'removes')}${stat(e.trip.tray_opens, 'My Trip opens')}${stat(e.trip.build_my_trip_clicks, 'Build My Trip clicks')}</div></div>
+      <div class="card"><h3>Key pages</h3>
+      <div class="stats">${stat(e.pages.home, 'home')}${stat(e.pages.browse, 'browse')}${stat(e.pages.whats_on, 'What’s On')}${stat(e.pages.hidden_gems, 'Hidden Gems')}</div>
+      <p class="empty">Counted on our own server from the first day this was switched on; full traffic comes from Google Analytics.</p></div>`);
+  }
+
   if (d.plans) {
     const p = d.plans;
     parts.push(`<div class="card"><h3>Trip planner requests</h3>

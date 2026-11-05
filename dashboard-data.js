@@ -87,6 +87,24 @@ function collect(db, { site = 'site', days = 30, now = new Date() } = {}) {
     };
   });
 
+  // Feature use: per-day counts from site_event_counts (site-events.js), so Roam Now and Build My Trip show without Google.
+  out.events = safe(() => {
+    if (!tableExists(db, 'site_event_counts')) return null;
+    const rows = db.prepare('SELECT day, name, n FROM site_event_counts WHERE day >= ?').all(since);
+    const t = {};
+    const per = {};
+    for (const r of rows) { t[r.name] = (t[r.name] || 0) + r.n; (per[r.name] = per[r.name] || []).push({ day: r.day, n: r.n }); }
+    const g = (n) => t[n] || 0;
+    return {
+      pages: { home: g('page_view:home'), roam_now: g('page_view:map'), build_my_trip: g('page_view:trip'), whats_on: g('page_view:whats_on'), browse: g('page_view:browse'), hidden_gems: g('page_view:hidden_gems') },
+      roam_now: { opens: g('page_view:map'), near_me: g('map_near_me'), searches: g('map_search'), empty_searches: g('map_search_empty'), voice: g('map_voice_search'), filters: g('map_filter'), pins: g('map_pin'), directions: g('map_directions'), shares: g('map_share') },
+      trip: { page_views: g('page_view:trip'), plans_started: g('trip_plan_start'), plans_completed: g('trip_plan_complete'), shared: g('trip_share'), adds: g('add_to_trip'), removes: g('remove_from_trip'), tray_opens: g('open_my_trip'), build_my_trip_clicks: g('build_my_trip_click') },
+      roam_now_per_day: series(per['page_view:map'] || [], list),
+      trip_per_day: series(per['page_view:trip'] || [], list),
+      totals: t,
+    };
+  });
+
   out.listings = safe(() => ({
     venues: db.prepare('SELECT COUNT(*) AS n FROM venues WHERE redirect_to IS NULL').get().n,
     events: tableExists(db, 'events') ? db.prepare('SELECT COUNT(*) AS n FROM events').get().n : null,

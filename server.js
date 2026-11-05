@@ -6,6 +6,8 @@ const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
 const dashboardData = require('./dashboard-data');
+const siteEvents = require('./site-events');
+const siteEventCounter = siteEvents.createCounter(db);
 const { renderDashboardPage } = require('./dashboard-page');
 const tripDemand = require('./trip-demand');
 const tripDemandLog = tripDemand.createLogger(db);
@@ -14830,6 +14832,19 @@ function renderAnalyticsHeadHtml(pageType) {
   window.dataLayer = window.dataLayer || [];
   function gtag(){ dataLayer.push(arguments); }
 ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
+  // Site event counts (2026-11-05): a per-day count of fixed-list feature events on our own server (no visitor id, nothing typed).
+  var ROAM_EV = ${JSON.stringify([...siteEvents.EVENTS].filter((n) => !n.startsWith('page_view:')))};
+  function roamCount(n){
+    try {
+      if (!navigator.sendBeacon || /(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
+      navigator.sendBeacon('/api/site-event', new Blob([JSON.stringify({ name: n })], { type: 'application/json' }));
+    } catch (e) { /* counting must never break the site */ }
+  }
+  (function(){
+    var pages = { '/': 'home', '/map': 'map', '/trip': 'trip', '/whats-on': 'whats_on', '/browse': 'browse', '/hidden-gems': 'hidden_gems' };
+    var k = pages[(location.pathname.replace(/^\\/fr(?=\\/|$)/, '') || '/').replace(/(.)\\/$/, '$1')];
+    if (k) roamCount('page_view:' + k);
+  })();
   window.trackEvent = function(name, params){
     try {
       var p = {};
@@ -14840,6 +14855,7 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       if (name === 'add_to_trip' && !p.trip_source) p.trip_source = window.__roamTripSource || 'individual';
       if (typeof gtag === 'function') gtag('event', name, p);
       // Build My Trip demand log (Stage 1): tell our own server which business was added/removed. Anonymous.
+      if (ROAM_EV.indexOf(name) !== -1) roamCount(name);
       if ((name === 'add_to_trip' || name === 'remove_from_trip') && navigator.sendBeacon && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) {
         navigator.sendBeacon('/api/trip/signal', new Blob([JSON.stringify({ kind: name === 'add_to_trip' ? 'add' : 'remove', ref: p.venue_ref || p.ref || null, name: p.venue_name || null, region: p.region || p.venue_region || null })], { type: 'application/json' }));
       }
@@ -41213,7 +41229,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -56948,6 +56964,18 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderListYourVenuePage());
     }
+    // POST /api/site-event -- counts one feature event (fixed list in site-events.js). Body { name }. Same-origin only,
+    // 512-byte cap, always 204. Stores a per-day count and nothing else.
+    if (pathname === '/api/site-event' && method === 'POST') {
+      if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
+      try {
+        const b = await readLimitedJsonBody(req, 512);
+        if (b && typeof b.name === 'string') siteEventCounter.record(req, b.name, requestClientIp(req));
+      } catch (e) { /* ignore: counting only */ }
+      res.writeHead(204);
+      return res.end();
+    }
+
     // POST /api/trip/signal -- Build My Trip demand log, Stage 1. The page reports that a visitor added or
     // removed a business. Anonymous, same-origin only, tiny body, always answers 204.
     if (pathname === '/api/trip/signal' && method === 'POST') {
