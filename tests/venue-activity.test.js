@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { DatabaseSync } = require('node:sqlite');
 const va = require('../venue-activity');
+const labels = require('../click-labels');
 const { renderBusinessPage } = require('../venue-activity-page');
 
 const NOW = new Date('2026-11-05T20:00:00Z');
@@ -11,6 +12,9 @@ function memDb() {
   const d = new DatabaseSync(':memory:');
   d.exec(`CREATE TABLE venues (id INTEGER PRIMARY KEY, name TEXT, region TEXT, type TEXT, redirect_to INTEGER);
   CREATE TABLE venue_event_counts (day TEXT NOT NULL, venue_id INTEGER NOT NULL, name TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, venue_id, name));
+  CREATE TABLE event_click_counts (day TEXT NOT NULL, event_id INTEGER NOT NULL, name TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, event_id, name));
+  CREATE TABLE events (id INTEGER PRIMARY KEY, name TEXT, region TEXT, start_datetime TEXT);
+  INSERT INTO events VALUES (7, 'Friday Trivia Night', 'kelowna', '2026-11-06T19:00');
   CREATE TABLE trip_demand_events (day TEXT, visitor TEXT, venue_id INTEGER, kind TEXT, created_at TEXT);
   INSERT INTO venues (id, name, region, type) VALUES (1, 'Rustic Reel Brewing', 'Kelowna', 'brewery'), (2, 'Reel Deal 100% Tacos', 'Kelowna', 'restaurant'), (3, 'Old Name', 'Kelowna', 'cafe');
   UPDATE venues SET redirect_to = 1 WHERE id = 3;`);
@@ -66,4 +70,57 @@ test('page: escapes names, shows results for both sites and the detail card', ()
   const d = memDb(); const c = va.createCounter(d); c.record(req(), 1, 'outbound_click:phone', '1.1.1.1', NOW);
   const page = renderBusinessPage({ q: 'rustic', days: 30, detail: { key: 'okanagan', name: 'Okanagan Roam', data: c.detail(1, 30, NOW), error: null }, results: [] });
   assert.match(page, /Rustic Reel Brewing/); assert.match(page, /Phone/);
+});
+
+test('click sheet: only known items are counted; the sheet lists every item with zeros', () => {
+  const c = va.createCounter(memDb());
+  assert.equal(c.record(req(), 1, 'click:see_hours', '2.2.2.2', NOW), true);
+  assert.equal(c.record(req(), 1, 'click:see_hours', '2.2.2.2', NOW), true);
+  assert.equal(c.record(req(), 1, 'click:full_menu', '2.2.2.2', NOW), true);
+  assert.equal(c.record(req(), 1, 'click:made_up_item', '2.2.2.2', NOW), false);
+  assert.equal(c.record(req(), 1, 'click:See<b>', '2.2.2.2', NOW), false);
+  const d = c.detail(1, 30, NOW);
+  assert.equal(d.sheet_total, 3);
+  const by = Object.fromEntries(d.sheet.map((r) => [r.key, r.n]));
+  assert.equal(by.see_hours, 2); assert.equal(by.full_menu, 1); assert.equal(by.website, 0);
+  assert.ok(d.sheet.length === labels.labelsFor('venue').length && d.sheet.every((r) => r.text && r.group));
+  assert.equal(d.clicks_total, 0, 'old link-click counting is unchanged by sheet clicks');
+  assert.ok(!d.sheet.some((r) => r.key === 'tickets_info'), 'event-only items are not on a business sheet');
+});
+
+test('events: views and clicks are counted per event, search finds events, unknown events are ignored', () => {
+  const c = va.createCounter(memDb());
+  assert.equal(c.recordEvent(req(), 7, 'event_view', '3.3.3.3', NOW), true);
+  assert.equal(c.recordEvent(req(), 7, 'click:tickets_info', '3.3.3.3', NOW), true);
+  assert.equal(c.recordEvent(req(), 7, 'click:full_menu', '3.3.3.3', NOW), true, 'valid key, counted as given (sheet only shows event items)');
+  assert.equal(c.recordEvent(req(), 7, 'venue_view', '3.3.3.3', NOW), false);
+  assert.equal(c.recordEvent(req(), 99, 'event_view', '3.3.3.3', NOW), false);
+  assert.equal(c.recordEvent(req('Googlebot/2.1'), 7, 'event_view', '3.3.3.3', NOW), false);
+  const d = c.detailEvent(7, 30, NOW);
+  assert.equal(d.views, 1);
+  const by = Object.fromEntries(d.sheet.map((r) => [r.key, r.n]));
+  assert.equal(by.tickets_info, 1); assert.equal(by.add_to_calendar, 0);
+  assert.ok(!d.sheet.some((r) => r.key === 'see_hours'));
+  assert.deepEqual(c.searchEvents('trivia').map((m) => [m.id, m.type]), [[7, 'event']]);
+  assert.equal(c.detailEvent(99), null);
+});
+
+test('click items: keys are unique, lowercase, and each has a selector; the browser classifier ships them all', () => {
+  const keys = labels.LABELS.map((l) => l.key);
+  assert.equal(new Set(keys).size, keys.length);
+  assert.ok(keys.every((k) => /^[a-z_]{1,32}$/.test(k)));
+  assert.ok(labels.LABELS.every((l) => l.sel && l.pages.length));
+  const js = labels.clientClassifierJs();
+  for (const k of keys) assert.ok(js.includes(`"${k}"`), k);
+  // The fallbacks come last so a specific item always wins.
+  assert.equal(keys.at(-1), 'other_button'); assert.equal(keys.at(-2), 'other_link');
+});
+
+test('page: the click sheet shows every item and event results link with kind=event', () => {
+  const c = va.createCounter(memDb());
+  c.record(req(), 1, 'click:see_hours', '4.4.4.4', NOW);
+  const html = renderBusinessPage({ q: 'x', days: 30, detail: { key: 'okanagan', name: 'Okanagan Roam', data: c.detail(1, 30, NOW) } });
+  assert.match(html, /Everything people can click/); assert.match(html, /See hours/); assert.match(html, /Add to trip/);
+  const res = renderBusinessPage({ q: 'triv', days: 30, results: [{ key: 'okanagan', name: 'Okanagan Roam', matches: c.searchEvents('trivia') }], searched: true });
+  assert.match(res, /kind=event/);
 });

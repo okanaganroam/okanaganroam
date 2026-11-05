@@ -1337,4 +1337,15 @@ CREATE TABLE IF NOT EXISTS venue_event_counts (
 );
 `);
 
+// Event click sheet (2026-11-05): per day and event, page views and clicks by item. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS event_click_counts (
+  day TEXT NOT NULL,
+  event_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, event_id, name)
+);
+`);
+
 module.exports = db;
