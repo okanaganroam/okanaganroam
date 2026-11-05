@@ -33764,6 +33764,8 @@ function eventLocationAddress(event, hostVenue) {
 // schema's image, which Google's event results strongly recommend.
 function eventImagePath(event, categories) {
   if (event.image_url && /^https?:\/\//.test(event.image_url)) return event.image_url;
+  // A photo kept on this site (2026-11-05, recurring-event photos): /images/events/... counts too.
+  if (event.image_url && /^\/images\/events\/[\w.-]+\.(jpe?g|webp|png)$/.test(event.image_url) && fs.existsSync(path.join(__dirname, 'public', event.image_url))) return event.image_url;
   const kind = eventKindPhoto({ id: event.id, name: event.name, description: event.description, categories });
   if (kind) { const big = kind.replace(/-800\.jpg$/, '.jpg'); return fs.existsSync(path.join(__dirname, 'public', big)) ? big : kind; }
   const key = (categories || []).find((c) => WHATSON_CATEGORY_BANNERS[c]);
