@@ -620,3 +620,23 @@ test('V3 page example card (2026-10-29): a real plan for today, EN + FR times, a
     assert.doesNotMatch(h, /class="t3-try"/);
   }
 });
+
+test('V3 /trip?region=<town> names that town in the placeholder and the four examples; unknown towns change nothing', () => {
+  const html = require('../trip-planner-v3-page.js').renderTripPlannerV3Page({ esc: (x) => String(x), regions: [{ slug: 'vernon', label: 'Vernon' }, { slug: 'kelowna', label: 'Kelowna' }], regionImages: {}, preview: false });
+  const start = html.indexOf('// /trip?region=<town>');
+  assert.ok(start > 0, 'the region pre-fill block is in the page script');
+  const end = html.indexOf('// A shared link (/trip?q=...)', start);
+  const block = html.slice(start, end);
+  const run = (search, lang) => {
+    const attrs = {}; const chips = [0, 1, 2, 3].map(() => ({ textContent: 'x', removeAttribute() {} }));
+    const input = { removeAttribute() {}, setAttribute: (k, v) => { attrs[k] = v; } };
+    new Function('location', 'REGIONS', 'document', 'input', 'lang', 'URLSearchParams', block)({ search }, [{ slug: 'vernon', label: 'Vernon' }], { querySelectorAll: () => chips }, input, () => lang || 'en', URLSearchParams);
+    return { chips: chips.map((c) => c.textContent), placeholder: attrs.placeholder };
+  };
+  const v = run('?region=vernon');
+  assert.deepEqual(v.chips, ['3 days in Vernon: wineries, easy walks and great food', '2 days in Vernon with the kids', 'A romantic weekend in Vernon', 'What can we do around Vernon if it rains?']);
+  assert.match(v.placeholder, /^Plan 3 days in Vernon this autumn/);
+  assert.match(run('?region=vernon', 'fr').chips[0], /^3 jours à Vernon/);
+  assert.deepEqual(run('?region=nowhere').chips, ['x', 'x', 'x', 'x']);
+  assert.deepEqual(run('').chips, ['x', 'x', 'x', 'x']);
+});
