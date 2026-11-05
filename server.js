@@ -8,6 +8,7 @@ const db = require('./db');
 const dashboardData = require('./dashboard-data');
 const gaReport = require('./ga-report');
 const venueActivity = require('./venue-activity');
+const clickLabels = require('./click-labels');
 const venueActivityCounter = venueActivity.createCounter(db);
 const { renderBusinessPage } = require('./venue-activity-page');
 const siteEvents = require('./site-events');
@@ -14846,9 +14847,10 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
   }
   function roamVenue(p, name){
     try {
-      if (!p || !p.venue_id || !navigator.sendBeacon || /(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
-      var n = name === 'venue_view' ? 'venue_view' : 'outbound_click:' + String(p.link_type || 'other').replace(/[^a-z_]/g, '').slice(0, 24);
-      navigator.sendBeacon('/api/venue-event', new Blob([JSON.stringify({ venue_id: p.venue_id, name: n })], { type: 'application/json' }));
+      if (!p || !(p.venue_id || p.event_id) || !navigator.sendBeacon || /(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
+      var n = name === 'venue_view' ? 'venue_view' : name === 'event_view' ? 'event_view' : name === 'page_click' ? 'click:' + String(p.click_key || '').replace(/[^a-z_]/g, '').slice(0, 32) : 'outbound_click:' + String(p.link_type || 'other').replace(/[^a-z_]/g, '').slice(0, 24);
+      var body = p.event_id ? { event_id: p.event_id, name: n } : { venue_id: p.venue_id, name: n };
+      navigator.sendBeacon('/api/venue-event', new Blob([JSON.stringify(body)], { type: 'application/json' }));
     } catch (e) { /* counting must never break the site */ }
   }
   (function(){
@@ -14867,7 +14869,7 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       if (typeof gtag === 'function') gtag('event', name, p);
       // Build My Trip demand log (Stage 1): tell our own server which business was added/removed. Anonymous.
       if (ROAM_EV.indexOf(name) !== -1) roamCount(name);
-      if (name === 'venue_view' || name === 'outbound_click') roamVenue(p, name);
+      if (name === 'venue_view' || name === 'outbound_click' || name === 'event_view' || name === 'page_click') roamVenue(p, name);
       if ((name === 'add_to_trip' || name === 'remove_from_trip') && navigator.sendBeacon && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) {
         navigator.sendBeacon('/api/trip/signal', new Blob([JSON.stringify({ kind: name === 'add_to_trip' ? 'add' : 'remove', ref: p.venue_ref || p.ref || null, name: p.venue_name || null, region: p.region || p.venue_region || null })], { type: 'application/json' }));
       }
@@ -18362,6 +18364,15 @@ function golfVenueEngagementScriptHtml(venue) {
     var params = ctx();
     params.link_type = link.getAttribute('data-track');
     track('outbound_click', params);
+  });
+  ${clickLabels.clientClassifierJs()}
+  document.addEventListener('click', function(e){
+    try {
+      var el = e.target && e.target.closest ? e.target.closest('a,button,summary,[data-vg-open]') : null;
+      if (!el) return;
+      var key = roamClickKey(el, 'venue');
+      if (key) { var q = ctx(); q.click_key = key; track('page_click', q); }
+    } catch (err) { /* counting must never break the site */ }
   });
 ${favTrip ? golfFavTripScriptBody(venue.type) : ''}
 })();
@@ -34739,6 +34750,15 @@ ${pastOccs.map(dateItem).join('\n')}
   function ctx(){ var c = {}; for (var k in pageCtx) c[k] = pageCtx[k]; return c; }
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
   (function(){ var v = ctx(), extra = ${viewCtx}; for (var k in extra) v[k] = extra[k]; track('event_view', v); })();
+  ${clickLabels.clientClassifierJs()}
+  document.addEventListener('click', function(e){
+    try {
+      var el = e.target && e.target.closest ? e.target.closest('a,button,summary') : null;
+      if (!el) return;
+      var key = roamClickKey(el, 'event');
+      if (key) { var q = ctx(); q.click_key = key; track('page_click', q); }
+    } catch (err) { /* counting must never break the site */ }
+  });
 ${golfFavTripScriptBody('whatson')}
 })();
 </script>`;
@@ -41269,7 +41289,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business page is viewed and its links are clicked, as plain daily totals with nothing that identifies you.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -57022,7 +57042,8 @@ const server = http.createServer(async (req, res) => {
       if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
       try {
         const b = await readLimitedJsonBody(req, 512);
-        if (b) venueActivityCounter.record(req, b.venue_id, b.name, requestClientIp(req));
+        if (b && b.event_id) venueActivityCounter.recordEvent(req, b.event_id, b.name, requestClientIp(req));
+        else if (b) venueActivityCounter.record(req, b.venue_id, b.name, requestClientIp(req));
       } catch (e) { /* ignore: counting only */ }
       res.writeHead(204);
       return res.end();
@@ -57329,8 +57350,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/admin/venue-activity' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
       res.setHeader('Cache-Control', 'no-store');
-      if (query.id) return sendJSON(res, 200, { detail: venueActivityCounter.detail(query.id, query.days) });
-      return sendJSON(res, 200, { matches: venueActivityCounter.search(query.q) });
+      if (query.id) return sendJSON(res, 200, { detail: query.kind === 'event' ? venueActivityCounter.detailEvent(query.id, query.days) : venueActivityCounter.detail(query.id, query.days) });
+      return sendJSON(res, 200, { matches: [...venueActivityCounter.search(query.q), ...venueActivityCounter.searchEvents(query.q)] });
     }
     // The page: /admin/dashboard/business?q=name (search both sites) and &site=okanagan|whistler&id=123 (one business).
     if ((pathname === '/admin/dashboard/business' || pathname === '/admin/dashboard/business/') && (method === 'GET' || method === 'HEAD')) {
@@ -57353,8 +57374,8 @@ const server = http.createServer(async (req, res) => {
       let detail = null; let results = [];
       const id = /^[1-9][0-9]*$/.test(String(query.id || '')) ? String(query.id) : '';
       if (id) {
-        if (query.site === 'whistler') { const w = await wFetch(`id=${id}&days=${days}`); detail = { key: 'whistler', name: 'Whistler Roam', data: w.data && w.data.detail, error: w.error || (w.data && w.data.detail ? null : 'Business not found.') }; }
-        else { const dd = venueActivityCounter.detail(id, days); detail = { key: 'okanagan', name: 'Okanagan Roam', data: dd, error: dd ? null : 'Business not found.' }; }
+        if (query.site === 'whistler') { const w = await wFetch(`id=${id}&days=${days}${query.kind === 'event' ? '&kind=event' : ''}`); detail = { key: 'whistler', name: 'Whistler Roam', data: w.data && w.data.detail, error: w.error || (w.data && w.data.detail ? null : 'Business not found.') }; }
+        else { const dd = query.kind === 'event' ? venueActivityCounter.detailEvent(id, days) : venueActivityCounter.detail(id, days); detail = { key: 'okanagan', name: 'Okanagan Roam', data: dd, error: dd ? null : 'Business not found.' }; }
       } else if (q.trim().length >= 2) {
         const w = await wFetch(`q=${encodeURIComponent(q)}`);
         results = [{ key: 'okanagan', name: 'Okanagan Roam', matches: venueActivityCounter.search(q), error: null }, { key: 'whistler', name: 'Whistler Roam', matches: (w.data && w.data.matches) || [], error: w.error || null }];

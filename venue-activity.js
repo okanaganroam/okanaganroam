@@ -4,8 +4,12 @@
 // number. No visitor id, no IP. Shown on the owner dashboard's business search together with the Build My Trip demand
 // log (shown in plans / added / removed), which already holds per-business counts.
 const { isBot, isInternal, dayOf, enabled: demandEnabled } = require('./trip-demand');
+const { labelsFor, isKey } = require('./click-labels');
 
-const NAME_RE = /^(venue_view|outbound_click:[a-z_]{1,24})$/;
+const NAME_RE = /^(venue_view|outbound_click:[a-z_]{1,24}|click:[a-z_]{1,32})$/;
+const nameOk = (n) => typeof n === 'string' && NAME_RE.test(n) && (!n.startsWith('click:') || isKey(n.slice(6)));
+const EVENT_NAME_RE = /^(event_view|click:[a-z_]{1,32})$/;
+const eventNameOk = (n) => typeof n === 'string' && EVENT_NAME_RE.test(n) && (!n.startsWith('click:') || isKey(n.slice(6)));
 const RATE_PER_HOUR = 300;
 const hits = new Map();
 function rateLimited(ip, now = Date.now()) {
@@ -19,13 +23,18 @@ function rateLimited(ip, now = Date.now()) {
 const dayList = (days, now) => { const out = []; for (let i = days - 1; i >= 0; i -= 1) out.push(dayOf(new Date(now.getTime() - i * 86400000))); return out; };
 const tableExists = (db, n) => { try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(n); } catch (e) { return false; } };
 
+// Every item that can be clicked on this kind of page, with its count (zero when nobody clicked it).
+function sheetRows(kind, counts) {
+  return labelsFor(kind).map((l) => ({ key: l.key, text: l.text, group: l.group, n: counts[l.key] || 0 }));
+}
+
 function createCounter(db) {
   const up = db.prepare('INSERT INTO venue_event_counts (day, venue_id, name, n) VALUES (?, ?, ?, 1) ON CONFLICT(day, venue_id, name) DO UPDATE SET n = n + 1');
   const exists = db.prepare('SELECT 1 FROM venues WHERE id = ? AND redirect_to IS NULL');
 
   function record(req, venueId, name, ip, now = new Date()) {
     const id = Number(venueId);
-    if (!demandEnabled() || !Number.isInteger(id) || id <= 0 || typeof name !== 'string' || !NAME_RE.test(name)) return false;
+    if (!demandEnabled() || !Number.isInteger(id) || id <= 0 || !nameOk(name)) return false;
     if (isBot(req) || isInternal(req) || rateLimited(ip) || !exists.get(id)) return false;
     up.run(dayOf(now), id, name);
     return true;
@@ -47,9 +56,9 @@ function createCounter(db) {
     const since = list[0];
     const rows = db.prepare('SELECT day, name, n FROM venue_event_counts WHERE venue_id = ? AND day >= ?').all(venue.id, since);
     const clicks = {}; const viewsByDay = new Map(); const clicksByDay = new Map();
-    let views = 0; let clickTotal = 0;
+    let views = 0; let clickTotal = 0; const sheet = {}; let sheetTotal = 0;
     for (const r of rows) {
-      if (r.name === 'venue_view') { views += r.n; viewsByDay.set(r.day, r.n); } else {
+      if (r.name.startsWith('click:')) { sheet[r.name.slice(6)] = (sheet[r.name.slice(6)] || 0) + r.n; sheetTotal += r.n; } else if (r.name === 'venue_view') { views += r.n; viewsByDay.set(r.day, r.n); } else {
         const k = r.name.slice('outbound_click:'.length);
         clicks[k] = (clicks[k] || 0) + r.n; clickTotal += r.n; clicksByDay.set(r.day, (clicksByDay.get(r.day) || 0) + r.n);
       }
@@ -67,9 +76,48 @@ function createCounter(db) {
       views_per_day: list.map((day) => ({ day, n: viewsByDay.get(day) || 0 })),
       clicks_per_day: list.map((day) => ({ day, n: clicksByDay.get(day) || 0 })),
       demand,
+      sheet: sheetRows('venue', sheet), sheet_total: sheetTotal,
     };
   }
-  return { record, search, detail };
+
+  // Events (2026-11-05): the same sheet for an event page.
+  const upEv = db.prepare('INSERT INTO event_click_counts (day, event_id, name, n) VALUES (?, ?, ?, 1) ON CONFLICT(day, event_id, name) DO UPDATE SET n = n + 1');
+  const evExists = db.prepare('SELECT 1 FROM events WHERE id = ?');
+  function recordEvent(req, eventId, name, ip, now = new Date()) {
+    const id = Number(eventId);
+    if (!demandEnabled() || !Number.isInteger(id) || id <= 0 || !eventNameOk(name)) return false;
+    if (isBot(req) || isInternal(req) || rateLimited(ip) || !evExists.get(id)) return false;
+    upEv.run(dayOf(now), id, name);
+    return true;
+  }
+  function searchEvents(q) {
+    const s = String(q || '').trim().slice(0, 80);
+    if (s.length < 2) return [];
+    const like = `%${s.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    return db.prepare(`SELECT id, name, region, 'event' AS type FROM events WHERE name LIKE ? ESCAPE '\\' ORDER BY start_datetime DESC LIMIT 8`).all(like);
+  }
+  function detailEvent(eventId, days = 30, now = new Date()) {
+    days = [7, 30, 90].includes(Number(days)) ? Number(days) : 30;
+    const venue = db.prepare("SELECT id, name, region, 'event' AS type FROM events WHERE id = ?").get(Number(eventId));
+    if (!venue) return null;
+    const list = dayList(days, now);
+    const since = list[0];
+    const rows = db.prepare('SELECT day, name, n FROM event_click_counts WHERE event_id = ? AND day >= ?').all(venue.id, since);
+    const sheet = {}; const viewsByDay = new Map(); const clicksByDay = new Map(); let views = 0; let total = 0;
+    for (const r of rows) {
+      if (r.name === 'event_view') { views += r.n; viewsByDay.set(r.day, r.n); } else {
+        const k = r.name.slice(6); sheet[k] = (sheet[k] || 0) + r.n; total += r.n; clicksByDay.set(r.day, (clicksByDay.get(r.day) || 0) + r.n);
+      }
+    }
+    const first = db.prepare('SELECT MIN(day) AS d FROM event_click_counts').get().d;
+    return {
+      venue, days, since, counting_since: first || null, views, clicks_total: total, clicks: [],
+      views_per_day: list.map((day) => ({ day, n: viewsByDay.get(day) || 0 })),
+      clicks_per_day: list.map((day) => ({ day, n: clicksByDay.get(day) || 0 })),
+      demand: null, sheet: sheetRows('event', sheet), sheet_total: total,
+    };
+  }
+  return { record, search, detail, recordEvent, searchEvents, detailEvent };
 }
 
-module.exports = { NAME_RE, RATE_PER_HOUR, createCounter, rateLimited };
+module.exports = { NAME_RE, nameOk, eventNameOk, RATE_PER_HOUR, createCounter, rateLimited };
