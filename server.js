@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const tripDemand = require('./trip-demand');
+const tripDemandLog = tripDemand.createLogger(db);
 const r2 = require('./r2');
 // Beach photo fallbacks; optional like french-text, so an isolated copy of server.js + db.js (the fail-closed tests)
 // still starts, keeping each venue's own image.
@@ -14835,6 +14837,10 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       // stops (window.__roamTripSource), otherwise an individual addition.
       if (name === 'add_to_trip' && !p.trip_source) p.trip_source = window.__roamTripSource || 'individual';
       if (typeof gtag === 'function') gtag('event', name, p);
+      // Build My Trip demand log (Stage 1): tell our own server which business was added/removed. Anonymous.
+      if ((name === 'add_to_trip' || name === 'remove_from_trip') && navigator.sendBeacon && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) {
+        navigator.sendBeacon('/api/trip/signal', new Blob([JSON.stringify({ kind: name === 'add_to_trip' ? 'add' : 'remove', ref: p.venue_ref || p.ref || null, name: p.venue_name || null, region: p.region || p.venue_region || null })], { type: 'application/json' }));
+      }
     } catch (e) { /* analytics must never break the site */ }
   };
   // Measurement Phase C: open_my_trip, once per visitor click that OPENS the
@@ -41205,7 +41211,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -56689,7 +56695,12 @@ const server = http.createServer(async (req, res) => {
       const parsed = parseTripPlanBody(body);
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
       // Weekly specials (2026-10-27): a stop on its special's day says so, added after planning like the deals.
-      try { return sendJSON(res, 200, withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))))); } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
+      try {
+        const planResult = withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))));
+        // Stage 1 demand log: which businesses this plan showed (anonymous, never blocks the reply).
+        try { req.__ip = requestClientIp(req); tripDemandLog.record(req, 'shown', tripDemand.collectVenueIds(planResult)); } catch (e) { /* logging must never break the planner */ }
+        return sendJSON(res, 200, planResult);
+      } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
@@ -56935,6 +56946,42 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderListYourVenuePage());
     }
+    // POST /api/trip/signal -- Build My Trip demand log, Stage 1. The page reports that a visitor added or
+    // removed a business. Anonymous, same-origin only, tiny body, always answers 204.
+    if (pathname === '/api/trip/signal' && method === 'POST') {
+      if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
+      try {
+        const b = await readLimitedJsonBody(req, 2048);
+        const kind = b && b.kind === 'add' ? 'add' : b && b.kind === 'remove' ? 'remove' : null;
+        let id = null;
+        const m = b && typeof b.ref === 'string' ? /^venue:([1-9][0-9]*)$/.exec(b.ref) : null;
+        if (m) id = Number(m[1]);
+        else if (b && typeof b.name === 'string' && b.name.length <= 120) {
+          const rows = db.prepare('SELECT id FROM venues WHERE name = ? AND (? IS NULL OR region = ?)').all(b.name, b.region || null, b.region || null);
+          if (rows.length === 1) id = rows[0].id;
+        }
+        if (kind && id) { req.__ip = requestClientIp(req); tripDemandLog.record(req, kind, [id]); }
+      } catch (e) { /* ignore: logging only */ }
+      res.writeHead(204);
+      return res.end();
+    }
+
+    // GET /api/admin/trip-demand?days=30&threshold=10[&format=csv] -- which businesses Build My Trip is sending
+    // people to. Admin token. ready_to_contact = added by at least `threshold` different visitor-days.
+    if (pathname === '/api/admin/trip-demand' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      const days = Math.min(365, Math.max(1, parseInt(query.days, 10) || 30));
+      const threshold = Math.max(1, parseInt(query.threshold, 10) || 10);
+      const rows = tripDemandLog.report(days, threshold);
+      if (query.format === 'csv') {
+        const csv = ['id,name,region,type,shown,added,removed,ready_to_contact']
+          .concat(rows.map((r) => [r.id, JSON.stringify(r.name), r.region, r.type, r.shown, r.added, r.removed, r.ready_to_contact].join(','))).join('\n');
+        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(csv + '\n');
+      }
+      return sendJSON(res, 200, { days, threshold, count: rows.length, rows });
+    }
+
     if (pathname === '/api/venue-submissions' && method === 'POST') {
       return await handleVenueSubmission(req, res);
     }
