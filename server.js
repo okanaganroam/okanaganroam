@@ -19978,6 +19978,9 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   }
   body.map-page .pm-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 12px 16px; }
   body.map-page .pm-tabs { flex: none; display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(27,43,58,0.08); }
+  body.map-page .pm-float .pm-tabs { margin-bottom: 10px; }
+  body.map-page .is-route .pm-float .pm-tabs { display: none; }
+  body.map-page .pm-event-price { display: block; margin-top: 4px; font-weight: 800; color: #166534; }
   body.map-page .pm-tab { min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.88rem; cursor: pointer; }
   body.map-page .pm-tab[aria-selected="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
   /* Filters: one panel with everything else. */
@@ -20687,8 +20690,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
+        var price = x.price;
+        if (FR && price === 'Free') price = 'Gratuit';
+        else if (FR && price === 'By donation') price = 'Contribution volontaire';
+        else if (FR && price === 'Ticketed') price = 'Billets requis';
         var where = [x.venue, CONF.r[x.region], x.d != null && me ? T.km(x.d) : ''].filter(Boolean).join(' · ');
-        html += '<li class="pm-item pm-event"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span><span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></button>'
+        html += '<li class="pm-item pm-event"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + '</span><span class="pm-when">' + esc(whenText(x, x.g)) + '</span>' + (price ? '<span class="pm-event-price">' + esc(price) + '</span>' : '') + '<span class="pm-meta">' + esc(where) + (x.lat == null ? ' <em>' + esc(T.noPin) + '</em>' : '') + '</span></button>'
           + '<div class="pm-acts">' + (x.lat != null ? '<a class="pm-dir" data-dir="event" data-k="e' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a>' : '') + '<a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       }
     });
@@ -21508,7 +21515,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else setStatus(T.eventsFor(evSaidText), 9000);
   }
   function addEvent(a, ah){
-    var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], tp: a[12] || [], ah: !!ah, d: null };
+    var e = { ix: events.length, name: a[0], url: a[1], fu: FR && a[11] ? '/fr' + a[1] : '', region: a[2], venue: a[3], lat: a[4], lng: a[5], sd: a[6], st: a[7], ed: a[8], et: a[9], ad: a[10], tp: a[12] || [], price: a[13] || '', ah: !!ah, d: null };
     if (e.lat != null) e.m = L.marker([e.lat, e.lng], { icon: iconFor('event'), title: e.name }).bindPopup(pmPopup(function(){ return popupForEvent(e); }));
     events.push(e);
   }
@@ -21758,7 +21765,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 16; // 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 17; // 17: event prices; 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -21968,7 +21975,7 @@ function mapPlacesData(now = new Date()) {
 function mapEventsData(now = new Date(), { ahead = false } = {}) {
   const today = todayLocal(now);
   const weekEnd = addLocalDays(today, MAP_EVENT_DAYS);
-  const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.venue_id, e.venue_name_text, o.start_date, o.end_date, o.start_time, o.end_time, o.all_day
+  const rows = db.prepare(`SELECT e.id, e.name, e.slug, e.region, e.venue_id, e.venue_name_text, e.price_kind, e.price_text, o.start_date, o.end_date, o.start_time, o.end_time, o.all_day
     FROM event_occurrences o JOIN events e ON e.id = o.event_id
     WHERE e.status = 'scheduled' AND o.status = 'scheduled' AND o.end_date >= ? AND o.start_date <= ?
     ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, ahead ? addLocalDays(today, MAP_AHEAD_DAYS) : weekEnd);
@@ -22045,7 +22052,7 @@ function mapEventsData(now = new Date(), { ahead = false } = {}) {
     out.push([r.name, `/${r.region}/events/${r.slug}`, r.region, venue ? venue.name : (r.venue_name_text || ''), point ? mapRound(point.lat) : null, point ? mapRound(point.lng) : null,
       r.start_date, r.start_time || '', r.end_date, r.end_time || '', r.all_day ? 1 : 0,
       // [11] 1 when the event has a French page (round 9, 2026-10-19), so /fr/map links to it.
-      hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0, kinds.get(Number(r.id)) || 0]);
+      hasFrenchTwin(`/${r.region}/events/${r.slug}`) ? 1 : 0, kinds.get(Number(r.id)) || 0, eventPriceLabel(r) || 0]);
   }
   return out;
 }
@@ -22150,7 +22157,11 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1>${R('Find your kind of nearby.','Trouvez votre prochaine découverte.')}</h1><p>${R('Find places that fit your needs.','Trouvez des lieux qui vous correspondent.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('EXPLORING AROUND','EXPLORER AUTOUR DE')}</small><b id="rnLocationText">${R('Kelowna map area · Change location','Zone de Kelowna · Changer')}</b></span></button></div>
+      <div class="rn-intro"><div><h1>${R('Find your kind of nearby.','Trouvez votre prochaine découverte.')}</h1><p>${R('Find places to go and events happening nearby.','Trouvez des lieux à visiter et des événements à proximité.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('EXPLORING AROUND','EXPLORER AUTOUR DE')}</small><b id="rnLocationText">${R('Kelowna map area · Change location','Zone de Kelowna · Changer')}</b></span></button></div>
+      <div class="pm-tabs" role="tablist" aria-label="${R('Explore places or events','Explorer les lieux ou les événements')}">
+          <button type="button" role="tab" class="pm-tab" id="pmTabPlaces" aria-selected="true" aria-controls="pmList">Places</button>
+          <button type="button" role="tab" class="pm-tab" id="pmTabEvents" aria-selected="false" aria-controls="pmList">Events</button>
+        </div>
       <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
@@ -22183,10 +22194,6 @@ ${renderGolfHeaderHtml()}
       <button type="button" class="pm-handle" id="pmHandle" aria-label="Show more of the list"><span></span></button>
       <div class="pm-sheet-head">
         <h2 class="pm-count" id="pmCount" aria-live="polite">Loading the map&hellip;</h2>
-        <div class="pm-tabs" role="tablist" aria-label="Show">
-          <button type="button" role="tab" class="pm-tab" id="pmTabPlaces" aria-selected="true" aria-controls="pmList">Places</button>
-          <button type="button" role="tab" class="pm-tab" id="pmTabEvents" aria-selected="false" aria-controls="pmList">Events</button>
-        </div>
       </div>
       <div class="pm-sheet-body" id="pmSheetBody">
         <section class="pm-route" id="pmRoute" hidden aria-live="polite"></section>
