@@ -2344,7 +2344,7 @@ function renderScript(d) {
       // The example card and its one-liner are a Penticton happy hour crawl; coming from another town's page they would
       // show the wrong town (West Kelowna visitors saw Penticton stops), so they are hidden there.
       if (town.slug !== 'penticton') {
-        Array.prototype.forEach.call(document.querySelectorAll('.t3-try, .t3-sample'), function(el){ el.hidden = true; el.style.display = 'none'; });
+        Array.prototype.forEach.call(document.querySelectorAll('.t3-try, .t3-sample'), function(el){ el.hidden = true; if (el.style) el.style.display = 'none'; });
       }
       var n = town.label, fr = lang() === 'fr';
       var texts = fr
