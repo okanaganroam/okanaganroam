@@ -30,7 +30,7 @@ for (const [town, c] of Object.entries(TOWNS)) {
     assert.ok(fs.existsSync(path.join(root, c.hero)), `missing hero ${c.hero}`);
     const n = c.name;
     const keys = [c.sub, c.placeholder, `${n}, your way.`, `Search ${n}`, `Build my ${n} trip ↗`, `What’s your ${n} mood?`, EYEBROW[c.category],
-      ...c.tiles.flatMap(t => [t.title, t.sub]), ...c.picks.flatMap(p => [p.tag, p.copy]), ...c.plan.flatMap(p => [p.title, p.copy, p.label])];
+      ...c.tiles.flatMap(t => [t.title, t.sub]), ...c.picks.flatMap(p => [p.tag, p.copy]), ...c.plan.flatMap(p => [p.title, p.copy, p.label]), ...(c.credits || [])];
     for (const k of keys) assert.ok(french[k], `no French for: ${k}`);
   });
 }

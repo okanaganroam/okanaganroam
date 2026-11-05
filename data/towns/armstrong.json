@@ -1,7 +1,7 @@
 {
  "town": "armstrong",
  "name": "Armstrong",
- "hero": "/images/venues/sparrowgrass-field-flower-2610.jpg",
+ "hero": "/images/regions/photos/armstrong-2611-2400.jpg",
  "category": "country",
  "sub": "Farm-fresh food, flowers and small-town charm.",
  "placeholder": "Search Armstrong… cafes, farms, trails",
@@ -96,5 +96,6 @@
    "href": "/guide/armstrong/kid_friendly",
    "label": "Kid-friendly picks"
   }
- ]
+ ],
+ "credits": ["Hero photo: City of Armstrong"]
 }

@@ -1,7 +1,7 @@
 {
  "town": "vernon",
  "name": "Vernon",
- "hero": "/images/hiking/venues/kal-crystal-waters-trail-20261015-b4.jpg",
+ "hero": "/images/regions/photos/vernon-2611-2400.jpg",
  "category": "city",
  "sub": "Three lakes, farm stops and plenty of fresh air.",
  "placeholder": "Search Vernon… cafés, beaches, trails",
@@ -96,5 +96,6 @@
    "href": "/guide/vernon/kid_friendly",
    "label": "Family-friendly places"
   }
- ]
+ ],
+ "credits": ["Hero photo: Judy Gallagher, CC BY 2.0, via Wikimedia Commons"]
 }

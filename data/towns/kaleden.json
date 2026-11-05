@@ -1,7 +1,7 @@
 {
  "town": "kaleden",
  "name": "Kaleden",
- "hero": "/images/regions/photos/kaleden-2610-1200.jpg",
+ "hero": "/images/regions/photos/kaleden-2611-2400.jpg",
  "category": "wine",
  "sub": "Quiet lakeside wineries, golf and Skaha views.",
  "placeholder": "Search Kaleden… wineries, golf, cafes",
@@ -88,5 +88,6 @@
    "href": "/dog-friendly?regions=kaleden",
    "label": "Dog-friendly spots"
   }
- ]
+ ],
+ "credits": ["Hero photo: GoToVan, CC BY 2.0, via Wikimedia Commons"]
 }
