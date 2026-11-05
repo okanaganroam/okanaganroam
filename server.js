@@ -52533,8 +52533,8 @@ ${renderGolfHeaderHtml()}
         </div>
         <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>
       </section>
-      <div class="op-taskbar" id="opTaskBar" data-task="hours photos events contact more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
-      <aside class="op-helpme" id="opHelpMe" data-task="home hours photos events contact more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
+      <div class="op-taskbar" id="opTaskBar" data-task="hours photos video events contact more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
+      <aside class="op-helpme" id="opHelpMe" data-task="home hours photos video events contact more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
       })()}
       <div data-task="all">
       ${instantOn
@@ -52885,6 +52885,7 @@ ${ownerFooterHtml(fr)}
       if (el.hasAttribute('hidden') && showIt && /^op(Tasks|TaskBar|HelpMe)$/.test(el.id)) el.hidden = false;
     });
     var bar = document.getElementById('opTaskBar'); if (bar) bar.hidden = !(t && t !== 'all');
+    if (fm && (t === 'photos' || t === 'video' || t === 'events')) fm.classList.add('op-off'); else if (fm) fm.classList.remove('op-off');
     if (t && t !== 'all') Array.prototype.forEach.call(document.querySelectorAll('details[data-task~="' + t + '"]'), function(d){ d.open = true; });
     if (!t || t === 'all') window.scrollTo(0, 0);
     else { var h = document.getElementById('opTaskBar'); if (h) h.scrollIntoView({ block: 'start' }); }
