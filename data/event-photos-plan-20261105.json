@@ -1,0 +1,147 @@
+{
+ "date": "2026-11-05",
+ "reason": "Recurring-event photos",
+ "batch_id": "event-photos-2026-11-05",
+ "update": [
+  {
+   "id": 1,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/prospera-place-2611.jpg"
+   },
+   "why": "Real photo of the host place (Prospera Place)"
+  },
+  {
+   "id": 11,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/soec-penticton-2611.jpg"
+   },
+   "why": "Real photo of the host place (Darren Kirby / Wikimedia Commons)"
+  },
+  {
+   "id": 12,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/kal-tire-place-2611.jpg"
+   },
+   "why": "Real photo of the host place (Vernon Vipers)"
+  },
+  {
+   "id": 627,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/sun-bowl-arena-2611.jpg"
+   },
+   "why": "Real photo of the host place (Town of Osoyoos)"
+  },
+  {
+   "id": 546,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/caravan-farm-winter-2611.jpg"
+   },
+   "why": "Real photo of the host place (Caravan Farm Theatre)"
+  },
+  {
+   "id": 13,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/ubco-gymnasium-2611.jpg"
+   },
+   "why": "Real photo of the host place (UBC Okanagan Campus Recreation)"
+  },
+  {
+   "id": 17,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/ubco-gymnasium-2611.jpg"
+   },
+   "why": "Real photo of the host place (UBC Okanagan Campus Recreation)"
+  },
+  {
+   "id": 18,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/ubco-gymnasium-2611.jpg"
+   },
+   "why": "Real photo of the host place (UBC Okanagan Campus Recreation)"
+  },
+  {
+   "id": 21,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/ubco-gymnasium-2611.jpg"
+   },
+   "why": "Real photo of the host place (UBC Okanagan Campus Recreation)"
+  },
+  {
+   "id": 541,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/rca-mary-irwin-theatre-2611.jpg"
+   },
+   "why": "Real photo of the host place (Rotary Centre for the Arts)"
+  },
+  {
+   "id": 765,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/rca-mary-irwin-theatre-2611.jpg"
+   },
+   "why": "Real photo of the host place (Rotary Centre for the Arts)"
+  },
+  {
+   "id": 678,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/powerhouse-theatre-2611.jpg"
+   },
+   "why": "Real photo of the host place (Powerhouse Theatre)"
+  },
+  {
+   "id": 955,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/powerhouse-theatre-2611.jpg"
+   },
+   "why": "Real photo of the host place (Powerhouse Theatre)"
+  },
+  {
+   "id": 958,
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/events/powerhouse-theatre-2611.jpg"
+   },
+   "why": "Real photo of the host place (Powerhouse Theatre)"
+  }
+ ]
+}

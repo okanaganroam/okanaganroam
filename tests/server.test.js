@@ -18831,6 +18831,8 @@ test('Card excerpts (2026-10-13): Food & Drink list cards show a short blurb, th
 
 test('Event images (SEO, 2026-10-13): event pages share a picture and their Event schema carries one -- the event\'s own image_url, else its What\'s On category photo, else the What\'s On banner', () => {
   assert.equal(app.eventImagePath({ image_url: 'https://cdn.example.com/poster.jpg' }, ['live-music']), 'https://cdn.example.com/poster.jpg');
+  assert.equal(app.eventImagePath({ image_url: '/images/events/kal-tire-place-2611.jpg' }, ['sports']), '/images/events/kal-tire-place-2611.jpg', 'a photo kept on this site counts');
+  assert.notEqual(app.eventImagePath({ image_url: '/images/events/not-a-real-file-2611.jpg' }, ['sports']), '/images/events/not-a-real-file-2611.jpg', 'a missing local file falls back');
   assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'community-events']), '/images/whats-on/nightlife.jpg');
   // Event photos (2026-10-16): a kind of event wins over the category photo; live music with no clearer match shows a band.
   assert.equal(app.eventImagePath({ image_url: '' }, ['nightlife', 'live-music']), '/images/events/rock-2610.jpg');
