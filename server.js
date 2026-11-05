@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
+const r2 = require('./r2');
 // Beach photo fallbacks; optional like french-text, so an isolated copy of server.js + db.js (the fail-closed tests)
 // still starts, keeping each venue's own image.
 const { beachPhotoForVenue } = (() => { try { return require('./beach-photo-fallbacks'); } catch (e) { return { beachPhotoForVenue: (v) => v.image_url }; } })();
@@ -1337,7 +1338,7 @@ const VENUE_DELETE_CHILDREN = [
   ['visitor_contribution_photos', 'contribution_id IN (SELECT id FROM visitor_contributions WHERE venue_id = ?)'],
   ['visitor_contribution_notes', 'contribution_id IN (SELECT id FROM visitor_contributions WHERE venue_id = ?)'],
   ['venue_seasons', 'venue_id = ?'], ['venue_owner_links', 'venue_id = ?'], ['owner_change_requests', 'venue_id = ?'],
-  ['owner_photos', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
+  ['owner_photos', 'venue_id = ?'], ['owner_videos', 'venue_id = ?'], ['venue_menus', 'venue_id = ?'], ['owner_account_venues', 'venue_id = ?'],
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
   ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'], ['event_partner_venues', 'venue_id = ?'],
   ['venue_visit_info', 'venue_id = ?'],
@@ -44178,6 +44179,150 @@ async function handleOwnerPhotoUpload(req, res, token) {
   return sendSubmissionResponse(res, 201, { ok: true, id, live, main, preview: `/owner-photos/preview/${previewKey}.jpg` });
 }
 
+// ---------- Owner videos (2026-11-05) ----------
+// A business shares a short clip; Dayton edits it into a reel for Instagram/Facebook. The browser uploads the file straight
+// to Cloudflare R2 with a short-lived presigned URL (the site's own disk is far too small for video), so this server only
+// handles the paperwork: /video/start (permission + a presigned PUT), /video/done (checks the file is really in the bucket).
+// Off until R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET are set (see r2.js).
+const OWNER_VIDEO_MAX_BYTES = 150 * 1024 * 1024;
+const OWNER_VIDEO_MAX_SECONDS = 120;
+const OWNER_VIDEO_TYPES = { 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm', 'video/x-m4v': 'm4v' };
+const OWNER_VIDEO_EXTS = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', m4v: 'video/x-m4v' };
+const OWNER_VIDEO_PENDING_LIMIT = 5;
+const OWNER_VIDEO_DAILY_LIMIT = 12;
+const OWNER_VIDEO_KEYS = new Set(['id', 'name', 'size', 'type', 'seconds', 'credit', 'rights', 'contact_name', 'contact_email', 'note', 'company_website']);
+const ownerVideoEnabled = () => r2.configured();
+
+function ownerVideoContentType(name, type) {
+  const t = String(type || '').toLowerCase();
+  if (OWNER_VIDEO_TYPES[t]) return t;
+  const ext = (/\.([a-z0-9]{2,4})$/i.exec(String(name || '')) || [])[1];
+  return ext ? OWNER_VIDEO_EXTS[ext.toLowerCase()] || null : null;
+}
+
+function buildOwnerVideoEmail(venue, v) {
+  return {
+    _subject: `[VIDEO] New video from ${venue.name} (${Math.round(v.bytes / 1048576)} MB)`,
+    _template: 'table',
+    _captcha: 'false',
+    'Status': 'PENDING REVIEW. The video is stored privately; nothing is public.',
+    'Venue': `${venue.name} (venue #${venue.id})`,
+    'Listing': venueListingUrl(venue),
+    'Video': `#${v.id}: ${v.original_name || ''}, ${Math.round(v.bytes / 1048576)} MB${v.duration_s ? `, about ${v.duration_s} seconds` : ''}`,
+    'Credit / tag': v.credit,
+    'Note': v.note || '(none)',
+    'Contact': [v.contact_name, v.contact_email].filter(Boolean).join(', ') || '(none)',
+    'How to review': `Open ${ADMIN_REVIEW_URL}, watch or download it under Videos, then approve or reject it.`,
+  };
+}
+
+async function handleOwnerVideo(req, res, token, step) {
+  const generic = 'Sorry, something went wrong. Please try again, or email the video to info@okanaganroam.com.';
+  if (!ownerVideoEnabled()) return sendSubmissionResponse(res, 404, { ok: false, error: 'Video sharing is not available yet. Please email your video to info@okanaganroam.com.' });
+  if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Videos are only accepted from the Okanagan Roam website.' });
+  const ip = requestClientIp(req);
+  if (ownerPhotoRateLimited(ip)) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many tries at once. Please wait a while and try again.' });
+  const found = typeof token === 'function' ? token() : venueForOwnerToken(token);
+  if (!found) return sendSubmissionResponse(res, 404, { ok: false, error: 'This edit link is not valid any more. Please ask us for a new one at info@okanaganroam.com.' });
+  if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: generic });
+  let body;
+  try { body = await readLimitedJsonBody(req, 8 * 1024); } catch (err) { return sendSubmissionResponse(res, 400, { ok: false, error: generic }); }
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !OWNER_VIDEO_KEYS.has(k))) return sendSubmissionResponse(res, 400, { ok: false, error: generic });
+  if (typeof body.company_website === 'string' && body.company_website.trim()) return sendSubmissionResponse(res, 201, { ok: true });
+  const { venue } = found;
+  // Anything started and never finished (a closed tab, a lost signal) is tidied away after a day.
+  for (const old of db.prepare("SELECT id, object_key FROM owner_videos WHERE status = 'uploading' AND submitted_at < datetime('now', '-1 day')").all()) {
+    try { await r2.remove(old.object_key); } catch (e) { continue; }
+    db.prepare('DELETE FROM owner_videos WHERE id = ?').run(old.id);
+  }
+  if (step === 'done') {
+    const id = Number(body.id);
+    const row = Number.isInteger(id) ? db.prepare("SELECT * FROM owner_videos WHERE id = ? AND venue_id = ? AND status = 'uploading'").get(id, venue.id) : null;
+    if (!row) return sendSubmissionResponse(res, 404, { ok: false, error: 'We could not find that upload. Please try again.' });
+    let info;
+    try { info = await r2.head(row.object_key); } catch (err) {
+      console.error(`[owner-videos] checking #${id} failed: ${String((err && err.message) || err).slice(0, 200)}`);
+      return sendSubmissionResponse(res, 502, { ok: false, error: generic });
+    }
+    if (!info || !info.size) return sendSubmissionResponse(res, 409, { ok: false, error: 'The video did not finish uploading. Please try again.' });
+    if (info.size > OWNER_VIDEO_MAX_BYTES * 1.02) {
+      try { await r2.remove(row.object_key); } catch (e) { /* tidied later */ }
+      db.prepare("UPDATE owner_videos SET status = 'rejected', rejection_reason = 'too large' WHERE id = ?").run(id);
+      return sendSubmissionResponse(res, 400, { ok: false, error: 'That video is too large. Please try a shorter clip.' });
+    }
+    db.prepare("UPDATE owner_videos SET status = 'pending', bytes = ?, uploaded_at = CURRENT_TIMESTAMP WHERE id = ?").run(info.size, id);
+    db.prepare('UPDATE venue_owner_links SET last_used_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(venue.id);
+    const done = db.prepare('SELECT * FROM owner_videos WHERE id = ?').get(id);
+    notifyInBackground(`owner video for venue #${venue.id}`, async () => {
+      try { await venueSubmissionTransport(buildOwnerVideoEmail(venue, done)); } catch (err) {
+        console.error(`[owner-videos] notification for venue #${venue.id} failed: ${String((err && err.message) || err).slice(0, 300)}`);
+      }
+    });
+    return sendSubmissionResponse(res, 201, { ok: true, id });
+  }
+  // step === 'start'
+  if (body.rights !== true) return sendSubmissionResponse(res, 400, { ok: false, errors: { rights: 'Please tick the box to confirm you filmed this or have permission to share it.' } });
+  const credit = typeof body.credit === 'string' ? body.credit.trim().replace(/\s+/g, ' ') : '';
+  if (credit.length < 2 || credit.length > 120 || /[<>]/.test(credit)) return sendSubmissionResponse(res, 400, { ok: false, errors: { credit: 'Please enter your business name, and your Instagram or Facebook name if you would like us to tag it.' } });
+  const contact = typeof token === 'function' ? { email: null } : ownerOptionalEmail(body.contact_email);
+  if (contact.error) return sendSubmissionResponse(res, 400, { ok: false, errors: { contact_email: contact.error } });
+  const size = Number(body.size);
+  if (!Number.isInteger(size) || size < 1) return sendSubmissionResponse(res, 400, { ok: false, errors: { video: 'That file could not be read as a video.' } });
+  if (size > OWNER_VIDEO_MAX_BYTES) return sendSubmissionResponse(res, 400, { ok: false, errors: { video: `That video is bigger than ${Math.round(OWNER_VIDEO_MAX_BYTES / 1048576)} MB. Please film a shorter clip (under a minute is perfect).` } });
+  const type = ownerVideoContentType(body.name, body.type);
+  if (!type) return sendSubmissionResponse(res, 400, { ok: false, errors: { video: 'Please choose a video file (MP4 or MOV, the kind your phone makes).' } });
+  const seconds = Number.isFinite(Number(body.seconds)) ? Math.round(Number(body.seconds)) : null;
+  if (seconds && seconds > OWNER_VIDEO_MAX_SECONDS) return sendSubmissionResponse(res, 400, { ok: false, errors: { video: `That video is longer than ${OWNER_VIDEO_MAX_SECONDS / 60} minutes. Please choose a shorter clip (10 to 60 seconds is perfect).` } });
+  const ipHash = crypto.createHash('sha256').update(`okanagan-roam-owner-video:${ip}`).digest('hex');
+  const pending = db.prepare("SELECT COUNT(*) AS n FROM owner_videos WHERE venue_id = ? AND status = 'pending'").get(venue.id).n;
+  if (pending >= OWNER_VIDEO_PENDING_LIMIT) return sendSubmissionResponse(res, 409, { ok: false, error: `You have ${pending} videos waiting for us. Please wait until we have looked at those.` });
+  const today = db.prepare("SELECT COUNT(*) AS n FROM owner_videos WHERE ip_hash = ? AND submitted_at >= datetime('now', '-1 day')").get(ipHash).n;
+  if (today >= OWNER_VIDEO_DAILY_LIMIT) return sendSubmissionResponse(res, 429, { ok: false, error: 'That is a lot of videos for one day. Please try again tomorrow.' });
+  const key = `videos/${venue.id}/${crypto.randomBytes(12).toString('hex')}.${OWNER_VIDEO_TYPES[type]}`;
+  const clean = (v, n) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, n) || null : null);
+  const id = Number(db.prepare(`INSERT INTO owner_videos (venue_id, object_key, original_name, content_type, bytes, duration_s, credit, contact_name, contact_email, note, rights_confirmed_at, ip_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`).run(venue.id, key, clean(body.name, 200), type, size, seconds, credit, clean(body.contact_name, 100), contact.email, clean(body.note, 500), ipHash).lastInsertRowid);
+  rememberOwnerContact(venue.id, contact.email);
+  return sendSubmissionResponse(res, 201, { ok: true, id, upload: r2.url('PUT', key, { expires: 1800 }), type });
+}
+
+function listOwnerVideos(status = 'pending') {
+  const rows = db.prepare(`SELECT v.*, ven.name AS venue_name FROM owner_videos v JOIN venues ven ON ven.id = v.venue_id
+    WHERE ${status === 'all' ? "v.status IN ('pending', 'approved', 'rejected', 'removed')" : 'v.status = ?'} ORDER BY v.id DESC`);
+  return status === 'all' ? rows.all() : rows.all(status);
+}
+
+function renderAdminVideoCard(v, approved) {
+  const mb = Math.round((v.bytes || 0) / 1048576);
+  return `<article class="rv-card" data-kind="video" data-id="${v.id}">
+      <h3>${adminReviewEsc(v.venue_name)}</h3>
+      <p class="rv-meta">Video #${v.id} · ${mb} MB${v.duration_s ? ` · about ${v.duration_s}s` : ''} · sent ${adminReviewEsc(adminReviewTime(v.uploaded_at || v.submitted_at))} · credit / tag “${adminReviewEsc(v.credit)}”${v.contact_email ? ` · ${adminReviewEsc(v.contact_email)}` : ''}</p>
+      ${v.note ? `<p class="rv-meta">Note: ${adminReviewEsc(v.note)}</p>` : ''}
+      <p><a class="rv-btn" href="/admin/review/video/${v.id}/watch" target="_blank" rel="noopener">Watch</a> <a class="rv-btn" href="/admin/review/video/${v.id}/watch?download=1">Download</a></p>
+      <p class="rv-meta">The owner confirmed they filmed it or have permission, and that we may edit it and share it on our website and social media, crediting and tagging the business.</p>
+      ${adminReviewActions('video', v.id, { remove: approved, approveLabel: 'Good to use', reasonPlaceholder: approved ? 'Reason (optional)' : 'Reason if rejecting (the file is deleted)' })}
+    </article>`;
+}
+
+// Approve / reject / remove. Reject and remove delete the file from the bucket; nobody is emailed.
+async function adminVideoAction(id, action, body) {
+  const row = db.prepare('SELECT * FROM owner_videos WHERE id = ?').get(id);
+  if (!row) return { status: 404, body: { error: 'That video was not found.' } };
+  if (action === 'approve') {
+    if (row.status !== 'pending') return { status: 409, body: { error: 'This video is not waiting for review.' } };
+    db.prepare("UPDATE owner_videos SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ? WHERE id = ?").run(ADMIN_REVIEWER, id);
+    return { status: 200, body: { ok: true, emailed: 'not_told' } };
+  }
+  if (action === 'reject' || action === 'remove') {
+    if (!['pending', 'approved'].includes(row.status)) return { status: 409, body: { error: 'This video was already dealt with.' } };
+    try { await r2.remove(row.object_key); } catch (err) { return { status: 502, body: { error: 'The video could not be deleted from storage. Please try again.' } }; }
+    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
+    db.prepare('UPDATE owner_videos SET status = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, rejection_reason = ? WHERE id = ?').run(action === 'reject' ? 'rejected' : 'removed', ADMIN_REVIEWER, reason || null, id);
+    return { status: 200, body: { ok: true, emailed: 'not_told' } };
+  }
+  return { status: 400, body: { error: 'Unknown action.' } };
+}
+
 // ---------- Visitor photos & tips (2026-10-17) ----------
 //
 // drafts/visitor-photos-tips-plan.md. A visitor shares a short tip and/or up
@@ -50944,6 +51089,7 @@ const ADMIN_REVIEW_ERRORS = {
 // One decision from the review page -> { status, body }.
 async function adminReviewAction(kind, id, action, body) {
   if (action === 'dismiss' && kind !== 'photo') return { status: 400, body: { error: 'Unknown action.' } };
+  if (kind === 'video') return adminVideoAction(id, action, body);
   if (kind === 'claim') return adminClaimAction(id, action, body, ADMIN_REVIEWER);
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 300) : '';
   let r;
@@ -51358,6 +51504,8 @@ function renderAdminOwnerStats(st) {
 function renderAdminReviewPage() {
   const changes = listOwnerChanges('pending');
   const photos = listOwnerPhotos('pending');
+  const videos = ownerVideoEnabled() ? listOwnerVideos('pending') : [];
+  const videosOk = ownerVideoEnabled() ? listOwnerVideos('approved') : [];
   const live = recentLiveOwnerPhotos();
   const events = listEventSubmissions('pending');
   const eventChanges = listOwnerEventChanges('pending');
@@ -51374,7 +51522,7 @@ function renderAdminReviewPage() {
   const staleSpecials = staleVenueSpecials();
   const staleNights = staleVenueWeeklyNights();
   const nightsMusic = weeklyNightsLiveMusicWithoutBadge();
-  const total = changes.length + photos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
+  const total = changes.length + photos.length + videos.length + events.length + eventChanges.length + venues.length + menus.length + visitor.length + visitorReported.length + claims.length;
   const section = (key, title, items, render, empty) => `<section class="rv-section" id="${key}"><h2>${title} <span class="rv-meta">(${items.length})</span></h2>
     ${items.length ? items.map(render).join('') : `<p class="rv-empty">${empty}</p>`}</section>`;
   const mail = ownerDirectEmail()
@@ -51385,9 +51533,11 @@ function renderAdminReviewPage() {
     <h1>${total ? `${total} waiting for you` : 'All caught up'}</h1>
     ${mail}
     ${renderAdminOwnerStats(ownerSignupStats())}
-    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a><a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a>${staleDeals.length ? `<a href="#staledeals">Stale happy hour deals (${staleDeals.length})</a>` : ''}</nav>
+    <nav class="rv-tabs"><a href="#updates">Owner updates (${changes.length})</a><a href="#photos">Photos (${photos.length})</a>${ownerVideoEnabled() ? `<a href="#videos">Videos (${videos.length})</a>` : ''}<a href="#events">Events (${events.length})</a>${eventChanges.length ? `<a href="#eventchanges">Event changes (${eventChanges.length})</a>` : ''}<a href="#venues">New venues (${venues.length})</a><a href="#claims">Claims (${claims.length})</a><a href="#menus">Menus (${menus.length})</a><a href="#visitor">Visitor photos &amp; tips (${visitor.length})</a>${visitorReported.length ? `<a href="#visitorreported">Reported (${visitorReported.length})</a>` : ''}<a href="#live">Live photos (${live.length})</a><a href="#liveupdates">Live owner changes (${instant.length})</a>${staleDeals.length ? `<a href="#staledeals">Stale happy hour deals (${staleDeals.length})</a>` : ''}</nav>
     ${section('updates', 'Owner updates', changes, renderAdminChangeCard, 'No updates waiting.')}
     ${section('photos', 'Photos to approve', photos, (p) => renderAdminPhotoCard(p, false), 'No photos waiting.')}
+    ${ownerVideoEnabled() ? section('videos', 'Videos to review', videos, (v) => renderAdminVideoCard(v, false), 'No videos waiting.') : ''}
+    ${videosOk.length ? section('videosok', 'Videos approved for reels (delete once posted)', videosOk, (v) => renderAdminVideoCard(v, true), '') : ''}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
     ${eventChanges.length ? section('eventchanges', 'Changes to live events', eventChanges, renderAdminEventChangeCard, '') : ''}
     ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
@@ -52378,6 +52528,7 @@ ${renderGolfHeaderHtml()}
           ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
           ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
+          ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
           ${tile('more', '&#11088;', L('Features, prices and deals', 'Caractéristiques, prix et spéciaux'), L('Dog friendly, patio, happy hour…', 'Chiens admis, terrasse, happy hour…'))}
@@ -52571,6 +52722,35 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="ofSubmit">${L('Upload photos', 'Téléverser les photos')}</button>
     </form>
     </details>
+    ${ownerVideoEnabled() ? `<details class="op-fold op-sec" id="video" data-task="video" open>
+    <summary><h2 class="lyv-section-label">${L('Share a video', 'Partager une vidéo')}</h2></summary>
+    <p class="op-hint">${L('Film 10 to 60 seconds of your business: your space, a dish or drink being made, your team, or the view. Any phone video is fine, and it can be held up or sideways. We&rsquo;ll edit it into a short reel and share it on our Instagram and Facebook, naming and tagging your business.', 'Filmez de 10 à 60 secondes de votre entreprise : votre espace, un plat ou une boisson en préparation, votre équipe ou la vue. N’importe quelle vidéo de téléphone convient, à la verticale ou à l’horizontale. Nous la monterons en un court reel et le partagerons sur notre Instagram et notre Facebook, en nommant et en identifiant votre entreprise.')}</p>
+    <form class="venue-form" id="ovForm" novalidate>
+      <div class="form-row full"><div class="form-field">
+        <label for="ovFile">${L('Choose a video', 'Choisir une vidéo')}</label>
+        <input type="file" id="ovFile" accept="video/mp4,video/quicktime,video/webm,video/*">
+        <p class="op-hint">${L('Up to 150 MB. If it is bigger, film a shorter clip.', 'Jusqu’à 150 Mo. Si elle est plus grosse, filmez un clip plus court.')}</p>
+        <p class="lyv-error" id="ovFileError" hidden></p>
+      </div></div>
+      <div class="form-row">
+        <div class="form-field"><label for="ovCredit">${L('Business name, and Instagram or Facebook name to tag', 'Nom de l’entreprise, et nom Instagram ou Facebook à identifier')}</label><input type="text" id="ovCredit" maxlength="120" value="${escapeHtml(venue.name)}"><p class="lyv-error" id="ovCreditError" hidden></p></div>
+        ${found.account ? '' : `<div class="form-field"><label for="ovEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="ovEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="ovEmailError" hidden></p></div>`}
+      </div>
+      <div class="form-row full"><div class="form-field">
+        <label for="ovNote">${L('Anything we should know? (optional)', 'Quelque chose à nous dire? (facultatif)')}</label>
+        <textarea id="ovNote" rows="2" maxlength="500" placeholder="${L('For example: the dish is our new fall special.', 'Par exemple : ce plat est notre nouveau spécial d’automne.')}"></textarea>
+      </div></div>
+      <div class="form-row full"><div class="form-field">
+        <label class="op-closed" style="width:auto;align-items:flex-start"><input type="checkbox" id="ovRights" style="margin-top:4px"> <span>${L('I filmed this video (or have permission to share it), and Okanagan Roam may edit it and share it on its website and social media, crediting and tagging my business.', 'J’ai filmé cette vidéo (ou j’ai la permission de la partager), et Okanagan Roam peut la monter et la partager sur son site Web et ses médias sociaux, en citant et en identifiant mon entreprise.')}</span></label>
+        <p class="lyv-error" id="ovRightsError" hidden></p>
+      </div></div>
+      <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="ovHp" tabindex="-1" autocomplete="off"></label></div>
+      <progress id="ovBar" max="100" value="0" hidden style="width:100%"></progress>
+      <p class="op-hint" id="ovProgress" aria-live="polite"></p>
+      <p class="lyv-error" id="ovFormError" hidden></p>
+      <button type="submit" class="venue-form-submit" id="ovSubmit">${L('Upload video', 'Téléverser la vidéo')}</button>
+    </form>
+    </details>` : ''}
     <details class="op-fold op-sec" id="events" data-task="events">
     <summary><h2 class="lyv-section-label" id="oeHead">${L('Add an event', 'Ajouter un événement')}</h2> <span class="op-fold-hint">${L('Live music, tastings, markets, classes or specials on What&rsquo;s On', 'Musique en direct, dégustations, marchés, cours ou spéciaux dans À l’affiche')}</span></summary>
     <p class="op-hint">${L('Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.', 'Musique en direct, dégustations, marchés, cours, spéciaux. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.')}</p>
@@ -52695,7 +52875,7 @@ ${ownerFooterHtml(fr)}
   }
   // Simple view (2026-11-04): start from a short list of tasks; picking one shows only that part of the page.
   // Old links (#photos, #hours, an email that points at a section) and "Show me the full page" open the whole page.
-  var TASK_OF = { hours: 'hours', photos: 'photos', events: 'events', badges: 'more', price: 'more', happy: 'more', specials: 'more', 'weekly-nights': 'more', opLinksBox: 'contact', opDescriptionLabel: 'contact' };
+  var TASK_OF = { hours: 'hours', photos: 'photos', video: 'video', events: 'events', badges: 'more', price: 'more', happy: 'more', specials: 'more', 'weekly-nights': 'more', opLinksBox: 'contact', opDescriptionLabel: 'contact' };
   function setTask(t){
     document.body.setAttribute('data-op-task', t);
     var fm = document.getElementById('opForm'), dn = document.getElementById('opDone');
@@ -53308,6 +53488,77 @@ ${ownerFooterHtml(fr)}
       if (sent) { document.getElementById('ofFiles').value = ''; rememberEmail(emailVal('ofEmail')); shareEmail(emailVal('ofEmail')); refreshPhotos(); }
     }).catch(function(){ btn.disabled = false; show('ofFormError', T.upNet); });
   });
+  // Share a video (2026-11-05): ask the server for a permission slip, send the file straight to storage, then confirm.
+  var vf = document.getElementById('ovForm');
+  if (vf) {
+    var VT = {
+      pick: ${JSON.stringify(L('Please choose a video.', 'Veuillez choisir une vidéo.'))},
+      big: ${JSON.stringify(L('That video is bigger than 150 MB. Please film a shorter clip (under a minute is perfect).', 'Cette vidéo dépasse 150 Mo. Veuillez filmer un clip plus court (moins d’une minute, c’est parfait).'))},
+      long: ${JSON.stringify(L('That video is longer than 2 minutes. Please choose a shorter clip (10 to 60 seconds is perfect).', 'Cette vidéo dure plus de 2 minutes. Veuillez choisir un clip plus court (de 10 à 60 secondes, c’est parfait).'))},
+      rights: ${JSON.stringify(L('Please tick the box to confirm you filmed this or have permission to share it.', 'Veuillez cocher la case pour confirmer que vous avez filmé cette vidéo ou que vous avez la permission de la partager.'))},
+      sending: ${JSON.stringify(L('Sending your video… please keep this page open.', 'Envoi de votre vidéo… veuillez garder cette page ouverte.'))},
+      pct: ${JSON.stringify(L('Sending your video… {n}% (please keep this page open)', 'Envoi de votre vidéo… {n} % (veuillez garder cette page ouverte)'))},
+      done: ${JSON.stringify(L('Thank you! We have your video. We will edit it into a reel and tag your business when it is posted.', 'Merci! Nous avons votre vidéo. Nous la monterons en reel et identifierons votre entreprise lors de la publication.'))},
+      net: ${JSON.stringify(L('The upload was interrupted. Please check your connection and try again. If it keeps failing, email the video to info@okanaganroam.com.', 'L’envoi a été interrompu. Vérifiez votre connexion et réessayez. Si cela continue, envoyez la vidéo à info@okanaganroam.com.'))},
+      wrong: ${JSON.stringify(L('Sorry, something went wrong. Please try again, or email the video to info@okanaganroam.com.', 'Désolé, une erreur s’est produite. Veuillez réessayer ou envoyer la vidéo à info@okanaganroam.com.'))}
+    };
+    var vPost = function(step, payload){
+      return fetch(location.pathname + '/video/' + step, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function(r){ return r.json(); });
+    };
+    var vLength = function(file){
+      return new Promise(function(resolve){
+        try {
+          var v = document.createElement('video'), u = URL.createObjectURL(file), done = false;
+          var finish = function(n){ if (done) return; done = true; URL.revokeObjectURL(u); resolve(n); };
+          v.preload = 'metadata'; v.onloadedmetadata = function(){ finish(isFinite(v.duration) ? Math.round(v.duration) : 0); };
+          v.onerror = function(){ finish(0); }; setTimeout(function(){ finish(0); }, 4000); v.src = u;
+        } catch (e) { resolve(0); }
+      });
+    };
+    vf.addEventListener('submit', function(e){
+      e.preventDefault();
+      ['ovFileError', 'ovCreditError', 'ovEmailError', 'ovRightsError', 'ovFormError'].forEach(function(id){ show(id, ''); });
+      var file = (document.getElementById('ovFile').files || [])[0];
+      if (!file) return show('ovFileError', VT.pick);
+      if (file.size > 150 * 1024 * 1024) return show('ovFileError', VT.big);
+      if (!document.getElementById('ovRights').checked) return show('ovRightsError', VT.rights);
+      var btn = document.getElementById('ovSubmit'), bar = document.getElementById('ovBar'), prog = document.getElementById('ovProgress');
+      var emailEl = document.getElementById('ovEmail');
+      btn.disabled = true; prog.textContent = VT.sending;
+      var fail = function(msg){ btn.disabled = false; bar.hidden = true; prog.textContent = ''; show('ovFormError', msg); };
+      vLength(file).then(function(secs){
+        if (secs > 120) return fail(VT.long);
+        return vPost('start', { name: file.name, size: file.size, type: file.type, seconds: secs, credit: document.getElementById('ovCredit').value, rights: true,
+          contact_email: emailEl ? emailEl.value : '', note: document.getElementById('ovNote').value, company_website: document.getElementById('ovHp').value })
+        .then(function(j){
+          if (!j || !j.ok) {
+            var errs = (j && j.errors) || {};
+            if (errs.credit) show('ovCreditError', errs.credit);
+            if (errs.contact_email) show('ovEmailError', errs.contact_email);
+            if (errs.rights) show('ovRightsError', errs.rights);
+            return fail(errs.video || (j && j.error) || (errs.credit || errs.contact_email || errs.rights ? '' : VT.wrong));
+          }
+          bar.hidden = false; bar.value = 0;
+          return new Promise(function(resolve){
+            var x = new XMLHttpRequest();
+            x.open('PUT', j.upload);
+            x.setRequestHeader('Content-Type', j.type || file.type || 'video/mp4');
+            x.upload.onprogress = function(ev){ if (ev.lengthComputable) { var n = Math.round(ev.loaded * 100 / ev.total); bar.value = n; prog.textContent = VT.pct.replace('{n}', n); } };
+            x.onload = function(){ resolve(x.status >= 200 && x.status < 300); };
+            x.onerror = function(){ resolve(false); }; x.ontimeout = function(){ resolve(false); };
+            x.send(file);
+          }).then(function(ok){
+            if (!ok) return fail(VT.net);
+            return vPost('done', { id: j.id }).then(function(d){
+              if (!d || !d.ok) return fail((d && d.error) || VT.wrong);
+              btn.disabled = false; bar.hidden = true; prog.textContent = VT.done; document.getElementById('ovFile').value = '';
+            });
+          });
+        });
+      }).catch(function(){ fail(VT.net); });
+    });
+  }
   // "create a login" in the thank-you note opens the login box.
   Array.prototype.forEach.call(document.querySelectorAll('a[href="#opLogin"]'), function(a){
     a.addEventListener('click', function(e){
@@ -56692,13 +56943,14 @@ const server = http.createServer(async (req, res) => {
           base: ownerPath(`/owner/account/venue/${id}/menu`, res.ownerLang), back: ownerPath(`/owner/account/venue/${id}`, res.ownerLang),
         });
       }
-      const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos))?$/.exec(pathname);
+      const vm = /^\/owner\/account\/venue\/(\d+)(?:\/(changes|events|photos|video\/start|video\/done))?$/.exec(pathname);
       if (vm) {
         const resolve = () => venueForOwnerAccount(account, Number(vm[1]));
         if (vm[2] && method === 'POST') {
           if (!account) return sendSubmissionResponse(res, 401, { ok: false, error: 'Please sign in again at okanaganroam.com/owner/login.' });
           if (vm[2] === 'changes') return await handleOwnerChangeSubmission(req, res, resolve);
           if (vm[2] === 'events') return await handleOwnerEventSubmission(req, res, resolve);
+          if (vm[2].startsWith('video/')) return await handleOwnerVideo(req, res, resolve, vm[2].slice(6));
           return await handleOwnerPhotoUpload(req, res, resolve);
         }
         if (!vm[2] && method === 'GET') {
@@ -56723,6 +56975,8 @@ const server = http.createServer(async (req, res) => {
       if (eventsMatch && method === 'POST') return await handleOwnerEventSubmission(req, res, eventsMatch[1]);
       const photosMatch = /^([A-Za-z0-9_-]+)\/photos$/.exec(rest);
       if (photosMatch && method === 'POST') return await handleOwnerPhotoUpload(req, res, photosMatch[1]);
+      const videoMatch = /^([A-Za-z0-9_-]+)\/video\/(start|done)$/.exec(rest);
+      if (videoMatch && method === 'POST') return await handleOwnerVideo(req, res, videoMatch[1], videoMatch[2]);
       const menuMatch = /^([A-Za-z0-9_-]+)\/menu(\/[a-z0-9/]*)?$/.exec(rest);
       if (menuMatch) {
         return await handleMenuRoute(req, res, method, menuMatch[2] || '', {
@@ -56841,7 +57095,16 @@ const server = http.createServer(async (req, res) => {
       }
     }
     {
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
+      const w = /^\/admin\/review\/video\/(\d+)\/watch$/.exec(pathname);
+      if (w && method === 'GET') {
+        if (!adminSessionValid(req)) { res.writeHead(401, { 'Content-Type': 'text/plain' }); return res.end('Please sign in at /admin/review first.'); }
+        const v = db.prepare("SELECT object_key, status, original_name FROM owner_videos WHERE id = ? AND status IN ('pending', 'approved')").get(Number(w[1]));
+        if (!v || !ownerVideoEnabled()) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+        const query3 = query.download ? { 'response-content-disposition': `attachment; filename="${String(v.original_name || 'video').replace(/[^A-Za-z0-9._-]+/g, '_')}"` } : {};
+        res.writeHead(302, { Location: r2.url('GET', v.object_key, { expires: 3600, query: query3 }), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+        return res.end();
+      }
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim|video)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });

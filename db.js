@@ -906,6 +906,35 @@ CREATE TABLE IF NOT EXISTS owner_photos (
 CREATE INDEX IF NOT EXISTS idx_owner_photos_venue ON owner_photos (venue_id, status);
 `);
 
+// Owner videos (2026-11-05): short clips from owners that Dayton edits into social reels. The file lives in Cloudflare R2
+// (object_key), uploaded straight from the owner's browser; this row is the paperwork. status: uploading (permission
+// given, file not confirmed yet) -> pending (file is in the bucket, waiting for Dayton) -> approved (OK to use) or
+// rejected / removed (file deleted from the bucket).
+db.exec(`
+CREATE TABLE IF NOT EXISTS owner_videos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  venue_id INTEGER NOT NULL REFERENCES venues(id),
+  object_key TEXT NOT NULL UNIQUE,
+  original_name TEXT,
+  content_type TEXT,
+  bytes INTEGER,
+  duration_s INTEGER,
+  credit TEXT NOT NULL,
+  contact_name TEXT,
+  contact_email TEXT,
+  note TEXT,
+  rights_confirmed_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'uploading' CHECK (status IN ('uploading', 'pending', 'approved', 'rejected', 'removed')),
+  ip_hash TEXT,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  uploaded_at TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  rejection_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_owner_videos_venue ON owner_videos (venue_id, status);
+`);
+
 // Menus (2026-10-17): an owner photographs their printed menu (or sends a PDF), the server has it read into text,
 // the owner checks it and publishes. One row per attempt; the published one is shown on the venue's /menu page.
 // status: draft (pages being added) -> reading -> ready (owner checking) -> published, or pending (link-only owner,
