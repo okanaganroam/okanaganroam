@@ -41,3 +41,14 @@ test('route preview measures the resized map before fitting its bounds',()=>{
  const c={map:{stop(){calls.push('stop')},invalidateSize(o){assert.equal(o.pan,false);calls.push('measure')}},fitTo(bounds,zoom){assert.equal(bounds,'route-bounds');assert.equal(zoom,17);calls.push('fit')}};
  vm.createContext(c);vm.runInContext(source.slice(from,to)+';fitRoutePreview({line:{getBounds:()=>"route-bounds"}})',c);assert.deepEqual(calls,['stop','measure','fit']);
 });
+test('town-based browsing dismisses location help without dismissing route-origin help',()=>{
+ const from=source.indexOf('  function dismissTownLocationHelp(){');assert.ok(from>=0);const to=source.indexOf('\n  function ',from+3);const fn=source.slice(from,to);
+ const help={hidden:false};const c={town:'kelowna',pendingRoute:null,$:()=>help,cancelPendingLocation(){c.cancelled=true},floatGap(){c.resized=true}};vm.createContext(c);vm.runInContext(fn+';result=dismissTownLocationHelp()',c);
+ assert.equal(help.hidden,true);assert.equal(c.result,true);assert.ok(c.cancelled&&c.resized);
+ help.hidden=false;c.pendingRoute={name:'Cafe'};c.cancelled=false;vm.runInContext('result=dismissTownLocationHelp()',c);assert.equal(help.hidden,false);assert.equal(c.result,false);assert.equal(c.cancelled,false);
+ c.pendingRoute=null;c.town='';vm.runInContext('result=dismissTownLocationHelp()',c);assert.equal(help.hidden,false);assert.equal(c.result,false);
+});
+test('a delayed location error cannot reopen help once browsing has a town',()=>{
+ const from=source.indexOf('  function showLocationHelp(text){');const to=source.indexOf('\n  function ',from+3);
+ const c={dismissTownLocationHelp:()=>true,$(){throw new Error('Should not reopen town help')}};vm.createContext(c);vm.runInContext(source.slice(from,to)+';showLocationHelp("blocked")',c);
+});
