@@ -33,6 +33,23 @@ function siteColumn(s, days) {
   const d = s.data;
   const parts = [`<section class="col"><h2>${esc(s.name)} <small>last ${days} days</small></h2>`];
 
+
+  if (d.traffic) {
+    const g = d.traffic;
+    if (g.error) parts.push(`<div class="card"><h3>Traffic (Google Analytics)</h3><p class="warn">${esc(g.error)}</p></div>`);
+    else {
+      const mins = Math.floor(g.avg_session_seconds / 60), secs = g.avg_session_seconds % 60;
+      parts.push(`<div class="card"><h3>Traffic (Google Analytics)</h3>
+      <div class="stats">${stat(g.users, 'visitors')}${stat(g.sessions, 'visits')}${stat(g.views, 'page views')}${stat(g.new_users, 'new visitors')}${stat(g.engagement_rate, 'engaged visits %')}<div class="stat"><div class="v">${mins}:${String(secs).padStart(2, '0')}</div><div class="l">average visit</div><div class="n">minutes:seconds</div></div></div>
+      ${bars(g.users_per_day, 'Visitors per day')}
+      <h4>Where visits come from</h4>${table(['Channel', 'Visits'], g.channels.map((c) => [esc(c.name), num(c.sessions)]))}
+      <h4>Devices</h4>${table(['Device', 'Visits'], g.devices.map((c) => [esc(c.name), num(c.sessions)]))}
+      <h4>Top pages</h4>${table(['Page', 'Views'], g.top_pages.map((c) => [esc(c.path), num(c.views)]))}</div>`);
+    }
+  } else {
+    parts.push('<div class="card"><h3>Traffic (Google Analytics)</h3><p class="empty">Not connected yet on this site.</p></div>');
+  }
+
   if (d.demand) {
     const m = d.demand;
     parts.push(`<div class="card"><h3>Build My Trip demand</h3>
