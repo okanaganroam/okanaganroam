@@ -44216,7 +44216,7 @@ const VC_TEXT = {
   tip: ['Tip (optional)', 'Conseil (facultatif)'],
   tipHint: ['What should other visitors know? Best dish, best time to go, parking…', 'Que devraient savoir les autres visiteurs? Meilleur plat, meilleur moment pour y aller, stationnement…'],
   photos: ['Photos (optional, up to 3)', 'Photos (facultatif, jusqu’à 3)'],
-  photosHint: ['JPEG, PNG, WebP or HEIC, at least 800 pixels wide.', 'JPEG, PNG, WebP ou HEIC, d’au moins 800 pixels de large.'],
+  photosHint: ['JPEG, PNG or WebP, at least 800 pixels wide.', 'JPEG, PNG ou WebP, d’au moins 800 pixels de large.'],
   rights: ['If adding photos: I took these photos (or have the rights to them) and Okanagan Roam may show them on this listing and its social posts.', 'Si vous ajoutez des photos : j’ai pris ces photos (ou j’en ai les droits) et Okanagan Roam peut les montrer sur cette fiche et dans ses publications sur les réseaux sociaux.'],
   honesty: ['My tip is my own honest experience. I don’t work for or own this business.', 'Mon conseil reflète honnêtement ma propre expérience. Je ne travaille pas pour cette entreprise et je n’en suis pas propriétaire.'],
   hp: ['Leave this empty', 'Laissez ce champ vide'],
@@ -44456,7 +44456,7 @@ function visitorSectionHtml(venue, lang) {
         <div class="vc-field"><label for="vcEmail">${t('email')}</label><input type="email" id="vcEmail" maxlength="254" autocomplete="email" inputmode="email" aria-describedby="vcEmailHint"><p class="vc-hint" id="vcEmailHint">${t('emailHint')}</p><p class="vc-error" id="vcEmailError" hidden></p></div>
       </div>
       <div class="vc-field"><label for="vcTip">${t('tip')}</label><textarea id="vcTip" rows="4" maxlength="${VISITOR_TIP_MAX}" placeholder="${t('tipHint')}" aria-describedby="vcTipCount"></textarea><p class="vc-hint" id="vcTipCount" aria-live="polite">${t('chars', { n: VISITOR_TIP_MAX })}</p><p class="vc-error" id="vcTipError" hidden></p></div>
-      <div class="vc-field"><label for="vcPhotos">${t('photos')}</label><input type="file" id="vcPhotos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple aria-describedby="vcPhotosHint"><p class="vc-hint" id="vcPhotosHint">${t('photosHint')}</p><p class="vc-error" id="vcPhotosError" hidden></p></div>
+      <div class="vc-field"><label for="vcPhotos">${t('photos')}</label><input type="file" id="vcPhotos" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="vcPhotosHint"><p class="vc-hint" id="vcPhotosHint">${t('photosHint')}</p><p class="vc-error" id="vcPhotosError" hidden></p></div>
       <div class="vc-field"><label class="vc-check"><input type="checkbox" id="vcRights"> <span>${t('rights')}</span></label><p class="vc-error" id="vcRightsError" hidden></p></div>
       <div class="vc-field"><label class="vc-check"><input type="checkbox" id="vcHonesty"> <span>${t('honesty')}</span></label><p class="vc-error" id="vcHonestyError" hidden></p></div>
       <div class="vc-hp" aria-hidden="true"><label>${t('hp')} <input type="text" id="vcHp" tabindex="-1" autocomplete="off"></label></div>
@@ -52184,8 +52184,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     rights: L('Please confirm you took these photos or have permission to share them.', 'Confirmez que vous avez pris ces photos ou que vous avez la permission de les partager.'),
     uploading: L('Uploading photo {i} of {n}...', 'Téléversement de la photo {i} sur {n}…'),
     couldNot: L('could not upload', 'téléversement impossible'),
-    tooSmall: L('too small (needs to be at least 800 pixels wide)', 'trop petite (au moins 800 pixels de large)'),
+    tooSmall: L('is too small ({n} pixels on its longest side; it needs at least 800). Please choose a larger photo.', 'est trop petite ({n} pixels sur son plus grand côté; il en faut au moins 800). Choisissez une photo plus grande.'),
     unreadable: L('could not be read. Try a JPG or PNG.', 'illisible. Essayez un JPG ou un PNG.'),
+    heic: L('is a HEIC photo, which this browser can\u2019t open. Please choose a JPG or PNG instead (on an iPhone, open this page in Safari, or set Settings \u2192 Camera \u2192 Formats \u2192 Most Compatible).', 'est une photo HEIC, que ce navigateur ne peut pas ouvrir. Choisissez plut\u00f4t un JPG ou un PNG (sur iPhone, ouvrez cette page dans Safari, ou r\u00e9glez R\u00e9glages \u2192 Appareil photo \u2192 Formats \u2192 Le plus compatible).'),
     upLive1: L('1 photo uploaded and live on your page. Thanks!', '1 photo téléversée et en ligne sur votre page. Merci!'),
     upLiveN: L('{n} photos uploaded and live on your page. Thanks!', '{n} photos téléversées et en ligne sur votre page. Merci!'),
     upRev1: L('1 photo uploaded. Thanks! We\u2019ll review it, usually within a day', '1 photo téléversée. Merci! Nous la vérifierons, en général d’ici un jour'),
@@ -52508,7 +52509,7 @@ ${renderGolfHeaderHtml()}
     <form class="venue-form" id="ofForm" novalidate>
       <div class="form-row full"><div class="form-field">
         <label for="ofFiles">${L('Choose photos', 'Choisir des photos')}</label>
-        <input type="file" id="ofFiles" accept="image/jpeg,image/png,image/webp,image/heic" multiple>
+        <input type="file" id="ofFiles" accept="image/jpeg,image/png,image/webp" multiple>
         <p class="lyv-error" id="ofFilesError" hidden></p>
       </div></div>
       <div class="form-row">
@@ -53165,7 +53166,7 @@ ${ownerFooterHtml(fr)}
       img.onload = function(){
         var w = img.naturalWidth, h = img.naturalHeight, long = Math.max(w, h);
         URL.revokeObjectURL(url);
-        if (long < 800) return reject(new Error('small'));
+        if (long < 800) { var se = new Error('small'); se.long = long; return reject(se); }
         var scale = Math.min(1, 1600 / long);
         var c = document.createElement('canvas');
         c.width = Math.round(w * scale); c.height = Math.round(h * scale);
@@ -53185,9 +53186,17 @@ ${ownerFooterHtml(fr)}
         });
         resolve(out);
       };
-      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('read')); };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error(/hei[cf]/i.test(file.type || '') || /\.hei[cf]$/i.test(file.name || '') ? 'heic' : 'read')); };
       img.src = url;
     });
+  }
+  // One quiet retry when the connection drops or the server is briefly unavailable (a weak phone signal, a deploy).
+  function sendPhoto(payload){
+    var attempt = function(){
+      return fetch(location.pathname + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function(r){ if (r.status === 502 || r.status === 503 || r.status === 504) throw new Error('busy'); return r.json(); });
+    };
+    return attempt().catch(function(){ return new Promise(function(ok){ setTimeout(ok, 1500); }).then(attempt); });
   }
   pf.addEventListener('submit', function(e){
     e.preventDefault();
@@ -53205,17 +53214,15 @@ ${ownerFooterHtml(fr)}
       chain = chain.then(function(){
         progress.textContent = T.uploading.replace('{i}', i + 1).replace('{n}', files.length);
         return resize(file).then(function(made){
-          return fetch(location.pathname + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ image: made.image, image_w160: made.image_w160, image_w240: made.image_w240, image_w480: made.image_w480, image_w960: made.image_w960, image_w1200: made.image_w1200, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted }) })
-            .then(function(r){ return r.json(); })
+          return sendPhoto({ image: made.image, image_w160: made.image_w160, image_w240: made.image_w240, image_w480: made.image_w480, image_w960: made.image_w960, image_w1200: made.image_w1200, credit: credit, contact_email: emailVal('ofEmail'), rights: true, notify: i === files.length - 1, company_website: '', started_at: pfStarted })
             .then(function(j){
               if (j && j.ok) { sent++; if (j.live) liveCount++; return; }
               var errs = (j && j.errors) || {};
               if (errs.credit) show('ofCreditError', errs.credit);
               if (errs.contact_email) show('ofEmailError', errs.contact_email);
               problems.push(file.name + ': ' + (errs.image || errs.credit || (j && j.error) || T.couldNot));
-            });
-        }, function(err){ problems.push(file.name + ': ' + (err.message === 'small' ? T.tooSmall : T.unreadable)); });
+            }, function(){ problems.push(file.name + ': ' + T.upNet); });
+        }, function(err){ problems.push(file.name + ': ' + (err.message === 'small' ? T.tooSmall.replace('{n}', err.long) : err.message === 'heic' ? T.heic : T.unreadable)); });
       });
     });
     chain.then(function(){
