@@ -1,4 +1,4 @@
-const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT } = require('./roam-now-layout.js');
+const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT, roamOpenByDefault } = require('./roam-now-layout.js');
 const http = require('http');
 const url = require('url');
 const fs = require('fs');
@@ -20230,9 +20230,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     nearMe: 'Near me', recenter: 'Centre on me', finding: 'Finding you…', near: 'Showing what’s near you.', stopped: 'Location turned off.',
     sheetMore: 'Show more of the list', sheetLess: 'Show less of the list',
     pinBtn: 'Drop a pin', pinRemove: 'Remove the pin', pinRemoved: 'Pin removed.', stopLocTxt: 'Turn off my location',
-    tapToPin: 'Tap the map where you want to look around.', pinned: 'Showing what’s around your pin. Drag it to move it.',
+    tapToPin: 'Tap an area on the map to find places nearby.', pinned: 'Showing what’s around your pin. Drag it to move it.',
     pinOutside: 'Drop the pin inside the Okanagan.', outside: 'You’re outside the Okanagan, so Near me can’t help yet. Tap the map to drop a pin where you’ll be.',
-    denied: 'Location is blocked. Choose a town or a starting point on the map, or enable location in your browser settings.',
+    denied: 'Location is blocked in your browser. Enable location in your browser settings, or choose on the map instead.',
     failed: 'Couldn’t find your location right now. Try again somewhere with a clear signal, or drop a pin on the map.', unsupported: 'This browser can’t share your location.',
     loading: 'Loading the map…', loadFailed: 'The map couldn’t load. Reload the page to try again.',
     placesNear: function(n, r){ return n + (n === 1 ? ' place' : ' places') + (r ? ' within ' + r + ' km' : ' near you'); },
@@ -20274,7 +20274,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // be tapped. From zoom 17 only pins within a pixel of each other still group; tapping that group fans them out.
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 17 ? 1 : z >= 15 ? 18 : z >= 13 ? 32 : 48; }, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
-  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = false, town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', termTyping = false, dealQuery = '', dealWordsFor = null, dealWords = [], radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
+  ${roamOpenByDefault.toString()}
+  var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = roamOpenByDefault(location.search,location.hash), town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', termTyping = false, dealQuery = '', dealWordsFor = null, dealWords = [], radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
   var kindChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-kind]')), featChips = Array.prototype.slice.call(document.querySelectorAll('[data-pm-feat]')), openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-open]')), topBtns = Array.prototype.slice.call(document.querySelectorAll('[data-pm-top]')), tagHolder = document.getElementById('pmTagChips'), activeEl = $('pmActive'), searchEl = $('pmSearch');
@@ -20285,7 +20286,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var returnContext=null;
   try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
   document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
-  function showLocationHelp(text){$('rnLocationHelp').hidden=false;$('rnLocationMessage').textContent=(pendingRoute?T.to+' '+pendingRoute.name+'. ':'')+text;$('rnChooseTown').hidden=!!pendingRoute;$('rnChoosePin').textContent=pendingRoute?(FR?'Choisir le départ sur la carte':'Choose a start on map'):(FR?'Choisir sur la carte':'Choose on map');floatGap();}
+  function showLocationHelp(text){$('rnLocationHelp').hidden=false;$('rnLocationMessage').textContent=(pendingRoute?T.to+' '+pendingRoute.name+'. ':'')+text+(pendingRoute?(FR?' Activez la position pour le guidage en direct, ou choisissez le départ sur la carte pour un aperçu.':' Enable location for live guidance, or choose a start on the map for a route preview.'):'');$('rnChooseTown').hidden=!!pendingRoute;$('rnChoosePin').textContent=pendingRoute?(FR?'Choisir le départ sur la carte':'Choose a start on map'):(FR?'Choisir sur la carte':'Choose on map');floatGap();}
   function cancelPendingLocation(){if(!me){watching=false;stopWatch();nearBtn.classList.remove('is-finding');nearBtn.setAttribute('aria-pressed','false');nearLabel.textContent=T.nearMe;}}
   function chooseMapPoint(){cancelPendingLocation();closePanel();$('rnLocationHelp').hidden=true;roamView('map');setPinMode(true);}
   function roamView(view){
@@ -20349,6 +20350,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function closePanel(){ if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
   filtersBtn.addEventListener('click', function(){ if (panel.hidden) openPanel(); else closePanel(); });
   $('pmPanelDone').addEventListener('click', closePanel);
+  $('rnApplyFilters').addEventListener('click',closePanel);
   $('rnBackdrop').addEventListener('click',closePanel);
   document.addEventListener('keydown',function(e){if(panel.hidden)return;if(e.key==='Escape')closePanel();if(e.key==='Tab'){var els=Array.prototype.slice.call(panel.querySelectorAll('button,select,a[href],summary')).filter(function(x){return !x.disabled&&x.offsetParent!==null}),first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
   function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params || {}); } catch (e) {} }
@@ -20730,6 +20732,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       r.line = L.polyline(r.path, { color: '#1D4ED8', weight: 6, opacity: 0.85 }).addTo(map);
       var first = !r.fitted; r.fitted = true;
       drawRoute();
+      if(me.pin)setStatus(FR?'Aperçu de l’itinéraire depuis votre point de départ.':'Route preview from your chosen starting point.');
       // With the visitor's real location: zoom in on them and follow as they go. From a pin: show the whole route.
       if (first) { map.stop(); if (!me.pin) startNav(); else fitTo(r.line.getBounds(), 17); }
       track('map_directions', { kind: 'route', mode: r.mode, on_site: true });
@@ -20747,13 +20750,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (r.error && !r.data) html += '<p class="pm-route-sum">' + esc(T.routeFailed) + '</p>';
     else if (r.data) {
       html += '<p class="pm-route-sum"><strong>' + esc(durText(r.data.duration)) + '</strong> · ' + esc(T.km(r.data.distance / 1000)) + '</p>';
+      if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Aperçu depuis le point choisi. Utilisez votre position pour le guidage en direct et les annonces vocales.':'Route preview from your chosen point. Use your location for live progress and voice guidance.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
       html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
     }
     html += '<p class="pm-route-alt"><a ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
     routeEl.innerHTML = html;
     drawNav();
   }
+  routeEl.addEventListener('click',function(e){if(e.target.closest('#rnRouteUseLocation')&&route){pendingRoute=route.x;startCompass();unlockVoice();nearBtn.click();}});
   function endRoute(){
+    pendingRoute=null;
     if (route && route.line) map.removeLayer(route.line);
     route = null; follow = false; stage.classList.remove('is-following'); keepAwake(false); stopCompass(); hush();
     // Back from street level to the results around the visitor, with the list half open.
@@ -20965,7 +20971,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // Tap the red button then the map, or long-press the map; drag the pin to move it. The pin stays in this page only.
   var pinBtn = $('pmPinBtn'), pinMarker = null, pinMode = false;
   var PIN_ICON = L.divIcon({ className: 'pm-droppin', html: '<svg viewBox="0 0 24 34" width="30" height="42" aria-hidden="true"><path d="M12 1C6 1 1 5.8 1 11.9 1 20.3 12 33 12 33s11-12.7 11-21.1C23 5.8 18 1 12 1z" fill="#DC2626" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="#fff"/></svg>', iconSize: [30, 42], iconAnchor: [15, 41] });
-  function setPinMode(on){ pinMode = on; stage.classList.toggle('is-pinning', on); pinBtn.setAttribute('aria-pressed', on || pinMarker ? 'true' : 'false'); if (on) setStatus(T.tapToPin, 15000); }
+  function setPinMode(on){ pinMode = on; stage.classList.toggle('is-pinning', on); pinBtn.setAttribute('aria-pressed', on || pinMarker ? 'true' : 'false'); if (on) setStatus(pendingRoute?(FR?'Touchez votre point de départ sur la carte pour voir l’itinéraire.':'Tap your starting point on the map to preview the route.'):T.tapToPin, 15000); }
   function dropPin(ll, fit){
     if (!OK_BOUNDS.contains(ll)) { setStatus(T.pinOutside); return; }
     // A new browsing location replaces the town; a route start keeps the original search.
@@ -20981,7 +20987,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (route) { if (route.line) map.removeLayer(route.line); route = null; drawRoute(); }
     radiusKm = pickRadius(anyOn(kinds) || anyOn(feats) || openOnly ? 4 : 8);
     radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.pinRemove;
-    setStatus(T.pinned); limit = 25;
+    setStatus(pendingRoute?(FR?'Point de départ choisi. Calcul de l’itinéraire…':'Starting point selected. Calculating your route…'):T.pinned); limit = 25;
     if (sheet.getAttribute('data-state') === 'peek') setSheet('half');
     track('map_pin', { radius_km: radiusKm });
     syncChips();render(fit);if(pendingRoute){var destination=pendingRoute;pendingRoute=null;startRoute(destination);}
@@ -21008,7 +21014,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var label = function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); }, uniq = function(a){ return a.filter(function(v, i){ return a.indexOf(v) === i; }); };
     var parts = uniq([].concat(xs.map(function(x){ return x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
-    $('pmPanelDone').textContent=(FR?'Voir les lieux':'Show places')+(n?' · '+n:'');
+    $('rnApplyFilters').textContent=(tab==='events'?(FR?'Voir les événements':'Show events'):(FR?'Voir les lieux':'Show places'))+(n?' · '+n:'');
+    $('pmPanel').querySelectorAll('.rn-filter-group').forEach(function(g){var count=g.querySelectorAll('[aria-pressed="true"]').length;g.querySelector('[data-rn-count]').textContent=count?'('+count+')':''});
     $('rnLocationText').textContent=roamLocationLabel();
     badge.hidden = !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
@@ -21025,9 +21032,9 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         town ? ['in.' + town] : [], price ? ['p.' + price] : [], atMin != null ? ['at.' + atMin + (atUntil ? 'u' : '')] : [], atDay ? ['on.' + atDay] : [], tagOr ? ['or'] : [], on(notTypes).map(function(k){ return 'x.y.' + k; }),
         on(notTags).map(function(k){ return 'x.t.' + k; }), on(notKinds).map(function(k){ return 'x.k.' + k; }), on(notFeats).map(function(k){ return 'x.f.' + k; }));
       var rawSearch=searchEl.value.trim();
-      var q = (f.length ? 'f=' + f.join(',') : '') + (rawSearch ? (f.length ? '&' : '') + 'q=' + encodeURIComponent(rawSearch) : '')+(radiusFixed?'&r='+radiusKm:'');
+      var q = 'f=' + f.join(',') + (rawSearch ? '&q=' + encodeURIComponent(rawSearch) : '')+(radiusFixed?'&r='+radiusKm:'');
       q=q.replace(/^&/,'');
-      history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + (tab === 'events' ? '#events' : ''));
+      history.replaceState(null, '', location.pathname + (q ? '?' + q : '?f=') + (tab === 'events' ? '#events' : ''));
     } catch (e) {}
   }
   // With location on, a narrower search widens the distance by itself rather than coming up empty.
@@ -22114,7 +22121,9 @@ ${renderGolfHeaderHtml()}
     </section>
     <div id="rnBackdrop" class="rn-backdrop" hidden></div>
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="true" aria-labelledby="pmPanelTitle">
-      <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">Show places</button></div>
+      <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">${R('Close filters','Fermer les filtres')}</button></div>
+      <div class="rn-panel-body">
+      <p class="rn-panel-note">${R('Open a section to choose what matters to you. Place filters apply to Places; Events use your town and search.','Ouvrez une section pour choisir vos critères. Les filtres de lieux concernent les lieux; les événements utilisent la ville et la recherche.')}</p>
       <p class="pm-active" id="pmActive" hidden></p>
       <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
       <div class="pm-chips" role="group" aria-label="What are you after?">
@@ -22132,12 +22141,13 @@ ${renderGolfHeaderHtml()}
           <select id="pmTown" class="pm-select pm-town"><option value="">Town&hellip;</option>${townOptions}</select></label>
       </div>
       <button type="button" class="pm-stop-loc" id="pmStopLoc" hidden>Turn off my location</button>
-      <div class="rn-panel-footer"><button type="button" class="rn-clear" id="rnClear">${R('Clear all filters','Effacer tous les filtres')}</button></div>
       <h3>What the pins mean</h3>
       <ul class="pm-key" aria-label="What the pins mean">
         ${MAP_GROUPS.map((g) => `<li><span class="pm-pin pm-key-pin pm-pin-${g.key}" aria-hidden="true"><span></span></span>${escapeHtml(g.label)}</li>`).join('')}<li><span class="pm-pin pm-key-pin pm-pin-event" aria-hidden="true"><span></span></span>Events</li>
       </ul>
       <p class="pm-panel-links">Prefer a list? <a href="/browse">Browse &amp; Search every place</a> or <a href="/whats-on">see everything that’s on</a>.</p>
+      </div>
+      <div class="rn-panel-footer"><button type="button" class="rn-clear" id="rnClear">${R('Clear all','Tout effacer')}</button><button type="button" class="pm-panel-done" id="rnApplyFilters">${R('Show places','Voir les lieux')}</button></div>
     </div>
   </div>
   </main>

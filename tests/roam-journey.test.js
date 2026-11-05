@@ -50,3 +50,6 @@ test('built-in destinations resolve real venues and event hosts, rejecting arbit
   assert.equal(app.mapDestination('/kelowna/cafes/missing-journey-fixture',now),null);
  }finally{if(event){db.prepare('DELETE FROM event_occurrences WHERE event_id=?').run(event);db.prepare('DELETE FROM events WHERE id=?').run(event)}if(venue)db.prepare('DELETE FROM venues WHERE id=?').run(venue)}
 });
+
+test('clearing every filter retains an explicit empty selection for Back and reload',()=>{const c=syncContext();c.kinds={};c.feats={};c.town='';vm.runInContext('syncChips()',c);assert.equal(c.saved,'/map?f=')});
+test('an explicit distance also preserves Open now being off',()=>{const c=syncContext();c.kinds={};c.feats={};c.town='';c.radiusFixed=true;c.radiusKm=10;vm.runInContext('syncChips()',c);assert.equal(c.saved,'/map?f=&r=10')});
