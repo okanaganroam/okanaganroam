@@ -152,6 +152,15 @@
       "event_ids": [
         2
       ]
+    },
+    {
+      "file": "public/images/events/mission-hill-culinary-2611.jpg",
+      "credit": "Mission Hill Family Estate",
+      "source_page": "https://www.missionhillwinery.com/culinary-classes-calendar/",
+      "licence": "Venue own-site photo; no licence stated",
+      "event_ids": [
+        1023
+      ]
     }
   ]
 }
