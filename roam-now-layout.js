@@ -35,6 +35,48 @@ body.map-page .rn-location-help{background:#edf0e8;border:1px solid #ccd5c6;bord
 @media(max-width:899px){body.map-page .pm-stage{padding:12px 16px}body.map-page .rn-intro{margin-bottom:10px}body.map-page .rn-intro h1{font-size:23px;margin-bottom:3px}body.map-page .rn-intro p{font-size:12px;line-height:1.4}body.map-page .rn-location{margin-top:9px;min-height:44px;padding:8px 12px}body.map-page .rn-location small{display:none}body.map-page .rn-location b{font-size:13px}body.map-page .pm-searchbar{height:46px}body.map-page .pm-quick{margin-top:9px;gap:6px 8px}body.map-page .pm-quick [data-pm-kind]{min-width:0;font-size:11.5px;white-space:normal;text-align:center;line-height:1.15}body.map-page .rn-needs-title{display:none}body.map-page .pm-quick .pm-quick-clear:not([hidden]){display:none}body.map-page .rn-views{margin-top:10px}body.map-page .pm-float{margin-bottom:12px}body.map-page .pm-sheet-head{padding-bottom:10px}body.map-page .rn-location-help{font-size:12px;padding:10px;margin-top:10px}body.map-page .rn-location-help p{margin-bottom:6px}body.map-page .rn-location-help button{padding:0 10px;font-size:12px}body.map-page .pm-map-view.is-route .pm-sheet-head{display:none}body.map-page .pm-map-view.is-route .pm-sheet-body{height:100%}body.map-page .pm-map-view.is-route .pm-route{margin-bottom:0}body.map-page .pm-map-view.is-route .pm-route-head h2{font-size:17px}}
 body.map-page .pm-panel{display:flex;flex-direction:column;overflow:hidden;padding:0}body.map-page .pm-panel[hidden]{display:none}body.map-page .pm-panel-head{position:relative;top:auto;flex-shrink:0;margin:0;padding:12px 16px}body.map-page .rn-panel-body{overflow-y:auto;overscroll-behavior:contain;min-height:0;padding:0 16px 16px;flex:1}body.map-page .rn-panel-footer{position:relative;bottom:auto;flex-shrink:0;margin:0;padding:12px 16px max(12px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:12px}body.map-page .rn-filter-group{border-bottom:1px solid #d8dbd2;margin-bottom:4px}body.map-page .rn-filter-group summary{min-height:48px;cursor:pointer;font-weight:800;display:list-item;padding:12px 4px;box-sizing:border-box}body.map-page .rn-filter-group [data-rn-count]{font-size:12px;color:#5e716b;margin-left:8px}body.map-page .rn-filter-group .pm-chips{padding-bottom:12px}body.map-page .rn-panel-note{font-size:13px;line-height:1.5;color:#5e716b}body.map-page .rn-route-preview{padding:10px 12px;background:#edf0e8;border-radius:10px;font-size:13px;line-height:1.5}
 @media(max-width:899px){body.map-page .pm-map-view.is-route:not(.is-nav){min-height:0}body.map-page .pm-map-view.is-route:not(.is-nav) .pm-sheet,body.map-page .pm-map-view.is-route:not(.is-nav) .pm-sheet[data-state]{height:min(56dvh,500px,calc(100% - 160px))}body.map-page .pm-map-view.is-route:not(.is-nav) .pm-route-head{margin-bottom:8px}body.map-page .pm-map-view.is-route:not(.is-nav) .pm-route-sum{margin:8px 0}body.map-page .pm-map-view.is-route:not(.is-nav) .pm-steps{margin-top:8px}}
+html:has(body.pm-app-page), body.pm-app-page {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body.pm-app-page .pm-stage,
+body.pm-app-page .pm-stage.is-route {
+  height: calc(100dvh - var(--pm-top, 72px));
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+body.pm-app-page .pm-float {
+  flex: 0 1 auto;
+  max-height: 62%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.pm-app-page .pm-sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.pm-app-page .pm-item-main {
+  text-decoration: none;
+}
+@media (min-width: 900px) {
+  body.pm-app-page .pm-sheet, body.pm-app-page .pm-sheet[data-state] {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+  }
+  body.pm-app-page #okMap { height: auto; }
+}
+@media (max-width: 899px) {
+  body.pm-app-page .pm-list-view .pm-sheet,
+  body.pm-app-page .pm-list-view .pm-sheet[data-state] {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+  }
+}
 </style>`;
 module.exports={ROAM_LAYOUT_STYLE,renderRoamFilterGroups,roamOpenByDefault,roamRouteLocationMessage};
 
