@@ -1301,4 +1301,19 @@ CREATE TABLE IF NOT EXISTS removed_venues (
   ]) seed.run(...r, '2026-10-19');
 }
 
+// Build My Trip demand log (Stage 1, 2026-11-05). Anonymous: one row per
+// day + rotating visitor hash + venue + kind, so we can count how many
+// different visitors were shown / added a business. No IP, name or email.
+db.exec(`
+CREATE TABLE IF NOT EXISTS trip_demand_events (
+  day TEXT NOT NULL,
+  visitor TEXT NOT NULL,
+  venue_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (day, visitor, venue_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_trip_demand_venue ON trip_demand_events (venue_id, kind, day);
+`);
+
 module.exports = db;
