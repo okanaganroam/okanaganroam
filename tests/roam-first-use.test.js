@@ -35,3 +35,9 @@ test('route location help gives one cause and one next-step instruction',()=>{
 test('apply button labels do not imply the selected-filter count is a result count',()=>{
  const line=source.split('\n').find(l=>l.includes("$('rnApplyFilters').textContent="));assert.ok(line);assert.ok(!line.includes("+(n?"));
 });
+test('route preview measures the resized map before fitting its bounds',()=>{
+ const from=source.indexOf('  function fitRoutePreview(r){');assert.ok(from>=0);
+ const to=source.indexOf('\n  function ',from+3);const calls=[];
+ const c={map:{stop(){calls.push('stop')},invalidateSize(o){assert.equal(o.pan,false);calls.push('measure')}},fitTo(bounds,zoom){assert.equal(bounds,'route-bounds');assert.equal(zoom,17);calls.push('fit')}};
+ vm.createContext(c);vm.runInContext(source.slice(from,to)+';fitRoutePreview({line:{getBounds:()=>"route-bounds"}})',c);assert.deepEqual(calls,['stop','measure','fit']);
+});
