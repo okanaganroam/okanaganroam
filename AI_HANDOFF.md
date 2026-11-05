@@ -34,6 +34,13 @@ Owner approved the restored simpler desktop/mobile preview (without town filter 
 
 Validation: tests RED/GREEN, focused homepage and Big White/Kelowna regressions 8/8; syntax/diff checks; independent final review clean. Local public-API fixture checked at 1440px desktop and 390px English/French mobile: no horizontal overflow; responsive hero/photo grids, native more picks, footer collapse, search and language navigation. Four destination renderers byte-identical against origin/main. Temporary fixture DB restored/excluded before commit. Production verification to be recorded on this change's PR.
 
+
+## Homepage trip banner/footer correction - 2026-11-04
+
+Owner found that the published Build My Trip section/footer did not match the approved preview. Root causes: legacy footer markup was reused despite the approved compact structure; global heading/eyebrow styles overrode the banner's inherited light text. Replaced only the homepage footer with the approved navy four-column desktop / three-fold mobile layout, using the approved wordmark/tagline and link grouping. Kept real category/destination routes, all social links, legal links and the existing contact/app dialogs and scripts. Explicitly set trip heading/eyebrow white and suppressed the legacy eyebrow decoration. Scoped footer wordmark rules prevent global logo styles splitting it over two lines.
+
+Validation: two regressions observed RED then GREEN; focused suite 10/10, syntax/diff checks; actual desktop/mobile bottom-of-page screenshots compared directly with approved preview. Mobile 390px English/French no horizontal overflow, three groups collapsed; Contact us opens retained dialog. Language link supported by homepage switch handler. Frozen assets/database unchanged. Live verification follows deployment on the correction PR.
+
 ## Current Status
 
 * **Current status (2026-10-05): read "Stage 0–4 Program" below first, then the "Stage 5" sections and "V3 French support".** The Stage 0–4 section holds the current production status, the frozen files and the standing rules (updated for the V3 French launch); the later sections record what changed since. PRs #19–#30 (Stage 5F–5H, SEO-1/SEO-2, the `/browse` performance and Directory redesign work) are not described in this file beyond the frozen-file notes. The dated baselines in this list are kept as history.
