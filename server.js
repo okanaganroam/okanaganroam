@@ -20030,7 +20030,8 @@ const MAP_PAGE_STYLE = `<style id="near-me-map">
   /* Weekly nights (2026-10-27): tonight's, under the specials line. */
   body.map-page .pm-wn { display: block; margin-top: 4px; font-size: 0.84rem; font-weight: 700; color: #4B3A78; }
   body.map-page .pm-wn.is-on { font-weight: 800; }
-  body.map-page .pm-dog { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.35; color: #5B3A1A; }
+  body.map-page .pm-item-main .pm-st.is-open { display: flex; width: fit-content; padding: 4px 8px; border-radius: 8px; background: #eaf4e9; }
+  body.map-page .pm-visit-note { display: block; margin-top: 4px; font-size: 0.82rem; line-height: 1.35; color: #5B3A1A; }
   /* Audit fix (2026-10-27): on a phone the happy hour, specials and nights lines keep to two lines each (cards with all
      three reached 329px, 40% of the screen); the full text is on Details. */
   @media (max-width: 767px) { body.map-page .pm-hh, body.map-page .pm-sp, body.map-page .pm-wn { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; } }
@@ -20479,7 +20480,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var on = FEAT_ORDER.filter(function(k){ return p.f & CONF.f[k]; });
     on.sort(function(a, b){ return (feats[b] ? 1 : 0) - (feats[a] ? 1 : 0); });
     var out = on.length ? '<span class="pm-feats">' + on.slice(0, 3).map(function(k){ return '<span class="pm-feat' + (feats[k] ? ' is-on' : '') + '">' + esc(T.feat[k]) + '</span>'; }).join('') + '</span>' : '';
-    if (p.dog && feats.dogs) out += '<span class="pm-dog">' + esc(T.dogRule + ' ' + p.dog) + '</span>';
+    if (p.dog) out += '<span class="pm-visit-note"><strong>' + esc(T.dogRule) + '</strong> ' + esc(p.dog) + '</span>';
+    if (p.gluten) out += '<span class="pm-visit-note"><strong>' + esc(FR ? 'Sans gluten :' : 'Gluten-free:') + '</strong> ' + esc(p.gluten) + '</span>';
     // Happy hour deals (2026-10-26): the first two, after the happy hour line, while it is on now or later today.
     if (p.hhs) out += '<span class="pm-hh' + (p.hhs.now ? ' is-now' : '') + '">${uiIcon('cocktail')} ' + esc(p.hhs.text) + (p.dl ? '<span class="pm-hh-deals"> · <span' + (p.dlEn ? ' lang="en"' : '') + '>' + esc(p.dl) + '</span></span>' : '') + '</span>';
     // Weekly specials (2026-10-27): "Today: Wing Wednesday · 60¢ wings" (« Aujourd’hui : … »).
@@ -21696,7 +21698,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { photo: d.i && d.i[a[5]] || '', ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, vf: a[18] || 0, dl: a[16] ? (typeof a[16] === 'string' ? a[16] : FR ? a[16][1] : a[16][0]) : '', dlEn: !!(FR && typeof a[16] === 'string'), g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
+      var gluten = d.gf && d.gf[a[5]];
+      var p = { gluten: gluten && (FR ? gluten[1] : gluten[0]) || '', photo: d.i && d.i[a[5]] || '', ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, vf: a[18] || 0, dl: a[16] ? (typeof a[16] === 'string' ? a[16] : FR ? a[16][1] : a[16][0]) : '', dlEn: !!(FR && typeof a[16] === 'string'), g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
       // Deal text for the search ("cheap pints", "wings"), in both languages when there are two.
       if (a[16]) p.dk = mapNameKey(typeof a[16] === 'string' ? a[16] : a[16].join(' '));
       // Today's specials (2026-10-27): [weekday, English, French?]; their words join the deal search ("wings", "taco tuesday").
@@ -21755,7 +21758,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 15; // 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 16; // 16: gluten-free notes; 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -21769,8 +21772,9 @@ function mapDataVersion(now = new Date()) {
   try { wn = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_weekly_nights').get(); } catch (err) { /* an older database */ }
   // Verified mark (2026-10-27): the claimed places too, so a new claim shows its tick without waiting for another change.
   const claimed = [...claimedVenueIds()].sort((a, b) => a - b).join(',');
+  const visit = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venue_visit_info').get();
   // MAP_DATA_FORMAT changes whenever the shape of the data does, so a browser never keeps an older shape.
-  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}`).digest('hex').slice(0, 12);
+  return crypto.createHash('md5').update(`${MAP_DATA_FORMAT}|${todayLocal(now)}|${v.u}|${v.n}|${e.u}|${e.n}|${o.u}|${o.n}|${getAdvisoryNotes(now).size}|${sp.u}|${sp.n}|${claimed}|${wn.u}|${wn.n}|${visit.u}|${visit.n}`).digest('hex').slice(0, 12);
 }
 const mapRound = (n) => Math.round(Number(n) * 1e5) / 1e5;
 // Places: [lat, lng, name, type, region, url, hours or 0, features, dog rule]. Hours ship only for a place that has
@@ -22060,7 +22064,24 @@ function mapLiveData(now = new Date()) {
     const photo = venueThumbPhoto(v);
     if (photo && REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]) photos[`/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`] = photo;
   }
-  const json = JSON.stringify({ p: mapPlacesData(now), e: mapEventsData(now), i: photos });
+  const glutenFreeNotes = {};
+  const visitRows = db.prepare(`SELECT v.region, v.type, v.slug, i.info
+    FROM venue_visit_info i JOIN venues v ON v.id = i.venue_id
+    WHERE v.redirect_to IS NULL AND v.slug IS NOT NULL
+      AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL`).all();
+  for (const v of visitRows) {
+    if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
+    let info;
+    try { info = JSON.parse(v.info); } catch { continue; }
+    if (!Array.isArray(info?.rows)) continue;
+    const mentionsGluten = /\b(?:gluten[- ]free|celiac|coeliac)\b/i;
+    const matching = info.rows.filter((row) => typeof row?.text === 'string' && row.text.trim()
+      && (mentionsGluten.test(row.text) || mentionsGluten.test(row.label)));
+    const note = matching.find((row) => /dietary|gluten/i.test(row.label)) || matching[0];
+    if (note) glutenFreeNotes[`/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`] =
+      [note.text, visitTextFr(note.text)];
+  }
+  const json = JSON.stringify({ p: mapPlacesData(now), e: mapEventsData(now), i: photos, gf: glutenFreeNotes });
   mapDataCache = { version, json };
   return mapDataCache;
 }
