@@ -203,10 +203,10 @@ test('Roam Now script: night words, whole-word deal words, names first, happy ho
   const base = { town: 'kelowna', fit: (p) => p.f };
   assert.deepEqual(c2.list(ps, base).map((p) => p.name), ['Open Arcade', 'Trivia Pub'], 'open first by default');
   assert.deepEqual(c2.list(ps, { ...base, fitFirst: true }).map((p) => p.name), ['Trivia Pub', 'Open Arcade']);
-  // Happy hour later today when none is on now; tonight's nights skip the open-at check; a named listing always matches.
-  assert.ok(html.includes("k === 'happy' && hhKnown ? !(p.hhs && (p.hhs.now || !hhAnyNow))"));
+  // Happy hour now is strict; tonight's nights skip the open-at check; names cannot bypass needs.
+  assert.ok(html.includes("k === 'happy' ? !(p.hhs && p.hhs.now)"));
   assert.ok(html.includes('if ((atMin != null || atDay) && !nightHit(p) && !openAt(p, atMin, atDay)) return false;'));
-  assert.ok(html.includes('if (nameHit(p)) return true;'));
+  assert.ok(!html.includes('if (nameHit(p)) return true;'), 'named venues still respect selected needs');
   assert.ok(html.includes("hhLaterNote: 'No happy hour on right now. These places have one later today.'"));
   assert.ok(html.includes('function hhOf(p){\n    if (!p.hh || p.sc) return null;'), 'never on a place closed for the season');
   // The shown words: "open mic", never "openmic".

@@ -1,3 +1,4 @@
+const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups } = require('./roam-now-layout.js');
 const http = require('http');
 const url = require('url');
 const fs = require('fs');
@@ -20280,6 +20281,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
+  function roamView(view){
+    if (typeof route !== 'undefined' && route && view === 'list') return;
+    stage.classList.toggle('pm-list-view',view === 'list');stage.classList.toggle('pm-map-view',view === 'map');
+    $('rnList').setAttribute('aria-pressed',view === 'list');$('rnMap').setAttribute('aria-pressed',view === 'map');
+    floatGap();map.invalidateSize();if(!WIDE.matches)window.scrollTo(0,0);
+  }
+  $('rnList').addEventListener('click',function(){roamView('list')});
+  $('rnMap').addEventListener('click',function(){roamView('map')});
+  $('rnLocation').addEventListener('click',function(){openPanel();$('pmTown').focus()});
+  $('rnClear').addEventListener('click',clearAll);
+  $('rnUseLocation').addEventListener('click',function(){closePanel();nearBtn.click()});
   // The map fills the screen below the header.
   function fitStage(){ var top = stage.getBoundingClientRect().top + (window.scrollY || 0); document.documentElement.style.setProperty('--pm-top', Math.max(0, Math.round(top)) + 'px'); }
   fitStage(); map.invalidateSize(); okLimits(); window.addEventListener('resize', function(){ fitStage(); map.invalidateSize(); okLimits(); });
@@ -20306,7 +20318,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var h = sheet.offsetHeight, H = stage.offsetHeight, pick = h < H * 0.3 ? 'peek' : h < H * 0.72 ? 'half' : 'full';
     sheet.classList.remove('is-dragging'); sheet.style.height = ''; setSheet(pick);
   }
-  [handle, sheet.querySelector('.pm-sheet-head')].forEach(function(el){ el.addEventListener('pointerdown', dragStart); });
+  // List-first layout scrolls normally; the results heading must not resize the sheet.
+  handle.addEventListener('pointerdown', dragStart);
   window.addEventListener('pointermove', dragMove);
   window.addEventListener('pointerup', dragEnd);
   window.addEventListener('pointercancel', dragEnd);
@@ -20321,11 +20334,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   if (WIDE.matches) fitTo(L.latLngBounds([49.80, -119.70], [50.02, -119.38]), 11);
   else fitTo(L.latLngBounds([49.858, -119.505], [49.900, -119.470]), 13);
   // Filters: everything beyond the quick chips, in one panel.
-  function openPanel(){ panel.hidden = false; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus(); }
-  function closePanel(){ if (panel.hidden) return; panel.hidden = true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
+  function openPanel(){ $('rnBackdrop').hidden=false;panel.hidden = false; filtersBtn.setAttribute('aria-expanded', 'true'); $('pmPanelDone').focus(); }
+  function closePanel(){ if (panel.hidden) return; panel.hidden = true;$('rnBackdrop').hidden=true; filtersBtn.setAttribute('aria-expanded', 'false'); filtersBtn.focus(); }
   filtersBtn.addEventListener('click', function(){ if (panel.hidden) openPanel(); else closePanel(); });
   $('pmPanelDone').addEventListener('click', closePanel);
-  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closePanel(); });
+  $('rnBackdrop').addEventListener('click',closePanel);
+  document.addEventListener('keydown',function(e){if(panel.hidden)return;if(e.key==='Escape')closePanel();if(e.key==='Tab'){var els=Array.prototype.slice.call(panel.querySelectorAll('button,select,a[href],summary')).filter(function(x){return !x.disabled&&x.offsetParent!==null}),first=els[0],last=els[els.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
   function track(name, params){ try { if (window.trackEvent) window.trackEvent(name, params || {}); } catch (e) {} }
   var IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   function dirUrl(lat, lng, name){ return IOS ? 'https://maps.apple.com/?daddr=' + lat + ',' + lng + '&q=' + encodeURIComponent(name) : 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng; }
@@ -20420,22 +20434,18 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function setStatus(text, ms){ clearTimeout(statusTimer); statusEl.textContent = text || ''; statusEl.hidden = !text; floatGap(); if (text) statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
   // Round 13 (2026-10-20): the room the search bar, chips and notice take at the top (--pm-float-h), so the list
   // sheet never slides under a notice and hides its handle.
-  function floatGap(){ try { var st = stage.getBoundingClientRect(), fb = floatEl.getBoundingClientRect(); stage.style.setProperty('--pm-float-h', Math.max(20, Math.round(fb.bottom - st.top + 8)) + 'px'); } catch (e) {} }
+  function floatGap(){ try { var st=stage.getBoundingClientRect(),fb=floatEl.getBoundingClientRect(),next=Math.max(20,Math.round(fb.bottom-st.top+8))+'px';if(stage.style.getPropertyValue('--pm-float-h')!==next){stage.style.setProperty('--pm-float-h',next);map.invalidateSize();} } catch(e){} }
   if (window.ResizeObserver) new ResizeObserver(floatGap).observe(floatEl);
   // A message with a link in it (round 12, 2026-10-20): html is built from the page's own words only.
   function setStatusHtml(html, ms){ clearTimeout(statusTimer); statusEl.innerHTML = html; statusEl.hidden = false; floatGap(); statusTimer = setTimeout(function(){ setStatus(''); }, ms || 7000); }
   statusEl.addEventListener('click', function(e){ if (e.target && e.target.closest && e.target.closest('a')) return; setStatus(''); });
   // Room taken by the search bar and the list, so fitted pins land where they can be seen.
   function pad(){
-    // The top of the clear map is below the banner, or the search and chips (not a passing message).
-    var topEl = stage.classList.contains('is-nav') ? $('pmNavbar') : $('pmPlaceFilters').hidden ? floatEl.querySelector('.pm-searchbar') : $('pmPlaceFilters');
-    var st = stage.getBoundingClientRect(), fl = topEl.getBoundingClientRect(), sh = sheet.getBoundingClientRect();
-    if (WIDE.matches) return { paddingTopLeft: [Math.round(sh.right - st.left) + 24, 24], paddingBottomRight: [70, 24] };
-    // The sheet may still be sliding, so use the height it is heading for.
-    var state = sheet.getAttribute('data-state'), H = st.height, sheetPx = state === 'full' ? H - 124 : state === 'half' ? H * 0.42 : 168;
-    return { paddingTopLeft: [24, Math.round(fl.bottom - st.top) + 16], paddingBottomRight: [24, Math.round(Math.min(sheetPx, H * 0.42)) + 20] };
+    // The map has its own column; only the mobile map sheet overlaps it.
+    return { paddingTopLeft: [24,24], paddingBottomRight: [70, WIDE.matches || stage.classList.contains('pm-list-view') ? 24 : stage.classList.contains('is-route') ? 300 : 210] };
   }
-  function fitTo(bounds, maxZoom){ var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
+  var fitRefresh=false;
+  function fitTo(bounds, maxZoom){ fitRefresh=true;var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
   // Phone map (2026-10-19, round 7): a popup's own pan keeps it clear of the search bar, the chips and the list sheet
   // (the same room pad() gives fitted pins), instead of Leaflet's 5px from the map's edge, which left the popup's top
   // under the chips.
@@ -20487,7 +20497,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // The search words as the visitor reads them: "open mic" (« scène ouverte »), never the map's own "openmic" token.
   function termShown(t){ return String(t || '').replace(/\\bopenmic\\b/g, T.openMicWords); }
   function matchesPlace(p){
-    if (nameHit(p)) return true;
+    // A named venue still has to meet the visitor’s selected needs.
     var tk = onTags(), byDeal = dealHit(p);
     // What it serves: all of them (or, when no place has all, any of them).
     if (tk.length && !byDeal) { var hits = tk.filter(function(k){ return p.tg.indexOf(TAGIX[k]) !== -1; }).length; if (tagAny || tagOr ? !hits : hits < tk.length) return false; }
@@ -20506,7 +20516,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     for (var nf in notFeats) if (notFeats[nf] && (nf === 'specials' ? p.spOn : nf === 'nights' ? p.wnOn : (p.f & CONF.f[nf]))) return false;
     // Specials today (2026-10-27): from today's specials ([17]), not a stored feature bit.
     // Weekly nights tonight (2026-10-27): from tonight's nights ([19]).
-    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' && hhKnown ? !(p.hhs && (p.hhs.now || !hhAnyNow)) : !(p.f & CONF.f[k]))) return false;
+    for (var k in feats) if (feats[k] && (k === 'specials' ? !p.spOn : k === 'nights' ? !p.wnOn : k === 'happy' ? !(p.hhs && p.hhs.now) : !(p.f & CONF.f[k]))) return false;
     if (openOnly && !(p.st && p.st.state === 'open')) return false;
     return !term || byDeal || mapNameHas(p.key, term, termTyping);
   }
@@ -20534,6 +20544,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // the map" while 3 matched).
   var searchFit = false, hhNoteShown = false;
   function render(fit){
+    $('rnLocationText').textContent=me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location');
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
     var items, onMap, sf = searchFit; searchFit = false;
     if (me) { places.forEach(function(p){ p.d = distKm(me.lat, me.lng, p.lat, p.lng); }); events.forEach(function(e){ e.d = e.lat == null ? null : distKm(me.lat, me.lng, e.lat, e.lng); }); }
@@ -20547,7 +20558,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var coffeeOnly = kinds.coffee && Object.keys(kinds).every(function(k){ return !kinds[k] || k === 'coffee'; });
       // Audit fix (2026-10-27): the order within the list: a listing the search names first, then tonight's nights for a
       // night search (both ahead of open now), the coffee fit, and happy hour later today by its start time.
-      var nightQ = nightSearch(), hhLater = !!(feats.happy && hhKnown && !hhAnyNow);
+      var nightQ = nightSearch(), hhLater = false;
       var fitFn = function(p){ return (nameQ && !nameHit(p) ? 1000 : 0) + (nightQ && !nightHit(p) ? 100 : 0) + (coffeeOnly ? mapCoffeeFit(p, TAGIX) * 10 : 0) + (hhLater ? (p.hhs && p.hhs.at != null ? p.hhs.at / 1440 : 1) : 0); };
       items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: fitFn, fitFirst: !!(nameQ || nightQ), cost: tags.hiking ? mapHikeCost : null });
       if (hhLater && !hhNoteShown) { hhNoteShown = true; setStatus(T.hhLaterNote, 9000); }
@@ -20604,7 +20615,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       if (tab === 'places') {
         if (me && x.st && x.st.state === 'open') openSeen = true;
         if (me && openSeen && !dividerDone && isOpen(x)) { html += '<li class="pm-group"><h3>' + esc(T.closedNow) + '</h3></li>'; dividerDone = true; }
-        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '"><span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
+        html += '<li class="pm-item"><button type="button" class="pm-item-main" data-i="' + i + '">' + (x.photo ? '<img class="rn-photo" src="' + esc(x.photo) + '" alt="' + esc(x.name) + '" loading="lazy" width="480" height="320">' : '<span class="rn-no-photo">' + esc(TYPES[x.type] || '') + '</span>') + '<span class="pm-name">' + esc(x.name) + (x.vf ? '<span class="pm-vf" role="img" aria-label="' + esc(T.verified) + '" title="' + esc(T.verified) + '">&#10003;</span>' : '') + '</span><span class="pm-meta">' + placeMeta(x) + '</span>' + statusHtml(x.st) + featHtml(x) + '</button>'
           + '<div class="pm-acts"><a class="pm-dir" data-dir="place" data-k="p' + x.ix + '" ' + hrefAttr(dirUrl(x.lat, x.lng, x.name)) + ' target="_blank" rel="noopener">' + esc(T.directions) + '</a><a class="pm-link" ' + hrefAttr(x.fu || x.url) + '>' + esc(T.details) + '</a></div></li>';
       } else {
         if (x.g !== lastGroup) { html += '<li class="pm-group"><h3>' + esc(T[x.g]) + '</h3></li>'; lastGroup = x.g; }
@@ -20655,6 +20666,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     radiusKm = Number(w.getAttribute('data-wider')); radiusFixed = true; radiusSel.value = String(radiusKm); limit = 25; render(true);
   });
   function focusItem(x){
+    roamView('map');
     if (x.lat == null || !x.m) return;
     setSheet('peek');
     if (cluster.zoomToShowLayer) cluster.zoomToShowLayer(x.m, function(){ x.m.openPopup(); });
@@ -20678,6 +20690,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function durText(sec){ var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
   function startRoute(x){
     if (!MB) return false;
+    roamView('map');
     // Asked for during the tap itself (iPhone only allows the compass prompt then).
     if (!me || !me.pin) { startCompass(); unlockVoice(); }
     if (!me) { pendingRoute = x; if (!watching) nearBtn.click(); setStatus(T.routeNeedsLocation); return true; }
@@ -20713,6 +20726,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function drawRoute(){
     var r = route;
     routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
+    stage.classList.toggle('is-route',!!r);
     if (!r) { routeEl.innerHTML = ''; drawNav(); return; }
     var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2><button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(T.endRoute) + '</button></div>';
     html += '<div class="pm-modes" role="group" aria-label="' + esc(T.howGo) + '">' + MODES.map(function(m){ return '<button type="button" class="pm-mode" data-mode="' + m[0] + '" aria-pressed="' + (r.mode === m[0]) + '">' + esc(m[1]) + '</button>'; }).join('') + '</div>';
@@ -20731,7 +20745,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (route && route.line) map.removeLayer(route.line);
     route = null; follow = false; stage.classList.remove('is-following'); keepAwake(false); stopCompass(); hush();
     // Back from street level to the results around the visitor, with the list half open.
-    drawRoute(); if (me) setSheet('half'); render(true);
+    drawRoute();roamView('list'); if (me) setSheet('half'); render(true);
   }
   // ---- Following the visitor along the route ----
   var navbar = $('pmNavbar'), follow = false, wakeLock = null, followZoom = 18, waitingZoom = false;
@@ -20966,6 +20980,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   document.addEventListener('visibilitychange', function(){ if (!watching) return; if (document.hidden) stopWatch(); else if (watchId == null) startWatch(); });
   radiusSel.addEventListener('change', function(){ radiusKm = Number(radiusSel.value); radiusFixed = true; limit = 25; render(true); });
   function syncChips(){
+    $('pmTown').value=town||'';
     kindChips.forEach(function(c){ c.setAttribute('aria-pressed', kinds[c.getAttribute('data-pm-kind')] ? 'true' : 'false'); });
     featChips.forEach(function(c){ c.setAttribute('aria-pressed', feats[c.getAttribute('data-pm-feat')] ? 'true' : 'false'); });
     openBtns.forEach(function(c){ c.setAttribute('aria-pressed', openOnly ? 'true' : 'false'); });
@@ -20976,11 +20991,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var label = function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); }, uniq = function(a){ return a.filter(function(v, i){ return a.indexOf(v) === i; }); };
     var parts = uniq([].concat(xs.map(function(x){ return x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
+    $('pmPanelDone').textContent=(FR?'Voir les lieux':'Show places')+(n?' · '+n:'');
+    $('rnLocationText').textContent=me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location');
     badge.hidden = !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
     // Keep the quick chips that are on in view.
     var row = $('pmPlaceFilters'), ons = row.querySelectorAll('[aria-pressed="true"]'), on = ons[ons.length - 1];
-    if (on && on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = on.offsetLeft + on.offsetWidth - row.clientWidth + 10;
+    if (false && on && on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = on.offsetLeft + on.offsetWidth - row.clientWidth + 10;
     else if (!on) row.scrollLeft = 0;
     if (term) parts.push('“' + termShown(term) + '”');
     activeEl.hidden = !parts.length;
@@ -21527,7 +21544,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       } catch (err) { stopMic(); setStatus(T.micFail); }
     });
   }
-  $('pmTown').addEventListener('change', function(e){ var c = CONF.c[e.target.value]; if (c) { closePanel(); map.setView(c, 13); } });
+  $('pmTown').addEventListener('change', function(e){ town=e.target.value; var c=CONF.c[town]; if(c)map.setView(c,13); changed(); });
   function setTab(t){
     tab = t; limit = 25;
     $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
@@ -21593,11 +21610,12 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   map.on('moveend zoomend resize', queuePinFix);
   if (window.ResizeObserver) new ResizeObserver(queuePinFix).observe(sheet);
   var moveTimer = null;
-  map.on('moveend', function(){ if (me || tab !== 'places') return; clearTimeout(moveTimer); moveTimer = setTimeout(function(){ render(false); }, 150); });
+  $('rnSearchArea').addEventListener('click',function(){this.hidden=true;render(false)});
+  map.on('moveend',function(){if(me||tab!=='places')return;clearTimeout(moveTimer);if(fitRefresh){fitRefresh=false;moveTimer=setTimeout(function(){render(false)},150)}else $('rnSearchArea').hidden=false;});
   countEl.textContent = T.loading;
   fetch(CONF.src, { headers: { Accept: 'application/json' } }).then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(d){
     places = []; d.p.forEach(function(a){
-      var p = { ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, vf: a[18] || 0, dl: a[16] ? (typeof a[16] === 'string' ? a[16] : FR ? a[16][1] : a[16][0]) : '', dlEn: !!(FR && typeof a[16] === 'string'), g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
+      var p = { photo: d.i && d.i[a[5]] || '', ix: places.length, lat: a[0], lng: a[1], name: a[2], type: a[3], region: a[4], url: a[5], fu: FR ? '/fr' + a[5] : '', h: a[6] || null, f: a[7] || 0, dog: (FR && a[14]) || a[8] || '', r: a[9] ? a[9] / 10 : 0, tg: a[10] || [], hh: a[11] || null, pr: a[12] || 0, sc: a[13] || 0, lf: a[15] || 0, vf: a[18] || 0, dl: a[16] ? (typeof a[16] === 'string' ? a[16] : FR ? a[16][1] : a[16][0]) : '', dlEn: !!(FR && typeof a[16] === 'string'), g: CONF.g[a[3]], key: mapNameKey(a[2]), d: null };
       // Deal text for the search ("cheap pints", "wings"), in both languages when there are two.
       if (a[16]) p.dk = mapNameKey(typeof a[16] === 'string' ? a[16] : a[16].join(' '));
       // Today's specials (2026-10-27): [weekday, English, French?]; their words join the deal search ("wings", "taco tuesday").
@@ -21608,10 +21626,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       places.push(p);
     });
     events = []; d.e.forEach(function(a){ addEvent(a, false); });
-    refreshStatus();
+    refreshStatus();fitRefresh=false;
     // Until researched times are loaded, the chip stays "Happy hour" (places that have one).
     hhKnown = places.some(function(p){ return p.hh; });
-    if (!hhKnown) featChips.forEach(function(c){ if (c.getAttribute('data-pm-feat') === 'happy') c.lastChild.textContent = ' ' + T.feat.happy; });
+    // Happy hour now always requires current researched times.
     try {
       var qs = new URLSearchParams(location.search);
       (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k === 'or') tagOr = true;
@@ -21646,7 +21664,7 @@ const MAP_EVENT_DAYS = 7;
 // only when a search needs it (New Year's Eve, Christmas markets, or an events search with nothing this week), so
 // the first load stays the week's events (data.json ~81 KB gzip; 30 days in it would add ~10 KB and ~200 more pins).
 const MAP_AHEAD_DAYS = WHATSON_DEFAULT_WINDOW_DAYS;
-const MAP_DATA_FORMAT = 13; // 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
+const MAP_DATA_FORMAT = 15; // 15: own-photo dictionary (compact place rows unchanged); 8 (round 11): the Free to visit bit and each event's kinds; 9 (round 13): Local Favourites, more event pins and kinds; 10 (2026-10-26): happy hour deals [16]; 11 (2026-10-27): today's specials [17]; 12 (2026-10-27): verified mark [18]; 13 (2026-10-27): tonight's weekly nights [19]
 let mapDataCache = null;
 function mapDataVersion(now = new Date()) {
   const v = db.prepare('SELECT MAX(updated_at) AS u, COUNT(*) AS n FROM venues').get();
@@ -21946,7 +21964,12 @@ function mapIsDec31Night(e) {
 function mapLiveData(now = new Date()) {
   const version = mapDataVersion(now);
   if (mapDataCache && mapDataCache.version === version) return mapDataCache;
-  const json = JSON.stringify({ p: mapPlacesData(now), e: mapEventsData(now) });
+  const photos = {};
+  for (const v of db.prepare('SELECT name, region, type, slug, image_url FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND image_url IS NOT NULL').all()) {
+    const photo = venueThumbPhoto(v);
+    if (photo && REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]) photos[`/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`] = photo;
+  }
+  const json = JSON.stringify({ p: mapPlacesData(now), e: mapEventsData(now), i: photos });
   mapDataCache = { version, json };
   return mapDataCache;
 }
@@ -21963,6 +21986,7 @@ function mapFrWords() {
   return { ...Object.fromEntries(FR_SEARCH_SYNONYM_MAP), marche: 'farmers market', marches: 'farmers market' };
 }
 function renderPlacesMapPage(placeCount = null, now = new Date(), opts = {}) {
+  const R=(en,fr)=>opts.lang==='fr'?fr:en;
   const count = placeCount == null ? mapPlaces().length : placeCount;
   const title = 'Roam Now: Okanagan Map of What’s Open Near You | Okanagan Roam';
   const description = `Find what’s open near you in the Okanagan: ${count.toLocaleString('en-CA')} restaurants, wineries, beaches, trails and more on one map, with directions and what’s on this week.`;
@@ -21994,26 +22018,28 @@ ${pageHead(title, description, canonical, [breadcrumb], { golfTheme: true })}
 ${renderOutdoorThemeStyles()}
 ${renderAnalyticsHeadHtml('hub')}
 ${MAP_PAGE_STYLE}
+${ROAM_LAYOUT_STYLE}
 </head>
 <body class="golf-page outdoor-page region-page map-page pm-app-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${renderGolfHeaderHtml()}
   <main class="pm-app" id="main">
-  <h1 class="visually-hidden">Roam Now: map of what’s open near you in the Okanagan</h1>
+
   <p class="visually-hidden">Find what’s open near you, get directions, and see what’s on.</p>
-  <div class="pm-stage" id="pmStage">
+  <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
+      <div class="rn-intro"><div><h1>${R('Find your kind of nearby.','Trouvez votre prochaine découverte.')}</h1><p>${R('Choose what you want. Add your needs. Find a place and go.','Choisissez vos envies et vos besoins. Trouvez un lieu et partez.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('EXPLORING AROUND','EXPLORER AUTOUR DE')}</small><b id="rnLocationText">${R('Kelowna map area · Change location','Zone de Kelowna · Changer')}</b></span></button></div>
       <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label class="visually-hidden" for="pmSearch">Search, e.g. patio drinks with my dog</label>
         <input type="search" id="pmSearch" class="pm-search" placeholder="Try “dog-friendly patio”" autocomplete="off" enterkeyhint="search">
         <button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-        <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="visually-hidden">Filters</span><span class="pm-badge" id="pmBadge" hidden></span></button>
+        <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="pm-badge" id="pmBadge" hidden></span><span>Filters</span></button>
       </div>
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
-        <span class="pm-tagchips" id="pmTagChips"></span>
+        <span class="rn-needs-title">${R('Your needs','Vos besoins')}</span><span class="pm-tagchips" id="pmTagChips"></span>
         <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
         <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">${uiIcon('star')}</span> Top rated</button>
         ${(() => {
@@ -22025,9 +22051,11 @@ ${renderGolfHeaderHtml()}
         })()}
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
       </div>
+      <div class="rn-views" role="group" aria-label="Results view"><button type="button" id="rnList" aria-pressed="true">${R('List','Liste')}</button><button type="button" id="rnMap" aria-pressed="false">${R('Map','Carte')}</button></div>
       <div class="pm-navbar" id="pmNavbar" hidden aria-live="polite"></div>
       <p class="pm-toast" id="pmStatus" role="status" aria-live="polite"></p>
     </div>
+    <button type="button" class="pm-chip rn-search-area" id="rnSearchArea" hidden>${R('Search this area','Rechercher dans cette zone')}</button>
     <button type="button" class="pm-locate" id="pmNear" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span class="visually-hidden" id="pmNearLabel">Near me</span></button>
     <button type="button" class="pm-pinbtn" id="pmPinBtn" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-7.2 7-12.5A7 7 0 0 0 5 9.5C5 14.8 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span class="visually-hidden">Drop a pin</span></button>
     <section class="pm-sheet" id="pmSheet" data-state="peek" aria-labelledby="pmCount">
@@ -22046,25 +22074,19 @@ ${renderGolfHeaderHtml()}
         <noscript><p>The map needs JavaScript. <a href="/browse">Browse &amp; Search every place</a> instead.</p></noscript>
       </div>
     </section>
-    <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="false" aria-labelledby="pmPanelTitle">
-      <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">Done</button></div>
+    <div id="rnBackdrop" class="rn-backdrop" hidden></div>
+    <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="true" aria-labelledby="pmPanelTitle">
+      <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">Show places</button></div>
       <p class="pm-active" id="pmActive" hidden></p>
-      <h3>What are you after?</h3>
+      <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
       <div class="pm-chips" role="group" aria-label="What are you after?">
         ${MAP_KINDS.map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n        ')}
       </div>
-      <h3>Must have</h3>
-      <div class="pm-chips" role="group" aria-label="Must have">
-        <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
-        <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">${uiIcon('star')}</span> Top rated</button>
-        ${MAP_MUST_HAVES.map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n        ')}
-      </div>
-      <h3>Dietary</h3>
-      <div class="pm-chips" role="group" aria-label="Dietary">
-        ${MAP_DIETARY.map((f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`).join('\n        ')}
-      </div>
+      </details>
+      ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}
+      <h3>${R('Where would you like to explore?','Où souhaitez-vous explorer?')}</h3><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button>
       <div class="pm-panel-row">
-        <label><span>Distance</span>
+        <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
           <select id="pmRadius" class="pm-select pm-radius" disabled>
             <option value="1">1 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="0">Any</option>
           </select></label>
@@ -22072,6 +22094,7 @@ ${renderGolfHeaderHtml()}
           <select id="pmTown" class="pm-select pm-town"><option value="">Town&hellip;</option>${townOptions}</select></label>
       </div>
       <button type="button" class="pm-stop-loc" id="pmStopLoc" hidden>Turn off my location</button>
+      <div class="rn-panel-footer"><button type="button" class="rn-clear" id="rnClear">${R('Clear all filters','Effacer tous les filtres')}</button></div>
       <h3>What the pins mean</h3>
       <ul class="pm-key" aria-label="What the pins mean">
         ${MAP_GROUPS.map((g) => `<li><span class="pm-pin pm-key-pin pm-pin-${g.key}" aria-hidden="true"><span></span></span>${escapeHtml(g.label)}</li>`).join('')}<li><span class="pm-pin pm-key-pin pm-pin-event" aria-hidden="true"><span></span></span>Events</li>
