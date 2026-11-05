@@ -1,4 +1,4 @@
-const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT, roamOpenByDefault } = require('./roam-now-layout.js');
+const { ROAM_LAYOUT_STYLE, renderRoamFilterGroups, roamDirectionsHref, ROAM_RETURN_SCRIPT, roamOpenByDefault, roamRouteLocationMessage } = require('./roam-now-layout.js');
 const http = require('http');
 const url = require('url');
 const fs = require('fs');
@@ -20275,6 +20275,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var cluster = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: function(z){ return z >= 17 ? 1 : z >= 15 ? 18 : z >= 13 ? 32 : 48; }, spiderfyOnMaxZoom: true, chunkedLoading: true }) : L.layerGroup();
   map.addLayer(cluster);
   ${roamOpenByDefault.toString()}
+  ${roamRouteLocationMessage.toString()}
   var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = roamOpenByDefault(location.search,location.hash), town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', termTyping = false, dealQuery = '', dealWordsFor = null, dealWords = [], radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
@@ -20286,7 +20287,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   var returnContext=null;
   try{var savedReturn=JSON.parse(sessionStorage.getItem('roamReturn')||'null');if(savedReturn&&savedReturn.url===location.pathname+location.search+location.hash)returnContext=savedReturn;}catch(e){}
   document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;try{var u=new URL(a.href,location.href);if(u.origin!==location.origin||!/^\\/(?:fr\\/)?[a-z0-9-]+\\/[a-z0-9-]+\\/[a-z0-9-]+$/.test(u.pathname)||a.hasAttribute('data-dir'))return;sessionStorage.setItem('roamReturn',JSON.stringify({target:u.pathname,url:location.pathname+location.search+location.hash,view:stage.classList.contains('pm-map-view')?'map':'list',limit:limit,y:window.scrollY,listY:$('pmSheetBody').scrollTop}));}catch(err){}});
-  function showLocationHelp(text){$('rnLocationHelp').hidden=false;$('rnLocationMessage').textContent=(pendingRoute?T.to+' '+pendingRoute.name+'. ':'')+text+(pendingRoute?(FR?' Activez la position pour le guidage en direct, ou choisissez le départ sur la carte pour un aperçu.':' Enable location for live guidance, or choose a start on the map for a route preview.'):'');$('rnChooseTown').hidden=!!pendingRoute;$('rnChoosePin').textContent=pendingRoute?(FR?'Choisir le départ sur la carte':'Choose a start on map'):(FR?'Choisir sur la carte':'Choose on map');floatGap();}
+  function showLocationHelp(text){
+    var reason=text===T.denied?'blocked':text===T.failed?'failed':text===T.outside?'outside':text===T.unsupported?'unsupported':'needed';
+    $('rnLocationHelp').hidden=false;
+    $('rnLocationMessage').textContent=pendingRoute?roamRouteLocationMessage(reason,pendingRoute.name,FR?'fr':'en'):text;
+    $('rnChooseTown').hidden=!!pendingRoute;
+    $('rnChoosePin').textContent=pendingRoute?(FR?'Choisir le départ sur la carte':'Choose a start on map'):(FR?'Choisir sur la carte':'Choose on map');floatGap();
+  }
   function cancelPendingLocation(){if(!me){watching=false;stopWatch();nearBtn.classList.remove('is-finding');nearBtn.setAttribute('aria-pressed','false');nearLabel.textContent=T.nearMe;}}
   function chooseMapPoint(){cancelPendingLocation();closePanel();$('rnLocationHelp').hidden=true;roamView('map');setPinMode(true);}
   function roamView(view){
@@ -20455,7 +20462,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // Room taken by the search bar and the list, so fitted pins land where they can be seen.
   function pad(){
     // The map has its own column; only the mobile map sheet overlaps it.
-    return { paddingTopLeft: [24,24], paddingBottomRight: [70, WIDE.matches || stage.classList.contains('pm-list-view') ? 24 : stage.classList.contains('is-route') ? 300 : 210] };
+    return { paddingTopLeft: [24,24], paddingBottomRight: [70, WIDE.matches || stage.classList.contains('pm-list-view') ? 24 : stage.classList.contains('is-route') ? Math.min(sheet.getBoundingClientRect().height+20,Math.max(24,map.getSize().y-120)) : 210] };
   }
   var fitRefresh=false;
   function fitTo(bounds, maxZoom){ fitRefresh=true;var o = pad(); o.maxZoom = maxZoom; map.fitBounds(bounds, o); }
@@ -20750,8 +20757,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (r.error && !r.data) html += '<p class="pm-route-sum">' + esc(T.routeFailed) + '</p>';
     else if (r.data) {
       html += '<p class="pm-route-sum"><strong>' + esc(durText(r.data.duration)) + '</strong> · ' + esc(T.km(r.data.distance / 1000)) + '</p>';
-      if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Aperçu depuis le point choisi. Utilisez votre position pour le guidage en direct et les annonces vocales.':'Route preview from your chosen point. Use your location for live progress and voice guidance.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
       html += '<ol class="pm-steps">' + r.steps.map(function(st, i){ return '<li' + (i === r.step ? ' class="is-now" aria-current="step"' : i < r.step ? ' class="is-done"' : '') + '><span>' + esc(st.maneuver && st.maneuver.instruction || '') + '</span>' + (st.distance > 0 ? '<small>' + esc(T.km(st.distance / 1000)) + '</small>' : '') + '</li>'; }).join('') + '</ol>';
+      if(me&&me.pin)html+='<p class="rn-route-preview">'+esc(FR?'Aperçu depuis le point choisi. Utilisez votre position pour le guidage en direct et les annonces vocales.':'Route preview from your chosen point. Use your location for live progress and voice guidance.')+' <button type="button" class="pm-chip" id="rnRouteUseLocation">'+esc(FR?'Utiliser ma position':'Use my location')+'</button></p>';
     }
     html += '<p class="pm-route-alt"><a ' + hrefAttr(dirUrl(x.lat, x.lng, x.venue || x.name)) + ' target="_blank" rel="noopener" data-dir="handoff">' + esc(IOS ? T.openApple : T.openGoogle) + '</a> ' + esc(T.voiceNote) + '</p>';
     routeEl.innerHTML = html;
@@ -21014,7 +21021,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var label = function(c){ return c.textContent.replace(/^\\s+|\\s+$/g, ''); }, uniq = function(a){ return a.filter(function(v, i){ return a.indexOf(v) === i; }); };
     var parts = uniq([].concat(xs.map(function(x){ return x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
-    $('rnApplyFilters').textContent=(tab==='events'?(FR?'Voir les événements':'Show events'):(FR?'Voir les lieux':'Show places'))+(n?' · '+n:'');
+    $('rnApplyFilters').textContent=(tab==='events'?(FR?'Voir les événements':'Show events'):(FR?'Voir les lieux':'Show places'));
     $('pmPanel').querySelectorAll('.rn-filter-group').forEach(function(g){var count=g.querySelectorAll('[aria-pressed="true"]').length;g.querySelector('[data-rn-count]').textContent=count?'('+count+')':''});
     $('rnLocationText').textContent=roamLocationLabel();
     badge.hidden = !n; badge.textContent = String(n);

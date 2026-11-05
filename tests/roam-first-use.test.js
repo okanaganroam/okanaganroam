@@ -23,3 +23,15 @@ test('switching from route preview to live location retains the destination and 
  const c={route:{x:{name:'Cafe'}},routeEl:{addEventListener(t,fn){c.click=fn}},nearBtn:{click(){c.requested=true}},startCompass(){c.compass=true},unlockVoice(){c.voice=true}};
  vm.createContext(c);vm.runInContext(handler,c);c.click({target:{closest:()=>true}});assert.equal(c.pendingRoute,c.route.x);assert.ok(c.requested&&c.compass&&c.voice);
 });
+
+test('route location help gives one cause and one next-step instruction',()=>{
+ const {roamRouteLocationMessage}=require('../roam-now-layout');
+ const en=roamRouteLocationMessage('blocked','Cafe','en');
+ assert.match(en,/To Cafe/);assert.equal((en.match(/browser/g)||[]).length,1);assert.equal((en.match(/live guidance/g)||[]).length,1);assert.match(en,/route preview/);
+ assert.ok(!en.includes('Enable location in your browser settings, or choose on the map instead'));
+ assert.match(roamRouteLocationMessage('failed','Cafe','en'),/Couldn’t find your location/);
+ assert.match(roamRouteLocationMessage('blocked','Café','fr'),/guidage en direct/);
+});
+test('apply button labels do not imply the selected-filter count is a result count',()=>{
+ const line=source.split('\n').find(l=>l.includes("$('rnApplyFilters').textContent="));assert.ok(line);assert.ok(!line.includes("+(n?"));
+});
