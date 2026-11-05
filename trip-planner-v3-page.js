@@ -2341,6 +2341,11 @@ function renderScript(d) {
       var slug = new URLSearchParams(location.search).get('region');
       var town = slug && REGIONS.filter(function(r){ return r.slug === slug; })[0];
       if (!town || !town.label) return;
+      // The example card and its one-liner are a Penticton happy hour crawl; coming from another town's page they would
+      // show the wrong town (West Kelowna visitors saw Penticton stops), so they are hidden there.
+      if (town.slug !== 'penticton') {
+        Array.prototype.forEach.call(document.querySelectorAll('.t3-try, .t3-sample'), function(el){ el.hidden = true; if (el.style) el.style.display = 'none'; });
+      }
       var n = town.label, fr = lang() === 'fr';
       var texts = fr
         ? ['3 jours \u00e0 ' + n + '\u00a0: vignobles, promenades faciles et bonne bouffe', '2 jours \u00e0 ' + n + ' avec les enfants', 'Une fin de semaine romantique \u00e0 ' + n, 'Que peut-on faire autour de ' + n + ' s\u2019il pleut?']

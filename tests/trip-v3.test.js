@@ -639,4 +639,6 @@ test('V3 /trip?region=<town> names that town in the placeholder and the four exa
   assert.match(run('?region=vernon', 'fr').chips[0], /^3 jours à Vernon/);
   assert.deepEqual(run('?region=nowhere').chips, ['x', 'x', 'x', 'x']);
   assert.deepEqual(run('').chips, ['x', 'x', 'x', 'x']);
+  // The Penticton example card is hidden on another town's page, and kept for Penticton itself.
+  assert.match(block, /town\.slug !== 'penticton'/);
 });
