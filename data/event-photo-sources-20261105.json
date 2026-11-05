@@ -143,6 +143,15 @@
       "event_ids": [
         1029
       ]
+    },
+    {
+      "file": "public/images/events/west-kelowna-warriors-2611.jpg",
+      "credit": "West Kelowna Warriors",
+      "source_page": "https://www.westkelownawarriors.ca/warriors-unveil-new-video-scoreclock",
+      "licence": "Team own-site photo; no licence stated",
+      "event_ids": [
+        2
+      ]
     }
   ]
 }
