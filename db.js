@@ -1326,4 +1326,15 @@ CREATE TABLE IF NOT EXISTS site_event_counts (
 );
 `);
 
+// Business activity counts (2026-11-05): per day and business, page views and link clicks. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS venue_event_counts (
+  day TEXT NOT NULL,
+  venue_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, venue_id, name)
+);
+`);
+
 module.exports = db;

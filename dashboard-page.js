@@ -98,18 +98,7 @@ function siteColumn(s, days) {
   return parts.join('');
 }
 
-function renderDashboardPage({ sites, days = 30, site = 'both', clarityId = '', generatedAt = new Date() }) {
-  const shown = site === 'both' ? sites : sites.filter((s) => s.key === site);
-  const tab = (key, label) => `<a class="tab${site === key ? ' on' : ''}" href="/admin/dashboard?site=${key}&days=${days}">${esc(label)}</a>`;
-  const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard?site=${esc(site)}&days=${n}">${n}d</a>`).join('');
-  const links = [
-    clarityId ? `<a href="https://clarity.microsoft.com/projects/view/${esc(clarityId)}/dashboard" target="_blank" rel="noopener">Screen recordings and heatmaps (Clarity)</a>` : '',
-    '<a href="https://analytics.google.com/" target="_blank" rel="noopener">Traffic and events (Google Analytics)</a>',
-    '<a href="/admin/review">Review inbox</a>',
-  ].filter(Boolean).map((l) => `<li>${l}</li>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>Dashboard – Okanagan Roam and Whistler Roam</title>
-<style>
+const STYLE = `<style>
 :root{--bg:#f6f4ee;--card:#fff;--ink:#1f2a24;--mute:#66706a;--line:#e3dfd3;--accent:#1f5f4a;--bar:#2f7d63;--warn:#9a3b12}
 @media (prefers-color-scheme:dark){:root{--bg:#151a17;--card:#1e2521;--ink:#e8ede9;--mute:#9aa59d;--line:#2d3731;--accent:#6fc2a0;--bar:#5db38f;--warn:#f0a070}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
@@ -124,7 +113,21 @@ main{max-width:1280px;margin:0 auto;padding:0 16px 40px;display:grid;gap:16px;gr
 .spark{margin:10px 0 0}.spark svg{width:100%;height:44px;fill:var(--bar)}.spark figcaption{font-size:.78rem;color:var(--mute)}
 .tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.85rem}th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}th{color:var(--mute);font-weight:600}
 .empty{color:var(--mute);margin:4px 0}.warn{color:var(--warn)}footer{max-width:1280px;margin:0 auto;padding:0 16px 24px;color:var(--mute);font-size:.8rem}
-</style></head><body>
+</style>`;
+
+function renderDashboardPage({ sites, days = 30, site = 'both', clarityId = '', generatedAt = new Date() }) {
+  const shown = site === 'both' ? sites : sites.filter((s) => s.key === site);
+  const tab = (key, label) => `<a class="tab${site === key ? ' on' : ''}" href="/admin/dashboard?site=${key}&days=${days}">${esc(label)}</a>`;
+  const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard?site=${esc(site)}&days=${n}">${n}d</a>`).join('');
+  const links = [
+    clarityId ? `<a href="https://clarity.microsoft.com/projects/view/${esc(clarityId)}/dashboard" target="_blank" rel="noopener">Screen recordings and heatmaps (Clarity)</a>` : '',
+    '<a href="https://analytics.google.com/" target="_blank" rel="noopener">Traffic and events (Google Analytics)</a>',
+    '<a href="/admin/dashboard/business"><b>Search a business</b> (views and clicks)</a>',
+    '<a href="/admin/review">Review inbox</a>',
+  ].filter(Boolean).map((l) => `<li>${l}</li>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Dashboard – Okanagan Roam and Whistler Roam</title>
+${STYLE}</head><body>
 <header><h1>Dashboard</h1><p class="sub">Both sites in one place. Numbers from each site’s own records; traffic and recordings open in their own tools.</p>
 <div class="bar"><div class="tabs">${tab('both', 'Both')}${tab('okanagan', 'Okanagan Roam')}${tab('whistler', 'Whistler Roam')}</div><div class="tabs">${range}</div></div>
 <ul class="links">${links}</ul></header>
@@ -133,4 +136,4 @@ main{max-width:1280px;margin:0 auto;padding:0 16px 40px;display:grid;gap:16px;gr
 </body></html>`;
 }
 
-module.exports = { renderDashboardPage };
+module.exports = { renderDashboardPage, esc, num, bars, stat, table, STYLE };
