@@ -134,6 +134,15 @@
         822,
         827
       ]
+    },
+    {
+      "file": "public/images/events/copper-brewing-2611.jpg",
+      "credit": "Copper Brewing Co. (owner-uploaded listing photo)",
+      "source_page": "https://okanaganroam.com/kelowna/breweries/copper-brewing-co",
+      "licence": "Uploaded by the venue owner through the owner portal",
+      "event_ids": [
+        1029
+      ]
     }
   ]
 }
