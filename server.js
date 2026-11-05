@@ -52317,6 +52317,27 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-secnav { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
   body.owner-page .op-secnav a { display: inline-flex; align-items: center; min-height: 40px; padding: 4px 14px; border-radius: 999px; background: var(--sand-deep, #EFE6D6); color: var(--ref-navy, #1F3A5F); font-weight: 800; font-size: 0.9rem; text-decoration: none; }
   body.owner-page .op-why { font-size: 0.82rem; color: #9C2F22; }
+  /* Simple view (2026-11-04): a short list of what an owner can do; picking one shows only that part of the page. */
+  body.owner-page .op-off { display: none !important; }
+  body.owner-page .op-tasks { margin: 18px 0 8px; }
+  body.owner-page .op-tasks[hidden], body.owner-page .op-taskbar[hidden], body.owner-page .op-helpme[hidden] { display: none; }
+  body.owner-page .op-tasks h2 { font-size: 1.5rem; margin: 0 0 6px; }
+  body.owner-page .op-tasks > .op-hint { font-size: 1.02rem; margin: 0 0 14px; }
+  body.owner-page .op-task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  body.owner-page .op-task { display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 14px 16px; border: 2px solid rgba(42,32,25,0.14); border-radius: 16px; background: #fff; color: inherit; text-align: left; font: inherit; text-decoration: none; cursor: pointer; }
+  body.owner-page .op-task:hover, body.owner-page .op-task:focus-visible { border-color: var(--ref-navy, #1F3A5F); box-shadow: 0 4px 14px -8px rgba(0,0,0,0.4); }
+  body.owner-page .op-task-icon { font-size: 2rem; line-height: 1; flex: 0 0 auto; }
+  body.owner-page .op-task-text { display: flex; flex-direction: column; gap: 3px; }
+  body.owner-page .op-task-text strong { font-size: 1.08rem; line-height: 1.25; }
+  body.owner-page .op-task-text span { font-size: 0.9rem; color: rgba(42,32,25,0.75); line-height: 1.3; }
+  body.owner-page .op-all-link { margin: 14px 0 0; }
+  body.owner-page .op-linkbtn, body.owner-page .op-back { background: none; border: 0; padding: 10px 0; min-height: 44px; font: inherit; font-weight: 700; color: var(--ref-navy, #1F3A5F); text-decoration: underline; cursor: pointer; }
+  body.owner-page .op-back { text-decoration: none; font-size: 1.05rem; }
+  body.owner-page .op-taskbar { margin: 8px 0 4px; }
+  body.owner-page .op-helpme { margin: 14px 0; padding: 14px 16px; border-radius: 14px; background: var(--paper, #FBF7F0); border: 1px dashed rgba(42,32,25,0.3); font-size: 0.98rem; line-height: 1.5; }
+  @media (max-width: 640px) {
+    body.owner-page .op-task-grid { grid-template-columns: 1fr; }
+  }
   ${OWNER_STATUS_CSS}
   @media (max-width: 640px) {
     body.owner-page .venue-form { padding: 18px 14px; }
@@ -52343,29 +52364,51 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
+      ${(() => {
+        const menuHref = token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`);
+        const hasMenu = MENU_VENUE_TYPES.has(venue.type);
+        const tile = (task, icon, title, sub) => `<button type="button" class="op-task" data-pick="${task}"><span class="op-task-icon" aria-hidden="true">${icon}</span><span class="op-task-text"><strong>${title}</strong><span>${sub}</span></span></button>`;
+        const mailHref = `mailto:info@okanaganroam.com?subject=${encodeURIComponent(`Please update ${venue.name}`)}`;
+        return `<section class="op-tasks" id="opTasks" data-task="home" hidden aria-labelledby="opTasksHead">
+        <h2 id="opTasksHead">${L('What would you like to do today?', 'Que souhaitez-vous faire aujourd’hui?')}</h2>
+        <p class="op-hint">${instantOn ? L('Pick one. Your changes go live on your page as soon as you save them.', 'Choisissez une option. Vos modifications sont en ligne dès que vous les enregistrez.') : L('Pick one. Nothing changes until you press the Send button, and we check every change (usually within a day) before it goes on your page.', 'Choisissez une option. Rien ne change avant que vous touchiez le bouton Envoyer, et nous vérifions chaque modification (habituellement en moins d’une journée) avant qu’elle soit en ligne.')}</p>
+        <div class="op-task-grid">
+          ${tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
+          ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
+          ${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">&#127869;</span><span class="op-task-text"><strong>${isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
+          ${tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
+          ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
+          ${tile('more', '&#11088;', L('Features, prices and deals', 'Caractéristiques, prix et spéciaux'), L('Dog friendly, patio, happy hour…', 'Chiens admis, terrasse, happy hour…'))}
+        </div>
+        <p class="op-all-link"><button type="button" class="op-linkbtn" data-pick="all">${L('Show me the full page instead', 'Afficher plutôt la page complète')}</button></p>
+      </section>
+      <div class="op-taskbar" id="opTaskBar" data-task="hours photos events contact more" hidden><button type="button" class="op-back" data-pick="">&larr; ${L('Back to the list', 'Retour à la liste')}</button></div>
+      <aside class="op-helpme" id="opHelpMe" data-task="home hours photos events contact more" hidden><strong>${L('Would you rather have us do it?', 'Vous préférez que nous le fassions?')}</strong> ${L('That&rsquo;s no problem. Email us what you&rsquo;d like changed. A photo of your menu, or just a few words, is plenty.', 'Aucun problème. Écrivez-nous ce que vous voulez changer. Une photo de votre menu, ou simplement quelques mots, suffit.')} <a href="${mailHref}">info@okanaganroam.com</a></aside>`;
+      })()}
+      <div data-task="all">
       ${instantOn
     ? L(`<p>Update your listing below and press <strong>Save changes</strong>. Your hours, season, phone, description, badges${showHappyHour ? ', happy hour' : ''} and price range go live on <a href="${escapeHtml(listing)}">your page</a> straight away. A new name, address, website or link is checked first, usually within a day.</p>
       <p class="op-reassure">Free &middot; about 5 minutes &middot; you can change anything again at any time.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Enregistrer les modifications</strong>. Vos heures, votre saison, votre téléphone, votre description, vos caractéristiques${showHappyHour ? ', votre happy hour' : ''} et votre gamme de prix sont mis en ligne sur <a href="${escapeHtml(listing)}">votre page</a> tout de suite. Un nouveau nom, une nouvelle adresse, un nouveau site Web ou un nouveau lien sont d’abord vérifiés, en général d’ici un jour.</p>
       <p class="op-reassure">Gratuit &middot; environ 5 minutes &middot; vous pouvez tout modifier de nouveau en tout temps.</p>`)
     : L(`<p>Update your listing below and press <strong>Send changes</strong>. We review every change, usually within a day, and then it goes live on <a href="${escapeHtml(listing)}">your page</a>.<span id="opLinkNote"> Keep this link private; anyone with it can suggest changes.</span></p>
       <p class="op-reassure">Free &middot; about 5 minutes. Want your changes to go live straight away? <a href="#opLogin" data-open-login>Create a login</a> below.</p>`, `<p>Mettez votre fiche à jour ci-dessous, puis touchez <strong>Envoyer les modifications</strong>. Nous vérifions chaque modification, en général d’ici un jour, puis elle est mise en ligne sur <a href="${escapeHtml(listing)}">votre page</a>.<span id="opLinkNote"> Gardez ce lien privé : toute personne qui l’a peut proposer des modifications.</span></p>
-      <p class="op-reassure">Gratuit &middot; environ 5 minutes. Pour que vos modifications soient en ligne tout de suite, <a href="#opLogin" data-open-login>créez un compte</a> ci-dessous.</p>`)}
-      ${ownerMenuCardHtml(venue, token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`), lang).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}
+      <p class="op-reassure">Gratuit &middot; environ 5 minutes. Pour que vos modifications soient en ligne tout de suite, <a href="#opLogin" data-open-login>créez un compte</a> ci-dessous.</p>`)}</div>
+      <div data-task="all">${ownerMenuCardHtml(venue, token ? P(`${OWNER_LINK_PATH}${token}/menu`) : P(`/owner/account/venue/${venue.id}/menu`), lang).replace(/<a class="op-menu-card" href="([^"]*)"/, '<a class="op-menu-card" href="$1" id="opMenuCard"')}</div>
     </div>
-    <nav class="op-secnav" id="opSecNav" aria-label="${L('Parts of this page', 'Sections de cette page')}"><a href="#hours">${L('Hours', 'Heures')}</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? L('Prices', 'Prix') : 'Menu'}</a>` : ''}<a href="#events">${L('Events', 'Événements')}</a></nav>
+    <nav class="op-secnav" id="opSecNav" data-task="all" aria-label="${L('Parts of this page', 'Sections de cette page')}"><a href="#hours">${L('Hours', 'Heures')}</a><a href="#photos">Photos</a>${MENU_VENUE_TYPES.has(venue.type) ? `<a href="#opMenuCard">${isPriceList(venue) ? L('Prices', 'Prix') : 'Menu'}</a>` : ''}<a href="#events">${L('Events', 'Événements')}</a></nav>
     <div class="op-head">
       ${found.welcome ? `<p class="op-done show" id="opWelcome" role="status">${L(`You&rsquo;re signed in.${found.welcome.live.length ? ` What you sent from your link is now live: ${escapeHtml(ownerFieldNames(found.welcome.live, 'en'))}.` : ''} From now on your changes go live as soon as you save them. Next time, sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>.`, `Vous êtes connecté.${found.welcome.live.length ? ` Ce que vous avez envoyé avec votre lien est maintenant en ligne : ${escapeHtml(ownerFieldNames(found.welcome.live, 'fr'))}.` : ''} Désormais, vos modifications sont en ligne dès que vous les enregistrez. La prochaine fois, connectez-vous à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.`)}</p>` : ''}
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</p>` : ''; })()}
-      ${pendingNote}
-      ${ownerActivityHtml(ownerVenueActivity(venue.id, 12, lang), lang)}
+      <div data-task="home all">${pendingNote}
+      ${ownerActivityHtml(ownerVenueActivity(venue.id, 12, lang), lang)}</div>
       ${found.account ? `<p class="op-bar-in">${L('Signed in as', 'Connecté en tant que')} <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="${P('/owner/account')}">${L('My listings', 'Mes fiches')}</a> &middot; <a href="${P('/owner/account/settings')}">${L('Account settings', 'Paramètres du compte')}</a></p>` : viewer && found.viewerManages ? `
       <p class="op-login">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>, et cette entreprise est liée à votre compte. <a href="/fr/owner/account/venue/${venue.id}"><strong>Ouvrez-la à partir de Mes fiches</strong></a> pour que vos photos${MENU_VENUE_TYPES.has(venue.type) ? ` et ${menuWord} soient mis` : ' soient mises'} en ligne tout de suite.`)}</p>` : viewer ? `
-      <div class="op-login" id="opAddLogin">
+      <div class="op-login" id="opAddLogin" data-task="home all">
         <p style="margin:0 0 10px">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>. Add ${escapeHtml(venue.name)} to your login to manage it from <a href="/owner/account">My listings</a>, with photos going live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>. Ajoutez ${escapeHtml(venue.name)} à votre compte pour la gérer à partir de <a href="/fr/owner/account">Mes fiches</a>; vos photos seront alors mises en ligne tout de suite.`)}</p>
         <button type="button" class="venue-form-submit" id="olsAdd">${L('Add to my login', 'Ajouter à mon compte')} (${escapeHtml(viewer.email)})</button>
         <p class="lyv-error" id="olsAddError" hidden></p>
       </div>` : `
-      <details class="op-login" id="opLogin">
+      <details class="op-login" id="opLogin" data-task="home all">
         <summary>${L(`<strong>Create a login</strong> (30 seconds): your photos${MENU_VENUE_TYPES.has(venue.type) ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} then go live straight away, and you won&rsquo;t need this link next time`, `<strong>Créer un compte</strong> (30 secondes) : vos photos${MENU_VENUE_TYPES.has(venue.type) ? ` et ${menuWord}` : ''} seront mis en ligne tout de suite, et vous n’aurez plus besoin de ce lien`)}</summary>
         <form id="olsForm" novalidate>
           <p class="op-hint">${L('Choose a password. Next time, sign in at <strong>okanaganroam.com/owner/login</strong>. Already have a login? Use the same email and password to add this business to it. <a href="/owner/forgot">Forgot your password?</a>', 'Choisissez un mot de passe. La prochaine fois, connectez-vous à <strong>okanaganroam.com/fr/owner/login</strong>. Vous avez déjà un compte? Utilisez le même courriel et le même mot de passe pour y ajouter cette entreprise. <a href="/fr/owner/forgot">Mot de passe oublié?</a>')}</p>
@@ -52380,9 +52423,9 @@ ${renderGolfHeaderHtml()}
       </details>`}
     </div>
     <form class="venue-form" id="opForm" novalidate>
-      <details class="op-fold op-sec" id="hours" open>
+      <details class="op-fold op-sec" id="hours" data-task="hours" open>
       <summary><span class="lyv-section-label">${L('Opening hours', 'Heures d’ouverture')}${waitChip('hours')}</span></summary>
-      <p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Closing after midnight? Just enter the closing time, like 01:00.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 01:00.')}</p>
+      <p class="op-hint">${hoursKnown ? '' : L('<strong>We don&rsquo;t have your hours yet.</strong> Add the times you&rsquo;re open, and tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', '<strong>Nous n’avons pas encore vos heures.</strong> Ajoutez vos heures d’ouverture et cochez « Fermé » pour les jours où vous êtes fermés. ')}${hoursKnown ? L('Tick &ldquo;Closed&rdquo; for days you&rsquo;re closed. ', 'Cochez « Fermé » pour les jours où vous êtes fermés. ') : ''}${L('Open past midnight? Just enter the real closing time, like 1:00 AM.', 'Vous fermez après minuit? Entrez simplement l’heure de fermeture, comme 1:00.')}</p>
       <div id="opHours">${dayRows('hours', hours, true)}</div>
       <p class="lyv-error" id="opHoursError" hidden></p>
       ${(() => {
@@ -52402,13 +52445,13 @@ ${renderGolfHeaderHtml()}
       ${ownerClosuresHtml(snap.closures || [], waitChip('closures'), lang)}
       </details>
 
-      <p class="lyv-section-label">${L('Contact', 'Coordonnées')}</p>
-      <div class="form-row">
+      <p class="lyv-section-label" data-task="contact">${L('Contact', 'Coordonnées')}</p>
+      <div class="form-row" data-task="contact">
         <div class="form-field"><label for="opPhone">${L('Phone', 'Téléphone')}${waitChip('phone')}</label><input type="tel" id="opPhone" maxlength="40" value="${escapeHtml(snap.phone)}"><p class="lyv-error" id="opPhoneError" hidden></p></div>
         <div class="form-field"><label for="opWebsite">${L('Website', 'Site Web')}${waitChip('website')}${instantOn ? ` <span class="op-hint">${L('(checked first)', '(vérifié d’abord)')}</span>` : ''}</label><input type="url" id="opWebsite" maxlength="300" placeholder="${L('yourbusiness.com', 'votreentreprise.com')}" autocapitalize="off" value="${escapeHtml(snap.website)}"><p class="lyv-error" id="opWebsiteError" hidden></p></div>
       </div>
 
-      <details class="op-fold" id="opLinksBox"${OWNER_BOOKING_FIRST_TYPES.has(venue.type) && !snap.booking_url ? ' open' : ''}>
+      <details class="op-fold" id="opLinksBox" data-task="contact"${OWNER_BOOKING_FIRST_TYPES.has(venue.type) && !snap.booking_url ? ' open' : ''}>
       <summary><span class="lyv-section-label">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? L('Booking link, name, address &amp; links', 'Lien de réservation, nom, adresse et liens') : L('Name, address &amp; links', 'Nom, adresse et liens')}${waitChip('name', 'address', ...OWNER_LINK_FIELDS)}</span> <span class="op-fold-hint">${OWNER_BOOKING_FIRST_TYPES.has(venue.type) ? L('Add your booking link so visitors get a &ldquo;Book&rdquo; button', 'Ajoutez votre lien de réservation pour que les visiteurs aient un bouton « Réserver »') : L('Change your business name, address, menu, booking or social links', 'Changez le nom de votre entreprise, votre adresse ou vos liens de menu, de réservation et de réseaux sociaux')}</span></summary>
       <div class="form-row">
         ${instantOn ? `<p class="op-hint" style="grid-column:1/-1;margin:0">${L('We check a new name, address or link before it goes live, usually within a day.', 'Nous vérifions un nouveau nom, une nouvelle adresse ou un nouveau lien avant sa mise en ligne, en général d’ici un jour.')}</p>` : ''}
@@ -52425,15 +52468,15 @@ ${renderGolfHeaderHtml()}
       </div>
       </details>
 
-      <p class="lyv-section-label" id="opDescriptionLabel">Description${waitChip('description')}</p>
-      <div class="form-row full"><div class="form-field">
+      <p class="lyv-section-label" id="opDescriptionLabel" data-task="contact">Description${waitChip('description')}</p>
+      <div class="form-row full" data-task="contact"><div class="form-field">
         <textarea id="opDescription" rows="6" maxlength="${OWNER_DESCRIPTION_MAX}" aria-labelledby="opDescriptionLabel" aria-describedby="opDescCount">${escapeHtml(snap.description)}</textarea>
         <p class="op-hint">${L(`A few sentences about what makes your place worth a visit. If it mentions your hours or prices, check they still match.${instantOn ? ' It goes live as you write it; we may lightly edit it later for length and style.' : ' We may lightly edit for length and style.'} Plain text only.`, `Quelques phrases sur ce qui rend votre endroit intéressant. Si elle mentionne vos heures ou vos prix, vérifiez qu’ils sont toujours exacts.${instantOn ? ' Elle est mise en ligne telle que vous l’écrivez; nous pourrions la retoucher un peu plus tard pour la longueur et le style.' : ' Nous pourrions la retoucher un peu pour la longueur et le style.'} Texte seulement. Vous pouvez l’écrire en français ou en anglais.`)}</p>
         <p class="op-hint op-count" id="opDescCount" aria-live="polite"></p>
         <p class="lyv-error" id="opDescriptionError" hidden></p>
       </div></div>
 
-      <details class="op-fold op-sec" id="badges">
+      <details class="op-fold op-sec" id="badges" data-task="more">
       <summary><span class="lyv-section-label">${L('Badges', 'Caractéristiques')}${waitChip('badges')}</span> <span class="op-fold-hint">${(() => { const n = RESEARCHED_BOOL_FIELDS.filter((f) => snap.badges[f] && (f !== 'happy_hour' || showHappyHour)).length; return n ? L(`${n} ticked, like dog friendly or patio`, `${n} coché${n === 1 ? '' : 's'}, comme chiens acceptés ou terrasse`) : L('Dog friendly, patio, vegan options and more', 'Chiens acceptés, terrasse, options véganes et plus'); })()}</span></summary>
       <p class="op-hint">${L('Tick everything that&rsquo;s true. Visitors filter by these on our map and lists.', 'Cochez tout ce qui s’applique. Les visiteurs s’en servent pour filtrer notre carte et nos listes.')}</p>
       <div class="amenity-check-grid" id="opBadges">${badgeChecks}
@@ -52441,7 +52484,7 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
       ${NO_PRICE_TYPES.has(venue.type) ? '' : `
-      <details class="op-fold op-sec" id="price"${waitingFields.has('price_range') ? ' open' : ''}>
+      <details class="op-fold op-sec" id="price" data-task="more"${waitingFields.has('price_range') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opPriceLabel">${L('Price range', 'Gamme de prix')}${waitChip('price_range')}</span> <span class="op-fold-hint">${snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement')}</span></summary>
       <div class="form-row full"><div class="form-field">
         <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
@@ -52452,7 +52495,7 @@ ${renderGolfHeaderHtml()}
       </div></div>
       </details>`}
       ${showHappyHour ? `
-      <details class="op-fold op-sec" id="happy">
+      <details class="op-fold op-sec" id="happy" data-task="more">
       <summary><span class="lyv-section-label">Happy hour${waitChip('happy_hour')}</span> <span class="op-fold-hint">${(() => { const n = OWNER_DAYS.filter((d) => hh[d] && hh[d].length).length; return n ? L(`Set for ${n} day${n === 1 ? '' : 's'}`, `Indiqué pour ${n} jour${n === 1 ? '' : 's'}`) : L('Not set', 'Non indiqué'); })()}</span></summary>
       <p class="op-hint">${L('Add the times your happy hour runs. We show &ldquo;Happy hour now&rdquo; on the map while it&rsquo;s on. Tick &ldquo;None&rdquo; for days without one.', 'Ajoutez les heures de votre happy hour. Nous affichons « Happy hour en cours » sur la carte pendant qu’il a lieu. Cochez « Aucun » pour les jours sans happy hour.')}</p>
       <div id="opHappy">${dayRows('happy', hh, false)}</div>
@@ -52466,7 +52509,7 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opDealsError" hidden></p>
       </details>` : ''}
       ${showSpecials ? `
-      <details class="op-fold op-sec" id="specials"${waitingFields.has('specials') ? ' open' : ''}>
+      <details class="op-fold op-sec" id="specials" data-task="more"${waitingFields.has('specials') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opSpecialsLabel">${L('Weekly specials', 'Spéciaux de la semaine')}${waitChip('specials')}</span> <span class="op-fold-hint">${specialsNow.length ? L(`${specialsNow.length} special${specialsNow.length === 1 ? '' : 's'}`, `${specialsNow.length} spécia${specialsNow.length === 1 ? 'l' : 'ux'}`) : L('None yet', 'Aucun pour l’instant')}</span></summary>
       <p class="op-hint">${specialsAlcohol
         ? L(`Deals on a day of the week, up to ${SPECIALS_MAX} (&ldquo;Wing Wednesday&rdquo; &middot; &ldquo;60&cent; wings&rdquo;). Tick the days, and add a time if it isn&rsquo;t all day. Happy hour goes under Happy hour; trivia and karaoke go under Weekly nights. We show today&rsquo;s special on your listing, on the map and in Build My Trip. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Des offres un jour de la semaine, jusqu’à ${SPECIALS_MAX} (« Mercredi des ailes » · « Ailes à 60 ¢ »). Cochez les jours, et ajoutez une heure si ce n’est pas toute la journée. Le happy hour va sous Happy hour; les quiz et le karaoké vont sous Soirées de la semaine. Nous affichons le spécial du jour sur votre fiche, sur la carte et dans Planifier mon voyage. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)
@@ -52475,31 +52518,32 @@ ${renderGolfHeaderHtml()}
       <p class="lyv-error" id="opSpecialsError" hidden></p>
       </details>` : ''}
       ${showNights ? `
-      <details class="op-fold op-sec" id="weekly-nights"${waitingFields.has('weekly_nights') ? ' open' : ''}>
+      <details class="op-fold op-sec" id="weekly-nights" data-task="more"${waitingFields.has('weekly_nights') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opNightsLabel">${L('Weekly nights', 'Soirées de la semaine')}${waitChip('weekly_nights')}</span> <span class="op-fold-hint">${nightsNow.length ? L(`${nightsNow.length} night${nightsNow.length === 1 ? '' : 's'}`, `${nightsNow.length} soirée${nightsNow.length === 1 ? '' : 's'}`) : L('None yet', 'Aucune pour l’instant')}</span></summary>
       <p class="op-hint">${L(`Your regular nights, up to ${NIGHTS_MAX}: trivia, karaoke, an open mic, bingo, live music, a run club (&ldquo;Trivia Tuesday&rdquo;, Tuesdays 7 PM). Tick the days, pick the kind and how often, and add the time. We show tonight&rsquo;s on your listing, on the map, on What&rsquo;s On and in Build My Trip. A one-off show is an event instead. Leave out links, phone numbers and emoji. Clear every box to remove them.`, `Vos soirées régulières, jusqu’à ${NIGHTS_MAX} : quiz, karaoké, scène ouverte, bingo, musique live, club de course (« Quiz du mardi », le mardi à 19 h). Cochez les jours, choisissez le genre et la fréquence, et ajoutez l’heure. Nous affichons celle du soir sur votre fiche, sur la carte, dans À l’affiche et dans Planifier mon voyage. Un spectacle unique est plutôt un événement. N’indiquez pas de liens, de numéros de téléphone ni d’émojis. Videz toutes les cases pour les retirer.`)}</p>
       <div id="opNights" role="group" aria-labelledby="opNightsLabel">${nightRows()}</div>
       <p class="lyv-error" id="opNightsError" hidden></p>
       </details>` : ''}
 
-      <p class="lyv-section-label">${L('Anything else?', 'Autre chose?')}</p>
-      <div class="form-row">
+      <p class="lyv-section-label" data-task="hours contact more all">${L('Anything else?', 'Autre chose?')}</p>
+      <div class="form-row" data-task="hours contact more all">
         <div class="form-field"><label for="opName">${L('Your name', 'Votre nom')}</label><input type="text" id="opName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"></div>
         ${found.account ? '' : `<div class="form-field"><label for="opEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="opEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="op-hint" style="margin:4px 0 0">${L('We&rsquo;ll email you when it&rsquo;s live.', 'Nous vous écrirons quand ce sera en ligne.')}</p><p class="lyv-error" id="opEmailError" hidden></p></div>`}
       </div>
-      <div class="form-row full"><div class="form-field">
+      <div class="form-row full" data-task="hours contact more all"><div class="form-field">
         <label for="opNote">${L('Note for us (optional)', 'Note pour nous (facultatif)')}</label>
         <textarea id="opNote" rows="3" maxlength="1000" placeholder="${L('Seasonal closures, new menu, anything we should know.', 'Fermetures saisonnières, nouveau menu, tout ce que nous devrions savoir.')}"></textarea>
       </div></div>
       <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="opFormError" hidden></p>
-      <button type="submit" class="venue-form-submit" id="opSubmit">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
+      <button type="submit" class="venue-form-submit" id="opSubmit" data-task="hours contact more all">${instantOn ? L('Save changes', 'Enregistrer les modifications') : L('Send changes', 'Envoyer les modifications')}</button>
     </form>
     <div class="op-done" id="opDone" role="status"><span id="opDoneText">${L('Thanks! We&rsquo;ve got your changes and will review them, usually within a day.', 'Merci! Nous avons reçu vos modifications et nous les vérifierons, en général d’ici un jour.')}</span><span id="opDoneMail"${found.account ? '' : ' hidden'}>${L(' We&rsquo;ll email you when they&rsquo;re live.', ' Nous vous écrirons quand elles seront en ligne.')}</span>
-      <button type="button" class="op-more" id="opMore">${L('Make more changes', 'Faire d’autres modifications')}</button>${found.account || viewer ? '' : `
+      <button type="button" class="op-more" id="opMore">${L('Make more changes', 'Faire d’autres modifications')}</button>
+      <button type="button" class="op-more" data-pick="">${L('Back to the list', 'Retour à la liste')}</button>${found.account || viewer ? '' : `
       <span class="op-done-login" id="opDoneLogin">${L('<strong>Skip the link next time:</strong> <a href="#opLogin">create a login</a>. It takes 30 seconds.', '<strong>Plus besoin du lien la prochaine fois :</strong> <a href="#opLogin">créez un compte</a>. Ça prend 30 secondes.')}</span>`}</div>
     <div class="op-unsent" id="opUnsent" hidden role="status"><span>${instantOn ? L('Your listing changes aren&rsquo;t saved yet.', 'Les modifications de votre fiche ne sont pas encore enregistrées.') : L('Your listing changes aren&rsquo;t sent yet.', 'Les modifications de votre fiche ne sont pas encore envoyées.')}</span> <button type="button" id="opUnsentSend">${instantOn ? L('Save changes', 'Enregistrer') : L('Send changes', 'Envoyer')}</button></div>
-    <details class="op-fold op-sec" id="photos" open>
+    <details class="op-fold op-sec" id="photos" data-task="photos" open>
     <summary><h2 class="lyv-section-label">Photos</h2></summary>
     <p class="op-hint">${L('Send up to 5 photos at a time: your space, food, drinks or what you offer. Wide (landscape) shots work best.', 'Envoyez jusqu’à 5 photos à la fois : votre espace, vos plats, vos boissons ou ce que vous offrez. Les photos à l’horizontale donnent les meilleurs résultats.')} ${found.account ? L('Because you&rsquo;re signed in, your photos go live straight away. If your page has no photo of its own yet, the first one becomes its main photo, credited to you.', 'Comme vous êtes connecté, vos photos sont mises en ligne tout de suite. Si votre page n’a pas encore sa propre photo, la première devient sa photo principale, avec votre nom en crédit.') : L('We review every photo; the best one can become the main photo on your page, credited to you. Signed-in owners&rsquo; photos go live straight away.', 'Nous vérifions chaque photo; la meilleure peut devenir la photo principale de votre page, avec votre nom en crédit. Avec un compte, vos photos sont mises en ligne tout de suite.')}</p>
     <p class="op-hint op-video-hint">${L('Have a short video (10&ndash;30 seconds) of your space, a dish or a drink? Email it to <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> and we may feature it on our Instagram and Facebook, with credit.', 'Vous avez une courte vidéo (10 à 30 secondes) de votre espace, d’un plat ou d’une boisson? Envoyez-la à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> et nous pourrions la présenter sur notre Instagram et notre Facebook, avec crédit.')}</p>
@@ -52525,7 +52569,7 @@ ${renderGolfHeaderHtml()}
       <button type="submit" class="venue-form-submit" id="ofSubmit">${L('Upload photos', 'Téléverser les photos')}</button>
     </form>
     </details>
-    <details class="op-fold op-sec" id="events">
+    <details class="op-fold op-sec" id="events" data-task="events">
     <summary><h2 class="lyv-section-label" id="oeHead">${L('Add an event', 'Ajouter un événement')}</h2> <span class="op-fold-hint">${L('Live music, tastings, markets, classes or specials on What&rsquo;s On', 'Musique en direct, dégustations, marchés, cours ou spéciaux dans À l’affiche')}</span></summary>
     <p class="op-hint">${L('Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.', 'Musique en direct, dégustations, marchés, cours, spéciaux. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.')}</p>
     <form class="venue-form" id="oeForm" novalidate>
@@ -52628,6 +52672,7 @@ ${ownerFooterHtml(fr)}
   }
   function show(id, msg){
     var el = document.getElementById(id); if (!el) return; el.textContent = msg || ''; el.hidden = !msg;
+    if (msg && el.closest('.op-off') && typeof setTask === 'function') setTask('all');
     // Tie a field's message to its box, so a screen reader reads both when the box gets focus.
     var f = el.closest('.form-field'), input = f && f.querySelector('input:not([type=checkbox]), textarea, select');
     if (!input) return;
@@ -52646,6 +52691,34 @@ ${ownerFooterHtml(fr)}
     var input = f && f.querySelector('input:not([type=checkbox]):not([disabled]), textarea, select');
     if (input) setTimeout(function(){ input.focus({ preventScroll: true }); }, 350);
   }
+  // Simple view (2026-11-04): start from a short list of tasks; picking one shows only that part of the page.
+  // Old links (#photos, #hours, an email that points at a section) and "Show me the full page" open the whole page.
+  var TASK_OF = { hours: 'hours', photos: 'photos', events: 'events', badges: 'more', price: 'more', happy: 'more', specials: 'more', 'weekly-nights': 'more', opLinksBox: 'contact', opDescriptionLabel: 'contact' };
+  function setTask(t){
+    document.body.setAttribute('data-op-task', t);
+    var fm = document.getElementById('opForm'), dn = document.getElementById('opDone');
+    if (fm && fm.style.display === 'none') { fm.style.display = ''; if (dn) dn.classList.remove('show'); }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-task]'), function(el){
+      var tokens = ' ' + el.getAttribute('data-task') + ' ';
+      var showIt = t === 'all' ? !(tokens.indexOf(' home ') >= 0 && tokens.indexOf(' all ') < 0) : tokens.indexOf(' ' + (t || 'home') + ' ') >= 0;
+      el.classList.toggle('op-off', !showIt);
+      if (el.hasAttribute('hidden') && showIt && /^op(Tasks|TaskBar|HelpMe)$/.test(el.id)) el.hidden = false;
+    });
+    var bar = document.getElementById('opTaskBar'); if (bar) bar.hidden = !(t && t !== 'all');
+    if (t && t !== 'all') Array.prototype.forEach.call(document.querySelectorAll('details[data-task~="' + t + '"]'), function(d){ d.open = true; });
+    if (!t || t === 'all') window.scrollTo(0, 0);
+    else { var h = document.getElementById('opTaskBar'); if (h) h.scrollIntoView({ block: 'start' }); }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-pick]'), function(b){ b.addEventListener('click', function(){ setTask(b.getAttribute('data-pick')); }); });
+  (function(){
+    var hash = (location.hash || '').replace('#', ''), q = location.search || '';
+    var start = '';
+    if (TASK_OF[hash] && !/[?&](welcome|live)=/.test(q)) start = TASK_OF[hash];
+    else if (hash || /[?&](welcome|live)=/.test(q)) start = 'all';
+    setTask(start);
+    if (start) window.scrollTo(0, 0);
+    if (hash && start) setTimeout(function(){ var el = document.getElementById(hash); if (el) el.scrollIntoView({ block: 'start' }); }, 50);
+  })();
   // Live count under the description, so the minimum is clear before sending.
   var dsc = document.getElementById('opDescription'), dscCount = document.getElementById('opDescCount');
   function countDesc(){ if (!dsc || !dscCount) return; var n = dsc.value.trim().length; dscCount.textContent = T.chars.replace('{n}', n) + (n < ${OWNER_DESCRIPTION_MIN} ? T.charsMin : ''); dscCount.classList.toggle('op-count-low', n < ${OWNER_DESCRIPTION_MIN}); }
