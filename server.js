@@ -20281,6 +20281,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   var stage = $('pmStage'), floatEl = stage.querySelector('.pm-float'), sheet = $('pmSheet'), handle = $('pmHandle'), panel = $('pmPanel'), filtersBtn = $('pmFiltersBtn'), badge = $('pmBadge'), quickClear = $('pmQuickClear');
+  function roamLocationLabel(){return town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location')}
   function roamView(view){
     if (typeof route !== 'undefined' && route && view === 'list') return;
     stage.classList.toggle('pm-list-view',view === 'list');stage.classList.toggle('pm-map-view',view === 'map');
@@ -20291,7 +20292,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   $('rnMap').addEventListener('click',function(){roamView('map')});
   $('rnLocation').addEventListener('click',function(){openPanel();$('pmTown').focus()});
   $('rnClear').addEventListener('click',clearAll);
-  $('rnUseLocation').addEventListener('click',function(){closePanel();nearBtn.click()});
+  $('rnUseLocation').addEventListener('click',function(){town='';syncChips();closePanel();nearBtn.click()});
   // The map fills the screen below the header.
   function fitStage(){ var top = stage.getBoundingClientRect().top + (window.scrollY || 0); document.documentElement.style.setProperty('--pm-top', Math.max(0, Math.round(top)) + 'px'); }
   fitStage(); map.invalidateSize(); okLimits(); window.addEventListener('resize', function(){ fitStage(); map.invalidateSize(); okLimits(); });
@@ -20544,7 +20545,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // the map" while 3 matched).
   var searchFit = false, hhNoteShown = false;
   function render(fit){
-    $('rnLocationText').textContent=me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location');
+    $('rnLocationText').textContent=roamLocationLabel();
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes;
     var items, onMap, sf = searchFit; searchFit = false;
     if (me) { places.forEach(function(p){ p.d = distKm(me.lat, me.lng, p.lat, p.lng); }); events.forEach(function(e){ e.d = e.lat == null ? null : distKm(me.lat, me.lng, e.lat, e.lng); }); }
@@ -20992,7 +20993,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var parts = uniq([].concat(xs.map(function(x){ return x.label; }), [].concat(kindChips.filter(function(c){ return kinds[c.getAttribute('data-pm-kind')]; }), openOnly ? [openBtns[0]] : [], topOnly ? [topBtns[0]] : [], featChips.filter(function(c){ return feats[c.getAttribute('data-pm-feat')]; })).map(label)));
     var n = parts.length;
     $('pmPanelDone').textContent=(FR?'Voir les lieux':'Show places')+(n?' · '+n:'');
-    $('rnLocationText').textContent=me?(me.pin?(FR?'Autour de votre repère':'Around your pin'):(FR?'Près de vous':'Near your location'))+' · '+(radiusKm?radiusKm+' km':(FR?'Toute distance':'Any distance')):town?(CONF.r[town]+' · '+(FR?'Changer':'Change')):(FR?'Zone de Kelowna · Changer':'Kelowna map area · Change location');
+    $('rnLocationText').textContent=roamLocationLabel();
     badge.hidden = !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
     // Keep the quick chips that are on in view.
