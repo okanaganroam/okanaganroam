@@ -51,3 +51,23 @@ test('explicit town remains visible when GPS is also available',()=>{
  vm.createContext(ctx);vm.runInContext(fn+';result=roamLocationLabel()',ctx);assert.equal(ctx.result,'Vernon · Change');
  ctx.town='';vm.runInContext('result=roamLocationLabel()',ctx);assert.equal(ctx.result,'Near your location · 5 km');
 });
+
+test('map cards receive recorded gluten-free details with qualifications intact', () => {
+  const app = require('../server');
+  const db = require('../db');
+  const id = Number(db.prepare(
+    'INSERT INTO venues(name,region,type,slug,latitude,longitude,gluten_free) VALUES (?,?,?,?,?,?,?)'
+  ).run('Roam dietary fixture', 'kelowna', 'cafe', 'roam-dietary-fixture', 49.88, -119.49, 1).lastInsertRowid);
+  const path = '/kelowna/cafes/roam-dietary-fixture';
+  try {
+    assert.equal(JSON.parse(app.mapLiveData().json).gf[path], undefined);
+    const detail = 'Gluten-free buns are available. The fryer is shared.';
+    db.prepare('INSERT INTO venue_visit_info(venue_id,info) VALUES (?,?)').run(id, JSON.stringify({
+      rows: [{ label: 'Menu', text: 'Sandwiches and coffee.' }, { label: 'Dietary', text: detail }],
+    }));
+    assert.equal(JSON.parse(app.mapLiveData().json).gf[path][0], detail);
+  } finally {
+    db.prepare('DELETE FROM venue_visit_info WHERE venue_id=?').run(id);
+    db.prepare('DELETE FROM venues WHERE id=?').run(id);
+  }
+});
