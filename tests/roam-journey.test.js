@@ -44,6 +44,13 @@ test('built-in destinations resolve real venues and event hosts, rejecting arbit
   event=Number(db.prepare('INSERT INTO events(name,slug,region,start_datetime,venue_id,status) VALUES (?,?,?,?,?,?)').run('Journey event fixture','journey-routing-fixture','kelowna','2026-11-07T18:00:00',venue,'scheduled').lastInsertRowid);
   db.prepare('INSERT INTO event_occurrences(event_id,start_date,end_date,start_time,end_time) VALUES (?,?,?,?,?)').run(event,'2026-11-07','2026-11-07','18:00','20:00');
   const now=new Date('2026-11-06T20:00:00Z');
+  const eventPrice = () => app.mapEventsData(now).find(row => row[1] === '/kelowna/events/journey-routing-fixture')[13];
+  assert.equal(eventPrice(), 0);
+  const setPrice = db.prepare('UPDATE events SET price_kind=?, price_text=? WHERE id=?');
+  setPrice.run('free', null, event);
+  assert.equal(eventPrice(), 'Free');
+  setPrice.run('paid', '$20–$35', event);
+  assert.equal(eventPrice(), '$20–$35');
   assert.equal(app.mapDestination('/kelowna/cafes/journey-routing-fixture',now).lat,49.88);
   assert.equal(app.mapDestination('/fr/kelowna/events/journey-routing-fixture',now).name,'Journey event fixture');
   assert.equal(app.mapDestination('https://evil.example/kelowna/cafes/a',now),null);
