@@ -1316,4 +1316,14 @@ CREATE TABLE IF NOT EXISTS trip_demand_events (
 CREATE INDEX IF NOT EXISTS idx_trip_demand_venue ON trip_demand_events (venue_id, kind, day);
 `);
 
+// Site event counts (2026-11-05): per day, how often each fixed-list feature event happened. Counts only, no visitor id.
+db.exec(`
+CREATE TABLE IF NOT EXISTS site_event_counts (
+  day TEXT NOT NULL,
+  name TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, name)
+);
+`);
+
 module.exports = db;

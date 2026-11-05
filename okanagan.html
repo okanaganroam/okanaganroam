@@ -71,9 +71,28 @@
   // never throws if gtag hasn't loaded yet (ad blockers, slow network,
   // offline testing) — analytics failing silently should never be able to
   // break the actual site.
+  // Site event counts (2026-11-05): a per-day count of fixed-list feature events on our own server (no visitor id, nothing
+  // typed), the same list and endpoint as the shared analytics head in server.js; plus the Build My Trip demand beacon.
+  var ROAM_EV = ["open_map", "map_near_me", "map_filter", "map_search", "map_search_empty", "map_voice_search", "map_pin", "map_directions", "map_share", "map_arrived", "map_outside", "nearby_click", "build_my_trip_click", "trip_plan_start", "trip_plan_complete", "trip_plan_regenerate", "trip_share", "add_whole_trip", "open_my_trip", "add_to_trip", "remove_from_trip", "shared_trip_view", "shared_trip_save", "shared_trip_cta_click", "hotel_page_click", "bio_link_click", "listing_submit", "outbound_click", "search"];
+  function roamBeacon(url, obj){
+    try {
+      if (!navigator.sendBeacon || /(?:^|;\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
+      navigator.sendBeacon(url, new Blob([JSON.stringify(obj)], { type: 'application/json' }));
+    } catch (e) { /* counting must never break the site */ }
+  }
+  (function(){
+    var pages = { '/': 'home', '/map': 'map', '/trip': 'trip', '/whats-on': 'whats_on', '/browse': 'browse', '/hidden-gems': 'hidden_gems' };
+    var k = pages[(location.pathname.replace(/^\/fr(?=\/|$)/, '') || '/').replace(/(.)\/$/, '$1')];
+    if (k) roamBeacon('/api/site-event', { name: 'page_view:' + k });
+  })();
   window.trackEvent = function(name, params){
     try {
       if (typeof gtag === 'function') gtag('event', name, params || {});
+      if (ROAM_EV.indexOf(name) !== -1) roamBeacon('/api/site-event', { name: name });
+      if (name === 'add_to_trip' || name === 'remove_from_trip') {
+        var p = params || {};
+        roamBeacon('/api/trip/signal', { kind: name === 'add_to_trip' ? 'add' : 'remove', ref: p.venue_ref || p.ref || null, name: p.venue_name || null, region: p.region || p.venue_region || null });
+      }
     } catch (e) { /* analytics must never break the site */ }
   };
 </script>
