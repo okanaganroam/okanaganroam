@@ -145,6 +145,36 @@ function plainRelativeDates(text, now = new Date()) {
   if (/^\W*(?:(?:we|i)(?: only| just)? (?:have|got) )?(?:about |around )?(?:\d{1,2}|an?|one|two|three|four) (?:hours?|hrs?)(?: [a-z]+ [a-z]+)?(?: (?:in|around|near|at|downtown) [a-z ]+?)?(?: (?:tomorrow|today|tonight|right now|this (?:morning|afternoon|evening)|on [a-z]+|at (?:noon|\d{1,2}(?::\d\d)? ?(?:am|pm)?)))*\W*$/i.test(String(text).trim()) && !/\b(?:flights?|layover|airport)\b/i.test(text)) {
     text = String(text).trim() + ' a cafe and an easy walk';
   }
+  // "Thursday to Sunday", "arriving Friday, leaving Monday": a trip of that many days starting on the first weekday.
+  {
+    const WD = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const wdRe = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday)';
+    const days = (a, b) => ((WD.indexOf(b) - WD.indexOf(a) + 7) % 7) + 1;
+    const t0 = String(text);
+    if (!/\b\d{1,2}[ -]?(?:days?|nights?)\b/i.test(t0)) {
+      text = t0
+        .replace(new RegExp('\\b(?:arriv(?:e|es|ing)|land(?:s|ing)?|get(?:ting)? in|check(?:ing)? in|fly(?:ing)? in|coming|visit(?:ing)?)(?: on)? ' + wdRe + '\\b(?:[^.!?]{0,40}?)\\b(?:leav(?:e|es|ing)|depart(?:s|ing)?|fly(?:ing)? out|check(?:ing)? out|head(?:ing)? home|going home|returning|back)(?: on)? ' + wdRe + '\\b', 'gi'),
+          (m, a, b) => ` ${days(a.toLowerCase(), b.toLowerCase())} days starting ${a.toLowerCase()} `)
+        .replace(new RegExp('(?<!\\bopen )\\b(?:from )?' + wdRe + '(?: night| evening| morning| afternoon)? (?:to|through|thru|until|till) (?:the )?' + wdRe + '\\b', 'gi'),
+          (m, a, b) => (a.toLowerCase() === b.toLowerCase() ? m : ` ${days(a.toLowerCase(), b.toLowerCase())} days starting ${a.toLowerCase()} `));
+    }
+  }
+  // "Friday in Penticton, Saturday in Naramata, Sunday brunch in Summerland": one trip through the towns, one day each.
+  {
+    const WD = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const seg = '(sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?: night| evening| morning| afternoon)?(?: (?:brunch|lunch|dinner|breakfast))? (?:in|at|around|near) ((?:[a-z]+)(?: (?:[a-z]+))?)';
+    const re = new RegExp('\\b' + seg + '(?:,? (?:and |then )?' + seg + ')+', 'gi');
+    text = String(text).replace(re, (m) => {
+      const parts = [...m.matchAll(new RegExp(seg, 'gi'))].map((x) => ({ d: x[1].toLowerCase(), place: x[2].toLowerCase().trim() }));
+      const places = [...new Set(parts.map((x) => x.place))];
+      if (parts.length < 2 || places.length < 2) return m;
+      const n = ((WD.indexOf(parts[parts.length - 1].d) - WD.indexOf(parts[0].d) + 7) % 7) + 1;
+      if (n < parts.length || n > 7) return m;
+      return ` ${n} days in ${places.slice(0, -1).join(', ')} and ${places[places.length - 1]} starting ${parts[0].d} `;
+    });
+  }
+  // "one nice dinner and the rest casual": the rest of the trip has no kind of place to look for.
+  text = String(text).replace(/\b(?:and |but )?(?:the )?rest (?:is |are |will be |being )?(?:casual|relaxed|easy|simple|low[ -]key|flexible)\b/gi, ' ');
   const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10, twelve: 12, fourteen: 14 };
   const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   return String(text).replace(/\b(?:in|within) (?:about |around )?(\d{1,2}|one|two|three|four|five|six|seven|ten|twelve|fourteen) (days?|weeks?)(?! (?:ago|away|long|time))\b(?!\s+(?:in|at|around) [a-z]+ (?:for|to))/gi, (m, n, unit) => {

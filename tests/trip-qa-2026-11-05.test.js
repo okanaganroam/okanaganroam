@@ -420,3 +420,17 @@ test('"can\'t walk much" / "bad knees" does not plan a walk and says access is n
   assert.ok(!/outdoor/i.test(p.summary || ''), p.summary);
   assert.ok((p.warnings || []).some(w => /access isn.t listed/i.test(w)));
 });
+
+test('weekday spans ("Thursday to Sunday", "arriving Friday, leaving Monday", a town per weekday) are multi-day trips', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  const daysOf = (text) => (app.runTripPlan({ text }).days || []).length;
+  assert.equal(daysOf('Thursday to Sunday in Kelowna'), 4);
+  assert.equal(daysOf('Friday to Sunday in Penticton'), 3);
+  assert.equal(daysOf('we arrive Thursday and leave Sunday, Kelowna'), 4);
+  assert.equal(daysOf('arriving Friday, leaving Monday, Vernon'), 4);
+  assert.equal(daysOf('Friday night to Sunday brunch in Penticton'), 3);
+  assert.equal(daysOf('Friday night in Penticton, Saturday in Naramata, Sunday brunch in Summerland'), 3);
+  // Opening hours are not a trip.
+  assert.notEqual(app.runTripPlan({ text: 'restaurants open Monday to Friday in Kelowna' }).kind, 'multi_day');
+});
