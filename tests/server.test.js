@@ -32822,3 +32822,12 @@ test("What's On cards: a busy place's photo shows on at most two cards per page;
   assert.deepEqual(cards.map((c) => /data-photo="venue"/.test(c)), [true, true, false, false]);
   assert.match(cards[2], /<img class="whatson-event-img whatson-event-photo" src="\/images\/events\//);
 });
+
+test('a combination guide with too few places sends people to the closest real page, keeps campaign tags, and unknown guides stay 404', () => withDiscoveryServer(async (base) => {
+  const r = await fetch(`${base}/guide/peachland/wineries-with-live-music?utm_source=x&utm_medium=email&utm_campaign=y`, { redirect: 'manual' });
+  assert.equal(r.status, 301);
+  const to = r.headers.get('location');
+  assert.match(to, /^\/(?:guide\/)?peachland(?:[/?]|$)/);
+  assert.match(to, /utm_campaign=y/);
+  assert.equal((await fetch(`${base}/guide/peachland/not-a-combo`, { redirect: 'manual' })).status, 404);
+}));

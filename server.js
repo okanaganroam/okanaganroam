@@ -11819,6 +11819,14 @@ function getComboGuideVenues(region, combo) {
   return db.prepare(`SELECT * FROM venues WHERE region = ? AND ${comboGuideWhere(combo)} ORDER BY reviews DESC`)
     .all(...[region, combo.type].filter(Boolean));
 }
+// Where a combination guide goes when a town has too few places for it: the town's category page, else the guide for
+// its first badge, else the town.
+function thinComboGuideTarget(region, combo) {
+  if (combo.type && CATEGORY_SLUGS[combo.type] && (getVenuesByRegionCategory(region, combo.type).length >= MIN_CATEGORY_VENUES || RETAINED_EMPTY_CATEGORY_PAGES.has(`${region}/${combo.type}`))) return `/${region}/${CATEGORY_SLUGS[combo.type]}`;
+  const first = combo.badges[0];
+  if (first && listGuideCombos(MIN_GUIDE_VENUES).some((c) => c.region === region && c.badge === first)) return `/guide/${region}/${first}`;
+  return `/${region}`;
+}
 // Every town + combination page with enough places: { region, slug, count, lastmod }.
 // Town and category pages link these too, so the list is kept until a venue changes.
 let comboGuidesCache = null;
@@ -55250,6 +55258,10 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
+        // Too few places in this town for its own page: send people to the closest real page, not a dead end.
+        const closest = thinComboGuideTarget(region, combo);
+        res.writeHead(301, { Location: withCampaignParams(`${res.twinLang === 'fr' ? '/fr' : ''}${closest}`, parsed.search), 'Cache-Control': 'public, max-age=3600' });
+        return res.end();
       }
       if (REGION_LABELS[region] && BOOL_FIELDS.includes(badge)) {
         const rows = db
@@ -59497,6 +59509,7 @@ module.exports = {
   listComboGuides,
   renderComboGuidePage,
   GUIDE_COMBOS,
+  thinComboGuideTarget,
   venueThumbPhoto,
   trimVenueTagline,
   venueDayHoursText,
