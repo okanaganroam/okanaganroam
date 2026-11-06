@@ -384,3 +384,15 @@ test('"no early mornings" is a relaxed pace, and "between a meeting and my fligh
   p = app.runTripPlan({ text: 'I have 3 hours between a meeting in Kelowna and my flight, something near the airport' });
   assert.ok(!/between|meeting|flight/i.test(p.summary || ''), p.summary);
 });
+
+test('a bare time box ("we have 2 hours in Vernon", "an hour to kill") becomes a short plan, not a list of ideas', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const text of ['we have 2 hours in Vernon', 'I have an hour to kill in Kelowna tomorrow at noon']) {
+    const p = app.runTripPlan({ text });
+    assert.equal(p.kind, 'itinerary', text);
+    assert.ok(!/\b(?:hour|hours|kill)\b/i.test(p.summary || ''), text + ' -> ' + p.summary);
+  }
+  // A layover keeps its own handling.
+  assert.equal(app.runTripPlan({ text: '3 hours between flights in Kelowna' }).kind, 'discover');
+});

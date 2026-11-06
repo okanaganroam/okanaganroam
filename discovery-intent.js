@@ -118,7 +118,7 @@ function plainClockTimes(text) {
 }
 
 // A named holiday with a fixed date ("fireworks on Canada Day", "dinner on Valentine's Day") is that date.
-function fixedHolidayDates(text) {
+function fixedHolidayDates(text, keepName = false) {
   const dateOf = (h) => {
     const k = h.toLowerCase().replace(/[’']/g, '').replace(/\s+/g, ' ');
     if (k === 'remembrance day') return 'november 11';
@@ -131,11 +131,17 @@ function fixedHolidayDates(text) {
     if (/^valentines? ?s? day$/.test(k)) return 'february 14';
     return null;
   };
-  return String(text).replace(/\b(?:on |for )?(remembrance day|canada day|christmas eve|christmas day|boxing day|new[ ’']?years?[ ’']?s? eve|new[ ’']?years?[ ’']?s? day|valentine[ ’']?s? day)(?! (?:long )?weekend)\b/gi, (m, h) => (dateOf(h) ? ` on ${dateOf(h)} ` : m)).replace(/\s+/g, ' ');
+  return String(text).replace(/\b(?:on |for )?(remembrance day|canada day|christmas eve|christmas day|boxing day|new[ ’']?years?[ ’']?s? eve|new[ ’']?years?[ ’']?s? day|valentine[ ’']?s? day)(?! (?:long )?weekend)\b/gi, (m, h) => (dateOf(h) ? (keepName ? ` ${h} on ${dateOf(h)} ` : ` on ${dateOf(h)} `) : m)).replace(/\s+/g, ' ');
 }
 
 // "in 2 weeks", "in ten days", "a week from Friday" is not read by the date reader; "in N days/weeks" becomes that date.
 function plainRelativeDates(text, now = new Date()) {
+  // "an hour to kill", "time to kill", "kill some time": a stretch of free time, not words to search for.
+  text = String(text).replace(/\b(an|one|1) hour (?:to|2) kill\b/g, ' 1 hours ').replace(/\b(\d{1,2}|two|three|four|five) hours? (?:to )?kill\b/g, ' $1 hours ').replace(/\b(?:some |a little |a bit of |extra )?time to kill\b|\bkill(?:ing)? (?:some |a little |an? )?(?:time|hour|afternoon|morning|evening)\b/g, ' ');
+  // A bare time box ("we have 2 hours in Vernon") with nothing to do in it: a coffee and an easy walk fill it.
+  if (/^\W*(?:(?:we|i)(?: only| just)? (?:have|got) )?(?:about |around )?(?:\d{1,2}|an?|one|two|three|four) (?:hours?|hrs?)(?: [a-z]+ [a-z]+)?(?: (?:in|around|near|at|downtown) [a-z ]+?)?(?: (?:tomorrow|today|tonight|right now|this (?:morning|afternoon|evening)|on [a-z]+|at (?:noon|\d{1,2}(?::\d\d)? ?(?:am|pm)?)))*\W*$/i.test(String(text).trim()) && !/\b(?:flights?|layover|airport)\b/i.test(text)) {
+    text = String(text).trim() + ' a cafe and an easy walk';
+  }
   const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10, twelve: 12, fourteen: 14 };
   const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   return String(text).replace(/\b(?:in|within) (?:about |around )?(\d{1,2}|one|two|three|four|five|six|seven|ten|twelve|fourteen) (days?|weeks?)(?! (?:ago|away|long|time))\b(?!\s+(?:in|at|around) [a-z]+ (?:for|to))/gi, (m, n, unit) => {
@@ -274,7 +280,7 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
   // Holiday weekends become the dates of that long weekend (the next one coming).
   s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
-  s = fixedHolidayDates(s);
+  s = fixedHolidayDates(s, true);
   // "I hate the cold" is a feeling about the weather, not a place.
   s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
   // "a couple in our 60s": an age, not a search word. 60+ reads as seniors.
