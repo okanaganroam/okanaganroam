@@ -3857,12 +3857,18 @@ function startLaterOnMorningGaps(result, input, requirements) {
     const first = rows[0].startMinutes, wait0 = morningWaitOf(rows);
     if (!Number.isFinite(first) || wait0 < 60) continue;
     const ids = rows.map((r) => r.venueId).join(','), timed = rows.filter((r) => Number.isFinite(r.startMinutes)).length;
+    // 2026-11-05: sliding the day later must not put a café and lunch under 75 minutes apart (a 10:45 coffee, lunch at 11:30).
+    const typeOf = new Map(day.stops.filter((st) => st.venue).map((st) => [st.venue.id, st.venue.type]));
+    const eats = (r) => ['cafe', 'restaurant'].includes(typeOf.get(r.venueId));
+    const eatsTooClose = (cand) => cand.some((r, i) => i > 0 && eats(r) && eats(cand[i - 1]) && Number.isFinite(r.startMinutes) && Number.isFinite(cand[i - 1].startMinutes) && r.startMinutes - cand[i - 1].startMinutes < 75);
+    const closeNow = eatsTooClose(rows);
     let pick = null;
     for (let m = first + 15; m <= Math.min(first + 180, 690); m += 15) {
       const probe = JSON.parse(JSON.stringify(result));
       scheduleTripByHours(probe, input, { ...requirements, dayStartMinutes: { ...(requirements.dayStartMinutes || {}), [day.day]: m } }, { probe: true });
       const cand = (probe.schedule || []).filter((r) => r.day === day.day);
       if (cand.map((r) => r.venueId).join(',') !== ids || cand.filter((r) => Number.isFinite(r.startMinutes)).length < timed) continue;
+      if (!closeNow && eatsTooClose(cand)) continue;
       if (cand.some((r) => r.daylight && r.daylight.status === 'conflict')) continue;
       const w = morningWaitOf(cand);
       if (w <= wait0 - 30 && (!pick || w < pick.w)) pick = { m, w };
