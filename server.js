@@ -20412,6 +20412,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   map.addLayer(cluster);
   ${roamOpenByDefault.toString()}
   ${roamRouteLocationMessage.toString()}
+  var happyEntry = new URLSearchParams(location.search).get('show') === 'happy-hour';
   var places = [], events = [], tab = 'places', kinds = {}, feats = {}, tags = {}, topOnly = false, tagAny = false, openOnly = roamOpenByDefault(location.search,location.hash), town = '', price = '', atMin = null, notTags = {}, notKinds = {}, notFeats = {}, notTypes = {}, atDay = '', atUntil = false, tagOr = false, radiusFixed = false, term = '', termTyping = false, dealQuery = '', dealWordsFor = null, dealWords = [], radiusKm = 5, me = null, lastRender = null, watchId = null, watching = false, meMarker = null, meCircle = null, limit = 25, listItems = [];
   var $ = function(id){ return document.getElementById(id); };
   var statusEl = $('pmStatus'), countEl = $('pmCount'), listEl = $('pmList'), moreBtn = $('pmMore'), nearBtn = $('pmNear'), nearLabel = $('pmNearLabel'), radiusSel = $('pmRadius');
@@ -20786,6 +20787,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function render(fit){
     dismissTownLocationHelp();
     $('rnLocationText').textContent=roamLocationLabel();
+    stage.classList.toggle('rn-happy-entry', happyEntry && !!feats.happy);
     if (watching && !me && !town && !pendingRoute) {
       countEl.textContent = FR ? 'Recherche de votre position…' : 'Finding your location…';
       listItems = [];
@@ -20809,10 +20811,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       // night search (both ahead of open now), the coffee fit, and happy hour later today by its start time.
       var nightQ = nightSearch(), hhLater = false;
       var fitFn = function(p){ return (nameQ && !nameHit(p) ? 1000 : 0) + (nightQ && !nightHit(p) ? 100 : 0) + (coffeeOnly ? mapCoffeeFit(p, TAGIX) * 10 : 0) + (hhLater ? (p.hhs && p.hhs.at != null ? p.hhs.at / 1440 : 1) : 0); };
-      items = mapPlaceList(onMap, { me: !!me, town: town, wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: fitFn, fitFirst: !!(nameQ || nightQ), cost: tags.hiking ? mapHikeCost : null });
+      items = mapPlaceList(onMap, { me: !!me, town: town || (happyEntry && feats.happy && !me), wide: WIDE.matches, zoom: map.getZoom(), filtering: filtering, inView: function(p){ return b.contains([p.lat, p.lng]); }, fit: fitFn, fitFirst: !!(nameQ || nightQ), cost: tags.hiking ? mapHikeCost : null });
       if (hhLater && !hhNoteShown) { hhNoteShown = true; setStatus(T.hhLaterNote, 9000); }
       if (!feats.happy) hhNoteShown = false;
-      countEl.textContent = town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
+      countEl.textContent = happyEntry && feats.happy ? (FR ? 'Happy hour en cours' : 'Happy Hour Now') + ' · ' + items.length : town ? T.placesHere(items.length) : me ? T.placesNear(items.length, radiusKm) : (listOn ? T.placesHere(items.length) : T.zoomHint);
     } else {
       events.forEach(function(e){ e.g = evGroup(e, today, nowMin); });
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 };
@@ -21363,6 +21365,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         if (freeEventsOnly) q += '&free=1';
       }
       if (openOnly && includeUnlistedHours) q += '&unlisted=1';
+      if (happyEntry && feats.happy) q += '&show=happy-hour';
       q=q.replace(/^&/,'');
       history.replaceState(null, '', location.pathname + (q ? '?' + q : '?f=') + (tab === 'events' ? '#events' : ''));
     } catch (e) {}
@@ -21433,6 +21436,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return out;
   }
   function relaxHtml(){
+    if (happyEntry && feats.happy) return esc(FR ? 'Aucun happy hour en cours ne correspond à cette recherche.' : 'No happy hours are listed as happening now for this search.') +
+      ' <button type="button" class="pm-relax" data-relax="town">' + esc(FR ? 'Changer la zone' : 'Change search area') + '</button>';
     if (openOnly && !includeUnlistedHours && places.some(function(p){
       return !p.st && matchesPlace(p, true) && (!me || !radiusFixed || !radiusKm || town || p.d <= radiusKm);
     })) {
@@ -21458,6 +21463,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     return esc(T.without(best.label)) + ' <button type="button" class="pm-relax" data-relax="' + esc(best.id) + '">' + esc(T.dropIt) + '</button>';
   }
   listEl.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-relax]'); if (!b) return;
+    if (b.getAttribute('data-relax') === 'town') { openTownPicker(); return; }
     if (b.getAttribute('data-relax') === 'unlisted') { includeUnlistedHours = true; searchFit = true; changed(); return; }
     if (b.getAttribute('data-relax') === 'fit') { var ms = places.filter(matchesPlace).slice(0, 300); if (ms.length) { fitTo(L.latLngBounds(ms.map(function(p){ return [p.lat, p.lng]; })), 15); } return; }
     dropOne(b.getAttribute('data-relax')); if (b.getAttribute('data-relax') === 'term') searchEl.value = ''; liveBase = null; changed(); });
@@ -22040,12 +22046,13 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         if(wantEvents){evTerm=term;evKinds=evFilt.slice();evSaidText=[term].concat(evSaid).join(' ').trim();term='';evBySearch=true;tab='events';var restoreToday=okToday(),restoreMin=okanaganClock(new Date()).minutes;aheadOn=!!(nyeAsk||xmasMarket||((evTerm||evKinds.length)&&!events.some(function(e){return !e.ah&&eventGroup(e,restoreToday,restoreMin)&&evHit(e)})));if(aheadOn)loadAhead();}
       }
       // 2026-10-26: the homepage's happy hour line opens the map with Happy hour now on (/map?show=happy-hour).
-      if (qs.get('show') === 'happy-hour') feats.happy = true;
+      if (happyEntry) { feats.happy = true; searchFit = true; }
     } catch (e) {}
     var initialHash = location.hash;
     if (initialHash === '#events'||(CONF.dest&&CONF.dest.url.indexOf('/events/')!==-1)) tab = 'events';
     syncChips();
     // A town or a short search in the address opens fitted to its results (Phone map, 2026-10-19, round 7).
+    if (happyEntry && tab === 'places' && !returnContext && !CONF.directionRequested) setCompactResults(true);
     if (tab === 'events') setTab('events'); else render(true);
     if(returnContext){limit=Math.max(25,Math.min(500,Number(returnContext.limit)||25));drawList();}
     // Near me starts by itself when asked for (#near-me, the home-screen shortcut) or when this browser already allows it.
@@ -22494,7 +22501,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1 class="rn-place-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('Change town or distance','Changer la ville ou la distance')}</small><b id="rnLocationText">${R('Browsing Kelowna','Explorer Kelowna')}</b></span></button></div>
+      <div class="rn-intro"><div><h1 class="rn-happy-copy">${R('Happy Hour Now','Happy hour en cours')}</h1><p class="rn-happy-copy">${R('Find happy hours happening right now.','Trouvez les happy hours en cours.')}</p><h1 class="rn-place-copy rn-general-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy rn-general-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('Change town or distance','Changer la ville ou la distance')}</small><b id="rnLocationText">${R('Browsing Kelowna','Explorer Kelowna')}</b></span></button></div>
       <div class="rn-map-picker-heading">
         <button type="button" id="rnMapPickerBack" class="pm-chip">${R('Back to filters','Retour aux filtres')}</button>
         <p id="rnMapPickerHint" role="status">${R('Tap the map to choose where to search.','Touchez la carte pour choisir où chercher.')}</p>
