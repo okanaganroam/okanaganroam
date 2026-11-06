@@ -267,3 +267,16 @@ test('Server: "3 hours between flights, stuck at Kelowna airport" is a 3-hour wi
   assert.ok(/180 minutes|3 hours/.test(text) && !/stuck|flights|airport/i.test(JSON.stringify(p.unsupported || [])), text.slice(0, 400));
   assert.ok(/Kelowna/.test(JSON.stringify(p.understood || p.summary)), text.slice(0, 300));
 });
+
+test('plain times: "between 2 and 5", "home by 6", "free after 4pm", "avoid crowds", "cheap as possible"', () => {
+  assert.equal(d.plainClockTimes('free between 2 and 5 tomorrow in Vernon').trim(), 'from 2pm to 5pm tomorrow in Vernon');
+  assert.equal(d.plainClockTimes('home by 6'), 'home by 6pm');
+  assert.equal(d.plainClockTimes('home by 6:30'), 'home by 6:30pm');
+  assert.equal(d.plainClockTimes('back by 9pm'), 'back by 9pm');
+  assert.equal(d.plainClockTimes('between 9am and 12 pm').trim(), 'from 9am to 12pm');
+  assert.equal(d.plainClockTimes('we are free after 4pm today').replace(/\s+/g, ' '), 'we are after 4pm today');
+  for (const text of ['avoid crowds, 2 days Kelowna', 'cheap as possible, 1 day Kelowna', 'a day in Penticton with exactly 3 wineries']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /avoid|crowd|possible|^as$|exactly/i.test(w)), [], text);
+  }
+});

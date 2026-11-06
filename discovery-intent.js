@@ -107,6 +107,16 @@ function mergeSegmentStays(text) {
   });
 }
 
+// Times said plainly: "free between 2 and 5" is from 2pm to 5pm; "home by 6" is by 6pm; "free after 4pm" is after 4pm.
+// (Used on the normalised words and on the request's own text.)
+function plainClockTimes(text) {
+  const clockPart = (h, ap) => (ap ? `${h}${ap}` : (parseInt(h, 10) >= 1 && parseInt(h, 10) <= 8 ? `${h}pm` : `${h}`));
+  return String(text)
+    .replace(/\b(?:(?:free|available|around|out) )?between (\d{1,2}(?::30| ?30)?) ?(am|pm)? (?:and|to|-) (\d{1,2}(?::30| ?30)?) ?(am|pm)?(?![\d:])/gi, (m, a, ap1, b, ap2) => ` from ${clockPart(a, ap1 || ap2)} to ${clockPart(b, ap2)} `)
+    .replace(/\b(home|back|done|finished|finish|return|back at the hotel|back to the hotel) by (\d{1,2}(?::30)?)(?! ?(?:am|pm|a m|p m|o clock|:))\b/gi, (m, w, h) => `${w} by ${clockPart(h, '')}`)
+    .replace(/\b(?:free|available) (?=(?:after|before|from|until|till|at|between) \d)/gi, ' ');
+}
+
 // Next occurrence of a Canadian long weekend, as "<month> <d> to <month> <d>" (Saturday to Monday, or the days around the date).
 function holidayWeekendDates(name, now = new Date()) {
   const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
@@ -207,6 +217,9 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen) (?:years? old|year olds?|yo)\b/g, ' kids ');
   s = s.replace(/\b(?:coach|bus|motorcoach) (?:tour )?(?:group|trip)\b/g, ' ');
   s = s.replace(/\b(?:a )?(?:group|party|crew|gang|bunch) of (\d{1,3}|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty) (?:guys|girls|ladies|gals|boys|men|women|people|folks|adults|friends|colleagues|coworkers|seniors|retirees|students|kids|teens|teenagers|members|guests)\b/g, ' $1 friends ');
+  s = plainClockTimes(s);
+  // Plain phrases: "cheap as possible", "avoid crowds", "exactly 3".
+  s = s.replace(/\b(?:as )?cheap(?:ly)? as (?:possible|we can|you can)\b|\bcheapest possible\b/g, ' budget ').replace(/\b(?:avoid(?:ing)?|away from|no|not|without|skip) (?:the )?(?:crowds?|crowded|busy|touristy)\b|\buncrowded\b/g, ' quiet ').replace(/\bexactly (?=\d|one|two|three|four|five)/g, ' ');
   // A sunrise hike or walk is a morning hike or walk (sunrise itself is not a place).
   s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
   // Holiday weekends become the dates of that long weekend (the next one coming).
@@ -2159,6 +2172,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 }
 
 module.exports = {
+  plainClockTimes,
   mergeSegmentStays,
   holidayWeekendDates,
   OUTSIDE_PLACE_NAMES: Object.values(OUTSIDE_PLACES),
