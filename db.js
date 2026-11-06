@@ -1437,4 +1437,16 @@ CREATE TABLE IF NOT EXISTS referral_counts (
 );
 `);
 
+// Restore missing public visitor pins from the venues' official directions.
+const fillVisitorPin = db.prepare(`
+  UPDATE venues
+  SET address = ?, latitude = ?, longitude = ?, updated_at = CURRENT_TIMESTAMP
+  WHERE region = ? AND slug = ? AND redirect_to IS NULL
+    AND (latitude IS NULL OR longitude IS NULL OR (latitude = 0 AND longitude = 0))
+`);
+// https://roomandpillarspa.com/pages/contact-us
+fillVisitorPin.run('Unit 100, 1546 Harvey Ave', 49.8822793, -119.464409, 'kelowna', 'room-and-pillar-spa');
+// https://okanaganwarriors.ca/qa/
+fillVisitorPin.run('Marron Valley Road', 49.3943595, -119.6916885, 'penticton', 'okanagan-warriors-adventure');
+
 module.exports = db;
