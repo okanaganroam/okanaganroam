@@ -187,7 +187,7 @@ function stripTravelNoise(normalized) {
   let s = ` ${mergeSegmentStays(normalized)} `;
   if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
   // "4 hours between flights, stuck at the airport" is a layover.
-  s = s.replace(/\bbetween (?:my |our |the |two )?(?:flights?|connections?|connecting flights?|planes?)\b/g, ' layover ').replace(/\bstuck\b/g, ' ');
+  s = s.replace(/\bbetween (?:a |the |my |our )?(?:meetings?|conference|appointments?|work|calls?|sessions?)( (?:in|at) [a-z]+(?: [a-z]+)?)? and (?:my |our |the |a )?(?:flights?|plane|departure)\b/g, ' layover $1 ').replace(/\bbetween (?:my |our |the |two )?(?:flights?|connections?|connecting flights?|planes?)\b/g, ' layover ').replace(/\bstuck\b/g, ' ');
   s = s.replace(/\bsit ?down\b/g, ' ').replace(/\s+/g, ' ');
   const arriving = /\b(?:land|lands|landing|landed|arrive|arrives|arriving|arrived|fly|flying|flight|layover|lay over|stopover|connecting)\b/.test(s);
   if (arriving) {
@@ -264,6 +264,9 @@ function stripTravelNoise(normalized) {
   if (/\bgolf/.test(s)) {
     s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?(?: of golf)?\b(?! of (?:drinks?|beers?|applause))|\b18 holes\b|\b(?:nine|9) holes\b|\b(?:foursome|threesome|twosome)\b/g, ' ');
   }
+  // "no early mornings", "we like to sleep in", "late starts": a slow start, which the planner reads as a relaxed pace.
+  s = s.replace(/\b(?:no|nothing|not|avoid|without) (?:any )?early (?:mornings?|starts?|wake ?ups?|alarms?)\b|\b(?:we|i) (?:like|love|want|prefer|need) to sleep in\b|\bsleep(?:ing)? in\b|\blate starts?\b|\b(?:not|aren t|arent) (?:a )?(?:morning|early) (?:person|people|birds?|risers?)\b|\bslow mornings?\b|\b(?:don t|do not) want to (?:get up|wake up|be up) early\b/g, ' relaxed ');
+  s = joinOutsidePlaces(s);
   s = plainRelativeDates(s);
   // "two weeks": 14 days (the planner covers seven and says so).
   s = s.replace(/\b(2|3|4|5|two|three|four|five)[ -]weeks?(?: long)?\b(?! (?:from now|ago|away))/g, (m, n, off) => (/\b(?:in|within|after|for the next) $/.test(s.slice(Math.max(0, off - 16), off)) && !/^ (?:in|around|at|for) /.test(s.slice(off + m.length, off + m.length + 5)) ? m : ` ${({ two: 2, three: 3, four: 4, five: 5 }[n] || Number(n)) * 7} days `));
@@ -295,6 +298,17 @@ const VALLEY_WIDE_PHRASES = vocabulary.localList('wideScope');
 
 // Places visitors name that this site does not cover.
 const OUTSIDE_PLACES = Object.fromEntries(vocabulary.localList('outsidePlaces').map((p) => [String(p).toLowerCase(), p]));
+// A two-word place ("Salmon Arm", "Las Vegas") is matched as one word: its spaces are closed up in the text first.
+const OUTSIDE_MULTIWORD = vocabulary.localList('outsidePlaces').filter((p) => /\s/.test(String(p)));
+for (const p of OUTSIDE_MULTIWORD) OUTSIDE_PLACES[String(p).toLowerCase().replace(/\s+/g, '')] = p;
+function joinOutsidePlaces(text) {
+  let out = String(text);
+  for (const p of OUTSIDE_MULTIWORD) {
+    const re = new RegExp('\\b' + String(p).toLowerCase().split(/\s+/).join('\\s+') + '\\b', 'g');
+    out = out.replace(re, String(p).toLowerCase().replace(/\s+/g, ''));
+  }
+  return out;
+}
 
 const TYPE_ALIASES = {
   sport: ['sports and recreation', 'sports venues', 'recreation activities', 'skate park', 'skate parks', 'skatepark', 'skateparks', 'disc golf', 'tennis', 'pickleball', 'bmx'],

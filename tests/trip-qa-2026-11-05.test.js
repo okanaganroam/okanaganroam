@@ -365,3 +365,22 @@ test('golf wording ("4 players", "one round", "foursome") and "a round of drinks
     assert.ok(!/\bround\b|\bplayers\b/i.test(said), text + ' -> ' + said);
   }
 });
+
+test('two-word places outside the Okanagan ("Salmon Arm", "Las Vegas") are reported as not covered', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  for (const [text, name] of [['things to do in Salmon Arm', 'Salmon Arm'], ['a weekend in Las Vegas', 'Las Vegas']]) {
+    const p = app.runTripPlan({ text });
+    assert.ok((p.unsupported || []).includes(name), text);
+    assert.ok(!/seafood|salmon/i.test(p.summary || ''), text + ' -> ' + p.summary);
+  }
+});
+
+test('"no early mornings" is a relaxed pace, and "between a meeting and my flight" is a layover', () => {
+  process.env.TRIP_PLANNER_V2 = 'on';
+  const app = require('../server.js');
+  let p = app.runTripPlan({ text: 'retired couple, 5 days, wine tour Kelowna to Osoyoos, no early mornings' });
+  assert.ok(!(p.unsupported || []).some(u => /early/i.test(u)));
+  p = app.runTripPlan({ text: 'I have 3 hours between a meeting in Kelowna and my flight, something near the airport' });
+  assert.ok(!/between|meeting|flight/i.test(p.summary || ''), p.summary);
+});
