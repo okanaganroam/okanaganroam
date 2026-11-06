@@ -243,6 +243,20 @@ body.pm-app-page #rnStartRoute { min-height: 48px; font-size: 15px; }
     display: flex;
     margin-top: 6px;
   }
+  body.pm-app-page .pm-list-view:not(.rn-results-compact) .rn-results-toolbar {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding-block: 4px;
+    background: #f6f3eb;
+  }
+  body.pm-app-page .pm-map-view:not(.is-route):not(.is-route-origin):not(.is-map-picker) .pm-float > :not(.rn-views):not(.pm-toast):not(.rn-location-help),
+  body.pm-app-page .pm-map-view:not(.is-route):not(.is-route-origin):not(.is-map-picker) .pm-sheet {
+    display: none;
+  }
+  body.pm-app-page .pm-map-view:not(.is-route):not(.is-route-origin):not(.is-map-picker) .rn-views {
+    margin-top: 0;
+  }
   body.pm-app-page .rn-results-compact.pm-list-view .pm-float {
     display: flex;
     flex-wrap: wrap;
