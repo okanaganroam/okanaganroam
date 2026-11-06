@@ -16,7 +16,7 @@ const KINDS = {
   theatre: /\b(?:theatres?|theaters?|cinema|performing arts)\b/,
   spa: /\b(?:spas?|thermal spa|sauna experience|saunas?|floating sauna|massages?|wellness)\b/, // 2026-10-25: saunas and wellness studios
   wine_tour: /\b(?:wine tours?|winery tours?|vineyard tours?)\b/,
-  boat_tour: /\b(?:boat tours?|lake cruises?|cruises?)\b/,
+  boat_tour: /\b(?:boat tours?|boat rides?|boat trips?|boat cruises?|boating|lake cruises?|cruises?)\b/,
   guided_hike: /\b(?:guided hikes?|guided hiking|hiking tours?)\b/,
   cooking: /\bcooking class(?:es)?\b/,
   pottery: /\b(?:pottery|ceramics?) (?:classes?|workshops?|studio)?\b/,
@@ -129,7 +129,7 @@ function inferPlannerKinds(v) {
 }
 function inferPlannerActivities(v) {
   if (!['outdoor','tour','beach'].includes(v.type)) return [];
-  const patterns = {skiing:/\b(?:skiing|ski resort|cross country ski)\b/g,snowshoeing:/\bsnowshoe(?:ing)?\b/g,hiking:/\b(?:hiking|hikes?|walking trails?|lookout trail)\b/g,winter:/\b(?:skiing|ski resort|snowshoe(?:ing)?|nordic trails?|cross country ski)\b/g,viewpoints:/\b(?:viewpoints?|lookouts?|sunset stop)\b/g};
+  const patterns = {skiing:/\b(?:skiing|ski resort|mountain resort|cross country ski)\b/g,snowshoeing:/\bsnowshoe(?:ing)?\b/g,hiking:/\b(?:hiking|hikes?|walking trails?|lookout trail)\b/g,winter:/\b(?:skiing|ski resort|mountain resort|snowshoe(?:ing)?|nordic trails?|cross country ski)\b/g,viewpoints:/\b(?:viewpoints?|lookouts?|sunset stop)\b/g};
   const clauses=String(v.description||v.textDesc||'').split(/[.;!]|\b(?:but|however|yet)\b/i).map(norm);
   const name=norm(v.name||v.textName);
   return Object.entries(patterns).filter(([,re])=>{
@@ -510,7 +510,7 @@ function explicitOutingComponents(trip,requirements) {
   const kinds=items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
   // 2026-10-25: "spa day and dinner in Penticton" found nothing (the spa and the dinner were one request); an activity
   // asked for with a meal is two stops, as a game and dinner already were.
-  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
+  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
   if(!scoped)return requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip;
   const text=requirements.text||'',parts=[];
   const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor';

@@ -2430,6 +2430,9 @@ function applyFoodTourMeaning(text, intent, requirements) {
 const WINE_TRIP_RE = /\b(?:wineries|vineyards|wine (?:tours?|trips?|weekends?|getaways?|country|tastings?|crawls?|lovers?|routes?|days?|holiday|vacation|escape|region)|winery (?:tours?|hopping|crawl)|tastings|wine)\b/;
 const SKI_RESORT_NAME_RE = /\b(?:ski resort|mountain resort|ski hill|ski area)\b/;
 const SKI_WORDS_RE = /\b(?:ski|skis|skiing|skier|skiers|snowboard|snowboarding|snowboarders?|ski trip|ski weekend|ski holiday|ski vacation|ski hill|ski resort|on the slopes|hit the slopes)\b/;
+// 2026-11-05: "a week in February, not skiing, I hate the cold" was planned as seven days at Big White ("skiing" was read as asked).
+const SKI_NEGATED_RE = /\b(?:not|no|without|never|avoid|skip|hate|hates|dislike|except|instead of|rather than)\s+(?:\w+\s+){0,2}(?:ski|skis|skiing|skier|skiers|snowboard|snowboarding|ski trip|ski hill|ski resort)\b|\b(?:don t|do not|dont|won t|can t|cannot|doesn t|does not|not going to)\s+(?:\w+\s+){0,2}(?:ski|skis|skiing|snowboard|snowboarding)\b/g;
+function skiWordsAsked(t) { return SKI_WORDS_RE.test(String(t || '').replace(SKI_NEGATED_RE, ' ')); }
 // Town -> its nearest downhill resort's region, for "ski trip from Kelowna".
 const SKI_REGION_FOR_TOWN = { kelowna: 'big-white', 'west-kelowna': 'big-white', 'lake-country': 'big-white', peachland: 'big-white', vernon: 'silverstar', coldstream: 'silverstar', armstrong: 'silverstar', lumby: 'silverstar', enderby: 'silverstar', 'spallumcheen': 'silverstar', penticton: 'apex', summerland: 'apex', naramata: 'apex', kaleden: 'apex', keremeos: 'apex', 'okanagan-falls': 'apex', oliver: 'baldy', osoyoos: 'baldy' };
 // Winter things to add after skiing: tube park, skating, sleigh rides, dog sleds, snowshoes, lights trails.
@@ -2465,7 +2468,7 @@ function tripTheme(ctx) {
   if (ctx.dayThemes && ctx.dayThemes.length) return null;
   if (items.some((i) => ['event', 'venue', 'rainy', 'transport', 'day_trip'].includes(i.kind) && i.strength !== 'prefer')) return null;
   // Kids on a ski trip are fine; a wine trip with kids (or that doesn't drink) keeps the general planner.
-  const skiAsked = items.some((i) => i.kind === 'activity' && i.value === 'skiing' && i.strength === 'must') || SKI_WORDS_RE.test(text);
+  const skiAsked = items.some((i) => i.kind === 'activity' && i.value === 'skiing' && i.strength === 'must') || skiWordsAsked(text);
   if (skiAsked && !ctx.skiOffSeason && !/\b(?:cross country|nordic|x c)\b/.test(text) && !/\b(?:water ?ski|jet ?ski)/.test(text)) return 'ski';
   const wine = (ctx.types.has('winery') || items.some((i) => i.kind === 'type' && i.value === 'winery' && i.strength === 'must')) && !ctx.alcoholFree && !ctx.kids;
   // A wine trip, not "a winery visit": wineries, vineyards, wine tours, a wine weekend or wine tastings.
@@ -2912,7 +2915,7 @@ function skiOpeningFor(facts, regions, date) {
 }
 function skiOffSeasonMonth(text, intent, requirements, tripDate, namedDate, opening) {
   const t = normWords(text);
-  if (!SKI_WORDS_RE.test(t) || /\b(?:water ?ski|jet ?ski)/.test(t)) return null;
+  if (!skiWordsAsked(t) || /\b(?:water ?ski|jet ?ski)/.test(t)) return null;
   const day = requirements && /^\d{4}-\d{2}-\d{2}$/.test(requirements.startDate || '') ? requirements.startDate : /^\d{4}-\d{2}-\d{2}$/.test(namedDate || '') ? namedDate : null;
   if (day && opening && opening.date > day) return MONTH_NAMES[Number(day.slice(5, 7)) - 1];
   // The visitor's dates, else the month or season they named; an undated ski trip is for when the lifts run.
@@ -6962,6 +6965,7 @@ function scheduleNotes(result, ctx) {
 }
 
 module.exports = {
+  skiWordsAsked,
   // Planner (2026-10-27): long idle gaps and daypart labels
   closeIdleGaps,
   IDLE_GAP_LIMIT,
