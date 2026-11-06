@@ -16,7 +16,7 @@ const KINDS = {
   theatre: /\b(?:theatres?|theaters?|cinema|performing arts)\b/,
   spa: /\b(?:spas?|thermal spa|sauna experience|saunas?|floating sauna|massages?|wellness)\b/, // 2026-10-25: saunas and wellness studios
   wine_tour: /\b(?:wine tours?|winery tours?|vineyard tours?)\b/,
-  boat_tour: /\b(?:boat tours?|lake cruises?|cruises?)\b/,
+  boat_tour: /\b(?:boat tours?|boat rides?|boat trips?|boat cruises?|boating|lake cruises?|cruises?)\b/,
   guided_hike: /\b(?:guided hikes?|guided hiking|hiking tours?)\b/,
   cooking: /\bcooking class(?:es)?\b/,
   pottery: /\b(?:pottery|ceramics?) (?:classes?|workshops?|studio)?\b/,
@@ -129,7 +129,7 @@ function inferPlannerKinds(v) {
 }
 function inferPlannerActivities(v) {
   if (!['outdoor','tour','beach'].includes(v.type)) return [];
-  const patterns = {skiing:/\b(?:skiing|ski resort|cross country ski)\b/g,snowshoeing:/\bsnowshoe(?:ing)?\b/g,hiking:/\b(?:hiking|hikes?|walking trails?|lookout trail)\b/g,winter:/\b(?:skiing|ski resort|snowshoe(?:ing)?|nordic trails?|cross country ski)\b/g,viewpoints:/\b(?:viewpoints?|lookouts?|sunset stop)\b/g};
+  const patterns = {skiing:/\b(?:skiing|ski resort|mountain resort|cross country ski)\b/g,snowshoeing:/\bsnowshoe(?:ing)?\b/g,hiking:/\b(?:hiking|hikes?|walking trails?|lookout trail)\b/g,winter:/\b(?:skiing|ski resort|mountain resort|snowshoe(?:ing)?|nordic trails?|cross country ski)\b/g,viewpoints:/\b(?:viewpoints?|lookouts?|sunset stop)\b/g};
   const clauses=String(v.description||v.textDesc||'').split(/[.;!]|\b(?:but|however|yet)\b/i).map(norm);
   const name=norm(v.name||v.textName);
   return Object.entries(patterns).filter(([,re])=>{
@@ -151,10 +151,11 @@ function tripCalendar(text, referenceDate=null) {
   const months=['january','february','march','april','may','june','july','august','september','october','november','december'];
   const month='('+months.map(m=>m+'|'+m.slice(0,3)).join('|')+')';
   const day='(\\d{1,2})(?:st|nd|rd|th)?';
-  const join='\\s*(?:and|to|through|until|[-–—])\\s*';
+  // 2026-11-05: "from July 3rd until the 9th", "the 3rd to the 9th of July" (the "the" and "of" were not read).
+  const join='\\s*(?:and|to|through|thru|until|till|[-–—])\\s*(?:the\\s+)?';
   const patterns=[
     new RegExp('\\b'+month+'\\.?\\s+'+day+'(?:'+join+'(?:'+month+'\\.?\\s+)?'+day+')?(?:\\s*,?\\s*(20\\d{2}))?\\b','i'),
-    new RegExp('\\b'+day+'(?:'+join+day+')?\\s+'+month+'\\.?(?:\\s*,?\\s*(20\\d{2}))?\\b','i'),
+    new RegExp('\\b(?:the\\s+)?'+day+'(?:'+join+day+')?\\s+(?:of\\s+)?'+month+'\\.?(?:\\s*,?\\s*(20\\d{2}))?\\b','i'),
   ];
   let startDate=null,endDate=null,source=null,conflict=null;
   const iso=[...String(text).matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)];
@@ -185,8 +186,24 @@ function tripCalendar(text, referenceDate=null) {
       startDate=year ? real(year,firstMonth,firstDay) : null;
       if(!m[a?5:4] && startDate && referenceDate && startDate<referenceDate) {year++;startDate=real(year,firstMonth,firstDay);}
       const lastDay=m[a?4:2];
-      if(lastDay)endDate=real(year,a&&m[3]?monthNo(m[3]):firstMonth,Number(lastDay));
-      source=m[0];if(!conflict&&(!startDate||lastDay&&!endDate))conflict='The calendar date is invalid; choose a real date.';
+      if(lastDay){
+        const endMonth=a&&m[3]?monthNo(m[3]):firstMonth;
+        endDate=real(year,endMonth,Number(lastDay));
+        // "December 20 to January 2": the end is in the next year.
+        if(startDate&&endDate&&endDate<startDate&&a&&m[3]&&!m[5])endDate=real(year+1,endMonth,Number(lastDay));
+      }
+      source=m[0];
+      // 2026-11-05: "arriving December 20, leaving December 27": two dates joined by a leaving word are the range.
+      if(a&&!lastDay&&startDate){
+        const rest=String(text).slice(m.index+m[0].length);
+        const second=new RegExp('^[^.;]*?\\b(?:leav\\w*|depart\\w*|return\\w*|flying (?:out|home)|going home|check\\w* out|back home|until|till|through|thru)\\b[^.;\\d]*?'+month+'\\.?\\s+'+day+'\\b','i').exec(rest);
+        if(second){
+          const em=monthNo(second[1]);let end=real(year,em,Number(second[2]));
+          if(end&&end<startDate)end=real(year+1,em,Number(second[2]));
+          if(end){endDate=end;source=String(text).slice(m.index,m.index+m[0].length+second[0].length);}
+        }
+      }
+      if(!conflict&&(!startDate||lastDay&&!endDate))conflict='The calendar date is invalid; choose a real date.';
     }
   }
   // 2026-10-14: "next weekend" is the Saturday after the coming one (the one after today's, on a weekend).
@@ -199,9 +216,9 @@ function tripCalendar(text, referenceDate=null) {
     const weekday=/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s*,?\s*$/i.exec(before);
     if(weekday && weekday[1].slice(0,3).toLowerCase()!==DAYS[new Date(startDate+'T12:00:00Z').getUTCDay()]) conflict='The calendar date conflicts with the named weekday; confirm the travel date.';
   }
-  let days=null;
-  if(startDate&&endDate){days=Math.round((new Date(endDate+'T12:00:00Z')-new Date(startDate+'T12:00:00Z'))/86400000)+1;if(days<1)conflict='The calendar date range ends before it starts; confirm the travel dates.';else if(days>7)conflict='The calendar date range exceeds seven days; the planner supports up to seven days.';}
-  return {startDate,endDate,days,source,conflict,cleanText:source?String(text).replace(source,' '):String(text)};
+  let days=null,trimmed=null;
+  if(startDate&&endDate){days=Math.round((new Date(endDate+'T12:00:00Z')-new Date(startDate+'T12:00:00Z'))/86400000)+1;if(days<1)conflict='The calendar date range ends before it starts; confirm the travel dates.';else if(days>7&&days<=62){trimmed=days;endDate=new Date(new Date(startDate+'T12:00:00Z').getTime()+6*86400000).toISOString().slice(0,10);days=7;}else if(days>62)conflict='The calendar date range exceeds seven days; the planner supports up to seven days.';}
+  return {startDate,endDate,days,trimmed,source,conflict,cleanText:source?String(text).replace(source,' '):String(text)};
 }
 // 2026-10-14: "something indoors if it rains", "in case it rains", "a rainy-day backup" is a fallback, not the
 // trip's weather. Like "a rainy day option", it adds one indoor option and leaves the rest of the plan as asked
@@ -240,6 +257,8 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   }
   const calendar=tripCalendar(original,referenceDate),startDate=calendar.startDate;
   if(calendar.conflict)conflicts.push(calendar.conflict);
+  // 2026-11-05: dates covering more than a week plan the first seven days and say so (it was an error with no plan).
+  if(calendar.trimmed)conflicts.push(`Your dates cover ${calendar.trimmed} days; the planner covers up to seven at a time, so this plan is for the first seven (${calendar.startDate} to ${calendar.endDate}).`);
   const add=(kind,value,clause,extra={})=>{
     const sc=scope(clause),strength=/\b(?:prefer|preferably|ideally|if possible)\b/.test(clause)?'prefer':'must';
     if (!items.some(i=>i.kind===kind&&i.value===value&&i.dayIndex===sc.dayIndex&&i.weekday===sc.weekday)) items.push({id:`r${items.length+1}`,kind,value,strength,sourceText:clause,...sc,...extra});
@@ -510,7 +529,7 @@ function explicitOutingComponents(trip,requirements) {
   const kinds=items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
   // 2026-10-25: "spa day and dinner in Penticton" found nothing (the spa and the dinner were one request); an activity
   // asked for with a meal is two stops, as a game and dinner already were.
-  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
+  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
   if(!scoped)return requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip;
   const text=requirements.text||'',parts=[];
   const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour'].includes(k)?'tour':'indoor';

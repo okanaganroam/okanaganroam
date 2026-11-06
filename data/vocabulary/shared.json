@@ -60,6 +60,14 @@
    "après ski"
   ],
   "cocktail": [
+   "dancing",
+   "nightclub",
+   "nightclubs",
+   "night club",
+   "night clubs",
+   "clubbing",
+   "dance club",
+   "dance floor",
    "cocktail spot",
    "cocktail spots",
    "wine bar",
@@ -161,6 +169,10 @@
    "botanical garden"
   ],
   "indoor": [
+   "educational",
+   "educational trip",
+   "learn about the history",
+   "team building",
    "spa",
    "spas",
    "nordic spa",
@@ -454,6 +466,12 @@
    "dog walks"
   ],
   "cycling": [
+   "cyclists",
+   "cyclist",
+   "bike trip",
+   "biking trip",
+   "cycling trip",
+   "bike holiday",
    "cycle",
    "ride bikes",
    "bike path",
@@ -703,6 +721,20 @@
    "mid price"
   ],
   "upscale": [
+   "luxury",
+   "luxurious",
+   "lavish",
+   "splurge",
+   "splurging",
+   "fine dining",
+   "money no object",
+   "cost no object",
+   "price no object",
+   "no expense spared",
+   "spare no expense",
+   "sky is the limit",
+   "no budget limit",
+   "no budget",
    "special occasion",
    "treat ourselves",
    "treat yourself",
@@ -1431,5 +1463,6 @@
    "en": "",
    "fr": ""
   }
- }
+ },
+ "originPlaces": ["australia", "sydney", "melbourne", "brisbane", "perth", "auckland", "new zealand", "london", "england", "uk", "u k", "united kingdom", "britain", "scotland", "ireland", "dublin", "france", "paris", "germany", "berlin", "munich", "netherlands", "amsterdam", "belgium", "switzerland", "zurich", "italy", "rome", "milan", "spain", "madrid", "barcelona", "portugal", "sweden", "stockholm", "norway", "oslo", "denmark", "copenhagen", "finland", "poland", "europe", "asia", "japan", "tokyo", "osaka", "kyoto", "korea", "south korea", "seoul", "china", "beijing", "shanghai", "hong kong", "taiwan", "singapore", "india", "delhi", "mumbai", "bangalore", "dubai", "uae", "israel", "mexico", "brazil", "argentina", "chile", "colombia", "south africa", "nigeria", "egypt", "texas", "california", "new york", "florida", "chicago", "boston", "los angeles", "san francisco", "the states", "the us", "usa", "u s a", "america", "ontario", "quebec", "alberta", "manitoba", "saskatchewan", "nova scotia", "winnipeg", "ottawa", "halifax", "overseas", "abroad", "out of town", "out of province", "out of country"]
 }

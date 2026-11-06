@@ -79,6 +79,65 @@ function normalizeDiscoveryText(text) {
     .trim();
 }
 
+// ---------- travel noise (2026-11-05) ----------
+// Where a visitor is travelling FROM, and how they arrive, say nothing about what to do here ("flying in from Sydney",
+// "we land at Kelowna airport", "a 5 hour layover", "couple in our 60s", "free time from 3pm"). They were being searched
+// for as places to eat ("Nothing matching 'sydney' was available") and a layover returned no plan at all.
+// Only on the visitor's own words, after an exact venue-name match, so "Kelowna Airport" the venue still resolves.
+const ORIGIN_PLACES = require('./vocabulary.js').sharedList('originPlaces').map((p) => normalizeDiscoveryText(String(p))).filter(Boolean).sort((a, b) => b.length - a.length);
+const ORIGIN_RE = ORIGIN_PLACES.length ? new RegExp(`\\bfrom (?:the )?(?:${ORIGIN_PLACES.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g') : null;
+function stripTravelNoise(normalized) {
+  let s = ` ${normalized} `;
+  if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
+  const arriving = /\b(?:land|lands|landing|landed|arrive|arrives|arriving|arrived|fly|flying|flight|layover|lay over|stopover|connecting)\b/.test(s);
+  if (arriving) {
+    // "land at Kelowna airport" is Kelowna; the airport itself is not a thing to search for.
+    s = s.replace(/\b(?:international )?airport\b/g, ' ');
+    s = s.replace(/\b(?:we|i|they|were|im) (?:will |would |am |are )?(?:land|arrive)\b/g, ' ').replace(/\b(?:landing|landed|arriving|arrived|flying in(?:to)?|fly in(?:to)?|flying to)\b/g, ' ');
+  }
+  s = s.replace(/\b(\d+(?: and a half)?|an?|one|two|three|four|five|six|seven|eight) hours?(?: long)? (?:lay over|layover|stopover)\b/g, '$1 hours things to do').replace(/\b(?:lay over|layover|stopover)s?\b/g, ' things to do ').replace(/\bfree (?:time|window|hours)\b/g, ' things to do ');
+  s = s.replace(/\b(?:a |the |our )?(?:conference|convention|work trip|business trip)\b/g, ' ');
+  s = s.replace(/\b(?:solo )?(?:traveller|traveler|tourist)s?\b/g, ' ');
+  // Money is no object: an upscale trip ("no" would otherwise read as a refusal of "object").
+  s = s.replace(/\b(?:money|cost|price|expense|budget)s? (?:is |are )?no (?:object|issue|concern|problem|limit)\b/g, ' luxury ').replace(/\bno (?:budget|expense) (?:limit|spared)\b/g, ' luxury ');
+  // A nap in the middle of the day is a pacing wish, not a place; a named kind of party is a celebration.
+  s = s.replace(/\b(?:with |and )?(?:a |an |the )?(?:nap|naps|naptime|nap time)\b(?: in the middle(?: of the day)?| midday| after lunch)?/g, ' ');
+  s = s.replace(/\b(?:retirement|birthday|farewell|graduation|engagement|office|staff|company|christmas|holiday|going away|baby shower) (?:party|parties|do)\b/g, ' celebration ');
+  s = s.replace(/\bschool (?:group|trip|class|field trip)\b/g, ' kids ');
+  // "a sunset dinner" is dinner with a lake view, not a lookout plus a dinner.
+  s = s.replace(/\bsunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b|\bdinner with a (?:sunset )?view\b/g, ' dinner with a lake view ');
+  // A baby's age in months ("a 6 month old").
+  s = s.replace(/\b\d{1,2}[ -]?(?:months?|mos?)[ -]?old\b|\b\d{1,2} months?(?= old| and)\b/g, ' ');
+  // Why they want a quiet place is theirs ("to write", "to read").
+  s = s.replace(/\b(?:to|and) (?:write|read|work|study|paint|think|journal|recharge)\b/g, ' ').replace(/\b(?:writing|reading|painting) retreat\b/g, ' quiet ');
+  s = s.replace(/\b(?:aged?|ages) \d{1,2}(?: (?:and|to|or|through|-) \d{1,2})?\b/g, ' ').replace(/\b\d{1,2} (?:years? old|year olds?|yo)\b/g, ' ');
+  // "from the other side of the world" is where they live. "wedding guests" are visitors; "retired" is an age; the lights of
+  // a Christmas lights trip are the Christmas events; cherry blossom time is gardens.
+  s = s.replace(/\b(?:from )?(?:the )?(?:other|far) side of the (?:world|globe|planet)\b|\bhalf ?way (?:across|around) the (?:world|globe)\b|\bwedding guests?\b/g, ' ');
+  s = s.replace(/\b(?:christmas|holiday|xmas) lights?(?: displays?| shows?| festivals?)?\b/g, ' christmas ').replace(/\b(?:cherry |apple |spring )?blossoms?(?: time| season)?\b/g, ' gardens ');
+  s = s.replace(/\b(?:retired|retirees?)\b/g, ' seniors ');
+  // "in four months" / "in 10 weeks": the month they will be here, so the season rules apply (not today's).
+  s = s.replace(/\bin (?:about |around |roughly )?(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a few|a couple of) (month|months|week|weeks)\b/g, (m, n, unit) => {
+    const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, 'a few': 3, 'a couple of': 2 };
+    const count = /^\d/.test(n) ? Number(n) : words[n];
+    const days = /^month/.test(unit) ? count * 30 : count * 7;
+    if (!(days > 31)) return m; // within the next month: leave it to the date reader
+    const when = new Date(Date.now() + days * 86400000);
+    return ` in ${['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'][when.getUTCMonth()]} `;
+  });
+  // "What's open right now in Vernon" asks for things to do that are open (the hours check does the rest).
+  s = s.replace(/\b(?:whats|what is|is anything|anything|what s) open\b/g, ' things to do ');
+  // A beer, cider or distillery "tour" is a run of breweries, cideries or distilleries (it picked a farm tour).
+  s = s.replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?|hopping|trail)\b/g, ' brewery crawl ').replace(/\b(?:cider|cidery) (?:tours?|trail)\b/g, ' cidery crawl ').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) (?:tours?|trail)\b/g, ' distillery crawl ');
+  // "for my sister's wedding" is why they are here; "we have the Friday free" is a day, not a search word.
+  s = s.replace(/\bfor (?:my |our |a |the )?(?:\w+s )?wedding\b/g, ' ').replace(/\b(?:have|got) (?:the |a )?(\w+day|weekend|afternoon|morning|evening|day) free\b/g, ' on $1 ');
+  // "I hate the cold" is a feeling about the weather, not a place.
+  s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
+  // "a couple in our 60s": an age, not a search word. 60+ reads as seniors.
+  s = s.replace(/\b(?:in )?(?:our|my|their) (?:early |late |mid )?(\d0)s\b/g, (m, d) => (Number(d) >= 60 ? ' seniors ' : ' '));
+  return s.replace(/\s+/g, ' ').trim();
+}
+
 // ---------- vocabulary ----------
 // Every table below maps phrases onto values that must ALSO exist in the
 // supplied taxonomy -- buildPhraseTable() drops any entry whose target value
@@ -1112,7 +1171,7 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
 
   // 1b. Stage 3.2: closed-vocabulary corrections ("osoyos" -> "osoyoos").
   // Everything below reads the corrected words; the corrections are listed.
-  const fixed = correctDiscoveryTokens(normalized.split(' '), index);
+  const fixed = correctDiscoveryTokens(stripTravelNoise(normalized).split(' '), index);
   intent.corrections = fixed.corrections;
   // "Pizzeria" is a pizza place (2026-10-19); listings say "pizza".
   const tokens = fixed.tokens.map((w) => (w === 'pizzeria' || w === 'pizzerias' ? 'pizza' : w));
@@ -1277,6 +1336,8 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   if (season || month) intent.season = season || MONTH_SEASON[month];
   if (lengthDays !== null) {
     if (lengthDays >= 1 && lengthDays <= DISCOVERY_MAX_DAYS) intent.days = lengthDays;
+    // 2026-11-05: "10 days" used to fall back to a ONE-day plan. Plan the longest trip we do (a week) and say so.
+    else if (lengthDays > DISCOVERY_MAX_DAYS && lengthDays <= 60) { intent.days = DISCOVERY_MAX_DAYS; intent.unsupported.push(`${lengthDays} days (the planner covers up to ${DISCOVERY_MAX_DAYS}, so this is the first ${DISCOVERY_MAX_DAYS})`); }
     else intent.unsupported.push(`${lengthDays} days (the planner covers 1-${DISCOVERY_MAX_DAYS})`);
   }
   const whenValue = lastOf('when', whenMentions);
@@ -1294,7 +1355,9 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   if (intent.when) {
     const lastWhen = whenMentions.slice().sort((a, b) => a.start - b.start)[whenMentions.length - 1];
     const fromPhrase = lastWhen && WHEN_PHRASE_DAYPART[lastWhen.phrase];
-    const part = fromPhrase || lastOf('daypart', daypartMentions);
+    // 2026-11-05: "dinner for 6 in Vernon tomorrow" listed a café that closes at 2:30 PM. A dated meal is that part of the day.
+    const mealPart = /\b(?:dinner|supper)\b/.test(normalized) ? 'evening' : /\b(?:breakfast|brunch)\b/.test(normalized) ? 'morning' : /\blunch\b/.test(normalized) ? 'afternoon' : null;
+    const part = fromPhrase || lastOf('daypart', daypartMentions) || mealPart;
     if (part && DISCOVERY_DAYPARTS.includes(part) && !intent.when.now) intent.when.daypart = part;
   }
 
@@ -1722,6 +1785,8 @@ function tripPhraseTable(taxonomy) {
     // Stage 3.1: "nice dinners", "two lunches" are the same meal parts.
     add(pluralOf(meal), 'tripMeal', meal);
   }
+  // 2026-11-05: "a birthday dinner, then drinks" -- the birthday dinner is a dinner, so what follows it comes after it.
+  if (byPhrase.has('birthday dinner') && TRIP_MEALS.dinner && TRIP_MEALS.dinner.types.every((ty) => t.types.includes(ty))) add('birthday dinner', 'tripMeal', 'dinner');
   for (const [part, phrases] of Object.entries(TRIP_DAYPARTS)) for (const p of phrases) add(p, 'tripDaypart', part);
   return Array.from(byPhrase.values());
 }
@@ -1776,7 +1841,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
   // Step 1 (2026-09-29): a comma or semicolon separates parts like "and"
   // does ("coffee, a beach afternoon, a winery and dinner"). Normalization
   // drops punctuation, so the separator is made a word first.
-  const normalized = normalizeDiscoveryText(typeof text === 'string' ? text.replace(/\s*[,;]\s*/g, ' and ') : text);
+  const normalized = stripTravelNoise(normalizeDiscoveryText(typeof text === 'string' ? text.replace(/\s*[,;]\s*/g, ' and ') : text));
   // A planning verb does not turn dinner plus an event into a full-day trip.
   // Explicit day counts continue through the day planner.
   const shortEventOuting = base.mode === 'plan' && !base.days

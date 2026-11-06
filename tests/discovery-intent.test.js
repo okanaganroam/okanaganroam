@@ -197,11 +197,12 @@ test('trip length: digits, words, adjectives, weekends, weeks and out-of-range',
   const cases = [['3 days in Kelowna', 3], ['three days in Kelowna', 3], ['a 3-day Kelowna trip', 3], ['3 relaxed days in Kelowna', 3],
     ['a weekend in Kelowna', 2], ['a long weekend in Penticton', 3], ['a week in Vernon', 7], ['one day in Kelowna', 1], ['2 nights in Osoyoos', 3]];
   for (const [q, days] of cases) { const i = I(q); assert.equal(i.days, days, q); assert.equal(i.mode, 'plan', q); }
+  // 2026-11-05: more than a week plans the first week and says so (it used to fall back to a one-day plan).
   const tooLong = I('10 days in Kelowna');
-  assert.equal(tooLong.days, null);
+  assert.equal(tooLong.days, 7);
   assert.equal(tooLong.mode, 'plan');
-  assert.deepEqual(tooLong.needs, ['days']);
-  assert.ok(tooLong.unsupported.some((u) => /10 days/.test(u)));
+  assert.ok(tooLong.unsupported.some((u) => /10 days/.test(u) && /first 7/.test(u)));
+  assert.equal(I('400 days in Kelowna').days, null, 'an absurd length is still not planned');
   assert.equal(I('I ate 3 apples that day').days, null, 'a number near "day" is not a trip length');
 });
 
