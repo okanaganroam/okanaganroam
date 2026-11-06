@@ -13,6 +13,14 @@ const entries = {
   'wineries/meadow-vista-honey-wines': [1000, 'Mead tasting', 'Dégustation d’hydromel', 'https://meadowvista.ca/pages/visit-us'],
   'wineries/summerhill-pyramid-winery': [1500, 'Earth Steward White tasting', 'Dégustation Earth Steward White', 'https://summerhill.bc.ca/tastings-experiences/'],
   'restaurants/derrick-s-steakhouse': [4000, 'Flat iron steak, sides extra', 'Steak flat iron, accompagnements en sus', 'https://www.derrickssteakhouse.ca/menus'],
+  'restaurants/lakeside-dining-room': [2900, 'Oaxacan chicken mole', 'Poulet mole d’Oaxaca', 'https://document-tc.galaxy.tf/wdpdf-3xu6bysf3uj5pt0bsgpe2h0g7/lakeside-dining-room_cms-document.pdf'],
+  'wineries/hidden-vines-family-estate-winery': [1000, 'Four-wine tasting', 'Dégustation de quatre vins', 'https://hiddenvines.ca/visit/'],
+  'wineries/priest-creek-family-estate-winery': [1500, 'Five-wine tasting', 'Dégustation de cinq vins', 'https://www.priestcreekwinery.com/visit'],
+  'restaurants/humo-kelowna': [4500, 'Miso black cod', 'Morue charbonnière au miso', 'https://humokelowna.com/humo-dinner/'],
+  'restaurants/pur-simple': [2500, 'Pork belly Benedicts', 'Bénédictines au porc', 'https://locations.pursimple.com/ca/bc/kelowna/1575-banks-rd-unit-100'],
+  'wineries/azhadi-vineyards': [1500, 'Discovery Experience tasting', 'Dégustation Découverte', 'https://azhadivineyards.com/experiences/'],
+  'wineries/tantalus-vineyards': [2500, 'Small Lot tasting', 'Dégustation Small Lot', 'https://tantalus.ca/products/reserve-tasting-experience'],
+  'restaurants/ustaad-g76-kelowna': [1699, 'Vegetarian combo thali (online menu)', 'Thali végétarien (menu en ligne)', 'https://order.online/store/ustaad-g76-indian-cuisine-2742628'],
 };
 
 function tripStopPrice(url) {
