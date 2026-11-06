@@ -130,7 +130,27 @@ function createCounter(db) {
       demand: null, sheet: sheetRows('event', sheet), sheet_total: total,
     };
   }
-  return { record, search, detail, recordEvent, searchEvents, detailEvent };
+  // Most viewed (2026-11-05): businesses and events ranked by page views over the last N days, with their clicks.
+  function top(days = 30, limit = 100, now = new Date()) {
+    days = [7, 30, 90].includes(Number(days)) ? Number(days) : 30;
+    const since = dayList(days, now)[0];
+    limit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+    const businesses = db.prepare(`SELECT v.id, v.name, v.region, v.type,
+        SUM(CASE WHEN c.name = 'venue_view' THEN c.n ELSE 0 END) AS views,
+        SUM(CASE WHEN c.name LIKE 'click:%' THEN c.n ELSE 0 END) AS clicks
+      FROM venue_event_counts c JOIN venues v ON v.id = c.venue_id
+      WHERE c.day >= ? AND v.redirect_to IS NULL GROUP BY v.id HAVING views > 0
+      ORDER BY views DESC, clicks DESC, v.name LIMIT ?`).all(since, limit);
+    const events = db.prepare(`SELECT e.id, e.name, e.region, 'event' AS type,
+        SUM(CASE WHEN c.name = 'event_view' THEN c.n ELSE 0 END) AS views,
+        SUM(CASE WHEN c.name LIKE 'click:%' THEN c.n ELSE 0 END) AS clicks
+      FROM event_click_counts c JOIN events e ON e.id = c.event_id
+      WHERE c.day >= ? GROUP BY e.id HAVING views > 0
+      ORDER BY views DESC, clicks DESC, e.name LIMIT ?`).all(since, Math.min(limit, 50));
+    const first = db.prepare('SELECT MIN(day) AS d FROM venue_event_counts').get().d;
+    return { days, since, counting_since: first || null, businesses, events };
+  }
+  return { record, search, detail, recordEvent, searchEvents, detailEvent, top };
 }
 
 module.exports = { applyInventory, NAME_RE, nameOk, eventNameOk, RATE_PER_HOUR, createCounter, rateLimited };
