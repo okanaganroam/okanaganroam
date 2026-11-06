@@ -14,7 +14,7 @@ test('Happy hour now excludes a venue with no current happy hour',()=>assert.equ
 test('layout groups all needs and provides explicit List and Map controls',()=>{
   const layout=require('../roam-now-layout.js');
   const html=layout.renderRoamFilterGroups({must:[{key:'dogs',label:'Dogs OK'},{key:'music',label:'Live music'},{key:'patio',label:'Patio'},{key:'happy',label:'Happy hour now'},{key:'kids',label:'Kids welcome'},{key:'groups',label:'Good for groups'}],diet:[{key:'gf',label:'Gluten-free'}]});
-  for(const label of ['Dietary','Features','Who’s coming','Right now'])assert.ok(html.includes(label));
+  for(const label of ['Dietary','Patios, music, views & sports','Dogs, kids & groups','Right now'])assert.ok(html.includes(label));
   for(const key of ['gf','dogs','music','patio','happy','kids','groups'])assert.ok(html.includes('data-pm-feat="'+key+'"'));
   assert.ok(layout.ROAM_LAYOUT_STYLE.includes('pm-list-view'));
 });

@@ -11,11 +11,11 @@ function roamRouteLocationMessage(reason,destination,lang='en'){
   return (fr?'Vers ':'To ')+destination+'. '+(causes[reason]?causes[reason]+' ':'')+(fr?'Utilisez votre position pour le guidage en direct, ou choisissez le départ sur la carte pour un aperçu.':'Use your location for live guidance, or choose a start on the map for a route preview.');
 }
 function renderRoamFilterGroups({must,diet,lang='en'}) {
-  const translations={'Dietary':'Régimes alimentaires','Features':'Caractéristiques','Who’s coming':'Avec qui?','Right now':'En ce moment','More options':'Autres options'};
+  const translations={'Dietary':'Régimes alimentaires','Patios, music, views & sports':'Terrasses, musique, vues et sports','Dogs, kids & groups':'Chiens, enfants et groupes','Right now':'En ce moment','More options':'Autres options'};
   const titleLabel=t=>lang==='fr'?(translations[t]||t):t;
   const chips=items=>items.map(f=>`<button type="button" class="pm-chip" data-pm-feat="${esc(f.key)}" aria-pressed="false">${f.icon?'<span aria-hidden="true">'+f.icon+'</span> ':''}${esc(f.label)}</button>`).join('');
   const group=(title,content)=>`<details class="rn-filter-group"><summary>${titleLabel(title)}<span data-rn-count></span></summary><div class="pm-chips" role="group" aria-label="${titleLabel(title)}">${content}</div></details>`;
-  return group('Dietary',chips(diet))+group('Features',chips(must.filter(f=>['patio','music','lake','sports'].includes(f.key))))+group('Who’s coming',chips(must.filter(f=>['dogs','kids','groups'].includes(f.key))))+group('Right now','<button type="button" class="pm-chip" data-pm-open aria-pressed="false">'+(lang==='fr'?'Ouvert maintenant':'Open now')+'</button>'+chips(must.filter(f=>['happy','specials','nights'].includes(f.key))))+group('More options',chips(must.filter(f=>['late','early','nonalc','free'].includes(f.key))))+'<button type="button" class="pm-chip" data-pm-top aria-pressed="false">'+(lang==='fr'?'Les mieux notés':'Top rated')+'</button>';
+  return group('Dietary',chips(diet))+group('Patios, music, views & sports',chips(must.filter(f=>['patio','music','lake','sports'].includes(f.key))))+group('Dogs, kids & groups',chips(must.filter(f=>['dogs','kids','groups'].includes(f.key))))+group('Right now','<button type="button" class="pm-chip" data-pm-open aria-pressed="false">'+(lang==='fr'?'Ouvert maintenant':'Open now')+'</button>'+chips(must.filter(f=>['happy','specials','nights'].includes(f.key))))+group('More options',chips(must.filter(f=>['late','early','nonalc','free'].includes(f.key))))+'<button type="button" class="pm-chip" data-pm-top aria-pressed="false">'+(lang==='fr'?'Les mieux notés':'Top rated')+'</button>';
 }
 const ROAM_LAYOUT_STYLE=`<style id="roam-now-layout">
 body.map-page{background:#f6f3eb}body.map-page .pm-stage{height:auto;min-height:900px;overflow:visible;max-width:1500px;margin:auto;padding:24px;--pm-sheet-h:0px}
@@ -140,6 +140,10 @@ body.pm-app-page #rnApplyFilters,
 body.pm-app-page #rnShowResults,
 body.pm-app-page #rnStartRoute { min-height: 48px; font-size: 15px; }
 @media (max-width: 899px) {
+  body.pm-app-page .pm-searchbar { padding-left: 12px; gap: 2px; }
+  body.pm-app-page .pm-searchbar .pm-search-icon,
+  body.pm-app-page .pm-searchbar .pm-filters-btn svg { display: none; }
+  body.pm-app-page .pm-searchbar .pm-search { padding: 0 2px; }
   body.pm-app-page .pm-list-view:not(.is-route):not(.is-route-origin) .rn-results-toolbar {
     display: flex;
     margin-top: 6px;

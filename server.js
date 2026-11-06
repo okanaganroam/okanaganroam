@@ -20919,6 +20919,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function durText(sec){ var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
   function startRoute(x){
     if (!MB) return false;
+    setStatus('');
     if (!routeReturn) {
       routeReturn = {
         view: stage.classList.contains('pm-map-view') ? 'map' : 'list',
@@ -21203,7 +21204,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function located(){
     $('rnLocationHelp').hidden=true;
     radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.stopLocTxt;
-    nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.recenter; setStatus(town ? '' : T.near);
+    nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.recenter; setStatus(town || pendingRoute || route ? '' : T.near);
   }
   function onErr(err){
     if(!watching)return;
