@@ -255,6 +255,13 @@ body.pm-app-page #rnStartRoute { min-height: 48px; font-size: 15px; }
     display: flex;
     margin-top: 6px;
   }
+  body.pm-app-page .pm-list-view:not(.rn-results-compact):not(.is-route):not(.is-route-origin) .pm-sheet,
+  body.pm-app-page .pm-list-view:not(.rn-results-compact):not(.is-route):not(.is-route-origin) .rn-views {
+    display: none;
+  }
+  body.pm-app-page .pm-list-view:not(.rn-results-compact) .pm-float {
+    max-height: 100%;
+  }
   body.pm-app-page .pm-list-view:not(.rn-results-compact) .rn-results-toolbar {
     position: sticky;
     bottom: 0;
