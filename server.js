@@ -14922,6 +14922,8 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
     var pages = { '/': 'home', '/map': 'map', '/trip': 'trip', '/whats-on': 'whats_on', '/browse': 'browse', '/hidden-gems': 'hidden_gems' };
     var k = pages[(location.pathname.replace(/^\\/fr(?=\\/|$)/, '') || '/').replace(/(.)\\/$/, '$1')];
     if (k) roamCount('page_view:' + k);
+    // Pages opened and where they led from (page-stats.js): sent only by a real browser, never for our own visits.
+    try { var nav = performance.getEntriesByType('navigation')[0]; var st = nav && nav.responseStatus; if (navigator.sendBeacon && (!st || st === 200) && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) navigator.sendBeacon('/api/page-view', new Blob([JSON.stringify({ path: location.pathname, from: document.referrer })], { type: 'application/json' })); } catch (e) { /* counting must never break the site */ }
   })();
   window.trackEvent = function(name, params){
     try {
@@ -54514,7 +54516,6 @@ const server = http.createServer(async (req, res) => {
   applySecurityHeaders(res);
   referralCounter.watch(req, res, requestClientIp(req)); // how people find us (referrals.js)
   notFoundCounter.watch(req, res, requestClientIp(req)); // broken pages (2026-11-06)
-  pageStats.watch(req, res, requestClientIp(req)); // pages opened and where they lead (2026-11-06)
   if ((req.method === 'GET' || req.method === 'HEAD') && String(req.url).split('?')[0] === '/healthz') return handleHealthz(req, res);
   if (req.method === 'POST' && String(req.url).split('?')[0] === CSP_REPORT_PATH) return handleCspReport(req, res);
   // Lighter pages (2026-10-18): shared CSS goes out as cached files, and a
@@ -57475,6 +57476,16 @@ const server = http.createServer(async (req, res) => {
       try {
         const b = await readLimitedJsonBody(req, 512);
         if (b && typeof b.term === 'string') searchTermCounter.record(req, 'map', b.term, b.found !== false, requestClientIp(req));
+      } catch (e) { /* ignore: counting only */ }
+      res.writeHead(204);
+      return res.end();
+    }
+    // POST /api/page-view -- a page reporting that it loaded in a browser. Body { path, from }. Same-origin only, always 204.
+    if (pathname === '/api/page-view' && method === 'POST') {
+      if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
+      try {
+        const b = await readLimitedJsonBody(req, 1024);
+        if (b && typeof b.path === 'string') pageStats.recordView(req, b.path, b.from, requestClientIp(req));
       } catch (e) { /* ignore: counting only */ }
       res.writeHead(204);
       return res.end();

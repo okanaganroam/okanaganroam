@@ -9,7 +9,7 @@ const crypto = require('crypto');
 
 const KINDS = new Set(['shown', 'add', 'remove']);
 const DAILY_CAP = 300; // rows per visitor per day, a runaway-bot guard
-const BOT_RE = /bot|crawl|spider|slurp|preview|fetch|monitor|headless|curl|wget|python|axios|node-fetch|go-http|lighthouse|facebookexternalhit/i;
+const BOT_RE = /bot|crawl|spider|slurp|preview|fetch|monitor|headless|curl|wget|python|axios|node-fetch|go-http|lighthouse|facebookexternalhit|audit|domain-watch|^node$|^mozilla\/5\.0$/i;
 
 function enabled(env = process.env) {
   return String(env.TRIP_DEMAND_LOG || 'on').toLowerCase() !== 'off';
@@ -28,8 +28,11 @@ function isBot(req) {
   return !ua || BOT_RE.test(ua);
 }
 
-function isInternal(req) {
-  return /(?:^|;\s*)roam_internal=1(?:;|$)/.test(String(req.headers.cookie || ''));
+// Our own visits: the roam_internal cookie, or an address in INTERNAL_IPS (comma separated), so testing never counts as visitors.
+function isInternal(req, env = process.env) {
+  if (/(?:^|;\s*)roam_internal=1(?:;|$)/.test(String(req.headers.cookie || ''))) return true;
+  const ip = String(req.headers['x-real-ip'] || '').trim();
+  return !!ip && String(env.INTERNAL_IPS || '').split(',').map((x) => x.trim()).includes(ip);
 }
 
 // Walk a plan result and collect the ids of venues it recommends.
