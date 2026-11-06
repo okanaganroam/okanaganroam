@@ -57434,6 +57434,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/admin/venue-activity' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
       res.setHeader('Cache-Control', 'no-store');
+      if (query.top) return sendJSON(res, 200, venueActivityCounter.top(query.days, query.limit));
       if (query.id) { const ev = query.kind === 'event'; return sendJSON(res, 200, { detail: await sheetWithPage(ev ? 'event' : 'venue', ev ? venueActivityCounter.detailEvent(query.id, query.days) : venueActivityCounter.detail(query.id, query.days)) }); }
       return sendJSON(res, 200, { matches: [...venueActivityCounter.search(query.q), ...venueActivityCounter.searchEvents(query.q)] });
     }
@@ -57481,16 +57482,19 @@ const server = http.createServer(async (req, res) => {
           return { error: r.status === 404 ? 'Whistler Roam doesn’t have business search yet.' : r.status === 401 ? 'Whistler Roam rejected the admin key.' : `Whistler Roam answered ${r.status}.` };
         } catch (e) { return { error: 'Couldn’t reach Whistler Roam right now.' }; }
       };
-      let detail = null; let results = [];
+      let detail = null; let results = []; let tops = [];
       const id = /^[1-9][0-9]*$/.test(String(query.id || '')) ? String(query.id) : '';
       if (id) {
         if (query.site === 'whistler') { const w = await wFetch(`id=${id}&days=${days}${query.kind === 'event' ? '&kind=event' : ''}`); detail = { key: 'whistler', name: 'Whistler Roam', data: w.data && w.data.detail, error: w.error || (w.data && w.data.detail ? null : 'Business not found.') }; }
         else { const dd = await sheetWithPage(query.kind === 'event' ? 'event' : 'venue', query.kind === 'event' ? venueActivityCounter.detailEvent(id, days) : venueActivityCounter.detail(id, days)); detail = { key: 'okanagan', name: 'Okanagan Roam', data: dd, error: dd ? null : 'Business not found.' }; }
+      } else if (q.trim().length < 2) {
+        const w = await wFetch(`top=1&days=${days}&limit=100`);
+        tops = [{ key: 'okanagan', name: 'Okanagan Roam', data: venueActivityCounter.top(days, 100), error: null }, { key: 'whistler', name: 'Whistler Roam', data: w.data || null, error: w.error || null }];
       } else if (q.trim().length >= 2) {
         const w = await wFetch(`q=${encodeURIComponent(q)}`);
         results = [{ key: 'okanagan', name: 'Okanagan Roam', matches: venueActivityCounter.search(q), error: null }, { key: 'whistler', name: 'Whistler Roam', matches: (w.data && w.data.matches) || [], error: w.error || null }];
       }
-      return res.end(renderBusinessPage({ q, days, results, detail, searched: q.trim().length >= 2 || !!id }));
+      return res.end(renderBusinessPage({ q, days, results, detail, tops, searched: q.trim().length >= 2 || !!id }));
     }
     // Review page (2026-10-15): see renderAdminReviewPage.
     if ((pathname === '/admin/review' || pathname === '/admin/review/') && (method === 'GET' || method === 'HEAD')) {

@@ -124,3 +124,25 @@ test('page: the click sheet shows every item and event results link with kind=ev
   const res = renderBusinessPage({ q: 'triv', days: 30, results: [{ key: 'okanagan', name: 'Okanagan Roam', matches: c.searchEvents('trivia') }], searched: true });
   assert.match(res, /kind=event/);
 });
+
+test('most viewed: businesses ranked by page views in the window, with clicks; zero-view and redirected ones left out', () => {
+  const db = memDb(); const c = va.createCounter(db);
+  for (let i = 0; i < 3; i += 1) c.record(req(), 1, 'venue_view', '8.8.8.8', NOW);
+  c.record(req(), 2, 'venue_view', '8.8.8.8', NOW);
+  c.record(req(), 2, 'click:website', '8.8.8.8', NOW); c.record(req(), 2, 'click:directions', '8.8.8.8', NOW);
+  c.record(req(), 1, 'click:website', '8.8.8.8', NOW);
+  db.exec("INSERT INTO venue_event_counts VALUES ('2026-11-05', 3, 'venue_view', 99)");
+  db.exec("INSERT INTO venue_event_counts VALUES ('2026-08-01', 2, 'venue_view', 500)");
+  c.recordEvent(req(), 7, 'event_view', '8.8.8.8', NOW);
+  const t = c.top(30, 100, NOW);
+  assert.deepEqual(t.businesses.map((b) => [b.id, b.views, b.clicks]), [[1, 3, 1], [2, 1, 2]]);
+  assert.deepEqual(t.events.map((e) => [e.id, e.views]), [[7, 1]]);
+  assert.equal(c.top(30, 1, NOW).businesses.length, 1);
+});
+
+test('page: the landing view lists the most viewed businesses for each site, linking to their sheets', () => {
+  const c = va.createCounter(memDb());
+  c.record(req(), 1, 'venue_view', '8.8.8.8', NOW);
+  const html = renderBusinessPage({ q: '', days: 30, tops: [{ key: 'okanagan', name: 'Okanagan Roam', data: c.top(30, 100, NOW) }, { key: 'whistler', name: 'Whistler Roam', error: 'Not connected yet' }] });
+  assert.match(html, /most viewed, last 30 days/); assert.match(html, /Rustic Reel Brewing/); assert.match(html, /site=okanagan&id=1/); assert.match(html, /Not connected yet/);
+});
