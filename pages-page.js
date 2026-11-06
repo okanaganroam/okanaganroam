@@ -4,7 +4,7 @@ const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
 
 const TYPES = { home: 'Home', tool: 'Tool', list: 'List', guide: 'Guide', category: 'Category', town: 'Town or topic' };
 const FILTERS = {
-  open: 'Open now', top: 'Top picks', drinks: 'Drinks', food: 'Food', coffee: 'Coffee', wine: 'Wineries', beach: 'Beaches', outdoor: 'Outdoors', golf: 'Golf', do: 'Things to do',
+  open: 'Open now', top: 'Top picks', drinks: 'Drinks', food: 'Food', coffee: 'Coffee', wine: 'Wineries', beach: 'Beaches', outdoor: 'Outdoors', golf: 'Golf', do: 'Things to do', indoor: 'Indoors',
   patio: 'Patio', dogs: 'Dogs OK', happy: 'Happy hour now', specials: 'Specials today', nights: 'Weekly nights', music: 'Live music', lake: 'Lake view', kids: 'Kid friendly',
   veg: 'Vegetarian', vegan: 'Vegan', gf: 'Gluten free', late: 'Open late', early: 'Open early', groups: 'Good for groups', sports: 'Sports on TV', nonalc: 'Alcohol-free drinks', free: 'Free to visit',
 };
