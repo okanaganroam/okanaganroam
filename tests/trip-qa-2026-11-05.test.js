@@ -230,3 +230,9 @@ test('"Instagrammable", "locals only", "3 generations", "I have a car with a bik
   }
   assert.equal(parse('dinner in Kelowna for kids on a snowy day').occasion, 'rainy_day');
 });
+
+test('a sunrise hike is a morning hike', () => {
+  const i = parse('sunrise hike then breakfast in Kelowna tomorrow');
+  assert.ok(!leftovers(i).includes('sunrise'), JSON.stringify(leftovers(i)));
+  assert.equal(i.when && i.when.daypart, 'morning');
+});

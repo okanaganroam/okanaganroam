@@ -200,6 +200,8 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\s+/g, " ").replace(/\b(?:most )?(?:instagram(?:m)?able|photogenic|picture perfect)\b/g, ' viewpoints ').replace(/\b(?:locals? only|only locals?|(?:no|not|without|avoid) (?:the )?(?:tourist )?traps?|off the beaten (?:path|track))\b/g, ' hidden gems ');
   s = s.replace(/\b(?:\d|two|three|four|five) generations?\b/g, ' ').replace(/\bdo together\b/g, ' do ').replace(/\b(?:i|we) (?:have|got|bring|are bringing) (?:a|our|my) (?:car|rental|van|suv)(?: with (?:a |our )?(?:bike|roof|bikes) ?racks?)?\b/g, ' ');
   s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing) (?:day|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
+  // A sunrise hike or walk is a morning hike or walk (sunrise itself is not a place).
+  s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
   // Holiday weekends become the dates of that long weekend (the next one coming).
   s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
   // "I hate the cold" is a feeling about the weather, not a place.
