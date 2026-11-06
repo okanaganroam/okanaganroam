@@ -58,7 +58,7 @@ test('counting: visits by source and landing page; agents; skips assets, errors,
   hit(c, '/kelowna', { ua: 'Mozilla/5.0 (compatible; GPTBot/1.1)' });
   hit(c, '/kelowna', { ua: 'curl/8', referer: 'https://www.google.com/' });
   const rep = c.report(30, NOW);
-  assert.deepEqual(rep.totals, { ai: 2, search: 1, social: 0, other: 0 });
+  assert.deepEqual(rep.totals, { ai: 2, search: 1, social: 0, other: 0, email: 0 });
   assert.deepEqual(rep.landing_ai, [{ source: 'chatgpt', page: '/kelowna/breweries/copper-brewing-co', n: 2 }]);
   assert.deepEqual(rep.landing_search, [{ source: 'google', page: '/kelowna', n: 1 }]);
   assert.deepEqual(rep.ai_fetched, [{ source: 'chatgpt', page: '/kelowna/wineries', n: 1 }]);
