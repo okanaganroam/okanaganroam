@@ -23,6 +23,7 @@ const tripRequirements = require('./trip-requirements');
 // Everything that differs between the Roam sites (names, towns, ski hills, routes) lives in trip-site.js; this file is the same on every site.
 const SITE = require('./trip-site.js');
 const tripStory = require('./trip-story');
+const { tripStopPrice } = require('./trip-stop-prices');
 
 const PLAN_DAYPARTS = {
   relaxed: ['morning', 'afternoon', 'evening'],
@@ -1289,11 +1290,13 @@ function why(reasons) {
 // Collections a stop card may name, and how (Build My Trip V3).
 const PUBLIC_COLLECTION_LABELS = { hidden_gem: 'Hidden Gem', local_favorite: 'Local Favourite', dog_friendly: 'Dogs allowed (official)' };
 function publicVenue(v, ctx) {
+  const cost = tripStopPrice(v.url, v.id);
   return {
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
+    ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : ctx ? typeLabel(ctx, v.type, 'singular') : v.type,
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
-    rating: v.rating, reviews: v.reviews, price: v.price, address: v.address || null,
+    rating: v.rating, reviews: v.reviews, price: v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
     // the kind of place (the site's category photos), labelled as an example.
     photo: ownStopPhoto(v), // real photos only (2026-10-28): no example photo for a place without its own
@@ -6061,9 +6064,9 @@ function planTripUnchecked(input) {
   pullDinnersForward(result, { ...input, intent }, requirements);
   startLaterOnMorningGaps(result, { ...input, intent }, requirements);
   leadUpToDinner(result, { ...input, intent }, requirements);
-  separateBackToBackMeals(result, { ...input, intent }, requirements);
   // Planner (2026-10-27): no wait of more than 90 minutes between stops is left unexplained (see closeIdleGaps).
   closeIdleGaps(result, { ...input, intent }, requirements, { userTimed: namedTimes });
+  separateBackToBackMeals(result, { ...input, intent }, requirements);
   if (eveningWalk && result.days.length) {
     // 2026-10-19: the rule is applied, not only stated. A dinner reached by car after the cut-off is said, day by day.
     const late = eveningWalkLateDrives(result, eveningWalk);

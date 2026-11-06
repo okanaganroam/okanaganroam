@@ -10,7 +10,7 @@ const KEYS = ['brand', 'brandWithArticle', 'brandFrOf', 'area', 'areaShort', 'ar
   'regionDriveLegs', 'townCentres', 'wellKnownSights', 'notDayBaseRegions', 'village', 'gatewayRegion', 'southGateway', 'mountainForTown', 'dayOnlyMountainRegions', 'summerLiftSightRe',
   'backcountryAskedRe', 'beachTownRe', 'beachWordRe', 'lakesideWords', 'lakeCrossing', 'curatedEventLocations', 'skiHillRegions', 'defaultSkiRegion', 'skiRegionForTown', 'skiVillageForHill',
   'skiSeasonMonths', 'skiOffMonths', 'skiHillNameRe', 'skiTownLabels', 'skiSuggestion', 'french', 'defaultRegion', 'nearTowns', 'skiHillBase', 'nameGenericWords', 'commonNameWords',
-  'venueNicknames', 'frenchRequests', 'page'];
+  'venueNicknames', 'stopPrices', 'frenchRequests', 'page'];
 
 test('trip-site.js has every value the shared planner files read', () => {
   for (const k of KEYS) assert.ok(k in SITE, k);

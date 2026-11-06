@@ -143,8 +143,9 @@ function plainRelativeDates(text, now = new Date()) {
   // "an hour to kill", "time to kill", "kill some time": a stretch of free time, not words to search for.
   text = String(text).replace(/\b(an|one|1) hour (?:to|2) kill\b/g, ' 1 hours ').replace(/\b(\d{1,2}|two|three|four|five) hours? (?:to )?kill\b/g, ' $1 hours ').replace(/\b(?:some |a little |a bit of |extra )?time to kill\b|\bkill(?:ing)? (?:some |a little |an? )?(?:time|hour|afternoon|morning|evening)\b/g, ' ');
   // A bare time box ("we have 2 hours in Vernon") with nothing to do in it: a coffee and an easy walk fill it.
-  if (/^\W*(?:(?:we|i)(?: only| just)? (?:have|got) )?(?:about |around )?(?:\d{1,2}|an?|one|two|three|four) (?:hours?|hrs?)(?: [a-z]+ [a-z]+)?(?: (?:in|around|near|at|downtown) [a-z ]+?)?(?: (?:tomorrow|today|tonight|right now|this (?:morning|afternoon|evening)|on [a-z]+|at (?:noon|\d{1,2}(?::\d\d)? ?(?:am|pm)?)))*\W*$/i.test(String(text).trim()) && !/\b(?:flights?|layover|airport)\b/i.test(text)) {
-    text = String(text).trim() + ' a cafe and an easy walk';
+  if (/^\W*(?:(?:we|i)(?: only| just)? (?:have|got) )?(?:about |around )?(?:\d{1,2}|an?|one|two|three|four) (?:hours?|hrs?)(?: [a-z]+ [a-z]+)?(?: (?:in|around|near|at|downtown) [a-z ]+?)?(?: (?:tomorrow|today|tonight|right now|this (?:morning|afternoon|evening)|on [a-z]+|at (?:noon|\d{1,2}(?::\d\d)? ?(?:am|pm)?)))*\W*$/i.test(String(text).replace(/\s+/g, ' ').trim()) && !/\b(?:flights?|layover|airport)\b/i.test(text)) {
+    // One hour only fits one stop; a coffee and a walk together run well past it.
+    text = String(text).replace(/\s+/g, ' ').trim() + (/(?:^|\W)(?:an?|one|1) (?:hours?|hrs?)\b/i.test(text) ? ' a cafe' : ' a cafe and an easy walk');
   }
   // "Thursday to Sunday", "arriving Friday, leaving Monday": a trip of that many days starting on the first weekday.
   {

@@ -44247,7 +44247,11 @@ async function handleOwnerChangeSubmission(req, res, token) {
     }
   }
   if (errors.form === OWNER_NOTHING_CHANGED && (reverts.length || badgeReverts.length || Object.keys(carried).length)) delete errors.form;
-  if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, errors });
+  if (Object.keys(errors).length) {
+    // Which boxes were refused, never what was typed, so a save that keeps failing can be traced.
+    console.warn(`[owner-portal] refused changes for venue #${venue.id}: ${Object.keys(errors).join(', ')}`);
+    return sendSubmissionResponse(res, 400, { ok: false, errors });
+  }
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 1000) || null : null;
   const contactName = typeof body.contact_name === 'string' ? body.contact_name.trim().slice(0, 100) || null : null;
   const ipHash = crypto.createHash('sha256').update(`okanagan-roam-owner-change:${requestClientIp(req)}`).digest('hex');
@@ -44593,7 +44597,10 @@ async function handleOwnerEventSubmission(req, res, token) {
   const partners = cleanPartnerIds(body.partner_venue_ids, venue.id);
   if (partners === null) errors.partner_venue_ids = `Choose up to ${EVENT_PARTNER_MAX} businesses listed on Okanagan Roam.`;
   else data.partner_venue_ids = partners;
-  if (Object.keys(errors).length) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
+  if (Object.keys(errors).length) {
+    console.warn(`[owner-portal] refused an event for venue #${venue.id}: ${Object.keys(errors).join(', ')}`);
+    return sendSubmissionResponse(res, 400, { ok: false, error: 'Please fix the highlighted fields.', errors });
+  }
   if (body.change_of !== undefined && body.change_of !== null && body.change_of !== '') return await handleOwnerEventChange(req, res, venue, Number(body.change_of), data);
   const duplicate = db.prepare(
     `SELECT id FROM event_submissions WHERE status = 'pending' AND owner_venue_id = ? AND start_date = ? AND LOWER(name) = LOWER(?)`

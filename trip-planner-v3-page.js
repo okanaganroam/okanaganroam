@@ -459,7 +459,7 @@ function renderStyles() {
   .t3.is-compact .t3-status:empty { display: none; }
   /* What we understood (the editable chips) belongs to the request, so it folds away with it until "Edit request"
      (2026-10-18): the plan then starts right under the bar instead of about 400px further down. */
-  .t3.is-compact .t3-understood { display: none; }
+  .t3.is-compact > .t3-understood { display: none; }
   .t3.is-compact .t3-result { padding-top: 14px; }
 
   /* How it works (before the first plan). */
@@ -656,6 +656,31 @@ function renderStyles() {
   .t3-caveats li + li { margin-top: 4px; }
   .t3-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 44px; }
+  .t3-estimate { padding: 14px 16px; border-radius: 12px; background: #e9f1ec; font-weight: 800; }
+  .t3-stop-price { margin: 6px 0; font-size: .88rem; font-weight: 800; color: #28594d; }
+  .t3-how .t3-sample { color: inherit; }
+  .t3-fit summary, .t3-how summary { cursor: pointer; font-weight: 700; }
+  @media (min-width: 900px) {
+    .t3-stops .t3-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(132px, max-content);
+      grid-template-rows: auto auto 1fr;
+      column-gap: 16px;
+    }
+    .t3-stops .t3-card .t3-more-menu { position: static; min-width: 0; box-sizing: border-box; }
+    .t3-stops .t3-card > :not(.t3-actions) { grid-column: 1; }
+    .t3-stops .t3-card .t3-actions {
+      grid-column: 2;
+      grid-row: 1 / span 3;
+      flex-direction: column;
+      align-items: stretch;
+      align-self: start;
+      margin: 0;
+      padding: 0 0 0 14px;
+      border-top: 0;
+      border-left: 1px solid rgba(27,43,58,.1);
+    }
+  }
   .t3-card.is-swapped { box-shadow: 0 0 0 3px var(--ref-gold, #C9A227); transition: box-shadow 0.4s; }
   .t3-swap-note { margin: 0 0 6px; font-size: 0.8125rem; font-weight: 800; color: #6B5410; }
   .t3-more { position: relative; display: inline-block; }
@@ -808,21 +833,20 @@ function renderBody(d) {
     <div class="t3-wrap t3-hero-inner">
       <nav class="t3-crumb" aria-label="Breadcrumb"><a href="/" data-i18n="tripv3.crumbHome">Home</a> &rsaquo; <span data-i18n="tripv3.name">Build My Trip</span></nav>
       <p class="t3-eyebrow" data-i18n="tripv3.name">Build My Trip</p>
-      <h1 class="t3-title" id="t3Title" data-i18n="tripv3.title">Tell us the trip. We&rsquo;ll map it out.</h1>
-      <p class="t3-lead" data-i18n="tripv3.lead">Say what you want. We&rsquo;ll plan it day by day from real places that are open, and tell you why each one fits.</p>
+      <h1 class="t3-title" id="t3Title"><span class="t3-en">${SITE_PAGE.title}</span><span class="t3-fr" lang="fr">${SITE_PAGE.titleFr}</span></h1>
+      <p class="t3-lead"><span class="t3-en">Tell us where you’re going, for how long, and what you’d like to do.</span><span class="t3-fr" lang="fr">Indiquez votre destination, la durée du voyage et ce que vous aimeriez faire.</span></p>
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
         <textarea id="t3Input" rows="3" maxlength="500" placeholder="${SITE_PAGE.placeholder}" data-i18n-placeholder="tripv3.placeholder"></textarea>
         <div class="t3-composer-foot">
-          <span class="t3-hint" data-i18n="tripv3.hint">${SITE_PAGE.hint}</span>
+          <span class="t3-hint"><span class="t3-en">Get a day-by-day plan you can edit, save, and share.</span><span class="t3-fr" lang="fr">Obtenez un plan jour par jour à modifier, à enregistrer et à partager.</span></span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
         </div>
       </form>
       <div class="t3-examples">
-        <span class="t3-examples-label" id="t3ExamplesLabel" data-i18n="tripv3.examplesLabel">Or start from one of these:</span>
+        <span class="t3-examples-label" id="t3ExamplesLabel"><span class="t3-en">Try an example</span><span class="t3-fr" lang="fr">Essayez un exemple</span></span>
           ${chips}
       </div>
-      ${t3SampleCardHtml(d)}
       <div class="t3-editbar" id="t3EditBar" hidden>
         <p class="t3-editbar-text"><span class="t3-editbar-label" id="t3EditLabel">Your request</span> <span id="t3EditText"></span></p>
         <button type="button" class="t3-editbar-btn" id="t3EditBtn" aria-controls="t3Form">Edit request</button>
@@ -830,14 +854,11 @@ function renderBody(d) {
       <p class="t3-status" id="t3Status" role="status" aria-live="polite"></p>
     </div>
   </section>
-  <section class="t3-wrap t3-how" id="t3How" aria-labelledby="t3HowTitle">
-    <h2 id="t3HowTitle" data-i18n="tripv3.howTitle">What we check for you</h2>
-    <ul class="t3-how-grid">
-      <li><strong data-i18n="tripv3.how1Title">Open, and in season</strong><span data-i18n="tripv3.how1Text">Each stop fits its opening hours. Places closed that day or out of season are left out.</span></li>
-      <li><strong data-i18n="tripv3.how2Title">${SITE_PAGE.how2Title}</strong><span data-i18n="tripv3.how2Text">${SITE_PAGE.how2Text}</span></li>
-      <li><strong data-i18n="tripv3.how3Title">A plan you can use</strong><span data-i18n="tripv3.how3Text">Keep, swap or remove stops, see it on the map, get a Google Maps route and share it with a link.</span></li>
-    </ul>
-  </section>
+  <details class="t3-wrap t3-how" id="t3How">
+    <summary><span class="t3-en">How it works</span><span class="t3-fr" lang="fr">Comment ça marche</span></summary>
+    <p><span class="t3-en">Describe your trip or choose an example. Then swap or remove stops, save your trip, and share the plan with your group.</span><span class="t3-fr" lang="fr">Décrivez votre voyage ou choisissez un exemple. Remplacez ou retirez des arrêts, enregistrez le voyage et partagez le plan avec votre groupe.</span></p>
+    ${t3SampleCardHtml(d)}
+  </details>
   <section class="t3-wrap t3-result" id="t3Result" hidden aria-labelledby="t3Headline"></section>
 </main>`;
 }
@@ -1378,6 +1399,37 @@ function renderScript(d) {
     }
     return items.length ? '<ul class="t3-badges" aria-label="' + esc(tx('tripv3.verified')) + '">' + items.join('') + '</ul>' : '';
   }
+  function cad(cents){
+    return new Intl.NumberFormat(lang() === 'fr' ? 'fr-CA' : 'en-CA', {
+      style: 'currency', currency: 'CAD', minimumFractionDigits: cents % 100 ? 2 : 0
+    }).format(cents / 100);
+  }
+  function stopPriceHtml(v){
+    var french = lang() === 'fr', cost = v.cost;
+    if (cost && Number.isSafeInteger(cost.cents) && cost.cents > 0) {
+      return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
+        + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
+    }
+    return '<p class="t3-stop-price"' + (v.freeEntry ? ' data-cost-cents="0"' : '') + '>'
+      + esc(v.freeEntry ? (french ? 'Entrée gratuite' : 'Free entry') : (french ? 'Prix par personne à vérifier' : 'Check price per person')) + '</p>';
+  }
+  function updateTripEstimate(){
+    var el = resultEl.querySelector('[data-t3-estimate]');
+    if (!el) return;
+    var cards = Array.from(resultEl.querySelectorAll('.t3-stops .t3-card'));
+    var known = 0, cents = 0, french = lang() === 'fr';
+    cards.forEach(function(card){
+      var price = card.querySelector('[data-cost-cents]');
+      if (price) { known++; cents += Number(price.dataset.costCents); }
+    });
+    if (!cards.length) return;
+    var missing = cards.length - known;
+    el.hidden = false;
+    el.textContent = (french ? 'Estimation par personne : ' : 'Estimated total per person: ')
+      + (known ? cad(cents) + ' CAD' : (french ? 'à vérifier' : 'check prices'))
+      + (missing ? (french ? ' · Prix à vérifier pour ' + missing + ' arrêt(s)' : ' · ' + missing + ' unpriced ' + (missing === 1 ? 'stop' : 'stops') + ' excluded') : '')
+      + (known ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
+  }
   function cardHtml(stop, key, opts){
     opts = opts || {};
     var v = stop.venue, url = placeUrl(v), counts = opts.counts || {};
@@ -1402,6 +1454,7 @@ function renderScript(d) {
       + '<div class="t3-card-top"><span>' + esc(v.indoorGolf ? (lang() === 'fr' ? 'Golf intérieur' : 'Indoor golf') : frLabel('tripv3.type.' + v.type, v.typeLabel)) + '</span><span aria-hidden="true">·</span><span>' + esc(v.regionLabel) + '</span></div>'
       + '<h4>' + (url ? '<a ' + hrefAttr(url) + '>' + esc(v.name) + '</a>' : esc(v.name)) + '</h4>'
       + (same && v.address ? '<p class="t3-address">' + esc(v.address) + '</p>' : '')
+      + stopPriceHtml(v)
       + factsLine(v)
       + '</div>'
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
@@ -1413,7 +1466,7 @@ function renderScript(d) {
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
       + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : esc(stop.nightLine)) + '</p>' : '')
-      + (why ? '<ul class="t3-why" aria-label="' + esc(tx('tripv3.whyFits')) + '">' + why + '</ul>' : '')
+      + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
       + '<div class="t3-actions">'
@@ -1737,24 +1790,26 @@ function renderScript(d) {
     var rainNote = /^(?:If it rains:|S’il pleut :)/;
     var notes = (p.notes || []).filter(function(n){ return (p.contextNotes || []).indexOf(n) === -1 && !((p.rainBackup || []).length && rainNote.test(n)); });
     var rainHtml = (p.rainBackup || []).length ? '<p class="t3-expect t3-rain">' + esc(lang() === 'fr' ? 'S’il pleut : ' : 'If it rains: ') + p.rainBackup.map(function(v){ var u = placeUrl(v); return u ? '<a ' + hrefAttr(u) + '>' + esc(v.name) + '</a>' : esc(v.name); }).join(lang() === 'fr' ? ' ou ' : ' or ') + esc(lang() === 'fr' ? ' — des options intérieures à proximité pour remplacer une plage ou une sortie en plein air.' : ' — indoor backups nearby, to swap in for a beach or outdoor stop.') + '</p>' : '';
-    var html = understoodHtml(p)
-      + '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
-      + (state.text ? '<p class="t3-request">' + esc(tx('tripv3.youAsked', { text: state.text })) + '</p>' : '')
+    var html = '<div class="t3-plan"><header class="t3-plan-head"><p class="t3-eyebrow">' + esc(tx('tripv3.yourPlan')) + '</p>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert" aria-live="polite"><p>' + esc(lang()==='fr' ? 'Plusieurs événements correspondent à «'+p.eventAmbiguity.phrase+'». Choisissez celui que vous voulez ajouter à votre sortie :' : 'More than one listed event matches “'+p.eventAmbiguity.phrase+'”. Choose the one you want to add to your outing:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name,i){var id=p.eventAmbiguity.candidateIds&&p.eventAmbiguity.candidateIds[i];return Number.isSafeInteger(id)&&id>0?'<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="'+id+'">'+esc(name)+'</button>':'';}).join('') + '</div></section>' : '')
       + '<h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary) + '</h2>'
-      + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect t3-story">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p><button type="button" class="t3-story-more" data-t3-story-more aria-expanded="false">' + esc(lang() === 'fr' ? 'Lire tout le plan' : 'Read the whole plan') + '</button>' : '')
-      + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
-      + rainHtml
-      // Winter in Whistler: skiing is suggested, not forced (2026-10-25).
-      + (p.skiSuggestion && state.text ? '<p class="t3-expect t3-ski-suggest">' + esc(lang() === 'fr' ? p.skiSuggestion.textFr : p.skiSuggestion.text) + ' <a ' + hrefAttr(((location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip') + '?q=' + encodeURIComponent(state.text + ' ' + (lang() === 'fr' ? p.skiSuggestion.addFr : p.skiSuggestion.add))) + '>' + esc(lang() === 'fr' ? p.skiSuggestion.labelFr : p.skiSuggestion.label) + ' \u2192</a></p>' : '')
       + '<div class="t3-plan-actions">'
       + (hasStops ? '<button type="button" class="t3-btn" data-t3-add-all aria-describedby="t3PlanStatus">' + esc(tx('tripv3.addAll')) + '</button>' : '')
       + (regen ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-regen>' + esc(regen) + '</button>' : '')
       + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-share>' + esc(tx('tripv3.share')) + '</button>'
       + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-view-trip hidden>' + esc(tx('tripv3.viewTrip')) + '</button>'
       + '</div><p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p>'
+      + '<details class="t3-details"><summary>' + esc(lang() === 'fr' ? 'Notes sur le plan' : 'Planning notes') + '</summary>'
+      + understoodHtml(p)
+      + ((p.story && p.story.text) || (p.experience && p.experience.text) ? '<p class="t3-expect t3-story">' + esc(String((p.story && p.story.text) || p.experience.text).replace(/([^.])\\.\\.(?=\\s|$)/g, '$1.')) + '</p><button type="button" class="t3-story-more" data-t3-story-more aria-expanded="false">' + esc(lang() === 'fr' ? 'Lire tout le plan' : 'Read the whole plan') + '</button>' : '')
+      + ((p.contextNotes || []).length ? '<p class="t3-expect">' + p.contextNotes.map(esc).join(' ') + '</p>' : '')
+      + rainHtml
+      // Winter: skiing is suggested, not forced (2026-10-25).
+      + (p.skiSuggestion && state.text ? '<p class="t3-expect t3-ski-suggest">' + esc(lang() === 'fr' ? p.skiSuggestion.textFr : p.skiSuggestion.text) + ' <a ' + hrefAttr(((location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip') + '?q=' + encodeURIComponent(state.text + ' ' + (lang() === 'fr' ? p.skiSuggestion.addFr : p.skiSuggestion.add))) + '>' + esc(lang() === 'fr' ? p.skiSuggestion.labelFr : p.skiSuggestion.label) + ' \u2192</a></p>' : '')
+      + '</details>'
       + (notes.length ? '<details class="t3-details"><summary>' + esc(tx('tripv3.howMade')) + '</summary><ul>' + notes.map(function(n){ return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></details>' : '')
       + '</header>';
+    var aboveStopsLength = html.length;
     if(p.timeBudget){
       var budget=p.timeBudget, fr=document.documentElement.lang==='fr';
       html+='<section class="t3-warnings" aria-label="'+(fr?'Options de durée':'Time budget options')+'"><h3>'+(fr?'Adaptez la sortie à votre temps':'Make this outing fit your time')+'</h3>';
@@ -1856,6 +1911,8 @@ function renderScript(d) {
     }
     html += t3ListingGapSummaryHtml(p,lang()==='fr',esc);
     html += warningSummaryHtml(p);
+    var tripDetails = html.slice(aboveStopsLength);
+    html = html.slice(0, aboveStopsLength);
     // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
@@ -1883,10 +1940,13 @@ function renderScript(d) {
     } else {
       html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
+    if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
+    html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';
     detachMap();
     resultEl.innerHTML = html;
+    updateTripEstimate();
     // Round 11: French plans link to French pages (see t3FrenchHref).
     if (lang() === 'fr') Array.prototype.forEach.call(resultEl.querySelectorAll('a[href^="/"]'), function(a){ var u = a.getAttribute('href'), fr = t3FrenchHref(u, a.getAttribute('data-url-fr')); if (fr !== u) a.setAttribute('href', fr); });
     resultEl.hidden = false;

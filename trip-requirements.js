@@ -276,7 +276,8 @@ const RAIN_BACKUP_CONTEXT=/\b(?:beach|beaches|hike|hikes|hiking|walk|walks|park|
 const CONDITIONAL_RAIN=/\b(?:if|in case|incase|should|when) (?:it|the weather) (?:rains?|is (?:raining|rainy|bad|wet|crappy|lousy)|turns(?: bad| wet)?|gets (?:bad|wet|rainy))\b|\bin case of (?:rain|bad weather)\b|\b(?:back ?up|plan b|fallback|rain option)\b/;
 function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDate=null}) {
   const items=[],conflicts=[];let explicitMealCount=null;
-  const original=String(text||''), normalizedText=norm(original);
+  // "at noon" / "starting at midday" is a 12 pm start, like "at 2 pm" (not after a meal such as "lunch at noon", which the bare-start rule skips).
+  const original=String(text||'').replace(/\b(at|from|around|starting|start|begin|leave|depart)(\s+(?:at\s+)?)(?:noon|midday)\b/gi,'$1$2 12 pm'), normalizedText=norm(original);
   const duration=/\b(\d+(?:\.\d+)?)\s*[- ]?\s*(hours?|hrs?|minutes?|mins?)\b/i.exec(original);
   const durationMinutes=duration ? Number(duration[1])*(/^h/i.test(duration[2])?60:1) : null;
   if (durationMinutes>0 && durationMinutes<=1440) items.push({id:'duration',kind:'duration',value:durationMinutes,strength:'must',sourceText:duration[0],dayIndex:null,weekday:null});
@@ -664,8 +665,8 @@ function explicitOutingComponents(trip,requirements) {
 // A place named in a short outing is its stop (bindNamedVenues), whichever way the components were built.
 function expandTripComponents(trip,requirements) { return bindNamedVenues(expandTripComponentsInner(trip,requirements),requirements); }
 function expandTripComponentsInner(trip,requirements) {
-  // Round 15b (2026-10-20): a crawl keeps its three stops ("brewery hopping in Squamish this afternoon" became one brewery:
-  // the afternoon's explicit-outing rebuild merged the crawl's copies into its one "brewery" item).
+  // Round 15b (2026-10-20): a crawl keeps its three stops ("brewery hopping this afternoon" became one brewery:
+  // the afternoon's explicit-outing rebuild merged the crawl's copies into its one item).
   if (!(trip?.multi && trip.crawl) && (!trip?.multi || requirements.daypart || requirements.onlyRequested || requirements.items.some(i=>i.kind==='transport'))) trip=explicitOutingComponents(trip,requirements);
   if (!trip?.multi) return trip;
   trip=skatingComponents(trip,requirements);

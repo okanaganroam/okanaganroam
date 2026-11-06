@@ -111,6 +111,26 @@ module.exports = {
   commonNameWords: ['okanagan', 'kelowna', 'penticton', 'vernon', 'oliver', 'osoyoos', 'naramata', 'summerland', 'peachland', 'armstrong', 'enderby', 'lumby', 'kaleden', 'coldstream'],
   venueNicknames: [], // [[regex, listing name]]: local names for a place, from the request's own words
 
+  // Published prices per person, checked November 6, 2026: [cents, label, French label, source]. A meal is one named
+  // example, and a winery price is for the named tasting, without purchase discounts.
+  stopPrices: {
+    byUrl: {
+      '/kelowna/restaurants/home-block-at-cedarcreek-estate-winery': [5000, 'Two-course lunch, food only', 'Dîner deux services, sans vin', 'https://www.cedarcreek.bc.ca/home-block-restaurant/lunch-menu/'],
+      '/kelowna/wineries/the-view-winery-vineyard': [1000, 'Wine or cider flight', 'Dégustation de vin ou de cidre', 'https://theviewwinery.com/events-2/'],
+      '/kelowna/wineries/spearhead-winery': [1500, 'Guided wine tasting', 'Dégustation guidée', 'https://www.spearheadwinery.com/visit-us/'],
+      '/kelowna/restaurants/wildling': [6900, 'Sample dinner: turnips, tagliolini and crudo', 'Exemple de souper : navets, tagliolini et crudo', 'https://www.wildling.ca/'],
+      '/kelowna/restaurants/soul-de-cuba-cafe': [2050, 'Classic Cuban sandwich', 'Sandwich cubain classique', 'https://souldecubacafe.ca/kelowna/index.php/menu/lunch'],
+      '/kelowna/wineries/sandhill-wines': [1800, 'Signature tasting', 'Dégustation Signature', 'https://www.sandhillwines.ca/visit/tasting-room/'],
+      '/kelowna/wineries/waldhof-family-estate-winery': [1000, 'Waldhof flight', 'Dégustation Waldhof', 'https://waldhofwine.ca/'],
+      '/kelowna/restaurants/kasai-teppanyaki-steak-sushi-house': [4800, 'Teppan chicken dinner', 'Souper de poulet teppan', 'https://kasaiteppanyaki.ca/menu'],
+      '/kelowna/restaurants/frankie-we-salute-you': [2275, 'Frankie cheeseburger', 'Cheeseburger Frankie', 'https://www.frankiewesaluteyou.com/menu'],
+      '/kelowna/wineries/meadow-vista-honey-wines': [1000, 'Mead tasting', 'Dégustation d’hydromel', 'https://meadowvista.ca/pages/visit-us'],
+      '/kelowna/wineries/summerhill-pyramid-winery': [1500, 'Earth Steward White tasting', 'Dégustation Earth Steward White', 'https://summerhill.bc.ca/tastings-experiences/'],
+      '/kelowna/restaurants/derrick-s-steakhouse': [4000, 'Flat iron steak, sides extra', 'Steak flat iron, accompagnements en sus', 'https://www.derrickssteakhouse.ca/menus'],
+    },
+    byId: {},
+  },
+
   // French requests: place words the interpreter turns into English.
   frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' }, places: [], lakes: [['lac okanagan', 'okanagan lake']] },
 
@@ -127,6 +147,7 @@ module.exports = {
     storagePrefix: 'okanagan',
     siteUrl: 'https://okanaganroam.com',
     mapCredit: { en: 'Powered by Geoapify', fr: 'Fourni par Geoapify', url: 'https://www.geoapify.com/' },
+    title: 'Build your Okanagan trip', titleFr: 'Planifiez votre voyage dans l’Okanagan',
     examples: ['3 days in Kelowna: wineries, easy walks and great food', '2 days in Penticton with the kids', 'A romantic weekend in Naramata', 'What can we do around Penticton if it rains?'],
     placeholder: 'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food.',
     townExamples: {
@@ -139,8 +160,5 @@ module.exports = {
     sampleText: 'ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.',
     sampleTitle: 'A happy hour crawl in Penticton',
     sampleStopLabel: { en: 'Happy hour', fr: 'Happy hour' },
-    hint: 'Checks each place&rsquo;s hours, seasons and happy hours.',
-    how2Title: 'Happy hours and what&rsquo;s on',
-    how2Text: 'Happy hour stops land inside happy hour, with the deals, weekly specials and nights like trivia or live music.',
   },
 };
