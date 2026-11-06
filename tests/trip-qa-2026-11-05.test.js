@@ -322,3 +322,10 @@ test('Server: a trip to Hawaii or Paris says the Okanagan Valley is the only are
     assert.ok((p.notes || []).some((n) => n.includes(`${place} isn’t included`)), text + ' ' + JSON.stringify(p.notes));
   }
 });
+
+test('"in 2 weeks" is a date, and week phrases are read as days', () => {
+  const di = require('../discovery-intent.js');
+  const now = new Date('2026-11-06T09:00:00Z');
+  assert.match(di.plainRelativeDates('a trip in 2 weeks to Kelowna', now), /on november 20/);
+  assert.equal(di.plainRelativeDates('in 3 months', now), 'in 3 months');
+});

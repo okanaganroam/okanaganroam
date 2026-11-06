@@ -134,6 +134,19 @@ function fixedHolidayDates(text) {
   return String(text).replace(/\b(?:on |for )?(remembrance day|canada day|christmas eve|christmas day|boxing day|new[ ’']?years?[ ’']?s? eve|new[ ’']?years?[ ’']?s? day|valentine[ ’']?s? day)(?! (?:long )?weekend)\b/gi, (m, h) => (dateOf(h) ? ` on ${dateOf(h)} ` : m)).replace(/\s+/g, ' ');
 }
 
+// "in 2 weeks", "in ten days", "a week from Friday" is not read by the date reader; "in N days/weeks" becomes that date.
+function plainRelativeDates(text, now = new Date()) {
+  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10, twelve: 12, fourteen: 14 };
+  const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  return String(text).replace(/\b(?:in|within) (?:about |around )?(\d{1,2}|one|two|three|four|five|six|seven|ten|twelve|fourteen) (days?|weeks?)(?! (?:ago|away|long|time))\b(?!\s+(?:in|at|around) [a-z]+ (?:for|to))/gi, (m, n, unit) => {
+    const count = /^\d/.test(n) ? Number(n) : words[n.toLowerCase()];
+    const days = /^week/i.test(unit) ? count * 7 : count;
+    if (!(days >= 2 && days <= 31)) return m;
+    const d = new Date(now.getTime() - 7 * 3600000 + days * 86400000); // the Okanagan's calendar day
+    return ` on ${M[d.getUTCMonth()]} ${d.getUTCDate()} `;
+  });
+}
+
 // Next occurrence of a Canadian long weekend, as "<month> <d> to <month> <d>" (Saturday to Monday, or the days around the date).
 function holidayWeekendDates(name, now = new Date()) {
   const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
@@ -237,6 +250,11 @@ function stripTravelNoise(normalized) {
   s = plainClockTimes(s);
   // Plain phrases: "cheap as possible", "avoid crowds", "exactly 3".
   s = s.replace(/\b(?:as )?cheap(?:ly)? as (?:possible|we can|you can)\b|\bcheapest possible\b/g, ' budget ').replace(/\b(?:avoid(?:ing)?|away from|no|not|without|skip) (?:the )?(?:crowds?|crowded|busy)\b|\buncrowded\b/g, ' quiet ').replace(/\bexactly (?=\d|one|two|three|four|five)/g, ' ');
+  // "a family week", "week long", "weeklong", "a fortnight": a week (or two) of the trip.
+  s = s.replace(/\b(?:(?:a|our|the|one|1) )?((?:(?:family|beach|wine|summer|winter|ski|relaxing|relaxed|little|whole|full|nice|lovely|great|long|quiet|romantic|fun|adventure|foodie|dream|perfect|first|last) )+)week\b/g, ' a week $1 ').replace(/\bweek ?-?long\b/g, ' a week ').replace(/\b(?:a )?fortnight\b/g, ' two weeks ');
+  s = plainRelativeDates(s);
+  // "two weeks": 14 days (the planner covers seven and says so).
+  s = s.replace(/\b(2|3|4|5|two|three|four|five)[ -]weeks?(?: long)?\b(?! (?:from now|ago|away))/g, (m, n, off) => (/\b(?:in|within|after|for the next) $/.test(s.slice(Math.max(0, off - 16), off)) && !/^ (?:in|around|at|for) /.test(s.slice(off + m.length, off + m.length + 5)) ? m : ` ${({ two: 2, three: 3, four: 4, five: 5 }[n] || Number(n)) * 7} days `));
   // A sunrise hike or walk is a morning hike or walk (sunrise itself is not a place).
   s = s.replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/g, 'morning $1');
   // Holiday weekends become the dates of that long weekend (the next one coming).
@@ -2190,6 +2208,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 }
 
 module.exports = {
+  plainRelativeDates,
   fixedHolidayDates,
   plainClockTimes,
   mergeSegmentStays,
