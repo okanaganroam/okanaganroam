@@ -7489,7 +7489,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: a beer, cider or distillery "tour" is a run of breweries, cideries or distilleries ("craft beer tour in Kelowna"
   // was one farm tour); the requirements see the same words.
-  const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy)
+  const planText = discoveryIntentModule().mergeSegmentStays(tripPlannerFrModule().tripPlannerText(text, taxonomy))
     .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
     .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl');
   // Calendar dates are handled by requirements, not mistaken for a day count.

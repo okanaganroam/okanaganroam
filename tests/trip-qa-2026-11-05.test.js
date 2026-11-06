@@ -214,3 +214,19 @@ test('"before our flight", "spending 2 nights", "beginners", "colours" and "spri
     assert.deepEqual(leftovers(i).filter((w) => /flight|spending|stopping|beginner|first|colou?r/i.test(w)), [], text);
   }
 });
+
+test('"two days Kelowna and one day Vernon" is one trip of the total length', () => {
+  assert.equal(d.mergeSegmentStays('two days kelowna and one day vernon wine and food couple'), '3 days in kelowna and vernon wine and food couple');
+  assert.equal(d.mergeSegmentStays('2 nights penticton then 2 nights vernon, hiking'), '5 days in penticton and vernon, hiking');
+  assert.equal(d.mergeSegmentStays('2 days in kelowna and 1 day hiking'), '2 days in kelowna and 1 day hiking');
+  const i = parse('two days Kelowna and one day Vernon, wine and food, couple');
+  assert.equal(i.days, 3);
+});
+
+test('"Instagrammable", "locals only", "3 generations", "I have a car with a bike rack" and "a snowy day" are read, not searched', () => {
+  for (const text of ['the most Instagrammable spots in Kelowna for a day', 'we are 3 generations, 6 people, 2 days in Vernon, mostly outdoors', 'I have a car with a bike rack, 3 days cycling, Penticton', 'dinner in Kelowna for kids on a snowy day']) {
+    const i = parse(text);
+    assert.deepEqual(leftovers(i).filter((w) => /instagram|generation|^car$|^rack$|snowy/i.test(w)), [], text);
+  }
+  assert.equal(parse('dinner in Kelowna for kids on a snowy day').occasion, 'rainy_day');
+});

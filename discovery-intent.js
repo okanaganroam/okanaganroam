@@ -87,6 +87,26 @@ function normalizeDiscoveryText(text) {
 const ORIGIN_PLACES = require('./vocabulary.js').sharedList('originPlaces').map((p) => normalizeDiscoveryText(String(p))).filter(Boolean).sort((a, b) => b.length - a.length);
 const ORIGIN_RE = ORIGIN_PLACES.length ? new RegExp(`\\bfrom (?:the )?(?:${ORIGIN_PLACES.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g') : null;
 
+// "two days Kelowna and one day Vernon", "2 nights Penticton then 2 nights Vernon": one trip of the total length through both towns.
+const STAY_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+function mergeSegmentStays(text) {
+  const num = '(\\d|one|two|three|four|five|six|seven)', unit = '(days?|nights?)', place = "((?:[a-z]+ ){0,1}[a-z]+)";
+  const re = new RegExp(`\\b${num} ${unit} (?:in |at |around |near )?${place} (?:and|then|followed by|and then|after that|plus) ${num} ${unit} (?:in |at |around |near )?${place}\\b`, 'i');
+  return String(text).replace(re, (m, n1, u1, p1, n2, u2, p2) => {
+    // A town, not an activity: "2 days in Kelowna and 1 day hiking" is one town and a hike.
+    const ACTIVITY = /^(?:hik\w*|bik\w*|cycl\w*|wine\w*|vineyards?|beer|brew\w*|food|golf\w*|beach\w*|lunch|dinner|brunch|breakfast|coffee|cafes?|spa|ski\w*|relax\w*|rest|shopping|sightseeing|exploring|fun|swim\w*|boat\w*|kayak\w*|couple|family|kids|friends|with|for|wineries|winery)$/;
+    const town = (w) => { const out = []; for (const x of w.split(' ')) { if (ACTIVITY.test(x)) break; out.push(x); } return out.join(' '); };
+    const rest2 = p2; p1 = town(p1); p2 = town(p2);
+    if (!p1 || !p2 || p1 === p2) return m;
+    const tail = rest2.slice(p2.length);
+    const a = STAY_WORDS[n1.toLowerCase()] || Number(n1), b = STAY_WORDS[n2.toLowerCase()] || Number(n2);
+    const nights = /^night/i.test(u1) || /^night/i.test(u2);
+    const total = nights ? a + b + 1 : a + b;
+    if (!(total >= 2 && total <= 7)) return m;
+    return `${total} days in ${p1} and ${p2}${tail}`;
+  });
+}
+
 // Next occurrence of a Canadian long weekend, as "<month> <d> to <month> <d>" (Saturday to Monday, or the days around the date).
 function holidayWeekendDates(name, now = new Date()) {
   const M = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
@@ -124,7 +144,7 @@ function holidayWeekendDates(name, now = new Date()) {
   return null;
 }
 function stripTravelNoise(normalized) {
-  let s = ` ${normalized} `;
+  let s = ` ${mergeSegmentStays(normalized)} `;
   if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
   const arriving = /\b(?:land|lands|landing|landed|arrive|arrives|arriving|arrived|fly|flying|flight|layover|lay over|stopover|connecting)\b/.test(s);
   if (arriving) {
@@ -176,6 +196,10 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(?:relying on|rely on|using|taking|by) (?:public )?(?:transit|buses|the bus|bus)\b|\b(?:we )?(?:don t|do not|dont) (?:have a car|drive)\b/g, ' no car ');
   s = s.replace(/\b(?:first time|first timers?|beginners?|newbies?|novices?)\b/g, ' ').replace(/\b(?:fall|autumn) colou?rs?\b|\bcolou?rs\b/g, ' ');
   s = s.replace(/\bspring break(?: week)?\b/g, ' in march ');
+  // More plain talk: "Instagrammable" is a view, "locals only / no tourist traps" is hidden gems, a car and a rack, 3 generations, "do together", a snowy day is an indoor day.
+  s = s.replace(/\s+/g, " ").replace(/\b(?:most )?(?:instagram(?:m)?able|photogenic|picture perfect)\b/g, ' viewpoints ').replace(/\b(?:locals? only|only locals?|(?:no|not|without|avoid) (?:the )?(?:tourist )?traps?|off the beaten (?:path|track))\b/g, ' hidden gems ');
+  s = s.replace(/\b(?:\d|two|three|four|five) generations?\b/g, ' ').replace(/\bdo together\b/g, ' do ').replace(/\b(?:i|we) (?:have|got|bring|are bringing) (?:a|our|my) (?:car|rental|van|suv)(?: with (?:a |our )?(?:bike|roof|bikes) ?racks?)?\b/g, ' ');
+  s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing) (?:day|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
   // Holiday weekends become the dates of that long weekend (the next one coming).
   s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
   // "I hate the cold" is a feeling about the weather, not a place.
@@ -2124,6 +2148,7 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
 }
 
 module.exports = {
+  mergeSegmentStays,
   holidayWeekendDates,
   OUTSIDE_PLACE_NAMES: Object.values(OUTSIDE_PLACES),
   DISCOVERY_INTENT_VERSION,
