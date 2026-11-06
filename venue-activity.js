@@ -23,9 +23,22 @@ function rateLimited(ip, now = Date.now()) {
 const dayList = (days, now) => { const out = []; for (let i = days - 1; i >= 0; i -= 1) out.push(dayOf(new Date(now.getTime() - i * 86400000))); return out; };
 const tableExists = (db, n) => { try { return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(n); } catch (e) { return false; } };
 
-// Every item that can be clicked on this kind of page, with its count (zero when nobody clicked it).
-function sheetRows(kind, counts) {
-  return labelsFor(kind).map((l) => ({ key: l.key, text: l.text, group: l.group, n: counts[l.key] || 0 }));
+// The rows of a click sheet. With the page's own inventory (what is really clickable on it) the sheet lists exactly those
+// items, with how many of each the page has and the clicks so far; an item clicked earlier that is no longer on the page
+// is kept and marked. Without an inventory (the page could not be read) it falls back to the full list for that kind.
+function sheetRows(kind, counts, inventory) {
+  if (!Array.isArray(inventory)) return labelsFor(kind).map((l) => ({ key: l.key, text: l.text, group: l.group, n: counts[l.key] || 0, on_page: null, examples: [] }));
+  const rows = inventory.map((i) => ({ key: i.key, text: i.text, group: i.group, n: counts[i.key] || 0, on_page: i.on_page, examples: i.examples || [] }));
+  const have = new Set(rows.map((r) => r.key));
+  for (const l of labelsFor(kind)) if (!have.has(l.key) && counts[l.key]) rows.push({ key: l.key, text: l.text, group: l.group, n: counts[l.key], on_page: 0, examples: [] });
+  return rows;
+}
+// Re-cut a detail's sheet against the page's inventory.
+function applyInventory(detail, kind, inventory) {
+  if (!detail) return detail;
+  const counts = {};
+  for (const r of detail.sheet || []) if (r.n) counts[r.key] = r.n;
+  return { ...detail, sheet: sheetRows(kind, counts, inventory), sheet_from_page: Array.isArray(inventory) };
 }
 
 function createCounter(db) {
@@ -120,4 +133,4 @@ function createCounter(db) {
   return { record, search, detail, recordEvent, searchEvents, detailEvent };
 }
 
-module.exports = { NAME_RE, nameOk, eventNameOk, RATE_PER_HOUR, createCounter, rateLimited };
+module.exports = { applyInventory, NAME_RE, nameOk, eventNameOk, RATE_PER_HOUR, createCounter, rateLimited };

@@ -4,14 +4,20 @@ const { esc, num, bars, stat, table, STYLE } = require('./dashboard-page');
 
 const LABELS = { website: 'Website', phone: 'Phone', booking: 'Book online', directions: 'Directions', other: 'Other link' };
 
-// The click sheet: every kind of thing that can be clicked on this page, most-clicked first within its group.
+// The click sheet: what this page has that can be clicked, with how many there are and how many clicks each got.
 function sheetHtml(v) {
   const rows = v.sheet || [];
   if (!rows.length) return '';
   const total = v.sheet_total || 0;
   const sorted = rows.slice().sort((a, b) => b.n - a.n || rows.indexOf(a) - rows.indexOf(b));
-  return `<h4>Everything people can click <small>${num(total)} clicks in all</small></h4>
-    ${table(['What they clicked', 'Where', 'Clicks', 'Share'], sorted.map((r) => [esc(r.text), esc(r.group), r.n ? `<b>${num(r.n)}</b>` : '0', total && r.n ? `${Math.round((r.n / total) * 100)}%` : '']))}`;
+  const hint = (r) => {
+    if (r.on_page === 0) return ' <small class="warn">(no longer on this page)</small>';
+    const named = ['cta_other', 'booking', 'social_link', 'featured_guide', 'more_like_this', 'claim_listing', 'expand_section', 'other_link', 'other_button', 'tickets_info', 'event_website', 'full_menu', 'see_deals', 'more_details'].includes(r.key);
+    return named && r.examples && r.examples.length ? ` <small>${esc(r.examples.join(' · '))}</small>` : '';
+  };
+  return `<h4>Everything clickable on this page <small>${num(total)} clicks in all</small></h4>
+    ${v.sheet_from_page ? '' : '<p class="warn">Couldn’t read the live page just now, so this is the general list for this kind of page.</p>'}
+    ${table(['What', 'Where', 'On the page', 'Clicks', 'Share'], sorted.map((r) => [esc(r.text) + hint(r), esc(r.group), r.on_page == null ? '' : num(r.on_page), r.n ? `<b>${num(r.n)}</b>` : '0', total && r.n ? `${Math.round((r.n / total) * 100)}%` : '']))}`;
 }
 
 function detailCard(d, days) {
@@ -23,7 +29,7 @@ function detailCard(d, days) {
     ${bars(v.views_per_day, 'Page views per day')}${bars(v.clicks_per_day, 'Link clicks per day')}
     ${sheetHtml(v)}
     ${v.clicks && v.clicks.length ? `<h4>Link clicks counted before the full sheet</h4>${table(['Link', 'Clicks'], v.clicks.map((c) => [esc(LABELS[c.type] || c.type), `<b>${num(c.n)}</b>`]))}` : ''}
-    <p class="empty">Counting started ${v.counting_since ? esc(v.counting_since) : 'today'}, so earlier days show zero. Only clicks on this page are counted (not cards in lists). A zero can mean nobody clicked it, or this page does not have that item.</p></div>`;
+    <p class="empty">Counting started ${v.counting_since ? esc(v.counting_since) : 'today'}, so earlier days show zero. The list comes from the live page, so it only shows what this page has. Only clicks on this page are counted (not cards in lists).</p></div>`;
 }
 
 function renderBusinessPage({ q = '', days = 30, results = [], detail = null, searched = false }) {

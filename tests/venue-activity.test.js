@@ -120,7 +120,7 @@ test('page: the click sheet shows every item and event results link with kind=ev
   const c = va.createCounter(memDb());
   c.record(req(), 1, 'click:see_hours', '4.4.4.4', NOW);
   const html = renderBusinessPage({ q: 'x', days: 30, detail: { key: 'okanagan', name: 'Okanagan Roam', data: c.detail(1, 30, NOW) } });
-  assert.match(html, /Everything people can click/); assert.match(html, /See hours/); assert.match(html, /Add to trip/);
+  assert.match(html, /Everything clickable on this page/); assert.match(html, /See hours/); assert.match(html, /Add to trip/);
   const res = renderBusinessPage({ q: 'triv', days: 30, results: [{ key: 'okanagan', name: 'Okanagan Roam', matches: c.searchEvents('trivia') }], searched: true });
   assert.match(res, /kind=event/);
 });
