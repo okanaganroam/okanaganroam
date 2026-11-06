@@ -283,15 +283,28 @@ body.pm-app-page #rnShowResults:hover { background: #284858; }
   body.pm-app-page .pm-list-view:not(.rn-results-compact):not(.is-route):not(.is-route-origin) .rn-views {
     display: none;
   }
-  body.pm-app-page .pm-list-view:not(.rn-results-compact) .pm-float {
+  body.pm-app-page .pm-list-view:not(.rn-results-compact, .is-route, .is-route-origin, .is-map-picker) .pm-float {
     max-height: 100%;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
-  body.pm-app-page .pm-list-view:not(.rn-results-compact) .rn-results-toolbar {
-    position: sticky;
-    bottom: 0;
+  body.pm-app-page .pm-list-view:not(.rn-results-compact, .is-route, .is-route-origin, .is-map-picker) .rn-results-toolbar {
+    position: fixed;
+    inset: auto 0 0;
+    margin: 0;
     z-index: 1;
-    padding-block: 4px;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
     background: #f6f3eb;
+  }
+  body.pm-app-page .rn-panel-footer {
+    flex-direction: column;
+    gap: 4px;
+  }
+  body.pm-app-page .rn-panel-footer .rn-clear { min-height: 32px; }
+  body.pm-app-page #rnShowResults,
+  body.pm-app-page #rnApplyFilters {
+    width: 100%;
+    min-height: 56px;
+    font-size: 17px;
   }
   body.pm-app-page .pm-map-view:not(.is-route):not(.is-route-origin):not(.is-map-picker) .pm-float > :not(.rn-views):not(.pm-toast):not(.rn-location-help),
   body.pm-app-page .pm-map-view:not(.is-route):not(.is-route-origin):not(.is-map-picker) .pm-sheet {
