@@ -1348,6 +1348,18 @@ CREATE TABLE IF NOT EXISTS event_click_counts (
 );
 `);
 
+// Broken pages (2026-11-06): per day, who asked (visitor / crawler / probe), the missing address and where the link was. Counts only.
+db.exec(`
+CREATE TABLE IF NOT EXISTS not_found_counts (
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  path TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, kind, path, ref)
+);
+`);
+
 // What people search for on our own site (2026-11-06): per day, where (site / trip), cleaned words and found-or-not. Counts only.
 db.exec(`
 CREATE TABLE IF NOT EXISTS search_term_counts (

@@ -13,10 +13,28 @@ const GROUPS = { ai: 'AI assistants', search: 'Search engines', social: 'Social'
 const name = (s) => NAMES[s] || s;
 const pageLink = (p) => `<a href="${esc(p)}" target="_blank" rel="noopener">${esc(p)}</a>`;
 
+const delta = (n, flip) => (n === 0 || n === null || n === undefined ? '<span class="empty">0</span>' : `<b style="color:${(flip ? n < 0 : n > 0) ? '#1a7f37' : '#b42318'}">${n > 0 ? '+' : ''}${num(n)}</b>`);
+const moveTable = (rows, linkPages) => table(['', 'Clicks', 'Before', 'Shown', 'Before', 'Position'], rows.map((r) => [
+  (linkPages ? pageLink(r.key.replace(/^https?:\/\/[^/]+/, '') || '/') : esc(r.key)) + (r.status === 'new' ? ' <small>new</small>' : r.status === 'gone' ? ' <small>no longer shown</small>' : ''),
+  `<b>${num(r.clicks)}</b> ${delta(r.d_clicks)}`, num(r.prev_clicks), `${num(r.impressions)} ${delta(r.d_impressions)}`, num(r.prev_impressions), r.impressions ? `${r.position}${r.prev_impressions ? ` <small>was ${r.prev_position}</small>` : ''}` : '–',
+]));
+function trendsHtml(t) {
+  if (!t) return '';
+  const c = t.current; const p = t.previous;
+  const pctChange = (a, b) => (b ? `${a >= b ? '+' : ''}${Math.round(((a - b) / b) * 100)}%` : a ? 'new' : '');
+  return `<h4>Compared with the ${num(t.daily.length)} days before <small>${esc(c.start)} to ${esc(c.end)} against ${esc(p.start)} to ${esc(p.end)}</small></h4>
+    <div class="stats">${stat(c.clicks, 'clicks', pctChange(c.clicks, p.clicks) ? `${pctChange(c.clicks, p.clicks)} (was ${num(p.clicks)})` : '')}${stat(c.impressions, 'times shown', pctChange(c.impressions, p.impressions) ? `${pctChange(c.impressions, p.impressions)} (was ${num(p.impressions)})` : '')}${stat(c.ctr, '% of showings clicked', `was ${p.ctr}%`)}${stat(c.position || null, 'average position', p.position ? `was ${p.position}` : '')}</div>
+    ${bars(t.daily.map((d) => ({ day: d.day, n: d.clicks })), 'Google clicks per day')}${bars(t.daily.map((d) => ({ day: d.day, n: d.impressions })), 'Times shown in Google per day')}
+    <h4>Search words going up</h4>${moveTable(t.queries.rising, false)}
+    <h4>Search words going down</h4>${moveTable(t.queries.falling, false)}
+    <h4>Pages going up</h4>${moveTable(t.pages.rising, true)}
+    <h4>Pages going down</h4>${moveTable(t.pages.falling, true)}`;
+}
+
 function searchConsoleHtml(sc) {
   if (sc === null || sc === undefined) return `<h4>What people typed into Google</h4><p class="empty">Not connected yet. Google Search Console is the only place that shows the words people typed into Google. To turn it on: in Search Console open Settings → Users and permissions, add the dashboard’s Google account (the same one used for Analytics) as a user, turn on the “Search Console API” in Google Cloud, then set GSC_SITE_URL on this site.</p>`;
   if (sc.error) return `<h4>What people typed into Google</h4><p class="warn">${esc(sc.error)}</p>`;
-  return `<h4>What people typed into Google <small>${esc(sc.start)} to ${esc(sc.end)}, from Search Console</small></h4>
+  return `${trendsHtml(sc.trends)}<h4>What people typed into Google <small>${esc(sc.start)} to ${esc(sc.end)}, from Search Console</small></h4>
     ${table(['Search words', 'Clicks', 'Shown', 'Avg. position'], sc.queries.map((r) => [esc(r.key), r.clicks ? `<b>${num(r.clicks)}</b>` : '0', num(r.impressions), String(r.position)]))}
     <h4>Pages Google sent people to</h4>
     ${table(['Page', 'Clicks', 'Shown', 'Avg. position'], sc.pages.map((r) => [pageLink(r.key.replace(/^https?:\/\/[^/]+/, '') || '/'), r.clicks ? `<b>${num(r.clicks)}</b>` : '0', num(r.impressions), String(r.position)]))}

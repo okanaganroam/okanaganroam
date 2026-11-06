@@ -38,6 +38,38 @@ async function accessToken(c, now = Date.now()) {
 const ymd = (d) => d.toISOString().slice(0, 10);
 const shape = (rows) => (rows || []).map((r) => ({ key: String((r.keys && r.keys[0]) || ''), clicks: r.clicks || 0, impressions: r.impressions || 0, position: Math.round((r.position || 0) * 10) / 10 }));
 
+const r1 = (x) => Math.round(x * 10) / 10;
+const sumRows = (rows) => {
+  let clicks = 0; let imp = 0; let posW = 0;
+  for (const r of rows) { clicks += r.clicks || 0; imp += r.impressions || 0; posW += (r.position || 0) * (r.impressions || 0); }
+  return { clicks, impressions: imp, ctr: imp ? r1((clicks / imp) * 1000) / 10 : 0, position: imp ? r1(posW / imp) : 0 };
+};
+// Compare two lists of {key, clicks, impressions, position}: what rose, fell, is new, or is gone. Tiny noise (under 3 impressions in both) is ignored.
+function movers(cur, prev, limit = 15) {
+  const p = new Map(prev.map((r) => [r.key, r])); const c = new Map(cur.map((r) => [r.key, r]));
+  const out = [];
+  for (const key of new Set([...c.keys(), ...p.keys()])) {
+    const a = c.get(key) || { clicks: 0, impressions: 0, position: 0 }; const b = p.get(key) || { clicks: 0, impressions: 0, position: 0 };
+    if (a.impressions + b.impressions < 3) continue;
+    out.push({ key, clicks: a.clicks, prev_clicks: b.clicks, impressions: a.impressions, prev_impressions: b.impressions, position: a.position, prev_position: b.position,
+      d_clicks: a.clicks - b.clicks, d_impressions: a.impressions - b.impressions, status: !p.has(key) ? 'new' : !c.has(key) ? 'gone' : 'both' });
+  }
+  const score = (r) => r.d_clicks * 100 + r.d_impressions;
+  const rising = out.filter((r) => score(r) > 0).sort((a, b) => score(b) - score(a) || a.key.localeCompare(b.key)).slice(0, limit);
+  const falling = out.filter((r) => score(r) < 0).sort((a, b) => score(a) - score(b) || a.key.localeCompare(b.key)).slice(0, limit);
+  return { rising, falling };
+}
+// Pure: builds the comparison from the raw API rows (so it can be tested without Google).
+function buildTrends({ daily, curQueries, prevQueries, curPages, prevPages }, curStart, curEnd, prevStart, prevEnd) {
+  const inRange = (r, a, b) => r.keys[0] >= a && r.keys[0] <= b;
+  const cur = daily.filter((r) => inRange(r, curStart, curEnd)); const prev = daily.filter((r) => inRange(r, prevStart, prevEnd));
+  return {
+    current: { start: curStart, end: curEnd, ...sumRows(cur) }, previous: { start: prevStart, end: prevEnd, ...sumRows(prev) },
+    daily: cur.map((r) => ({ day: r.keys[0], clicks: r.clicks || 0, impressions: r.impressions || 0 })),
+    queries: movers(shape(curQueries), shape(prevQueries)), pages: movers(shape(curPages), shape(prevPages)),
+  };
+}
+
 async function report(days = 28, now = new Date()) {
   const c = creds();
   if (!c) return null;
@@ -49,10 +81,10 @@ async function report(days = 28, now = new Date()) {
     const t = await accessToken(c);
     const end = new Date(now.getTime() - 2 * 86400000);
     const start = new Date(end.getTime() - (days - 1) * 86400000);
-    const q = async (dimensions, rowLimit) => {
+    const q = async (dimensions, rowLimit, from = start, to = end) => {
       const r = await fetch(`https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(c.site)}/searchAnalytics/query`, {
         method: 'POST', headers: { authorization: `Bearer ${t}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ startDate: ymd(start), endDate: ymd(end), dimensions, rowLimit }), signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({ startDate: ymd(from), endDate: ymd(to), dimensions, rowLimit }), signal: AbortSignal.timeout(8000),
       });
       if (r.status === 403) { const e = new Error('forbidden'); e.code = 403; throw e; }
       if (!r.ok) { const e = new Error('http'); e.code = r.status; throw e; }
@@ -60,6 +92,13 @@ async function report(days = 28, now = new Date()) {
     };
     const [queries, pages] = await Promise.all([q(['query'], 100), q(['page'], 25)]);
     const data = { days, start: ymd(start), end: ymd(end), queries: shape(queries), pages: shape(pages) };
+    // Compared with the period just before (same length). A failure here leaves the rest of the report intact.
+    try {
+      const pEnd = new Date(start.getTime() - 86400000); const pStart = new Date(pEnd.getTime() - (days - 1) * 86400000);
+      const [daily, prevQueries, prevPages] = await Promise.all([q(['date'], 400, pStart, end), q(['query'], 500, pStart, pEnd), q(['page'], 200, pStart, pEnd)]);
+      const [curQueries, curPages] = await Promise.all([q(['query'], 500), q(['page'], 200)]);
+      data.trends = buildTrends({ daily, curQueries, prevQueries, curPages, prevPages }, ymd(start), ymd(end), ymd(pStart), ymd(pEnd));
+    } catch (e) { data.trends = null; }
     cache.set(key, { at: Date.now(), data });
     return data;
   } catch (e) {
@@ -69,4 +108,4 @@ async function report(days = 28, now = new Date()) {
   }
 }
 
-module.exports = { report, creds };
+module.exports = { report, creds, buildTrends, movers, sumRows };
