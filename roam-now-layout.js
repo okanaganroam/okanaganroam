@@ -207,6 +207,10 @@ body.pm-app-page .rn-more-activity-options {
   flex-wrap: wrap;
   gap: 6px;
 }
+body.pm-app-page .rn-happy-copy,
+body.pm-app-page .rn-happy-entry .rn-general-copy { display: none; }
+body.pm-app-page .rn-happy-entry:not(.rn-events-mode) .rn-happy-copy { display: block; }
+body.pm-app-page .rn-happy-entry .pm-count { font-weight: 800; }
 body.pm-app-page .rn-event-copy,
 body.pm-app-page .rn-events-mode .rn-place-copy { display: none; }
 body.pm-app-page .rn-events-mode .rn-event-copy { display: block; }

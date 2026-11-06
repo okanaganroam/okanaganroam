@@ -3,7 +3,7 @@ const source=fs.readFileSync(require.resolve('../server'),'utf8');
 function syncContext(tab='places'){
  const node=()=>({hidden:false,textContent:'',innerHTML:'',value:'',scrollLeft:0,clientWidth:600,setAttribute(){},querySelectorAll(){return []}});const nodes={};const $=id=>nodes[id]||(nodes[id]=node());
  const chip=(key,label,attr)=>({textContent:label,setAttribute(){},getAttribute(n){return n===attr?key:null}});
- const ctx={$ ,kindChips:[chip('coffee','Coffee','data-pm-kind')],featChips:[chip('dogs','Dogs OK','data-pm-feat'),chip('gf','Gluten-free','data-pm-feat')],openBtns:[chip('','Open now','')],topBtns:[],kinds:{coffee:true},feats:{dogs:true,gf:true},onTags:()=>[],extras:()=>[],esc:String,T:{clear:'Clear'},on:o=>Object.keys(o).filter(k=>o[k]),notTypes:{},notTags:{},notKinds:{},notFeats:{},openOnly:false,topOnly:false,includeUnlistedHours:false,price:'',town:'kelowna',atMin:null,atDay:'',atUntil:false,tagOr:false,term:'',radiusKm:5,radiusFixed:false,searchEl:{value:''},tagHolder:node(),activeEl:node(),badge:node(),quickClear:node(),roamLocationLabel:()=>'',FR:false,tab,eventPeriod:'',freeEventsOnly:false,navigator:{},location:{pathname:'/map'},history:{replaceState(a,b,url){ctx.saved=url}}};
+ const ctx={$ ,kindChips:[chip('coffee','Coffee','data-pm-kind')],featChips:[chip('dogs','Dogs OK','data-pm-feat'),chip('gf','Gluten-free','data-pm-feat')],openBtns:[chip('','Open now','')],topBtns:[],kinds:{coffee:true},feats:{dogs:true,gf:true},onTags:()=>[],extras:()=>[],esc:String,T:{clear:'Clear'},on:o=>Object.keys(o).filter(k=>o[k]),notTypes:{},notTags:{},notKinds:{},notFeats:{},openOnly:false,happyEntry:false,topOnly:false,includeUnlistedHours:false,price:'',town:'kelowna',atMin:null,atDay:'',atUntil:false,tagOr:false,term:'',radiusKm:5,radiusFixed:false,searchEl:{value:''},tagHolder:node(),activeEl:node(),badge:node(),quickClear:node(),roamLocationLabel:()=>'',FR:false,tab,eventPeriod:'',freeEventsOnly:false,navigator:{},location:{pathname:'/map'},history:{replaceState(a,b,url){ctx.saved=url}}};
  const fn=source.slice(source.indexOf('  function syncChips(){'),source.indexOf('  // With location on,',source.indexOf('  function syncChips(){')));vm.createContext(ctx);vm.runInContext(fn+';syncChips()',ctx);return ctx;
 }
 test('filter changes save all choices to a URL that survives venue Back',()=>{const c=syncContext();assert.match(c.saved||'',/f=coffee,dogs,gf,in.kelowna/)});
@@ -21,7 +21,7 @@ test('detail directions link to the built-in map and retain French routing',()=>
 test('initial Events and Near me links survive URL synchronization',()=>{
  const block=source.slice(source.indexOf('    var initialHash = location.hash;'),source.indexOf('    if (returnContext && !CONF.dest)',source.indexOf('    var initialHash = location.hash;')));
  for(const hash of ['#events','#near-me']){
-  const c={location:{hash},tab:'places',syncChips(){c.location.hash=''},returnContext:null,render(){},setTab(t){c.tab=t},CONF:{},nearBtn:{click(){c.near=true}},navigator:{}};
+  const c={location:{hash},happyEntry:false,tab:'places',syncChips(){c.location.hash=''},returnContext:null,render(){},setTab(t){c.tab=t},CONF:{},nearBtn:{click(){c.near=true}},navigator:{}};
   vm.createContext(c);vm.runInContext(block,c);if(hash==='#events')assert.equal(c.tab,'events');else assert.equal(c.near,true);
  }
 });
