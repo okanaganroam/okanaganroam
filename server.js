@@ -20750,6 +20750,17 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // the next render fits the map to what it found when some of it is off-screen ("bingo" said "1 place in this part of
   // the map" while 3 matched).
   var searchFit = false, hhNoteShown = false;
+  var eventPeriod = '', freeEventsOnly = false;
+  function matchesEventFilters(event, today){
+    if (freeEventsOnly && String(event.price || '').trim().toLowerCase() !== 'free') return false;
+    if (eventPeriod === 'today') return event.sd <= today && event.ed >= today;
+    if (eventPeriod === 'weekend') {
+      var day = new Date(today + 'T12:00:00Z').getUTCDay();
+      var saturday = addDays(today, day === 0 ? -1 : 6 - day);
+      return event.sd <= addDays(saturday, 1) && event.ed >= (day === 0 ? today : saturday);
+    }
+    return true;
+  }
   function render(fit){
     dismissTownLocationHelp();
     $('rnLocationText').textContent=roamLocationLabel();
@@ -20785,10 +20796,15 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       var order = { now: 0, later: 1, running: 2, tomorrow: 3, week: 4, ahead: 5 };
       // An event without a pin counts as near when its town centre is within the distance.
       var nearTown = function(e){ var c = CONF.c[e.region]; return c && distKm(me.lat, me.lng, c[0], c[1]) <= radiusKm; };
-      items = events.filter(function(e){ return e.g && (!town || e.region === town) && ((!evTerm && !evKinds.length) || evHit(e)) && (town || !me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
+      items = events.filter(function(e){ return e.g && matchesEventFilters(e, today) && (!town || e.region === town) && ((!evTerm && !evKinds.length) || evHit(e)) && (town || !me || !radiusKm || (e.d != null ? e.d <= radiusKm : nearTown(e))); })
         .sort(function(a, b){ return order[a.g] - order[b.g] || (a.sd < b.sd ? -1 : a.sd > b.sd ? 1 : 0) || ((a.st || '') < (b.st || '') ? -1 : (a.st || '') > (b.st || '') ? 1 : 0) || (me && a.d != null && b.d != null ? a.d - b.d : 0); });
       onMap = items.filter(function(e){ return e.lat != null; });
       countEl.textContent = aheadOn && aheadState === true ? T.eventsSoon(items.length, me && !town ? radiusKm : 0) : me && !town ? T.eventsNear(items.length, radiusKm) : T.eventsCount(items.length);
+      if (eventPeriod) {
+        var periodLabel = eventPeriod === 'today' ? (FR ? 'aujourd’hui' : 'today') : (FR ? 'cette fin de semaine' : 'this weekend');
+        countEl.textContent = items.length + (FR ? (items.length === 1 ? ' événement ' : ' événements ') : (items.length === 1 ? ' event ' : ' events ')) + periodLabel;
+        if (me && !town && radiusKm) countEl.textContent += (FR ? ' · À moins de ' : ' · Within ') + radiusKm + ' km';
+      }
       if(town)countEl.textContent+=(FR?' · À ':' · In ')+CONF.r[town];
     }
     // During directions, only the destination stays on the map.
@@ -20878,6 +20894,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   // The empty Events list suggests a bigger distance only when a bigger one has events; a search with nothing in
   // the days the map holds (« réveillon » in October) says so instead.
   function noEventsText(){
+    if (eventPeriod || freeEventsOnly) return FR ? 'Aucun événement ne correspond. Essayez de retirer un filtre.' : 'No matching events. Try turning off a filter.';
     var today = okToday(), nowMin = okanaganClock(new Date()).minutes, searching = !!(evTerm || evKinds.length);
     if (me && radiusKm && events.some(function(e){ return evGroup(e, today, nowMin) && (!searching || evHit(e)); })) return T.noEvents;
     return searching ? (aheadOn && aheadState === true ? T.noEventsSoon : T.noEventsWeek) : T.noEventsHere;
@@ -21306,6 +21323,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
         on(notTags).map(function(k){ return 'x.t.' + k; }), on(notKinds).map(function(k){ return 'x.k.' + k; }), on(notFeats).map(function(k){ return 'x.f.' + k; }));
       var rawSearch=searchEl.value.trim();
       var q = 'f=' + f.join(',') + (rawSearch ? '&q=' + encodeURIComponent(rawSearch) : '')+(radiusFixed?'&r='+radiusKm:'');
+      if (tab === 'events') {
+        if (eventPeriod) q += '&when=' + eventPeriod;
+        if (freeEventsOnly) q += '&free=1';
+      }
       q=q.replace(/^&/,'');
       history.replaceState(null, '', location.pathname + (q ? '?' + q : '?f=') + (tab === 'events' ? '#events' : ''));
     } catch (e) {}
@@ -21346,7 +21367,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     else if (part[0] === 'notf') delete notFeats[part[1]];
     liveBase = null; changed();
   });
-  function clearAll(){ kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; nameQ = ''; dealQuery = ''; evTerm = ''; evKinds = []; aheadOn = false; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
+  function clearAll(){ eventPeriod = ''; freeEventsOnly = false; updateEventChips(); kinds = {}; feats = {}; tags = {}; notTags = {}; notKinds = {}; notFeats = {}; notTypes = {}; topOnly = false; openOnly = false; town = ''; price = ''; atMin = null; atDay = ''; atUntil = false; tagOr = false; term = ''; nameQ = ''; dealQuery = ''; evTerm = ''; evKinds = []; aheadOn = false; liveBase = null; lastSearchSet = null; radiusFixed = false; searchEl.value = ''; changed(); }
   function on(o){ return Object.keys(o).filter(function(k){ return o[k]; }); }
   // When nothing matches: the first filter worth dropping that gives results at some distance ("Try without Open at
   // 3 AM"), with a button that drops it (the distance then chooses itself). Tried one at a time on a copy of the filters.
@@ -21852,8 +21873,28 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
     $('pmTabEvents').setAttribute('aria-selected', t === 'events' ? 'true' : 'false');
     $('pmPlaceFilters').hidden = t !== 'places';
+    $('rnEventFilters').hidden = !eventMode;
+    updateEventChips();
     syncChips();
     render(!!me);
+  }
+  $('rnEventFilters').addEventListener('click', function(e){
+    var chip = e.target.closest('[data-event-filter]');
+    if (!chip) return;
+    var filter = chip.dataset.eventFilter;
+    if (filter === 'free') freeEventsOnly = !freeEventsOnly;
+    else eventPeriod = eventPeriod === filter ? '' : filter;
+    updateEventChips();
+    limit = 25;
+    $('pmSheetBody').scrollTop = 0;
+    syncChips();
+    render(false);
+  });
+  function updateEventChips(){
+    $('rnEventFilters').querySelectorAll('[data-event-filter]').forEach(function(chip){
+      var filter = chip.dataset.eventFilter;
+      chip.setAttribute('aria-pressed', String(filter === 'free' ? freeEventsOnly : eventPeriod === filter));
+    });
   }
   $('pmTabPlaces').addEventListener('click', function(){ evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false; setTab('places'); });
   $('pmTabEvents').addEventListener('click', function(){ evTerm = ''; evKinds = []; aheadOn = false; evBySearch = false; setTab('events'); });
@@ -21935,6 +21976,8 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     // Happy hour now always requires current researched times.
     try {
       var qs = new URLSearchParams(location.search);
+      eventPeriod = ['today','weekend'].includes(qs.get('when')) ? qs.get('when') : '';
+      freeEventsOnly = qs.get('free') === '1';
       (qs.get('f') || '').split(',').forEach(function(k){ if (k === 'open') openOnly = true; else if (k === 'top') topOnly = true; else if (k === 'or') tagOr = true;
         else if (k.indexOf('in.') === 0 && CONF.r[k.slice(3)]) town = k.slice(3); else if (/^p\\.(cheap|afford|fancy)$/.test(k)) price = k.slice(2); else if (/^at\\.\\d+u?$/.test(k)) { atMin = parseInt(k.slice(3), 10); atUntil = /u$/.test(k); } else if (/^on\\.(\\+1|mon|tue|wed|thu|fri|sat|sun)$/.test(k)) atDay = k.slice(3); else if (k.indexOf('x.y.') === 0 && TYPES[k.slice(4)]) notTypes[k.slice(4)] = true;
         else if (k.indexOf('x.t.') === 0 && TAGIX[k.slice(4)] != null) notTags[k.slice(4)] = true; else if (k.indexOf('x.k.') === 0 && CONF.k[k.slice(4)]) notKinds[k.slice(4)] = true; else if (k.indexOf('x.f.') === 0 && CONF.f[k.slice(4)]) notFeats[k.slice(4)] = true; else if (k.indexOf('t.') === 0 && TAGIX[k.slice(2)] != null) tags[k.slice(2)] = true; else if (CONF.k[k]) kinds[k] = true; else if (CONF.f[k]) feats[k] = true; });
@@ -22028,6 +22071,7 @@ const MAP_KINDS = [
   { key: 'beach', label: 'Beaches', icon: uiIcon('beach'), types: ['beach'] },
   { key: 'outdoor', label: 'Outdoors', icon: uiIcon('tree'), types: ['outdoor'] },
   { key: 'golf', label: 'Golf', icon: uiIcon('golf'), types: ['golf'] },
+  { key: 'indoor', label: 'Indoor things to do', icon: '<span aria-hidden="true">🌧️</span>', types: ['indoor'] },
   { key: 'do', label: 'Things to do', icon: uiIcon('target'), types: ['tour', 'sport', 'indoor', 'shop'] },
 ];
 const MAP_MUST_HAVES = [
@@ -22396,16 +22440,22 @@ ${renderGolfHeaderHtml()}
       </div>
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
         <span class="rn-needs-title">${R('Your needs','Vos besoins')}</span><span class="pm-tagchips" id="pmTagChips"></span>
-        <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span> Open now</button>
+        <button type="button" class="pm-chip" data-pm-open aria-pressed="false"><span class="pm-dot is-open" aria-hidden="true"></span><span aria-hidden="true">⏰</span> Open now</button>
         <button type="button" class="pm-chip" data-pm-top aria-pressed="false"><span aria-hidden="true">${uiIcon('star')}</span> Top rated</button>
         ${(() => {
           // Every filter in one row: Happy hour, Patio and Dogs OK, the dietary ones, the kinds of place, then the rest.
           const feat = (f) => `<button type="button" class="pm-chip" data-pm-feat="${f.key}" aria-pressed="false"><span aria-hidden="true">${f.icon}</span> ${escapeHtml(f.label)}</button>`;
-          const kind = (k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`;
+          const quickEmoji = { drinks: '🍹', food: '🍔', coffee: '☕', do: '🧭' };
+          const kind = (k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${quickEmoji[k.key] || k.icon}</span> ${escapeHtml(k.label)}</button>`;
           const first = ['happy', 'specials', 'nights', 'patio', 'dogs'];
           return [...first.map((key) => MAP_MUST_HAVES.find((f) => f.key === key)).map(feat), ...MAP_DIETARY.map(feat), ...MAP_KINDS.map(kind), ...MAP_MUST_HAVES.filter((f) => !first.includes(f.key)).map(feat)].join('\n        ');
         })()}
         <button type="button" class="pm-chip pm-quick-clear" id="pmQuickClear" hidden>&#10005; Clear</button>
+      </div>
+      <div class="pm-quick rn-event-filters" id="rnEventFilters" role="group" aria-label="${R('Event filters','Filtres des événements')}" hidden>
+        <button type="button" class="pm-chip" data-event-filter="today" aria-pressed="false"><span aria-hidden="true">☀️</span> ${R('Today','Aujourd’hui')}</button>
+        <button type="button" class="pm-chip" data-event-filter="weekend" aria-pressed="false"><span aria-hidden="true">🎉</span> ${R('This weekend','Cette fin de semaine')}</button>
+        <button type="button" class="pm-chip" data-event-filter="free" aria-pressed="false"><span aria-hidden="true">🎟️</span> ${R('Free','Gratuit')}</button>
       </div>
       <div class="rn-location-help" id="rnLocationHelp" hidden><p id="rnLocationMessage" role="status"></p><div><button type="button" id="rnRetryLocation">${R('Try my location','Réessayer ma position')}</button><button type="button" id="rnChooseTown">${R('Choose a town','Choisir une ville')}</button><button type="button" id="rnChoosePin">${R('Choose on map','Choisir sur la carte')}</button></div></div>
       <div class="rn-views" role="group" aria-label="Results view"><button type="button" id="rnList" aria-pressed="true">${R('List','Liste')}</button><button type="button" id="rnMap" aria-pressed="false">${R('Map','Carte')}</button></div>

@@ -121,6 +121,7 @@ async function mapFns(lang) {
 function emptyText(fns, state) {
   const ctx = { T: fns.T, okToday: () => '2026-10-20', okanaganClock: () => ({ minutes: 600 }), eventGroup: (e) => (e.sd <= '2026-10-27' ? 'week' : null),
     evHit: (e) => e.tp.includes('new_years'), me: null, radiusKm: 5, evTerm: '', evKinds: [], aheadOn: false, aheadState: null, events: [], ...state };
+  Object.assign(ctx, { eventPeriod: '', freeEventsOnly: false });
   vm.runInNewContext(`${fns.src}\nthis.out = noEventsText();`, ctx);
   return ctx.out;
 }
