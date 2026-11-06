@@ -20980,7 +20980,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     routeEl.hidden = !r; countEl.hidden = !!r; listEl.hidden = !!r; moreBtn.hidden = !!r || listItems.length <= limit;
     stage.classList.toggle('is-route',!!r);
     if (!r) { routeEl.innerHTML = ''; drawNav(); return; }
-    var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2><button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(T.endRoute) + '</button></div>';
+    var x = r.x, html = '<div class="pm-route-head"><h2>' + esc(T.to + ' ' + x.name) + '</h2><button type="button" class="pm-route-end" id="pmRouteEnd">' + esc(r.started ? T.endRoute : (FR ? 'Retour aux résultats' : 'Back to results')) + '</button></div>';
     html += '<div class="pm-modes" role="group" aria-label="' + esc(T.howGo) + '">' + MODES.map(function(m){ return '<button type="button" class="pm-mode" data-mode="' + m[0] + '" aria-pressed="' + (r.mode === m[0]) + '">' + esc(m[1]) + '</button>'; }).join('') + '</div>';
     if (r.arrived) html += '<p class="pm-route-sum is-arrived">' + esc(T.arrived) + '</p>';
     else if (r.loading && !r.data) html += '<p class="pm-route-sum">' + esc(T.routing) + '</p>';
@@ -21203,7 +21203,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
   function located(){
     $('rnLocationHelp').hidden=true;
     radiusSel.value = String(radiusKm); radiusSel.disabled = false; stopLoc.hidden = false; stopLoc.textContent = T.stopLocTxt;
-    nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.recenter; setStatus(T.near);
+    nearBtn.classList.remove('is-finding'); nearBtn.setAttribute('aria-pressed', 'true'); nearLabel.textContent = T.recenter; setStatus(town ? '' : T.near);
   }
   function onErr(err){
     if(!watching)return;
@@ -21287,7 +21287,7 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     var n = parts.length;
     $('pmPanel').querySelectorAll('.rn-filter-group').forEach(function(g){var count=g.querySelectorAll('[aria-pressed="true"]').length;g.querySelector('[data-rn-count]').textContent=count?'('+count+')':''});
     $('rnLocationText').textContent=roamLocationLabel();
-    badge.hidden = !n; badge.textContent = String(n);
+    badge.hidden = tab === 'events' || !n; badge.textContent = String(n);
     quickClear.hidden = !n && !term;
     // Keep the quick chips that are on in view.
     var row = $('pmPlaceFilters'), ons = row.querySelectorAll('[aria-pressed="true"]'), activeChip = ons[ons.length - 1];
@@ -21836,9 +21836,16 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
       } catch (err) { stopMic(); setStatus(T.micFail); }
     });
   }
-  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); if(town && choosingTown) { closePanel(); setCompactResults(true); if (!WIDE.matches) $('rnEditSearch').focus(); } });
+  $('pmTown').addEventListener('change', function(e){ town=e.target.value;if(town){setStatus('');cancelPendingLocation();$('rnLocationHelp').hidden=true;pendingRoute=null;} var c=CONF.c[town]; if(c)map.setView(c,13); changed(); if(town && choosingTown) { closePanel(); setCompactResults(true); if (!WIDE.matches) $('rnEditSearch').focus(); } });
   function setTab(t){
     tab = t; limit = 25;
+    var eventMode = t === 'events';
+    stage.classList.toggle('rn-events-mode', eventMode);
+    searchEl.placeholder = eventMode ? (FR ? 'Chercher un événement' : 'Search events') : (FR ? 'Chercher un lieu' : 'Search places');
+    $('rnSearchLabel').textContent = searchEl.placeholder;
+    $('rnFilterLabel').textContent = eventMode ? (FR ? 'Lieu' : 'Location') : (FR ? 'Filtres' : 'Filters');
+    $('pmPanelTitle').textContent = eventMode ? (FR ? 'Lieu des événements' : 'Event location') : (FR ? 'Filtres' : 'Filters');
+    $('pmPanelDone').textContent = eventMode ? (FR ? 'Fermer' : 'Close') : (FR ? 'Fermer les filtres' : 'Close filters');
     $('pmTabPlaces').setAttribute('aria-selected', t === 'places' ? 'true' : 'false');
     $('pmTabEvents').setAttribute('aria-selected', t === 'events' ? 'true' : 'false');
     $('pmPlaceFilters').hidden = t !== 'places';
@@ -22363,7 +22370,7 @@ ${renderGolfHeaderHtml()}
   <div class="pm-stage pm-list-view" id="pmStage">
     <div id="okMap" role="region" aria-label="Map of places across the Okanagan"></div>
     <div class="pm-float">
-      <div class="rn-intro"><div><h1>${R('Find a place near you','Trouvez un lieu près de vous')}</h1><p>${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('Change town or distance','Changer la ville ou la distance')}</small><b id="rnLocationText">${R('Kelowna map area','Zone de Kelowna')}</b></span></button></div>
+      <div class="rn-intro"><div><h1 class="rn-place-copy">${R('Find a place near you','Trouvez un lieu près de vous')}</h1><h1 class="rn-event-copy">${R('Find events near you','Trouvez des événements près de vous')}</h1><p class="rn-event-copy">${R('Try live music, markets, or an event name.','Essayez musique, marchés ou le nom d’un événement.')}</p><p class="rn-place-copy">${R('Try coffee, pizza, or a business name.','Essayez café, pizza ou le nom d’un commerce.')}</p></div><button type="button" class="rn-location" id="rnLocation"><span aria-hidden="true">◎</span><span><small>${R('Change town or distance','Changer la ville ou la distance')}</small><b id="rnLocationText">${R('Kelowna map area','Zone de Kelowna')}</b></span></button></div>
       <div class="rn-map-picker-heading">
         <button type="button" id="rnMapPickerBack" class="pm-chip">${R('Back to filters','Retour aux filtres')}</button>
         <p id="rnMapPickerHint" role="status">${R('Tap the map to choose where to search.','Touchez la carte pour choisir où chercher.')}</p>
@@ -22379,10 +22386,10 @@ ${renderGolfHeaderHtml()}
         </div>
       <div class="pm-searchbar">
         <span class="pm-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
-        <label class="visually-hidden" for="pmSearch">${R('Search places or events','Rechercher des lieux ou des événements')}</label>
-        <input type="search" id="pmSearch" class="pm-search" placeholder="${R('Search places or events','Rechercher des lieux ou des événements')}" autocomplete="off" enterkeyhint="search">
+        <label class="visually-hidden" id="rnSearchLabel" for="pmSearch">${R('Search places','Chercher un lieu')}</label>
+        <input type="search" id="pmSearch" class="pm-search" placeholder="${R('Search places','Chercher un lieu')}" autocomplete="off" enterkeyhint="search">
         <button type="button" class="pm-mic" id="pmMic" hidden aria-pressed="false" aria-label="Search by voice"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-        <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="pm-badge" id="pmBadge" hidden></span><span>Filters</span></button>
+        <button type="button" class="pm-filters-btn" id="pmFiltersBtn" aria-expanded="false" aria-controls="pmPanel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="pm-badge" id="pmBadge" hidden></span><span id="rnFilterLabel">${R('Filters','Filtres')}</span></button>
       </div>
       <div class="pm-quick" id="pmPlaceFilters" role="group" aria-label="Quick filters">
         <span class="rn-needs-title">${R('Your needs','Vos besoins')}</span><span class="pm-tagchips" id="pmTagChips"></span>
@@ -22425,14 +22432,14 @@ ${renderGolfHeaderHtml()}
     <div class="pm-panel" id="pmPanel" hidden role="dialog" aria-modal="true" aria-labelledby="pmPanelTitle">
       <div class="pm-panel-head"><h2 id="pmPanelTitle">Filters</h2><button type="button" class="pm-panel-done" id="pmPanelDone">${R('Close filters','Fermer les filtres')}</button></div>
       <div class="rn-panel-body">
-      <p class="rn-panel-note">${R('Tap a filter group below to see its options. For events, use your town and search.','Touchez un groupe de filtres ci-dessous pour voir ses options. Pour les événements, choisissez une ville et utilisez la recherche.')}</p>
+      <div class="rn-place-copy rn-place-options"><p class="rn-panel-note">${R('Tap a filter group below to see its options.','Touchez un groupe de filtres ci-dessous pour voir ses options.')}</p>
       <p class="pm-active" id="pmActive" hidden></p>
       <details class="rn-categories"><summary>${R('More categories','Autres catégories')}</summary>
       <div class="pm-chips" role="group" aria-label="What are you after?">
         ${MAP_KINDS.map((k) => `<button type="button" class="pm-chip" data-pm-kind="${k.key}" aria-pressed="false"><span aria-hidden="true">${k.icon}</span> ${escapeHtml(k.label)}</button>`).join('\n        ')}
       </div>
       </details>
-      ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}
+      ${renderRoamFilterGroups({ must: MAP_MUST_HAVES, diet: MAP_DIETARY, lang: opts.lang })}</div>
       <h3>${R('Where would you like to explore?','Où souhaitez-vous explorer?')}</h3><button type="button" class="pm-chip" id="rnUseLocation">${R('Use my location','Utiliser ma position')}</button><button type="button" class="pm-chip" id="rnPanelPin">${R('Choose on map','Choisir sur la carte')}</button>
       <div class="pm-panel-row">
         <label><span>${R('Distance from your location or pin','Distance de votre position ou repère')}</span>
@@ -33886,7 +33893,13 @@ ${VENUE_MENU_CSS}` : ''}
     { name: venue.name },
   ])}
   <div class="venue-top-links" style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">${venueBackLink}${hasFrench ? `<p class="venue-lang-switch" style="margin:0 0 14px;font-size:.86rem">${fr ? `<a href="${venuePagePath(venue)}" hreflang="en" lang="en">English</a>` : `<a href="${venuePagePath(venue, 'fr')}" hreflang="fr" lang="fr">Fran\u00e7ais</a>`}</p>` : ''}</div></div>
-  <style>@media (min-width: 900px) {
+  <style>
+  .venue-mobile-title { display: none; }
+  @media (max-width: 899px) {
+    .venue-mobile-title { display: block; margin: 0 0 12px; }
+    .venue-header .venue-desktop-title { display: none; }
+  }
+  @media (min-width: 900px) {
     /* Venue page polish (2026-10-29): on a computer the breadcrumb already says "Penticton › Indoor & Rainy Day Spots",
        so the back link under it is hidden and the language link sits at the end of the breadcrumb row. */
     .venue-topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
@@ -33894,11 +33907,12 @@ ${VENUE_MENU_CSS}` : ''}
     .venue-topbar .venue-top-links .category-back-link { display: none; }
     .venue-topbar .venue-lang-switch { margin: 0 !important; white-space: nowrap; }
   }</style>
+  ${themedHeroTitle ? '' : `<h1 class="venue-mobile-title">${escapeHtml(venue.name)}</h1>`}
   ${imageHtml}
   <div class="venue-layout">
   <div class="venue-main">
   <div class="venue-header">
-    ${themedHeroTitle ? '' : `<h1>${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
+    ${themedHeroTitle ? '' : `<h1 class="venue-desktop-title">${escapeHtml(venue.name)}</h1>\n    `}<p class="venue-at-a-glance">${atAGlanceParts}</p>
     ${openStatusHtml}${happyHourHtml}<p class="chips">${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>${hikeGlanceHtml}${venueWhyHtml}${(() => {
       // Verified mark (2026-10-27): a pill on every listing the business manages (venueIsClaimed: a login, an approved
       // claim or an approved owner update), with the date of its last approved update when there is one. It replaces
